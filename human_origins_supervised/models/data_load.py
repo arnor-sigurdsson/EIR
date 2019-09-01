@@ -6,7 +6,7 @@ import pandas as pd
 import torch
 from aislib import data_load as data_utils
 from aislib.misc_utils import get_logger
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import LabelEncoder, StandardScaler
 from torch.nn.functional import pad
 from torch.utils.data import Dataset
 
@@ -74,25 +74,27 @@ class CustomArrayDataset(Dataset):
 
     def __init__(
         self,
-        data_folder,
-        model_task,
-        label_fpath=None,
-        label_column=None,
-        target_height=4,
-        target_width=None,
-        data_type="packbits",
-        with_labels=True,
+        data_folder: Path,
+        model_task: str,
+        with_labels: bool = True,
+        label_fpath: Path = None,
+        label_column: str = None,
+        target_height: int = 4,
+        target_width: int = None,
+        data_type: str = "packbits",
+        reg_scaler=None,
     ):
         super().__init__()
 
         self.data_folder = data_folder
+        self.model_task = model_task
+        self.with_labels = with_labels
         self.label_fpath = label_fpath
         self.label_column = label_column
         self.target_height = target_height
         self.target_width = target_width
         self.data_type = data_type
-        self.with_labels = with_labels
-        self.model_task = model_task
+        self.reg_scaler = reg_scaler
 
         self.ids = None
         self.arrays = None
@@ -135,17 +137,29 @@ class CustomArrayDataset(Dataset):
 
         elif self.model_task == "reg":
             self.labels_numerical = [float(i) for i in self.labels]
+
+            if not self.reg_scaler:
+                self.reg_scaler = StandardScaler()
+                self.reg_scaler.fit(self.labels_numerical)
+
+            self.labels_numerical = self.reg_scaler.transform(self.labels_numerical)
             self.num_classes = 1
 
 
 class MemoryArrayDataset(CustomArrayDataset):
 
     """
-    TODO: Update data_utils.load_np_arrays_from_folder to return ids.
+    TODO:
+        - Update data_utils.load_np_arrays_from_folder to return ids.
+        - Change / fix this silly logic with custom_ids, this class should filter
+          while loading. Easy for uint8, but ``load_np_packbits_from_folder`` needs
+          to be updated as well.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, custom_ids=None, **kwargs):
         super().__init__(*args, **kwargs)
+
+        self.custom_ids = custom_ids
 
         if self.data_type == "uint8":
             files = [i for i in Path(self.data_folder).iterdir()]
@@ -158,6 +172,11 @@ class MemoryArrayDataset(CustomArrayDataset):
             )
 
         self.arrays = torch.from_numpy(self.arrays)
+
+        if custom_ids:
+            self.ids, self.arrays = filter_ids_from_array_and_id_lists(
+                custom_ids, self.ids, self.arrays, "keep"
+            )
 
         if self.with_labels:
             self.init_label_attributes()
@@ -183,11 +202,18 @@ class MemoryArrayDataset(CustomArrayDataset):
 
 
 class DiskArrayDataset(CustomArrayDataset):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, custom_ids=None, **kwargs):
         super().__init__(*args, **kwargs)
+
+        self.custom_ids = custom_ids
 
         self.arrays = [i for i in Path(self.data_folder).iterdir()]
         self.ids = [i.stem for i in self.arrays]
+
+        if custom_ids:
+            self.ids, self.arrays = filter_ids_from_array_and_id_lists(
+                custom_ids, self.ids, self.arrays, "keep"
+            )
 
         if self.with_labels:
             self.init_label_attributes()
