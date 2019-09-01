@@ -136,7 +136,7 @@ class CustomArrayDataset(Dataset):
             assert le_it([0]) == self.labels_unique[0]
 
         elif self.model_task == "reg":
-            self.labels_numerical = [float(i) for i in self.labels]
+            self.labels_numerical = np.array([float(i) for i in self.labels]).reshape(-1, 1)
 
             if not self.reg_scaler:
                 self.reg_scaler = StandardScaler()

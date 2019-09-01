@@ -111,11 +111,10 @@ def main(cl_args):
         "label_column": cl_args.label_column,
     }
 
-    breakpoint()
     train_dataset = dataset(**class_args, custom_ids=train_ids)
     valid_dataset = dataset(**class_args, custom_ids=valid_ids)
 
-    assert len(train_dataset) + len(valid_dataset) == len(all_ids)
+    assert len(train_dataset) > len(valid_dataset)
     assert set(valid_dataset.ids).isdisjoint(train_dataset.ids)
 
     cl_args.target_width = train_dataset[0][0].shape[2]
