@@ -1,0 +1,7 @@
+genotypename:	/mnt/interim/0_filtered_data/human_origins_filtered_50980.eigenstrat
+snpname:	/mnt/interim/0_filtered_data/data_filtered_50980.snp
+indivname:	/mnt/interim/0_filtered_data/data_filtered.ind
+evecoutname:	./chr1_pca_evec.txt
+evaloutname:	./chr1_pca_eval.txt
+numoutevec:	50
+lsqproject:	YES

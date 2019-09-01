@@ -1,0 +1,20 @@
+default_language_version:
+  python: python3.7
+repos:
+  - repo: https://github.com/ambv/black
+    rev: stable
+    hooks:
+      - id: black
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v1.2.3
+    hooks:
+      - id: flake8
+      - id: check-added-large-files
+  - repo: local
+    hooks:
+      - id: test
+        name: Run tests
+        entry: tox
+        language: system
+        types: [python]
+        stages: [push]

@@ -1,0 +1,38 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[dev-packages]
+pytest = "*"
+tox = "*"
+flake8 = "*"
+jupyter = "*"
+ipykernel = "*"
+sphinx = "*"
+coverage = "*"
+snakeviz = "*"
+pytest-cov = "*"
+pynvim = "*"
+visidata = "*"
+black = "==19.3b0"
+pre-commit = "*"
+
+[packages]
+pandas = "*"
+numpy = "*"
+torch = "*"
+torchvision = "*"
+py = "*"
+matplotlib = "==3.1.0"
+pytorch-ignite = "*"
+tqdm = "*"
+sympy = "*"
+scikit-learn = "*"
+human-origins-supervised = {path = ".",editable = true}
+shap = "*"
+seaborn = "*"
+aislib = {git = "ssh://git@github.com/arnor-sigurdsson/aislib.git",editable = true,ref = "v0.1.0-alpha"}
+
+[requires]
+python_version = "3.7"

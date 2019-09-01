@@ -1,0 +1,3 @@
+[run]
+omit = 
+    human_origins_supervised/visualization/visualization_funcs.py
