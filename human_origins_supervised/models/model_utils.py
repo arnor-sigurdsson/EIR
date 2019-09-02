@@ -48,7 +48,7 @@ def predict_on_batch(model, inputs):
 
 def cast_labels(model_task, labels):
     if model_task == "reg":
-        return labels.to(dtype=torch.float)
+        return labels.to(dtype=torch.float).unsqueeze(1)
     return labels.to(dtype=torch.long)
 
 
