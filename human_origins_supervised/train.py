@@ -11,15 +11,15 @@ from sklearn.preprocessing import LabelEncoder
 from torch import nn
 from torch.optim import Adam
 from torch.optim.optimizer import Optimizer
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader
 
 from human_origins_supervised.models import data_load, model_utils
 from human_origins_supervised.models.models import Model
-from human_origins_supervised.train_utils.train_handlers import configure_trainer
 from human_origins_supervised.train_utils.misc_funcs import (
     calc_multiclass_metrics,
     calc_regression_metrics,
 )
+from human_origins_supervised.train_utils.train_handlers import configure_trainer
 
 torch.manual_seed(0)
 np.random.seed(0)
@@ -96,27 +96,10 @@ def main(cl_args):
             " choose a different one."
         )
 
-    dataset = data_load.DiskArrayDataset
-    if cl_args.memory_dataset:
-        dataset = data_load.MemoryArrayDataset
+    train_dataset, valid_dataset = data_load.set_up_datasets(cl_args)
 
-    full_dataset = dataset(
-        data_folder=cl_args.data_folder,
-        model_task=cl_args.model_task,
-        target_width=cl_args.target_width,
-        label_fpath=cl_args.label_file,
-        label_column=cl_args.label_column,
-    )
-
-    cl_args.target_width = full_dataset[0][0].shape[2]
-    cl_args.data_width = full_dataset.data_width
-
-    val_size = int(0.1 * len(full_dataset))
-    train_size = len(full_dataset) - val_size
-
-    train_dataset, valid_dataset = random_split(full_dataset, [train_size, val_size])
-
-    assert len(train_dataset) + len(valid_dataset) == len(full_dataset)
+    cl_args.target_width = train_dataset[0][0].shape[2]
+    cl_args.data_width = train_dataset.data_width
 
     train_dloader = DataLoader(
         train_dataset, batch_size=cl_args.batch_size, shuffle=True
@@ -126,7 +109,7 @@ def main(cl_args):
         valid_dataset, batch_size=cl_args.batch_size, shuffle=False
     )
 
-    model = Model(cl_args, full_dataset.num_classes).to(cl_args.device)
+    model = Model(cl_args, train_dataset.num_classes).to(cl_args.device)
     assert model.data_size_after_conv > 8
 
     if cl_args.debug:
@@ -150,8 +133,8 @@ def main(cl_args):
         model,
         optimizer,
         criterion,
-        full_dataset.label_encoder,
-        full_dataset.data_width,
+        train_dataset.label_encoder,
+        train_dataset.data_width,
     )
 
     no_params = sum(p.numel() for p in model.parameters() if p.requires_grad)

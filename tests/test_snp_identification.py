@@ -5,11 +5,11 @@ import numpy as np
 import pytest
 from torch import optim
 from torch.nn import CrossEntropyLoss
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader
 
 from human_origins_supervised import train
-from human_origins_supervised.models.models import Model
 from human_origins_supervised.models import data_load
+from human_origins_supervised.models.models import Model
 
 
 @pytest.fixture()
@@ -17,40 +17,33 @@ def create_test_dataset(create_test_data, create_test_cl_args):
     path, test_data_params = create_test_data
 
     cl_args = create_test_cl_args
-    full_dataset = data_load.MemoryArrayDataset(
-        data_folder=path / "test_arrays",
-        model_task=cl_args.model_task,
-        target_width=cl_args.target_width,
-        label_fpath=cl_args.label_file,
-        label_column=cl_args.label_column,
-        data_type=test_data_params["data_type"],
+    cl_args.data_folder = str(path / "test_arrays")
+    cl_args.data_type = test_data_params["data_type"]
+
+    train_dataset, valid_dataset = data_load.set_up_datasets(
+        cl_args, valid_fraction=0.3
     )
 
-    return full_dataset
+    return train_dataset, valid_dataset
 
 
 @pytest.fixture()
 def create_test_dloaders(create_test_dataset):
-    test_dataset = create_test_dataset
-
-    train_size = int(0.7 * len(test_dataset))
-    val_size = int(0.3 * len(test_dataset))
-
-    train_dataset, val_dataset = random_split(test_dataset, [train_size, val_size])
+    train_dataset, valid_dataset = create_test_dataset
 
     train_dloader = DataLoader(train_dataset, batch_size=16, shuffle=True)
 
-    valid_dloader = DataLoader(val_dataset, batch_size=16, shuffle=False)
+    valid_dloader = DataLoader(valid_dataset, batch_size=16, shuffle=False)
 
-    return train_dloader, valid_dloader, train_dataset, val_dataset
+    return train_dloader, valid_dloader, train_dataset, valid_dataset
 
 
 @pytest.fixture()
 def create_test_model(create_test_cl_args, create_test_dataset):
     cl_args = create_test_cl_args
-    dataset = create_test_dataset
+    train_dataset, _ = create_test_dataset
 
-    model = Model(cl_args, dataset.num_classes)
+    model = Model(cl_args, train_dataset.num_classes)
 
     return model
 
@@ -90,19 +83,21 @@ def test_identification(
         be throwing important information away.
     """
     cl_args = create_test_cl_args
-    train_dloader, val_dloader, train_dset, val_dset = create_test_dloaders
+    train_dloader, valid_dloader, train_dataset, valid_dataset = create_test_dloaders
     model = create_test_model
     optimizer = create_test_optimizer
     criterion = CrossEntropyLoss()
-    label_encoder = create_test_dataset.label_encoder
+
+    train_dataset, valid_dataset = create_test_dataset
+    label_encoder = train_dataset.label_encoder
 
     run_path = Path(f"models/{cl_args.run_name}/")
 
     config = train.Config(
         cl_args,
         train_dloader,
-        val_dloader,
-        val_dset,
+        valid_dloader,
+        valid_dataset,
         model,
         optimizer,
         criterion,

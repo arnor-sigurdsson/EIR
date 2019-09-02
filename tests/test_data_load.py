@@ -1,65 +1,50 @@
-from typing import Union, Type
-
 import pytest
 
 from human_origins_supervised.models import data_load
 
 
-@pytest.mark.parametrize(
-    "dataset_class", [data_load.DiskArrayDataset, data_load.MemoryArrayDataset]
-)
+@pytest.mark.parametrize("dataset_type", ["memory", "disk"])
 def test_memory_dataset(
-    dataset_class: Union[
-        Type[data_load.MemoryArrayDataset], Type[data_load.DiskArrayDataset]
-    ],
+    dataset_type: str,
     create_test_data: pytest.fixture,
     create_test_cl_args: pytest.fixture,
 ):
     test_path, test_data_params = create_test_data
     cl_args = create_test_cl_args
 
+    if dataset_type == "disk":
+        cl_args.memory_dataset = False
+
     classes_tested = ["Asia", "Europe"]
     if test_data_params["class_type"] == "multi":
         classes_tested += ["Africa"]
     classes_tested.sort()
 
-    target_no_samples = len(classes_tested) * 100
+    train_no_samples = int(len(classes_tested) * 100 * 0.9)
+    valid_no_sample = int(len(classes_tested) * 100 * 0.1)
 
-    full_dataset = dataset_class(
-        data_folder=test_path / "test_arrays",
-        model_task=cl_args.model_task,
-        target_width=cl_args.target_width,
-        label_fpath=cl_args.label_file,
-        label_column=cl_args.label_column,
-        data_type=test_data_params["data_type"],
-    )
+    train_dataset, valid_dataset = data_load.set_up_datasets(cl_args)
 
-    assert len(full_dataset) == target_no_samples
-    assert len(full_dataset.arrays) == target_no_samples
-    assert len(full_dataset.ids) == target_no_samples
+    for dataset, exp_no_sample in zip(
+        (train_dataset, valid_dataset), (train_no_samples, valid_no_sample)
+    ):
+        assert len(dataset) == exp_no_sample
+        assert set(i.label[cl_args.label_column] for i in dataset.samples) == set(
+            classes_tested
+        )
+        assert set(dataset.labels_unique) == set(classes_tested)
 
-    assert len(full_dataset.labels) == target_no_samples
-    assert set(full_dataset.labels) == set(classes_tested)
-    assert set(full_dataset.labels_unique) == set(classes_tested)
+        le_it = dataset.label_encoder.inverse_transform
+        assert (le_it(range(len(classes_tested))) == classes_tested).all()
 
-    le_it = full_dataset.label_encoder.inverse_transform
-    assert (le_it(range(len(classes_tested))) == classes_tested).all()
+        test_sample, test_label, test_id = dataset[0]
 
-    test_sample, test_label, test_id = full_dataset[0]
-    assert test_label == full_dataset.labels_numerical[0]
-    assert test_id == full_dataset.ids[0]
+        le_t = dataset.label_encoder.transform
+        test_label_string = dataset.samples[0].label[cl_args.label_column]
+        assert test_label == le_t([test_label_string])
+        assert test_id == dataset.samples[0].sample_id
 
-    if isinstance(full_dataset, data_load.MemoryArrayDataset):
-        assert (test_sample == full_dataset.arrays[0]).all()
-
-    full_dataset_with_padding = dataset_class(
-        data_folder=test_path / "test_arrays",
-        model_task=cl_args.model_task,
-        target_width=cl_args.target_width + 200,
-        label_fpath=cl_args.label_file,
-        label_column=cl_args.label_column,
-        data_type=test_data_params["data_type"],
-    )
-
-    test_sample_pad, test_label_pad, test_id_pad = full_dataset_with_padding[0]
+    cl_args.target_width = 1200
+    train_dataset, valid_dataset = data_load.set_up_datasets(cl_args)
+    test_sample_pad, test_label_pad, test_id_pad = train_dataset[0]
     assert test_sample_pad.shape[-1] == 1200
