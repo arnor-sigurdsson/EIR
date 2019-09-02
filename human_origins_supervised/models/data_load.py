@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import torch
 from aislib.misc_utils import get_logger
+from sklearn.externals import joblib
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from torch.nn.functional import pad
@@ -85,15 +86,24 @@ def set_up_dataset_labels(
     df_labels_train = df_labels.loc[train_ids]
     df_labels_valid = df_labels.loc[valid_ids]
 
+    def col_values(column):
+        return column.values.astype(float).reshape(-1, 1)
+
     if cl_args.model_task == "reg":
         reg_col = cl_args.label_column
         logger.debug("Applying standard scaling to column %s.", reg_col)
 
         scaler = StandardScaler()
-        scaler.fit(df_labels_train[reg_col])
+        scaler.fit(col_values(df_labels_train[reg_col]))
+        scaler_outpath = Path("./models", cl_args.run_name, "standard_scaler.save")
+        joblib.dump(scaler, scaler_outpath)
 
-        df_labels_train[reg_col] = scaler.transform(df_labels_train[reg_col])
-        df_labels_valid[reg_col] = scaler.transform(df_labels_valid[reg_col])
+        df_labels_train[reg_col] = scaler.transform(
+            col_values(df_labels_train[reg_col])
+        )
+        df_labels_valid[reg_col] = scaler.transform(
+            col_values(df_labels_valid[reg_col])
+        )
 
     train_labels_dict = df_labels_train.to_dict("index")
     valid_labels_dict = df_labels_valid.to_dict("index")
