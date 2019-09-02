@@ -5,7 +5,7 @@ from typing import Union, Tuple, List, Dict
 
 import numpy as np
 import torch
-from aislib.misc_utils import get_logger
+from aislib.misc_utils import get_logger, ensure_path_exists
 from ignite.engine import Engine
 from sklearn.preprocessing import LabelEncoder
 from torch import nn
@@ -90,11 +90,13 @@ def train_ignite(config) -> None:
 
 
 def main(cl_args):
-    if Path("models", cl_args.run_name).exists():
+    run_folder = Path("models", cl_args.run_name)
+    if run_folder.exists():
         raise FileExistsError(
             "There already exists a run with that name, please"
             " choose a different one."
         )
+    ensure_path_exists(run_folder, is_folder=True)
 
     train_dataset, valid_dataset = data_load.set_up_datasets(cl_args)
 

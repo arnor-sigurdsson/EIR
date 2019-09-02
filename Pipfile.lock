@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "38c8498f1337f2e490968a5778a9d4088022e59ca453aefdd3d8132e2a0cf5bc"
+            "sha256": "3b481da7c111d51ce3404fc9e3ca0540e4c4687c68534b9e5cddcf21346678ff"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -20,6 +20,14 @@
             "editable": true,
             "git": "ssh://git@github.com/arnor-sigurdsson/aislib.git",
             "ref": "c0781e05ed75997dfc5890e15b0d582335cbd96b"
+        },
+        "appnope": {
+            "hashes": [
+                "sha256:5b26757dc6f79a3b7dc9fab95359328d5747fcb2409d331ea66d0272b90ab2a0",
+                "sha256:8b995ffe925347a2138d7ac0fe77155e4311a0ea6d6da4f5128fe4b3cbe5ed71"
+            ],
+            "markers": "sys_platform == 'darwin'",
+            "version": "==0.1.0"
         },
         "backcall": {
             "hashes": [
@@ -79,6 +87,7 @@
                 "sha256:21e0c34a69ad7fde4f2b1f3402290e9ec46f545f15f1541c582edfe05d87b63a",
                 "sha256:315d6b19643ec4afd4c41c671f9f2d65ea9d787da093487a81ead7b0bac94524"
             ],
+            "index": "pypi",
             "version": "==0.13.2"
         },
         "kiwisolver": {
@@ -401,14 +410,13 @@
         },
         "shap": {
             "hashes": [
-                "sha256:12beeec5aa0a8b2131622eff63f560c97f4c5e35159fa05e528e451fe9842c38",
-                "sha256:3e0b7badf77b798bd2e7dec2086707371ee2bc9d83137be85339e6cb5322f7d9",
-                "sha256:928fff49627022e33664561a60939e7801bb188037cf2d6cbc124a3b071a085f",
-                "sha256:a7c80ef3cc50d87a22865f94172a8f4baef3c2640ab9db841f376b2a498457bb",
-                "sha256:cd628d9f7416f644703962d96354a2102cb1738c0706b6545e171bfaaf281ac7"
+                "sha256:38dfeb51be77b7be2fc2ad41167d7f984a36840c7dde251beada0b85d911894b",
+                "sha256:41ee03e9dae23eee5e3d3133ca7ef2e606899c6317ffebe93e93bceeda005a37",
+                "sha256:7316fb64cf72ac122c773c5c3dd019ffeda8379f04424684720c57594b4684ac",
+                "sha256:7b8c74d0df2ca4798201e818a24cc328aad360d5871a92048f455e71fe115543"
             ],
             "index": "pypi",
-            "version": "==0.29.3"
+            "version": "==0.30.0"
         },
         "six": {
             "hashes": [
@@ -492,6 +500,14 @@
                 "sha256:d8b24664561d0d34ddfaec54636d502d7cea6e29c3eaf68f3df6180863e2166e"
             ],
             "version": "==1.4.3"
+        },
+        "appnope": {
+            "hashes": [
+                "sha256:5b26757dc6f79a3b7dc9fab95359328d5747fcb2409d331ea66d0272b90ab2a0",
+                "sha256:8b995ffe925347a2138d7ac0fe77155e4311a0ea6d6da4f5128fe4b3cbe5ed71"
+            ],
+            "markers": "sys_platform == 'darwin'",
+            "version": "==0.1.0"
         },
         "aspy.yaml": {
             "hashes": [
@@ -1089,10 +1105,10 @@
         },
         "qtconsole": {
             "hashes": [
-                "sha256:40f53ab58ef77aa4b53aca1ee314eed873d05952dec22d2ab84d20660943b7de",
-                "sha256:756bdcb6de6900dc50b14430accff2e47b846c3e7820e04075d4067b4c0ab52f"
+                "sha256:40d5d8e00d070ea266dbf6f0da74c4b9597b8b8d67cd8233c3ffd8debf923703",
+                "sha256:b91e7412587e6cfe1644696538f73baf5611e837be5406633218443b2827c6d9"
             ],
-            "version": "==4.5.4"
+            "version": "==4.5.5"
         },
         "requests": {
             "hashes": [

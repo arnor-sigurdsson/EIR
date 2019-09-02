@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import torch
 from aislib.misc_utils import get_logger
-from sklearn.externals import joblib
+import joblib
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from torch.nn.functional import pad

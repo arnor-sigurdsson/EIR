@@ -33,6 +33,7 @@ human-origins-supervised = {path = ".",editable = true}
 shap = "*"
 seaborn = "*"
 aislib = {git = "ssh://git@github.com/arnor-sigurdsson/aislib.git",editable = true,ref = "v0.1.0-alpha"}
+joblib = "*"
 
 [requires]
 python_version = "3.7"
