@@ -83,8 +83,8 @@ def set_up_dataset_labels(
     )
     df_labels = parse_label_df(df_labels, COLUMN_OPS)
 
-    df_labels_train = df_labels.loc[train_ids]
-    df_labels_valid = df_labels.loc[valid_ids]
+    df_labels_train = df_labels.reindex(train_ids)
+    df_labels_valid = df_labels.reindex(valid_ids)
 
     def col_values(column):
         return column.values.astype(float).reshape(-1, 1)
@@ -185,6 +185,21 @@ class ArrayDatasetBase(Dataset):
         self.num_classes = None
         self.label_encoder = label_encoder
 
+    def parse_label(
+        self, sample_label_dict: Dict[str, Union[str, float]]
+    ) -> Union[List[None], int, float]:
+
+        if not sample_label_dict:
+            return []
+
+        label_value = sample_label_dict[self.label_column]
+        if self.model_task == "reg":
+            return float(label_value)
+        elif self.model_task == "cls":
+            return self.label_encoder.transform([label_value]).squeeze()
+
+        raise ValueError
+
     def get_samples(self, array_hook: Callable = lambda x: x):
         files = {i.stem: i for i in Path(self.data_folder).iterdir()}
         samples = []
@@ -262,11 +277,7 @@ class MemoryArrayDataset(ArrayDatasetBase):
         sample = self.samples[index]
 
         array = sample.array
-        label = (
-            self.label_encoder.transform([sample.label[self.label_column]])
-            if self.labels_dict
-            else []
-        ).squeeze()
+        label = self.parse_label(sample.label)
         sample_id = sample.sample_id
 
         if self.target_width:
@@ -299,11 +310,7 @@ class DiskArrayDataset(ArrayDatasetBase):
         sample = self.samples[index]
 
         array = np.load(sample.array)
-        label = (
-            self.label_encoder.transform([sample.label[self.label_column]])
-            if self.labels_dict
-            else []
-        ).squeeze()
+        label = self.parse_label(sample.label)
         sample_id = sample.sample_id
 
         if self.data_type == "packbits":
