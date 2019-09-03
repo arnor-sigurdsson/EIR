@@ -63,7 +63,6 @@ def parse_label_df(
             for func, args_dict in ops_funcs:
                 logger.debug("Applying func %s to column in pre-processing.", func)
                 df = func(df=df, column_name=column_name, **args_dict)
-
     return df
 
 
@@ -83,8 +82,8 @@ def set_up_dataset_labels(
     )
     df_labels = parse_label_df(df_labels, COLUMN_OPS)
 
-    df_labels_train = df_labels.reindex(train_ids)
-    df_labels_valid = df_labels.reindex(valid_ids)
+    df_labels_train = df_labels.loc[df_labels.index.intersection(train_ids)]
+    df_labels_valid = df_labels.loc[df_labels.index.intersection(valid_ids)]
 
     def col_values(column):
         return column.values.astype(float).reshape(-1, 1)
@@ -131,6 +130,8 @@ def set_up_datasets(
         train_labels, valid_labels = set_up_dataset_labels(
             cl_args=cl_args, all_ids=all_ids, train_ids=train_ids, valid_ids=valid_ids
         )
+        train_ids = list(train_labels.keys())
+        valid_ids = list(valid_labels.keys())
 
     dataset_class_common_args = {
         "data_folder": cl_args.data_folder,

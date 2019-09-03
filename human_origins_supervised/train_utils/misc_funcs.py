@@ -2,6 +2,7 @@ from typing import Dict
 
 import torch
 from sklearn.metrics import matthews_corrcoef, r2_score
+from scipy.stats import pearsonr
 
 
 def calc_multiclass_metrics(
@@ -23,13 +24,13 @@ def calc_regression_metrics(
     train_pred = outputs.detach().cpu().numpy()
     train_labels = labels.cpu().numpy()
 
-    r2 = r2_score(train_labels, train_pred)
+    r = pearsonr(train_labels.squeeze(), train_pred.squeeze())[0]
 
-    return {f"{prefix}_r2": r2}
+    return {f"{prefix}_r": r}
 
 
 def get_train_metrics(model_task):
     if model_task == "reg":
-        return ["t_r2"]
+        return ["t_r"]
     elif model_task == "cls":
         return ["t_mcc"]
