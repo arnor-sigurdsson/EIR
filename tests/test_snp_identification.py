@@ -20,7 +20,7 @@ def create_test_dataset(create_test_data, create_test_cl_args):
     cl_args.data_folder = str(path / "test_arrays")
     cl_args.data_type = test_data_params["data_type"]
 
-    train_dataset, valid_dataset = datasets.set_up_datasets(cl_args, valid_fraction=0.3)
+    train_dataset, valid_dataset = datasets.set_up_datasets(cl_args, valid_size=0.3)
 
     return train_dataset, valid_dataset
 

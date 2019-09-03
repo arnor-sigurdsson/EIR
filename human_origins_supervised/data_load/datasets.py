@@ -75,7 +75,9 @@ class Sample:
 
 def set_up_dataset_labels(
     cl_args: Namespace, all_ids: List[str], train_ids: List[str], valid_ids: List[str]
-) -> Tuple[Dict[str, str], Dict[str, str]]:
+) -> Tuple[
+    Dict[str, Dict[str, Union[str, float]]], Dict[str, Dict[str, Union[str, float]]]
+]:
 
     df_labels = get_meta_from_label_file(
         cl_args.label_file, cl_args.label_column, all_ids
@@ -110,7 +112,7 @@ def set_up_dataset_labels(
 
 
 def set_up_datasets(
-    cl_args: Namespace, with_labels: bool = True, valid_fraction=0.1
+    cl_args: Namespace, with_labels: bool = True, valid_size: Union[int, float] = 0.1
 ) -> Tuple[
     Union["MemoryArrayDataset", "DiskArrayDataset"],
     Union["MemoryArrayDataset", "DiskArrayDataset"],
@@ -121,7 +123,7 @@ def set_up_datasets(
         dataset = MemoryArrayDataset
 
     all_ids = [i.stem for i in Path(cl_args.data_folder).iterdir()]
-    train_ids, valid_ids = train_test_split(all_ids, test_size=valid_fraction)
+    train_ids, valid_ids = train_test_split(all_ids, test_size=valid_size)
 
     train_labels = None
     valid_labels = None
