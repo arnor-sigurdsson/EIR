@@ -1,8 +1,8 @@
 from typing import Dict
 
 import torch
-from sklearn.metrics import matthews_corrcoef, r2_score
 from scipy.stats import pearsonr
+from sklearn.metrics import matthews_corrcoef
 
 
 def calc_multiclass_metrics(

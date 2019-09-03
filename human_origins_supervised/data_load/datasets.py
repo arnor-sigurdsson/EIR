@@ -13,7 +13,7 @@ from sklearn.preprocessing import LabelEncoder, StandardScaler
 from torch.nn.functional import pad
 from torch.utils.data import Dataset
 
-from human_origins_supervised.label_loading_ops import COLUMN_OPS
+from human_origins_supervised.data_load import COLUMN_OPS
 
 logger = get_logger(__name__)
 

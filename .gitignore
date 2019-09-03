@@ -83,6 +83,11 @@ models/
 label_loading_ops/
 !label_loading_ops/common_ops.py
 
+# exclude custom modules for label file processing
+human_origins_supervised/data_load/*
+!human_origins_supervised/data_load/common_ops.py
+!human_origins_supervised/data_load/datasets.py
+
 # Mac OS-specific storage files
 .DS_Store
 

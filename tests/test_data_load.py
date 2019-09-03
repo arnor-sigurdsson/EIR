@@ -1,6 +1,6 @@
 import pytest
 
-from human_origins_supervised.models import data_load
+from human_origins_supervised.data_load import datasets
 
 
 @pytest.mark.parametrize("dataset_type", ["memory", "disk"])
@@ -23,7 +23,7 @@ def test_memory_dataset(
     train_no_samples = int(len(classes_tested) * 100 * 0.9)
     valid_no_sample = int(len(classes_tested) * 100 * 0.1)
 
-    train_dataset, valid_dataset = data_load.set_up_datasets(cl_args)
+    train_dataset, valid_dataset = datasets.set_up_datasets(cl_args)
 
     for dataset, exp_no_sample in zip(
         (train_dataset, valid_dataset), (train_no_samples, valid_no_sample)
@@ -45,6 +45,6 @@ def test_memory_dataset(
         assert test_id == dataset.samples[0].sample_id
 
     cl_args.target_width = 1200
-    train_dataset, valid_dataset = data_load.set_up_datasets(cl_args)
+    train_dataset, valid_dataset = datasets.set_up_datasets(cl_args)
     test_sample_pad, test_label_pad, test_id_pad = train_dataset[0]
     assert test_sample_pad.shape[-1] == 1200

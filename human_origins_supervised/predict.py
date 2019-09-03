@@ -11,7 +11,7 @@ from sklearn.preprocessing import LabelEncoder
 from torch.utils.data import DataLoader
 
 import human_origins_supervised.visualization.visualization_funcs as vf
-from human_origins_supervised.models import data_load
+from human_origins_supervised.data_load import datasets
 from human_origins_supervised.models.model_utils import gather_pred_outputs_from_dloader
 from human_origins_supervised.models.models import Model
 
@@ -40,7 +40,7 @@ def load_model(model_path: Path, n_classes):
 def predict(cl_args):
     outfolder = Path(cl_args.output_folder)
 
-    test_dataset = data_load.MemoryArrayDataset(
+    test_dataset = datasets.MemoryArrayDataset(
         data_folder=cl_args.data_folder, with_labels=cl_args.evaluate
     )
 

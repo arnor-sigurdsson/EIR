@@ -13,7 +13,8 @@ from torch.optim import Adam
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 
-from human_origins_supervised.models import data_load, model_utils
+from human_origins_supervised.data_load import datasets
+from human_origins_supervised.models import model_utils
 from human_origins_supervised.models.models import Model
 from human_origins_supervised.train_utils.misc_funcs import (
     calc_multiclass_metrics,
@@ -98,7 +99,7 @@ def main(cl_args):
         )
     ensure_path_exists(run_folder, is_folder=True)
 
-    train_dataset, valid_dataset = data_load.set_up_datasets(cl_args)
+    train_dataset, valid_dataset = datasets.set_up_datasets(cl_args)
 
     cl_args.target_width = train_dataset[0][0].shape[2]
     cl_args.data_width = train_dataset.data_width
