@@ -167,7 +167,6 @@ def anno_meta_hook(
 
 def evaluate(engine: Engine, config: "Config", run_folder: Path) -> None:
     """
-
     A bit hacky how we manually attach metrics here, but that's because we
     don't want to evaluate as a running average (i.e. do it in the step
     function), but rather run over the whole validation dataset as we do
@@ -182,7 +181,7 @@ def evaluate(engine: Engine, config: "Config", run_folder: Path) -> None:
     )
 
     gather_preds = model_utils.gather_pred_outputs_from_dloader
-    val_outputs_total, val_labels_total, ids_total = gather_preds(
+    val_outputs_total, val_labels_total, val_ids_total = gather_preds(
         c.valid_loader, c.model, c.cl_args.device
     )
     val_labels_total = model_utils.cast_labels(c.cl_args.model_task, val_labels_total)
@@ -206,18 +205,19 @@ def evaluate(engine: Engine, config: "Config", run_folder: Path) -> None:
         val_labels_total = val_labels_total.cpu().numpy()
 
         vf.gen_eval_graphs(
-            val_labels_total,
-            val_outputs_total,
-            sample_outfolder,
-            c.label_encoder,
-            c.cl_args.model_task,
+            val_labels=val_labels_total,
+            val_outputs=val_outputs_total,
+            val_ids=val_ids_total,
+            outfolder=sample_outfolder,
+            encoder=c.label_encoder,
+            model_task=c.cl_args.model_task,
         )
 
         if c.cl_args.model_task == "cls":
             get_most_wrong_wrapper(
                 val_labels_total,
                 val_outputs_total,
-                ids_total,
+                val_ids_total,
                 c.label_encoder,
                 c.cl_args.data_folder,
                 sample_outfolder,
