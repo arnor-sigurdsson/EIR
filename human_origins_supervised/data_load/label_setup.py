@@ -78,7 +78,11 @@ def parse_label_df(df, column_ops: al_all_column_ops) -> pd.DataFrame:
             for column_op in ops_funcs:
                 func, args_dict = column_op.function, column_op.args
 
-                logger.debug("Applying func %s to column in pre-processing.", func)
+                logger.debug(
+                    "Applying func %s with args %s to column in pre-processing.",
+                    func,
+                    args_dict,
+                )
                 logger.debug("Shape before: %s", df.shape)
                 df = func(df=df, column_name=column_name, **args_dict)
                 logger.debug("Shape after: %s", df.shape)
