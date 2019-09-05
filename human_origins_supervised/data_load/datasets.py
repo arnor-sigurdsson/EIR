@@ -3,10 +3,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Dict, Union, Tuple, Callable
 
+import joblib
 import numpy as np
 import torch
 from aislib.misc_utils import get_logger
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import LabelEncoder, StandardScaler
 from torch.nn.functional import pad
 from torch.utils.data import Dataset
 
@@ -24,7 +25,6 @@ def set_up_datasets(
     """
     This funtion is only ever called if we have labels.
     """
-
     train_labels, valid_labels = set_up_train_and_valid_labels(cl_args, valid_size)
 
     dataset_class_common_args = {
@@ -35,8 +35,19 @@ def set_up_datasets(
         "data_type": cl_args.data_type,
     }
 
+    # TODO: Do this in a nice way
+    label_encoder = None
+    if cl_args.model_task == "reg":
+        label_encoder = joblib.load(
+            Path("./models", cl_args.run_name, "standard_scaler.save")
+        )
+
     dataset_class = MemoryArrayDataset if cl_args.memory_dataset else DiskArrayDataset
-    train_dataset = dataset_class(**dataset_class_common_args, labels_dict=train_labels)
+    train_dataset = dataset_class(
+        **dataset_class_common_args,
+        labels_dict=train_labels,
+        label_encoder=label_encoder,
+    )
     valid_dataset = dataset_class(
         **dataset_class_common_args,
         labels_dict=valid_labels,
@@ -65,7 +76,7 @@ class ArrayDatasetBase(Dataset):
         model_task: str,
         label_column: str = None,
         labels_dict: Dict[str, str] = None,
-        label_encoder=None,
+        label_encoder: Union[LabelEncoder, StandardScaler] = None,
         target_height: int = 4,
         target_width: int = None,
         data_type: str = "packbits",
@@ -138,9 +149,6 @@ class ArrayDatasetBase(Dataset):
 
             if not self.label_encoder:
                 self.label_encoder = LabelEncoder().fit(self.labels_unique)
-
-                le_it = self.label_encoder.inverse_transform
-                assert le_it([0]) == self.labels_unique[0]
 
         elif self.model_task == "reg":
             self.num_classes = 1

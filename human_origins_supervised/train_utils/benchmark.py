@@ -1,7 +1,7 @@
 from functools import partial
 from functools import wraps
 from pathlib import Path
-from typing import Dict, Tuple, Union, TYPE_CHECKING
+from typing import Dict, Tuple, Union, List, TYPE_CHECKING
 
 import numpy as np
 import shap
@@ -58,7 +58,7 @@ def predict_on_array(
 
 def predict_sklearn_on_supervised_loader(
     classifier: SGDClassifier, loader: DataLoader
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> Tuple[np.ndarray, np.ndarray, List[str]]:
     """
     Sometimes we get large negatives for all classes after the linear combination,
     so when we pass those to the logistic function (expit(x) = 1/(1+exp(-x))) we
@@ -68,16 +68,19 @@ def predict_sklearn_on_supervised_loader(
     """
     outputs_total = []
     labels_total = []
-    for inputs, labels, *_ in loader:
+    ids_total = []
+    for inputs, labels, ids in loader:
         inputs = flatten(inputs.cpu().numpy())
         labels = labels.cpu().numpy()
 
         outputs = classifier.predict_proba(inputs)
         outputs[np.isnan(outputs)] = 0
+
         outputs_total += [i for i in outputs]
         labels_total += [i for i in labels]
+        ids_total += [i for i in ids]
 
-    return np.array(outputs_total), np.array(labels_total)
+    return np.array(outputs_total), np.array(labels_total), ids_total
 
 
 def save_bencmark_metrics(outfolder: Path, metrics: Dict[str, float]) -> None:
@@ -166,14 +169,13 @@ def benchmark(engine: Engine, config: "Config", run_folder: Path) -> None:
     )
 
     predictor = predict_sklearn_on_supervised_loader
-    lr_val_probs, valid_labels = predictor(lr_classifier, c.valid_loader)
+    lr_val_probs, valid_labels, valid_ids = predictor(lr_classifier, c.valid_loader)
     lr_val_preds = np.argmax(lr_val_probs, axis=1)
 
-    lr_train_probs, train_labels = predictor(lr_classifier, c.train_loader)
+    lr_train_probs, train_labels, train_ids = predictor(lr_classifier, c.train_loader)
     lr_train_preds = np.argmax(lr_train_probs, axis=1)
 
     lr_val_mcc = matthews_corrcoef(valid_labels, lr_val_preds)
-
     lr_train_mcc = matthews_corrcoef(train_labels, lr_train_preds)
 
     # save analysis
@@ -184,6 +186,7 @@ def benchmark(engine: Engine, config: "Config", run_folder: Path) -> None:
     vf.gen_eval_graphs(
         valid_labels,
         lr_val_probs,
+        valid_ids,
         benchmark_folder,
         c.label_encoder,
         config.cl_args.model_task,

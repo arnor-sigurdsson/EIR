@@ -1,6 +1,6 @@
-from pathlib import Path
-from typing import List, Callable
 from itertools import groupby
+from pathlib import Path
+from typing import List, Callable, Union
 
 import matplotlib
 import numpy as np
@@ -13,7 +13,7 @@ from sklearn.metrics import (
     average_precision_score,
     confusion_matrix,
 )
-from sklearn.preprocessing import label_binarize
+from sklearn.preprocessing import label_binarize, LabelEncoder, StandardScaler
 from sklearn.utils.multiclass import unique_labels
 
 matplotlib.use("Agg")
@@ -88,6 +88,33 @@ def generate_basic_curve(metrics_filename, column_name, fname, skiprows=0):
     plt.close()
 
 
+def gen_eval_graphs(
+    val_labels: np.ndarray,
+    val_outputs: np.ndarray,
+    val_ids_total: list,
+    outfolder: Path,
+    encoder: Union[LabelEncoder, StandardScaler],
+    model_task,
+):
+    """
+    TODO:
+        - Clean this function up – expecially when it comes to label_encoder.
+        - Use val_ids_total to hook into other labels for plotting.
+    """
+    if model_task == "cls":
+        n_classes = len(encoder.classes_)
+        val_pred = val_outputs.argmax(axis=1)
+        generate_confusion_matrix(val_labels, val_pred, encoder.classes_, outfolder)
+    else:
+        n_classes = None
+
+    plot_funcs = select_performance_curve_funcs(model_task, n_classes)
+    for plot_func in plot_funcs:
+        plot_func(
+            y_true=val_labels, y_outp=val_outputs, outfolder=outfolder, encoder=encoder
+        )
+
+
 def select_performance_curve_funcs(
     model_task: str, n_classes: int = None
 ) -> List[Callable]:
@@ -100,41 +127,39 @@ def select_performance_curve_funcs(
         else:
             return [generate_multi_class_roc_curve, generate_multi_class_pr_curve]
     elif model_task == "reg":
-        return []
+        return [generate_regression_prediction_plot]
 
 
-def gen_eval_graphs(
-    val_labels: np.ndarray,
-    val_probabilities: np.ndarray,
+def generate_regression_prediction_plot(
+    y_true: np.ndarray,
+    y_outp: np.ndarray,
+    encoder: StandardScaler,
     outfolder: Path,
-    label_encoder,
-    model_task,
+    title_extra: str = "",
+    *args,
+    **kwargs,
 ):
-    """
-    TODO: Clean this function up – expecially when it comes to label_encoder.
-    """
-    if model_task == "cls":
-        n_classes = len(label_encoder.classes_)
-        val_pred = val_probabilities.argmax(axis=1)
-        generate_confusion_matrix(
-            val_labels, val_pred, label_encoder.classes_, outfolder
-        )
-    else:
-        n_classes = None
 
-    plot_funcs = select_performance_curve_funcs(model_task, n_classes)
-    for plot_func in plot_funcs:
-        plot_func(
-            y_test=val_labels,
-            y_score=val_probabilities,
-            outfolder=outfolder,
-            label_encoder=label_encoder,
-        )
+    fig, ax = plt.subplots()
+    y_true = encoder.inverse_transform(y_true.reshape(-1, 1))
+    y_outp = encoder.inverse_transform(y_outp.reshape(-1, 1))
+
+    ax.scatter(y_true, y_outp, edgecolors=(0, 0, 0))
+    ax.plot([y_true.min(), y_true.max()], [y_true.min(), y_true.max()], "k--", lw=4)
+    ax.set_xlabel("Measured")
+    ax.set_ylabel("Predicted")
+    ax.set(title=title_extra)
+
+    plt.tight_layout()
+    plt.savefig(outfolder / "regression_predictions.png", dpi=200)
+    plt.close()
 
 
-def generate_binary_roc_curve(y_test, y_score, outfolder, *args, **kwargs):
-    y_test_bin = label_binarize(y_test, classes=[0, 1])
-    fpr, tpr, _ = roc_curve(y_test_bin, y_score[:, 1])
+def generate_binary_roc_curve(
+    y_true: np.ndarray, y_outp: np.ndarray, outfolder: Path, *args, **kwargs
+):
+    y_true_bin = label_binarize(y_true, classes=[0, 1])
+    fpr, tpr, _ = roc_curve(y_true_bin, y_outp[:, 1])
     roc_auc = auc(fpr, tpr)
 
     plt.plot(fpr, tpr, lw=2, label=f"(area = {roc_auc:0.2f})")
@@ -152,10 +177,10 @@ def generate_binary_roc_curve(y_test, y_score, outfolder, *args, **kwargs):
     plt.close()
 
 
-def generate_binary_pr_curve(y_test, y_score, outfolder, *args, **kwargs):
-    y_test_bin = label_binarize(y_test, classes=[0, 1])
-    precision, recall, _ = precision_recall_curve(y_test_bin, y_score[:, 1])
-    average_precision = average_precision_score(y_test_bin, y_score[:, 1])
+def generate_binary_pr_curve(y_true, y_outp, outfolder, *args, **kwargs):
+    y_true_bin = label_binarize(y_true, classes=[0, 1])
+    precision, recall, _ = precision_recall_curve(y_true_bin, y_outp[:, 1])
+    average_precision = average_precision_score(y_true_bin, y_outp[:, 1])
 
     plt.step(
         recall,
@@ -178,23 +203,28 @@ def generate_binary_pr_curve(y_test, y_score, outfolder, *args, **kwargs):
 
 
 def generate_multi_class_roc_curve(
-    y_test, y_score: np.array, label_encoder, outfolder: Path
+    y_true: np.ndarray,
+    y_outp: np.ndarray,
+    encoder: LabelEncoder,
+    outfolder: Path,
+    *args,
+    **kwargs,
 ):
     fpr = dict()
     tpr = dict()
     roc_auc = dict()
 
-    unique_classes = sorted(label_encoder.classes_)
+    unique_classes = sorted(encoder.classes_)
     n_classes = len(unique_classes)
-    assert len(np.unique(y_test)) == n_classes
+    assert len(np.unique(y_true)) == n_classes
 
-    y_test_bin = label_binarize(y_test, classes=range(n_classes))
+    y_true_bin = label_binarize(y_true, classes=range(n_classes))
 
     for i in range(n_classes):
-        fpr[i], tpr[i], _ = roc_curve(y_test_bin[:, i], y_score[:, i])
+        fpr[i], tpr[i], _ = roc_curve(y_true_bin[:, i], y_outp[:, i])
         roc_auc[i] = auc(fpr[i], tpr[i])
 
-    fpr["micro"], tpr["micro"], _ = roc_curve(y_test_bin.ravel(), y_score.ravel())
+    fpr["micro"], tpr["micro"], _ = roc_curve(y_true_bin.ravel(), y_outp.ravel())
     roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
 
     all_fpr = np.unique(np.concatenate([fpr[i] for i in range(n_classes)]))
@@ -237,8 +267,8 @@ def generate_multi_class_roc_curve(
             tpr[i],
             color=color,
             lw=2,
-            label=f"{label_encoder.inverse_transform([i])[0]} "
-            f"({np.count_nonzero(y_test == i)}) "
+            label=f"{encoder.inverse_transform([i])[0]} "
+            f"({np.count_nonzero(y_true == i)}) "
             f"(area = {roc_auc[i]:0.2f})",
         )
 
@@ -256,30 +286,35 @@ def generate_multi_class_roc_curve(
 
 
 def generate_multi_class_pr_curve(
-    y_test, y_score: np.array, label_encoder, outfolder: Path
+    y_true: np.ndarray,
+    y_outp: np.ndarray,
+    encoder: LabelEncoder,
+    outfolder: Path,
+    *args,
+    **kwargs,
 ):
     precision = dict()
     recall = dict()
 
-    unique_classes = sorted(label_encoder.classes_)
+    unique_classes = sorted(encoder.classes_)
     n_classes = len(unique_classes)
-    assert len(np.unique(y_test)) == n_classes
+    assert len(np.unique(y_true)) == n_classes
 
-    y_test_bin = label_binarize(y_test, classes=range(n_classes))
+    y_true_bin = label_binarize(y_true, classes=range(n_classes))
 
     average_precision = dict()
     for i in range(n_classes):
         precision[i], recall[i], _ = precision_recall_curve(
-            y_test_bin[:, i], y_score[:, i]
+            y_true_bin[:, i], y_outp[:, i]
         )
-        average_precision[i] = average_precision_score(y_test_bin[:, i], y_score[:, i])
+        average_precision[i] = average_precision_score(y_true_bin[:, i], y_outp[:, i])
 
     # A "micro-average": quantifying score on all classes jointly
     precision["micro"], recall["micro"], _ = precision_recall_curve(
-        y_test_bin.ravel(), y_score.ravel()
+        y_true_bin.ravel(), y_outp.ravel()
     )
     average_precision["micro"] = average_precision_score(
-        y_test_bin, y_score, average="micro"
+        y_true_bin, y_outp, average="micro"
     )
     plt.figure(figsize=(12, 8))
 
@@ -299,8 +334,8 @@ def generate_multi_class_pr_curve(
             precision[i],
             color=color,
             lw=2,
-            label=f"{label_encoder.inverse_transform([i])[0]} "
-            f"({np.count_nonzero(y_test == i)}) "
+            label=f"{encoder.inverse_transform([i])[0]} "
+            f"({np.count_nonzero(y_true == i)}) "
             f"(area = {average_precision[i]:0.2f})",
         )
 
@@ -317,7 +352,13 @@ def generate_multi_class_pr_curve(
 
 
 def generate_confusion_matrix(
-    y_true, y_pred, classes, outfolder, normalize=False, title=None, cmap=plt.cm.Blues
+    y_true: np.ndarray,
+    y_outp: np.ndarray,
+    classes,
+    outfolder: Path,
+    normalize: bool = False,
+    title: str = "",
+    cmap: plt = plt.cm.Blues,
 ):
     if not title:
         if normalize:
@@ -325,10 +366,10 @@ def generate_confusion_matrix(
         else:
             title = "Confusion matrix, without normalization"
 
-    conf_mat = confusion_matrix(y_true, y_pred)
+    conf_mat = confusion_matrix(y_true, y_outp)
 
     # Only use the labels that appear in the data
-    classes = classes[unique_labels(y_true, y_pred)]
+    classes = classes[unique_labels(y_true, y_outp)]
     if normalize:
         conf_mat = conf_mat.astype("float") / conf_mat.sum(axis=1)[:, np.newaxis]
 
