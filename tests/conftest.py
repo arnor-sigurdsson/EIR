@@ -15,19 +15,6 @@ def pytest_generate_tests(metafunc):
     if "keep_outputs" in metafunc.fixturenames and option_value is not None:
         metafunc.parametrize("keep_outputs", [option_value])
 
-    for fixt_to_param in ("create_test_data",):
-        if fixt_to_param in metafunc.fixturenames:
-            metafunc.parametrize(
-                fixt_to_param,
-                [
-                    {"class_type": "binary", "data_type": "packbits"},
-                    {"class_type": "multi", "data_type": "packbits"},
-                    {"class_type": "binary", "data_type": "uint8"},
-                    {"class_type": "multi", "data_type": "uint8"},
-                ],
-                indirect=True,
-            )
-
 
 @pytest.fixture
 def args_config():

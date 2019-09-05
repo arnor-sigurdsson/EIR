@@ -4,66 +4,51 @@ from pathlib import Path
 from typing import List, Dict, Union, Tuple, Callable
 
 import numpy as np
-import pandas as pd
 import torch
 from aislib.misc_utils import get_logger
-import joblib
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.preprocessing import LabelEncoder
 from torch.nn.functional import pad
 from torch.utils.data import Dataset
 
-from human_origins_supervised.data_load import COLUMN_OPS
+from human_origins_supervised.data_load.label_setup import set_up_train_and_valid_labels
 
 logger = get_logger(__name__)
 
+# Type Aliases
+al_datasets = Union["MemoryArrayDataset", "DiskArrayDataset"]
 
-def get_meta_from_label_file(
-    label_fpath: Path, label_column: str, ids_to_keep: Union[List[str], None] = None
-) -> pd.DataFrame:
+
+def set_up_datasets(
+    cl_args: Namespace, valid_size: Union[int, float] = 0.1
+) -> Tuple[al_datasets, al_datasets]:
     """
-    We want to set up a dataframe containing the labels for the current modelling task
-    we are dealing with. We also don't want to create a new label file for each run
-    rather just refer to a "master" file for consistency.
-
-    Hence this function just reads in the label file, and only returns rows from the
-    master df which match `ids_to_keep`.
-
-    :param label_fpath: Path to the label .csv file.
-    :param label_column: Which column to grab (currently only supports one).
-    :param ids_to_keep: Which IDs to grab from the label file.
-    :return: Dataframe with ID as index and only the IDs listed in `ids_to_filter`.
-    """
-    df = pd.read_csv(label_fpath, usecols=["ID", label_column], dtype={"ID": str})
-    df = df.set_index("ID")
-
-    if ids_to_keep:
-        df = df[df.index.isin(ids_to_keep)]
-
-    return df
-
-
-def parse_label_df(
-    df, column_ops: Dict[str, List[Tuple[Callable, Dict]]]
-) -> pd.DataFrame:
-    """
-    We want to be able to dynamically apply various operations to different columns
-    in the label file (e.g. different operations for creating obesity labels or parsing
-    country of origin).
-
-    :param df: Dataframe to perform processing on.
-    :param column_ops: A dictionarity of colum names, where each value is a list
-    of tuples, where each tuple is a callable as the first element and the callable's
-    arguments as the second element.
-    :return: Parsed dataframe.
+    This funtion is only ever called if we have labels.
     """
 
-    for column_name, ops_funcs in column_ops.items():
-        if column_name in df.columns:
-            for func, args_dict in ops_funcs:
-                logger.debug("Applying func %s to column in pre-processing.", func)
-                df = func(df=df, column_name=column_name, **args_dict)
-    return df
+    train_labels, valid_labels = set_up_train_and_valid_labels(cl_args, valid_size)
+
+    dataset_class_common_args = {
+        "data_folder": cl_args.data_folder,
+        "model_task": cl_args.model_task,
+        "target_width": cl_args.target_width,
+        "label_column": cl_args.label_column,
+        "data_type": cl_args.data_type,
+    }
+
+    dataset_class = MemoryArrayDataset if cl_args.memory_dataset else DiskArrayDataset
+    train_dataset = dataset_class(**dataset_class_common_args, labels_dict=train_labels)
+    valid_dataset = dataset_class(
+        **dataset_class_common_args,
+        labels_dict=valid_labels,
+        label_encoder=train_dataset.label_encoder,
+    )
+
+    assert len(train_dataset) > len(valid_dataset)
+    assert set(valid_dataset.labels_dict.keys()).isdisjoint(
+        train_dataset.labels_dict.keys()
+    )
+
+    return train_dataset, valid_dataset
 
 
 @dataclass
@@ -73,97 +58,11 @@ class Sample:
     label: Union[Dict[str, str], float, None]
 
 
-def set_up_dataset_labels(
-    cl_args: Namespace, all_ids: List[str], train_ids: List[str], valid_ids: List[str]
-) -> Tuple[
-    Dict[str, Dict[str, Union[str, float]]], Dict[str, Dict[str, Union[str, float]]]
-]:
-
-    df_labels = get_meta_from_label_file(
-        cl_args.label_file, cl_args.label_column, all_ids
-    )
-    df_labels = parse_label_df(df_labels, COLUMN_OPS)
-
-    df_labels_train = df_labels.loc[df_labels.index.intersection(train_ids)]
-    df_labels_valid = df_labels.loc[df_labels.index.intersection(valid_ids)]
-
-    def col_values(column):
-        return column.values.astype(float).reshape(-1, 1)
-
-    if cl_args.model_task == "reg":
-        reg_col = cl_args.label_column
-        logger.debug("Applying standard scaling to column %s.", reg_col)
-
-        scaler = StandardScaler()
-        scaler.fit(col_values(df_labels_train[reg_col]))
-        scaler_outpath = Path("./models", cl_args.run_name, "standard_scaler.save")
-        joblib.dump(scaler, scaler_outpath)
-
-        df_labels_train[reg_col] = scaler.transform(
-            col_values(df_labels_train[reg_col])
-        )
-        df_labels_valid[reg_col] = scaler.transform(
-            col_values(df_labels_valid[reg_col])
-        )
-
-    train_labels_dict = df_labels_train.to_dict("index")
-    valid_labels_dict = df_labels_valid.to_dict("index")
-    return train_labels_dict, valid_labels_dict
-
-
-def set_up_datasets(
-    cl_args: Namespace, with_labels: bool = True, valid_size: Union[int, float] = 0.1
-) -> Tuple[
-    Union["MemoryArrayDataset", "DiskArrayDataset"],
-    Union["MemoryArrayDataset", "DiskArrayDataset"],
-]:
-
-    dataset = DiskArrayDataset
-    if cl_args.memory_dataset:
-        dataset = MemoryArrayDataset
-
-    all_ids = [i.stem for i in Path(cl_args.data_folder).iterdir()]
-    train_ids, valid_ids = train_test_split(all_ids, test_size=valid_size)
-
-    train_labels = None
-    valid_labels = None
-
-    if with_labels:
-        train_labels, valid_labels = set_up_dataset_labels(
-            cl_args=cl_args, all_ids=all_ids, train_ids=train_ids, valid_ids=valid_ids
-        )
-        train_ids = list(train_labels.keys())
-        valid_ids = list(valid_labels.keys())
-
-    dataset_class_common_args = {
-        "data_folder": cl_args.data_folder,
-        "model_task": cl_args.model_task,
-        "target_width": cl_args.target_width,
-        "label_column": cl_args.label_column,
-        "data_type": cl_args.data_type,
-    }
-    train_dataset = dataset(
-        **dataset_class_common_args, ids=train_ids, labels_dict=train_labels
-    )
-    valid_dataset = dataset(
-        **dataset_class_common_args,
-        ids=valid_ids,
-        labels_dict=valid_labels,
-        label_encoder=train_dataset.label_encoder,
-    )
-
-    assert len(train_dataset) > len(valid_dataset)
-    assert set(valid_dataset.ids).isdisjoint(train_dataset.ids)
-
-    return train_dataset, valid_dataset
-
-
 class ArrayDatasetBase(Dataset):
     def __init__(
         self,
         data_folder: Path,
         model_task: str,
-        ids=List[str],
         label_column: str = None,
         labels_dict: Dict[str, str] = None,
         label_encoder=None,
@@ -175,7 +74,6 @@ class ArrayDatasetBase(Dataset):
 
         self.data_folder = data_folder
         self.model_task = model_task
-        self.ids = ids
         self.target_height = target_height
         self.target_width = target_width
         self.data_type = data_type
@@ -207,7 +105,7 @@ class ArrayDatasetBase(Dataset):
         files = {i.stem: i for i in Path(self.data_folder).iterdir()}
         samples = []
 
-        for sample_id in self.ids:
+        for sample_id in self.labels_dict:
             cur_sample = Sample(
                 sample_id=sample_id,
                 array=array_hook(files.get(sample_id)),

@@ -60,6 +60,16 @@ def create_test_optimizer(create_test_cl_args, create_test_model):
     return optimizer
 
 
+@pytest.mark.parametrize(
+    "create_test_data",
+    [
+        {"class_type": "binary", "data_type": "packbits"},
+        {"class_type": "multi", "data_type": "packbits"},
+        {"class_type": "binary", "data_type": "uint8"},
+        {"class_type": "multi", "data_type": "uint8"},
+    ],
+    indirect=True,
+)
 def test_identification(
     create_test_cl_args,
     create_test_dloaders,
