@@ -1,4 +1,4 @@
-from human_origins_supervised.label_loading_ops import common_ops
+from human_origins_supervised.data_load import common_ops
 
 import torch
 import pandas as pd

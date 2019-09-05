@@ -191,7 +191,7 @@ def get_snp_names(snp_file: str, data_folder: Path = None) -> np.array:
             )
 
         data_size = data_folder.parent.name
-        assert data_size == "full" or int(data_size)
+        assert data_size.startswith("full") or int(data_size)
 
         snp_string = f"parsed_files/{data_size}/data_final.snp"
         snp_file = Path(data_folder).parents[2] / snp_string

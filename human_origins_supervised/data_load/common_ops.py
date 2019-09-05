@@ -10,10 +10,12 @@ def streamline_df(
     df_func: Callable[[pd.DataFrame, Any], pd.DataFrame]
 ) -> Callable[[Any], pd.DataFrame]:
     @wraps(df_func)
-    def wrapper(*args, **kwargs) -> pd.DataFrame:
-
-        df = df_func(*args, **kwargs)
+    def wrapper(*args, df=None, column_name=None, **kwargs) -> pd.DataFrame:
         df = df.dropna()
+
+        df = df_func(*args, df=df, column_name=column_name, **kwargs)
+
+        df = df[column_name].to_frame()
         df = df.astype(str)
 
         return df

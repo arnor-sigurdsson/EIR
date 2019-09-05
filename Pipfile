@@ -17,6 +17,7 @@ pynvim = "*"
 visidata = "*"
 black = "==19.3b0"
 pre-commit = "*"
+gpustat = "*"
 
 [packages]
 pandas = "*"
@@ -32,7 +33,8 @@ scikit-learn = "*"
 human-origins-supervised = {path = ".",editable = true}
 shap = "*"
 seaborn = "*"
-aislib = {git = "ssh://git@github.com/arnor-sigurdsson/aislib.git",editable = true,ref = "v0.1.0-alpha"}
+aislib = {ref = "v0.1.0-alpha",git = "ssh://git@github.com/arnor-sigurdsson/aislib.git",editable = true}
+joblib = "*"
 
 [requires]
 python_version = "3.7"

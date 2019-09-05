@@ -5,16 +5,16 @@ from typing import Union, Tuple, List, Dict
 
 import numpy as np
 import torch
-from aislib.misc_utils import get_logger
+from aislib.misc_utils import get_logger, ensure_path_exists
 from ignite.engine import Engine
-from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from torch import nn
 from torch.optim import Adam
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 
-from human_origins_supervised.models import data_load, model_utils
+from human_origins_supervised.data_load import datasets
+from human_origins_supervised.models import model_utils
 from human_origins_supervised.models.models import Model
 from human_origins_supervised.train_utils.misc_funcs import (
     calc_multiclass_metrics,
@@ -91,34 +91,15 @@ def train_ignite(config) -> None:
 
 
 def main(cl_args):
-    if Path("models", cl_args.run_name).exists():
+    run_folder = Path("models", cl_args.run_name)
+    if run_folder.exists():
         raise FileExistsError(
             "There already exists a run with that name, please"
             " choose a different one."
         )
+    ensure_path_exists(run_folder, is_folder=True)
 
-    dataset = data_load.DiskArrayDataset
-    if cl_args.memory_dataset:
-        dataset = data_load.MemoryArrayDataset
-
-    all_ids = [i.stem for i in Path(cl_args.data_folder).iterdir()]
-    train_ids, valid_ids = train_test_split(all_ids, test_size=0.1)
-    class_args = {
-        "data_folder": cl_args.data_folder,
-        "model_task": cl_args.model_task,
-        "target_width": cl_args.target_width,
-        "label_fpath": cl_args.label_file,
-        "label_column": cl_args.label_column,
-    }
-
-    train_dataset = dataset(**class_args, custom_ids=train_ids)
-    valid_dataset = dataset(
-        **class_args, custom_ids=valid_ids, reg_scaler=train_dataset.reg_scaler
-    )
-
-    assert valid_dataset.reg_scaler == train_dataset.reg_scaler
-    assert len(train_dataset) > len(valid_dataset)
-    assert set(valid_dataset.ids).isdisjoint(train_dataset.ids)
+    train_dataset, valid_dataset = datasets.set_up_datasets(cl_args)
 
     cl_args.target_width = train_dataset[0][0].shape[2]
     cl_args.data_width = train_dataset.data_width
