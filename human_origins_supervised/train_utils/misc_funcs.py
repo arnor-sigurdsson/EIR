@@ -24,7 +24,10 @@ def calc_regression_metrics(
     train_pred = outputs.detach().cpu().numpy()
     train_labels = labels.cpu().numpy()
 
-    r = pearsonr(train_labels.squeeze(), train_pred.squeeze())[0]
+    if len(train_pred) < 2:
+        r = 0
+    else:
+        r = pearsonr(train_labels.squeeze(), train_pred.squeeze())[0]
 
     return {f"{prefix}_r": r}
 

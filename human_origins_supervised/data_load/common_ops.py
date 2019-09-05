@@ -15,7 +15,7 @@ def streamline_df(
 
         df = df_func(*args, df=df, column_name=column_name, **kwargs)
 
-        df = df[column_name]
+        df = df[column_name].to_frame()
         df = df.astype(str)
 
         return df

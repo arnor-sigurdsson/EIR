@@ -77,7 +77,6 @@ def parse_label_df(df, column_ops: al_all_column_ops) -> pd.DataFrame:
         if column_name in df.columns:
             for column_op in ops_funcs:
                 func, args_dict = column_op.function, column_op.args
-
                 logger.debug(
                     "Applying func %s with args %s to column in pre-processing.",
                     func,
