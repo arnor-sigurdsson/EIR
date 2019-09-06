@@ -203,8 +203,8 @@ def test_regression(
 
     df = pd.read_csv(run_path / "training_history.log")
 
-    assert df.iloc[:, 1].max() > 0.9
-    assert df.iloc[:, 3].max() > 0.9
+    assert df.loc[:, "t_r2"].max() > 0.9
+    assert df.loc[:, "v_r2"].max() > 0.9
 
     if not keep_outputs:
         cleanup()

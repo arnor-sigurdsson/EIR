@@ -16,7 +16,7 @@ from torch.utils.data import DataLoader
 from human_origins_supervised.data_load import datasets
 from human_origins_supervised.models import model_utils
 from human_origins_supervised.models.models import Model
-from human_origins_supervised.train_utils.misc_funcs import select_metric_func
+from human_origins_supervised.train_utils.metric_funcs import select_metric_func
 from human_origins_supervised.train_utils.train_handlers import configure_trainer
 
 torch.manual_seed(0)

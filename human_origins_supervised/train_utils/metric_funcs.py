@@ -1,7 +1,8 @@
 from typing import Dict
 
 import torch
-from sklearn.metrics import matthews_corrcoef, r2_score
+import numpy as np
+from sklearn.metrics import matthews_corrcoef, r2_score, mean_squared_error
 
 
 def calc_multiclass_metrics(
@@ -24,8 +25,9 @@ def calc_regression_metrics(
     labels = labels.cpu().numpy()
 
     r2 = r2_score(y_true=labels, y_pred=preds)
+    rmse = np.sqrt(mean_squared_error(y_true=labels, y_pred=preds))
 
-    return {f"{prefix}_r2": r2}
+    return {f"{prefix}_r2": r2, f"{prefix}_rmse": rmse}
 
 
 def select_metric_func(model_task: str):
@@ -37,6 +39,6 @@ def select_metric_func(model_task: str):
 
 def get_train_metrics(model_task):
     if model_task == "reg":
-        return ["t_r2"]
+        return ["t_r2", "t_rmse"]
     elif model_task == "cls":
         return ["t_mcc"]

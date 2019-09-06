@@ -20,7 +20,7 @@ from torch import nn
 
 from human_origins_supervised.models import model_utils
 from human_origins_supervised.train_utils.benchmark import benchmark
-from human_origins_supervised.train_utils.misc_funcs import (
+from human_origins_supervised.train_utils.metric_funcs import (
     select_metric_func,
     get_train_metrics,
 )
