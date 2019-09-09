@@ -23,7 +23,7 @@ def create_test_dataset(create_test_data, create_test_cl_args):
     cl_args.data_folder = str(path / "test_arrays")
     cl_args.data_type = test_data_params["data_type"]
 
-    run_path = Path(f"models/{cl_args.run_name}/")
+    run_path = Path(f"runs/{cl_args.run_name}/")
     ensure_path_exists(run_path, is_folder=True)
 
     train_dataset, valid_dataset = datasets.set_up_datasets(cl_args, valid_size=0.3)
@@ -131,7 +131,7 @@ def test_classification_snp_identification(
     train_dataset, valid_dataset = create_test_dataset
     label_encoder = train_dataset.label_encoder
 
-    run_path = Path(f"models/{cl_args.run_name}/")
+    run_path = Path(f"runs/{cl_args.run_name}/")
 
     config = train.Config(
         cl_args,
@@ -190,7 +190,7 @@ def test_regression(
     train_dataset, valid_dataset = create_test_dataset
     label_encoder = train_dataset.label_encoder
 
-    run_path = Path(f"models/{cl_args.run_name}/")
+    run_path = Path(f"runs/{cl_args.run_name}/")
 
     config = train.Config(
         cl_args,

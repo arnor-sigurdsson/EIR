@@ -113,7 +113,7 @@ def scale_regression_labels(
     df_labels_train: pd.DataFrame,
     df_labels_valid: pd.DataFrame,
     reg_col: str,
-    experiment_folder: Path,
+    runs_folder: Path,
 ) -> al_train_val_dfs:
     """
     Used to scale regression column.
@@ -128,7 +128,7 @@ def scale_regression_labels(
 
     scaler = StandardScaler()
     scaler.fit(parse_colvals(df_labels_train[reg_col]))
-    scaler_outpath = experiment_folder / "standard_scaler.save"
+    scaler_outpath = runs_folder / "standard_scaler.save"
     joblib.dump(scaler, scaler_outpath)
 
     df_labels_train[reg_col] = scaler.transform(parse_colvals(df_labels_train[reg_col]))
@@ -142,9 +142,9 @@ def process_train_and_label_dfs(
 ) -> al_train_val_dfs:
 
     if cl_args.model_task == "reg":
-        experiment_folder = Path("./models", cl_args.run_name)
+        runs_folder = Path("./runs", cl_args.run_name)
         df_labels_train, df_labels_valid = scale_regression_labels(
-            df_labels_train, df_labels_valid, cl_args.label_column, experiment_folder
+            df_labels_train, df_labels_valid, cl_args.label_column, runs_folder
         )
 
     return df_labels_train, df_labels_valid
