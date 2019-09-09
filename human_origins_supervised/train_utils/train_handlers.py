@@ -271,7 +271,7 @@ def sample(engine: Engine, config: "Config", run_folder: Path) -> None:
         sample_outfolder = Path(run_folder, "samples", str(epoch))
         ensure_path_exists(sample_outfolder, is_folder=True)
 
-        if args.model_task == "cls" and do_acts:
+        if do_acts:
             model_copy = copy.deepcopy(c.model)
 
             no_explainer_background_samples = np.max([int(args.batch_size / 8), 16])
@@ -280,7 +280,11 @@ def sample(engine: Engine, config: "Config", run_folder: Path) -> None:
             )
 
             proc_funcs = {"pre": (pre_transform,)}
-            act_func = partial(mv.get_shap_sample_acts_deep, explainer=explainer)
+            act_func = partial(
+                mv.get_shap_sample_acts_deep,
+                explainer=explainer,
+                model_task=args.model_task,
+            )
 
             mv.analyze_activations(config, act_func, proc_funcs, sample_outfolder)
 

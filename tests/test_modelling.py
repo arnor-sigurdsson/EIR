@@ -66,6 +66,31 @@ def create_test_optimizer(create_test_cl_args, create_test_model):
     return optimizer
 
 
+def check_snp_types(cls_name, top_grads_msk, expected_idxs):
+    """
+    Adds an additional check for SNP types (i.e. reference homozygous, heterozygous,
+    alternative homozygous, missing).
+
+    Used when we have masked out the SNPs (otherwise the 0s in the one hot might have
+    a high activation, since they're saying the same thing as a 1 being in a spot).
+    """
+    top_idxs = list(top_grads_msk[cls_name]["top_n_grads"].argmax(0))
+    assert top_idxs == expected_idxs
+
+
+def check_identified_snps(arrpath, expected_top_indxs, top_row_grads_dict, check_types):
+    top_grads_array = np.load(arrpath, allow_pickle=True)
+    top_grads_dict: dict = top_grads_array[()]
+
+    for cls in top_grads_dict.keys():
+        assert sorted(top_grads_dict[cls]["top_n_idxs"]) == expected_top_indxs
+
+        expected_top_rows = top_row_grads_dict[cls]
+
+        if check_types:
+            check_snp_types(cls, top_grads_dict, expected_top_rows)
+
+
 @pytest.mark.parametrize(
     "create_test_data",
     [
@@ -76,7 +101,7 @@ def create_test_optimizer(create_test_cl_args, create_test_model):
     ],
     indirect=True,
 )
-def test_identification(
+def test_classification_snp_identification(
     create_test_data,
     create_test_cl_args,
     create_test_dloaders,
@@ -123,33 +148,19 @@ def test_identification(
     def cleanup():
         rmtree(run_path)
 
-    def check_snp_types(cls_name, top_grads_msk, expected_idxs):
-        top_idxs = list(top_grads_msk[cls_name]["top_n_grads"].argmax(0))
-        assert top_idxs == expected_idxs
-
     if run_path.exists():
         cleanup()
 
     train.train_ignite(config)
 
     arrpath = run_path / f"samples/{cl_args.n_epochs}/top_acts.npy"
-    top_grads_array = np.load(arrpath, allow_pickle=True)
-    top_grads_dict: dict = top_grads_array[()]
-
-    expected_top_indxs = [0, 100, 200, 300, 400, 500, 600, 700, 800, 900]
-
     arrpath_msk = run_path / f"samples/{cl_args.n_epochs}/top_grads_masked.npy"
-    top_grads_msk_array = np.load(arrpath_msk, allow_pickle=True)
-    top_grads_msk_dict: dict = top_grads_msk_array[()]
-
+    expected_top_indxs = [0, 100, 200, 300, 400, 500, 600, 700, 800, 900]
     top_row_grads_dict = {"Asia": [1] * 10, "Europe": [2] * 10, "Africa": [0] * 10}
 
-    for cls in top_grads_dict.keys():
-        assert sorted(top_grads_dict[cls]["top_n_idxs"]) == expected_top_indxs
-        assert sorted(top_grads_msk_dict[cls]["top_n_idxs"]) == expected_top_indxs
-
-        expected_top_rows = top_row_grads_dict[cls]
-        check_snp_types(cls, top_grads_msk_dict, expected_top_rows)
+    for path in [arrpath, arrpath_msk]:
+        check_types = True if path == arrpath_msk else False
+        check_identified_snps(path, expected_top_indxs, top_row_grads_dict, check_types)
 
     if not keep_outputs:
         cleanup()
@@ -205,6 +216,15 @@ def test_regression(
 
     assert df.loc[:, "t_r2"].max() > 0.9
     assert df.loc[:, "v_r2"].max() > 0.9
+
+    arrpath = run_path / f"samples/{cl_args.n_epochs}/top_acts.npy"
+    arrpath_msk = run_path / f"samples/{cl_args.n_epochs}/top_grads_masked.npy"
+    expected_top_indxs = [0, 100, 200, 300, 400, 500, 600, 700, 800, 900]
+    top_row_grads_dict = {"Regression": [0] * 10}
+
+    for path in [arrpath, arrpath_msk]:
+        check_types = True if path == arrpath_msk else False
+        check_identified_snps(path, expected_top_indxs, top_row_grads_dict, check_types)
 
     if not keep_outputs:
         cleanup()
