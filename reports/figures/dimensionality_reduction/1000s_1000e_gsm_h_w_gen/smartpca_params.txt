@@ -1,7 +1,0 @@
-genotypename:	/mnt/generated/human_origins_filtered_1000_gen.eigenstrat
-snpname:	/mnt/interim/0_filtered_data/data_filtered_1000.snp
-indivname:	/mnt/generated/data_filtered_gen.ind
-evecoutname:	./pca_evec.txt
-evaloutname:	./pca_eval.txt
-numoutevec:	50
-lsqproject:	YES
