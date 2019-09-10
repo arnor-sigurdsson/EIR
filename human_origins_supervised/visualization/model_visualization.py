@@ -39,12 +39,28 @@ def suppress_stdout():
 
 
 def get_target_classes(cl_args, label_encoder):
+
+    if cl_args.model_task == "reg":
+        return ["Regression"]
+
     if cl_args.act_classes:
         target_classes = cl_args.act_classes
     else:
         target_classes = label_encoder.classes_
 
     return target_classes
+
+
+def get_act_condition(sample_label, label_encoder, target_classes, model_task):
+    if model_task == "reg":
+        return "Regression"
+
+    le_it = label_encoder.inverse_transform
+    cur_trn_label = le_it([sample_label.item()])[0]
+    if cur_trn_label in target_classes:
+        return cur_trn_label
+
+    return None
 
 
 def accumulate_activations(
@@ -54,7 +70,6 @@ def accumulate_activations(
     transform_funcs: Dict[str, Tuple[Callable]],
 ):
     c = config
-    le_it = c.label_encoder.inverse_transform
 
     target_classes = get_target_classes(c.cl_args, c.label_encoder)
 
@@ -66,10 +81,11 @@ def accumulate_activations(
     for single_sample, sample_label, *_ in valid_sampling_dloader:
         # we want to keep the original sample for masking
         single_sample_org = deepcopy(single_sample).cpu().numpy().squeeze()
+        cur_trn_label = get_act_condition(
+            sample_label, c.label_encoder, target_classes, c.cl_args.model_task
+        )
 
-        cur_trn_label = le_it([sample_label.item()])[0]
-        if cur_trn_label in target_classes:
-
+        if cur_trn_label:
             # apply pre-processing functions on sample and input
             for pre_func in transform_funcs.get("pre", ()):
                 single_sample, sample_label = pre_func(
@@ -111,7 +127,10 @@ def get_shap_object(
 
 
 def get_shap_sample_acts_deep(
-    explainer: DeepExplainer, single_sample: torch.Tensor, sample_label: torch.Tensor
+    explainer: DeepExplainer,
+    single_sample: torch.Tensor,
+    sample_label: torch.Tensor,
+    model_task: str,
 ):
     """
     Note: We only get the grads for a correct prediction.
@@ -119,8 +138,13 @@ def get_shap_sample_acts_deep(
     TODO: Add functionality to use ranked_outputs or all outputs.
     """
     with suppress_stdout():
-        shap_grads, pred_label = explainer.shap_values(single_sample, ranked_outputs=1)
+        output = explainer.shap_values(single_sample, ranked_outputs=1)
+        if model_task == "reg":
+            assert isinstance(output, np.ndarray)
+            return output
 
+    assert len(output) == 2
+    shap_grads, pred_label = output
     if pred_label.item() == sample_label.item():
         return shap_grads[0]
 
@@ -280,6 +304,7 @@ def plot_top_gradients(
     snp_names: np.array,
     output_folder: Path,
     fname="top_snps.png",
+    custom_ylabel=None,
 ):
     n_cls = len(top_gradients_dict.keys())
     classes = sorted(list(top_gradients_dict.keys()))
@@ -301,7 +326,8 @@ def plot_top_gradients(
             cur_ax = plt.subplot(gs[cls_idx, grad_idx])
             cur_ax.imshow(cur_grads, vmin=0, vmax=1)
 
-            cur_ax.set_ylabel(row_name)
+            ylabel = row_name if not custom_ylabel else custom_ylabel
+            cur_ax.set_ylabel(ylabel)
 
             if cls_idx == n_cls - 1:
                 top_snp_names = snp_names[cls_top_idxs]
