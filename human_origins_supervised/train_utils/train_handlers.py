@@ -370,7 +370,7 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
     """
     args = config.cl_args
 
-    run_folder = "models/" + args.run_name
+    run_folder = "runs/" + args.run_name
 
     for handler in evaluate, sample:
         trainer.add_event_handler(
