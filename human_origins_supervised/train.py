@@ -7,7 +7,7 @@ import numpy as np
 import torch
 from aislib.misc_utils import get_logger, ensure_path_exists
 from ignite.engine import Engine
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import LabelEncoder, StandardScaler
 from torch import nn
 from torch.optim import Adam
 from torch.optim.optimizer import Optimizer
@@ -16,10 +16,7 @@ from torch.utils.data import DataLoader
 from human_origins_supervised.data_load import datasets
 from human_origins_supervised.models import model_utils
 from human_origins_supervised.models.models import Model
-from human_origins_supervised.train_utils.misc_funcs import (
-    calc_multiclass_metrics,
-    calc_regression_metrics,
-)
+from human_origins_supervised.train_utils.metric_funcs import select_metric_func
 from human_origins_supervised.train_utils.train_handlers import configure_trainer
 
 torch.manual_seed(0)
@@ -44,7 +41,7 @@ class Config:
     model: nn.Module
     optimizer: Optimizer
     criterion: nn.CrossEntropyLoss
-    label_encoder: Union[LabelEncoder, None]
+    label_encoder: Union[LabelEncoder, StandardScaler]
     data_width: int
 
 
@@ -52,9 +49,7 @@ def train_ignite(config) -> None:
     c = config
     args = config.cl_args
 
-    metric_func = (
-        calc_multiclass_metrics if args.model_task == "cls" else calc_regression_metrics
-    )
+    metric_func = select_metric_func(args.model_task, c.label_encoder)
 
     def step(
         engine: Engine,
@@ -78,7 +73,9 @@ def train_ignite(config) -> None:
         c.optimizer.step()
 
         train_loss = train_loss.item()
-        metric_dict = metric_func(train_outputs, train_labels, "t")
+        metric_dict = metric_func(
+            outputs=train_outputs, labels=train_labels, prefix="t"
+        )
         metric_dict["t_loss"] = train_loss
 
         return metric_dict
@@ -105,11 +102,19 @@ def main(cl_args):
     cl_args.data_width = train_dataset.data_width
 
     train_dloader = DataLoader(
-        train_dataset, batch_size=cl_args.batch_size, shuffle=True
+        train_dataset,
+        batch_size=cl_args.batch_size,
+        shuffle=True,
+        num_workers=8,
+        pin_memory=True,
     )
 
     valid_dloader = DataLoader(
-        valid_dataset, batch_size=cl_args.batch_size, shuffle=False
+        valid_dataset,
+        batch_size=cl_args.batch_size,
+        shuffle=False,
+        num_workers=8,
+        pin_memory=True,
     )
 
     model = Model(cl_args, train_dataset.num_classes).to(cl_args.device)

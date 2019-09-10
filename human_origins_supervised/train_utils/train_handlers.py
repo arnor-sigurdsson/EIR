@@ -15,14 +15,13 @@ from ignite.engine import Events, Engine
 from ignite.handlers import ModelCheckpoint
 from ignite.metrics import RunningAverage
 from scipy.special import softmax
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import LabelEncoder, StandardScaler
 from torch import nn
 
 from human_origins_supervised.models import model_utils
 from human_origins_supervised.train_utils.benchmark import benchmark
-from human_origins_supervised.train_utils.misc_funcs import (
-    calc_multiclass_metrics,
-    calc_regression_metrics,
+from human_origins_supervised.train_utils.metric_funcs import (
+    select_metric_func,
     get_train_metrics,
 )
 from human_origins_supervised.visualization import (
@@ -121,6 +120,23 @@ def inverse_numerical_labels_hook(
     return df
 
 
+def scale_and_save_regression_preds(
+    y_true: np.ndarray,
+    y_outp: np.ndarray,
+    ids: List[str],
+    scaler: StandardScaler,
+    outfolder: Path,
+) -> None:
+
+    y_true = scaler.inverse_transform(y_true).squeeze()
+    y_outp = scaler.inverse_transform(y_outp).squeeze()
+
+    data = np.array([ids, y_true, y_outp]).T
+    df = pd.DataFrame(data=data, columns=["ID", "Actual", "Predicted"])
+
+    df.to_csv(outfolder / "regression_predictions.csv", index=["ID"])
+
+
 def anno_meta_hook(
     df: pd.DataFrame,
     data_folder: Union[None, Path] = None,
@@ -167,7 +183,6 @@ def anno_meta_hook(
 
 def evaluate(engine: Engine, config: "Config", run_folder: Path) -> None:
     """
-
     A bit hacky how we manually attach metrics here, but that's because we
     don't want to evaluate as a running average (i.e. do it in the step
     function), but rather run over the whole validation dataset as we do
@@ -175,14 +190,10 @@ def evaluate(engine: Engine, config: "Config", run_folder: Path) -> None:
     """
     c = config
 
-    metric_func = (
-        calc_multiclass_metrics
-        if c.cl_args.model_task == "cls"
-        else calc_regression_metrics
-    )
+    metric_func = select_metric_func(c.cl_args.model_task, c.label_encoder)
 
     gather_preds = model_utils.gather_pred_outputs_from_dloader
-    val_outputs_total, val_labels_total, ids_total = gather_preds(
+    val_outputs_total, val_labels_total, val_ids_total = gather_preds(
         c.valid_loader, c.model, c.cl_args.device
     )
     val_labels_total = model_utils.cast_labels(c.cl_args.model_task, val_labels_total)
@@ -206,20 +217,29 @@ def evaluate(engine: Engine, config: "Config", run_folder: Path) -> None:
         val_labels_total = val_labels_total.cpu().numpy()
 
         vf.gen_eval_graphs(
-            val_labels_total,
-            val_outputs_total,
-            sample_outfolder,
-            c.label_encoder,
-            c.cl_args.model_task,
+            val_labels=val_labels_total,
+            val_outputs=val_outputs_total,
+            val_ids_total=val_ids_total,
+            outfolder=sample_outfolder,
+            encoder=c.label_encoder,
+            model_task=c.cl_args.model_task,
         )
 
         if c.cl_args.model_task == "cls":
             get_most_wrong_wrapper(
                 val_labels_total,
                 val_outputs_total,
-                ids_total,
+                val_ids_total,
                 c.label_encoder,
                 c.cl_args.data_folder,
+                sample_outfolder,
+            )
+        else:
+            scale_and_save_regression_preds(
+                val_labels_total,
+                val_outputs_total,
+                val_ids_total,
+                c.label_encoder,
                 sample_outfolder,
             )
 
@@ -251,7 +271,7 @@ def sample(engine: Engine, config: "Config", run_folder: Path) -> None:
         sample_outfolder = Path(run_folder, "samples", str(epoch))
         ensure_path_exists(sample_outfolder, is_folder=True)
 
-        if args.model_task == "cls" and do_acts:
+        if do_acts:
             model_copy = copy.deepcopy(c.model)
 
             no_explainer_background_samples = np.max([int(args.batch_size / 8), 16])
@@ -260,7 +280,11 @@ def sample(engine: Engine, config: "Config", run_folder: Path) -> None:
             )
 
             proc_funcs = {"pre": (pre_transform,)}
-            act_func = partial(mv.get_shap_sample_acts_deep, explainer=explainer)
+            act_func = partial(
+                mv.get_shap_sample_acts_deep,
+                explainer=explainer,
+                model_task=args.model_task,
+            )
 
             mv.analyze_activations(config, act_func, proc_funcs, sample_outfolder)
 
