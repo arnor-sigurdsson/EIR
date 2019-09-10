@@ -39,7 +39,7 @@ def set_up_datasets(
     label_encoder = None
     if cl_args.model_task == "reg":
         label_encoder = joblib.load(
-            Path("./models", cl_args.run_name, "standard_scaler.save")
+            Path("./runs", cl_args.run_name, "standard_scaler.save")
         )
 
     dataset_class = MemoryArrayDataset if cl_args.memory_dataset else DiskArrayDataset

@@ -88,7 +88,7 @@ def train_ignite(config) -> None:
 
 
 def main(cl_args):
-    run_folder = Path("models", cl_args.run_name)
+    run_folder = Path("runs", cl_args.run_name)
     if run_folder.exists():
         raise FileExistsError(
             "There already exists a run with that name, please"
