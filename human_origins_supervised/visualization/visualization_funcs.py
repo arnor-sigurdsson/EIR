@@ -53,7 +53,6 @@ def generate_training_curve(
 
     ax_1.set_xlim(left=skiprows + 1, right=xlim_upper)
     ax_1.xaxis.set_major_locator(MaxNLocator(integer=True))
-    ax_1.set_ylim(top=1, bottom=0)
 
     lines = line_1a + line_1b
     labels = [l.get_label() for l in lines]
@@ -428,6 +427,7 @@ def generate_all_plots(metrics_file: Path, hook_funcs):
         column_pairs = get_column_pairs()
         for pair in column_pairs:
             generate_training_curve(metrics_file, hook_funcs=hook_funcs, cols=pair)
+
     except ValueError:
         print(f"Skipping {metrics_file} as it has old columns.")
     plt.close("all")

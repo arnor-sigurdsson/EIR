@@ -49,7 +49,7 @@ def train_ignite(config) -> None:
     c = config
     args = config.cl_args
 
-    metric_func = select_metric_func(args.model_task)
+    metric_func = select_metric_func(args.model_task, c.label_encoder)
 
     def step(
         engine: Engine,
@@ -102,11 +102,19 @@ def main(cl_args):
     cl_args.data_width = train_dataset.data_width
 
     train_dloader = DataLoader(
-        train_dataset, batch_size=cl_args.batch_size, shuffle=True
+        train_dataset,
+        batch_size=cl_args.batch_size,
+        shuffle=True,
+        num_workers=8,
+        pin_memory=True,
     )
 
     valid_dloader = DataLoader(
-        valid_dataset, batch_size=cl_args.batch_size, shuffle=False
+        valid_dataset,
+        batch_size=cl_args.batch_size,
+        shuffle=False,
+        num_workers=8,
+        pin_memory=True,
     )
 
     model = Model(cl_args, train_dataset.num_classes).to(cl_args.device)
@@ -223,7 +231,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--data_type",
         type=str,
-        default="packbits",
+        default="uint8",
         choices=["packbits", "uint8"],
         help="Format of the data being passed in.",
     )

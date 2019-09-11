@@ -190,7 +190,7 @@ def evaluate(engine: Engine, config: "Config", run_folder: Path) -> None:
     """
     c = config
 
-    metric_func = select_metric_func(c.cl_args.model_task)
+    metric_func = select_metric_func(c.cl_args.model_task, c.label_encoder)
 
     gather_preds = model_utils.gather_pred_outputs_from_dloader
     val_outputs_total, val_labels_total, val_ids_total = gather_preds(

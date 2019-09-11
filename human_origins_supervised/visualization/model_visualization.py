@@ -206,6 +206,8 @@ def get_snp_names(snp_file: str, data_folder: Path = None) -> np.array:
     """
     Not super happy about this implementation, as the infer option is kind of
     restricted to the project structure - but maybe that's ok?
+
+    The common structure is data/UKBB/processed/<ind_size>/<snp_size>/<type>
     """
     if snp_file == "infer":
         if not data_folder:
@@ -214,10 +216,12 @@ def get_snp_names(snp_file: str, data_folder: Path = None) -> np.array:
                 f" as snp_file parameter."
             )
 
-        data_size = data_folder.parent.name
-        assert data_size.startswith("full") or int(data_size)
+        snp_size = data_folder.parts[3]
+        ind_size = data_folder.parts[4]
+        assert snp_size.startswith("full") or int(snp_size.split("_")[0])
+        assert ind_size.startswith("full") or int(ind_size.split("_")[0])
 
-        snp_string = f"parsed_files/{data_size}/data_final.snp"
+        snp_string = f"parsed_files/{ind_size}/{snp_size}/data_final.snp"
         snp_file = Path(data_folder).parents[2] / snp_string
 
         if not snp_file.exists():
