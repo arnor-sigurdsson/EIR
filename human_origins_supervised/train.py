@@ -183,7 +183,7 @@ if __name__ == "__main__":
         default=0.999,
         help="adam: decay of second order momentum of gradient",
     )
-    parser.add_argument("--wd", type=float, default=1e-3, help="weight decay for adam.")
+    parser.add_argument("--wd", type=float, default=1e-4, help="weight decay for adam.")
 
     parser.add_argument(
         "--kernel_width",

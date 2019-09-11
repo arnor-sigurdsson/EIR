@@ -186,7 +186,7 @@ def make_conv_layers(
     :param input_width: Used to calculate convolutional parameters.
     :return: A list of `nn.Module` objects to be passed to `nn.Sequential`.
     """
-    base_chn_exp = 5
+    base_chn_exp = 6
     down_stride_w = 4
     first_kernel, first_pad = set_up_conv_params(
         input_width, kernel_base_width, down_stride_w
@@ -248,10 +248,10 @@ class Model(nn.Module):
 
         self.last_act = nn.Sequential(nn.BatchNorm2d(self.no_out_channels), nn.ReLU())
         self.fc = nn.Sequential(
-            nn.Dropout2d(0.25),
+            # nn.Dropout2d(0.25),
             nn.Linear(
                 self.data_size_after_conv * self.no_out_channels, self.num_classes
-            ),
+            )
         )
 
     def forward(self, x):
