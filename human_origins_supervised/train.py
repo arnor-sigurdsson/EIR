@@ -231,7 +231,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--data_type",
         type=str,
-        default="packbits",
+        default="uint8",
         choices=["packbits", "uint8"],
         help="Format of the data being passed in.",
     )
