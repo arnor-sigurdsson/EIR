@@ -106,7 +106,7 @@ def main(cl_args):
         batch_size=cl_args.batch_size,
         shuffle=True,
         num_workers=8,
-        pin_memory=True,
+        pin_memory=False,
     )
 
     valid_dloader = DataLoader(
@@ -114,7 +114,7 @@ def main(cl_args):
         batch_size=cl_args.batch_size,
         shuffle=False,
         num_workers=8,
-        pin_memory=True,
+        pin_memory=False,
     )
 
     model = Model(cl_args, train_dataset.num_classes).to(cl_args.device)

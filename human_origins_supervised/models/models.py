@@ -186,7 +186,7 @@ def make_conv_layers(
     :param input_width: Used to calculate convolutional parameters.
     :return: A list of `nn.Module` objects to be passed to `nn.Sequential`.
     """
-    base_chn_exp = 6
+    base_chn_exp = 5
     down_stride_w = 4
     first_kernel, first_pad = set_up_conv_params(
         input_width, kernel_base_width, down_stride_w
