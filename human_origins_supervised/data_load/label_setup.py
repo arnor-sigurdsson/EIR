@@ -7,7 +7,13 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
-from human_origins_supervised.data_load import COLUMN_OPS, ColumnOperation
+from human_origins_supervised.data_load.common_ops import ColumnOperation
+
+try:
+    from human_origins_supervised.data_load import COLUMN_OPS
+except ModuleNotFoundError:
+    COLUMN_OPS = {}
+
 from aislib.misc_utils import get_logger
 
 logger = get_logger(__name__)

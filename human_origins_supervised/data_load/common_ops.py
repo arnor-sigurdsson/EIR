@@ -1,9 +1,18 @@
+from dataclasses import dataclass
 from functools import wraps, partial
 from pathlib import Path
-from typing import List, Tuple, Any, Union, Callable
+from typing import List, Tuple, Any, Union, Callable, Dict
 
 import pandas as pd
 import torch
+from pandas import DataFrame
+
+
+@dataclass
+class ColumnOperation:
+    function: Callable[[DataFrame, str], DataFrame]
+    args: Dict[str, Any]
+    extra_columns_deps: Union[Tuple[str, ...], None] = ()
 
 
 def streamline_df(

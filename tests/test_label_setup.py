@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 import pytest
 
-from human_origins_supervised.data_load import ColumnOperation
+from human_origins_supervised.data_load.common_ops import ColumnOperation
 from human_origins_supervised.data_load import label_setup
 
 
