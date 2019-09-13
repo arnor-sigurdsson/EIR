@@ -248,10 +248,10 @@ class Model(nn.Module):
 
         self.last_act = nn.Sequential(nn.BatchNorm2d(self.no_out_channels), nn.ReLU())
         self.fc = nn.Sequential(
-            # nn.Dropout2d(0.25),
+            nn.Dropout2d(run_config.do),
             nn.Linear(
                 self.data_size_after_conv * self.no_out_channels, self.num_classes
-            )
+            ),
         )
 
     def forward(self, x):

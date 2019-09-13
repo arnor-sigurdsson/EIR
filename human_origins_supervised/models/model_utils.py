@@ -1,6 +1,10 @@
 from typing import List, Tuple, Union
 
 import torch
+from torch.utils.data import DataLoader
+from torch.nn import Module
+
+al_dloader_outputs = Tuple[torch.Tensor, Union[List[str], torch.LongTensor], List[str]]
 
 
 def find_no_resblocks_needed(width: int, stride: int, min_size: int = 32) -> List[int]:
@@ -53,13 +57,17 @@ def cast_labels(model_task, labels):
 
 
 def gather_pred_outputs_from_dloader(
-    data_loader, model, device, with_labels=True
-) -> Tuple[torch.Tensor, Union[List[str], torch.LongTensor], List[str]]:
-    model.eval()
+    data_loader: DataLoader, model: Module, device: str, with_labels: bool = True
+) -> al_dloader_outputs:
+    """
+    Used to gather predictions from a dataloader, normally for evaluation – hence the
+    assertion that we are in eval mode.
+    """
     outputs_total = []
     labels_total = []
     ids_total = []
 
+    assert not model.training
     for inputs, labels, ids in data_loader:
         inputs = inputs.to(device=device, dtype=torch.float32)
 
@@ -75,11 +83,12 @@ def gather_pred_outputs_from_dloader(
     if with_labels:
         labels_total = torch.stack(labels_total)
 
-    model.train()
     return torch.stack(outputs_total), labels_total, ids_total
 
 
-def gather_dloader_samples(data_loader, device, n_samples=None):
+def gather_dloader_samples(
+    data_loader: DataLoader, device: str, n_samples: Union[int, None] = None
+) -> al_dloader_outputs:
     inputs_total = []
     labels_total = []
     ids_total = []
@@ -99,4 +108,4 @@ def gather_dloader_samples(data_loader, device, n_samples=None):
                 ids_total = ids_total[:n_samples]
                 break
 
-    return torch.stack(inputs_total), torch.stack(labels_total), ids_total
+    return torch.stack(inputs_total), labels_total, ids_total

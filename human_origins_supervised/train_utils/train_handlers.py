@@ -192,10 +192,13 @@ def evaluate(engine: Engine, config: "Config", run_folder: Path) -> None:
 
     metric_func = select_metric_func(c.cl_args.model_task, c.label_encoder)
 
+    c.model.eval()
     gather_preds = model_utils.gather_pred_outputs_from_dloader
     val_outputs_total, val_labels_total, val_ids_total = gather_preds(
         c.valid_loader, c.model, c.cl_args.device
     )
+    c.model.train()
+
     val_labels_total = model_utils.cast_labels(c.cl_args.model_task, val_labels_total)
 
     val_loss = c.criterion(val_outputs_total, val_labels_total)
