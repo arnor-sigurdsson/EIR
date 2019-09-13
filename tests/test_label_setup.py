@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 import pytest
 
-from human_origins_supervised.data_load import ColumnOperation
+from human_origins_supervised.data_load.common_ops import ColumnOperation
 from human_origins_supervised.data_load import label_setup
 
 
@@ -64,9 +64,9 @@ def test_load_label_df(create_test_data):
 
     df_label = label_setup.load_label_df(label_fpath, "Origin")
 
-    assert df_label.shape[0] == 100 * n_classes
+    assert df_label.shape[0] == 200 * n_classes
     assert df_label.index.name == "ID"
-    assert [i for i in df_label.Origin.value_counts()] == [100] * n_classes
+    assert [i for i in df_label.Origin.value_counts()] == [200] * n_classes
 
     df_label["ExtraCol"] = "ExtraVal"
     label_extra_fpath = path / "labels_extracol.csv"
@@ -119,7 +119,7 @@ def test_label_df_parse_wrapper(create_test_data, create_test_cl_args):
     cl_args = create_test_cl_args
     df_labels = label_setup.label_df_parse_wrapper(cl_args)
 
-    assert df_labels.shape == (200, 1)
+    assert df_labels.shape == (400, 1)
     assert set(df_labels[cl_args.label_column].unique()) == {"Asia", "Europe"}
 
 
@@ -196,7 +196,7 @@ def test_set_up_train_and_valid_labels(create_test_data, create_test_cl_args):
         cl_args, 0.1
     )
 
-    assert len(train_labels_dict) + len(valid_labels_dict) == n_classes * 100
+    assert len(train_labels_dict) + len(valid_labels_dict) == n_classes * 200
     assert len(train_labels_dict) > len(valid_labels_dict)
 
     train_ids_set = set(train_labels_dict.keys())

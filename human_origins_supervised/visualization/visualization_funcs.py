@@ -143,10 +143,10 @@ def generate_regression_prediction_plot(
     y_true = encoder.inverse_transform(y_true.reshape(-1, 1))
     y_outp = encoder.inverse_transform(y_outp.reshape(-1, 1))
 
-    ax.scatter(y_true, y_outp, edgecolors=(0, 0, 0))
-    ax.plot([y_true.min(), y_true.max()], [y_true.min(), y_true.max()], "k--", lw=4)
-    ax.set_xlabel("Measured")
-    ax.set_ylabel("Predicted")
+    ax.scatter(y_outp, y_true, edgecolors=(0, 0, 0))
+    ax.plot([y_true.min(), y_true.max()], [y_true.min(), y_true.max()], "k--", lw=2)
+    ax.set_xlabel("Predicted")
+    ax.set_ylabel("Measured")
     ax.set(title=title_extra)
 
     plt.tight_layout()

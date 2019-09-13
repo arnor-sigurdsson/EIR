@@ -96,7 +96,7 @@ def main(cl_args):
         )
     ensure_path_exists(run_folder, is_folder=True)
 
-    train_dataset, valid_dataset = datasets.set_up_datasets(cl_args)
+    train_dataset, valid_dataset = datasets.set_up_datasets(cl_args, valid_size=5000)
 
     cl_args.target_width = train_dataset[0][0].shape[2]
     cl_args.data_width = train_dataset.data_width
@@ -106,7 +106,7 @@ def main(cl_args):
         batch_size=cl_args.batch_size,
         shuffle=True,
         num_workers=8,
-        pin_memory=True,
+        pin_memory=False,
     )
 
     valid_dloader = DataLoader(
@@ -114,7 +114,7 @@ def main(cl_args):
         batch_size=cl_args.batch_size,
         shuffle=False,
         num_workers=8,
-        pin_memory=True,
+        pin_memory=False,
     )
 
     model = Model(cl_args, train_dataset.num_classes).to(cl_args.device)
@@ -183,7 +183,7 @@ if __name__ == "__main__":
         default=0.999,
         help="adam: decay of second order momentum of gradient",
     )
-    parser.add_argument("--wd", type=float, default=1e-3, help="weight decay for adam.")
+    parser.add_argument("--wd", type=float, default=5e-4, help="weight decay for adam.")
 
     parser.add_argument(
         "--kernel_width",
@@ -196,6 +196,13 @@ if __name__ == "__main__":
         type=int,
         nargs="+",
         help="Number of hidden convolutional layers.",
+    )
+
+    parser.add_argument(
+        "--do",
+        type=float,
+        default=0.0,
+        help="Dropout before fully connected layer at the end of network.",
     )
 
     parser.add_argument(

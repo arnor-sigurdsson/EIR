@@ -98,7 +98,7 @@ def gather_and_flatten_samples(
 
     array = tensors.numpy().squeeze()
 
-    return flatten(array), labels
+    return flatten(array), np.array(labels)
 
 
 def run_partial_fit(

@@ -155,6 +155,7 @@ def get_snp_cols_w_top_grads(
     accumulated_grads: Dict[str, List[np.array]],
     n: int = 10,
     custom_indexes_dict: dict = None,
+    abs_grads=False,
 ) -> Dict[str, Dict[str, np.array]]:
     """
     `accumulated_grads` specs:
@@ -181,7 +182,10 @@ def get_snp_cols_w_top_grads(
             top_snps_per_class[cls] = {}
 
             if not custom_indexes_dict:
+                if abs_grads:
+                    grads_arr_mean = np.abs(grads_arr_mean)
                 sum_snp_values = grads_arr_mean.sum(0)
+
                 top_n_idxs = sorted(np.argpartition(sum_snp_values, -n)[-n:])
 
                 top_snps_per_class[cls]["top_n_idxs"] = top_n_idxs
@@ -437,7 +441,9 @@ def analyze_activations(config: "Config", act_func, proc_funcs, outfolder):
         c, c.valid_dataset, act_func, proc_funcs
     )
 
-    top_gradients_dict = get_snp_cols_w_top_grads(acc_acts)
+    abs_grads = True if args.model_task == "reg" else False
+    top_gradients_dict = get_snp_cols_w_top_grads(acc_acts, abs_grads=abs_grads)
+
     snp_names = get_snp_names(args.snp_file, Path(args.data_folder))
 
     plot_top_gradients(acc_acts, top_gradients_dict, snp_names, outfolder)

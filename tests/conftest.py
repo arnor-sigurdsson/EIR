@@ -3,6 +3,8 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
+np.random.seed(0)
+
 
 def pytest_addoption(parser):
     parser.addoption("--keep_outputs", action="store_true")
@@ -42,6 +44,7 @@ def args_config():
             "get_acts": True,
             "benchmark": True,
             "kernel_width": 12,
+            "do": 0.0,
             "memory_dataset": True,
         }
     )
@@ -95,7 +98,7 @@ def create_test_data(request, tmp_path):
     if test_data_params["class_type"] in ("multi", "regression"):
         target_classes["Africa"] = 0
 
-    n_per_class = 100
+    n_per_class = 200
     n_snps = 1000
 
     array_folder = tmp_path / "test_arrays"
@@ -104,15 +107,18 @@ def create_test_data(request, tmp_path):
     label_file.write("ID,Origin\n")
 
     for cls, snp_row_idx in target_classes.items():
-
         for sample_idx in range(n_per_class):
+
             outpath = array_folder / f"{sample_idx}_{cls}.npy"
 
-            base_array = np.zeros((4, n_snps))
-            base_array[0, :] = 1
-            snp_idxs = list(range(0, 1000, 100))
+            # create random one hot array
+            base_array = np.eye(4)[np.random.choice(4, n_snps)].T
+            snp_idxs = np.array(range(50, 1000, 100))
 
-            base_array[0, snp_idxs] = 0
+            # zero out snp_idxs
+            base_array[:, snp_idxs] = 0
+
+            # assign class specific snps
             base_array[snp_row_idx, snp_idxs] = 1
 
             arr_to_save = base_array.astype(np.uint8)
