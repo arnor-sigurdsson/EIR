@@ -22,10 +22,10 @@ def pytest_generate_tests(metafunc):
 def args_config():
     config = SimpleNamespace(
         **{
-            "b1": 0.5,
+            "b1": 0.9,
             "b2": 0.999,
-            "batch_size": 16,
-            "checkpoint_interval": 50,
+            "batch_size": 32,
+            "checkpoint_interval": 120,
             "data_folder": "REPLACE_ME",
             "label_file": "REPLACE_ME",
             "label_column": "Origin",
@@ -35,17 +35,18 @@ def args_config():
             "device": "cpu",
             "gpu_num": "0",
             "lr": 1e-3,
+            "wd": 5e-4,
             "n_cpu": 8,
             "n_epochs": 10,
             "run_name": "test_run",
-            "sample_interval": 5,
+            "sample_interval": 20,
             "target_width": 1000,
             "act_classes": None,
             "get_acts": True,
             "benchmark": True,
             "kernel_width": 12,
             "do": 0.0,
-            "memory_dataset": True,
+            "memory_dataset": False,
         }
     )
 
@@ -66,7 +67,7 @@ def create_test_cl_args(args_config, create_test_data):
     args_config.model_task = model_task
     args_config.label_file = str(test_path / "labels.csv")
     args_config.n_epochs = 20
-    args_config.sample_interval = 5
+    args_config.sample_interval = 60
     args_config.target_width = 1000
     args_config.data_width = 1000
     args_config.run_name = (

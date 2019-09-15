@@ -96,7 +96,7 @@ def main(cl_args):
         )
     ensure_path_exists(run_folder, is_folder=True)
 
-    train_dataset, valid_dataset = datasets.set_up_datasets(cl_args, valid_size=5000)
+    train_dataset, valid_dataset = datasets.set_up_datasets(cl_args, valid_size=0.05)
 
     cl_args.target_width = train_dataset[0][0].shape[2]
     cl_args.data_width = train_dataset.data_width

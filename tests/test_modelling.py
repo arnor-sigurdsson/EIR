@@ -183,8 +183,12 @@ def test_classification_snp_identification(
 
     train.train_ignite(config)
 
-    arrpath = run_path / f"samples/{cl_args.n_epochs}/top_acts.npy"
-    arrpath_msk = run_path / f"samples/{cl_args.n_epochs}/top_grads_masked.npy"
+    # TODO: Update after doing eval / sample after last_iter
+    # n_iter = 20 * 600 / 32 = 375
+
+    last_iter = 360
+    arrpath = run_path / f"samples/{last_iter}/top_acts.npy"
+    arrpath_msk = run_path / f"samples/{last_iter}/top_grads_masked.npy"
     expected_top_indxs = list(range(50, 1000, 100))
     top_row_grads_dict = {"Asia": [1] * 10, "Europe": [2] * 10, "Africa": [0] * 10}
 
@@ -247,8 +251,9 @@ def test_regression(
     assert df.loc[:, "t_r2"].max() > 0.9
     assert df.loc[:, "v_r2"].max() > 0.8
 
-    arrpath = run_path / f"samples/{cl_args.n_epochs}/top_acts.npy"
-    arrpath_msk = run_path / f"samples/{cl_args.n_epochs}/top_grads_masked.npy"
+    last_iter = 360
+    arrpath = run_path / f"samples/{last_iter}/top_acts.npy"
+    arrpath_msk = run_path / f"samples/{last_iter}/top_grads_masked.npy"
     expected_top_indxs = list(range(50, 1000, 100))
     top_row_grads_dict = {"Regression": [0] * 10}
 

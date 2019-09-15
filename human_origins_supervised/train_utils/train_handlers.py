@@ -35,12 +35,15 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 
-def check_if_sample_or_end_epoch(epoch: int, sample_interval: int, n_epochs: int):
-    if sample_interval:
-        condition_1 = epoch % sample_interval == 0
+def check_if_iteration_sample(
+    iteration: int, epoch: int, iter_sample_interval: int, n_epochs: int
+):
+    if iter_sample_interval:
+        condition_1 = iteration % iter_sample_interval == 0
     else:
         condition_1 = False
-    condition_2 = epoch == n_epochs
+    # TODO: Use Events.COMPLETED later
+    condition_2 = False
 
     return condition_1 or condition_2
 
@@ -144,7 +147,7 @@ def anno_meta_hook(
 ) -> pd.DataFrame:
     df["Sample_ID"] = df["Sample_ID"].map(lambda x: x.split("_-_")[0])
 
-    type_ = "command line argument"
+    # type_ = "command line argument"
     if anno_fpath == "infer":
         if not data_folder:
             raise ValueError(
@@ -154,15 +157,15 @@ def anno_meta_hook(
 
         data_folder_name = data_folder.parts[1]
         anno_fpath = Path(f"data/{data_folder_name}/raw/data.anno")
-        type_ = "inferred"
+        # type_ = "inferred"
 
     if not anno_fpath.exists():
-        logger.error(
-            "Could not find %s anno file at %s. Skipping meta info hook in wrong "
-            "prediction analysis.",
-            type_,
-            anno_fpath,
-        )
+        # logger.error(
+        #     "Could not find %s anno file at %s. Skipping meta info hook in wrong "
+        #     "prediction analysis.",
+        #     type_,
+        #     anno_fpath,
+        # )
         return df
 
     anno_columns = ["Instance ID", "Group Label", "Location", "Country"]
@@ -189,6 +192,23 @@ def evaluate(engine: Engine, config: "Config", run_folder: Path) -> None:
     in this function.
     """
     c = config
+    iteration = engine.state.iteration
+    epoch = engine.state.epoch
+
+    do_eval = check_if_iteration_sample(
+        iteration, epoch, c.cl_args.sample_interval, c.cl_args.n_epochs
+    )
+
+    # TODO: Do this better
+    if not do_eval:
+        placeholder_metrics = (
+            {"v_mcc": np.nan}
+            if c.cl_args.model_task == "cls"
+            else {"v_r2": np.nan, "v_rmse": np.nan}
+        )
+        placeholder_metrics["v_loss"] = np.nan
+        engine.state.metrics.update(placeholder_metrics)
+        return
 
     metric_func = select_metric_func(c.cl_args.model_task, c.label_encoder)
 
@@ -207,44 +227,39 @@ def evaluate(engine: Engine, config: "Config", run_folder: Path) -> None:
 
     engine.state.metrics.update(metric_dict)
 
-    epoch = engine.state.epoch
-    save_eval_results = check_if_sample_or_end_epoch(
-        epoch, c.cl_args.sample_interval, c.cl_args.n_epochs
+    # save eval results
+    sample_outfolder = Path(run_folder, "samples", str(iteration))
+    ensure_path_exists(sample_outfolder, is_folder=True)
+
+    val_outputs_total = val_outputs_total.cpu().numpy()
+    val_labels_total = val_labels_total.cpu().numpy()
+
+    vf.gen_eval_graphs(
+        val_labels=val_labels_total,
+        val_outputs=val_outputs_total,
+        val_ids_total=val_ids_total,
+        outfolder=sample_outfolder,
+        encoder=c.label_encoder,
+        model_task=c.cl_args.model_task,
     )
-    if save_eval_results:
 
-        sample_outfolder = Path(run_folder, "samples", str(epoch))
-        ensure_path_exists(sample_outfolder, is_folder=True)
-
-        val_outputs_total = val_outputs_total.cpu().numpy()
-        val_labels_total = val_labels_total.cpu().numpy()
-
-        vf.gen_eval_graphs(
-            val_labels=val_labels_total,
-            val_outputs=val_outputs_total,
-            val_ids_total=val_ids_total,
-            outfolder=sample_outfolder,
-            encoder=c.label_encoder,
-            model_task=c.cl_args.model_task,
+    if c.cl_args.model_task == "cls":
+        get_most_wrong_wrapper(
+            val_labels_total,
+            val_outputs_total,
+            val_ids_total,
+            c.label_encoder,
+            c.cl_args.data_folder,
+            sample_outfolder,
         )
-
-        if c.cl_args.model_task == "cls":
-            get_most_wrong_wrapper(
-                val_labels_total,
-                val_outputs_total,
-                val_ids_total,
-                c.label_encoder,
-                c.cl_args.data_folder,
-                sample_outfolder,
-            )
-        else:
-            scale_and_save_regression_preds(
-                val_labels_total,
-                val_outputs_total,
-                val_ids_total,
-                c.label_encoder,
-                sample_outfolder,
-            )
+    else:
+        scale_and_save_regression_preds(
+            val_labels_total,
+            val_outputs_total,
+            val_ids_total,
+            c.label_encoder,
+            sample_outfolder,
+        )
 
 
 def sample(engine: Engine, config: "Config", run_folder: Path) -> None:
@@ -266,12 +281,15 @@ def sample(engine: Engine, config: "Config", run_folder: Path) -> None:
 
         return single_sample, sample_label
 
+    iteration = engine.state.iteration
     epoch = engine.state.epoch
-    do_sample = check_if_sample_or_end_epoch(epoch, args.sample_interval, args.n_epochs)
+    do_sample = check_if_iteration_sample(
+        iteration, epoch, args.sample_interval, args.n_epochs
+    )
     do_acts = args.get_acts
 
     if do_sample:
-        sample_outfolder = Path(run_folder, "samples", str(epoch))
+        sample_outfolder = Path(run_folder, "samples", str(iteration))
         ensure_path_exists(sample_outfolder, is_folder=True)
 
         if do_acts:
@@ -308,9 +326,7 @@ def attach_metrics(engine: Engine, monitoring_metrics: List[str]) -> None:
         RunningAverage(output_transform=partial_func).attach(engine, metric)
 
 
-def log_stats(
-    engine: Engine, pbar: ProgressBar, run_folder: Path, run_name: str = None
-) -> None:
+def log_stats(engine: Engine, pbar: ProgressBar) -> None:
     log_string = f"[Epoch {engine.state.epoch}/{engine.state.max_epochs}]"
 
     for name, value in engine.state.metrics.items():
@@ -318,16 +334,19 @@ def log_stats(
 
     pbar.log_message(log_string)
 
+
+def write_metrics(engine: Engine, run_folder: Path, run_name: str):
     if run_name:
         with open(str(run_folder) + "/training_history.log", "a") as logfile:
             fieldnames = sorted(engine.state.metrics.keys())
             writer = csv.DictWriter(logfile, fieldnames=fieldnames)
-            if engine.state.epoch == 1:
+
+            if engine.state.iteration == 1:
                 writer.writeheader()
             writer.writerow(engine.state.metrics)
 
 
-def save_progress(
+def plot_progress(
     engine: Engine, cl_args: Namespace, run_folder: Path, model: nn.Module
 ) -> None:
     hook_funcs = []
@@ -349,8 +368,11 @@ def save_progress(
     if cl_args.benchmark:
         hook_funcs.append(plot_benchmark_hook)
 
-    if check_if_sample_or_end_epoch(
-        engine.state.epoch, cl_args.sample_interval, cl_args.n_epochs
+    if check_if_iteration_sample(
+        engine.state.iteration,
+        engine.state.epoch,
+        cl_args.sample_interval,
+        cl_args.n_epochs,
     ):
         metrics_file = run_folder + "/training_history.log"
         vf.generate_all_plots(metrics_file, hook_funcs=hook_funcs)
@@ -377,7 +399,7 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
 
     for handler in evaluate, sample:
         trainer.add_event_handler(
-            Events.EPOCH_COMPLETED, handler, config=config, run_folder=run_folder
+            Events.ITERATION_COMPLETED, handler, config=config, run_folder=run_folder
         )
 
     monitoring_metrics = ["t_loss"] + get_train_metrics(model_task=args.model_task)
@@ -386,13 +408,7 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
     pbar = ProgressBar()
     pbar.attach(trainer, metric_names=monitoring_metrics)
 
-    trainer.add_event_handler(
-        Events.EPOCH_COMPLETED,
-        log_stats,
-        pbar=pbar,
-        run_folder=run_folder,
-        run_name=args.run_name,
-    )
+    trainer.add_event_handler(Events.EPOCH_COMPLETED, log_stats, pbar=pbar)
 
     if args.run_name:
         checkpoint_handler = ModelCheckpoint(
@@ -418,9 +434,18 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
             Events.EPOCH_COMPLETED, checkpoint_handler, to_save={"model": config.model}
         )
 
+        # this needs to be attached before plot progress so we have the last row
+        # when plotting
         trainer.add_event_handler(
-            Events.EPOCH_COMPLETED,
-            save_progress,
+            Events.ITERATION_COMPLETED,
+            write_metrics,
+            run_folder=run_folder,
+            run_name=args.run_name,
+        )
+
+        trainer.add_event_handler(
+            Events.ITERATION_COMPLETED,
+            plot_progress,
             cl_args=args,
             run_folder=run_folder,
             model=config.model,
