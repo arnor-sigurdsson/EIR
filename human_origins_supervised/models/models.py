@@ -74,7 +74,7 @@ class AbstractBlock(nn.Module):
         self.conv_1_kernel_h = 4 if isinstance(self, FirstBlock) else 1
         self.down_stride_h = self.conv_1_kernel_h
 
-        self.act = nn.ReLU()
+        self.act = nn.LeakyReLU()
 
         self.bn_1 = nn.BatchNorm2d(in_channels, out_channels)
         self.conv_1 = nn.Conv2d(
@@ -246,9 +246,11 @@ class Model(nn.Module):
 
         self.no_out_channels = self.conv[-1].out_channels
 
-        self.last_act = nn.Sequential(nn.BatchNorm2d(self.no_out_channels), nn.ReLU())
+        self.last_act = nn.Sequential(
+            nn.BatchNorm2d(self.no_out_channels), nn.LeakyReLU()
+        )
         self.fc = nn.Sequential(
-            nn.Dropout2d(run_config.do),
+            nn.Dropout(run_config.do),
             nn.Linear(
                 self.data_size_after_conv * self.no_out_channels, self.num_classes
             ),
