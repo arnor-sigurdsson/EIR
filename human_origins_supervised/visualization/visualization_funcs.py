@@ -92,7 +92,7 @@ def generate_basic_curve(metrics_filename, column_name, fname, skiprows=0):
 def gen_eval_graphs(
     val_labels: np.ndarray,
     val_outputs: np.ndarray,
-    val_ids_total: list,
+    val_ids: list,
     outfolder: Path,
     encoder: Union[LabelEncoder, StandardScaler],
     model_task,
