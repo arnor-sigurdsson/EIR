@@ -193,7 +193,7 @@ def test_set_up_train_and_valid_labels(create_test_data, create_test_cl_args):
     n_classes = 2 if test_data_params.get("class_type") == "binary" else 3
 
     train_labels_dict, valid_labels_dict = label_setup.set_up_train_and_valid_labels(
-        cl_args, 0.1
+        cl_args
     )
 
     assert len(train_labels_dict) + len(valid_labels_dict) == n_classes * 200
