@@ -96,7 +96,7 @@ def main(cl_args):
         )
     ensure_path_exists(run_folder, is_folder=True)
 
-    train_dataset, valid_dataset = datasets.set_up_datasets(cl_args, valid_size=0.05)
+    train_dataset, valid_dataset = datasets.set_up_datasets(cl_args)
 
     cl_args.target_width = train_dataset[0][0].shape[2]
     cl_args.data_width = train_dataset.data_width
@@ -219,6 +219,13 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        "--valid_size",
+        type=float,
+        default=0.05,
+        help="Size if the validaton set, if float",
+    )
+
+    parser.add_argument(
         "--label_file", type=str, required=True, help="Which file to load labels from."
     )
 
@@ -291,6 +298,10 @@ if __name__ == "__main__":
     )
 
     cur_cl_args = parser.parse_args()
+
+    if cur_cl_args.valid_size > 1.0:
+        cur_cl_args.valid_size = int(cur_cl_args.valid_size)
+
     cur_cl_args.device = (
         "cuda:" + cur_cl_args.gpu_num if torch.cuda.is_available() else "cpu"
     )

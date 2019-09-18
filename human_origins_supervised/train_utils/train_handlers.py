@@ -327,7 +327,8 @@ def log_stats(engine: Engine, pbar: ProgressBar) -> None:
     log_string = f"[Epoch {engine.state.epoch}/{engine.state.max_epochs}]"
 
     for name, value in engine.state.metrics.items():
-        log_string += f" | {name}: {value:.4f}"
+        if name.startswith("t_"):
+            log_string += f" | {name}: {value:.4f}"
 
     pbar.log_message(log_string)
 

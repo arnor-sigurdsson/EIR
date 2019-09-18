@@ -27,6 +27,7 @@ def args_config():
             "batch_size": 32,
             "checkpoint_interval": 120,
             "data_folder": "REPLACE_ME",
+            "valid_size": 0.1,
             "label_file": "REPLACE_ME",
             "label_column": "Origin",
             "data_type": "packbits",
@@ -66,7 +67,7 @@ def create_test_cl_args(args_config, create_test_data):
     args_config.snp_file = str(test_path / "test_snps.snp")
     args_config.model_task = model_task
     args_config.label_file = str(test_path / "labels.csv")
-    args_config.n_epochs = 15
+    args_config.n_epochs = 10
     args_config.sample_interval = 50
     args_config.target_width = 1000
     args_config.data_width = 1000
