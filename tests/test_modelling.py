@@ -27,7 +27,7 @@ def create_test_dataset(create_test_data, create_test_cl_args):
     run_path = Path(f"runs/{cl_args.run_name}/")
     ensure_path_exists(run_path, is_folder=True)
 
-    train_dataset, valid_dataset = datasets.set_up_datasets(cl_args, valid_size=0.3)
+    train_dataset, valid_dataset = datasets.set_up_datasets(cl_args)
 
     return train_dataset, valid_dataset
 
@@ -261,7 +261,7 @@ def test_regression(
     top_row_grads_dict = {"Regression": [0] * 10}
 
     for path in [arrpath, arrpath_msk]:
-        check_identified_snps(path, expected_top_indxs, top_row_grads_dict, False, 2)
+        check_identified_snps(path, expected_top_indxs, top_row_grads_dict, False, 1)
 
     if not keep_outputs:
         cleanup()

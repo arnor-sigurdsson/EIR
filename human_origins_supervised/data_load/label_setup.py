@@ -157,7 +157,7 @@ def process_train_and_label_dfs(
 
 
 def set_up_train_and_valid_labels(
-    cl_args: Namespace, valid_size: Union[int, float]
+    cl_args: Namespace
 ) -> Tuple[al_label_dict, al_label_dict]:
     """
     Splits and does split based processing (e.g. scaling validation set with training
@@ -166,7 +166,7 @@ def set_up_train_and_valid_labels(
 
     df_labels = label_df_parse_wrapper(cl_args)
 
-    df_labels_train, df_labels_valid = split_df(df_labels, valid_size)
+    df_labels_train, df_labels_valid = split_df(df_labels, cl_args.valid_size)
 
     df_labels_train, df_labels_valid = process_train_and_label_dfs(
         cl_args, df_labels_train, df_labels_valid

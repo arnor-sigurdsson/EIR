@@ -33,7 +33,7 @@ def test_set_up_datasets(create_test_cl_args, create_test_data):
         for i in range(10):
             bad_label_writer.writerow([f"SampleIgnoreLabel_{i}", "BadLabel"])
 
-    train_dataset, valid_dataset = datasets.set_up_datasets(cl_args, valid_size=0.2)
+    train_dataset, valid_dataset = datasets.set_up_datasets(cl_args)
 
     assert len(train_dataset) + len(valid_dataset) == 200 * n_classes
 

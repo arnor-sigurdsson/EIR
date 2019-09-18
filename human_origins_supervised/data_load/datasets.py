@@ -19,13 +19,11 @@ logger = get_logger(__name__)
 al_datasets = Union["MemoryArrayDataset", "DiskArrayDataset"]
 
 
-def set_up_datasets(
-    cl_args: Namespace, valid_size: Union[int, float] = 0.1
-) -> Tuple[al_datasets, al_datasets]:
+def set_up_datasets(cl_args: Namespace) -> Tuple[al_datasets, al_datasets]:
     """
     This funtion is only ever called if we have labels.
     """
-    train_labels, valid_labels = set_up_train_and_valid_labels(cl_args, valid_size)
+    train_labels, valid_labels = set_up_train_and_valid_labels(cl_args)
 
     dataset_class_common_args = {
         "data_folder": cl_args.data_folder,
@@ -99,7 +97,11 @@ class ArrayDatasetBase(Dataset):
 
     def parse_label(
         self, sample_label_dict: Dict[str, Union[str, float]]
-    ) -> Union[List[None], int, float]:
+    ) -> Union[List[None], np.ndarray, float]:
+        """
+        TODO:   Add label column here, if we are using multiple columns from the
+                label file later.
+        """
 
         if not sample_label_dict:
             return []
