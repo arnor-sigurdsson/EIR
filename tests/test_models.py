@@ -12,6 +12,8 @@ def test_make_conv_layers():
     """
     conv_layer_list = [1, 1, 1, 1]
     conv_layers = models.make_conv_layers(conv_layer_list, 12, 10000)
-    assert len(conv_layers) == len(conv_layer_list) + 2
+
+    # account for first block, add +2 instead if using SA
+    assert len(conv_layers) == len(conv_layer_list) + 1
     assert isinstance(conv_layers[0], models.FirstBlock)
-    assert isinstance(conv_layers[-2], models.SelfAttention)
+    # assert isinstance(conv_layers[-2], models.SelfAttention)

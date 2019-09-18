@@ -1,7 +1,6 @@
 import copy
 import csv
 import json
-from argparse import Namespace
 from functools import partial
 from pathlib import Path
 from typing import List, Union, TYPE_CHECKING
@@ -35,23 +34,25 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 
-def check_if_sample_or_end_epoch(epoch: int, sample_interval: int, n_epochs: int):
-    if sample_interval:
-        condition_1 = epoch % sample_interval == 0
+def check_if_iteration_sample(
+    iteration: int, iter_sample_interval: int, n_iterations_per_epochs, n_epochs
+):
+    if iter_sample_interval:
+        condition_1 = iteration % iter_sample_interval == 0
     else:
         condition_1 = False
-    condition_2 = epoch == n_epochs
+
+    condition_2 = iteration == n_iterations_per_epochs * n_epochs
 
     return condition_1 or condition_2
 
 
-def get_most_wrong_preds(
+def get_most_wrong_cls_preds(
     val_true: np.ndarray,
     val_preds: np.ndarray,
     val_outputs: np.ndarray,
     ids: np.ndarray,
 ) -> pd.DataFrame:
-
     wrong_mask = val_preds != val_true
     wrong_indices = np.where(wrong_mask)[0]
     all_probs = softmax(val_outputs[wrong_indices], axis=1)
@@ -91,21 +92,16 @@ def get_most_wrong_preds(
 
 
 def get_most_wrong_wrapper(
-    val_labels_total,
-    val_outputs_total,
-    ids_total,
-    label_encoder,
-    data_folder,
-    outfolder,
+    val_labels, val_outputs, val_ids, encoder, data_folder, outfolder
 ):
-    val_preds_total = val_outputs_total.argmax(axis=1)
+    val_preds_total = val_outputs.argmax(axis=1)
 
-    if (val_labels_total != val_preds_total).sum() > 0:
-        df_most_wrong = get_most_wrong_preds(
-            val_labels_total, val_preds_total, val_outputs_total, np.array(ids_total)
+    if (val_labels != val_preds_total).sum() > 0:
+        df_most_wrong = get_most_wrong_cls_preds(
+            val_labels, val_preds_total, val_outputs, np.array(val_ids)
         )
 
-        df_most_wrong = inverse_numerical_labels_hook(df_most_wrong, label_encoder)
+        df_most_wrong = inverse_numerical_labels_hook(df_most_wrong, encoder)
         df_most_wrong = anno_meta_hook(df_most_wrong, Path(data_folder))
         df_most_wrong.to_csv(outfolder / "wrong_preds.csv")
 
@@ -113,7 +109,6 @@ def get_most_wrong_wrapper(
 def inverse_numerical_labels_hook(
     df: pd.DataFrame, label_encoder: LabelEncoder
 ) -> pd.DataFrame:
-
     for column in ["True_Label", "Wrong_Label"]:
         df[column] = label_encoder.inverse_transform(df[column])
 
@@ -121,17 +116,16 @@ def inverse_numerical_labels_hook(
 
 
 def scale_and_save_regression_preds(
-    y_true: np.ndarray,
-    y_outp: np.ndarray,
-    ids: List[str],
-    scaler: StandardScaler,
+    val_labels: np.ndarray,
+    val_outputs: np.ndarray,
+    val_ids: List[str],
+    encoder: StandardScaler,
     outfolder: Path,
 ) -> None:
+    val_labels = encoder.inverse_transform(val_labels).squeeze()
+    val_outputs = encoder.inverse_transform(val_outputs).squeeze()
 
-    y_true = scaler.inverse_transform(y_true).squeeze()
-    y_outp = scaler.inverse_transform(y_outp).squeeze()
-
-    data = np.array([ids, y_true, y_outp]).T
+    data = np.array([val_ids, val_labels, val_outputs]).T
     df = pd.DataFrame(data=data, columns=["ID", "Actual", "Predicted"])
 
     df.to_csv(outfolder / "regression_predictions.csv", index=["ID"])
@@ -181,6 +175,38 @@ def anno_meta_hook(
     return df_merged
 
 
+def save_evaluation_results(
+    val_outputs: torch.Tensor,
+    val_labels: torch.Tensor,
+    val_ids: List[str],
+    iteration: int,
+    run_folder: Path,
+    config: "Config",
+) -> None:
+    args = config.cl_args
+
+    sample_outfolder = Path(run_folder, "samples", str(iteration))
+    ensure_path_exists(sample_outfolder, is_folder=True)
+
+    val_outputs = val_outputs.cpu().numpy()
+    val_labels = val_labels.cpu().numpy()
+
+    common_args = {
+        "val_outputs": val_outputs,
+        "val_labels": val_labels,
+        "val_ids": val_ids,
+        "outfolder": sample_outfolder,
+        "encoder": config.label_encoder,
+    }
+
+    vf.gen_eval_graphs(model_task=args.model_task, **common_args)
+
+    if args.model_task == "cls":
+        get_most_wrong_wrapper(data_folder=args.data_folder, **common_args)
+    elif args.model_task == "reg":
+        scale_and_save_regression_preds(**common_args)
+
+
 def evaluate(engine: Engine, config: "Config", run_folder: Path) -> None:
     """
     A bit hacky how we manually attach metrics here, but that's because we
@@ -189,17 +215,33 @@ def evaluate(engine: Engine, config: "Config", run_folder: Path) -> None:
     in this function.
     """
     c = config
+    args = c.cl_args
+    iteration = engine.state.iteration
 
-    metric_func = select_metric_func(c.cl_args.model_task, c.label_encoder)
+    n_iters_per_epoch = len(c.train_loader)
+    do_eval = check_if_iteration_sample(
+        iteration, args.sample_interval, n_iters_per_epoch, args.n_epochs
+    )
+    train_metrics = get_train_metrics(args.model_task, prefix="v")
+
+    # we update here witht NaNs as the metrics are written out in each iteration to
+    # training_history.log, so the iterations match when plotting later
+    if not do_eval:
+        placeholder_metrics = {metric: np.nan for metric in train_metrics}
+        placeholder_metrics["v_loss"] = np.nan
+        engine.state.metrics.update(placeholder_metrics)
+        return
+
+    metric_func = select_metric_func(args.model_task, c.label_encoder)
 
     c.model.eval()
     gather_preds = model_utils.gather_pred_outputs_from_dloader
     val_outputs_total, val_labels_total, val_ids_total = gather_preds(
-        c.valid_loader, c.model, c.cl_args.device
+        c.valid_loader, c.model, args.device
     )
     c.model.train()
 
-    val_labels_total = model_utils.cast_labels(c.cl_args.model_task, val_labels_total)
+    val_labels_total = model_utils.cast_labels(args.model_task, val_labels_total)
 
     val_loss = c.criterion(val_outputs_total, val_labels_total)
     metric_dict = metric_func(val_outputs_total, val_labels_total, "v")
@@ -207,44 +249,14 @@ def evaluate(engine: Engine, config: "Config", run_folder: Path) -> None:
 
     engine.state.metrics.update(metric_dict)
 
-    epoch = engine.state.epoch
-    save_eval_results = check_if_sample_or_end_epoch(
-        epoch, c.cl_args.sample_interval, c.cl_args.n_epochs
+    save_evaluation_results(
+        val_outputs=val_outputs_total,
+        val_labels=val_labels_total,
+        val_ids=val_ids_total,
+        iteration=iteration,
+        run_folder=run_folder,
+        config=config,
     )
-    if save_eval_results:
-
-        sample_outfolder = Path(run_folder, "samples", str(epoch))
-        ensure_path_exists(sample_outfolder, is_folder=True)
-
-        val_outputs_total = val_outputs_total.cpu().numpy()
-        val_labels_total = val_labels_total.cpu().numpy()
-
-        vf.gen_eval_graphs(
-            val_labels=val_labels_total,
-            val_outputs=val_outputs_total,
-            val_ids_total=val_ids_total,
-            outfolder=sample_outfolder,
-            encoder=c.label_encoder,
-            model_task=c.cl_args.model_task,
-        )
-
-        if c.cl_args.model_task == "cls":
-            get_most_wrong_wrapper(
-                val_labels_total,
-                val_outputs_total,
-                val_ids_total,
-                c.label_encoder,
-                c.cl_args.data_folder,
-                sample_outfolder,
-            )
-        else:
-            scale_and_save_regression_preds(
-                val_labels_total,
-                val_outputs_total,
-                val_ids_total,
-                c.label_encoder,
-                sample_outfolder,
-            )
 
 
 def sample(engine: Engine, config: "Config", run_folder: Path) -> None:
@@ -266,12 +278,15 @@ def sample(engine: Engine, config: "Config", run_folder: Path) -> None:
 
         return single_sample, sample_label
 
-    epoch = engine.state.epoch
-    do_sample = check_if_sample_or_end_epoch(epoch, args.sample_interval, args.n_epochs)
+    iteration = engine.state.iteration
+    n_iter_per_epoch = len(c.train_loader)
+    do_sample = check_if_iteration_sample(
+        iteration, args.sample_interval, n_iter_per_epoch, args.n_epochs
+    )
     do_acts = args.get_acts
 
     if do_sample:
-        sample_outfolder = Path(run_folder, "samples", str(epoch))
+        sample_outfolder = Path(run_folder, "samples", str(iteration))
         ensure_path_exists(sample_outfolder, is_folder=True)
 
         if do_acts:
@@ -308,9 +323,7 @@ def attach_metrics(engine: Engine, monitoring_metrics: List[str]) -> None:
         RunningAverage(output_transform=partial_func).attach(engine, metric)
 
 
-def log_stats(
-    engine: Engine, pbar: ProgressBar, run_folder: Path, run_name: str = None
-) -> None:
+def log_stats(engine: Engine, pbar: ProgressBar) -> None:
     log_string = f"[Epoch {engine.state.epoch}/{engine.state.max_epochs}]"
 
     for name, value in engine.state.metrics.items():
@@ -318,18 +331,22 @@ def log_stats(
 
     pbar.log_message(log_string)
 
+
+def write_metrics(engine: Engine, run_folder: Path, run_name: str):
     if run_name:
         with open(str(run_folder) + "/training_history.log", "a") as logfile:
             fieldnames = sorted(engine.state.metrics.keys())
             writer = csv.DictWriter(logfile, fieldnames=fieldnames)
-            if engine.state.epoch == 1:
+
+            if engine.state.iteration == 1:
                 writer.writeheader()
             writer.writerow(engine.state.metrics)
 
 
-def save_progress(
-    engine: Engine, cl_args: Namespace, run_folder: Path, model: nn.Module
+def plot_progress(
+    engine: Engine, config: "Config", run_folder: Path, model: nn.Module
 ) -> None:
+    args = config.cl_args
     hook_funcs = []
 
     def plot_benchmark_hook(ax):
@@ -346,13 +363,14 @@ def save_progress(
         labels.append("LR Benchmark")
         ax.legend(handles, labels)
 
-    if cl_args.benchmark:
+    if args.benchmark:
         hook_funcs.append(plot_benchmark_hook)
 
-    if check_if_sample_or_end_epoch(
-        engine.state.epoch, cl_args.sample_interval, cl_args.n_epochs
+    n_iter_per_epoch = len(config.train_loader)
+    if check_if_iteration_sample(
+        engine.state.iteration, args.sample_interval, n_iter_per_epoch, args.n_epochs
     ):
-        metrics_file = run_folder + "/training_history.log"
+        metrics_file = Path(run_folder, "training_history.log")
         vf.generate_all_plots(metrics_file, hook_funcs=hook_funcs)
 
         with open(Path(run_folder, "model_info.txt"), "w") as mfile:
@@ -377,7 +395,7 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
 
     for handler in evaluate, sample:
         trainer.add_event_handler(
-            Events.EPOCH_COMPLETED, handler, config=config, run_folder=run_folder
+            Events.ITERATION_COMPLETED, handler, config=config, run_folder=run_folder
         )
 
     monitoring_metrics = ["t_loss"] + get_train_metrics(model_task=args.model_task)
@@ -386,13 +404,7 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
     pbar = ProgressBar()
     pbar.attach(trainer, metric_names=monitoring_metrics)
 
-    trainer.add_event_handler(
-        Events.EPOCH_COMPLETED,
-        log_stats,
-        pbar=pbar,
-        run_folder=run_folder,
-        run_name=args.run_name,
-    )
+    trainer.add_event_handler(Events.EPOCH_COMPLETED, log_stats, pbar=pbar)
 
     if args.run_name:
         checkpoint_handler = ModelCheckpoint(
@@ -418,10 +430,19 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
             Events.EPOCH_COMPLETED, checkpoint_handler, to_save={"model": config.model}
         )
 
+        # this needs to be attached before plot progress so we have the last row
+        # when plotting
         trainer.add_event_handler(
-            Events.EPOCH_COMPLETED,
-            save_progress,
-            cl_args=args,
+            Events.ITERATION_COMPLETED,
+            write_metrics,
+            run_folder=run_folder,
+            run_name=args.run_name,
+        )
+
+        trainer.add_event_handler(
+            Events.ITERATION_COMPLETED,
+            plot_progress,
+            config=config,
             run_folder=run_folder,
             model=config.model,
         )

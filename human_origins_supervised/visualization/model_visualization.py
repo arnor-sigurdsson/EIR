@@ -233,6 +233,7 @@ def get_snp_names(snp_file: str, data_folder: Path = None) -> np.array:
                 f"Could not find {snp_file} when inferring" f"about it's location."
             )
 
+    # TODO: Change this after we start using .bim files.
     snp_df = pd.read_csv(snp_file, sep=r"\s+", usecols=[0], names=["snps"])
     snp_arr = snp_df.snps.array
 

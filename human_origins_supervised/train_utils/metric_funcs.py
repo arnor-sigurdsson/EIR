@@ -48,8 +48,8 @@ def select_metric_func(model_task: str, label_encoder: StandardScaler):
     return partial(calc_regression_metrics, label_encoder=label_encoder)
 
 
-def get_train_metrics(model_task):
+def get_train_metrics(model_task, prefix="t"):
     if model_task == "reg":
-        return ["t_r2", "t_rmse"]
+        return [f"{prefix}_r2", f"{prefix}_rmse"]
     elif model_task == "cls":
-        return ["t_mcc"]
+        return [f"{prefix}_mcc"]

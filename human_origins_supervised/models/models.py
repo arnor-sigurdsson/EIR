@@ -74,7 +74,7 @@ class AbstractBlock(nn.Module):
         self.conv_1_kernel_h = 4 if isinstance(self, FirstBlock) else 1
         self.down_stride_h = self.conv_1_kernel_h
 
-        self.act = nn.ReLU()
+        self.act = nn.LeakyReLU()
 
         self.bn_1 = nn.BatchNorm2d(in_channels, out_channels)
         self.conv_1 = nn.Conv2d(
@@ -223,8 +223,8 @@ def make_conv_layers(
 
             base_layers.append(cur_layer)
 
-    attention_channels = base_layers[-2].out_channels
-    base_layers.insert(-1, SelfAttention(attention_channels))
+    # attention_channels = base_layers[-2].out_channels
+    # base_layers.insert(-1, SelfAttention(attention_channels))
     return base_layers
 
 
@@ -246,13 +246,22 @@ class Model(nn.Module):
 
         self.no_out_channels = self.conv[-1].out_channels
 
-        self.last_act = nn.Sequential(nn.BatchNorm2d(self.no_out_channels), nn.ReLU())
+        self.last_act = nn.Sequential(
+            nn.BatchNorm2d(self.no_out_channels), nn.LeakyReLU()
+        )
         self.fc = nn.Sequential(
-            nn.Dropout2d(run_config.do),
+            nn.Dropout(run_config.do),
             nn.Linear(
                 self.data_size_after_conv * self.no_out_channels, self.num_classes
             ),
         )
+
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode="fan_out")
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
 
     def forward(self, x):
         out = self.conv(x)
