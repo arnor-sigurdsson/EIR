@@ -35,7 +35,7 @@ def test_get_most_wrong_preds():
         side_effect=dummy_function,
         autospec=True,
     ):
-        df_most_wrong = train_handlers.get_most_wrong_preds(
+        df_most_wrong = train_handlers.get_most_wrong_cls_preds(
             test_val_true, test_val_preds, test_val_probs, test_ids
         )
 
