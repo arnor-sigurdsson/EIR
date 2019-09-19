@@ -1,8 +1,10 @@
 from typing import List, Tuple, Union
 
 import torch
-from torch.utils.data import DataLoader
 from torch.nn import Module
+from torch.utils.data import DataLoader
+
+from human_origins_supervised.train_utils.utils import get_extra_labels_from_ids
 
 al_dloader_outputs = Tuple[torch.Tensor, Union[List[str], torch.LongTensor], List[str]]
 
@@ -45,7 +47,7 @@ def find_no_resblocks_needed(width: int, stride: int, min_size: int = 32) -> Lis
 
 def predict_on_batch(model, inputs):
     with torch.no_grad():
-        val_outputs = model(inputs)
+        val_outputs = model(*inputs)
 
     return val_outputs
 
@@ -57,7 +59,13 @@ def cast_labels(model_task, labels):
 
 
 def gather_pred_outputs_from_dloader(
-    data_loader: DataLoader, model: Module, device: str, with_labels: bool = True
+    data_loader: DataLoader,
+    cl_args,
+    model: Module,
+    device: str,
+    label_column,
+    labels_dict,
+    with_labels: bool = True,
 ) -> al_dloader_outputs:
     """
     Used to gather predictions from a dataloader, normally for evaluation – hence the
@@ -71,7 +79,13 @@ def gather_pred_outputs_from_dloader(
     for inputs, labels, ids in data_loader:
         inputs = inputs.to(device=device, dtype=torch.float32)
 
-        outputs = predict_on_batch(model, inputs)
+        extra_labels = (
+            get_extra_labels_from_ids(labels_dict, ids, label_column)
+            if cl_args.embed_columns
+            else None
+        )
+
+        outputs = predict_on_batch(model, (inputs, extra_labels))
 
         outputs_total += [i for i in outputs]
         ids_total += [i for i in ids]

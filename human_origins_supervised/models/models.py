@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict
 
 import aislib.pytorch as torch_utils
 import torch
@@ -228,12 +228,23 @@ def make_conv_layers(
     return base_layers
 
 
+def calc_extra_embed_dim(embeddings_dict):
+    base = 0
+    if not embeddings_dict:
+        return base
+
+    for embed_col in embeddings_dict:
+        base += embed_col["embedding_module"].embedding_dim
+
+
 class Model(nn.Module):
-    def __init__(self, run_config, num_classes):
+    def __init__(self, run_config, num_classes, embeddings_dict=None):
         super().__init__()
 
         self.run_config = run_config
         self.num_classes = num_classes
+        self.embeddings_dict = embeddings_dict
+
         self.conv = nn.Sequential(
             *make_conv_layers(
                 self.resblocks, run_config.kernel_width, run_config.target_width
@@ -249,11 +260,13 @@ class Model(nn.Module):
         self.last_act = nn.Sequential(
             nn.BatchNorm2d(self.no_out_channels), nn.LeakyReLU()
         )
+
+        extra_embed_dim = calc_extra_embed_dim(embeddings_dict)
+        fc_in_features = (
+            self.data_size_after_conv * self.no_out_channels
+        ) + extra_embed_dim
         self.fc = nn.Sequential(
-            nn.Dropout(run_config.do),
-            nn.Linear(
-                self.data_size_after_conv * self.no_out_channels, self.num_classes
-            ),
+            nn.Dropout(run_config.do), nn.Linear(fc_in_features, self.num_classes)
         )
 
         for m in self.modules():
@@ -263,10 +276,16 @@ class Model(nn.Module):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
-    def forward(self, x):
+    def forward(self, x, extra_labels: Dict[str, str] = None):
         out = self.conv(x)
         out = self.last_act(out)
         out = out.view(out.shape[0], -1)
+
+        if extra_labels:
+            for col, value in extra_labels.items():
+                lookup_index = self.embeddings_dict[col][value]
+                cur_embedding = self.embeddings_dict[col][lookup_index]
+                out = torch.cat((cur_embedding, out))
 
         out = self.fc(out)
         return out
