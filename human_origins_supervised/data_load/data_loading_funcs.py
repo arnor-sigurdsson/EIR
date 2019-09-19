@@ -34,8 +34,7 @@ def get_weighted_random_sampler(train_dataset: datasets.ArrayDatasetBase, label_
     """
     label_parser = train_dataset.parse_label
     labels = [
-        label_parser(label)[label_column].item()
-        for label in train_dataset.labels_dict.values()
+        label_parser(label).item() for label in train_dataset.labels_dict.values()
     ]
 
     label_counts = [i[1] for i in sorted(Counter(labels).items())]

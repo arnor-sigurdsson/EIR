@@ -246,6 +246,7 @@ class Model(nn.Module):
 
         self.run_config = run_config
         self.num_classes = num_classes
+        self.embeddings_dict = embeddings_dict
 
         # TODO: Cleanup / refactor.
         if embeddings_dict:
@@ -270,7 +271,7 @@ class Model(nn.Module):
             nn.BatchNorm2d(self.no_out_channels), nn.LeakyReLU()
         )
 
-        extra_embed_dim = calc_extra_embed_dim(embeddings_dict)
+        extra_embed_dim = len(embeddings_dict) * 10 if embeddings_dict else 0
         fc_in_features = (
             self.data_size_after_conv * self.no_out_channels
         ) + extra_embed_dim
@@ -302,7 +303,7 @@ class Model(nn.Module):
 
                 cur_embedding_module = getattr(self, col_key)
                 cur_embedding = cur_embedding_module(cur_lookup_indexes)
-                out = torch.cat((cur_embedding, out))
+                out = torch.cat((cur_embedding, out), dim=1)
 
         out = self.fc(out)
         return out
