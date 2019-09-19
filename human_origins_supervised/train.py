@@ -2,6 +2,7 @@ import argparse
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Union, Tuple, List, Dict
+from collections import Counter
 
 import numpy as np
 import torch
@@ -11,7 +12,7 @@ from sklearn.preprocessing import LabelEncoder, StandardScaler
 from torch import nn
 from torch.optim import Adam
 from torch.optim.optimizer import Optimizer
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, WeightedRandomSampler
 
 from human_origins_supervised.data_load import datasets
 from human_origins_supervised.models import model_utils
@@ -87,6 +88,29 @@ def train_ignite(config) -> None:
     trainer.run(c.train_loader, args.n_epochs)
 
 
+def get_weighted_random_sampler(train_dataset: datasets.ArrayDatasetBase, label_column):
+    """
+    TODO: Use label column here after we add additional columns in dataset label dict.
+    """
+    label_parser = train_dataset.parse_label
+    labels = [
+        label_parser(label).item() for label in train_dataset.labels_dict.values()
+    ]
+
+    label_counts = [i[1] for i in sorted(Counter(labels).items())]
+
+    logger.info("Using weighted sampling with label counts %s", label_counts)
+
+    weights = 1.0 / torch.tensor(label_counts, dtype=torch.float32)
+    samples_weighted = weights[labels]
+
+    sampler = WeightedRandomSampler(
+        samples_weighted, num_samples=len(train_dataset), replacement=True
+    )
+
+    return sampler
+
+
 def main(cl_args):
     run_folder = Path("runs", cl_args.run_name)
     if run_folder.exists():
@@ -101,10 +125,17 @@ def main(cl_args):
     cl_args.target_width = train_dataset[0][0].shape[2]
     cl_args.data_width = train_dataset.data_width
 
+    train_sampler = (
+        get_weighted_random_sampler(train_dataset, cl_args.label_column)
+        if cl_args.model_task == "cls" and cl_args.weighted_sampling
+        else None
+    )
+
     train_dloader = DataLoader(
         train_dataset,
         batch_size=cl_args.batch_size,
-        shuffle=True,
+        sampler=train_sampler,
+        shuffle=False if train_sampler else True,
         num_workers=8,
         pin_memory=False,
     )
@@ -222,7 +253,14 @@ if __name__ == "__main__":
         "--valid_size",
         type=float,
         default=0.05,
-        help="Size if the validaton set, if float",
+        help="Size if the validaton set, if float then uses a percentage. If int, "
+        "then raw counts.",
+    )
+
+    parser.add_argument(
+        "--weighted_sampling",
+        action="store_true",
+        help="Whether to use weighted sampling when doing classification.",
     )
 
     parser.add_argument(

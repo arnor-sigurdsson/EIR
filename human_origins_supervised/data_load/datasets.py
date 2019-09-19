@@ -97,7 +97,11 @@ class ArrayDatasetBase(Dataset):
 
     def parse_label(
         self, sample_label_dict: Dict[str, Union[str, float]]
-    ) -> Union[List[None], int, float]:
+    ) -> Union[List[None], np.ndarray, float]:
+        """
+        TODO:   Add label column here, if we are using multiple columns from the
+                label file later.
+        """
 
         if not sample_label_dict:
             return []
