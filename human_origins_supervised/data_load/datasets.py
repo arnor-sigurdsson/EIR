@@ -11,7 +11,10 @@ from sklearn.preprocessing import LabelEncoder, StandardScaler
 from torch.nn.functional import pad
 from torch.utils.data import Dataset
 
-from human_origins_supervised.data_load.label_setup import set_up_train_and_valid_labels
+from human_origins_supervised.data_load.label_setup import (
+    set_up_train_and_valid_labels,
+    al_label_dict,
+)
 
 logger = get_logger(__name__)
 
@@ -21,7 +24,7 @@ al_datasets = Union["MemoryArrayDataset", "DiskArrayDataset"]
 
 def set_up_datasets(cl_args: Namespace) -> Tuple[al_datasets, al_datasets]:
     """
-    This funtion is only ever called if we have labels.
+    This function is only ever called if we have labels.
     """
     train_labels, valid_labels = set_up_train_and_valid_labels(cl_args)
 
@@ -73,7 +76,7 @@ class ArrayDatasetBase(Dataset):
         data_folder: Path,
         model_task: str,
         label_column: str = None,
-        labels_dict: Dict[str, str] = None,
+        labels_dict: al_label_dict = None,
         label_encoder: Union[LabelEncoder, StandardScaler] = None,
         target_height: int = 4,
         target_width: int = None,

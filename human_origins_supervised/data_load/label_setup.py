@@ -1,6 +1,6 @@
 from argparse import Namespace
 from pathlib import Path
-from typing import Tuple, Dict, Union
+from typing import Tuple, Dict, Union, List
 
 import joblib
 import pandas as pd
@@ -26,12 +26,12 @@ al_label_dict = Dict[str, Dict[str, Union[str, float]]]
 
 def get_extra_columns(
     label_column: str, all_column_ops: al_all_column_ops
-) -> Tuple[str, ...]:
-    extra_columns_flat = ()
+) -> List[str]:
+    extra_columns_flat = []
     if label_column in all_column_ops:
         cur_ops = all_column_ops.get(label_column)
         extra_columns = [i.extra_columns_deps for i in cur_ops]
-        extra_columns_flat = tuple(
+        extra_columns_flat = list(
             column for column_deps in extra_columns for column in column_deps
         )
 
@@ -96,11 +96,19 @@ def parse_label_df(df, column_ops: al_all_column_ops) -> pd.DataFrame:
 
 def label_df_parse_wrapper(cl_args: Namespace) -> pd.DataFrame:
     all_ids = tuple(i.stem for i in Path(cl_args.data_folder).iterdir())
-    extra_columns = get_extra_columns(cl_args.label_column, COLUMN_OPS)
+
+    extra_label_parsing_cols = get_extra_columns(cl_args.label_column, COLUMN_OPS)
+    extra_embed_cols = cl_args.embed_columns
+    all_extra_cols = extra_label_parsing_cols + extra_embed_cols
+
     df_labels = load_label_df(
-        cl_args.label_file, cl_args.label_column, all_ids, extra_columns
+        cl_args.label_file, cl_args.label_column, all_ids, all_extra_cols
     )
     df_labels = parse_label_df(df_labels, COLUMN_OPS)
+
+    # remove columns only used for parsing, so only keep actual label column
+    # and extra embedding columns
+    df_labels = df_labels.drop(extra_label_parsing_cols, axis=1)
 
     return df_labels
 
