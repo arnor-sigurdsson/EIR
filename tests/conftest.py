@@ -48,6 +48,7 @@ def args_config():
             "kernel_width": 12,
             "do": 0.0,
             "memory_dataset": False,
+            "embed_columns": [],
         }
     )
 

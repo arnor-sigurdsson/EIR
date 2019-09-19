@@ -43,10 +43,10 @@ def test_get_extra_columns(get_test_column_ops):
     test_column_ops = get_test_column_ops
 
     extra_columns = label_setup.get_extra_columns("OriginExtraColumns", test_column_ops)
-    assert extra_columns == ("ExtraCol1", "ExtraCol2", "ExtraCol3")
+    assert extra_columns == ["ExtraCol1", "ExtraCol2", "ExtraCol3"]
 
     extra_columns_empty = label_setup.get_extra_columns("Origin", test_column_ops)
-    assert extra_columns_empty == ()
+    assert extra_columns_empty == []
 
 
 @pytest.mark.parametrize(
