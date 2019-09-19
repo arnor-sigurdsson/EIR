@@ -108,7 +108,9 @@ def label_df_parse_wrapper(cl_args: Namespace) -> pd.DataFrame:
 
     # remove columns only used for parsing, so only keep actual label column
     # and extra embedding columns
-    df_labels = df_labels.drop(extra_label_parsing_cols, axis=1)
+    to_drop = [i for i in extra_label_parsing_cols if i not in extra_embed_cols]
+    if to_drop:
+        df_labels = df_labels.drop(to_drop, axis=1)
 
     return df_labels
 
