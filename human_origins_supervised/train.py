@@ -57,30 +57,26 @@ def get_unique_embed_values(
     unique_embeddings_dict = {i: set() for i in embedding_cols}
 
     for sample_labels in labels_dict.values():
-        for key, value in sample_labels:
+        for key, value in sample_labels.items():
             if key in embedding_cols:
                 unique_embeddings_dict[key].add(value)
 
     return unique_embeddings_dict
 
 
-def set_up_embedding_dict(unique_emb_dict: Dict[str, Set[str]]):
+def set_up_embedding_lookups(unique_emb_dict: Dict[str, Set[str]]):
     emb_dict = {}
 
     for emb_col, emb_uniq_value in unique_emb_dict.items():
-        lookup_table = {k: idx for k, idx in enumerate(emb_uniq_value)}
-        cur_emb_module = nn.Embedding(len(lookup_table), 10)
-        emb_dict[emb_col] = {
-            "lookup_table": lookup_table,
-            "embedding_module": cur_emb_module,
-        }
+        lookup_table = {k: idx for idx, k in enumerate(emb_uniq_value)}
+        emb_dict[emb_col] = {"lookup_table": lookup_table}
 
     return emb_dict
 
 
 def get_embedding_dict(labels_dict, embedding_cols):
     unique_embs = get_unique_embed_values(labels_dict, embedding_cols)
-    emb_dict = set_up_embedding_dict(unique_embs)
+    emb_dict = set_up_embedding_lookups(unique_embs)
 
     return emb_dict
 

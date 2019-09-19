@@ -234,7 +234,10 @@ def calc_extra_embed_dim(embeddings_dict):
         return base
 
     for embed_col in embeddings_dict:
-        base += embed_col["embedding_module"].embedding_dim
+        cur_embedding = embeddings_dict[embed_col]["embedding_module"]
+        base += cur_embedding.embedding_dim
+
+    return base
 
 
 class Model(nn.Module):
@@ -243,7 +246,13 @@ class Model(nn.Module):
 
         self.run_config = run_config
         self.num_classes = num_classes
-        self.embeddings_dict = embeddings_dict
+
+        # TODO: Cleanup / refactor.
+        if embeddings_dict:
+            for emb_col in embeddings_dict:
+                num_embeddings = len(embeddings_dict[emb_col]["lookup_table"])
+                embedding_module = nn.Embedding(num_embeddings, 10)
+                setattr(self, emb_col, embedding_module)
 
         self.conv = nn.Sequential(
             *make_conv_layers(
@@ -276,15 +285,23 @@ class Model(nn.Module):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
-    def forward(self, x, extra_labels: Dict[str, str] = None):
+    def forward(self, x, extra_labels: List[Dict[str, str]] = None):
         out = self.conv(x)
         out = self.last_act(out)
         out = out.view(out.shape[0], -1)
 
+        # TODO: Cleanup / refactor.
         if extra_labels:
-            for col, value in extra_labels.items():
-                lookup_index = self.embeddings_dict[col][value]
-                cur_embedding = self.embeddings_dict[col][lookup_index]
+            for col_key in self.embeddings_dict:
+                cur_lookup_table = self.embeddings_dict[col_key]["lookup_table"]
+                cur_lookup_indexes = [
+                    cur_lookup_table.get(i[col_key]) for i in extra_labels
+                ]
+                cur_lookup_indexes = torch.tensor(cur_lookup_indexes, dtype=torch.long)
+                cur_lookup_indexes = cur_lookup_indexes.to(self.run_config.device)
+
+                cur_embedding_module = getattr(self, col_key)
+                cur_embedding = cur_embedding_module(cur_lookup_indexes)
                 out = torch.cat((cur_embedding, out))
 
         out = self.fc(out)
