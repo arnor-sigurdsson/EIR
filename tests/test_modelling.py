@@ -176,6 +176,7 @@ def test_classification_snp_identification(
         model,
         optimizer,
         criterion,
+        train_dataset.labels_dict,
         label_encoder,
         cl_args.data_width,
     )
@@ -236,6 +237,7 @@ def test_regression(
         model,
         optimizer,
         criterion,
+        train_dataset.labels_dict,
         label_encoder,
         cl_args.data_width,
     )

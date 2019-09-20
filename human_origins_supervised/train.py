@@ -2,7 +2,6 @@ import argparse
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Union, Tuple, List, Dict
-from collections import Counter
 
 import numpy as np
 import torch
@@ -12,13 +11,18 @@ from sklearn.preprocessing import LabelEncoder, StandardScaler
 from torch import nn
 from torch.optim import Adam
 from torch.optim.optimizer import Optimizer
-from torch.utils.data import DataLoader, WeightedRandomSampler
+from torch.utils.data import DataLoader
 
 from human_origins_supervised.data_load import datasets
+from human_origins_supervised.data_load.data_loading_funcs import (
+    get_weighted_random_sampler,
+)
 from human_origins_supervised.models import model_utils
+from human_origins_supervised.models.embeddings import get_embedding_dict
 from human_origins_supervised.models.models import Model
 from human_origins_supervised.train_utils.metric_funcs import select_metric_func
 from human_origins_supervised.train_utils.train_handlers import configure_trainer
+from human_origins_supervised.train_utils.utils import get_extra_labels_from_ids
 
 torch.manual_seed(0)
 np.random.seed(0)
@@ -42,6 +46,7 @@ class Config:
     model: nn.Module
     optimizer: Optimizer
     criterion: nn.CrossEntropyLoss
+    labels_dict: Dict
     label_encoder: Union[LabelEncoder, StandardScaler]
     data_width: int
 
@@ -61,14 +66,20 @@ def train_ignite(config) -> None:
         """
         c.model.train()
 
-        train_seqs, train_labels, *_ = loader_batch
+        train_seqs, train_labels, train_ids = loader_batch
         train_seqs = train_seqs.to(device=args.device, dtype=torch.float32)
 
         train_labels = train_labels.to(device=args.device)
         train_labels = model_utils.cast_labels(args.model_task, train_labels)
 
+        extra_labels = (
+            get_extra_labels_from_ids(c.labels_dict, train_ids, args.label_column)
+            if args.embed_columns
+            else None
+        )
+
         c.optimizer.zero_grad()
-        train_outputs = c.model(train_seqs)
+        train_outputs = c.model(train_seqs, extra_labels=extra_labels)
         train_loss = c.criterion(train_outputs, train_labels)
         train_loss.backward()
         c.optimizer.step()
@@ -88,29 +99,6 @@ def train_ignite(config) -> None:
     trainer.run(c.train_loader, args.n_epochs)
 
 
-def get_weighted_random_sampler(train_dataset: datasets.ArrayDatasetBase, label_column):
-    """
-    TODO: Use label column here after we add additional columns in dataset label dict.
-    """
-    label_parser = train_dataset.parse_label
-    labels = [
-        label_parser(label).item() for label in train_dataset.labels_dict.values()
-    ]
-
-    label_counts = [i[1] for i in sorted(Counter(labels).items())]
-
-    logger.info("Using weighted sampling with label counts %s", label_counts)
-
-    weights = 1.0 / torch.tensor(label_counts, dtype=torch.float32)
-    samples_weighted = weights[labels]
-
-    sampler = WeightedRandomSampler(
-        samples_weighted, num_samples=len(train_dataset), replacement=True
-    )
-
-    return sampler
-
-
 def main(cl_args):
     run_folder = Path("runs", cl_args.run_name)
     if run_folder.exists():
@@ -126,7 +114,7 @@ def main(cl_args):
     cl_args.data_width = train_dataset.data_width
 
     train_sampler = (
-        get_weighted_random_sampler(train_dataset, cl_args.label_column)
+        get_weighted_random_sampler(train_dataset)
         if cl_args.model_task == "cls" and cl_args.weighted_sampling
         else None
     )
@@ -148,7 +136,12 @@ def main(cl_args):
         pin_memory=False,
     )
 
-    model = Model(cl_args, train_dataset.num_classes).to(cl_args.device)
+    embedding_dict = (
+        get_embedding_dict(train_dataset.labels_dict, cl_args.embed_columns)
+        if cl_args.embed_columns
+        else None
+    )
+    model = Model(cl_args, train_dataset.num_classes, embedding_dict).to(cl_args.device)
     assert model.data_size_after_conv > 8
 
     if cl_args.debug:
@@ -172,6 +165,7 @@ def main(cl_args):
         model,
         optimizer,
         criterion,
+        train_dataset.labels_dict,
         train_dataset.label_encoder,
         train_dataset.data_width,
     )
@@ -264,6 +258,13 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        "--na_augment",
+        default=0.0,
+        type=float,
+        help="Percentage of SNPs to convert to NA in training set as data augmentation",
+    )
+
+    parser.add_argument(
         "--label_file", type=str, required=True, help="Which file to load labels from."
     )
 
@@ -272,6 +273,14 @@ if __name__ == "__main__":
         type=str,
         required=True,
         help="What column in label file to model on.",
+    )
+
+    parser.add_argument(
+        "--embed_columns",
+        type=str,
+        nargs="+",
+        default=[],
+        help="What columns to embed and add to fully connected layer at end of model.",
     )
 
     parser.add_argument(
