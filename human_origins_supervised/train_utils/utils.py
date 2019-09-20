@@ -1,18 +1,11 @@
-from typing import Dict, Union, Tuple
+from typing import List, Dict
 
-import torch
-
-
-def split_target_and_extra_labels(
-    all_labels_batch: Dict[str, Union[torch.tensor, str]], label_column: str
-) -> Tuple[torch.Tensor, Dict[str, str]]:
-    target_labels = all_labels_batch[label_column]
-    extra_labels = {k: v for k, v in all_labels_batch.items() if k != label_column}
-
-    return target_labels, extra_labels
+from human_origins_supervised.data_load.label_setup import al_label_dict
 
 
-def get_extra_labels_from_ids(labels_dict, cur_ids, label_column):
+def get_extra_labels_from_ids(
+    labels_dict: al_label_dict, cur_ids: List[str], label_column: str
+) -> List[Dict[str, str]]:
     """
     Returns a batch in same order as cur_ids.
     """

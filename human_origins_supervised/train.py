@@ -1,7 +1,7 @@
 import argparse
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Union, Tuple, List, Dict, Set
+from typing import Union, Tuple, List, Dict
 
 import numpy as np
 import torch
@@ -17,8 +17,8 @@ from human_origins_supervised.data_load import datasets
 from human_origins_supervised.data_load.data_loading_funcs import (
     get_weighted_random_sampler,
 )
-from human_origins_supervised.data_load.label_setup import al_label_dict
 from human_origins_supervised.models import model_utils
+from human_origins_supervised.models.embeddings import get_embedding_dict
 from human_origins_supervised.models.models import Model
 from human_origins_supervised.train_utils.metric_funcs import select_metric_func
 from human_origins_supervised.train_utils.train_handlers import configure_trainer
@@ -49,36 +49,6 @@ class Config:
     labels_dict: Dict
     label_encoder: Union[LabelEncoder, StandardScaler]
     data_width: int
-
-
-def get_unique_embed_values(
-    labels_dict: al_label_dict, embedding_cols: List[str]
-) -> Dict[str, Set[str]]:
-    unique_embeddings_dict = {i: set() for i in embedding_cols}
-
-    for sample_labels in labels_dict.values():
-        for key, value in sample_labels.items():
-            if key in embedding_cols:
-                unique_embeddings_dict[key].add(value)
-
-    return unique_embeddings_dict
-
-
-def set_up_embedding_lookups(unique_emb_dict: Dict[str, Set[str]]):
-    emb_dict = {}
-
-    for emb_col, emb_uniq_value in unique_emb_dict.items():
-        lookup_table = {k: idx for idx, k in enumerate(emb_uniq_value)}
-        emb_dict[emb_col] = {"lookup_table": lookup_table}
-
-    return emb_dict
-
-
-def get_embedding_dict(labels_dict, embedding_cols):
-    unique_embs = get_unique_embed_values(labels_dict, embedding_cols)
-    emb_dict = set_up_embedding_lookups(unique_embs)
-
-    return emb_dict
 
 
 def train_ignite(config) -> None:
