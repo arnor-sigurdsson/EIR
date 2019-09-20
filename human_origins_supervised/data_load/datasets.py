@@ -15,6 +15,7 @@ from human_origins_supervised.data_load.label_setup import (
     set_up_train_and_valid_labels,
     al_label_dict,
 )
+from .data_loading_funcs import make_random_snps_missing
 
 logger = get_logger(__name__)
 
@@ -48,6 +49,7 @@ def set_up_datasets(cl_args: Namespace) -> Tuple[al_datasets, al_datasets]:
         **dataset_class_common_args,
         labels_dict=train_labels,
         label_encoder=label_encoder,
+        na_augment=cl_args.na_augment,
     )
     valid_dataset = dataset_class(
         **dataset_class_common_args,
@@ -80,6 +82,7 @@ class ArrayDatasetBase(Dataset):
         label_encoder: Union[LabelEncoder, StandardScaler] = None,
         target_height: int = 4,
         target_width: int = None,
+        na_augment: float = 0.0,
         data_type: str = "packbits",
     ):
         super().__init__()
@@ -97,6 +100,8 @@ class ArrayDatasetBase(Dataset):
         self.labels_unique = None
         self.num_classes = None
         self.label_encoder = label_encoder
+
+        self.na_augment = na_augment
 
     def parse_label(
         self, sample_label_dict: Dict[str, Union[str, float]]
@@ -198,6 +203,9 @@ class MemoryArrayDataset(ArrayDatasetBase):
             right_padding = self.target_width - array.shape[2]
             array = pad(array, [0, right_padding])
 
+        if self.na_augment:
+            array = make_random_snps_missing(array, self.na_augment)
+
         return array, label, sample_id
 
     def __len__(self):
@@ -231,6 +239,8 @@ class DiskArrayDataset(ArrayDatasetBase):
             array = np.unpackbits(array).reshape(self.target_height, -1)
 
         array = torch.from_numpy(array).unsqueeze(0)
+        if self.na_augment:
+            array = make_random_snps_missing(array, self.na_augment)
 
         if self.target_width:
             right_padding = self.target_width - array.shape[2]

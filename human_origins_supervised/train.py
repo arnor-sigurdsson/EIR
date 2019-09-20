@@ -114,7 +114,7 @@ def main(cl_args):
     cl_args.data_width = train_dataset.data_width
 
     train_sampler = (
-        get_weighted_random_sampler(train_dataset, cl_args.label_column)
+        get_weighted_random_sampler(train_dataset)
         if cl_args.model_task == "cls" and cl_args.weighted_sampling
         else None
     )
@@ -255,6 +255,13 @@ if __name__ == "__main__":
         "--weighted_sampling",
         action="store_true",
         help="Whether to use weighted sampling when doing classification.",
+    )
+
+    parser.add_argument(
+        "--na_augment",
+        default=0.0,
+        type=float,
+        help="Percentage of SNPs to convert to NA in training set as data augmentation",
     )
 
     parser.add_argument(

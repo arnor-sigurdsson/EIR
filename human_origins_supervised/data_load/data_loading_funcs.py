@@ -1,15 +1,17 @@
 from collections import Counter
+from typing import TYPE_CHECKING
 
 import torch
+from aislib.misc_utils import get_logger
 from torch.utils.data import WeightedRandomSampler
 
-from aislib.misc_utils import get_logger
-from human_origins_supervised.data_load import datasets
+if TYPE_CHECKING:
+    from human_origins_supervised.data_load.datasets import ArrayDatasetBase
 
 logger = get_logger(__name__)
 
 
-def get_weighted_random_sampler(train_dataset: datasets.ArrayDatasetBase, label_column):
+def get_weighted_random_sampler(train_dataset: "ArrayDatasetBase"):
     """
     TODO: Use label column here after we add additional columns in dataset label dict.
 
@@ -49,3 +51,14 @@ def get_weighted_random_sampler(train_dataset: datasets.ArrayDatasetBase, label_
     )
 
     return sampler
+
+
+def make_random_snps_missing(array, percentage=0.05):
+    n_snps = array.shape[2]
+    n_to_drop = (int(n_snps * percentage),)
+    random_to_drop = torch.randint(0, n_snps, n_to_drop)
+
+    missing_arr = torch.tensor([0, 0, 0, 1], dtype=torch.uint8).reshape(-1, 1)
+    array[:, :, random_to_drop] = missing_arr
+
+    return array
