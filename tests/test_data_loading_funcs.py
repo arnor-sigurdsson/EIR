@@ -20,5 +20,4 @@ def test_make_random_snps_missing():
 
         assert (array.sum(1) != 1).sum() == 0
         expected_missing = torch.tensor([1] * 5, dtype=torch.uint8)
-        breakpoint()
         assert (array[:, 3, mock_return] == expected_missing).all()
