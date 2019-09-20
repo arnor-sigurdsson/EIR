@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict
 
 import aislib.pytorch as torch_utils
 import torch
@@ -6,6 +6,7 @@ from aislib.misc_utils import get_logger
 from torch import nn
 
 from .model_utils import find_no_resblocks_needed
+from . import embeddings
 
 logger = get_logger(__name__)
 
@@ -228,12 +229,30 @@ def make_conv_layers(
     return base_layers
 
 
+def calc_extra_embed_dim(embeddings_dict):
+    base = 0
+    if not embeddings_dict:
+        return base
+
+    for embed_col in embeddings_dict:
+        cur_embedding = embeddings_dict[embed_col]["embedding_module"]
+        base += cur_embedding.embedding_dim
+
+    return base
+
+
 class Model(nn.Module):
-    def __init__(self, run_config, num_classes):
+    def __init__(self, run_config, num_classes, embeddings_dict=None):
         super().__init__()
 
         self.run_config = run_config
         self.num_classes = num_classes
+        self.embeddings_dict = embeddings_dict
+
+        emb_total_dim = 0
+        if embeddings_dict:
+            emb_total_dim = embeddings.attach_embeddings(self, embeddings_dict)
+
         self.conv = nn.Sequential(
             *make_conv_layers(
                 self.resblocks, run_config.kernel_width, run_config.target_width
@@ -249,11 +268,12 @@ class Model(nn.Module):
         self.last_act = nn.Sequential(
             nn.BatchNorm2d(self.no_out_channels), nn.LeakyReLU()
         )
+
+        fc_in_features = (
+            self.data_size_after_conv * self.no_out_channels
+        ) + emb_total_dim
         self.fc = nn.Sequential(
-            nn.Dropout(run_config.do),
-            nn.Linear(
-                self.data_size_after_conv * self.no_out_channels, self.num_classes
-            ),
+            nn.Dropout(run_config.do), nn.Linear(fc_in_features, self.num_classes)
         )
 
         for m in self.modules():
@@ -263,10 +283,21 @@ class Model(nn.Module):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
-    def forward(self, x):
+    def forward(self, x, extra_labels: List[Dict[str, str]] = None):
         out = self.conv(x)
         out = self.last_act(out)
         out = out.view(out.shape[0], -1)
+
+        if extra_labels:
+            for col_key in self.embeddings_dict:
+                cur_embedding = embeddings.lookup_embeddings(
+                    self,
+                    self.embeddings_dict,
+                    col_key,
+                    extra_labels,
+                    self.run_config.device,
+                )
+                out = torch.cat((cur_embedding, out), dim=1)
 
         out = self.fc(out)
         return out

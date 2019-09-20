@@ -23,8 +23,11 @@ def streamline_df(
 
         df = df_func(*args, df=df, column_name=column_name, **kwargs)
 
-        df = df[column_name].to_frame()
-        df = df.dropna()
+        # TODO: Here is where all extra columns are dropped, move this somewhere else.
+        #       Otherwise we might run into problems when we are adding extra embedding
+        #       columns.
+        # df = df[column_name].to_frame()
+        df = df.dropna(subset=[column_name])
 
         df = df.astype(str)
 
