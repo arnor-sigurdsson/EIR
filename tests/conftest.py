@@ -49,6 +49,7 @@ def args_config():
             "do": 0.0,
             "memory_dataset": False,
             "embed_columns": [],
+            "na_augment": 0.0,
         }
     )
 
