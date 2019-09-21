@@ -412,21 +412,21 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
 
     trainer.add_event_handler(Events.EPOCH_COMPLETED, log_stats, pbar=pbar)
 
-    # If we want to keep the run, add the appropriate event handlers
     if args.run_name:
-        trainer = add_event_handlers(trainer, config, run_folder, args)
+        trainer = add_event_handlers(trainer, config, run_folder)
 
     return trainer
 
 
-# TODO: Of what type is "args"
+# TODO: mabye more descripive name
 # TODO: better docstring
-def add_event_handlers(trainer: Engine, config: "Config", run_folder: str, args):
+def add_event_handlers(trainer: Engine, config: "Config", run_folder: str):
     # If use has specified the run name, keep the output of the run, such as graphs
     """
     This makes sure to add the appropriate event handlers
     if the user wants to keep the output
     """
+    args = config.cl_args
     checkpoint_handler = ModelCheckpoint(
         Path(run_folder, "saved_models"),
         args.run_name,
