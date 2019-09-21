@@ -373,6 +373,7 @@ def plot_progress(
         hook_funcs.append(plot_benchmark_hook)
 
     n_iter_per_epoch = len(config.train_loader)
+
     if check_if_iteration_sample(
         engine.state.iteration, args.sample_interval, n_iter_per_epoch, args.n_epochs
     ):
@@ -383,44 +384,9 @@ def plot_progress(
             mfile.write(str(model))
 
 
-def configure_trainer(trainer: Engine, config: "Config") -> Engine:
-    """
-    NOTE:
-        **Important** the evaluate handler must be attached before the
-        ``save_progress`` function, as it manually adds validation metrics
-        to the engine state. I.e. we need to make sure they have been
-        calculated before calling ``save_progress`` during training.
-
-    TODO:
-        Check if there is a better way to address tohe above, e.g. reordering
-        the handlers in this func in the end?
-    """
-    args = config.cl_args
-
-    run_folder = "runs/" + args.run_name
-
-    for handler in evaluate, sample:
-        trainer.add_event_handler(
-            Events.ITERATION_COMPLETED, handler, config=config, run_folder=run_folder
-        )
-
-    monitoring_metrics = ["t_loss"] + get_train_metrics(model_task=args.model_task)
-    attach_metrics(trainer, monitoring_metrics)
-
-    pbar = ProgressBar()
-    pbar.attach(trainer, metric_names=monitoring_metrics)
-
-    trainer.add_event_handler(Events.EPOCH_COMPLETED, log_stats, pbar=pbar)
-
-    if args.run_name:
-        trainer = add_event_handlers(trainer, config, run_folder)
-
-    return trainer
-
-
 # TODO: mabye more descripive name
 # TODO: better docstring
-def add_event_handlers(trainer: Engine, config: "Config", run_folder: str):
+def _add_event_handlers(trainer: Engine, config: "Config", run_folder: str):
     # If use has specified the run name, keep the output of the run, such as graphs
     """
     This makes sure to add the appropriate event handlers
@@ -471,4 +437,39 @@ def add_event_handlers(trainer: Engine, config: "Config", run_folder: str):
         trainer.add_event_handler(
             Events.STARTED, benchmark, config=config, run_folder=run_folder
         )
+    return trainer
+
+
+def configure_trainer(trainer: Engine, config: "Config") -> Engine:
+    """
+    NOTE:
+        **Important** the evaluate handler must be attached before the
+        ``save_progress`` function, as it manually adds validation metrics
+        to the engine state. I.e. we need to make sure they have been
+        calculated before calling ``save_progress`` during training.
+
+    TODO:
+        Check if there is a better way to address tohe above, e.g. reordering
+        the handlers in this func in the end?
+    """
+    args = config.cl_args
+
+    run_folder = "runs/" + args.run_name
+
+    for handler in evaluate, sample:
+        trainer.add_event_handler(
+            Events.ITERATION_COMPLETED, handler, config=config, run_folder=run_folder
+        )
+
+    monitoring_metrics = ["t_loss"] + get_train_metrics(model_task=args.model_task)
+    attach_metrics(trainer, monitoring_metrics)
+
+    pbar = ProgressBar()
+    pbar.attach(trainer, metric_names=monitoring_metrics)
+
+    trainer.add_event_handler(Events.EPOCH_COMPLETED, log_stats, pbar=pbar)
+
+    if args.run_name:
+        trainer = _add_event_handlers(trainer, config, run_folder)
+
     return trainer
