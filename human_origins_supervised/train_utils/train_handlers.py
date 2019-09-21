@@ -412,50 +412,63 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
 
     trainer.add_event_handler(Events.EPOCH_COMPLETED, log_stats, pbar=pbar)
 
+    # If we want to keep the run, add the appropriate event handlers
     if args.run_name:
-        checkpoint_handler = ModelCheckpoint(
-            Path(run_folder, "saved_models"),
-            args.run_name,
-            create_dir=True,
-            n_saved=100,
-            save_interval=args.checkpoint_interval,
-            save_as_state_dict=True,
+        trainer = add_event_handlers(trainer, config, run_folder, args)
+
+    return trainer
+
+
+# TODO: Of what type is "args"
+# TODO: better docstring
+def add_event_handlers(trainer: Engine, config: "Config", run_folder: str, args):
+    # If use has specified the run name, keep the output of the run, such as graphs
+    """
+    This makes sure to add the appropriate event handlers
+    if the user wants to keep the output
+    """
+    checkpoint_handler = ModelCheckpoint(
+        Path(run_folder, "saved_models"),
+        args.run_name,
+        create_dir=True,
+        n_saved=100,
+        save_interval=args.checkpoint_interval,
+        save_as_state_dict=True,
+    )
+
+    if args.model_task == "cls":
+        np.save(
+            Path(run_folder, "saved_models", "classes.npy"),
+            config.label_encoder.classes_,
         )
 
-        if args.model_task == "cls":
-            np.save(
-                Path(run_folder, "saved_models", "classes.npy"),
-                config.label_encoder.classes_,
-            )
+    with open(run_folder + "/run_config.json", "w") as config_file:
+        config_dict = vars(args)
+        json.dump(config_dict, config_file, sort_keys=True, indent=4)
 
-        with open(run_folder + "/run_config.json", "w") as config_file:
-            config_dict = vars(args)
-            json.dump(config_dict, config_file, sort_keys=True, indent=4)
+    trainer.add_event_handler(
+        Events.EPOCH_COMPLETED, checkpoint_handler, to_save={"model": config.model}
+    )
 
+    # this needs to be attached before plot progress so we have the last row
+    # when plotting
+    trainer.add_event_handler(
+        Events.ITERATION_COMPLETED,
+        write_metrics,
+        run_folder=run_folder,
+        run_name=args.run_name,
+    )
+
+    trainer.add_event_handler(
+        Events.ITERATION_COMPLETED,
+        plot_progress,
+        config=config,
+        run_folder=run_folder,
+        model=config.model,
+    )
+
+    if args.benchmark:
         trainer.add_event_handler(
-            Events.EPOCH_COMPLETED, checkpoint_handler, to_save={"model": config.model}
+            Events.STARTED, benchmark, config=config, run_folder=run_folder
         )
-
-        # this needs to be attached before plot progress so we have the last row
-        # when plotting
-        trainer.add_event_handler(
-            Events.ITERATION_COMPLETED,
-            write_metrics,
-            run_folder=run_folder,
-            run_name=args.run_name,
-        )
-
-        trainer.add_event_handler(
-            Events.ITERATION_COMPLETED,
-            plot_progress,
-            config=config,
-            run_folder=run_folder,
-            model=config.model,
-        )
-
-        if args.benchmark:
-            trainer.add_event_handler(
-                Events.STARTED, benchmark, config=config, run_folder=run_folder
-            )
-
     return trainer
