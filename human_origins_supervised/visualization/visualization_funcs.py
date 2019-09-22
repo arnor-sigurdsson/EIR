@@ -6,8 +6,10 @@ import matplotlib
 import numpy as np
 import pandas as pd
 from scipy import interp
+from scipy.stats import pearsonr
 from sklearn.metrics import (
     roc_curve,
+    r2_score,
     auc,
     precision_recall_curve,
     average_precision_score,
@@ -145,7 +147,19 @@ def generate_regression_prediction_plot(
     y_true = encoder.inverse_transform(y_true.reshape(-1, 1))
     y_outp = encoder.inverse_transform(y_outp.reshape(-1, 1))
 
+    r2 = r2_score(y_true, y_outp)
+    pcc = pearsonr(y_true.squeeze(), y_outp.squeeze())[0]
+
     ax.scatter(y_outp, y_true, edgecolors=(0, 0, 0))
+    ax.text(
+        x=0.05,
+        y=0.95,
+        s=f"R2 = {r2:.2f}, PCC = {pcc:.2f}",
+        ha="left",
+        va="top",
+        transform=ax.transAxes,
+    )
+
     ax.plot([y_true.min(), y_true.max()], [y_true.min(), y_true.max()], "k--", lw=2)
     ax.set_xlabel("Predicted")
     ax.set_ylabel("Measured")
