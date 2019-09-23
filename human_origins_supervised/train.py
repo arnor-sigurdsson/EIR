@@ -9,7 +9,7 @@ from aislib.misc_utils import get_logger, ensure_path_exists
 from ignite.engine import Engine
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from torch import nn
-from torch.optim import Adam
+from torch.optim.adamw import AdamW
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 
@@ -147,7 +147,7 @@ def main(cl_args):
     if cl_args.debug:
         breakpoint()
 
-    optimizer = Adam(
+    optimizer = AdamW(
         model.parameters(),
         lr=cl_args.lr,
         betas=(cl_args.b1, cl_args.b2),
@@ -208,7 +208,7 @@ if __name__ == "__main__":
         default=0.999,
         help="adam: decay of second order momentum of gradient",
     )
-    parser.add_argument("--wd", type=float, default=5e-4, help="weight decay for adam.")
+    parser.add_argument("--wd", type=float, default=1e-5, help="weight decay for adam.")
 
     parser.add_argument(
         "--kernel_width",
