@@ -150,7 +150,7 @@ def generate_regression_prediction_plot(
     r2 = r2_score(y_true, y_outp)
     pcc = pearsonr(y_true.squeeze(), y_outp.squeeze())[0]
 
-    ax.scatter(y_outp, y_true, edgecolors=(0, 0, 0))
+    ax.scatter(y_outp, y_true, edgecolors=(0, 0, 0), alpha=0.2, s=10)
     ax.text(
         x=0.05,
         y=0.95,
