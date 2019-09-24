@@ -46,6 +46,7 @@ def args_config():
             "get_acts": True,
             "benchmark": True,
             "kernel_width": 12,
+            "channel_exp_base": 5,
             "do": 0.0,
             "memory_dataset": False,
             "embed_columns": [],

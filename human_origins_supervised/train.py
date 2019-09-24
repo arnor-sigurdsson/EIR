@@ -216,6 +216,14 @@ if __name__ == "__main__":
         default=12,
         help="base width of the conv kernels used.",
     )
+
+    parser.add_argument(
+        "--channel_exp_base",
+        type=int,
+        default=5,
+        help="Exponential base for channels in first layer (i.e. default is 2**5)",
+    )
+
     parser.add_argument(
         "--resblocks",
         type=int,
