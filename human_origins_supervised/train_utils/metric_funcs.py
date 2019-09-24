@@ -5,6 +5,7 @@ import torch
 import numpy as np
 from sklearn.metrics import matthews_corrcoef, r2_score, mean_squared_error
 from sklearn.preprocessing import StandardScaler
+from scipy.stats import pearsonr
 
 
 def calc_multiclass_metrics(
@@ -34,11 +35,13 @@ def calc_regression_metrics(
 
     if len(preds) < 2:
         r2 = 0
+        pcc = 0
     else:
         r2 = r2_score(y_true=labels, y_pred=preds)
+        pcc = pearsonr(labels, preds)[0]
     rmse = np.sqrt(mean_squared_error(y_true=labels, y_pred=preds))
 
-    return {f"{prefix}_r2": r2, f"{prefix}_rmse": rmse}
+    return {f"{prefix}_r2": r2, f"{prefix}_rmse": rmse, f"{prefix}_pcc": pcc}
 
 
 def select_metric_func(model_task: str, label_encoder: StandardScaler):
@@ -50,6 +53,6 @@ def select_metric_func(model_task: str, label_encoder: StandardScaler):
 
 def get_train_metrics(model_task, prefix="t"):
     if model_task == "reg":
-        return [f"{prefix}_r2", f"{prefix}_rmse"]
+        return [f"{prefix}_r2", f"{prefix}_rmse", f"{prefix}_pcc"]
     elif model_task == "cls":
         return [f"{prefix}_mcc"]
