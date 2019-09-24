@@ -152,10 +152,10 @@ class Block(AbstractBlock):
 
         out = self.conv_1(out)
 
-        out = self.do(out)
-
         out = self.bn_2(out)
         out = self.act(out)
+
+        out = self.do(out)
         out = self.conv_2(out)
 
         out = out + identity
