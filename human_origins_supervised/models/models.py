@@ -139,6 +139,7 @@ class Block(AbstractBlock):
         super().__init__(*args, **kwargs)
 
         self.full_preact = full_preact
+        self.do = nn.Dropout2d(0.3)
 
     def forward(self, x):
         out = self.bn_1(x)
@@ -150,6 +151,8 @@ class Block(AbstractBlock):
             identity = self.downsample_identity(x)
 
         out = self.conv_1(out)
+
+        out = self.do(out)
 
         out = self.bn_2(out)
         out = self.act(out)
