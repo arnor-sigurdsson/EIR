@@ -170,7 +170,10 @@ def set_up_conv_params(current_width: int, kernel_size: int, stride: int):
 
 
 def make_conv_layers(
-    residual_blocks: List[int], kernel_base_width: int, input_width: int
+    residual_blocks: List[int],
+    kernel_base_width: int,
+    channel_exp_base: int,
+    input_width: int,
 ) -> List[nn.Module]:
     """
     Used to set up the convolutional layers for the model. Based on the passed in
@@ -184,10 +187,10 @@ def make_conv_layers(
     :param residual_blocks: List of ints, where each int indicates number of blocks w.
     that channel dimension.
     :param kernel_base_width: Width of the kernels applied during convolutions.
+    :param channel_exp_base: Number of channels in first layer (2 in the power of).
     :param input_width: Used to calculate convolutional parameters.
     :return: A list of `nn.Module` objects to be passed to `nn.Sequential`.
     """
-    base_chn_exp = 5
     down_stride_w = 4
     first_kernel, first_pad = set_up_conv_params(
         input_width, kernel_base_width, down_stride_w
@@ -195,7 +198,7 @@ def make_conv_layers(
     base_layers = [
         FirstBlock(
             in_channels=1,
-            out_channels=2 ** base_chn_exp,
+            out_channels=2 ** channel_exp_base,
             conv_1_kernel_w=first_kernel,
             conv_1_padding=first_pad,
             down_stride_w=down_stride_w,
@@ -212,7 +215,7 @@ def make_conv_layers(
             )
 
             cur_in_channels = base_layers[-1].out_channels
-            cur_out_channels = 2 ** (base_chn_exp + layer_arch_idx)
+            cur_out_channels = 2 ** (channel_exp_base + layer_arch_idx)
             cur_layer = Block(
                 in_channels=cur_in_channels,
                 out_channels=cur_out_channels,
@@ -255,7 +258,10 @@ class Model(nn.Module):
 
         self.conv = nn.Sequential(
             *make_conv_layers(
-                self.resblocks, run_config.kernel_width, run_config.target_width
+                self.resblocks,
+                run_config.kernel_width,
+                run_config.channel_exp_base,
+                run_config.target_width,
             )
         )
 

@@ -11,7 +11,7 @@ from human_origins_supervised.data_load.common_ops import ColumnOperation
 
 try:
     from human_origins_supervised.data_load import COLUMN_OPS
-except ModuleNotFoundError:
+except ImportError:
     COLUMN_OPS = {}
 
 from aislib.misc_utils import get_logger
