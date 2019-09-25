@@ -5,8 +5,8 @@ import torch
 from aislib.misc_utils import get_logger
 from torch import nn
 
-from .model_utils import find_no_resblocks_needed
 from . import embeddings
+from .model_utils import find_no_resblocks_needed
 
 logger = get_logger(__name__)
 
@@ -75,7 +75,7 @@ class AbstractBlock(nn.Module):
         self.conv_1_kernel_h = 4 if isinstance(self, FirstBlock) else 1
         self.down_stride_h = self.conv_1_kernel_h
 
-        self.act = nn.LeakyReLU()
+        self.act = nn.ReLU()
 
         self.bn_1 = nn.BatchNorm2d(in_channels, out_channels)
         self.conv_1 = nn.Conv2d(
@@ -274,13 +274,11 @@ class Model(nn.Module):
 
         self.no_out_channels = self.conv[-1].out_channels
 
-        self.last_act = nn.Sequential(
-            nn.BatchNorm2d(self.no_out_channels), nn.LeakyReLU()
-        )
-
         fc_in_features = (
             self.data_size_after_conv * self.no_out_channels
         ) + emb_total_dim
+
+        self.last_act = nn.Sequential(nn.BatchNorm1d(fc_in_features), nn.ReLU())
         self.fc = nn.Sequential(
             nn.Dropout(run_config.do), nn.Linear(fc_in_features, self.num_classes)
         )
@@ -288,13 +286,12 @@ class Model(nn.Module):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 nn.init.kaiming_normal_(m.weight, mode="fan_out")
-            elif isinstance(m, nn.BatchNorm2d):
+            elif isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.BatchNorm1d):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
     def forward(self, x, extra_labels: List[Dict[str, str]] = None):
         out = self.conv(x)
-        out = self.last_act(out)
         out = out.view(out.shape[0], -1)
 
         if extra_labels:
@@ -308,6 +305,7 @@ class Model(nn.Module):
                 )
                 out = torch.cat((cur_embedding, out), dim=1)
 
+        out = self.last_act(out)
         out = self.fc(out)
         return out
 
