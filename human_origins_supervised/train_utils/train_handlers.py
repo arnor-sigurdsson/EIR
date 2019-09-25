@@ -34,6 +34,15 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 
+class MyRunningAverage(RunningAverage):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def attach(self, engine, name):
+        engine.add_event_handler(Events.ITERATION_COMPLETED, self.iteration_completed)
+        engine.add_event_handler(Events.ITERATION_COMPLETED, self.completed, name)
+
+
 def check_if_iteration_sample(
     iteration: int, iter_sample_interval: int, n_iterations_per_epochs, n_epochs
 ):
@@ -325,7 +334,7 @@ def attach_metrics(engine: Engine, monitoring_metrics: List[str]) -> None:
     """
     for metric in monitoring_metrics:
         partial_func = partial(lambda x, metric_: x[metric_], metric_=metric)
-        RunningAverage(output_transform=partial_func).attach(engine, metric)
+        MyRunningAverage(output_transform=partial_func).attach(engine, metric)
 
 
 def log_stats(engine: Engine, pbar: ProgressBar) -> None:
