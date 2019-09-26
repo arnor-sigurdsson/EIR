@@ -13,7 +13,7 @@ from sklearn.metrics import matthews_corrcoef
 from torch.utils.data import DataLoader
 
 from human_origins_supervised.models import model_utils
-from human_origins_supervised.visualization import model_visualization as mv
+from human_origins_supervised.train_utils import activation_analysis as av
 from human_origins_supervised.visualization import visualization_funcs as vf
 
 if TYPE_CHECKING:
@@ -203,4 +203,4 @@ def benchmark(engine: Engine, config: "Config", run_folder: Path) -> None:
 
         act_func = partial(linear_act_func, explainer_=explainer)
 
-        mv.analyze_activations(config, act_func, proc_funcs, benchmark_folder)
+        av.analyze_activations(config, act_func, proc_funcs, benchmark_folder)

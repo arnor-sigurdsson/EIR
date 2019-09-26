@@ -18,3 +18,16 @@ def get_extra_labels_from_ids(
         extra_labels.append(cur_labels_extra)
 
     return extra_labels
+
+
+def check_if_iteration_sample(
+    iteration: int, iter_sample_interval: int, n_iterations_per_epochs, n_epochs
+):
+    if iter_sample_interval:
+        condition_1 = iteration % iter_sample_interval == 0
+    else:
+        condition_1 = False
+
+    condition_2 = iteration == n_iterations_per_epochs * n_epochs
+
+    return condition_1 or condition_2

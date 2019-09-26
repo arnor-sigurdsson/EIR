@@ -1,27 +1,27 @@
+import copy
 import os
 import sys
 from contextlib import contextmanager
 from copy import deepcopy
+from functools import partial
 from pathlib import Path
-from typing import Dict, List, Callable, Tuple, TYPE_CHECKING
+from typing import Callable, Dict, Tuple, List, TYPE_CHECKING
 
-import matplotlib
 import numpy as np
 import pandas as pd
 import torch
+from aislib.misc_utils import ensure_path_exists, get_logger
+from ignite.engine import Engine
 from shap import DeepExplainer
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import Dataset, DataLoader
 
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-from matplotlib import gridspec
-import matplotlib.cm as cm
-
+import human_origins_supervised.visualization.activation_visualization as av
+from human_origins_supervised.models import model_utils
 from human_origins_supervised.models.model_utils import gather_dloader_samples
-
-from aislib.misc_utils import get_logger
+from human_origins_supervised.train_utils.utils import check_if_iteration_sample
 
 if TYPE_CHECKING:
+    from human_origins_supervised.train_utils.train_handlers import HandlerConfig
     from human_origins_supervised.train import Config
 
 logger = get_logger(__name__)
@@ -307,62 +307,6 @@ def gather_and_rescale_snps(
     return top_snps_dict
 
 
-def plot_top_gradients(
-    accumulated_grads: Dict,
-    top_gradients_dict: Dict,
-    snp_names: np.array,
-    output_folder: Path,
-    fname="top_snps.png",
-    custom_ylabel=None,
-):
-    n_cls = len(top_gradients_dict.keys())
-    classes = sorted(list(top_gradients_dict.keys()))
-
-    grads_scaled: dict = gather_and_rescale_snps(
-        accumulated_grads, top_gradients_dict, classes
-    )
-
-    fig = plt.figure(figsize=(n_cls * 4, n_cls * 2 + 1))
-    gs = gridspec.GridSpec(n_cls, n_cls, wspace=0.2, hspace=0.2)
-
-    for grad_idx, col_name in enumerate(classes):
-        cls_top_idxs = top_gradients_dict[col_name]["top_n_idxs"]
-
-        for cls_idx, row_name in enumerate(classes):
-
-            cur_grads = grads_scaled[col_name][row_name]
-
-            cur_ax = plt.subplot(gs[cls_idx, grad_idx])
-            cur_ax.imshow(cur_grads, vmin=0, vmax=1)
-
-            ylabel = row_name if not custom_ylabel else custom_ylabel
-            cur_ax.set_ylabel(ylabel)
-
-            if cls_idx == n_cls - 1:
-                top_snp_names = snp_names[cls_top_idxs]
-                cur_ax.set_xticks(np.arange(len(top_snp_names)))
-                cur_ax.set_xticklabels(top_snp_names)
-                plt.setp(cur_ax.get_xticklabels(), rotation=90, ha="center")
-            else:
-                cur_ax.set_xticklabels([])
-                cur_ax.set_xticks([])
-
-            cur_ax.set_yticks(np.arange(4))
-            cur_ax.set_yticklabels(["0", "1", "2", "MIS"])
-
-    axs = fig.get_axes()
-    for ax, col_title in zip(axs[::n_cls], classes):
-        ax.set_title(f"Top {col_title} SNPs")
-
-    for ax in axs:
-        ax.label_outer()
-
-    # plt.tight_layout gives a warning here, seems to be gs specific behavior
-    gs.tight_layout(fig)
-    plt.savefig(output_folder / fname, bbox_inches="tight")
-    plt.close()
-
-
 def index_masked_grads(top_grads_dict, accumulated_grads_times_input):
     indexes_from_all_grads = {
         key: top_grads_dict[key]["top_n_idxs"] for key in top_grads_dict.keys()
@@ -380,8 +324,12 @@ def save_masked_grads(
 ):
     top_grads_msk_inputs = index_masked_grads(top_gradients_dict, acc_grads_times_inp)
 
-    plot_top_gradients(
-        acc_grads_times_inp,
+    classes = sorted(list(top_gradients_dict.keys()))
+    scaled_grads = gather_and_rescale_snps(
+        acc_grads_times_inp, top_grads_msk_inputs, classes
+    )
+    av.plot_top_gradients(
+        scaled_grads,
         top_grads_msk_inputs,
         snp_names,
         sample_outfolder,
@@ -389,49 +337,6 @@ def save_masked_grads(
     )
 
     np.save(sample_outfolder / "top_grads_masked.npy", top_grads_msk_inputs)
-
-
-def plot_snp_gradients(accumulated_grads, outfolder, type_="avg"):
-    n_classes = len(accumulated_grads.keys())
-
-    colors = iter(cm.tab20(np.arange(n_classes)))
-
-    fig, ax = plt.subplots(figsize=(12, 6))
-
-    out_path = outfolder / f"snp_grads_per_class_{type_}.png"
-
-    for label, grads in accumulated_grads.items():
-        if grads:
-            color = next(colors)
-
-            if type_ == "avg":
-                grads_averaged = np.array(grads).mean(0).sum(0)
-
-                ax.plot(grads_averaged, label=label, color=color, lw=0.5)
-
-            elif type_ == "single":
-                for idx, single_grad in enumerate(grads):
-                    single_grad_sum = single_grad.sum(0)
-
-                    ax.plot(
-                        single_grad_sum,
-                        color=color,
-                        label=label if idx == 0 else "",
-                        lw=0.5,
-                    )
-        else:
-            logger.warning(
-                "No gradients aggregated for class %s due to no "
-                "correct predictions for the class, gradient "
-                "will not be plotted in line plot (%s).",
-                label,
-                out_path,
-            )
-
-    plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
-    plt.tight_layout()
-    plt.savefig(out_path, bbox_inches="tight")
-    plt.close()
 
 
 def analyze_activations(config: "Config", act_func, proc_funcs, outfolder):
@@ -447,10 +352,60 @@ def analyze_activations(config: "Config", act_func, proc_funcs, outfolder):
 
     snp_names = get_snp_names(args.snp_file, Path(args.data_folder))
 
-    plot_top_gradients(acc_acts, top_gradients_dict, snp_names, outfolder)
+    classes = sorted(list(top_gradients_dict.keys()))
+    scaled_grads = gather_and_rescale_snps(acc_acts, top_gradients_dict, classes)
+    av.plot_top_gradients(scaled_grads, top_gradients_dict, snp_names, outfolder)
 
     np.save(outfolder / "top_acts.npy", top_gradients_dict)
 
     save_masked_grads(acc_acts_masked, top_gradients_dict, snp_names, outfolder)
 
-    plot_snp_gradients(acc_acts, outfolder, "avg")
+    av.plot_snp_gradients(acc_acts, outfolder, "avg")
+
+
+def activation_analysis_handler(engine: Engine, run: "HandlerConfig") -> None:
+    """
+    We need to copy the model to avoid affecting the actual model during
+    training (e.g. zero-ing out gradients).
+
+    TODO: Refactor this function further – reuse for parts for benchmarking.
+    """
+
+    c = run.config
+    args = c.cl_args
+
+    def pre_transform(single_sample, sample_label):
+        single_sample = single_sample.to(device=args.device, dtype=torch.float32)
+
+        sample_label = sample_label.to(device=args.device)
+        sample_label = model_utils.cast_labels(args.model_task, sample_label)
+
+        return single_sample, sample_label
+
+    iteration = engine.state.iteration
+    n_iter_per_epoch = len(c.train_loader)
+    do_sample = check_if_iteration_sample(
+        iteration, args.sample_interval, n_iter_per_epoch, args.n_epochs
+    )
+    do_acts = args.get_acts
+
+    if do_sample:
+        sample_outfolder = Path(run.run_folder, "samples", str(iteration))
+        ensure_path_exists(sample_outfolder, is_folder=True)
+
+        if do_acts:
+            model_copy = copy.deepcopy(c.model)
+
+            no_explainer_background_samples = np.max([int(args.batch_size / 8), 16])
+            explainer = get_shap_object(
+                model_copy, args.device, c.train_loader, no_explainer_background_samples
+            )
+
+            proc_funcs = {"pre": (pre_transform,)}
+            act_func = partial(
+                get_shap_sample_acts_deep,
+                explainer=explainer,
+                model_task=args.model_task,
+            )
+
+            analyze_activations(run.config, act_func, proc_funcs, sample_outfolder)
