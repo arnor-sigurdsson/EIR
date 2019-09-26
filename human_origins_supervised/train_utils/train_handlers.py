@@ -4,6 +4,7 @@ import json
 from functools import partial
 from pathlib import Path
 from typing import List, Union, TYPE_CHECKING
+from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
@@ -15,7 +16,6 @@ from ignite.handlers import ModelCheckpoint
 from ignite.metrics import RunningAverage
 from scipy.special import softmax
 from sklearn.preprocessing import LabelEncoder, StandardScaler
-from torch import nn
 
 from human_origins_supervised.models import model_utils
 from human_origins_supervised.train_utils.benchmark import benchmark
@@ -229,14 +229,23 @@ def save_evaluation_results(
         scale_and_save_regression_preds(**common_args)
 
 
-def evaluate(engine: Engine, config: "Config", run_folder: Path) -> None:
+@dataclass
+class RunConfig:
+    config: "Config"
+    run_folder: Path
+    run_name: str
+    pbar: ProgressBar
+    monitoring_metrics: List[str]
+
+
+def evaluate(engine: Engine, run: "RunConfig") -> None:
     """
     A bit hacky how we manually attach metrics here, but that's because we
     don't want to evaluate as a running average (i.e. do it in the step
     function), but rather run over the whole validation dataset as we do
     in this function.
     """
-    c = config
+    c = run.config
     args = c.cl_args
     iteration = engine.state.iteration
 
@@ -281,12 +290,12 @@ def evaluate(engine: Engine, config: "Config", run_folder: Path) -> None:
         val_labels=val_labels_total,
         val_ids=val_ids_total,
         iteration=iteration,
-        run_folder=run_folder,
-        config=config,
+        run_folder=run.run_folder,
+        config=run.config,
     )
 
 
-def sample(engine: Engine, config: "Config", run_folder: Path) -> None:
+def sample(engine: Engine, run: "RunConfig") -> None:
     """
     We need to copy the model to avoid affecting the actual model during
     training (e.g. zero-ing out gradients).
@@ -294,7 +303,7 @@ def sample(engine: Engine, config: "Config", run_folder: Path) -> None:
     TODO: Refactor this function further – reuse for parts for benchmarking.
     """
 
-    c = config
+    c = run.config
     args = c.cl_args
 
     def pre_transform(single_sample, sample_label):
@@ -313,7 +322,7 @@ def sample(engine: Engine, config: "Config", run_folder: Path) -> None:
     do_acts = args.get_acts
 
     if do_sample:
-        sample_outfolder = Path(run_folder, "samples", str(iteration))
+        sample_outfolder = Path(run.run_folder, "samples", str(iteration))
         ensure_path_exists(sample_outfolder, is_folder=True)
 
         if do_acts:
@@ -331,10 +340,10 @@ def sample(engine: Engine, config: "Config", run_folder: Path) -> None:
                 model_task=args.model_task,
             )
 
-            mv.analyze_activations(config, act_func, proc_funcs, sample_outfolder)
+            mv.analyze_activations(run.config, act_func, proc_funcs, sample_outfolder)
 
 
-def attach_metrics(engine: Engine, monitoring_metrics: List[str]) -> None:
+def attach_metrics(engine: Engine, run: "RunConfig") -> None:
     """
     For each metric, we crate an output_transform function that grabs the
     target variable from the output of the step function (which is a dict).
@@ -345,42 +354,39 @@ def attach_metrics(engine: Engine, monitoring_metrics: List[str]) -> None:
     We use a partial so each lambda has it's own metric variable (otherwise
     they all reference the same object as it gets overwritten).
     """
-    for metric in monitoring_metrics:
+    for metric in run.monitoring_metrics:
         partial_func = partial(lambda x, metric_: x[metric_], metric_=metric)
         MyRunningAverage(output_transform=partial_func, alpha=0.95).attach(
             engine, metric
         )
 
 
-def log_stats(engine: Engine, pbar: ProgressBar) -> None:
+def log_stats(engine: Engine, run: "RunConfig") -> None:
     log_string = f"[Epoch {engine.state.epoch}/{engine.state.max_epochs}]"
 
     for name, value in engine.state.metrics.items():
         if name.startswith("t_"):
             log_string += f" | {name}: {value:.4f}"
 
-    pbar.log_message(log_string)
+    run.pbar.log_message(log_string)
 
 
-def write_metrics(engine: Engine, run_folder: Path, run_name: str):
-    if run_name:
-        with open(str(run_folder) + "/training_history.log", "a") as logfile:
-            fieldnames = sorted(engine.state.metrics.keys())
-            writer = csv.DictWriter(logfile, fieldnames=fieldnames)
+def write_metrics(engine: Engine, run: "RunConfig"):
+    with open(str(run.run_folder) + "/training_history.log", "a") as logfile:
+        fieldnames = sorted(engine.state.metrics.keys())
+        writer = csv.DictWriter(logfile, fieldnames=fieldnames)
 
-            if engine.state.iteration == 1:
-                writer.writeheader()
-            writer.writerow(engine.state.metrics)
+        if engine.state.iteration == 1:
+            writer.writeheader()
+        writer.writerow(engine.state.metrics)
 
 
-def plot_progress(
-    engine: Engine, config: "Config", run_folder: Path, model: nn.Module
-) -> None:
-    args = config.cl_args
+def plot_progress(engine: Engine, run: "RunConfig") -> None:
+    args = run.config.cl_args
     hook_funcs = []
 
     def plot_benchmark_hook(ax):
-        benchmark_file = Path(run_folder, "benchmark/benchmark_metrics.txt")
+        benchmark_file = Path(run.run_folder, "benchmark/benchmark_metrics.txt")
         with open(str(benchmark_file), "r") as bfile:
             lines = [i.strip() for i in bfile if i.startswith("VAL MCC")]
             value = float(lines[0].split(": ")[-1])
@@ -396,15 +402,60 @@ def plot_progress(
     if args.benchmark:
         hook_funcs.append(plot_benchmark_hook)
 
-    n_iter_per_epoch = len(config.train_loader)
+    n_iter_per_epoch = len(run.config.train_loader)
+
     if check_if_iteration_sample(
         engine.state.iteration, args.sample_interval, n_iter_per_epoch, args.n_epochs
     ):
-        metrics_file = Path(run_folder, "training_history.log")
+        metrics_file = Path(run.run_folder, "training_history.log")
         vf.generate_all_plots(metrics_file, hook_funcs=hook_funcs)
 
-        with open(Path(run_folder, "model_info.txt"), "w") as mfile:
-            mfile.write(str(model))
+        with open(Path(run.run_folder, "model_info.txt"), "w") as mfile:
+            mfile.write(str(run.config.model))
+
+
+# TODO: mabye more descripive name
+# TODO: better docstring
+def _add_event_handlers(trainer: Engine, run: "RunConfig"):
+    # If use has specified the run name, keep the output of the run, such as graphs
+    """
+    This makes sure to add the appropriate event handlers
+    if the user wants to keep the output
+    """
+    args = run.config.cl_args
+    checkpoint_handler = ModelCheckpoint(
+        Path(run.run_folder, "saved_models"),
+        args.run_name,
+        create_dir=True,
+        n_saved=100,
+        save_interval=args.checkpoint_interval,
+        save_as_state_dict=True,
+    )
+
+    if args.model_task == "cls":
+        np.save(
+            Path(run.run_folder, "saved_models", "classes.npy"),
+            run.config.label_encoder.classes_,
+        )
+
+    with open(run.run_folder + "/run_config.json", "w") as config_file:
+        config_dict = vars(args)
+        json.dump(config_dict, config_file, sort_keys=True, indent=4)
+
+    trainer.add_event_handler(
+        Events.EPOCH_COMPLETED, checkpoint_handler, to_save={"model": run.config.model}
+    )
+
+    # this needs to be attached before plot progress so we have the last row
+    # when plotting
+    trainer.add_event_handler(Events.ITERATION_COMPLETED, write_metrics, run=run)
+    trainer.add_event_handler(Events.ITERATION_COMPLETED, plot_progress, run=run)
+
+    if args.benchmark:
+        trainer.add_event_handler(
+            Events.STARTED, benchmark, config=run.config, run_folder=run.run_folder
+        )
+    return trainer
 
 
 def configure_trainer(trainer: Engine, config: "Config") -> Engine:
@@ -420,66 +471,22 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
         the handlers in this func in the end?
     """
     args = config.cl_args
-
     run_folder = "runs/" + args.run_name
+    pbar = ProgressBar()
+    run_name = args.run_name
+    monitoring_metrics = ["t_loss"] + get_train_metrics(model_task=args.model_task)
+
+    run = RunConfig(config, run_folder, run_name, pbar, monitoring_metrics)
 
     for handler in evaluate, sample:
-        trainer.add_event_handler(
-            Events.ITERATION_COMPLETED, handler, config=config, run_folder=run_folder
-        )
+        trainer.add_event_handler(Events.ITERATION_COMPLETED, handler, run=run)
 
-    monitoring_metrics = ["t_loss"] + get_train_metrics(model_task=args.model_task)
-    attach_metrics(trainer, monitoring_metrics)
+    attach_metrics(trainer, run=run)
+    pbar.attach(trainer, metric_names=run.monitoring_metrics)
 
-    pbar = ProgressBar()
-    pbar.attach(trainer, metric_names=monitoring_metrics)
+    trainer.add_event_handler(Events.EPOCH_COMPLETED, log_stats, run=run)
 
-    trainer.add_event_handler(Events.EPOCH_COMPLETED, log_stats, pbar=pbar)
-
-    if args.run_name:
-        checkpoint_handler = ModelCheckpoint(
-            Path(run_folder, "saved_models"),
-            args.run_name,
-            create_dir=True,
-            n_saved=100,
-            save_interval=args.checkpoint_interval,
-            save_as_state_dict=True,
-        )
-
-        if args.model_task == "cls":
-            np.save(
-                Path(run_folder, "saved_models", "classes.npy"),
-                config.label_encoder.classes_,
-            )
-
-        with open(run_folder + "/run_config.json", "w") as config_file:
-            config_dict = vars(args)
-            json.dump(config_dict, config_file, sort_keys=True, indent=4)
-
-        trainer.add_event_handler(
-            Events.EPOCH_COMPLETED, checkpoint_handler, to_save={"model": config.model}
-        )
-
-        # this needs to be attached before plot progress so we have the last row
-        # when plotting
-        trainer.add_event_handler(
-            Events.ITERATION_COMPLETED,
-            write_metrics,
-            run_folder=run_folder,
-            run_name=args.run_name,
-        )
-
-        trainer.add_event_handler(
-            Events.ITERATION_COMPLETED,
-            plot_progress,
-            config=config,
-            run_folder=run_folder,
-            model=config.model,
-        )
-
-        if args.benchmark:
-            trainer.add_event_handler(
-                Events.STARTED, benchmark, config=config, run_folder=run_folder
-            )
+    if run.run_name:
+        trainer = _add_event_handlers(trainer, run)
 
     return trainer
