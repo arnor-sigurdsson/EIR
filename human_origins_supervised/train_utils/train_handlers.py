@@ -35,12 +35,25 @@ logger = get_logger(__name__)
 
 
 class MyRunningAverage(RunningAverage):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, epoch_bound=True, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        self.epoch_bound = epoch_bound
+
     def attach(self, engine, name):
+        if self.epoch_bound:
+            engine.add_event_handler(Events.EPOCH_STARTED, self.started)
         engine.add_event_handler(Events.ITERATION_COMPLETED, self.iteration_completed)
         engine.add_event_handler(Events.ITERATION_COMPLETED, self.completed, name)
+
+    def compute(self):
+        if self._value is None:
+            self._value = self._get_src_value()
+        else:
+            self._value = (
+                self._get_src_value() * self.alpha + (1.0 - self.alpha) * self._value
+            )
+        return self._value
 
 
 def check_if_iteration_sample(
@@ -334,7 +347,9 @@ def attach_metrics(engine: Engine, monitoring_metrics: List[str]) -> None:
     """
     for metric in monitoring_metrics:
         partial_func = partial(lambda x, metric_: x[metric_], metric_=metric)
-        MyRunningAverage(output_transform=partial_func).attach(engine, metric)
+        MyRunningAverage(output_transform=partial_func, alpha=0.95).attach(
+            engine, metric
+        )
 
 
 def log_stats(engine: Engine, pbar: ProgressBar) -> None:

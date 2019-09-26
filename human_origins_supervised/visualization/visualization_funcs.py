@@ -40,13 +40,21 @@ def generate_training_curve(
     xticks = np.arange(1, xlim_upper + 1)
     validation_values = df_cut[cols[1]].dropna()
     validation_xticks = validation_values.index
-    line_1a = ax_1.plot(xticks, df_cut[cols[0]], c="orange", label="Train", zorder=1)
+    line_1a = ax_1.plot(
+        xticks,
+        df_cut[cols[0]],
+        c="orange",
+        label="Train",
+        zorder=1,
+        alpha=0.5,
+        linewidth=0.8,
+    )
     line_1b = ax_1.plot(
         validation_xticks,
         validation_values,
         c="red",
-        linewidth=0.5,
-        alpha=0.5,
+        linewidth=0.8,
+        alpha=1.0,
         label="Validation",
         zorder=0,
     )
