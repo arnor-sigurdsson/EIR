@@ -48,7 +48,7 @@ def get_weighted_random_sampler(train_dataset: "ArrayDatasetBase"):
     samples_weighted = weights[labels]
 
     num_sample_per_epoch = min(label_counts) * len(weights)
-    logger.debug("Num sampler per epoch: %d", num_sample_per_epoch)
+    logger.debug("Num samples per epoch: %d", num_sample_per_epoch)
     sampler = WeightedRandomSampler(
         samples_weighted, num_samples=num_sample_per_epoch, replacement=False
     )

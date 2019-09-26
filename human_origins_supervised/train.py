@@ -142,7 +142,7 @@ def main(cl_args):
         else None
     )
     model = Model(cl_args, train_dataset.num_classes, embedding_dict).to(cl_args.device)
-    assert model.data_size_after_conv > 8
+    assert model.data_size_after_conv >= 8
 
     if cl_args.debug:
         breakpoint()

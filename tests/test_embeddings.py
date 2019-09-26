@@ -27,7 +27,7 @@ def create_emb_test_label_data():
 
 
 @pytest.fixture
-def create_test_model():
+def create_test_emb_model():
     class TestModel(nn.Module):
         def __init__(self):
             super().__init__()
@@ -69,9 +69,9 @@ def test_calc_embedding_dimension():
     assert emb.calc_embedding_dimension(60) > 10
 
 
-def test_attach_embeddings(create_emb_test_label_data, create_test_model):
+def test_attach_embeddings(create_emb_test_label_data, create_test_emb_model):
     test_label_dict, emb_cols = create_emb_test_label_data
-    test_model = create_test_model
+    test_model = create_test_emb_model
 
     emb_dict = emb.get_embedding_dict(test_label_dict, emb_cols)
 
@@ -90,9 +90,9 @@ def test_attach_embeddings(create_emb_test_label_data, create_test_model):
         assert cur_embedding.embedding_dim == 2
 
 
-def test_lookup_embeddings(create_emb_test_label_data, create_test_model):
+def test_lookup_embeddings(create_emb_test_label_data, create_test_emb_model):
     test_label_dict, emb_cols = create_emb_test_label_data
-    test_model = create_test_model
+    test_model = create_test_emb_model
 
     emb_dict = emb.get_embedding_dict(test_label_dict, emb_cols)
     emb.attach_embeddings(test_model, emb_dict)

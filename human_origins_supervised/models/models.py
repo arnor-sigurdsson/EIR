@@ -60,6 +60,7 @@ class AbstractBlock(nn.Module):
         self,
         in_channels: int,
         out_channels: int,
+        dropout: float,
         conv_1_kernel_w: int = 12,
         conv_1_padding: int = 4,
         down_stride_w: int = 4,
@@ -75,6 +76,7 @@ class AbstractBlock(nn.Module):
         self.conv_1_kernel_h = 4 if isinstance(self, FirstBlock) else 1
         self.down_stride_h = self.conv_1_kernel_h
 
+        self.do = nn.Dropout2d(dropout)
         self.act = nn.LeakyReLU()
 
         self.bn_1 = nn.BatchNorm2d(in_channels, out_channels)
@@ -130,6 +132,7 @@ class FirstBlock(AbstractBlock):
     def forward(self, x):
 
         out = self.conv_1(x)
+        out = self.do(out)
 
         return out
 
@@ -139,7 +142,6 @@ class Block(AbstractBlock):
         super().__init__(*args, **kwargs)
 
         self.full_preact = full_preact
-        self.do = nn.Dropout2d(0.3)
 
     def forward(self, x):
         out = self.bn_1(x)
@@ -177,6 +179,7 @@ def make_conv_layers(
     kernel_base_width: int,
     channel_exp_base: int,
     input_width: int,
+    dropout: float,
 ) -> List[nn.Module]:
     """
     Used to set up the convolutional layers for the model. Based on the passed in
@@ -192,6 +195,7 @@ def make_conv_layers(
     :param kernel_base_width: Width of the kernels applied during convolutions.
     :param channel_exp_base: Number of channels in first layer (2 in the power of).
     :param input_width: Used to calculate convolutional parameters.
+    :param dropout: Percentage of dropout to pass to blocks.
     :return: A list of `nn.Module` objects to be passed to `nn.Sequential`.
     """
     down_stride_w = 4
@@ -205,6 +209,7 @@ def make_conv_layers(
             conv_1_kernel_w=first_kernel,
             conv_1_padding=first_pad,
             down_stride_w=down_stride_w,
+            dropout=dropout,
         )
     ]
 
@@ -226,6 +231,7 @@ def make_conv_layers(
                 conv_1_padding=cur_padd,
                 down_stride_w=down_stride_w,
                 full_preact=True if len(base_layers) == 1 else False,
+                dropout=dropout,
             )
 
             base_layers.append(cur_layer)
@@ -265,6 +271,7 @@ class Model(nn.Module):
                 run_config.kernel_width,
                 run_config.channel_exp_base,
                 run_config.target_width,
+                run_config.do,
             )
         )
 
@@ -279,9 +286,7 @@ class Model(nn.Module):
         ) + emb_total_dim
 
         self.last_act = nn.Sequential(nn.BatchNorm1d(fc_in_features), nn.LeakyReLU())
-        self.fc = nn.Sequential(
-            nn.Dropout(run_config.do), nn.Linear(fc_in_features, self.num_classes)
-        )
+        self.fc = nn.Linear(fc_in_features, self.num_classes)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):

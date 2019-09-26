@@ -219,6 +219,7 @@ def test_regression(
 ):
 
     cl_args = create_test_cl_args
+
     train_dloader, valid_dloader, train_dataset, valid_dataset = create_test_dloaders
     model = create_test_model
     optimizer = create_test_optimizer
@@ -252,9 +253,9 @@ def test_regression(
 
     df = pd.read_csv(run_path / "training_history.log")
 
-    assert df.loc[:, "t_r2"].max() > 0.95
+    assert df.loc[:, "t_r2"].max() > 0.8
     # lower due to overfitting on training set
-    assert df.loc[:, "v_r2"].max() > 0.65
+    assert df.loc[:, "v_r2"].max() > 0.8
 
     last_iter = len(train_dloader) * cl_args.n_epochs
     arrpath = run_path / f"samples/{last_iter}/top_acts.npy"
