@@ -1,13 +1,13 @@
 import numpy as np
 import pytest
 
-from human_origins_supervised.visualization import model_visualization as mv
+from human_origins_supervised.train_utils import activation_analysis as av
 
 
 def test_rescale_gradients():
     input_array = np.array([[0, 0, 1], [0, 0, 2], [0, 0, 4]])
 
-    rescaled_array = mv.rescale_gradients(input_array)
+    rescaled_array = av.rescale_gradients(input_array)
 
     assert (
         rescaled_array == np.array([[0, 0, 0.25], [0, 0, 0.50], [0, 0, 1.00]])
@@ -32,7 +32,7 @@ def acc_grads_inp():
 
 
 def test_get_top_gradients(acc_grads_inp):
-    top_snps_per_class = mv.get_snp_cols_w_top_grads(acc_grads_inp, 3)
+    top_snps_per_class = av.get_snp_cols_w_top_grads(acc_grads_inp, 3)
     assert top_snps_per_class["Asia"]["top_n_idxs"] == [0, 2, 4]
     asia_grads = top_snps_per_class["Asia"]["top_n_grads"]
     assert (
@@ -62,17 +62,17 @@ def test_get_snp_names(tmp_path):
     file_ = tmp_path / "data_final.snp"
     file_.write_text(snp_file_str)
 
-    snp_arr = mv.get_snp_names(file_)
+    snp_arr = av.get_snp_names(file_)
     assert len(snp_arr) == 10
     assert snp_arr[0] == "rs3094315"
     assert snp_arr[-1] == "rs1320571"
 
 
 def test_gather_and_rescale_snps(acc_grads_inp):
-    top_gradients_dict = mv.get_snp_cols_w_top_grads(acc_grads_inp, 3)
+    top_gradients_dict = av.get_snp_cols_w_top_grads(acc_grads_inp, 3)
     classes = ["Asia", "Europe"]
 
-    top_snps_dict = mv.gather_and_rescale_snps(
+    top_snps_dict = av.gather_and_rescale_snps(
         acc_grads_inp, top_gradients_dict, classes
     )
 
