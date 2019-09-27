@@ -363,7 +363,9 @@ def analyze_activations(config: "Config", act_func, proc_funcs, outfolder):
     av.plot_snp_gradients(acc_acts, outfolder, "avg")
 
 
-def activation_analysis_handler(engine: Engine, run: "HandlerConfig") -> None:
+def activation_analysis_handler(
+    engine: Engine, handler_config: "HandlerConfig"
+) -> None:
     """
     We need to copy the model to avoid affecting the actual model during
     training (e.g. zero-ing out gradients).
@@ -371,7 +373,7 @@ def activation_analysis_handler(engine: Engine, run: "HandlerConfig") -> None:
     TODO: Refactor this function further – reuse for parts for benchmarking.
     """
 
-    c = run.config
+    c = handler_config.config
     args = c.cl_args
 
     def pre_transform(single_sample, sample_label):
@@ -390,7 +392,7 @@ def activation_analysis_handler(engine: Engine, run: "HandlerConfig") -> None:
     do_acts = args.get_acts
 
     if do_sample:
-        sample_outfolder = Path(run.run_folder, "samples", str(iteration))
+        sample_outfolder = Path(handler_config.run_folder, "samples", str(iteration))
         ensure_path_exists(sample_outfolder, is_folder=True)
 
         if do_acts:
@@ -408,4 +410,4 @@ def activation_analysis_handler(engine: Engine, run: "HandlerConfig") -> None:
                 model_task=args.model_task,
             )
 
-            analyze_activations(run.config, act_func, proc_funcs, sample_outfolder)
+            analyze_activations(c, act_func, proc_funcs, sample_outfolder)

@@ -24,14 +24,14 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 
-def evaluation_handler(engine: Engine, run: "HandlerConfig") -> None:
+def evaluation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
     """
     A bit hacky how we manually attach metrics here, but that's because we
     don't want to evaluate as a running average (i.e. do it in the step
     function), but rather run over the whole validation dataset as we do
     in this function.
     """
-    c = run.config
+    c = handler_config.config
     args = c.cl_args
     iteration = engine.state.iteration
 
@@ -76,8 +76,8 @@ def evaluation_handler(engine: Engine, run: "HandlerConfig") -> None:
         val_labels=val_labels_total,
         val_ids=val_ids_total,
         iteration=iteration,
-        run_folder=run.run_folder,
-        config=run.config,
+        run_folder=handler_config.run_folder,
+        config=handler_config.config,
     )
 
 
