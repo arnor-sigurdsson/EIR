@@ -286,7 +286,11 @@ class Model(nn.Module):
         ) + emb_total_dim
 
         self.last_act = nn.Sequential(nn.BatchNorm1d(fc_in_features), nn.LeakyReLU())
-        self.fc = nn.Linear(fc_in_features, self.num_classes)
+        self.fc = nn.Linear(fc_in_features, 128)
+
+        self.bn_2 = nn.BatchNorm1d(128)
+        self.ac_2 = nn.LeakyReLU()
+        self.fc_2 = nn.Linear(128, self.num_classes)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -312,6 +316,11 @@ class Model(nn.Module):
 
         out = self.last_act(out)
         out = self.fc(out)
+
+        out = self.bn_2(out)
+        out = self.ac_2(out)
+        out = self.fc_2(out)
+
         return out
 
     @property
