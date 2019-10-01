@@ -5,8 +5,8 @@ import torch
 from aislib.misc_utils import get_logger
 from torch import nn
 
-from .model_utils import find_no_resblocks_needed
 from . import embeddings
+from .model_utils import find_no_resblocks_needed
 
 logger = get_logger(__name__)
 
@@ -60,6 +60,7 @@ class AbstractBlock(nn.Module):
         self,
         in_channels: int,
         out_channels: int,
+        dropout: float,
         conv_1_kernel_w: int = 12,
         conv_1_padding: int = 4,
         down_stride_w: int = 4,
@@ -75,6 +76,7 @@ class AbstractBlock(nn.Module):
         self.conv_1_kernel_h = 4 if isinstance(self, FirstBlock) else 1
         self.down_stride_h = self.conv_1_kernel_h
 
+        self.do = nn.Dropout2d(dropout)
         self.act = nn.LeakyReLU()
 
         self.bn_1 = nn.BatchNorm2d(in_channels, out_channels)
@@ -130,6 +132,7 @@ class FirstBlock(AbstractBlock):
     def forward(self, x):
 
         out = self.conv_1(x)
+        out = self.do(out)
 
         return out
 
@@ -153,6 +156,8 @@ class Block(AbstractBlock):
 
         out = self.bn_2(out)
         out = self.act(out)
+
+        out = self.do(out)
         out = self.conv_2(out)
 
         out = out + identity
@@ -174,6 +179,7 @@ def make_conv_layers(
     kernel_base_width: int,
     channel_exp_base: int,
     input_width: int,
+    dropout: float,
 ) -> List[nn.Module]:
     """
     Used to set up the convolutional layers for the model. Based on the passed in
@@ -189,6 +195,7 @@ def make_conv_layers(
     :param kernel_base_width: Width of the kernels applied during convolutions.
     :param channel_exp_base: Number of channels in first layer (2 in the power of).
     :param input_width: Used to calculate convolutional parameters.
+    :param dropout: Percentage of dropout to pass to blocks.
     :return: A list of `nn.Module` objects to be passed to `nn.Sequential`.
     """
     down_stride_w = 4
@@ -202,6 +209,7 @@ def make_conv_layers(
             conv_1_kernel_w=first_kernel,
             conv_1_padding=first_pad,
             down_stride_w=down_stride_w,
+            dropout=dropout,
         )
     ]
 
@@ -223,6 +231,7 @@ def make_conv_layers(
                 conv_1_padding=cur_padd,
                 down_stride_w=down_stride_w,
                 full_preact=True if len(base_layers) == 1 else False,
+                dropout=dropout,
             )
 
             base_layers.append(cur_layer)
@@ -262,6 +271,7 @@ class Model(nn.Module):
                 run_config.kernel_width,
                 run_config.channel_exp_base,
                 run_config.target_width,
+                run_config.do,
             )
         )
 
@@ -271,27 +281,22 @@ class Model(nn.Module):
 
         self.no_out_channels = self.conv[-1].out_channels
 
-        self.last_act = nn.Sequential(
-            nn.BatchNorm2d(self.no_out_channels), nn.LeakyReLU()
-        )
-
         fc_in_features = (
             self.data_size_after_conv * self.no_out_channels
         ) + emb_total_dim
-        self.fc = nn.Sequential(
-            nn.Dropout(run_config.do), nn.Linear(fc_in_features, self.num_classes)
-        )
+
+        self.last_act = nn.Sequential(nn.BatchNorm1d(fc_in_features), nn.LeakyReLU())
+        self.fc = nn.Linear(fc_in_features, self.num_classes)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 nn.init.kaiming_normal_(m.weight, mode="fan_out")
-            elif isinstance(m, nn.BatchNorm2d):
+            elif isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.BatchNorm1d):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
     def forward(self, x, extra_labels: List[Dict[str, str]] = None):
         out = self.conv(x)
-        out = self.last_act(out)
         out = out.view(out.shape[0], -1)
 
         if extra_labels:
@@ -305,6 +310,7 @@ class Model(nn.Module):
                 )
                 out = torch.cat((cur_embedding, out), dim=1)
 
+        out = self.last_act(out)
         out = self.fc(out)
         return out
 

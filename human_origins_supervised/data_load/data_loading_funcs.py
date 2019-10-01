@@ -47,8 +47,10 @@ def get_weighted_random_sampler(train_dataset: "ArrayDatasetBase"):
     weights = 1.0 / torch.tensor(label_counts, dtype=torch.float32)
     samples_weighted = weights[labels]
 
+    num_sample_per_epoch = min(label_counts) * len(weights)
+    logger.debug("Num samples per epoch: %d", num_sample_per_epoch)
     sampler = WeightedRandomSampler(
-        samples_weighted, num_samples=len(train_dataset), replacement=True
+        samples_weighted, num_samples=num_sample_per_epoch, replacement=False
     )
 
     return sampler

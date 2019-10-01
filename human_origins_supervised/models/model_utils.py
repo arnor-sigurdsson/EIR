@@ -27,7 +27,7 @@ def find_no_resblocks_needed(width: int, stride: int, min_size: int = 32) -> Lis
     7 blocks --> [2, 2, 2, 1]
     10 blocks --> [2, 2, 4, 2]
     """
-    # account for first resblock
+    # account for first conv
     cur_width = width // stride
 
     resblocks = [0] * 4

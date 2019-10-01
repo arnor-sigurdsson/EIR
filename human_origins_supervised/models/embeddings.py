@@ -27,8 +27,9 @@ def set_up_embedding_lookups(
 ) -> al_emb_lookup_dict:
     emb_lookup_dict = {}
 
-    for emb_col, emb_uniq_value in unique_emb_dict.items():
-        lookup_table = {k: idx for idx, k in enumerate(emb_uniq_value)}
+    for emb_col, emb_uniq_values in unique_emb_dict.items():
+        sorted_unique_values = sorted(emb_uniq_values)
+        lookup_table = {k: idx for idx, k in enumerate(sorted_unique_values)}
         emb_lookup_dict[emb_col] = {"lookup_table": lookup_table}
 
     return emb_lookup_dict

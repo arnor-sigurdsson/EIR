@@ -40,13 +40,21 @@ def generate_training_curve(
     xticks = np.arange(1, xlim_upper + 1)
     validation_values = df_cut[cols[1]].dropna()
     validation_xticks = validation_values.index
-    line_1a = ax_1.plot(xticks, df_cut[cols[0]], c="orange", label="Train", zorder=1)
+    line_1a = ax_1.plot(
+        xticks,
+        df_cut[cols[0]],
+        c="orange",
+        label="Train",
+        zorder=1,
+        alpha=0.5,
+        linewidth=0.8,
+    )
     line_1b = ax_1.plot(
         validation_xticks,
         validation_values,
         c="red",
-        linewidth=0.5,
-        alpha=0.5,
+        linewidth=0.8,
+        alpha=1.0,
         label="Validation",
         zorder=0,
     )
@@ -57,6 +65,8 @@ def generate_training_curve(
 
     ax_1.set_xlim(left=skiprows + 1, right=xlim_upper)
     ax_1.xaxis.set_major_locator(MaxNLocator(integer=True))
+    if xlim_upper > 1e4:
+        ax_1.ticklabel_format(style="sci", axis="x", scilimits=(0, 0))
 
     lines = line_1a + line_1b
     labels = [l.get_label() for l in lines]

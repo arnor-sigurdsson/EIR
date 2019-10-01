@@ -71,6 +71,7 @@ def create_test_cl_args(args_config, create_test_data):
     args_config.model_task = model_task
     args_config.label_file = str(test_path / "labels.csv")
     args_config.n_epochs = 10
+    args_config.do = 0.3
     args_config.sample_interval = 50
     args_config.target_width = 1000
     args_config.data_width = 1000

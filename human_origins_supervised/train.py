@@ -142,7 +142,7 @@ def main(cl_args):
         else None
     )
     model = Model(cl_args, train_dataset.num_classes, embedding_dict).to(cl_args.device)
-    assert model.data_size_after_conv > 8
+    assert model.data_size_after_conv >= 8
 
     if cl_args.debug:
         breakpoint()
@@ -208,7 +208,7 @@ if __name__ == "__main__":
         default=0.999,
         help="adam: decay of second order momentum of gradient",
     )
-    parser.add_argument("--wd", type=float, default=1e-5, help="weight decay for adam.")
+    parser.add_argument("--wd", type=float, default=5e-4, help="weight decay for adam.")
 
     parser.add_argument(
         "--kernel_width",
