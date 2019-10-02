@@ -271,7 +271,7 @@ class Model(nn.Module):
                 run_config.kernel_width,
                 run_config.channel_exp_base,
                 run_config.target_width,
-                run_config.do,
+                run_config.rb_do,
             )
         )
 
@@ -285,12 +285,18 @@ class Model(nn.Module):
             self.data_size_after_conv * self.no_out_channels
         ) + emb_total_dim
 
-        self.last_act = nn.Sequential(nn.BatchNorm1d(fc_in_features), nn.LeakyReLU())
-        self.fc = nn.Linear(fc_in_features, 128)
+        self.fc_1 = nn.Sequential(
+            nn.BatchNorm1d(fc_in_features),
+            nn.LeakyReLU(),
+            nn.Linear(fc_in_features, 128),
+        )
 
-        self.bn_2 = nn.BatchNorm1d(128)
-        self.ac_2 = nn.LeakyReLU()
-        self.fc_2 = nn.Linear(128, self.num_classes)
+        self.fc_2 = nn.Sequential(
+            nn.BatchNorm1d(128),
+            nn.LeakyReLU(),
+            nn.Dropout(run_config.fc_do),
+            nn.Linear(128, self.num_classes),
+        )
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -314,13 +320,8 @@ class Model(nn.Module):
                 )
                 out = torch.cat((cur_embedding, out), dim=1)
 
-        out = self.last_act(out)
-        out = self.fc(out)
-
-        out = self.bn_2(out)
-        out = self.ac_2(out)
+        out = self.fc_1(out)
         out = self.fc_2(out)
-
         return out
 
     @property
