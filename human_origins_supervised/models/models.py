@@ -198,9 +198,9 @@ def make_conv_layers(
     :param dropout: Percentage of dropout to pass to blocks.
     :return: A list of `nn.Module` objects to be passed to `nn.Sequential`.
     """
-    down_stride_w = 4
+    down_stride_w = 10
     first_kernel, first_pad = set_up_conv_params(
-        input_width, kernel_base_width, down_stride_w
+        input_width, kernel_base_width * 4, down_stride_w * 2
     )
     base_layers = [
         FirstBlock(
@@ -208,7 +208,7 @@ def make_conv_layers(
             out_channels=2 ** channel_exp_base,
             conv_1_kernel_w=first_kernel,
             conv_1_padding=first_pad,
-            down_stride_w=down_stride_w,
+            down_stride_w=down_stride_w * 2,
             dropout=dropout,
         )
     ]
@@ -288,7 +288,7 @@ class Model(nn.Module):
         self.fc_1 = nn.Sequential(
             nn.BatchNorm1d(fc_in_features),
             nn.LeakyReLU(),
-            nn.Linear(fc_in_features, 128),
+            nn.Linear(fc_in_features, self.num_classes),
         )
 
         self.fc_2 = nn.Sequential(
@@ -321,13 +321,13 @@ class Model(nn.Module):
                 out = torch.cat((cur_embedding, out), dim=1)
 
         out = self.fc_1(out)
-        out = self.fc_2(out)
+        # out = self.fc_2(out)
         return out
 
     @property
     def resblocks(self):
         if not self.run_config.resblocks:
-            residual_blocks = find_no_resblocks_needed(self.run_config.target_width, 4)
+            residual_blocks = find_no_resblocks_needed(self.run_config.target_width, 10)
             logger.info(
                 "No residual blocks specified in CL args, using input "
                 "%s based on width approximation calculation.",

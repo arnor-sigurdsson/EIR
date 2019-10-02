@@ -9,7 +9,7 @@ from human_origins_supervised.train_utils.utils import get_extra_labels_from_ids
 al_dloader_outputs = Tuple[torch.Tensor, Union[List[str], torch.LongTensor], List[str]]
 
 
-def find_no_resblocks_needed(width: int, stride: int, min_size: int = 32) -> List[int]:
+def find_no_resblocks_needed(width: int, stride: int) -> List[int]:
     """
     Used in order to calculate / set up residual blocks specifications as a list
     automatically when they are not passed in as CL args, based on the minimum
@@ -27,8 +27,10 @@ def find_no_resblocks_needed(width: int, stride: int, min_size: int = 32) -> Lis
     7 blocks --> [2, 2, 2, 1]
     10 blocks --> [2, 2, 4, 2]
     """
+
+    min_size = 8 * stride
     # account for first conv
-    cur_width = width // stride
+    cur_width = width // (stride * 2)
 
     resblocks = [0] * 4
     while cur_width >= min_size:

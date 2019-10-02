@@ -32,7 +32,7 @@ def args_config():
             "label_column": "Origin",
             "data_type": "packbits",
             "data_width": 1000,
-            "resblocks": [2],
+            "resblocks": None,
             "device": "cpu",
             "gpu_num": "0",
             "lr": 1e-3,
