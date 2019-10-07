@@ -329,8 +329,9 @@ class Model(nn.Module):
                 )
                 all_embeddings.append(cur_embedding)
 
-            all_embeddings = torch.cat(all_embeddings)
-            out = torch.cat((all_embeddings, out), dim=1)
+            all_embeddings = torch.cat(all_embeddings, dim=1)
+            out_e = self.fc_e(all_embeddings)
+            out = torch.cat((out_e, out), dim=1)
 
         out = self.fc_2(out)
         out = self.fc_3(out)
