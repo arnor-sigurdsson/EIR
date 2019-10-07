@@ -287,15 +287,17 @@ class Model(nn.Module):
         self.fc_1 = nn.Sequential(
             nn.BatchNorm1d(fc_1_in_features),
             nn.LeakyReLU(),
-            nn.Linear(fc_1_in_features, fc_base),
+            nn.Linear(fc_1_in_features, fc_base, bias=False),
         )
 
         if emb_total_dim:
-            self.fc_e = nn.Linear(emb_total_dim, emb_total_dim)
+            self.fc_e = nn.Linear(emb_total_dim, emb_total_dim, bias=False)
             fc_base += emb_total_dim
 
         self.fc_2 = nn.Sequential(
-            nn.BatchNorm1d(fc_base), nn.LeakyReLU(), nn.Linear(fc_base, fc_base)
+            nn.BatchNorm1d(fc_base),
+            nn.LeakyReLU(),
+            nn.Linear(fc_base, fc_base, bias=False),
         )
 
         self.fc_3 = nn.Sequential(
