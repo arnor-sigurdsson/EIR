@@ -281,12 +281,28 @@ class Model(nn.Module):
 
         self.no_out_channels = self.conv[-1].out_channels
 
-        fc_in_features = (
-            self.data_size_after_conv * self.no_out_channels
-        ) + emb_total_dim
+        fc_1_in_features = self.data_size_after_conv * self.no_out_channels
+        fc_base = 128
 
-        self.last_act = nn.Sequential(nn.BatchNorm1d(fc_in_features), nn.LeakyReLU())
-        self.fc = nn.Linear(fc_in_features, self.num_classes)
+        self.fc_1 = nn.Sequential(
+            nn.BatchNorm1d(fc_1_in_features),
+            nn.LeakyReLU(),
+            nn.Linear(fc_1_in_features, fc_base),
+        )
+
+        if emb_total_dim:
+            self.fc_e = nn.Linear(emb_total_dim, emb_total_dim)
+            fc_base += emb_total_dim
+
+        self.fc_2 = nn.Sequential(
+            nn.BatchNorm1d(fc_base), nn.LeakyReLU(), nn.Linear(fc_base, fc_base)
+        )
+
+        self.fc_3 = nn.Sequential(
+            nn.BatchNorm1d(fc_base),
+            nn.LeakyReLU(),
+            nn.Linear(fc_base, self.num_classes),
+        )
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -299,7 +315,10 @@ class Model(nn.Module):
         out = self.conv(x)
         out = out.view(out.shape[0], -1)
 
+        out = self.fc_1(out)
+
         if extra_labels:
+            all_embeddings = []
             for col_key in self.embeddings_dict:
                 cur_embedding = embeddings.lookup_embeddings(
                     self,
@@ -308,10 +327,13 @@ class Model(nn.Module):
                     extra_labels,
                     self.run_config.device,
                 )
-                out = torch.cat((cur_embedding, out), dim=1)
+                all_embeddings.append(cur_embedding)
 
-        out = self.last_act(out)
-        out = self.fc(out)
+            all_embeddings = torch.cat(all_embeddings)
+            out = torch.cat((all_embeddings, out), dim=1)
+
+        out = self.fc_2(out)
+        out = self.fc_3(out)
         return out
 
     @property
