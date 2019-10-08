@@ -232,10 +232,14 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--do",
+        "--rb_do", type=float, default=0.0, help="Dropout in residual blocks."
+    )
+
+    parser.add_argument(
+        "--fc_do",
         type=float,
         default=0.0,
-        help="Dropout before fully connected layer at the end of network.",
+        help="Dropout before last fully connected layer.",
     )
 
     parser.add_argument(

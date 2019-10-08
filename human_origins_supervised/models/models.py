@@ -60,7 +60,7 @@ class AbstractBlock(nn.Module):
         self,
         in_channels: int,
         out_channels: int,
-        dropout: float,
+        rb_do: float,
         conv_1_kernel_w: int = 12,
         conv_1_padding: int = 4,
         down_stride_w: int = 4,
@@ -76,7 +76,7 @@ class AbstractBlock(nn.Module):
         self.conv_1_kernel_h = 4 if isinstance(self, FirstBlock) else 1
         self.down_stride_h = self.conv_1_kernel_h
 
-        self.do = nn.Dropout2d(dropout)
+        self.rb_do = nn.Dropout2d(rb_do)
         self.act = nn.LeakyReLU()
 
         self.bn_1 = nn.BatchNorm2d(in_channels, out_channels)
@@ -132,7 +132,7 @@ class FirstBlock(AbstractBlock):
     def forward(self, x):
 
         out = self.conv_1(x)
-        out = self.do(out)
+        out = self.rb_do(out)
 
         return out
 
@@ -157,7 +157,7 @@ class Block(AbstractBlock):
         out = self.bn_2(out)
         out = self.act(out)
 
-        out = self.do(out)
+        out = self.rb_do(out)
         out = self.conv_2(out)
 
         out = out + identity
@@ -179,7 +179,7 @@ def make_conv_layers(
     kernel_base_width: int,
     channel_exp_base: int,
     input_width: int,
-    dropout: float,
+    rb_do: float,
 ) -> List[nn.Module]:
     """
     Used to set up the convolutional layers for the model. Based on the passed in
@@ -195,7 +195,7 @@ def make_conv_layers(
     :param kernel_base_width: Width of the kernels applied during convolutions.
     :param channel_exp_base: Number of channels in first layer (2 in the power of).
     :param input_width: Used to calculate convolutional parameters.
-    :param dropout: Percentage of dropout to pass to blocks.
+    :param rb_do: Percentage of dropout to pass to blocks.
     :return: A list of `nn.Module` objects to be passed to `nn.Sequential`.
     """
     down_stride_w = 4
@@ -209,7 +209,7 @@ def make_conv_layers(
             conv_1_kernel_w=first_kernel,
             conv_1_padding=first_pad,
             down_stride_w=down_stride_w,
-            dropout=dropout,
+            rb_do=rb_do,
         )
     ]
 
@@ -231,7 +231,7 @@ def make_conv_layers(
                 conv_1_padding=cur_padd,
                 down_stride_w=down_stride_w,
                 full_preact=True if len(base_layers) == 1 else False,
-                dropout=dropout,
+                rb_do=rb_do,
             )
 
             base_layers.append(cur_layer)
@@ -271,7 +271,7 @@ class Model(nn.Module):
                 run_config.kernel_width,
                 run_config.channel_exp_base,
                 run_config.target_width,
-                run_config.do,
+                run_config.rb_do,
             )
         )
 
@@ -303,6 +303,7 @@ class Model(nn.Module):
         self.fc_3 = nn.Sequential(
             nn.BatchNorm1d(fc_base),
             nn.LeakyReLU(),
+            nn.Dropout(run_config.fc_do),
             nn.Linear(fc_base, self.num_classes),
         )
 
