@@ -74,7 +74,7 @@ def generate_training_curve(
 
     if hook_funcs:
         for func in hook_funcs:
-            func(ax_1)
+            func(ax_1, target=cols[1])
 
     plt.grid()
 
@@ -452,23 +452,9 @@ def generate_all_plots(metrics_file: Path, hook_funcs):
     try:
         column_pairs = get_column_pairs()
         for pair in column_pairs:
+
             generate_training_curve(metrics_file, hook_funcs=hook_funcs, cols=pair)
 
     except ValueError:
         print(f"Skipping {metrics_file} as it has old columns.")
     plt.close("all")
-
-
-def regenerate_all_run_plots(run_folder: Path):
-    metrics_fname = "training_history.log"
-
-    for run_folder in run_folder.iterdir():
-        if run_folder.is_dir() and not run_folder.name.startswith("."):
-
-            if run_folder.name != "previous_runs":
-                generate_all_plots(run_folder / metrics_fname)
-
-            else:
-                for previous_run_collection in run_folder.iterdir():
-                    if previous_run_collection.name.startswith("v"):
-                        regenerate_all_run_plots(previous_run_collection)

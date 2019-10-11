@@ -63,9 +63,6 @@ def create_test_cl_args(args_config, create_test_data):
 
     model_task = "reg" if test_data_params["class_type"] == "regression" else "cls"
 
-    if model_task == "reg":
-        args_config.benchmark = False
-
     args_config.data_folder = str(test_path / "test_arrays")
     args_config.snp_file = str(test_path / "test_snps.snp")
     args_config.model_task = model_task
