@@ -48,7 +48,7 @@ def create_test_model(create_test_cl_args, create_test_dataset):
     cl_args = create_test_cl_args
     train_dataset, _ = create_test_dataset
 
-    model = Model(cl_args, train_dataset.num_classes)
+    model = Model(cl_args, train_dataset.num_classes).to(device=cl_args.device)
 
     return model
 
