@@ -79,7 +79,7 @@ def attach_metrics(engine: Engine, handler_config: HandlerConfig) -> None:
     """
     for metric in handler_config.monitoring_metrics:
         partial_func = partial(lambda x, metric_: x[metric_], metric_=metric)
-        MyRunningAverage(output_transform=partial_func, alpha=0.80).attach(
+        MyRunningAverage(output_transform=partial_func, alpha=0.20).attach(
             engine, metric
         )
 
