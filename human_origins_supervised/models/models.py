@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import List
 
 import aislib.pytorch as torch_utils
 import torch
@@ -295,21 +295,12 @@ class Model(nn.Module):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
-    def forward(self, x, extra_labels: List[Dict[str, str]] = None):
+    def forward(self, x, extra_embeddings: torch.Tensor = None):
         out = self.conv(x)
         out = out.view(out.shape[0], -1)
 
-        if extra_labels:
-            for col_key in self.embeddings_dict:
-                cur_embedding = embeddings.lookup_embeddings(
-                    self,
-                    self.embeddings_dict,
-                    col_key,
-                    extra_labels,
-                    self.run_config.device,
-                )
-                out = torch.cat((cur_embedding, out), dim=1)
-
+        if extra_embeddings is not None:
+            out = torch.cat((extra_embeddings, out), dim=1)
         out = self.last_act(out)
         out = self.fc(out)
         return out
