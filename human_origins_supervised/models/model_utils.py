@@ -63,7 +63,6 @@ def gather_pred_outputs_from_dloader(
     cl_args,
     model: Module,
     device: str,
-    label_column,
     labels_dict,
     with_labels: bool = True,
 ) -> al_dloader_outputs:

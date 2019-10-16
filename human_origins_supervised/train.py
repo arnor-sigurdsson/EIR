@@ -1,4 +1,5 @@
 import argparse
+from sys import platform
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Union, Tuple, List, Dict
@@ -121,12 +122,14 @@ def main(cl_args):
         else None
     )
 
+    # Currently as bug with OSX: https://github.com/pytorch/pytorch/issues/2125
+    nw = 0 if platform == "darwin" else 8
     train_dloader = DataLoader(
         train_dataset,
         batch_size=cl_args.batch_size,
         sampler=train_sampler,
         shuffle=False if train_sampler else True,
-        # num_workers=8,
+        num_workers=nw,
         pin_memory=False,
     )
 
@@ -134,7 +137,7 @@ def main(cl_args):
         valid_dataset,
         batch_size=cl_args.batch_size,
         shuffle=False,
-        # num_workers=8,
+        num_workers=nw,
         pin_memory=False,
     )
 
