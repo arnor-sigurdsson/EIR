@@ -171,14 +171,17 @@ def benchmark(engine: Engine, config: "Config", run_folder: Path) -> None:
     def flatten_hook(single_sample, sample_label) -> tuple:
         return flatten(single_sample), sample_label
 
-    def linear_act_func(single_sample, sample_label, explainer_):
+    def linear_act_func(inputs: av.al_model_inputs, sample_label, explainer_):
         """
         Note that in binary cases, activations for sample being the positive
         class by default. Hence we multiply by -1 to invert the activations
         for the negative class.
+
+        Note that inputs here is composed of the SNP data and embeddings, but the
+        linear benchmarking currently only supports the SNP data.
         """
 
-        acts = explainer_.shap_values(single_sample)
+        acts = explainer_.shap_values(inputs[0])
         if len(acts) == 1:
             if sample_label.item() == 0:
                 return acts * -1

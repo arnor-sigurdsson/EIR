@@ -11,7 +11,7 @@ def test_make_conv_layers():
 
     """
     conv_layer_list = [1, 1, 1, 1]
-    conv_layers = models.make_conv_layers(conv_layer_list, 12, 5, 10000, 0.1)
+    conv_layers = models.make_conv_layers(conv_layer_list, 12, 5, int(8e5), 0.1)
 
     # account for first block, add +2 instead if using SA
     assert len(conv_layers) == len(conv_layer_list) + 1

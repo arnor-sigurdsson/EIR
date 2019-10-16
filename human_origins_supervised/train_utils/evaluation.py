@@ -54,12 +54,7 @@ def evaluation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
     c.model.eval()
     gather_preds = model_utils.gather_pred_outputs_from_dloader
     val_outputs_total, val_labels_total, val_ids_total = gather_preds(
-        c.valid_loader,
-        c.cl_args,
-        c.model,
-        args.device,
-        args.label_column,
-        c.valid_dataset.labels_dict,
+        c.valid_loader, c.cl_args, c.model, args.device, c.valid_dataset.labels_dict
     )
     c.model.train()
 
