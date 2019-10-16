@@ -107,3 +107,47 @@ def test_lookup_embeddings(create_emb_test_label_data, create_test_emb_model):
 
     model_embedding = test_model.embed_Population(extra_label_emb_index)
     assert (cur_embedding == model_embedding).all()
+
+
+def test_get_embeddings_from_ids(create_emb_test_label_data, create_test_emb_model):
+    """
+    id:
+
+    "ID1": {
+            "Origin": "Iceland",
+            "Climate": "Cool",
+            "Population": "Small",
+            "Food": "Fish",
+        }
+
+
+    emb_dict:
+
+    {'Climate':{'lookup_table': {'Cool': 0, 'Warm': 1}},
+    'Population': {'lookup_table': {'Large': 0, 'Small': 1}},
+    'Food': {'lookup_table': {'Fish': 0, 'Tacos': 1}}}
+    """
+    test_label_dict, emb_cols = create_emb_test_label_data
+    test_model = create_test_emb_model
+
+    emb_dict = emb.get_embedding_dict(test_label_dict, emb_cols)
+    emb.attach_embeddings(test_model, emb_dict)
+
+    test_model.embeddings_dict = emb_dict
+
+    test_embeddings = emb.get_embeddings_from_ids(
+        test_label_dict, ["ID1"], "Origin", test_model, "cpu"
+    )
+    assert test_embeddings.shape[1] == 6
+
+    # check climate, "Cool" at index 0
+    id1_emb_climate = test_embeddings[:, :2]
+    assert (id1_emb_climate == test_model.embed_Climate(torch.tensor(0))).all().item()
+
+    # check food, "Fish" at index 0
+    id1_emb_food = test_embeddings[:, 2:4]
+    assert (id1_emb_food == test_model.embed_Food(torch.tensor(0))).all().item()
+
+    # check population, "Small" at index 1
+    id_emb_pop = test_embeddings[:, 4:]
+    assert (id_emb_pop == test_model.embed_Population(torch.tensor(1))).all().item()

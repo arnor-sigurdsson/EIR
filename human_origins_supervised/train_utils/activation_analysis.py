@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from copy import deepcopy
 from functools import partial
 from pathlib import Path
-from typing import Callable, Dict, Tuple, List, TYPE_CHECKING
+from typing import Union, Callable, Dict, Tuple, List, TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -16,6 +16,7 @@ from shap import DeepExplainer
 from torch.utils.data import Dataset, DataLoader
 
 import human_origins_supervised.visualization.activation_visualization as av
+from human_origins_supervised.models import embeddings
 from human_origins_supervised.models import model_utils
 from human_origins_supervised.models.model_utils import gather_dloader_samples
 from human_origins_supervised.train_utils.utils import check_if_iteration_sample
@@ -25,6 +26,10 @@ if TYPE_CHECKING:
     from human_origins_supervised.train import Config
 
 logger = get_logger(__name__)
+
+# would be better to use Tuple here, but shap does literal type check for list, i.e.
+# if type(data) == list:
+al_model_inputs = List[Union[torch.Tensor, Union[torch.Tensor, None]]]
 
 
 @contextmanager
@@ -70,6 +75,7 @@ def accumulate_activations(
     transform_funcs: Dict[str, Tuple[Callable]],
 ):
     c = config
+    args = c.cl_args
 
     target_classes = get_target_classes(c.cl_args, c.label_encoder)
 
@@ -78,7 +84,7 @@ def accumulate_activations(
     acc_acts = {name: [] for name in target_classes}
     acc_acts_masked = {name: [] for name in target_classes}
 
-    for single_sample, sample_label, *_ in valid_sampling_dloader:
+    for single_sample, sample_label, sample_id in valid_sampling_dloader:
         # we want to keep the original sample for masking
         single_sample_org = deepcopy(single_sample).cpu().numpy().squeeze()
         cur_trn_label = get_act_condition(
@@ -92,10 +98,26 @@ def accumulate_activations(
                     single_sample=single_sample, sample_label=sample_label
                 )
 
-            single_acts = act_func(
-                single_sample=single_sample, sample_label=sample_label
-            )
+            extra_embeddings = None
+            if args.embed_columns:
+                extra_embeddings = embeddings.get_embeddings_from_ids(
+                    c.valid_dataset.labels_dict,
+                    list(sample_id),
+                    args.label_column,
+                    c.model,
+                    args.device,
+                ).detach()
+
+            shap_inputs = [
+                i for i in (single_sample, extra_embeddings) if i is not None
+            ]
+            single_acts = act_func(inputs=shap_inputs, sample_label=sample_label)
             if single_acts is not None:
+                # currently we are only going to get acts for snps
+                # TODO: Add analysis / plots for embeddings.
+                if isinstance(single_acts, list):
+                    single_acts = single_acts[0]
+
                 # apply post-processing functions on activations
                 for post_func in transform_funcs.get("post", ()):
                     single_acts = post_func(single_acts)
@@ -115,20 +137,33 @@ def rescale_gradients(gradients):
 
 
 def get_shap_object(
+    config,
     model: torch.nn.Module,
     device: str,
     train_loader: DataLoader,
     n_background_samples: int = 64,
 ):
-    background, *_ = gather_dloader_samples(train_loader, device, n_background_samples)
+    c = config
+    args = c.cl_args
 
-    explainer = DeepExplainer(model, background)
+    background, _, ids = gather_dloader_samples(
+        train_loader, device, n_background_samples
+    )
+
+    extra_embeddings = None
+    if args.embed_columns:
+        extra_embeddings = embeddings.get_embeddings_from_ids(
+            c.labels_dict, ids, args.label_column, c.model, args.device
+        ).detach()
+
+    shap_inputs = [i for i in (background, extra_embeddings) if i is not None]
+    explainer = DeepExplainer(model, shap_inputs)
     return explainer
 
 
 def get_shap_sample_acts_deep(
     explainer: DeepExplainer,
-    single_sample: torch.Tensor,
+    inputs: al_model_inputs,
     sample_label: torch.Tensor,
     model_task: str,
 ):
@@ -138,10 +173,12 @@ def get_shap_sample_acts_deep(
     TODO: Add functionality to use ranked_outputs or all outputs.
     """
     with suppress_stdout():
-        output = explainer.shap_values(single_sample, ranked_outputs=1)
-        if model_task == "reg":
-            assert isinstance(output, np.ndarray)
-            return output
+        output = explainer.shap_values(inputs, ranked_outputs=1)
+
+    if model_task == "reg":
+        assert isinstance(output[0], np.ndarray)
+        assert len(output) == 1
+        return output
 
     assert len(output) == 2
     shap_grads, pred_label = output
@@ -400,7 +437,11 @@ def activation_analysis_handler(
 
             no_explainer_background_samples = np.max([int(args.batch_size / 8), 16])
             explainer = get_shap_object(
-                model_copy, args.device, c.train_loader, no_explainer_background_samples
+                c,
+                model_copy,
+                args.device,
+                c.train_loader,
+                no_explainer_background_samples,
             )
 
             proc_funcs = {"pre": (pre_transform,)}

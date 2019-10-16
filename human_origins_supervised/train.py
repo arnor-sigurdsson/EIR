@@ -1,4 +1,5 @@
 import argparse
+from sys import platform
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Union, Tuple, List, Dict
@@ -18,11 +19,13 @@ from human_origins_supervised.data_load.data_loading_funcs import (
     get_weighted_random_sampler,
 )
 from human_origins_supervised.models import model_utils
-from human_origins_supervised.models.embeddings import get_embedding_dict
+from human_origins_supervised.models.embeddings import (
+    get_embedding_dict,
+    get_embeddings_from_ids,
+)
 from human_origins_supervised.models.models import Model
 from human_origins_supervised.train_utils.metric_funcs import select_metric_func
 from human_origins_supervised.train_utils.train_handlers import configure_trainer
-from human_origins_supervised.train_utils.utils import get_extra_labels_from_ids
 
 torch.manual_seed(0)
 np.random.seed(0)
@@ -72,14 +75,14 @@ def train_ignite(config) -> None:
         train_labels = train_labels.to(device=args.device)
         train_labels = model_utils.cast_labels(args.model_task, train_labels)
 
-        extra_labels = (
-            get_extra_labels_from_ids(c.labels_dict, train_ids, args.label_column)
-            if args.embed_columns
-            else None
-        )
+        extra_embeddings = None
+        if args.embed_columns:
+            extra_embeddings = get_embeddings_from_ids(
+                c.labels_dict, train_ids, args.label_column, c.model, args.device
+            )
 
         c.optimizer.zero_grad()
-        train_outputs = c.model(train_seqs, extra_labels=extra_labels)
+        train_outputs = c.model(train_seqs, extra_embeddings=extra_embeddings)
         train_loss = c.criterion(train_outputs, train_labels)
         train_loss.backward()
         c.optimizer.step()
@@ -119,12 +122,14 @@ def main(cl_args):
         else None
     )
 
+    # Currently as bug with OSX: https://github.com/pytorch/pytorch/issues/2125
+    nw = 0 if platform == "darwin" else 8
     train_dloader = DataLoader(
         train_dataset,
         batch_size=cl_args.batch_size,
         sampler=train_sampler,
         shuffle=False if train_sampler else True,
-        num_workers=8,
+        num_workers=nw,
         pin_memory=False,
     )
 
@@ -132,7 +137,7 @@ def main(cl_args):
         valid_dataset,
         batch_size=cl_args.batch_size,
         shuffle=False,
-        num_workers=8,
+        num_workers=nw,
         pin_memory=False,
     )
 
