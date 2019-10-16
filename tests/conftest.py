@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 
 import numpy as np
+from torch import cuda
 import pytest
 
 np.random.seed(0)
@@ -33,7 +34,7 @@ def args_config():
             "data_type": "packbits",
             "data_width": 1000,
             "resblocks": None,
-            "device": "cpu",
+            "device": "cuda:0" if cuda.is_available() else "cpu",
             "gpu_num": "0",
             "lr": 1e-3,
             "wd": 5e-4,
@@ -64,9 +65,6 @@ def create_test_cl_args(args_config, create_test_data):
 
     model_task = "reg" if test_data_params["class_type"] == "regression" else "cls"
 
-    if model_task == "reg":
-        args_config.benchmark = False
-
     args_config.data_folder = str(test_path / "test_arrays")
     args_config.snp_file = str(test_path / "test_snps.snp")
     args_config.model_task = model_task
@@ -75,7 +73,7 @@ def create_test_cl_args(args_config, create_test_data):
     args_config.na_augment = 0.1
     args_config.fc_do = 0.25
     args_config.rb_do = 0.25
-    args_config.sample_interval = 50
+    args_config.sample_interval = 200
     args_config.target_width = 1000
     args_config.data_width = 1000
     args_config.run_name = (
@@ -107,7 +105,7 @@ def create_test_data(request, tmp_path):
     if test_data_params["class_type"] in ("multi", "regression"):
         target_classes["Africa"] = 0
 
-    n_per_class = 200
+    n_per_class = 500
     n_snps = 1000
 
     array_folder = tmp_path / "test_arrays"

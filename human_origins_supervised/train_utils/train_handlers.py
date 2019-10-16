@@ -79,7 +79,7 @@ def attach_metrics(engine: Engine, handler_config: HandlerConfig) -> None:
     """
     for metric in handler_config.monitoring_metrics:
         partial_func = partial(lambda x, metric_: x[metric_], metric_=metric)
-        MyRunningAverage(output_transform=partial_func, alpha=0.30).attach(
+        MyRunningAverage(output_transform=partial_func, alpha=0.20).attach(
             engine, metric
         )
 
@@ -104,28 +104,33 @@ def write_metrics(engine: Engine, handler_config: HandlerConfig):
         writer.writerow(engine.state.metrics)
 
 
+def _plot_benchmark_hook(ax, run_folder, target: str):
+
+    benchmark_file = Path(run_folder, "benchmark/benchmark_metrics.txt")
+    with open(str(benchmark_file), "r") as bfile:
+        lines = [i.strip() for i in bfile if i.startswith(target)]
+
+        # If we did not run benchmark for this metric, don't plot anything
+        if not lines:
+            return
+
+        value = float(lines[0].split(": ")[-1])
+
+    benchm_line = ax.axhline(y=value, linewidth=0.5, color="gray", linestyle="dashed")
+    handles, labels = ax.get_legend_handles_labels()
+    handles.append(benchm_line)
+    labels.append("LR Benchmark")
+    ax.legend(handles, labels)
+
+
 def plot_progress(engine: Engine, handler_config: HandlerConfig) -> None:
     args = handler_config.config.cl_args
     hook_funcs = []
 
-    def plot_benchmark_hook(ax):
-        benchmark_file = Path(
-            handler_config.run_folder, "benchmark/benchmark_metrics.txt"
-        )
-        with open(str(benchmark_file), "r") as bfile:
-            lines = [i.strip() for i in bfile if i.startswith("VAL MCC")]
-            value = float(lines[0].split(": ")[-1])
-
-        benchm_line = ax.axhline(
-            y=value, linewidth=0.5, color="gray", linestyle="dashed"
-        )
-        handles, labels = ax.get_legend_handles_labels()
-        handles.append(benchm_line)
-        labels.append("LR Benchmark")
-        ax.legend(handles, labels)
-
     if args.benchmark:
-        hook_funcs.append(plot_benchmark_hook)
+        hook_funcs.append(
+            partial(_plot_benchmark_hook, run_folder=handler_config.run_folder)
+        )
 
     n_iter_per_epoch = len(handler_config.config.train_loader)
 
