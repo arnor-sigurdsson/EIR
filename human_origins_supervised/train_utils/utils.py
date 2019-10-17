@@ -4,7 +4,7 @@ from human_origins_supervised.data_load.label_setup import al_label_dict
 
 
 def get_extra_labels_from_ids(
-    labels_dict: al_label_dict, cur_ids: List[str], label_column: str
+    labels_dict: al_label_dict, cur_ids: List[str], target_columns: List[str]
 ) -> List[Dict[str, str]]:
     """
     Returns a batch in same order as cur_ids.
@@ -13,7 +13,7 @@ def get_extra_labels_from_ids(
     for sample_id in cur_ids:
         cur_labels_all = labels_dict.get(sample_id)
         cur_labels_extra = {
-            k: v for k, v in cur_labels_all.items() if k != label_column
+            k: v for k, v in cur_labels_all.items() if k in target_columns
         }
         extra_labels.append(cur_labels_extra)
 

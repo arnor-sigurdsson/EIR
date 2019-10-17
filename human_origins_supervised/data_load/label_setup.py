@@ -14,7 +14,7 @@ try:
 except ImportError:
     COLUMN_OPS = {}
 
-from aislib.misc_utils import get_logger
+from aislib.misc_utils import get_logger, ensure_path_exists
 
 logger = get_logger(__name__)
 
@@ -99,7 +99,9 @@ def label_df_parse_wrapper(cl_args: Namespace) -> pd.DataFrame:
 
     extra_label_parsing_cols = get_extra_columns(cl_args.label_column, COLUMN_OPS)
     extra_embed_cols = cl_args.embed_columns
-    all_extra_cols = extra_label_parsing_cols + extra_embed_cols
+    extra_contn_cols = cl_args.contn_columns
+
+    all_extra_cols = extra_label_parsing_cols + extra_embed_cols + extra_contn_cols
 
     df_labels = load_label_df(
         cl_args.label_file, cl_args.label_column, all_ids, all_extra_cols
@@ -108,7 +110,11 @@ def label_df_parse_wrapper(cl_args: Namespace) -> pd.DataFrame:
 
     # remove columns only used for parsing, so only keep actual label column
     # and extra embedding columns
-    to_drop = [i for i in extra_label_parsing_cols if i not in extra_embed_cols]
+    to_drop = [
+        i
+        for i in extra_label_parsing_cols
+        if i not in extra_embed_cols + extra_contn_cols
+    ]
     if to_drop:
         df_labels = df_labels.drop(to_drop, axis=1)
 
@@ -144,7 +150,8 @@ def scale_regression_labels(
 
     scaler = StandardScaler()
     scaler.fit(parse_colvals(df_labels_train[reg_col]))
-    scaler_outpath = runs_folder / "standard_scaler.save"
+    scaler_outpath = runs_folder / "encoders" / f"{reg_col}_standard_scaler.save"
+    ensure_path_exists(scaler_outpath)
     joblib.dump(scaler, scaler_outpath)
 
     df_labels_train[reg_col] = scaler.transform(parse_colvals(df_labels_train[reg_col]))
@@ -156,11 +163,16 @@ def scale_regression_labels(
 def process_train_and_label_dfs(
     cl_args, df_labels_train, df_labels_valid
 ) -> al_train_val_dfs:
+    runs_folder = Path("./runs", cl_args.run_name)
 
+    # we make sure not to mess with the passed in CL arg, hence copy
+    continuous_columns = cl_args.contn_columns[:]
     if cl_args.model_task == "reg":
-        runs_folder = Path("./runs", cl_args.run_name)
+        continuous_columns.append(cl_args.label_column)
+
+    for continuous_column in continuous_columns:
         df_labels_train, df_labels_valid = scale_regression_labels(
-            df_labels_train, df_labels_valid, cl_args.label_column, runs_folder
+            df_labels_train, df_labels_valid, continuous_column, runs_folder
         )
 
     return df_labels_train, df_labels_valid

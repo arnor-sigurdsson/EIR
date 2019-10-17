@@ -78,13 +78,8 @@ def gather_pred_outputs_from_dloader(
     for inputs, labels, ids in data_loader:
         inputs = inputs.to(device=device, dtype=torch.float32)
 
-        extra_embeddings = None
-        if cl_args.embed_columns:
-            extra_embeddings = embeddings.get_embeddings_from_ids(
-                labels_dict, ids, cl_args.label_column, model, cl_args.device
-            )
-
-        outputs = predict_on_batch(model, (inputs, extra_embeddings))
+        extra_inputs = embeddings.get_extra_inputs(cl_args, ids, labels_dict, model)
+        outputs = predict_on_batch(model, (inputs, extra_inputs))
 
         outputs_total += [i for i in outputs]
         ids_total += [i for i in ids]

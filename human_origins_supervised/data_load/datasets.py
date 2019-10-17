@@ -41,7 +41,12 @@ def set_up_datasets(cl_args: Namespace) -> Tuple[al_datasets, al_datasets]:
     label_encoder = None
     if cl_args.model_task == "reg":
         label_encoder = joblib.load(
-            Path("./runs", cl_args.run_name, "standard_scaler.save")
+            Path(
+                "./runs",
+                cl_args.run_name,
+                "encoders",
+                f"{cl_args.label_column}_standard_scaler.save",
+            )
         )
 
     dataset_class = MemoryArrayDataset if cl_args.memory_dataset else DiskArrayDataset

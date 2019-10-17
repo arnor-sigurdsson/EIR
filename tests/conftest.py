@@ -51,6 +51,7 @@ def args_config():
             "do": 0.0,
             "memory_dataset": False,
             "embed_columns": [],
+            "contn_columns": [],
             "na_augment": 0.0,
         }
     )
@@ -69,8 +70,8 @@ def create_test_cl_args(args_config, create_test_data):
     args_config.model_task = model_task
     args_config.label_file = str(test_path / "labels.csv")
     args_config.n_epochs = 10
-    args_config.rb_do = 0.15
-    args_config.fc_do = 0.15
+    args_config.rb_do = 0.00
+    args_config.fc_do = 0.25
     args_config.na_augment = 0.10
     args_config.sample_interval = 200
     args_config.target_width = 1000

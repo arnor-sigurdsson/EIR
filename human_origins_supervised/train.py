@@ -1,7 +1,7 @@
 import argparse
-from sys import platform
 from dataclasses import dataclass
 from pathlib import Path
+from sys import platform
 from typing import Union, Tuple, List, Dict
 
 import numpy as np
@@ -21,7 +21,7 @@ from human_origins_supervised.data_load.data_loading_funcs import (
 from human_origins_supervised.models import model_utils
 from human_origins_supervised.models.embeddings import (
     get_embedding_dict,
-    get_embeddings_from_ids,
+    get_extra_inputs,
 )
 from human_origins_supervised.models.models import Model
 from human_origins_supervised.train_utils.metric_funcs import select_metric_func
@@ -75,14 +75,10 @@ def train_ignite(config) -> None:
         train_labels = train_labels.to(device=args.device)
         train_labels = model_utils.cast_labels(args.model_task, train_labels)
 
-        extra_embeddings = None
-        if args.embed_columns:
-            extra_embeddings = get_embeddings_from_ids(
-                c.labels_dict, train_ids, args.label_column, c.model, args.device
-            )
+        extra_inputs = get_extra_inputs(args, train_ids, c.labels_dict, c.model)
 
         c.optimizer.zero_grad()
-        train_outputs = c.model(train_seqs, extra_embeddings=extra_embeddings)
+        train_outputs = c.model(train_seqs, extra_inputs)
         train_loss = c.criterion(train_outputs, train_labels)
         train_loss.backward()
         c.optimizer.step()
@@ -146,7 +142,9 @@ def main(cl_args):
         if cl_args.embed_columns
         else None
     )
-    model = Model(cl_args, train_dataset.num_classes, embedding_dict).to(cl_args.device)
+    model = Model(
+        cl_args, train_dataset.num_classes, embedding_dict, cl_args.contn_columns
+    ).to(cl_args.device)
     assert model.data_size_after_conv >= 8
 
     if cl_args.debug:
@@ -298,6 +296,15 @@ if __name__ == "__main__":
         nargs="+",
         default=[],
         help="What columns to embed and add to fully connected layer at end of model.",
+    )
+
+    parser.add_argument(
+        "--contn_columns",
+        type=str,
+        nargs="+",
+        default=[],
+        help="What columns of continuous variables to add to fully connected layer at "
+        "end of model.",
     )
 
     parser.add_argument(
