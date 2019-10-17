@@ -98,23 +98,18 @@ def accumulate_activations(
                     single_sample=single_sample, sample_label=sample_label
                 )
 
-            extra_embeddings = None
-            if args.embed_columns:
-                extra_embeddings = embeddings.get_embeddings_from_ids(
-                    c.valid_dataset.labels_dict,
-                    list(sample_id),
-                    args.label_column,
-                    c.model,
-                    args.device,
-                ).detach()
+            extra_inputs = embeddings.get_extra_inputs(
+                args, list(sample_id), c.valid_dataset.labels_dict, c.model
+            )
+            # detach for shap
+            if extra_inputs is not None:
+                extra_inputs = extra_inputs.detach()
 
-            shap_inputs = [
-                i for i in (single_sample, extra_embeddings) if i is not None
-            ]
+            shap_inputs = [i for i in (single_sample, extra_inputs) if i is not None]
             single_acts = act_func(inputs=shap_inputs, sample_label=sample_label)
             if single_acts is not None:
                 # currently we are only going to get acts for snps
-                # TODO: Add analysis / plots for embeddings.
+                # TODO: Add analysis / plots for embeddings / extra inputs.
                 if isinstance(single_acts, list):
                     single_acts = single_acts[0]
 
@@ -137,7 +132,7 @@ def rescale_gradients(gradients):
 
 
 def get_shap_object(
-    config,
+    config: "Config",
     model: torch.nn.Module,
     device: str,
     train_loader: DataLoader,
@@ -150,13 +145,12 @@ def get_shap_object(
         train_loader, device, n_background_samples
     )
 
-    extra_embeddings = None
-    if args.embed_columns:
-        extra_embeddings = embeddings.get_embeddings_from_ids(
-            c.labels_dict, ids, args.label_column, c.model, args.device
-        ).detach()
+    extra_inputs = embeddings.get_extra_inputs(args, ids, c.labels_dict, c.model)
+    # detach for shap
+    if extra_inputs is not None:
+        extra_inputs = extra_inputs.detach()
 
-    shap_inputs = [i for i in (background, extra_embeddings) if i is not None]
+    shap_inputs = [i for i in (background, extra_inputs) if i is not None]
     explainer = DeepExplainer(model, shap_inputs)
     return explainer
 
@@ -177,7 +171,6 @@ def get_shap_sample_acts_deep(
 
     if model_task == "reg":
         assert isinstance(output[0], np.ndarray)
-        assert len(output) == 1
         return output
 
     assert len(output) == 2

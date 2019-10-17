@@ -136,7 +136,7 @@ def test_get_embeddings_from_ids(create_emb_test_label_data, create_test_emb_mod
     test_model.embeddings_dict = emb_dict
 
     test_embeddings = emb.get_embeddings_from_ids(
-        test_label_dict, ["ID1"], "Origin", test_model, "cpu"
+        test_label_dict, ["ID1"], ["Climate", "Food", "Population"], test_model, "cpu"
     )
     assert test_embeddings.shape[1] == 6
 

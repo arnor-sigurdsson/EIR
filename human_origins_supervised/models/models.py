@@ -1,4 +1,5 @@
-from typing import List
+from argparse import Namespace
+from typing import List, Tuple
 
 import aislib.pytorch as torch_utils
 import torch
@@ -6,6 +7,7 @@ from aislib.misc_utils import get_logger
 from torch import nn
 
 from . import embeddings
+from .embeddings import al_emb_lookup_dict
 from .model_utils import find_no_resblocks_needed
 
 logger = get_logger(__name__)
@@ -60,7 +62,7 @@ class AbstractBlock(nn.Module):
         self,
         in_channels: int,
         out_channels: int,
-        dropout: float,
+        rb_do: float,
         conv_1_kernel_w: int = 12,
         conv_1_padding: int = 4,
         down_stride_w: int = 4,
@@ -76,7 +78,7 @@ class AbstractBlock(nn.Module):
         self.conv_1_kernel_h = 4 if isinstance(self, FirstBlock) else 1
         self.down_stride_h = self.conv_1_kernel_h
 
-        self.do = nn.Dropout2d(dropout)
+        self.rb_do = nn.Dropout2d(rb_do)
         self.act = nn.LeakyReLU()
 
         self.bn_1 = nn.BatchNorm2d(in_channels, out_channels)
@@ -132,7 +134,7 @@ class FirstBlock(AbstractBlock):
     def forward(self, x):
 
         out = self.conv_1(x)
-        out = self.do(out)
+        out = self.rb_do(out)
 
         return out
 
@@ -157,7 +159,7 @@ class Block(AbstractBlock):
         out = self.bn_2(out)
         out = self.act(out)
 
-        out = self.do(out)
+        out = self.rb_do(out)
         out = self.conv_2(out)
 
         out = out + identity
@@ -179,7 +181,7 @@ def make_conv_layers(
     kernel_base_width: int,
     channel_exp_base: int,
     input_width: int,
-    dropout: float,
+    rb_do: float,
 ) -> List[nn.Module]:
     """
     Used to set up the convolutional layers for the model. Based on the passed in
@@ -195,7 +197,7 @@ def make_conv_layers(
     :param kernel_base_width: Width of the kernels applied during convolutions.
     :param channel_exp_base: Number of channels in first layer (2 in the power of).
     :param input_width: Used to calculate convolutional parameters.
-    :param dropout: Percentage of dropout to pass to blocks.
+    :param rb_do: Percentage of dropout to pass to blocks.
     :return: A list of `nn.Module` objects to be passed to `nn.Sequential`.
     """
     down_stride_w = 10
@@ -209,7 +211,7 @@ def make_conv_layers(
             conv_1_kernel_w=first_kernel,
             conv_1_padding=first_pad,
             down_stride_w=down_stride_w * 2,
-            dropout=dropout,
+            rb_do=rb_do,
         )
     ]
 
@@ -231,7 +233,7 @@ def make_conv_layers(
                 conv_1_padding=cur_padd,
                 down_stride_w=down_stride_w,
                 full_preact=True if len(base_layers) == 1 else False,
-                dropout=dropout,
+                rb_do=rb_do,
             )
 
             base_layers.append(cur_layer)
@@ -254,16 +256,25 @@ def calc_extra_embed_dim(embeddings_dict):
 
 
 class Model(nn.Module):
-    def __init__(self, run_config, num_classes, embeddings_dict=None):
+    def __init__(
+        self,
+        run_config: Namespace,
+        num_classes: int,
+        embeddings_dict: al_emb_lookup_dict = None,
+        extra_continuous_inputs: Tuple[str, ...] = None,
+    ):
         super().__init__()
 
         self.run_config = run_config
         self.num_classes = num_classes
         self.embeddings_dict = embeddings_dict
+        self.extra_continuous_inputs = extra_continuous_inputs
 
-        emb_total_dim = 0
+        emb_total_dim = con_total_dim = 0
         if embeddings_dict:
             emb_total_dim = embeddings.attach_embeddings(self, embeddings_dict)
+        if extra_continuous_inputs:
+            con_total_dim = len(self.extra_continuous_inputs)
 
         self.conv = nn.Sequential(
             *make_conv_layers(
@@ -290,9 +301,10 @@ class Model(nn.Module):
             nn.Linear(fc_1_in_features, fc_base, bias=False),
         )
 
-        if emb_total_dim:
-            self.fc_e = nn.Linear(emb_total_dim, emb_total_dim, bias=False)
-            fc_base += emb_total_dim
+        if emb_total_dim or con_total_dim:
+            extra_dim = emb_total_dim + con_total_dim
+            self.fc_extra = nn.Linear(extra_dim, extra_dim, bias=False)
+            fc_base += extra_dim
 
         self.fc_2 = nn.Sequential(
             nn.BatchNorm1d(fc_base),
@@ -314,14 +326,15 @@ class Model(nn.Module):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
-    def forward(self, x, extra_embeddings: torch.Tensor = None):
+    def forward(self, x: torch.Tensor, extra_inputs: torch.Tensor = None):
         out = self.conv(x)
         out = out.view(out.shape[0], -1)
 
         out = self.fc_1(out)
 
-        if extra_embeddings is not None:
-            out = torch.cat((extra_embeddings, out), dim=1)
+        if extra_inputs is not None:
+            out_extra = self.fc_extra(extra_inputs)
+            out = torch.cat((out_extra, out), dim=1)
 
         out = self.fc_2(out)
         out = self.fc_3(out)

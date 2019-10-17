@@ -1,5 +1,6 @@
+from argparse import Namespace
 from collections import OrderedDict
-from typing import List, Dict, Set
+from typing import List, Dict, Set, Union
 
 import torch
 from torch import nn
@@ -90,7 +91,7 @@ def lookup_embeddings(
 def get_embeddings_from_ids(
     labels_dict: al_label_dict,
     ids: List[str],
-    label_column: str,
+    embed_columns: List[str],
     model: nn.Module,
     device: str,
 ) -> torch.Tensor:
@@ -98,15 +99,18 @@ def get_embeddings_from_ids(
     A wrapper function that gathers the extra labels for passed in IDs and returns all
     embeddings.
 
+    Note that lookup_embeddings here gets embeddings for all IDs, i.e. each element
+    for extra_embreddings before the `.cat` is a NxK_i tensor where N is number of IDs
+    and K_i is the embedding dimension for a given embedding.
+
     :param labels_dict: Label including all IDs passed to this function.
     :param ids: The IDs to look up embeddings for.
-    :param label_column: Current label column to be ignored when looking up extra
-    labels.
+    :param embed_columns: Column names to grab embeddings for.
     :param model: Model that has the embeddings as attributes attached to it.
     :param device: Device to move the embeddings to.
     :return:
     """
-    extra_labels = get_extra_labels_from_ids(labels_dict, ids, label_column)
+    extra_labels = get_extra_labels_from_ids(labels_dict, ids, embed_columns)
 
     if not extra_labels:
         raise ValueError("No extra labels found for when looking up embeddings.")
@@ -121,3 +125,53 @@ def get_embeddings_from_ids(
     extra_embeddings = torch.cat(extra_embeddings, dim=1)
 
     return extra_embeddings
+
+
+def get_extra_continuous_inputs_from_ids(
+    labels_dict: al_label_dict, ids: List[str], continuous_columns: List[str]
+) -> torch.Tensor:
+    """
+    TODO:   Do the casting to torch tensors when the labels are being set up for the
+            first time instead of having to cast on every batch.
+    """
+    extra_labels = get_extra_labels_from_ids(labels_dict, ids, continuous_columns)
+
+    extra_continuous = []
+    for col in continuous_columns:
+        extra_continuous_cur_column = torch.tensor(
+            [torch.tensor(sample[col], dtype=torch.float) for sample in extra_labels]
+        ).unsqueeze(1)
+        extra_continuous.append(extra_continuous_cur_column)
+
+    extra_continuous = torch.cat(extra_continuous, dim=1)
+
+    return extra_continuous
+
+
+def get_extra_inputs(
+    cl_args: Namespace, ids: List[str], labels_dict: al_label_dict, model: nn.Module
+) -> Union[torch.Tensor, None]:
+    """
+    We want to have a wrapper function to gather all extra inputs needed by the model.
+    """
+    extra_embeddings = None
+    if cl_args.embed_columns:
+        extra_embeddings = get_embeddings_from_ids(
+            labels_dict, ids, cl_args.embed_columns, model, cl_args.device
+        ).to(device=cl_args.device)
+        if not cl_args.contn_columns:
+            return extra_embeddings.to(device=cl_args.device)
+
+    extra_continuous = None
+    if cl_args.contn_columns:
+        extra_continuous = get_extra_continuous_inputs_from_ids(
+            labels_dict, ids, cl_args.contn_columns
+        ).to(device=cl_args.device)
+        if not cl_args.embed_columns:
+            return extra_continuous.to(device=cl_args.device)
+
+    if extra_continuous is not None and extra_embeddings is not None:
+        concat_emb_and_con = torch.cat((extra_embeddings, extra_continuous), dim=1)
+        return concat_emb_and_con.to(device=cl_args.device)
+
+    return None
