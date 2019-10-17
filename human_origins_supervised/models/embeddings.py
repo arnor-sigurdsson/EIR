@@ -147,7 +147,6 @@ def get_extra_continuous_inputs_from_ids(
 
     return extra_continuous
 
-
 def get_extra_inputs(
     cl_args: Namespace, ids: List[str], labels_dict: al_label_dict, model: nn.Module
 ) -> Union[torch.Tensor, None]:
@@ -158,7 +157,7 @@ def get_extra_inputs(
     if cl_args.embed_columns:
         extra_embeddings = get_embeddings_from_ids(
             labels_dict, ids, cl_args.embed_columns, model, cl_args.device
-        )
+        ).to(device=cl_args.device)
         if not cl_args.contn_columns:
             return extra_embeddings
 
@@ -166,12 +165,13 @@ def get_extra_inputs(
     if cl_args.contn_columns:
         extra_continuous = get_extra_continuous_inputs_from_ids(
             labels_dict, ids, cl_args.contn_columns
-        )
+        ).to(device=cl_args.device)
         if not cl_args.embed_columns:
             return extra_continuous
 
-    if extra_continuous and extra_embeddings:
-        extra_inputs = torch.cat((extra_embeddings, extra_continuous), dim=1)
-        return extra_inputs
+    if extra_continuous is not None and extra_embeddings is not None:
+        concat_emb_and_con = torch.cat((extra_embeddings, extra_continuous), dim=1)
+        return concat_emb_and_con.to(device=cl_args.device)
 
     return None
+
