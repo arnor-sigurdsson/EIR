@@ -159,7 +159,7 @@ def get_extra_inputs(
             labels_dict, ids, cl_args.embed_columns, model, cl_args.device
         ).to(device=cl_args.device)
         if not cl_args.contn_columns:
-            return extra_embeddings
+            return extra_embeddings.to(device=cl_args.device)
 
     extra_continuous = None
     if cl_args.contn_columns:
@@ -167,7 +167,7 @@ def get_extra_inputs(
             labels_dict, ids, cl_args.contn_columns
         ).to(device=cl_args.device)
         if not cl_args.embed_columns:
-            return extra_continuous
+            return extra_continuous.to(device=cl_args.device)
 
     if extra_continuous is not None and extra_embeddings is not None:
         concat_emb_and_con = torch.cat((extra_embeddings, extra_continuous), dim=1)
