@@ -4,7 +4,7 @@ import torch
 from torch.nn import Module
 from torch.utils.data import DataLoader
 
-from human_origins_supervised.train_utils.utils import get_extra_labels_from_ids
+from human_origins_supervised.models import embeddings
 
 al_dloader_outputs = Tuple[torch.Tensor, Union[List[str], torch.LongTensor], List[str]]
 
@@ -63,7 +63,6 @@ def gather_pred_outputs_from_dloader(
     cl_args,
     model: Module,
     device: str,
-    label_column,
     labels_dict,
     with_labels: bool = True,
 ) -> al_dloader_outputs:
@@ -79,13 +78,13 @@ def gather_pred_outputs_from_dloader(
     for inputs, labels, ids in data_loader:
         inputs = inputs.to(device=device, dtype=torch.float32)
 
-        extra_labels = (
-            get_extra_labels_from_ids(labels_dict, ids, label_column)
-            if cl_args.embed_columns
-            else None
-        )
+        extra_embeddings = None
+        if cl_args.embed_columns:
+            extra_embeddings = embeddings.get_embeddings_from_ids(
+                labels_dict, ids, cl_args.label_column, model, cl_args.device
+            )
 
-        outputs = predict_on_batch(model, (inputs, extra_labels))
+        outputs = predict_on_batch(model, (inputs, extra_embeddings))
 
         outputs_total += [i for i in outputs]
         ids_total += [i for i in ids]
