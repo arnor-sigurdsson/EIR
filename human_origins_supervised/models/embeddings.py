@@ -167,6 +167,7 @@ def get_extra_inputs(
         extra_continuous = get_extra_continuous_inputs_from_ids(
             labels_dict, ids, cl_args.contn_columns
         ).to(device=cl_args.device)
+
         if not cl_args.embed_columns:
             return extra_continuous.to(device=cl_args.device)
 

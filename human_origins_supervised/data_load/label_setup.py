@@ -160,6 +160,39 @@ def scale_regression_labels(
     return df_labels_train, df_labels_valid
 
 
+def get_missing_stats_string(df: pd.DataFrame, target_columns: str) -> Dict[str, int]:
+    missing_count_dict = {}
+    for col in target_columns:
+        missing_count_dict[col] = int(df[col].isnull().sum())
+
+    return missing_count_dict
+
+
+def handle_missing_label_values(df: pd.DataFrame, cl_args, name="df"):
+
+    if cl_args.embed_columns:
+        missing_stats = get_missing_stats_string(df, cl_args.embed_columns)
+        logger.debug(
+            "Replacing NaNs in embedding columns %s (counts: %s) in %s with 'NA'.",
+            cl_args.embed_columns,
+            missing_stats,
+            name,
+        )
+        df[cl_args.embed_columns] = df[cl_args.embed_columns].fillna("NA")
+
+    if cl_args.contn_columns:
+        missing_stats = get_missing_stats_string(df, cl_args.contn_columns)
+        logger.debug(
+            "Replacing NaNs in continuous columns %s (counts: %s) in %s with 0.",
+            cl_args.contn_columns,
+            missing_stats,
+            name,
+        )
+        df[cl_args.contn_columns] = df[cl_args.contn_columns].fillna(0)
+
+    return df
+
+
 def process_train_and_label_dfs(
     cl_args, df_labels_train, df_labels_valid
 ) -> al_train_val_dfs:
@@ -174,6 +207,9 @@ def process_train_and_label_dfs(
         df_labels_train, df_labels_valid = scale_regression_labels(
             df_labels_train, df_labels_valid, continuous_column, runs_folder
         )
+
+    df_labels_train = handle_missing_label_values(df_labels_train, cl_args, "train df")
+    df_labels_valid = handle_missing_label_values(df_labels_valid, cl_args, "valid df")
 
     return df_labels_train, df_labels_valid
 
