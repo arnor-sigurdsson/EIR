@@ -1,10 +1,12 @@
 from typing import List, Tuple, Union
+from argparse import Namespace
 
 import torch
 from torch.nn import Module
 from torch.utils.data import DataLoader
 
 from human_origins_supervised.models import embeddings
+from human_origins_supervised.data_load.label_setup import al_label_dict
 
 al_dloader_outputs = Tuple[torch.Tensor, Union[List[str], torch.LongTensor], List[str]]
 
@@ -47,14 +49,14 @@ def find_no_resblocks_needed(width: int, stride: int) -> List[int]:
     return [i for i in resblocks if i != 0]
 
 
-def predict_on_batch(model, inputs):
+def predict_on_batch(model: Module, inputs: Tuple[torch.Tensor, ...]) -> torch.Tensor:
     with torch.no_grad():
         val_outputs = model(*inputs)
 
     return val_outputs
 
 
-def cast_labels(model_task, labels):
+def cast_labels(model_task: str, labels: torch.Tensor) -> torch.Tensor:
     if model_task == "reg":
         return labels.to(dtype=torch.float).unsqueeze(1)
     return labels.to(dtype=torch.long)
@@ -62,10 +64,10 @@ def cast_labels(model_task, labels):
 
 def gather_pred_outputs_from_dloader(
     data_loader: DataLoader,
-    cl_args,
+    cl_args: Namespace,
     model: Module,
     device: str,
-    labels_dict,
+    labels_dict: al_label_dict,
     with_labels: bool = True,
 ) -> al_dloader_outputs:
     """

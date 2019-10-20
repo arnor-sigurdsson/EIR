@@ -21,8 +21,11 @@ def get_extra_labels_from_ids(
 
 
 def check_if_iteration_sample(
-    iteration: int, iter_sample_interval: int, n_iterations_per_epochs, n_epochs
-):
+    iteration: int,
+    iter_sample_interval: int,
+    n_iterations_per_epochs: int,
+    n_epochs: int,
+) -> bool:
     if iter_sample_interval:
         condition_1 = iteration % iter_sample_interval == 0
     else:

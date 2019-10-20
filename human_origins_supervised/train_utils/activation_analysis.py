@@ -1,6 +1,8 @@
 import copy
 import os
 import sys
+
+from argparse import Namespace
 from contextlib import contextmanager
 from copy import deepcopy
 from functools import partial
@@ -14,6 +16,7 @@ from aislib.misc_utils import ensure_path_exists, get_logger
 from ignite.engine import Engine
 from shap import DeepExplainer
 from torch.utils.data import Dataset, DataLoader
+from sklearn.preprocessing import StandardScaler, LabelEncoder
 
 import human_origins_supervised.visualization.activation_visualization as av
 from human_origins_supervised.models import embeddings
@@ -27,13 +30,17 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
+# Type aliases
 # would be better to use Tuple here, but shap does literal type check for list, i.e.
 # if type(data) == list:
 al_model_inputs = List[Union[torch.Tensor, Union[torch.Tensor, None]]]
+al_gradients_dict = Dict[str, List[np.array]]
+al_top_gradients_dict = Dict[str, Dict[str, np.array]]
+al_transform_funcs = Dict[str, Tuple[Callable]]
 
 
 @contextmanager
-def suppress_stdout():
+def suppress_stdout() -> None:
     with open(os.devnull, "w") as devnull:
         old_stdout = sys.stdout
         sys.stdout = devnull
@@ -43,7 +50,9 @@ def suppress_stdout():
             sys.stdout = old_stdout
 
 
-def get_target_classes(cl_args, label_encoder):
+def get_target_classes(
+    cl_args: Namespace, label_encoder: Union[StandardScaler, LabelEncoder]
+) -> List[str]:
 
     if cl_args.model_task == "reg":
         return ["Regression"]
@@ -56,7 +65,12 @@ def get_target_classes(cl_args, label_encoder):
     return target_classes
 
 
-def get_act_condition(sample_label, label_encoder, target_classes, model_task):
+def get_act_condition(
+    sample_label: torch.Tensor,
+    label_encoder: Union[StandardScaler, LabelEncoder],
+    target_classes: List[str],
+    model_task: str,
+):
     if model_task == "reg":
         return "Regression"
 
@@ -72,8 +86,8 @@ def accumulate_activations(
     config: "Config",
     valid_dataset: Dataset,
     act_func: Callable,
-    transform_funcs: Dict[str, Tuple[Callable]],
-):
+    transform_funcs: al_transform_funcs,
+) -> Tuple[Dict, Dict]:
     c = config
     args = c.cl_args
 
@@ -125,7 +139,7 @@ def accumulate_activations(
     return acc_acts, acc_acts_masked
 
 
-def rescale_gradients(gradients):
+def rescale_gradients(gradients: np.ndarray) -> np.ndarray:
     gradients_resc = gradients - gradients.min()
     gradients_resc = gradients_resc / (gradients.max() - gradients.min())
     return gradients_resc
@@ -185,7 +199,7 @@ def get_snp_cols_w_top_grads(
     accumulated_grads: Dict[str, List[np.array]],
     n: int = 10,
     custom_indexes_dict: dict = None,
-    abs_grads=False,
+    abs_grads: bool = False,
 ) -> Dict[str, Dict[str, np.array]]:
     """
     `accumulated_grads` specs:
@@ -271,10 +285,10 @@ def get_snp_names(snp_file: str, data_folder: Path = None) -> np.array:
 
 
 def gather_and_rescale_snps(
-    all_gradients_dict: Dict[str, List[np.array]],
-    top_gradients_dict: Dict[str, Dict[str, np.array]],
+    all_gradients_dict: al_gradients_dict,
+    top_gradients_dict: al_top_gradients_dict,
     classes: List[str],
-) -> Dict[str, Dict[str, np.array]]:
+) -> al_top_gradients_dict:
     """
     `accumulated_grads` specs:
 
@@ -337,7 +351,10 @@ def gather_and_rescale_snps(
     return top_snps_dict
 
 
-def index_masked_grads(top_grads_dict, accumulated_grads_times_input):
+def index_masked_grads(
+    top_grads_dict: al_top_gradients_dict,
+    accumulated_grads_times_input: al_gradients_dict,
+) -> al_top_gradients_dict:
     indexes_from_all_grads = {
         key: top_grads_dict[key]["top_n_idxs"] for key in top_grads_dict.keys()
     }
@@ -350,8 +367,11 @@ def index_masked_grads(top_grads_dict, accumulated_grads_times_input):
 
 
 def save_masked_grads(
-    acc_grads_times_inp, top_gradients_dict, snp_names, sample_outfolder
-):
+    acc_grads_times_inp: al_gradients_dict,
+    top_gradients_dict: al_top_gradients_dict,
+    snp_names: List[str],
+    sample_outfolder: Path,
+) -> None:
     top_grads_msk_inputs = index_masked_grads(top_gradients_dict, acc_grads_times_inp)
 
     classes = sorted(list(top_gradients_dict.keys()))
@@ -366,10 +386,15 @@ def save_masked_grads(
         "top_snps_masked.png",
     )
 
-    np.save(sample_outfolder / "top_grads_masked.npy", top_grads_msk_inputs)
+    np.save(str(sample_outfolder / "top_grads_masked.npy"), top_grads_msk_inputs)
 
 
-def analyze_activations(config: "Config", act_func, proc_funcs, outfolder):
+def analyze_activations(
+    config: "Config",
+    act_func: Callable,
+    proc_funcs: al_transform_funcs,
+    outfolder: Path,
+) -> None:
     c = config
     args = config.cl_args
 
@@ -386,7 +411,7 @@ def analyze_activations(config: "Config", act_func, proc_funcs, outfolder):
     scaled_grads = gather_and_rescale_snps(acc_acts, top_gradients_dict, classes)
     av.plot_top_gradients(scaled_grads, top_gradients_dict, snp_names, outfolder)
 
-    np.save(outfolder / "top_acts.npy", top_gradients_dict)
+    np.save(str(outfolder / "top_acts.npy"), top_gradients_dict)
 
     save_masked_grads(acc_acts_masked, top_gradients_dict, snp_names, outfolder)
 

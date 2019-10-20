@@ -117,7 +117,7 @@ class AbstractBlock(nn.Module):
             )
         )
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor):
         raise NotImplementedError
 
 
@@ -131,7 +131,7 @@ class FirstBlock(AbstractBlock):
         delattr(self, "conv_2")
         delattr(self, "bn_2")
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
 
         out = self.conv_1(x)
         out = self.rb_do(out)
@@ -140,12 +140,12 @@ class FirstBlock(AbstractBlock):
 
 
 class Block(AbstractBlock):
-    def __init__(self, full_preact=False, *args, **kwargs):
+    def __init__(self, full_preact: bool = False, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.full_preact = full_preact
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         out = self.bn_1(x)
         out = self.act(out)
 
@@ -241,18 +241,6 @@ def make_conv_layers(
     # attention_channels = base_layers[-2].out_channels
     # base_layers.insert(-1, SelfAttention(attention_channels))
     return base_layers
-
-
-def calc_extra_embed_dim(embeddings_dict):
-    base = 0
-    if not embeddings_dict:
-        return base
-
-    for embed_col in embeddings_dict:
-        cur_embedding = embeddings_dict[embed_col]["embedding_module"]
-        base += cur_embedding.embedding_dim
-
-    return base
 
 
 class Model(nn.Module):

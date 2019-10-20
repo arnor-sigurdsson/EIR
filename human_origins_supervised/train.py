@@ -54,7 +54,7 @@ class Config:
     data_width: int
 
 
-def train_ignite(config) -> None:
+def train_ignite(config: Config) -> None:
     c = config
     args = config.cl_args
 
@@ -98,7 +98,7 @@ def train_ignite(config) -> None:
     trainer.run(c.train_loader, args.n_epochs)
 
 
-def main(cl_args):
+def main(cl_args: argparse.Namespace) -> None:
     run_folder = Path("runs", cl_args.run_name)
     if run_folder.exists():
         raise FileExistsError(
