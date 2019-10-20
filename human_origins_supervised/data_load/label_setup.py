@@ -66,31 +66,40 @@ def load_label_df(
     return df_labels
 
 
-def parse_label_df(df, column_ops: al_all_column_ops) -> pd.DataFrame:
+def parse_label_df(
+    df, column_ops: al_all_column_ops, label_column: str
+) -> pd.DataFrame:
     """
     We want to be able to dynamically apply various operations to different columns
     in the label file (e.g. different operations for creating obesity labels or parsing
     country of origin).
 
+    If a column operaton is supposed to only be applied if its column is the target
+    variable, make sure it's not applied in other cases (e.g. if the column is a
+    embedding / continuous input to another target).
+
     :param df: Dataframe to perform processing on.
     :param column_ops: A dictionarity of colum names, where each value is a list
     of tuples, where each tuple is a callable as the first element and the callable's
     arguments as the second element.
+    :param label_column:
     :return: Parsed dataframe.
     """
 
     for column_name, ops_funcs in column_ops.items():
         if column_name in df.columns:
             for column_op in ops_funcs:
-                func, args_dict = column_op.function, column_op.args
-                logger.debug(
-                    "Applying func %s with args %s to column in pre-processing.",
-                    func,
-                    args_dict,
-                )
-                logger.debug("Shape before: %s", df.shape)
-                df = func(df=df, column_name=column_name, **args_dict)
-                logger.debug("Shape after: %s", df.shape)
+                do_skip = column_op.only_apply_if_target and column_name == label_column
+                if not do_skip:
+                    func, args_dict = column_op.function, column_op.function_args
+                    logger.debug(
+                        "Applying func %s with args %s to column in pre-processing.",
+                        func,
+                        args_dict,
+                    )
+                    logger.debug("Shape before: %s", df.shape)
+                    df = func(df=df, column_name=column_name, **args_dict)
+                    logger.debug("Shape after: %s", df.shape)
     return df
 
 
@@ -106,7 +115,7 @@ def label_df_parse_wrapper(cl_args: Namespace) -> pd.DataFrame:
     df_labels = load_label_df(
         cl_args.label_file, cl_args.label_column, all_ids, all_extra_cols
     )
-    df_labels = parse_label_df(df_labels, COLUMN_OPS)
+    df_labels = parse_label_df(df_labels, COLUMN_OPS, cl_args.label_column)
 
     # remove columns only used for parsing, so only keep actual label column
     # and extra embedding columns
@@ -160,7 +169,9 @@ def scale_regression_labels(
     return df_labels_train, df_labels_valid
 
 
-def get_missing_stats_string(df: pd.DataFrame, target_columns: str) -> Dict[str, int]:
+def get_missing_stats_string(
+    df: pd.DataFrame, target_columns: List[str]
+) -> Dict[str, int]:
     missing_count_dict = {}
     for col in target_columns:
         missing_count_dict[col] = int(df[col].isnull().sum())

@@ -10,9 +10,14 @@ from pandas import DataFrame
 
 @dataclass
 class ColumnOperation:
+    """
+    function: Function to apply on the label dataframe.
+    """
+
     function: Callable[[DataFrame, str], DataFrame]
-    args: Dict[str, Any]
+    function_args: Dict[str, Any]
     extra_columns_deps: Union[Tuple[str, ...], None] = ()
+    only_apply_if_target: bool = False
 
 
 def streamline_df(
@@ -23,13 +28,8 @@ def streamline_df(
 
         df = df_func(*args, df=df, column_name=column_name, **kwargs)
 
-        # TODO: Here is where all extra columns are dropped, move this somewhere else.
-        #       Otherwise we might run into problems when we are adding extra embedding
-        #       columns.
-        # df = df[column_name].to_frame()
+        # Remove NaNs in target column.
         df = df.dropna(subset=[column_name])
-
-        df = df.astype(str)
 
         return df
 
