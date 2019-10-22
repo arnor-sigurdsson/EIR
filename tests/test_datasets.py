@@ -35,7 +35,7 @@ def test_set_up_datasets(create_test_cl_args, create_test_data):
 
     train_dataset, valid_dataset = datasets.set_up_datasets(cl_args)
 
-    assert len(train_dataset) + len(valid_dataset) == 500 * n_classes
+    assert len(train_dataset) + len(valid_dataset) == 1000 * n_classes
 
     valid_ids = [i.sample_id for i in valid_dataset.samples]
     train_ids = [i.sample_id for i in train_dataset.samples]
@@ -70,8 +70,8 @@ def test_datasets(
         classes_tested += ["Africa"]
     classes_tested.sort()
 
-    train_no_samples = int(len(classes_tested) * 500 * 0.9)
-    valid_no_sample = int(len(classes_tested) * 500 * 0.1)
+    train_no_samples = int(len(classes_tested) * 1000 * 0.9)
+    valid_no_sample = int(len(classes_tested) * 1000 * 0.1)
 
     train_dataset, valid_dataset = datasets.set_up_datasets(cl_args)
 

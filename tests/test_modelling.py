@@ -45,9 +45,9 @@ def create_test_dataset(create_test_data, create_test_cl_args):
 def create_test_dloaders(create_test_dataset):
     train_dataset, valid_dataset = create_test_dataset
 
-    train_dloader = DataLoader(train_dataset, batch_size=16, shuffle=True)
+    train_dloader = DataLoader(train_dataset, batch_size=32, shuffle=True)
 
-    valid_dloader = DataLoader(valid_dataset, batch_size=16, shuffle=False)
+    valid_dloader = DataLoader(valid_dataset, batch_size=32, shuffle=False)
 
     return train_dloader, valid_dloader, train_dataset, valid_dataset
 

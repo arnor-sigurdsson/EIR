@@ -1,3 +1,4 @@
+from argparse import Namespace
 from human_origins_supervised.models import models
 
 
@@ -11,7 +12,16 @@ def test_make_conv_layers():
 
     """
     conv_layer_list = [1, 1, 1, 1]
-    conv_layers = models.make_conv_layers(conv_layer_list, 12, 5, int(8e5), 0.1)
+    test_run_config = Namespace(
+        kernel_width=5,
+        down_stride=4,
+        target_width=int(8e5),
+        rb_do=0.1,
+        first_kernel_expansion=1,
+        first_stride_expansion=5,
+        channel_exp_base=5,
+    )
+    conv_layers = models.make_conv_layers(conv_layer_list, test_run_config)
 
     # account for first block, add +2 instead if using SA
     assert len(conv_layers) == len(conv_layer_list) + 1
