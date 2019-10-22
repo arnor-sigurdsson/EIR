@@ -33,7 +33,7 @@ scikit-learn = "*"
 human-origins-supervised = {path = ".",editable = true}
 shap = "*"
 seaborn = "*"
-aislib = {ref = "v0.1.0-alpha",git = "ssh://git@github.com/arnor-sigurdsson/aislib.git",editable = true}
+aislib = {ref = "v0.1.1-alpha",git = "ssh://git@github.com/arnor-sigurdsson/aislib.git",editable = true}
 joblib = "*"
 
 [requires]
