@@ -97,8 +97,9 @@ def create_test_array(test_task, base_array, snp_idxs_candidates, snp_row_idx):
     base_array[:, snp_idxs_candidates] = 0
     base_array[3, snp_idxs_candidates] = 1
 
+    lower_bound = 0 if test_task == "reg" else 6
     np.random.shuffle(snp_idxs_candidates)
-    num_snps_this_sample = np.random.randint(2, 10)
+    num_snps_this_sample = np.random.randint(lower_bound, 10)
     snp_idxs = sorted(snp_idxs_candidates[:num_snps_this_sample])
 
     # zero out snp_idxs
