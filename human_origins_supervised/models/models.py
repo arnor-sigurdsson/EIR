@@ -278,25 +278,25 @@ class Model(nn.Module):
         fc_base = 128
 
         self.fc_1 = nn.Sequential(
-            nn.BatchNorm1d(fc_1_in_features),
-            nn.LeakyReLU(),
-            nn.Linear(fc_1_in_features, fc_base, bias=False),
+            # nn.BatchNorm1d(fc_1_in_features),
+            nn.SELU(),
+            nn.Linear(fc_1_in_features, fc_base, bias=True),
         )
 
         if emb_total_dim or con_total_dim:
             extra_dim = emb_total_dim + con_total_dim
-            self.fc_extra = nn.Linear(extra_dim, extra_dim, bias=False)
+            self.fc_extra = nn.Linear(extra_dim, extra_dim, bias=True)
             fc_base += extra_dim
 
         self.fc_2 = nn.Sequential(
-            nn.BatchNorm1d(fc_base),
-            nn.LeakyReLU(),
-            nn.Linear(fc_base, fc_base, bias=False),
+            # nn.BatchNorm1d(fc_base),
+            nn.SELU(),
+            nn.Linear(fc_base, fc_base, bias=True),
         )
 
         self.fc_3 = nn.Sequential(
-            nn.BatchNorm1d(fc_base),
-            nn.LeakyReLU(),
+            # nn.BatchNorm1d(fc_base),
+            nn.SELU(),
             nn.Dropout(run_config.fc_do),
             nn.Linear(fc_base, self.num_classes),
         )
