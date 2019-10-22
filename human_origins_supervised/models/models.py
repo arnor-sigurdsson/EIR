@@ -177,11 +177,7 @@ def set_up_conv_params(current_width: int, kernel_size: int, stride: int):
 
 
 def make_conv_layers(
-    residual_blocks: List[int],
-    kernel_base_width: int,
-    channel_exp_base: int,
-    input_width: int,
-    rb_do: float,
+    residual_blocks: List[int], run_config: Namespace
 ) -> List[nn.Module]:
     """
     Used to set up the convolutional layers for the model. Based on the passed in
@@ -194,38 +190,44 @@ def make_conv_layers(
 
     :param residual_blocks: List of ints, where each int indicates number of blocks w.
     that channel dimension.
-    :param kernel_base_width: Width of the kernels applied during convolutions.
-    :param channel_exp_base: Number of channels in first layer (2 in the power of).
-    :param input_width: Used to calculate convolutional parameters.
-    :param rb_do: Percentage of dropout to pass to blocks.
+    :param run_config: Experiment hyperparameters / configuration needed for the
+    convolution setup.
     :return: A list of `nn.Module` objects to be passed to `nn.Sequential`.
     """
-    down_stride_w = 10
+    rc = run_config
+
+    down_stride_w = rc.down_stride
+
+    first_conv_kernel = rc.kernel_width * rc.first_kernel_expansion
+    first_conv_stride = down_stride_w * rc.first_stride_expansion
     first_kernel, first_pad = set_up_conv_params(
-        input_width, kernel_base_width * 4, down_stride_w * 2
+        rc.target_width, first_conv_kernel, first_conv_stride
     )
+
     base_layers = [
         FirstBlock(
             in_channels=1,
-            out_channels=2 ** channel_exp_base,
+            out_channels=2 ** rc.channel_exp_base,
             conv_1_kernel_w=first_kernel,
             conv_1_padding=first_pad,
-            down_stride_w=down_stride_w * 2,
-            rb_do=rb_do,
+            down_stride_w=down_stride_w,
+            rb_do=rc.rb_do,
         )
     ]
 
     for layer_arch_idx, layer_arch_layers in enumerate(residual_blocks):
         for layer in range(layer_arch_layers):
             cur_conv = nn.Sequential(*base_layers)
-            cur_width = torch_utils.calc_size_after_conv_sequence(input_width, cur_conv)
+            cur_width = torch_utils.calc_size_after_conv_sequence(
+                rc.target_width, cur_conv
+            )
 
             cur_kern, cur_padd = set_up_conv_params(
-                cur_width, kernel_base_width, down_stride_w
+                cur_width, rc.kernel_width, down_stride_w
             )
 
             cur_in_channels = base_layers[-1].out_channels
-            cur_out_channels = 2 ** (channel_exp_base + layer_arch_idx)
+            cur_out_channels = 2 ** (rc.channel_exp_base + layer_arch_idx)
             cur_layer = Block(
                 in_channels=cur_in_channels,
                 out_channels=cur_out_channels,
@@ -233,7 +235,7 @@ def make_conv_layers(
                 conv_1_padding=cur_padd,
                 down_stride_w=down_stride_w,
                 full_preact=True if len(base_layers) == 1 else False,
-                rb_do=rb_do,
+                rb_do=rc.rb_do,
             )
 
             base_layers.append(cur_layer)
@@ -264,15 +266,7 @@ class Model(nn.Module):
         if extra_continuous_inputs:
             con_total_dim = len(self.extra_continuous_inputs)
 
-        self.conv = nn.Sequential(
-            *make_conv_layers(
-                self.resblocks,
-                run_config.kernel_width,
-                run_config.channel_exp_base,
-                run_config.target_width,
-                run_config.rb_do,
-            )
-        )
+        self.conv = nn.Sequential(*make_conv_layers(self.resblocks, run_config))
 
         self.data_size_after_conv = torch_utils.calc_size_after_conv_sequence(
             run_config.target_width, self.conv
@@ -331,7 +325,11 @@ class Model(nn.Module):
     @property
     def resblocks(self):
         if not self.run_config.resblocks:
-            residual_blocks = find_no_resblocks_needed(self.run_config.target_width, 10)
+            residual_blocks = find_no_resblocks_needed(
+                self.run_config.target_width,
+                self.run_config.down_stride,
+                self.run_config.first_stride_expansion,
+            )
             logger.info(
                 "No residual blocks specified in CL args, using input "
                 "%s based on width approximation calculation.",

@@ -221,6 +221,27 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        "--down_stride",
+        type=int,
+        default=4,
+        help="down stride to use common over the network.",
+    )
+
+    parser.add_argument(
+        "--first_kernel_expansion",
+        type=int,
+        default=1,
+        help="factor by which to expand the first kernel in the network",
+    )
+
+    parser.add_argument(
+        "--first_stride_expansion",
+        type=int,
+        default=1,
+        help="factor by which to expand the first stride in the network",
+    )
+
+    parser.add_argument(
         "--channel_exp_base",
         type=int,
         default=5,
