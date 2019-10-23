@@ -97,7 +97,7 @@ def create_test_array(test_task, base_array, snp_idxs_candidates, snp_row_idx):
     base_array[:, snp_idxs_candidates] = 0
     base_array[3, snp_idxs_candidates] = 1
 
-    lower_bound = 0 if test_task == "reg" else 6
+    lower_bound = 0 if test_task == "reg" else 5
     np.random.shuffle(snp_idxs_candidates)
     num_snps_this_sample = np.random.randint(lower_bound, 10)
     snp_idxs = sorted(snp_idxs_candidates[:num_snps_this_sample])
@@ -146,7 +146,9 @@ def create_test_data(request, tmp_path):
 
             # create random one hot array
             base_array = np.eye(4)[np.random.choice(4, n_snps)].T
-            snp_idxs_candidates = np.array(range(50, n_snps, 100))
+            # set up 10 candidates
+            step_size = n_snps // 10
+            snp_idxs_candidates = np.array(range(50, n_snps, step_size))
 
             cur_test_array, snps_this_sample = create_test_array(
                 test_task, base_array, snp_idxs_candidates, snp_row_idx
@@ -161,7 +163,7 @@ def create_test_data(request, tmp_path):
             if test_data_params["class_type"] in ("binary", "multi"):
                 label_file.write(f"{sample_idx}_{cls},{cls}\n")
             else:
-                value = 100 + (2.5 * len(snps_this_sample)) + np.random.randn()
+                value = 100 + (5 * len(snps_this_sample)) + np.random.randn()
                 label_file.write(f"{sample_idx}_{cls},{value}\n")
 
     label_file.close()
