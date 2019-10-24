@@ -26,7 +26,7 @@ from matplotlib.ticker import MaxNLocator
 
 def generate_training_curve(
     metrics_filename: Path,
-    skiprows: int = 0,
+    skiprows: int = 200,
     cols: tuple = ("t_mcc", "v_mcc"),
     hook_funcs=None,
 ) -> None:
@@ -37,7 +37,7 @@ def generate_training_curve(
     fig, ax_1 = plt.subplots()
 
     xlim_upper = df_cut.shape[0] + skiprows
-    xticks = np.arange(1, xlim_upper + 1)
+    xticks = np.arange(1 + skiprows, xlim_upper + 1)
     validation_values = df_cut[cols[1]].dropna()
     validation_xticks = validation_values.index
     line_1a = ax_1.plot(

@@ -214,6 +214,13 @@ if __name__ == "__main__":
     parser.add_argument("--wd", type=float, default=5e-4, help="weight decay for adam.")
 
     parser.add_argument(
+        "--fc_dim",
+        type=int,
+        default=128,
+        help="base dimensionality of fully connected layers at the end of the network",
+    )
+
+    parser.add_argument(
         "--kernel_width",
         type=int,
         default=12,
