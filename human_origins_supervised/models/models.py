@@ -79,7 +79,7 @@ class AbstractBlock(nn.Module):
         self.down_stride_h = self.conv_1_kernel_h
 
         self.rb_do = nn.Dropout2d(rb_do)
-        self.act = nn.LeakyReLU()
+        self.act = nn.SELU()
 
         self.bn_1 = nn.BatchNorm2d(in_channels, out_channels)
         self.conv_1 = nn.Conv2d(
@@ -275,36 +275,36 @@ class Model(nn.Module):
         self.no_out_channels = self.conv[-1].out_channels
 
         fc_1_in_features = self.data_size_after_conv * self.no_out_channels
-        fc_base = 128
+        fc_base = run_config.fc_dim
 
         self.fc_1 = nn.Sequential(
-            # nn.BatchNorm1d(fc_1_in_features),
             nn.SELU(),
-            nn.Linear(fc_1_in_features, fc_base, bias=True),
+            nn.BatchNorm1d(fc_1_in_features),
+            nn.Linear(fc_1_in_features, fc_base, bias=False),
         )
+        self.fc_1_identity = nn.Linear(fc_1_in_features, fc_base, bias=False)
 
         if emb_total_dim or con_total_dim:
             extra_dim = emb_total_dim + con_total_dim
-            self.fc_extra = nn.Linear(extra_dim, extra_dim, bias=True)
+            self.fc_extra = nn.Linear(extra_dim, extra_dim, bias=False)
             fc_base += extra_dim
 
         self.fc_2 = nn.Sequential(
-            # nn.BatchNorm1d(fc_base),
-            nn.SELU(),
-            nn.Linear(fc_base, fc_base, bias=True),
+            nn.SELU(), nn.BatchNorm1d(fc_base), nn.Linear(fc_base, fc_base, bias=False)
         )
+        self.fc_2_identity = nn.Linear(fc_base, fc_base, bias=False)
 
         self.fc_3 = nn.Sequential(
-            # nn.BatchNorm1d(fc_base),
             nn.SELU(),
-            nn.Dropout(run_config.fc_do),
+            nn.BatchNorm1d(fc_base),
+            nn.AlphaDropout(run_config.fc_do),
             nn.Linear(fc_base, self.num_classes),
         )
+        if self.run_config.model_task == "reg":
+            self.fc_3_identity = nn.Linear(fc_base, self.num_classes, bias=False)
 
         for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode="fan_out", a=1e-2)
-            elif isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.BatchNorm1d):
+            if isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.BatchNorm1d):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
@@ -312,15 +312,19 @@ class Model(nn.Module):
         out = self.conv(x)
         out = out.view(out.shape[0], -1)
 
-        out = self.fc_1(out)
+        out = self.fc_1(out) + self.fc_1_identity(out)
 
         if extra_inputs is not None:
             out_extra = self.fc_extra(extra_inputs)
             out = torch.cat((out_extra, out), dim=1)
 
-        out = self.fc_2(out)
-        out = self.fc_3(out)
-        return out
+        out = self.fc_2(out) + self.fc_2_identity(out)
+
+        out_final = self.fc_3(out)
+        if self.run_config.model_task == "reg":
+            out_final += self.fc_3_identity(out)
+
+        return out_final
 
     @property
     def resblocks(self):
