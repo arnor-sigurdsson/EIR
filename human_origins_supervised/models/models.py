@@ -79,7 +79,7 @@ class AbstractBlock(nn.Module):
         self.down_stride_h = self.conv_1_kernel_h
 
         self.rb_do = nn.Dropout2d(rb_do)
-        self.act_1 = nn.LeakyReLU()
+        self.act_1 = nn.ReLU()
 
         self.bn_1 = nn.BatchNorm2d(in_channels)
         self.conv_1 = nn.Conv2d(
@@ -96,7 +96,7 @@ class AbstractBlock(nn.Module):
         )
         conv_2_padding = conv_2_kernel_w // 2
 
-        self.act_2 = nn.LeakyReLU()
+        self.act_2 = nn.ReLU()
         self.bn_2 = nn.BatchNorm2d(out_channels)
         self.conv_2 = nn.Conv2d(
             out_channels,
@@ -149,7 +149,7 @@ class Block(AbstractBlock):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         out = self.bn_1(x)
-        out = self.act_1(x)
+        out = self.act_1(out)
 
         if self.full_preact:
             identity = self.downsample_identity(out)
@@ -280,11 +280,10 @@ class Model(nn.Module):
         fc_base = run_config.fc_dim
 
         self.fc_1 = nn.Sequential(
-            nn.LeakyReLU(),
             nn.BatchNorm1d(fc_1_in_features),
+            nn.ReLU(),
             nn.Linear(fc_1_in_features, fc_base, bias=False),
         )
-#        self.fc_1_identity = nn.Linear(fc_1_in_features, fc_base, bias=False)
 
         if emb_total_dim or con_total_dim:
             extra_dim = emb_total_dim + con_total_dim
@@ -292,23 +291,19 @@ class Model(nn.Module):
             fc_base += extra_dim
 
         self.fc_2 = nn.Sequential(
-            nn.LeakyReLU(), nn.BatchNorm1d(fc_base), nn.Linear(fc_base, fc_base, bias=False)
+            nn.BatchNorm1d(fc_base), nn.ReLU(), nn.Linear(fc_base, fc_base, bias=False)
         )
-#        self.fc_2_identity = nn.Linear(fc_base, fc_base, bias=False)
 
         self.fc_3 = nn.Sequential(
-            nn.LeakyReLU(),
             nn.BatchNorm1d(fc_base),
-            nn.AlphaDropout(run_config.fc_do),
+            nn.ReLU(),
+            nn.Dropout(run_config.fc_do),
             nn.Linear(fc_base, self.num_classes),
         )
-        if self.run_config.model_task == "reg":
-#            self.fc_3_identity = nn.Linear(fc_base, self.num_classes, bias=False)
-            pass
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                 nn.init.kaiming_normal_(m.weight, mode="fan_out", a=1e-2)
+                nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
             elif isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.BatchNorm1d):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
@@ -317,20 +312,16 @@ class Model(nn.Module):
         out = self.conv(x)
         out = out.view(out.shape[0], -1)
 
-        out = self.fc_1(out) # + self.fc_1_identity(out)
+        out = self.fc_1(out)
 
         if extra_inputs is not None:
             out_extra = self.fc_extra(extra_inputs)
             out = torch.cat((out_extra, out), dim=1)
 
-        out = self.fc_2(out) # + self.fc_2_identity(out)
+        out = self.fc_2(out)
+        out = self.fc_3(out)
 
-        out_final = self.fc_3(out)
-        if self.run_config.model_task == "reg":
-            # out_final += self.fc_3_identity(out)
-            pass
-
-        return out_final
+        return out
 
     @property
     def resblocks(self):
