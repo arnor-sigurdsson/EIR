@@ -1,7 +1,6 @@
 import copy
 import os
 import sys
-
 from argparse import Namespace
 from contextlib import contextmanager
 from copy import deepcopy
@@ -15,8 +14,8 @@ import torch
 from aislib.misc_utils import ensure_path_exists, get_logger
 from ignite.engine import Engine
 from shap import DeepExplainer
-from torch.utils.data import Dataset, DataLoader
 from sklearn.preprocessing import StandardScaler, LabelEncoder
+from torch.utils.data import Dataset, DataLoader
 
 import human_origins_supervised.visualization.activation_visualization as av
 from human_origins_supervised.models import embeddings
@@ -284,6 +283,32 @@ def get_snp_names(snp_file: str, data_folder: Path = None) -> np.array:
     return snp_arr
 
 
+def read_snp_df(snp_file_path: Path) -> pd.DataFrame:
+    """
+    TODO: Deprecate support for .snp files.
+
+    NOTE:
+        Currently we are using the same
+    """
+    bim_columns = ["CHR_CODE", "VAR_ID", "POS_CM", "BP_COORD", "ALT", "REF"]
+
+    if snp_file_path.suffix == ".snp":
+        logger.warning(
+            "Support for .snp files will be deprecated soon, for now the program "
+            "runs but when reading file %s reference and alternative "
+            "allele columns will probably be switched. Please consider using .bim.",
+            snp_file_path,
+        )
+    elif snp_file_path.suffix != ".bim":
+        raise ValueError(
+            "Please input either a .snp file or a .bim file for the snp_file argument."
+        )
+
+    df = pd.read_csv(snp_file_path, names=bim_columns, sep=r"\s+")
+
+    return df
+
+
 def gather_and_rescale_snps(
     all_gradients_dict: al_gradients_dict,
     top_gradients_dict: al_top_gradients_dict,
@@ -370,6 +395,7 @@ def save_masked_grads(
     acc_grads_times_inp: al_gradients_dict,
     top_gradients_dict: al_top_gradients_dict,
     snp_names: List[str],
+    snp_df: pd.DataFrame,
     sample_outfolder: Path,
 ) -> None:
     top_grads_msk_inputs = index_masked_grads(top_gradients_dict, acc_grads_times_inp)
@@ -384,6 +410,7 @@ def save_masked_grads(
         snp_names,
         sample_outfolder,
         "top_snps_masked.png",
+        snp_df=snp_df,
     )
 
     np.save(str(sample_outfolder / "top_grads_masked.npy"), top_grads_msk_inputs)
@@ -406,14 +433,17 @@ def analyze_activations(
     top_gradients_dict = get_snp_cols_w_top_grads(acc_acts, abs_grads=abs_grads)
 
     snp_names = get_snp_names(args.snp_file, Path(args.data_folder))
+    snp_df = read_snp_df(Path(args.snp_file))
 
     classes = sorted(list(top_gradients_dict.keys()))
     scaled_grads = gather_and_rescale_snps(acc_acts, top_gradients_dict, classes)
-    av.plot_top_gradients(scaled_grads, top_gradients_dict, snp_names, outfolder)
+    av.plot_top_gradients(
+        scaled_grads, top_gradients_dict, snp_names, outfolder, snp_df=snp_df
+    )
 
     np.save(str(outfolder / "top_acts.npy"), top_gradients_dict)
 
-    save_masked_grads(acc_acts_masked, top_gradients_dict, snp_names, outfolder)
+    save_masked_grads(acc_acts_masked, top_gradients_dict, snp_names, snp_df, outfolder)
 
     av.plot_snp_gradients(acc_acts, outfolder, "avg")
 

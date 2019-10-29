@@ -3,6 +3,7 @@ from typing import Dict
 
 import matplotlib
 import numpy as np
+import pandas as pd
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -14,13 +15,57 @@ from aislib.misc_utils import get_logger
 logger = get_logger(__name__)
 
 
+def generate_snp_gradient_matrix(
+    snp_df: pd.DataFrame, snp_indexes: np.ndarray
+) -> np.ndarray:
+    """
+    TODO:
+        Make this robust for .bim files later. Here we are basically mapping between
+        the one hot coordinates and whether we are pulling out a reference or
+        alternative (minor, A1) allele from the .bim / .snp file.
+        Note that plink uses: <Variant ID>_<counted allele> in the .raw file, where
+        'By default, A1 alleles are counted; this can be customized with
+        --recode-allele.'
+
+    TODO:
+        Check the 'forms' of the recoded file and what each number there corresponds
+        to w.r.t REF / HET / ALT. The columns positions in the .bim file are well
+        defined, so we just have to make sure we are mapping correctly between the
+        one-hot and genotype files (i.e. what exactly does [1,0,0,0] map to).
+        See: https://www.cog-genomics.org/plink/1.9/formats#bim
+        See: https://www.cog-genomics.org/plink/2.0/formats#bim
+        See: http://zzz.bwh.harvard.edu/plink/dataman.shtml#recode
+        'By default, the minor allele is assigned to be A1.'
+
+    NOTE:
+        Plink counts alternative (minor) alleles, while eigenstrat counts reference
+        alleles. For now we are going to write this with additive format in mind (i.e
+        0 = 0 copies of alternative (i.e. 2 copies of reference), 2 = 2 copies of
+        alternative).
+
+    NOTE:
+        What we flag as "alternative" and "reference" can in theory be somewhat
+        arbitrary, as long as we are grabbing the correct nucleotides.
+    """
+    snp_matrix = np.zeros((4, len(snp_indexes)), dtype=object)
+
+    for matrix_col, snp_idx in enumerate(snp_indexes):
+        cur_row = snp_df.iloc[snp_idx]
+        snp_matrix[0, matrix_col] = cur_row.REF * 2  # 0 alt alleles counted
+        snp_matrix[1, matrix_col] = cur_row.REF + cur_row.ALT  # 1 alt alleles counted
+        snp_matrix[2, matrix_col] = cur_row.ALT * 2  # 2 alt alleles counted
+        snp_matrix[3, matrix_col] = ""  # missing
+    return snp_matrix
+
+
 def plot_top_gradients(
     accumulated_grads: Dict,
     top_gradients_dict: Dict,
     snp_names: np.array,
     output_folder: Path,
-    fname="top_snps.png",
-    custom_ylabel=None,
+    fname: str = "top_snps.png",
+    custom_ylabel: str = None,
+    snp_df: pd.DataFrame = None,
 ):
     n_cls = len(top_gradients_dict.keys())
     classes = sorted(list(top_gradients_dict.keys()))
@@ -30,6 +75,7 @@ def plot_top_gradients(
 
     for grad_idx, col_name in enumerate(classes):
         cls_top_idxs = top_gradients_dict[col_name]["top_n_idxs"]
+        cur_snp_matrix = generate_snp_gradient_matrix(snp_df, cls_top_idxs)
 
         for cls_idx, row_name in enumerate(classes):
 
@@ -51,7 +97,18 @@ def plot_top_gradients(
                 cur_ax.set_xticks([])
 
             cur_ax.set_yticks(np.arange(4))
-            cur_ax.set_yticklabels(["0", "1", "2", "MIS"])
+            cur_ax.set_yticklabels(["REF", "HET", "ALT", "MIS"])
+
+            for snp_form in range(cur_snp_matrix.shape[0]):
+                for snp_id in range(cur_snp_matrix.shape[1]):
+                    cur_ax.text(
+                        snp_id,
+                        snp_form,
+                        cur_snp_matrix[snp_form, snp_id],
+                        ha="center",
+                        va="center",
+                        color="w",
+                    )
 
     axs = fig.get_axes()
     for ax, col_title in zip(axs[::n_cls], classes):
