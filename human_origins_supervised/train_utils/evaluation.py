@@ -180,7 +180,7 @@ def anno_meta_hook(
         type_ = "inferred"
 
     if not anno_fpath.exists():
-        logger.error(
+        logger.info(
             "Could not find %s anno file at %s. Skipping meta info hook in wrong "
             "prediction analysis.",
             type_,

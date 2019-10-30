@@ -28,7 +28,7 @@ def args_config():
             "batch_size": 32,
             "checkpoint_interval": 120,
             "data_folder": "REPLACE_ME",
-            "valid_size": 0.10,
+            "valid_size": 0.05,
             "label_file": "REPLACE_ME",
             "label_column": "Origin",
             "data_type": "packbits",
@@ -71,7 +71,7 @@ def create_test_cl_args(args_config, create_test_data):
     model_task = "reg" if test_data_params["class_type"] == "regression" else "cls"
 
     args_config.data_folder = str(test_path / "test_arrays")
-    args_config.snp_file = str(test_path / "test_snps.snp")
+    args_config.snp_file = str(test_path / "test_snps.bim")
     args_config.model_task = model_task
     args_config.label_file = str(test_path / "labels.csv")
     args_config.n_epochs = 5
@@ -131,7 +131,7 @@ def create_test_data(request, tmp_path):
     if test_data_params["class_type"] in ("multi", "regression"):
         target_classes["Africa"] = 0
 
-    n_per_class = 1000
+    n_per_class = 2000
     n_snps = 1000
     test_task = "reg" if test_data_params["class_type"] == "regression" else "cls"
 
@@ -169,9 +169,14 @@ def create_test_data(request, tmp_path):
 
     label_file.close()
 
-    snp_file = tmp_path / "test_snps.snp"
+    snp_file = tmp_path / "test_snps.bim"
+    base_snp_string_list = ["1", "REPLACE_W_IDX", "0.1", "10", "A", "T"]
     with open(snp_file, "w") as snpfile:
         for snp_idx in range(n_snps):
-            snpfile.write(f"rs{snp_idx}" + "\n")
+            cur_snp_list = base_snp_string_list[:]
+            cur_snp_list[1] = str(snp_idx)
+
+            cur_snp_string = "\t".join(cur_snp_list)
+            snpfile.write(cur_snp_string + "\n")
 
     return tmp_path, request.param
