@@ -249,62 +249,79 @@ def get_snp_cols_w_top_grads(
     return top_snps_per_class
 
 
-def get_snp_names(snp_file: str, data_folder: Path = None) -> np.array:
+def infer_snp_file_path(data_folder: Path):
+    if not data_folder:
+        raise ValueError(
+            f"'data_folder' variable must be set with 'infer'"
+            f" as snp_file parameter."
+        )
+
+    snp_size = data_folder.parts[3]
+    ind_size = data_folder.parts[4]
+    assert snp_size.startswith("full") or int(snp_size.split("_")[0])
+    assert ind_size.startswith("full") or int(ind_size.split("_")[0])
+
+    inferred_snp_string = f"parsed_files/{ind_size}/{snp_size}/data_final.snp"
+    inferred_snp_file = Path(data_folder).parents[2] / inferred_snp_string
+
+    logger.info(
+        "SNP file path not passed in as CL argument, will try inferred path: %s",
+        inferred_snp_file,
+    )
+
+    if not inferred_snp_file.exists():
+        raise FileNotFoundError(
+            f"Could not find {inferred_snp_file} when inferring" f"about it's location."
+        )
+
+    return inferred_snp_file
+
+
+def read_snp_df(
+    snp_file_path: Path, data_folder: Union[Path, None] = None
+) -> pd.DataFrame:
     """
-    Not super happy about this implementation, as the infer option is kind of
-    restricted to the project structure - but maybe that's ok?
-
-    The common structure is data/UKBB/processed/<ind_size>/<snp_size>/<type>
-    """
-    if snp_file == "infer":
-        if not data_folder:
-            raise ValueError(
-                f"'data_folder' variable must be set with 'infer'"
-                f" as snp_file parameter."
-            )
-
-        snp_size = data_folder.parts[3]
-        ind_size = data_folder.parts[4]
-        assert snp_size.startswith("full") or int(snp_size.split("_")[0])
-        assert ind_size.startswith("full") or int(ind_size.split("_")[0])
-
-        snp_string = f"parsed_files/{ind_size}/{snp_size}/data_final.snp"
-        snp_file = Path(data_folder).parents[2] / snp_string
-
-        if not snp_file.exists():
-            raise FileNotFoundError(
-                f"Could not find {snp_file} when inferring" f"about it's location."
-            )
-
-    # TODO: Change this after we start using .bim files.
-    snp_df = pd.read_csv(snp_file, sep=r"\s+", usecols=[0], names=["snps"])
-    snp_arr = snp_df.snps.array
-
-    return snp_arr
-
-
-def read_snp_df(snp_file_path: Path) -> pd.DataFrame:
-    """
-    TODO: Deprecate support for .snp files.
+    TODO: Deprecate support for .snp files – see hacky note below.
 
     NOTE:
-        Currently we are using the same
+        Here we have actually flipped the order of ALT / REF in the eigenstrat snp
+        format. This is because while plink .raw format counts alternative alleles
+        (usually minor, A1), eigensoft counts the major allele.
+
+        That is, a high activation for the first position ([x, 0, 0, 0]) in a snp column
+        means high activation for ALT in eigensoft format (0 REF counted) but
+        high activation for REF in .bim format (0 ALT, i.e. 2 REF counted). In
+        `generate_snp_gradient_matrix` we are assuming the .bim format, hence
+        we have a little hack for now by using flipped eigensoft columns for
+        compatibility (support for eigensoft to be deprecated).
+
+        So if we were to have the correct eigensoft column order, we would have to
+        change `generate_snp_gradient_matrix` row order and `plot_top_gradients` y-label
+        order of (REF / HET / ALT).
     """
+
+    if not snp_file_path:
+        snp_file_path = infer_snp_file_path(data_folder)
+
     bim_columns = ["CHR_CODE", "VAR_ID", "POS_CM", "BP_COORD", "ALT", "REF"]
+    eig_snp_file_columns = ["VAR_ID", "CHR_CODE", "POS_CM", "BP_COORD", "ALT", "REF"]
 
     if snp_file_path.suffix == ".snp":
         logger.warning(
             "Support for .snp files will be deprecated soon, for now the program "
-            "runs but when reading file %s reference and alternative "
+            "runs but when reading file %s, reference and alternative "
             "allele columns will probably be switched. Please consider using .bim.",
             snp_file_path,
         )
-    elif snp_file_path.suffix != ".bim":
+        snp_names = eig_snp_file_columns
+    elif snp_file_path.suffix == ".bim":
+        snp_names = bim_columns
+    else:
         raise ValueError(
             "Please input either a .snp file or a .bim file for the snp_file argument."
         )
 
-    df = pd.read_csv(snp_file_path, names=bim_columns, sep=r"\s+")
+    df = pd.read_csv(snp_file_path, names=snp_names, sep=r"\s+")
 
     return df
 
@@ -394,7 +411,6 @@ def index_masked_grads(
 def save_masked_grads(
     acc_grads_times_inp: al_gradients_dict,
     top_gradients_dict: al_top_gradients_dict,
-    snp_names: List[str],
     snp_df: pd.DataFrame,
     sample_outfolder: Path,
 ) -> None:
@@ -407,10 +423,9 @@ def save_masked_grads(
     av.plot_top_gradients(
         scaled_grads,
         top_grads_msk_inputs,
-        snp_names,
+        snp_df,
         sample_outfolder,
         "top_snps_masked.png",
-        snp_df=snp_df,
     )
 
     np.save(str(sample_outfolder / "top_grads_masked.npy"), top_grads_msk_inputs)
@@ -432,18 +447,15 @@ def analyze_activations(
     abs_grads = True if args.model_task == "reg" else False
     top_gradients_dict = get_snp_cols_w_top_grads(acc_acts, abs_grads=abs_grads)
 
-    snp_names = get_snp_names(args.snp_file, Path(args.data_folder))
-    snp_df = read_snp_df(Path(args.snp_file))
+    snp_df = read_snp_df(Path(args.snp_file), Path(args.data_folder))
 
     classes = sorted(list(top_gradients_dict.keys()))
     scaled_grads = gather_and_rescale_snps(acc_acts, top_gradients_dict, classes)
-    av.plot_top_gradients(
-        scaled_grads, top_gradients_dict, snp_names, outfolder, snp_df=snp_df
-    )
+    av.plot_top_gradients(scaled_grads, top_gradients_dict, snp_df, outfolder)
 
     np.save(str(outfolder / "top_acts.npy"), top_gradients_dict)
 
-    save_masked_grads(acc_acts_masked, top_gradients_dict, snp_names, snp_df, outfolder)
+    save_masked_grads(acc_acts_masked, top_gradients_dict, snp_df, outfolder)
 
     av.plot_snp_gradients(acc_acts, outfolder, "avg")
 

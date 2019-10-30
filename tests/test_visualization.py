@@ -68,6 +68,29 @@ def test_get_snp_names(tmp_path):
     assert snp_arr[-1] == "rs1320571"
 
 
+def test_read_snp_df(tmp_path):
+    snp_file_str = """
+                rs3094315    1        0.020130          752566 G A
+               rs7419119     1        0.022518          842013 G T
+              rs13302957     1        0.024116          891021 G A
+               rs6696609     1        0.024457          903426 T C
+                  rs8997     1        0.025727          949654 A G
+               rs9442372     1        0.026288         1018704 A G
+               rs4970405     1        0.026674         1048955 G A
+              rs11807848     1        0.026711         1061166 C T
+               rs4970421     1        0.028311         1108637 A G
+               rs1320571     1        0.028916         1120431 A G
+               """
+    file_ = tmp_path / "data_final.snp"
+    file_.write_text(snp_file_str)
+
+    snp_df = av.read_snp_df(file_)
+    snp_arr = snp_df["VAR_ID"].array
+    assert len(snp_arr) == 10
+    assert snp_arr[0] == "rs3094315"
+    assert snp_arr[-1] == "rs1320571"
+
+
 def test_gather_and_rescale_snps(acc_grads_inp):
     top_gradients_dict = av.get_snp_cols_w_top_grads(acc_grads_inp, 3)
     classes = ["Asia", "Europe"]
