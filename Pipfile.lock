@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "3aabc72a0df8759edcb743919f22f06c8adea9da456d563c4fb566d60b5cd814"
+            "sha256": "09fd4dd64aca2fe91ec7506e03cd8b300e0b960ae0628e9c27184b1504c47817"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -19,7 +19,7 @@
         "aislib": {
             "editable": true,
             "git": "ssh://git@github.com/arnor-sigurdsson/aislib.git",
-            "ref": "44142ca3742f46e5694195f22015811fa421c9e7"
+            "ref": "9533b93c82470f211a43700a136a9d9c271c26e3"
         },
         "cycler": {
             "hashes": [
