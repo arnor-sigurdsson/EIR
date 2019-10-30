@@ -28,12 +28,12 @@ def args_config():
             "batch_size": 32,
             "checkpoint_interval": 120,
             "data_folder": "REPLACE_ME",
-            "valid_size": 0.1,
+            "valid_size": 0.10,
             "label_file": "REPLACE_ME",
             "label_column": "Origin",
             "data_type": "packbits",
             "data_width": 1000,
-            "resblocks": [2],
+            "resblocks": None,
             "device": "cuda:0" if cuda.is_available() else "cpu",
             "gpu_num": "0",
             "lr": 1e-3,
@@ -47,10 +47,16 @@ def args_config():
             "get_acts": True,
             "benchmark": True,
             "kernel_width": 12,
+            "fc_dim": 128,
+            "down_stride": 4,
+            "first_kernel_expansion": 1,
+            "first_stride_expansion": 1,
             "channel_exp_base": 5,
-            "do": 0.0,
+            "rb_do": 0.0,
+            "fc_do": 0.0,
             "memory_dataset": False,
             "embed_columns": [],
+            "contn_columns": [],
             "na_augment": 0.0,
         }
     )
@@ -68,10 +74,11 @@ def create_test_cl_args(args_config, create_test_data):
     args_config.snp_file = str(test_path / "test_snps.snp")
     args_config.model_task = model_task
     args_config.label_file = str(test_path / "labels.csv")
-    args_config.n_epochs = 10
-
-    args_config.do = 0.00
-    args_config.sample_interval = 200
+    args_config.n_epochs = 5
+    args_config.rb_do = 0.00
+    args_config.fc_do = 0.00
+    args_config.na_augment = 0.00
+    args_config.sample_interval = 100
     args_config.target_width = 1000
     args_config.data_width = 1000
     args_config.run_name = (
@@ -85,6 +92,29 @@ def create_test_cl_args(args_config, create_test_data):
     return args_config
 
 
+def create_test_array(test_task, base_array, snp_idxs_candidates, snp_row_idx):
+    # make samples have the reference, otherwise might have alleles chosen
+    # below by random, without having the phenotype
+    base_array[:, snp_idxs_candidates] = 0
+    base_array[3, snp_idxs_candidates] = 1
+
+    lower_bound = 0 if test_task == "reg" else 5
+    np.random.shuffle(snp_idxs_candidates)
+    num_snps_this_sample = np.random.randint(lower_bound, 10)
+    snp_idxs = sorted(snp_idxs_candidates[:num_snps_this_sample])
+
+    # zero out snp_idxs
+    base_array[:, snp_idxs] = 0
+
+    # assign form 2 for those snps for additive
+    if test_task == "reg":
+        base_array[2, snp_idxs] = 1
+    else:
+        base_array[snp_row_idx, snp_idxs] = 1
+
+    return base_array, snp_idxs
+
+
 @pytest.fixture()
 def create_test_data(request, tmp_path):
     """
@@ -95,16 +125,15 @@ def create_test_data(request, tmp_path):
     Also create SNP file. folder/arrays/ and folder/snp_file
     """
 
-    regression_class_mappings = {"Asia": 150, "Europe": 170, "Africa": 190}
-
     target_classes = {"Asia": 1, "Europe": 2}
     test_data_params = request.param
 
     if test_data_params["class_type"] in ("multi", "regression"):
         target_classes["Africa"] = 0
 
-    n_per_class = 500
+    n_per_class = 1000
     n_snps = 1000
+    test_task = "reg" if test_data_params["class_type"] == "regression" else "cls"
 
     array_folder = tmp_path / "test_arrays"
     array_folder.mkdir()
@@ -118,15 +147,15 @@ def create_test_data(request, tmp_path):
 
             # create random one hot array
             base_array = np.eye(4)[np.random.choice(4, n_snps)].T
-            snp_idxs = np.array(range(50, 1000, 100))
+            # set up 10 candidates
+            step_size = n_snps // 10
+            snp_idxs_candidates = np.array(range(50, n_snps, step_size))
 
-            # zero out snp_idxs
-            base_array[:, snp_idxs] = 0
+            cur_test_array, snps_this_sample = create_test_array(
+                test_task, base_array, snp_idxs_candidates, snp_row_idx
+            )
 
-            # assign class specific snps
-            base_array[snp_row_idx, snp_idxs] = 1
-
-            arr_to_save = base_array.astype(np.uint8)
+            arr_to_save = cur_test_array.astype(np.uint8)
             if test_data_params["data_type"] == "packbits":
                 arr_to_save = np.packbits(arr_to_save)
 
@@ -135,7 +164,7 @@ def create_test_data(request, tmp_path):
             if test_data_params["class_type"] in ("binary", "multi"):
                 label_file.write(f"{sample_idx}_{cls},{cls}\n")
             else:
-                value = regression_class_mappings.get(cls) + np.random.randn()
+                value = 100 + (5 * len(snps_this_sample)) + np.random.randn()
                 label_file.write(f"{sample_idx}_{cls},{value}\n")
 
     label_file.close()

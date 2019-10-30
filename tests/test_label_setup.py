@@ -64,9 +64,9 @@ def test_load_label_df(create_test_data):
 
     df_label = label_setup.load_label_df(label_fpath, "Origin")
 
-    assert df_label.shape[0] == 500 * n_classes
+    assert df_label.shape[0] == 1000 * n_classes
     assert df_label.index.name == "ID"
-    assert [i for i in df_label.Origin.value_counts()] == [500] * n_classes
+    assert [i for i in df_label.Origin.value_counts()] == [1000] * n_classes
 
     df_label["ExtraCol"] = "ExtraVal"
     label_extra_fpath = path / "labels_extracol.csv"
@@ -97,7 +97,7 @@ def test_parse_label_df(create_test_data, get_test_column_ops):
     test_column_ops = get_test_column_ops
 
     df_label = label_setup.load_label_df(label_fpath, "Origin")
-    df_label_parsed = label_setup.parse_label_df(df_label, test_column_ops)
+    df_label_parsed = label_setup.parse_label_df(df_label, test_column_ops, "Origin")
 
     assert set(df_label_parsed.Origin.unique()) == {"Iceland" * 2, "Asia" * 2}
 
@@ -106,7 +106,7 @@ def test_parse_label_df(create_test_data, get_test_column_ops):
         df_label[col] = "Iceland"
 
     df_label = df_label.rename(columns={"Origin": "OriginExtraColumns"})
-    df_label_parsed = label_setup.parse_label_df(df_label, test_column_ops)
+    df_label_parsed = label_setup.parse_label_df(df_label, test_column_ops, "Origin")
     assert df_label_parsed["OriginExtraColumns"].unique().item() == "Iceland"
 
 
@@ -119,7 +119,7 @@ def test_label_df_parse_wrapper(create_test_data, create_test_cl_args):
     cl_args = create_test_cl_args
     df_labels = label_setup.label_df_parse_wrapper(cl_args)
 
-    assert df_labels.shape == (1000, 1)
+    assert df_labels.shape == (2000, 1)
     assert set(df_labels[cl_args.label_column].unique()) == {"Asia", "Europe"}
 
 
@@ -196,7 +196,7 @@ def test_set_up_train_and_valid_labels(create_test_data, create_test_cl_args):
         cl_args
     )
 
-    assert len(train_labels_dict) + len(valid_labels_dict) == n_classes * 500
+    assert len(train_labels_dict) + len(valid_labels_dict) == n_classes * 1000
     assert len(train_labels_dict) > len(valid_labels_dict)
 
     train_ids_set = set(train_labels_dict.keys())

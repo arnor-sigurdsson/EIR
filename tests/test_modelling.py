@@ -16,6 +16,10 @@ from human_origins_supervised.models.models import Model
 from aislib.misc_utils import ensure_path_exists
 
 
+def cleanup(run_path):
+    rmtree(run_path)
+
+
 @pytest.fixture()
 def create_test_dataset(create_test_data, create_test_cl_args):
     path, test_data_params = create_test_data
@@ -25,6 +29,11 @@ def create_test_dataset(create_test_data, create_test_cl_args):
     cl_args.data_type = test_data_params["data_type"]
 
     run_path = Path(f"runs/{cl_args.run_name}/")
+
+    # TODO: Use better logic here, to do the cleanup. Should not be in this fixture.
+    if run_path.exists():
+        cleanup(run_path)
+
     ensure_path_exists(run_path, is_folder=True)
 
     train_dataset, valid_dataset = datasets.set_up_datasets(cl_args)
@@ -36,9 +45,9 @@ def create_test_dataset(create_test_data, create_test_cl_args):
 def create_test_dloaders(create_test_dataset):
     train_dataset, valid_dataset = create_test_dataset
 
-    train_dloader = DataLoader(train_dataset, batch_size=16, shuffle=True)
+    train_dloader = DataLoader(train_dataset, batch_size=32, shuffle=True)
 
-    valid_dloader = DataLoader(valid_dataset, batch_size=16, shuffle=False)
+    valid_dloader = DataLoader(valid_dataset, batch_size=32, shuffle=False)
 
     return train_dloader, valid_dloader, train_dataset, valid_dataset
 
@@ -48,7 +57,11 @@ def create_test_model(create_test_cl_args, create_test_dataset):
     cl_args = create_test_cl_args
     train_dataset, _ = create_test_dataset
 
-    model = Model(cl_args, train_dataset.num_classes).to(device=cl_args.device)
+    model = Model(
+        cl_args,
+        train_dataset.num_classes,
+        extra_continuous_inputs=cl_args.contn_columns,
+    ).to(device=cl_args.device)
 
     return model
 
@@ -181,12 +194,6 @@ def test_classification_snp_identification(
         cl_args.data_width,
     )
 
-    def cleanup():
-        rmtree(run_path)
-
-    if run_path.exists():
-        cleanup()
-
     train.train_ignite(config)
 
     last_iter = len(train_dloader) * cl_args.n_epochs
@@ -200,7 +207,7 @@ def test_classification_snp_identification(
         check_identified_snps(path, expected_top_indxs, top_row_grads_dict, check_types)
 
     if not keep_outputs:
-        cleanup()
+        cleanup(run_path)
 
 
 @pytest.mark.parametrize(
@@ -219,6 +226,7 @@ def test_regression(
 ):
 
     cl_args = create_test_cl_args
+    run_path = Path(f"runs/{cl_args.run_name}/")
 
     train_dloader, valid_dloader, train_dataset, valid_dataset = create_test_dloaders
     model = create_test_model
@@ -227,8 +235,6 @@ def test_regression(
 
     train_dataset, valid_dataset = create_test_dataset
     label_encoder = train_dataset.label_encoder
-
-    run_path = Path(f"runs/{cl_args.run_name}/")
 
     config = train.Config(
         cl_args,
@@ -242,12 +248,6 @@ def test_regression(
         label_encoder,
         cl_args.data_width,
     )
-
-    def cleanup():
-        rmtree(run_path)
-
-    if run_path.exists():
-        cleanup()
 
     train.train_ignite(config)
 
@@ -267,4 +267,4 @@ def test_regression(
         check_identified_snps(path, expected_top_indxs, top_row_grads_dict, False, 1)
 
     if not keep_outputs:
-        cleanup()
+        cleanup(run_path)

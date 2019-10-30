@@ -1,7 +1,7 @@
 import argparse
-from sys import platform
 from dataclasses import dataclass
 from pathlib import Path
+from sys import platform
 from typing import Union, Tuple, List, Dict
 
 import numpy as np
@@ -21,7 +21,7 @@ from human_origins_supervised.data_load.data_loading_funcs import (
 from human_origins_supervised.models import model_utils
 from human_origins_supervised.models.embeddings import (
     get_embedding_dict,
-    get_embeddings_from_ids,
+    get_extra_inputs,
 )
 from human_origins_supervised.models.models import Model
 from human_origins_supervised.train_utils.metric_funcs import select_metric_func
@@ -54,7 +54,7 @@ class Config:
     data_width: int
 
 
-def train_ignite(config) -> None:
+def train_ignite(config: Config) -> None:
     c = config
     args = config.cl_args
 
@@ -75,14 +75,10 @@ def train_ignite(config) -> None:
         train_labels = train_labels.to(device=args.device)
         train_labels = model_utils.cast_labels(args.model_task, train_labels)
 
-        extra_embeddings = None
-        if args.embed_columns:
-            extra_embeddings = get_embeddings_from_ids(
-                c.labels_dict, train_ids, args.label_column, c.model, args.device
-            )
+        extra_inputs = get_extra_inputs(args, train_ids, c.labels_dict, c.model)
 
         c.optimizer.zero_grad()
-        train_outputs = c.model(train_seqs, extra_embeddings=extra_embeddings)
+        train_outputs = c.model(train_seqs, extra_inputs)
         train_loss = c.criterion(train_outputs, train_labels)
         train_loss.backward()
         c.optimizer.step()
@@ -102,7 +98,7 @@ def train_ignite(config) -> None:
     trainer.run(c.train_loader, args.n_epochs)
 
 
-def main(cl_args):
+def main(cl_args: argparse.Namespace) -> None:
     run_folder = Path("runs", cl_args.run_name)
     if run_folder.exists():
         raise FileExistsError(
@@ -146,7 +142,9 @@ def main(cl_args):
         if cl_args.embed_columns
         else None
     )
-    model = Model(cl_args, train_dataset.num_classes, embedding_dict).to(cl_args.device)
+    model = Model(
+        cl_args, train_dataset.num_classes, embedding_dict, cl_args.contn_columns
+    ).to(cl_args.device)
     assert model.data_size_after_conv >= 8
 
     if cl_args.debug:
@@ -216,10 +214,38 @@ if __name__ == "__main__":
     parser.add_argument("--wd", type=float, default=5e-4, help="weight decay for adam.")
 
     parser.add_argument(
+        "--fc_dim",
+        type=int,
+        default=128,
+        help="base dimensionality of fully connected layers at the end of the network",
+    )
+
+    parser.add_argument(
         "--kernel_width",
         type=int,
         default=12,
         help="base width of the conv kernels used.",
+    )
+
+    parser.add_argument(
+        "--down_stride",
+        type=int,
+        default=4,
+        help="down stride to use common over the network.",
+    )
+
+    parser.add_argument(
+        "--first_kernel_expansion",
+        type=int,
+        default=1,
+        help="factor by which to expand the first kernel in the network",
+    )
+
+    parser.add_argument(
+        "--first_stride_expansion",
+        type=int,
+        default=1,
+        help="factor by which to expand the first stride in the network",
     )
 
     parser.add_argument(
@@ -237,10 +263,14 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--do",
+        "--rb_do", type=float, default=0.0, help="Dropout in residual blocks."
+    )
+
+    parser.add_argument(
+        "--fc_do",
         type=float,
         default=0.0,
-        help="Dropout before fully connected layer at the end of network.",
+        help="Dropout before last fully connected layer.",
     )
 
     parser.add_argument(
@@ -294,6 +324,15 @@ if __name__ == "__main__":
         nargs="+",
         default=[],
         help="What columns to embed and add to fully connected layer at end of model.",
+    )
+
+    parser.add_argument(
+        "--contn_columns",
+        type=str,
+        nargs="+",
+        default=[],
+        help="What columns of continuous variables to add to fully connected layer at "
+        "end of model.",
     )
 
     parser.add_argument(

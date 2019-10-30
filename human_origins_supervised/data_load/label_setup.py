@@ -14,7 +14,7 @@ try:
 except ImportError:
     COLUMN_OPS = {}
 
-from aislib.misc_utils import get_logger
+from aislib.misc_utils import get_logger, ensure_path_exists
 
 logger = get_logger(__name__)
 
@@ -66,31 +66,40 @@ def load_label_df(
     return df_labels
 
 
-def parse_label_df(df, column_ops: al_all_column_ops) -> pd.DataFrame:
+def parse_label_df(
+    df, column_ops: al_all_column_ops, label_column: str
+) -> pd.DataFrame:
     """
     We want to be able to dynamically apply various operations to different columns
     in the label file (e.g. different operations for creating obesity labels or parsing
     country of origin).
 
+    If a column operaton is supposed to only be applied if its column is the target
+    variable, make sure it's not applied in other cases (e.g. if the column is a
+    embedding / continuous input to another target).
+
     :param df: Dataframe to perform processing on.
     :param column_ops: A dictionarity of colum names, where each value is a list
     of tuples, where each tuple is a callable as the first element and the callable's
     arguments as the second element.
+    :param label_column:
     :return: Parsed dataframe.
     """
 
     for column_name, ops_funcs in column_ops.items():
         if column_name in df.columns:
             for column_op in ops_funcs:
-                func, args_dict = column_op.function, column_op.args
-                logger.debug(
-                    "Applying func %s with args %s to column in pre-processing.",
-                    func,
-                    args_dict,
-                )
-                logger.debug("Shape before: %s", df.shape)
-                df = func(df=df, column_name=column_name, **args_dict)
-                logger.debug("Shape after: %s", df.shape)
+                do_skip = column_op.only_apply_if_target and column_name == label_column
+                if not do_skip:
+                    func, args_dict = column_op.function, column_op.function_args
+                    logger.debug(
+                        "Applying func %s with args %s to column in pre-processing.",
+                        func,
+                        args_dict,
+                    )
+                    logger.debug("Shape before: %s", df.shape)
+                    df = func(df=df, column_name=column_name, **args_dict)
+                    logger.debug("Shape after: %s", df.shape)
     return df
 
 
@@ -99,16 +108,22 @@ def label_df_parse_wrapper(cl_args: Namespace) -> pd.DataFrame:
 
     extra_label_parsing_cols = get_extra_columns(cl_args.label_column, COLUMN_OPS)
     extra_embed_cols = cl_args.embed_columns
-    all_extra_cols = extra_label_parsing_cols + extra_embed_cols
+    extra_contn_cols = cl_args.contn_columns
+
+    all_extra_cols = extra_label_parsing_cols + extra_embed_cols + extra_contn_cols
 
     df_labels = load_label_df(
         cl_args.label_file, cl_args.label_column, all_ids, all_extra_cols
     )
-    df_labels = parse_label_df(df_labels, COLUMN_OPS)
+    df_labels = parse_label_df(df_labels, COLUMN_OPS, cl_args.label_column)
 
     # remove columns only used for parsing, so only keep actual label column
     # and extra embedding columns
-    to_drop = [i for i in extra_label_parsing_cols if i not in extra_embed_cols]
+    to_drop = [
+        i
+        for i in extra_label_parsing_cols
+        if i not in extra_embed_cols + extra_contn_cols
+    ]
     if to_drop:
         df_labels = df_labels.drop(to_drop, axis=1)
 
@@ -144,7 +159,8 @@ def scale_regression_labels(
 
     scaler = StandardScaler()
     scaler.fit(parse_colvals(df_labels_train[reg_col]))
-    scaler_outpath = runs_folder / "standard_scaler.save"
+    scaler_outpath = runs_folder / "encoders" / f"{reg_col}_standard_scaler.save"
+    ensure_path_exists(scaler_outpath)
     joblib.dump(scaler, scaler_outpath)
 
     df_labels_train[reg_col] = scaler.transform(parse_colvals(df_labels_train[reg_col]))
@@ -153,15 +169,58 @@ def scale_regression_labels(
     return df_labels_train, df_labels_valid
 
 
+def get_missing_stats_string(
+    df: pd.DataFrame, target_columns: List[str]
+) -> Dict[str, int]:
+    missing_count_dict = {}
+    for col in target_columns:
+        missing_count_dict[col] = int(df[col].isnull().sum())
+
+    return missing_count_dict
+
+
+def handle_missing_label_values(df: pd.DataFrame, cl_args, name="df"):
+
+    if cl_args.embed_columns:
+        missing_stats = get_missing_stats_string(df, cl_args.embed_columns)
+        logger.debug(
+            "Replacing NaNs in embedding columns %s (counts: %s) in %s with 'NA'.",
+            cl_args.embed_columns,
+            missing_stats,
+            name,
+        )
+        df[cl_args.embed_columns] = df[cl_args.embed_columns].fillna("NA")
+
+    if cl_args.contn_columns:
+        missing_stats = get_missing_stats_string(df, cl_args.contn_columns)
+        logger.debug(
+            "Replacing NaNs in continuous columns %s (counts: %s) in %s with 0.",
+            cl_args.contn_columns,
+            missing_stats,
+            name,
+        )
+        df[cl_args.contn_columns] = df[cl_args.contn_columns].fillna(0)
+
+    return df
+
+
 def process_train_and_label_dfs(
     cl_args, df_labels_train, df_labels_valid
 ) -> al_train_val_dfs:
+    runs_folder = Path("./runs", cl_args.run_name)
 
+    # we make sure not to mess with the passed in CL arg, hence copy
+    continuous_columns = cl_args.contn_columns[:]
     if cl_args.model_task == "reg":
-        runs_folder = Path("./runs", cl_args.run_name)
+        continuous_columns.append(cl_args.label_column)
+
+    for continuous_column in continuous_columns:
         df_labels_train, df_labels_valid = scale_regression_labels(
-            df_labels_train, df_labels_valid, cl_args.label_column, runs_folder
+            df_labels_train, df_labels_valid, continuous_column, runs_folder
         )
+
+    df_labels_train = handle_missing_label_values(df_labels_train, cl_args, "train df")
+    df_labels_valid = handle_missing_label_values(df_labels_valid, cl_args, "valid df")
 
     return df_labels_train, df_labels_valid
 

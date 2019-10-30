@@ -1,15 +1,19 @@
 from typing import List, Tuple, Union
+from argparse import Namespace
 
 import torch
 from torch.nn import Module
 from torch.utils.data import DataLoader
 
 from human_origins_supervised.models import embeddings
+from human_origins_supervised.data_load.label_setup import al_label_dict
 
 al_dloader_outputs = Tuple[torch.Tensor, Union[List[str], torch.LongTensor], List[str]]
 
 
-def find_no_resblocks_needed(width: int, stride: int, min_size: int = 32) -> List[int]:
+def find_no_resblocks_needed(
+    width: int, stride: int, first_stride_expansion: int
+) -> List[int]:
     """
     Used in order to calculate / set up residual blocks specifications as a list
     automatically when they are not passed in as CL args, based on the minimum
@@ -27,8 +31,10 @@ def find_no_resblocks_needed(width: int, stride: int, min_size: int = 32) -> Lis
     7 blocks --> [2, 2, 2, 1]
     10 blocks --> [2, 2, 4, 2]
     """
+
+    min_size = 8 * stride
     # account for first conv
-    cur_width = width // stride
+    cur_width = width // (stride * first_stride_expansion)
 
     resblocks = [0] * 4
     while cur_width >= min_size:
@@ -45,14 +51,14 @@ def find_no_resblocks_needed(width: int, stride: int, min_size: int = 32) -> Lis
     return [i for i in resblocks if i != 0]
 
 
-def predict_on_batch(model, inputs):
+def predict_on_batch(model: Module, inputs: Tuple[torch.Tensor, ...]) -> torch.Tensor:
     with torch.no_grad():
         val_outputs = model(*inputs)
 
     return val_outputs
 
 
-def cast_labels(model_task, labels):
+def cast_labels(model_task: str, labels: torch.Tensor) -> torch.Tensor:
     if model_task == "reg":
         return labels.to(dtype=torch.float).unsqueeze(1)
     return labels.to(dtype=torch.long)
@@ -60,10 +66,10 @@ def cast_labels(model_task, labels):
 
 def gather_pred_outputs_from_dloader(
     data_loader: DataLoader,
-    cl_args,
+    cl_args: Namespace,
     model: Module,
     device: str,
-    labels_dict,
+    labels_dict: al_label_dict,
     with_labels: bool = True,
 ) -> al_dloader_outputs:
     """
@@ -78,13 +84,9 @@ def gather_pred_outputs_from_dloader(
     for inputs, labels, ids in data_loader:
         inputs = inputs.to(device=device, dtype=torch.float32)
 
-        extra_embeddings = None
-        if cl_args.embed_columns:
-            extra_embeddings = embeddings.get_embeddings_from_ids(
-                labels_dict, ids, cl_args.label_column, model, cl_args.device
-            )
+        extra_inputs = embeddings.get_extra_inputs(cl_args, ids, labels_dict, model)
 
-        outputs = predict_on_batch(model, (inputs, extra_embeddings))
+        outputs = predict_on_batch(model, (inputs, extra_inputs))
 
         outputs_total += [i for i in outputs]
         ids_total += [i for i in ids]

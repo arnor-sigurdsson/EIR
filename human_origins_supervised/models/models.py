@@ -1,4 +1,5 @@
-from typing import List
+from argparse import Namespace
+from typing import List, Tuple
 
 import aislib.pytorch as torch_utils
 import torch
@@ -6,6 +7,7 @@ from aislib.misc_utils import get_logger
 from torch import nn
 
 from . import embeddings
+from .embeddings import al_emb_lookup_dict
 from .model_utils import find_no_resblocks_needed
 
 logger = get_logger(__name__)
@@ -60,7 +62,7 @@ class AbstractBlock(nn.Module):
         self,
         in_channels: int,
         out_channels: int,
-        dropout: float,
+        rb_do: float,
         conv_1_kernel_w: int = 12,
         conv_1_padding: int = 4,
         down_stride_w: int = 4,
@@ -76,10 +78,10 @@ class AbstractBlock(nn.Module):
         self.conv_1_kernel_h = 4 if isinstance(self, FirstBlock) else 1
         self.down_stride_h = self.conv_1_kernel_h
 
-        self.do = nn.Dropout2d(dropout)
-        self.act = nn.LeakyReLU()
+        self.rb_do = nn.Dropout2d(rb_do)
+        self.act_1 = nn.ReLU()
 
-        self.bn_1 = nn.BatchNorm2d(in_channels, out_channels)
+        self.bn_1 = nn.BatchNorm2d(in_channels)
         self.conv_1 = nn.Conv2d(
             in_channels,
             out_channels,
@@ -94,7 +96,8 @@ class AbstractBlock(nn.Module):
         )
         conv_2_padding = conv_2_kernel_w // 2
 
-        self.bn_2 = nn.BatchNorm2d(out_channels, out_channels)
+        self.act_2 = nn.ReLU()
+        self.bn_2 = nn.BatchNorm2d(out_channels)
         self.conv_2 = nn.Conv2d(
             out_channels,
             out_channels,
@@ -115,7 +118,7 @@ class AbstractBlock(nn.Module):
             )
         )
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor):
         raise NotImplementedError
 
 
@@ -123,29 +126,30 @@ class FirstBlock(AbstractBlock):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        delattr(self, "act")
+        delattr(self, "act_1")
+        delattr(self, "act_2")
         delattr(self, "downsample_identity")
         delattr(self, "bn_1")
         delattr(self, "conv_2")
         delattr(self, "bn_2")
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
 
         out = self.conv_1(x)
-        out = self.do(out)
+        out = self.rb_do(out)
 
         return out
 
 
 class Block(AbstractBlock):
-    def __init__(self, full_preact=False, *args, **kwargs):
+    def __init__(self, full_preact: bool = False, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.full_preact = full_preact
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         out = self.bn_1(x)
-        out = self.act(out)
+        out = self.act_1(out)
 
         if self.full_preact:
             identity = self.downsample_identity(out)
@@ -155,9 +159,9 @@ class Block(AbstractBlock):
         out = self.conv_1(out)
 
         out = self.bn_2(out)
-        out = self.act(out)
+        out = self.act_2(out)
 
-        out = self.do(out)
+        out = self.rb_do(out)
         out = self.conv_2(out)
 
         out = out + identity
@@ -175,11 +179,7 @@ def set_up_conv_params(current_width: int, kernel_size: int, stride: int):
 
 
 def make_conv_layers(
-    residual_blocks: List[int],
-    kernel_base_width: int,
-    channel_exp_base: int,
-    input_width: int,
-    dropout: float,
+    residual_blocks: List[int], run_config: Namespace
 ) -> List[nn.Module]:
     """
     Used to set up the convolutional layers for the model. Based on the passed in
@@ -192,38 +192,44 @@ def make_conv_layers(
 
     :param residual_blocks: List of ints, where each int indicates number of blocks w.
     that channel dimension.
-    :param kernel_base_width: Width of the kernels applied during convolutions.
-    :param channel_exp_base: Number of channels in first layer (2 in the power of).
-    :param input_width: Used to calculate convolutional parameters.
-    :param dropout: Percentage of dropout to pass to blocks.
+    :param run_config: Experiment hyperparameters / configuration needed for the
+    convolution setup.
     :return: A list of `nn.Module` objects to be passed to `nn.Sequential`.
     """
-    down_stride_w = 4
+    rc = run_config
+
+    down_stride_w = rc.down_stride
+
+    first_conv_kernel = rc.kernel_width * rc.first_kernel_expansion
+    first_conv_stride = down_stride_w * rc.first_stride_expansion
     first_kernel, first_pad = set_up_conv_params(
-        input_width, kernel_base_width, down_stride_w
+        rc.target_width, first_conv_kernel, first_conv_stride
     )
+
     base_layers = [
         FirstBlock(
             in_channels=1,
-            out_channels=2 ** channel_exp_base,
+            out_channels=2 ** rc.channel_exp_base,
             conv_1_kernel_w=first_kernel,
             conv_1_padding=first_pad,
             down_stride_w=down_stride_w,
-            dropout=dropout,
+            rb_do=rc.rb_do,
         )
     ]
 
     for layer_arch_idx, layer_arch_layers in enumerate(residual_blocks):
         for layer in range(layer_arch_layers):
             cur_conv = nn.Sequential(*base_layers)
-            cur_width = torch_utils.calc_size_after_conv_sequence(input_width, cur_conv)
+            cur_width = torch_utils.calc_size_after_conv_sequence(
+                rc.target_width, cur_conv
+            )
 
             cur_kern, cur_padd = set_up_conv_params(
-                cur_width, kernel_base_width, down_stride_w
+                cur_width, rc.kernel_width, down_stride_w
             )
 
             cur_in_channels = base_layers[-1].out_channels
-            cur_out_channels = 2 ** (channel_exp_base + layer_arch_idx)
+            cur_out_channels = 2 ** (rc.channel_exp_base + layer_arch_idx)
             cur_layer = Block(
                 in_channels=cur_in_channels,
                 out_channels=cur_out_channels,
@@ -231,7 +237,7 @@ def make_conv_layers(
                 conv_1_padding=cur_padd,
                 down_stride_w=down_stride_w,
                 full_preact=True if len(base_layers) == 1 else False,
-                dropout=dropout,
+                rb_do=rc.rb_do,
             )
 
             base_layers.append(cur_layer)
@@ -241,39 +247,28 @@ def make_conv_layers(
     return base_layers
 
 
-def calc_extra_embed_dim(embeddings_dict):
-    base = 0
-    if not embeddings_dict:
-        return base
-
-    for embed_col in embeddings_dict:
-        cur_embedding = embeddings_dict[embed_col]["embedding_module"]
-        base += cur_embedding.embedding_dim
-
-    return base
-
-
 class Model(nn.Module):
-    def __init__(self, run_config, num_classes, embeddings_dict=None):
+    def __init__(
+        self,
+        run_config: Namespace,
+        num_classes: int,
+        embeddings_dict: al_emb_lookup_dict = None,
+        extra_continuous_inputs: Tuple[str, ...] = None,
+    ):
         super().__init__()
 
         self.run_config = run_config
         self.num_classes = num_classes
         self.embeddings_dict = embeddings_dict
+        self.extra_continuous_inputs = extra_continuous_inputs
 
-        emb_total_dim = 0
+        emb_total_dim = con_total_dim = 0
         if embeddings_dict:
             emb_total_dim = embeddings.attach_embeddings(self, embeddings_dict)
+        if extra_continuous_inputs:
+            con_total_dim = len(self.extra_continuous_inputs)
 
-        self.conv = nn.Sequential(
-            *make_conv_layers(
-                self.resblocks,
-                run_config.kernel_width,
-                run_config.channel_exp_base,
-                run_config.target_width,
-                run_config.do,
-            )
-        )
+        self.conv = nn.Sequential(*make_conv_layers(self.resblocks, run_config))
 
         self.data_size_after_conv = torch_utils.calc_size_after_conv_sequence(
             run_config.target_width, self.conv
@@ -281,34 +276,61 @@ class Model(nn.Module):
 
         self.no_out_channels = self.conv[-1].out_channels
 
-        fc_in_features = (
-            self.data_size_after_conv * self.no_out_channels
-        ) + emb_total_dim
+        fc_1_in_features = self.data_size_after_conv * self.no_out_channels
+        fc_base = run_config.fc_dim
 
-        self.last_act = nn.Sequential(nn.BatchNorm1d(fc_in_features), nn.LeakyReLU())
-        self.fc = nn.Linear(fc_in_features, self.num_classes)
+        self.fc_1 = nn.Sequential(
+            nn.BatchNorm1d(fc_1_in_features),
+            nn.ReLU(),
+            nn.Linear(fc_1_in_features, fc_base, bias=False),
+        )
+
+        if emb_total_dim or con_total_dim:
+            extra_dim = emb_total_dim + con_total_dim
+            self.fc_extra = nn.Linear(extra_dim, extra_dim, bias=False)
+            fc_base += extra_dim
+
+        self.fc_2 = nn.Sequential(
+            nn.BatchNorm1d(fc_base), nn.ReLU(), nn.Linear(fc_base, fc_base, bias=False)
+        )
+
+        self.fc_3 = nn.Sequential(
+            nn.BatchNorm1d(fc_base),
+            nn.ReLU(),
+            nn.Dropout(run_config.fc_do),
+            nn.Linear(fc_base, self.num_classes),
+        )
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode="fan_out")
+                nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
             elif isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.BatchNorm1d):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
-    def forward(self, x, extra_embeddings: torch.Tensor = None):
+    def forward(self, x: torch.Tensor, extra_inputs: torch.Tensor = None):
         out = self.conv(x)
         out = out.view(out.shape[0], -1)
 
-        if extra_embeddings is not None:
-            out = torch.cat((extra_embeddings, out), dim=1)
-        out = self.last_act(out)
-        out = self.fc(out)
+        out = self.fc_1(out)
+
+        if extra_inputs is not None:
+            out_extra = self.fc_extra(extra_inputs)
+            out = torch.cat((out_extra, out), dim=1)
+
+        out = self.fc_2(out)
+        out = self.fc_3(out)
+
         return out
 
     @property
     def resblocks(self):
         if not self.run_config.resblocks:
-            residual_blocks = find_no_resblocks_needed(self.run_config.target_width, 4)
+            residual_blocks = find_no_resblocks_needed(
+                self.run_config.target_width,
+                self.run_config.down_stride,
+                self.run_config.first_stride_expansion,
+            )
             logger.info(
                 "No residual blocks specified in CL args, using input "
                 "%s based on width approximation calculation.",
