@@ -4,8 +4,9 @@ from typing import Tuple, Dict, Union, List
 
 import joblib
 import pandas as pd
+import numpy as np
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, LabelEncoder
 
 from human_origins_supervised.data_load.common_ops import ColumnOperation
 
@@ -142,24 +143,33 @@ def split_df(df: pd.DataFrame, valid_size: Union[int, float]) -> al_train_val_df
     return df_labels_train, df_labels_valid
 
 
-def get_scaler_path(run_name: str, reg_column: str):
+def get_transformer_path(run_name: str, column_name: str, name: str):
     run_folder = Path("./runs", run_name)
-    scaler_path = run_folder / "encoders" / f"{reg_column}_standard_scaler.save"
+    scaler_path = run_folder / "transformers" / f"{column_name}_{name}.save"
 
     return scaler_path
 
 
-def scale_continuous_column(
+def get_target_transformer(model_task):
+    if model_task == "reg":
+        return StandardScaler()
+    elif model_task == "cls":
+        return LabelEncoder()
+
+    raise ValueError()
+
+
+def scale_non_target_continuous_columns(
     df: pd.DataFrame, reg_col: str, run_name: str, scaler_path: Path = None
 ) -> Tuple[pd.DataFrame, Path]:
     """
     Used to scale continuous columns in label file.
     """
 
-    def parse_colvals(column):
+    def parse_colvals(column: pd.Series) -> np.ndarray:
         return column.values.astype(float).reshape(-1, 1)
 
-    scaler_outpath = get_scaler_path(run_name, reg_col)
+    scaler_outpath = get_transformer_path(run_name, reg_col, "standard_scaler")
     if not scaler_path:
         logger.debug("Fitting standard scaler to training df of shape %s.", df.shape)
         scaler = StandardScaler()
@@ -219,14 +229,14 @@ def process_train_and_label_dfs(
 
     # we make sure not to mess with the passed in CL arg, hence copy
     continuous_columns = cl_args.contn_columns[:]
-    if cl_args.model_task == "reg":
-        continuous_columns.append(cl_args.target_column)
+    # if cl_args.model_task == "reg":
+    #    continuous_columns.append(cl_args.target_column)
 
     for continuous_column in continuous_columns:
-        df_labels_train, scaler_path = scale_continuous_column(
+        df_labels_train, scaler_path = scale_non_target_continuous_columns(
             df_labels_train, continuous_column, cl_args.run_name
         )
-        df_labels_valid, _ = scale_continuous_column(
+        df_labels_valid, _ = scale_non_target_continuous_columns(
             df_labels_valid, continuous_column, cl_args.run_name, scaler_path
         )
 

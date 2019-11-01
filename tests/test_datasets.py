@@ -1,3 +1,4 @@
+from unittest.mock import patch
 import csv
 from pathlib import Path
 
@@ -33,7 +34,13 @@ def test_set_up_datasets(create_test_cl_args, create_test_data):
         for i in range(10):
             bad_label_writer.writerow([f"SampleIgnoreLabel_{i}", "BadLabel"])
 
-    train_dataset, valid_dataset = datasets.set_up_datasets(cl_args)
+    # patch since we don't create run folders while testing
+    with patch(
+        "human_origins_supervised.data_load.datasets.joblib", autospec=True
+    ) as m:
+        train_dataset, valid_dataset = datasets.set_up_datasets(cl_args)
+
+        assert m.dump.call_count == 1
 
     assert len(train_dataset) + len(valid_dataset) == 2000 * n_classes
 
@@ -73,13 +80,19 @@ def test_datasets(
     train_no_samples = int(len(classes_tested) * 2000 * (1 - cl_args.valid_size))
     valid_no_sample = int(len(classes_tested) * 2000 * cl_args.valid_size)
 
-    train_dataset, valid_dataset = datasets.set_up_datasets(cl_args)
+    # patch since we don't create run folders while testing
+    with patch(
+        "human_origins_supervised.data_load.datasets.joblib", autospec=True
+    ) as m:
+        train_dataset, valid_dataset = datasets.set_up_datasets(cl_args)
+
+        assert m.dump.call_count == 1
 
     for dataset, exp_no_sample in zip(
         (train_dataset, valid_dataset), (train_no_samples, valid_no_sample)
     ):
         assert len(dataset) == exp_no_sample
-        assert set(i.label[cl_args.target_column] for i in dataset.samples) == set(
+        assert set(i.labels[cl_args.target_column] for i in dataset.samples) == set(
             classes_tested
         )
         assert set(dataset.labels_unique) == set(classes_tested)
@@ -90,11 +103,16 @@ def test_datasets(
         test_sample, test_label, test_id = dataset[0]
 
         tt_t = dataset.target_transformer.transform
-        test_label_string = dataset.samples[0].label[cl_args.target_column]
+        test_label_string = dataset.samples[0].labels[cl_args.target_column]
         assert test_label == tt_t([test_label_string])
         assert test_id == dataset.samples[0].sample_id
 
     cl_args.target_width = 1200
-    train_dataset, valid_dataset = datasets.set_up_datasets(cl_args)
+    with patch(
+        "human_origins_supervised.data_load.datasets.joblib", autospec=True
+    ) as m:
+        train_dataset, valid_dataset = datasets.set_up_datasets(cl_args)
+
+        assert m.dump.call_count == 1
     test_sample_pad, test_label_pad, test_id_pad = train_dataset[0]
     assert test_sample_pad.shape[-1] == 1200

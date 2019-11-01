@@ -57,14 +57,16 @@ def load_labels_for_testing(test_train_cl_args_mix: Namespace) -> al_label_dict:
     df_labels_test = label_setup.label_df_parse_wrapper(test_train_cl_args_mix)
 
     continuous_columns = test_train_cl_args_mix.contn_columns[:]
-    if test_train_cl_args_mix.model_task == "reg":
-        continuous_columns.append(test_train_cl_args_mix.target_column)
+    # if test_train_cl_args_mix.model_task == "reg":
+    # continuous_columns.append(test_train_cl_args_mix.target_column)
 
     for continuous_column in continuous_columns:
-        scaler_path = label_setup.get_scaler_path(
-            test_train_cl_args_mix.run_name, test_train_cl_args_mix.target_column
+        scaler_path = label_setup.get_transformer_path(
+            test_train_cl_args_mix.run_name,
+            test_train_cl_args_mix.target_column,
+            "standard_scaler",
         )
-        df_labels_test, _ = label_setup.scale_continuous_column(
+        df_labels_test, _ = label_setup.scale_non_target_continuous_columns(
             df_labels_test,
             continuous_column,
             test_train_cl_args_mix.run_name,
@@ -86,12 +88,12 @@ def set_up_test_dataset(
         test_train_cl_args_mix
     )
 
-    target_transformer = None
-    if test_train_cl_args_mix.model_task == "reg":
-        scaler_path = label_setup.get_scaler_path(
-            test_train_cl_args_mix.run_name, test_train_cl_args_mix.target_column
-        )
-        target_transformer = joblib.load(scaler_path)
+    target_transformer_path = label_setup.get_transformer_path(
+        test_train_cl_args_mix.run_name,
+        test_train_cl_args_mix.target_column,
+        "target_transformer",
+    )
+    target_transformer = joblib.load(target_transformer_path)
 
     test_dataset = datasets.DiskArrayDataset(
         **dataset_class_common_args,

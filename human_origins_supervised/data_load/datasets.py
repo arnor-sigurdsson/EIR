@@ -14,7 +14,8 @@ from torch.utils.data import Dataset
 from human_origins_supervised.data_load.label_setup import (
     set_up_train_and_valid_labels,
     al_label_dict,
-    get_scaler_path,
+    get_transformer_path,
+    get_target_transformer,
 )
 from .data_loading_funcs import make_random_snps_missing
 
@@ -46,16 +47,10 @@ def set_up_datasets(cl_args: Namespace) -> Tuple[al_datasets, al_datasets]:
     train_labels, valid_labels = set_up_train_and_valid_labels(cl_args)
     dataset_class_common_args = construct_dataset_init_params_from_cl_args(cl_args)
 
-    target_transformer = None
-    if cl_args.model_task == "reg":
-        scaler_path = get_scaler_path(cl_args.run_name, cl_args.target_column)
-        target_transformer = joblib.load(scaler_path)
-
     dataset_class = MemoryArrayDataset if cl_args.memory_dataset else DiskArrayDataset
     train_dataset = dataset_class(
         **dataset_class_common_args,
         labels_dict=train_labels,
-        target_transformer=target_transformer,
         na_augment=cl_args.na_augment,
     )
     valid_dataset = dataset_class(
@@ -63,6 +58,11 @@ def set_up_datasets(cl_args: Namespace) -> Tuple[al_datasets, al_datasets]:
         labels_dict=valid_labels,
         target_transformer=train_dataset.target_transformer,
     )
+
+    target_transformer_outpath = get_transformer_path(
+        cl_args.run_name, cl_args.target_column, "target_transformer"
+    )
+    joblib.dump(train_dataset.target_transformer, target_transformer_outpath)
 
     assert len(train_dataset) > len(valid_dataset)
     assert set(valid_dataset.labels_dict.keys()).isdisjoint(
@@ -76,7 +76,7 @@ def set_up_datasets(cl_args: Namespace) -> Tuple[al_datasets, al_datasets]:
 class Sample:
     sample_id: str
     array: torch.Tensor
-    label: Union[Dict[str, str], float, None]
+    labels: Union[Dict[str, str], float, None]
 
 
 class ArrayDatasetBase(Dataset):
@@ -137,7 +137,7 @@ class ArrayDatasetBase(Dataset):
             cur_sample = Sample(
                 sample_id=sample_id,
                 array=array_hook(files.get(sample_id)),
-                label=self.labels_dict.get(sample_id, None),
+                labels=self.labels_dict.get(sample_id, None),
             )
             samples.append(cur_sample)
 
@@ -151,24 +151,27 @@ class ArrayDatasetBase(Dataset):
         if not self.target_column:
             raise ValueError("Please specify label column name.")
 
-        non_labelled = tuple(i for i in self.samples if not i.label)
+        non_labelled = tuple(i for i in self.samples if not i.labels)
         if non_labelled:
             raise ValueError(
                 f"Expected all observations to have a label associated "
                 f"with them, but got {non_labelled}."
             )
+        all_sample_target_labels = np.array(
+            [i.labels[self.target_column] for i in self.samples]
+        )
 
         if self.model_task == "cls":
-            self.labels_unique = sorted(
-                np.unique([i.label[self.target_column] for i in self.samples])
-            )
+            self.labels_unique = sorted(np.unique(all_sample_target_labels))
             self.num_classes = len(self.labels_unique)
-
-            if not self.target_transformer:
-                self.target_transformer = LabelEncoder().fit(self.labels_unique)
 
         elif self.model_task == "reg":
             self.num_classes = 1
+
+        if not self.target_transformer:
+            target_transformer = get_target_transformer(self.model_task)
+            target_transformer.fit(all_sample_target_labels)
+            self.target_transformer = target_transformer
 
 
 class MemoryArrayDataset(ArrayDatasetBase):
@@ -203,7 +206,7 @@ class MemoryArrayDataset(ArrayDatasetBase):
         sample = self.samples[index]
 
         array = sample.array
-        label = self.parse_label(sample.label)
+        label = self.parse_label(sample.labels)
         sample_id = sample.sample_id
 
         if self.target_width:
@@ -239,7 +242,7 @@ class DiskArrayDataset(ArrayDatasetBase):
         sample = self.samples[index]
 
         array = np.load(sample.array)
-        label = self.parse_label(sample.label)
+        label = self.parse_label(sample.labels)
         sample_id = sample.sample_id
 
         if self.data_type == "packbits":

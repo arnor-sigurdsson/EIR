@@ -164,10 +164,10 @@ def test_scale_regression_labels(create_test_data, create_test_cl_args):
 
     df_train, df_valid = label_setup.split_df(df_labels, 0.1)
 
-    df_train, scaler_path = label_setup.scale_continuous_column(
+    df_train, scaler_path = label_setup.scale_non_target_continuous_columns(
         df_train, cl_args.target_column, path
     )
-    df_valid, _ = label_setup.scale_continuous_column(
+    df_valid, _ = label_setup.scale_non_target_continuous_columns(
         df_valid, cl_args.target_column, path, scaler_path
     )
 
