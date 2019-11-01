@@ -140,7 +140,7 @@ def split_df(df: pd.DataFrame, valid_size: Union[int, float]) -> al_train_val_df
     return df_labels_train, df_labels_valid
 
 
-def scale_continuous_columns(
+def scale_continuous_column(
     df: pd.DataFrame, reg_col: str, runs_folder: Path, scaler_path: Path = None
 ) -> Tuple[pd.DataFrame, Path]:
     """
@@ -215,10 +215,10 @@ def process_train_and_label_dfs(
         continuous_columns.append(cl_args.label_column)
 
     for continuous_column in continuous_columns:
-        df_labels_train, scaler_path = scale_continuous_columns(
+        df_labels_train, scaler_path = scale_continuous_column(
             df_labels_train, continuous_column, runs_folder
         )
-        df_labels_valid, _ = scale_continuous_columns(
+        df_labels_valid, _ = scale_continuous_column(
             df_labels_valid, continuous_column, runs_folder, scaler_path
         )
 
