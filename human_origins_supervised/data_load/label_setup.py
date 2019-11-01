@@ -25,11 +25,11 @@ al_label_dict = Dict[str, Dict[str, Union[str, float]]]
 
 
 def get_extra_columns(
-    label_column: str, all_column_ops: al_all_column_ops
+    target_column: str, all_column_ops: al_all_column_ops
 ) -> List[str]:
     extra_columns_flat = []
-    if label_column in all_column_ops:
-        cur_ops = all_column_ops.get(label_column)
+    if target_column in all_column_ops:
+        cur_ops = all_column_ops.get(target_column)
         extra_columns = [i.extra_columns_deps for i in cur_ops]
         extra_columns_flat = list(
             column for column_deps in extra_columns for column in column_deps
@@ -40,7 +40,7 @@ def get_extra_columns(
 
 def load_label_df(
     label_fpath: Path,
-    label_column: str,
+    target_column: str,
     ids_to_keep: Tuple[str, ...] = (),
     extra_columns: Tuple[str, ...] = (),
 ) -> pd.DataFrame:
@@ -48,7 +48,7 @@ def load_label_df(
     logger.debug("Reading in labelfile: %s", label_fpath)
     df_labels = pd.read_csv(
         label_fpath,
-        usecols=["ID", label_column] + list(extra_columns),
+        usecols=["ID", target_column] + list(extra_columns),
         dtype={"ID": str},
     )
 
@@ -67,7 +67,7 @@ def load_label_df(
 
 
 def parse_label_df(
-    df, column_ops: al_all_column_ops, label_column: str
+    df, column_ops: al_all_column_ops, target_column: str
 ) -> pd.DataFrame:
     """
     We want to be able to dynamically apply various operations to different columns
@@ -82,14 +82,16 @@ def parse_label_df(
     :param column_ops: A dictionarity of colum names, where each value is a list
     of tuples, where each tuple is a callable as the first element and the callable's
     arguments as the second element.
-    :param label_column:
+    :param target_column:
     :return: Parsed dataframe.
     """
 
     for column_name, ops_funcs in column_ops.items():
         if column_name in df.columns:
             for column_op in ops_funcs:
-                do_skip = column_op.only_apply_if_target and column_name == label_column
+                do_skip = (
+                    column_op.only_apply_if_target and column_name == target_column
+                )
                 if not do_skip:
                     func, args_dict = column_op.function, column_op.function_args
                     logger.debug(
@@ -106,16 +108,16 @@ def parse_label_df(
 def label_df_parse_wrapper(cl_args: Namespace) -> pd.DataFrame:
     all_ids = tuple(i.stem for i in Path(cl_args.data_folder).iterdir())
 
-    extra_label_parsing_cols = get_extra_columns(cl_args.label_column, COLUMN_OPS)
+    extra_label_parsing_cols = get_extra_columns(cl_args.target_column, COLUMN_OPS)
     extra_embed_cols = cl_args.embed_columns
     extra_contn_cols = cl_args.contn_columns
 
     all_extra_cols = extra_label_parsing_cols + extra_embed_cols + extra_contn_cols
 
     df_labels = load_label_df(
-        cl_args.label_file, cl_args.label_column, all_ids, all_extra_cols
+        cl_args.label_file, cl_args.target_column, all_ids, all_extra_cols
     )
-    df_labels = parse_label_df(df_labels, COLUMN_OPS, cl_args.label_column)
+    df_labels = parse_label_df(df_labels, COLUMN_OPS, cl_args.target_column)
 
     # remove columns only used for parsing, so only keep actual label column
     # and extra embedding columns
@@ -140,8 +142,15 @@ def split_df(df: pd.DataFrame, valid_size: Union[int, float]) -> al_train_val_df
     return df_labels_train, df_labels_valid
 
 
+def get_scaler_path(run_name: str, reg_column: str):
+    run_folder = Path("./runs", run_name)
+    scaler_path = run_folder / "encoders" / f"{reg_column}_standard_scaler.save"
+
+    return scaler_path
+
+
 def scale_continuous_column(
-    df: pd.DataFrame, reg_col: str, runs_folder: Path, scaler_path: Path = None
+    df: pd.DataFrame, reg_col: str, run_name: str, scaler_path: Path = None
 ) -> Tuple[pd.DataFrame, Path]:
     """
     Used to scale continuous columns in label file.
@@ -150,7 +159,7 @@ def scale_continuous_column(
     def parse_colvals(column):
         return column.values.astype(float).reshape(-1, 1)
 
-    scaler_outpath = runs_folder / "encoders" / f"{reg_col}_standard_scaler.save"
+    scaler_outpath = get_scaler_path(run_name, reg_col)
     if not scaler_path:
         logger.debug("Fitting standard scaler to training df of shape %s.", df.shape)
         scaler = StandardScaler()
@@ -170,10 +179,10 @@ def scale_continuous_column(
 
 
 def get_missing_stats_string(
-    df: pd.DataFrame, target_columns: List[str]
+    df: pd.DataFrame, columns_to_check: List[str]
 ) -> Dict[str, int]:
     missing_count_dict = {}
-    for col in target_columns:
+    for col in columns_to_check:
         missing_count_dict[col] = int(df[col].isnull().sum())
 
     return missing_count_dict
@@ -207,19 +216,19 @@ def handle_missing_label_values(df: pd.DataFrame, cl_args, name="df"):
 def process_train_and_label_dfs(
     cl_args, df_labels_train, df_labels_valid
 ) -> al_train_val_dfs:
-    runs_folder = Path("./runs", cl_args.run_name)
+    run_folder = Path("./runs", cl_args.run_name)
 
     # we make sure not to mess with the passed in CL arg, hence copy
     continuous_columns = cl_args.contn_columns[:]
     if cl_args.model_task == "reg":
-        continuous_columns.append(cl_args.label_column)
+        continuous_columns.append(cl_args.target_column)
 
     for continuous_column in continuous_columns:
         df_labels_train, scaler_path = scale_continuous_column(
-            df_labels_train, continuous_column, runs_folder
+            df_labels_train, continuous_column, cl_args.run_name
         )
         df_labels_valid, _ = scale_continuous_column(
-            df_labels_valid, continuous_column, runs_folder, scaler_path
+            df_labels_valid, continuous_column, run_folder, cl_args.run_name
         )
 
     df_labels_train = handle_missing_label_values(df_labels_train, cl_args, "train df")

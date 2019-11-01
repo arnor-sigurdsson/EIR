@@ -30,7 +30,7 @@ def args_config():
             "data_folder": "REPLACE_ME",
             "valid_size": 0.05,
             "label_file": "REPLACE_ME",
-            "label_column": "Origin",
+            "target_column": "Origin",
             "data_type": "packbits",
             "data_width": 1000,
             "resblocks": None,

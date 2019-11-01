@@ -14,6 +14,7 @@ from torch.utils.data import Dataset
 from human_origins_supervised.data_load.label_setup import (
     set_up_train_and_valid_labels,
     al_label_dict,
+    get_scaler_path,
 )
 from .data_loading_funcs import make_random_snps_missing
 
@@ -23,37 +24,38 @@ logger = get_logger(__name__)
 al_datasets = Union["MemoryArrayDataset", "DiskArrayDataset"]
 
 
+def construct_dataset_init_params_from_cl_args(cl_args):
+    """
+    Shared between here and predict.py.
+    """
+    dataset_class_common_args = {
+        "data_folder": cl_args.data_folder,
+        "model_task": cl_args.model_task,
+        "target_width": cl_args.target_width,
+        "target_column": cl_args.target_column,
+        "data_type": cl_args.data_type,
+    }
+
+    return dataset_class_common_args
+
+
 def set_up_datasets(cl_args: Namespace) -> Tuple[al_datasets, al_datasets]:
     """
     This function is only ever called if we have labels.
     """
     train_labels, valid_labels = set_up_train_and_valid_labels(cl_args)
+    dataset_class_common_args = construct_dataset_init_params_from_cl_args(cl_args)
 
-    dataset_class_common_args = {
-        "data_folder": cl_args.data_folder,
-        "model_task": cl_args.model_task,
-        "target_width": cl_args.target_width,
-        "label_column": cl_args.label_column,
-        "data_type": cl_args.data_type,
-    }
-
-    # TODO: Do this in a nice way
-    label_encoder = None
+    target_encoder = None
     if cl_args.model_task == "reg":
-        label_encoder = joblib.load(
-            Path(
-                "./runs",
-                cl_args.run_name,
-                "encoders",
-                f"{cl_args.label_column}_standard_scaler.save",
-            )
-        )
+        scaler_path = get_scaler_path(cl_args.run_name, cl_args.target_column)
+        target_encoder = joblib.load(scaler_path)
 
     dataset_class = MemoryArrayDataset if cl_args.memory_dataset else DiskArrayDataset
     train_dataset = dataset_class(
         **dataset_class_common_args,
         labels_dict=train_labels,
-        label_encoder=label_encoder,
+        label_encoder=target_encoder,
         na_augment=cl_args.na_augment,
     )
     valid_dataset = dataset_class(
@@ -82,7 +84,7 @@ class ArrayDatasetBase(Dataset):
         self,
         data_folder: Path,
         model_task: str,
-        label_column: str = None,
+        target_column: str = None,
         labels_dict: al_label_dict = None,
         label_encoder: Union[LabelEncoder, StandardScaler] = None,
         target_height: int = 4,
@@ -100,7 +102,7 @@ class ArrayDatasetBase(Dataset):
 
         self.samples: Union[List[Sample], None] = None
 
-        self.label_column = label_column
+        self.target_column = target_column
         self.labels_dict = labels_dict if labels_dict else {}
         self.labels_unique = None
         self.num_classes = None
@@ -119,7 +121,7 @@ class ArrayDatasetBase(Dataset):
         if not sample_label_dict:
             return []
 
-        label_value = sample_label_dict[self.label_column]
+        label_value = sample_label_dict[self.target_column]
         if self.model_task == "reg":
             return float(label_value)
         elif self.model_task == "cls":
@@ -146,7 +148,7 @@ class ArrayDatasetBase(Dataset):
         raise NotImplementedError
 
     def init_label_attributes(self):
-        if not self.label_column:
+        if not self.target_column:
             raise ValueError("Please specify label column name.")
 
         non_labelled = tuple(i for i in self.samples if not i.label)
@@ -158,7 +160,7 @@ class ArrayDatasetBase(Dataset):
 
         if self.model_task == "cls":
             self.labels_unique = sorted(
-                np.unique([i.label[self.label_column] for i in self.samples])
+                np.unique([i.label[self.target_column] for i in self.samples])
             )
             self.num_classes = len(self.labels_unique)
 

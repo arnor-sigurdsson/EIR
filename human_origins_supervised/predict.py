@@ -41,10 +41,6 @@ def load_model(model_path: Path, n_classes):
     return model
 
 
-def load_scaler():
-    pass
-
-
 def modify_train_cl_args_for_testing(train_cl_args: Namespace, test_cl_args: Namespace):
     # TODO:
     #  Make this clearer, maybe something like test_run_config, which is mixed
@@ -62,16 +58,17 @@ def load_labels_for_testing(test_train_cl_args_mix: Namespace) -> al_label_dict:
 
     continuous_columns = test_train_cl_args_mix.contn_columns[:]
     if test_train_cl_args_mix.model_task == "reg":
-        continuous_columns.append(test_train_cl_args_mix.label_column)
+        continuous_columns.append(test_train_cl_args_mix.target_column)
 
     for continuous_column in continuous_columns:
-        runs_folder = Path("./runs", test_train_cl_args_mix.run_name)
-        scaler_path = (
-            runs_folder / "encoders" / f"{continuous_column}_standard_scaler.save"
+        scaler_path = label_setup.get_scaler_path(
+            test_train_cl_args_mix.run_name, test_train_cl_args_mix.target_column
         )
-
         df_labels_test, _ = label_setup.scale_continuous_column(
-            df_labels_test, continuous_column, runs_folder, scaler_path
+            df_labels_test,
+            continuous_column,
+            test_train_cl_args_mix.run_name,
+            scaler_path,
         )
 
     df_labels_test = label_setup.handle_missing_label_values(
@@ -85,23 +82,14 @@ def load_labels_for_testing(test_train_cl_args_mix: Namespace) -> al_label_dict:
 def set_up_test_dataset(
     test_train_cl_args_mix: Namespace, test_labels_dict: al_label_dict
 ) -> Union[datasets.DiskArrayDataset, datasets.MemoryArrayDataset]:
-    # TODO: Set up boilerplate function in datasets.py?
-
-    dataset_class_common_args = {
-        "data_folder": test_train_cl_args_mix.data_folder,
-        "model_task": test_train_cl_args_mix.model_task,
-        "target_width": test_train_cl_args_mix.target_width,
-        "label_column": test_train_cl_args_mix.label_column,
-        "data_type": test_train_cl_args_mix.data_type,
-    }
+    dataset_class_common_args = datasets.construct_dataset_init_params_from_cl_args(
+        test_train_cl_args_mix
+    )
 
     label_encoder = None
     if test_train_cl_args_mix.model_task == "reg":
-        runs_folder = Path("./runs", test_train_cl_args_mix.run_name)
-        scaler_path = (
-            runs_folder
-            / "encoders"
-            / f"{test_train_cl_args_mix.label_column}_standard_scaler.save"
+        scaler_path = label_setup.get_scaler_path(
+            test_train_cl_args_mix.run_name, test_train_cl_args_mix.target_column
         )
         label_encoder = joblib.load(scaler_path)
 
@@ -148,7 +136,6 @@ def predict(test_cl_args):
     preds_sm = F.softmax(preds, dim=1)
     preds = preds_sm.cpu().numpy()
 
-    # TODO: Update with new dataset structure
     test_ids = [i.sample_id for i in test_dataset.samples]
     df_preds = pd.DataFrame(data=preds, index=test_ids, columns=classes)
     df_preds.index.name = "ID"

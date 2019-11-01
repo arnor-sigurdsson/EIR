@@ -312,10 +312,11 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--label_column",
+        "--target_column",
         type=str,
         required=True,
-        help="What column in label file to model on.",
+        help="What column in label file to treat as target variable"
+        "(i.e. to predict on).",
     )
 
     parser.add_argument(

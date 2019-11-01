@@ -79,7 +79,7 @@ def test_datasets(
         (train_dataset, valid_dataset), (train_no_samples, valid_no_sample)
     ):
         assert len(dataset) == exp_no_sample
-        assert set(i.label[cl_args.label_column] for i in dataset.samples) == set(
+        assert set(i.label[cl_args.target_column] for i in dataset.samples) == set(
             classes_tested
         )
         assert set(dataset.labels_unique) == set(classes_tested)
@@ -90,7 +90,7 @@ def test_datasets(
         test_sample, test_label, test_id = dataset[0]
 
         le_t = dataset.label_encoder.transform
-        test_label_string = dataset.samples[0].label[cl_args.label_column]
+        test_label_string = dataset.samples[0].label[cl_args.target_column]
         assert test_label == le_t([test_label_string])
         assert test_id == dataset.samples[0].sample_id
 

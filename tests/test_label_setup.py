@@ -118,7 +118,7 @@ def test_label_df_parse_wrapper(create_test_data, create_test_cl_args):
     df_labels = label_setup.label_df_parse_wrapper(cl_args)
 
     assert df_labels.shape == (4000, 1)
-    assert set(df_labels[cl_args.label_column].unique()) == {"Asia", "Europe"}
+    assert set(df_labels[cl_args.target_column].unique()) == {"Asia", "Europe"}
 
 
 @pytest.mark.parametrize(
@@ -159,20 +159,20 @@ def test_scale_regression_labels(create_test_data, create_test_cl_args):
     df_labels = label_setup.label_df_parse_wrapper(cl_args)
 
     for column_value, new_value in zip(["Africa", "Asia", "Europe"], [150, 170, 190]):
-        mask = df_labels[cl_args.label_column] == column_value
+        mask = df_labels[cl_args.target_column] == column_value
         df_labels[mask] = new_value
 
     df_train, df_valid = label_setup.split_df(df_labels, 0.1)
 
     df_train, scaler_path = label_setup.scale_continuous_column(
-        df_train, cl_args.label_column, path
+        df_train, cl_args.target_column, path
     )
     df_valid, _ = label_setup.scale_continuous_column(
-        df_valid, cl_args.label_column, path, scaler_path
+        df_valid, cl_args.target_column, path, scaler_path
     )
 
-    assert df_train[cl_args.label_column].between(-2, 2).all()
-    assert df_valid[cl_args.label_column].between(-2, 2).all()
+    assert df_train[cl_args.target_column].between(-2, 2).all()
+    assert df_valid[cl_args.target_column].between(-2, 2).all()
 
 
 @pytest.mark.parametrize(
