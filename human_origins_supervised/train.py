@@ -50,7 +50,7 @@ class Config:
     optimizer: Optimizer
     criterion: nn.CrossEntropyLoss
     labels_dict: Dict
-    label_encoder: Union[LabelEncoder, StandardScaler]
+    target_transformer: Union[LabelEncoder, StandardScaler]
     data_width: int
 
 
@@ -58,7 +58,7 @@ def train_ignite(config: Config) -> None:
     c = config
     args = config.cl_args
 
-    metric_func = select_metric_func(args.model_task, c.label_encoder)
+    metric_func = select_metric_func(args.model_task, c.target_transformer)
 
     def step(
         engine: Engine,
@@ -169,7 +169,7 @@ def main(cl_args: argparse.Namespace) -> None:
         optimizer,
         criterion,
         train_dataset.labels_dict,
-        train_dataset.label_encoder,
+        train_dataset.target_transformer,
         train_dataset.data_width,
     )
 

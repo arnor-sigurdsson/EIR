@@ -46,22 +46,22 @@ def set_up_datasets(cl_args: Namespace) -> Tuple[al_datasets, al_datasets]:
     train_labels, valid_labels = set_up_train_and_valid_labels(cl_args)
     dataset_class_common_args = construct_dataset_init_params_from_cl_args(cl_args)
 
-    target_encoder = None
+    target_transformer = None
     if cl_args.model_task == "reg":
         scaler_path = get_scaler_path(cl_args.run_name, cl_args.target_column)
-        target_encoder = joblib.load(scaler_path)
+        target_transformer = joblib.load(scaler_path)
 
     dataset_class = MemoryArrayDataset if cl_args.memory_dataset else DiskArrayDataset
     train_dataset = dataset_class(
         **dataset_class_common_args,
         labels_dict=train_labels,
-        label_encoder=target_encoder,
+        target_transformer=target_transformer,
         na_augment=cl_args.na_augment,
     )
     valid_dataset = dataset_class(
         **dataset_class_common_args,
         labels_dict=valid_labels,
-        label_encoder=train_dataset.label_encoder,
+        target_transformer=train_dataset.target_transformer,
     )
 
     assert len(train_dataset) > len(valid_dataset)
@@ -86,7 +86,7 @@ class ArrayDatasetBase(Dataset):
         model_task: str,
         target_column: str = None,
         labels_dict: al_label_dict = None,
-        label_encoder: Union[LabelEncoder, StandardScaler] = None,
+        target_transformer: Union[LabelEncoder, StandardScaler] = None,
         target_height: int = 4,
         target_width: int = None,
         na_augment: float = 0.0,
@@ -106,7 +106,7 @@ class ArrayDatasetBase(Dataset):
         self.labels_dict = labels_dict if labels_dict else {}
         self.labels_unique = None
         self.num_classes = None
-        self.label_encoder = label_encoder
+        self.target_transformer = target_transformer
 
         self.na_augment = na_augment
 
@@ -125,7 +125,7 @@ class ArrayDatasetBase(Dataset):
         if self.model_task == "reg":
             return float(label_value)
         elif self.model_task == "cls":
-            return self.label_encoder.transform([label_value]).squeeze()
+            return self.target_transformer.transform([label_value]).squeeze()
 
         raise ValueError
 
@@ -164,8 +164,8 @@ class ArrayDatasetBase(Dataset):
             )
             self.num_classes = len(self.labels_unique)
 
-            if not self.label_encoder:
-                self.label_encoder = LabelEncoder().fit(self.labels_unique)
+            if not self.target_transformer:
+                self.target_transformer = LabelEncoder().fit(self.labels_unique)
 
         elif self.model_task == "reg":
             self.num_classes = 1

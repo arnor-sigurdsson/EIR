@@ -86,17 +86,17 @@ def set_up_test_dataset(
         test_train_cl_args_mix
     )
 
-    label_encoder = None
+    target_transformer = None
     if test_train_cl_args_mix.model_task == "reg":
         scaler_path = label_setup.get_scaler_path(
             test_train_cl_args_mix.run_name, test_train_cl_args_mix.target_column
         )
-        label_encoder = joblib.load(scaler_path)
+        target_transformer = joblib.load(scaler_path)
 
     test_dataset = datasets.DiskArrayDataset(
         **dataset_class_common_args,
         labels_dict=test_labels_dict,
-        label_encoder=label_encoder,
+        target_transformer=target_transformer,
     )
 
     return test_dataset
@@ -118,8 +118,8 @@ def predict(test_cl_args):
     )
 
     classes = np.load(test_cl_args.classes_path)
-    label_encoder = LabelEncoder()
-    label_encoder.classes_ = classes
+    target_transformer = LabelEncoder()
+    target_transformer.classes_ = classes
 
     model = load_model(Path(test_cl_args.model_path), len(classes))
     model = model.to(test_cl_args.device)
@@ -148,7 +148,7 @@ def predict(test_cl_args):
             preds,
             ids,
             outfolder,
-            label_encoder,
+            target_transformer,
             test_train_mixed_cl_args.model_task,
         )
 

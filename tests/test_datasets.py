@@ -84,14 +84,14 @@ def test_datasets(
         )
         assert set(dataset.labels_unique) == set(classes_tested)
 
-        le_it = dataset.label_encoder.inverse_transform
-        assert (le_it(range(len(classes_tested))) == classes_tested).all()
+        tt_it = dataset.target_transformer.inverse_transform
+        assert (tt_it(range(len(classes_tested))) == classes_tested).all()
 
         test_sample, test_label, test_id = dataset[0]
 
-        le_t = dataset.label_encoder.transform
+        tt_t = dataset.target_transformer.transform
         test_label_string = dataset.samples[0].label[cl_args.target_column]
-        assert test_label == le_t([test_label_string])
+        assert test_label == tt_t([test_label_string])
         assert test_id == dataset.samples[0].sample_id
 
     cl_args.target_width = 1200

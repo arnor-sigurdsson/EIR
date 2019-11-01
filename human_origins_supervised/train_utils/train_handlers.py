@@ -175,7 +175,7 @@ def _attach_event_handlers(trainer: Engine, handler_config: HandlerConfig):
     if args.model_task == "cls":
         np.save(
             Path(handler_config.run_folder, "saved_models", "classes.npy"),
-            handler_config.config.label_encoder.classes_,
+            handler_config.config.target_transformer.classes_,
         )
 
     with open(handler_config.run_folder + "/cl_args.json", "w") as config_file:

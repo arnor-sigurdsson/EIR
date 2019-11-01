@@ -25,13 +25,13 @@ def calc_regression_metrics(
     outputs: torch.Tensor,
     labels: torch.Tensor,
     prefix: str,
-    label_encoder: StandardScaler,
+    target_transformer: StandardScaler,
 ) -> Dict[str, float]:
     preds = outputs.detach().cpu().numpy()
     labels = labels.cpu().numpy()
 
-    labels = label_encoder.inverse_transform(labels).squeeze()
-    preds = label_encoder.inverse_transform(preds).squeeze()
+    labels = target_transformer.inverse_transform(labels).squeeze()
+    preds = target_transformer.inverse_transform(preds).squeeze()
 
     if len(preds) < 2:
         r2 = 0
@@ -44,11 +44,11 @@ def calc_regression_metrics(
     return {f"{prefix}_r2": r2, f"{prefix}_rmse": rmse, f"{prefix}_pcc": pcc}
 
 
-def select_metric_func(model_task: str, label_encoder: StandardScaler):
+def select_metric_func(model_task: str, target_transformer: StandardScaler):
     if model_task == "cls":
         return calc_multiclass_metrics
 
-    return partial(calc_regression_metrics, label_encoder=label_encoder)
+    return partial(calc_regression_metrics, target_transformer=target_transformer)
 
 
 def get_train_metrics(model_task, prefix="t"):
