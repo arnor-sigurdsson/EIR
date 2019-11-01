@@ -216,7 +216,6 @@ def handle_missing_label_values(df: pd.DataFrame, cl_args, name="df"):
 def process_train_and_label_dfs(
     cl_args, df_labels_train, df_labels_valid
 ) -> al_train_val_dfs:
-    run_folder = Path("./runs", cl_args.run_name)
 
     # we make sure not to mess with the passed in CL arg, hence copy
     continuous_columns = cl_args.contn_columns[:]
@@ -228,7 +227,7 @@ def process_train_and_label_dfs(
             df_labels_train, continuous_column, cl_args.run_name
         )
         df_labels_valid, _ = scale_continuous_column(
-            df_labels_valid, continuous_column, run_folder, cl_args.run_name
+            df_labels_valid, continuous_column, cl_args.run_name, scaler_path
         )
 
     df_labels_train = handle_missing_label_values(df_labels_train, cl_args, "train df")

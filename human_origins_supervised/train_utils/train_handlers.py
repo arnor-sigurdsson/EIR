@@ -178,7 +178,7 @@ def _attach_event_handlers(trainer: Engine, handler_config: HandlerConfig):
             handler_config.config.label_encoder.classes_,
         )
 
-    with open(handler_config.run_folder + "/run_config.json", "w") as config_file:
+    with open(handler_config.run_folder + "/cl_args.json", "w") as config_file:
         config_dict = vars(args)
         json.dump(config_dict, config_file, sort_keys=True, indent=4)
 

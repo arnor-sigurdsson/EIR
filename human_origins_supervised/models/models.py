@@ -178,9 +178,7 @@ def set_up_conv_params(current_width: int, kernel_size: int, stride: int):
     return kernel_size, padding
 
 
-def make_conv_layers(
-    residual_blocks: List[int], run_config: Namespace
-) -> List[nn.Module]:
+def make_conv_layers(residual_blocks: List[int], cl_args: Namespace) -> List[nn.Module]:
     """
     Used to set up the convolutional layers for the model. Based on the passed in
     residual blocks, we want to set up the actual blocks with all the relevant
@@ -192,28 +190,28 @@ def make_conv_layers(
 
     :param residual_blocks: List of ints, where each int indicates number of blocks w.
     that channel dimension.
-    :param run_config: Experiment hyperparameters / configuration needed for the
+    :param cl_args: Experiment hyperparameters / configuration needed for the
     convolution setup.
     :return: A list of `nn.Module` objects to be passed to `nn.Sequential`.
     """
-    rc = run_config
+    ca = cl_args
 
-    down_stride_w = rc.down_stride
+    down_stride_w = ca.down_stride
 
-    first_conv_kernel = rc.kernel_width * rc.first_kernel_expansion
-    first_conv_stride = down_stride_w * rc.first_stride_expansion
+    first_conv_kernel = ca.kernel_width * ca.first_kernel_expansion
+    first_conv_stride = down_stride_w * ca.first_stride_expansion
     first_kernel, first_pad = set_up_conv_params(
-        rc.target_width, first_conv_kernel, first_conv_stride
+        ca.target_width, first_conv_kernel, first_conv_stride
     )
 
     base_layers = [
         FirstBlock(
             in_channels=1,
-            out_channels=2 ** rc.channel_exp_base,
+            out_channels=2 ** ca.channel_exp_base,
             conv_1_kernel_w=first_kernel,
             conv_1_padding=first_pad,
             down_stride_w=down_stride_w,
-            rb_do=rc.rb_do,
+            rb_do=ca.rb_do,
         )
     ]
 
@@ -221,15 +219,15 @@ def make_conv_layers(
         for layer in range(layer_arch_layers):
             cur_conv = nn.Sequential(*base_layers)
             cur_width = torch_utils.calc_size_after_conv_sequence(
-                rc.target_width, cur_conv
+                ca.target_width, cur_conv
             )
 
             cur_kern, cur_padd = set_up_conv_params(
-                cur_width, rc.kernel_width, down_stride_w
+                cur_width, ca.kernel_width, down_stride_w
             )
 
             cur_in_channels = base_layers[-1].out_channels
-            cur_out_channels = 2 ** (rc.channel_exp_base + layer_arch_idx)
+            cur_out_channels = 2 ** (ca.channel_exp_base + layer_arch_idx)
             cur_layer = Block(
                 in_channels=cur_in_channels,
                 out_channels=cur_out_channels,
@@ -237,7 +235,7 @@ def make_conv_layers(
                 conv_1_padding=cur_padd,
                 down_stride_w=down_stride_w,
                 full_preact=True if len(base_layers) == 1 else False,
-                rb_do=rc.rb_do,
+                rb_do=ca.rb_do,
             )
 
             base_layers.append(cur_layer)
@@ -250,14 +248,14 @@ def make_conv_layers(
 class Model(nn.Module):
     def __init__(
         self,
-        run_config: Namespace,
+        cl_args: Namespace,
         num_classes: int,
         embeddings_dict: al_emb_lookup_dict = None,
         extra_continuous_inputs: Tuple[str, ...] = None,
     ):
         super().__init__()
 
-        self.run_config = run_config
+        self.cl_args = cl_args
         self.num_classes = num_classes
         self.embeddings_dict = embeddings_dict
         self.extra_continuous_inputs = extra_continuous_inputs
@@ -268,16 +266,16 @@ class Model(nn.Module):
         if extra_continuous_inputs:
             con_total_dim = len(self.extra_continuous_inputs)
 
-        self.conv = nn.Sequential(*make_conv_layers(self.resblocks, run_config))
+        self.conv = nn.Sequential(*make_conv_layers(self.resblocks, cl_args))
 
         self.data_size_after_conv = torch_utils.calc_size_after_conv_sequence(
-            run_config.target_width, self.conv
+            cl_args.target_width, self.conv
         )
 
         self.no_out_channels = self.conv[-1].out_channels
 
         fc_1_in_features = self.data_size_after_conv * self.no_out_channels
-        fc_base = run_config.fc_dim
+        fc_base = cl_args.fc_dim
 
         self.fc_1 = nn.Sequential(
             nn.BatchNorm1d(fc_1_in_features),
@@ -297,7 +295,7 @@ class Model(nn.Module):
         self.fc_3 = nn.Sequential(
             nn.BatchNorm1d(fc_base),
             nn.ReLU(),
-            nn.Dropout(run_config.fc_do),
+            nn.Dropout(cl_args.fc_do),
             nn.Linear(fc_base, self.num_classes),
         )
 
@@ -325,11 +323,11 @@ class Model(nn.Module):
 
     @property
     def resblocks(self):
-        if not self.run_config.resblocks:
+        if not self.cl_args.resblocks:
             residual_blocks = find_no_resblocks_needed(
-                self.run_config.target_width,
-                self.run_config.down_stride,
-                self.run_config.first_stride_expansion,
+                self.cl_args.target_width,
+                self.cl_args.down_stride,
+                self.cl_args.first_stride_expansion,
             )
             logger.info(
                 "No residual blocks specified in CL args, using input "
@@ -337,4 +335,4 @@ class Model(nn.Module):
                 residual_blocks,
             )
             return residual_blocks
-        return self.run_config.resblocks
+        return self.cl_args.resblocks

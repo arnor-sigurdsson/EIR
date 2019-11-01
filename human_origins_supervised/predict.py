@@ -23,18 +23,18 @@ torch.manual_seed(0)
 np.random.seed(0)
 
 
-def load_run_config(run_config_path: Path) -> Namespace:
-    with open(str(run_config_path), "r") as infile:
-        run_config = json.load(infile)
+def load_cl_args_config(cl_args_config_path: Path) -> Namespace:
+    with open(str(cl_args_config_path), "r") as infile:
+        loaded_cl_args = json.load(infile)
 
-    return Namespace(**run_config)
+    return Namespace(**loaded_cl_args)
 
 
 def load_model(model_path: Path, n_classes):
-    model_run_config_path = model_path.parents[1] / "run_config.json"
-    run_config = load_run_config(model_run_config_path)
+    model_cl_args_path = model_path.parents[1] / "cl_args.json"
+    cl_args = load_cl_args_config(model_cl_args_path)
 
-    model = Model(run_config, n_classes)
+    model = Model(cl_args, n_classes)
     model.load_state_dict(torch.load(model_path))
     model.eval()
 
@@ -43,7 +43,7 @@ def load_model(model_path: Path, n_classes):
 
 def modify_train_cl_args_for_testing(train_cl_args: Namespace, test_cl_args: Namespace):
     # TODO:
-    #  Make this clearer, maybe something like test_run_config, which is mixed
+    #  Make this clearer, maybe something like test_cl_args, which is mixed
     #  from train/test, and predict_cl_args, which refers to CL args given to this
     #  script.
     train_cl_args_mod = deepcopy(train_cl_args)
@@ -104,8 +104,8 @@ def set_up_test_dataset(
 
 def predict(test_cl_args):
     outfolder = Path(test_cl_args.output_folder)
-    train_cl_args = load_run_config(
-        Path(test_cl_args.model_path).parents[1] / "run_config.json"
+    train_cl_args = load_cl_args_config(
+        Path(test_cl_args.model_path).parents[1] / "cl_args.json"
     )
     test_train_mixed_cl_args = modify_train_cl_args_for_testing(
         train_cl_args, test_cl_args
