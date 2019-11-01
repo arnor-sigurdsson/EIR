@@ -183,7 +183,7 @@ def _attach_event_handlers(trainer: Engine, handler_config: HandlerConfig):
         json.dump(config_dict, config_file, sort_keys=True, indent=4)
 
     trainer.add_event_handler(
-        Events.EPOCH_COMPLETED,
+        Events.ITERATION_COMPLETED,
         checkpoint_handler,
         to_save={"model": handler_config.config.model},
     )

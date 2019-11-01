@@ -140,33 +140,33 @@ def split_df(df: pd.DataFrame, valid_size: Union[int, float]) -> al_train_val_df
     return df_labels_train, df_labels_valid
 
 
-def scale_regression_labels(
-    df_labels_train: pd.DataFrame,
-    df_labels_valid: pd.DataFrame,
-    reg_col: str,
-    runs_folder: Path,
-) -> al_train_val_dfs:
+def scale_continuous_columns(
+    df: pd.DataFrame, reg_col: str, runs_folder: Path, scaler_path: Path = None
+) -> Tuple[pd.DataFrame, Path]:
     """
-    Used to scale regression column.
+    Used to scale continuous columns in label file.
     """
 
     def parse_colvals(column):
         return column.values.astype(float).reshape(-1, 1)
 
-    logger.debug(
-        "Applying standard scaling to column %s in train and valid sets.", reg_col
-    )
-
-    scaler = StandardScaler()
-    scaler.fit(parse_colvals(df_labels_train[reg_col]))
     scaler_outpath = runs_folder / "encoders" / f"{reg_col}_standard_scaler.save"
-    ensure_path_exists(scaler_outpath)
-    joblib.dump(scaler, scaler_outpath)
+    if not scaler_path:
+        logger.debug("Fitting standard scaler to training df of shape %s.", df.shape)
+        scaler = StandardScaler()
+        scaler.fit(parse_colvals(df[reg_col]))
+        ensure_path_exists(scaler_outpath)
+        joblib.dump(scaler, scaler_outpath)
+    else:
+        logger.debug(
+            "Transforming valid/test (shape %s) df with scaler fitted on training df.",
+            df.shape,
+        )
+        scaler = joblib.load(scaler_outpath)
 
-    df_labels_train[reg_col] = scaler.transform(parse_colvals(df_labels_train[reg_col]))
-    df_labels_valid[reg_col] = scaler.transform(parse_colvals(df_labels_valid[reg_col]))
+    df[reg_col] = scaler.transform(parse_colvals(df[reg_col]))
 
-    return df_labels_train, df_labels_valid
+    return df, scaler_outpath
 
 
 def get_missing_stats_string(
@@ -215,8 +215,11 @@ def process_train_and_label_dfs(
         continuous_columns.append(cl_args.label_column)
 
     for continuous_column in continuous_columns:
-        df_labels_train, df_labels_valid = scale_regression_labels(
-            df_labels_train, df_labels_valid, continuous_column, runs_folder
+        df_labels_train, scaler_path = scale_continuous_columns(
+            df_labels_train, continuous_column, runs_folder
+        )
+        df_labels_valid, _ = scale_continuous_columns(
+            df_labels_valid, continuous_column, runs_folder, scaler_path
         )
 
     df_labels_train = handle_missing_label_values(df_labels_train, cl_args, "train df")
