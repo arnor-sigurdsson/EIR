@@ -179,10 +179,12 @@ class ArrayDatasetBase(Dataset):
 
         elif self.model_task == "reg":
             self.num_classes = 1
+            # StandardScaler() expects 2D array, LabelEncoder() a 1D array
+            all_sample_target_labels = all_sample_target_labels.reshape(-1, 1)
 
         if not self.target_transformer:
             target_transformer = get_target_transformer(self.model_task)
-            target_transformer.fit(all_sample_target_labels.reshape(-1, 1))
+            target_transformer.fit(all_sample_target_labels)
             self.target_transformer = target_transformer
 
 

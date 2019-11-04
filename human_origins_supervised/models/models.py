@@ -1,5 +1,5 @@
 from argparse import Namespace
-from typing import List, Tuple
+from typing import List, Union
 
 import aislib.pytorch as torch_utils
 import torch
@@ -250,21 +250,21 @@ class Model(nn.Module):
         self,
         cl_args: Namespace,
         num_classes: int,
-        embeddings_dict: al_emb_lookup_dict = None,
-        extra_continuous_inputs: Tuple[str, ...] = None,
+        embeddings_dict: Union[al_emb_lookup_dict, None] = None,
+        extra_continuous_inputs_columns: Union[List[str], None] = None,
     ):
         super().__init__()
 
         self.cl_args = cl_args
         self.num_classes = num_classes
         self.embeddings_dict = embeddings_dict
-        self.extra_continuous_inputs = extra_continuous_inputs
+        self.extra_continuous_inputs_columns = extra_continuous_inputs_columns
 
         emb_total_dim = con_total_dim = 0
         if embeddings_dict:
             emb_total_dim = embeddings.attach_embeddings(self, embeddings_dict)
-        if extra_continuous_inputs:
-            con_total_dim = len(self.extra_continuous_inputs)
+        if extra_continuous_inputs_columns:
+            con_total_dim = len(self.extra_continuous_inputs_columns)
 
         self.conv = nn.Sequential(*make_conv_layers(self.resblocks, cl_args))
 
