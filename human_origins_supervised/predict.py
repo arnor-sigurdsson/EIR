@@ -1,16 +1,15 @@
 import argparse
 import json
+from argparse import Namespace
 from copy import deepcopy
 from pathlib import Path
 from typing import Union
-from argparse import Namespace
-import joblib
 
+import joblib
 import numpy as np
 import pandas as pd
 import torch
 import torch.nn.functional as F
-from sklearn.preprocessing import LabelEncoder
 from torch.utils.data import DataLoader
 
 import human_origins_supervised.visualization.visualization_funcs as vf
@@ -30,11 +29,18 @@ def load_cl_args_config(cl_args_config_path: Path) -> Namespace:
     return Namespace(**loaded_cl_args)
 
 
-def load_model(model_path: Path, n_classes):
-    model_cl_args_path = model_path.parents[1] / "cl_args.json"
-    cl_args = load_cl_args_config(model_cl_args_path)
+def load_model(model_path: Path, n_classes: int, train_cl_args: Namespace):
 
-    model = Model(cl_args, n_classes)
+    embeddings_dict = None
+    if train_cl_args.embed_columns:
+        model_embeddings_path = (
+            model_path.parents[1] / "extra_inputs" / "embeddings.save"
+        )
+        embeddings_dict = joblib.load(model_embeddings_path)
+
+    model = Model(
+        train_cl_args, n_classes, embeddings_dict, train_cl_args.contn_columns
+    )
     model.load_state_dict(torch.load(model_path))
     model.eval()
 
@@ -42,10 +48,12 @@ def load_model(model_path: Path, n_classes):
 
 
 def modify_train_cl_args_for_testing(train_cl_args: Namespace, test_cl_args: Namespace):
-    # TODO:
-    #  Make this clearer, maybe something like test_cl_args, which is mixed
-    #  from train/test, and predict_cl_args, which refers to CL args given to this
-    #  script.
+    """
+    TODO:
+        Make this clearer, maybe something like test_cl_args, which is mixed
+        from train/test, and predict_cl_args, which refers to CL args given to this
+        script.
+    """
     train_cl_args_mod = deepcopy(train_cl_args)
     train_cl_args_mod.data_folder = test_cl_args.data_folder
 
@@ -57,8 +65,6 @@ def load_labels_for_testing(test_train_cl_args_mix: Namespace) -> al_label_dict:
     df_labels_test = label_setup.label_df_parse_wrapper(test_train_cl_args_mix)
 
     continuous_columns = test_train_cl_args_mix.contn_columns[:]
-    # if test_train_cl_args_mix.model_task == "reg":
-    # continuous_columns.append(test_train_cl_args_mix.target_column)
 
     for continuous_column in continuous_columns:
         scaler_path = label_setup.get_transformer_path(
@@ -106,26 +112,30 @@ def set_up_test_dataset(
 
 def predict(test_cl_args):
     outfolder = Path(test_cl_args.output_folder)
+
+    # Set up CL arguments
     train_cl_args = load_cl_args_config(
         Path(test_cl_args.model_path).parents[1] / "cl_args.json"
     )
     test_train_mixed_cl_args = modify_train_cl_args_for_testing(
         train_cl_args, test_cl_args
     )
+
+    # Set up data loading
     test_labels_dict = load_labels_for_testing(test_train_mixed_cl_args)
     test_dataset = set_up_test_dataset(test_train_mixed_cl_args, test_labels_dict)
-
     test_dloader = DataLoader(
         test_dataset, batch_size=test_cl_args.batch_size, shuffle=False
     )
 
-    classes = np.load(test_cl_args.classes_path)
-    target_transformer = LabelEncoder()
-    target_transformer.classes_ = classes
-
-    model = load_model(Path(test_cl_args.model_path), len(classes))
+    # Set up model
+    model = load_model(
+        Path(test_cl_args.model_path), test_dataset.num_classes, train_cl_args
+    )
     model = model.to(test_cl_args.device)
+    assert not model.training
 
+    # Get predictions
     preds, labels, ids = gather_pred_outputs_from_dloader(
         test_dloader,
         test_train_mixed_cl_args,
@@ -138,7 +148,9 @@ def predict(test_cl_args):
     preds_sm = F.softmax(preds, dim=1)
     preds = preds_sm.cpu().numpy()
 
+    # Evaluate / analyse predictions
     test_ids = [i.sample_id for i in test_dataset.samples]
+    classes = test_dataset.target_transformer.classes_
     df_preds = pd.DataFrame(data=preds, index=test_ids, columns=classes)
     df_preds.index.name = "ID"
 
@@ -150,7 +162,7 @@ def predict(test_cl_args):
             preds,
             ids,
             outfolder,
-            target_transformer,
+            test_dataset.target_transformer,
             test_train_mixed_cl_args.model_task,
         )
 
@@ -168,7 +180,7 @@ if __name__ == "__main__":
         "--batch_size", type=int, default=64, help="size of the batches"
     )
 
-    parser.add_argument("--evaluate", dest="benchmark", action="store_true")
+    parser.add_argument("--evaluate", dest="evaluate", action="store_true")
     parser.set_defaults(evaluate=False)
 
     parser.add_argument(
