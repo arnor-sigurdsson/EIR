@@ -1,11 +1,14 @@
+import joblib
+from pathlib import Path
 from argparse import Namespace
 from collections import OrderedDict
-from typing import List, Dict, Set, Union
+from typing import List, Dict, Set, Union, overload
 
 import torch
 from torch import nn
 from human_origins_supervised.data_load.label_setup import al_label_dict
 from human_origins_supervised.train_utils.utils import get_extra_labels_from_ids
+from aislib.misc_utils import ensure_path_exists
 
 # Aliases
 al_unique_embed_vals = Dict[str, Set[str]]
@@ -49,6 +52,34 @@ def get_embedding_dict(
     emb_lookup_dict = set_up_embedding_lookups(unique_embs)
 
     return emb_lookup_dict
+
+
+@overload
+def set_up_and_save_embeddings_dict(
+    embedding_columns: None, labels_dict: al_label_dict, run_folder: Path
+) -> None:
+    ...
+
+
+@overload
+def set_up_and_save_embeddings_dict(
+    embedding_columns: List[str], labels_dict: al_label_dict, run_folder: Path
+) -> al_emb_lookup_dict:
+    ...
+
+
+def set_up_and_save_embeddings_dict(embedding_columns, labels_dict, run_folder):
+    """
+    We need to save it for test time models to be able to load.
+    """
+    if embedding_columns:
+        embedding_dict = get_embedding_dict(labels_dict, embedding_columns)
+        outpath = run_folder / "extra_inputs" / "embeddings.save"
+        ensure_path_exists(outpath)
+        joblib.dump(embedding_dict, outpath)
+        return embedding_dict
+
+    return None
 
 
 def calc_embedding_dimension(n_categories: int) -> int:

@@ -20,7 +20,7 @@ from human_origins_supervised.data_load.data_loading_funcs import (
 )
 from human_origins_supervised.models import model_utils
 from human_origins_supervised.models.embeddings import (
-    get_embedding_dict,
+    set_up_and_save_embeddings_dict,
     get_extra_inputs,
 )
 from human_origins_supervised.models.models import Model
@@ -137,10 +137,8 @@ def main(cl_args: argparse.Namespace) -> None:
         pin_memory=False,
     )
 
-    embedding_dict = (
-        get_embedding_dict(train_dataset.labels_dict, cl_args.embed_columns)
-        if cl_args.embed_columns
-        else None
+    embedding_dict = set_up_and_save_embeddings_dict(
+        cl_args.embed_columns, train_dataset.labels_dict, run_folder
     )
     model = Model(
         cl_args, train_dataset.num_classes, embedding_dict, cl_args.contn_columns
