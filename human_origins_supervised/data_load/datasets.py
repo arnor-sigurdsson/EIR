@@ -6,7 +6,7 @@ from typing import List, Dict, Union, Tuple, Callable
 import joblib
 import numpy as np
 import torch
-from aislib.misc_utils import get_logger
+from aislib.misc_utils import get_logger, ensure_path_exists
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from torch.nn.functional import pad
 from torch.utils.data import Dataset
@@ -40,6 +40,18 @@ def construct_dataset_init_params_from_cl_args(cl_args):
     return dataset_class_common_args
 
 
+def save_target_transformer(
+    run_name: str,
+    target_column: str,
+    target_transformer: Union[StandardScaler, LabelEncoder],
+) -> None:
+    target_transformer_outpath = get_transformer_path(
+        run_name, target_column, "target_transformer"
+    )
+    ensure_path_exists(target_transformer_outpath)
+    joblib.dump(target_transformer, target_transformer_outpath)
+
+
 def set_up_datasets(cl_args: Namespace) -> Tuple[al_datasets, al_datasets]:
     """
     This function is only ever called if we have labels.
@@ -59,10 +71,9 @@ def set_up_datasets(cl_args: Namespace) -> Tuple[al_datasets, al_datasets]:
         target_transformer=train_dataset.target_transformer,
     )
 
-    target_transformer_outpath = get_transformer_path(
-        cl_args.run_name, cl_args.target_column, "target_transformer"
+    save_target_transformer(
+        cl_args.run_name, cl_args.target_column, train_dataset.target_transformer
     )
-    joblib.dump(train_dataset.target_transformer, target_transformer_outpath)
 
     assert len(train_dataset) > len(valid_dataset)
     assert set(valid_dataset.labels_dict.keys()).isdisjoint(
@@ -114,20 +125,21 @@ class ArrayDatasetBase(Dataset):
         self, sample_label_dict: Dict[str, Union[str, float]]
     ) -> Union[List[None], np.ndarray, float]:
         """
-        TODO:   Add label column here, if we are using multiple columns from the
-                label file later.
+        TODO:   Check if there is a significant performance hit doing the transform on
+                the fly here versus doing one pass and loading.
         """
 
         if not sample_label_dict:
             return []
 
         label_value = sample_label_dict[self.target_column]
-        if self.model_task == "reg":
-            return float(label_value)
-        elif self.model_task == "cls":
-            return self.target_transformer.transform([label_value]).squeeze()
+        tt_t = self.target_transformer.transform
 
-        raise ValueError
+        # StandardScaler() takes [[arr]] whereas LabelEncoder() takes [arr]
+        label_value = [label_value] if self.model_task == "reg" else label_value
+        label_value_trns = tt_t([label_value]).squeeze()
+
+        return label_value_trns
 
     def get_samples(self, array_hook: Callable = lambda x: x):
         files = {i.stem: i for i in Path(self.data_folder).iterdir()}
@@ -170,7 +182,7 @@ class ArrayDatasetBase(Dataset):
 
         if not self.target_transformer:
             target_transformer = get_target_transformer(self.model_task)
-            target_transformer.fit(all_sample_target_labels)
+            target_transformer.fit(all_sample_target_labels.reshape(-1, 1))
             self.target_transformer = target_transformer
 
 

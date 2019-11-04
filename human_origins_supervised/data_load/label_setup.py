@@ -229,8 +229,6 @@ def process_train_and_label_dfs(
 
     # we make sure not to mess with the passed in CL arg, hence copy
     continuous_columns = cl_args.contn_columns[:]
-    # if cl_args.model_task == "reg":
-    #    continuous_columns.append(cl_args.target_column)
 
     for continuous_column in continuous_columns:
         df_labels_train, scaler_path = scale_non_target_continuous_columns(
