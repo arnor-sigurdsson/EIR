@@ -55,8 +55,8 @@ def test_set_up_datasets(create_test_cl_args, create_test_data):
 @pytest.mark.parametrize(
     "create_test_data",
     [
-        {"class_type": "binary", "data_type": "packbits"},
-        {"class_type": "multi", "data_type": "packbits"},
+        {"class_type": "binary", "data_type": "uint8"},
+        {"class_type": "multi", "data_type": "uint8"},
     ],
     indirect=True,
 )
@@ -88,6 +88,8 @@ def test_datasets(
 
         assert m.dump.call_count == 1
 
+    # TODO: Refactor the below into a function since we're also using it in
+    #       test_set_up_test_dataset
     for dataset, exp_no_sample in zip(
         (train_dataset, valid_dataset), (train_no_samples, valid_no_sample)
     ):

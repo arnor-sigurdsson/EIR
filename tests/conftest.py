@@ -1,8 +1,14 @@
+from pathlib import Path
+from shutil import rmtree
 from types import SimpleNamespace
 
 import numpy as np
+from aislib.misc_utils import ensure_path_exists
 from torch import cuda
 import pytest
+
+from human_origins_supervised.data_load import datasets
+from human_origins_supervised.models.models import Model
 
 np.random.seed(0)
 
@@ -65,7 +71,7 @@ def args_config():
 
 
 @pytest.fixture()
-def create_test_cl_args(args_config, create_test_data):
+def create_test_cl_args(request, args_config, create_test_data):
     test_path, test_data_params = create_test_data
 
     model_task = "reg" if test_data_params["class_type"] == "regression" else "cls"
@@ -88,6 +94,14 @@ def create_test_cl_args(args_config, create_test_data):
         + "_"
         + test_data_params["data_type"]
     )
+
+    # If tests need to have their own config different from the base defined above,
+    # only supporting custom_cl_args hardcoded for now
+    if hasattr(request, "param"):
+        assert "custom_cl_args" in request.param.keys()
+        custom_cl_args = request.param["custom_cl_args"]
+        for k, v in custom_cl_args.items():
+            setattr(args_config, k, v)
 
     return args_config
 
@@ -138,7 +152,8 @@ def create_test_data(request, tmp_path):
     array_folder = tmp_path / "test_arrays"
     array_folder.mkdir()
     label_file = open(tmp_path / "labels.csv", "w")
-    label_file.write("ID,Origin\n")
+    # extra col for testing extra inputs
+    label_file.write("ID,Origin,OriginExtraCol\n")
 
     for cls, snp_row_idx in target_classes.items():
         for sample_idx in range(n_per_class):
@@ -162,10 +177,10 @@ def create_test_data(request, tmp_path):
             np.save(outpath, arr_to_save)
 
             if test_data_params["class_type"] in ("binary", "multi"):
-                label_file.write(f"{sample_idx}_{cls},{cls}\n")
+                label_file.write(f"{sample_idx}_{cls},{cls},{cls}\n")
             else:
                 value = 100 + (5 * len(snps_this_sample)) + np.random.randn()
-                label_file.write(f"{sample_idx}_{cls},{value}\n")
+                label_file.write(f"{sample_idx}_{cls},{value},{value}\n")
 
     label_file.close()
 
@@ -180,3 +195,42 @@ def create_test_data(request, tmp_path):
             snpfile.write(cur_snp_string + "\n")
 
     return tmp_path, request.param
+
+
+@pytest.fixture()
+def create_test_model(create_test_cl_args, create_test_dataset):
+    cl_args = create_test_cl_args
+    train_dataset, _ = create_test_dataset
+
+    model = Model(
+        cl_args,
+        train_dataset.num_classes,
+        extra_continuous_inputs_columns=cl_args.contn_columns,
+    ).to(device=cl_args.device)
+
+    return model
+
+
+def cleanup(run_path):
+    rmtree(run_path)
+
+
+@pytest.fixture()
+def create_test_dataset(create_test_data, create_test_cl_args):
+    path, test_data_params = create_test_data
+
+    cl_args = create_test_cl_args
+    cl_args.data_folder = str(path / "test_arrays")
+    cl_args.data_type = test_data_params["data_type"]
+
+    run_path = Path(f"runs/{cl_args.run_name}/")
+
+    # TODO: Use better logic here, to do the cleanup. Should not be in this fixture.
+    if run_path.exists():
+        cleanup(run_path)
+
+    ensure_path_exists(run_path, is_folder=True)
+
+    train_dataset, valid_dataset = datasets.set_up_datasets(cl_args)
+
+    return train_dataset, valid_dataset

@@ -1,5 +1,4 @@
 from pathlib import Path
-from shutil import rmtree
 from typing import Union
 
 import numpy as np
@@ -10,35 +9,7 @@ from torch.nn import CrossEntropyLoss, MSELoss
 from torch.utils.data import DataLoader
 
 from human_origins_supervised import train
-from human_origins_supervised.data_load import datasets
-from human_origins_supervised.models.models import Model
-
-from aislib.misc_utils import ensure_path_exists
-
-
-def cleanup(run_path):
-    rmtree(run_path)
-
-
-@pytest.fixture()
-def create_test_dataset(create_test_data, create_test_cl_args):
-    path, test_data_params = create_test_data
-
-    cl_args = create_test_cl_args
-    cl_args.data_folder = str(path / "test_arrays")
-    cl_args.data_type = test_data_params["data_type"]
-
-    run_path = Path(f"runs/{cl_args.run_name}/")
-
-    # TODO: Use better logic here, to do the cleanup. Should not be in this fixture.
-    if run_path.exists():
-        cleanup(run_path)
-
-    ensure_path_exists(run_path, is_folder=True)
-
-    train_dataset, valid_dataset = datasets.set_up_datasets(cl_args)
-
-    return train_dataset, valid_dataset
+from conftest import cleanup
 
 
 @pytest.fixture()
@@ -50,20 +21,6 @@ def create_test_dloaders(create_test_dataset):
     valid_dloader = DataLoader(valid_dataset, batch_size=64, shuffle=False)
 
     return train_dloader, valid_dloader, train_dataset, valid_dataset
-
-
-@pytest.fixture()
-def create_test_model(create_test_cl_args, create_test_dataset):
-    cl_args = create_test_cl_args
-    train_dataset, _ = create_test_dataset
-
-    model = Model(
-        cl_args,
-        train_dataset.num_classes,
-        extra_continuous_inputs=cl_args.contn_columns,
-    ).to(device=cl_args.device)
-
-    return model
 
 
 @pytest.fixture()
