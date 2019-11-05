@@ -1,8 +1,15 @@
+from pathlib import Path
+from shutil import rmtree
 from types import SimpleNamespace
 
 import numpy as np
-from torch import cuda
+from aislib.misc_utils import ensure_path_exists
+from torch import cuda, optim
 import pytest
+from torch.utils.data import DataLoader
+
+from human_origins_supervised.data_load import datasets
+from human_origins_supervised.models.models import Model
 
 np.random.seed(0)
 
@@ -26,11 +33,11 @@ def args_config():
             "b1": 0.9,
             "b2": 0.999,
             "batch_size": 32,
-            "checkpoint_interval": 120,
+            "checkpoint_interval": 100,
             "data_folder": "REPLACE_ME",
             "valid_size": 0.05,
             "label_file": "REPLACE_ME",
-            "label_column": "Origin",
+            "target_column": "Origin",
             "data_type": "packbits",
             "data_width": 1000,
             "resblocks": None,
@@ -65,7 +72,7 @@ def args_config():
 
 
 @pytest.fixture()
-def create_test_cl_args(args_config, create_test_data):
+def create_test_cl_args(request, args_config, create_test_data):
     test_path, test_data_params = create_test_data
 
     model_task = "reg" if test_data_params["class_type"] == "regression" else "cls"
@@ -88,6 +95,14 @@ def create_test_cl_args(args_config, create_test_data):
         + "_"
         + test_data_params["data_type"]
     )
+
+    # If tests need to have their own config different from the base defined above,
+    # only supporting custom_cl_args hardcoded for now
+    if hasattr(request, "param"):
+        assert "custom_cl_args" in request.param.keys()
+        custom_cl_args = request.param["custom_cl_args"]
+        for k, v in custom_cl_args.items():
+            setattr(args_config, k, v)
 
     return args_config
 
@@ -115,6 +130,15 @@ def create_test_array(test_task, base_array, snp_idxs_candidates, snp_row_idx):
     return base_array, snp_idxs
 
 
+def split_test_array_folder(test_folder: Path):
+    test_array_test_set_folder = test_folder / "test_arrays_test_set"
+    test_array_test_set_folder.mkdir()
+
+    test_arrays_test_set = [i for i in (test_folder / "test_arrays").iterdir()][:200]
+    for array_file in test_arrays_test_set:
+        array_file.replace(test_array_test_set_folder / array_file.name)
+
+
 @pytest.fixture()
 def create_test_data(request, tmp_path):
     """
@@ -138,7 +162,8 @@ def create_test_data(request, tmp_path):
     array_folder = tmp_path / "test_arrays"
     array_folder.mkdir()
     label_file = open(tmp_path / "labels.csv", "w")
-    label_file.write("ID,Origin\n")
+    # extra col for testing extra inputs
+    label_file.write("ID,Origin,OriginExtraCol\n")
 
     for cls, snp_row_idx in target_classes.items():
         for sample_idx in range(n_per_class):
@@ -162,10 +187,10 @@ def create_test_data(request, tmp_path):
             np.save(outpath, arr_to_save)
 
             if test_data_params["class_type"] in ("binary", "multi"):
-                label_file.write(f"{sample_idx}_{cls},{cls}\n")
+                label_file.write(f"{sample_idx}_{cls},{cls},{cls}\n")
             else:
                 value = 100 + (5 * len(snps_this_sample)) + np.random.randn()
-                label_file.write(f"{sample_idx}_{cls},{value}\n")
+                label_file.write(f"{sample_idx}_{cls},{value},{value}\n")
 
     label_file.close()
 
@@ -179,4 +204,71 @@ def create_test_data(request, tmp_path):
             cur_snp_string = "\t".join(cur_snp_list)
             snpfile.write(cur_snp_string + "\n")
 
+    if test_data_params.get("split_to_test", False):
+        split_test_array_folder(tmp_path)
+
     return tmp_path, request.param
+
+
+@pytest.fixture()
+def create_test_model(create_test_cl_args, create_test_dataset):
+    cl_args = create_test_cl_args
+    train_dataset, _ = create_test_dataset
+
+    model = Model(
+        cl_args,
+        train_dataset.num_classes,
+        extra_continuous_inputs_columns=cl_args.contn_columns,
+    ).to(device=cl_args.device)
+
+    return model
+
+
+def cleanup(run_path):
+    rmtree(run_path)
+
+
+@pytest.fixture()
+def create_test_dataset(create_test_data, create_test_cl_args):
+    path, test_data_params = create_test_data
+
+    cl_args = create_test_cl_args
+    cl_args.data_folder = str(path / "test_arrays")
+    cl_args.data_type = test_data_params["data_type"]
+
+    run_path = Path(f"runs/{cl_args.run_name}/")
+
+    # TODO: Use better logic here, to do the cleanup. Should not be in this fixture.
+    if run_path.exists():
+        cleanup(run_path)
+
+    ensure_path_exists(run_path, is_folder=True)
+
+    train_dataset, valid_dataset = datasets.set_up_datasets(cl_args)
+
+    return train_dataset, valid_dataset
+
+
+@pytest.fixture()
+def create_test_dloaders(create_test_dataset):
+    train_dataset, valid_dataset = create_test_dataset
+
+    train_dloader = DataLoader(train_dataset, batch_size=64, shuffle=True)
+
+    valid_dloader = DataLoader(valid_dataset, batch_size=64, shuffle=False)
+
+    return train_dloader, valid_dloader, train_dataset, valid_dataset
+
+
+@pytest.fixture()
+def create_test_optimizer(create_test_cl_args, create_test_model):
+    cl_args = create_test_cl_args
+    model = create_test_model
+    optimizer = optim.Adam(
+        model.parameters(),
+        lr=cl_args.lr,
+        betas=(cl_args.b1, cl_args.b2),
+        weight_decay=0.001,
+    )
+
+    return optimizer

@@ -49,7 +49,7 @@ def evaluation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
         engine.state.metrics.update(placeholder_metrics)
         return
 
-    metric_func = select_metric_func(args.model_task, c.label_encoder)
+    metric_func = select_metric_func(args.model_task, c.target_transformer)
 
     c.model.eval()
     gather_preds = model_utils.gather_pred_outputs_from_dloader
@@ -136,10 +136,10 @@ def get_most_wrong_wrapper(
 
 
 def inverse_numerical_labels_hook(
-    df: pd.DataFrame, label_encoder: LabelEncoder
+    df: pd.DataFrame, target_transformer: LabelEncoder
 ) -> pd.DataFrame:
     for column in ["True_Label", "Wrong_Label"]:
-        df[column] = label_encoder.inverse_transform(df[column])
+        df[column] = target_transformer.inverse_transform(df[column])
 
     return df
 
@@ -225,7 +225,7 @@ def save_evaluation_results(
         "val_labels": val_labels,
         "val_ids": val_ids,
         "outfolder": sample_outfolder,
-        "encoder": config.label_encoder,
+        "encoder": config.target_transformer,
     }
 
     vf.gen_eval_graphs(model_task=args.model_task, **common_args)

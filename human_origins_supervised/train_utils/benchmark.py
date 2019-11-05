@@ -196,7 +196,7 @@ def benchmark(engine: Engine, config: "Config", run_folder: Path) -> None:
         return reshaped_activations
 
     classes = (
-        np.arange(len(c.label_encoder.classes_))
+        np.arange(len(c.target_transformer.classes_))
         if c.cl_args.model_task == "cls"
         else None
     )
@@ -219,7 +219,7 @@ def benchmark(engine: Engine, config: "Config", run_folder: Path) -> None:
         lin_val_preds,
         val_ids,
         benchmark_folder,
-        c.label_encoder,
+        c.target_transformer,
         config.cl_args.model_task,
     )
 

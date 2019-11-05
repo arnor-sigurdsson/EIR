@@ -52,15 +52,15 @@ def test_get_most_wrong_preds():
 
 
 def test_inverse_numerical_labels_hook():
-    test_label_encoder = LabelEncoder()
-    test_label_encoder.fit(["Asia", "Europe"])
+    test_target_transformer = LabelEncoder()
+    test_target_transformer.fit(["Asia", "Europe"])
 
     test_df = pd.DataFrame(
         columns=["True_Label", "Wrong_Label"], data=[[0, 1], [0, 1], [1, 0], [1, 0]]
     )
 
     test_df_encoded = evaluation.inverse_numerical_labels_hook(
-        test_df, test_label_encoder
+        test_df, test_target_transformer
     )
 
     assert list(test_df_encoded["True_Label"]) == ["Asia"] * 2 + ["Europe"] * 2

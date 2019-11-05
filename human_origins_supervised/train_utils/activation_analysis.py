@@ -50,7 +50,7 @@ def suppress_stdout() -> None:
 
 
 def get_target_classes(
-    cl_args: Namespace, label_encoder: Union[StandardScaler, LabelEncoder]
+    cl_args: Namespace, target_transformer: Union[StandardScaler, LabelEncoder]
 ) -> List[str]:
 
     if cl_args.model_task == "reg":
@@ -59,22 +59,22 @@ def get_target_classes(
     if cl_args.act_classes:
         target_classes = cl_args.act_classes
     else:
-        target_classes = label_encoder.classes_
+        target_classes = target_transformer.classes_
 
     return target_classes
 
 
 def get_act_condition(
     sample_label: torch.Tensor,
-    label_encoder: Union[StandardScaler, LabelEncoder],
+    target_transformer: Union[StandardScaler, LabelEncoder],
     target_classes: List[str],
     model_task: str,
 ):
     if model_task == "reg":
         return "Regression"
 
-    le_it = label_encoder.inverse_transform
-    cur_trn_label = le_it([sample_label.item()])[0]
+    tt_it = target_transformer.inverse_transform
+    cur_trn_label = tt_it([sample_label.item()])[0]
     if cur_trn_label in target_classes:
         return cur_trn_label
 
@@ -90,7 +90,7 @@ def accumulate_activations(
     c = config
     args = c.cl_args
 
-    target_classes = get_target_classes(c.cl_args, c.label_encoder)
+    target_classes = get_target_classes(c.cl_args, c.target_transformer)
 
     valid_sampling_dloader = DataLoader(valid_dataset, batch_size=1, shuffle=False)
 
@@ -101,7 +101,7 @@ def accumulate_activations(
         # we want to keep the original sample for masking
         single_sample_org = deepcopy(single_sample).cpu().numpy().squeeze()
         cur_trn_label = get_act_condition(
-            sample_label, c.label_encoder, target_classes, c.cl_args.model_task
+            sample_label, c.target_transformer, target_classes, c.cl_args.model_task
         )
 
         if cur_trn_label:

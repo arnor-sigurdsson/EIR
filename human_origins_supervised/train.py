@@ -20,7 +20,7 @@ from human_origins_supervised.data_load.data_loading_funcs import (
 )
 from human_origins_supervised.models import model_utils
 from human_origins_supervised.models.embeddings import (
-    get_embedding_dict,
+    set_up_and_save_embeddings_dict,
     get_extra_inputs,
 )
 from human_origins_supervised.models.models import Model
@@ -50,7 +50,7 @@ class Config:
     optimizer: Optimizer
     criterion: nn.CrossEntropyLoss
     labels_dict: Dict
-    label_encoder: Union[LabelEncoder, StandardScaler]
+    target_transformer: Union[LabelEncoder, StandardScaler]
     data_width: int
 
 
@@ -58,7 +58,7 @@ def train_ignite(config: Config) -> None:
     c = config
     args = config.cl_args
 
-    metric_func = select_metric_func(args.model_task, c.label_encoder)
+    metric_func = select_metric_func(args.model_task, c.target_transformer)
 
     def step(
         engine: Engine,
@@ -137,14 +137,13 @@ def main(cl_args: argparse.Namespace) -> None:
         pin_memory=False,
     )
 
-    embedding_dict = (
-        get_embedding_dict(train_dataset.labels_dict, cl_args.embed_columns)
-        if cl_args.embed_columns
-        else None
+    embedding_dict = set_up_and_save_embeddings_dict(
+        cl_args.embed_columns, train_dataset.labels_dict, run_folder
     )
-    model = Model(
+    model: torch.nn.Module = Model(
         cl_args, train_dataset.num_classes, embedding_dict, cl_args.contn_columns
-    ).to(cl_args.device)
+    )
+    model = model.to(device=cl_args.device)
     assert model.data_size_after_conv >= 8
 
     if cl_args.debug:
@@ -169,7 +168,7 @@ def main(cl_args: argparse.Namespace) -> None:
         optimizer,
         criterion,
         train_dataset.labels_dict,
-        train_dataset.label_encoder,
+        train_dataset.target_transformer,
         train_dataset.data_width,
     )
 
@@ -312,10 +311,11 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--label_column",
+        "--target_column",
         type=str,
         required=True,
-        help="What column in label file to model on.",
+        help="What column in label file to treat as target variable"
+        "(i.e. to predict on).",
     )
 
     parser.add_argument(
@@ -401,7 +401,7 @@ if __name__ == "__main__":
     if cur_cl_args.valid_size > 1.0:
         cur_cl_args.valid_size = int(cur_cl_args.valid_size)
 
-    cur_cl_args.device = (
+    cur_cl_args.device = torch.device(
         "cuda:" + cur_cl_args.gpu_num if torch.cuda.is_available() else "cpu"
     )
 

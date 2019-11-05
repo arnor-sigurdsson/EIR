@@ -1,10 +1,38 @@
+from unittest.mock import patch
 import csv
 from pathlib import Path
+from argparse import Namespace
+from typing import List
 
 import numpy as np
 import pytest
 
 from human_origins_supervised.data_load import datasets
+from human_origins_supervised.data_load.datasets import al_datasets
+
+
+def check_dataset(
+    dataset: al_datasets,
+    exp_no_sample: int,
+    classes_tested: List[str],
+    cl_args: Namespace,
+) -> None:
+
+    assert len(dataset) == exp_no_sample
+    assert set(i.labels[cl_args.target_column] for i in dataset.samples) == set(
+        classes_tested
+    )
+    assert set(dataset.labels_unique) == set(classes_tested)
+
+    tt_it = dataset.target_transformer.inverse_transform
+    assert (tt_it(range(len(classes_tested))) == classes_tested).all()
+
+    test_sample, test_label, test_id = dataset[0]
+
+    tt_t = dataset.target_transformer.transform
+    test_label_string = dataset.samples[0].labels[cl_args.target_column]
+    assert test_label == tt_t([test_label_string])
+    assert test_id == dataset.samples[0].sample_id
 
 
 @pytest.mark.parametrize(
@@ -33,9 +61,15 @@ def test_set_up_datasets(create_test_cl_args, create_test_data):
         for i in range(10):
             bad_label_writer.writerow([f"SampleIgnoreLabel_{i}", "BadLabel"])
 
-    train_dataset, valid_dataset = datasets.set_up_datasets(cl_args)
+    # patch since we don't create run folders while testing
+    with patch(
+        "human_origins_supervised.data_load.datasets.joblib", autospec=True
+    ) as m:
+        train_dataset, valid_dataset = datasets.set_up_datasets(cl_args)
 
-    assert len(train_dataset) + len(valid_dataset) == 1000 * n_classes
+        assert m.dump.call_count == 1
+
+    assert len(train_dataset) + len(valid_dataset) == 2000 * n_classes
 
     valid_ids = [i.sample_id for i in valid_dataset.samples]
     train_ids = [i.sample_id for i in train_dataset.samples]
@@ -48,8 +82,8 @@ def test_set_up_datasets(create_test_cl_args, create_test_data):
 @pytest.mark.parametrize(
     "create_test_data",
     [
-        {"class_type": "binary", "data_type": "packbits"},
-        {"class_type": "multi", "data_type": "packbits"},
+        {"class_type": "binary", "data_type": "uint8"},
+        {"class_type": "multi", "data_type": "uint8"},
     ],
     indirect=True,
 )
@@ -70,31 +104,28 @@ def test_datasets(
         classes_tested += ["Africa"]
     classes_tested.sort()
 
-    train_no_samples = int(len(classes_tested) * 1000 * 0.9)
-    valid_no_sample = int(len(classes_tested) * 1000 * 0.1)
+    train_no_samples = int(len(classes_tested) * 2000 * (1 - cl_args.valid_size))
+    valid_no_sample = int(len(classes_tested) * 2000 * cl_args.valid_size)
 
-    train_dataset, valid_dataset = datasets.set_up_datasets(cl_args)
+    # patch since we don't create run folders while testing
+    with patch(
+        "human_origins_supervised.data_load.datasets.joblib", autospec=True
+    ) as m:
+        train_dataset, valid_dataset = datasets.set_up_datasets(cl_args)
+
+        assert m.dump.call_count == 1
 
     for dataset, exp_no_sample in zip(
         (train_dataset, valid_dataset), (train_no_samples, valid_no_sample)
     ):
-        assert len(dataset) == exp_no_sample
-        assert set(i.label[cl_args.label_column] for i in dataset.samples) == set(
-            classes_tested
-        )
-        assert set(dataset.labels_unique) == set(classes_tested)
-
-        le_it = dataset.label_encoder.inverse_transform
-        assert (le_it(range(len(classes_tested))) == classes_tested).all()
-
-        test_sample, test_label, test_id = dataset[0]
-
-        le_t = dataset.label_encoder.transform
-        test_label_string = dataset.samples[0].label[cl_args.label_column]
-        assert test_label == le_t([test_label_string])
-        assert test_id == dataset.samples[0].sample_id
+        check_dataset(dataset, exp_no_sample, classes_tested, cl_args)
 
     cl_args.target_width = 1200
-    train_dataset, valid_dataset = datasets.set_up_datasets(cl_args)
+    with patch(
+        "human_origins_supervised.data_load.datasets.joblib", autospec=True
+    ) as m:
+        train_dataset, valid_dataset = datasets.set_up_datasets(cl_args)
+
+        assert m.dump.call_count == 1
     test_sample_pad, test_label_pad, test_id_pad = train_dataset[0]
     assert test_sample_pad.shape[-1] == 1200

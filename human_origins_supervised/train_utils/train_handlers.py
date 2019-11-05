@@ -5,7 +5,6 @@ from functools import partial
 from pathlib import Path
 from typing import List, TYPE_CHECKING
 
-import numpy as np
 from aislib.misc_utils import get_logger
 from ignite.contrib.handlers import ProgressBar
 from ignite.engine import Events, Engine
@@ -172,18 +171,12 @@ def _attach_event_handlers(trainer: Engine, handler_config: HandlerConfig):
         save_as_state_dict=True,
     )
 
-    if args.model_task == "cls":
-        np.save(
-            Path(handler_config.run_folder, "saved_models", "classes.npy"),
-            handler_config.config.label_encoder.classes_,
-        )
-
-    with open(handler_config.run_folder + "/run_config.json", "w") as config_file:
+    with open(handler_config.run_folder + "/cl_args.json", "w") as config_file:
         config_dict = vars(args)
         json.dump(config_dict, config_file, sort_keys=True, indent=4)
 
     trainer.add_event_handler(
-        Events.EPOCH_COMPLETED,
+        Events.ITERATION_COMPLETED,
         checkpoint_handler,
         to_save={"model": handler_config.config.model},
     )

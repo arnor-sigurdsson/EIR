@@ -1,83 +1,13 @@
 from pathlib import Path
-from shutil import rmtree
 from typing import Union
 
 import numpy as np
 import pandas as pd
 import pytest
-from torch import optim
 from torch.nn import CrossEntropyLoss, MSELoss
-from torch.utils.data import DataLoader
 
 from human_origins_supervised import train
-from human_origins_supervised.data_load import datasets
-from human_origins_supervised.models.models import Model
-
-from aislib.misc_utils import ensure_path_exists
-
-
-def cleanup(run_path):
-    rmtree(run_path)
-
-
-@pytest.fixture()
-def create_test_dataset(create_test_data, create_test_cl_args):
-    path, test_data_params = create_test_data
-
-    cl_args = create_test_cl_args
-    cl_args.data_folder = str(path / "test_arrays")
-    cl_args.data_type = test_data_params["data_type"]
-
-    run_path = Path(f"runs/{cl_args.run_name}/")
-
-    # TODO: Use better logic here, to do the cleanup. Should not be in this fixture.
-    if run_path.exists():
-        cleanup(run_path)
-
-    ensure_path_exists(run_path, is_folder=True)
-
-    train_dataset, valid_dataset = datasets.set_up_datasets(cl_args)
-
-    return train_dataset, valid_dataset
-
-
-@pytest.fixture()
-def create_test_dloaders(create_test_dataset):
-    train_dataset, valid_dataset = create_test_dataset
-
-    train_dloader = DataLoader(train_dataset, batch_size=64, shuffle=True)
-
-    valid_dloader = DataLoader(valid_dataset, batch_size=64, shuffle=False)
-
-    return train_dloader, valid_dloader, train_dataset, valid_dataset
-
-
-@pytest.fixture()
-def create_test_model(create_test_cl_args, create_test_dataset):
-    cl_args = create_test_cl_args
-    train_dataset, _ = create_test_dataset
-
-    model = Model(
-        cl_args,
-        train_dataset.num_classes,
-        extra_continuous_inputs=cl_args.contn_columns,
-    ).to(device=cl_args.device)
-
-    return model
-
-
-@pytest.fixture()
-def create_test_optimizer(create_test_cl_args, create_test_model):
-    cl_args = create_test_cl_args
-    model = create_test_model
-    optimizer = optim.Adam(
-        model.parameters(),
-        lr=cl_args.lr,
-        betas=(cl_args.b1, cl_args.b2),
-        weight_decay=0.001,
-    )
-
-    return optimizer
+from conftest import cleanup
 
 
 def check_snp_types(cls_name, top_grads_msk, expected_idxs, at_least_n):
@@ -177,7 +107,7 @@ def test_classification_snp_identification(
     criterion = CrossEntropyLoss()
 
     train_dataset, valid_dataset = create_test_dataset
-    label_encoder = train_dataset.label_encoder
+    target_transformer = train_dataset.target_transformer
 
     run_path = Path(f"runs/{cl_args.run_name}/")
 
@@ -190,7 +120,7 @@ def test_classification_snp_identification(
         optimizer,
         criterion,
         train_dataset.labels_dict,
-        label_encoder,
+        target_transformer,
         cl_args.data_width,
     )
 
@@ -234,7 +164,7 @@ def test_regression(
     criterion = CrossEntropyLoss() if cl_args.model_task == "cls" else MSELoss()
 
     train_dataset, valid_dataset = create_test_dataset
-    label_encoder = train_dataset.label_encoder
+    target_transformer = train_dataset.target_transformer
 
     config = train.Config(
         cl_args,
@@ -245,7 +175,7 @@ def test_regression(
         optimizer,
         criterion,
         train_dataset.labels_dict,
-        label_encoder,
+        target_transformer,
         cl_args.data_width,
     )
 

@@ -12,7 +12,7 @@ def test_make_conv_layers():
 
     """
     conv_layer_list = [1, 1, 1, 1]
-    test_run_config = Namespace(
+    test_cl_args = Namespace(
         kernel_width=5,
         down_stride=4,
         target_width=int(8e5),
@@ -21,7 +21,7 @@ def test_make_conv_layers():
         first_stride_expansion=5,
         channel_exp_base=5,
     )
-    conv_layers = models.make_conv_layers(conv_layer_list, test_run_config)
+    conv_layers = models.make_conv_layers(conv_layer_list, test_cl_args)
 
     # account for first block, add +2 instead if using SA
     assert len(conv_layers) == len(conv_layer_list) + 1
