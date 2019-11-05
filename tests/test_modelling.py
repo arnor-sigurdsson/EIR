@@ -4,37 +4,10 @@ from typing import Union
 import numpy as np
 import pandas as pd
 import pytest
-from torch import optim
 from torch.nn import CrossEntropyLoss, MSELoss
-from torch.utils.data import DataLoader
 
 from human_origins_supervised import train
 from conftest import cleanup
-
-
-@pytest.fixture()
-def create_test_dloaders(create_test_dataset):
-    train_dataset, valid_dataset = create_test_dataset
-
-    train_dloader = DataLoader(train_dataset, batch_size=64, shuffle=True)
-
-    valid_dloader = DataLoader(valid_dataset, batch_size=64, shuffle=False)
-
-    return train_dloader, valid_dloader, train_dataset, valid_dataset
-
-
-@pytest.fixture()
-def create_test_optimizer(create_test_cl_args, create_test_model):
-    cl_args = create_test_cl_args
-    model = create_test_model
-    optimizer = optim.Adam(
-        model.parameters(),
-        lr=cl_args.lr,
-        betas=(cl_args.b1, cl_args.b2),
-        weight_decay=0.001,
-    )
-
-    return optimizer
 
 
 def check_snp_types(cls_name, top_grads_msk, expected_idxs, at_least_n):

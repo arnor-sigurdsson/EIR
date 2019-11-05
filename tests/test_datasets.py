@@ -1,11 +1,38 @@
 from unittest.mock import patch
 import csv
 from pathlib import Path
+from argparse import Namespace
+from typing import List
 
 import numpy as np
 import pytest
 
 from human_origins_supervised.data_load import datasets
+from human_origins_supervised.data_load.datasets import al_datasets
+
+
+def check_dataset(
+    dataset: al_datasets,
+    exp_no_sample: int,
+    classes_tested: List[str],
+    cl_args: Namespace,
+) -> None:
+
+    assert len(dataset) == exp_no_sample
+    assert set(i.labels[cl_args.target_column] for i in dataset.samples) == set(
+        classes_tested
+    )
+    assert set(dataset.labels_unique) == set(classes_tested)
+
+    tt_it = dataset.target_transformer.inverse_transform
+    assert (tt_it(range(len(classes_tested))) == classes_tested).all()
+
+    test_sample, test_label, test_id = dataset[0]
+
+    tt_t = dataset.target_transformer.transform
+    test_label_string = dataset.samples[0].labels[cl_args.target_column]
+    assert test_label == tt_t([test_label_string])
+    assert test_id == dataset.samples[0].sample_id
 
 
 @pytest.mark.parametrize(
@@ -88,26 +115,10 @@ def test_datasets(
 
         assert m.dump.call_count == 1
 
-    # TODO: Refactor the below into a function since we're also using it in
-    #       test_set_up_test_dataset
     for dataset, exp_no_sample in zip(
         (train_dataset, valid_dataset), (train_no_samples, valid_no_sample)
     ):
-        assert len(dataset) == exp_no_sample
-        assert set(i.labels[cl_args.target_column] for i in dataset.samples) == set(
-            classes_tested
-        )
-        assert set(dataset.labels_unique) == set(classes_tested)
-
-        tt_it = dataset.target_transformer.inverse_transform
-        assert (tt_it(range(len(classes_tested))) == classes_tested).all()
-
-        test_sample, test_label, test_id = dataset[0]
-
-        tt_t = dataset.target_transformer.transform
-        test_label_string = dataset.samples[0].labels[cl_args.target_column]
-        assert test_label == tt_t([test_label_string])
-        assert test_id == dataset.samples[0].sample_id
+        check_dataset(dataset, exp_no_sample, classes_tested, cl_args)
 
     cl_args.target_width = 1200
     with patch(

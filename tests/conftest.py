@@ -4,8 +4,9 @@ from types import SimpleNamespace
 
 import numpy as np
 from aislib.misc_utils import ensure_path_exists
-from torch import cuda
+from torch import cuda, optim
 import pytest
+from torch.utils.data import DataLoader
 
 from human_origins_supervised.data_load import datasets
 from human_origins_supervised.models.models import Model
@@ -32,7 +33,7 @@ def args_config():
             "b1": 0.9,
             "b2": 0.999,
             "batch_size": 32,
-            "checkpoint_interval": 120,
+            "checkpoint_interval": 100,
             "data_folder": "REPLACE_ME",
             "valid_size": 0.05,
             "label_file": "REPLACE_ME",
@@ -129,6 +130,15 @@ def create_test_array(test_task, base_array, snp_idxs_candidates, snp_row_idx):
     return base_array, snp_idxs
 
 
+def split_test_array_folder(test_folder: Path):
+    test_array_test_set_folder = test_folder / "test_arrays_test_set"
+    test_array_test_set_folder.mkdir()
+
+    test_arrays_test_set = [i for i in (test_folder / "test_arrays").iterdir()][:200]
+    for array_file in test_arrays_test_set:
+        array_file.replace(test_array_test_set_folder / array_file.name)
+
+
 @pytest.fixture()
 def create_test_data(request, tmp_path):
     """
@@ -194,6 +204,9 @@ def create_test_data(request, tmp_path):
             cur_snp_string = "\t".join(cur_snp_list)
             snpfile.write(cur_snp_string + "\n")
 
+    if test_data_params.get("split_to_test", False):
+        split_test_array_folder(tmp_path)
+
     return tmp_path, request.param
 
 
@@ -234,3 +247,28 @@ def create_test_dataset(create_test_data, create_test_cl_args):
     train_dataset, valid_dataset = datasets.set_up_datasets(cl_args)
 
     return train_dataset, valid_dataset
+
+
+@pytest.fixture()
+def create_test_dloaders(create_test_dataset):
+    train_dataset, valid_dataset = create_test_dataset
+
+    train_dloader = DataLoader(train_dataset, batch_size=64, shuffle=True)
+
+    valid_dloader = DataLoader(valid_dataset, batch_size=64, shuffle=False)
+
+    return train_dloader, valid_dloader, train_dataset, valid_dataset
+
+
+@pytest.fixture()
+def create_test_optimizer(create_test_cl_args, create_test_model):
+    cl_args = create_test_cl_args
+    model = create_test_model
+    optimizer = optim.Adam(
+        model.parameters(),
+        lr=cl_args.lr,
+        betas=(cl_args.b1, cl_args.b2),
+        weight_decay=0.001,
+    )
+
+    return optimizer

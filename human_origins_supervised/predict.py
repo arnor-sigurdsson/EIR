@@ -132,7 +132,7 @@ def predict(test_cl_args):
     model = load_model(
         Path(test_cl_args.model_path), test_dataset.num_classes, train_cl_args
     )
-    model = model.to(test_cl_args.device)
+    model = model.to(device=test_cl_args.device)
     assert not model.training
 
     # Get predictions
@@ -188,22 +188,6 @@ if __name__ == "__main__":
         type=str,
         required=True,
         help="Path to folder with samples to predict on.",
-    )
-
-    parser.add_argument(
-        "--labels_folder",
-        type=str,
-        required=False,
-        help="Path to label file for samples. Used when evaluating on test data and/or "
-        "using extra label inputs..",
-    )
-
-    parser.add_argument(
-        "--classes_path",
-        type=str,
-        required=True,
-        help="Path to a .npy file with class names in same"
-        "order as the numerical encoding in the model.",
     )
 
     parser.add_argument(
