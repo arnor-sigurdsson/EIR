@@ -21,12 +21,14 @@ def test_load_model(args_config, tmp_path):
     """
 
     cl_args = args_config
-    model = Model(cl_args, 1, None, cl_args.contn_columns)
+    model: torch.nn.Module = Model(cl_args, 1, None, cl_args.contn_columns)
 
     model_path = tmp_path / "model.pt"
     torch.save(model.state_dict(), model_path)
 
-    loaded_model = predict.load_model(model_path, model.num_classes, cl_args)
+    loaded_model = predict.load_model(
+        model_path, model.num_classes, cl_args, cl_args.device
+    )
     # make sure we're in eval model
     assert not loaded_model.training
 

@@ -3,7 +3,6 @@ import json
 from argparse import Namespace
 from copy import deepcopy
 from pathlib import Path
-from typing import Union
 
 import joblib
 import numpy as np
@@ -14,6 +13,7 @@ from torch.utils.data import DataLoader
 
 import human_origins_supervised.visualization.visualization_funcs as vf
 from human_origins_supervised.data_load import datasets, label_setup
+from human_origins_supervised.data_load.datasets import al_datasets
 from human_origins_supervised.data_load.label_setup import al_label_dict
 from human_origins_supervised.models.model_utils import gather_pred_outputs_from_dloader
 from human_origins_supervised.models.models import Model
@@ -29,7 +29,9 @@ def load_cl_args_config(cl_args_config_path: Path) -> Namespace:
     return Namespace(**loaded_cl_args)
 
 
-def load_model(model_path: Path, n_classes: int, train_cl_args: Namespace):
+def load_model(
+    model_path: Path, n_classes: int, train_cl_args: Namespace, device: str
+) -> torch.nn.Module:
 
     embeddings_dict = None
     if train_cl_args.embed_columns:
@@ -38,24 +40,28 @@ def load_model(model_path: Path, n_classes: int, train_cl_args: Namespace):
         )
         embeddings_dict = joblib.load(model_embeddings_path)
 
-    model = Model(
+    model: torch.nn.Module = Model(
         train_cl_args, n_classes, embeddings_dict, train_cl_args.contn_columns
     )
     model.load_state_dict(torch.load(model_path))
     model.eval()
+    model = model.to(device=torch.device(device))
 
     return model
 
 
-def modify_train_cl_args_for_testing(train_cl_args: Namespace, test_cl_args: Namespace):
+def modify_train_cl_args_for_testing(
+    train_cl_args: Namespace, predict_cl_args: Namespace
+) -> Namespace:
     """
-    TODO:
-        Make this clearer, maybe something like test_cl_args, which is mixed
-        from train/test, and predict_cl_args, which refers to CL args given to this
-        script.
+    When initalizing the datasets and model classes, we want to make sure we have the
+    same configuration as when training the model, with the exception of which
+    data_folder to get observations from (i.e. here we want the test set folder).
+
+    We use deepcopy to make sure the training configuration stays frozen.
     """
     train_cl_args_mod = deepcopy(train_cl_args)
-    train_cl_args_mod.data_folder = test_cl_args.data_folder
+    train_cl_args_mod.data_folder = predict_cl_args.data_folder
 
     return train_cl_args_mod
 
@@ -89,7 +95,7 @@ def load_labels_for_testing(test_train_cl_args_mix: Namespace) -> al_label_dict:
 
 def set_up_test_dataset(
     test_train_cl_args_mix: Namespace, test_labels_dict: al_label_dict
-) -> Union[datasets.DiskArrayDataset, datasets.MemoryArrayDataset]:
+) -> al_datasets:
     dataset_class_common_args = datasets.construct_dataset_init_params_from_cl_args(
         test_train_cl_args_mix
     )
@@ -110,29 +116,42 @@ def set_up_test_dataset(
     return test_dataset
 
 
-def predict(test_cl_args):
-    outfolder = Path(test_cl_args.output_folder)
+def save_predictions(
+    preds: torch.Tensor, test_dataset: al_datasets, outfolder: Path
+) -> None:
+    test_ids = [i.sample_id for i in test_dataset.samples]
+    classes = test_dataset.target_transformer.classes_
+    df_preds = pd.DataFrame(data=preds, index=test_ids, columns=classes)
+    df_preds.index.name = "ID"
+
+    df_preds.to_csv(outfolder / "predictions.csv")
+
+
+def predict(predict_cl_args: Namespace) -> None:
+    outfolder = Path(predict_cl_args.output_folder)
 
     # Set up CL arguments
     train_cl_args = load_cl_args_config(
-        Path(test_cl_args.model_path).parents[1] / "cl_args.json"
+        Path(predict_cl_args.model_path).parents[1] / "cl_args.json"
     )
     test_train_mixed_cl_args = modify_train_cl_args_for_testing(
-        train_cl_args, test_cl_args
+        train_cl_args, predict_cl_args
     )
 
     # Set up data loading
     test_labels_dict = load_labels_for_testing(test_train_mixed_cl_args)
     test_dataset = set_up_test_dataset(test_train_mixed_cl_args, test_labels_dict)
     test_dloader = DataLoader(
-        test_dataset, batch_size=test_cl_args.batch_size, shuffle=False
+        test_dataset, batch_size=predict_cl_args.batch_size, shuffle=False
     )
 
     # Set up model
     model = load_model(
-        Path(test_cl_args.model_path), test_dataset.num_classes, train_cl_args
+        Path(predict_cl_args.model_path),
+        test_dataset.num_classes,
+        train_cl_args,
+        predict_cl_args.device,
     )
-    model = model.to(device=test_cl_args.device)
     assert not model.training
 
     # Get predictions
@@ -142,24 +161,17 @@ def predict(test_cl_args):
         model,
         device=test_train_mixed_cl_args.device,
         labels_dict=test_dataset.labels_dict,
-        with_labels=test_cl_args.evaluate,
+        with_labels=predict_cl_args.evaluate,
     )
-
-    preds_sm = F.softmax(preds, dim=1)
-    preds = preds_sm.cpu().numpy()
+    preds_sm = F.softmax(preds, dim=1).cpu().numpy()
 
     # Evaluate / analyse predictions
-    test_ids = [i.sample_id for i in test_dataset.samples]
-    classes = test_dataset.target_transformer.classes_
-    df_preds = pd.DataFrame(data=preds, index=test_ids, columns=classes)
-    df_preds.index.name = "ID"
+    save_predictions(preds_sm, test_dataset, outfolder)
 
-    df_preds.to_csv(outfolder / "predictions.csv")
-
-    if test_cl_args.evaluate:
+    if predict_cl_args.evaluate:
         vf.gen_eval_graphs(
             labels.cpu().numpy(),
-            preds,
+            preds_sm,
             ids,
             outfolder,
             test_dataset.target_transformer,

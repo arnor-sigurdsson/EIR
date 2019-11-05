@@ -140,9 +140,10 @@ def main(cl_args: argparse.Namespace) -> None:
     embedding_dict = set_up_and_save_embeddings_dict(
         cl_args.embed_columns, train_dataset.labels_dict, run_folder
     )
-    model = Model(
+    model: torch.nn.Module = Model(
         cl_args, train_dataset.num_classes, embedding_dict, cl_args.contn_columns
-    ).to(cl_args.device)
+    )
+    model = model.to(device=cl_args.device)
     assert model.data_size_after_conv >= 8
 
     if cl_args.debug:
@@ -400,7 +401,7 @@ if __name__ == "__main__":
     if cur_cl_args.valid_size > 1.0:
         cur_cl_args.valid_size = int(cur_cl_args.valid_size)
 
-    cur_cl_args.device = (
+    cur_cl_args.device = torch.device(
         "cuda:" + cur_cl_args.gpu_num if torch.cuda.is_available() else "cpu"
     )
 
