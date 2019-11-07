@@ -45,7 +45,7 @@ def load_model(
     )
     model.load_state_dict(torch.load(model_path))
     model.eval()
-    model = model.to(device=torch.device(device))
+    model = model.to(device=device)
 
     return model
 

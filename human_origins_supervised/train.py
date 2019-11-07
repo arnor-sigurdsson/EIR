@@ -401,7 +401,7 @@ if __name__ == "__main__":
     if cur_cl_args.valid_size > 1.0:
         cur_cl_args.valid_size = int(cur_cl_args.valid_size)
 
-    cur_cl_args.device = torch.device(
+    cur_cl_args.device = (
         "cuda:" + cur_cl_args.gpu_num if torch.cuda.is_available() else "cpu"
     )
 
