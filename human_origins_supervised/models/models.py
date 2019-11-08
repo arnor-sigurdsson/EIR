@@ -1,7 +1,7 @@
 from argparse import Namespace
 from typing import List, Union
 
-import aislib.pytorch as torch_utils
+from aislib import pytorch_utils
 import torch
 from aislib.misc_utils import get_logger
 from torch import nn
@@ -173,7 +173,9 @@ def set_up_conv_params(current_width: int, kernel_size: int, stride: int):
     if current_width % 2 != 0:
         kernel_size -= 1
 
-    padding = torch_utils.calc_conv_padding_needed(current_width, kernel_size, stride)
+    padding = pytorch_utils.calc_conv_padding_needed(
+        current_width, kernel_size, stride, 1
+    )
 
     return kernel_size, padding
 
@@ -218,7 +220,7 @@ def make_conv_layers(residual_blocks: List[int], cl_args: Namespace) -> List[nn.
     for layer_arch_idx, layer_arch_layers in enumerate(residual_blocks):
         for layer in range(layer_arch_layers):
             cur_conv = nn.Sequential(*base_layers)
-            cur_width = torch_utils.calc_size_after_conv_sequence(
+            cur_width = pytorch_utils.calc_size_after_conv_sequence(
                 ca.target_width, cur_conv
             )
 
@@ -268,7 +270,7 @@ class Model(nn.Module):
 
         self.conv = nn.Sequential(*make_conv_layers(self.resblocks, cl_args))
 
-        self.data_size_after_conv = torch_utils.calc_size_after_conv_sequence(
+        self.data_size_after_conv = pytorch_utils.calc_size_after_conv_sequence(
             cl_args.target_width, self.conv
         )
 

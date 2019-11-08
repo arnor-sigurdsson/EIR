@@ -148,7 +148,7 @@ def predict(predict_cl_args: Namespace) -> None:
     # Set up model
     model = load_model(
         Path(predict_cl_args.model_path),
-        test_dataset.num_classes,
+        len(test_dataset.target_transformer.classes_),
         train_cl_args,
         predict_cl_args.device,
     )
@@ -159,7 +159,7 @@ def predict(predict_cl_args: Namespace) -> None:
         test_dloader,
         test_train_mixed_cl_args,
         model,
-        device=test_train_mixed_cl_args.device,
+        device=predict_cl_args.device,
         labels_dict=test_dataset.labels_dict,
         with_labels=predict_cl_args.evaluate,
     )

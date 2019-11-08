@@ -1,6 +1,7 @@
 from pathlib import Path
 from shutil import rmtree
 from types import SimpleNamespace
+from random import shuffle
 
 import numpy as np
 from aislib.misc_utils import ensure_path_exists
@@ -134,7 +135,10 @@ def split_test_array_folder(test_folder: Path):
     test_array_test_set_folder = test_folder / "test_arrays_test_set"
     test_array_test_set_folder.mkdir()
 
-    test_arrays_test_set = [i for i in (test_folder / "test_arrays").iterdir()][:200]
+    all_arrays = [i for i in (test_folder / "test_arrays").iterdir()]
+    shuffle(all_arrays)
+
+    test_arrays_test_set = all_arrays[:200]
     for array_file in test_arrays_test_set:
         array_file.replace(test_array_test_set_folder / array_file.name)
 
