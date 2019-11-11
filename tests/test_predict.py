@@ -21,7 +21,9 @@ def test_load_model(args_config, tmp_path):
     """
 
     cl_args = args_config
-    model: torch.nn.Module = Model(cl_args, 1, None, cl_args.contn_columns)
+    model: torch.nn.Module = Model(cl_args, 1, None, cl_args.contn_columns).to(
+        device=cl_args.device
+    )
 
     model_path = tmp_path / "model.pt"
     torch.save(model.state_dict(), model_path)

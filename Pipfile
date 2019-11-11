@@ -18,6 +18,8 @@ visidata = "*"
 black = "==19.3b0"
 pre-commit = "*"
 gpustat = "*"
+pyinstaller = "*"
+pycrypto = "*"
 
 [packages]
 pandas = "*"
@@ -31,7 +33,7 @@ tqdm = "*"
 sympy = "*"
 scikit-learn = "*"
 human-origins-supervised = {path = ".",editable = true}
-shap = "*"
+shap = "==0.32.0"
 seaborn = "*"
 aislib = {ref = "dev",git = "ssh://git@github.com/arnor-sigurdsson/aislib.git",editable = true}
 joblib = "*"
