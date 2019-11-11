@@ -10,6 +10,9 @@ import distutils
 if distutils.distutils_path.endswith('__init__.py'):
     distutils.distutils_path = os.path.dirname(distutils.distutils_path)
 
+# See: https://stackoverflow.com/questions/57517371/matplotlibdeprecationwarning-with-pyinstaller-exe 
+# for mpl DeprecationWarning showing up after compiling
+
 options = [('W ignore', None, 'OPTION')]
 
 block_cipher = None
@@ -17,7 +20,7 @@ block_cipher = None
 a = Analysis(['../human_origins_supervised/predict.py'],
              binaries=[],
              datas=[],
-             hiddenimports=[],
+             hiddenimports=['sklearn.utils._cython_blas'],
              hookspath=[],
              runtime_hooks=[],
              excludes=[],

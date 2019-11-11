@@ -11,6 +11,8 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
+from aislib.misc_utils import get_logger
+
 import human_origins_supervised.visualization.visualization_funcs as vf
 from human_origins_supervised.data_load import datasets, label_setup
 from human_origins_supervised.data_load.datasets import al_datasets
@@ -20,6 +22,8 @@ from human_origins_supervised.models.models import Model
 
 torch.manual_seed(0)
 np.random.seed(0)
+
+logger = get_logger(__name__)
 
 
 def load_cl_args_config(cl_args_config_path: Path) -> Namespace:
@@ -32,7 +36,6 @@ def load_cl_args_config(cl_args_config_path: Path) -> Namespace:
 def load_model(
     model_path: Path, n_classes: int, train_cl_args: Namespace, device: str
 ) -> torch.nn.Module:
-
     embeddings_dict = None
     if train_cl_args.embed_columns:
         model_embeddings_path = (
@@ -67,7 +70,6 @@ def modify_train_cl_args_for_testing(
 
 
 def load_labels_for_testing(test_train_cl_args_mix: Namespace) -> al_label_dict:
-
     df_labels_test = label_setup.label_df_parse_wrapper(test_train_cl_args_mix)
 
     continuous_columns = test_train_cl_args_mix.contn_columns[:]
@@ -207,11 +209,34 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--gpu_num", type=str, default="0", help="Which GPU to run (according to CUDA)."
+        "--device",
+        type=str,
+        default="cpu",
+        choices=["gpu", "cpu"],
+        help="Which device (CPU or GPU) to run" "the inference on.",
+    )
+
+    parser.add_argument(
+        "--gpu_num",
+        type=str,
+        default="0",
+        help="Which GPU to run (according to CUDA) if running with flat "
+        "'--device gpu'.",
     )
 
     cl_args = parser.parse_args()
 
-    cl_args.device = "cuda:" + cl_args.gpu_num if torch.cuda.is_available() else "cpu"
+    if cl_args.device == "gpu":
+        cl_args.device = (
+            "cuda:" + cl_args.gpu_num if torch.cuda.is_available() else "cpu"
+        )
+        if cl_args.device == "cpu":
+            logger.warning(
+                "Device CL input was 'gpu' with gpu_num '%s', "
+                "but number of available GPUs is %d. Reverting to CPU for "
+                "now.",
+                cl_args.gpu_num,
+                torch.cuda.device_count(),
+            )
 
     predict(cl_args)
