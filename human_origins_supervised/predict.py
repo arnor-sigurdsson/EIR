@@ -207,11 +207,25 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        "--device",
+        type=str,
+        default="cpu",
+        choices=["gpu", "cpu"],
+        help="Which device (CPU or GPU) to run" "the inference on.",
+    )
+
+    parser.add_argument(
         "--gpu_num", type=str, default="0", help="Which GPU to run (according to CUDA)."
     )
 
     cl_args = parser.parse_args()
 
-    cl_args.device = "cuda:" + cl_args.gpu_num if torch.cuda.is_available() else "cpu"
+    if cl_args.device == "gpu":
+        cl_args.device = (
+            "cuda:" + cl_args.gpu_num if torch.cuda.is_available() else "cpu"
+        )
+        if cl_args.device == 'cpu':
+            pass
 
     predict(cl_args)
+
