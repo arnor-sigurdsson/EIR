@@ -1,12 +1,13 @@
 from pathlib import Path
+from random import shuffle
 from shutil import rmtree
 from types import SimpleNamespace
-from random import shuffle
 
 import numpy as np
-from aislib.misc_utils import ensure_path_exists
-from torch import cuda, optim
 import pytest
+from aislib.misc_utils import ensure_path_exists
+from torch import cuda
+from torch.optim.adamw import AdamW
 from torch.utils.data import DataLoader
 
 from human_origins_supervised.data_load import datasets
@@ -54,7 +55,7 @@ def args_config():
             "device": "cuda:0" if cuda.is_available() else "cpu",
             "gpu_num": "0",
             "lr": 1e-3,
-            "wd": 5e-4,
+            "wd": 1e-4,
             "n_cpu": 8,
             "n_epochs": 10,
             "run_name": "test_run",
@@ -278,11 +279,12 @@ def create_test_dloaders(create_test_dataset):
 def create_test_optimizer(create_test_cl_args, create_test_model):
     cl_args = create_test_cl_args
     model = create_test_model
-    optimizer = optim.Adam(
+    optimizer = AdamW(
         model.parameters(),
         lr=cl_args.lr,
         betas=(cl_args.b1, cl_args.b2),
-        weight_decay=0.001,
+        weight_decay=cl_args.wd,
+        amsgrad=True,
     )
 
     return optimizer
