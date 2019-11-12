@@ -17,6 +17,15 @@ np.random.seed(0)
 
 def pytest_addoption(parser):
     parser.addoption("--keep_outputs", action="store_true")
+    parser.addoption(
+        "--num_samples_per_class",
+        type=int,
+        default=2000,
+        help="Number of samples per class.",
+    )
+    parser.addoption(
+        "--num_snps", type=int, default=1000, help="Number of SNPs per sample."
+    )
 
 
 def pytest_generate_tests(metafunc):
@@ -52,8 +61,8 @@ def args_config():
             "sample_interval": 20,
             "target_width": 1000,
             "act_classes": None,
-            "get_acts": True,
-            "benchmark": True,
+            "get_acts": False,
+            "benchmark": False,
             "kernel_width": 12,
             "fc_dim": 128,
             "down_stride": 4,
@@ -159,8 +168,8 @@ def create_test_data(request, tmp_path):
     if test_data_params["class_type"] in ("multi", "regression"):
         target_classes["Africa"] = 0
 
-    n_per_class = 2000
-    n_snps = 1000
+    n_per_class = request.config.getoption("--num_samples_per_class")
+    n_snps = request.config.getoption("--num_snps")
     test_task = "reg" if test_data_params["class_type"] == "regression" else "cls"
 
     array_folder = tmp_path / "test_arrays"

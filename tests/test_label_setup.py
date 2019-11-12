@@ -50,21 +50,23 @@ def test_get_extra_columns(get_test_column_ops):
 @pytest.mark.parametrize(
     "create_test_data",
     [
-        {"class_type": "binary", "data_type": "packbits"},
-        {"class_type": "multi", "data_type": "packbits"},
+        {"class_type": "binary", "data_type": "uint8"},
+        {"class_type": "multi", "data_type": "uint8"},
     ],
     indirect=True,
 )
-def test_load_label_df(create_test_data):
+def test_load_label_df(request, create_test_data):
     path, test_data_params = create_test_data
     label_fpath = path / "labels.csv"
     n_classes = 2 if test_data_params.get("class_type") == "binary" else 3
 
+    n_per_class = request.config.getoption("--num_samples_per_class")
+
     df_label = label_setup.load_label_df(label_fpath, "Origin")
 
-    assert df_label.shape[0] == 2000 * n_classes
+    assert df_label.shape[0] == n_per_class * n_classes
     assert df_label.index.name == "ID"
-    assert [i for i in df_label.Origin.value_counts()] == [2000] * n_classes
+    assert [i for i in df_label.Origin.value_counts()] == [n_per_class] * n_classes
 
     df_label["ExtraCol"] = "ExtraVal"
     label_extra_fpath = path / "labels_extracol.csv"
@@ -84,9 +86,7 @@ def test_load_label_df(create_test_data):
 
 
 @pytest.mark.parametrize(
-    "create_test_data",
-    [{"class_type": "binary", "data_type": "packbits"}],
-    indirect=True,
+    "create_test_data", [{"class_type": "binary", "data_type": "uint8"}], indirect=True
 )
 def test_parse_label_df(create_test_data, get_test_column_ops):
     path, test_data_params = create_test_data
@@ -109,23 +109,25 @@ def test_parse_label_df(create_test_data, get_test_column_ops):
 
 
 @pytest.mark.parametrize(
-    "create_test_data",
-    [{"class_type": "binary", "data_type": "packbits"}],
-    indirect=True,
+    "create_test_data", [{"class_type": "binary", "data_type": "uint8"}], indirect=True
 )
-def test_label_df_parse_wrapper(create_test_data, create_test_cl_args):
+def test_label_df_parse_wrapper(request, create_test_data, create_test_cl_args):
     cl_args = create_test_cl_args
     df_labels = label_setup.label_df_parse_wrapper(cl_args)
 
-    assert df_labels.shape == (4000, 1)
+    n_per_class = request.config.getoption("--num_samples_per_class")
+    # since we're only testing binary case here
+    n_total = n_per_class * 2
+
+    assert df_labels.shape == (n_total, 1)
     assert set(df_labels[cl_args.target_column].unique()) == {"Asia", "Europe"}
 
 
 @pytest.mark.parametrize(
     "create_test_data",
     [
-        {"class_type": "binary", "data_type": "packbits"},
-        {"class_type": "multi", "data_type": "packbits"},
+        {"class_type": "binary", "data_type": "uint8"},
+        {"class_type": "multi", "data_type": "uint8"},
     ],
     indirect=True,
 )
@@ -147,8 +149,8 @@ def test_split_df(create_test_data, create_test_cl_args):
 @pytest.mark.parametrize(
     "create_test_data",
     [
-        {"class_type": "binary", "data_type": "packbits"},
-        {"class_type": "multi", "data_type": "packbits"},
+        {"class_type": "binary", "data_type": "uint8"},
+        {"class_type": "multi", "data_type": "uint8"},
     ],
     indirect=True,
 )
@@ -178,21 +180,23 @@ def test_scale_regression_labels(create_test_data, create_test_cl_args):
 @pytest.mark.parametrize(
     "create_test_data",
     [
-        {"class_type": "binary", "data_type": "packbits"},
-        {"class_type": "multi", "data_type": "packbits"},
+        {"class_type": "binary", "data_type": "uint8"},
+        {"class_type": "multi", "data_type": "uint8"},
     ],
     indirect=True,
 )
-def test_set_up_train_and_valid_labels(create_test_data, create_test_cl_args):
+def test_set_up_train_and_valid_labels(request, create_test_data, create_test_cl_args):
     path, test_data_params = create_test_data
     cl_args = create_test_cl_args
     n_classes = 2 if test_data_params.get("class_type") == "binary" else 3
+
+    n_per_class = request.config.getoption("--num_samples_per_class")
 
     train_labels_dict, valid_labels_dict = label_setup.set_up_train_and_valid_labels(
         cl_args
     )
 
-    assert len(train_labels_dict) + len(valid_labels_dict) == n_classes * 2000
+    assert len(train_labels_dict) + len(valid_labels_dict) == n_classes * n_per_class
     assert len(train_labels_dict) > len(valid_labels_dict)
 
     train_ids_set = set(train_labels_dict.keys())

@@ -43,14 +43,19 @@ def check_dataset(
     ],
     indirect=True,
 )
-def test_set_up_datasets(create_test_cl_args, create_test_data):
+def test_set_up_datasets(request, create_test_cl_args, create_test_data):
     _, test_data_params = create_test_data
+
     cl_args = create_test_cl_args
     n_classes = 3 if test_data_params["class_type"] == "multi" else 2
 
+    n_per_class = request.config.getoption("--num_samples_per_class")
+    num_snps = request.config.getoption("--num_snps")
+
     # try setting up some labels and arrays that should not be included
+
     for i in range(10):
-        random_arr = np.random.rand(4, 1000)
+        random_arr = np.random.rand(4, num_snps)
         np.save(Path(cl_args.data_folder, f"SampleIgnoreFile_{i}.npy"), random_arr)
 
     with open(cl_args.label_file, "a") as csv_file:
@@ -69,7 +74,7 @@ def test_set_up_datasets(create_test_cl_args, create_test_data):
 
         assert m.dump.call_count == 1
 
-    assert len(train_dataset) + len(valid_dataset) == 2000 * n_classes
+    assert len(train_dataset) + len(valid_dataset) == n_per_class * n_classes
 
     valid_ids = [i.sample_id for i in valid_dataset.samples]
     train_ids = [i.sample_id for i in train_dataset.samples]
@@ -89,12 +94,15 @@ def test_set_up_datasets(create_test_cl_args, create_test_data):
 )
 @pytest.mark.parametrize("dataset_type", ["memory", "disk"])
 def test_datasets(
+    request,
     dataset_type: str,
     create_test_data: pytest.fixture,
     create_test_cl_args: pytest.fixture,
 ):
     test_path, test_data_params = create_test_data
     cl_args = create_test_cl_args
+
+    n_per_class = request.config.getoption("--num_samples_per_class")
 
     if dataset_type == "disk":
         cl_args.memory_dataset = False
@@ -104,8 +112,8 @@ def test_datasets(
         classes_tested += ["Africa"]
     classes_tested.sort()
 
-    train_no_samples = int(len(classes_tested) * 2000 * (1 - cl_args.valid_size))
-    valid_no_sample = int(len(classes_tested) * 2000 * cl_args.valid_size)
+    train_no_samples = int(len(classes_tested) * n_per_class * (1 - cl_args.valid_size))
+    valid_no_sample = int(len(classes_tested) * n_per_class * cl_args.valid_size)
 
     # patch since we don't create run folders while testing
     with patch(

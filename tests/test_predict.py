@@ -104,6 +104,7 @@ def test_load_labels_for_testing(
     indirect=True,
 )
 def test_set_up_test_dataset(
+    request,
     create_test_data: pytest.fixture,
     create_test_dataset: pytest.fixture,
     create_test_cl_args: pytest.fixture,
@@ -111,6 +112,8 @@ def test_set_up_test_dataset(
 ):
     test_path, test_data_params = create_test_data
     cl_args = create_test_cl_args
+
+    n_per_class = request.config.getoption("--num_samples_per_class")
 
     run_path = Path(f"runs/{cl_args.run_name}/")
 
@@ -122,7 +125,7 @@ def test_set_up_test_dataset(
     test_labels_dict = predict.load_labels_for_testing(cl_args)
     test_dataset = predict.set_up_test_dataset(cl_args, test_labels_dict)
 
-    exp_no_samples = 2000 * len(classes_tested)
+    exp_no_samples = n_per_class * len(classes_tested)
     check_dataset(test_dataset, exp_no_samples, classes_tested, cl_args)
 
     if not keep_outputs:
