@@ -61,8 +61,8 @@ def args_config():
             "sample_interval": 20,
             "target_width": 1000,
             "act_classes": None,
-            "get_acts": False,
-            "benchmark": False,
+            "get_acts": True,
+            "benchmark": True,
             "kernel_width": 12,
             "fc_dim": 128,
             "down_stride": 4,
@@ -86,6 +86,7 @@ def create_test_cl_args(request, args_config, create_test_data):
     test_path, test_data_params = create_test_data
 
     model_task = "reg" if test_data_params["class_type"] == "regression" else "cls"
+    n_snps = request.config.getoption("--num_snps")
 
     args_config.data_folder = str(test_path / "test_arrays")
     args_config.snp_file = str(test_path / "test_snps.bim")
@@ -96,8 +97,8 @@ def create_test_cl_args(request, args_config, create_test_data):
     args_config.fc_do = 0.00
     args_config.na_augment = 0.00
     args_config.sample_interval = 100
-    args_config.target_width = 1000
-    args_config.data_width = 1000
+    args_config.target_width = n_snps
+    args_config.data_width = n_snps
     args_config.run_name = (
         args_config.run_name
         + "_"

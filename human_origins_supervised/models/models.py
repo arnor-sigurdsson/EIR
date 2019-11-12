@@ -212,7 +212,7 @@ def make_conv_layers(residual_blocks: List[int], cl_args: Namespace) -> List[nn.
             out_channels=2 ** ca.channel_exp_base,
             conv_1_kernel_w=first_kernel,
             conv_1_padding=first_pad,
-            down_stride_w=down_stride_w,
+            down_stride_w=first_conv_stride,
             rb_do=ca.rb_do,
         )
     ]

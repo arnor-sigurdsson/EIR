@@ -141,7 +141,10 @@ def predict(predict_cl_args: Namespace) -> None:
     )
 
     # Set up data loading
-    test_labels_dict = load_labels_for_testing(test_train_mixed_cl_args)
+    test_labels_dict = None
+    if predict_cl_args.evaluate:
+        test_labels_dict = load_labels_for_testing(test_train_mixed_cl_args)
+
     test_dataset = set_up_test_dataset(test_train_mixed_cl_args, test_labels_dict)
     test_dloader = DataLoader(
         test_dataset, batch_size=predict_cl_args.batch_size, shuffle=False
