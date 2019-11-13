@@ -170,7 +170,7 @@ class Block(AbstractBlock):
 
 
 def set_up_conv_params(current_width: int, kernel_size: int, stride: int):
-    if current_width % 2 != 0:
+    if current_width % 2 != 0 or stride == 1:
         kernel_size -= 1
 
     padding = pytorch_utils.calc_conv_padding_needed(
@@ -178,6 +178,34 @@ def set_up_conv_params(current_width: int, kernel_size: int, stride: int):
     )
 
     return kernel_size, padding
+
+
+def get_block(
+    conv_blocks: List[nn.Module],
+    layer_arch_idx: int,
+    down_stride: int,
+    cl_args: Namespace,
+) -> Block:
+    ca = cl_args
+
+    cur_conv = nn.Sequential(*conv_blocks)
+    cur_width = pytorch_utils.calc_size_after_conv_sequence(ca.target_width, cur_conv)
+
+    cur_kern, cur_padd = set_up_conv_params(cur_width, ca.kernel_width, down_stride)
+
+    cur_in_channels = conv_blocks[-1].out_channels
+    cur_out_channels = 2 ** (ca.channel_exp_base + layer_arch_idx)
+    cur_layer = Block(
+        in_channels=cur_in_channels,
+        out_channels=cur_out_channels,
+        conv_1_kernel_w=cur_kern,
+        conv_1_padding=cur_padd,
+        down_stride_w=down_stride,
+        full_preact=True if len(conv_blocks) == 1 else False,
+        rb_do=ca.rb_do,
+    )
+
+    return cur_layer
 
 
 def make_conv_layers(residual_blocks: List[int], cl_args: Namespace) -> List[nn.Module]:
@@ -206,45 +234,25 @@ def make_conv_layers(residual_blocks: List[int], cl_args: Namespace) -> List[nn.
         ca.target_width, first_conv_kernel, first_conv_stride
     )
 
-    base_layers = [
+    conv_blocks = [
         FirstBlock(
             in_channels=1,
             out_channels=2 ** ca.channel_exp_base,
             conv_1_kernel_w=first_kernel,
             conv_1_padding=first_pad,
-            down_stride_w=down_stride_w,
+            down_stride_w=first_conv_stride,
             rb_do=ca.rb_do,
         )
     ]
 
     for layer_arch_idx, layer_arch_layers in enumerate(residual_blocks):
         for layer in range(layer_arch_layers):
-            cur_conv = nn.Sequential(*base_layers)
-            cur_width = pytorch_utils.calc_size_after_conv_sequence(
-                ca.target_width, cur_conv
-            )
-
-            cur_kern, cur_padd = set_up_conv_params(
-                cur_width, ca.kernel_width, down_stride_w
-            )
-
-            cur_in_channels = base_layers[-1].out_channels
-            cur_out_channels = 2 ** (ca.channel_exp_base + layer_arch_idx)
-            cur_layer = Block(
-                in_channels=cur_in_channels,
-                out_channels=cur_out_channels,
-                conv_1_kernel_w=cur_kern,
-                conv_1_padding=cur_padd,
-                down_stride_w=down_stride_w,
-                full_preact=True if len(base_layers) == 1 else False,
-                rb_do=ca.rb_do,
-            )
-
-            base_layers.append(cur_layer)
+            cur_layer = get_block(conv_blocks, layer_arch_idx, down_stride_w, ca)
+            conv_blocks.append(cur_layer)
 
     # attention_channels = base_layers[-2].out_channels
     # base_layers.insert(-1, SelfAttention(attention_channels))
-    return base_layers
+    return conv_blocks
 
 
 class Model(nn.Module):

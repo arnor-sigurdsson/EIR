@@ -143,9 +143,15 @@ class ArrayDatasetBase(Dataset):
 
     def get_samples(self, array_hook: Callable = lambda x: x):
         files = {i.stem: i for i in Path(self.data_folder).iterdir()}
+
+        # When training or evaluating on test, labels_dict maps to train/val/test IDs.
+        # When predicting on unknown test, then we don't have a labels dict.
+        # We don't want to use `files` variable for train/val, as the self.samples
+        # would have all obs. in both train/val, which is probably not a good idea.
+        sample_id_iter = self.labels_dict if self.labels_dict else files
         samples = []
 
-        for sample_id in self.labels_dict:
+        for sample_id in sample_id_iter:
             cur_sample = Sample(
                 sample_id=sample_id,
                 array=array_hook(files.get(sample_id)),
