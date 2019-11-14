@@ -400,6 +400,13 @@ if __name__ == "__main__":
         help="Whether to run in debug mode (w. breakpoint).",
     )
 
+    parser.add_argument(
+        "--custom_lib",
+        type=str,
+        default=None,
+        help="Path to custom library if using one.",
+    )
+
     cur_cl_args = parser.parse_args()
 
     if cur_cl_args.valid_size > 1.0:

@@ -9,6 +9,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 
 from human_origins_supervised.data_load.common_ops import ColumnOperation
+from human_origins_supervised.train_utils.utils import import_custom_module
 
 try:
     from human_origins_supervised.data_load import COLUMN_OPS
@@ -106,10 +107,23 @@ def parse_label_df(
     return df
 
 
+def _get_custom_column_ops(cl_args):
+    if not cl_args.custom_lib:
+        return {}
+
+    custom_module_base = cl_args.custom_lib
+    column_ops_path = custom_module_base + ".data_load.COLUMN_OPS"
+
+    column_ops = import_custom_module(column_ops_path)
+
+    return column_ops
+
+
 def label_df_parse_wrapper(cl_args: Namespace) -> pd.DataFrame:
     all_ids = tuple(i.stem for i in Path(cl_args.data_folder).iterdir())
+    column_ops = _get_custom_column_ops(cl_args)
 
-    extra_label_parsing_cols = get_extra_columns(cl_args.target_column, COLUMN_OPS)
+    extra_label_parsing_cols = get_extra_columns(cl_args.target_column, column_ops)
     extra_embed_cols = cl_args.embed_columns
     extra_contn_cols = cl_args.contn_columns
 
@@ -118,7 +132,7 @@ def label_df_parse_wrapper(cl_args: Namespace) -> pd.DataFrame:
     df_labels = load_label_df(
         cl_args.label_file, cl_args.target_column, all_ids, all_extra_cols
     )
-    df_labels = parse_label_df(df_labels, COLUMN_OPS, cl_args.target_column)
+    df_labels = parse_label_df(df_labels, column_ops, cl_args.target_column)
 
     # remove columns only used for parsing, so only keep actual label column
     # and extra embedding columns

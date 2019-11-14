@@ -1,10 +1,27 @@
-from typing import List, Dict
+from typing import List, Dict, TYPE_CHECKING
+import importlib
 
-from human_origins_supervised.data_load.label_setup import al_label_dict
+from aislib.misc_utils import get_logger
+
+logger = get_logger(__name__)
+
+if TYPE_CHECKING:
+    from human_origins_supervised.data_load.label_setup import al_label_dict
+
+
+def import_custom_module(module_path):
+    try:
+        module = importlib.import_module(module_path)
+        logger.debug("Imported custom module %s", module_path)
+    except ImportError:
+        logger.debug("Could not find custom module %s. Skipping.", module_path)
+        return None
+
+    return module
 
 
 def get_extra_labels_from_ids(
-    labels_dict: al_label_dict, cur_ids: List[str], target_columns: List[str]
+    labels_dict: "al_label_dict", cur_ids: List[str], target_columns: List[str]
 ) -> List[Dict[str, str]]:
     """
     Returns a batch in same order as cur_ids.
