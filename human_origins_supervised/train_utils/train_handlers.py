@@ -163,13 +163,15 @@ def _get_custom_handlers(handler_config: "HandlerConfig"):
     if not custom_module_base:
         return None
 
-    custom_handlers_path = custom_module_base + ".handlers.custom_handlers"
-    custom_handlers_module = import_custom_module(custom_handlers_path)
+    module_path = custom_module_base + '/handlers/custom_handlers.py'
+    module_name = 'custom_handlers'
+
+    custom_handlers_module = import_custom_module(module_path, module_name)
 
     if not hasattr(custom_handlers_module, "get_custom_handlers"):
         raise ImportError(
             f"Could not find function 'get_custom_handlers' "
-            f"in {custom_handlers_path}.py"
+            f"in {module_path}"
         )
 
     custom_handlers_getter = custom_handlers_module.get_custom_handlers

@@ -111,10 +111,12 @@ def _get_custom_column_ops(cl_args):
     if not cl_args.custom_lib:
         return {}
 
-    custom_module_base = cl_args.custom_lib
-    column_ops_path = custom_module_base + ".data_load.COLUMN_OPS"
+    module_path = cl_args.custom_lib + '/data_load/__init__.py'
+    module_name = 'data_load'
 
-    column_ops = import_custom_module(column_ops_path)
+    column_ops = import_custom_module(module_path, module_name).COLUMN_OPS
+    if column_ops is None:
+        return {}
 
     return column_ops
 

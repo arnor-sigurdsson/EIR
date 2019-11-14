@@ -1,5 +1,7 @@
+import sys
 from typing import List, Dict, TYPE_CHECKING
 import importlib
+import importlib.util
 
 from aislib.misc_utils import get_logger
 
@@ -9,16 +11,21 @@ if TYPE_CHECKING:
     from human_origins_supervised.data_load.label_setup import al_label_dict
 
 
-def import_custom_module(module_path):
+def import_custom_module(module_path, module_name):
+    spec = importlib.util.spec_from_file_location(module_name, module_path)
+    breakpoint()
     try:
-        module = importlib.import_module(module_path)
-        logger.debug("Imported custom module %s", module_path)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        logger.debug("Imported custom module %s at %s", module_name, module_path)
     except ImportError:
-        logger.debug("Could not find custom module %s. Skipping.", module_path)
+        logger.debug(
+            "Could not find custom module %s at %s. Skipping.", module_name, module_path
+        )
         return None
 
     return module
-
 
 def get_extra_labels_from_ids(
     labels_dict: "al_label_dict", cur_ids: List[str], target_columns: List[str]
