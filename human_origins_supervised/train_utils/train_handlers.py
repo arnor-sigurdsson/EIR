@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import List, TYPE_CHECKING
 
 from aislib.misc_utils import get_logger
-from ignite.contrib.handlers import ProgressBar
+from ignite.contrib.handlers import ProgressBar, CosineAnnealingScheduler
 from ignite.engine import Events, Engine
 from ignite.handlers import ModelCheckpoint
 from ignite.metrics import RunningAverage
@@ -63,6 +63,20 @@ class HandlerConfig:
     run_name: str
     pbar: ProgressBar
     monitoring_metrics: List[str]
+
+
+def get_lr_scheduler(optimizer, start_lr, end_lr, cycle_iter_size):
+    scheduler = CosineAnnealingScheduler(
+        optimizer,
+        "lr",
+        start_lr,
+        end_lr,
+        cycle_size=cycle_iter_size,
+        cycle_mult=2,
+        start_value_mult=1,
+    )
+
+    return scheduler
 
 
 def attach_metrics(engine: Engine, handler_config: HandlerConfig) -> None:
@@ -153,7 +167,7 @@ def _attach_custom_handlers(trainer: Engine, handler_config: "HandlerConfig"):
     return trainer
 
 
-def _attach_event_handlers(trainer: Engine, handler_config: HandlerConfig):
+def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
     """
     This makes sure to add the appropriate event handlers
     if the user wants to keep the output
@@ -225,6 +239,12 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
         config, run_folder, run_name, pbar, monitoring_metrics
     )
 
+    if args.cycle_lr:
+        scheduler = get_lr_scheduler(
+            config.optimizer, args.lr, 1e-4, len(config.train_loader)
+        )
+        trainer.add_event_handler(Events.ITERATION_STARTED, scheduler)
+
     for handler in evaluation_handler, activation_analysis_handler:
         trainer.add_event_handler(
             Events.ITERATION_COMPLETED, handler, handler_config=handler_config
@@ -238,6 +258,6 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
     )
 
     if handler_config.run_name:
-        trainer = _attach_event_handlers(trainer, handler_config)
+        trainer = _attach_run_event_handlers(trainer, handler_config)
 
     return trainer

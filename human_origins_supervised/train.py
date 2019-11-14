@@ -198,6 +198,10 @@ if __name__ == "__main__":
         "--batch_size", type=int, default=64, help="size of the batches"
     )
     parser.add_argument("--lr", type=float, default=1e-3, help="adam: learning rate")
+
+    parser.add_argument("--cycle_lr", dest="cycle_lr", action="store_true")
+    parser.set_defaults(cycle_lr=False)
+
     parser.add_argument(
         "--b1",
         type=float,
@@ -210,7 +214,7 @@ if __name__ == "__main__":
         default=0.999,
         help="adam: decay of second order momentum of gradient",
     )
-    parser.add_argument("--wd", type=float, default=5e-4, help="weight decay for adam.")
+    parser.add_argument("--wd", type=float, default=0.0, help="Weight decay.")
 
     parser.add_argument(
         "--fc_dim",
