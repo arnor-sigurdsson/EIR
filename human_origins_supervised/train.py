@@ -1,3 +1,4 @@
+from os.path import abspath
 import argparse
 from dataclasses import dataclass
 from pathlib import Path
@@ -400,6 +401,13 @@ if __name__ == "__main__":
         help="Whether to run in debug mode (w. breakpoint).",
     )
 
+    parser.add_argument(
+        "--custom_lib",
+        type=str,
+        default=None,
+        help="Path to custom library if using one.",
+    )
+
     cur_cl_args = parser.parse_args()
 
     if cur_cl_args.valid_size > 1.0:
@@ -408,6 +416,10 @@ if __name__ == "__main__":
     cur_cl_args.device = (
         "cuda:" + cur_cl_args.gpu_num if torch.cuda.is_available() else "cpu"
     )
+
+    # to make sure importlib gets absolute paths
+    if cur_cl_args.custom_lib is not None:
+        cur_cl_args.custom_lib = abspath(cur_cl_args.custom_lib)
 
     torch.backends.cudnn.benchmark = True
 

@@ -77,6 +77,7 @@ def args_config():
             "embed_columns": [],
             "contn_columns": [],
             "na_augment": 0.0,
+            "custom_lib": None,
         }
     )
 

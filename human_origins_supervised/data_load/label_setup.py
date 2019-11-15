@@ -3,17 +3,13 @@ from pathlib import Path
 from typing import Tuple, Dict, Union, List
 
 import joblib
-import pandas as pd
 import numpy as np
+import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 
 from human_origins_supervised.data_load.common_ops import ColumnOperation
-
-try:
-    from human_origins_supervised.data_load import COLUMN_OPS
-except ImportError:
-    COLUMN_OPS = {}
+from human_origins_supervised.train_utils.utils import get_custom_module_submodule
 
 from aislib.misc_utils import get_logger, ensure_path_exists
 
@@ -25,9 +21,20 @@ al_train_val_dfs = Tuple[pd.DataFrame, pd.DataFrame]
 al_label_dict = Dict[str, Dict[str, Union[str, float]]]
 
 
-def get_extra_columns(
+def _get_extra_columns(
     target_column: str, all_column_ops: al_all_column_ops
 ) -> List[str]:
+    """
+    We use this to grab extra columns needed for the current run, as specified in the
+    COLUMN_OPS, where the key is the target_column. That is, "for running with this
+    specific target column, what other columns do we need to grab", as specified
+    by the extra_columns_deps attribute of each column operation.
+
+    :param target_column: The main target column we are modelling on.
+    :param all_column_ops: The ledger of all column ops to be done for each target
+    column.
+    :returns A list of all extra columns needed from the label file for the current run.
+    """
     extra_columns_flat = []
     if target_column in all_column_ops:
         cur_ops = all_column_ops.get(target_column)
@@ -39,12 +46,21 @@ def get_extra_columns(
     return extra_columns_flat
 
 
-def load_label_df(
+def _load_label_df(
     label_fpath: Path,
     target_column: str,
     ids_to_keep: Tuple[str, ...] = (),
     extra_columns: Tuple[str, ...] = (),
 ) -> pd.DataFrame:
+    """
+    We want to load the label dataframe to be used for the torch dataset setup.
+
+    :param label_fpath: Path to the labelfile as passed in from the CL arguments.
+    :param target_column: Column we are predicting on.
+    :param ids_to_keep: Which IDs in the label dataframe we want to keep.
+    :param extra_columns: Extra columns in the label dataframe needed for this runþ
+    :return: A dataframe of labels.
+    """
 
     logger.debug("Reading in labelfile: %s", label_fpath)
     df_labels = pd.read_csv(
@@ -67,7 +83,7 @@ def load_label_df(
     return df_labels
 
 
-def parse_label_df(
+def _parse_label_df(
     df, column_ops: al_all_column_ops, target_column: str
 ) -> pd.DataFrame:
     """
@@ -106,19 +122,57 @@ def parse_label_df(
     return df
 
 
+def _get_custom_column_ops(custom_lib: str) -> al_all_column_ops:
+    """
+    We want to grab operations from a custom library for the current run, as defined
+    by the COLUMN_OPS specifications.
+
+    :param custom_lib: Path to the custom library to try loading custom column
+    operations from.
+    :return: Loaded CUSTOM_OPS variable to be used by other functions to process label
+    columns.
+    """
+    custom_column_ops_module = get_custom_module_submodule(
+        custom_lib, "custom_column_ops"
+    )
+
+    # If the user has not defined custom_column_ops, we're fine with that
+    if not custom_column_ops_module:
+        return {}
+
+    if not hasattr(custom_column_ops_module, "COLUMN_OPS"):
+        raise ImportError(
+            f"'COLUMN_OPS' variable must be defined in "
+            f"{custom_column_ops_module} for custom label operations."
+            f""
+        )
+
+    column_ops: al_all_column_ops = custom_column_ops_module.COLUMN_OPS
+
+    # Also if they have defined an empty COLUMN_OPS, we don't want things to break
+    if column_ops is None:
+        return {}
+
+    return column_ops
+
+
 def label_df_parse_wrapper(cl_args: Namespace) -> pd.DataFrame:
     all_ids = tuple(i.stem for i in Path(cl_args.data_folder).iterdir())
 
-    extra_label_parsing_cols = get_extra_columns(cl_args.target_column, COLUMN_OPS)
+    column_ops = {}
+    if cl_args.custom_lib:
+        column_ops = _get_custom_column_ops(cl_args.custom_lib)
+
+    extra_label_parsing_cols = _get_extra_columns(cl_args.target_column, column_ops)
     extra_embed_cols = cl_args.embed_columns
     extra_contn_cols = cl_args.contn_columns
 
     all_extra_cols = extra_label_parsing_cols + extra_embed_cols + extra_contn_cols
 
-    df_labels = load_label_df(
+    df_labels = _load_label_df(
         cl_args.label_file, cl_args.target_column, all_ids, all_extra_cols
     )
-    df_labels = parse_label_df(df_labels, COLUMN_OPS, cl_args.target_column)
+    df_labels = _parse_label_df(df_labels, column_ops, cl_args.target_column)
 
     # remove columns only used for parsing, so only keep actual label column
     # and extra embedding columns
@@ -133,7 +187,7 @@ def label_df_parse_wrapper(cl_args: Namespace) -> pd.DataFrame:
     return df_labels
 
 
-def split_df(df: pd.DataFrame, valid_size: Union[int, float]) -> al_train_val_dfs:
+def _split_df(df: pd.DataFrame, valid_size: Union[int, float]) -> al_train_val_dfs:
     train_ids, valid_ids = train_test_split(list(df.index), test_size=valid_size)
 
     df_labels_train = df.loc[df.index.intersection(train_ids)]
@@ -188,7 +242,7 @@ def scale_non_target_continuous_columns(
     return df, scaler_outpath
 
 
-def get_missing_stats_string(
+def _get_missing_stats_string(
     df: pd.DataFrame, columns_to_check: List[str]
 ) -> Dict[str, int]:
     missing_count_dict = {}
@@ -201,7 +255,7 @@ def get_missing_stats_string(
 def handle_missing_label_values(df: pd.DataFrame, cl_args, name="df"):
 
     if cl_args.embed_columns:
-        missing_stats = get_missing_stats_string(df, cl_args.embed_columns)
+        missing_stats = _get_missing_stats_string(df, cl_args.embed_columns)
         logger.debug(
             "Replacing NaNs in embedding columns %s (counts: %s) in %s with 'NA'.",
             cl_args.embed_columns,
@@ -211,7 +265,7 @@ def handle_missing_label_values(df: pd.DataFrame, cl_args, name="df"):
         df[cl_args.embed_columns] = df[cl_args.embed_columns].fillna("NA")
 
     if cl_args.contn_columns:
-        missing_stats = get_missing_stats_string(df, cl_args.contn_columns)
+        missing_stats = _get_missing_stats_string(df, cl_args.contn_columns)
         logger.debug(
             "Replacing NaNs in continuous columns %s (counts: %s) in %s with 0.",
             cl_args.contn_columns,
@@ -223,7 +277,7 @@ def handle_missing_label_values(df: pd.DataFrame, cl_args, name="df"):
     return df
 
 
-def process_train_and_label_dfs(
+def _process_train_and_label_dfs(
     cl_args, df_labels_train, df_labels_valid
 ) -> al_train_val_dfs:
 
@@ -254,9 +308,9 @@ def set_up_train_and_valid_labels(
 
     df_labels = label_df_parse_wrapper(cl_args)
 
-    df_labels_train, df_labels_valid = split_df(df_labels, cl_args.valid_size)
+    df_labels_train, df_labels_valid = _split_df(df_labels, cl_args.valid_size)
 
-    df_labels_train, df_labels_valid = process_train_and_label_dfs(
+    df_labels_train, df_labels_valid = _process_train_and_label_dfs(
         cl_args, df_labels_train, df_labels_valid
     )
 

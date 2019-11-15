@@ -40,10 +40,12 @@ def get_test_column_ops():
 def test_get_extra_columns(get_test_column_ops):
     test_column_ops = get_test_column_ops
 
-    extra_columns = label_setup.get_extra_columns("OriginExtraColumns", test_column_ops)
+    extra_columns = label_setup._get_extra_columns(
+        "OriginExtraColumns", test_column_ops
+    )
     assert extra_columns == ["ExtraCol1", "ExtraCol2", "ExtraCol3"]
 
-    extra_columns_empty = label_setup.get_extra_columns("Origin", test_column_ops)
+    extra_columns_empty = label_setup._get_extra_columns("Origin", test_column_ops)
     assert extra_columns_empty == []
 
 
@@ -62,7 +64,7 @@ def test_load_label_df(request, create_test_data):
 
     n_per_class = request.config.getoption("--num_samples_per_class")
 
-    df_label = label_setup.load_label_df(label_fpath, "Origin")
+    df_label = label_setup._load_label_df(label_fpath, "Origin")
 
     assert df_label.shape[0] == n_per_class * n_classes
     assert df_label.index.name == "ID"
@@ -72,14 +74,14 @@ def test_load_label_df(request, create_test_data):
     label_extra_fpath = path / "labels_extracol.csv"
     df_label.to_csv(label_extra_fpath)
 
-    df_label_extra = label_setup.load_label_df(
+    df_label_extra = label_setup._load_label_df(
         label_extra_fpath, "Origin", extra_columns=("ExtraCol",)
     )
 
     assert df_label_extra.shape[1] == 2
     assert df_label_extra["ExtraCol"].unique().item() == "ExtraVal"
 
-    df_label_ids = label_setup.load_label_df(
+    df_label_ids = label_setup._load_label_df(
         label_fpath, "Origin", ids_to_keep=("95_Europe", "96_Europe", "97_Europe")
     )
     assert df_label_ids.shape[0] == 3
@@ -94,8 +96,8 @@ def test_parse_label_df(create_test_data, get_test_column_ops):
 
     test_column_ops = get_test_column_ops
 
-    df_label = label_setup.load_label_df(label_fpath, "Origin")
-    df_label_parsed = label_setup.parse_label_df(df_label, test_column_ops, "Origin")
+    df_label = label_setup._load_label_df(label_fpath, "Origin")
+    df_label_parsed = label_setup._parse_label_df(df_label, test_column_ops, "Origin")
 
     assert set(df_label_parsed.Origin.unique()) == {"Iceland" * 2, "Asia" * 2}
 
@@ -104,7 +106,7 @@ def test_parse_label_df(create_test_data, get_test_column_ops):
         df_label[col] = "Iceland"
 
     df_label = df_label.rename(columns={"Origin": "OriginExtraColumns"})
-    df_label_parsed = label_setup.parse_label_df(df_label, test_column_ops, "Origin")
+    df_label_parsed = label_setup._parse_label_df(df_label, test_column_ops, "Origin")
     assert df_label_parsed["OriginExtraColumns"].unique().item() == "Iceland"
 
 
@@ -138,7 +140,7 @@ def test_split_df(create_test_data, create_test_cl_args):
 
     for valid_fraction in (0.1, 0.5, 0.7):
 
-        df_train, df_valid = label_setup.split_df(df_labels, valid_fraction)
+        df_train, df_valid = label_setup._split_df(df_labels, valid_fraction)
         expected_train = df_labels.shape[0] * (1 - valid_fraction)
         expected_valid = df_labels.shape[0] * valid_fraction
 
@@ -164,7 +166,7 @@ def test_scale_regression_labels(create_test_data, create_test_cl_args):
         mask = df_labels[cl_args.target_column] == column_value
         df_labels[mask] = new_value
 
-    df_train, df_valid = label_setup.split_df(df_labels, 0.1)
+    df_train, df_valid = label_setup._split_df(df_labels, 0.1)
 
     df_train, scaler_path = label_setup.scale_non_target_continuous_columns(
         df_train, cl_args.target_column, path
