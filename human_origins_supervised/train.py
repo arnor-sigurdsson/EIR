@@ -1,3 +1,4 @@
+from os.path import abspath
 import argparse
 from dataclasses import dataclass
 from pathlib import Path
@@ -198,6 +199,10 @@ if __name__ == "__main__":
         "--batch_size", type=int, default=64, help="size of the batches"
     )
     parser.add_argument("--lr", type=float, default=1e-3, help="adam: learning rate")
+
+    parser.add_argument("--cycle_lr", dest="cycle_lr", action="store_true")
+    parser.set_defaults(cycle_lr=False)
+
     parser.add_argument(
         "--b1",
         type=float,
@@ -210,7 +215,7 @@ if __name__ == "__main__":
         default=0.999,
         help="adam: decay of second order momentum of gradient",
     )
-    parser.add_argument("--wd", type=float, default=5e-4, help="weight decay for adam.")
+    parser.add_argument("--wd", type=float, default=0.0, help="Weight decay.")
 
     parser.add_argument(
         "--fc_dim",
@@ -396,6 +401,13 @@ if __name__ == "__main__":
         help="Whether to run in debug mode (w. breakpoint).",
     )
 
+    parser.add_argument(
+        "--custom_lib",
+        type=str,
+        default=None,
+        help="Path to custom library if using one.",
+    )
+
     cur_cl_args = parser.parse_args()
 
     if cur_cl_args.valid_size > 1.0:
@@ -404,6 +416,10 @@ if __name__ == "__main__":
     cur_cl_args.device = (
         "cuda:" + cur_cl_args.gpu_num if torch.cuda.is_available() else "cpu"
     )
+
+    # to make sure importlib gets absolute paths
+    if cur_cl_args.custom_lib is not None:
+        cur_cl_args.custom_lib = abspath(cur_cl_args.custom_lib)
 
     torch.backends.cudnn.benchmark = True
 

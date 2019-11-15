@@ -3,10 +3,10 @@ import json
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
-from typing import List, TYPE_CHECKING
+from typing import List, Callable, Union, Tuple, TYPE_CHECKING
 
 from aislib.misc_utils import get_logger
-from ignite.contrib.handlers import ProgressBar
+from ignite.contrib.handlers import ProgressBar, CosineAnnealingScheduler
 from ignite.engine import Events, Engine
 from ignite.handlers import ModelCheckpoint
 from ignite.metrics import RunningAverage
@@ -17,18 +17,18 @@ from human_origins_supervised.train_utils.activation_analysis import (
 from human_origins_supervised.train_utils.benchmark import benchmark
 from human_origins_supervised.train_utils.evaluation import evaluation_handler
 from human_origins_supervised.train_utils.metric_funcs import get_train_metrics
-from human_origins_supervised.train_utils.utils import check_if_iteration_sample
+from human_origins_supervised.train_utils.utils import (
+    check_if_iteration_sample,
+    get_custom_module_submodule,
+)
 from human_origins_supervised.visualization import visualization_funcs as vf
 
 if TYPE_CHECKING:
     from human_origins_supervised.train import Config
 
-try:
-    from human_origins_supervised.train_utils.custom_handlers import get_custom_handlers
-except ImportError:
-
-    def get_custom_handlers(*args, **kwargs):
-        return ()
+# Aliases
+al_get_custom_handles_return_value = Union[Tuple[Callable, ...], Tuple[None]]
+al_get_custom_handlers = Callable[["HandlerConfig"], al_get_custom_handles_return_value]
 
 
 logger = get_logger(__name__)
@@ -63,6 +63,20 @@ class HandlerConfig:
     run_name: str
     pbar: ProgressBar
     monitoring_metrics: List[str]
+
+
+def get_lr_scheduler(optimizer, start_lr, end_lr, cycle_iter_size):
+    scheduler = CosineAnnealingScheduler(
+        optimizer,
+        "lr",
+        start_lr,
+        end_lr,
+        cycle_size=cycle_iter_size,
+        cycle_mult=2,
+        start_value_mult=1,
+    )
+
+    return scheduler
 
 
 def attach_metrics(engine: Engine, handler_config: HandlerConfig) -> None:
@@ -143,17 +157,37 @@ def plot_progress(engine: Engine, handler_config: HandlerConfig) -> None:
             mfile.write(str(handler_config.config.model))
 
 
-def _attach_custom_handlers(trainer: Engine, handler_config: "HandlerConfig"):
-    if get_custom_handlers:
-        custom_handlers = get_custom_handlers(handler_config)
+def _get_custom_handlers(handler_config: "HandlerConfig"):
+    custom_lib = handler_config.config.cl_args.custom_lib
 
-        for custom_handler_attacher in custom_handlers:
-            trainer = custom_handler_attacher(trainer, handler_config)
+    custom_handlers_module = get_custom_module_submodule(custom_lib, "custom_handlers")
+
+    if not custom_handlers_module:
+        return None
+
+    if not hasattr(custom_handlers_module, "get_custom_handlers"):
+        raise ImportError(
+            f"'get_custom_handlers' function must be defined in "
+            f"{custom_handlers_module} for custom handler attachment."
+        )
+
+    custom_handlers_getter = custom_handlers_module.get_custom_handlers
+    custom_handlers = custom_handlers_getter(handler_config)
+
+    return custom_handlers
+
+
+def _attach_custom_handlers(trainer: Engine, handler_config, custom_handlers):
+    if not custom_handlers:
+        return trainer
+
+    for custom_handler_attacher in custom_handlers:
+        trainer = custom_handler_attacher(trainer, handler_config)
 
     return trainer
 
 
-def _attach_event_handlers(trainer: Engine, handler_config: HandlerConfig):
+def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
     """
     This makes sure to add the appropriate event handlers
     if the user wants to keep the output
@@ -198,8 +232,9 @@ def _attach_event_handlers(trainer: Engine, handler_config: HandlerConfig):
             run_folder=handler_config.run_folder,
         )
 
-    if get_custom_handlers:
-        trainer = _attach_custom_handlers(trainer, handler_config)
+    if args.custom_lib:
+        custom_handlers = _get_custom_handlers(handler_config)
+        trainer = _attach_custom_handlers(trainer, handler_config, custom_handlers)
     return trainer
 
 
@@ -225,6 +260,12 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
         config, run_folder, run_name, pbar, monitoring_metrics
     )
 
+    if args.cycle_lr:
+        scheduler = get_lr_scheduler(
+            config.optimizer, args.lr, 1e-4, len(config.train_loader)
+        )
+        trainer.add_event_handler(Events.ITERATION_STARTED, scheduler)
+
     for handler in evaluation_handler, activation_analysis_handler:
         trainer.add_event_handler(
             Events.ITERATION_COMPLETED, handler, handler_config=handler_config
@@ -238,6 +279,6 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
     )
 
     if handler_config.run_name:
-        trainer = _attach_event_handlers(trainer, handler_config)
+        trainer = _attach_run_event_handlers(trainer, handler_config)
 
     return trainer

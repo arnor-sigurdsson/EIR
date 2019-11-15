@@ -54,7 +54,8 @@ def args_config():
             "resblocks": None,
             "device": "cuda:0" if cuda.is_available() else "cpu",
             "gpu_num": "0",
-            "lr": 1e-3,
+            "lr": 1e-2,
+            "cycle_lr": True,
             "wd": 1e-4,
             "n_cpu": 8,
             "n_epochs": 10,
@@ -76,6 +77,7 @@ def args_config():
             "embed_columns": [],
             "contn_columns": [],
             "na_augment": 0.0,
+            "custom_lib": None,
         }
     )
 
