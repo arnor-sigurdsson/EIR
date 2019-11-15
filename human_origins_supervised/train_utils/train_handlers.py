@@ -19,7 +19,7 @@ from human_origins_supervised.train_utils.evaluation import evaluation_handler
 from human_origins_supervised.train_utils.metric_funcs import get_train_metrics
 from human_origins_supervised.train_utils.utils import (
     check_if_iteration_sample,
-    import_custom_module,
+    get_custom_module_submodule,
 )
 from human_origins_supervised.visualization import visualization_funcs as vf
 
@@ -158,20 +158,17 @@ def plot_progress(engine: Engine, handler_config: HandlerConfig) -> None:
 
 
 def _get_custom_handlers(handler_config: "HandlerConfig"):
-    custom_module_base = handler_config.config.cl_args.custom_lib
+    custom_lib = handler_config.config.cl_args.custom_lib
 
-    if not custom_module_base:
+    custom_handlers_module = get_custom_module_submodule(custom_lib, "custom_handlers")
+
+    if not custom_handlers_module:
         return None
-
-    module_path = custom_module_base + '/handlers/custom_handlers.py'
-    module_name = 'custom_handlers'
-
-    custom_handlers_module = import_custom_module(module_path, module_name)
 
     if not hasattr(custom_handlers_module, "get_custom_handlers"):
         raise ImportError(
-            f"Could not find function 'get_custom_handlers' "
-            f"in {module_path}"
+            f"'get_custom_handlers' function must be defined in "
+            f"{custom_handlers_module} for custom handler attachment."
         )
 
     custom_handlers_getter = custom_handlers_module.get_custom_handlers
