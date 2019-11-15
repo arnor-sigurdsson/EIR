@@ -28,6 +28,8 @@ from human_origins_supervised.models.models import Model
 from human_origins_supervised.train_utils.metric_funcs import select_metric_func
 from human_origins_supervised.train_utils.train_handlers import configure_trainer
 
+from torch_lr_finder import LRFinder
+
 torch.manual_seed(0)
 np.random.seed(0)
 
@@ -147,9 +149,6 @@ def main(cl_args: argparse.Namespace) -> None:
     model = model.to(device=cl_args.device)
     assert model.data_size_after_conv >= 8
 
-    if cl_args.debug:
-        breakpoint()
-
     optimizer = AdamW(
         model.parameters(),
         lr=cl_args.lr,
@@ -159,6 +158,12 @@ def main(cl_args: argparse.Namespace) -> None:
     )
 
     criterion = nn.CrossEntropyLoss() if cl_args.model_task == "cls" else nn.MSELoss()
+
+    if cl_args.debug:
+        breakpoint()
+        lr_finder = LRFinder(model, optimizer, criterion, cl_args.device)
+        lr_finder.range_test(train_dloader, end_lr=10, num_iter=100)
+        lr_finder.plot()
 
     config = Config(
         cl_args,
