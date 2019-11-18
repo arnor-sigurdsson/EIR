@@ -51,10 +51,7 @@ def test_get_extra_columns(get_test_column_ops):
 
 @pytest.mark.parametrize(
     "create_test_data",
-    [
-        {"class_type": "binary", "data_type": "uint8"},
-        {"class_type": "multi", "data_type": "uint8"},
-    ],
+    [{"class_type": "binary"}, {"class_type": "multi"}],
     indirect=True,
 )
 def test_load_label_df(request, create_test_data):
@@ -87,9 +84,7 @@ def test_load_label_df(request, create_test_data):
     assert df_label_ids.shape[0] == 3
 
 
-@pytest.mark.parametrize(
-    "create_test_data", [{"class_type": "binary", "data_type": "uint8"}], indirect=True
-)
+@pytest.mark.parametrize("create_test_data", [{"class_type": "binary"}], indirect=True)
 def test_parse_label_df(create_test_data, get_test_column_ops):
     path, test_data_params = create_test_data
     label_fpath = path / "labels.csv"
@@ -110,9 +105,7 @@ def test_parse_label_df(create_test_data, get_test_column_ops):
     assert df_label_parsed["OriginExtraColumns"].unique().item() == "Iceland"
 
 
-@pytest.mark.parametrize(
-    "create_test_data", [{"class_type": "binary", "data_type": "uint8"}], indirect=True
-)
+@pytest.mark.parametrize("create_test_data", [{"class_type": "binary"}], indirect=True)
 def test_label_df_parse_wrapper(request, create_test_data, create_test_cl_args):
     cl_args = create_test_cl_args
     df_labels = label_setup.label_df_parse_wrapper(cl_args)
@@ -127,10 +120,7 @@ def test_label_df_parse_wrapper(request, create_test_data, create_test_cl_args):
 
 @pytest.mark.parametrize(
     "create_test_data",
-    [
-        {"class_type": "binary", "data_type": "uint8"},
-        {"class_type": "multi", "data_type": "uint8"},
-    ],
+    [{"class_type": "binary"}, {"class_type": "multi"}],
     indirect=True,
 )
 def test_split_df(create_test_data, create_test_cl_args):
@@ -150,10 +140,7 @@ def test_split_df(create_test_data, create_test_cl_args):
 
 @pytest.mark.parametrize(
     "create_test_data",
-    [
-        {"class_type": "binary", "data_type": "uint8"},
-        {"class_type": "multi", "data_type": "uint8"},
-    ],
+    [{"class_type": "binary"}, {"class_type": "multi"}],
     indirect=True,
 )
 def test_scale_regression_labels(create_test_data, create_test_cl_args):
@@ -181,10 +168,7 @@ def test_scale_regression_labels(create_test_data, create_test_cl_args):
 
 @pytest.mark.parametrize(
     "create_test_data",
-    [
-        {"class_type": "binary", "data_type": "uint8"},
-        {"class_type": "multi", "data_type": "uint8"},
-    ],
+    [{"class_type": "binary"}, {"class_type": "multi"}],
     indirect=True,
 )
 def test_set_up_train_and_valid_labels(request, create_test_data, create_test_cl_args):

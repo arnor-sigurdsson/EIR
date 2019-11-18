@@ -34,7 +34,6 @@ def construct_dataset_init_params_from_cl_args(cl_args):
         "model_task": cl_args.model_task,
         "target_width": cl_args.target_width,
         "target_column": cl_args.target_column,
-        "data_type": cl_args.data_type,
     }
 
     return dataset_class_common_args
@@ -101,7 +100,6 @@ class ArrayDatasetBase(Dataset):
         target_height: int = 4,
         target_width: int = None,
         na_augment: float = 0.0,
-        data_type: str = "packbits",
     ):
         super().__init__()
 
@@ -109,7 +107,6 @@ class ArrayDatasetBase(Dataset):
         self.model_task = model_task
         self.target_height = target_height
         self.target_width = target_width
-        self.data_type = data_type
 
         self.samples: Union[List[Sample], None] = None
 
@@ -209,10 +206,6 @@ class MemoryArrayDataset(ArrayDatasetBase):
         pointing to filenames.
         """
         array = np.load(sample_fpath)
-        if self.data_type == "packbits":
-            array = np.unpackbits(array).reshape(self.target_height, -1)
-        elif self.data_type != "uint8":
-            raise ValueError
 
         array = array.astype(np.uint8)
         return torch.from_numpy(array).unsqueeze(0)
@@ -254,8 +247,6 @@ class DiskArrayDataset(ArrayDatasetBase):
     @property
     def data_width(self):
         data = np.load(self.samples[0].array)
-        if self.data_type == "packbits":
-            data = np.unpackbits(data).reshape(self.target_height, -1)
         return data.shape[1]
 
     def __getitem__(self, index):
@@ -264,9 +255,6 @@ class DiskArrayDataset(ArrayDatasetBase):
         array = np.load(sample.array)
         label = self.parse_label(sample.labels)
         sample_id = sample.sample_id
-
-        if self.data_type == "packbits":
-            array = np.unpackbits(array).reshape(self.target_height, -1)
 
         array = torch.from_numpy(array).unsqueeze(0)
         if self.na_augment:
