@@ -57,9 +57,7 @@ def test_modify_train_cl_args_for_testing():
 
 
 @pytest.mark.parametrize(
-    "create_test_data",
-    [{"class_type": "regression", "data_type": "uint8"}],
-    indirect=True,
+    "create_test_data", [{"class_type": "regression"}], indirect=True
 )
 @pytest.mark.parametrize(
     "create_test_cl_args",
@@ -92,9 +90,7 @@ def test_load_labels_for_testing(
         cleanup(run_path)
 
 
-@pytest.mark.parametrize(
-    "create_test_data", [{"class_type": "multi", "data_type": "uint8"}], indirect=True
-)
+@pytest.mark.parametrize("create_test_data", [{"class_type": "multi"}], indirect=True)
 @pytest.mark.parametrize(
     "create_test_cl_args",
     [
@@ -140,9 +136,7 @@ def grab_latest_model_path(saved_models_folder: Path):
 
 
 @pytest.mark.parametrize(
-    "create_test_data",
-    [{"class_type": "multi", "data_type": "uint8", "split_to_test": True}],
-    indirect=True,
+    "create_test_data", [{"class_type": "multi", "split_to_test": True}], indirect=True
 )
 @pytest.mark.parametrize(
     "create_test_cl_args",
