@@ -46,7 +46,8 @@ def load_model(
     model: torch.nn.Module = Model(
         train_cl_args, n_classes, embeddings_dict, train_cl_args.contn_columns
     )
-    model.load_state_dict(torch.load(model_path))
+    device_for_load = torch.device(device)
+    model.load_state_dict(torch.load(model_path, map_location=device_for_load))
     model.eval()
     model = model.to(device=device)
 
@@ -102,6 +103,8 @@ def set_up_test_dataset(
         test_train_cl_args_mix
     )
 
+    # TODO: Update this, currently we need to have the model in a hardcoded runs
+    #       folder when loading.
     target_transformer_path = label_setup.get_transformer_path(
         test_train_cl_args_mix.run_name,
         test_train_cl_args_mix.target_column,
