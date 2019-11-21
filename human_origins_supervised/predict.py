@@ -3,6 +3,7 @@ import json
 from argparse import Namespace
 from copy import deepcopy
 from pathlib import Path
+from typing import Union
 
 import joblib
 import numpy as np
@@ -36,7 +37,18 @@ def load_cl_args_config(cl_args_config_path: Path) -> Namespace:
 def load_model(
     model_path: Path, n_classes: int, train_cl_args: Namespace, device: str
 ) -> torch.nn.Module:
+    """
+    :param model_path: Path to the model as passed in CL arguments.
+    :param n_classes: Number of classes the model was trained on, used to set up last
+    layer neurons.
+    :param train_cl_args: CL arguments used during training, used to set up various
+    aspects of model architecture.
+    :param device: Which device to cast the model to.
+    :return: Loaded model initialized with saved weights.
+    """
+
     embeddings_dict = None
+
     if train_cl_args.embed_columns:
         model_embeddings_path = (
             model_path.parents[1] / "extra_inputs" / "embeddings.save"
@@ -70,22 +82,28 @@ def modify_train_cl_args_for_testing(
     return train_cl_args_mod
 
 
-def load_labels_for_testing(test_train_cl_args_mix: Namespace) -> al_label_dict:
+def load_labels_for_testing(
+    test_train_cl_args_mix: Namespace, run_folder: Path
+) -> al_label_dict:
+    """
+    Used when doing an evaluation on test set.
+
+    :param test_train_cl_args_mix: Training CL arguments with the data_folder
+    replaced with testing one.
+    :param run_folder: The run folder we are loading the model from.
+    :return: Testing labels for performance measurement.
+    """
+
     df_labels_test = label_setup.label_df_parse_wrapper(test_train_cl_args_mix)
 
     continuous_columns = test_train_cl_args_mix.contn_columns[:]
-
     for continuous_column in continuous_columns:
         scaler_path = label_setup.get_transformer_path(
-            test_train_cl_args_mix.run_name,
-            test_train_cl_args_mix.target_column,
-            "standard_scaler",
+            run_folder, continuous_column, "standard_scaler"
         )
+
         df_labels_test, _ = label_setup.scale_non_target_continuous_columns(
-            df_labels_test,
-            continuous_column,
-            test_train_cl_args_mix.run_name,
-            scaler_path,
+            df_labels_test, continuous_column, run_folder, scaler_path
         )
 
     df_labels_test = label_setup.handle_missing_label_values(
@@ -97,18 +115,25 @@ def load_labels_for_testing(test_train_cl_args_mix: Namespace) -> al_label_dict:
 
 
 def set_up_test_dataset(
-    test_train_cl_args_mix: Namespace, test_labels_dict: al_label_dict
+    test_train_cl_args_mix: Namespace,
+    test_labels_dict: Union[None, al_label_dict],
+    run_folder: Path,
 ) -> al_datasets:
+    """
+
+    :param test_train_cl_args_mix: Training CL arguments with the data_folder
+    replaced with testing one.
+    :param test_labels_dict: None if we are predicting on unknown data,
+    otherwise a dictionary of labels (if evaluating on test set).
+    :param run_folder: The run folder we are loading the model from.
+    :return: Dataset instance to be used for loading test samples.
+    """
     dataset_class_common_args = datasets.construct_dataset_init_params_from_cl_args(
         test_train_cl_args_mix
     )
 
-    # TODO: Update this, currently we need to have the model in a hardcoded runs
-    #       folder when loading.
     target_transformer_path = label_setup.get_transformer_path(
-        test_train_cl_args_mix.run_name,
-        test_train_cl_args_mix.target_column,
-        "target_transformer",
+        run_folder, test_train_cl_args_mix.target_column, "target_transformer"
     )
     target_transformer = joblib.load(target_transformer_path)
 
@@ -134,6 +159,7 @@ def save_predictions(
 
 def predict(predict_cl_args: Namespace) -> None:
     outfolder = Path(predict_cl_args.output_folder)
+    run_folder = Path(predict_cl_args.model_path).parents[1]
 
     # Set up CL arguments
     train_cl_args = load_cl_args_config(
@@ -146,9 +172,11 @@ def predict(predict_cl_args: Namespace) -> None:
     # Set up data loading
     test_labels_dict = None
     if predict_cl_args.evaluate:
-        test_labels_dict = load_labels_for_testing(test_train_mixed_cl_args)
+        test_labels_dict = load_labels_for_testing(test_train_mixed_cl_args, run_folder)
 
-    test_dataset = set_up_test_dataset(test_train_mixed_cl_args, test_labels_dict)
+    test_dataset = set_up_test_dataset(
+        test_train_mixed_cl_args, test_labels_dict, run_folder
+    )
     test_dloader = DataLoader(
         test_dataset, batch_size=predict_cl_args.batch_size, shuffle=False
     )

@@ -76,7 +76,7 @@ def test_load_labels_for_testing(
 
     run_path = Path(f"runs/{cl_args.run_name}/")
 
-    test_labels_dict = predict.load_labels_for_testing(cl_args)
+    test_labels_dict = predict.load_labels_for_testing(cl_args, run_path)
     df_test = pd.DataFrame.from_dict(test_labels_dict, orient="index")
 
     # make sure test data extra column was scaled correctly
@@ -118,8 +118,8 @@ def test_set_up_test_dataset(
         classes_tested += ["Africa"]
     classes_tested.sort()
 
-    test_labels_dict = predict.load_labels_for_testing(cl_args)
-    test_dataset = predict.set_up_test_dataset(cl_args, test_labels_dict)
+    test_labels_dict = predict.load_labels_for_testing(cl_args, run_path)
+    test_dataset = predict.set_up_test_dataset(cl_args, test_labels_dict, run_path)
 
     exp_no_samples = n_per_class * len(classes_tested)
     check_dataset(test_dataset, exp_no_samples, classes_tested, cl_args)
