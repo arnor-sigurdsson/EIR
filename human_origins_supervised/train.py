@@ -123,7 +123,7 @@ def main(cl_args: argparse.Namespace) -> None:
     if cl_args.multi_gpu:
         batch_size = torch.cuda.device_count() * batch_size
         logger.info(
-            "Batch size set to %d to account for, %d GPUs.",
+            "Batch size set to %d to account for %d GPUs.",
             batch_size,
             torch.cuda.device_count(),
         )
@@ -153,11 +153,11 @@ def main(cl_args: argparse.Namespace) -> None:
     model: torch.nn.Module = Model(
         cl_args, train_dataset.num_classes, embedding_dict, cl_args.contn_columns
     )
-    model = model.to(device=cl_args.device)
     assert model.data_size_after_conv >= 8
 
     if cl_args.multi_gpu:
         model = nn.DataParallel(model)
+    model = model.to(device=cl_args.device)
 
     optimizer = AdamW(
         model.parameters(),
@@ -290,7 +290,7 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--sa", action="store_True", help="Wheter to add self attention to the network."
+        "--sa", action="store_true", help="Wheter to add self attention to the network."
     )
 
     parser.add_argument(
@@ -410,7 +410,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--benchmark", dest="benchmark", action="store_true")
     parser.add_argument("--no_benchmark", dest="benchmark", action="store_false")
-    parser.set_defaults(benchmark=True)
+    parser.set_defaults(benchmark=False)
 
     parser.add_argument(
         "--debug",
@@ -438,6 +438,11 @@ if __name__ == "__main__":
     if cur_cl_args.custom_lib is not None:
         cur_cl_args.custom_lib = abspath(cur_cl_args.custom_lib)
 
-    torch.backends.cudnn.benchmark = True
+    # benchmark breaks if we run it with multiple GPUs
+    if not cur_cl_args.multi_gpu:
+        torch.backends.cudnn.benchmark = True
+    else:
+        logger.debug('Setting device to cuda:0 since running with multiple GPUs.')
+        cur_cl_args.device = 'cuda:0'
 
     main(cur_cl_args)
