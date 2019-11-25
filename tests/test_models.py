@@ -20,10 +20,11 @@ def test_make_conv_layers():
         first_kernel_expansion=1,
         first_stride_expansion=5,
         channel_exp_base=5,
+        sa=True,
     )
     conv_layers = models.make_conv_layers(conv_layer_list, test_cl_args)
 
     # account for first block, add +2 instead if using SA
-    assert len(conv_layers) == len(conv_layer_list) + 1
+    assert len(conv_layers) == len(conv_layer_list) + 2
     assert isinstance(conv_layers[0], models.FirstBlock)
-    # assert isinstance(conv_layers[-2], models.SelfAttention)
+    assert isinstance(conv_layers[-2], models.SelfAttention)
