@@ -34,22 +34,29 @@ def construct_dataset_init_params_from_cl_args(cl_args):
         "model_task": cl_args.model_task,
         "target_width": cl_args.target_width,
         "target_column": cl_args.target_column,
-        "data_type": cl_args.data_type,
     }
 
     return dataset_class_common_args
 
 
 def save_target_transformer(
-    run_name: str,
+    run_folder: Path,
     target_column: str,
     target_transformer: Union[StandardScaler, LabelEncoder],
-) -> None:
+) -> Path:
+    """
+    :param run_folder: Current run folder, used to anchor saving of transformer.
+    :param target_column: The target column passed in for the current run.
+    :param target_transformer: The transformer object to save.
+    :return: Output path of where the target transformer was saved.
+    """
     target_transformer_outpath = get_transformer_path(
-        run_name, target_column, "target_transformer"
+        run_folder, target_column, "target_transformer"
     )
     ensure_path_exists(target_transformer_outpath)
     joblib.dump(target_transformer, target_transformer_outpath)
+
+    return target_transformer_outpath
 
 
 def set_up_datasets(cl_args: Namespace) -> Tuple[al_datasets, al_datasets]:
@@ -71,8 +78,9 @@ def set_up_datasets(cl_args: Namespace) -> Tuple[al_datasets, al_datasets]:
         target_transformer=train_dataset.target_transformer,
     )
 
+    run_folder = Path("./runs", cl_args.run_name)
     save_target_transformer(
-        cl_args.run_name, cl_args.target_column, train_dataset.target_transformer
+        run_folder, cl_args.target_column, train_dataset.target_transformer
     )
 
     assert len(train_dataset) > len(valid_dataset)
@@ -101,7 +109,6 @@ class ArrayDatasetBase(Dataset):
         target_height: int = 4,
         target_width: int = None,
         na_augment: float = 0.0,
-        data_type: str = "packbits",
     ):
         super().__init__()
 
@@ -109,7 +116,6 @@ class ArrayDatasetBase(Dataset):
         self.model_task = model_task
         self.target_height = target_height
         self.target_width = target_width
-        self.data_type = data_type
 
         self.samples: Union[List[Sample], None] = None
 
@@ -209,10 +215,6 @@ class MemoryArrayDataset(ArrayDatasetBase):
         pointing to filenames.
         """
         array = np.load(sample_fpath)
-        if self.data_type == "packbits":
-            array = np.unpackbits(array).reshape(self.target_height, -1)
-        elif self.data_type != "uint8":
-            raise ValueError
 
         array = array.astype(np.uint8)
         return torch.from_numpy(array).unsqueeze(0)
@@ -254,8 +256,6 @@ class DiskArrayDataset(ArrayDatasetBase):
     @property
     def data_width(self):
         data = np.load(self.samples[0].array)
-        if self.data_type == "packbits":
-            data = np.unpackbits(data).reshape(self.target_height, -1)
         return data.shape[1]
 
     def __getitem__(self, index):
@@ -264,9 +264,6 @@ class DiskArrayDataset(ArrayDatasetBase):
         array = np.load(sample.array)
         label = self.parse_label(sample.labels)
         sample_id = sample.sample_id
-
-        if self.data_type == "packbits":
-            array = np.unpackbits(array).reshape(self.target_height, -1)
 
         array = torch.from_numpy(array).unsqueeze(0)
         if self.na_augment:

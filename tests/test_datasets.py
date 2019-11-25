@@ -37,10 +37,7 @@ def check_dataset(
 
 @pytest.mark.parametrize(
     "create_test_data",
-    [
-        {"class_type": "binary", "data_type": "packbits"},
-        {"class_type": "multi", "data_type": "packbits"},
-    ],
+    [{"class_type": "binary"}, {"class_type": "multi"}],
     indirect=True,
 )
 def test_set_up_datasets(request, create_test_cl_args, create_test_data):
@@ -86,10 +83,7 @@ def test_set_up_datasets(request, create_test_cl_args, create_test_data):
 
 @pytest.mark.parametrize(
     "create_test_data",
-    [
-        {"class_type": "binary", "data_type": "uint8"},
-        {"class_type": "multi", "data_type": "uint8"},
-    ],
+    [{"class_type": "binary"}, {"class_type": "multi"}],
     indirect=True,
 )
 @pytest.mark.parametrize("dataset_type", ["memory", "disk"])

@@ -351,13 +351,7 @@ if __name__ == "__main__":
         default="infer",
         help="File to load SNPs from (.snp format).",
     )
-    parser.add_argument(
-        "--data_type",
-        type=str,
-        default="uint8",
-        choices=["packbits", "uint8"],
-        help="Format of the data being passed in.",
-    )
+
     parser.add_argument(
         "--memory_dataset",
         action="store_true",

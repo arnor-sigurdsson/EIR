@@ -443,6 +443,7 @@ def analyze_activations(
     acc_acts, acc_acts_masked = accumulate_activations(
         c, c.valid_dataset, act_func, proc_funcs
     )
+    np.save(str(outfolder / "all_acts.npy"), acc_acts)
 
     abs_grads = True if args.model_task == "reg" else False
     top_gradients_dict = get_snp_cols_w_top_grads(acc_acts, abs_grads=abs_grads)

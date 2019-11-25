@@ -57,9 +57,7 @@ def test_modify_train_cl_args_for_testing():
 
 
 @pytest.mark.parametrize(
-    "create_test_data",
-    [{"class_type": "regression", "data_type": "uint8"}],
-    indirect=True,
+    "create_test_data", [{"class_type": "regression"}], indirect=True
 )
 @pytest.mark.parametrize(
     "create_test_cl_args",
@@ -78,7 +76,7 @@ def test_load_labels_for_testing(
 
     run_path = Path(f"runs/{cl_args.run_name}/")
 
-    test_labels_dict = predict.load_labels_for_testing(cl_args)
+    test_labels_dict = predict.load_labels_for_testing(cl_args, run_path)
     df_test = pd.DataFrame.from_dict(test_labels_dict, orient="index")
 
     # make sure test data extra column was scaled correctly
@@ -92,9 +90,7 @@ def test_load_labels_for_testing(
         cleanup(run_path)
 
 
-@pytest.mark.parametrize(
-    "create_test_data", [{"class_type": "multi", "data_type": "uint8"}], indirect=True
-)
+@pytest.mark.parametrize("create_test_data", [{"class_type": "multi"}], indirect=True)
 @pytest.mark.parametrize(
     "create_test_cl_args",
     [
@@ -122,8 +118,8 @@ def test_set_up_test_dataset(
         classes_tested += ["Africa"]
     classes_tested.sort()
 
-    test_labels_dict = predict.load_labels_for_testing(cl_args)
-    test_dataset = predict.set_up_test_dataset(cl_args, test_labels_dict)
+    test_labels_dict = predict.load_labels_for_testing(cl_args, run_path)
+    test_dataset = predict.set_up_test_dataset(cl_args, test_labels_dict, run_path)
 
     exp_no_samples = n_per_class * len(classes_tested)
     check_dataset(test_dataset, exp_no_samples, classes_tested, cl_args)
@@ -140,9 +136,7 @@ def grab_latest_model_path(saved_models_folder: Path):
 
 
 @pytest.mark.parametrize(
-    "create_test_data",
-    [{"class_type": "multi", "data_type": "uint8", "split_to_test": True}],
-    indirect=True,
+    "create_test_data", [{"class_type": "multi", "split_to_test": True}], indirect=True
 )
 @pytest.mark.parametrize(
     "create_test_cl_args",

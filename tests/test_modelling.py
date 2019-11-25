@@ -71,12 +71,7 @@ def check_identified_snps(
 
 @pytest.mark.parametrize(
     "create_test_data",
-    [
-        {"class_type": "binary", "data_type": "packbits"},
-        {"class_type": "multi", "data_type": "packbits"},
-        {"class_type": "binary", "data_type": "uint8"},
-        {"class_type": "multi", "data_type": "uint8"},
-    ],
+    [{"class_type": "binary"}, {"class_type": "multi"}],
     indirect=True,
 )
 def test_classification_snp_identification(
@@ -141,9 +136,7 @@ def test_classification_snp_identification(
 
 
 @pytest.mark.parametrize(
-    "create_test_data",
-    [{"class_type": "regression", "data_type": "packbits"}],
-    indirect=True,
+    "create_test_data", [{"class_type": "regression"}], indirect=True
 )
 def test_regression(
     create_test_data,

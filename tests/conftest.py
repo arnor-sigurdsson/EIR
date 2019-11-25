@@ -49,7 +49,6 @@ def args_config():
             "valid_size": 0.05,
             "label_file": "REPLACE_ME",
             "target_column": "Origin",
-            "data_type": "packbits",
             "data_width": 1000,
             "resblocks": None,
             "device": "cuda:0" if cuda.is_available() else "cpu",
@@ -102,13 +101,7 @@ def create_test_cl_args(request, args_config, create_test_data):
     args_config.sample_interval = 100
     args_config.target_width = n_snps
     args_config.data_width = n_snps
-    args_config.run_name = (
-        args_config.run_name
-        + "_"
-        + test_data_params["class_type"]
-        + "_"
-        + test_data_params["data_type"]
-    )
+    args_config.run_name = args_config.run_name + "_" + test_data_params["class_type"]
 
     # If tests need to have their own config different from the base defined above,
     # only supporting custom_cl_args hardcoded for now
@@ -198,9 +191,6 @@ def create_test_data(request, tmp_path):
             )
 
             arr_to_save = cur_test_array.astype(np.uint8)
-            if test_data_params["data_type"] == "packbits":
-                arr_to_save = np.packbits(arr_to_save)
-
             np.save(outpath, arr_to_save)
 
             if test_data_params["class_type"] in ("binary", "multi"):
@@ -251,7 +241,6 @@ def create_test_dataset(create_test_data, create_test_cl_args):
 
     cl_args = create_test_cl_args
     cl_args.data_folder = str(path / "test_arrays")
-    cl_args.data_type = test_data_params["data_type"]
 
     run_path = Path(f"runs/{cl_args.run_name}/")
 
