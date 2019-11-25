@@ -278,6 +278,10 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        "--sa", action="store_True", help="Wheter to add self attention to the network."
+    )
+
+    parser.add_argument(
         "--target_width",
         type=int,
         default=None,
