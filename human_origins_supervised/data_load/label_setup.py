@@ -197,9 +197,8 @@ def _split_df(df: pd.DataFrame, valid_size: Union[int, float]) -> al_train_val_d
     return df_labels_train, df_labels_valid
 
 
-def get_transformer_path(run_name: str, column_name: str, name: str):
-    run_folder = Path("./runs", run_name)
-    scaler_path = run_folder / "transformers" / f"{column_name}_{name}.save"
+def get_transformer_path(run_path: Path, column_name: str, name: str) -> Path:
+    scaler_path = run_path / "transformers" / f"{column_name}_{name}.save"
 
     return scaler_path
 
@@ -214,32 +213,50 @@ def get_target_transformer(model_task):
 
 
 def scale_non_target_continuous_columns(
-    df: pd.DataFrame, reg_col: str, run_name: str, scaler_path: Path = None
+    df: pd.DataFrame, continuous_column: str, run_folder: Path, scaler_path: Path = None
 ) -> Tuple[pd.DataFrame, Path]:
     """
-    Used to scale continuous columns in label file.
+    Used to scale continuous columns in label dataframes. For training set, we fit a
+    new scaler whereas for validation / testing we are expected to pass in
+    `scaler_path`, which loads a fitted scaler and does the transformation on the
+    continuous column in question.
+
+    :param df: The dataframe to do the scaling on.
+    :param continuous_column: The column of continuous values to do the fit and/or
+    scaling on.
+    :param run_folder: Folder for the current run, used to set up paths .
+    :param scaler_path: If this is passed in, assume we are only transforming and load
+    scaler from this path.
+    :return:
     """
 
     def parse_colvals(column: pd.Series) -> np.ndarray:
         return column.values.astype(float).reshape(-1, 1)
 
-    scaler_outpath = get_transformer_path(run_name, reg_col, "standard_scaler")
     if not scaler_path:
         logger.debug("Fitting standard scaler to training df of shape %s.", df.shape)
+
+        scaler_outpath = get_transformer_path(
+            run_folder, continuous_column, "standard_scaler"
+        )
+
         scaler = StandardScaler()
-        scaler.fit(parse_colvals(df[reg_col]))
+        scaler.fit(parse_colvals(df[continuous_column]))
         ensure_path_exists(scaler_outpath)
         joblib.dump(scaler, scaler_outpath)
+        scaler_return_path = scaler_outpath
+
     else:
         logger.debug(
             "Transforming valid/test (shape %s) df with scaler fitted on training df.",
             df.shape,
         )
-        scaler = joblib.load(scaler_outpath)
+        scaler = joblib.load(scaler_path)
+        scaler_return_path = scaler_path
 
-    df[reg_col] = scaler.transform(parse_colvals(df[reg_col]))
+    df[continuous_column] = scaler.transform(parse_colvals(df[continuous_column]))
 
-    return df, scaler_outpath
+    return df, scaler_return_path
 
 
 def _get_missing_stats_string(
@@ -283,13 +300,14 @@ def _process_train_and_label_dfs(
 
     # we make sure not to mess with the passed in CL arg, hence copy
     continuous_columns = cl_args.contn_columns[:]
+    run_folder = Path("./runs", cl_args.run_name)
 
     for continuous_column in continuous_columns:
         df_labels_train, scaler_path = scale_non_target_continuous_columns(
-            df_labels_train, continuous_column, cl_args.run_name
+            df_labels_train, continuous_column, run_folder
         )
         df_labels_valid, _ = scale_non_target_continuous_columns(
-            df_labels_valid, continuous_column, cl_args.run_name, scaler_path
+            df_labels_valid, continuous_column, run_folder, scaler_path
         )
 
     df_labels_train = handle_missing_label_values(df_labels_train, cl_args, "train df")
