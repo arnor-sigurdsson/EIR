@@ -70,6 +70,7 @@ def args_config():
             "first_kernel_expansion": 1,
             "first_stride_expansion": 1,
             "channel_exp_base": 5,
+            "sa": True,
             "rb_do": 0.0,
             "fc_do": 0.0,
             "memory_dataset": False,

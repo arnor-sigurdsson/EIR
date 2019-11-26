@@ -1,5 +1,5 @@
 from argparse import Namespace
-from typing import List, Union
+from typing import List, Union, Tuple
 
 from aislib import pytorch_utils
 import torch
@@ -15,45 +15,65 @@ logger = get_logger(__name__)
 
 class SelfAttention(nn.Module):
     def __init__(self, in_channels):
-        super().__init__()
+        super(SelfAttention, self).__init__()
         self.in_channels = in_channels
 
-        self.query_conv = nn.Conv2d(
-            in_channels=in_channels, out_channels=in_channels // 8, kernel_size=1
+        self.conv_theta = nn.Conv2d(
+            in_channels=in_channels,
+            out_channels=in_channels // 8,
+            kernel_size=1,
+            bias=False,
         )
-
-        self.key_conv = nn.Conv2d(
-            in_channels=in_channels, out_channels=in_channels // 8, kernel_size=1
+        self.conv_phi = nn.Conv2d(
+            in_channels=in_channels,
+            out_channels=in_channels // 8,
+            kernel_size=1,
+            bias=False,
         )
-
-        self.value_conv = nn.Conv2d(
-            in_channels=in_channels, out_channels=in_channels, kernel_size=1
+        self.conv_g = nn.Conv2d(
+            in_channels=in_channels,
+            out_channels=in_channels // 2,
+            kernel_size=1,
+            bias=False,
         )
-
-        self.gamma = nn.Parameter(torch.zeros(1))
-
+        self.conv_o = nn.Conv2d(
+            in_channels=in_channels // 2,
+            out_channels=in_channels,
+            kernel_size=1,
+            bias=False,
+        )
+        self.pool = nn.AvgPool2d((1, 4), stride=(1, 4), padding=0)
         self.softmax = nn.Softmax(dim=-1)
+        self.gamma = nn.Parameter(torch.zeros(1), True)
 
-    def forward(self, x, y=None):
-        batch_size, channels, width, height = x.size()
+    def forward(self, x):
+        _, ch, h, w = x.size()
 
-        proj_query = self.query_conv(x)
-        proj_query = proj_query.view(batch_size, -1, width * height).permute(0, 2, 1)
+        # Theta path
+        theta = self.conv_theta(x)
+        theta = theta.view(-1, ch // 8, h * w)
 
-        proj_key = self.key_conv(x)
-        proj_key = proj_key.view(batch_size, -1, width * height)
+        # Phi path
+        phi = self.conv_phi(x)
+        phi = self.pool(phi)
+        phi = phi.view(-1, ch // 8, h * w // 4)
 
-        energy = torch.bmm(proj_query, proj_key)
-        attention = self.softmax(energy)
-        attention = attention.permute(0, 2, 1)
+        # Attn map
+        attn = torch.bmm(theta.permute(0, 2, 1), phi)
+        attn = self.softmax(attn)
 
-        proj_value = self.value_conv(x)
-        proj_value = proj_value.view(batch_size, -1, width * height)
+        # g path
+        g = self.conv_g(x)
+        g = self.pool(g)
+        g = g.view(-1, ch // 2, h * w // 4)
 
-        out = torch.bmm(proj_value, attention)
-        out = out.view(batch_size, channels, width, height)
+        # Attn_g - o_conv
+        attn_g = torch.bmm(g, attn.permute(0, 2, 1))
+        attn_g = attn_g.view(-1, ch // 2, h, w)
+        attn_g = self.conv_o(attn_g)
 
-        out = self.gamma * out + x
+        # Out
+        out = x + self.gamma * attn_g
         return out
 
 
@@ -185,7 +205,7 @@ def get_block(
     layer_arch_idx: int,
     down_stride: int,
     cl_args: Namespace,
-) -> Block:
+) -> Tuple[Block, int]:
     ca = cl_args
 
     cur_conv = nn.Sequential(*conv_blocks)
@@ -205,7 +225,7 @@ def get_block(
         rb_do=ca.rb_do,
     )
 
-    return cur_layer
+    return cur_layer, cur_width
 
 
 def make_conv_layers(residual_blocks: List[int], cl_args: Namespace) -> List[nn.Module]:
@@ -245,13 +265,20 @@ def make_conv_layers(residual_blocks: List[int], cl_args: Namespace) -> List[nn.
         )
     ]
 
+    sa_added = False
     for layer_arch_idx, layer_arch_layers in enumerate(residual_blocks):
         for layer in range(layer_arch_layers):
-            cur_layer = get_block(conv_blocks, layer_arch_idx, down_stride_w, ca)
+            cur_layer, cur_width = get_block(
+                conv_blocks, layer_arch_idx, down_stride_w, ca
+            )
+
+            if cl_args.sa and cur_width < 1024 and not sa_added:
+                attention_channels = conv_blocks[-1].out_channels
+                conv_blocks.append(SelfAttention(attention_channels))
+                sa_added = True
+
             conv_blocks.append(cur_layer)
 
-    # attention_channels = base_layers[-2].out_channels
-    # base_layers.insert(-1, SelfAttention(attention_channels))
     return conv_blocks
 
 
