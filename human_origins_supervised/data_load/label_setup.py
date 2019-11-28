@@ -91,12 +91,12 @@ def _parse_label_df(
     in the label file (e.g. different operations for creating obesity labels or parsing
     country of origin).
 
-    If a column operaton is supposed to only be applied if its column is the target
+    If a column operation is supposed to only be applied if its column is the target
     variable, make sure it's not applied in other cases (e.g. if the column is a
     embedding / continuous input to another target).
 
     :param df: Dataframe to perform processing on.
-    :param column_ops: A dictionarity of colum names, where each value is a list
+    :param column_ops: A dictionary of column names, where each value is a list
     of tuples, where each tuple is a callable as the first element and the callable's
     arguments as the second element.
     :param target_column:
@@ -107,7 +107,7 @@ def _parse_label_df(
         if column_name in df.columns:
             for column_op in ops_funcs:
                 do_skip = (
-                    column_op.only_apply_if_target and column_name == target_column
+                    column_op.only_apply_if_target and column_name != target_column
                 )
                 if not do_skip:
                     func, args_dict = column_op.function, column_op.function_args
