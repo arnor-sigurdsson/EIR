@@ -53,9 +53,9 @@ def args_config():
             "resblocks": None,
             "device": "cuda:0" if cuda.is_available() else "cpu",
             "gpu_num": "0",
-            "lr": 1e-2,
+            "lr": 5e-3,
             "cycle_lr": True,
-            "wd": 1e-4,
+            "wd": 0.0,
             "n_cpu": 8,
             "n_epochs": 10,
             "run_name": "test_run",
@@ -70,7 +70,7 @@ def args_config():
             "first_kernel_expansion": 1,
             "first_stride_expansion": 1,
             "channel_exp_base": 5,
-            "sa": True,
+            "sa": False,
             "rb_do": 0.0,
             "fc_do": 0.0,
             "memory_dataset": False,
@@ -96,9 +96,12 @@ def create_test_cl_args(request, args_config, create_test_data):
     args_config.model_task = model_task
     args_config.label_file = str(test_path / "labels.csv")
     args_config.n_epochs = 5
+
     args_config.rb_do = 0.00
     args_config.fc_do = 0.00
+    args_config.wd = 0.00
     args_config.na_augment = 0.00
+
     args_config.sample_interval = 100
     args_config.target_width = n_snps
     args_config.data_width = n_snps

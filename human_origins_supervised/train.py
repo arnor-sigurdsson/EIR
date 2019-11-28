@@ -298,7 +298,9 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--sa", action="store_true", help="Wheter to add self attention to the network."
+        "--sa",
+        action="store_true",
+        help="Whether to add self attention to the network.",
     )
 
     parser.add_argument(
