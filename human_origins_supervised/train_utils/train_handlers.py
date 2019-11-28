@@ -6,7 +6,12 @@ from pathlib import Path
 from typing import List, Callable, Union, Tuple, TYPE_CHECKING
 
 from aislib.misc_utils import get_logger
-from ignite.contrib.handlers import ProgressBar, CosineAnnealingScheduler
+from ignite.contrib.handlers import (
+    ProgressBar,
+    CosineAnnealingScheduler,
+    LinearCyclicalScheduler,
+    ConcatScheduler,
+)
 from ignite.engine import Events, Engine
 from ignite.handlers import ModelCheckpoint
 from ignite.metrics import RunningAverage
@@ -65,18 +70,36 @@ class HandlerConfig:
     monitoring_metrics: List[str]
 
 
-def get_lr_scheduler(optimizer, start_lr, end_lr, cycle_iter_size):
-    scheduler = CosineAnnealingScheduler(
+def get_lr_scheduler(
+    optimizer, start_lr, end_lr, cycle_iter_size, do_warmup: bool = True
+):
+
+    scheduler_1 = LinearCyclicalScheduler(
         optimizer,
         "lr",
-        start_lr,
-        end_lr,
+        start_value=start_lr,
+        end_value=end_lr,
+        cycle_size=cycle_iter_size,
+    )
+
+    scheduler_2 = CosineAnnealingScheduler(
+        optimizer,
+        "lr",
+        start_value=start_lr,
+        end_value=end_lr,
         cycle_size=cycle_iter_size,
         cycle_mult=2,
         start_value_mult=1,
     )
 
-    return scheduler
+    if do_warmup:
+        scheduler = ConcatScheduler(
+            schedulers=[scheduler_1, scheduler_2], durations=[cycle_iter_size]
+        )
+
+        return scheduler
+
+    return scheduler_2
 
 
 def attach_metrics(engine: Engine, handler_config: HandlerConfig) -> None:

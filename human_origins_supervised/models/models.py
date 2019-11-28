@@ -1,5 +1,5 @@
 from argparse import Namespace
-from typing import List, Union
+from typing import List, Union, Tuple
 
 from aislib import pytorch_utils
 import torch
@@ -36,7 +36,7 @@ class SelfAttention(nn.Module):
             kernel_size=1,
             bias=False,
         )
-        self.conv_o_conv = nn.Conv2d(
+        self.conv_o = nn.Conv2d(
             in_channels=in_channels // 2,
             out_channels=in_channels,
             kernel_size=1,
@@ -70,7 +70,7 @@ class SelfAttention(nn.Module):
         # Attn_g - o_conv
         attn_g = torch.bmm(g, attn.permute(0, 2, 1))
         attn_g = attn_g.view(-1, ch // 2, h, w)
-        attn_g = self.conv_o_conv(attn_g)
+        attn_g = self.conv_o(attn_g)
 
         # Out
         out = x + self.gamma * attn_g
@@ -205,7 +205,7 @@ def get_block(
     layer_arch_idx: int,
     down_stride: int,
     cl_args: Namespace,
-) -> Block:
+) -> Tuple[Block, int]:
     ca = cl_args
 
     cur_conv = nn.Sequential(*conv_blocks)
@@ -225,7 +225,7 @@ def get_block(
         rb_do=ca.rb_do,
     )
 
-    return cur_layer
+    return cur_layer, cur_width
 
 
 def make_conv_layers(residual_blocks: List[int], cl_args: Namespace) -> List[nn.Module]:
@@ -265,14 +265,20 @@ def make_conv_layers(residual_blocks: List[int], cl_args: Namespace) -> List[nn.
         )
     ]
 
+    sa_added = False
     for layer_arch_idx, layer_arch_layers in enumerate(residual_blocks):
         for layer in range(layer_arch_layers):
-            cur_layer = get_block(conv_blocks, layer_arch_idx, down_stride_w, ca)
+            cur_layer, cur_width = get_block(
+                conv_blocks, layer_arch_idx, down_stride_w, ca
+            )
+
+            if cl_args.sa and cur_width < 1024 and not sa_added:
+                attention_channels = conv_blocks[-1].out_channels
+                conv_blocks.append(SelfAttention(attention_channels))
+                sa_added = True
+
             conv_blocks.append(cur_layer)
 
-    if cl_args.sa:
-        attention_channels = conv_blocks[-2].out_channels
-        conv_blocks.insert(-1, SelfAttention(attention_channels))
     return conv_blocks
 
 
