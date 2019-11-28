@@ -1,10 +1,15 @@
 import sys
-from typing import List, Dict, TYPE_CHECKING
+from typing import List, Dict, TYPE_CHECKING, Union
 import importlib
 import importlib.util
 from pathlib import Path
 
+from torch import nn
+from torch.utils.data import DataLoader
+from torch.optim.optimizer import Optimizer
+
 from aislib.misc_utils import get_logger
+from torch_lr_finder import LRFinder
 
 logger = get_logger(__name__)
 
@@ -83,3 +88,15 @@ def check_if_iteration_sample(
     condition_2 = iteration == n_iterations_per_epochs * n_epochs
 
     return condition_1 or condition_2
+
+
+def test_lr_range(
+    model: nn.Module,
+    optimizer: Optimizer,
+    criterion: Union[nn.CrossEntropyLoss, nn.MSELoss],
+    device: str,
+    train_dloader: DataLoader,
+) -> None:
+    lr_finder = LRFinder(model, optimizer, criterion, device)
+    lr_finder.range_test(train_dloader, end_lr=10, num_iter=100)
+    lr_finder.plot()

@@ -1,6 +1,7 @@
-from os.path import abspath
 import argparse
+import sys
 from dataclasses import dataclass
+from os.path import abspath
 from pathlib import Path
 from sys import platform
 from typing import Union, Tuple, List, Dict
@@ -27,8 +28,7 @@ from human_origins_supervised.models.embeddings import (
 from human_origins_supervised.models.models import Model
 from human_origins_supervised.train_utils.metric_funcs import select_metric_func
 from human_origins_supervised.train_utils.train_handlers import configure_trainer
-
-from torch_lr_finder import LRFinder
+from human_origins_supervised.train_utils.utils import test_lr_range
 
 torch.manual_seed(0)
 np.random.seed(0)
@@ -51,7 +51,7 @@ class Config:
     valid_dataset: torch.utils.data.Dataset
     model: nn.Module
     optimizer: Optimizer
-    criterion: nn.CrossEntropyLoss
+    criterion: Union[nn.CrossEntropyLoss, nn.MSELoss]
     labels_dict: Dict
     target_transformer: Union[LabelEncoder, StandardScaler]
     data_width: int
@@ -171,11 +171,9 @@ def main(cl_args: argparse.Namespace) -> None:
 
     criterion = nn.CrossEntropyLoss() if cl_args.model_task == "cls" else nn.MSELoss()
 
-    if cl_args.debug:
-        breakpoint()
-        lr_finder = LRFinder(model, optimizer, criterion, cl_args.device)
-        lr_finder.range_test(train_dloader, end_lr=10, num_iter=100)
-        lr_finder.plot()
+    if cl_args.find_lr:
+        test_lr_range(model, optimizer, criterion, cl_args.device, train_dloader)
+        sys.exit(0)
 
     config = Config(
         cl_args,
@@ -219,6 +217,15 @@ if __name__ == "__main__":
         "--batch_size", type=int, default=64, help="size of the batches"
     )
     parser.add_argument("--lr", type=float, default=1e-3, help="adam: learning rate")
+
+    parser.add_argument(
+        "--find_lr",
+        action="store_true",
+        help="Whether to perform a range test of different learning rates, with "
+        "the lower limit being what is passed in for the --lr flag. "
+        "Produces a plot and exits with status 0 before training if this flag "
+        "is active.",
+    )
 
     parser.add_argument("--cycle_lr", dest="cycle_lr", action="store_true")
     parser.set_defaults(cycle_lr=False)
