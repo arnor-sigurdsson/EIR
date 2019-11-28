@@ -98,5 +98,5 @@ def test_lr_range(
     train_dloader: DataLoader,
 ) -> None:
     lr_finder = LRFinder(model, optimizer, criterion, device)
-    lr_finder.range_test(train_dloader, end_lr=10, num_iter=100)
+    lr_finder.range_test(train_dloader, end_lr=10, num_iter=200)
     lr_finder.plot()

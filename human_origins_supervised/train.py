@@ -172,6 +172,10 @@ def main(cl_args: argparse.Namespace) -> None:
     criterion = nn.CrossEntropyLoss() if cl_args.model_task == "cls" else nn.MSELoss()
 
     if cl_args.find_lr:
+        logger.info(
+            "Running learning rate range test and exiting, results will be "
+            "saved to ./lr_search.png."
+        )
         test_lr_range(model, optimizer, criterion, cl_args.device, train_dloader)
         sys.exit(0)
 
@@ -229,6 +233,13 @@ if __name__ == "__main__":
 
     parser.add_argument("--cycle_lr", dest="cycle_lr", action="store_true")
     parser.set_defaults(cycle_lr=False)
+
+    parser.add_argument(
+        "--lr_lb",
+        type=float,
+        default=1e-4,
+        help="Lower bound for learning rate when using cycle_lr.",
+    )
 
     parser.add_argument(
         "--b1",
