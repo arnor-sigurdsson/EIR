@@ -19,7 +19,6 @@ black = "==19.3b0"
 pre-commit = "*"
 gpustat = "*"
 pyinstaller = "*"
-pycrypto = "*"
 
 [packages]
 pandas = "*"
