@@ -3,7 +3,7 @@ import json
 from argparse import Namespace
 from copy import deepcopy
 from pathlib import Path
-from typing import Union
+from typing import Union, List
 
 import joblib
 import numpy as np
@@ -25,6 +25,15 @@ torch.manual_seed(0)
 np.random.seed(0)
 
 logger = get_logger(__name__)
+
+
+def _get_classes(test_dataset: al_datasets, model_task: str) -> List[str]:
+
+    if model_task == "cls":
+        classes = test_dataset.target_transformer.classes_
+        return classes
+
+    return ["Regression"]
 
 
 def load_cl_args_config(cl_args_config_path: Path) -> Namespace:
@@ -147,10 +156,9 @@ def set_up_test_dataset(
 
 
 def save_predictions(
-    preds: torch.Tensor, test_dataset: al_datasets, outfolder: Path
+    preds: torch.Tensor, test_dataset: al_datasets, classes: List[str], outfolder: Path
 ) -> None:
     test_ids = [i.sample_id for i in test_dataset.samples]
-    classes = test_dataset.target_transformer.classes_
     df_preds = pd.DataFrame(data=preds, index=test_ids, columns=classes)
     df_preds.index.name = "ID"
 
@@ -181,10 +189,12 @@ def predict(predict_cl_args: Namespace) -> None:
         test_dataset, batch_size=predict_cl_args.batch_size, shuffle=False
     )
 
+    classes = _get_classes(test_dataset, train_cl_args.model_task)
+
     # Set up model
     model = load_model(
         Path(predict_cl_args.model_path),
-        len(test_dataset.target_transformer.classes_),
+        len(classes),
         train_cl_args,
         predict_cl_args.device,
     )
@@ -202,7 +212,7 @@ def predict(predict_cl_args: Namespace) -> None:
     preds_sm = F.softmax(preds, dim=1).cpu().numpy()
 
     # Evaluate / analyse predictions
-    save_predictions(preds_sm, test_dataset, outfolder)
+    save_predictions(preds_sm, test_dataset, classes, outfolder)
 
     if predict_cl_args.evaluate:
         vf.gen_eval_graphs(
