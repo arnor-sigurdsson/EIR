@@ -99,7 +99,7 @@ class AbstractBlock(nn.Module):
         self.down_stride_h = self.conv_1_kernel_h
 
         self.rb_do = nn.Dropout2d(rb_do)
-        self.act_1 = nn.ReLU()
+        self.act_1 = nn.PReLU()
 
         self.bn_1 = nn.BatchNorm2d(in_channels)
         self.conv_1 = nn.Conv2d(
@@ -116,7 +116,7 @@ class AbstractBlock(nn.Module):
         )
         conv_2_padding = conv_2_kernel_w // 2
 
-        self.act_2 = nn.ReLU()
+        self.act_2 = nn.PReLU()
         self.bn_2 = nn.BatchNorm2d(out_channels)
         self.conv_2 = nn.Conv2d(
             out_channels,
@@ -316,7 +316,7 @@ class Model(nn.Module):
 
         self.fc_1 = nn.Sequential(
             nn.BatchNorm1d(fc_1_in_features),
-            nn.ReLU(),
+            nn.PReLU(),
             nn.Linear(fc_1_in_features, fc_base, bias=False),
         )
 
@@ -326,19 +326,19 @@ class Model(nn.Module):
             fc_base += extra_dim
 
         self.fc_2 = nn.Sequential(
-            nn.BatchNorm1d(fc_base), nn.ReLU(), nn.Linear(fc_base, fc_base, bias=False)
+            nn.BatchNorm1d(fc_base), nn.PReLU(), nn.Linear(fc_base, fc_base, bias=False)
         )
 
         self.fc_3 = nn.Sequential(
             nn.BatchNorm1d(fc_base),
-            nn.ReLU(),
+            nn.PReLU(),
             nn.Dropout(cl_args.fc_do),
             nn.Linear(fc_base, self.num_classes),
         )
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
+                nn.init.kaiming_normal_(m.weight, a=0.25, mode="fan_out")
             elif isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.BatchNorm1d):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
