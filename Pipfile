@@ -19,7 +19,6 @@ black = "==19.3b0"
 pre-commit = "*"
 gpustat = "*"
 pyinstaller = "*"
-pycrypto = "*"
 
 [packages]
 pandas = "*"
@@ -37,6 +36,7 @@ shap = "==0.32.0"
 seaborn = "*"
 aislib = {ref = "dev",git = "ssh://git@github.com/arnor-sigurdsson/aislib.git",editable = true}
 joblib = "*"
+lr-finder = {editable = true,git = "ssh://git@github.com/arnor-sigurdsson/lr-finder.git"}
 
 [requires]
 python_version = "3.7"

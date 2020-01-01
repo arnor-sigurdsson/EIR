@@ -285,7 +285,7 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
 
     if args.cycle_lr:
         scheduler = get_lr_scheduler(
-            config.optimizer, args.lr, 1e-4, len(config.train_loader)
+            config.optimizer, args.lr, args.lr_lb, len(config.train_loader)
         )
         trainer.add_event_handler(Events.ITERATION_STARTED, scheduler)
 
