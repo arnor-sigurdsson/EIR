@@ -13,6 +13,12 @@ from .model_utils import find_no_resblocks_needed
 logger = get_logger(__name__)
 
 
+def get_model(model_type: str) -> Union["CNNModel", "MLPModel"]:
+    if model_type == "cnn":
+        return CNNModel
+    return MLPModel
+
+
 class SelfAttention(nn.Module):
     def __init__(self, in_channels):
         super(SelfAttention, self).__init__()
@@ -99,7 +105,7 @@ class AbstractBlock(nn.Module):
         self.down_stride_h = self.conv_1_kernel_h
 
         self.rb_do = nn.Dropout2d(rb_do)
-        self.act_1 = nn.ReLU()
+        self.act_1 = nn.PReLU()
 
         self.bn_1 = nn.BatchNorm2d(in_channels)
         self.conv_1 = nn.Conv2d(
@@ -116,7 +122,7 @@ class AbstractBlock(nn.Module):
         )
         conv_2_padding = conv_2_kernel_w // 2
 
-        self.act_2 = nn.ReLU()
+        self.act_2 = nn.PReLU()
         self.bn_2 = nn.BatchNorm2d(out_channels)
         self.conv_2 = nn.Conv2d(
             out_channels,
@@ -154,7 +160,6 @@ class FirstBlock(AbstractBlock):
         delattr(self, "bn_2")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-
         out = self.conv_1(x)
         out = self.rb_do(out)
 
@@ -282,7 +287,7 @@ def make_conv_layers(residual_blocks: List[int], cl_args: Namespace) -> List[nn.
     return conv_blocks
 
 
-class Model(nn.Module):
+class ModelBase(nn.Module):
     def __init__(
         self,
         cl_args: Namespace,
@@ -303,45 +308,61 @@ class Model(nn.Module):
         if extra_continuous_inputs_columns:
             con_total_dim = len(self.extra_continuous_inputs_columns)
 
-        self.conv = nn.Sequential(*make_conv_layers(self.resblocks, cl_args))
+        self.fc_base = cl_args.fc_dim
 
-        self.data_size_after_conv = pytorch_utils.calc_size_after_conv_sequence(
-            cl_args.target_width, self.conv
-        )
-
-        self.no_out_channels = self.conv[-1].out_channels
-
-        fc_1_in_features = self.data_size_after_conv * self.no_out_channels
-        fc_base = cl_args.fc_dim
-
-        self.fc_1 = nn.Sequential(
-            nn.BatchNorm1d(fc_1_in_features),
-            nn.ReLU(),
-            nn.Linear(fc_1_in_features, fc_base, bias=False),
-        )
-
+        # TODO: Better to have this a method so fc_extra is explicitly defined?
         if emb_total_dim or con_total_dim:
             extra_dim = emb_total_dim + con_total_dim
             self.fc_extra = nn.Linear(extra_dim, extra_dim, bias=False)
-            fc_base += extra_dim
+            self.fc_base += extra_dim
+
+    @property
+    def fc_1_in_features(self):
+        raise NotImplementedError
+
+
+class CNNModel(ModelBase):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.conv = nn.Sequential(*make_conv_layers(self.resblocks, self.cl_args))
+
+        self.data_size_after_conv = pytorch_utils.calc_size_after_conv_sequence(
+            self.cl_args.target_width, self.conv
+        )
+        self.no_out_channels = self.conv[-1].out_channels
+
+        self.fc_1 = nn.Sequential(
+            nn.BatchNorm1d(self.fc_1_in_features),
+            nn.PReLU(),
+            nn.Linear(self.fc_1_in_features, self.cl_args.fc_dim, bias=False),
+        )
+
+        # Note that extra_fc os called here between fc_1 and fc_2
 
         self.fc_2 = nn.Sequential(
-            nn.BatchNorm1d(fc_base), nn.ReLU(), nn.Linear(fc_base, fc_base, bias=False)
+            nn.BatchNorm1d(self.fc_base),
+            nn.PReLU(),
+            nn.Linear(self.fc_base, self.fc_base, bias=False),
         )
 
         self.fc_3 = nn.Sequential(
-            nn.BatchNorm1d(fc_base),
-            nn.ReLU(),
-            nn.Dropout(cl_args.fc_do),
-            nn.Linear(fc_base, self.num_classes),
+            nn.BatchNorm1d(self.fc_base),
+            nn.PReLU(),
+            nn.Dropout(self.cl_args.fc_do),
+            nn.Linear(self.fc_base, self.num_classes),
         )
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
+                nn.init.kaiming_normal_(m.weight, a=0.25, mode="fan_out")
             elif isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.BatchNorm1d):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
+
+    @property
+    def fc_1_in_features(self):
+        return self.no_out_channels * self.data_size_after_conv
 
     def forward(self, x: torch.Tensor, extra_inputs: torch.Tensor = None):
         out = self.conv(x)
@@ -373,3 +394,44 @@ class Model(nn.Module):
             )
             return residual_blocks
         return self.cl_args.resblocks
+
+
+class MLPModel(ModelBase):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.fc_1 = nn.Sequential(
+            nn.Linear(self.fc_1_in_features, self.cl_args.fc_dim, bias=False),
+            nn.BatchNorm1d(self.cl_args.fc_dim),
+            nn.PReLU(),
+        )
+
+        # Note that extra_fc os called here between fc_1 and fc_2
+
+        self.fc_2 = nn.Sequential(
+            nn.Linear(self.fc_base, self.fc_base, bias=False),
+            nn.BatchNorm1d(self.fc_base),
+            nn.PReLU(),
+        )
+
+        self.fc_3 = nn.Sequential(
+            nn.Dropout(self.cl_args.fc_do), nn.Linear(self.fc_base, self.num_classes)
+        )
+
+    @property
+    def fc_1_in_features(self):
+        return self.cl_args.target_width * 4
+
+    def forward(self, x: torch.Tensor, extra_inputs: torch.Tensor = None):
+        out = x.view(x.shape[0], -1)
+
+        out = self.fc_1(out)
+
+        if extra_inputs is not None:
+            out_extra = self.fc_extra(extra_inputs)
+            out = torch.cat((out_extra, out), dim=1)
+
+        out = self.fc_2(out)
+        out = self.fc_3(out)
+
+        return out

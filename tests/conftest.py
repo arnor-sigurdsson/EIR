@@ -11,7 +11,7 @@ from torch.optim.adamw import AdamW
 from torch.utils.data import DataLoader
 
 from human_origins_supervised.data_load import datasets
-from human_origins_supervised.models.models import Model
+from human_origins_supervised.models.models import CNNModel
 
 np.random.seed(0)
 
@@ -54,6 +54,7 @@ def args_config():
             "device": "cuda:0" if cuda.is_available() else "cpu",
             "gpu_num": "0",
             "lr": 5e-3,
+            "lr_lb": 1e-4,
             "cycle_lr": True,
             "wd": 0.0,
             "n_cpu": 8,
@@ -226,7 +227,7 @@ def create_test_model(create_test_cl_args, create_test_dataset):
     cl_args = create_test_cl_args
     train_dataset, _ = create_test_dataset
 
-    model = Model(
+    model = CNNModel(
         cl_args,
         train_dataset.num_classes,
         extra_continuous_inputs_columns=cl_args.contn_columns,

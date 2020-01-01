@@ -1,6 +1,7 @@
-from os.path import abspath
 import argparse
+import sys
 from dataclasses import dataclass
+from os.path import abspath
 from pathlib import Path
 from sys import platform
 from typing import Union, Tuple, List, Dict
@@ -24,9 +25,10 @@ from human_origins_supervised.models.embeddings import (
     set_up_and_save_embeddings_dict,
     get_extra_inputs,
 )
-from human_origins_supervised.models.models import Model
+from human_origins_supervised.models.models import get_model
 from human_origins_supervised.train_utils.metric_funcs import select_metric_func
 from human_origins_supervised.train_utils.train_handlers import configure_trainer
+from human_origins_supervised.train_utils.utils import test_lr_range
 
 torch.manual_seed(0)
 np.random.seed(0)
@@ -49,7 +51,7 @@ class Config:
     valid_dataset: torch.utils.data.Dataset
     model: nn.Module
     optimizer: Optimizer
-    criterion: nn.CrossEntropyLoss
+    criterion: Union[nn.CrossEntropyLoss, nn.MSELoss]
     labels_dict: Dict
     target_transformer: Union[LabelEncoder, StandardScaler]
     data_width: int
@@ -150,7 +152,9 @@ def main(cl_args: argparse.Namespace) -> None:
     embedding_dict = set_up_and_save_embeddings_dict(
         cl_args.embed_columns, train_dataset.labels_dict, run_folder
     )
-    model: torch.nn.Module = Model(
+
+    model_class = get_model(cl_args.model_type)
+    model: torch.nn.Module = model_class(
         cl_args, train_dataset.num_classes, embedding_dict, cl_args.contn_columns
     )
     assert model.data_size_after_conv >= 8
@@ -168,6 +172,14 @@ def main(cl_args: argparse.Namespace) -> None:
     )
 
     criterion = nn.CrossEntropyLoss() if cl_args.model_task == "cls" else nn.MSELoss()
+
+    if cl_args.find_lr:
+        logger.info(
+            "Running learning rate range test and exiting, results will be "
+            "saved to ./lr_search.png."
+        )
+        test_lr_range(model, optimizer, criterion, cl_args.device, train_dloader)
+        sys.exit(0)
 
     config = Config(
         cl_args,
@@ -212,8 +224,24 @@ if __name__ == "__main__":
     )
     parser.add_argument("--lr", type=float, default=1e-3, help="adam: learning rate")
 
+    parser.add_argument(
+        "--find_lr",
+        action="store_true",
+        help="Whether to perform a range test of different learning rates, with "
+        "the lower limit being what is passed in for the --lr flag. "
+        "Produces a plot and exits with status 0 before training if this flag "
+        "is active.",
+    )
+
     parser.add_argument("--cycle_lr", dest="cycle_lr", action="store_true")
     parser.set_defaults(cycle_lr=False)
+
+    parser.add_argument(
+        "--lr_lb",
+        type=float,
+        default=1e-4,
+        help="Lower bound for learning rate when using cycle_lr.",
+    )
 
     parser.add_argument(
         "--b1",
@@ -233,6 +261,14 @@ if __name__ == "__main__":
         "--fc_dim",
         type=int,
         default=128,
+        help="base dimensionality of fully connected layers at the end of the network",
+    )
+
+    parser.add_argument(
+        "--model_type",
+        type=str,
+        default="cnn",
+        choices=["cnn", "mlp"],
         help="base dimensionality of fully connected layers at the end of the network",
     )
 
