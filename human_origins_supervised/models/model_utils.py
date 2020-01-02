@@ -1,7 +1,8 @@
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Dict
 from argparse import Namespace
 
 import torch
+from torch import nn
 from torch.nn import Module
 from torch.utils.data import DataLoader
 
@@ -124,3 +125,18 @@ def gather_dloader_samples(
                 break
 
     return torch.stack(inputs_total), labels_total, ids_total
+
+
+def get_model_params(model: nn.Module, wd: float) -> List[Dict[str, Union[str, int]]]:
+    params = []
+    for name, param in model.named_parameters():
+        cur_dict = {"params": param}
+
+        if "act_" in name:
+            cur_dict["weight_decay"] = 0
+        else:
+            cur_dict["weight_decay"] = wd
+
+        params.append(cur_dict)
+
+    return params

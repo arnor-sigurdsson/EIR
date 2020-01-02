@@ -26,9 +26,11 @@ from human_origins_supervised.models.embeddings import (
     get_extra_inputs,
 )
 from human_origins_supervised.models.models import get_model
+from human_origins_supervised.models.model_utils import get_model_params
 from human_origins_supervised.train_utils.metric_funcs import select_metric_func
 from human_origins_supervised.train_utils.train_handlers import configure_trainer
 from human_origins_supervised.train_utils.utils import test_lr_range
+
 
 torch.manual_seed(0)
 np.random.seed(0)
@@ -163,12 +165,9 @@ def main(cl_args: argparse.Namespace) -> None:
         model = nn.DataParallel(model)
     model = model.to(device=cl_args.device)
 
+    params = get_model_params(model, cl_args.wd)
     optimizer = AdamW(
-        model.parameters(),
-        lr=cl_args.lr,
-        betas=(cl_args.b1, cl_args.b2),
-        weight_decay=cl_args.wd,
-        amsgrad=True,
+        params, lr=cl_args.lr, betas=(cl_args.b1, cl_args.b2), amsgrad=True
     )
 
     criterion = nn.CrossEntropyLoss() if cl_args.model_task == "cls" else nn.MSELoss()

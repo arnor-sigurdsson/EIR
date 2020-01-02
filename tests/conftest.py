@@ -11,6 +11,7 @@ from torch.optim.adamw import AdamW
 from torch.utils.data import DataLoader
 
 from human_origins_supervised.data_load import datasets
+from human_origins_supervised.models.model_utils import get_model_params
 from human_origins_supervised.models.models import CNNModel
 
 np.random.seed(0)
@@ -63,8 +64,8 @@ def args_config():
             "sample_interval": 20,
             "target_width": 1000,
             "act_classes": None,
-            "get_acts": True,
-            "benchmark": True,
+            "get_acts": False,
+            "benchmark": False,
             "kernel_width": 12,
             "fc_dim": 128,
             "down_stride": 4,
@@ -100,7 +101,7 @@ def create_test_cl_args(request, args_config, create_test_data):
 
     args_config.rb_do = 0.00
     args_config.fc_do = 0.00
-    args_config.wd = 0.00
+    args_config.wd = 1e-4
     args_config.na_augment = 0.00
 
     args_config.sample_interval = 100
@@ -275,12 +276,8 @@ def create_test_dloaders(create_test_dataset):
 def create_test_optimizer(create_test_cl_args, create_test_model):
     cl_args = create_test_cl_args
     model = create_test_model
-    optimizer = AdamW(
-        model.parameters(),
-        lr=cl_args.lr,
-        betas=(cl_args.b1, cl_args.b2),
-        weight_decay=cl_args.wd,
-        amsgrad=True,
-    )
+
+    params = get_model_params(model, cl_args.wd)
+    optimizer = AdamW(params, betas=(cl_args.b1, cl_args.b2), amsgrad=True)
 
     return optimizer

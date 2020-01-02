@@ -1,16 +1,37 @@
+from collections import OrderedDict
 from argparse import Namespace
 from typing import List, Union, Tuple
 
-from aislib import pytorch_utils
 import torch
+from aislib import pytorch_utils
 from aislib.misc_utils import get_logger
 from torch import nn
+from torch.nn import Module
+from torch.nn.parameter import Parameter
 
 from . import embeddings
 from .embeddings import al_emb_lookup_dict
 from .model_utils import find_no_resblocks_needed
 
 logger = get_logger(__name__)
+
+
+class Swish(Module):
+
+    __constants__ = ["num_parameters"]
+
+    def __init__(self, num_parameters=1, init=1):
+        self.num_parameters = num_parameters
+        super(Swish, self).__init__()
+        self.weight = Parameter(
+            torch.Tensor(num_parameters).fill_(init), requires_grad=True
+        )
+
+    def forward(self, input_):
+        return input_ * torch.sigmoid(self.weight * input_)
+
+    def extra_repr(self):
+        return "num_parameters={}".format(self.num_parameters)
 
 
 def get_model(model_type: str) -> Union["CNNModel", "MLPModel"]:
@@ -105,7 +126,7 @@ class AbstractBlock(nn.Module):
         self.down_stride_h = self.conv_1_kernel_h
 
         self.rb_do = nn.Dropout2d(rb_do)
-        self.act_1 = nn.PReLU()
+        self.act_1 = Swish()
 
         self.bn_1 = nn.BatchNorm2d(in_channels)
         self.conv_1 = nn.Conv2d(
@@ -122,7 +143,7 @@ class AbstractBlock(nn.Module):
         )
         conv_2_padding = conv_2_kernel_w // 2
 
-        self.act_2 = nn.PReLU()
+        self.act_2 = Swish()
         self.bn_2 = nn.BatchNorm2d(out_channels)
         self.conv_2 = nn.Conv2d(
             out_channels,
@@ -333,29 +354,44 @@ class CNNModel(ModelBase):
         self.no_out_channels = self.conv[-1].out_channels
 
         self.fc_1 = nn.Sequential(
-            nn.BatchNorm1d(self.fc_1_in_features),
-            nn.PReLU(),
-            nn.Linear(self.fc_1_in_features, self.cl_args.fc_dim, bias=False),
+            OrderedDict(
+                {
+                    "fc_1_bn_1": nn.BatchNorm1d(self.fc_1_in_features),
+                    "fc_1_act_1": Swish(),
+                    "fc_1_linear_1": nn.Linear(
+                        self.fc_1_in_features, self.cl_args.fc_dim, bias=False
+                    ),
+                }
+            )
+        )
+
+        self.fc_2 = nn.Sequential(
+            OrderedDict(
+                {
+                    "fc_2_bn_1": nn.BatchNorm1d(self.fc_base),
+                    "fc_2_act_1": Swish(),
+                    "fc_2_linear_1": nn.Linear(self.fc_base, self.fc_base, bias=False),
+                }
+            )
         )
 
         # Note that extra_fc os called here between fc_1 and fc_2
 
-        self.fc_2 = nn.Sequential(
-            nn.BatchNorm1d(self.fc_base),
-            nn.PReLU(),
-            nn.Linear(self.fc_base, self.fc_base, bias=False),
-        )
-
         self.fc_3 = nn.Sequential(
-            nn.BatchNorm1d(self.fc_base),
-            nn.PReLU(),
-            nn.Dropout(self.cl_args.fc_do),
-            nn.Linear(self.fc_base, self.num_classes),
+            OrderedDict(
+                {
+                    "fc_3_bn_1": nn.BatchNorm1d(self.fc_base),
+                    "fc_3_act_1": Swish(),
+                    "fc_3_do_1": nn.Dropout(self.cl_args.fc_do),
+                    "fc_3_linear_1": nn.Linear(self.fc_base, self.num_classes),
+                }
+            )
         )
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, a=0.25, mode="fan_out")
+                # Swish slope is roughly 0.5 around 0
+                nn.init.kaiming_normal_(m.weight, a=0.5, mode="fan_out")
             elif isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.BatchNorm1d):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
@@ -401,21 +437,36 @@ class MLPModel(ModelBase):
         super().__init__(*args, **kwargs)
 
         self.fc_1 = nn.Sequential(
-            nn.Linear(self.fc_1_in_features, self.cl_args.fc_dim, bias=False),
-            nn.BatchNorm1d(self.cl_args.fc_dim),
-            nn.PReLU(),
+            OrderedDict(
+                {
+                    "fc_1_linear_1": nn.Linear(
+                        self.fc_1_in_features, self.cl_args.fc_dim, bias=False
+                    ),
+                    "fc_1_bn_1": nn.BatchNorm1d(self.cl_args.fc_dim),
+                    "fc_1_act_1": Swish(),
+                }
+            )
         )
 
         # Note that extra_fc os called here between fc_1 and fc_2
 
         self.fc_2 = nn.Sequential(
-            nn.Linear(self.fc_base, self.fc_base, bias=False),
-            nn.BatchNorm1d(self.fc_base),
-            nn.PReLU(),
+            OrderedDict(
+                {
+                    "fc_2_linear_1": nn.Linear(self.fc_base, self.fc_base, bias=False),
+                    "fc_2_bn_1": nn.BatchNorm1d(self.fc_base),
+                    "fc_2_act_1": Swish(),
+                }
+            )
         )
 
         self.fc_3 = nn.Sequential(
-            nn.Dropout(self.cl_args.fc_do), nn.Linear(self.fc_base, self.num_classes)
+            OrderedDict(
+                {
+                    "fc_3_do_1": nn.Dropout(self.cl_args.fc_do),
+                    "fc_3_linear_1": nn.Linear(self.fc_base, self.num_classes),
+                }
+            )
         )
 
     @property
