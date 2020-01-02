@@ -423,8 +423,8 @@ class MLPModel(ModelBase):
                     "fc_1_linear_1": nn.Linear(
                         self.fc_1_in_features, self.cl_args.fc_dim, bias=False
                     ),
-                    "fc_1_bn_1": nn.BatchNorm1d(self.cl_args.fc_dim),
                     "fc_1_act_1": Swish(),
+                    "fc_1_bn_1": nn.BatchNorm1d(self.cl_args.fc_dim),
                 }
             )
         )
@@ -435,8 +435,8 @@ class MLPModel(ModelBase):
             OrderedDict(
                 {
                     "fc_2_linear_1": nn.Linear(self.fc_base, self.fc_base, bias=False),
-                    "fc_2_bn_1": nn.BatchNorm1d(self.fc_base),
                     "fc_2_act_1": Swish(),
+                    "fc_2_bn_1": nn.BatchNorm1d(self.fc_base),
                 }
             )
         )
