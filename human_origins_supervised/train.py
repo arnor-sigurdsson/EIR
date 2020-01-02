@@ -159,7 +159,8 @@ def main(cl_args: argparse.Namespace) -> None:
     model: torch.nn.Module = model_class(
         cl_args, train_dataset.num_classes, embedding_dict, cl_args.contn_columns
     )
-    assert model.data_size_after_conv >= 8
+    if cl_args.model_type == "cnn":
+        assert model.data_size_after_conv >= 8
 
     if cl_args.multi_gpu:
         model = nn.DataParallel(model)
@@ -254,7 +255,7 @@ if __name__ == "__main__":
         default=0.999,
         help="adam: decay of second order momentum of gradient",
     )
-    parser.add_argument("--wd", type=float, default=0.0, help="Weight decay.")
+    parser.add_argument("--wd", type=float, default=1e-4, help="Weight decay.")
 
     parser.add_argument(
         "--fc_dim",

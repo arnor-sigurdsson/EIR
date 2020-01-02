@@ -1,37 +1,18 @@
-from collections import OrderedDict
 from argparse import Namespace
+from collections import OrderedDict
 from typing import List, Union, Tuple
 
 import torch
 from aislib import pytorch_utils
 from aislib.misc_utils import get_logger
+from aislib.pytorch_modules import Swish
 from torch import nn
-from torch.nn import Module
-from torch.nn.parameter import Parameter
 
 from . import embeddings
 from .embeddings import al_emb_lookup_dict
 from .model_utils import find_no_resblocks_needed
 
 logger = get_logger(__name__)
-
-
-class Swish(Module):
-
-    __constants__ = ["num_parameters"]
-
-    def __init__(self, num_parameters=1, init=1):
-        self.num_parameters = num_parameters
-        super(Swish, self).__init__()
-        self.weight = Parameter(
-            torch.Tensor(num_parameters).fill_(init), requires_grad=True
-        )
-
-    def forward(self, input_):
-        return input_ * torch.sigmoid(self.weight * input_)
-
-    def extra_repr(self):
-        return "num_parameters={}".format(self.num_parameters)
 
 
 def get_model(model_type: str) -> Union["CNNModel", "MLPModel"]:
