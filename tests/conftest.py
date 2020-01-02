@@ -79,6 +79,7 @@ def args_config():
             "embed_columns": [],
             "contn_columns": [],
             "na_augment": 0.0,
+            "model_type": "cnn",
             "custom_lib": None,
         }
     )
@@ -116,6 +117,9 @@ def create_test_cl_args(request, args_config, create_test_data):
         custom_cl_args = request.param["custom_cl_args"]
         for k, v in custom_cl_args.items():
             setattr(args_config, k, v)
+
+    # This is done after in case tests modify run_name
+    args_config.run_name += "_" + args_config.model_type
 
     return args_config
 
