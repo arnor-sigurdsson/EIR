@@ -11,7 +11,7 @@ from torch.optim.adamw import AdamW
 from torch.utils.data import DataLoader
 
 from human_origins_supervised.data_load import datasets
-from human_origins_supervised.models.models import Model
+from human_origins_supervised.models.models import CNNModel
 
 np.random.seed(0)
 
@@ -78,6 +78,7 @@ def args_config():
             "embed_columns": [],
             "contn_columns": [],
             "na_augment": 0.0,
+            "model_type": "cnn",
             "custom_lib": None,
         }
     )
@@ -115,6 +116,9 @@ def create_test_cl_args(request, args_config, create_test_data):
         custom_cl_args = request.param["custom_cl_args"]
         for k, v in custom_cl_args.items():
             setattr(args_config, k, v)
+
+    # This is done after in case tests modify run_name
+    args_config.run_name += "_" + args_config.model_type
 
     return args_config
 
@@ -227,7 +231,7 @@ def create_test_model(create_test_cl_args, create_test_dataset):
     cl_args = create_test_cl_args
     train_dataset, _ = create_test_dataset
 
-    model = Model(
+    model = CNNModel(
         cl_args,
         train_dataset.num_classes,
         extra_continuous_inputs_columns=cl_args.contn_columns,

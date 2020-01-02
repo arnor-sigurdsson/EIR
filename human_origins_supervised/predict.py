@@ -19,7 +19,7 @@ from human_origins_supervised.data_load import datasets, label_setup
 from human_origins_supervised.data_load.datasets import al_datasets
 from human_origins_supervised.data_load.label_setup import al_label_dict
 from human_origins_supervised.models.model_utils import gather_pred_outputs_from_dloader
-from human_origins_supervised.models.models import Model
+from human_origins_supervised.models.models import CNNModel
 
 torch.manual_seed(0)
 np.random.seed(0)
@@ -64,7 +64,7 @@ def load_model(
         )
         embeddings_dict = joblib.load(model_embeddings_path)
 
-    model: torch.nn.Module = Model(
+    model: torch.nn.Module = CNNModel(
         train_cl_args, n_classes, embeddings_dict, train_cl_args.contn_columns
     )
     device_for_load = torch.device(device)

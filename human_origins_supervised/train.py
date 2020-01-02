@@ -25,7 +25,7 @@ from human_origins_supervised.models.embeddings import (
     set_up_and_save_embeddings_dict,
     get_extra_inputs,
 )
-from human_origins_supervised.models.models import Model
+from human_origins_supervised.models.models import get_model
 from human_origins_supervised.train_utils.metric_funcs import select_metric_func
 from human_origins_supervised.train_utils.train_handlers import configure_trainer
 from human_origins_supervised.train_utils.utils import test_lr_range
@@ -152,7 +152,9 @@ def main(cl_args: argparse.Namespace) -> None:
     embedding_dict = set_up_and_save_embeddings_dict(
         cl_args.embed_columns, train_dataset.labels_dict, run_folder
     )
-    model: torch.nn.Module = Model(
+
+    model_class = get_model(cl_args.model_type)
+    model: torch.nn.Module = model_class(
         cl_args, train_dataset.num_classes, embedding_dict, cl_args.contn_columns
     )
     assert model.data_size_after_conv >= 8
@@ -259,6 +261,14 @@ if __name__ == "__main__":
         "--fc_dim",
         type=int,
         default=128,
+        help="base dimensionality of fully connected layers at the end of the network",
+    )
+
+    parser.add_argument(
+        "--model_type",
+        type=str,
+        default="cnn",
+        choices=["cnn", "mlp"],
         help="base dimensionality of fully connected layers at the end of the network",
     )
 

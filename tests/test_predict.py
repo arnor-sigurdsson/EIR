@@ -9,7 +9,7 @@ from torch.nn import CrossEntropyLoss
 from conftest import cleanup
 from human_origins_supervised import predict
 from human_origins_supervised import train
-from human_origins_supervised.models.models import Model
+from human_origins_supervised.models.models import CNNModel
 from test_datasets import check_dataset
 
 
@@ -21,7 +21,7 @@ def test_load_model(args_config, tmp_path):
     """
 
     cl_args = args_config
-    model: torch.nn.Module = Model(cl_args, 1, None, cl_args.contn_columns).to(
+    model: torch.nn.Module = CNNModel(cl_args, 1, None, cl_args.contn_columns).to(
         device=cl_args.device
     )
 
