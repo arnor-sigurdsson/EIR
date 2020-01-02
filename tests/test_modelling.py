@@ -74,6 +74,14 @@ def check_identified_snps(
     [{"class_type": "binary"}, {"class_type": "multi"}],
     indirect=True,
 )
+@pytest.mark.parametrize(
+    "create_test_cl_args",
+    [
+        {"custom_cl_args": {"model_type": "cnn"}},
+        {"custom_cl_args": {"model_type": "mlp"}},
+    ],
+    indirect=True,
+)
 def test_classification_snp_identification(
     create_test_data,
     create_test_cl_args,
@@ -137,6 +145,14 @@ def test_classification_snp_identification(
 
 @pytest.mark.parametrize(
     "create_test_data", [{"class_type": "regression"}], indirect=True
+)
+@pytest.mark.parametrize(
+    "create_test_cl_args",
+    [
+        {"custom_cl_args": {"model_type": "cnn"}},
+        {"custom_cl_args": {"model_type": "mlp"}},
+    ],
+    indirect=True,
 )
 def test_regression(
     create_test_data,
