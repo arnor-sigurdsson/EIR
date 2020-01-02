@@ -157,7 +157,8 @@ def main(cl_args: argparse.Namespace) -> None:
     model: torch.nn.Module = model_class(
         cl_args, train_dataset.num_classes, embedding_dict, cl_args.contn_columns
     )
-    assert model.data_size_after_conv >= 8
+    if cl_args.model_type == 'cnn':
+        assert model.data_size_after_conv >= 8
 
     if cl_args.multi_gpu:
         model = nn.DataParallel(model)
