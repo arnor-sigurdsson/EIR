@@ -41,28 +41,6 @@ al_get_custom_handlers = Callable[["HandlerConfig"], al_get_custom_handles_retur
 logger = get_logger(__name__)
 
 
-class MyRunningAverage(RunningAverage):
-    def __init__(self, epoch_bound=True, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        self.epoch_bound = epoch_bound
-
-    def attach(self, engine, name):
-        if self.epoch_bound:
-            engine.add_event_handler(Events.EPOCH_STARTED, self.started)
-        engine.add_event_handler(Events.ITERATION_COMPLETED, self.iteration_completed)
-        engine.add_event_handler(Events.ITERATION_COMPLETED, self.completed, name)
-
-    def compute(self):
-        if self._value is None:
-            self._value = self._get_src_value()
-        else:
-            self._value = (
-                self._get_src_value() * self.alpha + (1.0 - self.alpha) * self._value
-            )
-        return self._value
-
-
 @dataclass
 class HandlerConfig:
     config: "Config"
@@ -142,9 +120,7 @@ def attach_metrics(engine: Engine, handler_config: HandlerConfig) -> None:
     """
     for metric in handler_config.monitoring_metrics:
         partial_func = partial(lambda x, metric_: x[metric_], metric_=metric)
-        MyRunningAverage(output_transform=partial_func, alpha=0.20).attach(
-            engine, metric
-        )
+        RunningAverage(output_transform=partial_func, alpha=0.95).attach(engine, metric)
 
 
 def log_stats(engine: Engine, handler_config: HandlerConfig) -> None:

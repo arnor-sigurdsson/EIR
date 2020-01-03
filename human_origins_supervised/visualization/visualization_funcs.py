@@ -5,7 +5,6 @@ from typing import List, Callable, Union
 import matplotlib
 import numpy as np
 import pandas as pd
-from scipy import interp
 from scipy.stats import pearsonr
 from sklearn.metrics import (
     roc_curve,
@@ -257,7 +256,7 @@ def generate_multi_class_roc_curve(
     # Then interpolate all ROC curves at this points
     mean_tpr = np.zeros_like(all_fpr)
     for i in range(n_classes):
-        mean_tpr += interp(all_fpr, fpr[i], tpr[i])
+        mean_tpr += np.interp(all_fpr, fpr[i], tpr[i])
 
     # Finally average it and compute AUC
     mean_tpr /= n_classes
