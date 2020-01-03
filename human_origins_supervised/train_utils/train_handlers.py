@@ -5,6 +5,8 @@ from functools import partial
 from pathlib import Path
 from typing import List, Callable, Union, Tuple, TYPE_CHECKING
 
+import matplotlib.pyplot as plt
+import numpy as np
 from aislib.misc_utils import get_logger
 from ignite.contrib.handlers import (
     ProgressBar,
@@ -72,13 +74,19 @@ class HandlerConfig:
 
 def get_lr_scheduler(
     optimizer, start_lr, end_lr, cycle_iter_size, do_warmup: bool = True
-):
+) -> Union[ConcatScheduler, CosineAnnealingScheduler]:
+
+    """
+    Note that the full cycle of the linear scheduler increases and decreases, hence
+    we use durations as cycle_iter_size // 2 to make the first scheduler only go for
+    the increasing phase.
+    """
 
     scheduler_1 = LinearCyclicalScheduler(
         optimizer,
         "lr",
-        start_value=start_lr,
-        end_value=end_lr,
+        start_value=end_lr,
+        end_value=start_lr,
         cycle_size=cycle_iter_size,
     )
 
@@ -94,12 +102,31 @@ def get_lr_scheduler(
 
     if do_warmup:
         scheduler = ConcatScheduler(
-            schedulers=[scheduler_1, scheduler_2], durations=[cycle_iter_size]
+            schedulers=[scheduler_1, scheduler_2], durations=[cycle_iter_size // 2]
         )
-
         return scheduler
 
     return scheduler_2
+
+
+def plot_lr_schedule(
+    scheduler: Union[ConcatScheduler, CosineAnnealingScheduler],
+    n_epochs: int,
+    cycle_iter_size: int,
+    output_folder: Path,
+):
+
+    simulated_vals = np.array(
+        scheduler.simulate_values(
+            num_events=n_epochs * cycle_iter_size,
+            schedulers=scheduler.schedulers,
+            durations=[cycle_iter_size // 2],
+        )
+    )
+
+    plt.plot(simulated_vals[:, 0], simulated_vals[:, 1])
+    plt.savefig(output_folder / "lr_schedule.png")
+    plt.close()
 
 
 def attach_metrics(engine: Engine, handler_config: HandlerConfig) -> None:
@@ -286,6 +313,12 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
     if args.cycle_lr:
         scheduler = get_lr_scheduler(
             config.optimizer, args.lr, args.lr_lb, len(config.train_loader)
+        )
+        plot_lr_schedule(
+            scheduler=scheduler,
+            n_epochs=args.n_epochs,
+            cycle_iter_size=len(config.train_loader),
+            output_folder=Path(run_folder),
         )
         trainer.add_event_handler(Events.ITERATION_STARTED, scheduler)
 
