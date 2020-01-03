@@ -18,7 +18,7 @@ from sklearn.preprocessing import StandardScaler, LabelEncoder
 from torch.utils.data import Dataset, DataLoader
 
 import human_origins_supervised.visualization.activation_visualization as av
-from human_origins_supervised.models import embeddings
+from human_origins_supervised.models.extra_inputs_module import get_extra_inputs
 from human_origins_supervised.models import model_utils
 from human_origins_supervised.models.model_utils import gather_dloader_samples
 from human_origins_supervised.train_utils.utils import check_if_iteration_sample
@@ -111,7 +111,7 @@ def accumulate_activations(
                     single_sample=single_sample, sample_label=sample_label
                 )
 
-            extra_inputs = embeddings.get_extra_inputs(
+            extra_inputs = get_extra_inputs(
                 args, list(sample_id), c.valid_dataset.labels_dict, c.model
             )
             # detach for shap
@@ -158,7 +158,7 @@ def get_shap_object(
         train_loader, device, n_background_samples
     )
 
-    extra_inputs = embeddings.get_extra_inputs(args, ids, c.labels_dict, c.model)
+    extra_inputs = get_extra_inputs(args, ids, c.labels_dict, c.model)
     # detach for shap
     if extra_inputs is not None:
         extra_inputs = extra_inputs.detach()

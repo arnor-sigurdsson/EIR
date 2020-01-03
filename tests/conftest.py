@@ -54,7 +54,7 @@ def args_config():
             "resblocks": None,
             "device": "cuda:0" if cuda.is_available() else "cpu",
             "gpu_num": "0",
-            "lr": 5e-3,
+            "lr": 1e-2,
             "lr_lb": 1e-4,
             "cycle_lr": True,
             "wd": 0.0,

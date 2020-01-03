@@ -78,6 +78,7 @@ target/
 # exclude data from source control by default
 data
 runs/
+/*.png
 
 # exclude custom modules for label file processing
 label_loading_ops/

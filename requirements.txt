@@ -1,7 +1,7 @@
 -i https://pypi.org/simple
 -e .
 -e git+ssh://git@github.com/arnor-sigurdsson/aislib.git@f1d66be83c0aa58f3bafe395913ec6290824f68e#egg=aislib
--e git+ssh://git@github.com/arnor-sigurdsson/lr-finder.git@859791fd97119bbd450496461bd5c68994023f91#egg=lr-finder
+-e git+ssh://git@github.com/arnor-sigurdsson/lr-finder.git@13a31cfc0bc0e4a3637f13a18fb051e1c4e43d28#egg=lr-finder
 attrs==19.3.0
 cffi==1.13.2
 cycler==0.10.0
@@ -29,7 +29,7 @@ pytest==5.3.2
 python-dateutil==2.8.1
 pytorch-ignite==0.2.1
 pytz==2019.3
-scikit-learn==0.22
+scikit-learn==0.22.1
 scipy==1.4.1
 seaborn==0.9.0
 shap==0.32.0

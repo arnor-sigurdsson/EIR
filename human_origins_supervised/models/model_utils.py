@@ -1,14 +1,20 @@
-from typing import List, Tuple, Union, Dict
 from argparse import Namespace
+from functools import partial
+from typing import List, Tuple, Union, Dict, TYPE_CHECKING
 
 import torch
 from torch import nn
 from torch.nn import Module
 from torch.utils.data import DataLoader
+from torch_lr_finder import LRFinder
 
-from human_origins_supervised.models import embeddings
 from human_origins_supervised.data_load.label_setup import al_label_dict
+from human_origins_supervised.models.extra_inputs_module import get_extra_inputs
 
+if TYPE_CHECKING:
+    from human_origins_supervised.train import Config
+
+# Aliases
 al_dloader_outputs = Tuple[torch.Tensor, Union[List[str], torch.LongTensor], List[str]]
 
 
@@ -85,7 +91,7 @@ def gather_pred_outputs_from_dloader(
     for inputs, labels, ids in data_loader:
         inputs = inputs.to(device=device, dtype=torch.float32)
 
-        extra_inputs = embeddings.get_extra_inputs(cl_args, ids, labels_dict, model)
+        extra_inputs = get_extra_inputs(cl_args, ids, labels_dict, model)
 
         outputs = predict_on_batch(model, (inputs, extra_inputs))
 
@@ -140,3 +146,22 @@ def get_model_params(model: nn.Module, wd: float) -> List[Dict[str, Union[str, i
         params.append(cur_dict)
 
     return params
+
+
+def test_lr_range(config: "Config") -> None:
+
+    c = config
+
+    extra_inputs_hook = partial(
+        get_extra_inputs, cl_args=c.cl_args, labels_dict=c.labels_dict, model=c.model
+    )
+
+    lr_finder = LRFinder(
+        c.model,
+        c.optimizer,
+        c.criterion,
+        c.cl_args.device,
+        extra_inputs_hook=extra_inputs_hook,
+    )
+    lr_finder.range_test(c.train_loader, end_lr=10, num_iter=200)
+    lr_finder.plot()
