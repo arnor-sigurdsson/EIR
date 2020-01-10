@@ -3,7 +3,7 @@ import json
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
-from typing import List, Callable, Union, Tuple, TYPE_CHECKING
+from typing import List, Callable, Union, Tuple, Dict, TYPE_CHECKING
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -50,17 +50,20 @@ class HandlerConfig:
     monitoring_metrics: List[str]
 
 
-def get_lr_scheduler(
+def get_cyclic_lr_schedulr(
     optimizer, start_lr, end_lr, cycle_iter_size, do_warmup: bool = True
-) -> Union[ConcatScheduler, CosineAnnealingScheduler]:
+) -> Tuple[Union[ConcatScheduler, CosineAnnealingScheduler], Dict]:
 
     """
     Note that the full cycle of the linear scheduler increases and decreases, hence
     we use durations as cycle_iter_size // 2 to make the first scheduler only go for
     the increasing phase.
+
+    We return the arguments because the simulate_values are classmethods, which
+    we need to pass the arguments too.
     """
 
-    scheduler_1 = LinearCyclicalScheduler(
+    warmup_scheduler = LinearCyclicalScheduler(
         optimizer,
         "lr",
         start_value=end_lr,
@@ -68,37 +71,39 @@ def get_lr_scheduler(
         cycle_size=cycle_iter_size,
     )
 
-    scheduler_2 = CosineAnnealingScheduler(
-        optimizer,
-        "lr",
-        start_value=start_lr,
-        end_value=end_lr,
-        cycle_size=cycle_iter_size,
-        cycle_mult=2,
-        start_value_mult=1,
-    )
+    cosine_scheduler_kwargs = {
+        "optimizer": optimizer,
+        "param_name": "lr",
+        "start_value": start_lr,
+        "end_value": end_lr,
+        "cycle_size": cycle_iter_size,
+        "cycle_mult": 2,
+        "start_value_mult": 1,
+    }
+    cosine_anneal_scheduler = CosineAnnealingScheduler(**cosine_scheduler_kwargs)
 
     if do_warmup:
-        scheduler = ConcatScheduler(
-            schedulers=[scheduler_1, scheduler_2], durations=[cycle_iter_size // 2]
-        )
-        return scheduler
+        concat_scheduler_kwargs = {
+            "schedulers": [warmup_scheduler, cosine_anneal_scheduler],
+            "durations": [cycle_iter_size // 2],
+        }
+        scheduler = ConcatScheduler(**concat_scheduler_kwargs)
+        return scheduler, concat_scheduler_kwargs
 
-    return scheduler_2
+    return cosine_anneal_scheduler, cosine_scheduler_kwargs
 
 
 def plot_lr_schedule(
     scheduler: Union[ConcatScheduler, CosineAnnealingScheduler],
     n_epochs: int,
     cycle_iter_size: int,
+    scheduler_args: Dict,
     output_folder: Path,
 ):
 
     simulated_vals = np.array(
         scheduler.simulate_values(
-            num_events=n_epochs * cycle_iter_size,
-            schedulers=scheduler.schedulers,
-            durations=[cycle_iter_size // 2],
+            num_events=n_epochs * cycle_iter_size, **scheduler_args
         )
     )
 
@@ -286,8 +291,13 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
         config, run_folder, run_name, pbar, monitoring_metrics
     )
 
+    for handler in evaluation_handler, activation_analysis_handler:
+        trainer.add_event_handler(
+            Events.ITERATION_COMPLETED, handler, handler_config=handler_config
+        )
+
     if args.cycle_lr:
-        scheduler = get_lr_scheduler(
+        scheduler, scheduler_args = get_cyclic_lr_schedulr(
             config.optimizer, args.lr, args.lr_lb, len(config.train_loader)
         )
         plot_lr_schedule(
@@ -295,13 +305,9 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
             n_epochs=args.n_epochs,
             cycle_iter_size=len(config.train_loader),
             output_folder=Path(run_folder),
+            scheduler_args=scheduler_args,
         )
         trainer.add_event_handler(Events.ITERATION_STARTED, scheduler)
-
-    for handler in evaluation_handler, activation_analysis_handler:
-        trainer.add_event_handler(
-            Events.ITERATION_COMPLETED, handler, handler_config=handler_config
-        )
 
     attach_metrics(trainer, handler_config=handler_config)
     pbar.attach(trainer, metric_names=handler_config.monitoring_metrics)
