@@ -26,9 +26,11 @@ from human_origins_supervised.models.embeddings import (
     get_extra_inputs,
 )
 from human_origins_supervised.models.models import get_model
+from human_origins_supervised.models.model_utils import get_model_params
 from human_origins_supervised.train_utils.metric_funcs import select_metric_func
 from human_origins_supervised.train_utils.train_handlers import configure_trainer
 from human_origins_supervised.train_utils.utils import test_lr_range
+
 
 torch.manual_seed(0)
 np.random.seed(0)
@@ -157,19 +159,16 @@ def main(cl_args: argparse.Namespace) -> None:
     model: torch.nn.Module = model_class(
         cl_args, train_dataset.num_classes, embedding_dict, cl_args.contn_columns
     )
-    if cl_args.model_type == 'cnn':
+    if cl_args.model_type == "cnn":
         assert model.data_size_after_conv >= 8
 
     if cl_args.multi_gpu:
         model = nn.DataParallel(model)
     model = model.to(device=cl_args.device)
 
+    params = get_model_params(model, cl_args.wd)
     optimizer = AdamW(
-        model.parameters(),
-        lr=cl_args.lr,
-        betas=(cl_args.b1, cl_args.b2),
-        weight_decay=cl_args.wd,
-        amsgrad=True,
+        params, lr=cl_args.lr, betas=(cl_args.b1, cl_args.b2), amsgrad=True
     )
 
     criterion = nn.CrossEntropyLoss() if cl_args.model_task == "cls" else nn.MSELoss()
@@ -256,7 +255,7 @@ if __name__ == "__main__":
         default=0.999,
         help="adam: decay of second order momentum of gradient",
     )
-    parser.add_argument("--wd", type=float, default=0.0, help="Weight decay.")
+    parser.add_argument("--wd", type=float, default=1e-4, help="Weight decay.")
 
     parser.add_argument(
         "--fc_dim",
