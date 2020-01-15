@@ -131,7 +131,8 @@ def main(cl_args: argparse.Namespace) -> None:
             torch.cuda.device_count(),
         )
 
-    # Currently as bug with OSX: https://github.com/pytorch/pytorch/issues/2125
+    # Currently as bug with OSX in torch 1.3.0:
+    # https://github.com/pytorch/pytorch/issues/2125
     nw = 0 if platform == "darwin" else 8
     train_dloader = DataLoader(
         train_dataset,
@@ -232,14 +233,20 @@ if __name__ == "__main__":
         "is active.",
     )
 
-    parser.add_argument("--cycle_lr", dest="cycle_lr", action="store_true")
-    parser.set_defaults(cycle_lr=False)
+    parser.add_argument(
+        "--lr_schedule",
+        type=str,
+        default=None,
+        choices=["cycle", "plateau"],
+        help="Whether to use cyclical or reduce on plateau learning rate schedule. "
+        "Otherwise keeps same learning rate.",
+    )
 
     parser.add_argument(
         "--lr_lb",
         type=float,
-        default=1e-4,
-        help="Lower bound for learning rate when using cycle_lr.",
+        default=0.0,
+        help="Lower bound for learning rate when using cyclical LR schedule.",
     )
 
     parser.add_argument(
