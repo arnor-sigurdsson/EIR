@@ -8,8 +8,8 @@ from aislib.misc_utils import get_logger
 from aislib.pytorch_modules import Swish
 from torch import nn
 
-from . import embeddings
-from .embeddings import al_emb_lookup_dict
+from . import extra_inputs_module
+from .extra_inputs_module import al_emb_lookup_dict
 from .model_utils import find_no_resblocks_needed
 
 logger = get_logger(__name__)
@@ -306,7 +306,7 @@ class ModelBase(nn.Module):
 
         emb_total_dim = con_total_dim = 0
         if embeddings_dict:
-            emb_total_dim = embeddings.attach_embeddings(self, embeddings_dict)
+            emb_total_dim = extra_inputs_module.attach_embeddings(self, embeddings_dict)
         if extra_continuous_inputs_columns:
             con_total_dim = len(self.extra_continuous_inputs_columns)
 

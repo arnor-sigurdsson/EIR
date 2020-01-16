@@ -3,8 +3,10 @@ import json
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
-from typing import List, Callable, Union, Tuple, TYPE_CHECKING
+from typing import List, Callable, Union, Tuple, Dict, TYPE_CHECKING
 
+import matplotlib.pyplot as plt
+import numpy as np
 from aislib.misc_utils import get_logger
 from ignite.contrib.handlers import (
     ProgressBar,
@@ -39,28 +41,6 @@ al_get_custom_handlers = Callable[["HandlerConfig"], al_get_custom_handles_retur
 logger = get_logger(__name__)
 
 
-class MyRunningAverage(RunningAverage):
-    def __init__(self, epoch_bound=True, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        self.epoch_bound = epoch_bound
-
-    def attach(self, engine, name):
-        if self.epoch_bound:
-            engine.add_event_handler(Events.EPOCH_STARTED, self.started)
-        engine.add_event_handler(Events.ITERATION_COMPLETED, self.iteration_completed)
-        engine.add_event_handler(Events.ITERATION_COMPLETED, self.completed, name)
-
-    def compute(self):
-        if self._value is None:
-            self._value = self._get_src_value()
-        else:
-            self._value = (
-                self._get_src_value() * self.alpha + (1.0 - self.alpha) * self._value
-            )
-        return self._value
-
-
 @dataclass
 class HandlerConfig:
     config: "Config"
@@ -70,36 +50,66 @@ class HandlerConfig:
     monitoring_metrics: List[str]
 
 
-def get_lr_scheduler(
+def get_cyclic_lr_schedulr(
     optimizer, start_lr, end_lr, cycle_iter_size, do_warmup: bool = True
-):
+) -> Tuple[Union[ConcatScheduler, CosineAnnealingScheduler], Dict]:
 
-    scheduler_1 = LinearCyclicalScheduler(
+    """
+    Note that the full cycle of the linear scheduler increases and decreases, hence
+    we use durations as cycle_iter_size // 2 to make the first scheduler only go for
+    the increasing phase.
+
+    We return the arguments because the simulate_values are classmethods, which
+    we need to pass the arguments too.
+    """
+
+    warmup_scheduler = LinearCyclicalScheduler(
         optimizer,
         "lr",
-        start_value=start_lr,
-        end_value=end_lr,
+        start_value=end_lr,
+        end_value=start_lr,
         cycle_size=cycle_iter_size,
     )
 
-    scheduler_2 = CosineAnnealingScheduler(
-        optimizer,
-        "lr",
-        start_value=start_lr,
-        end_value=end_lr,
-        cycle_size=cycle_iter_size,
-        cycle_mult=2,
-        start_value_mult=1,
-    )
+    cosine_scheduler_kwargs = {
+        "optimizer": optimizer,
+        "param_name": "lr",
+        "start_value": start_lr,
+        "end_value": end_lr,
+        "cycle_size": cycle_iter_size,
+        "cycle_mult": 2,
+        "start_value_mult": 1,
+    }
+    cosine_anneal_scheduler = CosineAnnealingScheduler(**cosine_scheduler_kwargs)
 
     if do_warmup:
-        scheduler = ConcatScheduler(
-            schedulers=[scheduler_1, scheduler_2], durations=[cycle_iter_size]
+        concat_scheduler_kwargs = {
+            "schedulers": [warmup_scheduler, cosine_anneal_scheduler],
+            "durations": [cycle_iter_size // 2],
+        }
+        scheduler = ConcatScheduler(**concat_scheduler_kwargs)
+        return scheduler, concat_scheduler_kwargs
+
+    return cosine_anneal_scheduler, cosine_scheduler_kwargs
+
+
+def plot_lr_schedule(
+    scheduler: Union[ConcatScheduler, CosineAnnealingScheduler],
+    n_epochs: int,
+    cycle_iter_size: int,
+    scheduler_args: Dict,
+    output_folder: Path,
+):
+
+    simulated_vals = np.array(
+        scheduler.simulate_values(
+            num_events=n_epochs * cycle_iter_size, **scheduler_args
         )
+    )
 
-        return scheduler
-
-    return scheduler_2
+    plt.plot(simulated_vals[:, 0], simulated_vals[:, 1])
+    plt.savefig(output_folder / "lr_schedule.png")
+    plt.close()
 
 
 def attach_metrics(engine: Engine, handler_config: HandlerConfig) -> None:
@@ -115,9 +125,7 @@ def attach_metrics(engine: Engine, handler_config: HandlerConfig) -> None:
     """
     for metric in handler_config.monitoring_metrics:
         partial_func = partial(lambda x, metric_: x[metric_], metric_=metric)
-        MyRunningAverage(output_transform=partial_func, alpha=0.20).attach(
-            engine, metric
-        )
+        RunningAverage(output_transform=partial_func, alpha=0.95).attach(engine, metric)
 
 
 def log_stats(engine: Engine, handler_config: HandlerConfig) -> None:
@@ -283,16 +291,23 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
         config, run_folder, run_name, pbar, monitoring_metrics
     )
 
-    if args.cycle_lr:
-        scheduler = get_lr_scheduler(
-            config.optimizer, args.lr, args.lr_lb, len(config.train_loader)
-        )
-        trainer.add_event_handler(Events.ITERATION_STARTED, scheduler)
-
     for handler in evaluation_handler, activation_analysis_handler:
         trainer.add_event_handler(
             Events.ITERATION_COMPLETED, handler, handler_config=handler_config
         )
+
+    if args.cycle_lr:
+        scheduler, scheduler_args = get_cyclic_lr_schedulr(
+            config.optimizer, args.lr, args.lr_lb, len(config.train_loader)
+        )
+        plot_lr_schedule(
+            scheduler=scheduler,
+            n_epochs=args.n_epochs,
+            cycle_iter_size=len(config.train_loader),
+            output_folder=Path(run_folder),
+            scheduler_args=scheduler_args,
+        )
+        trainer.add_event_handler(Events.ITERATION_STARTED, scheduler)
 
     attach_metrics(trainer, handler_config=handler_config)
     pbar.attach(trainer, metric_names=handler_config.monitoring_metrics)

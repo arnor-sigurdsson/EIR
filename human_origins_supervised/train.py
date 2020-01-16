@@ -8,7 +8,8 @@ from typing import Union, Tuple, List, Dict
 
 import numpy as np
 import torch
-from aislib.misc_utils import get_logger, ensure_path_exists
+from aislib.misc_utils import ensure_path_exists
+from aislib.misc_utils import get_logger
 from ignite.engine import Engine
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from torch import nn
@@ -21,16 +22,14 @@ from human_origins_supervised.data_load.data_loading_funcs import (
     get_weighted_random_sampler,
 )
 from human_origins_supervised.models import model_utils
-from human_origins_supervised.models.embeddings import (
+from human_origins_supervised.models.extra_inputs_module import (
     set_up_and_save_embeddings_dict,
     get_extra_inputs,
 )
+from human_origins_supervised.models.model_utils import get_model_params, test_lr_range
 from human_origins_supervised.models.models import get_model
-from human_origins_supervised.models.model_utils import get_model_params
 from human_origins_supervised.train_utils.metric_funcs import select_metric_func
 from human_origins_supervised.train_utils.train_handlers import configure_trainer
-from human_origins_supervised.train_utils.utils import test_lr_range
-
 
 torch.manual_seed(0)
 np.random.seed(0)
@@ -173,14 +172,6 @@ def main(cl_args: argparse.Namespace) -> None:
 
     criterion = nn.CrossEntropyLoss() if cl_args.model_task == "cls" else nn.MSELoss()
 
-    if cl_args.find_lr:
-        logger.info(
-            "Running learning rate range test and exiting, results will be "
-            "saved to ./lr_search.png."
-        )
-        test_lr_range(model, optimizer, criterion, cl_args.device, train_dloader)
-        sys.exit(0)
-
     config = Config(
         cl_args,
         train_dloader,
@@ -193,6 +184,14 @@ def main(cl_args: argparse.Namespace) -> None:
         train_dataset.target_transformer,
         train_dataset.data_width,
     )
+
+    if cl_args.find_lr:
+        logger.info(
+            "Running learning rate range test and exiting, results will be "
+            "saved to ./lr_search.png."
+        )
+        test_lr_range(config)
+        sys.exit(0)
 
     no_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     logger.info(
@@ -255,7 +254,7 @@ if __name__ == "__main__":
         default=0.999,
         help="adam: decay of second order momentum of gradient",
     )
-    parser.add_argument("--wd", type=float, default=1e-4, help="Weight decay.")
+    parser.add_argument("--wd", type=float, default=0.00, help="Weight decay.")
 
     parser.add_argument(
         "--fc_dim",

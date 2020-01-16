@@ -54,10 +54,10 @@ def args_config():
             "resblocks": None,
             "device": "cuda:0" if cuda.is_available() else "cpu",
             "gpu_num": "0",
-            "lr": 5e-3,
-            "lr_lb": 1e-4,
+            "lr": 5e-2,
+            "lr_lb": 0.00,
             "cycle_lr": True,
-            "wd": 0.0,
+            "wd": 0.00,
             "n_cpu": 8,
             "n_epochs": 10,
             "run_name": "test_run",
@@ -102,7 +102,7 @@ def create_test_cl_args(request, args_config, create_test_data):
 
     args_config.rb_do = 0.00
     args_config.fc_do = 0.00
-    args_config.wd = 1e-4
+    args_config.wd = 0.00
     args_config.na_augment = 0.00
 
     args_config.sample_interval = 100
@@ -282,6 +282,8 @@ def create_test_optimizer(create_test_cl_args, create_test_model):
     model = create_test_model
 
     params = get_model_params(model, cl_args.wd)
-    optimizer = AdamW(params, betas=(cl_args.b1, cl_args.b2), amsgrad=True)
+    optimizer = AdamW(
+        params, lr=cl_args.lr, betas=(cl_args.b1, cl_args.b2), amsgrad=True
+    )
 
     return optimizer
