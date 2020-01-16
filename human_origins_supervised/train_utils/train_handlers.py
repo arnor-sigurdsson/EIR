@@ -70,7 +70,7 @@ def log_stats(engine: Engine, handler_config: HandlerConfig) -> None:
 
     for name, value in engine.state.metrics.items():
         if name.startswith("t_"):
-            log_string += f" | {name}: {value:.4f}"
+            log_string += f" | {name}: {value:.4g}"
 
     handler_config.pbar.log_message(log_string)
 
