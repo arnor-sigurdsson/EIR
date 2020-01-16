@@ -1,6 +1,6 @@
 from itertools import groupby
 from pathlib import Path
-from typing import List, Callable, Union
+from typing import List, Callable, Union, Tuple
 
 import matplotlib
 import numpy as np
@@ -23,11 +23,31 @@ import matplotlib.cm as cm
 from matplotlib.ticker import MaxNLocator
 
 
+def _get_min_or_max_funcs(columns: Tuple[str, str]) -> Union[np.argmax, np.argmin]:
+
+    func = np.argmax
+    metric = columns[0].split("_")[-1]
+    if metric in ["loss", "rmse"]:
+        return np.argmin
+
+    return func
+
+
+def _get_validation_extreme_value_and_iter(
+    extreme_index_func: Union[np.argmax, np.argmin], validation_values: pd.Series
+) -> Tuple[int, float]:
+
+    extreme_index: int = extreme_index_func(validation_values)
+    extreme_value: float = validation_values[extreme_index]
+
+    return extreme_index, extreme_value
+
+
 def generate_training_curve(
     metrics_filename: Path,
-    skiprows: int = 200,
-    cols: tuple = ("t_mcc", "v_mcc"),
-    hook_funcs=None,
+    skiprows: int = 0,
+    cols: Tuple[str, str] = ("", ""),
+    hook_funcs: List[Callable] = None,
 ) -> None:
 
     df = pd.read_csv(metrics_filename, usecols=cols)
@@ -38,7 +58,13 @@ def generate_training_curve(
     xlim_upper = df_cut.shape[0] + skiprows
     xticks = np.arange(1 + skiprows, xlim_upper + 1)
     validation_values = df_cut[cols[1]].dropna()
-    validation_xticks = validation_values.index
+    validation_xticks = validation_values.index + 1
+
+    extreme_func = _get_min_or_max_funcs(cols)
+    extreme_valid_idx, extreme_valid_value = _get_validation_extreme_value_and_iter(
+        extreme_func, validation_values
+    )
+
     line_1a = ax_1.plot(
         xticks,
         df_cut[cols[0]],
@@ -54,9 +80,11 @@ def generate_training_curve(
         c="red",
         linewidth=0.8,
         alpha=1.0,
-        label="Validation",
+        label=f"Validation (best: {extreme_valid_value:.4g} at {extreme_valid_idx+1})",
         zorder=0,
     )
+
+    ax_1.axhline(y=extreme_valid_value, linewidth=0.4, c="red", linestyle="dashed")
 
     ax_1.set_xlabel("Iteration")
     y_label = cols[0].split("_")[-1].upper()
@@ -163,7 +191,7 @@ def generate_regression_prediction_plot(
     ax.text(
         x=0.05,
         y=0.95,
-        s=f"R2 = {r2:.2f}, PCC = {pcc:.2f}",
+        s=f"R2 = {r2:.2g}, PCC = {pcc:.2g}",
         ha="left",
         va="top",
         transform=ax.transAxes,
