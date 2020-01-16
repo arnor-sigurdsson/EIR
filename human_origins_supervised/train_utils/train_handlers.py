@@ -16,16 +16,16 @@ from human_origins_supervised.train_utils.activation_analysis import (
 )
 from human_origins_supervised.train_utils.benchmark import benchmark
 from human_origins_supervised.train_utils.evaluation import evaluation_handler
+from human_origins_supervised.train_utils.lr_scheduling import (
+    set_up_scheduler,
+    attach_lr_scheduler,
+)
 from human_origins_supervised.train_utils.metric_funcs import get_train_metrics
 from human_origins_supervised.train_utils.utils import (
     check_if_iteration_sample,
     get_custom_module_submodule,
 )
 from human_origins_supervised.visualization import visualization_funcs as vf
-from human_origins_supervised.train_utils.lr_scheduling import (
-    set_up_scheduler,
-    attach_lr_scheduler,
-)
 
 if TYPE_CHECKING:
     from human_origins_supervised.train import Config
@@ -35,7 +35,7 @@ al_get_custom_handles_return_value = Union[Tuple[Callable, ...], Tuple[None]]
 al_get_custom_handlers = Callable[["HandlerConfig"], al_get_custom_handles_return_value]
 
 
-logger = get_logger(__name__)
+logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
 @dataclass
@@ -60,7 +60,9 @@ def attach_metrics(engine: Engine, handler_config: HandlerConfig) -> None:
     """
     for metric in handler_config.monitoring_metrics:
         partial_func = partial(lambda x, metric_: x[metric_], metric_=metric)
-        RunningAverage(output_transform=partial_func, alpha=0.95).attach(engine, metric)
+        RunningAverage(
+            output_transform=partial_func, alpha=0.98, epoch_bound=False
+        ).attach(engine, metric)
 
 
 def log_stats(engine: Engine, handler_config: HandlerConfig) -> None:

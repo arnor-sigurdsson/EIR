@@ -9,7 +9,7 @@ from torch.utils.data import WeightedRandomSampler
 if TYPE_CHECKING:
     from human_origins_supervised.data_load.datasets import ArrayDatasetBase
 
-logger = get_logger(__name__)
+logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
 def get_weighted_random_sampler(train_dataset: "ArrayDatasetBase"):

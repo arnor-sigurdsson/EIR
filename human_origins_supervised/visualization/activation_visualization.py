@@ -12,7 +12,7 @@ import matplotlib.cm as cm
 
 from aislib.misc_utils import get_logger
 
-logger = get_logger(__name__)
+logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
 def generate_snp_gradient_matrix(

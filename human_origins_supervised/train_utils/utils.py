@@ -6,7 +6,7 @@ from pathlib import Path
 
 from aislib.misc_utils import get_logger
 
-logger = get_logger(__name__)
+logger = get_logger(name=__name__, tqdm_compatible=True)
 
 if TYPE_CHECKING:
     from human_origins_supervised.data_load.label_setup import al_label_dict

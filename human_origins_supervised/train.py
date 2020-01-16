@@ -34,7 +34,7 @@ from human_origins_supervised.train_utils.train_handlers import configure_traine
 torch.manual_seed(0)
 np.random.seed(0)
 
-logger = get_logger(__name__)
+logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
 @dataclass
@@ -246,7 +246,7 @@ if __name__ == "__main__":
         "--lr_lb",
         type=float,
         default=0.0,
-        help="Lower bound for learning rate when using cyclical LR schedule.",
+        help="Lower bound for learning rate when using LR scheduling.",
     )
 
     parser.add_argument(

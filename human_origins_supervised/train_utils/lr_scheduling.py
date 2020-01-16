@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Tuple, Union, Dict, TYPE_CHECKING
 
 import numpy as np
+from aislib.misc_utils import get_logger
 from ignite.contrib.handlers import (
     ConcatScheduler,
     CosineAnnealingScheduler,
@@ -16,6 +17,8 @@ from human_origins_supervised.train_utils.utils import check_if_iteration_sample
 if TYPE_CHECKING:
     from human_origins_supervised.train_utils.train_handlers import HandlerConfig
     from human_origins_supervised.train import Config
+
+logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
 def _get_cyclic_lr_scheduler(
@@ -61,8 +64,24 @@ def _get_cyclic_lr_scheduler(
     return cosine_anneal_scheduler, cosine_scheduler_kwargs
 
 
+def _log_reduce_on_plateu_step(
+    reduce_on_plateau_scheduler: ReduceLROnPlateau, iteration: int
+) -> None:
+    sched = reduce_on_plateau_scheduler
+
+    prev_lr = sched.optimizer.param_groups[0]["lr"]
+    new_lr = prev_lr * sched.factor
+    if sched.num_bad_epochs >= sched.patience:
+        logger.info(
+            "Iter %d: Reducing learning rate from %.0e to %.0e.",
+            iteration,
+            prev_lr,
+            new_lr,
+        )
+
+
 def _step_reduce_on_plateau_scheduler(
-    engine: Engine, config: "Config", reduce_on_plateau_scheduler
+    engine: Engine, config: "Config", reduce_on_plateau_scheduler: ReduceLROnPlateau
 ) -> None:
     cl_args = config.cl_args
     iteration = engine.state.iteration
@@ -73,6 +92,7 @@ def _step_reduce_on_plateau_scheduler(
     )
 
     if do_step:
+        _log_reduce_on_plateu_step(reduce_on_plateau_scheduler, iteration)
         reduce_on_plateau_scheduler.step(engine.state.metrics["v_loss"])
 
 
@@ -116,7 +136,9 @@ def set_up_scheduler(
         )
 
     else:
-        lr_scheduler = ReduceLROnPlateau(c.optimizer, "min", patience=5)
+        lr_scheduler = ReduceLROnPlateau(
+            c.optimizer, "min", patience=10, min_lr=c.cl_args.lr_lb
+        )
 
     return lr_scheduler
 
