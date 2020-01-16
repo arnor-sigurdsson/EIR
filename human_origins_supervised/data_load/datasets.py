@@ -19,7 +19,7 @@ from human_origins_supervised.data_load.label_setup import (
 )
 from .data_loading_funcs import make_random_snps_missing
 
-logger = get_logger(__name__)
+logger = get_logger(name=__name__, tqdm_compatible=True)
 
 # Type Aliases
 al_datasets = Union["MemoryArrayDataset", "DiskArrayDataset"]

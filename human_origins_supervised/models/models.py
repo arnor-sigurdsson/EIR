@@ -12,7 +12,7 @@ from . import extra_inputs_module
 from .extra_inputs_module import al_emb_lookup_dict
 from .model_utils import find_no_resblocks_needed
 
-logger = get_logger(__name__)
+logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
 def get_model(model_type: str) -> Union["CNNModel", "MLPModel"]:

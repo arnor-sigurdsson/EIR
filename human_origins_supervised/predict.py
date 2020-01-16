@@ -24,7 +24,7 @@ from human_origins_supervised.models.models import CNNModel
 torch.manual_seed(0)
 np.random.seed(0)
 
-logger = get_logger(__name__)
+logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
 def _get_classes(test_dataset: al_datasets, model_task: str) -> List[str]:

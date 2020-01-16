@@ -13,7 +13,7 @@ from human_origins_supervised.train_utils.utils import get_custom_module_submodu
 
 from aislib.misc_utils import get_logger, ensure_path_exists
 
-logger = get_logger(__name__)
+logger = get_logger(name=__name__, tqdm_compatible=True)
 
 # Type Aliases
 al_all_column_ops = Dict[str, Tuple[ColumnOperation, ...]]

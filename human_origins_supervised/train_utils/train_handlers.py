@@ -3,17 +3,10 @@ import json
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
-from typing import List, Callable, Union, Tuple, Dict, TYPE_CHECKING
+from typing import List, Callable, Union, Tuple, TYPE_CHECKING
 
-import matplotlib.pyplot as plt
-import numpy as np
 from aislib.misc_utils import get_logger
-from ignite.contrib.handlers import (
-    ProgressBar,
-    CosineAnnealingScheduler,
-    LinearCyclicalScheduler,
-    ConcatScheduler,
-)
+from ignite.contrib.handlers import ProgressBar
 from ignite.engine import Events, Engine
 from ignite.handlers import ModelCheckpoint
 from ignite.metrics import RunningAverage
@@ -23,6 +16,10 @@ from human_origins_supervised.train_utils.activation_analysis import (
 )
 from human_origins_supervised.train_utils.benchmark import benchmark
 from human_origins_supervised.train_utils.evaluation import evaluation_handler
+from human_origins_supervised.train_utils.lr_scheduling import (
+    set_up_scheduler,
+    attach_lr_scheduler,
+)
 from human_origins_supervised.train_utils.metric_funcs import get_train_metrics
 from human_origins_supervised.train_utils.utils import (
     check_if_iteration_sample,
@@ -38,7 +35,7 @@ al_get_custom_handles_return_value = Union[Tuple[Callable, ...], Tuple[None]]
 al_get_custom_handlers = Callable[["HandlerConfig"], al_get_custom_handles_return_value]
 
 
-logger = get_logger(__name__)
+logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
 @dataclass
@@ -48,68 +45,6 @@ class HandlerConfig:
     run_name: str
     pbar: ProgressBar
     monitoring_metrics: List[str]
-
-
-def get_cyclic_lr_schedulr(
-    optimizer, start_lr, end_lr, cycle_iter_size, do_warmup: bool = True
-) -> Tuple[Union[ConcatScheduler, CosineAnnealingScheduler], Dict]:
-
-    """
-    Note that the full cycle of the linear scheduler increases and decreases, hence
-    we use durations as cycle_iter_size // 2 to make the first scheduler only go for
-    the increasing phase.
-
-    We return the arguments because the simulate_values are classmethods, which
-    we need to pass the arguments too.
-    """
-
-    warmup_scheduler = LinearCyclicalScheduler(
-        optimizer,
-        "lr",
-        start_value=end_lr,
-        end_value=start_lr,
-        cycle_size=cycle_iter_size,
-    )
-
-    cosine_scheduler_kwargs = {
-        "optimizer": optimizer,
-        "param_name": "lr",
-        "start_value": start_lr,
-        "end_value": end_lr,
-        "cycle_size": cycle_iter_size,
-        "cycle_mult": 2,
-        "start_value_mult": 1,
-    }
-    cosine_anneal_scheduler = CosineAnnealingScheduler(**cosine_scheduler_kwargs)
-
-    if do_warmup:
-        concat_scheduler_kwargs = {
-            "schedulers": [warmup_scheduler, cosine_anneal_scheduler],
-            "durations": [cycle_iter_size // 2],
-        }
-        scheduler = ConcatScheduler(**concat_scheduler_kwargs)
-        return scheduler, concat_scheduler_kwargs
-
-    return cosine_anneal_scheduler, cosine_scheduler_kwargs
-
-
-def plot_lr_schedule(
-    scheduler: Union[ConcatScheduler, CosineAnnealingScheduler],
-    n_epochs: int,
-    cycle_iter_size: int,
-    scheduler_args: Dict,
-    output_folder: Path,
-):
-
-    simulated_vals = np.array(
-        scheduler.simulate_values(
-            num_events=n_epochs * cycle_iter_size, **scheduler_args
-        )
-    )
-
-    plt.plot(simulated_vals[:, 0], simulated_vals[:, 1])
-    plt.savefig(output_folder / "lr_schedule.png")
-    plt.close()
 
 
 def attach_metrics(engine: Engine, handler_config: HandlerConfig) -> None:
@@ -125,7 +60,9 @@ def attach_metrics(engine: Engine, handler_config: HandlerConfig) -> None:
     """
     for metric in handler_config.monitoring_metrics:
         partial_func = partial(lambda x, metric_: x[metric_], metric_=metric)
-        RunningAverage(output_transform=partial_func, alpha=0.95).attach(engine, metric)
+        RunningAverage(
+            output_transform=partial_func, alpha=0.98, epoch_bound=False
+        ).attach(engine, metric)
 
 
 def log_stats(engine: Engine, handler_config: HandlerConfig) -> None:
@@ -236,7 +173,7 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
         save_as_state_dict=True,
     )
 
-    with open(handler_config.run_folder + "/cl_args.json", "w") as config_file:
+    with open(str(handler_config.run_folder / "cl_args.json"), "w") as config_file:
         config_dict = vars(args)
         json.dump(config_dict, config_file, sort_keys=True, indent=4)
 
@@ -281,11 +218,11 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
         Check if there is a better way to address the above, e.g. reordering
         the handlers in this func in the end?
     """
-    args = config.cl_args
-    run_folder = "runs/" + args.run_name
+    cl_args = config.cl_args
+    run_folder = Path("runs/", cl_args.run_name)
     pbar = ProgressBar()
-    run_name = args.run_name
-    monitoring_metrics = ["t_loss"] + get_train_metrics(model_task=args.model_task)
+    run_name = cl_args.run_name
+    monitoring_metrics = ["t_loss"] + get_train_metrics(model_task=cl_args.model_task)
 
     handler_config = HandlerConfig(
         config, run_folder, run_name, pbar, monitoring_metrics
@@ -296,18 +233,9 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
             Events.ITERATION_COMPLETED, handler, handler_config=handler_config
         )
 
-    if args.cycle_lr:
-        scheduler, scheduler_args = get_cyclic_lr_schedulr(
-            config.optimizer, args.lr, args.lr_lb, len(config.train_loader)
-        )
-        plot_lr_schedule(
-            scheduler=scheduler,
-            n_epochs=args.n_epochs,
-            cycle_iter_size=len(config.train_loader),
-            output_folder=Path(run_folder),
-            scheduler_args=scheduler_args,
-        )
-        trainer.add_event_handler(Events.ITERATION_STARTED, scheduler)
+    if cl_args.lr_schedule is not None:
+        lr_scheduler = set_up_scheduler(handler_config)
+        attach_lr_scheduler(trainer, lr_scheduler, config)
 
     attach_metrics(trainer, handler_config=handler_config)
     pbar.attach(trainer, metric_names=handler_config.monitoring_metrics)

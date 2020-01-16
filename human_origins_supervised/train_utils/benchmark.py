@@ -18,7 +18,7 @@ from human_origins_supervised.visualization import visualization_funcs as vf
 if TYPE_CHECKING:
     from human_origins_supervised.train import Config
 
-logger = get_logger(__name__)
+logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
 def func_call_logger(pre_message, post_message):

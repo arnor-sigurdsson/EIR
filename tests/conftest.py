@@ -44,7 +44,7 @@ def args_config():
         **{
             "b1": 0.9,
             "b2": 0.999,
-            "batch_size": 32,
+            "batch_size": 64,
             "checkpoint_interval": 100,
             "data_folder": "REPLACE_ME",
             "valid_size": 0.05,
@@ -54,9 +54,9 @@ def args_config():
             "resblocks": None,
             "device": "cuda:0" if cuda.is_available() else "cpu",
             "gpu_num": "0",
-            "lr": 5e-2,
-            "lr_lb": 0.00,
-            "cycle_lr": True,
+            "lr": 1e-2,
+            "lr_lb": 1e-5,
+            "lr_schedule": "plateau",
             "wd": 0.00,
             "n_cpu": 8,
             "n_epochs": 10,
@@ -65,7 +65,7 @@ def args_config():
             "target_width": 1000,
             "act_classes": None,
             "get_acts": True,
-            "benchmark": True,
+            "benchmark": False,
             "kernel_width": 12,
             "fc_dim": 128,
             "down_stride": 4,
@@ -266,12 +266,17 @@ def create_test_dataset(create_test_data, create_test_cl_args):
 
 
 @pytest.fixture()
-def create_test_dloaders(create_test_dataset):
+def create_test_dloaders(create_test_cl_args, create_test_dataset):
+    cl_args = create_test_cl_args
     train_dataset, valid_dataset = create_test_dataset
 
-    train_dloader = DataLoader(train_dataset, batch_size=64, shuffle=True)
+    train_dloader = DataLoader(
+        train_dataset, batch_size=cl_args.batch_size, shuffle=True
+    )
 
-    valid_dloader = DataLoader(valid_dataset, batch_size=64, shuffle=False)
+    valid_dloader = DataLoader(
+        valid_dataset, batch_size=cl_args.batch_size, shuffle=False
+    )
 
     return train_dloader, valid_dloader, train_dataset, valid_dataset
 
