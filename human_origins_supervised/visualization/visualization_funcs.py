@@ -23,12 +23,17 @@ import matplotlib.cm as cm
 from matplotlib.ticker import MaxNLocator
 
 
-def _get_min_or_max_funcs(columns: Tuple[str, str]) -> Union[np.argmax, np.argmin]:
+def _get_min_or_max_funcs(
+    columns: Tuple[str, str]
+) -> Union[pd.Series.idxmin, pd.Series.idxmax]:
+    """
+    The functions returned here will be explicitly called on a pd.Series instance.
+    """
 
-    func = np.argmax
+    func = pd.Series.idxmax
     metric = columns[0].split("_")[-1]
     if metric in ["loss", "rmse"]:
-        return np.argmin
+        return pd.Series.idxmin
 
     return func
 
@@ -160,7 +165,7 @@ def select_performance_curve_funcs(
 ) -> List[Callable]:
     if model_task == "cls":
         if not n_classes or n_classes < 2:
-            raise ValueError("Expected number of classes to be not none and  >2.")
+            raise ValueError("Expected number of classes to be not None and >2.")
 
         if n_classes == 2:
             return [generate_binary_roc_curve, generate_binary_pr_curve]
@@ -191,7 +196,7 @@ def generate_regression_prediction_plot(
     ax.text(
         x=0.05,
         y=0.95,
-        s=f"R2 = {r2:.2g}, PCC = {pcc:.2g}",
+        s=f"R2 = {r2:.4g}, PCC = {pcc:.4g}",
         ha="left",
         va="top",
         transform=ax.transAxes,
@@ -214,7 +219,7 @@ def generate_binary_roc_curve(
     fpr, tpr, _ = roc_curve(y_true_bin, y_outp[:, 1])
     roc_auc = auc(fpr, tpr)
 
-    plt.plot(fpr, tpr, lw=2, label=f"(area = {roc_auc:0.2f})")
+    plt.plot(fpr, tpr, lw=2, label=f"(area = {roc_auc:0.4g})")
 
     plt.plot([0, 1], [0, 1], "k--", lw=2)
     plt.xlim([0.0, 1.0])
@@ -238,7 +243,7 @@ def generate_binary_pr_curve(y_true, y_outp, outfolder, *args, **kwargs):
         recall,
         precision,
         where="post",
-        label=f"(area = {average_precision:0.2f})",
+        label=f"(area = {average_precision:0.4g})",
         lw=2,
     )
 
@@ -297,7 +302,7 @@ def generate_multi_class_roc_curve(
     plt.plot(
         fpr["micro"],
         tpr["micro"],
-        label=f'micro-average ROC curve (area = {roc_auc["micro"]:0.2f})',
+        label=f'micro-average ROC curve (area = {roc_auc["micro"]:0.4g})',
         color="deeppink",
         linestyle=":",
         linewidth=4,
@@ -306,7 +311,7 @@ def generate_multi_class_roc_curve(
     plt.plot(
         fpr["macro"],
         tpr["macro"],
-        label=f'macro-average ROC curve (area = {roc_auc["macro"]:0.2f})',
+        label=f'macro-average ROC curve (area = {roc_auc["macro"]:0.4g})',
         color="navy",
         linestyle=":",
         linewidth=4,
@@ -321,7 +326,7 @@ def generate_multi_class_roc_curve(
             lw=2,
             label=f"{encoder.inverse_transform([i])[0]} "
             f"({np.count_nonzero(y_true == i)}) "
-            f"(area = {roc_auc[i]:0.2f})",
+            f"(area = {roc_auc[i]:0.4g})",
         )
 
     plt.plot([0, 1], [0, 1], "k--", lw=2)
@@ -376,7 +381,7 @@ def generate_multi_class_pr_curve(
         color="gold",
         lw=2,
         label=f"Micro-Average Precision-Recall "
-        f'(area = {average_precision["micro"]:0.2f})',
+        f'(area = {average_precision["micro"]:0.4g})',
     )
 
     colors = iter(cm.tab20(np.arange(n_classes)))
@@ -388,7 +393,7 @@ def generate_multi_class_pr_curve(
             lw=2,
             label=f"{encoder.inverse_transform([i])[0]} "
             f"({np.count_nonzero(y_true == i)}) "
-            f"(area = {average_precision[i]:0.2f})",
+            f"(area = {average_precision[i]:0.4g})",
         )
 
     plt.xlim([0.0, 1.0])

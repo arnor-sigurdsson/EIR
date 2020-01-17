@@ -14,6 +14,7 @@ from ignite.engine import Engine
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from torch import nn
 from torch.optim.adamw import AdamW
+from torch.optim import SGD
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 
@@ -56,6 +57,21 @@ class Config:
     labels_dict: Dict
     target_transformer: Union[LabelEncoder, StandardScaler]
     data_width: int
+
+
+def get_optimizer(model: nn.Module, cl_args: argparse.Namespace) -> Optimizer:
+    params = get_model_params(model, cl_args.wd)
+
+    if cl_args.optimizer == "adamw":
+        optimizer = AdamW(
+            params, lr=cl_args.lr, betas=(cl_args.b1, cl_args.b2), amsgrad=True
+        )
+    elif cl_args.optimizer == "sgdm":
+        optimizer = SGD(params, lr=cl_args.lr, momentum=0.9)
+    else:
+        raise ValueError()
+
+    return optimizer
 
 
 def train_ignite(config: Config) -> None:
@@ -166,10 +182,7 @@ def main(cl_args: argparse.Namespace) -> None:
         model = nn.DataParallel(model)
     model = model.to(device=cl_args.device)
 
-    params = get_model_params(model, cl_args.wd)
-    optimizer = AdamW(
-        params, lr=cl_args.lr, betas=(cl_args.b1, cl_args.b2), amsgrad=True
-    )
+    optimizer = get_optimizer(model, cl_args)
 
     criterion = nn.CrossEntropyLoss() if cl_args.model_task == "cls" else nn.MSELoss()
 
@@ -250,11 +263,20 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        "--optimizer",
+        type=str,
+        choices=["adamw", "sgdm"],
+        default="adamw",
+        help="Whether to use AdamW or SGDM optimizer.",
+    )
+
+    parser.add_argument(
         "--b1",
         type=float,
         default=0.9,
         help="adam: decay of first order momentum of gradient",
     )
+
     parser.add_argument(
         "--b2",
         type=float,
@@ -422,7 +444,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--checkpoint_interval",
         type=int,
-        default=1000,
+        default=5000,
         help="Epoch to checkpoint model.",
     )
     parser.add_argument(
