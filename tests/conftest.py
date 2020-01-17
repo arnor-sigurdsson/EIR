@@ -7,12 +7,11 @@ import numpy as np
 import pytest
 from aislib.misc_utils import ensure_path_exists
 from torch import cuda
-from torch.optim.adamw import AdamW
 from torch.utils.data import DataLoader
 
 from human_origins_supervised.data_load import datasets
-from human_origins_supervised.models.model_utils import get_model_params
 from human_origins_supervised.models.models import CNNModel
+from human_origins_supervised.train import get_optimizer
 
 np.random.seed(0)
 
@@ -44,6 +43,7 @@ def args_config():
         **{
             "b1": 0.9,
             "b2": 0.999,
+            "optimizer": "adamw",
             "batch_size": 64,
             "checkpoint_interval": 100,
             "data_folder": "REPLACE_ME",
@@ -286,9 +286,6 @@ def create_test_optimizer(create_test_cl_args, create_test_model):
     cl_args = create_test_cl_args
     model = create_test_model
 
-    params = get_model_params(model, cl_args.wd)
-    optimizer = AdamW(
-        params, lr=cl_args.lr, betas=(cl_args.b1, cl_args.b2), amsgrad=True
-    )
+    optimizer = get_optimizer(model, cl_args)
 
     return optimizer
