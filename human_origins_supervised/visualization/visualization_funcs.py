@@ -50,7 +50,7 @@ def _get_validation_extreme_value_and_iter(
 
 def generate_training_curve(
     metrics_filename: Path,
-    skiprows: int = 0,
+    skiprows: int = 200,
     cols: Tuple[str, str] = ("", ""),
     hook_funcs: List[Callable] = None,
 ) -> None:
