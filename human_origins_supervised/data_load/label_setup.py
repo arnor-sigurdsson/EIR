@@ -159,7 +159,6 @@ def _get_custom_column_ops(custom_lib: str) -> al_all_column_ops:
 
 def _gather_ids_from_folder(data_folder: Path):
     logger.debug("Gathering IDs from %s.", data_folder)
-    breakpoint()
     all_ids = tuple(i.stem for i in tqdm(data_folder.iterdir(), desc="Progress"))
 
     return all_ids
