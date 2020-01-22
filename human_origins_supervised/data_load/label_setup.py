@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, LabelEncoder
+from tqdm import tqdm
 
 from human_origins_supervised.data_load.common_ops import ColumnOperation
 from human_origins_supervised.train_utils.utils import get_custom_module_submodule
@@ -156,8 +157,16 @@ def _get_custom_column_ops(custom_lib: str) -> al_all_column_ops:
     return column_ops
 
 
+def _gather_ids_from_folder(data_folder: Path):
+    logger.debug("Gathering IDs from %s.", data_folder)
+    breakpoint()
+    all_ids = tuple(i.stem for i in tqdm(data_folder.iterdir(), desc="Progress"))
+
+    return all_ids
+
+
 def label_df_parse_wrapper(cl_args: Namespace) -> pd.DataFrame:
-    all_ids = tuple(i.stem for i in Path(cl_args.data_folder).iterdir())
+    all_ids = _gather_ids_from_folder(Path(cl_args.data_folder))
 
     column_ops = {}
     if cl_args.custom_lib:
@@ -270,7 +279,6 @@ def _get_missing_stats_string(
 
 
 def handle_missing_label_values(df: pd.DataFrame, cl_args, name="df"):
-
     if cl_args.embed_columns:
         missing_stats = _get_missing_stats_string(df, cl_args.embed_columns)
         logger.debug(
@@ -297,7 +305,6 @@ def handle_missing_label_values(df: pd.DataFrame, cl_args, name="df"):
 def _process_train_and_label_dfs(
     cl_args, df_labels_train, df_labels_valid
 ) -> al_train_val_dfs:
-
     # we make sure not to mess with the passed in CL arg, hence copy
     continuous_columns = cl_args.contn_columns[:]
     run_folder = Path("./runs", cl_args.run_name)

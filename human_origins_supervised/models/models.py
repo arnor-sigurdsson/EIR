@@ -154,16 +154,16 @@ class FirstBlock(AbstractBlock):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        delattr(self, "act_1")
-        delattr(self, "act_2")
-        delattr(self, "downsample_identity")
         delattr(self, "bn_1")
-        delattr(self, "conv_2")
+        delattr(self, "act_1")
+        delattr(self, "downsample_identity")
         delattr(self, "bn_2")
+        delattr(self, "act_2")
+        delattr(self, "rb_do")
+        delattr(self, "conv_2")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         out = self.conv_1(x)
-        out = self.rb_do(out)
 
         return out
 

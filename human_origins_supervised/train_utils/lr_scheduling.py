@@ -71,7 +71,7 @@ def _log_reduce_on_plateu_step(
 
     prev_lr = sched.optimizer.param_groups[0]["lr"]
     new_lr = prev_lr * sched.factor
-    if sched.num_bad_epochs >= sched.patience:
+    if sched.num_bad_epochs >= sched.patience and prev_lr > sched.min_lrs[0]:
         logger.info(
             "Iter %d: Reducing learning rate from %.0e to %.0e.",
             iteration,
