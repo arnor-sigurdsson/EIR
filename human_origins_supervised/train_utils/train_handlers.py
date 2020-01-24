@@ -169,7 +169,6 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
         args.run_name,
         create_dir=True,
         n_saved=100,
-        save_interval=args.checkpoint_interval,
         save_as_state_dict=True,
     )
 
@@ -178,7 +177,7 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
         json.dump(config_dict, config_file, sort_keys=True, indent=4)
 
     trainer.add_event_handler(
-        Events.ITERATION_COMPLETED,
+        Events.ITERATION_COMPLETED(every=args.checkpoint_interval),
         checkpoint_handler,
         to_save={"model": handler_config.config.model},
     )

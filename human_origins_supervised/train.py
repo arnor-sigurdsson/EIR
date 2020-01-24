@@ -31,6 +31,7 @@ from human_origins_supervised.models.model_utils import get_model_params, test_l
 from human_origins_supervised.models.models import get_model
 from human_origins_supervised.train_utils.metric_funcs import select_metric_func
 from human_origins_supervised.train_utils.train_handlers import configure_trainer
+from human_origins_supervised.train_utils.utils import get_run_folder
 
 torch.manual_seed(0)
 np.random.seed(0)
@@ -118,14 +119,21 @@ def train_ignite(config: Config) -> None:
     trainer.run(c.train_loader, args.n_epochs)
 
 
-def main(cl_args: argparse.Namespace) -> None:
-    run_folder = Path("runs", cl_args.run_name)
-    if run_folder.exists():
+def prepare_run_folder(run_name: str) -> Path:
+    run_folder = get_run_folder(run_name)
+    history_file = run_folder / "training_history.log"
+    if history_file.exists():
         raise FileExistsError(
-            "There already exists a run with that name, please"
-            " choose a different one."
+            f"There already exists a run with that name: {history_file}. Please choose "
+            f"a different run name or delete the folder."
         )
     ensure_path_exists(run_folder, is_folder=True)
+
+    return run_folder
+
+
+def main(cl_args: argparse.Namespace) -> None:
+    run_folder = prepare_run_folder(cl_args.run_name)
 
     train_dataset, valid_dataset = datasets.set_up_datasets(cl_args)
 
@@ -200,10 +208,6 @@ def main(cl_args: argparse.Namespace) -> None:
     )
 
     if cl_args.find_lr:
-        logger.info(
-            "Running learning rate range test and exiting, results will be "
-            "saved to ./lr_search.png."
-        )
         test_lr_range(config)
         sys.exit(0)
 

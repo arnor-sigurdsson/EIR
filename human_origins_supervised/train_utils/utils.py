@@ -83,3 +83,7 @@ def check_if_iteration_sample(
     condition_2 = iteration == n_iterations_per_epochs * n_epochs
 
     return condition_1 or condition_2
+
+
+def get_run_folder(run_name: str) -> Path:
+    return Path("runs", run_name)
