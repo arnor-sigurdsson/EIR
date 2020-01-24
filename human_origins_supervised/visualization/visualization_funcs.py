@@ -1,4 +1,3 @@
-from itertools import groupby
 from pathlib import Path
 from typing import List, Callable, Union, Tuple
 
@@ -23,76 +22,49 @@ import matplotlib.cm as cm
 from matplotlib.ticker import MaxNLocator
 
 
-def _get_min_or_max_funcs(
-    columns: Tuple[str, str]
-) -> Union[pd.Series.idxmin, pd.Series.idxmax]:
-    """
-    The functions returned here will be explicitly called on a pd.Series instance.
-    """
-
-    func = pd.Series.idxmax
-    metric = columns[0].split("_")[-1]
-    if metric in ["loss", "rmse"]:
-        return pd.Series.idxmin
-
-    return func
-
-
-def _get_validation_extreme_value_and_iter(
-    extreme_index_func: Union[np.argmax, np.argmin], validation_values: pd.Series
-) -> Tuple[int, float]:
-
-    extreme_index: int = extreme_index_func(validation_values)
-    extreme_value: float = validation_values[extreme_index]
-
-    return extreme_index, extreme_value
-
-
 def generate_training_curve(
-    metrics_filename: Path,
+    train_series: pd.Series,
+    valid_series: pd.Series,
+    output_folder: Path,
     skiprows: int = 200,
-    cols: Tuple[str, str] = ("", ""),
     hook_funcs: List[Callable] = None,
 ) -> None:
 
-    df = pd.read_csv(metrics_filename, usecols=cols)
-    df_cut = df.iloc[skiprows:, :]
-
     fig, ax_1 = plt.subplots()
 
-    xlim_upper = df_cut.shape[0] + skiprows
+    xlim_upper = train_series.shape[0] + skiprows
     xticks = np.arange(1 + skiprows, xlim_upper + 1)
-    validation_values = df_cut[cols[1]].dropna()
-    validation_xticks = validation_values.index + 1
 
-    extreme_func = _get_min_or_max_funcs(cols)
+    extreme_func = _get_min_or_max_funcs(train_series.name)
     extreme_valid_idx, extreme_valid_value = _get_validation_extreme_value_and_iter(
-        extreme_func, validation_values
+        extreme_func, valid_series
     )
 
     line_1a = ax_1.plot(
         xticks,
-        df_cut[cols[0]],
+        train_series.values,
         c="orange",
         label="Train",
         zorder=1,
         alpha=0.5,
         linewidth=0.8,
     )
+
+    validation_xticks = valid_series.index
     line_1b = ax_1.plot(
         validation_xticks,
-        validation_values,
+        valid_series.values,
         c="red",
         linewidth=0.8,
         alpha=1.0,
-        label=f"Validation (best: {extreme_valid_value:.4g} at {extreme_valid_idx+1})",
+        label=f"Validation (best: {extreme_valid_value:.4g} at {extreme_valid_idx})",
         zorder=0,
     )
 
     ax_1.axhline(y=extreme_valid_value, linewidth=0.4, c="red", linestyle="dashed")
 
     ax_1.set_xlabel("Iteration")
-    y_label = cols[0].split("_")[-1].upper()
+    y_label = _parse_metrics_colname(train_series.name)
     ax_1.set_ylabel(y_label)
 
     ax_1.set_xlim(left=skiprows + 1, right=xlim_upper)
@@ -106,31 +78,43 @@ def generate_training_curve(
 
     if hook_funcs:
         for func in hook_funcs:
-            func(ax_1, target=cols[1])
+            func(ax_1, target=valid_series.name)
 
     plt.grid()
 
-    run_folder = Path(metrics_filename).parent
-    plt.savefig(run_folder / f"training_curve_{y_label}.png", dpi=200)
+    plt.savefig(output_folder / f"training_curve_{y_label}.png", dpi=200)
     plt.close()
 
 
-def generate_basic_curve(metrics_filename, column_name, fname, skiprows=0):
-    df = pd.read_csv(metrics_filename, usecols=[column_name])
-    df = df.iloc[skiprows:, :]
+def _get_min_or_max_funcs(
+    column_name: str,
+) -> Union[pd.Series.idxmin, pd.Series.idxmax]:
+    """
+    The functions returned here will be explicitly called on a pd.Series instance.
+    """
 
-    fig, ax = plt.subplots()
-    ax.plot(df[column_name], c="navy")
+    func = pd.Series.idxmax
+    metric = _parse_metrics_colname(column_name)
+    if metric in ["LOSS", "RMSE"]:
+        return pd.Series.idxmin
 
-    ax.set_xlabel("Epoch")
-    ax.set_ylabel("Loss")
+    return func
 
-    ax.set_xlim(left=skiprows, right=df.shape[0] + skiprows)
-    ax.set_xlim(left=skiprows, right=df.shape[0] + skiprows)
 
-    run_folder = Path(metrics_filename).parent
-    plt.savefig(run_folder / fname, dpi=200)
-    plt.close()
+def _parse_metrics_colname(column_name: str):
+    assert column_name.startswith("v_") or column_name.startswith("t_")
+
+    return column_name.split("_")[-1].upper()
+
+
+def _get_validation_extreme_value_and_iter(
+    extreme_index_func: Union[np.argmax, np.argmin], validation_values: pd.Series
+) -> Tuple[int, float]:
+
+    extreme_index: int = extreme_index_func(validation_values)
+    extreme_value: float = validation_values[extreme_index]
+
+    return extreme_index, extreme_value
 
 
 def gen_eval_graphs(
@@ -468,25 +452,23 @@ def generate_confusion_matrix(
     plt.close()
 
 
-def generate_all_plots(metrics_file: Path, hook_funcs):
-    def get_column_pairs():
-        with open(str(metrics_file), "r") as infile:
-            header_list = infile.readline().strip().split(",")
-            header_list.sort(key=lambda x: x.split("_")[-1])
+def generate_all_plots(
+    training_history: pd.DataFrame,
+    valid_history: pd.DataFrame,
+    hook_funcs: List[Callable],
+    output_folder: Path,
+) -> None:
+    metrics = [i.split("_")[-1] for i in training_history.columns]
 
-            header_pairs = [
-                tuple(v)
-                for k, v in groupby(header_list, key=lambda x: x.split("_")[-1])
-            ]
+    for metric_suffix in metrics:
+        train_colname = "t_" + metric_suffix
+        valid_colname = "v_" + metric_suffix
+        train_series = training_history[train_colname]
+        valid_series = valid_history[valid_colname]
 
-            return header_pairs
-
-    try:
-        column_pairs = get_column_pairs()
-        for pair in column_pairs:
-
-            generate_training_curve(metrics_file, hook_funcs=hook_funcs, cols=pair)
-
-    except ValueError:
-        print(f"Skipping {metrics_file} as it has old columns.")
-    plt.close("all")
+        generate_training_curve(
+            train_series=train_series,
+            valid_series=valid_series,
+            output_folder=output_folder,
+            hook_funcs=hook_funcs,
+        )

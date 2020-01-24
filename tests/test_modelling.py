@@ -190,11 +190,11 @@ def test_regression(
 
     train.train_ignite(config)
 
-    df = pd.read_csv(run_path / "training_history.log")
+    df_train = pd.read_csv(run_path / "training_history.log")
+    assert df_train.loc[:, "t_r2"].max() > 0.8
 
-    assert df.loc[:, "t_r2"].max() > 0.8
-    # lower due to overfitting on training set
-    assert df.loc[:, "v_r2"].max() > 0.8
+    df_valid = pd.read_csv(run_path / "eval_history.log")
+    assert df_valid.loc[:, "v_r2"].max() > 0.8
 
     last_iter = len(train_dloader) * cl_args.n_epochs
     arrpath = run_path / f"samples/{last_iter}/top_acts.npy"

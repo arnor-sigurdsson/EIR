@@ -1,4 +1,3 @@
-import csv
 import json
 from dataclasses import dataclass
 from functools import partial
@@ -22,8 +21,10 @@ from human_origins_supervised.train_utils.lr_scheduling import (
 )
 from human_origins_supervised.train_utils.metric_funcs import get_train_metrics
 from human_origins_supervised.train_utils.utils import (
-    check_if_iteration_sample,
     get_custom_module_submodule,
+    append_metrics_to_file,
+    read_metrics_history_file,
+    get_run_folder,
 )
 from human_origins_supervised.visualization import visualization_funcs as vf
 
@@ -75,14 +76,20 @@ def log_stats(engine: Engine, handler_config: HandlerConfig) -> None:
     handler_config.pbar.log_message(log_string)
 
 
-def write_metrics(engine: Engine, handler_config: HandlerConfig):
-    with open(str(handler_config.run_folder) + "/training_history.log", "a") as logfile:
-        fieldnames = sorted(engine.state.metrics.keys())
-        writer = csv.DictWriter(logfile, fieldnames=fieldnames)
+def _write_training_metrics_handler(engine: Engine, handler_config: HandlerConfig):
+    args = handler_config.config.cl_args
+    iteration = engine.state.iteration
 
-        if engine.state.iteration == 1:
-            writer.writeheader()
-        writer.writerow(engine.state.metrics)
+    metric_dict = engine.state.metrics
+
+    write_header = True if iteration == 1 else False
+    outfile = get_run_folder(args.run_name) / "training_history.log"
+    append_metrics_to_file(
+        filepath=outfile,
+        metrics=metric_dict,
+        iteration=iteration,
+        write_header=write_header,
+    )
 
 
 def _plot_benchmark_hook(ax, run_folder, target: str):
@@ -104,7 +111,7 @@ def _plot_benchmark_hook(ax, run_folder, target: str):
     ax.legend(handles, labels)
 
 
-def plot_progress(engine: Engine, handler_config: HandlerConfig) -> None:
+def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> None:
     args = handler_config.config.cl_args
     hook_funcs = []
 
@@ -113,16 +120,19 @@ def plot_progress(engine: Engine, handler_config: HandlerConfig) -> None:
             partial(_plot_benchmark_hook, run_folder=handler_config.run_folder)
         )
 
-    n_iter_per_epoch = len(handler_config.config.train_loader)
+    run_folder = get_run_folder(args.run_name)
+    train_history = read_metrics_history_file(run_folder / "training_history.log")
+    valid_history = read_metrics_history_file(run_folder / "eval_history.log")
 
-    if check_if_iteration_sample(
-        engine.state.iteration, args.sample_interval, n_iter_per_epoch, args.n_epochs
-    ):
-        metrics_file = Path(handler_config.run_folder, "training_history.log")
-        vf.generate_all_plots(metrics_file, hook_funcs=hook_funcs)
+    vf.generate_all_plots(
+        training_history=train_history,
+        valid_history=valid_history,
+        output_folder=run_folder,
+        hook_funcs=hook_funcs,
+    )
 
-        with open(Path(handler_config.run_folder, "model_info.txt"), "w") as mfile:
-            mfile.write(str(handler_config.config.model))
+    with open(Path(handler_config.run_folder, "model_info.txt"), "w") as mfile:
+        mfile.write(str(handler_config.config.model))
 
 
 def _get_custom_handlers(handler_config: "HandlerConfig"):
@@ -163,21 +173,21 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
     TODO: Better docstring.
     TODO: Better name for `run`
     """
-    args = handler_config.config.cl_args
+    cl_args = handler_config.config.cl_args
     checkpoint_handler = ModelCheckpoint(
         Path(handler_config.run_folder, "saved_models"),
-        args.run_name,
+        cl_args.run_name,
         create_dir=True,
         n_saved=100,
         save_as_state_dict=True,
     )
 
     with open(str(handler_config.run_folder / "cl_args.json"), "w") as config_file:
-        config_dict = vars(args)
+        config_dict = vars(cl_args)
         json.dump(config_dict, config_file, sort_keys=True, indent=4)
 
     trainer.add_event_handler(
-        Events.ITERATION_COMPLETED(every=args.checkpoint_interval),
+        Events.ITERATION_COMPLETED(every=cl_args.checkpoint_interval),
         checkpoint_handler,
         to_save={"model": handler_config.config.model},
     )
@@ -185,13 +195,17 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
     # *gotcha*: write_metrics needs to be attached before plot progress so we have the
     # last row when plotting
     trainer.add_event_handler(
-        Events.ITERATION_COMPLETED, write_metrics, handler_config=handler_config
+        event_name=Events.ITERATION_COMPLETED,
+        handler=_write_training_metrics_handler,
+        handler_config=handler_config,
     )
     trainer.add_event_handler(
-        Events.ITERATION_COMPLETED, plot_progress, handler_config=handler_config
+        event_name=Events.ITERATION_COMPLETED(every=cl_args.sample_interval),
+        handler=_plot_progress_handler,
+        handler_config=handler_config,
     )
 
-    if args.benchmark:
+    if cl_args.benchmark:
         trainer.add_event_handler(
             Events.STARTED,
             benchmark,
@@ -199,7 +213,7 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
             run_folder=handler_config.run_folder,
         )
 
-    if args.custom_lib:
+    if cl_args.custom_lib:
         custom_handlers = _get_custom_handlers(handler_config)
         trainer = _attach_custom_handlers(trainer, handler_config, custom_handlers)
     return trainer
@@ -229,7 +243,13 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
 
     for handler in evaluation_handler, activation_analysis_handler:
         trainer.add_event_handler(
-            Events.ITERATION_COMPLETED, handler, handler_config=handler_config
+            Events.ITERATION_COMPLETED(every=cl_args.sample_interval),
+            handler,
+            handler_config=handler_config,
+        )
+
+        trainer.add_event_handler(
+            Events.COMPLETED, handler, handler_config=handler_config
         )
 
     if cl_args.lr_schedule is not None:

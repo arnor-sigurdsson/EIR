@@ -1,9 +1,11 @@
+import csv
 import sys
 from typing import List, Dict, TYPE_CHECKING
 import importlib
 import importlib.util
 from pathlib import Path
 
+import pandas as pd
 from aislib.misc_utils import get_logger
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
@@ -69,21 +71,25 @@ def get_extra_labels_from_ids(
     return extra_labels
 
 
-def check_if_iteration_sample(
-    iteration: int,
-    iter_sample_interval: int,
-    n_iterations_per_epochs: int,
-    n_epochs: int,
-) -> bool:
-    if iter_sample_interval:
-        condition_1 = iteration % iter_sample_interval == 0
-    else:
-        condition_1 = False
-
-    condition_2 = iteration == n_iterations_per_epochs * n_epochs
-
-    return condition_1 or condition_2
-
-
 def get_run_folder(run_name: str) -> Path:
     return Path("runs", run_name)
+
+
+def append_metrics_to_file(
+    filepath: Path, metrics: Dict, iteration: int, write_header=False
+):
+    with open(str(filepath), "a") as logfile:
+        fieldnames = ["iteration"] + sorted(metrics.keys())
+        writer = csv.DictWriter(logfile, fieldnames=fieldnames)
+
+        if write_header:
+            writer.writeheader()
+
+        dict_to_write = {**{"iteration": iteration}, **metrics}
+        writer.writerow(dict_to_write)
+
+
+def read_metrics_history_file(file_path: Path) -> pd.DataFrame:
+    df = pd.read_csv(file_path, index_col="iteration")
+
+    return df
