@@ -21,7 +21,7 @@ def pytest_addoption(parser):
     parser.addoption(
         "--num_samples_per_class",
         type=int,
-        default=2000,
+        default=1000,
         help="Number of samples per class.",
     )
     parser.addoption(
@@ -41,46 +41,48 @@ def pytest_generate_tests(metafunc):
 def args_config():
     config = SimpleNamespace(
         **{
+            "act_classes": None,
             "b1": 0.9,
             "b2": 0.999,
-            "optimizer": "adamw",
             "batch_size": 64,
+            "benchmark": True,
+            "channel_exp_base": 5,
             "checkpoint_interval": 100,
+            "contn_columns": [],
+            "custom_lib": None,
             "data_folder": "REPLACE_ME",
-            "valid_size": 0.05,
-            "label_file": "REPLACE_ME",
-            "target_column": "Origin",
             "data_width": 1000,
-            "resblocks": None,
             "device": "cuda:0" if cuda.is_available() else "cpu",
+            "down_stride": 4,
+            "embed_columns": [],
+            "fc_dim": 128,
+            "fc_do": 0.0,
+            "first_kernel_expansion": 1,
+            "first_stride_expansion": 1,
+            "get_acts": True,
             "gpu_num": "0",
+            "kernel_width": 12,
+            "label_file": "REPLACE_ME",
             "lr": 1e-2,
             "lr_lb": 1e-5,
             "lr_schedule": "plateau",
-            "wd": 0.00,
+            "memory_dataset": False,
+            "model_type": "cnn",
+            "multi_gpu": False,
             "n_cpu": 8,
             "n_epochs": 10,
-            "run_name": "test_run",
-            "sample_interval": 20,
-            "target_width": 1000,
-            "act_classes": None,
-            "get_acts": True,
-            "benchmark": False,
-            "kernel_width": 12,
-            "fc_dim": 128,
-            "down_stride": 4,
-            "first_kernel_expansion": 1,
-            "first_stride_expansion": 1,
-            "channel_exp_base": 5,
-            "sa": False,
-            "rb_do": 0.0,
-            "fc_do": 0.0,
-            "memory_dataset": False,
-            "embed_columns": [],
-            "contn_columns": [],
             "na_augment": 0.0,
-            "model_type": "cnn",
-            "custom_lib": None,
+            "optimizer": "adamw",
+            "rb_do": 0.0,
+            "resblocks": None,
+            "run_name": "test_run",
+            "sa": False,
+            "sample_interval": 20,
+            "target_column": "Origin",
+            "target_width": 1000,
+            "valid_size": 0.05,
+            "wd": 0.00,
+            "weighted_sampling": False,
         }
     )
 
@@ -228,9 +230,9 @@ def create_test_data(request, tmp_path):
 
 
 @pytest.fixture()
-def create_test_model(create_test_cl_args, create_test_dataset):
+def create_test_model(create_test_cl_args, create_test_datasets):
     cl_args = create_test_cl_args
-    train_dataset, _ = create_test_dataset
+    train_dataset, _ = create_test_datasets
 
     model = CNNModel(
         cl_args,
@@ -246,7 +248,7 @@ def cleanup(run_path):
 
 
 @pytest.fixture()
-def create_test_dataset(create_test_data, create_test_cl_args):
+def create_test_datasets(create_test_data, create_test_cl_args):
     path, test_data_params = create_test_data
 
     cl_args = create_test_cl_args
@@ -266,9 +268,9 @@ def create_test_dataset(create_test_data, create_test_cl_args):
 
 
 @pytest.fixture()
-def create_test_dloaders(create_test_cl_args, create_test_dataset):
+def create_test_dloaders(create_test_cl_args, create_test_datasets):
     cl_args = create_test_cl_args
-    train_dataset, valid_dataset = create_test_dataset
+    train_dataset, valid_dataset = create_test_datasets
 
     train_dloader = DataLoader(
         train_dataset, batch_size=cl_args.batch_size, shuffle=True

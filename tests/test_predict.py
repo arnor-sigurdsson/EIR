@@ -65,7 +65,7 @@ def test_modify_train_cl_args_for_testing():
     indirect=True,
 )
 def test_load_labels_for_testing(
-    create_test_data, create_test_dataset, create_test_cl_args, keep_outputs
+    create_test_data, create_test_datasets, create_test_cl_args, keep_outputs
 ):
     """
     Note here we are treating the generated test data (i.e. by tests, not test-set-data)
@@ -102,7 +102,7 @@ def test_load_labels_for_testing(
 def test_set_up_test_dataset(
     request,
     create_test_data: pytest.fixture,
-    create_test_dataset: pytest.fixture,
+    create_test_datasets,
     create_test_cl_args: pytest.fixture,
     keep_outputs,
 ):
@@ -160,7 +160,7 @@ def test_predict(
     create_test_dloaders,
     create_test_model,
     create_test_optimizer,
-    create_test_dataset,
+    create_test_datasets,
     keep_outputs,
 ):
     test_path, test_data_params = create_test_data
@@ -171,7 +171,7 @@ def test_predict(
     optimizer = create_test_optimizer
     criterion = CrossEntropyLoss()
 
-    train_dataset, valid_dataset = create_test_dataset
+    train_dataset, valid_dataset = create_test_datasets
     target_transformer = train_dataset.target_transformer
 
     run_path = Path(f"runs/{cl_args.run_name}/")

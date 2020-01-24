@@ -15,7 +15,7 @@ from .model_utils import find_no_resblocks_needed
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
-def get_model(model_type: str) -> Union["CNNModel", "MLPModel"]:
+def get_model_class(model_type: str) -> Union["CNNModel", "MLPModel"]:
     if model_type == "cnn":
         return CNNModel
     return MLPModel
