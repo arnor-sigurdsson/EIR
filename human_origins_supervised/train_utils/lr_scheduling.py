@@ -12,7 +12,10 @@ from ignite.engine import Engine, Events
 from matplotlib import pyplot as plt
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
-from human_origins_supervised.train_utils.utils import check_if_iteration_sample
+from human_origins_supervised.train_utils.utils import (
+    read_metrics_history_file,
+    get_run_folder,
+)
 
 if TYPE_CHECKING:
     from human_origins_supervised.train_utils.train_handlers import HandlerConfig
@@ -81,19 +84,17 @@ def _log_reduce_on_plateu_step(
 
 
 def _step_reduce_on_plateau_scheduler(
-    engine: Engine, config: "Config", reduce_on_plateau_scheduler: ReduceLROnPlateau
+    engine: Engine,
+    reduce_on_plateau_scheduler: ReduceLROnPlateau,
+    eval_history_fpath: Path,
 ) -> None:
-    cl_args = config.cl_args
     iteration = engine.state.iteration
 
-    n_iters_per_epoch = len(config.train_loader)
-    do_step = check_if_iteration_sample(
-        iteration, cl_args.sample_interval, n_iters_per_epoch, cl_args.n_epochs
-    )
+    _log_reduce_on_plateu_step(reduce_on_plateau_scheduler, iteration)
 
-    if do_step:
-        _log_reduce_on_plateu_step(reduce_on_plateau_scheduler, iteration)
-        reduce_on_plateau_scheduler.step(engine.state.metrics["v_loss"])
+    eval_df = read_metrics_history_file(eval_history_fpath)
+    latest_val_loss = eval_df["v_loss"].iloc[-1]
+    reduce_on_plateau_scheduler.step(latest_val_loss)
 
 
 def _plot_lr_schedule(
@@ -155,14 +156,18 @@ def attach_lr_scheduler(
     We use iteration started for the cycle lr_scheduler, to make sure we start at the
     lower bound of the learning rate when using warmup for the first iteration.
     """
+    cl_args = config.cl_args
 
-    if config.cl_args.lr_schedule == "cycle":
-        engine.add_event_handler(Events.ITERATION_STARTED, lr_scheduler)
+    if cl_args.lr_schedule == "cycle":
+        engine.add_event_handler(
+            event_name=Events.ITERATION_STARTED, handler=lr_scheduler
+        )
 
     else:
+        eval_history_fpath = get_run_folder(cl_args.run_name) / "eval_history.log"
         engine.add_event_handler(
-            Events.ITERATION_COMPLETED,
-            _step_reduce_on_plateau_scheduler,
-            config=config,
+            event_name=Events.ITERATION_COMPLETED(every=cl_args.sample_interval),
+            handler=_step_reduce_on_plateau_scheduler,
             reduce_on_plateau_scheduler=lr_scheduler,
+            eval_history_fpath=eval_history_fpath,
         )

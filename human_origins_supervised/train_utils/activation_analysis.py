@@ -18,10 +18,9 @@ from sklearn.preprocessing import StandardScaler, LabelEncoder
 from torch.utils.data import Dataset, DataLoader
 
 import human_origins_supervised.visualization.activation_visualization as av
-from human_origins_supervised.models.extra_inputs_module import get_extra_inputs
 from human_origins_supervised.models import model_utils
+from human_origins_supervised.models.extra_inputs_module import get_extra_inputs
 from human_origins_supervised.models.model_utils import gather_dloader_samples
-from human_origins_supervised.train_utils.utils import check_if_iteration_sample
 
 if TYPE_CHECKING:
     from human_origins_supervised.train_utils.train_handlers import HandlerConfig
@@ -88,7 +87,7 @@ def accumulate_activations(
     transform_funcs: al_transform_funcs,
 ) -> Tuple[Dict, Dict]:
     c = config
-    args = c.cl_args
+    cl_args = c.cl_args
 
     target_classes = get_target_classes(c.cl_args, c.target_transformer)
 
@@ -112,7 +111,7 @@ def accumulate_activations(
                 )
 
             extra_inputs = get_extra_inputs(
-                args, list(sample_id), c.valid_dataset.labels_dict, c.model
+                cl_args, list(sample_id), c.valid_dataset.labels_dict, c.model
             )
             # detach for shap
             if extra_inputs is not None:
@@ -152,13 +151,13 @@ def get_shap_object(
     n_background_samples: int = 64,
 ):
     c = config
-    args = c.cl_args
+    cl_args = c.cl_args
 
     background, _, ids = gather_dloader_samples(
         train_loader, device, n_background_samples
     )
 
-    extra_inputs = get_extra_inputs(args, ids, c.labels_dict, c.model)
+    extra_inputs = get_extra_inputs(cl_args, ids, c.labels_dict, c.model)
     # detach for shap
     if extra_inputs is not None:
         extra_inputs = extra_inputs.detach()
@@ -438,17 +437,17 @@ def analyze_activations(
     outfolder: Path,
 ) -> None:
     c = config
-    args = config.cl_args
+    cl_args = config.cl_args
 
     acc_acts, acc_acts_masked = accumulate_activations(
         c, c.valid_dataset, act_func, proc_funcs
     )
     np.save(str(outfolder / "all_acts.npy"), acc_acts)
 
-    abs_grads = True if args.model_task == "reg" else False
+    abs_grads = True if cl_args.model_task == "reg" else False
     top_gradients_dict = get_snp_cols_w_top_grads(acc_acts, abs_grads=abs_grads)
 
-    snp_df = read_snp_df(Path(args.snp_file), Path(args.data_folder))
+    snp_df = read_snp_df(Path(cl_args.snp_file), Path(cl_args.data_folder))
 
     classes = sorted(list(top_gradients_dict.keys()))
     scaled_grads = gather_and_rescale_snps(acc_acts, top_gradients_dict, classes)
@@ -472,44 +471,39 @@ def activation_analysis_handler(
     """
 
     c = handler_config.config
-    args = c.cl_args
+    cl_args = c.cl_args
+    iteration = engine.state.iteration
 
     def pre_transform(single_sample, sample_label):
-        single_sample = single_sample.to(device=args.device, dtype=torch.float32)
+        single_sample = single_sample.to(device=cl_args.device, dtype=torch.float32)
 
-        sample_label = sample_label.to(device=args.device)
-        sample_label = model_utils.cast_labels(args.model_task, sample_label)
+        sample_label = sample_label.to(device=cl_args.device)
+        sample_label = model_utils.cast_labels(cl_args.model_task, sample_label)
 
         return single_sample, sample_label
 
-    iteration = engine.state.iteration
-    n_iter_per_epoch = len(c.train_loader)
-    do_sample = check_if_iteration_sample(
-        iteration, args.sample_interval, n_iter_per_epoch, args.n_epochs
-    )
-    do_acts = args.get_acts
+    do_acts = cl_args.get_acts
 
-    if do_sample:
-        sample_outfolder = Path(handler_config.run_folder, "samples", str(iteration))
-        ensure_path_exists(sample_outfolder, is_folder=True)
+    sample_outfolder = Path(handler_config.run_folder, "samples", str(iteration))
+    ensure_path_exists(sample_outfolder, is_folder=True)
 
-        if do_acts:
-            model_copy = copy.deepcopy(c.model)
+    if do_acts:
+        model_copy = copy.deepcopy(c.model)
 
-            no_explainer_background_samples = np.max([int(args.batch_size / 8), 16])
-            explainer = get_shap_object(
-                c,
-                model_copy,
-                args.device,
-                c.train_loader,
-                no_explainer_background_samples,
-            )
+        no_explainer_background_samples = np.max([int(cl_args.batch_size / 8), 16])
+        explainer = get_shap_object(
+            c,
+            model_copy,
+            cl_args.device,
+            c.train_loader,
+            no_explainer_background_samples,
+        )
 
-            proc_funcs = {"pre": (pre_transform,)}
-            act_func = partial(
-                get_shap_sample_acts_deep,
-                explainer=explainer,
-                model_task=args.model_task,
-            )
+        proc_funcs = {"pre": (pre_transform,)}
+        act_func = partial(
+            get_shap_sample_acts_deep,
+            explainer=explainer,
+            model_task=cl_args.model_task,
+        )
 
-            analyze_activations(c, act_func, proc_funcs, sample_outfolder)
+        analyze_activations(c, act_func, proc_funcs, sample_outfolder)

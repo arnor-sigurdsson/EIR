@@ -10,12 +10,10 @@ from scipy.special import softmax
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
 from human_origins_supervised.models import model_utils
-from human_origins_supervised.train_utils.metric_funcs import (
-    get_train_metrics,
-    select_metric_func,
-)
-from human_origins_supervised.train_utils.utils import check_if_iteration_sample
+from human_origins_supervised.train_utils.metric_funcs import select_metric_func
+from human_origins_supervised.train_utils.utils import get_run_folder
 from human_origins_supervised.visualization import visualization_funcs as vf
+from human_origins_supervised.train_utils.utils import append_metrics_to_file
 
 if TYPE_CHECKING:
     from human_origins_supervised.train_utils.train_handlers import HandlerConfig
@@ -32,39 +30,32 @@ def evaluation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
     in this function.
     """
     c = handler_config.config
-    args = c.cl_args
+    cl_args = c.cl_args
     iteration = engine.state.iteration
 
-    n_iters_per_epoch = len(c.train_loader)
-    do_eval = check_if_iteration_sample(
-        iteration, args.sample_interval, n_iters_per_epoch, args.n_epochs
-    )
-    train_metrics = get_train_metrics(args.model_task, prefix="v")
-
-    # we update here with NaNs as the metrics are written out in each iteration to
-    # training_history.log, so the iterations match when plotting later
-    if not do_eval:
-        placeholder_metrics = {metric: np.nan for metric in train_metrics}
-        placeholder_metrics["v_loss"] = np.nan
-        engine.state.metrics.update(placeholder_metrics)
-        return
-
-    metric_func = select_metric_func(args.model_task, c.target_transformer)
+    metric_func = select_metric_func(cl_args.model_task, c.target_transformer)
 
     c.model.eval()
     gather_preds = model_utils.gather_pred_outputs_from_dloader
     val_outputs_total, val_labels_total, val_ids_total = gather_preds(
-        c.valid_loader, c.cl_args, c.model, args.device, c.valid_dataset.labels_dict
+        c.valid_loader, c.cl_args, c.model, cl_args.device, c.valid_dataset.labels_dict
     )
     c.model.train()
 
-    val_labels_total = model_utils.cast_labels(args.model_task, val_labels_total)
+    val_labels_total = model_utils.cast_labels(cl_args.model_task, val_labels_total)
 
     val_loss = c.criterion(val_outputs_total, val_labels_total)
     metric_dict = metric_func(val_outputs_total, val_labels_total, "v")
     metric_dict["v_loss"] = val_loss.item()
 
-    engine.state.metrics.update(metric_dict)
+    write_header = True if iteration == cl_args.sample_interval else False
+    outfile = get_run_folder(cl_args.run_name) / "eval_history.log"
+    append_metrics_to_file(
+        filepath=outfile,
+        metrics=metric_dict,
+        iteration=iteration,
+        write_header=write_header,
+    )
 
     save_evaluation_results(
         val_outputs=val_outputs_total,
@@ -212,7 +203,7 @@ def save_evaluation_results(
     run_folder: Path,
     config: "Config",
 ) -> None:
-    args = config.cl_args
+    cl_args = config.cl_args
 
     sample_outfolder = Path(run_folder, "samples", str(iteration))
     ensure_path_exists(sample_outfolder, is_folder=True)
@@ -228,9 +219,9 @@ def save_evaluation_results(
         "encoder": config.target_transformer,
     }
 
-    vf.gen_eval_graphs(model_task=args.model_task, **common_args)
+    vf.gen_eval_graphs(model_task=cl_args.model_task, **common_args)
 
-    if args.model_task == "cls":
-        get_most_wrong_wrapper(data_folder=args.data_folder, **common_args)
-    elif args.model_task == "reg":
+    if cl_args.model_task == "cls":
+        get_most_wrong_wrapper(data_folder=cl_args.data_folder, **common_args)
+    elif cl_args.model_task == "reg":
         scale_and_save_regression_preds(**common_args)

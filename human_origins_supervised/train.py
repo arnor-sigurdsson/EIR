@@ -63,9 +63,9 @@ class Config:
 
 def train_ignite(config: Config) -> None:
     c = config
-    args = config.cl_args
+    cl_args = config.cl_args
 
-    metric_func = select_metric_func(args.model_task, c.target_transformer)
+    metric_func = select_metric_func(cl_args.model_task, c.target_transformer)
 
     def step(
         engine: Engine,
@@ -77,12 +77,12 @@ def train_ignite(config: Config) -> None:
         c.model.train()
 
         train_seqs, train_labels, train_ids = loader_batch
-        train_seqs = train_seqs.to(device=args.device, dtype=torch.float32)
+        train_seqs = train_seqs.to(device=cl_args.device, dtype=torch.float32)
 
-        train_labels = train_labels.to(device=args.device)
-        train_labels = model_utils.cast_labels(args.model_task, train_labels)
+        train_labels = train_labels.to(device=cl_args.device)
+        train_labels = model_utils.cast_labels(cl_args.model_task, train_labels)
 
-        extra_inputs = get_extra_inputs(args, train_ids, c.labels_dict, c.model)
+        extra_inputs = get_extra_inputs(cl_args, train_ids, c.labels_dict, c.model)
 
         c.optimizer.zero_grad()
         train_outputs = c.model(train_seqs, extra_inputs)
@@ -102,7 +102,7 @@ def train_ignite(config: Config) -> None:
 
     trainer = configure_trainer(trainer, config)
 
-    trainer.run(c.train_loader, args.n_epochs)
+    trainer.run(c.train_loader, cl_args.n_epochs)
 
 
 def _prepare_run_folder(run_name: str) -> Path:
