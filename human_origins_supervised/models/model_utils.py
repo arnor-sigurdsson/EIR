@@ -8,14 +8,18 @@ from torch.nn import Module
 from torch.utils.data import DataLoader
 from torch_lr_finder import LRFinder
 
+from aislib.misc_utils import get_logger
 from human_origins_supervised.data_load.label_setup import al_label_dict
 from human_origins_supervised.models.extra_inputs_module import get_extra_inputs
+from human_origins_supervised.train_utils.utils import get_run_folder
 
 if TYPE_CHECKING:
     from human_origins_supervised.train import Config
 
 # Aliases
 al_dloader_outputs = Tuple[torch.Tensor, Union[List[str], torch.LongTensor], List[str]]
+
+logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
 def find_no_resblocks_needed(
@@ -155,13 +159,20 @@ def test_lr_range(config: "Config") -> None:
     extra_inputs_hook = partial(
         get_extra_inputs, cl_args=c.cl_args, labels_dict=c.labels_dict, model=c.model
     )
+    plot_path = get_run_folder(c.cl_args.run_name) / "lr_search.png"
+
+    logger.info(
+        "Running learning rate range test and exiting, results will be " "saved to %s.",
+        plot_path,
+    )
 
     lr_finder = LRFinder(
-        c.model,
-        c.optimizer,
-        c.criterion,
-        c.cl_args.device,
+        model=c.model,
+        optimizer=c.optimizer,
+        criterion=c.criterion,
+        device=c.cl_args.device,
         extra_inputs_hook=extra_inputs_hook,
+        plot_output_path=plot_path,
     )
-    lr_finder.range_test(c.train_loader, end_lr=10, num_iter=200)
+    lr_finder.range_test(c.train_loader, end_lr=10, num_iter=300)
     lr_finder.plot()

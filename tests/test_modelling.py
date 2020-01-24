@@ -88,7 +88,7 @@ def test_classification_snp_identification(
     create_test_dloaders,
     create_test_model,
     create_test_optimizer,
-    create_test_dataset,
+    create_test_datasets,
     keep_outputs,
 ):
     """
@@ -109,7 +109,7 @@ def test_classification_snp_identification(
     optimizer = create_test_optimizer
     criterion = CrossEntropyLoss()
 
-    train_dataset, valid_dataset = create_test_dataset
+    train_dataset, valid_dataset = create_test_datasets
     target_transformer = train_dataset.target_transformer
 
     run_path = Path(f"runs/{cl_args.run_name}/")
@@ -160,7 +160,7 @@ def test_regression(
     create_test_dloaders,
     create_test_model,
     create_test_optimizer,
-    create_test_dataset,
+    create_test_datasets,
     keep_outputs,
 ):
 
@@ -172,7 +172,7 @@ def test_regression(
     optimizer = create_test_optimizer
     criterion = CrossEntropyLoss() if cl_args.model_task == "cls" else MSELoss()
 
-    train_dataset, valid_dataset = create_test_dataset
+    train_dataset, valid_dataset = create_test_datasets
     target_transformer = train_dataset.target_transformer
 
     config = train.Config(
