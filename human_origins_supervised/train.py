@@ -456,11 +456,24 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--target_column",
+        "--target_columns",
         type=str,
         required=True,
         help="What column in label file to treat as target variable"
         "(i.e. to predict on).",
+    )
+
+    parser.add_argument(
+        "--target_con_columns",
+        type=list,
+        default=[],
+        help="Continuous target columns in label file.",
+    )
+    parser.add_argument(
+        "--target_cat_columns",
+        type=list,
+        default=[],
+        help="Categorical target columns in label file.",
     )
 
     parser.add_argument(

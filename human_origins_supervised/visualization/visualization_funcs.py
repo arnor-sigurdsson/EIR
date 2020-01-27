@@ -127,7 +127,7 @@ def gen_eval_graphs(
 ):
     """
     TODO:
-        - Clean this function up – expecially when it comes to target_transformer.
+        - Clean this function up – expecially when it comes to target_transformers.
         - Use val_ids_total to hook into other labels for plotting.
     """
     if model_task == "cls":

@@ -27,7 +27,7 @@ def _get_extra_columns(
 ) -> List[str]:
     """
     We use this to grab extra columns needed for the current run, as specified in the
-    COLUMN_OPS, where the key is the target_column. That is, "for running with this
+    COLUMN_OPS, where the key is the target_columns. That is, "for running with this
     specific target column, what other columns do we need to grab", as specified
     by the extra_columns_deps attribute of each column operation.
 
@@ -205,10 +205,10 @@ def _split_df(df: pd.DataFrame, valid_size: Union[int, float]) -> al_train_val_d
     return df_labels_train, df_labels_valid
 
 
-def get_transformer_path(run_path: Path, column_name: str, name: str) -> Path:
-    scaler_path = run_path / "transformers" / f"{column_name}_{name}.save"
+def get_transformer_path(run_path: Path, transformer_name: str, suffix: str) -> Path:
+    transformer_path = run_path / "transformers" / f"{transformer_name}_{suffix}.save"
 
-    return scaler_path
+    return transformer_path
 
 
 def get_target_transformer(model_task):

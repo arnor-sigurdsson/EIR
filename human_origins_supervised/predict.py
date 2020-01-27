@@ -142,7 +142,7 @@ def set_up_test_dataset(
     )
 
     target_transformer_path = label_setup.get_transformer_path(
-        run_folder, test_train_cl_args_mix.target_column, "target_transformer"
+        run_folder, test_train_cl_args_mix.target_column, "target_transformers"
     )
     target_transformer = joblib.load(target_transformer_path)
 

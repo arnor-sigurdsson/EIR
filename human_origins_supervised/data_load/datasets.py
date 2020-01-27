@@ -23,40 +23,7 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 
 # Type Aliases
 al_datasets = Union["MemoryArrayDataset", "DiskArrayDataset"]
-
-
-def construct_dataset_init_params_from_cl_args(cl_args):
-    """
-    Shared between here and predict.py.
-    """
-    dataset_class_common_args = {
-        "data_folder": cl_args.data_folder,
-        "model_task": cl_args.model_task,
-        "target_width": cl_args.target_width,
-        "target_column": cl_args.target_column,
-    }
-
-    return dataset_class_common_args
-
-
-def save_target_transformer(
-    run_folder: Path,
-    target_column: str,
-    target_transformer: Union[StandardScaler, LabelEncoder],
-) -> Path:
-    """
-    :param run_folder: Current run folder, used to anchor saving of transformer.
-    :param target_column: The target column passed in for the current run.
-    :param target_transformer: The transformer object to save.
-    :return: Output path of where the target transformer was saved.
-    """
-    target_transformer_outpath = get_transformer_path(
-        run_folder, target_column, "target_transformer"
-    )
-    ensure_path_exists(target_transformer_outpath)
-    joblib.dump(target_transformer, target_transformer_outpath)
-
-    return target_transformer_outpath
+al_target_transformers = Union[StandardScaler, LabelEncoder]
 
 
 def set_up_datasets(cl_args: Namespace) -> Tuple[al_datasets, al_datasets]:
@@ -75,13 +42,16 @@ def set_up_datasets(cl_args: Namespace) -> Tuple[al_datasets, al_datasets]:
     valid_dataset = dataset_class(
         **dataset_class_common_args,
         labels_dict=valid_labels,
-        target_transformer=train_dataset.target_transformer,
+        target_transformers=train_dataset.target_transformers,
     )
 
     run_folder = Path("./runs", cl_args.run_name)
-    save_target_transformer(
-        run_folder, cl_args.target_column, train_dataset.target_transformer
-    )
+    for (transformer_name, target_transformer) in train_dataset.target_transformers:
+        save_target_transformer(
+            run_folder=run_folder,
+            transformer_name=transformer_name,
+            target_transformer=target_transformer,
+        )
 
     assert len(train_dataset) > len(valid_dataset)
     assert set(valid_dataset.labels_dict.keys()).isdisjoint(
@@ -89,6 +59,60 @@ def set_up_datasets(cl_args: Namespace) -> Tuple[al_datasets, al_datasets]:
     )
 
     return train_dataset, valid_dataset
+
+
+def construct_dataset_init_params_from_cl_args(cl_args):
+    """
+    Shared between here and predict.py.
+    """
+    target_columns = merge_target_columns(
+        target_con_columns=cl_args.target_con_columns,
+        target_cat_columns=cl_args.target_cat_columns,
+    )
+    dataset_class_common_args = {
+        "data_folder": cl_args.data_folder,
+        "model_task": cl_args.model_task,
+        "target_width": cl_args.target_width,
+        "target_columns": target_columns,
+    }
+
+    return dataset_class_common_args
+
+
+def merge_target_columns(
+    target_con_columns: List[str], target_cat_columns: List[str]
+) -> Dict[str, List[str]]:
+
+    if len(target_con_columns + target_cat_columns) == 0:
+        raise ValueError("Expected at least 1 target column")
+
+    all_target_columns = {"con": [], "cat": []}
+    [all_target_columns["con"].append(i) for i in target_con_columns]
+    [all_target_columns["cat"].append(i) for i in target_cat_columns]
+
+    assert len(all_target_columns) > 0
+
+    return all_target_columns
+
+
+def save_target_transformer(
+    run_folder: Path, transformer_name: str, target_transformer: al_target_transformers
+) -> Path:
+    """
+    :param run_folder: Current run folder, used to anchor saving of transformer.
+    :param transformer_name: The target column passed in for the current run.
+    :param target_transformer: The transformer object to save.
+    :return: Output path of where the target transformer was saved.
+    """
+    target_transformer_outpath = get_transformer_path(
+        run_path=run_folder,
+        transformer_name=transformer_name,
+        suffix="target_transformer",
+    )
+    ensure_path_exists(target_transformer_outpath)
+    joblib.dump(target_transformer, target_transformer_outpath)
+
+    return target_transformer_outpath
 
 
 @dataclass
@@ -103,9 +127,9 @@ class ArrayDatasetBase(Dataset):
         self,
         data_folder: Path,
         model_task: str,
-        target_column: str = None,
+        target_columns: Dict[str, List[str]] = None,
         labels_dict: al_label_dict = None,
-        target_transformer: Union[LabelEncoder, StandardScaler] = None,
+        target_transformers: Dict[str, al_target_transformers] = None,
         target_height: int = 4,
         target_width: int = None,
         na_augment: float = 0.0,
@@ -119,16 +143,16 @@ class ArrayDatasetBase(Dataset):
 
         self.samples: Union[List[Sample], None] = None
 
-        self.target_column = target_column
+        self.target_columns = target_columns
         self.labels_dict = labels_dict if labels_dict else {}
         self.labels_unique = None
         self.num_classes = None
-        self.target_transformer = target_transformer
+        self.target_transformers = target_transformers
 
         self.na_augment = na_augment
 
     def parse_label(
-        self, sample_label_dict: Dict[str, Union[str, float]]
+        self, sample_label_dict: Dict[str, Union[str, float]], target_column: str
     ) -> Union[List[None], np.ndarray, float]:
         """
         TODO:   Check if there is a significant performance hit doing the transform on
@@ -138,8 +162,8 @@ class ArrayDatasetBase(Dataset):
         if not sample_label_dict:
             return []
 
-        label_value = sample_label_dict[self.target_column]
-        tt_t = self.target_transformer.transform
+        label_value = sample_label_dict[target_column]
+        tt_t = self.target_transformers[target_column].transform
 
         # StandardScaler() takes [[arr]] whereas LabelEncoder() takes [arr]
         label_value = [label_value] if self.model_task == "reg" else label_value
@@ -148,12 +172,20 @@ class ArrayDatasetBase(Dataset):
         return label_value_trns
 
     def get_samples(self, array_hook: Callable = lambda x: x):
+        """
+        If we have initialized a labels_dict variable, we use that to iterate over IDs.
+        This is for (a) training, (b) evaluating or (c) testing on test set for
+        generalization error.
+
+        When predicting on unknown set (i.e. no labels), then we don't have a
+        labels dict, hence we refer to `files directly`.
+
+        We don't want to use `files` variable for train/val, as the self.samples
+        would have all obs. in both train/val, which is probably not a good idea as
+        it might pose data leakage risks.
+        """
         files = {i.stem: i for i in Path(self.data_folder).iterdir()}
 
-        # When training or evaluating on test, labels_dict maps to train/val/test IDs.
-        # When predicting on unknown test, then we don't have a labels dict.
-        # We don't want to use `files` variable for train/val, as the self.samples
-        # would have all obs. in both train/val, which is probably not a good idea.
         sample_id_iter = self.labels_dict if self.labels_dict else files
         samples = []
 
@@ -172,32 +204,70 @@ class ArrayDatasetBase(Dataset):
         raise NotImplementedError
 
     def init_label_attributes(self):
-        if not self.target_column:
+        if not self.target_columns:
             raise ValueError("Please specify label column name.")
 
+        self.check_non_labelled()
+
+        if not self.target_transformers:
+            self.target_transformers = set_up_all_target_transformers(
+                self.samples, self.target_columns
+            )
+
+        # TODO: Rename to be more descriptive, dict now instead of int.
+        self.num_classes = set_up_num_classes(self.target_transformers)
+
+    def check_non_labelled(self):
         non_labelled = tuple(i for i in self.samples if not i.labels)
         if non_labelled:
             raise ValueError(
                 f"Expected all observations to have a label associated "
                 f"with them, but got {non_labelled}."
             )
-        all_sample_target_labels = np.array(
-            [i.labels[self.target_column] for i in self.samples]
-        )
 
-        if self.model_task == "cls":
-            self.labels_unique = sorted(np.unique(all_sample_target_labels))
-            self.num_classes = len(self.labels_unique)
 
-        elif self.model_task == "reg":
-            self.num_classes = 1
-            # StandardScaler() expects 2D array, LabelEncoder() a 1D array
-            all_sample_target_labels = all_sample_target_labels.reshape(-1, 1)
+def set_up_all_target_transformers(
+    samples: List[Sample], target_columns: Dict[str, List[str]]
+) -> Dict[str, al_target_transformers]:
 
-        if not self.target_transformer:
-            target_transformer = get_target_transformer(self.model_task)
-            target_transformer.fit(all_sample_target_labels)
-            self.target_transformer = target_transformer
+    target_transformers = {}
+    for column_type in target_columns:
+        for cur_target_column in target_columns:
+            cur_target_transformer = fit_transformer_on_target_column(
+                samples=samples,
+                target_column=cur_target_column,
+                column_type=column_type,
+            )
+            target_transformers[cur_target_column] = cur_target_transformer
+
+    return target_transformers
+
+
+def fit_transformer_on_target_column(
+    samples: List[Sample], target_column, column_type: str
+) -> al_target_transformers:
+
+    transformer = get_target_transformer(column_type)
+    # Change to list/tuple if transformer cannot accept iterable
+    target_values_gen = (i.labels[target_column] for i in samples)
+    transformer.fit(target_values_gen)
+
+    return transformer
+
+
+def set_up_num_classes(
+    target_transformers: Dict[str, al_target_transformers]
+) -> Dict[str, int]:
+
+    num_classes_dict = {}
+    for target_column, transformer in target_transformers:
+        if isinstance(transformer, StandardScaler):
+            num_classes = 1
+        else:
+            num_classes = len(transformer.classes_)
+        num_classes_dict[target_column] = num_classes
+
+    return num_classes_dict
 
 
 class MemoryArrayDataset(ArrayDatasetBase):

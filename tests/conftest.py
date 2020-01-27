@@ -38,6 +38,16 @@ def pytest_generate_tests(metafunc):
 
 
 @pytest.fixture
+def parse_test_cl_args(request):
+    n_per_class = request.config.getoption("--num_samples_per_class")
+    num_snps = request.config.getoption("--num_snps")
+
+    parsed_args = {"n_per_class": n_per_class, "num_snps": num_snps}
+
+    return parsed_args
+
+
+@pytest.fixture
 def args_config():
     config = SimpleNamespace(
         **{
@@ -79,6 +89,8 @@ def args_config():
             "sa": False,
             "sample_interval": 20,
             "target_column": "Origin",
+            "target_con_columns": [],
+            "target_cat_columns": ["Origin"],
             "target_width": 1000,
             "valid_size": 0.05,
             "wd": 0.00,
