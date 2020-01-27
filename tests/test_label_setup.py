@@ -26,27 +26,23 @@ def get_test_column_ops():
             ColumnOperation(test_column_op_1, replace_dict_args),
             ColumnOperation(test_column_op_2, multiplier_dict_arg),
         ],
-        "OriginExtraColumns": [
+        "OriginExtraColumnsAll": [
             ColumnOperation(
                 test_column_op_1, replace_dict_args, ("ExtraCol1", "ExtraCol2")
             ),
             ColumnOperation(test_column_op_3, replace_column_dict_arg, ("ExtraCol3",)),
         ],
+        "OriginExtraColumnsPartial1": [
+            ColumnOperation(
+                test_column_op_1, replace_dict_args, ("ExtraCol1", "ExtraCol2")
+            )
+        ],
+        "OriginExtraColumnsPartial2": [
+            ColumnOperation(test_column_op_3, replace_column_dict_arg, ("ExtraCol3",))
+        ],
     }
 
     return test_column_ops
-
-
-def test_get_extra_columns(get_test_column_ops):
-    test_column_ops = get_test_column_ops
-
-    extra_columns = label_setup._get_extra_columns(
-        "OriginExtraColumns", test_column_ops
-    )
-    assert extra_columns == ["ExtraCol1", "ExtraCol2", "ExtraCol3"]
-
-    extra_columns_empty = label_setup._get_extra_columns("Origin", test_column_ops)
-    assert extra_columns_empty == []
 
 
 @pytest.mark.parametrize(
@@ -54,34 +50,122 @@ def test_get_extra_columns(get_test_column_ops):
     [{"class_type": "binary"}, {"class_type": "multi"}],
     indirect=True,
 )
-def test_load_label_df(request, create_test_data):
-    path, test_data_params = create_test_data
-    label_fpath = path / "labels.csv"
+def test_set_up_train_and_valid_labels(
+    parse_test_cl_args, create_test_data, create_test_cl_args
+):
+    n_per_class = parse_test_cl_args["n_per_class"]
+    _, test_data_params = create_test_data
+    cl_args = create_test_cl_args
+
     n_classes = 2 if test_data_params.get("class_type") == "binary" else 3
 
-    n_per_class = request.config.getoption("--num_samples_per_class")
+    train_labels_dict, valid_labels_dict = label_setup.set_up_train_and_valid_labels(
+        cl_args
+    )
 
-    df_label = label_setup._load_label_df(label_fpath, "Origin")
+    assert len(train_labels_dict) + len(valid_labels_dict) == n_classes * n_per_class
+    assert len(train_labels_dict) > len(valid_labels_dict)
 
+    train_ids_set = set(train_labels_dict.keys())
+    valid_ids_set = set(valid_labels_dict.keys())
+
+    assert len(train_ids_set) == len(train_labels_dict)
+    assert len(valid_ids_set) == len(valid_labels_dict)
+
+    assert valid_ids_set.isdisjoint(train_ids_set)
+
+
+@pytest.mark.parametrize("create_test_data", [{"class_type": "binary"}], indirect=True)
+def test_label_df_parse_wrapper(
+    parse_test_cl_args, create_test_data, create_test_cl_args
+):
+    n_per_class = parse_test_cl_args["n_per_class"]
+    cl_args = create_test_cl_args
+    df_labels = label_setup.label_df_parse_wrapper(cl_args)
+
+    # since we're only testing binary case here
+    n_total = n_per_class * 2
+
+    assert df_labels.shape == (n_total, 1)
+    assert set(df_labels[cl_args.target_column].unique()) == {"Asia", "Europe"}
+
+
+@pytest.mark.parametrize(
+    "test_input,expected",
+    [
+        (["Origin"], []),
+        (["OriginExtraColumnsAll"], ["ExtraCol1", "ExtraCol2", "ExtraCol3"]),
+        (["OriginExtraColumnsPartial1", "Origin"], ["ExtraCol1", "ExtraCol2"]),
+        (
+            ["OriginExtraColumnsPartial1", "OriginExtraColumnsPartial2"],
+            ["ExtraCol1", "ExtraCol2", "ExtraCol3"],
+        ),
+    ],
+)
+def test_get_extra_columns(test_input, expected, get_test_column_ops):
+    test_column_ops = get_test_column_ops
+
+    test_output = label_setup._get_extra_columns(test_input, test_column_ops)
+    assert test_output == expected
+
+
+@pytest.mark.parametrize(
+    "create_test_data",
+    [{"class_type": "binary"}, {"class_type": "multi"}],
+    indirect=True,
+)
+def test_load_label_df(parse_test_cl_args, create_test_data):
+    """
+    TODO:   Split this into four separate tests when we have rewritten create_test_data
+            to only generate each type of data once.
+
+    """
+    n_per_class = parse_test_cl_args["n_per_class"]
+    path, test_data_params = create_test_data
+    label_fpath = path / "labels.csv"
+
+    n_classes = 2 if test_data_params.get("class_type") == "binary" else 3
+
+    target_column_single = ["Origin"]
+
+    df_label = label_setup._load_label_df(label_fpath, target_column_single)
+
+    # Case 1
     assert df_label.shape[0] == n_per_class * n_classes
     assert df_label.index.name == "ID"
     assert [i for i in df_label.Origin.value_counts()] == [n_per_class] * n_classes
 
+    # Case 2
     df_label["ExtraCol"] = "ExtraVal"
     label_extra_fpath = path / "labels_extracol.csv"
     df_label.to_csv(label_extra_fpath)
 
     df_label_extra = label_setup._load_label_df(
-        label_extra_fpath, "Origin", extra_columns=("ExtraCol",)
+        label_extra_fpath, target_column_single, extra_columns=("ExtraCol",)
     )
 
     assert df_label_extra.shape[1] == 2
     assert df_label_extra["ExtraCol"].unique().item() == "ExtraVal"
 
+    # Case 3
     df_label_ids = label_setup._load_label_df(
-        label_fpath, "Origin", ids_to_keep=("95_Europe", "96_Europe", "97_Europe")
+        label_fpath,
+        target_column_single,
+        ids_to_keep=("95_Europe", "96_Europe", "97_Europe"),
     )
     assert df_label_ids.shape[0] == 3
+
+    # Case 4
+    df_label["ExtraTarget"] = "ExtraTargetVal"
+    multi_target_fpath = path / "labels_extracol.csv"
+    df_label.to_csv(multi_target_fpath)
+
+    target_column_multi = ["Origin", "ExtraTarget"]
+    df_label_multi_target = label_setup._load_label_df(
+        multi_target_fpath, target_column_multi, extra_columns=("ExtraCol",)
+    )
+    assert df_label_multi_target.shape[1] == 3
+    assert "ExtraTarget" in df_label_multi_target.columns
 
 
 @pytest.mark.parametrize("create_test_data", [{"class_type": "binary"}], indirect=True)
@@ -91,8 +175,8 @@ def test_parse_label_df(create_test_data, get_test_column_ops):
 
     test_column_ops = get_test_column_ops
 
-    df_label = label_setup._load_label_df(label_fpath, "Origin")
-    df_label_parsed = label_setup._parse_label_df(df_label, test_column_ops, "Origin")
+    df_label = label_setup._load_label_df(label_fpath, ["Origin"])
+    df_label_parsed = label_setup._parse_label_df(df_label, test_column_ops, ["Origin"])
 
     assert set(df_label_parsed.Origin.unique()) == {"Iceland" * 2, "Asia" * 2}
 
@@ -100,22 +184,9 @@ def test_parse_label_df(create_test_data, get_test_column_ops):
     for col in extra_cols:
         df_label[col] = "Iceland"
 
-    df_label = df_label.rename(columns={"Origin": "OriginExtraColumns"})
-    df_label_parsed = label_setup._parse_label_df(df_label, test_column_ops, "Origin")
-    assert df_label_parsed["OriginExtraColumns"].unique().item() == "Iceland"
-
-
-@pytest.mark.parametrize("create_test_data", [{"class_type": "binary"}], indirect=True)
-def test_label_df_parse_wrapper(request, create_test_data, create_test_cl_args):
-    cl_args = create_test_cl_args
-    df_labels = label_setup.label_df_parse_wrapper(cl_args)
-
-    n_per_class = request.config.getoption("--num_samples_per_class")
-    # since we're only testing binary case here
-    n_total = n_per_class * 2
-
-    assert df_labels.shape == (n_total, 1)
-    assert set(df_labels[cl_args.target_column].unique()) == {"Asia", "Europe"}
+    df_label = df_label.rename(columns={"Origin": "OriginExtraColumnsAll"})
+    df_label_parsed = label_setup._parse_label_df(df_label, test_column_ops, ["Origin"])
+    assert df_label_parsed["OriginExtraColumnsAll"].unique().item() == "Iceland"
 
 
 @pytest.mark.parametrize(
@@ -164,31 +235,3 @@ def test_scale_regression_labels(create_test_data, create_test_cl_args):
 
     assert df_train[cl_args.target_column].between(-2, 2).all()
     assert df_valid[cl_args.target_column].between(-2, 2).all()
-
-
-@pytest.mark.parametrize(
-    "create_test_data",
-    [{"class_type": "binary"}, {"class_type": "multi"}],
-    indirect=True,
-)
-def test_set_up_train_and_valid_labels(request, create_test_data, create_test_cl_args):
-    path, test_data_params = create_test_data
-    cl_args = create_test_cl_args
-    n_classes = 2 if test_data_params.get("class_type") == "binary" else 3
-
-    n_per_class = request.config.getoption("--num_samples_per_class")
-
-    train_labels_dict, valid_labels_dict = label_setup.set_up_train_and_valid_labels(
-        cl_args
-    )
-
-    assert len(train_labels_dict) + len(valid_labels_dict) == n_classes * n_per_class
-    assert len(train_labels_dict) > len(valid_labels_dict)
-
-    train_ids_set = set(train_labels_dict.keys())
-    valid_ids_set = set(valid_labels_dict.keys())
-
-    assert len(train_ids_set) == len(train_labels_dict)
-    assert len(valid_ids_set) == len(valid_labels_dict)
-
-    assert valid_ids_set.isdisjoint(train_ids_set)

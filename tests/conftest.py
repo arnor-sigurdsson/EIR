@@ -2,6 +2,7 @@ from pathlib import Path
 from random import shuffle
 from shutil import rmtree
 from types import SimpleNamespace
+from typing import List, Tuple
 
 import numpy as np
 import pytest
@@ -42,7 +43,7 @@ def parse_test_cl_args(request):
     n_per_class = request.config.getoption("--num_samples_per_class")
     num_snps = request.config.getoption("--num_snps")
 
-    parsed_args = {"n_per_class": n_per_class, "num_snps": num_snps}
+    parsed_args = {"n_per_class": n_per_class, "n_snps": num_snps}
 
     return parsed_args
 
@@ -138,7 +139,76 @@ def create_test_cl_args(request, args_config, create_test_data):
     return args_config
 
 
-def create_test_array(test_task, base_array, snp_idxs_candidates, snp_row_idx):
+@pytest.fixture()
+def create_test_data(request, tmp_path, parse_test_cl_args):
+    """
+    Create a folder of data in same format, i.e. with ID_-_Class.
+    Numpy arrays, can be in non-packbits format.
+    Have different indexes for SNP locs in question.
+
+    Also create SNP file. folder/arrays/ and folder/snp_file
+
+    TODO:   Refactor this into different fixtures so that we don't have rewrite the
+            test data to the disk multiple times
+    """
+
+    target_classes = {"Asia": 1, "Europe": 2}
+    test_data_params = request.param
+
+    if test_data_params["class_type"] in ("multi", "regression"):
+        target_classes["Africa"] = 0
+
+    n_per_class = parse_test_cl_args["n_per_class"]
+    n_snps = parse_test_cl_args["n_snps"]
+
+    test_task = "reg" if test_data_params["class_type"] == "regression" else "cls"
+
+    label_file = open(str(tmp_path / "labels.csv"), "w")
+    # extra col for testing extra inputs
+    label_file.write("ID,Origin,OriginExtraCol,ExtraTarget\n")
+
+    array_folder = set_up_test_data_array_outpath(tmp_path)
+
+    for cls, snp_row_idx in target_classes.items():
+        for sample_idx in range(n_per_class):
+
+            outpath = array_folder / f"{sample_idx}_{cls}.npy"
+
+            base_array, snp_idxs_candidates = set_up_test_array_base_params(n_snps)
+
+            cur_test_array, snps_this_sample = create_test_array(
+                test_task=test_task,
+                base_array=base_array,
+                snp_idxs_candidates=snp_idxs_candidates,
+                snp_row_idx=snp_row_idx,
+            )
+
+            np.save(str(outpath), cur_test_array)
+
+            if test_task == "reg":
+                value_base = 100 + (5 * len(snps_this_sample)) + np.random.randn()
+                values = [value_base] * 3 + [value_base - 10]
+            else:
+                values = [cls] * 4
+            line_string = get_label_file_string(str(sample_idx), values)
+            label_file.write(line_string)
+
+    label_file.close()
+
+    write_test_data_snp_file(tmp_path, n_snps)
+
+    if test_data_params.get("split_to_test", False):
+        split_test_array_folder(tmp_path)
+
+    return tmp_path, request.param
+
+
+def create_test_array(
+    test_task: str,
+    base_array: np.ndarray,
+    snp_idxs_candidates: np.ndarray,
+    snp_row_idx: int,
+) -> Tuple[np.ndarray, np.ndarray]:
     # make samples have the reference, otherwise might have alleles chosen
     # below by random, without having the phenotype
     base_array[:, snp_idxs_candidates] = 0
@@ -158,10 +228,46 @@ def create_test_array(test_task, base_array, snp_idxs_candidates, snp_row_idx):
     else:
         base_array[snp_row_idx, snp_idxs] = 1
 
+    base_array = base_array.astype(np.uint8)
     return base_array, snp_idxs
 
 
-def split_test_array_folder(test_folder: Path):
+def set_up_test_data_array_outpath(base_folder: Path) -> Path:
+    array_folder = base_folder / "test_arrays"
+    array_folder.mkdir()
+
+    return array_folder
+
+
+def set_up_test_array_base_params(n_snps: int) -> Tuple[np.ndarray, np.ndarray]:
+    # create random one hot array
+    base_array = np.eye(4)[np.random.choice(4, n_snps)].T
+    # set up 10 candidates
+    step_size = n_snps // 10
+    snp_idxs_candidates = np.array(range(50, n_snps, step_size))
+
+    return base_array, snp_idxs_candidates
+
+
+def get_label_file_string(sample_id: str, column_values: List[str]) -> str:
+    values_part = ",".join(column_values)
+    return f"{sample_id}_{values_part}\n"
+
+
+def write_test_data_snp_file(base_folder: Path, n_snps: int) -> None:
+    snp_file = base_folder / "test_snps.bim"
+    base_snp_string_list = ["1", "REPLACE_W_IDX", "0.1", "10", "A", "T"]
+
+    with open(str(snp_file), "w") as snpfile:
+        for snp_idx in range(n_snps):
+            cur_snp_list = base_snp_string_list[:]
+            cur_snp_list[1] = str(snp_idx)
+
+            cur_snp_string = "\t".join(cur_snp_list)
+            snpfile.write(cur_snp_string + "\n")
+
+
+def split_test_array_folder(test_folder: Path) -> None:
     test_array_test_set_folder = test_folder / "test_arrays_test_set"
     test_array_test_set_folder.mkdir()
 
@@ -171,74 +277,6 @@ def split_test_array_folder(test_folder: Path):
     test_arrays_test_set = all_arrays[:200]
     for array_file in test_arrays_test_set:
         array_file.replace(test_array_test_set_folder / array_file.name)
-
-
-@pytest.fixture()
-def create_test_data(request, tmp_path):
-    """
-    Create a folder of data in same format, i.e. with ID_-_Class.
-    Numpy arrays, can be in non-packbits format.
-    Have different indexes for SNP locs in question.
-
-    Also create SNP file. folder/arrays/ and folder/snp_file
-    """
-
-    target_classes = {"Asia": 1, "Europe": 2}
-    test_data_params = request.param
-
-    if test_data_params["class_type"] in ("multi", "regression"):
-        target_classes["Africa"] = 0
-
-    n_per_class = request.config.getoption("--num_samples_per_class")
-    n_snps = request.config.getoption("--num_snps")
-    test_task = "reg" if test_data_params["class_type"] == "regression" else "cls"
-
-    array_folder = tmp_path / "test_arrays"
-    array_folder.mkdir()
-    label_file = open(tmp_path / "labels.csv", "w")
-    # extra col for testing extra inputs
-    label_file.write("ID,Origin,OriginExtraCol\n")
-
-    for cls, snp_row_idx in target_classes.items():
-        for sample_idx in range(n_per_class):
-
-            outpath = array_folder / f"{sample_idx}_{cls}.npy"
-
-            # create random one hot array
-            base_array = np.eye(4)[np.random.choice(4, n_snps)].T
-            # set up 10 candidates
-            step_size = n_snps // 10
-            snp_idxs_candidates = np.array(range(50, n_snps, step_size))
-
-            cur_test_array, snps_this_sample = create_test_array(
-                test_task, base_array, snp_idxs_candidates, snp_row_idx
-            )
-
-            arr_to_save = cur_test_array.astype(np.uint8)
-            np.save(outpath, arr_to_save)
-
-            if test_data_params["class_type"] in ("binary", "multi"):
-                label_file.write(f"{sample_idx}_{cls},{cls},{cls}\n")
-            else:
-                value = 100 + (5 * len(snps_this_sample)) + np.random.randn()
-                label_file.write(f"{sample_idx}_{cls},{value},{value}\n")
-
-    label_file.close()
-
-    snp_file = tmp_path / "test_snps.bim"
-    base_snp_string_list = ["1", "REPLACE_W_IDX", "0.1", "10", "A", "T"]
-    with open(snp_file, "w") as snpfile:
-        for snp_idx in range(n_snps):
-            cur_snp_list = base_snp_string_list[:]
-            cur_snp_list[1] = str(snp_idx)
-
-            cur_snp_string = "\t".join(cur_snp_list)
-            snpfile.write(cur_snp_string + "\n")
-
-    if test_data_params.get("split_to_test", False):
-        split_test_array_folder(tmp_path)
-
-    return tmp_path, request.param
 
 
 @pytest.fixture()

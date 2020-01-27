@@ -15,7 +15,6 @@ from human_origins_supervised.data_load.label_setup import (
     set_up_train_and_valid_labels,
     al_label_dict,
     get_transformer_path,
-    get_target_transformer,
 )
 from .data_loading_funcs import make_random_snps_missing
 
@@ -347,3 +346,12 @@ class DiskArrayDataset(ArrayDatasetBase):
 
     def __len__(self):
         return len(self.samples)
+
+
+def get_target_transformer(model_task):
+    if model_task == "reg":
+        return StandardScaler()
+    elif model_task == "cls":
+        return LabelEncoder()
+
+    raise ValueError()

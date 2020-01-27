@@ -6,7 +6,7 @@ import joblib
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
 
 from human_origins_supervised.data_load.common_ops import ColumnOperation
@@ -22,34 +22,100 @@ al_train_val_dfs = Tuple[pd.DataFrame, pd.DataFrame]
 al_label_dict = Dict[str, Dict[str, Union[str, float]]]
 
 
+def set_up_train_and_valid_labels(
+    cl_args: Namespace
+) -> Tuple[al_label_dict, al_label_dict]:
+    """
+    Splits and does split based processing (e.g. scaling validation set with training
+    set for regression) on the labels.
+    """
+
+    df_labels = label_df_parse_wrapper(cl_args)
+
+    df_labels_train, df_labels_valid = _split_df(df_labels, cl_args.valid_size)
+
+    df_labels_train, df_labels_valid = _process_train_and_label_dfs(
+        cl_args, df_labels_train, df_labels_valid
+    )
+
+    train_labels_dict = df_labels_train.to_dict("index")
+    valid_labels_dict = df_labels_valid.to_dict("index")
+    return train_labels_dict, valid_labels_dict
+
+
+def label_df_parse_wrapper(cl_args: Namespace) -> pd.DataFrame:
+    all_ids = _gather_ids_from_folder(Path(cl_args.data_folder))
+
+    column_ops = {}
+    if cl_args.custom_lib:
+        column_ops = _get_custom_column_ops(cl_args.custom_lib)
+
+    target_columns = cl_args.target_con_columns + cl_args.target_cat_columns
+
+    extra_label_parsing_cols = _get_extra_columns(target_columns, column_ops)
+    extra_embed_cols = cl_args.embed_columns
+    extra_contn_cols = cl_args.contn_columns
+
+    all_extra_cols = extra_label_parsing_cols + extra_embed_cols + extra_contn_cols
+
+    df_labels = _load_label_df(
+        cl_args.label_file, target_columns, all_ids, all_extra_cols
+    )
+    df_labels = _parse_label_df(df_labels, column_ops, target_columns)
+
+    # remove columns only used for parsing, so only keep actual label column
+    # and extra embedding columns
+    to_drop = [
+        i
+        for i in extra_label_parsing_cols
+        if i not in extra_embed_cols + extra_contn_cols
+    ]
+    if to_drop:
+        df_labels = df_labels.drop(to_drop, axis=1)
+
+    return df_labels
+
+
+def _gather_ids_from_folder(data_folder: Path):
+    logger.debug("Gathering IDs from %s.", data_folder)
+    all_ids = tuple(i.stem for i in tqdm(data_folder.iterdir(), desc="Progress"))
+
+    return all_ids
+
+
 def _get_extra_columns(
-    target_column: str, all_column_ops: al_all_column_ops
+    target_columns: List[str], all_column_ops: al_all_column_ops
 ) -> List[str]:
     """
     We use this to grab extra columns needed for the current run, as specified in the
-    COLUMN_OPS, where the key is the target_columns. That is, "for running with this
-    specific target column, what other columns do we need to grab", as specified
+    COLUMN_OPS, where the keys are the target_columns. That is, "for running with these
+    specific target columns, what other columns do we need to grab", as specified
     by the extra_columns_deps attribute of each column operation.
 
-    :param target_column: The main target column we are modelling on.
+    :param target_columns: The target columns we are modelling on.
     :param all_column_ops: The ledger of all column ops to be done for each target
     column.
     :returns A list of all extra columns needed from the label file for the current run.
     """
-    extra_columns_flat = []
-    if target_column in all_column_ops:
-        cur_ops = all_column_ops.get(target_column)
-        extra_columns = [i.extra_columns_deps for i in cur_ops]
-        extra_columns_flat = list(
-            column for column_deps in extra_columns for column in column_deps
-        )
 
-    return extra_columns_flat
+    extra_columns = []
+    for target_column in target_columns:
+
+        if target_column in all_column_ops:
+            cur_ops = all_column_ops.get(target_column)
+            cur_extra_columns = [i.extra_columns_deps for i in cur_ops]
+
+            cur_extra_columns_flat = list(
+                column for column_deps in cur_extra_columns for column in column_deps
+            )
+            extra_columns += cur_extra_columns_flat
+
+    return extra_columns
 
 
 def _load_label_df(
     label_fpath: Path,
-    target_column: str,
+    target_columns: List[str],
     ids_to_keep: Tuple[str, ...] = (),
     extra_columns: Tuple[str, ...] = (),
 ) -> pd.DataFrame:
@@ -57,7 +123,7 @@ def _load_label_df(
     We want to load the label dataframe to be used for the torch dataset setup.
 
     :param label_fpath: Path to the labelfile as passed in from the CL arguments.
-    :param target_column: Column we are predicting on.
+    :param target_columns: Column we are predicting on.
     :param ids_to_keep: Which IDs in the label dataframe we want to keep.
     :param extra_columns: Extra columns in the label dataframe needed for this runþ
     :return: A dataframe of labels.
@@ -66,7 +132,7 @@ def _load_label_df(
     logger.debug("Reading in labelfile: %s", label_fpath)
     df_labels = pd.read_csv(
         label_fpath,
-        usecols=["ID", target_column] + list(extra_columns),
+        usecols=["ID"] + target_columns + list(extra_columns),
         dtype={"ID": str},
     )
 
@@ -85,7 +151,7 @@ def _load_label_df(
 
 
 def _parse_label_df(
-    df, column_ops: al_all_column_ops, target_column: str
+    df: pd.DataFrame, column_ops: al_all_column_ops, target_columns: List[str]
 ) -> pd.DataFrame:
     """
     We want to be able to dynamically apply various operations to different columns
@@ -108,7 +174,7 @@ def _parse_label_df(
         if column_name in df.columns:
             for column_op in ops_funcs:
                 do_skip = (
-                    column_op.only_apply_if_target and column_name != target_column
+                    column_op.only_apply_if_target and column_name not in target_columns
                 )
                 if not do_skip:
                     func, args_dict = column_op.function, column_op.function_args
@@ -157,44 +223,6 @@ def _get_custom_column_ops(custom_lib: str) -> al_all_column_ops:
     return column_ops
 
 
-def _gather_ids_from_folder(data_folder: Path):
-    logger.debug("Gathering IDs from %s.", data_folder)
-    all_ids = tuple(i.stem for i in tqdm(data_folder.iterdir(), desc="Progress"))
-
-    return all_ids
-
-
-def label_df_parse_wrapper(cl_args: Namespace) -> pd.DataFrame:
-    all_ids = _gather_ids_from_folder(Path(cl_args.data_folder))
-
-    column_ops = {}
-    if cl_args.custom_lib:
-        column_ops = _get_custom_column_ops(cl_args.custom_lib)
-
-    extra_label_parsing_cols = _get_extra_columns(cl_args.target_column, column_ops)
-    extra_embed_cols = cl_args.embed_columns
-    extra_contn_cols = cl_args.contn_columns
-
-    all_extra_cols = extra_label_parsing_cols + extra_embed_cols + extra_contn_cols
-
-    df_labels = _load_label_df(
-        cl_args.label_file, cl_args.target_column, all_ids, all_extra_cols
-    )
-    df_labels = _parse_label_df(df_labels, column_ops, cl_args.target_column)
-
-    # remove columns only used for parsing, so only keep actual label column
-    # and extra embedding columns
-    to_drop = [
-        i
-        for i in extra_label_parsing_cols
-        if i not in extra_embed_cols + extra_contn_cols
-    ]
-    if to_drop:
-        df_labels = df_labels.drop(to_drop, axis=1)
-
-    return df_labels
-
-
 def _split_df(df: pd.DataFrame, valid_size: Union[int, float]) -> al_train_val_dfs:
     train_ids, valid_ids = train_test_split(list(df.index), test_size=valid_size)
 
@@ -205,19 +233,25 @@ def _split_df(df: pd.DataFrame, valid_size: Union[int, float]) -> al_train_val_d
     return df_labels_train, df_labels_valid
 
 
-def get_transformer_path(run_path: Path, transformer_name: str, suffix: str) -> Path:
-    transformer_path = run_path / "transformers" / f"{transformer_name}_{suffix}.save"
+def _process_train_and_label_dfs(
+    cl_args, df_labels_train, df_labels_valid
+) -> al_train_val_dfs:
+    # we make sure not to mess with the passed in CL arg, hence copy
+    continuous_columns = cl_args.contn_columns[:]
+    run_folder = Path("./runs", cl_args.run_name)
 
-    return transformer_path
+    for continuous_column in continuous_columns:
+        df_labels_train, scaler_path = scale_non_target_continuous_columns(
+            df_labels_train, continuous_column, run_folder
+        )
+        df_labels_valid, _ = scale_non_target_continuous_columns(
+            df_labels_valid, continuous_column, run_folder, scaler_path
+        )
 
+    df_labels_train = handle_missing_label_values(df_labels_train, cl_args, "train df")
+    df_labels_valid = handle_missing_label_values(df_labels_valid, cl_args, "valid df")
 
-def get_target_transformer(model_task):
-    if model_task == "reg":
-        return StandardScaler()
-    elif model_task == "cls":
-        return LabelEncoder()
-
-    raise ValueError()
+    return df_labels_train, df_labels_valid
 
 
 def scale_non_target_continuous_columns(
@@ -267,14 +301,10 @@ def scale_non_target_continuous_columns(
     return df, scaler_return_path
 
 
-def _get_missing_stats_string(
-    df: pd.DataFrame, columns_to_check: List[str]
-) -> Dict[str, int]:
-    missing_count_dict = {}
-    for col in columns_to_check:
-        missing_count_dict[col] = int(df[col].isnull().sum())
+def get_transformer_path(run_path: Path, transformer_name: str, suffix: str) -> Path:
+    transformer_path = run_path / "transformers" / f"{transformer_name}_{suffix}.save"
 
-    return missing_count_dict
+    return transformer_path
 
 
 def handle_missing_label_values(df: pd.DataFrame, cl_args, name="df"):
@@ -301,43 +331,11 @@ def handle_missing_label_values(df: pd.DataFrame, cl_args, name="df"):
     return df
 
 
-def _process_train_and_label_dfs(
-    cl_args, df_labels_train, df_labels_valid
-) -> al_train_val_dfs:
-    # we make sure not to mess with the passed in CL arg, hence copy
-    continuous_columns = cl_args.contn_columns[:]
-    run_folder = Path("./runs", cl_args.run_name)
+def _get_missing_stats_string(
+    df: pd.DataFrame, columns_to_check: List[str]
+) -> Dict[str, int]:
+    missing_count_dict = {}
+    for col in columns_to_check:
+        missing_count_dict[col] = int(df[col].isnull().sum())
 
-    for continuous_column in continuous_columns:
-        df_labels_train, scaler_path = scale_non_target_continuous_columns(
-            df_labels_train, continuous_column, run_folder
-        )
-        df_labels_valid, _ = scale_non_target_continuous_columns(
-            df_labels_valid, continuous_column, run_folder, scaler_path
-        )
-
-    df_labels_train = handle_missing_label_values(df_labels_train, cl_args, "train df")
-    df_labels_valid = handle_missing_label_values(df_labels_valid, cl_args, "valid df")
-
-    return df_labels_train, df_labels_valid
-
-
-def set_up_train_and_valid_labels(
-    cl_args: Namespace
-) -> Tuple[al_label_dict, al_label_dict]:
-    """
-    Splits and does split based processing (e.g. scaling validation set with training
-    set for regression) on the labels.
-    """
-
-    df_labels = label_df_parse_wrapper(cl_args)
-
-    df_labels_train, df_labels_valid = _split_df(df_labels, cl_args.valid_size)
-
-    df_labels_train, df_labels_valid = _process_train_and_label_dfs(
-        cl_args, df_labels_train, df_labels_valid
-    )
-
-    train_labels_dict = df_labels_train.to_dict("index")
-    valid_labels_dict = df_labels_valid.to_dict("index")
-    return train_labels_dict, valid_labels_dict
+    return missing_count_dict
