@@ -22,7 +22,10 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 
 # Type Aliases
 al_datasets = Union["MemoryArrayDataset", "DiskArrayDataset"]
+al_target_columns = Dict[str, List[str]]
 al_target_transformers = Union[StandardScaler, LabelEncoder]
+al_sample_label_dict = Dict[str, Union[str, float]]
+al_label_value = Union[List[None], np.ndarray, float]
 
 
 def set_up_datasets(cl_args: Namespace) -> Tuple[al_datasets, al_datasets]:
@@ -45,7 +48,8 @@ def set_up_datasets(cl_args: Namespace) -> Tuple[al_datasets, al_datasets]:
     )
 
     run_folder = Path("./runs", cl_args.run_name)
-    for (transformer_name, target_transformer) in train_dataset.target_transformers:
+    target_transformers = train_dataset.target_transformers
+    for (transformer_name, target_transformer) in target_transformers.items():
         save_target_transformer(
             run_folder=run_folder,
             transformer_name=transformer_name,
@@ -70,7 +74,6 @@ def construct_dataset_init_params_from_cl_args(cl_args):
     )
     dataset_class_common_args = {
         "data_folder": cl_args.data_folder,
-        "model_task": cl_args.model_task,
         "target_width": cl_args.target_width,
         "target_columns": target_columns,
     }
@@ -117,7 +120,7 @@ def save_target_transformer(
 @dataclass
 class Sample:
     sample_id: str
-    array: torch.Tensor
+    array: Union[str, torch.Tensor]
     labels: Union[Dict[str, str], float, None]
 
 
@@ -125,8 +128,7 @@ class ArrayDatasetBase(Dataset):
     def __init__(
         self,
         data_folder: Path,
-        model_task: str,
-        target_columns: Dict[str, List[str]] = None,
+        target_columns: al_target_columns,
         labels_dict: al_label_dict = None,
         target_transformers: Dict[str, al_target_transformers] = None,
         target_height: int = 4,
@@ -136,7 +138,6 @@ class ArrayDatasetBase(Dataset):
         super().__init__()
 
         self.data_folder = data_folder
-        self.model_task = model_task
         self.target_height = target_height
         self.target_width = target_width
 
@@ -144,33 +145,24 @@ class ArrayDatasetBase(Dataset):
 
         self.target_columns = target_columns
         self.labels_dict = labels_dict if labels_dict else {}
-        self.labels_unique = None
-        self.num_classes = None
         self.target_transformers = target_transformers
+        self.num_classes = None
 
         self.na_augment = na_augment
 
-    def parse_label(
-        self, sample_label_dict: Dict[str, Union[str, float]], target_column: str
-    ) -> Union[List[None], np.ndarray, float]:
-        """
-        TODO:   Check if there is a significant performance hit doing the transform on
-                the fly here versus doing one pass and loading.
-        """
+    def init_label_attributes(self):
+        if not self.target_columns:
+            raise ValueError("Please specify label column name.")
 
-        if not sample_label_dict:
-            return []
+        if not self.target_transformers:
+            self.target_transformers = set_up_all_target_transformers(
+                self.labels_dict, self.target_columns
+            )
 
-        label_value = sample_label_dict[target_column]
-        tt_t = self.target_transformers[target_column].transform
+        # TODO: Rename to be more descriptive, dict now instead of int.
+        self.num_classes = set_up_num_classes(self.target_transformers)
 
-        # StandardScaler() takes [[arr]] whereas LabelEncoder() takes [arr]
-        label_value = [label_value] if self.model_task == "reg" else label_value
-        label_value_trns = tt_t([label_value]).squeeze()
-
-        return label_value_trns
-
-    def get_samples(self, array_hook: Callable = lambda x: x):
+    def set_up_samples(self, array_hook: Callable = lambda x: x) -> List[Sample]:
         """
         If we have initialized a labels_dict variable, we use that to iterate over IDs.
         This is for (a) training, (b) evaluating or (c) testing on test set for
@@ -189,10 +181,16 @@ class ArrayDatasetBase(Dataset):
         samples = []
 
         for sample_id in sample_id_iter:
+            raw_sample_labels = self.labels_dict.get(sample_id, None)
+            parsed_sample_labels = transform_sample_labels(
+                target_transformers=self.target_transformers,
+                sample_label_dict=raw_sample_labels,
+            )
+
             cur_sample = Sample(
                 sample_id=sample_id,
                 array=array_hook(files.get(sample_id)),
-                labels=self.labels_dict.get(sample_id, None),
+                labels=parsed_sample_labels,
             )
             samples.append(cur_sample)
 
@@ -201,20 +199,6 @@ class ArrayDatasetBase(Dataset):
     @property
     def data_width(self):
         raise NotImplementedError
-
-    def init_label_attributes(self):
-        if not self.target_columns:
-            raise ValueError("Please specify label column name.")
-
-        self.check_non_labelled()
-
-        if not self.target_transformers:
-            self.target_transformers = set_up_all_target_transformers(
-                self.samples, self.target_columns
-            )
-
-        # TODO: Rename to be more descriptive, dict now instead of int.
-        self.num_classes = set_up_num_classes(self.target_transformers)
 
     def check_non_labelled(self):
         non_labelled = tuple(i for i in self.samples if not i.labels)
@@ -225,15 +209,31 @@ class ArrayDatasetBase(Dataset):
             )
 
 
+def streamline_label_value_for_transformers(
+    target_columns: al_target_columns,
+    cur_target_column: str,
+    label_value: al_label_value,
+):
+    """
+    StandardScaler() takes [[arr]] whereas LabelEncoder() takes [arr]
+    """
+    if cur_target_column in target_columns["con"]:
+        label_value = [label_value]
+
+    return label_value
+
+
 def set_up_all_target_transformers(
-    samples: List[Sample], target_columns: Dict[str, List[str]]
+    labels_dict: al_label_dict, target_columns: al_target_columns
 ) -> Dict[str, al_target_transformers]:
 
     target_transformers = {}
     for column_type in target_columns:
-        for cur_target_column in target_columns:
+        target_columns_of_cur_type = target_columns[column_type]
+
+        for cur_target_column in target_columns_of_cur_type:
             cur_target_transformer = fit_transformer_on_target_column(
-                samples=samples,
+                labels_dict=labels_dict,
                 target_column=cur_target_column,
                 column_type=column_type,
             )
@@ -243,15 +243,42 @@ def set_up_all_target_transformers(
 
 
 def fit_transformer_on_target_column(
-    samples: List[Sample], target_column, column_type: str
+    labels_dict: al_label_dict, target_column, column_type: str
 ) -> al_target_transformers:
+    """
+    TODO: Maybe make this more efficient by just getting unique values?
+    """
 
     transformer = get_target_transformer(column_type)
-    # Change to list/tuple if transformer cannot accept iterable
-    target_values_gen = (i.labels[target_column] for i in samples)
-    transformer.fit(target_values_gen)
+
+    target_values = list((i[target_column] for i in labels_dict.values()))
+    transformer.fit(target_values)
 
     return transformer
+
+
+def transform_sample_labels(
+    target_transformers: Dict[str, al_target_transformers],
+    sample_label_dict: al_sample_label_dict,
+):
+
+    transformed_labels = {}
+    for label_column, label_value in sample_label_dict.items():
+        transformer = target_transformers[label_column]
+        cur_label_parsed = transform_label_value(transformer, label_value)
+        transformed_labels[label_column] = cur_label_parsed.item()
+
+    return transformed_labels
+
+
+def transform_label_value(transformer, label_value):
+    tt_t = transformer.transform
+    if isinstance(transformer, StandardScaler):
+        label_value = [label_value]
+
+    label_value_transformed = tt_t([label_value]).squeeze()
+
+    return label_value_transformed
 
 
 def set_up_num_classes(
@@ -259,7 +286,7 @@ def set_up_num_classes(
 ) -> Dict[str, int]:
 
     num_classes_dict = {}
-    for target_column, transformer in target_transformers:
+    for target_column, transformer in target_transformers.items():
         if isinstance(transformer, StandardScaler):
             num_classes = 1
         else:
@@ -273,10 +300,11 @@ class MemoryArrayDataset(ArrayDatasetBase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.samples = self.get_samples(array_hook=self.mem_sample_loader)
-
         if self.labels_dict:
             self.init_label_attributes()
+
+        self.samples = self.set_up_samples(array_hook=self.mem_sample_loader)
+        self.check_non_labelled()
 
     def mem_sample_loader(self, sample_fpath):
         """
@@ -297,7 +325,7 @@ class MemoryArrayDataset(ArrayDatasetBase):
         sample = self.samples[index]
 
         array = sample.array
-        label = self.parse_label(sample.labels)
+        label = sample.labels
         sample_id = sample.sample_id
 
         if self.target_width:
@@ -317,10 +345,11 @@ class DiskArrayDataset(ArrayDatasetBase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.samples = self.get_samples()
-
         if self.labels_dict:
             self.init_label_attributes()
+
+        self.samples = self.set_up_samples()
+        self.check_non_labelled()
 
     @property
     def data_width(self):
@@ -331,7 +360,7 @@ class DiskArrayDataset(ArrayDatasetBase):
         sample = self.samples[index]
 
         array = np.load(sample.array)
-        label = self.parse_label(sample.labels)
+        label = sample.labels
         sample_id = sample.sample_id
 
         array = torch.from_numpy(array).unsqueeze(0)
@@ -348,10 +377,10 @@ class DiskArrayDataset(ArrayDatasetBase):
         return len(self.samples)
 
 
-def get_target_transformer(model_task):
-    if model_task == "reg":
+def get_target_transformer(column_type):
+    if column_type == "con":
         return StandardScaler()
-    elif model_task == "cls":
+    elif column_type == "cat":
         return LabelEncoder()
 
     raise ValueError()

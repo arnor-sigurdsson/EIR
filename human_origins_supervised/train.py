@@ -280,7 +280,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        "--model_task",
+        "--column_type",
         type=str,
         default="cls",
         choices=["cls", "reg"],
