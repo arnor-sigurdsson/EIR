@@ -365,10 +365,10 @@ def cleanup(run_path):
 
 @pytest.fixture()
 def create_test_datasets(create_test_data, create_test_cl_args):
-    path, test_data_params = create_test_data
+    c = create_test_data
 
     cl_args = create_test_cl_args
-    cl_args.data_folder = str(path / "test_arrays")
+    cl_args.data_folder = str(c.scoped_tmp_path / "test_arrays")
 
     run_path = Path(f"runs/{cl_args.run_name}/")
 

@@ -53,7 +53,7 @@ def set_up_datasets(cl_args: Namespace) -> Tuple[al_datasets, al_datasets]:
         save_target_transformer(
             run_folder=run_folder,
             transformer_name=transformer_name,
-            target_transformer=target_transformer,
+            target_transformer_object=target_transformer,
         )
 
     assert len(train_dataset) > len(valid_dataset)
@@ -98,12 +98,14 @@ def merge_target_columns(
 
 
 def save_target_transformer(
-    run_folder: Path, transformer_name: str, target_transformer: al_target_transformers
+    run_folder: Path,
+    transformer_name: str,
+    target_transformer_object: al_target_transformers,
 ) -> Path:
     """
     :param run_folder: Current run folder, used to anchor saving of transformer.
     :param transformer_name: The target column passed in for the current run.
-    :param target_transformer: The transformer object to save.
+    :param target_transformer_object: The transformer object to save.
     :return: Output path of where the target transformer was saved.
     """
     target_transformer_outpath = get_transformer_path(
@@ -112,7 +114,7 @@ def save_target_transformer(
         suffix="target_transformer",
     )
     ensure_path_exists(target_transformer_outpath)
-    joblib.dump(target_transformer, target_transformer_outpath)
+    joblib.dump(value=target_transformer_object, filename=target_transformer_outpath)
 
     return target_transformer_outpath
 
@@ -242,6 +244,8 @@ def fit_transformer_on_target_column(
     transformer = get_target_transformer(column_type)
 
     target_values = list((i[target_column] for i in labels_dict.values()))
+    # TODO: Parse target values depending on tranformer [target_values] if
+    #       StandardScaler
     transformer.fit(target_values)
 
     return transformer

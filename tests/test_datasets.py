@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 import numpy as np
 import pytest
+from sklearn.preprocessing import StandardScaler
 
 from human_origins_supervised.data_load import datasets
 from human_origins_supervised.data_load.datasets import al_datasets
@@ -28,6 +29,7 @@ def check_dataset(
     assert transformed_values_in_dataset == expected_transformed_values
 
     tt_it = dataset.target_transformers[target_column].inverse_transform
+
     assert (tt_it(range(len(classes_tested))) == classes_tested).all()
 
     test_sample, test_label, test_id = dataset[0]
@@ -42,17 +44,14 @@ def check_dataset(
     indirect=True,
 )
 def test_set_up_datasets(create_test_cl_args, create_test_data, parse_test_cl_args):
-    _, test_data_params = create_test_data
+    c = create_test_data
+    n_classes = len(c.target_classes)
 
     cl_args = create_test_cl_args
-    n_classes = 3 if test_data_params["class_type"] == "multi" else 2
-
-    n_per_class = parse_test_cl_args["n_per_class"]
-    num_snps = parse_test_cl_args["n_snps"]
 
     # try setting up some labels and arrays that should not be included
     for i in range(10):
-        random_arr = np.random.rand(4, num_snps)
+        random_arr = np.random.rand(4, c.n_snps)
         np.save(Path(cl_args.data_folder, f"SampleIgnoreFile_{i}.npy"), random_arr)
 
     with open(cl_args.label_file, "a") as csv_file:
@@ -70,7 +69,7 @@ def test_set_up_datasets(create_test_cl_args, create_test_data, parse_test_cl_ar
 
         assert m.dump.call_count == 1
 
-    assert len(train_dataset) + len(valid_dataset) == n_per_class * n_classes
+    assert len(train_dataset) + len(valid_dataset) == c.n_per_class * n_classes
 
     valid_ids = [i.sample_id for i in valid_dataset.samples]
     train_ids = [i.sample_id for i in train_dataset.samples]
@@ -78,6 +77,94 @@ def test_set_up_datasets(create_test_cl_args, create_test_data, parse_test_cl_ar
     assert set(valid_ids).isdisjoint(set(train_ids))
     assert len([i for i in valid_ids if i.startswith("SampleIgnore")]) == 0
     assert len([i for i in train_ids if i.startswith("SampleIgnore")]) == 0
+
+
+def test_construct_dataset_init_params_from_cl_args(args_config):
+    pass
+
+
+@pytest.mark.parametrize(
+    "test_input,expected",
+    [  # test case 1
+        (
+            (["con_1", "con_2"], ["cat_1", "cat_2"]),
+            {"con": ["con_1", "con_2"], "cat": ["cat_1", "cat_2"]},
+        ),
+        # test case 2
+        ((["con_1", "con_2"], []), {"con": ["con_1", "con_2"], "cat": []}),
+    ],
+)
+def test_merge_target_columns_pass(test_input, expected):
+    test_output = datasets.merge_target_columns(*test_input)
+    assert test_output == expected
+
+
+def test_merge_target_columns_fail():
+    with pytest.raises(ValueError):
+        datasets.merge_target_columns([], [])
+
+
+def test_save_target_transformer():
+
+    test_transformer = StandardScaler()
+    test_transformer.fit([[1, 2, 3, 4, 5]])
+
+    # patch since we don't create run folders while testing
+    joblib_patch_target = "human_origins_supervised.data_load.datasets.joblib"
+    with patch(joblib_patch_target, autospec=True) as m:
+        datasets.save_target_transformer(
+            run_folder=Path("/tmp/"),
+            transformer_name="harry_du_bois",
+            target_transformer_object=test_transformer,
+        )
+
+        assert m.dump.call_count == 1
+
+        _, m_kwargs = m.dump.call_args
+        # check that we have correct name, with target_transformer tagged on
+        assert m_kwargs["filename"].name == ("harry_du_bois_target_transformer.save")
+
+
+@pytest.mark.parametrize(
+    "create_test_data",
+    [{"class_type": "binary"}, {"class_type": "multi"}, {"class_type": "regression"}],
+    indirect=True,
+)
+def test_set_up_all_target_transformers_prev(create_test_datasets, create_test_data):
+    train_dataset, _ = create_test_datasets
+
+
+def test_set_up_all_target_transformers():
+    test_labels_dict = {
+        "1": {"Origin": "Asia", "Height": 150},
+        "2": {"Origin": "Africa", "Height": 190},
+        "3": {"Origin": "Europe", "Height": 170},
+    }
+
+    test_target_columns_dict = {"con": ["Height"], "cat": ["Origin"]}
+
+    all_target_transformers = datasets.set_up_all_target_transformers(
+        labels_dict=test_labels_dict, target_columns=test_target_columns_dict
+    )
+
+    # TODO: Finish.
+    assert all_target_transformers
+
+
+def test_fit_transformer_on_target_column():
+    pass
+
+
+def test_transform_sample_labels():
+    pass
+
+
+def test_transform_label_value():
+    pass
+
+
+def set_up_num_classes():
+    pass
 
 
 @pytest.mark.parametrize(
@@ -92,17 +179,17 @@ def test_datasets(
     create_test_cl_args: pytest.fixture,
     parse_test_cl_args,
 ):
-    _, test_data_params = create_test_data
+    c = create_test_data
     cl_args = create_test_cl_args
-
-    classes_tested = get_classes_tested(test_data_fixture_params=test_data_params)
-    n_per_class = parse_test_cl_args["n_per_class"]
+    classes_tested = sorted(list(c.target_classes.keys()))
 
     if dataset_type == "disk":
         cl_args.memory_dataset = False
 
-    train_no_samples = int(len(classes_tested) * n_per_class * (1 - cl_args.valid_size))
-    valid_no_sample = int(len(classes_tested) * n_per_class * cl_args.valid_size)
+    train_no_samples = int(
+        len(classes_tested) * c.n_per_class * (1 - cl_args.valid_size)
+    )
+    valid_no_sample = int(len(classes_tested) * c.n_per_class * cl_args.valid_size)
 
     # patch since we don't create run folders while testing
     joblib_patch_target = "human_origins_supervised.data_load.datasets.joblib"
