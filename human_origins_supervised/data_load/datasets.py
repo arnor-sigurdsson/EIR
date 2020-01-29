@@ -209,26 +209,16 @@ class ArrayDatasetBase(Dataset):
             )
 
 
-def streamline_label_value_for_transformers(
-    target_columns: al_target_columns,
-    cur_target_column: str,
-    label_value: al_label_value,
-):
-    """
-    StandardScaler() takes [[arr]] whereas LabelEncoder() takes [arr]
-    """
-    if cur_target_column in target_columns["con"]:
-        label_value = [label_value]
-
-    return label_value
-
-
 def set_up_all_target_transformers(
     labels_dict: al_label_dict, target_columns: al_target_columns
 ) -> Dict[str, al_target_transformers]:
 
     target_transformers = {}
     for column_type in target_columns:
+        logger.debug(
+            "Fitting transformers on %s target columns %s", column_type, target_columns
+        )
+
         target_columns_of_cur_type = target_columns[column_type]
 
         for cur_target_column in target_columns_of_cur_type:
@@ -246,7 +236,7 @@ def fit_transformer_on_target_column(
     labels_dict: al_label_dict, target_column, column_type: str
 ) -> al_target_transformers:
     """
-    TODO: Maybe make this more efficient by just getting unique values?
+    TODO: Maybe make this more efficient by just getting unique values in target values?
     """
 
     transformer = get_target_transformer(column_type)
@@ -325,7 +315,7 @@ class MemoryArrayDataset(ArrayDatasetBase):
         sample = self.samples[index]
 
         array = sample.array
-        label = sample.labels
+        labels = sample.labels
         sample_id = sample.sample_id
 
         if self.target_width:
@@ -335,7 +325,7 @@ class MemoryArrayDataset(ArrayDatasetBase):
         if self.na_augment:
             array = make_random_snps_missing(array, self.na_augment)
 
-        return array, label, sample_id
+        return array, labels, sample_id
 
     def __len__(self):
         return len(self.samples)
@@ -360,7 +350,7 @@ class DiskArrayDataset(ArrayDatasetBase):
         sample = self.samples[index]
 
         array = np.load(sample.array)
-        label = sample.labels
+        labels = sample.labels
         sample_id = sample.sample_id
 
         array = torch.from_numpy(array).unsqueeze(0)
@@ -371,7 +361,7 @@ class DiskArrayDataset(ArrayDatasetBase):
             right_padding = self.target_width - array.shape[2]
             array = pad(array, [0, right_padding])
 
-        return array, label, sample_id
+        return array, labels, sample_id
 
     def __len__(self):
         return len(self.samples)

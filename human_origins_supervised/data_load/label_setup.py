@@ -143,7 +143,7 @@ def _load_label_df(
         df_labels = df_labels[df_labels.index.isin(ids_to_keep)]
         no_dropped = no_labels - df_labels.shape[0]
         logger.debug(
-            "Removed %d file IDs from label based on IDs present in data folder.",
+            "Removed %d file IDs from label file based on IDs present in data folder.",
             no_dropped,
         )
 

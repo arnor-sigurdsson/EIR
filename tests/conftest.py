@@ -1,11 +1,14 @@
+import csv
+from dataclasses import dataclass
 from pathlib import Path
 from random import shuffle
 from shutil import rmtree
 from types import SimpleNamespace
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 
 import numpy as np
 import pytest
+from _pytest.fixtures import SubRequest
 from aislib.misc_utils import ensure_path_exists
 from torch import cuda
 from torch.utils.data import DataLoader
@@ -102,6 +105,209 @@ def args_config():
     return config
 
 
+@pytest.fixture(scope="session")
+def create_test_data(request, tmp_path_factory, parse_test_cl_args):
+    c = _create_test_data_config(request, tmp_path_factory, parse_test_cl_args)
+
+    fieldnames = ["ID", "Origin", "OriginExtraCol", "ExtraTarget"]
+
+    label_file_handle, label_file_writer = _set_up_label_file_writing(
+        path=c.scoped_tmp_path, fieldnames=fieldnames
+    )
+
+    array_outfolder = _set_up_test_data_array_outpath(c.scoped_tmp_path)
+
+    for cls, snp_row_idx in c.target_classes.items():
+        for sample_idx in range(c.n_per_class):
+
+            sample_outpath = array_outfolder / f"{sample_idx}_{cls}"
+
+            num_active_snps_in_sample = _save_test_array_to_disk(
+                test_data_config=c,
+                active_snp_row_idx=snp_row_idx,
+                sample_outpath=sample_outpath,
+            )
+
+            label_line_base = _set_up_label_line_dict(
+                sample_name=sample_outpath.name, fieldnames=fieldnames
+            )
+
+            label_line_dict = _get_current_test_label_values(
+                values_dict=label_line_base,
+                task_type=c.task_type,
+                num_active_snps=num_active_snps_in_sample,
+                cur_class=cls,
+            )
+            label_file_writer.writerow(label_line_dict)
+
+    label_file_handle.close()
+
+    write_test_data_snp_file(c.scoped_tmp_path, c.n_snps)
+
+    if c.request_params.get("split_to_test", False):
+        split_test_array_folder(c.scoped_tmp_path)
+
+    return c.scoped_tmp_path, c.request_params
+
+
+@dataclass
+class TestDataConfig:
+    request_params: Dict
+    task_type: str
+    scoped_tmp_path: Path
+    target_classes: Dict[str, int]
+    n_per_class: int
+    n_snps: int
+
+
+def _create_test_data_config(
+    create_test_data_fixture_request: SubRequest, tmp_path_factory, parsed_test_cl_args
+):
+
+    request_params = create_test_data_fixture_request.param
+    task_type = request_params["class_type"]
+    scoped_tmp_path = tmp_path_factory.mktemp(task_type)
+
+    target_classes = {"Asia": 1, "Europe": 2}
+    if task_type in ("multi", "regression"):
+        target_classes["Africa"] = 0
+
+    config = TestDataConfig(
+        request_params=request_params,
+        task_type=task_type,
+        scoped_tmp_path=scoped_tmp_path,
+        target_classes=target_classes,
+        n_per_class=parsed_test_cl_args["n_per_class"],
+        n_snps=parsed_test_cl_args["n_snps"],
+    )
+
+    return config
+
+
+def _set_up_label_file_writing(path: Path, fieldnames: List[str]):
+    label_file = str(path / "labels.csv")
+
+    label_file_handle = open(str(label_file), "w")
+
+    writer = csv.DictWriter(f=label_file_handle, fieldnames=fieldnames, delimiter=",")
+    writer.writeheader()
+
+    return label_file_handle, writer
+
+
+def _set_up_label_line_dict(sample_name: str, fieldnames: List[str]):
+    label_line_dict = {k: None for k in fieldnames}
+    assert "ID" in label_line_dict.keys()
+    label_line_dict["ID"] = sample_name
+    return label_line_dict
+
+
+def _get_current_test_label_values(values_dict, task_type, num_active_snps, cur_class):
+
+    if task_type == "regression":
+        value = 100 + (5 * len(num_active_snps)) + np.random.randn()
+        values_dict["Origin"] = value
+        values_dict["OriginExtraCol"] = value - 5
+        values_dict["ExtraTarget"] = value - 10
+    else:
+        for key in values_dict:
+            if key != "ID":
+                values_dict[key] = cur_class
+
+    return values_dict
+
+
+def _save_test_array_to_disk(
+    test_data_config: TestDataConfig, active_snp_row_idx, sample_outpath: Path
+):
+    c = test_data_config
+
+    base_array, snp_idxs_candidates = _set_up_base_test_array(c.n_snps)
+
+    cur_test_array, snps_this_sample = _create_test_array(
+        test_task=c.task_type,
+        base_array=base_array,
+        snp_idxs_candidates=snp_idxs_candidates,
+        snp_row_idx=active_snp_row_idx,
+    )
+
+    np.save(str(sample_outpath), cur_test_array)
+
+    return snps_this_sample
+
+
+def _set_up_base_test_array(n_snps: int) -> Tuple[np.ndarray, np.ndarray]:
+    # create random one hot array
+    base_array = np.eye(4)[np.random.choice(4, n_snps)].T
+    # set up 10 candidates
+    step_size = n_snps // 10
+    snp_idxs_candidates = np.array(range(50, n_snps, step_size))
+
+    return base_array, snp_idxs_candidates
+
+
+def _create_test_array(
+    test_task: str,
+    base_array: np.ndarray,
+    snp_idxs_candidates: np.ndarray,
+    snp_row_idx: int,
+) -> Tuple[np.ndarray, List[int]]:
+    # make samples have the reference, otherwise might have alleles chosen
+    # below by random, without having the phenotype
+    base_array[:, snp_idxs_candidates] = 0
+    base_array[3, snp_idxs_candidates] = 1
+
+    lower_bound = 0 if test_task == "reg" else 5
+    np.random.shuffle(snp_idxs_candidates)
+    num_snps_this_sample = np.random.randint(lower_bound, 10)
+    snp_idxs = sorted(snp_idxs_candidates[:num_snps_this_sample])
+
+    # zero out snp_idxs
+    base_array[:, snp_idxs] = 0
+
+    # assign form 2 for those snps for additive
+    if test_task == "regression":
+        base_array[2, snp_idxs] = 1
+    else:
+        base_array[snp_row_idx, snp_idxs] = 1
+
+    base_array = base_array.astype(np.uint8)
+    return base_array, snp_idxs
+
+
+def _set_up_test_data_array_outpath(base_folder: Path) -> Path:
+    array_folder = base_folder / "test_arrays"
+    if not array_folder.exists():
+        array_folder.mkdir()
+
+    return array_folder
+
+
+def write_test_data_snp_file(base_folder: Path, n_snps: int) -> None:
+    snp_file = base_folder / "test_snps.bim"
+    base_snp_string_list = ["1", "REPLACE_W_IDX", "0.1", "10", "A", "T"]
+
+    with open(str(snp_file), "w") as snpfile:
+        for snp_idx in range(n_snps):
+            cur_snp_list = base_snp_string_list[:]
+            cur_snp_list[1] = str(snp_idx)
+
+            cur_snp_string = "\t".join(cur_snp_list)
+            snpfile.write(cur_snp_string + "\n")
+
+
+def split_test_array_folder(test_folder: Path) -> None:
+    test_array_test_set_folder = test_folder / "test_arrays_test_set"
+    test_array_test_set_folder.mkdir()
+
+    all_arrays = [i for i in (test_folder / "test_arrays").iterdir()]
+    shuffle(all_arrays)
+
+    test_arrays_test_set = all_arrays[:200]
+    for array_file in test_arrays_test_set:
+        array_file.replace(test_array_test_set_folder / array_file.name)
+
+
 @pytest.fixture()
 def create_test_cl_args(request, args_config, create_test_data):
     test_path, test_data_params = create_test_data
@@ -137,144 +343,6 @@ def create_test_cl_args(request, args_config, create_test_data):
     args_config.run_name += "_" + args_config.model_type
 
     return args_config
-
-
-@pytest.fixture(scope="session")
-def create_test_data(request, tmp_path_factory, parse_test_cl_args):
-    """
-    Create a folder of data in same format, i.e. with ID_-_Class.
-    Numpy arrays, can be in non-packbits format.
-    Have different indexes for SNP locs in question.
-
-    Also create SNP file. folder/arrays/ and folder/snp_file
-    """
-    test_data_params = request.param
-    class_type = test_data_params["class_type"]
-    scoped_tmp_path = tmp_path_factory.mktemp(class_type)
-
-    target_classes = {"Asia": 1, "Europe": 2}
-    if class_type in ("multi", "regression"):
-        target_classes["Africa"] = 0
-
-    n_per_class = parse_test_cl_args["n_per_class"]
-    n_snps = parse_test_cl_args["n_snps"]
-
-    test_task = "reg" if class_type == "regression" else "cls"
-
-    label_file = open(str(scoped_tmp_path / "labels.csv"), "w")
-    # extra col for testing extra inputs
-    label_file.write("ID,Origin,OriginExtraCol,ExtraTarget\n")
-
-    array_folder = set_up_test_data_array_outpath(scoped_tmp_path)
-
-    for cls, snp_row_idx in target_classes.items():
-        for sample_idx in range(n_per_class):
-
-            outpath = array_folder / f"{sample_idx}_{cls}.npy"
-
-            base_array, snp_idxs_candidates = set_up_base_test_array(n_snps)
-
-            cur_test_array, snps_this_sample = create_test_array(
-                test_task=test_task,
-                base_array=base_array,
-                snp_idxs_candidates=snp_idxs_candidates,
-                snp_row_idx=snp_row_idx,
-            )
-
-            np.save(str(outpath), cur_test_array)
-
-            if test_task == "reg":
-                value_base = 100 + (5 * len(snps_this_sample)) + np.random.randn()
-                values = [value_base] * 3 + [value_base - 10]
-            else:
-                values = [cls] * 4
-            line_string = get_label_file_string(str(sample_idx), values)
-            label_file.write(line_string)
-
-    label_file.close()
-
-    write_test_data_snp_file(scoped_tmp_path, n_snps)
-
-    if test_data_params.get("split_to_test", False):
-        split_test_array_folder(scoped_tmp_path)
-
-    return scoped_tmp_path, test_data_params
-
-
-def create_test_array(
-    test_task: str,
-    base_array: np.ndarray,
-    snp_idxs_candidates: np.ndarray,
-    snp_row_idx: int,
-) -> Tuple[np.ndarray, List[int]]:
-    # make samples have the reference, otherwise might have alleles chosen
-    # below by random, without having the phenotype
-    base_array[:, snp_idxs_candidates] = 0
-    base_array[3, snp_idxs_candidates] = 1
-
-    lower_bound = 0 if test_task == "reg" else 5
-    np.random.shuffle(snp_idxs_candidates)
-    num_snps_this_sample = np.random.randint(lower_bound, 10)
-    snp_idxs = sorted(snp_idxs_candidates[:num_snps_this_sample])
-
-    # zero out snp_idxs
-    base_array[:, snp_idxs] = 0
-
-    # assign form 2 for those snps for additive
-    if test_task == "reg":
-        base_array[2, snp_idxs] = 1
-    else:
-        base_array[snp_row_idx, snp_idxs] = 1
-
-    base_array = base_array.astype(np.uint8)
-    return base_array, snp_idxs
-
-
-def set_up_test_data_array_outpath(base_folder: Path) -> Path:
-    array_folder = base_folder / "test_arrays"
-    array_folder.mkdir()
-
-    return array_folder
-
-
-def set_up_base_test_array(n_snps: int) -> Tuple[np.ndarray, np.ndarray]:
-    # create random one hot array
-    base_array = np.eye(4)[np.random.choice(4, n_snps)].T
-    # set up 10 candidates
-    step_size = n_snps // 10
-    snp_idxs_candidates = np.array(range(50, n_snps, step_size))
-
-    return base_array, snp_idxs_candidates
-
-
-def get_label_file_string(sample_id: str, column_values: List[str]) -> str:
-    values_part = ",".join(column_values)
-    return f"{sample_id}_{values_part}\n"
-
-
-def write_test_data_snp_file(base_folder: Path, n_snps: int) -> None:
-    snp_file = base_folder / "test_snps.bim"
-    base_snp_string_list = ["1", "REPLACE_W_IDX", "0.1", "10", "A", "T"]
-
-    with open(str(snp_file), "w") as snpfile:
-        for snp_idx in range(n_snps):
-            cur_snp_list = base_snp_string_list[:]
-            cur_snp_list[1] = str(snp_idx)
-
-            cur_snp_string = "\t".join(cur_snp_list)
-            snpfile.write(cur_snp_string + "\n")
-
-
-def split_test_array_folder(test_folder: Path) -> None:
-    test_array_test_set_folder = test_folder / "test_arrays_test_set"
-    test_array_test_set_folder.mkdir()
-
-    all_arrays = [i for i in (test_folder / "test_arrays").iterdir()]
-    shuffle(all_arrays)
-
-    test_arrays_test_set = all_arrays[:200]
-    for array_file in test_arrays_test_set:
-        array_file.replace(test_array_test_set_folder / array_file.name)
 
 
 @pytest.fixture()
