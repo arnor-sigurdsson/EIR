@@ -106,7 +106,7 @@ def args_config():
 
 
 @pytest.fixture(scope="session")
-def create_test_data(request, tmp_path_factory, parse_test_cl_args):
+def create_test_data(request, tmp_path_factory, parse_test_cl_args) -> "TestDataConfig":
     c = _create_test_data_config(request, tmp_path_factory, parse_test_cl_args)
 
     fieldnames = ["ID", "Origin", "OriginExtraCol", "ExtraTarget"]
@@ -147,7 +147,7 @@ def create_test_data(request, tmp_path_factory, parse_test_cl_args):
     if c.request_params.get("split_to_test", False):
         split_test_array_folder(c.scoped_tmp_path)
 
-    return c.scoped_tmp_path, c.request_params
+    return c
 
 
 @dataclass
@@ -310,14 +310,14 @@ def split_test_array_folder(test_folder: Path) -> None:
 
 @pytest.fixture()
 def create_test_cl_args(request, args_config, create_test_data):
-    test_path, test_data_params = create_test_data
+    c = create_test_data
+    test_path = c.scoped_tmp_path
 
-    model_task = "reg" if test_data_params["class_type"] == "regression" else "cls"
     n_snps = request.config.getoption("--num_snps")
 
     args_config.data_folder = str(test_path / "test_arrays")
     args_config.snp_file = str(test_path / "test_snps.bim")
-    args_config.model_task = model_task
+    args_config.model_task = c.task_type
     args_config.label_file = str(test_path / "labels.csv")
     args_config.n_epochs = 5
 
@@ -329,7 +329,7 @@ def create_test_cl_args(request, args_config, create_test_data):
     args_config.sample_interval = 100
     args_config.target_width = n_snps
     args_config.data_width = n_snps
-    args_config.run_name = args_config.run_name + "_" + test_data_params["class_type"]
+    args_config.run_name = args_config.run_name + "_" + c.request_params["class_type"]
 
     # If tests need to have their own config different from the base defined above,
     # only supporting custom_cl_args hardcoded for now
