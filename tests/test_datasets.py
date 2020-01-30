@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import numpy as np
 import pytest
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, LabelEncoder
 
 from human_origins_supervised.data_load import datasets
 from human_origins_supervised.data_load.datasets import al_datasets
@@ -125,16 +125,8 @@ def test_save_target_transformer():
         assert m_kwargs["filename"].name == ("harry_du_bois_target_transformer.save")
 
 
-@pytest.mark.parametrize(
-    "create_test_data",
-    [{"class_type": "binary"}, {"class_type": "multi"}, {"class_type": "regression"}],
-    indirect=True,
-)
-def test_set_up_all_target_transformers_prev(create_test_datasets, create_test_data):
-    train_dataset, _ = create_test_datasets
-
-
-def test_set_up_all_target_transformers():
+@pytest.fixture()
+def get_transformer_test_data():
     test_labels_dict = {
         "1": {"Origin": "Asia", "Height": 150},
         "2": {"Origin": "Africa", "Height": 190},
@@ -143,28 +135,120 @@ def test_set_up_all_target_transformers():
 
     test_target_columns_dict = {"con": ["Height"], "cat": ["Origin"]}
 
+    return test_labels_dict, test_target_columns_dict
+
+
+def test_set_up_all_target_transformers(get_transformer_test_data):
+    test_labels_dict, test_target_columns_dict = get_transformer_test_data
+
     all_target_transformers = datasets.set_up_all_target_transformers(
         labels_dict=test_labels_dict, target_columns=test_target_columns_dict
     )
 
-    # TODO: Finish.
-    assert all_target_transformers
+    height_transformer = all_target_transformers["Height"]
+    assert isinstance(height_transformer, StandardScaler)
+
+    origin_transformer = all_target_transformers["Origin"]
+    assert isinstance(origin_transformer, LabelEncoder)
 
 
-def test_fit_transformer_on_target_column():
-    pass
+def test_fit_scaler_transformer_on_target_column(get_transformer_test_data):
+    test_labels_dict, test_target_columns_dict = get_transformer_test_data
+
+    height_transformer = datasets._fit_transformer_on_target_column(
+        labels_dict=test_labels_dict, target_column="Height", column_type="con"
+    )
+
+    assert height_transformer.n_samples_seen_ == 3
+    assert height_transformer.mean_ == 170
+    assert height_transformer.transform([[170]]) == 0
 
 
-def test_transform_sample_labels():
-    pass
+def test_fit_labelencoder_transformer_on_target_column(get_transformer_test_data):
+    test_labels_dict, test_target_columns_dict = get_transformer_test_data
+
+    origin_transformer = datasets._fit_transformer_on_target_column(
+        labels_dict=test_labels_dict, target_column="Origin", column_type="cat"
+    )
+
+    assert origin_transformer.transform(["Africa"]).item() == 0
+    assert origin_transformer.transform(["Europe"]).item() == 2
 
 
-def test_transform_label_value():
-    pass
+def test_streamline_values_for_transformer():
+    test_values = np.array([1, 2, 3, 4, 5])
+
+    scaler_transformer = StandardScaler()
+    streamlined_values_scaler = datasets._streamline_values_for_transformers(
+        transformer=scaler_transformer, values=test_values
+    )
+    assert streamlined_values_scaler.shape == (5, 1)
+
+    encoder_transformer = LabelEncoder()
+    streamlined_values_encoder = datasets._streamline_values_for_transformers(
+        transformer=encoder_transformer, values=test_values
+    )
+    assert streamlined_values_encoder.shape == (5,)
 
 
-def set_up_num_classes():
-    pass
+@pytest.mark.parametrize(
+    "test_input_key,expected",
+    [
+        ("1", {"Origin_as_int": 1, "Scaled_height_int": -1}),  # asia
+        ("2", {"Origin_as_int": 0, "Scaled_height_int": 1}),  # africa
+        ("3", {"Origin_as_int": 2, "Scaled_height_int": 0}),  # europe
+    ],
+)
+def test_transform_all_labels_in_sample(
+    test_input_key, expected, get_transformer_test_data
+):
+    test_labels_dict, test_target_columns_dict = get_transformer_test_data
+
+    target_transformers = datasets.set_up_all_target_transformers(
+        labels_dict=test_labels_dict, target_columns=test_target_columns_dict
+    )
+
+    test_input_dict = test_labels_dict[test_input_key]
+    transformed_sample_labels = datasets._transform_all_labels_in_sample(
+        target_transformers=target_transformers, sample_label_dict=test_input_dict
+    )
+
+    assert transformed_sample_labels["Origin"] == expected["Origin_as_int"]
+    assert int(transformed_sample_labels["Height"]) == expected["Scaled_height_int"]
+
+
+@pytest.mark.parametrize(
+    "test_input,expected",
+    [({"Transformer": StandardScaler()}, 0.0), ({"Transformer": LabelEncoder()}, 2)],
+)
+def test_transform_single_label_value(test_input, expected):
+    test_transformer = test_input["Transformer"]
+    test_data = np.array([0, 1, 2, 3, 4])
+
+    test_data_streamlined = datasets._streamline_values_for_transformers(
+        test_transformer, test_data
+    )
+
+    test_transformer.fit(test_data_streamlined)
+
+    transformed_value = datasets._transform_single_label_value(
+        transformer=test_transformer, label_value=2
+    )
+
+    assert transformed_value == expected
+
+
+def test_set_up_num_classes(get_transformer_test_data):
+    test_labels_dict, test_target_columns_dict = get_transformer_test_data
+
+    target_transformers = datasets.set_up_all_target_transformers(
+        labels_dict=test_labels_dict, target_columns=test_target_columns_dict
+    )
+
+    num_classes = datasets._set_up_num_classes(target_transformers=target_transformers)
+
+    assert num_classes["Height"] == 1
+    assert num_classes["Origin"] == 3
 
 
 @pytest.mark.parametrize(

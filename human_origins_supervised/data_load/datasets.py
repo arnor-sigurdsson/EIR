@@ -25,7 +25,7 @@ al_datasets = Union["MemoryArrayDataset", "DiskArrayDataset"]
 al_target_columns = Dict[str, List[str]]
 al_target_transformers = Union[StandardScaler, LabelEncoder]
 al_sample_label_dict = Dict[str, Union[str, float]]
-al_label_value = Union[List[None], np.ndarray, float]
+al_label_value = Union[str, float, int]
 
 
 def set_up_datasets(cl_args: Namespace) -> Tuple[al_datasets, al_datasets]:
@@ -162,7 +162,7 @@ class ArrayDatasetBase(Dataset):
             )
 
         # TODO: Rename to be more descriptive, dict now instead of int.
-        self.num_classes = set_up_num_classes(self.target_transformers)
+        self.num_classes = _set_up_num_classes(self.target_transformers)
 
     def set_up_samples(self, array_hook: Callable = lambda x: x) -> List[Sample]:
         """
@@ -184,7 +184,7 @@ class ArrayDatasetBase(Dataset):
 
         for sample_id in sample_id_iter:
             raw_sample_labels = self.labels_dict.get(sample_id, None)
-            parsed_sample_labels = transform_sample_labels(
+            parsed_sample_labels = _transform_all_labels_in_sample(
                 target_transformers=self.target_transformers,
                 sample_label_dict=raw_sample_labels,
             )
@@ -224,7 +224,7 @@ def set_up_all_target_transformers(
         target_columns_of_cur_type = target_columns[column_type]
 
         for cur_target_column in target_columns_of_cur_type:
-            cur_target_transformer = fit_transformer_on_target_column(
+            cur_target_transformer = _fit_transformer_on_target_column(
                 labels_dict=labels_dict,
                 target_column=cur_target_column,
                 column_type=column_type,
@@ -234,8 +234,8 @@ def set_up_all_target_transformers(
     return target_transformers
 
 
-def fit_transformer_on_target_column(
-    labels_dict: al_label_dict, target_column, column_type: str
+def _fit_transformer_on_target_column(
+    labels_dict: al_label_dict, target_column: str, column_type: str
 ) -> al_target_transformers:
     """
     TODO: Maybe make this more efficient by just getting unique values in target values?
@@ -243,15 +243,39 @@ def fit_transformer_on_target_column(
 
     transformer = get_target_transformer(column_type)
 
-    target_values = list((i[target_column] for i in labels_dict.values()))
-    # TODO: Parse target values depending on tranformer [target_values] if
-    #       StandardScaler
-    transformer.fit(target_values)
+    target_values = np.array([i[target_column] for i in labels_dict.values()])
+    target_values_streamlined = _streamline_values_for_transformers(
+        transformer=transformer, values=target_values
+    )
+
+    transformer.fit(target_values_streamlined)
 
     return transformer
 
 
-def transform_sample_labels(
+def get_target_transformer(column_type):
+    if column_type == "con":
+        return StandardScaler()
+    elif column_type == "cat":
+        return LabelEncoder()
+
+    raise ValueError()
+
+
+def _streamline_values_for_transformers(
+    transformer: al_target_transformers, values: np.ndarray
+) -> np.ndarray:
+    """
+    LabelEncoder() expects a 1D array, whereas StandardScaler() expects a 2D one.
+    """
+
+    if isinstance(transformer, StandardScaler):
+        values_reshaped = values.reshape(-1, 1)
+        return values_reshaped
+    return values
+
+
+def _transform_all_labels_in_sample(
     target_transformers: Dict[str, al_target_transformers],
     sample_label_dict: al_sample_label_dict,
 ):
@@ -259,23 +283,26 @@ def transform_sample_labels(
     transformed_labels = {}
     for label_column, label_value in sample_label_dict.items():
         transformer = target_transformers[label_column]
-        cur_label_parsed = transform_label_value(transformer, label_value)
+        cur_label_parsed = _transform_single_label_value(transformer, label_value)
         transformed_labels[label_column] = cur_label_parsed.item()
 
     return transformed_labels
 
 
-def transform_label_value(transformer, label_value):
+def _transform_single_label_value(transformer, label_value: Union[str, float, int]):
     tt_t = transformer.transform
-    if isinstance(transformer, StandardScaler):
-        label_value = [label_value]
+    label_value = np.array([label_value])
 
-    label_value_transformed = tt_t([label_value]).squeeze()
+    label_value_streamlined = _streamline_values_for_transformers(
+        transformer=transformer, values=label_value
+    )
+
+    label_value_transformed = tt_t(label_value_streamlined).squeeze()
 
     return label_value_transformed
 
 
-def set_up_num_classes(
+def _set_up_num_classes(
     target_transformers: Dict[str, al_target_transformers]
 ) -> Dict[str, int]:
 
@@ -369,12 +396,3 @@ class DiskArrayDataset(ArrayDatasetBase):
 
     def __len__(self):
         return len(self.samples)
-
-
-def get_target_transformer(column_type):
-    if column_type == "con":
-        return StandardScaler()
-    elif column_type == "cat":
-        return LabelEncoder()
-
-    raise ValueError()
