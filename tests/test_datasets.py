@@ -121,7 +121,7 @@ def test_save_target_transformer():
         assert m.dump.call_count == 1
 
         _, m_kwargs = m.dump.call_args
-        # check that we have correct name, with target_transformer tagged on
+        # check that we have correct name, with target_transformers tagged on
         assert m_kwargs["filename"].name == ("harry_du_bois_target_transformer.save")
 
 

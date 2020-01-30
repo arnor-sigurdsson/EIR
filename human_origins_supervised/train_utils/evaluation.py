@@ -33,7 +33,7 @@ def evaluation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
     cl_args = c.cl_args
     iteration = engine.state.iteration
 
-    metric_func = select_metric_func(cl_args.model_task, c.target_transformer)
+    metric_func = select_metric_func(cl_args.model_task, c.target_transformers)
 
     c.model.eval()
     gather_preds = model_utils.gather_pred_outputs_from_dloader
@@ -44,7 +44,7 @@ def evaluation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
 
     val_labels_total = model_utils.cast_labels(cl_args.model_task, val_labels_total)
 
-    val_loss = c.criterion(val_outputs_total, val_labels_total)
+    val_loss = c.criterions(val_outputs_total, val_labels_total)
     metric_dict = metric_func(val_outputs_total, val_labels_total, "v")
     metric_dict["v_loss"] = val_loss.item()
 
@@ -216,7 +216,7 @@ def save_evaluation_results(
         "val_labels": val_labels,
         "val_ids": val_ids,
         "outfolder": sample_outfolder,
-        "encoder": config.target_transformer,
+        "encoder": config.target_transformers,
     }
 
     vf.gen_eval_graphs(model_task=cl_args.model_task, **common_args)

@@ -11,7 +11,6 @@ import torch
 from aislib.misc_utils import ensure_path_exists
 from aislib.misc_utils import get_logger
 from ignite.engine import Engine
-from sklearn.preprocessing import LabelEncoder, StandardScaler
 from torch import nn
 from torch.optim import SGD
 from torch.optim.adamw import AdamW
@@ -22,6 +21,11 @@ from human_origins_supervised.data_load import datasets
 from human_origins_supervised.data_load.data_loading_funcs import (
     get_weighted_random_sampler,
 )
+from human_origins_supervised.data_load.datasets import (
+    al_target_transformers,
+    al_num_classes,
+    al_target_columns,
+)
 from human_origins_supervised.models import model_utils
 from human_origins_supervised.models.extra_inputs_module import (
     set_up_and_save_embeddings_dict,
@@ -30,9 +34,13 @@ from human_origins_supervised.models.extra_inputs_module import (
 )
 from human_origins_supervised.models.model_utils import get_model_params, test_lr_range
 from human_origins_supervised.models.models import get_model_class
-from human_origins_supervised.train_utils.metric_funcs import select_metric_func
+from human_origins_supervised.train_utils.metric_funcs import calculate_batch_metrics
 from human_origins_supervised.train_utils.train_handlers import configure_trainer
 from human_origins_supervised.train_utils.utils import get_run_folder
+
+# aliases
+al_criterions = Dict[str, Union[nn.CrossEntropyLoss, nn.MSELoss]]
+al_training_labels = Dict[str, torch.Tensor]
 
 torch.manual_seed(0)
 np.random.seed(0)
@@ -55,9 +63,10 @@ class Config:
     valid_dataset: torch.utils.data.Dataset
     model: nn.Module
     optimizer: Optimizer
-    criterion: Union[nn.CrossEntropyLoss, nn.MSELoss]
+    criterions: al_criterions
     labels_dict: Dict
-    target_transformer: Union[LabelEncoder, StandardScaler]
+    target_transformers: Dict[str, al_target_transformers]
+    target_columns: al_target_columns
     data_width: int
 
 
@@ -65,11 +74,11 @@ def train_ignite(config: Config) -> None:
     c = config
     cl_args = config.cl_args
 
-    metric_func = select_metric_func(cl_args.model_task, c.target_transformer)
+    # metric_func = select_metric_func(cl_args.model_task, c.target_transformers)
+    # metric_funcs = get_metric_funcs(c.target_columns)
 
     def step(
-        engine: Engine,
-        loader_batch: Tuple[torch.Tensor, Union[int, float, List[None]], List[str]],
+        engine: Engine, loader_batch: Tuple[torch.Tensor, al_training_labels, List[str]]
     ) -> Dict[str, float]:
         """
         The output here goes to engine.output.
@@ -79,20 +88,29 @@ def train_ignite(config: Config) -> None:
         train_seqs, train_labels, train_ids = loader_batch
         train_seqs = train_seqs.to(device=cl_args.device, dtype=torch.float32)
 
-        train_labels = train_labels.to(device=cl_args.device)
-        train_labels = model_utils.cast_labels(cl_args.model_task, train_labels)
+        train_labels = model_utils.cast_labels(
+            target_columns=c.target_columns, device=cl_args.device, labels=train_labels
+        )
 
         extra_inputs = get_extra_inputs(cl_args, train_ids, c.labels_dict, c.model)
 
         c.optimizer.zero_grad()
         train_outputs = c.model(train_seqs, extra_inputs)
-        train_loss = c.criterion(train_outputs, train_labels)
-        train_loss.backward()
+
+        train_losses = _calculate_losses(
+            criterions=c.criterions, labels=train_labels, outputs=train_outputs
+        )
+        train_loss_avg = _aggregate_losses(train_losses)
+        train_loss_avg.backward()
         c.optimizer.step()
 
-        train_loss = train_loss.item()
-        metric_dict = metric_func(
-            outputs=train_outputs, labels=train_labels, prefix="t"
+        train_loss = train_loss_avg.item()
+
+        metric_dict = calculate_batch_metrics(
+            target_columns=c.target_columns,
+            target_transformers=c.target_transformers,
+            train_outputs=train_outputs,
+            train_labels=train_labels,
         )
         metric_dict["t_loss"] = train_loss
 
@@ -189,7 +207,7 @@ def get_optimizer(model: nn.Module, cl_args: argparse.Namespace) -> Optimizer:
 
 def get_model(
     cl_args: argparse.Namespace,
-    num_classes: int,
+    num_classes: al_num_classes,
     embedding_dict: Union[al_emb_lookup_dict, None],
 ) -> Union[nn.Module, nn.DataParallel]:
 
@@ -206,13 +224,48 @@ def get_model(
     return model
 
 
-def get_criterion(
-    cl_args: argparse.Namespace
-) -> Union[nn.CrossEntropyLoss, nn.MSELoss]:
-    if cl_args.model_task == "cls":
-        return nn.CrossEntropyLoss()
+def _get_criterions(target_columns: al_target_columns) -> al_criterions:
 
-    return nn.MSELoss()
+    criterions_dict = {}
+
+    def get_criterion(column_type_):
+        if column_type_ == "con":
+            return nn.MSELoss()
+        elif column_type_ == "cat":
+            return nn.CrossEntropyLoss()
+
+    target_columns_gen = datasets.get_target_columns_generator(target_columns)
+
+    for column_type, column_name in target_columns_gen:
+        criterion = get_criterion(column_type)
+        criterions_dict[column_name] = criterion
+
+    return criterions_dict
+
+
+def _calculate_losses(
+    criterions: al_criterions,
+    labels: Dict[str, torch.Tensor],
+    outputs: Dict[str, torch.Tensor],
+) -> Dict[str, torch.Tensor]:
+
+    losses_dict = {}
+
+    for target_column, criterion in criterions.items():
+        cur_target_col_labels = labels[target_column]
+        cur_target_col_outputs = outputs[target_column]
+        losses_dict[target_column] = criterion(
+            input=cur_target_col_outputs, target=cur_target_col_labels
+        )
+
+    return losses_dict
+
+
+def _aggregate_losses(losses_dict: Dict[str, torch.Tensor]) -> torch.Tensor:
+    losses_values = list(losses_dict.values())
+    average_loss = torch.mean(torch.stack(losses_values))
+
+    return average_loss
 
 
 def _log_params(model: nn.Module) -> None:
@@ -232,7 +285,9 @@ def main(cl_args: argparse.Namespace) -> None:
 
     batch_size = _modify_bs_for_multi_gpu(cl_args.multi_gpu, cl_args.batch_size)
 
-    train_sampler = get_train_sampler(cl_args, train_dataset)
+    # TODO: Update to let user choose column for weighted sampling
+    # train_sampler = get_train_sampler(cl_args, train_dataset)
+    train_sampler = None
 
     train_dloader, valid_dloader = get_dataloaders(
         train_dataset=train_dataset,
@@ -249,19 +304,20 @@ def main(cl_args: argparse.Namespace) -> None:
 
     optimizer = get_optimizer(model, cl_args)
 
-    criterion = get_criterion(cl_args)
+    criterions = _get_criterions(train_dataset.target_columns)
 
     config = Config(
-        cl_args,
-        train_dloader,
-        valid_dloader,
-        valid_dataset,
-        model,
-        optimizer,
-        criterion,
-        train_dataset.labels_dict,
-        train_dataset.target_transformer,
-        train_dataset.data_width,
+        cl_args=cl_args,
+        train_loader=train_dloader,
+        valid_loader=valid_dloader,
+        valid_dataset=valid_dataset,
+        model=model,
+        optimizer=optimizer,
+        criterions=criterions,
+        labels_dict=train_dataset.labels_dict,
+        target_transformers=train_dataset.target_transformers,
+        target_columns=train_dataset.target_columns,
+        data_width=train_dataset.data_width,
     )
 
     _log_params(model)
@@ -280,7 +336,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        "--column_type",
+        "--target_column_type",
         type=str,
         default="cls",
         choices=["cls", "reg"],
@@ -456,22 +512,14 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--target_columns",
-        type=str,
-        required=True,
-        help="What column in label file to treat as target variable"
-        "(i.e. to predict on).",
-    )
-
-    parser.add_argument(
         "--target_con_columns",
-        type=list,
+        nargs="*",
         default=[],
         help="Continuous target columns in label file.",
     )
     parser.add_argument(
         "--target_cat_columns",
-        type=list,
+        nargs="*",
         default=[],
         help="Categorical target columns in label file.",
     )

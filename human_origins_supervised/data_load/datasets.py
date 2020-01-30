@@ -26,6 +26,7 @@ al_target_columns = Dict[str, List[str]]
 al_target_transformers = Union[StandardScaler, LabelEncoder]
 al_sample_label_dict = Dict[str, Union[str, float]]
 al_label_value = Union[str, float, int]
+al_num_classes = Dict[str, int]
 
 
 def set_up_datasets(cl_args: Namespace) -> Tuple[al_datasets, al_datasets]:
@@ -97,6 +98,12 @@ def merge_target_columns(
     return all_target_columns
 
 
+def get_target_columns_generator(target_columns: al_target_columns) -> Tuple[str, str]:
+    for column_type, list_of_cols_of_this_type in target_columns.items():
+        for cur_column in list_of_cols_of_this_type:
+            yield column_type, cur_column
+
+
 def save_target_transformer(
     run_folder: Path,
     transformer_name: str,
@@ -111,7 +118,7 @@ def save_target_transformer(
     target_transformer_outpath = get_transformer_path(
         run_path=run_folder,
         transformer_name=transformer_name,
-        suffix="target_transformer",
+        suffix="target_transformers",
     )
     ensure_path_exists(target_transformer_outpath)
     joblib.dump(value=target_transformer_object, filename=target_transformer_outpath)
@@ -304,7 +311,7 @@ def _transform_single_label_value(transformer, label_value: Union[str, float, in
 
 def _set_up_num_classes(
     target_transformers: Dict[str, al_target_transformers]
-) -> Dict[str, int]:
+) -> al_num_classes:
 
     num_classes_dict = {}
     for target_column, transformer in target_transformers.items():
@@ -342,6 +349,7 @@ class MemoryArrayDataset(ArrayDatasetBase):
         data = self.samples[0].array
         return data.shape[1]
 
+    # Note that dataloaders automatically convert arrays to tensors here, for labels
     def __getitem__(self, index: int):
         sample = self.samples[index]
 
@@ -377,6 +385,7 @@ class DiskArrayDataset(ArrayDatasetBase):
         data = np.load(self.samples[0].array)
         return data.shape[1]
 
+    # Note that dataloaders automatically convert arrays to tensors here, for labels
     def __getitem__(self, index):
         sample = self.samples[index]
 

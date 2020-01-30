@@ -19,7 +19,6 @@ from human_origins_supervised.train_utils.lr_scheduling import (
     set_up_scheduler,
     attach_lr_scheduler,
 )
-from human_origins_supervised.train_utils.metric_funcs import get_train_metrics
 from human_origins_supervised.train_utils.utils import (
     get_custom_module_submodule,
     append_metrics_to_file,
@@ -235,7 +234,10 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
     run_folder = Path("runs/", cl_args.run_name)
     pbar = ProgressBar()
     run_name = cl_args.run_name
-    monitoring_metrics = ["t_loss"] + get_train_metrics(model_task=cl_args.model_task)
+
+    # TODO: Use get_train_metrics when calculating for single columns later.
+    # monitoring_metrics = ["t_loss"] + get_train_metrics(model_task=cl_args.model_task)
+    monitoring_metrics = ["t_loss"]
 
     handler_config = HandlerConfig(
         config, run_folder, run_name, pbar, monitoring_metrics

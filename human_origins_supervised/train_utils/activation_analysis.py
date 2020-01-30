@@ -89,7 +89,7 @@ def accumulate_activations(
     c = config
     cl_args = c.cl_args
 
-    target_classes = get_target_classes(c.cl_args, c.target_transformer)
+    target_classes = get_target_classes(c.cl_args, c.target_transformers)
 
     valid_sampling_dloader = DataLoader(valid_dataset, batch_size=1, shuffle=False)
 
@@ -100,7 +100,7 @@ def accumulate_activations(
         # we want to keep the original sample for masking
         single_sample_org = deepcopy(single_sample).cpu().numpy().squeeze()
         cur_trn_label = get_act_condition(
-            sample_label, c.target_transformer, target_classes, c.cl_args.model_task
+            sample_label, c.target_transformers, target_classes, c.cl_args.model_task
         )
 
         if cur_trn_label:

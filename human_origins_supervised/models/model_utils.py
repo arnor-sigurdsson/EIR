@@ -10,6 +10,8 @@ from torch_lr_finder import LRFinder
 
 from aislib.misc_utils import get_logger
 from human_origins_supervised.data_load.label_setup import al_label_dict
+from human_origins_supervised.data_load.datasets import al_target_columns
+from human_origins_supervised.data_load.datasets import get_target_columns_generator
 from human_origins_supervised.models.extra_inputs_module import get_extra_inputs
 from human_origins_supervised.train_utils.utils import get_run_folder
 
@@ -69,10 +71,22 @@ def predict_on_batch(model: Module, inputs: Tuple[torch.Tensor, ...]) -> torch.T
     return val_outputs
 
 
-def cast_labels(model_task: str, labels: torch.Tensor) -> torch.Tensor:
-    if model_task == "reg":
-        return labels.to(dtype=torch.float).unsqueeze(1)
-    return labels.to(dtype=torch.long)
+def cast_labels(
+    target_columns: al_target_columns, device: str, labels: Dict[str, torch.Tensor]
+) -> Dict[str, torch.Tensor]:
+
+    target_columns_gen = get_target_columns_generator(target_columns)
+
+    labels_casted = {}
+    for column_type, column_name in target_columns_gen:
+        cur_labels = labels[column_name]
+        cur_labels.to(device=device)
+        if column_type == "con":
+            labels_casted[column_name] = cur_labels.to(dtype=torch.float).unsqueeze(1)
+        elif column_type == "cat":
+            labels_casted[column_name] = cur_labels.to(dtype=torch.long)
+
+    return labels_casted
 
 
 def gather_pred_outputs_from_dloader(
@@ -169,7 +183,7 @@ def test_lr_range(config: "Config") -> None:
     lr_finder = LRFinder(
         model=c.model,
         optimizer=c.optimizer,
-        criterion=c.criterion,
+        criterion=c.criterions,
         device=c.cl_args.device,
         extra_inputs_hook=extra_inputs_hook,
         plot_output_path=plot_path,

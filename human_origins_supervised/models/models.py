@@ -1,6 +1,6 @@
 from argparse import Namespace
 from collections import OrderedDict
-from typing import List, Union, Tuple
+from typing import List, Union, Tuple, Dict
 
 import torch
 from aislib import pytorch_utils
@@ -11,6 +11,7 @@ from torch import nn
 from . import extra_inputs_module
 from .extra_inputs_module import al_emb_lookup_dict
 from .model_utils import find_no_resblocks_needed
+from human_origins_supervised.data_load.datasets import al_num_classes
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -293,7 +294,7 @@ class ModelBase(nn.Module):
     def __init__(
         self,
         cl_args: Namespace,
-        num_classes: int,
+        num_classes: al_num_classes,
         embeddings_dict: Union[al_emb_lookup_dict, None] = None,
         extra_continuous_inputs_columns: Union[List[str], None] = None,
     ):
@@ -317,6 +318,10 @@ class ModelBase(nn.Module):
             extra_dim = emb_total_dim + con_total_dim
             self.fc_extra = nn.Linear(extra_dim, extra_dim, bias=False)
             self.fc_base += extra_dim
+
+        self.fc3_last_module = get_module_dict_from_target_columns(
+            num_classes=self.num_classes, fc_in=self.fc_base
+        )
 
     @property
     def fc_1_in_features(self):
@@ -364,7 +369,6 @@ class CNNModel(ModelBase):
                     "fc_3_bn_1": nn.BatchNorm1d(self.fc_base),
                     "fc_3_act_1": Swish(),
                     "fc_3_do_1": nn.Dropout(self.cl_args.fc_do),
-                    "fc_3_linear_1": nn.Linear(self.fc_base, self.num_classes),
                 }
             )
         )
@@ -394,7 +398,11 @@ class CNNModel(ModelBase):
         out = self.fc_2(out)
         out = self.fc_3(out)
 
-        return out
+        final_out = calculate_final_multi_output(
+            input_=out, last_module=self.fc3_last_module
+        )
+
+        return final_out
 
     @property
     def resblocks(self):
@@ -411,6 +419,25 @@ class CNNModel(ModelBase):
             )
             return residual_blocks
         return self.cl_args.resblocks
+
+
+def get_module_dict_from_target_columns(num_classes: al_num_classes, fc_in: int):
+
+    module_dict = {}
+    for key, num_classes in num_classes.items():
+        module_dict[key] = nn.Linear(fc_in, num_classes)
+
+    return nn.ModuleDict(module_dict)
+
+
+def calculate_final_multi_output(
+    input_: torch.Tensor, last_module: nn.ModuleDict
+) -> Dict[str, torch.Tensor]:
+    final_out = {}
+    for target_column, linear_layer in last_module.items():
+        final_out[target_column] = linear_layer(input_)
+
+    return final_out
 
 
 class MLPModel(ModelBase):
@@ -442,12 +469,7 @@ class MLPModel(ModelBase):
         )
 
         self.fc_3 = nn.Sequential(
-            OrderedDict(
-                {
-                    "fc_3_do_1": nn.Dropout(self.cl_args.fc_do),
-                    "fc_3_linear_1": nn.Linear(self.fc_base, self.num_classes),
-                }
-            )
+            OrderedDict({"fc_3_do_1": nn.Dropout(self.cl_args.fc_do)})
         )
 
     @property
@@ -466,4 +488,8 @@ class MLPModel(ModelBase):
         out = self.fc_2(out)
         out = self.fc_3(out)
 
-        return out
+        final_out = calculate_final_multi_output(
+            input_=out, last_module=self.fc3_last_module
+        )
+
+        return final_out
