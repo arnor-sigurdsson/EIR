@@ -190,7 +190,6 @@ def test_load_label_extra_target_extra_col(parse_test_cl_args, create_test_data)
     part_1 = df_label_multi_target["Origin"]
     part_2 = df_label_multi_target["OriginExtraCol"]
     part_3 = df_label_multi_target["ExtraTarget"]
-    breakpoint()
     assert (part_1 == part_2).all()
     assert (part_2 == part_3).all()
 
