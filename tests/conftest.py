@@ -5,7 +5,6 @@ from random import shuffle
 from shutil import rmtree
 from types import SimpleNamespace
 from typing import List, Tuple, Dict
-from unittest.mock import patch
 
 import numpy as np
 import pytest
@@ -40,16 +39,6 @@ def pytest_generate_tests(metafunc):
     option_value = metafunc.config.option.keep_outputs
     if "keep_outputs" in metafunc.fixturenames and option_value is not None:
         metafunc.parametrize("keep_outputs", [option_value])
-
-
-@pytest.fixture
-def patch_dynamic(request):
-    """
-    TODO:   Extend this if needed to patch multiple targets, return dict of mocks.
-            Then request.param is a list of targets to patch.
-    """
-    with patch(request.param, autospec=True) as m:
-        yield m
 
 
 @pytest.fixture(scope="session")
@@ -108,7 +97,7 @@ def args_config():
             "target_width": 1000,
             "valid_size": 0.05,
             "wd": 0.00,
-            "weighted_sampling": False,
+            "weighted_sampling_column": None,
         }
     )
 

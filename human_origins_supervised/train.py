@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from os.path import abspath
 from pathlib import Path
 from sys import platform
-from typing import Union, Tuple, List, Dict
+from typing import Union, Tuple, List, Dict, overload
 
 import numpy as np
 import torch
@@ -135,15 +135,34 @@ def _prepare_run_folder(run_name: str) -> Path:
     return run_folder
 
 
+@overload
 def get_train_sampler(
-    cl_args: argparse.Namespace, train_dataset: datasets.ArrayDatasetBase
-) -> Union[WeightedRandomSampler, None]:
+    column_to_sample: None, train_dataset: datasets.ArrayDatasetBase
+) -> None:
+    ...
 
-    if cl_args.model_task == "cls" and cl_args.weighted_sampling:
-        train_sampler = get_weighted_random_sampler(train_dataset)
+
+@overload
+def get_train_sampler(
+    column_to_sample: str, train_dataset: datasets.ArrayDatasetBase
+) -> WeightedRandomSampler:
+    ...
+
+
+def get_train_sampler(column_to_sample, train_dataset):
+    if column_to_sample is None:
+        return None
+
+    loaded_label_columns = tuple(train_dataset.samples[0].labels.keys())
+    if column_to_sample not in loaded_label_columns:
+        breakpoint()
+        raise ValueError("Weighted sampling from non-loaded columns not supported yet.")
+
+    if column_to_sample is not None:
+        train_sampler = get_weighted_random_sampler(
+            train_dataset=train_dataset, target_column=column_to_sample
+        )
         return train_sampler
-
-    return None
 
 
 def get_dataloaders(
@@ -208,7 +227,6 @@ def get_model(
     num_classes: al_num_classes,
     embedding_dict: Union[al_emb_lookup_dict, None],
 ) -> Union[nn.Module, nn.DataParallel]:
-
     model_class = get_model_class(cl_args.model_type)
     model = model_class(cl_args, num_classes, embedding_dict, cl_args.contn_columns)
 
@@ -223,7 +241,6 @@ def get_model(
 
 
 def _get_criterions(target_columns: al_target_columns) -> al_criterions:
-
     criterions_dict = {}
 
     def get_criterion(column_type_):
@@ -246,7 +263,6 @@ def _calculate_losses(
     labels: Dict[str, torch.Tensor],
     outputs: Dict[str, torch.Tensor],
 ) -> Dict[str, torch.Tensor]:
-
     losses_dict = {}
 
     for target_column, criterion in criterions.items():
@@ -283,9 +299,9 @@ def main(cl_args: argparse.Namespace) -> None:
 
     batch_size = _modify_bs_for_multi_gpu(cl_args.multi_gpu, cl_args.batch_size)
 
-    # TODO: Update to let user choose column for weighted sampling
-    # train_sampler = get_train_sampler(cl_args, train_dataset)
-    train_sampler = None
+    train_sampler = get_train_sampler(
+        column_to_sample=cl_args.weighted_sampling_column, train_dataset=train_dataset
+    )
 
     train_dloader, valid_dloader = get_dataloaders(
         train_dataset=train_dataset,
@@ -485,9 +501,10 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--weighted_sampling",
-        action="store_true",
-        help="Whether to use weighted sampling when doing classification.",
+        "--weighted_sampling_column",
+        type=str,
+        default=None,
+        help="Target column to apply weighted sampling on.",
     )
 
     parser.add_argument(

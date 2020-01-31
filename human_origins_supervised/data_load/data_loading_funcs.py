@@ -14,8 +14,6 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 
 def get_weighted_random_sampler(train_dataset: "ArrayDatasetBase", target_column: str):
     """
-    TODO: Use label column here after we add additional columns in dataset label dict.
-
     Labels spec:
 
     {
@@ -35,7 +33,7 @@ def get_weighted_random_sampler(train_dataset: "ArrayDatasetBase", target_column
 
 
     """
-    labels = (i.labels[target_column] for i in train_dataset.samples)
+    labels = list((i.labels[target_column] for i in train_dataset.samples))
 
     label_counts = [i[1] for i in sorted(Counter(labels).items())]
 

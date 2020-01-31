@@ -1,7 +1,7 @@
 import csv
 from pathlib import Path
 from typing import List
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
@@ -15,14 +15,14 @@ def get_joblib_patch_target():
     return "human_origins_supervised.data_load.datasets.joblib"
 
 
-@pytest.mark.parametrize("patch_dynamic", [get_joblib_patch_target()], indirect=True)
+@patch(get_joblib_patch_target(), autospec=True)
 @pytest.mark.parametrize(
     "create_test_data",
     [{"class_type": "binary"}, {"class_type": "multi"}],
     indirect=True,
 )
 def test_set_up_datasets(
-    create_test_cl_args, create_test_data, parse_test_cl_args, patch_dynamic: MagicMock
+    patched_joblib: MagicMock, create_test_cl_args, create_test_data, parse_test_cl_args
 ):
     c = create_test_data
     n_classes = len(c.target_classes)
@@ -30,7 +30,7 @@ def test_set_up_datasets(
     cl_args = create_test_cl_args
 
     train_dataset, valid_dataset = datasets.set_up_datasets(cl_args)
-    assert patch_dynamic.dump.call_count == 1
+    assert patched_joblib.dump.call_count == 1
 
     assert len(train_dataset) + len(valid_dataset) == c.n_per_class * n_classes
 
@@ -89,8 +89,8 @@ def test_merge_target_columns_fail():
         datasets.merge_target_columns([], [])
 
 
-@pytest.mark.parametrize("patch_dynamic", [get_joblib_patch_target()], indirect=True)
-def test_save_target_transformer(patch_dynamic: MagicMock):
+@patch(get_joblib_patch_target(), autospec=True)
+def test_save_target_transformer(patched_joblib):
 
     test_transformer = StandardScaler()
     test_transformer.fit([[1, 2, 3, 4, 5]])
@@ -101,9 +101,9 @@ def test_save_target_transformer(patch_dynamic: MagicMock):
         target_transformer_object=test_transformer,
     )
 
-    assert patch_dynamic.dump.call_count == 1
+    assert patched_joblib.dump.call_count == 1
 
-    _, m_kwargs = patch_dynamic.dump.call_args
+    _, m_kwargs = patched_joblib.dump.call_args
     # check that we have correct name, with target_transformers tagged on
     assert m_kwargs["filename"].name == "harry_du_bois_target_transformer.save"
 
@@ -234,7 +234,7 @@ def test_set_up_num_classes(get_transformer_test_data):
     assert num_classes["Origin"] == 3
 
 
-@pytest.mark.parametrize("patch_dynamic", [get_joblib_patch_target()], indirect=True)
+@patch(get_joblib_patch_target(), autospec=True)
 @pytest.mark.parametrize(
     "create_test_data",
     [{"class_type": "binary"}, {"class_type": "multi"}],
@@ -242,11 +242,11 @@ def test_set_up_num_classes(get_transformer_test_data):
 )
 @pytest.mark.parametrize("dataset_type", ["memory", "disk"])
 def test_datasets(
+    patched_joblib: MagicMock,
     dataset_type: str,
     create_test_data: pytest.fixture,
     create_test_cl_args: pytest.fixture,
     parse_test_cl_args,
-    patch_dynamic: MagicMock,
 ):
     c = create_test_data
     cl_args = create_test_cl_args
@@ -262,7 +262,7 @@ def test_datasets(
 
     train_dataset, valid_dataset = datasets.set_up_datasets(cl_args)
 
-    assert patch_dynamic.dump.call_count == 1
+    assert patched_joblib.dump.call_count == 1
 
     check_dataset(
         dataset=train_dataset,
@@ -276,7 +276,7 @@ def test_datasets(
     )
 
 
-@pytest.mark.parametrize("patch_dynamic", [get_joblib_patch_target()], indirect=True)
+@patch(get_joblib_patch_target(), autospec=True)
 @pytest.mark.parametrize(
     "create_test_data",
     [{"class_type": "binary"}, {"class_type": "multi"}],
@@ -284,11 +284,11 @@ def test_datasets(
 )
 @pytest.mark.parametrize("dataset_type", ["memory", "disk"])
 def test_dataset_padding(
+    patched_joblib: MagicMock,
     dataset_type: str,
     create_test_data: pytest.fixture,
     create_test_cl_args: pytest.fixture,
     parse_test_cl_args,
-    patch_dynamic: MagicMock,
 ):
     cl_args = create_test_cl_args
 
@@ -298,7 +298,7 @@ def test_dataset_padding(
     cl_args.target_width = 1200
 
     train_dataset, valid_dataset = datasets.set_up_datasets(cl_args)
-    assert patch_dynamic.dump.call_count == 1
+    assert patched_joblib.dump.call_count == 1
 
     test_sample_pad, test_label_pad, test_id_pad = train_dataset[0]
     assert test_sample_pad.shape[-1] == 1200
