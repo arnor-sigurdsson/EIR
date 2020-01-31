@@ -17,6 +17,7 @@ from torch.optim.adamw import AdamW
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader, WeightedRandomSampler
 
+from human_origins_supervised.data_load import data_utils
 from human_origins_supervised.data_load import datasets
 from human_origins_supervised.data_load.data_loading_funcs import (
     get_weighted_random_sampler,
@@ -73,9 +74,6 @@ class Config:
 def train_ignite(config: Config) -> None:
     c = config
     cl_args = config.cl_args
-
-    # metric_func = select_metric_func(cl_args.model_task, c.target_transformers)
-    # metric_funcs = get_metric_funcs(c.target_columns)
 
     def step(
         engine: Engine, loader_batch: Tuple[torch.Tensor, al_training_labels, List[str]]
@@ -234,7 +232,7 @@ def _get_criterions(target_columns: al_target_columns) -> al_criterions:
         elif column_type_ == "cat":
             return nn.CrossEntropyLoss()
 
-    target_columns_gen = datasets.get_target_columns_generator(target_columns)
+    target_columns_gen = data_utils.get_target_columns_generator(target_columns)
 
     for column_type, column_name in target_columns_gen:
         criterion = get_criterion(column_type)
@@ -334,14 +332,6 @@ def main(cl_args: argparse.Namespace) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-
-    parser.add_argument(
-        "--target_column_type",
-        type=str,
-        default="cls",
-        choices=["cls", "reg"],
-        help="Whether the task is a regression or classification.",
-    )
 
     parser.add_argument(
         "--n_epochs", type=int, default=5, help="number of epochs of training"

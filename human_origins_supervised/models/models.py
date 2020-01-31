@@ -319,7 +319,7 @@ class ModelBase(nn.Module):
             self.fc_extra = nn.Linear(extra_dim, extra_dim, bias=False)
             self.fc_base += extra_dim
 
-        self.fc3_last_module = get_module_dict_from_target_columns(
+        self.fc_3_last_module = get_module_dict_from_target_columns(
             num_classes=self.num_classes, fc_in=self.fc_base
         )
 
@@ -373,6 +373,8 @@ class CNNModel(ModelBase):
             )
         )
 
+        # Note that fc_3_last module gets called here
+
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 # Swish slope is roughly 0.5 around 0
@@ -399,7 +401,7 @@ class CNNModel(ModelBase):
         out = self.fc_3(out)
 
         final_out = calculate_final_multi_output(
-            input_=out, last_module=self.fc3_last_module
+            input_=out, last_module=self.fc_3_last_module
         )
 
         return final_out
@@ -472,6 +474,8 @@ class MLPModel(ModelBase):
             OrderedDict({"fc_3_do_1": nn.Dropout(self.cl_args.fc_do)})
         )
 
+        # Note that fc_3_last module gets called here
+
     @property
     def fc_1_in_features(self):
         return self.cl_args.target_width * 4
@@ -489,7 +493,7 @@ class MLPModel(ModelBase):
         out = self.fc_3(out)
 
         final_out = calculate_final_multi_output(
-            input_=out, last_module=self.fc3_last_module
+            input_=out, last_module=self.fc_3_last_module
         )
 
         return final_out

@@ -7,7 +7,7 @@ from sklearn.metrics import matthews_corrcoef, r2_score, mean_squared_error
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from scipy.stats import pearsonr
 
-from human_origins_supervised.data_load.datasets import get_target_columns_generator
+from human_origins_supervised.data_load.data_utils import get_target_columns_generator
 
 
 def calculate_batch_metrics(

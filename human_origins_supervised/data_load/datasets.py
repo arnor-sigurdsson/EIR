@@ -84,7 +84,7 @@ def construct_dataset_init_params_from_cl_args(cl_args):
 
 def merge_target_columns(
     target_con_columns: List[str], target_cat_columns: List[str]
-) -> Dict[str, List[str]]:
+) -> al_target_columns:
 
     if len(target_con_columns + target_cat_columns) == 0:
         raise ValueError("Expected at least 1 target column")
@@ -96,12 +96,6 @@ def merge_target_columns(
     assert len(all_target_columns) > 0
 
     return all_target_columns
-
-
-def get_target_columns_generator(target_columns: al_target_columns) -> Tuple[str, str]:
-    for column_type, list_of_cols_of_this_type in target_columns.items():
-        for cur_column in list_of_cols_of_this_type:
-            yield column_type, cur_column
 
 
 def save_target_transformer(
@@ -118,7 +112,7 @@ def save_target_transformer(
     target_transformer_outpath = get_transformer_path(
         run_path=run_folder,
         transformer_name=transformer_name,
-        suffix="target_transformers",
+        suffix="target_transformer",
     )
     ensure_path_exists(target_transformer_outpath)
     joblib.dump(value=target_transformer_object, filename=target_transformer_outpath)

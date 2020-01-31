@@ -11,7 +11,7 @@ from torch_lr_finder import LRFinder
 from aislib.misc_utils import get_logger
 from human_origins_supervised.data_load.label_setup import al_label_dict
 from human_origins_supervised.data_load.datasets import al_target_columns
-from human_origins_supervised.data_load.datasets import get_target_columns_generator
+from human_origins_supervised.data_load.data_utils import get_target_columns_generator
 from human_origins_supervised.models.extra_inputs_module import get_extra_inputs
 from human_origins_supervised.train_utils.utils import get_run_folder
 
@@ -152,6 +152,10 @@ def gather_dloader_samples(
 
 
 def get_model_params(model: nn.Module, wd: float) -> List[Dict[str, Union[str, int]]]:
+    """
+    We want to skip adding weight decay to learnable activation parameters so as
+    not to bias them towards 0.
+    """
     params = []
     for name, param in model.named_parameters():
         cur_dict = {"params": param}
