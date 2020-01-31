@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Dict, Union
+from typing import Dict, Union, TYPE_CHECKING
 
 import torch
 import numpy as np
@@ -9,9 +9,12 @@ from scipy.stats import pearsonr
 
 from human_origins_supervised.data_load.data_utils import get_target_columns_generator
 
+if TYPE_CHECKING:
+    from human_origins_supervised.train import al_criterions
+
 
 def calculate_batch_metrics(
-    target_columns, target_transformers, train_outputs, train_labels
+    target_columns, target_transformers, outputs, labels, prefix: str
 ) -> Dict:
     target_columns_gen = get_target_columns_generator(target_columns)
 
@@ -19,11 +22,11 @@ def calculate_batch_metrics(
     for column_type, column_name in target_columns_gen:
 
         metric_func = select_metric_func(column_type, target_transformers[column_name])
-        cur_outputs = train_outputs[column_name]
-        cur_labels = train_labels[column_name]
+        cur_outputs = outputs[column_name]
+        cur_labels = labels[column_name]
 
         cur_metric_dict = metric_func(
-            outputs=cur_outputs, labels=cur_labels, prefix=f"t_{column_name}"
+            outputs=cur_outputs, labels=cur_labels, prefix=f"{prefix}_{column_name}"
         )
 
         master_metric_dict[column_name] = cur_metric_dict
@@ -82,3 +85,27 @@ def calc_regression_metrics(
     rmse = np.sqrt(mean_squared_error(y_true=labels, y_pred=preds))
 
     return {f"{prefix}_r2": r2, f"{prefix}_rmse": rmse, f"{prefix}_pcc": pcc}
+
+
+def calculate_losses(
+    criterions: "al_criterions",
+    labels: Dict[str, torch.Tensor],
+    outputs: Dict[str, torch.Tensor],
+) -> Dict[str, torch.Tensor]:
+    losses_dict = {}
+
+    for target_column, criterion in criterions.items():
+        cur_target_col_labels = labels[target_column]
+        cur_target_col_outputs = outputs[target_column]
+        losses_dict[target_column] = criterion(
+            input=cur_target_col_outputs, target=cur_target_col_labels
+        )
+
+    return losses_dict
+
+
+def aggregate_losses(losses_dict: Dict[str, torch.Tensor]) -> torch.Tensor:
+    losses_values = list(losses_dict.values())
+    average_loss = torch.mean(torch.stack(losses_values))
+
+    return average_loss

@@ -52,3 +52,7 @@ def test_get_model_params(create_test_util_model):
             assert param_group["weight_decay"] == 0.00
         else:
             assert param_group["weight_decay"] == 0.05
+
+
+def stack_list_of_tensor_dicts():
+    assert False, NotImplementedError()

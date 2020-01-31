@@ -10,7 +10,11 @@ from scipy.special import softmax
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
 from human_origins_supervised.models import model_utils
-from human_origins_supervised.train_utils.metric_funcs import select_metric_func
+from human_origins_supervised.train_utils.metric_funcs import (
+    calculate_batch_metrics,
+    calculate_losses,
+    aggregate_losses,
+)
 from human_origins_supervised.train_utils.utils import get_run_folder
 from human_origins_supervised.visualization import visualization_funcs as vf
 from human_origins_supervised.train_utils.utils import append_metrics_to_file
@@ -33,8 +37,6 @@ def evaluation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
     cl_args = c.cl_args
     iteration = engine.state.iteration
 
-    metric_func = select_metric_func(cl_args.model_task, c.target_transformers)
-
     c.model.eval()
     gather_preds = model_utils.gather_pred_outputs_from_dloader
     val_outputs_total, val_labels_total, val_ids_total = gather_preds(
@@ -42,19 +44,32 @@ def evaluation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
     )
     c.model.train()
 
-    val_labels_total = model_utils.cast_labels(cl_args.model_task, val_labels_total)
+    val_labels_total = model_utils.cast_labels(
+        target_columns=c.target_columns, device=cl_args.device, labels=val_labels_total
+    )
 
-    val_loss = c.criterions(val_outputs_total, val_labels_total)
-    metric_dict = metric_func(val_outputs_total, val_labels_total, "v")
-    metric_dict["v_loss"] = val_loss.item()
+    val_losses = calculate_losses(
+        criterions=c.criterions, labels=val_labels_total, outputs=val_outputs_total
+    )
+    val_loss_avg = aggregate_losses(val_losses)
 
-    write_header = True if iteration == cl_args.sample_interval else False
+    metric_dict = calculate_batch_metrics(
+        target_columns=c.target_columns,
+        target_transformers=c.target_transformers,
+        outputs=val_outputs_total,
+        labels=val_labels_total,
+        prefix="v",
+    )
+    metric_dict["v_loss"] = val_loss_avg.item()
+
+    write_eval_header = True if iteration == cl_args.sample_interval else False
+
     outfile = get_run_folder(cl_args.run_name) / "eval_history.log"
     append_metrics_to_file(
         filepath=outfile,
         metrics=metric_dict,
         iteration=iteration,
-        write_header=write_header,
+        write_header=write_eval_header,
     )
 
     save_evaluation_results(

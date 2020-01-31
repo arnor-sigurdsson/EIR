@@ -8,6 +8,8 @@ from torch.optim import SGD
 from torch.optim.adamw import AdamW
 from torch.utils.data import WeightedRandomSampler, SequentialSampler, RandomSampler
 
+import train_utils.metric_funcs
+import train_utils.utils
 from human_origins_supervised import train
 from human_origins_supervised.models.models import CNNModel, MLPModel
 
@@ -199,7 +201,7 @@ def test_calculate_losses_good():
         label_values=common_values, output_values=common_values
     )
 
-    perfect_pred_loss = train._calculate_losses(
+    perfect_pred_loss = train_utils.metric_funcs.calculate_losses(
         criterions=test_criterions, labels=test_labels, outputs=test_outputs
     )
 
@@ -219,7 +221,7 @@ def test_calculate_losses_bad():
         label_values=label_values, output_values=output_values
     )
 
-    bad_pred_loss = train._calculate_losses(
+    bad_pred_loss = train_utils.metric_funcs.calculate_losses(
         criterions=test_criterions, labels=test_labels, outputs=test_outputs
     )
 
@@ -237,5 +239,5 @@ def test_aggregate_losses():
     # expected average of [0,1,2,3,4] = 2.0
     losses_dict = {str(i): torch.tensor(i, dtype=torch.float32) for i in range(5)}
 
-    test_aggregated_losses = train._aggregate_losses(losses_dict)
+    test_aggregated_losses = train_utils.metric_funcs.aggregate_losses(losses_dict)
     assert test_aggregated_losses.item() == 2.0

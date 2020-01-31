@@ -35,7 +35,11 @@ from human_origins_supervised.models.extra_inputs_module import (
 )
 from human_origins_supervised.models.model_utils import get_model_params, test_lr_range
 from human_origins_supervised.models.models import get_model_class
-from human_origins_supervised.train_utils.metric_funcs import calculate_batch_metrics
+from human_origins_supervised.train_utils.metric_funcs import (
+    calculate_batch_metrics,
+    calculate_losses,
+    aggregate_losses,
+)
 from human_origins_supervised.train_utils.train_handlers import configure_trainer
 from human_origins_supervised.train_utils.utils import get_run_folder
 
@@ -95,10 +99,10 @@ def train_ignite(config: Config) -> None:
         c.optimizer.zero_grad()
         train_outputs = c.model(train_seqs, extra_inputs)
 
-        train_losses = _calculate_losses(
+        train_losses = calculate_losses(
             criterions=c.criterions, labels=train_labels, outputs=train_outputs
         )
-        train_loss_avg = _aggregate_losses(train_losses)
+        train_loss_avg = aggregate_losses(train_losses)
         train_loss_avg.backward()
         c.optimizer.step()
 
@@ -107,8 +111,9 @@ def train_ignite(config: Config) -> None:
         metric_dict = calculate_batch_metrics(
             target_columns=c.target_columns,
             target_transformers=c.target_transformers,
-            train_outputs=train_outputs,
-            train_labels=train_labels,
+            outputs=train_outputs,
+            labels=train_labels,
+            prefix="t",
         )
         metric_dict["t_loss"] = train_loss
 
@@ -256,30 +261,6 @@ def _get_criterions(target_columns: al_target_columns) -> al_criterions:
         criterions_dict[column_name] = criterion
 
     return criterions_dict
-
-
-def _calculate_losses(
-    criterions: al_criterions,
-    labels: Dict[str, torch.Tensor],
-    outputs: Dict[str, torch.Tensor],
-) -> Dict[str, torch.Tensor]:
-    losses_dict = {}
-
-    for target_column, criterion in criterions.items():
-        cur_target_col_labels = labels[target_column]
-        cur_target_col_outputs = outputs[target_column]
-        losses_dict[target_column] = criterion(
-            input=cur_target_col_outputs, target=cur_target_col_labels
-        )
-
-    return losses_dict
-
-
-def _aggregate_losses(losses_dict: Dict[str, torch.Tensor]) -> torch.Tensor:
-    losses_values = list(losses_dict.values())
-    average_loss = torch.mean(torch.stack(losses_values))
-
-    return average_loss
 
 
 def _log_params(model: nn.Module) -> None:

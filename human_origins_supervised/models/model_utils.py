@@ -19,7 +19,9 @@ if TYPE_CHECKING:
     from human_origins_supervised.train import Config
 
 # Aliases
-al_dloader_outputs = Tuple[torch.Tensor, Union[List[str], torch.LongTensor], List[str]]
+al_dloader_outputs = Tuple[
+    Dict[str, torch.Tensor], Union[List[str], Dict[str, torch.Tensor]], List[str]
+]
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -101,8 +103,8 @@ def gather_pred_outputs_from_dloader(
     Used to gather predictions from a dataloader, normally for evaluation – hence the
     assertion that we are in eval mode.
     """
-    outputs_total = []
-    labels_total = []
+    all_output_batches = []
+    all_label_batches = []
     ids_total = []
 
     assert not model.training
@@ -113,17 +115,45 @@ def gather_pred_outputs_from_dloader(
 
         outputs = predict_on_batch(model, (inputs, extra_inputs))
 
-        outputs_total += [i for i in outputs]
+        # TODO: Update this, outputs is now dict.
+        all_output_batches.append(outputs)
+
         ids_total += [i for i in ids]
 
         if with_labels:
-            labels = labels.to(device=device)
-            labels_total += [i for i in labels]
+            breakpoint()
+            # TODO: Make sure this gets called after updating.
+            # labels = labels.to(device=device)
+            all_label_batches.append(labels)
 
+    breakpoint()
     if with_labels:
-        labels_total = torch.stack(labels_total)
+        all_label_batches = torch.stack(all_label_batches)
 
-    return torch.stack(outputs_total), labels_total, ids_total
+    # TODO: Add stacking call at the end of this func.
+    # We need to merge all the dictionaries of outputs and labels here
+    # So the final will be the correctly ordered outputs and labels according to ids.
+    return torch.stack(all_output_batches), all_label_batches, ids_total
+
+
+def stack_list_of_tensor_dicts(
+    list_of_dicts: List[Dict[str, torch.Tensor]]
+) -> Dict[str, torch.Tensor]:
+    """
+    Spec:
+        [batch_1, batch_2, batch_3]
+
+        batch_1 =   {
+                        'Target_Column_1': torch.Tensor(...),
+                        'Target_Column_2': torch.Tensor(...),
+                    }
+    """
+    stacked_outputs = {}
+    for key in list_of_dicts[0].keys():
+        aggregated_key_values = [small_dict[key] for small_dict in list_of_dicts]
+        stacked_outputs[key] = torch.stack(aggregated_key_values)
+
+    return stacked_outputs
 
 
 def gather_dloader_samples(
