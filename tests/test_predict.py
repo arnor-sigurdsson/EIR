@@ -10,7 +10,7 @@ from conftest import cleanup
 from human_origins_supervised import predict
 from human_origins_supervised import train
 from human_origins_supervised.models.models import CNNModel
-from test_datasets import check_dataset
+from test_data_load.test_datasets import check_dataset
 
 
 def test_load_model(args_config, tmp_path):

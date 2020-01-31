@@ -28,3 +28,7 @@ def test_make_conv_layers():
     assert len(conv_layers) == len(conv_layer_list) + 2
     assert isinstance(conv_layers[0], models.FirstBlock)
     assert isinstance(conv_layers[-2], models.SelfAttention)
+
+
+def test_get_module_dict_from_target_columns():
+    assert False, NotImplementedError()

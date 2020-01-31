@@ -105,23 +105,41 @@ def test_get_optimizer(args_config):
 
 def test_get_model(args_config):
 
+    # TODO: Refactor checking of fc_3 into separate test.
+
     args_config.model_type = "cnn"
-    cnn_model = train.get_model(args_config, 10, None)
+    num_classes_dict = {"Origin": 10, "Height": 1}
+    cnn_model = train.get_model(args_config, num_classes_dict, None)
+
     assert isinstance(cnn_model, CNNModel)
-    assert cnn_model.fc_3[-1].out_features == 10
+    assert cnn_model.fc_3_last_module["Origin"].out_features == 10
+    assert cnn_model.fc_3_last_module["Height"].out_features == 1
 
     args_config.model_type = "mlp"
-    mlp_model = train.get_model(args_config, 10, None)
+    mlp_model = train.get_model(args_config, num_classes_dict, None)
     assert isinstance(mlp_model, MLPModel)
-    assert mlp_model.fc_3[-1].out_features == 10
+    assert mlp_model.fc_3_last_module["Origin"].out_features == 10
+    assert mlp_model.fc_3_last_module["Height"].out_features == 1
 
 
-def test_get_criterion(args_config):
+def test_get_criterions():
 
-    args_config.model_task = "cls"
-    cls_criterion = train.get_criterion(args_config)
-    assert isinstance(cls_criterion, nn.CrossEntropyLoss)
+    test_target_columns_dict = {
+        "con": ["Height", "BMI"],
+        "cat": ["Origin", "HairColor"],
+    }
 
-    args_config.model_task = "mse"
-    mse_criterion = train.get_criterion(args_config)
-    assert isinstance(mse_criterion, nn.MSELoss)
+    test_criterions = train._get_criterions(test_target_columns_dict)
+    for column_name in test_target_columns_dict["con"]:
+        assert isinstance(test_criterions[column_name], nn.MSELoss)
+
+    for column_name in test_target_columns_dict["cat"]:
+        assert isinstance(test_criterions[column_name], nn.CrossEntropyLoss)
+
+
+def test_calculate_losses():
+    assert False, NotImplementedError()
+
+
+def test_aggregate_losses():
+    assert False, NotImplementedError()
