@@ -32,17 +32,23 @@ def generate_training_curve(
 
     fig, ax_1 = plt.subplots()
 
-    xlim_upper = train_series.shape[0] + skiprows
-    xticks = np.arange(1 + skiprows, xlim_upper + 1)
+    train_series_cut = train_series[train_series.index > skiprows]
+    valid_series_cut = valid_series[valid_series.index > skiprows]
 
-    extreme_func = _get_min_or_max_funcs(train_series.name)
+    if len(train_series_cut) == 0:
+        return
+
+    extreme_func = _get_min_or_max_funcs(train_series_cut.name)
     extreme_valid_idx, extreme_valid_value = _get_validation_extreme_value_and_iter(
-        extreme_func, valid_series
+        extreme_func, valid_series_cut
     )
+
+    xlim_upper = train_series_cut.shape[0] + skiprows
+    xticks = np.arange(1 + skiprows, xlim_upper + 1)
 
     line_1a = ax_1.plot(
         xticks,
-        train_series.values,
+        train_series_cut.values,
         c="orange",
         label="Train",
         zorder=1,
@@ -50,10 +56,10 @@ def generate_training_curve(
         linewidth=0.8,
     )
 
-    validation_xticks = valid_series.index
+    validation_xticks = valid_series_cut.index
     line_1b = ax_1.plot(
         validation_xticks,
-        valid_series.values,
+        valid_series_cut.values,
         c="red",
         linewidth=0.8,
         alpha=1.0,
@@ -64,7 +70,7 @@ def generate_training_curve(
     ax_1.axhline(y=extreme_valid_value, linewidth=0.4, c="red", linestyle="dashed")
 
     ax_1.set_xlabel("Iteration")
-    y_label = _parse_metrics_colname(train_series.name)
+    y_label = _parse_metrics_colname(train_series_cut.name)
     ax_1.set_ylabel(y_label)
 
     ax_1.set_xlim(left=skiprows + 1, right=xlim_upper)
@@ -78,7 +84,7 @@ def generate_training_curve(
 
     if hook_funcs:
         for func in hook_funcs:
-            func(ax_1, target=valid_series.name)
+            func(ax_1, target=valid_series_cut.name)
 
     plt.grid()
 
@@ -95,7 +101,7 @@ def _get_min_or_max_funcs(
 
     func = pd.Series.idxmax
     metric = _parse_metrics_colname(column_name)
-    if metric in ["LOSS", "RMSE"]:
+    if metric in ["LOSS", "RMSE", "LOSS-AVERAGE"]:
         return pd.Series.idxmin
 
     return func
@@ -122,32 +128,37 @@ def gen_eval_graphs(
     val_outputs: np.ndarray,
     val_ids: list,
     outfolder: Path,
-    encoder: Union[LabelEncoder, StandardScaler],
-    model_task,
+    transformer: Union[LabelEncoder, StandardScaler],
+    column_type: str,
 ):
     """
     TODO:
         - Clean this function up – expecially when it comes to target_transformers.
         - Use val_ids_total to hook into other labels for plotting.
     """
-    if model_task == "cls":
-        n_classes = len(encoder.classes_)
+    if column_type == "cat":
+        n_classes = len(transformer.classes_)
         val_pred = val_outputs.argmax(axis=1)
-        generate_confusion_matrix(val_labels, val_pred, encoder.classes_, outfolder)
-    else:
+        generate_confusion_matrix(val_labels, val_pred, transformer.classes_, outfolder)
+    elif column_type == "con":
         n_classes = None
+    else:
+        raise ValueError()
 
-    plot_funcs = select_performance_curve_funcs(model_task, n_classes)
+    plot_funcs = select_performance_curve_funcs(column_type, n_classes)
     for plot_func in plot_funcs:
         plot_func(
-            y_true=val_labels, y_outp=val_outputs, outfolder=outfolder, encoder=encoder
+            y_true=val_labels,
+            y_outp=val_outputs,
+            outfolder=outfolder,
+            transformer=transformer,
         )
 
 
 def select_performance_curve_funcs(
-    model_task: str, n_classes: int = None
+    column_type: str, n_classes: int = None
 ) -> List[Callable]:
-    if model_task == "cls":
+    if column_type == "cat":
         if not n_classes or n_classes < 2:
             raise ValueError("Expected number of classes to be not None and >2.")
 
@@ -155,14 +166,14 @@ def select_performance_curve_funcs(
             return [generate_binary_roc_curve, generate_binary_pr_curve]
         else:
             return [generate_multi_class_roc_curve, generate_multi_class_pr_curve]
-    elif model_task == "reg":
+    elif column_type == "con":
         return [generate_regression_prediction_plot]
 
 
 def generate_regression_prediction_plot(
     y_true: np.ndarray,
     y_outp: np.ndarray,
-    encoder: StandardScaler,
+    transformer: StandardScaler,
     outfolder: Path,
     title_extra: str = "",
     *args,
@@ -170,8 +181,8 @@ def generate_regression_prediction_plot(
 ):
 
     fig, ax = plt.subplots()
-    y_true = encoder.inverse_transform(y_true.reshape(-1, 1))
-    y_outp = encoder.inverse_transform(y_outp.reshape(-1, 1))
+    y_true = transformer.inverse_transform(y_true.reshape(-1, 1))
+    y_outp = transformer.inverse_transform(y_outp.reshape(-1, 1))
 
     r2 = r2_score(y_true, y_outp)
     pcc = pearsonr(y_true.squeeze(), y_outp.squeeze())[0]
@@ -246,7 +257,7 @@ def generate_binary_pr_curve(y_true, y_outp, outfolder, *args, **kwargs):
 def generate_multi_class_roc_curve(
     y_true: np.ndarray,
     y_outp: np.ndarray,
-    encoder: LabelEncoder,
+    transformer: LabelEncoder,
     outfolder: Path,
     *args,
     **kwargs,
@@ -255,7 +266,7 @@ def generate_multi_class_roc_curve(
     tpr = dict()
     roc_auc = dict()
 
-    unique_classes = sorted(encoder.classes_)
+    unique_classes = sorted(transformer.classes_)
     n_classes = len(unique_classes)
     assert len(np.unique(y_true)) == n_classes
 
@@ -308,7 +319,7 @@ def generate_multi_class_roc_curve(
             tpr[i],
             color=color,
             lw=2,
-            label=f"{encoder.inverse_transform([i])[0]} "
+            label=f"{transformer.inverse_transform([i])[0]} "
             f"({np.count_nonzero(y_true == i)}) "
             f"(area = {roc_auc[i]:0.4g})",
         )
@@ -329,7 +340,7 @@ def generate_multi_class_roc_curve(
 def generate_multi_class_pr_curve(
     y_true: np.ndarray,
     y_outp: np.ndarray,
-    encoder: LabelEncoder,
+    transformer: LabelEncoder,
     outfolder: Path,
     *args,
     **kwargs,
@@ -337,7 +348,7 @@ def generate_multi_class_pr_curve(
     precision = dict()
     recall = dict()
 
-    unique_classes = sorted(encoder.classes_)
+    unique_classes = sorted(transformer.classes_)
     n_classes = len(unique_classes)
     assert len(np.unique(y_true)) == n_classes
 
@@ -375,7 +386,7 @@ def generate_multi_class_pr_curve(
             precision[i],
             color=color,
             lw=2,
-            label=f"{encoder.inverse_transform([i])[0]} "
+            label=f"{transformer.inverse_transform([i])[0]} "
             f"({np.count_nonzero(y_true == i)}) "
             f"(area = {average_precision[i]:0.4g})",
         )
@@ -458,7 +469,7 @@ def generate_all_plots(
     hook_funcs: List[Callable],
     output_folder: Path,
 ) -> None:
-    metrics = [i.split("_")[-1] for i in training_history.columns]
+    metrics = ["_".join(i.split("_")[1:]) for i in training_history.columns]
 
     for metric_suffix in metrics:
         train_colname = "t_" + metric_suffix
