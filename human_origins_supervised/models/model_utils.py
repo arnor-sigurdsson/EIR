@@ -66,7 +66,9 @@ def find_no_resblocks_needed(
     return [i for i in resblocks if i != 0]
 
 
-def predict_on_batch(model: Module, inputs: Tuple[torch.Tensor, ...]) -> torch.Tensor:
+def predict_on_batch(
+    model: Module, inputs: Tuple[torch.Tensor, ...]
+) -> Dict[str, torch.Tensor]:
     with torch.no_grad():
         val_outputs = model(*inputs)
 
@@ -115,43 +117,48 @@ def gather_pred_outputs_from_dloader(
 
         outputs = predict_on_batch(model, (inputs, extra_inputs))
 
-        # TODO: Update this, outputs is now dict.
         all_output_batches.append(outputs)
 
         ids_total += [i for i in ids]
 
         if with_labels:
-            breakpoint()
-            # TODO: Make sure this gets called after updating.
-            # labels = labels.to(device=device)
             all_label_batches.append(labels)
 
-    breakpoint()
     if with_labels:
-        all_label_batches = torch.stack(all_label_batches)
+        all_label_batches = stack_list_of_tensor_dicts(all_label_batches)
 
-    # TODO: Add stacking call at the end of this func.
-    # We need to merge all the dictionaries of outputs and labels here
-    # So the final will be the correctly ordered outputs and labels according to ids.
-    return torch.stack(all_output_batches), all_label_batches, ids_total
+    all_output_batches = stack_list_of_tensor_dicts(all_output_batches)
+
+    return all_output_batches, all_label_batches, ids_total
 
 
 def stack_list_of_tensor_dicts(
-    list_of_dicts: List[Dict[str, torch.Tensor]]
+    list_of_batch_dicts: List[Dict[str, torch.Tensor]]
 ) -> Dict[str, torch.Tensor]:
     """
     Spec:
         [batch_1, batch_2, batch_3]
 
         batch_1 =   {
-                        'Target_Column_1': torch.Tensor(...),
+                        'Target_Column_1': torch.Tensor(...), # with obs as rows
                         'Target_Column_2': torch.Tensor(...),
                     }
     """
-    stacked_outputs = {}
-    for key in list_of_dicts[0].keys():
-        aggregated_key_values = [small_dict[key] for small_dict in list_of_dicts]
-        stacked_outputs[key] = torch.stack(aggregated_key_values)
+
+    target_columns = list_of_batch_dicts[0].keys()
+    aggregated_batches = {key: [] for key in target_columns}
+
+    for batch in list_of_batch_dicts:
+        assert set(batch.keys()) == target_columns
+
+        for column in batch.keys():
+            cur_column_batch = batch[column]
+            aggregated_batches[column] += [i for i in cur_column_batch]
+
+    stacked_outputs = {
+        key: torch.stack(list_of_tensors)
+        for key, list_of_tensors in aggregated_batches.items()
+    }
 
     return stacked_outputs
 

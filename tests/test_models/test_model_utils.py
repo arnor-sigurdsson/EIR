@@ -1,5 +1,7 @@
+from copy import deepcopy
 import pytest
 
+import torch
 from torch import nn
 from human_origins_supervised.models import model_utils
 
@@ -54,5 +56,30 @@ def test_get_model_params(create_test_util_model):
             assert param_group["weight_decay"] == 0.05
 
 
-def stack_list_of_tensor_dicts():
-    assert False, NotImplementedError()
+def set_up_stack_list_of_tensors_dicts_data():
+    test_batch_base = {
+        "Target_Column_1": torch.ones((5, 5)),
+        "Target_Column_2": torch.ones((5, 5)) * 2,
+    }
+
+    test_list_of_batches = [deepcopy(test_batch_base) for i in range(3)]
+
+    for i in range(3):
+        test_list_of_batches[i]["Target_Column_1"] *= i
+        test_list_of_batches[i]["Target_Column_2"] *= i
+
+    return test_list_of_batches
+
+
+def test_stack_list_of_tensor_dicts():
+    test_input = set_up_stack_list_of_tensors_dicts_data()
+
+    test_output = model_utils.stack_list_of_tensor_dicts(test_input)
+
+    assert (test_output["Target_Column_1"][0] == 0.0).all()
+    assert (test_output["Target_Column_1"][5] == 1.0).all()
+    assert (test_output["Target_Column_1"][10] == 2.0).all()
+
+    assert (test_output["Target_Column_2"][0] == 0.0).all()
+    assert (test_output["Target_Column_2"][5] == 2.0).all()
+    assert (test_output["Target_Column_2"][10] == 4.0).all()
