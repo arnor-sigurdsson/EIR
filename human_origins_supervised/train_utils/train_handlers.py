@@ -2,7 +2,7 @@ import json
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
-from typing import List, Callable, Union, Tuple, TYPE_CHECKING
+from typing import List, Callable, Union, Tuple, TYPE_CHECKING, Dict
 
 from aislib.misc_utils import get_logger
 from ignite.contrib.handlers import ProgressBar
@@ -10,6 +10,7 @@ from ignite.engine import Events, Engine
 from ignite.handlers import ModelCheckpoint
 from ignite.metrics import RunningAverage
 
+from human_origins_supervised.data_load.data_utils import get_target_columns_generator
 from human_origins_supervised.train_utils.activation_analysis import (
     activation_analysis_handler,
 )
@@ -19,11 +20,15 @@ from human_origins_supervised.train_utils.lr_scheduling import (
     set_up_scheduler,
     attach_lr_scheduler,
 )
+from human_origins_supervised.train_utils.metric_funcs import get_train_metrics
 from human_origins_supervised.train_utils.utils import (
     get_custom_module_submodule,
     append_metrics_to_file,
     read_metrics_history_file,
     get_run_folder,
+    get_metrics_files,
+    ensure_metrics_paths_exists,
+    filter_items_from_engine_metrics_dict,
 )
 from human_origins_supervised.visualization import visualization_funcs as vf
 
@@ -44,7 +49,7 @@ class HandlerConfig:
     run_folder: Path
     run_name: str
     pbar: ProgressBar
-    monitoring_metrics: List[str]
+    monitoring_metrics: List[Tuple[str, str]]
 
 
 def attach_metrics(engine: Engine, handler_config: HandlerConfig) -> None:
@@ -58,11 +63,22 @@ def attach_metrics(engine: Engine, handler_config: HandlerConfig) -> None:
     We use a partial so each lambda has it's own metric variable (otherwise
     they all reference the same object as it gets overwritten).
     """
-    for metric in handler_config.monitoring_metrics:
-        partial_func = partial(lambda x, metric_: x[metric_], metric_=metric)
+    for column_name, metric_name in handler_config.monitoring_metrics:
+
+        def output_transform(
+            metric_dict_from_step: Dict[str, Dict[str, float]],
+            main_key: str,
+            secondary_key: str,
+        ) -> float:
+            return metric_dict_from_step[main_key][secondary_key]
+
+        partial_func = partial(
+            output_transform, main_key=column_name, secondary_key=metric_name
+        )
+
         RunningAverage(
             output_transform=partial_func, alpha=0.98, epoch_bound=False
-        ).attach(engine, metric)
+        ).attach(engine, name=metric_name)
 
 
 def log_stats(engine: Engine, handler_config: HandlerConfig) -> None:
@@ -76,19 +92,42 @@ def log_stats(engine: Engine, handler_config: HandlerConfig) -> None:
 
 
 def _write_training_metrics_handler(engine: Engine, handler_config: HandlerConfig):
+    """
+    Note that engine.state.metrics contains the running averages we are interested in.
+
+    The main "problem" here is that we lose the structure of the metrics dict that
+    we get from `train_utils.metric_funcs.calculate_batch_metrics`, so we have to
+    filter all metrics for a given target column specifically, from the 1d array
+    engine.state.metrics gives us.
+    """
     args = handler_config.config.cl_args
     iteration = engine.state.iteration
+    target_columns = handler_config.config.target_columns
 
-    metric_dict = engine.state.metrics
+    engine_metrics_dict = engine.state.metrics
 
-    write_header = True if iteration == 1 else False
-    outfile = get_run_folder(args.run_name) / "training_history.log"
-    append_metrics_to_file(
-        filepath=outfile,
-        metrics=metric_dict,
-        iteration=iteration,
-        write_header=write_header,
+    run_folder = get_run_folder(run_name=args.run_name)
+
+    is_first_iteration = True if iteration == 1 else False
+
+    metrics_files = get_metrics_files(
+        target_columns=target_columns, run_folder=run_folder, target_prefix="t"
     )
+
+    if is_first_iteration:
+        ensure_metrics_paths_exists(metrics_files)
+
+    for metrics_name, metrics_history_file in metrics_files.items():
+        cur_metric_dict = filter_items_from_engine_metrics_dict(
+            engine_metrics_dict=engine_metrics_dict, target=metrics_name
+        )
+
+        append_metrics_to_file(
+            filepath=metrics_history_file,
+            metrics=cur_metric_dict,
+            iteration=iteration,
+            write_header=is_first_iteration,
+        )
 
 
 def _plot_benchmark_hook(ax, run_folder, target: str):
@@ -119,13 +158,36 @@ def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> Non
             partial(_plot_benchmark_hook, run_folder=handler_config.run_folder)
         )
 
-    run_folder = get_run_folder(args.run_name)
-    train_history = read_metrics_history_file(run_folder / "training_history.log")
-    valid_history = read_metrics_history_file(run_folder / "eval_history.log")
+    all_results_folder = get_run_folder(args.run_name) / "results"
 
+    for results_dir in all_results_folder.iterdir():
+        target_column = results_dir.name
+
+        train_history_path = read_metrics_history_file(
+            results_dir / f"t_{target_column}_history.log"
+        )
+        valid_history_path = read_metrics_history_file(
+            results_dir / f"v_{target_column}_history.log"
+        )
+
+        vf.generate_all_plots(
+            training_history=train_history_path,
+            valid_history=valid_history_path,
+            output_folder=results_dir,
+            hook_funcs=hook_funcs,
+        )
+
+    # TODO: Refactor
+    run_folder = get_run_folder(args.run_name)
+    average_training_history = read_metrics_history_file(
+        run_folder / "t_average-loss_history.log"
+    )
+    average_eval_history = read_metrics_history_file(
+        run_folder / "v_average-loss_history.log"
+    )
     vf.generate_all_plots(
-        training_history=train_history,
-        valid_history=valid_history,
+        training_history=average_training_history,
+        valid_history=average_eval_history,
         output_folder=run_folder,
         hook_funcs=hook_funcs,
     )
@@ -235,9 +297,7 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
     pbar = ProgressBar()
     run_name = cl_args.run_name
 
-    # TODO: Use get_train_metrics when calculating for single columns later.
-    # monitoring_metrics = ["t_loss"] + get_train_metrics(model_task=cl_args.model_task)
-    monitoring_metrics = ["t_loss"]
+    monitoring_metrics = get_monitoring_metrics(config.target_columns)
 
     handler_config = HandlerConfig(
         config, run_folder, run_name, pbar, monitoring_metrics
@@ -259,7 +319,7 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
         attach_lr_scheduler(trainer, lr_scheduler, config)
 
     attach_metrics(trainer, handler_config=handler_config)
-    pbar.attach(trainer, metric_names=handler_config.monitoring_metrics)
+    pbar.attach(trainer, metric_names=["t_loss-average"])
 
     trainer.add_event_handler(
         Events.EPOCH_COMPLETED, log_stats, handler_config=handler_config
@@ -269,3 +329,25 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
         trainer = _attach_run_event_handlers(trainer, handler_config)
 
     return trainer
+
+
+def get_monitoring_metrics(target_columns) -> List[Tuple[str, str]]:
+    """
+    TODO: Refactor. Possibly have loss in get_train_metrics.
+    """
+
+    target_columns_gen = get_target_columns_generator(target_columns)
+
+    loss_average_metrics = tuple(["t_loss-average"] * 2)
+    monitoring_metrics = [loss_average_metrics]
+    for column_type, column_name in target_columns_gen:
+
+        cur_metrics = get_train_metrics(
+            column_type=column_type, prefix=f"t_{column_name}"
+        )
+
+        for metric in cur_metrics:
+            cur_tuple = tuple([column_name, metric])
+            monitoring_metrics.append(cur_tuple)
+
+    return monitoring_metrics

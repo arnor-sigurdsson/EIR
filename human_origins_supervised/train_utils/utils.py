@@ -6,12 +6,13 @@ import importlib.util
 from pathlib import Path
 
 import pandas as pd
-from aislib.misc_utils import get_logger
+from aislib.misc_utils import get_logger, ensure_path_exists
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 if TYPE_CHECKING:
     from human_origins_supervised.data_load.label_setup import al_label_dict
+    from human_origins_supervised.train import al_target_columns
 
 
 def import_custom_module_as_package(module_path, module_name):
@@ -76,7 +77,7 @@ def get_run_folder(run_name: str) -> Path:
 
 
 def append_metrics_to_file(
-    filepath: Path, metrics: Dict, iteration: int, write_header=False
+    filepath: Path, metrics: Dict[str, float], iteration: int, write_header=False
 ):
     with open(str(filepath), "a") as logfile:
         fieldnames = ["iteration"] + sorted(metrics.keys())
@@ -93,3 +94,47 @@ def read_metrics_history_file(file_path: Path) -> pd.DataFrame:
     df = pd.read_csv(file_path, index_col="iteration")
 
     return df
+
+
+def get_metrics_files(
+    target_columns: "al_target_columns", run_folder: Path, target_prefix: str
+) -> Dict[str, Path]:
+    all_target_columns = target_columns["con"] + target_columns["cat"]
+
+    path_dict = {}
+    for target_column in all_target_columns:
+        cur_fname = target_prefix + "_" + target_column + "_history.log"
+        cur_path = Path(run_folder, "results", target_column, cur_fname)
+        path_dict[target_column] = cur_path
+
+    average_loss_training_metrics_file = Path(
+        run_folder, f"{target_prefix}_average-loss_history.log"
+    )
+    path_dict[f"{target_prefix}_loss-average"] = average_loss_training_metrics_file
+
+    return path_dict
+
+
+def ensure_metrics_paths_exists(metrics_files: Dict[str, Path]) -> None:
+    for path in metrics_files.values():
+        ensure_path_exists(path)
+
+
+def filter_items_from_engine_metrics_dict(
+    engine_metrics_dict: Dict[str, float], target: str
+):
+    """
+    Note that in case of the average loss we are not using a target column as the
+    target string – hence we just return it directly.
+    """
+
+    if target.endswith("loss-average"):
+        return {target: engine_metrics_dict[target]}
+
+    output_dict = {}
+    for key, value in engine_metrics_dict.items():
+        column_name = key.split("_")[1]
+        if column_name == target:
+            output_dict[key] = value
+
+    return output_dict

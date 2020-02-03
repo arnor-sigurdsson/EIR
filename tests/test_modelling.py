@@ -190,10 +190,10 @@ def test_regression(
 
     train.train_ignite(config)
 
-    df_train = pd.read_csv(run_path / "training_history.log")
+    df_train = pd.read_csv(run_path / "t_average-loss_history.log")
     assert df_train.loc[:, "t_r2"].max() > 0.8
 
-    df_valid = pd.read_csv(run_path / "eval_history.log")
+    df_valid = pd.read_csv(run_path / "v_average-loss_history.log")
     assert df_valid.loc[:, "v_r2"].max() > 0.8
 
     last_iter = len(train_dloader) * cl_args.n_epochs

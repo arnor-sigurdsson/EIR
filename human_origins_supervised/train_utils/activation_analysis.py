@@ -484,10 +484,10 @@ def activation_analysis_handler(
 
     do_acts = cl_args.get_acts
 
-    sample_outfolder = Path(handler_config.run_folder, "samples", str(iteration))
-    ensure_path_exists(sample_outfolder, is_folder=True)
-
     if do_acts:
+        sample_outfolder = Path(handler_config.run_folder, "samples", str(iteration))
+        ensure_path_exists(sample_outfolder, is_folder=True)
+
         model_copy = copy.deepcopy(c.model)
 
         no_explainer_background_samples = np.max([int(cl_args.batch_size / 8), 16])
