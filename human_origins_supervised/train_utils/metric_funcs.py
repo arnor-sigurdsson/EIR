@@ -100,7 +100,7 @@ def calc_regression_metrics(
         pcc = 0
     else:
         r2 = r2_score(y_true=labels, y_pred=preds)
-        pcc = pearsonr(labels, preds)[0]
+        pcc = pearsonr(x=labels, y=preds)[0]
     rmse = np.sqrt(mean_squared_error(y_true=labels, y_pred=preds))
 
     return {f"{prefix}_r2": r2, f"{prefix}_rmse": rmse, f"{prefix}_pcc": pcc}
