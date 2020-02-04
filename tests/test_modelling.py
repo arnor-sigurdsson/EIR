@@ -4,10 +4,9 @@ from typing import Union
 import numpy as np
 import pandas as pd
 import pytest
-from torch.nn import CrossEntropyLoss, MSELoss
 
-from human_origins_supervised import train
 from conftest import cleanup
+from human_origins_supervised import train
 
 
 def check_snp_types(cls_name, top_grads_msk, expected_idxs, at_least_n):
@@ -82,7 +81,7 @@ def check_identified_snps(
     ],
     indirect=True,
 )
-def test_classification_snp_identification(
+def test_classification(
     create_test_data,
     create_test_cl_args,
     create_test_dloaders,
@@ -107,24 +106,24 @@ def test_classification_snp_identification(
     train_dloader, valid_dloader, train_dataset, valid_dataset = create_test_dloaders
     model = create_test_model
     optimizer = create_test_optimizer
-    criterion = CrossEntropyLoss()
+    criterions = train._get_criterions(train_dataset.target_columns)
 
     train_dataset, valid_dataset = create_test_datasets
-    target_transformer = train_dataset.target_transformer
 
     run_path = Path(f"runs/{cl_args.run_name}/")
 
     config = train.Config(
-        cl_args,
-        train_dloader,
-        valid_dloader,
-        valid_dataset,
-        model,
-        optimizer,
-        criterion,
-        train_dataset.labels_dict,
-        target_transformer,
-        cl_args.data_width,
+        cl_args=cl_args,
+        train_loader=train_dloader,
+        valid_loader=valid_dloader,
+        valid_dataset=valid_dataset,
+        model=model,
+        optimizer=optimizer,
+        criterions=criterions,
+        labels_dict=train_dataset.labels_dict,
+        target_transformers=train_dataset.target_transformers,
+        target_columns=train_dataset.target_columns,
+        data_width=cl_args.data_width,
     )
 
     train.train_ignite(config)
@@ -170,22 +169,22 @@ def test_regression(
     train_dloader, valid_dloader, train_dataset, valid_dataset = create_test_dloaders
     model = create_test_model
     optimizer = create_test_optimizer
-    criterion = CrossEntropyLoss() if cl_args.model_task == "cls" else MSELoss()
+    criterions = train._get_criterions(train_dataset.target_columns)
 
     train_dataset, valid_dataset = create_test_datasets
-    target_transformer = train_dataset.target_transformer
 
     config = train.Config(
-        cl_args,
-        train_dloader,
-        valid_dloader,
-        valid_dataset,
-        model,
-        optimizer,
-        criterion,
-        train_dataset.labels_dict,
-        target_transformer,
-        cl_args.data_width,
+        cl_args=cl_args,
+        train_loader=train_dloader,
+        valid_loader=valid_dloader,
+        valid_dataset=valid_dataset,
+        model=model,
+        optimizer=optimizer,
+        criterions=criterions,
+        labels_dict=train_dataset.labels_dict,
+        target_transformers=train_dataset.target_transformers,
+        target_columns=train_dataset.target_columns,
+        data_width=cl_args.data_width,
     )
 
     train.train_ignite(config)

@@ -59,7 +59,7 @@ def args_config():
             "b1": 0.9,
             "b2": 0.999,
             "batch_size": 64,
-            "benchmark": True,
+            "benchmark": False,
             "channel_exp_base": 5,
             "checkpoint_interval": 100,
             "contn_columns": [],
@@ -325,7 +325,7 @@ def create_test_cl_args(request, args_config, create_test_data):
     args_config.wd = 0.00
     args_config.na_augment = 0.00
 
-    args_config.sample_interval = 100
+    args_config.sample_interval = 10
     args_config.target_width = n_snps
     args_config.data_width = n_snps
     args_config.run_name = args_config.run_name + "_" + c.request_params["class_type"]

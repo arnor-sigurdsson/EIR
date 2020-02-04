@@ -19,8 +19,11 @@ if TYPE_CHECKING:
     from human_origins_supervised.train import Config
 
 # Aliases
-al_dloader_outputs = Tuple[
+al_dloader_pred_outputs = Tuple[
     Dict[str, torch.Tensor], Union[List[str], Dict[str, torch.Tensor]], List[str]
+]
+al_dloader_raw_outputs = Tuple[
+    torch.Tensor, Union[List[str], Dict[str, torch.Tensor]], List[str]
 ]
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
@@ -100,7 +103,7 @@ def gather_pred_outputs_from_dloader(
     device: str,
     labels_dict: al_label_dict,
     with_labels: bool = True,
-) -> al_dloader_outputs:
+) -> al_dloader_pred_outputs:
     """
     Used to gather predictions from a dataloader, normally for evaluation – hence the
     assertion that we are in eval mode.
@@ -132,6 +135,35 @@ def gather_pred_outputs_from_dloader(
     return all_output_batches, all_label_batches, ids_total
 
 
+def gather_dloader_samples(
+    data_loader: DataLoader, device: str, n_samples: Union[int, None] = None
+) -> al_dloader_raw_outputs:
+    inputs_total = []
+    all_label_batches = []
+    ids_total = []
+
+    for inputs, labels, ids in data_loader:
+        inputs = inputs.to(device=device, dtype=torch.float32)
+
+        inputs_total += [i for i in inputs]
+        all_label_batches.append(labels)
+        ids_total += [i for i in ids]
+
+        if n_samples:
+            if len(inputs_total) >= n_samples:
+                inputs_total = inputs_total[:n_samples]
+                ids_total = ids_total[:n_samples]
+                break
+
+    all_label_batches = _stack_list_of_tensor_dicts(all_label_batches)
+
+    if n_samples:
+        for label_key in all_label_batches:
+            all_label_batches[label_key] = all_label_batches[label_key][:n_samples]
+
+    return torch.stack(inputs_total), all_label_batches, ids_total
+
+
 def _stack_list_of_tensor_dicts(
     list_of_batch_dicts: List[Dict[str, torch.Tensor]]
 ) -> Dict[str, torch.Tensor]:
@@ -161,31 +193,6 @@ def _stack_list_of_tensor_dicts(
     }
 
     return stacked_outputs
-
-
-def gather_dloader_samples(
-    data_loader: DataLoader, device: str, n_samples: Union[int, None] = None
-) -> al_dloader_outputs:
-    inputs_total = []
-    labels_total = []
-    ids_total = []
-
-    for inputs, labels, ids in data_loader:
-        inputs = inputs.to(device=device, dtype=torch.float32)
-        labels = labels.to(device=device)
-
-        inputs_total += [i for i in inputs]
-        labels_total += [i for i in labels]
-        ids_total += [i for i in ids]
-
-        if n_samples:
-            if len(inputs_total) >= n_samples:
-                inputs_total = inputs_total[:n_samples]
-                labels_total = labels_total[:n_samples]
-                ids_total = ids_total[:n_samples]
-                break
-
-    return torch.stack(inputs_total), labels_total, ids_total
 
 
 def get_model_params(model: nn.Module, wd: float) -> List[Dict[str, Union[str, int]]]:

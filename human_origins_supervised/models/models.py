@@ -8,10 +8,10 @@ from aislib.misc_utils import get_logger
 from aislib.pytorch_modules import Swish
 from torch import nn
 
+from human_origins_supervised.data_load.datasets import al_num_classes
 from . import extra_inputs_module
 from .extra_inputs_module import al_emb_lookup_dict
 from .model_utils import find_no_resblocks_needed
-from human_origins_supervised.data_load.datasets import al_num_classes
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
