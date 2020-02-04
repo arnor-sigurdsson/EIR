@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Union, Dict, TYPE_CHECKING
+from typing import List, Dict, TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -9,20 +9,19 @@ from ignite.engine import Engine
 from scipy.special import softmax
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
+from human_origins_supervised.data_load.data_utils import get_target_columns_generator
 from human_origins_supervised.models import model_utils
 from human_origins_supervised.train_utils.metric_funcs import (
     calculate_batch_metrics,
     calculate_losses,
     aggregate_losses,
 )
-from human_origins_supervised.train_utils.utils import get_run_folder
-from human_origins_supervised.visualization import visualization_funcs as vf
 from human_origins_supervised.train_utils.utils import (
     append_metrics_to_file,
     get_metrics_files,
 )
-
-from human_origins_supervised.data_load.data_utils import get_target_columns_generator
+from human_origins_supervised.train_utils.utils import get_run_folder
+from human_origins_supervised.visualization import visualization_funcs as vf
 
 if TYPE_CHECKING:
     from human_origins_supervised.train_utils.train_handlers import HandlerConfig
@@ -58,7 +57,7 @@ def evaluation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
     )
     val_loss_avg = aggregate_losses(val_losses)
 
-    metric_dict = calculate_batch_metrics(
+    eval_metrics_dict = calculate_batch_metrics(
         target_columns=c.target_columns,
         target_transformers=c.target_transformers,
         losses=val_losses,
@@ -66,7 +65,7 @@ def evaluation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
         labels=val_labels_total,
         prefix="v_",
     )
-    metric_dict["v_loss-average"] = {"v_loss-average": val_loss_avg.item()}
+    eval_metrics_dict["v_loss-average"] = {"v_loss-average": val_loss_avg.item()}
 
     write_eval_header = True if iteration == cl_args.sample_interval else False
     run_folder = get_run_folder(cl_args.run_name)
@@ -76,7 +75,7 @@ def evaluation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
         write_header=write_eval_header,
         iteration=iteration,
         target_columns=c.target_columns,
-        all_val_metrics_dict=metric_dict,
+        all_val_metrics_dict=eval_metrics_dict,
     )
 
     save_evaluation_results_wrapper(
@@ -136,7 +135,6 @@ def save_evaluation_results_wrapper(
             column_type=column_type,
             transformer=cur_transformer,
             output_folder=cur_output_folder,
-            config=config,
         )
 
 
@@ -148,9 +146,7 @@ def save_evaluation_results(
     column_type: str,
     transformer,
     output_folder: Path,
-    config: "Config",
 ) -> None:
-    cl_args = config.cl_args
 
     sample_outfolder = Path(output_folder, "samples", str(iteration))
     ensure_path_exists(sample_outfolder, is_folder=True)
@@ -169,7 +165,7 @@ def save_evaluation_results(
     vf.gen_eval_graphs(column_type=column_type, **common_args)
 
     if column_type == "cat":
-        get_most_wrong_wrapper(data_folder=cl_args.data_folder, **common_args)
+        get_most_wrong_wrapper(**common_args)
     elif column_type == "con":
         scale_and_save_regression_preds(**common_args)
 
@@ -218,9 +214,7 @@ def get_most_wrong_cls_preds(
     return df
 
 
-def get_most_wrong_wrapper(
-    val_labels, val_outputs, val_ids, transformer, data_folder, outfolder
-):
+def get_most_wrong_wrapper(val_labels, val_outputs, val_ids, transformer, outfolder):
     val_preds_total = val_outputs.argmax(axis=1)
 
     if (val_labels != val_preds_total).sum() > 0:
@@ -229,7 +223,6 @@ def get_most_wrong_wrapper(
         )
 
         df_most_wrong = inverse_numerical_labels_hook(df_most_wrong, transformer)
-        df_most_wrong = anno_meta_hook(df_most_wrong, Path(data_folder))
         df_most_wrong.to_csv(outfolder / "wrong_preds.csv")
 
 
@@ -256,47 +249,3 @@ def scale_and_save_regression_preds(
     df = pd.DataFrame(data=data, columns=["ID", "Actual", "Predicted"])
 
     df.to_csv(outfolder / "regression_predictions.csv", index=["ID"])
-
-
-def anno_meta_hook(
-    df: pd.DataFrame,
-    data_folder: Union[None, Path] = None,
-    anno_fpath: Union[Path, str] = "infer",
-) -> pd.DataFrame:
-    df["Sample_ID"] = df["Sample_ID"].map(lambda x: x.split("_-_")[0])
-
-    type_ = "command line argument"
-    if anno_fpath == "infer":
-        if not data_folder:
-            raise ValueError(
-                "Expected data folder to be passed in if inferring about"
-                "anno filepath."
-            )
-
-        data_folder_name = data_folder.parts[1]
-        anno_fpath = Path(f"data/{data_folder_name}/raw/data.anno")
-        type_ = "inferred"
-
-    if not anno_fpath.exists():
-        logger.info(
-            "Could not find %s anno file at %s. Skipping meta info hook in wrong "
-            "prediction analysis.",
-            type_,
-            anno_fpath,
-        )
-        return df
-
-    anno_columns = ["Instance ID", "Group Label", "Location", "Country"]
-    try:
-        df_anno = pd.read_csv(anno_fpath, usecols=anno_columns, sep="\t")
-    except ValueError:
-        logger.error(f"Could not read column names in {anno_fpath}, skipping.")
-        return df
-
-    df_merged = pd.merge(
-        df, df_anno, how="left", left_on="Sample_ID", right_on="Instance ID"
-    )
-    df_merged = df_merged.drop("Instance ID", axis=1)
-    df_merged.set_index("Sample_ID")
-
-    return df_merged

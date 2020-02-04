@@ -111,7 +111,7 @@ def train_ignite(config: Config) -> None:
 
         train_loss = train_loss_avg.item()
 
-        metric_dict = calculate_batch_metrics(
+        batch_metrics_dict = calculate_batch_metrics(
             target_columns=c.target_columns,
             target_transformers=c.target_transformers,
             losses=train_losses,
@@ -119,11 +119,9 @@ def train_ignite(config: Config) -> None:
             labels=train_labels,
             prefix="t_",
         )
+        batch_metrics_dict["t_loss-average"] = {"t_loss-average": train_loss}
 
-        metric_dict["t_loss-average"] = {"t_loss-average": train_loss}
-        engine.state.cur_metrics = metric_dict
-
-        return metric_dict
+        return batch_metrics_dict
 
     trainer = Engine(step)
 
