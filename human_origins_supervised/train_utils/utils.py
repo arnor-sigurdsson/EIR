@@ -121,20 +121,24 @@ def ensure_metrics_paths_exists(metrics_files: Dict[str, Path]) -> None:
 
 
 def filter_items_from_engine_metrics_dict(
-    engine_metrics_dict: Dict[str, float], target: str
+    engine_metrics_dict: Dict[str, float], metrics_substring: str
 ):
     """
     Note that in case of the average loss we are not using a target column as the
     target string – hence we just return it directly.
+
+    Here we are matching the against patterns likes 't_Origin_mcc' but note that this
+    could also include names like 't_Country_of_origin_mcc', or
+    't_Country-of-origin_mcc' where Country_of_origin is a column name. So we check if
+     the target is actually in the metric.
     """
 
-    if target.endswith("loss-average"):
-        return {target: engine_metrics_dict[target]}
+    if metrics_substring.endswith("loss-average"):
+        return {metrics_substring: engine_metrics_dict[metrics_substring]}
 
     output_dict = {}
-    for key, value in engine_metrics_dict.items():
-        column_name = key.split("_")[1]
-        if column_name == target:
-            output_dict[key] = value
+    for metric_name, metric_value in engine_metrics_dict.items():
+        if metrics_substring in metric_name:
+            output_dict[metric_name] = metric_value
 
     return output_dict

@@ -86,7 +86,7 @@ def train_ignite(config: Config) -> None:
         engine: Engine, loader_batch: Tuple[torch.Tensor, al_training_labels, List[str]]
     ) -> "al_step_metric_dict":
         """
-        The output here goes to engine.output.
+        The output here goes to trainer.output.
         """
         c.model.train()
 

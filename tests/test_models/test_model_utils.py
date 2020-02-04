@@ -74,7 +74,7 @@ def set_up_stack_list_of_tensors_dicts_data():
 def test_stack_list_of_tensor_dicts():
     test_input = set_up_stack_list_of_tensors_dicts_data()
 
-    test_output = model_utils.stack_list_of_tensor_dicts(test_input)
+    test_output = model_utils._stack_list_of_tensor_dicts(test_input)
 
     assert (test_output["Target_Column_1"][0] == 0.0).all()
     assert (test_output["Target_Column_1"][5] == 1.0).all()

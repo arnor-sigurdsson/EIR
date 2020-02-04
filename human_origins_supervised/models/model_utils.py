@@ -125,14 +125,14 @@ def gather_pred_outputs_from_dloader(
             all_label_batches.append(labels)
 
     if with_labels:
-        all_label_batches = stack_list_of_tensor_dicts(all_label_batches)
+        all_label_batches = _stack_list_of_tensor_dicts(all_label_batches)
 
-    all_output_batches = stack_list_of_tensor_dicts(all_output_batches)
+    all_output_batches = _stack_list_of_tensor_dicts(all_output_batches)
 
     return all_output_batches, all_label_batches, ids_total
 
 
-def stack_list_of_tensor_dicts(
+def _stack_list_of_tensor_dicts(
     list_of_batch_dicts: List[Dict[str, torch.Tensor]]
 ) -> Dict[str, torch.Tensor]:
     """
