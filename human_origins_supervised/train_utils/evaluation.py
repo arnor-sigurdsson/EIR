@@ -64,7 +64,7 @@ def evaluation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
         losses=val_losses,
         outputs=val_outputs_total,
         labels=val_labels_total,
-        prefix="v",
+        prefix="v_",
     )
     metric_dict["v_loss-average"] = {"v_loss-average": val_loss_avg.item()}
 
@@ -96,7 +96,7 @@ def write_eval_metrics(
     all_val_metrics_dict,
 ):
     metrics_files = get_metrics_files(
-        target_columns=target_columns, run_folder=run_folder, target_prefix="v"
+        target_columns=target_columns, run_folder=run_folder, target_prefix="v_"
     )
 
     for metrics_name, metrics_history_file in metrics_files.items():

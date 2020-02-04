@@ -38,9 +38,9 @@ def calculate_batch_metrics(
         cur_labels = labels[column_name]
 
         cur_metric_dict = metric_func(
-            outputs=cur_outputs, labels=cur_labels, prefix=f"{prefix}_{column_name}"
+            outputs=cur_outputs, labels=cur_labels, prefix=f"{prefix}{column_name}"
         )
-        cur_metric_dict[f"{prefix}_{column_name}_loss"] = losses[column_name].item()
+        cur_metric_dict[f"{prefix}{column_name}_loss"] = losses[column_name].item()
 
         master_metric_dict[column_name] = cur_metric_dict
 

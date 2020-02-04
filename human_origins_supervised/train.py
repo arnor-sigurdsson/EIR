@@ -117,7 +117,7 @@ def train_ignite(config: Config) -> None:
             losses=train_losses,
             outputs=train_outputs,
             labels=train_labels,
-            prefix="t",
+            prefix="t_",
         )
 
         metric_dict["t_loss-average"] = {"t_loss-average": train_loss}

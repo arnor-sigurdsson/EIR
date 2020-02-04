@@ -464,18 +464,18 @@ def generate_confusion_matrix(
 
 
 def generate_all_plots(
-    training_history: pd.DataFrame,
-    valid_history: pd.DataFrame,
+    training_history_df: pd.DataFrame,
+    valid_history_df: pd.DataFrame,
     hook_funcs: List[Callable],
     output_folder: Path,
 ) -> None:
-    metrics = ["_".join(i.split("_")[1:]) for i in training_history.columns]
+    metrics = ["_".join(i.split("_")[1:]) for i in training_history_df.columns]
 
     for metric_suffix in metrics:
         train_colname = "t_" + metric_suffix
         valid_colname = "v_" + metric_suffix
-        train_series = training_history[train_colname]
-        valid_series = valid_history[valid_colname]
+        train_series = training_history_df[train_colname]
+        valid_series = valid_history_df[valid_colname]
 
         generate_training_curve(
             train_series=train_series,

@@ -103,14 +103,14 @@ def get_metrics_files(
 
     path_dict = {}
     for target_column in all_target_columns:
-        cur_fname = target_prefix + "_" + target_column + "_history.log"
+        cur_fname = target_prefix + target_column + "_history.log"
         cur_path = Path(run_folder, "results", target_column, cur_fname)
         path_dict[target_column] = cur_path
 
     average_loss_training_metrics_file = Path(
-        run_folder, f"{target_prefix}_average-loss_history.log"
+        run_folder, f"{target_prefix}average-loss_history.log"
     )
-    path_dict[f"{target_prefix}_loss-average"] = average_loss_training_metrics_file
+    path_dict[f"{target_prefix}loss-average"] = average_loss_training_metrics_file
 
     return path_dict
 

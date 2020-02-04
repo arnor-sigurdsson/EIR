@@ -5,6 +5,7 @@ from functools import partial
 from pathlib import Path
 from typing import List, Callable, Union, Tuple, TYPE_CHECKING
 
+import pandas as pd
 from aislib.misc_utils import get_logger
 from ignite.contrib.handlers import ProgressBar
 from ignite.engine import Events, Engine
@@ -129,7 +130,7 @@ def _get_monitoring_metrics(target_columns) -> List[Tuple[str, str]]:
 
 def _attach_metrics(engine: Engine, monitoring_metrics: List[Tuple[str, str]]) -> None:
     """
-    For each metric, we crate an output_transform function that grabs the
+    For each metric, we create an output_transform function that grabs the
     target variable from the output of the step function (which is a dict).
 
     Basically what we attach to the trainer operates on the output of the
@@ -238,7 +239,7 @@ def _write_training_metrics_handler(engine: Engine, handler_config: HandlerConfi
     is_first_iteration = True if iteration == 1 else False
 
     metrics_files = get_metrics_files(
-        target_columns=target_columns, run_folder=run_folder, target_prefix="t"
+        target_columns=target_columns, run_folder=run_folder, target_prefix="t_"
     )
 
     if is_first_iteration:
@@ -285,42 +286,48 @@ def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> Non
             partial(_plot_benchmark_hook, run_folder=handler_config.run_folder)
         )
 
-    all_results_folder = get_run_folder(args.run_name) / "results"
+    run_folder = get_run_folder(args.run_name)
 
-    for results_dir in all_results_folder.iterdir():
+    for results_dir in (run_folder / "results").iterdir():
         target_column = results_dir.name
 
-        train_history_path = read_metrics_history_file(
-            results_dir / f"t_{target_column}_history.log"
-        )
-        valid_history_path = read_metrics_history_file(
-            results_dir / f"v_{target_column}_history.log"
+        train_history_df, valid_history_df = _get_metrics_dataframes(
+            results_dir=results_dir, target_string=target_column
         )
 
         vf.generate_all_plots(
-            training_history=train_history_path,
-            valid_history=valid_history_path,
+            training_history_df=train_history_df,
+            valid_history_df=valid_history_df,
             output_folder=results_dir,
             hook_funcs=hook_funcs,
         )
 
-    # TODO: Refactor
-    run_folder = get_run_folder(args.run_name)
-    average_training_history = read_metrics_history_file(
-        run_folder / "t_average-loss_history.log"
+    train_avg_history_df, valid_avg_history_df = _get_metrics_dataframes(
+        results_dir=run_folder, target_string="average-loss"
     )
-    average_eval_history = read_metrics_history_file(
-        run_folder / "v_average-loss_history.log"
-    )
+
     vf.generate_all_plots(
-        training_history=average_training_history,
-        valid_history=average_eval_history,
+        training_history_df=train_avg_history_df,
+        valid_history_df=valid_avg_history_df,
         output_folder=run_folder,
         hook_funcs=hook_funcs,
     )
 
     with open(Path(handler_config.run_folder, "model_info.txt"), "w") as mfile:
         mfile.write(str(handler_config.config.model))
+
+
+def _get_metrics_dataframes(
+    results_dir: Path, target_string: str
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    train_history_path = read_metrics_history_file(
+        results_dir / f"t_{target_string}_history.log"
+    )
+    valid_history_path = read_metrics_history_file(
+        results_dir / f"v_{target_string}_history.log"
+    )
+
+    return train_history_path, valid_history_path
 
 
 def _get_custom_handlers(handler_config: "HandlerConfig"):
