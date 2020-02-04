@@ -8,10 +8,9 @@ from torch.optim import SGD
 from torch.optim.adamw import AdamW
 from torch.utils.data import WeightedRandomSampler, SequentialSampler, RandomSampler
 
-import train_utils.metric_funcs
-import train_utils.utils
 from human_origins_supervised import train
 from human_origins_supervised.models.models import CNNModel, MLPModel
+from human_origins_supervised.train_utils import metric_funcs
 
 
 @patch("human_origins_supervised.train.get_run_folder", autospec=True)
@@ -31,7 +30,7 @@ def test_prepare_run_folder_fail(patched_get_run_folder, tmp_path):
     patched_get_run_folder.return_value = patched_path
     patched_path.mkdir()
 
-    fake_file = patched_path / "training_history.log"
+    fake_file = patched_path / "t_average-loss_history.log"
     fake_file.write_text("Disco Elysium")
 
     with pytest.raises(FileExistsError):
@@ -201,7 +200,7 @@ def test_calculate_losses_good():
         label_values=common_values, output_values=common_values
     )
 
-    perfect_pred_loss = train_utils.metric_funcs.calculate_losses(
+    perfect_pred_loss = metric_funcs.calculate_losses(
         criterions=test_criterions, labels=test_labels, outputs=test_outputs
     )
 
@@ -221,7 +220,7 @@ def test_calculate_losses_bad():
         label_values=label_values, output_values=output_values
     )
 
-    bad_pred_loss = train_utils.metric_funcs.calculate_losses(
+    bad_pred_loss = metric_funcs.calculate_losses(
         criterions=test_criterions, labels=test_labels, outputs=test_outputs
     )
 
@@ -239,5 +238,5 @@ def test_aggregate_losses():
     # expected average of [0,1,2,3,4] = 2.0
     losses_dict = {str(i): torch.tensor(i, dtype=torch.float32) for i in range(5)}
 
-    test_aggregated_losses = train_utils.metric_funcs.aggregate_losses(losses_dict)
+    test_aggregated_losses = metric_funcs.aggregate_losses(losses_dict)
     assert test_aggregated_losses.item() == 2.0

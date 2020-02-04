@@ -319,13 +319,22 @@ class ModelBase(nn.Module):
             self.fc_extra = nn.Linear(extra_dim, extra_dim, bias=False)
             self.fc_base += extra_dim
 
-        self.fc_3_last_module = get_module_dict_from_target_columns(
+        self.fc_3_last_module = _get_module_dict_from_target_columns(
             num_classes=self.num_classes, fc_in=self.fc_base
         )
 
     @property
     def fc_1_in_features(self):
         raise NotImplementedError
+
+
+def _get_module_dict_from_target_columns(num_classes: al_num_classes, fc_in: int):
+
+    module_dict = {}
+    for key, num_classes in num_classes.items():
+        module_dict[key] = nn.Linear(fc_in, num_classes)
+
+    return nn.ModuleDict(module_dict)
 
 
 class CNNModel(ModelBase):
@@ -400,7 +409,7 @@ class CNNModel(ModelBase):
         out = self.fc_2(out)
         out = self.fc_3(out)
 
-        final_out = calculate_final_multi_output(
+        final_out = _calculate_final_multi_output(
             input_=out, last_module=self.fc_3_last_module
         )
 
@@ -421,25 +430,6 @@ class CNNModel(ModelBase):
             )
             return residual_blocks
         return self.cl_args.resblocks
-
-
-def get_module_dict_from_target_columns(num_classes: al_num_classes, fc_in: int):
-
-    module_dict = {}
-    for key, num_classes in num_classes.items():
-        module_dict[key] = nn.Linear(fc_in, num_classes)
-
-    return nn.ModuleDict(module_dict)
-
-
-def calculate_final_multi_output(
-    input_: torch.Tensor, last_module: nn.ModuleDict
-) -> Dict[str, torch.Tensor]:
-    final_out = {}
-    for target_column, linear_layer in last_module.items():
-        final_out[target_column] = linear_layer(input_)
-
-    return final_out
 
 
 class MLPModel(ModelBase):
@@ -492,8 +482,18 @@ class MLPModel(ModelBase):
         out = self.fc_2(out)
         out = self.fc_3(out)
 
-        final_out = calculate_final_multi_output(
+        final_out = _calculate_final_multi_output(
             input_=out, last_module=self.fc_3_last_module
         )
 
         return final_out
+
+
+def _calculate_final_multi_output(
+    input_: torch.Tensor, last_module: nn.ModuleDict
+) -> Dict[str, torch.Tensor]:
+    final_out = {}
+    for target_column, linear_layer in last_module.items():
+        final_out[target_column] = linear_layer(input_)
+
+    return final_out
