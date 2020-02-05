@@ -108,7 +108,7 @@ def args_config():
 def create_test_data(request, tmp_path_factory, parse_test_cl_args) -> "TestDataConfig":
     c = _create_test_data_config(request, tmp_path_factory, parse_test_cl_args)
 
-    fieldnames = ["ID", "Origin", "OriginExtraCol", "ExtraTarget"]
+    fieldnames = ["ID", "Origin", "Height", "OriginExtraCol", "ExtraTarget"]
 
     label_file_handle, label_file_writer = _set_up_label_file_writing(
         path=c.scoped_tmp_path, fieldnames=fieldnames
@@ -133,7 +133,6 @@ def create_test_data(request, tmp_path_factory, parse_test_cl_args) -> "TestData
 
             label_line_dict = _get_current_test_label_values(
                 values_dict=label_line_base,
-                task_type=c.task_type,
                 num_active_snps=num_active_snps_in_sample,
                 cur_class=cls,
             )
@@ -167,9 +166,9 @@ def _create_test_data_config(
     task_type = request_params["class_type"]
     scoped_tmp_path = tmp_path_factory.mktemp(task_type)
 
-    target_classes = {"Asia": 1, "Europe": 2}
+    target_classes = {"Asia": 0, "Europe": 1}
     if task_type in ("multi", "regression"):
-        target_classes["Africa"] = 0
+        target_classes["Africa"] = 2
 
     config = TestDataConfig(
         request_params=request_params,
@@ -201,17 +200,19 @@ def _set_up_label_line_dict(sample_name: str, fieldnames: List[str]):
     return label_line_dict
 
 
-def _get_current_test_label_values(values_dict, task_type, num_active_snps, cur_class):
+def _get_current_test_label_values(values_dict, num_active_snps: List, cur_class: str):
+    class_base_heights = {"Asia": 120, "Europe": 140, "Africa": 160}
+    cur_base_height = class_base_heights[cur_class]
 
-    if task_type == "regression":
-        value = 100 + (5 * len(num_active_snps)) + np.random.randn()
-        values_dict["Origin"] = value
-        values_dict["OriginExtraCol"] = value - 5
-        values_dict["ExtraTarget"] = value - 10
-    else:
-        for key in values_dict:
-            if key != "ID":
-                values_dict[key] = cur_class
+    added_height = 5 * len(num_active_snps)
+    noise = np.random.randn()
+
+    height_value = cur_base_height + added_height + noise
+    values_dict["Height"] = height_value
+    values_dict["ExtraTarget"] = height_value - 10
+
+    values_dict["Origin"] = cur_class
+    values_dict["OriginExtraCol"] = cur_class
 
     return values_dict
 
@@ -251,24 +252,21 @@ def _create_test_array(
     snp_idxs_candidates: np.ndarray,
     snp_row_idx: int,
 ) -> Tuple[np.ndarray, List[int]]:
-    # make samples have the reference, otherwise might have alleles chosen
+    """
+    """
+    # make samples have missing for chosen, otherwise might have alleles chosen
     # below by random, without having the phenotype
     base_array[:, snp_idxs_candidates] = 0
     base_array[3, snp_idxs_candidates] = 1
 
-    lower_bound = 0 if test_task == "reg" else 5
+    lower_bound, upper_bound = 4, 11  # between 4 and 10 snps
+
     np.random.shuffle(snp_idxs_candidates)
-    num_snps_this_sample = np.random.randint(lower_bound, 10)
+    num_snps_this_sample = np.random.randint(lower_bound, upper_bound)
     snp_idxs = sorted(snp_idxs_candidates[:num_snps_this_sample])
 
-    # zero out snp_idxs
     base_array[:, snp_idxs] = 0
-
-    # assign form 2 for those snps for additive
-    if test_task == "regression":
-        base_array[2, snp_idxs] = 1
-    else:
-        base_array[snp_row_idx, snp_idxs] = 1
+    base_array[snp_row_idx, snp_idxs] = 1
 
     base_array = base_array.astype(np.uint8)
     return base_array, snp_idxs
@@ -325,7 +323,7 @@ def create_test_cl_args(request, args_config, create_test_data):
     args_config.wd = 0.00
     args_config.na_augment = 0.00
 
-    args_config.sample_interval = 10
+    args_config.sample_interval = 100
     args_config.target_width = n_snps
     args_config.data_width = n_snps
     args_config.run_name = args_config.run_name + "_" + c.request_params["class_type"]
