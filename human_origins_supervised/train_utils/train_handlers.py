@@ -160,9 +160,9 @@ def _attach_metrics(engine: Engine, monitoring_metrics: List[Tuple[str, str]]) -
 def _log_stats_to_pbar(engine: Engine, handler_config: HandlerConfig) -> None:
     log_string = f"[Epoch {engine.state.epoch}/{engine.state.max_epochs}]"
 
-    for name, value in engine.state.metrics.items():
-        if name.startswith("t_"):
-            log_string += f" | {name}: {value:.4g}"
+    key = "t_loss-average"
+    value = engine.state.metrics[key]
+    log_string += f" | {key}: {value:.4g}"
 
     handler_config.pbar.log_message(log_string)
 
