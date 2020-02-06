@@ -184,7 +184,7 @@ def get_shap_object(
     shap_inputs = [i for i in (background, extra_inputs) if i is not None]
 
     hook_partial = partial(
-        _grab_single_target_from_model_output_hook, output_target_column="Origin"
+        _grab_single_target_from_model_output_hook, output_target_column=column_name
     )
     hook_handle = model.register_forward_hook(hook_partial)
 
@@ -462,7 +462,7 @@ def save_masked_grads(
         "top_snps_masked.png",
     )
 
-    np.save(str(sample_outfolder / "top_grads_masked.npy"), top_grads_msk_inputs)
+    np.save(str(sample_outfolder / "top_acts_masked.npy"), top_grads_msk_inputs)
 
 
 def analyze_activations(

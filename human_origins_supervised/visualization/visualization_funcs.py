@@ -89,7 +89,7 @@ def generate_training_curve(
     plt.grid()
 
     plt.savefig(output_folder / f"training_curve_{y_label}.png", dpi=200)
-    plt.close()
+    plt.close("all")
 
 
 def _get_min_or_max_funcs(
@@ -204,7 +204,7 @@ def generate_regression_prediction_plot(
 
     plt.tight_layout()
     plt.savefig(outfolder / "regression_predictions.png", dpi=200)
-    plt.close()
+    plt.close("all")
 
 
 def generate_binary_roc_curve(
@@ -226,7 +226,7 @@ def generate_binary_roc_curve(
 
     plt.tight_layout()
     plt.savefig(outfolder / "bin_roc_curve.png", dpi=200)
-    plt.close()
+    plt.close("all")
 
 
 def generate_binary_pr_curve(y_true, y_outp, outfolder, *args, **kwargs):
@@ -251,7 +251,7 @@ def generate_binary_pr_curve(y_true, y_outp, outfolder, *args, **kwargs):
 
     plt.tight_layout()
     plt.savefig(outfolder / "bin_pr_curve.png", dpi=200)
-    plt.close()
+    plt.close("all")
 
 
 def generate_multi_class_roc_curve(
@@ -334,7 +334,7 @@ def generate_multi_class_roc_curve(
 
     plt.tight_layout()
     plt.savefig(outfolder / "mc_roc_curve.png", dpi=200)
-    plt.close()
+    plt.close("all")
 
 
 def generate_multi_class_pr_curve(
@@ -400,7 +400,7 @@ def generate_multi_class_pr_curve(
 
     plt.tight_layout()
     plt.savefig(outfolder / "mc_pr_curve.png", dpi=200)
-    plt.close()
+    plt.close("all")
 
 
 def generate_confusion_matrix(
@@ -460,7 +460,7 @@ def generate_confusion_matrix(
 
     fig.tight_layout()
     plt.savefig(outfolder / "confusion_matrix.png", dpi=200)
-    plt.close()
+    plt.close("all")
 
 
 def generate_all_plots(

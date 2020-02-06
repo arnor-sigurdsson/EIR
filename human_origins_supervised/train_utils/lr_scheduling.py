@@ -113,7 +113,7 @@ def _plot_lr_schedule(
 
     plt.plot(simulated_vals[:, 0], simulated_vals[:, 1])
     plt.savefig(output_folder / "lr_schedule.png")
-    plt.close()
+    plt.close("all")
 
 
 def set_up_scheduler(

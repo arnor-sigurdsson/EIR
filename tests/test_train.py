@@ -34,7 +34,7 @@ def test_prepare_run_folder_fail(patched_get_run_folder, tmp_path):
         train._prepare_run_folder("test_folder")
 
 
-@pytest.mark.parametrize("create_test_data", [{"class_type": "multi"}], indirect=True)
+@pytest.mark.parametrize("create_test_data", [{"task_type": "multi"}], indirect=True)
 def test_get_train_sampler(args_config, create_test_data, create_test_datasets):
     cl_args = args_config
     train_dataset, *_ = create_test_datasets
@@ -52,7 +52,7 @@ def test_get_train_sampler(args_config, create_test_data, create_test_datasets):
     assert test_sampler is None
 
 
-@pytest.mark.parametrize("create_test_data", [{"class_type": "multi"}], indirect=True)
+@pytest.mark.parametrize("create_test_data", [{"task_type": "multi"}], indirect=True)
 def test_get_dataloaders(create_test_cl_args, create_test_data, create_test_datasets):
     cl_args = create_test_cl_args
     cl_args.weighted_sampling_column = "Origin"
