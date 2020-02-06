@@ -3,7 +3,8 @@ import json
 from argparse import Namespace
 from copy import deepcopy
 from pathlib import Path
-from typing import Union, List
+from typing import Union, List, Dict
+from dataclasses import dataclass
 
 import joblib
 import numpy as np
@@ -11,6 +12,7 @@ import pandas as pd
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
+from sklearn.preprocessing import LabelEncoder
 
 from aislib.misc_utils import get_logger
 
@@ -19,7 +21,11 @@ from human_origins_supervised.data_load import datasets, label_setup
 from human_origins_supervised.data_load.datasets import al_datasets
 from human_origins_supervised.data_load.label_setup import al_label_dict
 from human_origins_supervised.models.model_utils import gather_pred_outputs_from_dloader
-from human_origins_supervised.models.models import CNNModel
+from human_origins_supervised.models.extra_inputs_module import al_emb_lookup_dict
+from human_origins_supervised.models.models import get_model_class, CNNModel, MLPModel
+from human_origins_supervised.train_utils.utils import get_run_folder
+from human_origins_supervised.train import al_target_transformers
+from human_origins_supervised.data_load.data_utils import get_target_columns_generator
 
 torch.manual_seed(0)
 np.random.seed(0)
@@ -27,28 +33,120 @@ np.random.seed(0)
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
-def _get_classes(test_dataset: al_datasets, model_task: str) -> List[str]:
+def predict(predict_cl_args: Namespace) -> None:
+    outfolder = Path(predict_cl_args.output_folder)
+    run_folder = Path(predict_cl_args.model_path).parents[1]
 
-    if model_task == "cls":
-        classes = test_dataset.target_transformer.classes_
-        return classes
+    c = get_test_config(run_folder=run_folder, predict_cl_args=predict_cl_args)
 
-    return ["Regression"]
+    all_preds, all_labels, all_ids = gather_pred_outputs_from_dloader(
+        data_loader=c.test_dataloader,
+        cl_args=c.train_args_modified_for_testing,
+        model=c.model,
+        device=predict_cl_args.device,
+        labels_dict=c.test_dataset.labels_dict,
+        with_labels=predict_cl_args.evaluate,
+    )
+
+    target_columns_gen = get_target_columns_generator(c.test_dataset.target_columns)
+
+    for target_column_type, target_column in target_columns_gen:
+        target_preds = all_preds[target_column]
+
+        cur_target_transformer = c.test_dataset.target_transformers[target_column]
+        preds_sm = F.softmax(input=target_preds, dim=1).cpu().numpy()
+
+        classes = _get_target_classnames(
+            transformer=cur_target_transformer, target_column=target_column
+        )
+        _save_predictions(
+            preds=preds_sm,
+            test_dataset=c.test_dataset,
+            classes=classes,
+            outfolder=outfolder,
+        )
+
+        if predict_cl_args.evaluate:
+            vf.gen_eval_graphs(
+                val_labels=all_labels.cpu().numpy(),
+                val_outputs=preds_sm,
+                val_ids=all_ids,
+                outfolder=outfolder,
+                transformer=cur_target_transformer,
+                column_type=target_column_type,
+            )
 
 
-def load_cl_args_config(cl_args_config_path: Path) -> Namespace:
+@dataclass
+class TestConfig:
+    train_cl_args: Namespace
+    train_args_modified_for_testing: Namespace
+    test_dataset: datasets.DiskArrayDataset
+    test_dataloader: DataLoader
+    model: Union[CNNModel, MLPModel]
+
+
+def get_test_config(run_folder: Path, predict_cl_args: Namespace):
+    train_cl_args = _load_cl_args_config(
+        cl_args_config_path=run_folder / "cl_args.json"
+    )
+
+    test_train_mixed_cl_args = _modify_train_cl_args_for_testing(
+        train_cl_args=train_cl_args, predict_cl_args=predict_cl_args
+    )
+
+    test_labels_dict = None
+    if predict_cl_args.evaluate:
+        test_labels_dict = _load_labels_for_testing(
+            test_train_cl_args_mix=test_train_mixed_cl_args, run_folder=run_folder
+        )
+
+    test_dataset = _set_up_test_dataset(
+        test_train_cl_args_mix=test_train_mixed_cl_args,
+        test_labels_dict=test_labels_dict,
+    )
+
+    test_dataloader = DataLoader(
+        dataset=test_dataset, batch_size=predict_cl_args.batch_size, shuffle=False
+    )
+
+    model = _load_model(
+        model_path=Path(predict_cl_args.model_path),
+        num_classes=test_dataset.num_classes,
+        train_cl_args=train_cl_args,
+        device=predict_cl_args.device,
+    )
+    assert not model.training
+
+    test_config = TestConfig(
+        train_cl_args=train_cl_args,
+        train_args_modified_for_testing=test_train_mixed_cl_args,
+        test_dataset=test_dataset,
+        test_dataloader=test_dataloader,
+        model=model,
+    )
+    return test_config
+
+
+def _get_target_classnames(transformer: al_target_transformers, target_column: str):
+    if isinstance(transformer, LabelEncoder):
+        return transformer.classes_
+    return target_column
+
+
+def _load_cl_args_config(cl_args_config_path: Path) -> Namespace:
     with open(str(cl_args_config_path), "r") as infile:
         loaded_cl_args = json.load(infile)
 
     return Namespace(**loaded_cl_args)
 
 
-def load_model(
-    model_path: Path, n_classes: int, train_cl_args: Namespace, device: str
+def _load_model(
+    model_path: Path, num_classes: int, train_cl_args: Namespace, device: str
 ) -> torch.nn.Module:
     """
     :param model_path: Path to the model as passed in CL arguments.
-    :param n_classes: Number of classes the model was trained on, used to set up last
+    :param num_classes: Number of classes the model was trained on, used to set up last
     layer neurons.
     :param train_cl_args: CL arguments used during training, used to set up various
     aspects of model architecture.
@@ -56,26 +154,55 @@ def load_model(
     :return: Loaded model initialized with saved weights.
     """
 
-    embeddings_dict = None
-
-    if train_cl_args.embed_columns:
-        model_embeddings_path = (
-            model_path.parents[1] / "extra_inputs" / "embeddings.save"
-        )
-        embeddings_dict = joblib.load(model_embeddings_path)
-
-    model: torch.nn.Module = CNNModel(
-        train_cl_args, n_classes, embeddings_dict, train_cl_args.contn_columns
+    embeddings_dict = _load_saved_embeddings_dict(
+        embed_columns=train_cl_args.embed_columns, run_name=train_cl_args.run_name
     )
-    device_for_load = torch.device(device)
-    model.load_state_dict(torch.load(model_path, map_location=device_for_load))
+
+    mode_class = get_model_class(train_cl_args.model_type)
+
+    model: torch.nn.Module = mode_class(
+        cl_args=train_cl_args,
+        num_classes=num_classes,
+        embeddings_dict=embeddings_dict,
+        extra_continuous_inputs_columns=train_cl_args.contn_columns,
+    )
+
+    model = _load_model_weights(
+        model=model, model_state_dict_path=model_path, device=device
+    )
+
     model.eval()
-    model = model.to(device=device)
 
     return model
 
 
-def modify_train_cl_args_for_testing(
+def _load_model_weights(
+    model: Union[CNNModel, MLPModel], model_state_dict_path: Path, device: str
+) -> Union[CNNModel, MLPModel]:
+    device_for_load = torch.device(device)
+    model.load_state_dict(
+        state_dict=torch.load(model_state_dict_path, map_location=device_for_load)
+    )
+    model = model.to(device=device_for_load)
+
+    return model
+
+
+def _load_saved_embeddings_dict(
+    embed_columns: Union[None, List[str]], run_name: str
+) -> Union[None, al_emb_lookup_dict]:
+    embeddings_dict = None
+
+    run_folder = get_run_folder(run_name)
+
+    if embed_columns:
+        model_embeddings_path = run_folder / "extra_inputs" / "embeddings.save"
+        embeddings_dict = joblib.load(model_embeddings_path)
+
+    return embeddings_dict
+
+
+def _modify_train_cl_args_for_testing(
     train_cl_args: Namespace, predict_cl_args: Namespace
 ) -> Namespace:
     """
@@ -91,7 +218,7 @@ def modify_train_cl_args_for_testing(
     return train_cl_args_mod
 
 
-def load_labels_for_testing(
+def _load_labels_for_testing(
     test_train_cl_args_mix: Namespace, run_folder: Path
 ) -> al_label_dict:
     """
@@ -108,25 +235,28 @@ def load_labels_for_testing(
     continuous_columns = test_train_cl_args_mix.contn_columns[:]
     for continuous_column in continuous_columns:
         scaler_path = label_setup.get_transformer_path(
-            run_folder, continuous_column, "standard_scaler"
+            run_path=run_folder,
+            transformer_name=continuous_column,
+            suffix="standard_scaler",
         )
 
         df_labels_test, _ = label_setup.scale_non_target_continuous_columns(
-            df_labels_test, continuous_column, run_folder, scaler_path
+            df=df_labels_test,
+            continuous_column=continuous_column,
+            run_folder=run_folder,
+            scaler_path=scaler_path,
         )
 
     df_labels_test = label_setup.handle_missing_label_values(
-        df_labels_test, test_train_cl_args_mix, "test_df"
+        df=df_labels_test, cl_args=test_train_cl_args_mix, name="test_df"
     )
     test_labels_dict = df_labels_test.to_dict("index")
 
     return test_labels_dict
 
 
-def set_up_test_dataset(
-    test_train_cl_args_mix: Namespace,
-    test_labels_dict: Union[None, al_label_dict],
-    run_folder: Path,
+def _set_up_test_dataset(
+    test_train_cl_args_mix: Namespace, test_labels_dict: Union[None, al_label_dict]
 ) -> al_datasets:
     """
 
@@ -138,24 +268,38 @@ def set_up_test_dataset(
     :return: Dataset instance to be used for loading test samples.
     """
     dataset_class_common_args = datasets.construct_dataset_init_params_from_cl_args(
-        test_train_cl_args_mix
+        cl_args=test_train_cl_args_mix
     )
 
-    target_transformer_path = label_setup.get_transformer_path(
-        run_folder, test_train_cl_args_mix.target_column, "target_transformers"
-    )
-    target_transformer = joblib.load(target_transformer_path)
+    target_transformers = _load_transformers(cl_args=test_train_cl_args_mix)
 
     test_dataset = datasets.DiskArrayDataset(
         **dataset_class_common_args,
         labels_dict=test_labels_dict,
-        target_transformer=target_transformer,
+        target_transformers=target_transformers,
     )
 
     return test_dataset
 
 
-def save_predictions(
+def _load_transformers(cl_args: Namespace) -> Dict[str, al_target_transformers]:
+    target_transformers_names = cl_args.target_con_columns + cl_args.target_cat_columns
+    run_folder = get_run_folder(cl_args.run_name)
+
+    target_transformers = {}
+    for transformer_name in target_transformers_names:
+        target_transformer_path = label_setup.get_transformer_path(
+            run_path=run_folder,
+            transformer_name=transformer_name,
+            suffix="target_transformers",
+        )
+        target_transformer_object = joblib.load(filename=target_transformer_path)
+        target_transformers[transformer_name] = target_transformer_object
+
+    return target_transformers
+
+
+def _save_predictions(
     preds: torch.Tensor, test_dataset: al_datasets, classes: List[str], outfolder: Path
 ) -> None:
     test_ids = [i.sample_id for i in test_dataset.samples]
@@ -163,66 +307,6 @@ def save_predictions(
     df_preds.index.name = "ID"
 
     df_preds.to_csv(outfolder / "predictions.csv")
-
-
-def predict(predict_cl_args: Namespace) -> None:
-    outfolder = Path(predict_cl_args.output_folder)
-    run_folder = Path(predict_cl_args.model_path).parents[1]
-
-    # Set up CL arguments
-    train_cl_args = load_cl_args_config(
-        Path(predict_cl_args.model_path).parents[1] / "cl_args.json"
-    )
-    test_train_mixed_cl_args = modify_train_cl_args_for_testing(
-        train_cl_args, predict_cl_args
-    )
-
-    # Set up data loading
-    test_labels_dict = None
-    if predict_cl_args.evaluate:
-        test_labels_dict = load_labels_for_testing(test_train_mixed_cl_args, run_folder)
-
-    test_dataset = set_up_test_dataset(
-        test_train_mixed_cl_args, test_labels_dict, run_folder
-    )
-    test_dloader = DataLoader(
-        test_dataset, batch_size=predict_cl_args.batch_size, shuffle=False
-    )
-
-    classes = _get_classes(test_dataset, train_cl_args.model_task)
-
-    # Set up model
-    model = load_model(
-        Path(predict_cl_args.model_path),
-        len(classes),
-        train_cl_args,
-        predict_cl_args.device,
-    )
-    assert not model.training
-
-    # Get predictions
-    preds, labels, ids = gather_pred_outputs_from_dloader(
-        test_dloader,
-        test_train_mixed_cl_args,
-        model,
-        device=predict_cl_args.device,
-        labels_dict=test_dataset.labels_dict,
-        with_labels=predict_cl_args.evaluate,
-    )
-    preds_sm = F.softmax(preds, dim=1).cpu().numpy()
-
-    # Evaluate / analyse predictions
-    save_predictions(preds_sm, test_dataset, classes, outfolder)
-
-    if predict_cl_args.evaluate:
-        vf.gen_eval_graphs(
-            labels.cpu().numpy(),
-            preds_sm,
-            ids,
-            outfolder,
-            test_dataset.target_transformer,
-            test_train_mixed_cl_args.model_task,
-        )
 
 
 if __name__ == "__main__":

@@ -28,7 +28,7 @@ def test_load_model(args_config, tmp_path):
     model_path = tmp_path / "model.pt"
     torch.save(model.state_dict(), model_path)
 
-    loaded_model = predict.load_model(
+    loaded_model = predict._load_model(
         model_path, model.num_classes, cl_args, cl_args.device
     )
     # make sure we're in eval model
@@ -49,7 +49,7 @@ def test_modify_train_cl_args_for_testing():
     cl_args_from_train = Namespace(data_folder="train/data/folder", lr=1e-3)
     cl_args_from_predict = Namespace(data_folder="test/data/folder")
 
-    mixed_args = predict.modify_train_cl_args_for_testing(
+    mixed_args = predict._modify_train_cl_args_for_testing(
         cl_args_from_train, cl_args_from_predict
     )
     assert mixed_args.data_folder == "test/data/folder"
@@ -57,7 +57,7 @@ def test_modify_train_cl_args_for_testing():
 
 
 @pytest.mark.parametrize(
-    "create_test_data", [{"class_type": "regression"}], indirect=True
+    "create_test_data", [{"task_type": "regression"}], indirect=True
 )
 @pytest.mark.parametrize(
     "create_test_cl_args",
@@ -76,7 +76,7 @@ def test_load_labels_for_testing(
 
     run_path = Path(f"runs/{cl_args.run_name}/")
 
-    test_labels_dict = predict.load_labels_for_testing(cl_args, run_path)
+    test_labels_dict = predict._load_labels_for_testing(cl_args, run_path)
     df_test = pd.DataFrame.from_dict(test_labels_dict, orient="index")
 
     # make sure test data extra column was scaled correctly
@@ -90,7 +90,7 @@ def test_load_labels_for_testing(
         cleanup(run_path)
 
 
-@pytest.mark.parametrize("create_test_data", [{"class_type": "multi"}], indirect=True)
+@pytest.mark.parametrize("create_test_data", [{"task_type": "multi"}], indirect=True)
 @pytest.mark.parametrize(
     "create_test_cl_args",
     [
@@ -114,12 +114,12 @@ def test_set_up_test_dataset(
     run_path = Path(f"runs/{cl_args.run_name}/")
 
     classes_tested = ["Asia", "Europe"]
-    if test_data_params["class_type"] == "multi":
+    if test_data_params["task_type"] == "multi":
         classes_tested += ["Africa"]
     classes_tested.sort()
 
-    test_labels_dict = predict.load_labels_for_testing(cl_args, run_path)
-    test_dataset = predict.set_up_test_dataset(cl_args, test_labels_dict, run_path)
+    test_labels_dict = predict._load_labels_for_testing(cl_args, run_path)
+    test_dataset = predict._set_up_test_dataset(cl_args, test_labels_dict, run_path)
 
     exp_no_samples = n_per_class * len(classes_tested)
     check_dataset(test_dataset, exp_no_samples, classes_tested, cl_args)
@@ -136,7 +136,62 @@ def grab_latest_model_path(saved_models_folder: Path):
 
 
 @pytest.mark.parametrize(
-    "create_test_data", [{"class_type": "multi", "split_to_test": True}], indirect=True
+    "create_test_data", [{"task_type": "multi", "split_to_test": True}], indirect=True
+)
+@pytest.mark.parametrize(
+    "create_test_cl_args",
+    [
+        {
+            "custom_cl_args": {
+                "run_name": "test_run_predict",
+                "n_epochs": 2,
+                "checkpoint_interval": 50,
+                # to save time since we're not testing the modelling
+                "benchmark": False,
+                "get_acts": False,
+            }
+        }
+    ],
+    indirect=True,
+)
+def test_predict_new(keep_outputs, _prep_modelling_test_configs):
+    config, test_config = _prep_modelling_test_configs
+    test_path = config.cl_args.data_folder
+
+    train.train_ignite(config)
+
+    model_path = grab_latest_model_path(test_config.run_path / "saved_models")
+    predict_cl_args = Namespace(
+        model_path=model_path,
+        batch_size=64,
+        evaluate=True,
+        data_folder=test_path / "test_arrays_test_set",
+        output_folder=test_path,
+        device="cpu",
+    )
+
+    predict.predict(predict_cl_args)
+
+    df_test = pd.read_csv(test_path / "predictions.csv", index_col="ID")
+    classes_sorted = sorted(config.train_dataset.target_transformer.classes_)
+
+    # check that columns in predictions.csv are in correct sorted order
+    assert (classes_sorted == df_test.columns).all()
+
+    for cls in classes_sorted:
+        class_indices = [i for i in df_test.index if i.endswith(cls)]
+        df_cur_class = df_test.loc[class_indices]
+        num_correct = (df_cur_class.idxmax(axis=1) == cls).sum()
+
+        # check that most were correct
+        assert num_correct / df_cur_class.shape[0] > 0.9
+
+    if not keep_outputs:
+        cleanup(test_config.run_path)
+
+
+@pytest.mark.parametrize(
+    "create_test_data", [{"task_type": "multi", "split_to_test": True}], indirect=True
 )
 @pytest.mark.parametrize(
     "create_test_cl_args",

@@ -276,12 +276,14 @@ def _log_params(model: nn.Module) -> None:
 def main(cl_args: argparse.Namespace) -> None:
     run_folder = _prepare_run_folder(cl_args.run_name)
 
-    train_dataset, valid_dataset = datasets.set_up_datasets(cl_args)
+    train_dataset, valid_dataset = datasets.set_up_datasets(cl_args=cl_args)
 
     cl_args.target_width = train_dataset[0][0].shape[2]
     cl_args.data_width = train_dataset.data_width
 
-    batch_size = _modify_bs_for_multi_gpu(cl_args.multi_gpu, cl_args.batch_size)
+    batch_size = _modify_bs_for_multi_gpu(
+        multi_gpu=cl_args.multi_gpu, batch_size=cl_args.batch_size
+    )
 
     train_sampler = get_train_sampler(
         column_to_sample=cl_args.weighted_sampling_column, train_dataset=train_dataset
