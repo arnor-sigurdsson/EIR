@@ -93,7 +93,7 @@ def _step_reduce_on_plateau_scheduler(
     _log_reduce_on_plateu_step(reduce_on_plateau_scheduler, iteration)
 
     eval_df = read_metrics_history_file(eval_history_fpath)
-    latest_val_loss = eval_df["v_loss"].iloc[-1]
+    latest_val_loss = eval_df["v_loss-average"].iloc[-1]
     reduce_on_plateau_scheduler.step(latest_val_loss)
 
 
@@ -113,7 +113,7 @@ def _plot_lr_schedule(
 
     plt.plot(simulated_vals[:, 0], simulated_vals[:, 1])
     plt.savefig(output_folder / "lr_schedule.png")
-    plt.close()
+    plt.close("all")
 
 
 def set_up_scheduler(
@@ -164,7 +164,9 @@ def attach_lr_scheduler(
         )
 
     else:
-        eval_history_fpath = get_run_folder(cl_args.run_name) / "eval_history.log"
+        eval_history_fpath = (
+            get_run_folder(cl_args.run_name) / "v_average-loss_history.log"
+        )
         engine.add_event_handler(
             event_name=Events.ITERATION_COMPLETED(every=cl_args.sample_interval),
             handler=_step_reduce_on_plateau_scheduler,

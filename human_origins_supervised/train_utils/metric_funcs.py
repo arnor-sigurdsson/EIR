@@ -1,21 +1,33 @@
 from functools import partial
-from typing import Dict, Union, TYPE_CHECKING
+from typing import Dict, Union, TYPE_CHECKING, List
 
-import torch
 import numpy as np
+import torch
+from scipy.stats import pearsonr
 from sklearn.metrics import matthews_corrcoef, r2_score, mean_squared_error
 from sklearn.preprocessing import StandardScaler, LabelEncoder
-from scipy.stats import pearsonr
 
 from human_origins_supervised.data_load.data_utils import get_target_columns_generator
 
 if TYPE_CHECKING:
-    from human_origins_supervised.train import al_criterions
+    from human_origins_supervised.train import (
+        al_criterions,
+        al_target_transformers,
+        al_target_columns,
+    )
+
+# aliases
+al_step_metric_dict = Dict[str, Dict[str, float]]
 
 
 def calculate_batch_metrics(
-    target_columns, target_transformers, outputs, labels, prefix: str
-) -> Dict:
+    target_columns: "al_target_columns",
+    target_transformers: Dict[str, "al_target_transformers"],
+    losses: Dict[str, torch.Tensor],
+    outputs: Dict[str, torch.Tensor],
+    labels: Dict[str, torch.Tensor],
+    prefix: str,
+) -> al_step_metric_dict:
     target_columns_gen = get_target_columns_generator(target_columns)
 
     master_metric_dict = {}
@@ -26,8 +38,9 @@ def calculate_batch_metrics(
         cur_labels = labels[column_name]
 
         cur_metric_dict = metric_func(
-            outputs=cur_outputs, labels=cur_labels, prefix=f"{prefix}_{column_name}"
+            outputs=cur_outputs, labels=cur_labels, prefix=f"{prefix}{column_name}"
         )
+        cur_metric_dict[f"{prefix}{column_name}_loss"] = losses[column_name].item()
 
         master_metric_dict[column_name] = cur_metric_dict
 
@@ -43,11 +56,17 @@ def select_metric_func(
     return partial(calc_regression_metrics, target_transformer=target_transformer)
 
 
-def get_train_metrics(model_task, prefix="t"):
-    if model_task == "reg":
-        return [f"{prefix}_r2", f"{prefix}_rmse", f"{prefix}_pcc"]
-    elif model_task == "cls":
-        return [f"{prefix}_mcc"]
+def get_train_metrics(column_type: str, prefix: str = "t") -> List[str]:
+    if column_type == "con":
+        base = [f"{prefix}_r2", f"{prefix}_rmse", f"{prefix}_pcc"]
+    elif column_type == "cat":
+        base = [f"{prefix}_mcc"]
+    else:
+        raise ValueError()
+
+    all_metrics = base + [f"{prefix}_loss"]
+
+    return all_metrics
 
 
 def calc_multiclass_metrics(
@@ -81,7 +100,7 @@ def calc_regression_metrics(
         pcc = 0
     else:
         r2 = r2_score(y_true=labels, y_pred=preds)
-        pcc = pearsonr(labels, preds)[0]
+        pcc = pearsonr(x=labels, y=preds)[0]
     rmse = np.sqrt(mean_squared_error(y_true=labels, y_pred=preds))
 
     return {f"{prefix}_r2": r2, f"{prefix}_rmse": rmse, f"{prefix}_pcc": pcc}

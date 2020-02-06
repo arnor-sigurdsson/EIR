@@ -19,8 +19,11 @@ if TYPE_CHECKING:
     from human_origins_supervised.train import Config
 
 # Aliases
-al_dloader_outputs = Tuple[
+al_dloader_pred_outputs = Tuple[
     Dict[str, torch.Tensor], Union[List[str], Dict[str, torch.Tensor]], List[str]
+]
+al_dloader_raw_outputs = Tuple[
+    torch.Tensor, Union[List[str], Dict[str, torch.Tensor]], List[str]
 ]
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
@@ -66,7 +69,9 @@ def find_no_resblocks_needed(
     return [i for i in resblocks if i != 0]
 
 
-def predict_on_batch(model: Module, inputs: Tuple[torch.Tensor, ...]) -> torch.Tensor:
+def predict_on_batch(
+    model: Module, inputs: Tuple[torch.Tensor, ...]
+) -> Dict[str, torch.Tensor]:
     with torch.no_grad():
         val_outputs = model(*inputs)
 
@@ -98,7 +103,7 @@ def gather_pred_outputs_from_dloader(
     device: str,
     labels_dict: al_label_dict,
     with_labels: bool = True,
-) -> al_dloader_outputs:
+) -> al_dloader_pred_outputs:
     """
     Used to gather predictions from a dataloader, normally for evaluation – hence the
     assertion that we are in eval mode.
@@ -115,70 +120,79 @@ def gather_pred_outputs_from_dloader(
 
         outputs = predict_on_batch(model, (inputs, extra_inputs))
 
-        # TODO: Update this, outputs is now dict.
         all_output_batches.append(outputs)
 
         ids_total += [i for i in ids]
 
         if with_labels:
-            breakpoint()
-            # TODO: Make sure this gets called after updating.
-            # labels = labels.to(device=device)
             all_label_batches.append(labels)
 
-    breakpoint()
     if with_labels:
-        all_label_batches = torch.stack(all_label_batches)
+        all_label_batches = _stack_list_of_tensor_dicts(all_label_batches)
 
-    # TODO: Add stacking call at the end of this func.
-    # We need to merge all the dictionaries of outputs and labels here
-    # So the final will be the correctly ordered outputs and labels according to ids.
-    return torch.stack(all_output_batches), all_label_batches, ids_total
+    all_output_batches = _stack_list_of_tensor_dicts(all_output_batches)
+
+    return all_output_batches, all_label_batches, ids_total
 
 
-def stack_list_of_tensor_dicts(
-    list_of_dicts: List[Dict[str, torch.Tensor]]
+def gather_dloader_samples(
+    data_loader: DataLoader, device: str, n_samples: Union[int, None] = None
+) -> al_dloader_raw_outputs:
+    inputs_total = []
+    all_label_batches = []
+    ids_total = []
+
+    for inputs, labels, ids in data_loader:
+        inputs = inputs.to(device=device, dtype=torch.float32)
+
+        inputs_total += [i for i in inputs]
+        all_label_batches.append(labels)
+        ids_total += [i for i in ids]
+
+        if n_samples:
+            if len(inputs_total) >= n_samples:
+                inputs_total = inputs_total[:n_samples]
+                ids_total = ids_total[:n_samples]
+                break
+
+    all_label_batches = _stack_list_of_tensor_dicts(all_label_batches)
+
+    if n_samples:
+        for label_key in all_label_batches:
+            all_label_batches[label_key] = all_label_batches[label_key][:n_samples]
+
+    return torch.stack(inputs_total), all_label_batches, ids_total
+
+
+def _stack_list_of_tensor_dicts(
+    list_of_batch_dicts: List[Dict[str, torch.Tensor]]
 ) -> Dict[str, torch.Tensor]:
     """
     Spec:
         [batch_1, batch_2, batch_3]
 
         batch_1 =   {
-                        'Target_Column_1': torch.Tensor(...),
+                        'Target_Column_1': torch.Tensor(...), # with obs as rows
                         'Target_Column_2': torch.Tensor(...),
                     }
     """
-    stacked_outputs = {}
-    for key in list_of_dicts[0].keys():
-        aggregated_key_values = [small_dict[key] for small_dict in list_of_dicts]
-        stacked_outputs[key] = torch.stack(aggregated_key_values)
+
+    target_columns = list_of_batch_dicts[0].keys()
+    aggregated_batches = {key: [] for key in target_columns}
+
+    for batch in list_of_batch_dicts:
+        assert set(batch.keys()) == target_columns
+
+        for column in batch.keys():
+            cur_column_batch = batch[column]
+            aggregated_batches[column] += [i for i in cur_column_batch]
+
+    stacked_outputs = {
+        key: torch.stack(list_of_tensors)
+        for key, list_of_tensors in aggregated_batches.items()
+    }
 
     return stacked_outputs
-
-
-def gather_dloader_samples(
-    data_loader: DataLoader, device: str, n_samples: Union[int, None] = None
-) -> al_dloader_outputs:
-    inputs_total = []
-    labels_total = []
-    ids_total = []
-
-    for inputs, labels, ids in data_loader:
-        inputs = inputs.to(device=device, dtype=torch.float32)
-        labels = labels.to(device=device)
-
-        inputs_total += [i for i in inputs]
-        labels_total += [i for i in labels]
-        ids_total += [i for i in ids]
-
-        if n_samples:
-            if len(inputs_total) >= n_samples:
-                inputs_total = inputs_total[:n_samples]
-                labels_total = labels_total[:n_samples]
-                ids_total = ids_total[:n_samples]
-                break
-
-    return torch.stack(inputs_total), labels_total, ids_total
 
 
 def get_model_params(model: nn.Module, wd: float) -> List[Dict[str, Union[str, int]]]:

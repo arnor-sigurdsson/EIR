@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from os.path import abspath
 from pathlib import Path
 from sys import platform
-from typing import Union, Tuple, List, Dict, overload
+from typing import Union, Tuple, List, Dict, overload, TYPE_CHECKING
 
 import numpy as np
 import torch
@@ -42,6 +42,9 @@ from human_origins_supervised.train_utils.metric_funcs import (
 )
 from human_origins_supervised.train_utils.train_handlers import configure_trainer
 from human_origins_supervised.train_utils.utils import get_run_folder
+
+if TYPE_CHECKING:
+    from human_origins_supervised.train_utils.metric_funcs import al_step_metric_dict
 
 # aliases
 al_criterions = Dict[str, Union[nn.CrossEntropyLoss, nn.MSELoss]]
@@ -81,9 +84,9 @@ def train_ignite(config: Config) -> None:
 
     def step(
         engine: Engine, loader_batch: Tuple[torch.Tensor, al_training_labels, List[str]]
-    ) -> Dict[str, float]:
+    ) -> "al_step_metric_dict":
         """
-        The output here goes to engine.output.
+        The output here goes to trainer.output.
         """
         c.model.train()
 
@@ -108,16 +111,17 @@ def train_ignite(config: Config) -> None:
 
         train_loss = train_loss_avg.item()
 
-        metric_dict = calculate_batch_metrics(
+        batch_metrics_dict = calculate_batch_metrics(
             target_columns=c.target_columns,
             target_transformers=c.target_transformers,
+            losses=train_losses,
             outputs=train_outputs,
             labels=train_labels,
-            prefix="t",
+            prefix="t_",
         )
-        metric_dict["t_loss"] = train_loss
+        batch_metrics_dict["t_loss-average"] = {"t_loss-average": train_loss}
 
-        return metric_dict
+        return batch_metrics_dict
 
     trainer = Engine(step)
 
@@ -128,7 +132,7 @@ def train_ignite(config: Config) -> None:
 
 def _prepare_run_folder(run_name: str) -> Path:
     run_folder = get_run_folder(run_name)
-    history_file = run_folder / "training_history.log"
+    history_file = run_folder / "t_average-loss_history.log"
     if history_file.exists():
         raise FileExistsError(
             f"There already exists a run with that name: {history_file}. Please choose "
@@ -160,7 +164,6 @@ def get_train_sampler(column_to_sample, train_dataset):
 
     loaded_label_columns = tuple(train_dataset.samples[0].labels.keys())
     if column_to_sample not in loaded_label_columns:
-        breakpoint()
         raise ValueError("Weighted sampling from non-loaded columns not supported yet.")
 
     if column_to_sample is not None:

@@ -1,4 +1,7 @@
 from argparse import Namespace
+
+import torch
+
 from human_origins_supervised.models import models
 
 
@@ -30,5 +33,40 @@ def test_make_conv_layers():
     assert isinstance(conv_layers[-2], models.SelfAttention)
 
 
+def get_test_module_dict_data():
+    test_classes_dict = {"Origin": 10, "Height": 1, "BMI": 1}
+    test_fc_in = 128
+
+    return test_classes_dict, test_fc_in
+
+
 def test_get_module_dict_from_target_columns():
-    assert False, NotImplementedError()
+    test_classes_dict, test_fc_in = get_test_module_dict_data()
+
+    output_layer_model_dict = models._get_module_dict_from_target_columns(
+        num_classes=test_classes_dict, fc_in=test_fc_in
+    )
+
+    for target_column, num_classes in test_classes_dict.items():
+        cur_module = output_layer_model_dict[target_column]
+        assert cur_module.in_features == test_fc_in
+        assert cur_module.out_features == test_classes_dict[target_column]
+
+
+def test_calculate_final_multi_output():
+    test_classes_dict, test_fc_in = get_test_module_dict_data()
+
+    output_layer_model_dict = models._get_module_dict_from_target_columns(
+        num_classes=test_classes_dict, fc_in=test_fc_in
+    )
+
+    test_input = torch.zeros(128)
+
+    test_multi_output = models._calculate_final_multi_output(
+        input_=test_input, last_module=output_layer_model_dict
+    )
+
+    # since the input is zero, we only get the bias
+    for target_column, tensor in test_multi_output.items():
+        module_bias = output_layer_model_dict[target_column].bias
+        assert (module_bias == tensor).all()

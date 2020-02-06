@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Union, TYPE_CHECKING
+from typing import List, Dict, TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -9,15 +9,19 @@ from ignite.engine import Engine
 from scipy.special import softmax
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
+from human_origins_supervised.data_load.data_utils import get_target_columns_generator
 from human_origins_supervised.models import model_utils
 from human_origins_supervised.train_utils.metric_funcs import (
     calculate_batch_metrics,
     calculate_losses,
     aggregate_losses,
 )
+from human_origins_supervised.train_utils.utils import (
+    append_metrics_to_file,
+    get_metrics_files,
+)
 from human_origins_supervised.train_utils.utils import get_run_folder
 from human_origins_supervised.visualization import visualization_funcs as vf
-from human_origins_supervised.train_utils.utils import append_metrics_to_file
 
 if TYPE_CHECKING:
     from human_origins_supervised.train_utils.train_handlers import HandlerConfig
@@ -53,33 +57,117 @@ def evaluation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
     )
     val_loss_avg = aggregate_losses(val_losses)
 
-    metric_dict = calculate_batch_metrics(
+    eval_metrics_dict = calculate_batch_metrics(
         target_columns=c.target_columns,
         target_transformers=c.target_transformers,
+        losses=val_losses,
         outputs=val_outputs_total,
         labels=val_labels_total,
-        prefix="v",
+        prefix="v_",
     )
-    metric_dict["v_loss"] = val_loss_avg.item()
+    eval_metrics_dict["v_loss-average"] = {"v_loss-average": val_loss_avg.item()}
 
     write_eval_header = True if iteration == cl_args.sample_interval else False
+    run_folder = get_run_folder(cl_args.run_name)
 
-    outfile = get_run_folder(cl_args.run_name) / "eval_history.log"
-    append_metrics_to_file(
-        filepath=outfile,
-        metrics=metric_dict,
-        iteration=iteration,
+    write_eval_metrics(
+        run_folder=run_folder,
         write_header=write_eval_header,
+        iteration=iteration,
+        target_columns=c.target_columns,
+        all_val_metrics_dict=eval_metrics_dict,
     )
 
-    save_evaluation_results(
+    save_evaluation_results_wrapper(
         val_outputs=val_outputs_total,
         val_labels=val_labels_total,
         val_ids=val_ids_total,
         iteration=iteration,
-        run_folder=handler_config.run_folder,
         config=handler_config.config,
     )
+
+
+def write_eval_metrics(
+    run_folder: Path,
+    write_header: bool,
+    iteration: int,
+    target_columns,
+    all_val_metrics_dict,
+):
+    metrics_files = get_metrics_files(
+        target_columns=target_columns, run_folder=run_folder, target_prefix="v_"
+    )
+
+    for metrics_name, metrics_history_file in metrics_files.items():
+        cur_metrics = all_val_metrics_dict[metrics_name]
+
+        append_metrics_to_file(
+            filepath=metrics_history_file,
+            metrics=cur_metrics,
+            iteration=iteration,
+            write_header=write_header,
+        )
+
+
+def save_evaluation_results_wrapper(
+    val_outputs: Dict[str, torch.Tensor],
+    val_labels: Dict[str, torch.Tensor],
+    val_ids: List[str],
+    iteration: int,
+    config: "Config",
+):
+
+    target_columns_gen = get_target_columns_generator(config.target_columns)
+
+    for column_type, column_name in target_columns_gen:
+        cur_val_outputs = val_outputs[column_name]
+        cur_val_labels = val_labels[column_name]
+        cur_transformer = config.target_transformers[column_name]
+        cur_output_folder = (
+            get_run_folder(config.cl_args.run_name) / "results" / column_name
+        )
+
+        save_evaluation_results(
+            val_outputs=cur_val_outputs,
+            val_labels=cur_val_labels,
+            val_ids=val_ids,
+            iteration=iteration,
+            column_type=column_type,
+            transformer=cur_transformer,
+            output_folder=cur_output_folder,
+        )
+
+
+def save_evaluation_results(
+    val_outputs: torch.Tensor,
+    val_labels: torch.Tensor,
+    val_ids: List[str],
+    iteration: int,
+    column_type: str,
+    transformer,
+    output_folder: Path,
+) -> None:
+
+    sample_outfolder = Path(output_folder, "samples", str(iteration))
+    ensure_path_exists(sample_outfolder, is_folder=True)
+
+    val_outputs = val_outputs.cpu().numpy()
+    val_labels = val_labels.cpu().numpy()
+
+    common_args = {
+        "val_outputs": val_outputs,
+        "val_labels": val_labels,
+        "val_ids": val_ids,
+        "outfolder": sample_outfolder,
+        "transformer": transformer,
+    }
+
+    vf.gen_eval_graphs(column_type=column_type, **common_args)
+
+    if column_type == "cat":
+        get_most_wrong_wrapper(**common_args)
+    elif column_type == "con":
+        scale_and_save_regression_preds(**common_args)
 
 
 def get_most_wrong_cls_preds(
@@ -126,9 +214,7 @@ def get_most_wrong_cls_preds(
     return df
 
 
-def get_most_wrong_wrapper(
-    val_labels, val_outputs, val_ids, encoder, data_folder, outfolder
-):
+def get_most_wrong_wrapper(val_labels, val_outputs, val_ids, transformer, outfolder):
     val_preds_total = val_outputs.argmax(axis=1)
 
     if (val_labels != val_preds_total).sum() > 0:
@@ -136,8 +222,7 @@ def get_most_wrong_wrapper(
             val_labels, val_preds_total, val_outputs, np.array(val_ids)
         )
 
-        df_most_wrong = inverse_numerical_labels_hook(df_most_wrong, encoder)
-        df_most_wrong = anno_meta_hook(df_most_wrong, Path(data_folder))
+        df_most_wrong = inverse_numerical_labels_hook(df_most_wrong, transformer)
         df_most_wrong.to_csv(outfolder / "wrong_preds.csv")
 
 
@@ -154,89 +239,13 @@ def scale_and_save_regression_preds(
     val_labels: np.ndarray,
     val_outputs: np.ndarray,
     val_ids: List[str],
-    encoder: StandardScaler,
+    transformer: StandardScaler,
     outfolder: Path,
 ) -> None:
-    val_labels = encoder.inverse_transform(val_labels).squeeze()
-    val_outputs = encoder.inverse_transform(val_outputs).squeeze()
+    val_labels = transformer.inverse_transform(val_labels).squeeze()
+    val_outputs = transformer.inverse_transform(val_outputs).squeeze()
 
     data = np.array([val_ids, val_labels, val_outputs]).T
     df = pd.DataFrame(data=data, columns=["ID", "Actual", "Predicted"])
 
     df.to_csv(outfolder / "regression_predictions.csv", index=["ID"])
-
-
-def anno_meta_hook(
-    df: pd.DataFrame,
-    data_folder: Union[None, Path] = None,
-    anno_fpath: Union[Path, str] = "infer",
-) -> pd.DataFrame:
-    df["Sample_ID"] = df["Sample_ID"].map(lambda x: x.split("_-_")[0])
-
-    type_ = "command line argument"
-    if anno_fpath == "infer":
-        if not data_folder:
-            raise ValueError(
-                "Expected data folder to be passed in if inferring about"
-                "anno filepath."
-            )
-
-        data_folder_name = data_folder.parts[1]
-        anno_fpath = Path(f"data/{data_folder_name}/raw/data.anno")
-        type_ = "inferred"
-
-    if not anno_fpath.exists():
-        logger.info(
-            "Could not find %s anno file at %s. Skipping meta info hook in wrong "
-            "prediction analysis.",
-            type_,
-            anno_fpath,
-        )
-        return df
-
-    anno_columns = ["Instance ID", "Group Label", "Location", "Country"]
-    try:
-        df_anno = pd.read_csv(anno_fpath, usecols=anno_columns, sep="\t")
-    except ValueError:
-        logger.error(f"Could not read column names in {anno_fpath}, skipping.")
-        return df
-
-    df_merged = pd.merge(
-        df, df_anno, how="left", left_on="Sample_ID", right_on="Instance ID"
-    )
-    df_merged = df_merged.drop("Instance ID", axis=1)
-    df_merged.set_index("Sample_ID")
-
-    return df_merged
-
-
-def save_evaluation_results(
-    val_outputs: torch.Tensor,
-    val_labels: torch.Tensor,
-    val_ids: List[str],
-    iteration: int,
-    run_folder: Path,
-    config: "Config",
-) -> None:
-    cl_args = config.cl_args
-
-    sample_outfolder = Path(run_folder, "samples", str(iteration))
-    ensure_path_exists(sample_outfolder, is_folder=True)
-
-    val_outputs = val_outputs.cpu().numpy()
-    val_labels = val_labels.cpu().numpy()
-
-    common_args = {
-        "val_outputs": val_outputs,
-        "val_labels": val_labels,
-        "val_ids": val_ids,
-        "outfolder": sample_outfolder,
-        "encoder": config.target_transformers,
-    }
-
-    vf.gen_eval_graphs(model_task=cl_args.model_task, **common_args)
-
-    if cl_args.model_task == "cls":
-        get_most_wrong_wrapper(data_folder=cl_args.data_folder, **common_args)
-    elif cl_args.model_task == "reg":
-        scale_and_save_regression_preds(**common_args)

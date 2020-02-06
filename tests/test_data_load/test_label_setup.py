@@ -46,9 +46,7 @@ def get_test_column_ops():
 
 
 @pytest.mark.parametrize(
-    "create_test_data",
-    [{"class_type": "binary"}, {"class_type": "multi"}],
-    indirect=True,
+    "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
 )
 def test_set_up_train_and_valid_labels(
     parse_test_cl_args, create_test_data, create_test_cl_args
@@ -73,7 +71,7 @@ def test_set_up_train_and_valid_labels(
     assert valid_ids_set.isdisjoint(train_ids_set)
 
 
-@pytest.mark.parametrize("create_test_data", [{"class_type": "binary"}], indirect=True)
+@pytest.mark.parametrize("create_test_data", [{"task_type": "binary"}], indirect=True)
 def test_label_df_parse_wrapper(
     parse_test_cl_args, create_test_data, create_test_cl_args
 ):
@@ -110,9 +108,7 @@ def test_get_extra_columns(test_input, expected, get_test_column_ops):
 
 
 @pytest.mark.parametrize(
-    "create_test_data",
-    [{"class_type": "binary"}, {"class_type": "multi"}],
-    indirect=True,
+    "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
 )
 def test_load_label_df_one_target_no_extra_col(parse_test_cl_args, create_test_data):
     c = create_test_data
@@ -129,9 +125,7 @@ def test_load_label_df_one_target_no_extra_col(parse_test_cl_args, create_test_d
 
 
 @pytest.mark.parametrize(
-    "create_test_data",
-    [{"class_type": "binary"}, {"class_type": "multi"}],
-    indirect=True,
+    "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
 )
 def test_load_label_df_one_target_one_extra_col(parse_test_cl_args, create_test_data):
     c = create_test_data
@@ -150,9 +144,7 @@ def test_load_label_df_one_target_one_extra_col(parse_test_cl_args, create_test_
 
 
 @pytest.mark.parametrize(
-    "create_test_data",
-    [{"class_type": "binary"}, {"class_type": "multi"}],
-    indirect=True,
+    "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
 )
 def test_load_label_df_filter_ids(parse_test_cl_args, create_test_data):
     c = create_test_data
@@ -170,31 +162,34 @@ def test_load_label_df_filter_ids(parse_test_cl_args, create_test_data):
 
 
 @pytest.mark.parametrize(
-    "create_test_data",
-    [{"class_type": "binary"}, {"class_type": "multi"}],
-    indirect=True,
+    "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
 )
 def test_load_label_extra_target_extra_col(parse_test_cl_args, create_test_data):
     c = create_test_data
 
     label_fpath = c.scoped_tmp_path / "labels.csv"
 
-    target_column_multi = ["Origin", "ExtraTarget"]
+    target_column_multi = ["Origin", "Height", "ExtraTarget"]
     df_label_multi_target = label_setup._load_label_df(
-        label_fpath, target_column_multi, extra_columns=("OriginExtraCol",)
+        label_fpath=label_fpath,
+        target_columns=target_column_multi,
+        extra_columns=("OriginExtraCol",),
     )
 
-    assert df_label_multi_target.shape[1] == 3
+    assert df_label_multi_target.shape[1] == 4
 
     # Check that they're all the same, as defined
     part_1 = df_label_multi_target["Origin"]
     part_2 = df_label_multi_target["OriginExtraCol"]
-    part_3 = df_label_multi_target["ExtraTarget"]
+
     assert (part_1 == part_2).all()
-    assert (part_2 == part_3).all()
+
+    part_3 = df_label_multi_target["Height"]
+    part_4 = df_label_multi_target["ExtraTarget"]
+    assert ((part_3 - 50).astype(int) == part_4.astype(int)).all()
 
 
-@pytest.mark.parametrize("create_test_data", [{"class_type": "binary"}], indirect=True)
+@pytest.mark.parametrize("create_test_data", [{"task_type": "binary"}], indirect=True)
 def test_parse_label_df(create_test_data, get_test_column_ops):
     c = create_test_data
     label_fpath = c.scoped_tmp_path / "labels.csv"
@@ -216,9 +211,7 @@ def test_parse_label_df(create_test_data, get_test_column_ops):
 
 
 @pytest.mark.parametrize(
-    "create_test_data",
-    [{"class_type": "binary"}, {"class_type": "multi"}],
-    indirect=True,
+    "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
 )
 def test_split_df(create_test_data, create_test_cl_args):
     cl_args = create_test_cl_args
@@ -236,9 +229,7 @@ def test_split_df(create_test_data, create_test_cl_args):
 
 
 @pytest.mark.parametrize(
-    "create_test_data",
-    [{"class_type": "binary"}, {"class_type": "multi"}],
-    indirect=True,
+    "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
 )
 def test_scale_regression_labels(create_test_data, create_test_cl_args):
     c = create_test_data

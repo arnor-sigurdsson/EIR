@@ -120,7 +120,7 @@ def plot_top_gradients(
     # plt.tight_layout gives a warning here, seems to be gs specific behavior
     gs.tight_layout(fig)
     plt.savefig(output_folder / fname, bbox_inches="tight")
-    plt.close()
+    plt.close("all")
 
 
 def plot_snp_gradients(accumulated_grads, outfolder, type_="avg"):
@@ -163,4 +163,4 @@ def plot_snp_gradients(accumulated_grads, outfolder, type_="avg"):
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
     plt.tight_layout()
     plt.savefig(out_path, bbox_inches="tight")
-    plt.close()
+    plt.close("all")

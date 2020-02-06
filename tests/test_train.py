@@ -1,15 +1,11 @@
-from copy import deepcopy
 from unittest.mock import patch
 
 import pytest
-import torch
 from torch import nn
 from torch.optim import SGD
 from torch.optim.adamw import AdamW
 from torch.utils.data import WeightedRandomSampler, SequentialSampler, RandomSampler
 
-import train_utils.metric_funcs
-import train_utils.utils
 from human_origins_supervised import train
 from human_origins_supervised.models.models import CNNModel, MLPModel
 
@@ -31,14 +27,14 @@ def test_prepare_run_folder_fail(patched_get_run_folder, tmp_path):
     patched_get_run_folder.return_value = patched_path
     patched_path.mkdir()
 
-    fake_file = patched_path / "training_history.log"
+    fake_file = patched_path / "t_average-loss_history.log"
     fake_file.write_text("Disco Elysium")
 
     with pytest.raises(FileExistsError):
         train._prepare_run_folder("test_folder")
 
 
-@pytest.mark.parametrize("create_test_data", [{"class_type": "multi"}], indirect=True)
+@pytest.mark.parametrize("create_test_data", [{"task_type": "multi"}], indirect=True)
 def test_get_train_sampler(args_config, create_test_data, create_test_datasets):
     cl_args = args_config
     train_dataset, *_ = create_test_datasets
@@ -56,7 +52,7 @@ def test_get_train_sampler(args_config, create_test_data, create_test_datasets):
     assert test_sampler is None
 
 
-@pytest.mark.parametrize("create_test_data", [{"class_type": "multi"}], indirect=True)
+@pytest.mark.parametrize("create_test_data", [{"task_type": "multi"}], indirect=True)
 def test_get_dataloaders(create_test_cl_args, create_test_data, create_test_datasets):
     cl_args = create_test_cl_args
     cl_args.weighted_sampling_column = "Origin"
@@ -146,98 +142,3 @@ def test_get_criterions():
 
     for column_name in test_target_columns_dict["cat"]:
         assert isinstance(test_criterions[column_name], nn.CrossEntropyLoss)
-
-
-def set_up_calculate_losses_data(
-    label_values: torch.Tensor, output_values: torch.Tensor
-):
-    test_target_columns_dict = {
-        "con": ["Height", "BMI"],
-        "cat": ["Origin", "HairColor"],
-    }
-
-    def generate_base_dict(values: torch.Tensor):
-
-        base_dict = {
-            "Height": deepcopy(values).to(dtype=torch.float32),
-            "BMI": deepcopy(values).to(dtype=torch.float32),
-            "Origin": deepcopy(values),
-            "HairColor": deepcopy(values),
-        }
-
-        return base_dict
-
-    test_criterions = train._get_criterions(test_target_columns_dict)
-    test_labels = generate_base_dict(label_values)
-
-    test_outputs = generate_base_dict(output_values)
-
-    one_hot = torch.nn.functional.one_hot
-    test_outputs["Origin"] = one_hot(test_outputs["Origin"])
-    test_outputs["Origin"] = test_outputs["Origin"].to(dtype=torch.float32)
-
-    test_outputs["HairColor"] = one_hot(test_outputs["HairColor"])
-    test_outputs["HairColor"] = test_outputs["HairColor"].to(dtype=torch.float32)
-
-    return test_criterions, test_labels, test_outputs
-
-
-def test_calculate_losses_good():
-    """
-    Note that CrossEntropy applies LogSoftmax() before calculating the NLLLoss().
-
-    We expect the the CrossEntropyLosses to be around 0.9048
-
-        >>> loss = torch.nn.CrossEntropyLoss()
-        >>> input_ = torch.zeros(1, 5)
-        >>> input_[0, 0] = 1
-        >>> target = torch.zeros(1, dtype=torch.long)
-        >>> loss(input_, target)
-        tensor(0.9048)
-    """
-
-    common_values = torch.tensor([0, 1, 2, 3, 4], dtype=torch.int64)
-    test_criterions, test_labels, test_outputs = set_up_calculate_losses_data(
-        label_values=common_values, output_values=common_values
-    )
-
-    perfect_pred_loss = train_utils.metric_funcs.calculate_losses(
-        criterions=test_criterions, labels=test_labels, outputs=test_outputs
-    )
-
-    assert perfect_pred_loss["Height"].item() == 0.0
-    assert perfect_pred_loss["BMI"].item() == 0.0
-
-    assert 0.904 < perfect_pred_loss["Origin"].item() < 0.905
-    assert 0.904 < perfect_pred_loss["HairColor"].item() < 0.905
-
-
-def test_calculate_losses_bad():
-
-    # diff of 2 between each pair, RMSE expected to be 4.0
-    label_values = torch.tensor([0, 1, 2, 3, 4], dtype=torch.int64)
-    output_values = torch.tensor([2, 3, 4, 5, 6], dtype=torch.int64)
-    test_criterions, test_labels, test_outputs = set_up_calculate_losses_data(
-        label_values=label_values, output_values=output_values
-    )
-
-    bad_pred_loss = train_utils.metric_funcs.calculate_losses(
-        criterions=test_criterions, labels=test_labels, outputs=test_outputs
-    )
-
-    expected_rmse = 4.0
-    assert bad_pred_loss["Height"].item() == expected_rmse
-    assert bad_pred_loss["BMI"].item() == expected_rmse
-
-    # check that the loss is more than upper bound (0.905) in perfect case
-    perfect_upper_bound = 0.905
-    assert bad_pred_loss["Origin"].item() > perfect_upper_bound
-    assert bad_pred_loss["HairColor"].item() > perfect_upper_bound
-
-
-def test_aggregate_losses():
-    # expected average of [0,1,2,3,4] = 2.0
-    losses_dict = {str(i): torch.tensor(i, dtype=torch.float32) for i in range(5)}
-
-    test_aggregated_losses = train_utils.metric_funcs.aggregate_losses(losses_dict)
-    assert test_aggregated_losses.item() == 2.0
