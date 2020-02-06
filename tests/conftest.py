@@ -1,4 +1,5 @@
 import csv
+from argparse import Namespace
 from dataclasses import dataclass
 from pathlib import Path
 from random import shuffle
@@ -15,7 +16,8 @@ from torch.utils.data import DataLoader
 
 from human_origins_supervised.data_load import datasets
 from human_origins_supervised.models.models import CNNModel
-from human_origins_supervised.train import get_optimizer
+from human_origins_supervised import train
+from human_origins_supervised.train import Config
 
 np.random.seed(0)
 
@@ -163,11 +165,11 @@ def _create_test_data_config(
 ):
 
     request_params = create_test_data_fixture_request.param
-    task_type = request_params["class_type"]
+    task_type = request_params["task_type"]
     scoped_tmp_path = tmp_path_factory.mktemp(task_type)
 
     target_classes = {"Asia": 0, "Europe": 1}
-    if task_type in ("multi", "regression"):
+    if task_type != "binary":
         target_classes["Africa"] = 2
 
     config = TestDataConfig(
@@ -209,7 +211,7 @@ def _get_current_test_label_values(values_dict, num_active_snps: List, cur_class
 
     height_value = cur_base_height + added_height + noise
     values_dict["Height"] = height_value
-    values_dict["ExtraTarget"] = height_value - 10
+    values_dict["ExtraTarget"] = height_value - 50
 
     values_dict["Origin"] = cur_class
     values_dict["OriginExtraCol"] = cur_class
@@ -326,7 +328,7 @@ def create_test_cl_args(request, args_config, create_test_data):
     args_config.sample_interval = 100
     args_config.target_width = n_snps
     args_config.data_width = n_snps
-    args_config.run_name = args_config.run_name + "_" + c.request_params["class_type"]
+    args_config.run_name = args_config.run_name + "_" + c.request_params["task_type"]
 
     # If tests need to have their own config different from the base defined above,
     # only supporting custom_cl_args hardcoded for now
@@ -401,6 +403,102 @@ def create_test_optimizer(create_test_cl_args, create_test_model):
     cl_args = create_test_cl_args
     model = create_test_model
 
-    optimizer = get_optimizer(model, cl_args)
+    optimizer = train.get_optimizer(model, cl_args)
 
     return optimizer
+
+
+@dataclass
+class ModelTestConfig:
+    iteration: int
+    run_path: Path
+    last_sample_folders: Dict[str, Path]
+    activations_path: Dict[str, Path]
+    masked_activations_path: Dict[str, Path]
+
+
+@pytest.fixture()
+def _prep_modelling_test_configs(
+    create_test_data,
+    create_test_cl_args,
+    create_test_dloaders,
+    create_test_model,
+    create_test_optimizer,
+    create_test_datasets,
+) -> Tuple[Config, ModelTestConfig]:
+    """
+    Note that the fixtures used in this fixture get indirectly parametrized by
+    test_classification and test_regression.
+    """
+    cl_args = create_test_cl_args
+    train_loader, valid_loader, train_dataset, valid_dataset = create_test_dloaders
+    model = create_test_model
+    optimizer = create_test_optimizer
+    criterions = train._get_criterions(train_dataset.target_columns)
+
+    train_dataset, valid_dataset = create_test_datasets
+
+    config = Config(
+        cl_args=cl_args,
+        train_loader=train_loader,
+        valid_loader=valid_loader,
+        valid_dataset=valid_dataset,
+        model=model,
+        optimizer=optimizer,
+        criterions=criterions,
+        labels_dict=train_dataset.labels_dict,
+        target_transformers=train_dataset.target_transformers,
+        target_columns=train_dataset.target_columns,
+        data_width=cl_args.data_width,
+    )
+
+    test_config = _get_cur_modelling_test_config(
+        train_loader=train_loader, cl_args=cl_args
+    )
+
+    return config, test_config
+
+
+def _get_cur_modelling_test_config(
+    train_loader: DataLoader, cl_args: Namespace
+) -> ModelTestConfig:
+
+    last_iter = len(train_loader) * cl_args.n_epochs
+    run_path = Path(f"runs/{cl_args.run_name}/")
+
+    target_columns = cl_args.target_cat_columns + cl_args.target_con_columns
+    last_sample_folders = _get_all_last_sample_folders(
+        target_columns=target_columns, run_path=run_path, iteration=last_iter
+    )
+
+    gen = last_sample_folders.items
+    activations_path = {k: folder / "top_acts.npy" for k, folder in gen()}
+    masked_activations_path = {k: folder / "top_acts_masked.npy" for k, folder in gen()}
+
+    test_config = ModelTestConfig(
+        iteration=last_iter,
+        run_path=run_path,
+        last_sample_folders=last_sample_folders,
+        activations_path=activations_path,
+        masked_activations_path=masked_activations_path,
+    )
+
+    return test_config
+
+
+def _get_all_last_sample_folders(
+    target_columns: List[str], run_path: Path, iteration: int
+) -> Dict[str, Path]:
+    sample_folders = {}
+    for col in target_columns:
+        sample_folders[col] = _get_test_sample_folder(
+            run_path=run_path, iteration=iteration, column_name=col
+        )
+
+    return sample_folders
+
+
+def _get_test_sample_folder(run_path: Path, iteration: int, column_name: str) -> Path:
+    sample_folder = run_path / f"results/{column_name}/samples/{iteration}"
+
+    return sample_folder

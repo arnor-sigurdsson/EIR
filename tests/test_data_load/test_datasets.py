@@ -17,9 +17,7 @@ def get_joblib_patch_target():
 
 @patch(get_joblib_patch_target(), autospec=True)
 @pytest.mark.parametrize(
-    "create_test_data",
-    [{"class_type": "binary"}, {"class_type": "multi"}],
-    indirect=True,
+    "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
 )
 def test_set_up_datasets(
     patched_joblib: MagicMock, create_test_cl_args, create_test_data, parse_test_cl_args
@@ -236,9 +234,7 @@ def test_set_up_num_classes(get_transformer_test_data):
 
 @patch(get_joblib_patch_target(), autospec=True)
 @pytest.mark.parametrize(
-    "create_test_data",
-    [{"class_type": "binary"}, {"class_type": "multi"}],
-    indirect=True,
+    "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
 )
 @pytest.mark.parametrize("dataset_type", ["memory", "disk"])
 def test_datasets(
@@ -278,9 +274,7 @@ def test_datasets(
 
 @patch(get_joblib_patch_target(), autospec=True)
 @pytest.mark.parametrize(
-    "create_test_data",
-    [{"class_type": "binary"}, {"class_type": "multi"}],
-    indirect=True,
+    "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
 )
 @pytest.mark.parametrize("dataset_type", ["memory", "disk"])
 def test_dataset_padding(
