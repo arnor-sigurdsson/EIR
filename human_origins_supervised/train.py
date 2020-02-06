@@ -300,7 +300,11 @@ def main(cl_args: argparse.Namespace) -> None:
         cl_args.embed_columns, train_dataset.labels_dict, run_folder
     )
 
-    model = get_model(cl_args, train_dataset.num_classes, embedding_dict)
+    model = get_model(
+        cl_args=cl_args,
+        num_classes=train_dataset.num_classes,
+        embedding_dict=embedding_dict,
+    )
 
     optimizer = get_optimizer(model, cl_args)
 

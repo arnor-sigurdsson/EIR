@@ -149,7 +149,11 @@ def get_embeddings_from_ids(
     extra_embeddings = []
     for col_key in model.embeddings_dict:
         cur_embedding = lookup_embeddings(
-            model, model.embeddings_dict, col_key, extra_labels, device
+            model=model,
+            embeddings_dict=model.embeddings_dict,
+            embedding_col=col_key,
+            extra_labels=extra_labels,
+            device=device,
         )
         extra_embeddings.append(cur_embedding)
 
@@ -187,16 +191,22 @@ def get_extra_inputs(
     """
     extra_embeddings = None
     if cl_args.embed_columns:
+
         extra_embeddings = get_embeddings_from_ids(
-            labels_dict, ids, cl_args.embed_columns, model, cl_args.device
+            labels_dict=labels_dict,
+            ids=ids,
+            embed_columns=cl_args.embed_columns,
+            model=model,
+            device=cl_args.device,
         ).to(device=cl_args.device)
+
         if not cl_args.contn_columns:
             return extra_embeddings.to(device=cl_args.device)
 
     extra_continuous = None
     if cl_args.contn_columns:
         extra_continuous = get_extra_continuous_inputs_from_ids(
-            labels_dict, ids, cl_args.contn_columns
+            labels_dict=labels_dict, ids=ids, continuous_columns=cl_args.contn_columns
         ).to(device=cl_args.device)
 
         if not cl_args.embed_columns:

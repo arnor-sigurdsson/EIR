@@ -242,10 +242,15 @@ def _process_train_and_label_dfs(
 
     for continuous_column in continuous_columns:
         df_labels_train, scaler_path = scale_non_target_continuous_columns(
-            df_labels_train, continuous_column, run_folder
+            df=df_labels_train,
+            continuous_column=continuous_column,
+            run_folder=run_folder,
         )
         df_labels_valid, _ = scale_non_target_continuous_columns(
-            df_labels_valid, continuous_column, run_folder, scaler_path
+            df=df_labels_valid,
+            continuous_column=continuous_column,
+            run_folder=run_folder,
+            scaler_path=scaler_path,
         )
 
     df_labels_train = handle_missing_label_values(df_labels_train, cl_args, "train df")
@@ -276,7 +281,11 @@ def scale_non_target_continuous_columns(
         return column.values.astype(float).reshape(-1, 1)
 
     if not scaler_path:
-        logger.debug("Fitting standard scaler to training df of shape %s.", df.shape)
+        logger.debug(
+            "Fitting standard scaler column %s in training df of shape %s.",
+            continuous_column,
+            df.shape,
+        )
 
         scaler_outpath = get_transformer_path(
             run_folder, continuous_column, "standard_scaler"
