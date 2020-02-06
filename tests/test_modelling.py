@@ -151,6 +151,16 @@ def _check_test_performance_results(
 @pytest.mark.parametrize(
     "create_test_cl_args",
     [
+        {  # Case 1: Check that we add and use extra inputs.
+            "custom_cl_args": {
+                "model_type": "cnn",
+                "target_cat_columns": ["Origin"],
+                "contn_columns": ["ExtraTarget"],
+                "embed_columns": ["OriginExtraCol"],
+                "target_con_columns": ["Height"],
+                "run_name": "extra_inputs",
+            }
+        },
         {
             "custom_cl_args": {
                 "model_type": "cnn",
@@ -170,15 +180,20 @@ def _check_test_performance_results(
 )
 def test_multi_task(keep_outputs, _prep_modelling_test_configs):
     config, test_config = _prep_modelling_test_configs
+    cl_args = config.cl_args
 
     train.train_ignite(config)
 
     for cat_column in config.cl_args.target_cat_columns:
+        threshold, at_least_n = _get_multi_task_test_args(
+            extra_columns=cl_args.contn_columns, target_copy="OriginExtraColumn"
+        )
+
         _check_test_performance_results(
             run_path=test_config.run_path,
             target_column=cat_column,
             metric="mcc",
-            threshold=0.9,
+            threshold=threshold,
         )
 
         top_row_grads_dict = {"Asia": [0] * 10, "Europe": [1] * 10, "Africa": [2] * 10}
@@ -186,14 +201,19 @@ def test_multi_task(keep_outputs, _prep_modelling_test_configs):
             test_config=test_config,
             target_column=cat_column,
             top_row_grads_dict=top_row_grads_dict,
+            at_least_n=at_least_n,
         )
 
     for con_column in config.cl_args.target_con_columns:
+        threshold, at_least_n = _get_multi_task_test_args(
+            extra_columns=cl_args.contn_columns, target_copy="ExtraTarget"
+        )
+
         _check_test_performance_results(
             run_path=test_config.run_path,
             target_column=con_column,
             metric="r2",
-            threshold=0.8,
+            threshold=threshold,
         )
 
         top_height_snp_index = 2
@@ -202,11 +222,24 @@ def test_multi_task(keep_outputs, _prep_modelling_test_configs):
             test_config=test_config,
             target_column=con_column,
             top_row_grads_dict=top_row_grads_dict,
-            at_least_n=8,
+            at_least_n=at_least_n,
         )
 
     if not keep_outputs:
         cleanup(test_config.run_path)
+
+
+def _get_multi_task_test_args(
+    extra_columns: List[str], target_copy: str
+) -> Tuple[float, int]:
+
+    an_extra_col_is_correlated_with_target = target_copy in extra_columns
+    if an_extra_col_is_correlated_with_target:
+        threshold, at_least_n = 0.95, 0
+    else:
+        threshold, at_least_n = 0.9, 10
+
+    return threshold, at_least_n
 
 
 def _get_test_activation_arrs(
