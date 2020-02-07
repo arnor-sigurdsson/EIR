@@ -1,6 +1,8 @@
 from argparse import Namespace
 from functools import partial
-from typing import List, Tuple, Union, Dict, TYPE_CHECKING
+from typing import List, Tuple, Union, Dict, Callable, TYPE_CHECKING
+from dataclasses import dataclass
+from pathlib import Path
 
 import torch
 from torch import nn
@@ -14,6 +16,10 @@ from human_origins_supervised.data_load.datasets import al_target_columns
 from human_origins_supervised.data_load.data_utils import get_target_columns_generator
 from human_origins_supervised.models.extra_inputs_module import get_extra_inputs
 from human_origins_supervised.train_utils.utils import get_run_folder
+from human_origins_supervised.train_utils.metric_funcs import (
+    calculate_losses,
+    aggregate_losses,
+)
 
 if TYPE_CHECKING:
     from human_origins_supervised.train import Config
@@ -216,25 +222,58 @@ def get_model_params(model: nn.Module, wd: float) -> List[Dict[str, Union[str, i
 
 def test_lr_range(config: "Config") -> None:
 
-    c = config
-
-    extra_inputs_hook = partial(
-        get_extra_inputs, cl_args=c.cl_args, labels_dict=c.labels_dict, model=c.model
-    )
-    plot_path = get_run_folder(c.cl_args.run_name) / "lr_search.png"
+    custom_lr_finder_objects = construct_lr_finder_custom_objects(config)
 
     logger.info(
         "Running learning rate range test and exiting, results will be " "saved to %s.",
-        plot_path,
+        custom_lr_finder_objects.plot_output_path,
     )
 
     lr_finder = LRFinder(
-        model=c.model,
-        optimizer=c.optimizer,
-        criterion=c.criterions,
-        device=c.cl_args.device,
-        extra_inputs_hook=extra_inputs_hook,
+        model=config.model,
+        optimizer=config.optimizer,
+        device=config.cl_args.device,
+        lr_finder_custom_objects=custom_lr_finder_objects,
+    )
+    lr_finder.range_test(config.train_loader, end_lr=10, num_iter=300)
+    lr_finder.plot()
+
+
+@dataclass
+class LRFinderCustomObjects:
+    label_casting_func: Callable
+    loss_func: Callable
+    extra_inputs_hook: Callable
+    plot_output_path: Path
+
+
+def construct_lr_finder_custom_objects(config) -> LRFinderCustomObjects:
+    c = config
+
+    p_label_casting = partial(
+        cast_labels, target_columns=c.target_columns, device=c.cl_args.device
+    )
+
+    p_extra_inputs_hook = partial(
+        get_extra_inputs, cl_args=c.cl_args, labels_dict=c.labels_dict, model=c.model
+    )
+
+    p_calculate_losses = partial(_calculate_losses_and_average, criterions=c.criterions)
+
+    plot_path = get_run_folder(c.cl_args.run_name) / "lr_search.png"
+
+    custom_lr_finder_objects = LRFinderCustomObjects(
+        label_casting_func=p_label_casting,
+        loss_func=p_calculate_losses,
+        extra_inputs_hook=p_extra_inputs_hook,
         plot_output_path=plot_path,
     )
-    lr_finder.range_test(c.train_loader, end_lr=10, num_iter=300)
-    lr_finder.plot()
+
+    return custom_lr_finder_objects
+
+
+def _calculate_losses_and_average(criterions, outputs, labels) -> torch.Tensor:
+    all_losses = calculate_losses(criterions=criterions, labels=labels, outputs=outputs)
+    average_loss = aggregate_losses(all_losses)
+
+    return average_loss
