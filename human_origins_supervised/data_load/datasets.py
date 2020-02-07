@@ -185,7 +185,7 @@ class ArrayDatasetBase(Dataset):
 
         for sample_id in sample_id_iter:
             raw_sample_labels = self.labels_dict.get(sample_id, None)
-            parsed_sample_labels = _transform_all_labels_in_sample(
+            parsed_sample_labels = _transform_target_labels_in_sample(
                 target_transformers=self.target_transformers,
                 sample_label_dict=raw_sample_labels,
             )
@@ -276,16 +276,27 @@ def _streamline_values_for_transformers(
     return values
 
 
-def _transform_all_labels_in_sample(
+def _transform_target_labels_in_sample(
     target_transformers: Dict[str, al_target_transformers],
     sample_label_dict: al_sample_label_dict,
 ):
+    """
+    We transform the target labels only because for:
+
+        - extra embed columns: We use the set up embedding dictionary.
+        - extra contn columns: The scaling and saving is done during label setup.
+    """
 
     transformed_labels = {}
     for label_column, label_value in sample_label_dict.items():
-        transformer = target_transformers[label_column]
-        cur_label_parsed = _transform_single_label_value(transformer, label_value)
-        transformed_labels[label_column] = cur_label_parsed.item()
+
+        if label_column in target_transformers.keys():
+
+            transformer = target_transformers[label_column]
+            cur_label_parsed = _transform_single_label_value(
+                transformer=transformer, label_value=label_value
+            )
+            transformed_labels[label_column] = cur_label_parsed.item()
 
     return transformed_labels
 

@@ -20,7 +20,7 @@ from human_origins_supervised import train
     ],
     indirect=True,
 )
-def test_classification(keep_outputs, _prep_modelling_test_configs):
+def test_classification(keep_outputs, prep_modelling_test_configs):
     """
     NOTE:
         We probably cannot check directly if the gradients for a given SNP
@@ -37,7 +37,7 @@ def test_classification(keep_outputs, _prep_modelling_test_configs):
         The indirect parametrization passes the arguments over to the fixtures used
         in _prep_modelling_test_config.
     """
-    config, test_config = _prep_modelling_test_configs
+    config, test_config = prep_modelling_test_configs
 
     train.train_ignite(config)
 
@@ -47,7 +47,7 @@ def test_classification(keep_outputs, _prep_modelling_test_configs):
         run_path=test_config.run_path,
         target_column=target_column,
         metric="mcc",
-        threshold=0.9,
+        threshold=0.8,
     )
 
     top_row_grads_dict = {"Asia": [0] * 10, "Europe": [1] * 10, "Africa": [2] * 10}
@@ -104,8 +104,8 @@ def _check_snps_wrapper(
     ],
     indirect=True,
 )
-def test_regression(keep_outputs, _prep_modelling_test_configs):
-    config, test_config = _prep_modelling_test_configs
+def test_regression(keep_outputs, prep_modelling_test_configs):
+    config, test_config = prep_modelling_test_configs
 
     train.train_ignite(config)
 
@@ -151,6 +151,16 @@ def _check_test_performance_results(
 @pytest.mark.parametrize(
     "create_test_cl_args",
     [
+        {  # Case 1: Check that we add and use extra inputs.
+            "custom_cl_args": {
+                "model_type": "cnn",
+                "target_cat_columns": ["Origin"],
+                "contn_columns": ["ExtraTarget"],
+                "embed_columns": ["OriginExtraCol"],
+                "target_con_columns": ["Height"],
+                "run_name": "extra_inputs",
+            }
+        },
         {
             "custom_cl_args": {
                 "model_type": "cnn",
@@ -168,17 +178,22 @@ def _check_test_performance_results(
     ],
     indirect=True,
 )
-def test_multi_task(keep_outputs, _prep_modelling_test_configs):
-    config, test_config = _prep_modelling_test_configs
+def test_multi_task(keep_outputs, prep_modelling_test_configs):
+    config, test_config = prep_modelling_test_configs
+    cl_args = config.cl_args
 
     train.train_ignite(config)
 
     for cat_column in config.cl_args.target_cat_columns:
+        threshold, at_least_n = _get_multi_task_test_args(
+            extra_columns=cl_args.contn_columns, target_copy="OriginExtraColumn"
+        )
+
         _check_test_performance_results(
             run_path=test_config.run_path,
             target_column=cat_column,
             metric="mcc",
-            threshold=0.9,
+            threshold=threshold,
         )
 
         top_row_grads_dict = {"Asia": [0] * 10, "Europe": [1] * 10, "Africa": [2] * 10}
@@ -186,14 +201,19 @@ def test_multi_task(keep_outputs, _prep_modelling_test_configs):
             test_config=test_config,
             target_column=cat_column,
             top_row_grads_dict=top_row_grads_dict,
+            at_least_n=at_least_n,
         )
 
     for con_column in config.cl_args.target_con_columns:
+        threshold, at_least_n = _get_multi_task_test_args(
+            extra_columns=cl_args.contn_columns, target_copy="ExtraTarget"
+        )
+
         _check_test_performance_results(
             run_path=test_config.run_path,
             target_column=con_column,
             metric="r2",
-            threshold=0.8,
+            threshold=threshold,
         )
 
         top_height_snp_index = 2
@@ -202,11 +222,29 @@ def test_multi_task(keep_outputs, _prep_modelling_test_configs):
             test_config=test_config,
             target_column=con_column,
             top_row_grads_dict=top_row_grads_dict,
-            at_least_n=8,
+            at_least_n=at_least_n,
         )
 
     if not keep_outputs:
         cleanup(test_config.run_path)
+
+
+def _get_multi_task_test_args(
+    extra_columns: List[str], target_copy: str
+) -> Tuple[float, int]:
+    """
+    We use 0 for at_least_n in the case we have correlated input columns because
+    in that case the model is not actually using any of the SNPs (better to use
+    the correlated column), hence we do not expect SNPs to be highly activated.
+    """
+
+    an_extra_col_is_correlated_with_target = target_copy in extra_columns
+    if an_extra_col_is_correlated_with_target:
+        threshold, at_least_n = 0.95, 0
+    else:
+        threshold, at_least_n = 0.8, 8
+
+    return threshold, at_least_n
 
 
 def _get_test_activation_arrs(

@@ -190,7 +190,7 @@ def test_transform_all_labels_in_sample(
     )
 
     test_input_dict = test_labels_dict[test_input_key]
-    transformed_sample_labels = datasets._transform_all_labels_in_sample(
+    transformed_sample_labels = datasets._transform_target_labels_in_sample(
         target_transformers=target_transformers, sample_label_dict=test_input_dict
     )
 

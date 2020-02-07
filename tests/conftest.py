@@ -14,10 +14,13 @@ from aislib.misc_utils import ensure_path_exists
 from torch import cuda
 from torch.utils.data import DataLoader
 
-from human_origins_supervised.data_load import datasets
-from human_origins_supervised.models.models import CNNModel
 from human_origins_supervised import train
-from human_origins_supervised.train import Config
+from human_origins_supervised.data_load import datasets
+from human_origins_supervised.models.extra_inputs_module import (
+    set_up_and_save_embeddings_dict,
+)
+from human_origins_supervised.train import Config, get_model
+from human_origins_supervised.train_utils.utils import get_run_folder
 
 np.random.seed(0)
 
@@ -328,7 +331,6 @@ def create_test_cl_args(request, args_config, create_test_data):
     args_config.sample_interval = 100
     args_config.target_width = n_snps
     args_config.data_width = n_snps
-    args_config.run_name = args_config.run_name + "_" + c.request_params["task_type"]
 
     # If tests need to have their own config different from the base defined above,
     # only supporting custom_cl_args hardcoded for now
@@ -339,7 +341,9 @@ def create_test_cl_args(request, args_config, create_test_data):
             setattr(args_config, k, v)
 
     # This is done after in case tests modify run_name
-    args_config.run_name += "_" + args_config.model_type
+    args_config.run_name += (
+        "_" + args_config.model_type + "_" + c.request_params["task_type"]
+    )
 
     return args_config
 
@@ -349,11 +353,19 @@ def create_test_model(create_test_cl_args, create_test_datasets):
     cl_args = create_test_cl_args
     train_dataset, _ = create_test_datasets
 
-    model = CNNModel(
-        cl_args,
-        train_dataset.num_classes,
-        extra_continuous_inputs_columns=cl_args.contn_columns,
-    ).to(device=cl_args.device)
+    run_folder = get_run_folder(cl_args.run_name)
+
+    embedding_dict = set_up_and_save_embeddings_dict(
+        embedding_columns=cl_args.embed_columns,
+        labels_dict=train_dataset.labels_dict,
+        run_folder=run_folder,
+    )
+
+    model = get_model(
+        cl_args=cl_args,
+        num_classes=train_dataset.num_classes,
+        embedding_dict=embedding_dict,
+    )
 
     return model
 
@@ -418,7 +430,7 @@ class ModelTestConfig:
 
 
 @pytest.fixture()
-def _prep_modelling_test_configs(
+def prep_modelling_test_configs(
     create_test_data,
     create_test_cl_args,
     create_test_dloaders,
