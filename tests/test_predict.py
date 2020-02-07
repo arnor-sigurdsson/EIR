@@ -1,10 +1,11 @@
 from argparse import Namespace
 from pathlib import Path
+from unittest.mock import patch
 
 import pandas as pd
 import pytest
 import torch
-from torch.nn import CrossEntropyLoss
+from sklearn.preprocessing import LabelEncoder
 
 from conftest import cleanup
 from human_origins_supervised import predict
@@ -21,15 +22,22 @@ def test_load_model(args_config, tmp_path):
     """
 
     cl_args = args_config
-    model: torch.nn.Module = CNNModel(cl_args, 1, None, cl_args.contn_columns).to(
-        device=cl_args.device
-    )
+    num_classes = {"Origin": 3}
+    model: torch.nn.Module = CNNModel(
+        cl_args=cl_args,
+        num_classes=num_classes,
+        embeddings_dict=None,
+        extra_continuous_inputs_columns=cl_args.contn_columns,
+    ).to(device=cl_args.device)
 
     model_path = tmp_path / "model.pt"
-    torch.save(model.state_dict(), model_path)
+    torch.save(obj=model.state_dict(), f=model_path)
 
     loaded_model = predict._load_model(
-        model_path, model.num_classes, cl_args, cl_args.device
+        model_path=model_path,
+        num_classes=model.num_classes,
+        train_cl_args=cl_args,
+        device=cl_args.device,
     )
     # make sure we're in eval model
     assert not loaded_model.training
@@ -56,12 +64,18 @@ def test_modify_train_cl_args_for_testing():
     assert mixed_args.lr == 1e-3
 
 
-@pytest.mark.parametrize(
-    "create_test_data", [{"task_type": "regression"}], indirect=True
-)
+@pytest.mark.parametrize("create_test_data", [{"task_type": "multi"}], indirect=True)
 @pytest.mark.parametrize(
     "create_test_cl_args",
-    [{"custom_cl_args": {"contn_columns": ["OriginExtraCol"]}}],
+    [
+        {
+            "custom_cl_args": {
+                "contn_columns": ["ExtraTarget"],
+                "target_con_columns": ["Height"],
+                "target_cat_columns": ["Origin"],
+            }
+        }
+    ],
     indirect=True,
 )
 def test_load_labels_for_testing(
@@ -76,20 +90,27 @@ def test_load_labels_for_testing(
 
     run_path = Path(f"runs/{cl_args.run_name}/")
 
-    test_labels_dict = predict._load_labels_for_testing(cl_args, run_path)
+    test_labels_dict = predict._load_labels_for_testing(
+        test_train_cl_args_mix=cl_args, run_folder=run_path
+    )
     df_test = pd.DataFrame.from_dict(test_labels_dict, orient="index")
 
     # make sure test data extra column was scaled correctly
-    assert df_test["OriginExtraCol"].between(-2, 2).all()
+    assert df_test["ExtraTarget"].between(-2, 2).all()
 
     # make sure that target column is unchanged (within expected bounds)
-    assert df_test[cl_args.target_column].max() < 160
-    assert df_test[cl_args.target_column].min() > 90
+    con_target_column = cl_args.target_con_columns[0]
+    assert df_test[con_target_column].max() < 220
+    assert df_test[con_target_column].min() > 130
+
+    cat_target_column = cl_args.target_cat_columns[0]
+    assert set(df_test[cat_target_column]) == {"Asia", "Africa", "Europe"}
 
     if not keep_outputs:
         cleanup(run_path)
 
 
+@patch("human_origins_supervised.predict._load_transformers", autospec=True)
 @pytest.mark.parametrize("create_test_data", [{"task_type": "multi"}], indirect=True)
 @pytest.mark.parametrize(
     "create_test_cl_args",
@@ -100,32 +121,35 @@ def test_load_labels_for_testing(
     indirect=True,
 )
 def test_set_up_test_dataset(
-    request,
-    create_test_data: pytest.fixture,
-    create_test_datasets,
-    create_test_cl_args: pytest.fixture,
-    keep_outputs,
+    mocked_load_transformers, create_test_data, create_test_cl_args
 ):
-    test_path, test_data_params = create_test_data
+    test_data_config = create_test_data
+    c = test_data_config
     cl_args = create_test_cl_args
-
-    n_per_class = request.config.getoption("--num_samples_per_class")
+    classes_tested = sorted(list(c.target_classes.keys()))
 
     run_path = Path(f"runs/{cl_args.run_name}/")
 
-    classes_tested = ["Asia", "Europe"]
-    if test_data_params["task_type"] == "multi":
-        classes_tested += ["Africa"]
-    classes_tested.sort()
+    test_labels_dict = predict._load_labels_for_testing(
+        test_train_cl_args_mix=cl_args, run_folder=run_path
+    )
 
-    test_labels_dict = predict._load_labels_for_testing(cl_args, run_path)
-    test_dataset = predict._set_up_test_dataset(cl_args, test_labels_dict, run_path)
+    target_column = create_test_cl_args.target_cat_columns[0]
+    mock_encoder = LabelEncoder().fit(["Asia", "Europe", "Africa"])
+    mocked_load_transformers.return_value = {target_column: mock_encoder}
 
-    exp_no_samples = n_per_class * len(classes_tested)
-    check_dataset(test_dataset, exp_no_samples, classes_tested, cl_args)
+    test_dataset = predict._set_up_test_dataset(
+        test_train_cl_args_mix=cl_args, test_labels_dict=test_labels_dict
+    )
 
-    if not keep_outputs:
-        cleanup(run_path)
+    exp_no_samples = c.n_per_class * len(classes_tested)
+
+    check_dataset(
+        dataset=test_dataset,
+        exp_no_sample=exp_no_samples,
+        classes_tested=classes_tested,
+        target_column=target_column,
+    )
 
 
 def grab_latest_model_path(saved_models_folder: Path):
@@ -154,9 +178,9 @@ def grab_latest_model_path(saved_models_folder: Path):
     ],
     indirect=True,
 )
-def test_predict_new(keep_outputs, _prep_modelling_test_configs):
-    config, test_config = _prep_modelling_test_configs
-    test_path = config.cl_args.data_folder
+def test_predict_new(keep_outputs, prep_modelling_test_configs):
+    config, test_config = prep_modelling_test_configs
+    test_path = Path(config.cl_args.data_folder).parent
 
     train.train_ignite(config)
 
@@ -170,15 +194,17 @@ def test_predict_new(keep_outputs, _prep_modelling_test_configs):
         device="cpu",
     )
 
-    predict.predict(predict_cl_args)
+    predict.predict(predict_cl_args=predict_cl_args)
 
     df_test = pd.read_csv(test_path / "predictions.csv", index_col="ID")
-    classes_sorted = sorted(config.train_dataset.target_transformer.classes_)
+
+    target_column = config.cl_args.target_cat_columns[0]
+    target_classes = sorted(config.target_transformers[target_column].classes_)
 
     # check that columns in predictions.csv are in correct sorted order
-    assert (classes_sorted == df_test.columns).all()
+    assert (target_classes == df_test.columns).all()
 
-    for cls in classes_sorted:
+    for cls in target_classes:
         class_indices = [i for i in df_test.index if i.endswith(cls)]
         df_cur_class = df_test.loc[class_indices]
         num_correct = (df_cur_class.idxmax(axis=1) == cls).sum()
@@ -188,89 +214,3 @@ def test_predict_new(keep_outputs, _prep_modelling_test_configs):
 
     if not keep_outputs:
         cleanup(test_config.run_path)
-
-
-@pytest.mark.parametrize(
-    "create_test_data", [{"task_type": "multi", "split_to_test": True}], indirect=True
-)
-@pytest.mark.parametrize(
-    "create_test_cl_args",
-    [
-        {
-            "custom_cl_args": {
-                "run_name": "test_run_predict",
-                "n_epochs": 2,
-                "checkpoint_interval": 50,
-                # to save time since we're not testing the modelling
-                "benchmark": False,
-                "get_acts": False,
-            }
-        }
-    ],
-    indirect=True,
-)
-def test_predict(
-    create_test_data,
-    create_test_cl_args,
-    create_test_dloaders,
-    create_test_model,
-    create_test_optimizer,
-    create_test_datasets,
-    keep_outputs,
-):
-    test_path, test_data_params = create_test_data
-
-    cl_args = create_test_cl_args
-    train_dloader, valid_dloader, train_dataset, valid_dataset = create_test_dloaders
-    model = create_test_model
-    optimizer = create_test_optimizer
-    criterion = CrossEntropyLoss()
-
-    train_dataset, valid_dataset = create_test_datasets
-    target_transformer = train_dataset.target_transformer
-
-    run_path = Path(f"runs/{cl_args.run_name}/")
-
-    config = train.Config(
-        cl_args,
-        train_dloader,
-        valid_dloader,
-        valid_dataset,
-        model,
-        optimizer,
-        criterion,
-        train_dataset.labels_dict,
-        target_transformer,
-        cl_args.data_width,
-    )
-
-    train.train_ignite(config)
-
-    model_path = grab_latest_model_path(run_path / "saved_models")
-    predict_cl_args = Namespace(
-        model_path=model_path,
-        batch_size=64,
-        evaluate=True,
-        data_folder=test_path / "test_arrays_test_set",
-        output_folder=test_path,
-        device="cpu",
-    )
-
-    predict.predict(predict_cl_args)
-
-    df_test = pd.read_csv(test_path / "predictions.csv", index_col="ID")
-    classes_sorted = sorted(train_dataset.target_transformer.classes_)
-
-    # check that columns in predictions.csv are in correct sorted order
-    assert (classes_sorted == df_test.columns).all()
-
-    for cls in classes_sorted:
-        class_indices = [i for i in df_test.index if i.endswith(cls)]
-        df_cur_class = df_test.loc[class_indices]
-        num_correct = (df_cur_class.idxmax(axis=1) == cls).sum()
-
-        # check that most were correct
-        assert num_correct / df_cur_class.shape[0] > 0.9
-
-    if not keep_outputs:
-        cleanup(run_path)

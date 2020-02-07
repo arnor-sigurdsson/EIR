@@ -67,8 +67,9 @@ def predict(predict_cl_args: Namespace) -> None:
         )
 
         if predict_cl_args.evaluate:
+            cur_labels = all_labels[target_column].cpu().numpy()
             vf.gen_eval_graphs(
-                val_labels=all_labels.cpu().numpy(),
+                val_labels=cur_labels,
                 val_outputs=preds_sm,
                 val_ids=all_ids,
                 outfolder=outfolder,
@@ -291,7 +292,7 @@ def _load_transformers(cl_args: Namespace) -> Dict[str, al_target_transformers]:
         target_transformer_path = label_setup.get_transformer_path(
             run_path=run_folder,
             transformer_name=transformer_name,
-            suffix="target_transformers",
+            suffix="target_transformer",
         )
         target_transformer_object = joblib.load(filename=target_transformer_path)
         target_transformers[transformer_name] = target_transformer_object

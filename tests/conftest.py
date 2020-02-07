@@ -430,7 +430,7 @@ class ModelTestConfig:
 
 
 @pytest.fixture()
-def _prep_modelling_test_configs(
+def prep_modelling_test_configs(
     create_test_data,
     create_test_cl_args,
     create_test_dloaders,
