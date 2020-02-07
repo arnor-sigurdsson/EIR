@@ -179,9 +179,10 @@ def _parse_label_df(
                 if not do_skip:
                     func, args_dict = column_op.function, column_op.function_args
                     logger.debug(
-                        "Applying func %s with args %s to column in pre-processing.",
+                        "Applying func %s with args %s to column %s in pre-processing.",
                         func,
                         args_dict,
+                        column_name,
                     )
                     logger.debug("Shape before: %s", df.shape)
                     df = func(df=df, column_name=column_name, **args_dict)
