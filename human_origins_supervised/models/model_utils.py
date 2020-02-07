@@ -87,7 +87,7 @@ def cast_labels(
     labels_casted = {}
     for column_type, column_name in target_columns_gen:
         cur_labels = labels[column_name]
-        cur_labels.to(device=device)
+        cur_labels = cur_labels.to(device=device)
         if column_type == "con":
             labels_casted[column_name] = cur_labels.to(dtype=torch.float).unsqueeze(1)
         elif column_type == "cat":
