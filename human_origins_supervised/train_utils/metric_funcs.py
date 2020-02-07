@@ -10,7 +10,7 @@ from sklearn.preprocessing import StandardScaler, LabelEncoder
 from human_origins_supervised.data_load.data_utils import get_target_columns_generator
 
 if TYPE_CHECKING:
-    from human_origins_supervised.train import (
+    from human_origins_supervised.train import (  # noqa: F401
         al_criterions,
         al_target_transformers,
         al_target_columns,

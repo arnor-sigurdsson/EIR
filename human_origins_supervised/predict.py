@@ -265,7 +265,6 @@ def _set_up_test_dataset(
     replaced with testing one.
     :param test_labels_dict: None if we are predicting on unknown data,
     otherwise a dictionary of labels (if evaluating on test set).
-    :param run_folder: The run folder we are loading the model from.
     :return: Dataset instance to be used for loading test samples.
     """
     dataset_class_common_args = datasets.construct_dataset_init_params_from_cl_args(
