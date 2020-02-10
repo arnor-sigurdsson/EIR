@@ -18,13 +18,18 @@ from aislib.misc_utils import get_logger
 
 import human_origins_supervised.visualization.visualization_funcs as vf
 from human_origins_supervised.data_load import datasets, label_setup
-from human_origins_supervised.data_load.datasets import al_datasets
-from human_origins_supervised.data_load.label_setup import al_label_dict
+from human_origins_supervised.data_load.datasets import (
+    al_datasets,
+    merge_target_columns,
+)
+from human_origins_supervised.data_load.label_setup import (
+    al_label_dict,
+    al_label_transformers,
+)
 from human_origins_supervised.models.model_utils import gather_pred_outputs_from_dloader
 from human_origins_supervised.models.extra_inputs_module import al_emb_lookup_dict
 from human_origins_supervised.models.models import get_model_class, CNNModel, MLPModel
 from human_origins_supervised.train_utils.utils import get_run_folder
-from human_origins_supervised.train import al_target_transformers
 from human_origins_supervised.data_load.data_utils import get_target_columns_generator
 
 torch.manual_seed(0)
@@ -99,7 +104,7 @@ def get_test_config(run_folder: Path, predict_cl_args: Namespace):
     test_labels_dict = None
     if predict_cl_args.evaluate:
         test_labels_dict = _load_labels_for_testing(
-            test_train_cl_args_mix=test_train_mixed_cl_args, run_folder=run_folder
+            test_train_cl_args_mix=test_train_mixed_cl_args
         )
 
     test_dataset = _set_up_test_dataset(
@@ -129,7 +134,7 @@ def get_test_config(run_folder: Path, predict_cl_args: Namespace):
     return test_config
 
 
-def _get_target_classnames(transformer: al_target_transformers, target_column: str):
+def _get_target_classnames(transformer: al_label_transformers, target_column: str):
     if isinstance(transformer, LabelEncoder):
         return transformer.classes_
     return target_column
@@ -219,34 +224,16 @@ def _modify_train_cl_args_for_testing(
     return train_cl_args_mod
 
 
-def _load_labels_for_testing(
-    test_train_cl_args_mix: Namespace, run_folder: Path
-) -> al_label_dict:
+def _load_labels_for_testing(test_train_cl_args_mix: Namespace) -> al_label_dict:
     """
     Used when doing an evaluation on test set.
 
     :param test_train_cl_args_mix: Training CL arguments with the data_folder
     replaced with testing one.
-    :param run_folder: The run folder we are loading the model from.
     :return: Testing labels for performance measurement.
     """
 
     df_labels_test = label_setup.label_df_parse_wrapper(test_train_cl_args_mix)
-
-    continuous_columns = test_train_cl_args_mix.contn_columns[:]
-    for continuous_column in continuous_columns:
-        scaler_path = label_setup.get_transformer_path(
-            run_path=run_folder,
-            transformer_name=continuous_column,
-            suffix="standard_scaler",
-        )
-
-        df_labels_test, _ = label_setup.scale_non_target_continuous_columns(
-            df=df_labels_test,
-            continuous_column=continuous_column,
-            run_folder=run_folder,
-            scaler_path=scaler_path,
-        )
 
     df_labels_test = label_setup.handle_missing_label_values(
         df=df_labels_test, cl_args=test_train_cl_args_mix, name="test_df"
@@ -260,43 +247,53 @@ def _set_up_test_dataset(
     test_train_cl_args_mix: Namespace, test_labels_dict: Union[None, al_label_dict]
 ) -> al_datasets:
     """
-
     :param test_train_cl_args_mix: Training CL arguments with the data_folder
     replaced with testing one.
     :param test_labels_dict: None if we are predicting on unknown data,
     otherwise a dictionary of labels (if evaluating on test set).
     :return: Dataset instance to be used for loading test samples.
     """
-    dataset_class_common_args = datasets.construct_dataset_init_params_from_cl_args(
-        cl_args=test_train_cl_args_mix
+    a = test_train_cl_args_mix
+
+    target_columns = merge_target_columns(
+        target_con_columns=a.target_con_columns, target_cat_columns=a.target_cat_columns
     )
 
-    target_transformers = _load_transformers(cl_args=test_train_cl_args_mix)
+    target_columns_flat = target_columns["con"] + target_columns["cat"]
+    target_transformers = _load_transformers(
+        cl_args=test_train_cl_args_mix, transformers_to_load=target_columns_flat
+    )
+
+    extra_con_transformers = _load_transformers(
+        cl_args=test_train_cl_args_mix, transformers_to_load=a.contn_columns
+    )
 
     test_dataset = datasets.DiskArrayDataset(
-        **dataset_class_common_args,
+        data_folder=test_train_cl_args_mix.data_folder,
+        target_columns=target_columns,
         labels_dict=test_labels_dict,
         target_transformers=target_transformers,
+        extra_con_transformers=extra_con_transformers,
+        target_width=test_train_cl_args_mix.target_width,
     )
 
     return test_dataset
 
 
-def _load_transformers(cl_args: Namespace) -> Dict[str, al_target_transformers]:
-    target_transformers_names = cl_args.target_con_columns + cl_args.target_cat_columns
+def _load_transformers(
+    cl_args: Namespace, transformers_to_load: List[str]
+) -> Dict[str, al_label_transformers]:
     run_folder = get_run_folder(cl_args.run_name)
 
-    target_transformers = {}
-    for transformer_name in target_transformers_names:
+    label_transformers = {}
+    for transformer_name in transformers_to_load:
         target_transformer_path = label_setup.get_transformer_path(
-            run_path=run_folder,
-            transformer_name=transformer_name,
-            suffix="target_transformer",
+            run_path=run_folder, transformer_name=transformer_name
         )
         target_transformer_object = joblib.load(filename=target_transformer_path)
-        target_transformers[transformer_name] = target_transformer_object
+        label_transformers[transformer_name] = target_transformer_object
 
-    return target_transformers
+    return label_transformers
 
 
 def _save_predictions(

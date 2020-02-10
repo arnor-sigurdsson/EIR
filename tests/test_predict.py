@@ -90,13 +90,8 @@ def test_load_labels_for_testing(
 
     run_path = Path(f"runs/{cl_args.run_name}/")
 
-    test_labels_dict = predict._load_labels_for_testing(
-        test_train_cl_args_mix=cl_args, run_folder=run_path
-    )
+    test_labels_dict = predict._load_labels_for_testing(test_train_cl_args_mix=cl_args)
     df_test = pd.DataFrame.from_dict(test_labels_dict, orient="index")
-
-    # make sure test data extra column was scaled correctly
-    assert df_test["ExtraTarget"].between(-2, 2).all()
 
     # make sure that target column is unchanged (within expected bounds)
     con_target_column = cl_args.target_con_columns[0]
@@ -105,6 +100,11 @@ def test_load_labels_for_testing(
 
     cat_target_column = cl_args.target_cat_columns[0]
     assert set(df_test[cat_target_column]) == {"Asia", "Africa", "Europe"}
+
+    # make sure that ExtraTarget column is as expected
+    extra_as_int = df_test["ExtraTarget"].astype(int)
+    height_as_int = df_test["Height"].astype(int)
+    assert (extra_as_int == (height_as_int - 50)).all()
 
     if not keep_outputs:
         cleanup(run_path)
@@ -128,11 +128,7 @@ def test_set_up_test_dataset(
     cl_args = create_test_cl_args
     classes_tested = sorted(list(c.target_classes.keys()))
 
-    run_path = Path(f"runs/{cl_args.run_name}/")
-
-    test_labels_dict = predict._load_labels_for_testing(
-        test_train_cl_args_mix=cl_args, run_folder=run_path
-    )
+    test_labels_dict = predict._load_labels_for_testing(test_train_cl_args_mix=cl_args)
 
     target_column = create_test_cl_args.target_cat_columns[0]
     mock_encoder = LabelEncoder().fit(["Asia", "Europe", "Africa"])
