@@ -12,7 +12,7 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 
 if TYPE_CHECKING:
     from human_origins_supervised.data_load.label_setup import al_label_dict
-    from human_origins_supervised.train import al_target_columns
+    from human_origins_supervised.data_load.label_setup import al_target_columns
 
 
 def import_custom_module_as_package(module_path, module_name):

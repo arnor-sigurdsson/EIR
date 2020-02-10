@@ -7,23 +7,30 @@ import joblib
 import numpy as np
 import torch
 from aislib.misc_utils import get_logger, ensure_path_exists
-from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.preprocessing import StandardScaler
 from torch.nn.functional import pad
 from torch.utils.data import Dataset
 
 from human_origins_supervised.data_load.label_setup import (
     set_up_train_and_valid_labels,
     al_label_dict,
+    al_target_columns,
+    al_label_transformers,
     get_transformer_path,
 )
-from .data_loading_funcs import make_random_snps_missing
+from human_origins_supervised.data_load.data_loading_funcs import (
+    make_random_snps_missing,
+)
+from human_origins_supervised.train_utils.utils import get_run_folder
+from human_origins_supervised.data_load.label_setup import (
+    set_up_label_transformers,
+    _streamline_values_for_transformers,
+)
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 # Type Aliases
 al_datasets = Union["MemoryArrayDataset", "DiskArrayDataset"]
-al_target_columns = Dict[str, List[str]]
-al_target_transformers = Union[StandardScaler, LabelEncoder]
 al_sample_label_dict = Dict[str, Union[str, float]]
 al_label_value = Union[str, float, int]
 al_num_classes = Dict[str, int]
@@ -34,7 +41,10 @@ def set_up_datasets(cl_args: Namespace) -> Tuple[al_datasets, al_datasets]:
     This function is only ever called if we have labels.
     """
     train_labels, valid_labels = set_up_train_and_valid_labels(cl_args)
-    dataset_class_common_args = construct_dataset_init_params_from_cl_args(cl_args)
+
+    dataset_class_common_args = _construct_common_dataset_init_params(
+        cl_args=cl_args, train_labels=train_labels
+    )
 
     dataset_class = MemoryArrayDataset if cl_args.memory_dataset else DiskArrayDataset
     train_dataset = dataset_class(
@@ -42,41 +52,49 @@ def set_up_datasets(cl_args: Namespace) -> Tuple[al_datasets, al_datasets]:
         labels_dict=train_labels,
         na_augment=cl_args.na_augment,
     )
-    valid_dataset = dataset_class(
-        **dataset_class_common_args,
-        labels_dict=valid_labels,
-        target_transformers=train_dataset.target_transformers,
-    )
 
-    run_folder = Path("./runs", cl_args.run_name)
-    target_transformers = train_dataset.target_transformers
-    for (transformer_name, target_transformer) in target_transformers.items():
-        save_target_transformer(
-            run_folder=run_folder,
-            transformer_name=transformer_name,
-            target_transformer_object=target_transformer,
-        )
+    valid_dataset = dataset_class(**dataset_class_common_args, labels_dict=valid_labels)
 
-    assert len(train_dataset) > len(valid_dataset)
-    assert set(valid_dataset.labels_dict.keys()).isdisjoint(
-        train_dataset.labels_dict.keys()
+    all_transformers = {
+        **train_dataset.target_transformers,
+        **train_dataset.extra_con_transformers,
+    }
+    _save_transformer_set(transformers=all_transformers, run_name=cl_args.run_name)
+
+    _check_valid_and_train_datasets(
+        train_dataset=train_dataset, valid_dataset=valid_dataset
     )
 
     return train_dataset, valid_dataset
 
 
-def construct_dataset_init_params_from_cl_args(cl_args):
+def _construct_common_dataset_init_params(
+    cl_args: Namespace, train_labels: al_label_dict
+) -> Dict:
     """
-    Shared between here and predict.py.
+    We do not use extra embed columns here because they do not have a transformer
+    associated with them.
     """
     target_columns = merge_target_columns(
         target_con_columns=cl_args.target_con_columns,
         target_cat_columns=cl_args.target_cat_columns,
     )
+
+    target_transformers_fit_on_train = set_up_label_transformers(
+        labels_dict=train_labels, label_columns=target_columns
+    )
+
+    contn_columns_dict = {"extra_con": cl_args.contn_columns}
+    extra_con_transformers_fit_on_train = set_up_label_transformers(
+        labels_dict=train_labels, label_columns=contn_columns_dict
+    )
+
     dataset_class_common_args = {
         "data_folder": cl_args.data_folder,
         "target_width": cl_args.target_width,
         "target_columns": target_columns,
+        "target_transformers": target_transformers_fit_on_train,
+        "extra_con_transformers": extra_con_transformers_fit_on_train,
     }
 
     return dataset_class_common_args
@@ -87,9 +105,10 @@ def merge_target_columns(
 ) -> al_target_columns:
 
     if len(target_con_columns + target_cat_columns) == 0:
-        raise ValueError("Expected at least 1 target column")
+        raise ValueError("Expected at least 1 label column")
 
     all_target_columns = {"con": [], "cat": []}
+
     [all_target_columns["con"].append(i) for i in target_con_columns]
     [all_target_columns["cat"].append(i) for i in target_cat_columns]
 
@@ -98,26 +117,40 @@ def merge_target_columns(
     return all_target_columns
 
 
-def save_target_transformer(
+def _save_transformer_set(
+    transformers: Dict[str, al_label_transformers], run_name: str
+) -> None:
+    run_folder = get_run_folder(run_name)
+
+    for (transformer_name, transformer_object) in transformers.items():
+        save_label_transformer(
+            run_folder=run_folder,
+            transformer_name=transformer_name,
+            target_transformer_object=transformer_object,
+        )
+
+
+def save_label_transformer(
     run_folder: Path,
     transformer_name: str,
-    target_transformer_object: al_target_transformers,
+    target_transformer_object: al_label_transformers,
 ) -> Path:
-    """
-    :param run_folder: Current run folder, used to anchor saving of transformer.
-    :param transformer_name: The target column passed in for the current run.
-    :param target_transformer_object: The transformer object to save.
-    :return: Output path of where the target transformer was saved.
-    """
     target_transformer_outpath = get_transformer_path(
-        run_path=run_folder,
-        transformer_name=transformer_name,
-        suffix="target_transformer",
+        run_path=run_folder, transformer_name=transformer_name
     )
     ensure_path_exists(target_transformer_outpath)
     joblib.dump(value=target_transformer_object, filename=target_transformer_outpath)
 
     return target_transformer_outpath
+
+
+def _check_valid_and_train_datasets(
+    train_dataset: al_datasets, valid_dataset: al_datasets
+) -> None:
+    assert len(train_dataset) > len(valid_dataset)
+    assert set(valid_dataset.labels_dict.keys()).isdisjoint(
+        train_dataset.labels_dict.keys()
+    )
 
 
 @dataclass
@@ -133,7 +166,8 @@ class ArrayDatasetBase(Dataset):
         data_folder: Path,
         target_columns: al_target_columns,
         labels_dict: al_label_dict = None,
-        target_transformers: Dict[str, al_target_transformers] = None,
+        target_transformers: Dict[str, al_label_transformers] = None,
+        extra_con_transformers: Dict[str, StandardScaler] = None,
         target_height: int = 4,
         target_width: int = None,
         na_augment: float = 0.0,
@@ -149,6 +183,7 @@ class ArrayDatasetBase(Dataset):
         self.target_columns = target_columns
         self.labels_dict = labels_dict if labels_dict else {}
         self.target_transformers = target_transformers
+        self.extra_con_transformers = extra_con_transformers
         self.num_classes = None
 
         self.na_augment = na_augment
@@ -156,11 +191,6 @@ class ArrayDatasetBase(Dataset):
     def init_label_attributes(self):
         if not self.target_columns:
             raise ValueError("Please specify label column name.")
-
-        if not self.target_transformers:
-            self.target_transformers = set_up_all_target_transformers(
-                self.labels_dict, self.target_columns
-            )
 
         # TODO: Rename to be more descriptive, dict now instead of int.
         self.num_classes = _set_up_num_classes(self.target_transformers)
@@ -185,8 +215,9 @@ class ArrayDatasetBase(Dataset):
 
         for sample_id in sample_id_iter:
             raw_sample_labels = self.labels_dict.get(sample_id, None)
-            parsed_sample_labels = _transform_target_labels_in_sample(
+            parsed_sample_labels = _transform_labels_in_sample(
                 target_transformers=self.target_transformers,
+                extra_con_transformers=self.extra_con_transformers,
                 sample_label_dict=raw_sample_labels,
             )
 
@@ -212,87 +243,29 @@ class ArrayDatasetBase(Dataset):
             )
 
 
-def set_up_all_target_transformers(
-    labels_dict: al_label_dict, target_columns: al_target_columns
-) -> Dict[str, al_target_transformers]:
-
-    target_transformers = {}
-    for column_type in target_columns:
-        logger.debug(
-            "Fitting transformers on %s target columns %s", column_type, target_columns
-        )
-
-        target_columns_of_cur_type = target_columns[column_type]
-
-        for cur_target_column in target_columns_of_cur_type:
-            cur_target_transformer = _fit_transformer_on_target_column(
-                labels_dict=labels_dict,
-                target_column=cur_target_column,
-                column_type=column_type,
-            )
-            target_transformers[cur_target_column] = cur_target_transformer
-
-    return target_transformers
-
-
-def _fit_transformer_on_target_column(
-    labels_dict: al_label_dict, target_column: str, column_type: str
-) -> al_target_transformers:
-    """
-    TODO: Maybe make this more efficient by just getting unique values in target values?
-    """
-
-    transformer = get_target_transformer(column_type)
-
-    target_values = np.array([i[target_column] for i in labels_dict.values()])
-    target_values_streamlined = _streamline_values_for_transformers(
-        transformer=transformer, values=target_values
-    )
-
-    transformer.fit(target_values_streamlined)
-
-    return transformer
-
-
-def get_target_transformer(column_type):
-    if column_type == "con":
-        return StandardScaler()
-    elif column_type == "cat":
-        return LabelEncoder()
-
-    raise ValueError()
-
-
-def _streamline_values_for_transformers(
-    transformer: al_target_transformers, values: np.ndarray
-) -> np.ndarray:
-    """
-    LabelEncoder() expects a 1D array, whereas StandardScaler() expects a 2D one.
-    """
-
-    if isinstance(transformer, StandardScaler):
-        values_reshaped = values.reshape(-1, 1)
-        return values_reshaped
-    return values
-
-
-def _transform_target_labels_in_sample(
-    target_transformers: Dict[str, al_target_transformers],
+def _transform_labels_in_sample(
+    target_transformers: Dict[str, al_label_transformers],
     sample_label_dict: al_sample_label_dict,
+    extra_con_transformers: Union[Dict[str, StandardScaler], None] = None,
 ):
     """
-    We transform the target labels only because for:
+    We transform the target and extra continuous labels only because for:
 
         - extra embed columns: We use the set up embedding dictionary.
-        - extra contn columns: The scaling and saving is done during label setup.
     """
 
     transformed_labels = {}
+
+    if not extra_con_transformers:
+        extra_con_transformers = {}
+
+    merged_transformers = {**target_transformers, **extra_con_transformers}
+
     for label_column, label_value in sample_label_dict.items():
 
-        if label_column in target_transformers.keys():
+        if label_column in merged_transformers.keys():
 
-            transformer = target_transformers[label_column]
+            transformer = merged_transformers[label_column]
             cur_label_parsed = _transform_single_label_value(
                 transformer=transformer, label_value=label_value
             )
@@ -315,7 +288,7 @@ def _transform_single_label_value(transformer, label_value: Union[str, float, in
 
 
 def _set_up_num_classes(
-    target_transformers: Dict[str, al_target_transformers]
+    target_transformers: Dict[str, al_label_transformers]
 ) -> al_num_classes:
 
     num_classes_dict = {}

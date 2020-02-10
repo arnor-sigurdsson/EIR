@@ -10,10 +10,10 @@ from sklearn.preprocessing import StandardScaler, LabelEncoder
 from human_origins_supervised.data_load.data_utils import get_target_columns_generator
 
 if TYPE_CHECKING:
-    from human_origins_supervised.train import (  # noqa: F401
-        al_criterions,
-        al_target_transformers,
+    from human_origins_supervised.train import al_criterions
+    from human_origins_supervised.data_load.label_setup import (  # noqa: F401
         al_target_columns,
+        al_label_transformers,
     )
 
 # aliases
@@ -22,7 +22,7 @@ al_step_metric_dict = Dict[str, Dict[str, float]]
 
 def calculate_batch_metrics(
     target_columns: "al_target_columns",
-    target_transformers: Dict[str, "al_target_transformers"],
+    target_transformers: Dict[str, "al_label_transformers"],
     losses: Dict[str, torch.Tensor],
     outputs: Dict[str, torch.Tensor],
     labels: Dict[str, torch.Tensor],

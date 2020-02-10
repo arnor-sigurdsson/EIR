@@ -22,10 +22,10 @@ from human_origins_supervised.data_load import datasets
 from human_origins_supervised.data_load.data_loading_funcs import (
     get_weighted_random_sampler,
 )
-from human_origins_supervised.data_load.datasets import (
-    al_target_transformers,
-    al_num_classes,
+from human_origins_supervised.data_load.datasets import al_num_classes
+from human_origins_supervised.data_load.label_setup import (
     al_target_columns,
+    al_label_transformers,
 )
 from human_origins_supervised.models import model_utils
 from human_origins_supervised.models.extra_inputs_module import (
@@ -73,7 +73,7 @@ class Config:
     optimizer: Optimizer
     criterions: al_criterions
     labels_dict: Dict
-    target_transformers: Dict[str, al_target_transformers]
+    target_transformers: Dict[str, al_label_transformers]
     target_columns: al_target_columns
     data_width: int
 

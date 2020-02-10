@@ -1,6 +1,6 @@
 from typing import Tuple
 
-from human_origins_supervised.data_load.datasets import al_target_columns
+from human_origins_supervised.data_load.label_setup import al_target_columns
 
 
 def get_target_columns_generator(target_columns: al_target_columns) -> Tuple[str, str]:

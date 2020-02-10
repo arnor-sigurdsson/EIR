@@ -2,17 +2,15 @@ from argparse import Namespace
 from pathlib import Path
 from typing import Tuple, Dict, Union, List
 
-import joblib
 import numpy as np
 import pandas as pd
+from aislib.misc_utils import get_logger
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, LabelEncoder
 from tqdm import tqdm
 
 from human_origins_supervised.data_load.common_ops import ColumnOperation
 from human_origins_supervised.train_utils.utils import get_custom_module_submodule
-
-from aislib.misc_utils import get_logger, ensure_path_exists
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -20,6 +18,8 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 al_all_column_ops = Dict[str, Tuple[ColumnOperation, ...]]
 al_train_val_dfs = Tuple[pd.DataFrame, pd.DataFrame]
 al_label_dict = Dict[str, Dict[str, Union[str, float]]]
+al_target_columns = Dict[str, List[str]]
+al_label_transformers = Union[StandardScaler, LabelEncoder]
 
 
 def set_up_train_and_valid_labels(
@@ -122,6 +122,9 @@ def _load_label_df(
     """
     We want to load the label dataframe to be used for the torch dataset setup.
 
+    TODO:   Add support here for not failing if we cannot find column, assuming it will
+            be processed by the label parsing ops. Find intersection first.
+
     :param label_fpath: Path to the labelfile as passed in from the CL arguments.
     :param target_columns: Column we are predicting on.
     :param ids_to_keep: Which IDs in the label dataframe we want to keep.
@@ -166,7 +169,7 @@ def _parse_label_df(
     :param column_ops: A dictionary of column names, where each value is a list
     of tuples, where each tuple is a callable as the first element and the callable's
     arguments as the second element.
-    :param target_column:
+    :param target_columns:
     :return: Parsed dataframe.
     """
 
@@ -237,22 +240,6 @@ def _split_df(df: pd.DataFrame, valid_size: Union[int, float]) -> al_train_val_d
 def _process_train_and_label_dfs(
     cl_args, df_labels_train, df_labels_valid
 ) -> al_train_val_dfs:
-    # we make sure not to mess with the passed in CL arg, hence copy
-    continuous_columns = cl_args.contn_columns[:]
-    run_folder = Path("./runs", cl_args.run_name)
-
-    for continuous_column in continuous_columns:
-        df_labels_train, scaler_path = scale_non_target_continuous_columns(
-            df=df_labels_train,
-            continuous_column=continuous_column,
-            run_folder=run_folder,
-        )
-        df_labels_valid, _ = scale_non_target_continuous_columns(
-            df=df_labels_valid,
-            continuous_column=continuous_column,
-            run_folder=run_folder,
-            scaler_path=scaler_path,
-        )
 
     df_labels_train = handle_missing_label_values(df_labels_train, cl_args, "train df")
     df_labels_valid = handle_missing_label_values(df_labels_valid, cl_args, "valid df")
@@ -260,59 +247,8 @@ def _process_train_and_label_dfs(
     return df_labels_train, df_labels_valid
 
 
-def scale_non_target_continuous_columns(
-    df: pd.DataFrame, continuous_column: str, run_folder: Path, scaler_path: Path = None
-) -> Tuple[pd.DataFrame, Path]:
-    """
-    Used to scale continuous columns in label dataframes. For training set, we fit a
-    new scaler whereas for validation / testing we are expected to pass in
-    `scaler_path`, which loads a fitted scaler and does the transformation on the
-    continuous column in question.
-
-    :param df: The dataframe to do the scaling on.
-    :param continuous_column: The column of continuous values to do the fit and/or
-    scaling on.
-    :param run_folder: Folder for the current run, used to set up paths .
-    :param scaler_path: If this is passed in, assume we are only transforming and load
-    scaler from this path.
-    :return:
-    """
-
-    def parse_colvals(column: pd.Series) -> np.ndarray:
-        return column.values.astype(float).reshape(-1, 1)
-
-    if not scaler_path:
-        logger.debug(
-            "Fitting standard scaler column %s in training df of shape %s.",
-            continuous_column,
-            df.shape,
-        )
-
-        scaler_outpath = get_transformer_path(
-            run_folder, continuous_column, "standard_scaler"
-        )
-
-        scaler = StandardScaler()
-        scaler.fit(parse_colvals(df[continuous_column]))
-        ensure_path_exists(scaler_outpath)
-        joblib.dump(scaler, scaler_outpath)
-        scaler_return_path = scaler_outpath
-
-    else:
-        logger.debug(
-            "Transforming valid/test (shape %s) df with scaler fitted on training df.",
-            df.shape,
-        )
-        scaler = joblib.load(scaler_path)
-        scaler_return_path = scaler_path
-
-    df[continuous_column] = scaler.transform(parse_colvals(df[continuous_column]))
-
-    return df, scaler_return_path
-
-
-def get_transformer_path(run_path: Path, transformer_name: str, suffix: str) -> Path:
-    transformer_path = run_path / "transformers" / f"{transformer_name}_{suffix}.save"
+def get_transformer_path(run_path: Path, transformer_name: str) -> Path:
+    transformer_path = run_path / "transformers" / f"{transformer_name}.save"
 
     return transformer_path
 
@@ -349,3 +285,65 @@ def _get_missing_stats_string(
         missing_count_dict[col] = int(df[col].isnull().sum())
 
     return missing_count_dict
+
+
+def set_up_label_transformers(
+    labels_dict: al_label_dict, label_columns: al_target_columns
+) -> Dict[str, al_label_transformers]:
+
+    label_transformers = {}
+
+    for column_type in label_columns:
+        logger.debug(
+            "Fitting transformers on %s target columns %s", column_type, label_columns
+        )
+
+        target_columns_of_cur_type = label_columns[column_type]
+
+        for cur_target_column in target_columns_of_cur_type:
+            cur_target_transformer = _fit_transformer_on_label_column(
+                labels_dict=labels_dict,
+                label_column=cur_target_column,
+                column_type=column_type,
+            )
+            label_transformers[cur_target_column] = cur_target_transformer
+
+    return label_transformers
+
+
+def _fit_transformer_on_label_column(
+    labels_dict: al_label_dict, label_column: str, column_type: str
+) -> al_label_transformers:
+
+    transformer = _get_transformer(column_type)
+
+    target_values = np.array([i[label_column] for i in labels_dict.values()])
+    target_values_streamlined = _streamline_values_for_transformers(
+        transformer=transformer, values=target_values
+    )
+
+    transformer.fit(target_values_streamlined)
+
+    return transformer
+
+
+def _get_transformer(column_type):
+    if column_type in ("con", "extra_con"):
+        return StandardScaler()
+    elif column_type == "cat":
+        return LabelEncoder()
+
+    raise ValueError()
+
+
+def _streamline_values_for_transformers(
+    transformer: al_label_transformers, values: np.ndarray
+) -> np.ndarray:
+    """
+    LabelEncoder() expects a 1D array, whereas StandardScaler() expects a 2D one.
+    """
+
+    if isinstance(transformer, StandardScaler):
+        values_reshaped = values.reshape(-1, 1)
+        return values_reshaped
+    return values
