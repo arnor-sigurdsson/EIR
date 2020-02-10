@@ -226,33 +226,3 @@ def test_split_df(create_test_data, create_test_cl_args):
 
         assert df_train.shape[0] == int(expected_train)
         assert df_valid.shape[0] == int(expected_valid)
-
-
-@pytest.mark.parametrize(
-    "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
-)
-def test_scale_regression_labels(create_test_data, create_test_cl_args):
-    c = create_test_data
-    cl_args = create_test_cl_args
-    test_target_column = cl_args.target_cat_columns[0]  # Origin
-
-    df_labels = label_setup.label_df_parse_wrapper(cl_args=cl_args)
-
-    for column_value, new_value in zip(["Africa", "Asia", "Europe"], [150, 170, 190]):
-        mask = df_labels[test_target_column] == column_value
-        df_labels[mask] = new_value
-
-    df_train, df_valid = label_setup._split_df(df_labels, 0.1)
-
-    df_train, scaler_path = label_setup.scale_non_target_continuous_columns(
-        df=df_train, continuous_column=test_target_column, run_folder=c.scoped_tmp_path
-    )
-    df_valid, _ = label_setup.scale_non_target_continuous_columns(
-        df=df_valid,
-        continuous_column=test_target_column,
-        run_folder=c.scoped_tmp_path,
-        scaler_path=scaler_path,
-    )
-
-    assert df_train[test_target_column].between(-2, 2).all()
-    assert df_valid[test_target_column].between(-2, 2).all()
