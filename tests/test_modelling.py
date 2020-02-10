@@ -240,7 +240,7 @@ def _get_multi_task_test_args(
 
     an_extra_col_is_correlated_with_target = target_copy in extra_columns
     if an_extra_col_is_correlated_with_target:
-        threshold, at_least_n = 0.95, 0
+        threshold, at_least_n = 0.9, 0
     else:
         threshold, at_least_n = 0.8, 8
 
