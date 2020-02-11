@@ -209,8 +209,14 @@ def _parse_label_df(
     in the label file (e.g. different operations for creating obesity labels or parsing
     country of origin).
 
-    If a column operation is supposed to only be applied if its column is the target
-    variable, make sure it's not applied in other cases (e.g. if the column is a
+    We consider applying a column operation if:
+
+        1. The column is in the df, hence loaded explicitly or as an extra column.
+        2. It is not in the df, but in label columns. Hence expected to be created
+           by the column op.
+
+    If a column operation is supposed to only be applied if its column is a label
+    column, make sure it's not applied in other cases (e.g. if the column is a
     embedding / continuous input to another target).
 
     :param df: Dataframe to perform processing on.
@@ -221,13 +227,30 @@ def _parse_label_df(
     :return: Parsed dataframe.
     """
 
+    def _is_column_candidate(column_name_: str) -> bool:
+        column_in_df = column_name_ in df.columns
+        column_expected_to_be_made = (
+            column_name_ in label_columns and column_name_ not in df.columns
+        )
+        is_candidate = column_in_df or column_expected_to_be_made
+        return is_candidate
+
+    def _do_call_column_op(column_op_: ColumnOperation, column_name_: str) -> bool:
+        only_apply_if_target = column_op_.only_apply_if_target
+        not_a_label_col = column_name_ not in label_columns
+        do_skip = only_apply_if_target and not_a_label_col
+
+        do_call = not do_skip
+        return do_call
+
     for column_name, ops_funcs in column_ops.items():
-        if column_name in df.columns:
+
+        if _is_column_candidate(column_name_=column_name):
+
             for column_op in ops_funcs:
-                do_skip = (
-                    column_op.only_apply_if_target and column_name not in label_columns
-                )
-                if not do_skip:
+
+                if _do_call_column_op(column_op_=column_op, column_name_=column_name):
+
                     func, args_dict = column_op.function, column_op.function_args
                     logger.debug(
                         "Applying func %s with args %s to column %s in pre-processing.",

@@ -1,3 +1,4 @@
+from unittest.mock import patch
 import pytest
 
 from human_origins_supervised.data_load import label_setup
@@ -21,6 +22,7 @@ def create_test_column_ops():
     replace_dict_args = {"replace_dict": {"Europe": "Iceland"}}
     multiplier_dict_arg = {"multiplier": 2}
     replace_column_dict_arg = {"replace_with_col": "ExtraCol3"}
+
     test_column_ops = {
         "Origin": [
             ColumnOperation(function=test_column_op_1, function_args=replace_dict_args),
@@ -52,6 +54,14 @@ def create_test_column_ops():
                 function=test_column_op_3,
                 function_args=replace_column_dict_arg,
                 extra_columns_deps=("ExtraCol3",),
+            )
+        ],
+        "ExtraTarget": [
+            ColumnOperation(
+                function=test_column_op_1,
+                function_args=replace_dict_args,
+                extra_columns_deps=(),
+                only_apply_if_target=True,
             )
         ],
     }
@@ -335,7 +345,16 @@ def test_get_currently_available_columns_fail(parse_test_cl_args, create_test_da
 
 
 @pytest.mark.parametrize("create_test_data", [{"task_type": "binary"}], indirect=True)
-def test_parse_label_df(create_test_data, create_test_column_ops):
+def test_parse_label_df_applied_1(create_test_data, create_test_column_ops):
+    """
+    Here we run column operations for 'Origin'. Hence we expect to apply:
+
+        - test_column_op_1: Replace "Europe with Iceland"
+        - test_column_op_2: Multiply the values by 2.
+
+    As these are the column operations associated with "Origin" in
+    create_test_column_ops.
+    """
     c = create_test_data
     label_fpath = c.scoped_tmp_path / "labels.csv"
 
@@ -351,15 +370,92 @@ def test_parse_label_df(create_test_data, create_test_column_ops):
 
     assert set(df_labels_parsed.Origin.unique()) == {"Iceland" * 2, "Asia" * 2}
 
+
+@pytest.mark.parametrize("create_test_data", [{"task_type": "binary"}], indirect=True)
+def test_parse_label_df_applied_2(create_test_data, create_test_column_ops):
+    """
+    Here we run column operations for 'OriginExtraColumnsAll'. Hence we expect to apply:
+
+        - test_column_op_1: Replace "Europe with Iceland"
+        - test_column_op_3: Replace value of of 'OriginExtraColumnsAll' with the values
+          in ExtraCol3.
+    """
+
+    c = create_test_data
+    label_fpath = c.scoped_tmp_path / "labels.csv"
+
+    test_column_ops = create_test_column_ops
+
+    label_columns = ["Origin"]
+    df_labels = label_setup._load_label_df(
+        label_fpath=label_fpath, columns=label_columns, custom_lib=None
+    )
+
     extra_cols = ("ExtraCol3",)
     for col in extra_cols:
         df_labels[col] = "Iceland"
 
     df_labels = df_labels.rename(columns={"Origin": "OriginExtraColumnsAll"})
+
+    new_label_columns = ["OriginExtraColumnsAll"]
+    df_labels_parsed = label_setup._parse_label_df(
+        df=df_labels, column_ops=test_column_ops, label_columns=new_label_columns
+    )
+
+    assert df_labels_parsed["OriginExtraColumnsAll"].unique().item() == "Iceland"
+
+
+@patch("human_origins_supervised.data_load.label_setup.logger.debug", autospec=True)
+@pytest.mark.parametrize("create_test_data", [{"task_type": "binary"}], indirect=True)
+def test_parse_label_df_not_applied(m_logger, create_test_data, create_test_column_ops):
+    """
+    Here we run column operations for 'Origin'. Hence we expect to apply:
+
+        - test_column_op_1: Replace "Europe with Iceland"
+        - test_column_op_2: Multiply the values by 2.
+
+    As these are the column operations associated with "Origin" in
+    create_test_column_ops.
+
+    Additionally, we manually add two columns to the label df. For these, we don't
+    expect them to change as no column operations should be performed on them.
+    Firstly because one op should only run if it's a target, secondly because it's
+    a random extra column.
+
+    So in the logging, we expect only 'Applying func' to be called twice, for the
+    'Origin' column.
+    """
+
+    def _check_mocked_logger_call_count():
+
+        calls = []
+        for call in m_logger.call_args_list:
+            cur_call_first_arg = call[0][0]
+            if cur_call_first_arg.startswith("Applying"):
+                calls.append(cur_call_first_arg)
+
+        assert len(calls) == 2
+
+    c = create_test_data
+    label_fpath = c.scoped_tmp_path / "labels.csv"
+
+    test_column_ops = create_test_column_ops
+
+    label_columns = ["Origin"]
+    df_labels = label_setup._load_label_df(
+        label_fpath=label_fpath, columns=label_columns, custom_lib="fake/lib"
+    )
+    df_labels["OnlyApplyIfTarget"] = 1
+    df_labels["SomeRandomCol"] = 1
+
     df_labels_parsed = label_setup._parse_label_df(
         df=df_labels, column_ops=test_column_ops, label_columns=label_columns
     )
-    assert df_labels_parsed["OriginExtraColumnsAll"].unique().item() == "Iceland"
+
+    assert set(df_labels_parsed.Origin.unique()) == {"Iceland" * 2, "Asia" * 2}
+    _check_mocked_logger_call_count()
+    assert df_labels_parsed["OnlyApplyIfTarget"].unique().item() == 1
+    assert df_labels_parsed["SomeRandomCol"].unique().item() == 1
 
 
 @pytest.mark.parametrize(
