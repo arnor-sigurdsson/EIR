@@ -5,7 +5,7 @@ from human_origins_supervised.data_load.common_ops import ColumnOperation
 
 
 @pytest.fixture()
-def get_test_column_ops():
+def create_test_column_ops():
     def test_column_op_1(df, column_name, replace_dict):
         df = df.replace({column_name: replace_dict})
         return df
@@ -23,22 +23,36 @@ def get_test_column_ops():
     replace_column_dict_arg = {"replace_with_col": "ExtraCol3"}
     test_column_ops = {
         "Origin": [
-            ColumnOperation(test_column_op_1, replace_dict_args),
-            ColumnOperation(test_column_op_2, multiplier_dict_arg),
+            ColumnOperation(function=test_column_op_1, function_args=replace_dict_args),
+            ColumnOperation(
+                function=test_column_op_2, function_args=multiplier_dict_arg
+            ),
         ],
         "OriginExtraColumnsAll": [
             ColumnOperation(
-                test_column_op_1, replace_dict_args, ("ExtraCol1", "ExtraCol2")
+                function=test_column_op_1,
+                function_args=replace_dict_args,
+                extra_columns_deps=("ExtraCol1", "ExtraCol2"),
             ),
-            ColumnOperation(test_column_op_3, replace_column_dict_arg, ("ExtraCol3",)),
+            ColumnOperation(
+                function=test_column_op_3,
+                function_args=replace_column_dict_arg,
+                extra_columns_deps=("ExtraCol3",),
+            ),
         ],
         "OriginExtraColumnsPartial1": [
             ColumnOperation(
-                test_column_op_1, replace_dict_args, ("ExtraCol1", "ExtraCol2")
+                function=test_column_op_1,
+                function_args=replace_dict_args,
+                extra_columns_deps=("ExtraCol1", "ExtraCol2"),
             )
         ],
         "OriginExtraColumnsPartial2": [
-            ColumnOperation(test_column_op_3, replace_column_dict_arg, ("ExtraCol3",))
+            ColumnOperation(
+                function=test_column_op_3,
+                function_args=replace_column_dict_arg,
+                extra_columns_deps=("ExtraCol3",),
+            )
         ],
     }
 
@@ -89,6 +103,91 @@ def test_label_df_parse_wrapper(
 
 
 @pytest.mark.parametrize(
+    "test_input_args,expected",
+    [
+        ({"target_cat_columns": ["Origin"]}, ["Origin"]),
+        (
+            {"target_cat_columns": ["Origin", "OriginExtraColumnsAll"]},
+            ["Origin", "OriginExtraColumnsAll", "ExtraCol1", "ExtraCol2", "ExtraCol3"],
+        ),
+        (
+            {
+                "target_cat_columns": ["Origin"],
+                "contn_columns": ["OriginExtraColumnsPartial1"],
+            },
+            ["Origin", "OriginExtraColumnsPartial1", "ExtraCol1", "ExtraCol2"],
+        ),
+        (
+            {
+                "target_con_columns": ["Origin"],
+                "target_cat_columns": ["OriginExtraColumnsAll"],
+                "contn_columns": ["OriginExtraColumnsPartial1"],
+                "embed_columns": ["OriginExtraColumnsPartial2"],
+            },
+            [
+                "Origin",
+                "OriginExtraColumnsAll",
+                "OriginExtraColumnsPartial1",
+                "OriginExtraColumnsPartial2",
+                "ExtraCol1",
+                "ExtraCol2",
+                "ExtraCol3",
+            ],
+        ),
+    ],
+)
+def test_get_all_label_columns_needed(
+    test_input_args, expected, args_config, create_test_column_ops
+):
+
+    for key, columns in test_input_args.items():
+        setattr(args_config, key, columns)
+
+    all_cols = label_setup._get_all_label_columns_needed(
+        cl_args=args_config, column_ops=create_test_column_ops
+    )
+    assert set(all_cols) == set(expected)
+
+
+@pytest.mark.parametrize(
+    "test_input_args,expected",
+    [
+        ({"target_cat_columns": ["Origin"]}, ["Origin"]),
+        (
+            {"target_cat_columns": ["Origin", "OriginExtraColumnsAll"]},
+            ["Origin", "OriginExtraColumnsAll"],
+        ),
+        (
+            {
+                "target_cat_columns": ["Origin"],
+                "contn_columns": ["OriginExtraColumnsPartial1"],
+            },
+            ["Origin", "OriginExtraColumnsPartial1"],
+        ),
+        (
+            {
+                "target_con_columns": ["Origin"],
+                "target_cat_columns": ["OriginExtraColumnsAll"],
+                "contn_columns": ["OriginExtraColumnsPartial1"],
+                "embed_columns": ["OriginExtraColumnsPartial2"],
+            },
+            [
+                "Origin",
+                "OriginExtraColumnsAll",
+                "OriginExtraColumnsPartial1",
+                "OriginExtraColumnsPartial2",
+            ],
+        ),
+    ],
+)
+def test_get_label_columns_from_cl_args(
+    test_input_args, expected, args_config, create_test_column_ops
+):
+    for key, columns in test_input_args.items():
+        setattr(args_config, key, columns)
+
+
+@pytest.mark.parametrize(
     "test_input,expected",
     [
         (["Origin"], []),
@@ -100,8 +199,8 @@ def test_label_df_parse_wrapper(
         ),
     ],
 )
-def test_get_extra_columns(test_input, expected, get_test_column_ops):
-    test_column_ops = get_test_column_ops
+def test_get_extra_columns(test_input, expected, create_test_column_ops):
+    test_column_ops = create_test_column_ops
 
     test_output = label_setup._get_extra_columns(test_input, test_column_ops)
     assert test_output == expected
@@ -116,8 +215,10 @@ def test_load_label_df_one_target_no_extra_col(parse_test_cl_args, create_test_d
     label_fpath = c.scoped_tmp_path / "labels.csv"
     n_classes = len(c.target_classes)
 
-    target_column_single = ["Origin"]
-    df_label = label_setup._load_label_df(label_fpath, target_column_single)
+    label_columns = ["Origin"]
+    df_label = label_setup._load_label_df(
+        label_fpath=label_fpath, columns=label_columns, custom_lib=None
+    )
 
     assert df_label.shape[0] == c.n_per_class * n_classes
     assert df_label.index.name == "ID"
@@ -132,33 +233,48 @@ def test_load_label_df_one_target_one_extra_col(parse_test_cl_args, create_test_
 
     label_fpath = c.scoped_tmp_path / "labels.csv"
 
-    target_column_single = ["Origin"]
+    label_columns = ["Origin", "OriginExtraCol"]
 
     df_label_extra = label_setup._load_label_df(
-        label_fpath, target_column_single, extra_columns=("OriginExtraCol",)
+        label_fpath=label_fpath, columns=label_columns, custom_lib=None
     )
 
     assert df_label_extra.shape[1] == 2
-    # OriginExtraCol is same as Origin by definiton
+
+    # OriginExtraCol is same as Origin by definition
     assert (df_label_extra["OriginExtraCol"] == df_label_extra["Origin"]).all()
 
 
 @pytest.mark.parametrize(
     "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
 )
-def test_load_label_df_filter_ids(parse_test_cl_args, create_test_data):
+def test_load_label_df_missing_col_fail(parse_test_cl_args, create_test_data):
     c = create_test_data
 
     label_fpath = c.scoped_tmp_path / "labels.csv"
 
-    target_column_single = ["Origin"]
+    label_columns = ["Origin", "NonExistentColumn"]
 
-    df_label_ids = label_setup._load_label_df(
-        label_fpath,
-        target_column_single,
-        ids_to_keep=("95_Europe", "96_Europe", "97_Europe"),
+    with pytest.raises(ValueError):
+        label_setup._load_label_df(
+            label_fpath=label_fpath, columns=label_columns, custom_lib=None
+        )
+
+
+@pytest.mark.parametrize(
+    "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
+)
+def test_load_label_df_missing_col_pass(parse_test_cl_args, create_test_data):
+    c = create_test_data
+
+    label_fpath = c.scoped_tmp_path / "labels.csv"
+
+    label_columns = ["Origin", "NonExistentColumn"]
+
+    df_labels = label_setup._load_label_df(
+        label_fpath=label_fpath, columns=label_columns, custom_lib="fake/lib"
     )
-    assert df_label_ids.shape[0] == 3
+    assert df_labels.shape[1] == 1
 
 
 @pytest.mark.parametrize(
@@ -169,11 +285,9 @@ def test_load_label_extra_target_extra_col(parse_test_cl_args, create_test_data)
 
     label_fpath = c.scoped_tmp_path / "labels.csv"
 
-    target_column_multi = ["Origin", "Height", "ExtraTarget"]
+    label_columns = ["Origin", "OriginExtraCol", "Height", "ExtraTarget"]
     df_label_multi_target = label_setup._load_label_df(
-        label_fpath=label_fpath,
-        target_columns=target_column_multi,
-        extra_columns=("OriginExtraCol",),
+        label_fpath=label_fpath, columns=label_columns, custom_lib=None
     )
 
     assert df_label_multi_target.shape[1] == 4
@@ -189,25 +303,101 @@ def test_load_label_extra_target_extra_col(parse_test_cl_args, create_test_data)
     assert ((part_3 - 50).astype(int) == part_4.astype(int)).all()
 
 
+@pytest.mark.parametrize(
+    "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
+)
+def test_get_currently_available_columns_pass(parse_test_cl_args, create_test_data):
+    c = create_test_data
+
+    label_fpath = c.scoped_tmp_path / "labels.csv"
+    label_columns = ["Origin", "NotExisting1", "NotExisting2"]
+
+    available_columns = label_setup._get_currently_available_columns(
+        label_fpath=label_fpath, requested_columns=label_columns, custom_lib="fake/lob"
+    )
+
+    assert available_columns == ["Origin"]
+
+
+@pytest.mark.parametrize(
+    "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
+)
+def test_get_currently_available_columns_fail(parse_test_cl_args, create_test_data):
+    c = create_test_data
+
+    label_fpath = c.scoped_tmp_path / "labels.csv"
+    label_columns = ["Origin", "NotExisting1", "NotExisting2"]
+
+    with pytest.raises(ValueError):
+        label_setup._get_currently_available_columns(
+            label_fpath=label_fpath, requested_columns=label_columns, custom_lib=None
+        )
+
+
 @pytest.mark.parametrize("create_test_data", [{"task_type": "binary"}], indirect=True)
-def test_parse_label_df(create_test_data, get_test_column_ops):
+def test_parse_label_df(create_test_data, create_test_column_ops):
     c = create_test_data
     label_fpath = c.scoped_tmp_path / "labels.csv"
 
-    test_column_ops = get_test_column_ops
+    test_column_ops = create_test_column_ops
 
-    df_label = label_setup._load_label_df(label_fpath, ["Origin"])
-    df_label_parsed = label_setup._parse_label_df(df_label, test_column_ops, ["Origin"])
+    label_columns = ["Origin"]
+    df_labels = label_setup._load_label_df(
+        label_fpath=label_fpath, columns=label_columns, custom_lib=None
+    )
+    df_labels_parsed = label_setup._parse_label_df(
+        df=df_labels, column_ops=test_column_ops, label_columns=label_columns
+    )
 
-    assert set(df_label_parsed.Origin.unique()) == {"Iceland" * 2, "Asia" * 2}
+    assert set(df_labels_parsed.Origin.unique()) == {"Iceland" * 2, "Asia" * 2}
 
     extra_cols = ("ExtraCol3",)
     for col in extra_cols:
-        df_label[col] = "Iceland"
+        df_labels[col] = "Iceland"
 
-    df_label = df_label.rename(columns={"Origin": "OriginExtraColumnsAll"})
-    df_label_parsed = label_setup._parse_label_df(df_label, test_column_ops, ["Origin"])
-    assert df_label_parsed["OriginExtraColumnsAll"].unique().item() == "Iceland"
+    df_labels = df_labels.rename(columns={"Origin": "OriginExtraColumnsAll"})
+    df_labels_parsed = label_setup._parse_label_df(
+        df=df_labels, column_ops=test_column_ops, label_columns=label_columns
+    )
+    assert df_labels_parsed["OriginExtraColumnsAll"].unique().item() == "Iceland"
+
+
+@pytest.mark.parametrize(
+    "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
+)
+def test_check_parsed_label_df_pass(parse_test_cl_args, create_test_data):
+    c = create_test_data
+    label_fpath = c.scoped_tmp_path / "labels.csv"
+
+    label_columns = ["Origin", "ExtraTarget"]
+
+    df_labels = label_setup._load_label_df(
+        label_fpath=label_fpath, columns=label_columns, custom_lib=None
+    )
+
+    df_labels_checked = label_setup._check_parsed_label_df(
+        df_labels=df_labels, supplied_label_columns=label_columns
+    )
+    assert df_labels is df_labels_checked
+
+
+@pytest.mark.parametrize(
+    "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
+)
+def test_check_parsed_label_df_fail(parse_test_cl_args, create_test_data):
+    c = create_test_data
+    label_fpath = c.scoped_tmp_path / "labels.csv"
+
+    label_columns = ["Origin", "ExtraTarget", "NotExisting"]
+
+    df_labels = label_setup._load_label_df(
+        label_fpath=label_fpath, columns=label_columns, custom_lib="fake/lib"
+    )
+
+    with pytest.raises(ValueError):
+        label_setup._check_parsed_label_df(
+            df_labels=df_labels, supplied_label_columns=label_columns
+        )
 
 
 @pytest.mark.parametrize(

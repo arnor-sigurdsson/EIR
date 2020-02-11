@@ -44,65 +44,81 @@ def set_up_train_and_valid_labels(
 
 
 def label_df_parse_wrapper(cl_args: Namespace) -> pd.DataFrame:
-    all_ids = _gather_ids_from_folder(Path(cl_args.data_folder))
+    available_ids = _gather_ids_from_folder(Path(cl_args.data_folder))
 
     column_ops = {}
     if cl_args.custom_lib:
-        column_ops = _get_custom_column_ops(cl_args.custom_lib)
+        column_ops = _get_custom_column_ops(custom_lib=cl_args.custom_lib)
 
-    target_columns = cl_args.target_con_columns + cl_args.target_cat_columns
-
-    extra_label_parsing_cols = _get_extra_columns(target_columns, column_ops)
-    extra_embed_cols = cl_args.embed_columns
-    extra_contn_cols = cl_args.contn_columns
-
-    all_extra_cols = extra_label_parsing_cols + extra_embed_cols + extra_contn_cols
+    all_cols = _get_all_label_columns_needed(cl_args=cl_args, column_ops=column_ops)
 
     df_labels = _load_label_df(
-        cl_args.label_file, target_columns, all_ids, all_extra_cols
+        label_fpath=cl_args.label_file, columns=all_cols, custom_lib=cl_args.custom_lib
     )
-    df_labels = _parse_label_df(df_labels, column_ops, target_columns)
 
-    # remove columns only used for parsing, so only keep actual label column
-    # and extra embedding columns
-    to_drop = [
-        i
-        for i in extra_label_parsing_cols
-        if i not in extra_embed_cols + extra_contn_cols
-    ]
-    if to_drop:
-        df_labels = df_labels.drop(to_drop, axis=1)
+    df_labels_filtered = _filter_ids_from_label_df(
+        df_labels=df_labels, ids_to_keep=available_ids
+    )
 
-    return df_labels
+    label_columns = _get_label_columns_from_cl_args(cl_args=cl_args)
+    df_labels_parsed = _parse_label_df(
+        df=df_labels_filtered, column_ops=column_ops, label_columns=label_columns
+    )
+
+    df_column_filtered = _drop_not_needed_label_columns(
+        df=df_labels_parsed, needed_label_columns=label_columns
+    )
+
+    df_final = _check_parsed_label_df(
+        df_labels=df_column_filtered, supplied_label_columns=label_columns
+    )
+
+    return df_final
 
 
-def _gather_ids_from_folder(data_folder: Path):
-    logger.debug("Gathering IDs from %s.", data_folder)
-    all_ids = tuple(i.stem for i in tqdm(data_folder.iterdir(), desc="Progress"))
+def _get_all_label_columns_needed(
+    cl_args: Namespace, column_ops: al_all_column_ops
+) -> List[str]:
 
-    return all_ids
+    supplied_label_columns = _get_label_columns_from_cl_args(cl_args=cl_args)
+
+    extra_label_parsing_cols = _get_extra_columns(
+        label_columns=supplied_label_columns, all_column_ops=column_ops
+    )
+    all_cols = supplied_label_columns + extra_label_parsing_cols
+
+    return all_cols
+
+
+def _get_label_columns_from_cl_args(cl_args: Namespace) -> List[str]:
+    target_columns = cl_args.target_con_columns + cl_args.target_cat_columns
+    extra_input_columns = cl_args.contn_columns + cl_args.embed_columns
+
+    all_label_columns = target_columns + extra_input_columns
+
+    return all_label_columns
 
 
 def _get_extra_columns(
-    target_columns: List[str], all_column_ops: al_all_column_ops
+    label_columns: List[str], all_column_ops: al_all_column_ops
 ) -> List[str]:
     """
     We use this to grab extra columns needed for the current run, as specified in the
-    COLUMN_OPS, where the keys are the target_columns. That is, "for running with these
-    specific target columns, what other columns do we need to grab", as specified
+    COLUMN_OPS, where the keys are the label columns. That is, "for running with these
+    specific label columns, what other columns do we need to grab", as specified
     by the extra_columns_deps attribute of each column operation.
 
-    :param target_columns: The target columns we are modelling on.
+    :param label_columns: The target columns we are modelling on.
     :param all_column_ops: The ledger of all column ops to be done for each target
     column.
     :returns A list of all extra columns needed from the label file for the current run.
     """
 
     extra_columns = []
-    for target_column in target_columns:
+    for column in label_columns:
 
-        if target_column in all_column_ops:
-            cur_ops = all_column_ops.get(target_column)
+        if column in all_column_ops:
+            cur_ops = all_column_ops.get(column)
             cur_extra_columns = [i.extra_columns_deps for i in cur_ops]
 
             cur_extra_columns_flat = list(
@@ -113,48 +129,80 @@ def _get_extra_columns(
     return extra_columns
 
 
+def _gather_ids_from_folder(data_folder: Path):
+    logger.debug("Gathering IDs from %s.", data_folder)
+    all_ids = tuple(i.stem for i in tqdm(data_folder.iterdir(), desc="Progress"))
+
+    return all_ids
+
+
 def _load_label_df(
-    label_fpath: Path,
-    target_columns: List[str],
-    ids_to_keep: Tuple[str, ...] = (),
-    extra_columns: Tuple[str, ...] = (),
+    label_fpath: Path, columns: List[str], custom_lib: Union[str, None]
 ) -> pd.DataFrame:
     """
-    We want to load the label dataframe to be used for the torch dataset setup.
-
-    TODO:   Add support here for not failing if we cannot find column, assuming it will
-            be processed by the label parsing ops. Find intersection first.
-
-    :param label_fpath: Path to the labelfile as passed in from the CL arguments.
-    :param target_columns: Column we are predicting on.
-    :param ids_to_keep: Which IDs in the label dataframe we want to keep.
-    :param extra_columns: Extra columns in the label dataframe needed for this runþ
-    :return: A dataframe of labels.
+    We accept only loading the available columns at this point because the passed
+    in columns might be forward referenced, meaning that they might be created
+    by the custom library.
     """
 
     logger.debug("Reading in labelfile: %s", label_fpath)
-    df_labels = pd.read_csv(
-        label_fpath,
-        usecols=["ID"] + target_columns + list(extra_columns),
-        dtype={"ID": str},
+
+    columns_with_id_col = ["ID"] + columns
+    available_columns = _get_currently_available_columns(
+        label_fpath=label_fpath,
+        requested_columns=columns_with_id_col,
+        custom_lib=custom_lib,
     )
 
-    df_labels = df_labels.set_index("ID")
+    df_labels = pd.read_csv(label_fpath, usecols=available_columns, dtype={"ID": str})
 
-    if ids_to_keep:
-        no_labels = df_labels.shape[0]
-        df_labels = df_labels[df_labels.index.isin(ids_to_keep)]
-        no_dropped = no_labels - df_labels.shape[0]
-        logger.debug(
-            "Removed %d file IDs from label file based on IDs present in data folder.",
-            no_dropped,
-        )
+    df_labels = df_labels.set_index("ID")
 
     return df_labels
 
 
+def _get_currently_available_columns(
+    label_fpath: Path, requested_columns: List[str], custom_lib: Union[str, None]
+) -> List[str]:
+
+    label_file_columns_set = set(pd.read_csv(label_fpath, dtype={"ID": str}, nrows=0))
+
+    requested_columns_set = set(requested_columns)
+
+    if not custom_lib:
+        missing_columns = requested_columns_set - label_file_columns_set
+        if missing_columns:
+            raise ValueError(
+                f"No custom library specified and could not find columns "
+                f"{missing_columns} in {label_fpath}."
+            )
+
+    available_columns = requested_columns_set.intersection(label_file_columns_set)
+
+    return list(available_columns)
+
+
+def _filter_ids_from_label_df(
+    df_labels: pd.DataFrame, ids_to_keep: Tuple[str, ...] = ()
+) -> pd.DataFrame:
+
+    if not ids_to_keep:
+        return df_labels
+
+    no_labels = df_labels.shape[0]
+    df_filtered = df_labels[df_labels.index.isin(ids_to_keep)]
+    no_dropped = no_labels - df_filtered.shape[0]
+
+    logger.debug(
+        "Removed %d file IDs from label file based on IDs present in data folder.",
+        no_dropped,
+    )
+
+    return df_filtered
+
+
 def _parse_label_df(
-    df: pd.DataFrame, column_ops: al_all_column_ops, target_columns: List[str]
+    df: pd.DataFrame, column_ops: al_all_column_ops, label_columns: List[str]
 ) -> pd.DataFrame:
     """
     We want to be able to dynamically apply various operations to different columns
@@ -169,7 +217,7 @@ def _parse_label_df(
     :param column_ops: A dictionary of column names, where each value is a list
     of tuples, where each tuple is a callable as the first element and the callable's
     arguments as the second element.
-    :param target_columns:
+    :param label_columns:
     :return: Parsed dataframe.
     """
 
@@ -177,7 +225,7 @@ def _parse_label_df(
         if column_name in df.columns:
             for column_op in ops_funcs:
                 do_skip = (
-                    column_op.only_apply_if_target and column_name not in target_columns
+                    column_op.only_apply_if_target and column_name not in label_columns
                 )
                 if not do_skip:
                     func, args_dict = column_op.function, column_op.function_args
@@ -190,6 +238,35 @@ def _parse_label_df(
                     logger.debug("Shape before: %s", df.shape)
                     df = func(df=df, column_name=column_name, **args_dict)
                     logger.debug("Shape after: %s", df.shape)
+    return df
+
+
+def _check_parsed_label_df(
+    df_labels: pd.DataFrame, supplied_label_columns: List[str]
+) -> pd.DataFrame:
+
+    missing_columns = set(supplied_label_columns) - set(df_labels.columns)
+    if missing_columns:
+        raise ValueError(
+            f"Columns asked for in CL args ({missing_columns}) "
+            f"missing from columns in label dataframe (with columns "
+            f"{df_labels.columns}. The missing columns are not"
+            f"found in the raw label file and not calculated by a forward"
+            f"reference in the supplied custom library."
+        )
+
+    return df_labels
+
+
+def _drop_not_needed_label_columns(
+    df: pd.DataFrame, needed_label_columns: List[str]
+) -> pd.DataFrame:
+
+    to_drop = [i for i in df.columns if i not in needed_label_columns]
+
+    if to_drop:
+        df = df.drop(to_drop, axis=1)
+
     return df
 
 
