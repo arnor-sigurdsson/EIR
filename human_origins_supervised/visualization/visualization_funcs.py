@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import List, Callable, Union, Tuple
+from textwrap import wrap
 
 import matplotlib
 import numpy as np
@@ -20,6 +21,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from matplotlib.ticker import MaxNLocator
+
+plt.rcParams.update({"xtick.labelsize": 12, "ytick.labelsize": 12})
 
 
 def generate_training_curve(
@@ -422,6 +425,7 @@ def generate_confusion_matrix(
 
     # Only use the labels that appear in the data
     classes = classes[unique_labels(y_true, y_outp)]
+    classes_wrapped = ["\n".join(wrap(c, 20)) for c in classes]
     if normalize:
         conf_mat = conf_mat.astype("float") / conf_mat.sum(axis=1)[:, np.newaxis]
 
@@ -434,15 +438,23 @@ def generate_confusion_matrix(
         xticks=np.arange(conf_mat.shape[1]),
         yticks=np.arange(conf_mat.shape[0]),
         # ... and label them with the respective list entries
-        xticklabels=classes,
-        yticklabels=classes,
+        xticklabels=classes_wrapped,
+        yticklabels=classes_wrapped,
         title=title,
         ylabel="True label",
         xlabel="Predicted label",
     )
 
     # Rotate the tick labels and set their alignment.
-    plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
+    plt.setp(
+        ax.get_xticklabels(),
+        rotation=45,
+        ha="right",
+        rotation_mode="anchor",
+        fontsize=8,
+    )
+
+    plt.setp(ax.get_yticklabels(), fontsize=8)
 
     # Loop over data dimensions and create text annotations.
     fmt = ".2f" if normalize else "d"
