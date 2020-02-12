@@ -394,11 +394,14 @@ def set_up_label_transformers(
     label_transformers = {}
 
     for column_type in label_columns:
-        logger.debug(
-            "Fitting transformers on %s target columns %s", column_type, label_columns
-        )
-
         target_columns_of_cur_type = label_columns[column_type]
+
+        if target_columns_of_cur_type:
+            logger.debug(
+                "Fitting transformers on %s label columns %s",
+                column_type,
+                target_columns_of_cur_type,
+            )
 
         for cur_target_column in target_columns_of_cur_type:
             cur_target_transformer = _fit_transformer_on_label_column(

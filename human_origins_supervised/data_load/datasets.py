@@ -10,6 +10,7 @@ from aislib.misc_utils import get_logger, ensure_path_exists
 from sklearn.preprocessing import StandardScaler
 from torch.nn.functional import pad
 from torch.utils.data import Dataset
+from tqdm import tqdm
 
 from human_origins_supervised.data_load.label_setup import (
     set_up_train_and_valid_labels,
@@ -213,7 +214,9 @@ class ArrayDatasetBase(Dataset):
         sample_id_iter = self.labels_dict if self.labels_dict else files
         samples = []
 
-        for sample_id in sample_id_iter:
+        logger.debug("Setting up %d samples in current dataset.", len(sample_id_iter))
+
+        for sample_id in tqdm(sample_id_iter, desc="Progress"):
             raw_sample_labels = self.labels_dict.get(sample_id, None)
             parsed_sample_labels = _transform_labels_in_sample(
                 target_transformers=self.target_transformers,
@@ -309,10 +312,11 @@ class MemoryArrayDataset(ArrayDatasetBase):
         if self.labels_dict:
             self.init_label_attributes()
 
-        self.samples = self.set_up_samples(array_hook=self.mem_sample_loader)
+        self.samples = self.set_up_samples(array_hook=self._mem_sample_loader)
         self.check_non_labelled()
 
-    def mem_sample_loader(self, sample_fpath):
+    @staticmethod
+    def _mem_sample_loader(sample_fpath):
         """
         A small hook to actually load the arrays into `self.samples` instead of just
         pointing to filenames.
