@@ -509,7 +509,7 @@ def activation_analysis_handler(
     We need to copy the model to avoid affecting the actual model during
     training (e.g. zero-ing out gradients).
 
-    TODO: Refactor this function further – reuse for parts for benchmarking.
+    TODO: Refactor this function further.
     """
 
     c = handler_config.config

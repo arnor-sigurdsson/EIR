@@ -590,10 +590,6 @@ if __name__ == "__main__":
         help="Classes to use for activation maps.",
     )
 
-    parser.add_argument("--benchmark", dest="benchmark", action="store_true")
-    parser.add_argument("--no_benchmark", dest="benchmark", action="store_false")
-    parser.set_defaults(benchmark=False)
-
     parser.add_argument(
         "--debug",
         action="store_true",

@@ -167,7 +167,6 @@ def grab_latest_model_path(saved_models_folder: Path):
                 "n_epochs": 2,
                 "checkpoint_interval": 50,
                 # to save time since we're not testing the modelling
-                "benchmark": False,
                 "get_acts": False,
             }
         }

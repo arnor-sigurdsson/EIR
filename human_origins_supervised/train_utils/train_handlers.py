@@ -16,7 +16,6 @@ from human_origins_supervised.data_load.data_utils import get_target_columns_gen
 from human_origins_supervised.train_utils.activation_analysis import (
     activation_analysis_handler,
 )
-from human_origins_supervised.train_utils.benchmark import benchmark
 from human_origins_supervised.train_utils.evaluation import evaluation_handler
 from human_origins_supervised.train_utils.lr_scheduling import (
     set_up_scheduler,
@@ -199,14 +198,6 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
         handler_config=handler_config,
     )
 
-    if cl_args.benchmark:
-        trainer.add_event_handler(
-            event_name=Events.STARTED,
-            handler=benchmark,
-            config=handler_config.config,
-            run_folder=handler_config.run_folder,
-        )
-
     if cl_args.custom_lib:
         custom_handlers = _get_custom_handlers(handler_config)
         trainer = _attach_custom_handlers(trainer, handler_config, custom_handlers)
@@ -258,33 +249,9 @@ def _write_training_metrics_handler(engine: Engine, handler_config: HandlerConfi
         )
 
 
-def _plot_benchmark_hook(ax, run_folder, target: str):
-
-    benchmark_file = Path(run_folder, "benchmark/benchmark_metrics.txt")
-    with open(str(benchmark_file), "r") as bfile:
-        lines = [i.strip() for i in bfile if i.startswith(target)]
-
-        # If we did not run benchmark for this metric, don't plot anything
-        if not lines:
-            return
-
-        value = float(lines[0].split(": ")[-1])
-
-    benchm_line = ax.axhline(y=value, linewidth=0.5, color="gray", linestyle="dashed")
-    handles, labels = ax.get_legend_handles_labels()
-    handles.append(benchm_line)
-    labels.append("LR Benchmark")
-    ax.legend(handles, labels)
-
-
 def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> None:
     args = handler_config.config.cl_args
     hook_funcs = []
-
-    if args.benchmark:
-        hook_funcs.append(
-            partial(_plot_benchmark_hook, run_folder=handler_config.run_folder)
-        )
 
     run_folder = get_run_folder(args.run_name)
 

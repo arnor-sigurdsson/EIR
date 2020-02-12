@@ -64,7 +64,6 @@ def args_config():
             "b1": 0.9,
             "b2": 0.999,
             "batch_size": 64,
-            "benchmark": False,
             "channel_exp_base": 5,
             "checkpoint_interval": 100,
             "contn_columns": [],
