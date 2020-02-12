@@ -117,7 +117,7 @@ def _plot_lr_schedule(
 
 
 def set_up_scheduler(
-    handler_config: "HandlerConfig"
+    handler_config: "HandlerConfig",
 ) -> Union[ConcatScheduler, CosineAnnealingScheduler, ReduceLROnPlateau]:
 
     c = handler_config.config

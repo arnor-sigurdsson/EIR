@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from matplotlib.ticker import MaxNLocator
 
-plt.rcParams.update({"xtick.labelsize": 12, "ytick.labelsize": 12})
+plt.rcParams.update({"xtick.labelsize": 14, "ytick.labelsize": 14})
 
 
 def generate_training_curve(

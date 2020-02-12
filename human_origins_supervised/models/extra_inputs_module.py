@@ -29,7 +29,7 @@ def get_unique_embed_values(
 
 
 def set_up_embedding_lookups(
-    unique_emb_dict: al_unique_embed_vals
+    unique_emb_dict: al_unique_embed_vals,
 ) -> al_emb_lookup_dict:
     emb_lookup_dict = {}
 

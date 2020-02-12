@@ -23,7 +23,7 @@ al_label_transformers = Union[StandardScaler, LabelEncoder]
 
 
 def set_up_train_and_valid_labels(
-    cl_args: Namespace
+    cl_args: Namespace,
 ) -> Tuple[al_label_dict, al_label_dict]:
     """
     Splits and does split based processing (e.g. scaling validation set with training
