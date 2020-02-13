@@ -1,5 +1,8 @@
 from unittest.mock import patch
 import pytest
+import numpy as np
+import pandas as pd
+from argparse import Namespace
 
 from human_origins_supervised.data_load import label_setup
 from human_origins_supervised.data_load.common_ops import ColumnOperation
@@ -512,3 +515,113 @@ def test_split_df(create_test_data, create_test_cl_args):
 
         assert df_train.shape[0] == int(expected_train)
         assert df_valid.shape[0] == int(expected_valid)
+
+
+@pytest.fixture
+def get_test_nan_df():
+    """
+    >>> df
+         A    B   C  D
+    0  NaN  2.0 NaN  0
+    1  3.0  4.0 NaN  1
+    2  NaN  NaN NaN  5
+    3  NaN  3.0 NaN  4
+    """
+    df = pd.DataFrame(
+        [
+            [np.nan, 2, np.nan, 0],
+            [3, 4, np.nan, 1],
+            [np.nan, np.nan, np.nan, 5],
+            [np.nan, 3, np.nan, 4],
+        ],
+        columns=list("ABCD"),
+    )
+
+    return df
+
+
+@pytest.fixture
+def get_test_nan_args():
+    cl_args = Namespace(
+        **{
+            "target_cat_columns": ["A"],
+            "embed_columns": ["B"],
+            "target_con_columns": ["C"],
+            "contn_columns": ["D"],
+        }
+    )
+
+    return cl_args
+
+
+def test_process_train_and_label_dfs(get_test_nan_df, get_test_nan_args):
+    test_df = get_test_nan_df
+    cl_args = get_test_nan_args
+
+    train_df = test_df.fillna(5)
+    valid_df = test_df
+
+    train_df_filled, valid_df_filled = label_setup._process_train_and_label_dfs(
+        cl_args=cl_args, df_labels_train=train_df, df_labels_valid=valid_df
+    )
+
+    assert set(train_df_filled["A"].unique()) == {5.0, 3.0}
+    assert set(valid_df_filled["A"].unique()) == {"NA", 3}
+
+    assert set(train_df_filled["B"].unique()) == {2.0, 3.0, 4.0, 5.0}
+    assert set(valid_df_filled["B"].unique()) == {"NA", 2, 3, 4}
+
+    assert (train_df_filled["C"] == 5.0).all()
+    assert (valid_df_filled["C"] == 5.0).all()
+
+    assert (train_df_filled["D"] == valid_df_filled["D"]).all()
+
+
+def test_handle_missing_label_values_in_df(get_test_nan_df, get_test_nan_args):
+    test_df = get_test_nan_df
+    cl_args = get_test_nan_args
+
+    test_df_filled = label_setup.handle_missing_label_values_in_df(
+        df=test_df, cl_args=cl_args, con_manual_values={"C": 3.0}
+    )
+    assert set(test_df_filled["A"].unique()) == {"NA", 3}
+    assert set(test_df_filled["B"].unique()) == {"NA", 2, 3, 4}
+    assert (test_df_filled["C"] == 3.0).all()
+    assert (test_df_filled["D"] == test_df["D"]).all()
+
+
+def test_fill_categorical_nans(get_test_nan_df):
+    test_df = get_test_nan_df
+    test_df_filled = label_setup._fill_categorical_nans(
+        df=test_df, column_names=["A", "B"]
+    )
+
+    assert set(test_df_filled["A"].unique()) == {"NA", 3}
+    assert set(test_df_filled["B"].unique()) == {"NA", 2, 3, 4}
+    assert test_df_filled["C"].isna().values.all()
+    assert test_df_filled["D"].notna().values.all()
+
+
+def test_fill_continuous_nans_auto_fill(get_test_nan_df):
+    test_df = get_test_nan_df
+    test_df_filled = label_setup._fill_continuous_nans(
+        df=test_df, column_names=["A", "B", "C"]
+    )
+    assert (test_df_filled["A"] == 3.0).all()
+    assert test_df_filled["B"].loc[1] == 4.0
+    assert test_df_filled["B"].loc[2] == 3.0
+    # if it's all NaN, we can't fill with anything
+    assert test_df_filled["C"].isna().values.all()
+
+
+def test_fill_continuous_nans_manual_fill(get_test_nan_df):
+    test_df = get_test_nan_df
+    manual_values = {"A": 1.0, "B": 2.0, "C": 3.0}
+    test_df_filled = label_setup._fill_continuous_nans(
+        df=test_df, column_names=["A", "B", "C"], con_manual_values=manual_values
+    )
+
+    assert test_df_filled["A"].loc[0] == 1.0
+    assert test_df_filled["A"].loc[1] == 3.0
+    assert test_df_filled["B"].loc[2] == 2.0
+    assert (test_df_filled["C"] == 3.0).all()
