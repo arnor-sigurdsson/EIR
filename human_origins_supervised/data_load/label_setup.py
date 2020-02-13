@@ -344,15 +344,19 @@ def _split_df(df: pd.DataFrame, valid_size: Union[int, float]) -> al_train_val_d
 def _process_train_and_label_dfs(
     cl_args: Namespace, df_labels_train: pd.DataFrame, df_labels_valid: pd.DataFrame
 ) -> al_train_val_dfs:
-    def _get_con_manual_vals_dict():
-        con_cols = cl_args.target_con_columns + cl_args.contn_columns
-        return {k: df_labels_train[k].mean() for k in con_cols}
 
-    df_labels_train = handle_missing_label_values_in_df(
-        df=df_labels_train, cl_args=cl_args, name="train df"
+    con_columns = cl_args.target_con_columns + cl_args.contn_columns
+    train_con_means = _get_con_manual_vals_dict(
+        df=df_labels_train, con_columns=con_columns
     )
 
-    train_con_means = _get_con_manual_vals_dict()
+    df_labels_train = handle_missing_label_values_in_df(
+        df=df_labels_train,
+        cl_args=cl_args,
+        con_manual_values=train_con_means,
+        name="train df",
+    )
+
     df_labels_valid = handle_missing_label_values_in_df(
         df=df_labels_valid,
         cl_args=cl_args,
@@ -361,6 +365,13 @@ def _process_train_and_label_dfs(
     )
 
     return df_labels_train, df_labels_valid
+
+
+def _get_con_manual_vals_dict(
+    df: pd.DataFrame, con_columns: List[str]
+) -> Dict[str, float]:
+    con_means_dict = {column: df[column].mean() for column in con_columns}
+    return con_means_dict
 
 
 def handle_missing_label_values_in_df(
@@ -381,7 +392,7 @@ def handle_missing_label_values_in_df(
         df=df_filled_cat,
         column_names=con_label_columns,
         name=name,
-        con_manual_values=con_manual_values,
+        con_means_dict=con_manual_values,
     )
 
     return df_filled_final
@@ -405,14 +416,9 @@ def _fill_categorical_nans(
 def _fill_continuous_nans(
     df: pd.DataFrame,
     column_names: List[str],
+    con_means_dict: Dict[str, float],
     name: str = "df",
-    con_manual_values: Dict[str, float] = None,
 ) -> pd.DataFrame:
-
-    if con_manual_values:
-        means_to_fill = con_manual_values
-    else:
-        means_to_fill = df[column_names].mean()
 
     missing_stats = _get_missing_stats_string(df, column_names)
     logger.debug(
@@ -420,10 +426,10 @@ def _fill_continuous_nans(
         column_names,
         missing_stats,
         name,
-        means_to_fill,
+        con_means_dict,
     )
 
-    df[column_names] = df[column_names].fillna(means_to_fill)
+    df[column_names] = df[column_names].fillna(con_means_dict)
     return df
 
 

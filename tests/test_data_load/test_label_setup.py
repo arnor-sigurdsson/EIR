@@ -602,23 +602,23 @@ def test_fill_categorical_nans(get_test_nan_df):
     assert test_df_filled["D"].notna().values.all()
 
 
-def test_fill_continuous_nans_auto_fill(get_test_nan_df):
+def test_get_con_manual_vals_dict(get_test_nan_df):
     test_df = get_test_nan_df
-    test_df_filled = label_setup._fill_continuous_nans(
-        df=test_df, column_names=["A", "B", "C"]
+
+    means_dict = label_setup._get_con_manual_vals_dict(
+        df=test_df, con_columns=["A", "B", "C", "D"]
     )
-    assert (test_df_filled["A"] == 3.0).all()
-    assert test_df_filled["B"].loc[1] == 4.0
-    assert test_df_filled["B"].loc[2] == 3.0
-    # if it's all NaN, we can't fill with anything
-    assert test_df_filled["C"].isna().values.all()
+    assert means_dict["A"] == 3.0
+    assert means_dict["B"] == 3.0
+    assert np.isnan(means_dict["C"])
+    assert means_dict["D"] == 2.5
 
 
-def test_fill_continuous_nans_manual_fill(get_test_nan_df):
+def test_fill_continuous_nans(get_test_nan_df):
     test_df = get_test_nan_df
     manual_values = {"A": 1.0, "B": 2.0, "C": 3.0}
     test_df_filled = label_setup._fill_continuous_nans(
-        df=test_df, column_names=["A", "B", "C"], con_manual_values=manual_values
+        df=test_df, column_names=["A", "B", "C"], con_means_dict=manual_values
     )
 
     assert test_df_filled["A"].loc[0] == 1.0
