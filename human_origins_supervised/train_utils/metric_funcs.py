@@ -1,5 +1,6 @@
 from functools import partial
 from typing import Dict, Union, TYPE_CHECKING, List
+import warnings
 
 import numpy as np
 import torch
@@ -78,7 +79,9 @@ def calc_multiclass_metrics(
     pred = pred.cpu().numpy()
     labels = labels.cpu().numpy()
 
-    mcc = matthews_corrcoef(labels, pred)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=RuntimeWarning)
+        mcc = matthews_corrcoef(labels, pred)
 
     return {f"{prefix}_mcc": mcc}
 
