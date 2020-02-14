@@ -101,6 +101,14 @@ def _check_snps_wrapper(
                 "target_con_columns": ["Height"],
             }
         },
+        {
+            "custom_cl_args": {
+                "model_type": "cnn",
+                "target_cat_columns": [],
+                "target_con_columns": ["Height"],
+                "lr_schedule": "cycle",
+            }
+        },
     ],
     indirect=True,
 )

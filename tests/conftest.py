@@ -100,6 +100,7 @@ def args_config():
             "target_cat_columns": ["Origin"],
             "target_width": 1000,
             "valid_size": 0.05,
+            "warmup_steps": 25,
             "wd": 0.00,
             "weighted_sampling_column": None,
         }
