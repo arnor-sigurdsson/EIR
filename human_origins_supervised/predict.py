@@ -233,14 +233,36 @@ def _load_labels_for_testing(test_train_cl_args_mix: Namespace) -> al_label_dict
     :return: Testing labels for performance measurement.
     """
 
-    df_labels_test = label_setup.label_df_parse_wrapper(test_train_cl_args_mix)
+    a = test_train_cl_args_mix
 
-    df_labels_test = label_setup.handle_missing_label_values(
-        df=df_labels_test, cl_args=test_train_cl_args_mix, name="test_df"
+    df_labels_test = label_setup.label_df_parse_wrapper(cl_args=a)
+
+    train_con_column_means = _prep_missing_con_dict(test_train_cl_args_mix=a)
+    df_labels_test = label_setup.handle_missing_label_values_in_df(
+        df=df_labels_test,
+        cl_args=test_train_cl_args_mix,
+        con_manual_values=train_con_column_means,
+        name="test_df",
     )
     test_labels_dict = df_labels_test.to_dict("index")
 
     return test_labels_dict
+
+
+def _prep_missing_con_dict(test_train_cl_args_mix: Namespace) -> Dict[str, float]:
+    a = test_train_cl_args_mix
+    con_columns = a.contn_columns + a.target_con_columns
+
+    extra_con_transformers = _load_transformers(
+        cl_args=a, transformers_to_load=con_columns
+    )
+
+    train_means = {
+        column: transformer.mean_[0]
+        for column, transformer in extra_con_transformers.items()
+    }
+
+    return train_means
 
 
 def _set_up_test_dataset(
@@ -261,20 +283,20 @@ def _set_up_test_dataset(
 
     target_columns_flat = target_columns["con"] + target_columns["cat"]
     target_transformers = _load_transformers(
-        cl_args=test_train_cl_args_mix, transformers_to_load=target_columns_flat
+        cl_args=a, transformers_to_load=target_columns_flat
     )
 
     extra_con_transformers = _load_transformers(
-        cl_args=test_train_cl_args_mix, transformers_to_load=a.contn_columns
+        cl_args=a, transformers_to_load=a.contn_columns
     )
 
     test_dataset = datasets.DiskArrayDataset(
-        data_folder=test_train_cl_args_mix.data_folder,
+        data_folder=a.data_folder,
         target_columns=target_columns,
         labels_dict=test_labels_dict,
         target_transformers=target_transformers,
         extra_con_transformers=extra_con_transformers,
-        target_width=test_train_cl_args_mix.target_width,
+        target_width=a.target_width,
     )
 
     return test_dataset

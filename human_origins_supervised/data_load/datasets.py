@@ -209,12 +209,13 @@ class ArrayDatasetBase(Dataset):
         would have all obs. in both train/val, which is probably not a good idea as
         it might pose data leakage risks.
         """
+
+        logger.debug("Setting up samples in current dataset.")
+
         files = {i.stem: i for i in Path(self.data_folder).iterdir()}
 
         sample_id_iter = self.labels_dict if self.labels_dict else files
         samples = []
-
-        logger.debug("Setting up %d samples in current dataset.", len(sample_id_iter))
 
         for sample_id in tqdm(sample_id_iter, desc="Progress"):
             raw_sample_labels = self.labels_dict.get(sample_id, None)

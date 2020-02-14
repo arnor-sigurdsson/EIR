@@ -28,9 +28,6 @@ def streamline_df(
 
         df = df_func(*args, df=df, column_name=column_name, **kwargs)
 
-        # Remove NaNs in target column.
-        df = df.dropna(subset=[column_name])
-
         return df
 
     return wrapper

@@ -30,12 +30,16 @@ def set_up_train_and_valid_labels(
     set for regression) on the labels.
     """
 
-    df_labels = label_df_parse_wrapper(cl_args)
+    df_labels = label_df_parse_wrapper(cl_args=cl_args)
 
-    df_labels_train, df_labels_valid = _split_df(df_labels, cl_args.valid_size)
+    df_labels_train, df_labels_valid = _split_df(
+        df=df_labels, valid_size=cl_args.valid_size
+    )
 
     df_labels_train, df_labels_valid = _process_train_and_label_dfs(
-        cl_args, df_labels_train, df_labels_valid
+        cl_args=cl_args,
+        df_labels_train=df_labels_train,
+        df_labels_valid=df_labels_valid,
     )
 
     train_labels_dict = df_labels_train.to_dict("index")
@@ -338,42 +342,94 @@ def _split_df(df: pd.DataFrame, valid_size: Union[int, float]) -> al_train_val_d
 
 
 def _process_train_and_label_dfs(
-    cl_args, df_labels_train, df_labels_valid
+    cl_args: Namespace, df_labels_train: pd.DataFrame, df_labels_valid: pd.DataFrame
 ) -> al_train_val_dfs:
 
-    df_labels_train = handle_missing_label_values(df_labels_train, cl_args, "train df")
-    df_labels_valid = handle_missing_label_values(df_labels_valid, cl_args, "valid df")
+    con_columns = cl_args.target_con_columns + cl_args.contn_columns
+    train_con_means = _get_con_manual_vals_dict(
+        df=df_labels_train, con_columns=con_columns
+    )
+
+    df_labels_train = handle_missing_label_values_in_df(
+        df=df_labels_train,
+        cl_args=cl_args,
+        con_manual_values=train_con_means,
+        name="train df",
+    )
+
+    df_labels_valid = handle_missing_label_values_in_df(
+        df=df_labels_valid,
+        cl_args=cl_args,
+        con_manual_values=train_con_means,
+        name="valid df",
+    )
 
     return df_labels_train, df_labels_valid
 
 
-def get_transformer_path(run_path: Path, transformer_name: str) -> Path:
-    transformer_path = run_path / "transformers" / f"{transformer_name}.save"
+def _get_con_manual_vals_dict(
+    df: pd.DataFrame, con_columns: List[str]
+) -> Dict[str, float]:
+    con_means_dict = {column: df[column].mean() for column in con_columns}
+    return con_means_dict
 
-    return transformer_path
+
+def handle_missing_label_values_in_df(
+    df: pd.DataFrame,
+    cl_args: Namespace,
+    con_manual_values: Union[Dict[str, float], None] = None,
+    name: str = "df",
+) -> pd.DataFrame:
+
+    cat_label_columns = cl_args.embed_columns + cl_args.target_cat_columns
+    con_label_columns = cl_args.contn_columns + cl_args.target_con_columns
+
+    df_filled_cat = _fill_categorical_nans(
+        df=df, column_names=cat_label_columns, name=name
+    )
+
+    df_filled_final = _fill_continuous_nans(
+        df=df_filled_cat,
+        column_names=con_label_columns,
+        name=name,
+        con_means_dict=con_manual_values,
+    )
+
+    return df_filled_final
 
 
-def handle_missing_label_values(df: pd.DataFrame, cl_args, name="df"):
-    if cl_args.embed_columns:
-        missing_stats = _get_missing_stats_string(df, cl_args.embed_columns)
-        logger.debug(
-            "Replacing NaNs in embedding columns %s (counts: %s) in %s with 'NA'.",
-            cl_args.embed_columns,
-            missing_stats,
-            name,
-        )
-        df[cl_args.embed_columns] = df[cl_args.embed_columns].fillna("NA")
+def _fill_categorical_nans(
+    df: pd.DataFrame, column_names: List[str], name: str = "df"
+) -> pd.DataFrame:
 
-    if cl_args.contn_columns:
-        missing_stats = _get_missing_stats_string(df, cl_args.contn_columns)
-        logger.debug(
-            "Replacing NaNs in continuous columns %s (counts: %s) in %s with 0.",
-            cl_args.contn_columns,
-            missing_stats,
-            name,
-        )
-        df[cl_args.contn_columns] = df[cl_args.contn_columns].fillna(0)
+    missing_stats = _get_missing_stats_string(df, column_names)
+    logger.debug(
+        "Replacing NaNs in embedding columns %s (counts: %s) in %s with 'NA'.",
+        column_names,
+        missing_stats,
+        name,
+    )
+    df[column_names] = df[column_names].fillna("NA")
+    return df
 
+
+def _fill_continuous_nans(
+    df: pd.DataFrame,
+    column_names: List[str],
+    con_means_dict: Dict[str, float],
+    name: str = "df",
+) -> pd.DataFrame:
+
+    missing_stats = _get_missing_stats_string(df, column_names)
+    logger.debug(
+        "Replacing NaNs in continuous columns %s (counts: %s) in %s with %s",
+        column_names,
+        missing_stats,
+        name,
+        con_means_dict,
+    )
+
+    df[column_names] = df[column_names].fillna(con_means_dict)
     return df
 
 
@@ -385,6 +441,12 @@ def _get_missing_stats_string(
         missing_count_dict[col] = int(df[col].isnull().sum())
 
     return missing_count_dict
+
+
+def get_transformer_path(run_path: Path, transformer_name: str) -> Path:
+    transformer_path = run_path / "transformers" / f"{transformer_name}.save"
+
+    return transformer_path
 
 
 def set_up_label_transformers(
