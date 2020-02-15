@@ -73,6 +73,7 @@ def _get_reduce_lr_on_plateu_step_params(cl_args: Namespace, config: "Config") -
         "optimizer": config.optimizer,
         "sample_interval": cl_args.sample_interval,
         "lr_upper_bound": cl_args.lr,
+        "lr_lower_bound": cl_args.lr_lb,
         "warmup_steps": warmup_steps,
     }
 
@@ -235,6 +236,7 @@ def _step_reduce_on_plateau_scheduler(
     engine: Engine,
     optimizer: Optimizer,
     lr_upper_bound: float,
+    lr_lower_bound: float,
     sample_interval: int,
     reduce_on_plateau_scheduler: ReduceLROnPlateau,
     eval_history_fpath: Path,
@@ -248,9 +250,10 @@ def _step_reduce_on_plateau_scheduler(
     iteration = engine.state.iteration
 
     if warmup_steps is not None and iteration <= warmup_steps:
-        lr_scale = min(1, (1 / warmup_steps) * iteration)
+        step_size = (lr_upper_bound - lr_lower_bound) / warmup_steps
+        cur_lr = lr_lower_bound + step_size * iteration
         for param_group in optimizer.param_groups:
-            param_group["lr"] = lr_scale * lr_upper_bound
+            param_group["lr"] = cur_lr
 
     else:
         if iteration % sample_interval == 0:
