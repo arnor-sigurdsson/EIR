@@ -366,6 +366,13 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        "--warmup_steps",
+        type=str,
+        default="auto",
+        help="How many steps to use in warmup.",
+    )
+
+    parser.add_argument(
         "--lr_lb",
         type=float,
         default=0.0,
