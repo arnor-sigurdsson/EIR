@@ -9,6 +9,7 @@ from aislib.misc_utils import get_logger
 from ignite.engine import Engine
 from scipy.special import softmax
 from sklearn.preprocessing import LabelEncoder, StandardScaler
+from torch.utils.tensorboard import SummaryWriter
 
 from human_origins_supervised.data_load.data_utils import get_target_columns_generator
 from human_origins_supervised.data_load.datasets import al_label_transformers
@@ -22,6 +23,7 @@ from human_origins_supervised.train_utils.utils import (
     append_metrics_to_file,
     get_metrics_files,
     prep_sample_outfolder,
+    add_metrics_to_writer,
 )
 from human_origins_supervised.train_utils.utils import get_run_folder
 from human_origins_supervised.visualization import visualization_funcs as vf
@@ -79,6 +81,7 @@ def evaluation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
         iteration=iteration,
         target_columns=c.target_columns,
         all_val_metrics_dict=eval_metrics_dict,
+        writer=c.writer,
     )
 
     save_evaluation_results_wrapper(
@@ -96,17 +99,25 @@ def write_eval_metrics(
     iteration: int,
     target_columns: Dict[str, List[str]],
     all_val_metrics_dict,
+    writer: SummaryWriter,
 ):
     metrics_files = get_metrics_files(
         target_columns=target_columns, run_folder=run_folder, target_prefix="v_"
     )
 
     for metrics_name, metrics_history_file in metrics_files.items():
-        cur_metrics = all_val_metrics_dict[metrics_name]
+        cur_metric_dict = all_val_metrics_dict[metrics_name]
+
+        add_metrics_to_writer(
+            name=f"validation/{metrics_name}",
+            metric_dict=cur_metric_dict,
+            iteration=iteration,
+            writer=writer,
+        )
 
         append_metrics_to_file(
             filepath=metrics_history_file,
-            metrics=cur_metrics,
+            metrics=cur_metric_dict,
             iteration=iteration,
             write_header=write_header,
         )

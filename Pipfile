@@ -37,6 +37,7 @@ seaborn = "*"
 aislib = {ref = "dev",git = "ssh://git@github.com/arnor-sigurdsson/aislib.git",editable = true}
 joblib = "*"
 lr-finder = {git = "ssh://git@github.com/arnor-sigurdsson/lr-finder.git",editable = true}
+tensorboard = "*"
 
 [requires]
 python_version = "3.7"

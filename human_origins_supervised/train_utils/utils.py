@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import List, Dict, TYPE_CHECKING
 
 import pandas as pd
+from torch.utils.tensorboard import SummaryWriter
 from aislib.misc_utils import get_logger, ensure_path_exists
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
@@ -152,6 +153,16 @@ def filter_items_from_engine_metrics_dict(
             output_dict[metric_name] = metric_value
 
     return output_dict
+
+
+def add_metrics_to_writer(
+    name: str, metric_dict: Dict[str, float], iteration: int, writer: SummaryWriter
+):
+    for metric_name, metric_value in metric_dict.items():
+        cur_name = name + f"/{metric_name}"
+        writer.add_scalar(
+            tag=cur_name, scalar_value=metric_value, global_step=iteration
+        )
 
 
 def configure_root_logger(run_name: str):

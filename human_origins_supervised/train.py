@@ -16,6 +16,7 @@ from torch.optim import SGD
 from torch.optim.adamw import AdamW
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader, WeightedRandomSampler
+from torch.utils.tensorboard import SummaryWriter
 
 from human_origins_supervised.data_load import data_utils
 from human_origins_supervised.data_load import datasets
@@ -76,6 +77,7 @@ class Config:
     target_transformers: Dict[str, al_label_transformers]
     target_columns: al_target_columns
     data_width: int
+    writer: SummaryWriter
 
 
 def train_ignite(config: Config) -> None:
@@ -266,6 +268,13 @@ def _get_criterions(target_columns: al_target_columns) -> al_criterions:
     return criterions_dict
 
 
+def get_summary_writer(cl_args: argparse.Namespace) -> SummaryWriter:
+    log_dir = Path("./runs", "tensorboard_logs", cl_args.run_name)
+    writer = SummaryWriter(log_dir=str(log_dir))
+
+    return writer
+
+
 def _log_params(model: nn.Module) -> None:
     no_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     logger.info(
@@ -310,6 +319,8 @@ def main(cl_args: argparse.Namespace) -> None:
 
     criterions = _get_criterions(train_dataset.target_columns)
 
+    writer = get_summary_writer(cl_args=cl_args)
+
     config = Config(
         cl_args=cl_args,
         train_loader=train_dloader,
@@ -322,6 +333,7 @@ def main(cl_args: argparse.Namespace) -> None:
         target_transformers=train_dataset.target_transformers,
         target_columns=train_dataset.target_columns,
         data_width=train_dataset.data_width,
+        writer=writer,
     )
 
     _log_params(model)

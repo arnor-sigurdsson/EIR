@@ -1,3 +1,4 @@
+import atexit
 import json
 from argparse import Namespace
 from dataclasses import dataclass
@@ -7,6 +8,7 @@ from typing import List, Callable, Union, Tuple, TYPE_CHECKING
 
 import pandas as pd
 from aislib.misc_utils import get_logger
+from torch.utils.tensorboard import SummaryWriter
 from ignite.contrib.handlers import ProgressBar
 from ignite.engine import Events, Engine
 from ignite.handlers import ModelCheckpoint
@@ -30,6 +32,7 @@ from human_origins_supervised.train_utils.utils import (
     get_metrics_files,
     ensure_metrics_paths_exists,
     filter_items_from_engine_metrics_dict,
+    add_metrics_to_writer,
 )
 from human_origins_supervised.visualization import visualization_funcs as vf
 
@@ -201,6 +204,14 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
     if cl_args.custom_lib:
         custom_handlers = _get_custom_handlers(handler_config)
         trainer = _attach_custom_handlers(trainer, handler_config, custom_handlers)
+
+    func = partial(
+        add_hparams_to_tensorboard,
+        config=handler_config.config,
+        writer=handler_config.config.writer,
+    )
+    atexit.register(func)
+
     return trainer
 
 
@@ -220,6 +231,7 @@ def _write_training_metrics_handler(engine: Engine, handler_config: HandlerConfi
     trainer.state.metrics gives us.
     """
     args = handler_config.config.cl_args
+    writer = handler_config.config.writer
     iteration = engine.state.iteration
     target_columns = handler_config.config.target_columns
 
@@ -239,6 +251,13 @@ def _write_training_metrics_handler(engine: Engine, handler_config: HandlerConfi
     for metrics_name, metrics_history_file in metrics_files.items():
         cur_metric_dict = filter_items_from_engine_metrics_dict(
             engine_metrics_dict=engine_metrics_dict, metrics_substring=metrics_name
+        )
+
+        add_metrics_to_writer(
+            name=f"train/{metrics_name}",
+            metric_dict=cur_metric_dict,
+            iteration=iteration,
+            writer=writer,
         )
 
         append_metrics_to_file(
@@ -295,6 +314,52 @@ def _get_metrics_dataframes(
     )
 
     return train_history_path, valid_history_path
+
+
+def add_hparams_to_tensorboard(config: "Config", writer: SummaryWriter):
+    """
+    TODO: Add resblocks here.
+    """
+
+    logger.debug(
+        "Exiting and logging best hyperparameters for best average loss"
+        "to tensorboard."
+    )
+
+    c = config
+    cl_args = c.cl_args
+    run_folder = get_run_folder(cl_args.run_name)
+
+    metrics_files = get_metrics_files(
+        target_columns=c.target_columns, run_folder=run_folder, target_prefix="v_"
+    )
+    average_loss_file = metrics_files["v_loss-average"]
+
+    average_loss_df = pd.read_csv(average_loss_file)
+    min_loss = average_loss_df["v_loss-average"].min()
+
+    h_params = [
+        "b1",
+        "b2",
+        "batch_size",
+        "channel_exp_base",
+        "down_stride",
+        "fc_dim",
+        "fc_do",
+        "first_kernel_expansion",
+        "first_stride_expansion",
+        "kernel_width",
+        "lr",
+        "na_augment",
+        "optimizer",
+        "rb_do",
+        "sa",
+        "warmup_steps",
+        "wd",
+    ]
+
+    h_param_dict = {param_name: getattr(cl_args, param_name) for param_name in h_params}
+    writer.add_hparams(h_param_dict, {"v_loss-average_min": min_loss})
 
 
 def _get_custom_handlers(handler_config: "HandlerConfig"):
