@@ -1,6 +1,7 @@
 import csv
 import importlib
 import importlib.util
+import logging
 import sys
 from pathlib import Path
 from typing import List, Dict, TYPE_CHECKING
@@ -151,3 +152,19 @@ def filter_items_from_engine_metrics_dict(
             output_dict[metric_name] = metric_value
 
     return output_dict
+
+
+def configure_root_logger(run_name: str):
+
+    logfile_path = get_run_folder(run_name=run_name) / "logging_history.log"
+
+    ensure_path_exists(logfile_path)
+    file_handler = logging.FileHandler(str(logfile_path))
+    file_handler.setLevel(logging.DEBUG)
+
+    formatter = logging.Formatter(
+        "%(asctime)s - %(levelname)s - %(name)s - %(message)s", "%H:%M:%S"
+    )
+    file_handler.setFormatter(formatter)
+
+    logging.getLogger("").addHandler(file_handler)

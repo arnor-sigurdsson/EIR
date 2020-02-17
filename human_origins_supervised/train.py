@@ -612,6 +612,8 @@ if __name__ == "__main__":
 
     cur_cl_args = parser.parse_args()
 
+    utils.configure_root_logger(run_name=cur_cl_args.run_name)
+
     if cur_cl_args.valid_size > 1.0:
         cur_cl_args.valid_size = int(cur_cl_args.valid_size)
 

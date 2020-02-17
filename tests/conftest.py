@@ -20,6 +20,7 @@ from human_origins_supervised.models.extra_inputs_module import (
     set_up_and_save_embeddings_dict,
 )
 from human_origins_supervised.train import Config, get_model
+from human_origins_supervised.train_utils.utils import configure_root_logger
 from human_origins_supervised.train_utils.utils import get_run_folder
 
 np.random.seed(0)
@@ -344,6 +345,8 @@ def create_test_cl_args(request, args_config, create_test_data):
     args_config.run_name += (
         "_" + args_config.model_type + "_" + c.request_params["task_type"]
     )
+
+    configure_root_logger(run_name=args_config.run_name)
 
     return args_config
 
