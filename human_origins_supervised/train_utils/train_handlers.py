@@ -262,7 +262,7 @@ def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> Non
             results_dir=results_dir, target_string=target_column
         )
 
-        vf.generate_all_plots(
+        vf.generate_all_training_curves(
             training_history_df=train_history_df,
             valid_history_df=valid_history_df,
             output_folder=results_dir,
@@ -273,7 +273,7 @@ def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> Non
         results_dir=run_folder, target_string="average-loss"
     )
 
-    vf.generate_all_plots(
+    vf.generate_all_training_curves(
         training_history_df=train_avg_history_df,
         valid_history_df=valid_avg_history_df,
         output_folder=run_folder,

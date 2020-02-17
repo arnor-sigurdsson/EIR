@@ -35,13 +35,13 @@ from human_origins_supervised.models.extra_inputs_module import (
 )
 from human_origins_supervised.models.model_utils import get_model_params, test_lr_range
 from human_origins_supervised.models.models import get_model_class
+from human_origins_supervised.train_utils import utils
 from human_origins_supervised.train_utils.metric_funcs import (
     calculate_batch_metrics,
     calculate_losses,
     aggregate_losses,
 )
 from human_origins_supervised.train_utils.train_handlers import configure_trainer
-from human_origins_supervised.train_utils.utils import get_run_folder
 
 if TYPE_CHECKING:
     from human_origins_supervised.train_utils.metric_funcs import al_step_metric_dict
@@ -131,7 +131,7 @@ def train_ignite(config: Config) -> None:
 
 
 def _prepare_run_folder(run_name: str) -> Path:
-    run_folder = get_run_folder(run_name)
+    run_folder = utils.get_run_folder(run_name)
     history_file = run_folder / "t_average-loss_history.log"
     if history_file.exists():
         raise FileExistsError(

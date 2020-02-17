@@ -17,6 +17,7 @@ from sklearn.preprocessing import LabelEncoder
 from aislib.misc_utils import get_logger
 
 import human_origins_supervised.visualization.visualization_funcs as vf
+from human_origins_supervised.train_utils.evaluation import PerformancePlotConfig
 from human_origins_supervised.data_load import datasets, label_setup
 from human_origins_supervised.data_load.datasets import (
     al_datasets,
@@ -73,14 +74,19 @@ def predict(predict_cl_args: Namespace) -> None:
 
         if predict_cl_args.evaluate:
             cur_labels = all_labels[target_column].cpu().numpy()
-            vf.gen_eval_graphs(
-                val_labels=cur_labels,
+
+            plot_config = PerformancePlotConfig(
                 val_outputs=preds_sm,
+                val_labels=cur_labels,
                 val_ids=all_ids,
-                outfolder=outfolder,
-                transformer=cur_target_transformer,
+                iteration=0,
+                column_name=target_column,
                 column_type=target_column_type,
+                target_transformer=cur_target_transformer,
+                output_folder=outfolder,
             )
+
+            vf.gen_eval_graphs(plot_config=plot_config)
 
 
 @dataclass

@@ -1,15 +1,17 @@
+from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Dict, TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
 import torch
-from aislib.misc_utils import ensure_path_exists, get_logger
+from aislib.misc_utils import get_logger
 from ignite.engine import Engine
 from scipy.special import softmax
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
 from human_origins_supervised.data_load.data_utils import get_target_columns_generator
+from human_origins_supervised.data_load.datasets import al_label_transformers
 from human_origins_supervised.models import model_utils
 from human_origins_supervised.train_utils.metric_funcs import (
     calculate_batch_metrics,
@@ -19,6 +21,7 @@ from human_origins_supervised.train_utils.metric_funcs import (
 from human_origins_supervised.train_utils.utils import (
     append_metrics_to_file,
     get_metrics_files,
+    prep_sample_outfolder,
 )
 from human_origins_supervised.train_utils.utils import get_run_folder
 from human_origins_supervised.visualization import visualization_funcs as vf
@@ -91,7 +94,7 @@ def write_eval_metrics(
     run_folder: Path,
     write_header: bool,
     iteration: int,
-    target_columns,
+    target_columns: Dict[str, List[str]],
     all_val_metrics_dict,
 ):
     metrics_files = get_metrics_files(
@@ -118,55 +121,61 @@ def save_evaluation_results_wrapper(
 ):
 
     target_columns_gen = get_target_columns_generator(config.target_columns)
+    transformers = config.target_transformers
 
     for column_type, column_name in target_columns_gen:
-        cur_val_outputs = val_outputs[column_name]
-        cur_val_labels = val_labels[column_name]
-        cur_transformer = config.target_transformers[column_name]
-        cur_output_folder = (
-            get_run_folder(config.cl_args.run_name) / "results" / column_name
+        cur_sample_outfolder = prep_sample_outfolder(
+            run_name=config.cl_args.run_name,
+            column_name=column_name,
+            iteration=iteration,
         )
 
-        save_evaluation_results(
+        cur_val_outputs = val_outputs[column_name].cpu().numpy()
+        cur_val_labels = val_labels[column_name].cpu().numpy()
+
+        plot_config = PerformancePlotConfig(
             val_outputs=cur_val_outputs,
             val_labels=cur_val_labels,
             val_ids=val_ids,
             iteration=iteration,
+            column_name=column_name,
             column_type=column_type,
-            transformer=cur_transformer,
-            output_folder=cur_output_folder,
+            target_transformer=transformers[column_name],
+            output_folder=cur_sample_outfolder,
         )
 
+        save_evaluation_results(plot_config=plot_config)
 
-def save_evaluation_results(
-    val_outputs: torch.Tensor,
-    val_labels: torch.Tensor,
-    val_ids: List[str],
-    iteration: int,
-    column_type: str,
-    transformer,
-    output_folder: Path,
-) -> None:
 
-    sample_outfolder = Path(output_folder, "samples", str(iteration))
-    ensure_path_exists(sample_outfolder, is_folder=True)
+@dataclass
+class PerformancePlotConfig:
+    val_outputs: np.ndarray
+    val_labels: np.ndarray
+    val_ids: List[str]
+    iteration: int
+    column_name: str
+    column_type: str
+    target_transformer: al_label_transformers
+    output_folder: Path
 
-    val_outputs = val_outputs.cpu().numpy()
-    val_labels = val_labels.cpu().numpy()
+
+def save_evaluation_results(plot_config: PerformancePlotConfig,) -> None:
+
+    pc = plot_config
 
     common_args = {
-        "val_outputs": val_outputs,
-        "val_labels": val_labels,
-        "val_ids": val_ids,
-        "outfolder": sample_outfolder,
-        "transformer": transformer,
+        "val_outputs": pc.val_outputs,
+        "val_labels": pc.val_labels,
+        "val_ids": pc.val_ids,
+        "outfolder": pc.output_folder,
+        "transformer": pc.target_transformer,
     }
 
-    vf.gen_eval_graphs(column_type=column_type, **common_args)
+    vf.gen_eval_graphs(plot_config=pc)
 
-    if column_type == "cat":
+    if pc.column_type == "cat":
         get_most_wrong_wrapper(**common_args)
-    elif column_type == "con":
+    elif pc.column_type == "con":
         scale_and_save_regression_preds(**common_args)
 
 

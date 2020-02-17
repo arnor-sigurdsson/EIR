@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Callable, Union, Tuple
+from typing import List, Callable, Union, Tuple, TYPE_CHECKING
 from textwrap import wrap
 
 import matplotlib
@@ -21,6 +21,9 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from matplotlib.ticker import MaxNLocator
+
+if TYPE_CHECKING:
+    from human_origins_supervised.train_utils.evaluation import PerformancePlotConfig
 
 
 def generate_training_curve(
@@ -124,35 +127,41 @@ def _get_validation_extreme_value_and_iter(
     return extreme_index, extreme_value
 
 
-def gen_eval_graphs(
-    val_labels: np.ndarray,
-    val_outputs: np.ndarray,
-    val_ids: list,
-    outfolder: Path,
-    transformer: Union[LabelEncoder, StandardScaler],
-    column_type: str,
-):
+def gen_eval_graphs(plot_config: "PerformancePlotConfig"):
     """
     TODO:
-        - Clean this function up – expecially when it comes to target_transformers.
+        - Clean this function up – especially when it comes to target_transformers.
         - Use val_ids_total to hook into other labels for plotting.
     """
-    if column_type == "cat":
-        n_classes = len(transformer.classes_)
-        val_pred = val_outputs.argmax(axis=1)
-        generate_confusion_matrix(val_labels, val_pred, transformer.classes_, outfolder)
-    elif column_type == "con":
+
+    pc = plot_config
+
+    if pc.column_type == "cat":
+        n_classes = len(pc.target_transformer.classes_)
+        val_argmaxed = pc.val_outputs.argmax(axis=1)
+        generate_confusion_matrix(
+            y_true=pc.val_labels,
+            y_outp=val_argmaxed,
+            classes=pc.target_transformer.classes_,
+            outfolder=pc.output_folder,
+            title_extra=pc.column_name,
+        )
+    elif pc.column_type == "con":
         n_classes = None
     else:
         raise ValueError()
 
-    plot_funcs = select_performance_curve_funcs(column_type, n_classes)
+    plot_funcs = select_performance_curve_funcs(
+        column_type=pc.column_type, n_classes=n_classes
+    )
+
     for plot_func in plot_funcs:
         plot_func(
-            y_true=val_labels,
-            y_outp=val_outputs,
-            outfolder=outfolder,
-            transformer=transformer,
+            y_true=pc.val_labels,
+            y_outp=pc.val_outputs,
+            outfolder=pc.output_folder,
+            transformer=pc.target_transformer,
+            title_extra=pc.column_name,
         )
 
 
@@ -180,7 +189,6 @@ def generate_regression_prediction_plot(
     *args,
     **kwargs,
 ):
-
     fig, ax = plt.subplots()
     y_true = transformer.inverse_transform(y_true.reshape(-1, 1))
     y_outp = transformer.inverse_transform(y_outp.reshape(-1, 1))
@@ -209,7 +217,12 @@ def generate_regression_prediction_plot(
 
 
 def generate_binary_roc_curve(
-    y_true: np.ndarray, y_outp: np.ndarray, outfolder: Path, *args, **kwargs
+    y_true: np.ndarray,
+    y_outp: np.ndarray,
+    outfolder: Path,
+    title_extra: str,
+    *args,
+    **kwargs,
 ):
     y_true_bin = label_binarize(y_true, classes=[0, 1])
     fpr, tpr, _ = roc_curve(y_true_bin, y_outp[:, 1])
@@ -222,7 +235,7 @@ def generate_binary_roc_curve(
     plt.ylim([0.0, 1.05])
     plt.xlabel("False Positive Rate")
     plt.ylabel("True Positive Rate")
-    plt.title("ROC curve")
+    plt.title(f"ROC curve – {title_extra}")
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5), prop={"size": 8})
 
     plt.tight_layout()
@@ -230,7 +243,14 @@ def generate_binary_roc_curve(
     plt.close("all")
 
 
-def generate_binary_pr_curve(y_true, y_outp, outfolder, *args, **kwargs):
+def generate_binary_pr_curve(
+    y_true: np.ndarray,
+    y_outp: np.ndarray,
+    outfolder: Path,
+    title_extra: str,
+    *args,
+    **kwargs,
+):
     y_true_bin = label_binarize(y_true, classes=[0, 1])
     precision, recall, _ = precision_recall_curve(y_true_bin, y_outp[:, 1])
     average_precision = average_precision_score(y_true_bin, y_outp[:, 1])
@@ -247,7 +267,7 @@ def generate_binary_pr_curve(y_true, y_outp, outfolder, *args, **kwargs):
     plt.ylim([0.0, 1.05])
     plt.xlabel("Recall")
     plt.ylabel("Precision")
-    plt.title("Precision-Recall curve")
+    plt.title(f"Precision-Recall curve – {title_extra}")
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5), prop={"size": 8})
 
     plt.tight_layout()
@@ -260,6 +280,7 @@ def generate_multi_class_roc_curve(
     y_outp: np.ndarray,
     transformer: LabelEncoder,
     outfolder: Path,
+    title_extra: str,
     *args,
     **kwargs,
 ):
@@ -330,7 +351,7 @@ def generate_multi_class_roc_curve(
     plt.ylim([0.0, 1.05])
     plt.xlabel("False Positive Rate", fontsize=14)
     plt.ylabel("True Positive Rate", fontsize=14)
-    plt.title("ROC curve", fontsize=20)
+    plt.title(f"ROC curve – {title_extra}", fontsize=20)
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
 
     plt.tight_layout()
@@ -343,6 +364,7 @@ def generate_multi_class_pr_curve(
     y_outp: np.ndarray,
     transformer: LabelEncoder,
     outfolder: Path,
+    title_extra: str,
     *args,
     **kwargs,
 ):
@@ -396,7 +418,7 @@ def generate_multi_class_pr_curve(
     plt.ylim([0.0, 1.05])
     plt.xlabel("Recall", fontsize=14)
     plt.ylabel("Precision", fontsize=14)
-    plt.title("Precision-Recall curve", fontsize=20)
+    plt.title(f"Precision-Recall curve – {title_extra}", fontsize=20)
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
 
     plt.tight_layout()
@@ -407,17 +429,17 @@ def generate_multi_class_pr_curve(
 def generate_confusion_matrix(
     y_true: np.ndarray,
     y_outp: np.ndarray,
-    classes,
+    classes: List[str],
     outfolder: Path,
     normalize: bool = False,
-    title: str = "",
+    title_extra: str = "",
     cmap: plt = plt.cm.Blues,
 ):
-    if not title:
+    if not title_extra:
         if normalize:
-            title = "Normalized confusion matrix"
+            title_extra = "Normalized confusion matrix"
         else:
-            title = "Confusion matrix, without normalization"
+            title_extra = "Confusion matrix, without normalization"
 
     conf_mat = confusion_matrix(y_true, y_outp)
 
@@ -438,7 +460,7 @@ def generate_confusion_matrix(
         # ... and label them with the respective list entries
         xticklabels=classes_wrapped,
         yticklabels=classes_wrapped,
-        title=title,
+        title=title_extra,
         ylabel="True label",
         xlabel="Predicted label",
     )
@@ -473,7 +495,7 @@ def generate_confusion_matrix(
     plt.close("all")
 
 
-def generate_all_plots(
+def generate_all_training_curves(
     training_history_df: pd.DataFrame,
     valid_history_df: pd.DataFrame,
     hook_funcs: List[Callable],

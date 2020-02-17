@@ -1,9 +1,9 @@
 import csv
-import sys
-from typing import List, Dict, TYPE_CHECKING
 import importlib
 import importlib.util
+import sys
 from pathlib import Path
+from typing import List, Dict, TYPE_CHECKING
 
 import pandas as pd
 from aislib.misc_utils import get_logger, ensure_path_exists
@@ -74,6 +74,15 @@ def get_extra_labels_from_ids(
 
 def get_run_folder(run_name: str) -> Path:
     return Path("runs", run_name)
+
+
+def prep_sample_outfolder(run_name: str, column_name: str, iteration: int) -> Path:
+    sample_outfolder = (
+        get_run_folder(run_name) / "results" / column_name / "samples" / str(iteration)
+    )
+    ensure_path_exists(sample_outfolder, is_folder=True)
+
+    return sample_outfolder
 
 
 def append_metrics_to_file(

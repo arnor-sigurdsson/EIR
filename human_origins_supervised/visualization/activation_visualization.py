@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Dict
+from typing import TYPE_CHECKING
 
 import matplotlib
 import numpy as np
@@ -11,6 +11,12 @@ from matplotlib import gridspec
 import matplotlib.cm as cm
 
 from aislib.misc_utils import get_logger
+
+if TYPE_CHECKING:
+    from human_origins_supervised.train_utils.activation_analysis import (
+        al_gradients_dict,
+        al_top_gradients_dict,
+    )
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -59,8 +65,8 @@ def generate_snp_gradient_matrix(
 
 
 def plot_top_gradients(
-    accumulated_grads: Dict,
-    top_gradients_dict: Dict,
+    accumulated_grads: "al_gradients_dict",
+    top_gradients_dict: "al_top_gradients_dict",
     snp_df: pd.DataFrame,
     output_folder: Path,
     fname: str = "top_snps.png",
@@ -123,7 +129,12 @@ def plot_top_gradients(
     plt.close("all")
 
 
-def plot_snp_gradients(accumulated_grads, outfolder, type_="avg"):
+def plot_snp_gradients(
+    accumulated_grads: "al_gradients_dict",
+    outfolder: Path,
+    title: str,
+    type_: str = "avg",
+):
     n_classes = len(accumulated_grads.keys())
 
     colors = iter(cm.tab20(np.arange(n_classes)))
@@ -160,6 +171,7 @@ def plot_snp_gradients(accumulated_grads, outfolder, type_="avg"):
                 out_path,
             )
 
+    plt.title(title)
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
     plt.tight_layout()
     plt.savefig(out_path, bbox_inches="tight")
