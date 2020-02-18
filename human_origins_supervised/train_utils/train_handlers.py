@@ -210,13 +210,13 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
         custom_handlers = _get_custom_handlers(handler_config)
         trainer = _attach_custom_handlers(trainer, handler_config, custom_handlers)
 
-    func = partial(
+    tensorboard_hparam_func = partial(
         add_hparams_to_tensorboard,
         h_params=H_PARAMS,
         config=handler_config.config,
         writer=handler_config.config.writer,
     )
-    atexit.register(func)
+    atexit.register(tensorboard_hparam_func)
 
     return trainer
 
@@ -338,12 +338,27 @@ def add_hparams_to_tensorboard(
         target_columns=c.target_columns, run_folder=run_folder, target_prefix="v_"
     )
 
-    best_overall_performance = _get_best_average_performance(
-        val_metrics_files=metrics_files, target_columns=c.target_columns
-    )
-    average_loss_file = metrics_files["v_average"]
+    try:
+        best_overall_performance = _get_best_average_performance(
+            val_metrics_files=metrics_files, target_columns=c.target_columns
+        )
+    except FileNotFoundError:
+        logger.debug(
+            "Could not find target column performance files at exit."
+            "Tensorboard hyper parameters not logged."
+        )
+        return
 
-    average_loss_df = pd.read_csv(average_loss_file)
+    average_loss_file = metrics_files["v_loss-average"]
+    try:
+        average_loss_df = pd.read_csv(average_loss_file)
+    except FileNotFoundError:
+        logger.debug(
+            "Could not find %s at exit. " "Tensorboard hyper parameters not logged.",
+            average_loss_file,
+        )
+        return
+
     min_loss = average_loss_df["v_loss-average"].min()
 
     h_param_dict = {
