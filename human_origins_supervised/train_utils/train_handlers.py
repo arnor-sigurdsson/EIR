@@ -4,7 +4,7 @@ from argparse import Namespace
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
-from typing import List, Callable, Union, Tuple, TYPE_CHECKING
+from typing import List, Callable, Union, Tuple, TYPE_CHECKING, Dict
 
 import pandas as pd
 from aislib.misc_utils import get_logger
@@ -18,6 +18,7 @@ from human_origins_supervised.data_load.data_utils import get_target_columns_gen
 from human_origins_supervised.train_utils.activation_analysis import (
     activation_analysis_handler,
 )
+from human_origins_supervised.train_utils import H_PARAMS
 from human_origins_supervised.train_utils.evaluation import evaluation_handler
 from human_origins_supervised.train_utils.lr_scheduling import (
     set_up_scheduler,
@@ -74,10 +75,14 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
     pbar = ProgressBar()
     run_name = cl_args.run_name
 
-    monitoring_metrics = _get_monitoring_metrics(config.target_columns)
+    monitoring_metrics = _get_monitoring_metrics(target_columns=config.target_columns)
 
     handler_config = HandlerConfig(
-        config, run_folder, run_name, pbar, monitoring_metrics
+        config=config,
+        run_folder=run_folder,
+        run_name=run_name,
+        pbar=pbar,
+        monitoring_metrics=monitoring_metrics,
     )
 
     for handler in evaluation_handler, activation_analysis_handler:
@@ -207,6 +212,7 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
 
     func = partial(
         add_hparams_to_tensorboard,
+        h_params=H_PARAMS,
         config=handler_config.config,
         writer=handler_config.config.writer,
     )
@@ -316,50 +322,76 @@ def _get_metrics_dataframes(
     return train_history_path, valid_history_path
 
 
-def add_hparams_to_tensorboard(config: "Config", writer: SummaryWriter):
-    """
-    TODO: Add resblocks here.
-    """
+def add_hparams_to_tensorboard(
+    h_params: List[str], config: "Config", writer: SummaryWriter
+) -> None:
 
     logger.debug(
-        "Exiting and logging best hyperparameters for best average loss"
+        "Exiting and logging best hyperparameters for best average loss "
         "to tensorboard."
     )
 
     c = config
-    cl_args = c.cl_args
-    run_folder = get_run_folder(cl_args.run_name)
+    run_folder = get_run_folder(c.cl_args.run_name)
 
     metrics_files = get_metrics_files(
         target_columns=c.target_columns, run_folder=run_folder, target_prefix="v_"
     )
-    average_loss_file = metrics_files["v_loss-average"]
+
+    best_overall_performance = _get_best_average_performance(
+        val_metrics_files=metrics_files, target_columns=c.target_columns
+    )
+    average_loss_file = metrics_files["v_average"]
 
     average_loss_df = pd.read_csv(average_loss_file)
     min_loss = average_loss_df["v_loss-average"].min()
 
-    h_params = [
-        "b1",
-        "b2",
-        "batch_size",
-        "channel_exp_base",
-        "down_stride",
-        "fc_dim",
-        "fc_do",
-        "first_kernel_expansion",
-        "first_stride_expansion",
-        "kernel_width",
-        "lr",
-        "na_augment",
-        "optimizer",
-        "rb_do",
-        "sa",
-        "warmup_steps",
-        "wd",
-    ]
+    h_param_dict = {
+        param_name: getattr(c.cl_args, param_name) for param_name in h_params
+    }
 
-    h_param_dict = {param_name: getattr(cl_args, param_name) for param_name in h_params}
-    writer.add_hparams(h_param_dict, {"v_loss-average_min": min_loss})
+    writer.add_hparams(
+        h_param_dict,
+        {
+            "v_loss-overall_min": min_loss,
+            "best_overall_performance": best_overall_performance,
+        },
+    )
+
+
+def _get_best_average_performance(val_metrics_files: Dict[str, Path], target_columns):
+    df_performances = _get_overall_performance(
+        val_metrics_files=val_metrics_files, target_columns=target_columns
+    )
+    best_performance = df_performances["Performance_Average"].max()
+
+    return best_performance
+
+
+def _get_overall_performance(
+    val_metrics_files: Dict[str, Path], target_columns
+) -> pd.DataFrame:
+    """
+    With continuous columns, we use the distance the MSE is from 1 as "performance".
+    """
+    target_columns_gen = get_target_columns_generator(target_columns)
+
+    df_performances = pd.DataFrame()
+    for column_type, column_name in target_columns_gen:
+        cur_metric_df = pd.read_csv(val_metrics_files[column_name])
+
+        if column_type == "con":
+            df_performances[column_name] = 1 - cur_metric_df[f"v_{column_name}_loss"]
+
+        elif column_type == "cat":
+            df_performances[column_name] = cur_metric_df[f"v_{column_name}_mcc"]
+
+        else:
+            raise ValueError()
+
+    df_performances["Performance_Average"] = df_performances.mean(axis=1)
+
+    return df_performances
 
 
 def _get_custom_handlers(handler_config: "HandlerConfig"):
