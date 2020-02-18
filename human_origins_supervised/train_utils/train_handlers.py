@@ -270,7 +270,7 @@ def _write_training_metrics_handler(engine: Engine, handler_config: HandlerConfi
             metric_dict=cur_metric_dict,
             iteration=iteration,
             writer=writer,
-            plot_skip_iter=cl_args.plot_skip_iter,
+            plot_skip_steps=cl_args.plot_skip_steps,
         )
 
         append_metrics_to_file(
@@ -299,7 +299,7 @@ def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> Non
             valid_history_df=valid_history_df,
             output_folder=results_dir,
             hook_funcs=hook_funcs,
-            plot_skip_iter=cl_args.plot_skip_iter,
+            plot_skip_steps=cl_args.plot_skip_steps,
         )
 
     train_avg_history_df, valid_avg_history_df = _get_metrics_dataframes(
@@ -311,7 +311,7 @@ def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> Non
         valid_history_df=valid_avg_history_df,
         output_folder=run_folder,
         hook_funcs=hook_funcs,
-        plot_skip_iter=cl_args.plot_skip_iter,
+        plot_skip_steps=cl_args.plot_skip_steps,
     )
 
     with open(Path(handler_config.run_folder, "model_info.txt"), "w") as mfile:
@@ -358,7 +358,8 @@ def add_hparams_to_tensorboard(
         )
         return
 
-    average_loss_file = metrics_files["v_loss-average"]
+    breakpoint()
+    average_loss_file = metrics_files["v_average"]
     try:
         average_loss_df = pd.read_csv(average_loss_file)
     except FileNotFoundError:

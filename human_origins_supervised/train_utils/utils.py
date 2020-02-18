@@ -164,9 +164,9 @@ def add_metrics_to_writer(
     metric_dict: Dict[str, float],
     iteration: int,
     writer: SummaryWriter,
-    plot_skip_iter: int,
+    plot_skip_steps: int,
 ) -> None:
-    if iteration >= plot_skip_iter:
+    if iteration >= plot_skip_steps:
         for metric_name, metric_value in metric_dict.items():
             cur_name = name + f"/{metric_name}"
             writer.add_scalar(

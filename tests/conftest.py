@@ -92,7 +92,7 @@ def args_config():
             "n_epochs": 10,
             "na_augment": 0.0,
             "optimizer": "adamw",
-            "plot_skip_iter": 50,
+            "plot_skip_steps": 50,
             "rb_do": 0.0,
             "resblocks": None,
             "run_name": "test_run",

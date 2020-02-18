@@ -94,7 +94,7 @@ def evaluation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
         target_columns=c.target_columns,
         all_val_metrics_dict=eval_metrics_dict,
         writer=c.writer,
-        plot_skip_iter=cl_args.plot_skip_iter,
+        plot_skip_steps=cl_args.plot_skip_steps,
     )
 
     save_evaluation_results_wrapper(
@@ -110,7 +110,7 @@ def write_eval_metrics(
     run_folder: Path,
     write_header: bool,
     iteration: int,
-    plot_skip_iter: int,
+    plot_skip_steps: int,
     target_columns: Dict[str, List[str]],
     all_val_metrics_dict,
     writer: SummaryWriter,
@@ -127,7 +127,7 @@ def write_eval_metrics(
             metric_dict=cur_metric_dict,
             iteration=iteration,
             writer=writer,
-            plot_skip_iter=plot_skip_iter,
+            plot_skip_steps=plot_skip_steps,
         )
 
         append_metrics_to_file(
