@@ -119,9 +119,9 @@ def get_metrics_files(
         path_dict[target_column] = cur_path
 
     average_loss_training_metrics_file = Path(
-        run_folder, f"{target_prefix}average-loss_history.log"
+        run_folder, f"{target_prefix}average_history.log"
     )
-    path_dict[f"{target_prefix}loss-average"] = average_loss_training_metrics_file
+    path_dict[f"{target_prefix}average"] = average_loss_training_metrics_file
 
     return path_dict
 
@@ -144,8 +144,12 @@ def filter_items_from_engine_metrics_dict(
      the target is actually in the metric.
     """
 
-    if metrics_substring.endswith("loss-average"):
-        return {metrics_substring: engine_metrics_dict[metrics_substring]}
+    if metrics_substring.endswith("_average"):
+        return {
+            k: engine_metrics_dict[k]
+            for k in engine_metrics_dict.keys()
+            if k.endswith("-average")
+        }
 
     output_dict = {}
     for metric_name, metric_value in engine_metrics_dict.items():

@@ -41,6 +41,7 @@ from human_origins_supervised.train_utils.metric_funcs import (
     calculate_batch_metrics,
     calculate_losses,
     aggregate_losses,
+    average_performances,
 )
 from human_origins_supervised.train_utils.train_handlers import configure_trainer
 
@@ -121,7 +122,13 @@ def train_ignite(config: Config) -> None:
             labels=train_labels,
             prefix="t_",
         )
-        batch_metrics_dict["t_loss-average"] = {"t_loss-average": train_loss}
+        average_performance = average_performances(
+            metric_dict=batch_metrics_dict, target_columns=c.target_columns, prefix="t_"
+        )
+        batch_metrics_dict["t_average"] = {
+            "t_loss-average": train_loss,
+            "t_perf-average": average_performance,
+        }
 
         return batch_metrics_dict
 
@@ -134,7 +141,7 @@ def train_ignite(config: Config) -> None:
 
 def _prepare_run_folder(run_name: str) -> Path:
     run_folder = utils.get_run_folder(run_name)
-    history_file = run_folder / "t_average-loss_history.log"
+    history_file = run_folder / "t_average_history.log"
     if history_file.exists():
         raise FileExistsError(
             f"There already exists a run with that name: {history_file}. Please choose "
@@ -584,6 +591,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--run_name",
+        required=True,
         type=str,
         help="Name of the current run, specifying will save " "run info and models.",
     )

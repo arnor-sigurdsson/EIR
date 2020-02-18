@@ -118,10 +118,16 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
 
 
 def _get_monitoring_metrics(target_columns) -> List[Tuple[str, str]]:
+    """
+    The spec for the tuple here follows the metric dict spec, i.e. the tuple is:
+    (column_name, metric).
+    """
     target_columns_gen = get_target_columns_generator(target_columns)
 
-    loss_average_metrics = tuple(["t_loss-average"] * 2)
-    monitoring_metrics = [loss_average_metrics]
+    loss_average_metrics = tuple(["t_average", "t_loss-average"])
+    perf_average_metrics = tuple(["t_average", "t_perf-average"])
+    monitoring_metrics = [loss_average_metrics, perf_average_metrics]
+
     for column_type, column_name in target_columns_gen:
 
         cur_metrics = get_train_metrics(
@@ -295,7 +301,7 @@ def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> Non
         )
 
     train_avg_history_df, valid_avg_history_df = _get_metrics_dataframes(
-        results_dir=run_folder, target_string="average-loss"
+        results_dir=run_folder, target_string="average"
     )
 
     vf.generate_all_training_curves(

@@ -48,6 +48,27 @@ def calculate_batch_metrics(
     return master_metric_dict
 
 
+def average_performances(
+    metric_dict: al_step_metric_dict, target_columns: "al_target_columns", prefix: str
+) -> float:
+    target_columns_gen = get_target_columns_generator(target_columns)
+
+    all_metrics = []
+    for column_type, column_name in target_columns_gen:
+        if column_type == "con":
+            value = 1 - metric_dict[column_name][f"{prefix}{column_name}_loss"]
+        elif column_type == "cat":
+            value = metric_dict[column_name][f"{prefix}{column_name}_mcc"]
+        else:
+            raise ValueError()
+
+        all_metrics.append(value)
+
+    average = np.array(all_metrics).mean()
+
+    return average
+
+
 def select_metric_func(
     target_column_type: str, target_transformer: Union[StandardScaler, LabelEncoder]
 ):

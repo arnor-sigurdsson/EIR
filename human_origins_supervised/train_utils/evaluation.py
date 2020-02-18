@@ -18,6 +18,7 @@ from human_origins_supervised.train_utils.metric_funcs import (
     calculate_batch_metrics,
     calculate_losses,
     aggregate_losses,
+    average_performances,
 )
 from human_origins_supervised.train_utils.utils import (
     append_metrics_to_file,
@@ -49,7 +50,12 @@ def evaluation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
     c.model.eval()
     gather_preds = model_utils.gather_pred_outputs_from_dloader
     val_outputs_total, val_labels_total, val_ids_total = gather_preds(
-        c.valid_loader, c.cl_args, c.model, cl_args.device, c.valid_dataset.labels_dict
+        data_loader=c.valid_loader,
+        cl_args=c.cl_args,
+        model=c.model,
+        device=cl_args.device,
+        labels_dict=c.valid_dataset.labels_dict,
+        with_labels=True,
     )
     c.model.train()
 
@@ -70,7 +76,13 @@ def evaluation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
         labels=val_labels_total,
         prefix="v_",
     )
-    eval_metrics_dict["v_loss-average"] = {"v_loss-average": val_loss_avg.item()}
+    average_performance = average_performances(
+        metric_dict=eval_metrics_dict, target_columns=c.target_columns, prefix="v_"
+    )
+    eval_metrics_dict["v_average"] = {
+        "v_loss-average": val_loss_avg.item(),
+        "v_perf-average": average_performance,
+    }
 
     write_eval_header = True if iteration == cl_args.sample_interval else False
     run_folder = get_run_folder(cl_args.run_name)
