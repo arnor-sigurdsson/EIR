@@ -465,6 +465,7 @@ def prep_modelling_test_configs(
         target_transformers=train_dataset.target_transformers,
         target_columns=train_dataset.target_columns,
         data_width=cl_args.data_width,
+        writer=train.get_summary_writer(cl_args),
     )
 
     test_config = _get_cur_modelling_test_config(
