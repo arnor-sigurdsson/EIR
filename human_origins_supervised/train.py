@@ -630,6 +630,13 @@ if __name__ == "__main__":
         help="Path to custom library if using one.",
     )
 
+    parser.add_argument(
+        "--plot_skip_steps",
+        type=int,
+        default=200,
+        help="How many iterations to skip in in plots.",
+    )
+
     cur_cl_args = parser.parse_args()
 
     utils.configure_root_logger(run_name=cur_cl_args.run_name)

@@ -242,14 +242,14 @@ def _write_training_metrics_handler(engine: Engine, handler_config: HandlerConfi
     filter all metrics for a given target column specifically, from the 1d array
     trainer.state.metrics gives us.
     """
-    args = handler_config.config.cl_args
+    cl_args = handler_config.config.cl_args
     writer = handler_config.config.writer
     iteration = engine.state.iteration
     target_columns = handler_config.config.target_columns
 
     engine_metrics_dict = engine.state.metrics
 
-    run_folder = get_run_folder(run_name=args.run_name)
+    run_folder = get_run_folder(run_name=cl_args.run_name)
 
     is_first_iteration = True if iteration == 1 else False
 
@@ -270,6 +270,7 @@ def _write_training_metrics_handler(engine: Engine, handler_config: HandlerConfi
             metric_dict=cur_metric_dict,
             iteration=iteration,
             writer=writer,
+            plot_skip_iter=cl_args.plot_skip_iter,
         )
 
         append_metrics_to_file(
@@ -281,10 +282,10 @@ def _write_training_metrics_handler(engine: Engine, handler_config: HandlerConfi
 
 
 def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> None:
-    args = handler_config.config.cl_args
+    cl_args = handler_config.config.cl_args
     hook_funcs = []
 
-    run_folder = get_run_folder(args.run_name)
+    run_folder = get_run_folder(cl_args.run_name)
 
     for results_dir in (run_folder / "results").iterdir():
         target_column = results_dir.name
@@ -298,6 +299,7 @@ def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> Non
             valid_history_df=valid_history_df,
             output_folder=results_dir,
             hook_funcs=hook_funcs,
+            plot_skip_iter=cl_args.plot_skip_iter,
         )
 
     train_avg_history_df, valid_avg_history_df = _get_metrics_dataframes(
@@ -309,6 +311,7 @@ def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> Non
         valid_history_df=valid_avg_history_df,
         output_folder=run_folder,
         hook_funcs=hook_funcs,
+        plot_skip_iter=cl_args.plot_skip_iter,
     )
 
     with open(Path(handler_config.run_folder, "model_info.txt"), "w") as mfile:

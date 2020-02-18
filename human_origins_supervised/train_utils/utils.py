@@ -160,13 +160,18 @@ def filter_items_from_engine_metrics_dict(
 
 
 def add_metrics_to_writer(
-    name: str, metric_dict: Dict[str, float], iteration: int, writer: SummaryWriter
-):
-    for metric_name, metric_value in metric_dict.items():
-        cur_name = name + f"/{metric_name}"
-        writer.add_scalar(
-            tag=cur_name, scalar_value=metric_value, global_step=iteration
-        )
+    name: str,
+    metric_dict: Dict[str, float],
+    iteration: int,
+    writer: SummaryWriter,
+    plot_skip_iter: int,
+) -> None:
+    if iteration >= plot_skip_iter:
+        for metric_name, metric_value in metric_dict.items():
+            cur_name = name + f"/{metric_name}"
+            writer.add_scalar(
+                tag=cur_name, scalar_value=metric_value, global_step=iteration
+            )
 
 
 def configure_root_logger(run_name: str):
