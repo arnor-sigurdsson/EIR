@@ -166,7 +166,11 @@ def add_metrics_to_writer(
     writer: SummaryWriter,
     plot_skip_steps: int,
 ) -> None:
-    if iteration >= plot_skip_steps:
+    """
+    We do %10 to reduce the amount of training data going to tensorboard, otherwise
+    it slows down with many large experiments.
+    """
+    if iteration >= plot_skip_steps and iteration % 10 == 0:
         for metric_name, metric_value in metric_dict.items():
             cur_name = name + f"/{metric_name}"
             writer.add_scalar(
