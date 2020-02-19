@@ -57,9 +57,6 @@ def attach_lr_scheduler(
             **step_scheduler_params
         )
 
-    else:
-        raise ValueError()
-
 
 def _get_reduce_lr_on_plateu_step_params(cl_args: Namespace, config: "Config") -> Dict:
     eval_history_fpath = get_run_folder(cl_args.run_name) / "v_average_history.log"

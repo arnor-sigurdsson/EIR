@@ -41,7 +41,7 @@ from human_origins_supervised.train_utils.metric_funcs import (
     calculate_batch_metrics,
     calculate_losses,
     aggregate_losses,
-    average_performances,
+    add_multi_task_average_metrics,
 )
 from human_origins_supervised.train_utils.train_handlers import configure_trainer
 
@@ -112,8 +112,6 @@ def train_ignite(config: Config) -> None:
         train_loss_avg.backward()
         c.optimizer.step()
 
-        train_loss = train_loss_avg.item()
-
         batch_metrics_dict = calculate_batch_metrics(
             target_columns=c.target_columns,
             target_transformers=c.target_transformers,
@@ -122,15 +120,15 @@ def train_ignite(config: Config) -> None:
             labels=train_labels,
             prefix="t_",
         )
-        average_performance = average_performances(
-            metric_dict=batch_metrics_dict, target_columns=c.target_columns, prefix="t_"
-        )
-        batch_metrics_dict["t_average"] = {
-            "t_loss-average": train_loss,
-            "t_perf-average": average_performance,
-        }
 
-        return batch_metrics_dict
+        batch_metrics_dict_w_avgs = add_multi_task_average_metrics(
+            batch_metrics_dict=batch_metrics_dict,
+            target_columns=c.target_columns,
+            prefix="t_",
+            loss=train_loss_avg.item(),
+        )
+
+        return batch_metrics_dict_w_avgs
 
     trainer = Engine(step)
 
@@ -378,8 +376,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--lr_schedule",
         type=str,
-        default=None,
-        choices=["cycle", "plateau"],
+        default="same",
+        choices=["cycle", "plateau", "same"],
         help="Whether to use cyclical or reduce on plateau learning rate schedule. "
         "Otherwise keeps same learning rate.",
     )

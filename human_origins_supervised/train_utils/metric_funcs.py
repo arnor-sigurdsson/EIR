@@ -48,6 +48,23 @@ def calculate_batch_metrics(
     return master_metric_dict
 
 
+def add_multi_task_average_metrics(
+    batch_metrics_dict: al_step_metric_dict,
+    target_columns: "al_target_columns",
+    prefix: str,
+    loss: float,
+):
+    average_performance = average_performances(
+        metric_dict=batch_metrics_dict, target_columns=target_columns, prefix=prefix
+    )
+    batch_metrics_dict[f"{prefix}average"] = {
+        f"{prefix}loss-average": loss,
+        f"{prefix}perf-average": average_performance,
+    }
+
+    return batch_metrics_dict
+
+
 def average_performances(
     metric_dict: al_step_metric_dict, target_columns: "al_target_columns", prefix: str
 ) -> float:

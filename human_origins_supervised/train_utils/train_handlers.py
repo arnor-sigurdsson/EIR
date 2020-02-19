@@ -96,11 +96,13 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
             event_name=Events.COMPLETED, handler=handler, handler_config=handler_config
         )
 
-    if cl_args.lr_schedule is not None:
+    if cl_args.lr_schedule != "same":
         lr_scheduler = set_up_scheduler(handler_config=handler_config)
         attach_lr_scheduler(engine=trainer, lr_scheduler=lr_scheduler, config=config)
 
-    _attach_metrics(engine=trainer, monitoring_metrics=monitoring_metrics)
+    _attach_running_average_metrics(
+        engine=trainer, monitoring_metrics=monitoring_metrics
+    )
     pbar.attach(engine=trainer, metric_names=["t_loss-average"])
 
     trainer.add_event_handler(
@@ -141,7 +143,9 @@ def _get_monitoring_metrics(target_columns) -> List[Tuple[str, str]]:
     return monitoring_metrics
 
 
-def _attach_metrics(engine: Engine, monitoring_metrics: List[Tuple[str, str]]) -> None:
+def _attach_running_average_metrics(
+    engine: Engine, monitoring_metrics: List[Tuple[str, str]]
+) -> None:
     """
     For each metric, we create an output_transform function that grabs the
     target variable from the output of the step function (which is a dict).
