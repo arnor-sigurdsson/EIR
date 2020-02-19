@@ -8,18 +8,18 @@ from typing import List, Callable, Union, Tuple, TYPE_CHECKING, Dict
 
 import pandas as pd
 from aislib.misc_utils import get_logger
-from torch.utils.tensorboard import SummaryWriter
 from ignite.contrib.handlers import ProgressBar
 from ignite.engine import Events, Engine
 from ignite.handlers import ModelCheckpoint
 from ignite.metrics import RunningAverage
+from torch.utils.tensorboard import SummaryWriter
 
 from human_origins_supervised.data_load.data_utils import get_target_columns_generator
+from human_origins_supervised.train_utils import H_PARAMS
 from human_origins_supervised.train_utils.activation_analysis import (
     activation_analysis_handler,
 )
-from human_origins_supervised.train_utils import H_PARAMS
-from human_origins_supervised.train_utils.evaluation import evaluation_handler
+from human_origins_supervised.train_utils.evaluation import validation_handler
 from human_origins_supervised.train_utils.lr_scheduling import (
     set_up_scheduler,
     attach_lr_scheduler,
@@ -27,13 +27,10 @@ from human_origins_supervised.train_utils.lr_scheduling import (
 from human_origins_supervised.train_utils.metric_funcs import get_train_metrics
 from human_origins_supervised.train_utils.utils import (
     get_custom_module_submodule,
-    append_metrics_to_file,
     read_metrics_history_file,
     get_run_folder,
     get_metrics_files,
-    ensure_metrics_paths_exists,
-    filter_items_from_engine_metrics_dict,
-    add_metrics_to_writer,
+    persist_metrics,
 )
 from human_origins_supervised.visualization import visualization_funcs as vf
 
@@ -59,17 +56,7 @@ class HandlerConfig:
 
 
 def configure_trainer(trainer: Engine, config: "Config") -> Engine:
-    """
-    NOTE:
-        **Important** the evaluate handler must be attached before the
-        ``save_progress`` function, as it manually adds validation metrics
-        to the trainer state. I.e. we need to make sure they have been
-        calculated before calling ``save_progress`` during training.
 
-    TODO:
-        Check if there is a better way to address the above, e.g. reordering
-        the handlers in this func in the end?
-    """
     cl_args = config.cl_args
     run_folder = Path("runs/", cl_args.run_name)
     pbar = ProgressBar()
@@ -85,7 +72,7 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
         monitoring_metrics=monitoring_metrics,
     )
 
-    for handler in evaluation_handler, activation_analysis_handler:
+    for handler in validation_handler, activation_analysis_handler:
         trainer.add_event_handler(
             event_name=Events.ITERATION_COMPLETED(every=cl_args.sample_interval),
             handler=handler,
@@ -220,13 +207,13 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
         custom_handlers = _get_custom_handlers(handler_config)
         trainer = _attach_custom_handlers(trainer, handler_config, custom_handlers)
 
-    tensorboard_hparam_func = partial(
+    log_tb_hparams_on_exit_func = partial(
         add_hparams_to_tensorboard,
         h_params=H_PARAMS,
         config=handler_config.config,
         writer=handler_config.config.writer,
     )
-    atexit.register(tensorboard_hparam_func)
+    atexit.register(log_tb_hparams_on_exit_func)
 
     return trainer
 
@@ -239,50 +226,46 @@ def _save_config(run_folder: Path, cl_args: Namespace):
 
 def _write_training_metrics_handler(engine: Engine, handler_config: HandlerConfig):
     """
-    Note that trainer.state.metrics contains the running averages we are interested in.
+    Note that trainer.state.metrics contains the *running averages* we are interested
+    in.
 
     The main "problem" here is that we lose the structure of the metrics dict that
     we get from `train_utils.metric_funcs.calculate_batch_metrics`, so we have to
     filter all metrics for a given target column specifically, from the 1d array
     trainer.state.metrics gives us.
     """
-    cl_args = handler_config.config.cl_args
-    writer = handler_config.config.writer
+
     iteration = engine.state.iteration
-    target_columns = handler_config.config.target_columns
-
-    engine_metrics_dict = engine.state.metrics
-
-    run_folder = get_run_folder(run_name=cl_args.run_name)
 
     is_first_iteration = True if iteration == 1 else False
 
-    metrics_files = get_metrics_files(
-        target_columns=target_columns, run_folder=run_folder, target_prefix="t_"
+    running_average_metrics = unflatten_engine_metrics_dict(
+        step_base=engine.state.output, engine_metrics_dict=engine.state.metrics
+    )
+    persist_metrics(
+        handler_config=handler_config,
+        metrics_dict=running_average_metrics,
+        iteration=iteration,
+        write_header=is_first_iteration,
+        prefixes={"metrics": "t_", "writer": "train"},
     )
 
-    if is_first_iteration:
-        ensure_metrics_paths_exists(metrics_files)
 
-    for metrics_name, metrics_history_file in metrics_files.items():
-        cur_metric_dict = filter_items_from_engine_metrics_dict(
-            engine_metrics_dict=engine_metrics_dict, metrics_substring=metrics_name
-        )
+def unflatten_engine_metrics_dict(
+    step_base: "al_step_metric_dict", engine_metrics_dict: Dict[str, float]
+) -> "al_step_metric_dict":
+    """
+    We need this to streamline the 1D dictionary that comes from engine.state.metrics.
+    """
+    unflattened_dict = {}
+    for column_name, column_metric_dict in step_base.items():
+        unflattened_dict[column_name] = {}
 
-        add_metrics_to_writer(
-            name=f"train/{metrics_name}",
-            metric_dict=cur_metric_dict,
-            iteration=iteration,
-            writer=writer,
-            plot_skip_steps=cl_args.plot_skip_steps,
-        )
+        for column_metric_name in column_metric_dict.keys():
+            eng_run_avg_value = engine_metrics_dict[column_metric_name]
+            unflattened_dict[column_name][column_metric_name] = eng_run_avg_value
 
-        append_metrics_to_file(
-            filepath=metrics_history_file,
-            metrics=cur_metric_dict,
-            iteration=iteration,
-            write_header=is_first_iteration,
-        )
+    return unflattened_dict
 
 
 def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> None:
@@ -355,29 +338,20 @@ def add_hparams_to_tensorboard(
         best_overall_performance = _get_best_average_performance(
             val_metrics_files=metrics_files, target_columns=c.target_columns
         )
-    except FileNotFoundError:
-        logger.debug(
-            "Could not find target column performance files at exit."
-            "Tensorboard hyper parameters not logged."
-        )
-        return
-
-    breakpoint()
-    average_loss_file = metrics_files["v_average"]
-    try:
+        average_loss_file = metrics_files["v_average"]
         average_loss_df = pd.read_csv(average_loss_file)
-    except FileNotFoundError:
+
+    except FileNotFoundError as e:
         logger.debug(
             "Could not find %s at exit. " "Tensorboard hyper parameters not logged.",
-            average_loss_file,
+            e.filename,
         )
         return
 
-    min_loss = average_loss_df["v_loss-average"].min()
-
     h_param_dict = {
-        param_name: getattr(c.cl_args, param_name) for param_name in h_params
+        param_name: str(getattr(c.cl_args, param_name)) for param_name in h_params
     }
+    min_loss = average_loss_df["v_loss-average"].min()
 
     writer.add_hparams(
         h_param_dict,
