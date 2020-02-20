@@ -348,9 +348,7 @@ def add_hparams_to_tensorboard(
         )
         return
 
-    h_param_dict = {
-        param_name: str(getattr(c.cl_args, param_name)) for param_name in h_params
-    }
+    h_param_dict = _generate_h_param_dict(cl_args=c.cl_args, h_params=h_params)
     min_loss = average_loss_df["v_loss-average"].min()
 
     writer.add_hparams(
@@ -395,6 +393,25 @@ def _get_overall_performance(
     df_performances["Performance_Average"] = df_performances.mean(axis=1)
 
     return df_performances
+
+
+def _generate_h_param_dict(
+    cl_args: Namespace, h_params: List[str]
+) -> Dict[str, Union[str, float, int]]:
+
+    h_param_dict = {}
+
+    for param_name in h_params:
+        param_value = getattr(cl_args, param_name)
+
+        if isinstance(param_value, List):
+            param_value = "_".join(param_value)
+        elif param_value is None:
+            param_value = str(param_value)
+
+        h_param_dict[param_name] = param_value
+
+    return h_param_dict
 
 
 def _get_custom_handlers(handler_config: "HandlerConfig"):
