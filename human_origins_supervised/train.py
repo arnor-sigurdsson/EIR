@@ -274,7 +274,7 @@ def _get_criterions(target_columns: al_target_columns) -> al_criterions:
 
 
 def get_summary_writer(cl_args: argparse.Namespace) -> SummaryWriter:
-    log_dir = Path("./runs", "tensorboard_logs", cl_args.run_name)
+    log_dir = Path("./runs", "tensorboard_logs", "active", cl_args.run_name)
     writer = SummaryWriter(log_dir=str(log_dir))
 
     return writer
