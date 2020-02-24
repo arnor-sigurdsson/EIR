@@ -41,6 +41,7 @@ from human_origins_supervised.train_utils.metric_funcs import (
     calculate_batch_metrics,
     calculate_losses,
     aggregate_losses,
+    add_multi_task_average_metrics,
 )
 from human_origins_supervised.train_utils.train_handlers import configure_trainer
 
@@ -111,8 +112,6 @@ def train_ignite(config: Config) -> None:
         train_loss_avg.backward()
         c.optimizer.step()
 
-        train_loss = train_loss_avg.item()
-
         batch_metrics_dict = calculate_batch_metrics(
             target_columns=c.target_columns,
             target_transformers=c.target_transformers,
@@ -121,9 +120,15 @@ def train_ignite(config: Config) -> None:
             labels=train_labels,
             prefix="t_",
         )
-        batch_metrics_dict["t_loss-average"] = {"t_loss-average": train_loss}
 
-        return batch_metrics_dict
+        batch_metrics_dict_w_avgs = add_multi_task_average_metrics(
+            batch_metrics_dict=batch_metrics_dict,
+            target_columns=c.target_columns,
+            prefix="t_",
+            loss=train_loss_avg.item(),
+        )
+
+        return batch_metrics_dict_w_avgs
 
     trainer = Engine(step)
 
@@ -134,7 +139,7 @@ def train_ignite(config: Config) -> None:
 
 def _prepare_run_folder(run_name: str) -> Path:
     run_folder = utils.get_run_folder(run_name)
-    history_file = run_folder / "t_average-loss_history.log"
+    history_file = run_folder / "t_average_history.log"
     if history_file.exists():
         raise FileExistsError(
             f"There already exists a run with that name: {history_file}. Please choose "
@@ -269,7 +274,7 @@ def _get_criterions(target_columns: al_target_columns) -> al_criterions:
 
 
 def get_summary_writer(cl_args: argparse.Namespace) -> SummaryWriter:
-    log_dir = Path("./runs", "tensorboard_logs", cl_args.run_name)
+    log_dir = Path("./runs", "tensorboard_logs", "active", cl_args.run_name)
     writer = SummaryWriter(log_dir=str(log_dir))
 
     return writer
@@ -371,8 +376,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--lr_schedule",
         type=str,
-        default=None,
-        choices=["cycle", "plateau"],
+        default="same",
+        choices=["cycle", "plateau", "same"],
         help="Whether to use cyclical or reduce on plateau learning rate schedule. "
         "Otherwise keeps same learning rate.",
     )
@@ -584,6 +589,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--run_name",
+        required=True,
         type=str,
         help="Name of the current run, specifying will save " "run info and models.",
     )
@@ -620,6 +626,13 @@ if __name__ == "__main__":
         type=str,
         default=None,
         help="Path to custom library if using one.",
+    )
+
+    parser.add_argument(
+        "--plot_skip_steps",
+        type=int,
+        default=200,
+        help="How many iterations to skip in in plots.",
     )
 
     cur_cl_args = parser.parse_args()

@@ -9,23 +9,12 @@ from aislib.misc_utils import get_logger
 from ignite.engine import Engine
 from scipy.special import softmax
 from sklearn.preprocessing import LabelEncoder, StandardScaler
-from torch.utils.tensorboard import SummaryWriter
 
 from human_origins_supervised.data_load.data_utils import get_target_columns_generator
 from human_origins_supervised.data_load.datasets import al_label_transformers
 from human_origins_supervised.models import model_utils
-from human_origins_supervised.train_utils.metric_funcs import (
-    calculate_batch_metrics,
-    calculate_losses,
-    aggregate_losses,
-)
-from human_origins_supervised.train_utils.utils import (
-    append_metrics_to_file,
-    get_metrics_files,
-    prep_sample_outfolder,
-    add_metrics_to_writer,
-)
-from human_origins_supervised.train_utils.utils import get_run_folder
+from human_origins_supervised.train_utils import metric_funcs
+from human_origins_supervised.train_utils import utils
 from human_origins_supervised.visualization import visualization_funcs as vf
 
 if TYPE_CHECKING:
@@ -35,7 +24,7 @@ if TYPE_CHECKING:
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
-def evaluation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
+def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
     """
     A bit hacky how we manually attach metrics here, but that's because we
     don't want to evaluate as a running average (i.e. do it in the step
@@ -49,7 +38,12 @@ def evaluation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
     c.model.eval()
     gather_preds = model_utils.gather_pred_outputs_from_dloader
     val_outputs_total, val_labels_total, val_ids_total = gather_preds(
-        c.valid_loader, c.cl_args, c.model, cl_args.device, c.valid_dataset.labels_dict
+        data_loader=c.valid_loader,
+        cl_args=c.cl_args,
+        model=c.model,
+        device=cl_args.device,
+        labels_dict=c.valid_dataset.labels_dict,
+        with_labels=True,
     )
     c.model.train()
 
@@ -57,12 +51,12 @@ def evaluation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
         target_columns=c.target_columns, device=cl_args.device, labels=val_labels_total
     )
 
-    val_losses = calculate_losses(
+    val_losses = metric_funcs.calculate_losses(
         criterions=c.criterions, labels=val_labels_total, outputs=val_outputs_total
     )
-    val_loss_avg = aggregate_losses(val_losses)
+    val_loss_avg = metric_funcs.aggregate_losses(val_losses)
 
-    eval_metrics_dict = calculate_batch_metrics(
+    eval_metrics_dict = metric_funcs.calculate_batch_metrics(
         target_columns=c.target_columns,
         target_transformers=c.target_transformers,
         losses=val_losses,
@@ -70,18 +64,21 @@ def evaluation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
         labels=val_labels_total,
         prefix="v_",
     )
-    eval_metrics_dict["v_loss-average"] = {"v_loss-average": val_loss_avg.item()}
+
+    eval_metrics_dict_w_avgs = metric_funcs.add_multi_task_average_metrics(
+        batch_metrics_dict=eval_metrics_dict,
+        target_columns=c.target_columns,
+        prefix="v_",
+        loss=val_loss_avg.item(),
+    )
 
     write_eval_header = True if iteration == cl_args.sample_interval else False
-    run_folder = get_run_folder(cl_args.run_name)
-
-    write_eval_metrics(
-        run_folder=run_folder,
-        write_header=write_eval_header,
+    utils.persist_metrics(
+        handler_config=handler_config,
+        metrics_dict=eval_metrics_dict_w_avgs,
         iteration=iteration,
-        target_columns=c.target_columns,
-        all_val_metrics_dict=eval_metrics_dict,
-        writer=c.writer,
+        write_header=write_eval_header,
+        prefixes={"metrics": "v_", "writer": "validation"},
     )
 
     save_evaluation_results_wrapper(
@@ -91,36 +88,6 @@ def evaluation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
         iteration=iteration,
         config=handler_config.config,
     )
-
-
-def write_eval_metrics(
-    run_folder: Path,
-    write_header: bool,
-    iteration: int,
-    target_columns: Dict[str, List[str]],
-    all_val_metrics_dict,
-    writer: SummaryWriter,
-):
-    metrics_files = get_metrics_files(
-        target_columns=target_columns, run_folder=run_folder, target_prefix="v_"
-    )
-
-    for metrics_name, metrics_history_file in metrics_files.items():
-        cur_metric_dict = all_val_metrics_dict[metrics_name]
-
-        add_metrics_to_writer(
-            name=f"validation/{metrics_name}",
-            metric_dict=cur_metric_dict,
-            iteration=iteration,
-            writer=writer,
-        )
-
-        append_metrics_to_file(
-            filepath=metrics_history_file,
-            metrics=cur_metric_dict,
-            iteration=iteration,
-            write_header=write_header,
-        )
 
 
 def save_evaluation_results_wrapper(
@@ -135,7 +102,7 @@ def save_evaluation_results_wrapper(
     transformers = config.target_transformers
 
     for column_type, column_name in target_columns_gen:
-        cur_sample_outfolder = prep_sample_outfolder(
+        cur_sample_outfolder = utils.prep_sample_outfolder(
             run_name=config.cl_args.run_name,
             column_name=column_name,
             iteration=iteration,

@@ -13,8 +13,14 @@ from aislib.misc_utils import get_logger, ensure_path_exists
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 if TYPE_CHECKING:
-    from human_origins_supervised.data_load.label_setup import al_label_dict
-    from human_origins_supervised.data_load.label_setup import al_target_columns
+    from human_origins_supervised.data_load.label_setup import (
+        al_label_dict,
+        al_target_columns,
+    )
+    from human_origins_supervised.train_utils.train_handlers import (
+        HandlerConfig,
+        al_step_metric_dict,
+    )
 
 
 def import_custom_module_as_package(module_path, module_name):
@@ -87,6 +93,46 @@ def prep_sample_outfolder(run_name: str, column_name: str, iteration: int) -> Pa
     return sample_outfolder
 
 
+def persist_metrics(
+    handler_config: "HandlerConfig",
+    metrics_dict: "al_step_metric_dict",
+    iteration: int,
+    write_header: bool,
+    prefixes: Dict[str, str],
+):
+
+    hc = handler_config
+    c = handler_config.config
+    cl_args = c.cl_args
+
+    metrics_files = get_metrics_files(
+        target_columns=c.target_columns,
+        run_folder=hc.run_folder,
+        target_prefix=f"{prefixes['metrics']}",
+    )
+
+    if write_header:
+        ensure_metrics_paths_exists(metrics_files)
+
+    for metrics_name, metrics_history_file in metrics_files.items():
+        cur_metric_dict = metrics_dict[metrics_name]
+
+        add_metrics_to_writer(
+            name=f"{prefixes['writer']}/{metrics_name}",
+            metric_dict=cur_metric_dict,
+            iteration=iteration,
+            writer=c.writer,
+            plot_skip_steps=cl_args.plot_skip_steps,
+        )
+
+        append_metrics_to_file(
+            filepath=metrics_history_file,
+            metrics=cur_metric_dict,
+            iteration=iteration,
+            write_header=write_header,
+        )
+
+
 def append_metrics_to_file(
     filepath: Path, metrics: Dict[str, float], iteration: int, write_header=False
 ):
@@ -119,9 +165,9 @@ def get_metrics_files(
         path_dict[target_column] = cur_path
 
     average_loss_training_metrics_file = Path(
-        run_folder, f"{target_prefix}average-loss_history.log"
+        run_folder, f"{target_prefix}average_history.log"
     )
-    path_dict[f"{target_prefix}loss-average"] = average_loss_training_metrics_file
+    path_dict[f"{target_prefix}average"] = average_loss_training_metrics_file
 
     return path_dict
 
@@ -131,38 +177,23 @@ def ensure_metrics_paths_exists(metrics_files: Dict[str, Path]) -> None:
         ensure_path_exists(path)
 
 
-def filter_items_from_engine_metrics_dict(
-    engine_metrics_dict: Dict[str, float], metrics_substring: str
-):
-    """
-    Note that in case of the average loss we are not using a target column as the
-    target string – hence we just return it directly.
-
-    Here we are matching the against patterns likes 't_Origin_mcc' but note that this
-    could also include names like 't_Country_of_origin_mcc', or
-    't_Country-of-origin_mcc' where Country_of_origin is a column name. So we check if
-     the target is actually in the metric.
-    """
-
-    if metrics_substring.endswith("loss-average"):
-        return {metrics_substring: engine_metrics_dict[metrics_substring]}
-
-    output_dict = {}
-    for metric_name, metric_value in engine_metrics_dict.items():
-        if metrics_substring in metric_name:
-            output_dict[metric_name] = metric_value
-
-    return output_dict
-
-
 def add_metrics_to_writer(
-    name: str, metric_dict: Dict[str, float], iteration: int, writer: SummaryWriter
-):
-    for metric_name, metric_value in metric_dict.items():
-        cur_name = name + f"/{metric_name}"
-        writer.add_scalar(
-            tag=cur_name, scalar_value=metric_value, global_step=iteration
-        )
+    name: str,
+    metric_dict: Dict[str, float],
+    iteration: int,
+    writer: SummaryWriter,
+    plot_skip_steps: int,
+) -> None:
+    """
+    We do %10 to reduce the amount of training data going to tensorboard, otherwise
+    it slows down with many large experiments.
+    """
+    if iteration >= plot_skip_steps and iteration % 10 == 0:
+        for metric_name, metric_value in metric_dict.items():
+            cur_name = name + f"/{metric_name}"
+            writer.add_scalar(
+                tag=cur_name, scalar_value=metric_value, global_step=iteration
+            )
 
 
 def configure_root_logger(run_name: str):

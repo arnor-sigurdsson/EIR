@@ -27,7 +27,7 @@ def test_prepare_run_folder_fail(patched_get_run_folder, tmp_path):
     patched_get_run_folder.return_value = patched_path
     patched_path.mkdir()
 
-    fake_file = patched_path / "t_average-loss_history.log"
+    fake_file = patched_path / "t_average_history.log"
     fake_file.write_text("Disco Elysium")
 
     with pytest.raises(FileExistsError):

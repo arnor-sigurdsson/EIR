@@ -500,6 +500,7 @@ def generate_all_training_curves(
     valid_history_df: pd.DataFrame,
     hook_funcs: List[Callable],
     output_folder: Path,
+    plot_skip_steps: int,
 ) -> None:
     metrics = ["_".join(i.split("_")[1:]) for i in training_history_df.columns]
 
@@ -514,4 +515,5 @@ def generate_all_training_curves(
             valid_series=valid_series,
             output_folder=output_folder,
             hook_funcs=hook_funcs,
+            skiprows=plot_skip_steps,
         )

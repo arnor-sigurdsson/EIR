@@ -57,12 +57,9 @@ def attach_lr_scheduler(
             **step_scheduler_params
         )
 
-    else:
-        raise ValueError()
-
 
 def _get_reduce_lr_on_plateu_step_params(cl_args: Namespace, config: "Config") -> Dict:
-    eval_history_fpath = get_run_folder(cl_args.run_name) / "v_average-loss_history.log"
+    eval_history_fpath = get_run_folder(cl_args.run_name) / "v_average_history.log"
 
     warmup_steps = _get_warmup_steps_from_cla(
         warmup_steps_arg=cl_args.warmup_steps, optimizer=config.optimizer
