@@ -16,6 +16,7 @@ from torch.optim import SGD
 from torch.optim.adamw import AdamW
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader, WeightedRandomSampler
+from torch.utils.tensorboard import SummaryWriter
 
 from human_origins_supervised.data_load import data_utils
 from human_origins_supervised.data_load import datasets
@@ -35,13 +36,14 @@ from human_origins_supervised.models.extra_inputs_module import (
 )
 from human_origins_supervised.models.model_utils import get_model_params, test_lr_range
 from human_origins_supervised.models.models import get_model_class
+from human_origins_supervised.train_utils import utils
 from human_origins_supervised.train_utils.metric_funcs import (
     calculate_batch_metrics,
     calculate_losses,
     aggregate_losses,
+    add_multi_task_average_metrics,
 )
 from human_origins_supervised.train_utils.train_handlers import configure_trainer
-from human_origins_supervised.train_utils.utils import get_run_folder
 
 if TYPE_CHECKING:
     from human_origins_supervised.train_utils.metric_funcs import al_step_metric_dict
@@ -76,6 +78,7 @@ class Config:
     target_transformers: Dict[str, al_label_transformers]
     target_columns: al_target_columns
     data_width: int
+    writer: SummaryWriter
 
 
 def train_ignite(config: Config) -> None:
@@ -109,8 +112,6 @@ def train_ignite(config: Config) -> None:
         train_loss_avg.backward()
         c.optimizer.step()
 
-        train_loss = train_loss_avg.item()
-
         batch_metrics_dict = calculate_batch_metrics(
             target_columns=c.target_columns,
             target_transformers=c.target_transformers,
@@ -119,9 +120,15 @@ def train_ignite(config: Config) -> None:
             labels=train_labels,
             prefix="t_",
         )
-        batch_metrics_dict["t_loss-average"] = {"t_loss-average": train_loss}
 
-        return batch_metrics_dict
+        batch_metrics_dict_w_avgs = add_multi_task_average_metrics(
+            batch_metrics_dict=batch_metrics_dict,
+            target_columns=c.target_columns,
+            prefix="t_",
+            loss=train_loss_avg.item(),
+        )
+
+        return batch_metrics_dict_w_avgs
 
     trainer = Engine(step)
 
@@ -131,8 +138,8 @@ def train_ignite(config: Config) -> None:
 
 
 def _prepare_run_folder(run_name: str) -> Path:
-    run_folder = get_run_folder(run_name)
-    history_file = run_folder / "t_average-loss_history.log"
+    run_folder = utils.get_run_folder(run_name)
+    history_file = run_folder / "t_average_history.log"
     if history_file.exists():
         raise FileExistsError(
             f"There already exists a run with that name: {history_file}. Please choose "
@@ -266,6 +273,13 @@ def _get_criterions(target_columns: al_target_columns) -> al_criterions:
     return criterions_dict
 
 
+def get_summary_writer(cl_args: argparse.Namespace) -> SummaryWriter:
+    log_dir = Path("./runs", "tensorboard_logs", "active", cl_args.run_name)
+    writer = SummaryWriter(log_dir=str(log_dir))
+
+    return writer
+
+
 def _log_params(model: nn.Module) -> None:
     no_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     logger.info(
@@ -310,6 +324,8 @@ def main(cl_args: argparse.Namespace) -> None:
 
     criterions = _get_criterions(train_dataset.target_columns)
 
+    writer = get_summary_writer(cl_args=cl_args)
+
     config = Config(
         cl_args=cl_args,
         train_loader=train_dloader,
@@ -322,6 +338,7 @@ def main(cl_args: argparse.Namespace) -> None:
         target_transformers=train_dataset.target_transformers,
         target_columns=train_dataset.target_columns,
         data_width=train_dataset.data_width,
+        writer=writer,
     )
 
     _log_params(model)
@@ -359,8 +376,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--lr_schedule",
         type=str,
-        default=None,
-        choices=["cycle", "plateau"],
+        default="same",
+        choices=["cycle", "plateau", "same"],
         help="Whether to use cyclical or reduce on plateau learning rate schedule. "
         "Otherwise keeps same learning rate.",
     )
@@ -572,6 +589,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--run_name",
+        required=True,
         type=str,
         help="Name of the current run, specifying will save " "run info and models.",
     )
@@ -610,7 +628,16 @@ if __name__ == "__main__":
         help="Path to custom library if using one.",
     )
 
+    parser.add_argument(
+        "--plot_skip_steps",
+        type=int,
+        default=200,
+        help="How many iterations to skip in in plots.",
+    )
+
     cur_cl_args = parser.parse_args()
+
+    utils.configure_root_logger(run_name=cur_cl_args.run_name)
 
     if cur_cl_args.valid_size > 1.0:
         cur_cl_args.valid_size = int(cur_cl_args.valid_size)

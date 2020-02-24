@@ -11,7 +11,7 @@ from typing import Union, Callable, Dict, Tuple, List, TYPE_CHECKING
 import numpy as np
 import pandas as pd
 import torch
-from aislib.misc_utils import ensure_path_exists, get_logger
+from aislib.misc_utils import get_logger
 from ignite.engine import Engine
 from shap import DeepExplainer
 from sklearn.preprocessing import StandardScaler, LabelEncoder
@@ -23,6 +23,7 @@ from human_origins_supervised.models import model_utils
 from human_origins_supervised.models.extra_inputs_module import get_extra_inputs
 from human_origins_supervised.models.model_utils import gather_dloader_samples
 from human_origins_supervised.models.models import CNNModel, MLPModel
+from human_origins_supervised.train_utils.utils import prep_sample_outfolder
 
 if TYPE_CHECKING:
     from human_origins_supervised.train_utils.train_handlers import HandlerConfig
@@ -469,37 +470,60 @@ def analyze_activations(
     config: "Config",
     act_func: Callable,
     proc_funcs: al_transform_funcs,
-    target_column: str,
+    column_name: str,
     column_type: str,
-    outfolder: Path,
+    sample_outfolder: Path,
 ) -> None:
     c = config
     cl_args = config.cl_args
 
     acc_acts, acc_acts_masked = accumulate_activations(
         config=c,
-        target_column=target_column,
+        target_column=column_name,
         column_type=column_type,
         act_func=act_func,
         transform_funcs=proc_funcs,
     )
 
-    np.save(str(outfolder / "all_acts.npy"), acc_acts)
+    np.save(str(sample_outfolder / "all_acts.npy"), acc_acts)
 
     abs_grads = True if column_type == "con" else False
-    top_gradients_dict = get_snp_cols_w_top_grads(acc_acts, abs_grads=abs_grads)
+    top_gradients_dict = get_snp_cols_w_top_grads(
+        accumulated_grads=acc_acts, abs_grads=abs_grads
+    )
 
-    snp_df = read_snp_df(Path(cl_args.snp_file), Path(cl_args.data_folder))
+    snp_df = read_snp_df(
+        snp_file_path=Path(cl_args.snp_file), data_folder=Path(cl_args.data_folder)
+    )
 
     classes = sorted(list(top_gradients_dict.keys()))
-    scaled_grads = gather_and_rescale_snps(acc_acts, top_gradients_dict, classes)
-    av.plot_top_gradients(scaled_grads, top_gradients_dict, snp_df, outfolder)
+    scaled_grads = gather_and_rescale_snps(
+        all_gradients_dict=acc_acts,
+        top_gradients_dict=top_gradients_dict,
+        classes=classes,
+    )
+    av.plot_top_gradients(
+        accumulated_grads=scaled_grads,
+        top_gradients_dict=top_gradients_dict,
+        snp_df=snp_df,
+        output_folder=sample_outfolder,
+    )
 
-    np.save(str(outfolder / "top_acts.npy"), top_gradients_dict)
+    np.save(file=str(sample_outfolder / "top_acts.npy"), arr=top_gradients_dict)
 
-    save_masked_grads(acc_acts_masked, top_gradients_dict, snp_df, outfolder)
+    save_masked_grads(
+        acc_grads_times_inp=acc_acts_masked,
+        top_gradients_dict=top_gradients_dict,
+        snp_df=snp_df,
+        sample_outfolder=sample_outfolder,
+    )
 
-    av.plot_snp_gradients(acc_acts, outfolder, "avg")
+    av.plot_snp_gradients(
+        accumulated_grads=acc_acts,
+        outfolder=sample_outfolder,
+        title=column_name,
+        type_="avg",
+    )
 
 
 def activation_analysis_handler(
@@ -530,16 +554,13 @@ def activation_analysis_handler(
         target_columns_gen = get_target_columns_generator(c.target_columns)
 
         for column_type, column_name in target_columns_gen:
-            sample_outfolder = _get_sample_outfolder(
-                run_folder=handler_config.run_folder,
-                target_column_name=column_name,
-                iteration=iteration,
+            sample_outfolder = prep_sample_outfolder(
+                run_name=cl_args.run_name, column_name=column_name, iteration=iteration
             )
-            ensure_path_exists(sample_outfolder, is_folder=True)
 
             no_explainer_background_samples = np.max([int(cl_args.batch_size / 8), 16])
 
-            explainer, handle = get_shap_object(
+            explainer, hook_handle = get_shap_object(
                 config=c,
                 model=model_copy,
                 column_name=column_name,
@@ -557,19 +578,9 @@ def activation_analysis_handler(
                 config=c,
                 act_func=act_func,
                 proc_funcs=proc_funcs,
-                target_column=column_name,
+                column_name=column_name,
                 column_type=column_type,
-                outfolder=sample_outfolder,
+                sample_outfolder=sample_outfolder,
             )
 
-            handle.remove()
-
-
-def _get_sample_outfolder(
-    run_folder: Path, target_column_name: str, iteration: int
-) -> Path:
-    sample_outfolder = Path(
-        run_folder, "results", target_column_name, "samples", str(iteration)
-    )
-
-    return sample_outfolder
+            hook_handle.remove()

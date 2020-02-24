@@ -107,6 +107,7 @@ def _check_snps_wrapper(
                 "target_cat_columns": [],
                 "target_con_columns": ["Height"],
                 "lr_schedule": "cycle",
+                "run_name": "test_cycle",
             }
         },
     ],

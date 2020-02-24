@@ -10,7 +10,7 @@ from human_origins_supervised import train
 from human_origins_supervised.models.models import CNNModel, MLPModel
 
 
-@patch("human_origins_supervised.train.get_run_folder", autospec=True)
+@patch("human_origins_supervised.train.utils.get_run_folder", autospec=True)
 def test_prepare_run_folder_pass(patched_get_run_folder, tmp_path):
 
     # patch since we don't want to create run folders while testing
@@ -20,14 +20,14 @@ def test_prepare_run_folder_pass(patched_get_run_folder, tmp_path):
     assert (tmp_path / "test_folder").exists()
 
 
-@patch("human_origins_supervised.train.get_run_folder", autospec=True)
+@patch("human_origins_supervised.train.utils.get_run_folder", autospec=True)
 def test_prepare_run_folder_fail(patched_get_run_folder, tmp_path):
 
     patched_path = tmp_path / "test_folder"
     patched_get_run_folder.return_value = patched_path
     patched_path.mkdir()
 
-    fake_file = patched_path / "t_average-loss_history.log"
+    fake_file = patched_path / "t_average_history.log"
     fake_file.write_text("Disco Elysium")
 
     with pytest.raises(FileExistsError):

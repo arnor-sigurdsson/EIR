@@ -20,6 +20,7 @@ from human_origins_supervised.models.extra_inputs_module import (
     set_up_and_save_embeddings_dict,
 )
 from human_origins_supervised.train import Config, get_model
+from human_origins_supervised.train_utils.utils import configure_root_logger
 from human_origins_supervised.train_utils.utils import get_run_folder
 
 np.random.seed(0)
@@ -91,13 +92,14 @@ def args_config():
             "n_epochs": 10,
             "na_augment": 0.0,
             "optimizer": "adamw",
+            "plot_skip_steps": 50,
             "rb_do": 0.0,
             "resblocks": None,
             "run_name": "test_run",
             "sa": False,
             "sample_interval": 20,
-            "target_con_columns": [],
             "target_cat_columns": ["Origin"],
+            "target_con_columns": [],
             "target_width": 1000,
             "valid_size": 0.05,
             "warmup_steps": 25,
@@ -345,6 +347,8 @@ def create_test_cl_args(request, args_config, create_test_data):
         "_" + args_config.model_type + "_" + c.request_params["task_type"]
     )
 
+    configure_root_logger(run_name=args_config.run_name)
+
     return args_config
 
 
@@ -462,6 +466,7 @@ def prep_modelling_test_configs(
         target_transformers=train_dataset.target_transformers,
         target_columns=train_dataset.target_columns,
         data_width=cl_args.data_width,
+        writer=train.get_summary_writer(cl_args),
     )
 
     test_config = _get_cur_modelling_test_config(

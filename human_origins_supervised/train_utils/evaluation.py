@@ -1,26 +1,20 @@
+from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Dict, TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
 import torch
-from aislib.misc_utils import ensure_path_exists, get_logger
+from aislib.misc_utils import get_logger
 from ignite.engine import Engine
 from scipy.special import softmax
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
 from human_origins_supervised.data_load.data_utils import get_target_columns_generator
+from human_origins_supervised.data_load.datasets import al_label_transformers
 from human_origins_supervised.models import model_utils
-from human_origins_supervised.train_utils.metric_funcs import (
-    calculate_batch_metrics,
-    calculate_losses,
-    aggregate_losses,
-)
-from human_origins_supervised.train_utils.utils import (
-    append_metrics_to_file,
-    get_metrics_files,
-)
-from human_origins_supervised.train_utils.utils import get_run_folder
+from human_origins_supervised.train_utils import metric_funcs
+from human_origins_supervised.train_utils import utils
 from human_origins_supervised.visualization import visualization_funcs as vf
 
 if TYPE_CHECKING:
@@ -30,7 +24,7 @@ if TYPE_CHECKING:
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
-def evaluation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
+def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
     """
     A bit hacky how we manually attach metrics here, but that's because we
     don't want to evaluate as a running average (i.e. do it in the step
@@ -44,7 +38,12 @@ def evaluation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
     c.model.eval()
     gather_preds = model_utils.gather_pred_outputs_from_dloader
     val_outputs_total, val_labels_total, val_ids_total = gather_preds(
-        c.valid_loader, c.cl_args, c.model, cl_args.device, c.valid_dataset.labels_dict
+        data_loader=c.valid_loader,
+        cl_args=c.cl_args,
+        model=c.model,
+        device=cl_args.device,
+        labels_dict=c.valid_dataset.labels_dict,
+        with_labels=True,
     )
     c.model.train()
 
@@ -52,12 +51,12 @@ def evaluation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
         target_columns=c.target_columns, device=cl_args.device, labels=val_labels_total
     )
 
-    val_losses = calculate_losses(
+    val_losses = metric_funcs.calculate_losses(
         criterions=c.criterions, labels=val_labels_total, outputs=val_outputs_total
     )
-    val_loss_avg = aggregate_losses(val_losses)
+    val_loss_avg = metric_funcs.aggregate_losses(val_losses)
 
-    eval_metrics_dict = calculate_batch_metrics(
+    eval_metrics_dict = metric_funcs.calculate_batch_metrics(
         target_columns=c.target_columns,
         target_transformers=c.target_transformers,
         losses=val_losses,
@@ -65,17 +64,21 @@ def evaluation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
         labels=val_labels_total,
         prefix="v_",
     )
-    eval_metrics_dict["v_loss-average"] = {"v_loss-average": val_loss_avg.item()}
+
+    eval_metrics_dict_w_avgs = metric_funcs.add_multi_task_average_metrics(
+        batch_metrics_dict=eval_metrics_dict,
+        target_columns=c.target_columns,
+        prefix="v_",
+        loss=val_loss_avg.item(),
+    )
 
     write_eval_header = True if iteration == cl_args.sample_interval else False
-    run_folder = get_run_folder(cl_args.run_name)
-
-    write_eval_metrics(
-        run_folder=run_folder,
-        write_header=write_eval_header,
+    utils.persist_metrics(
+        handler_config=handler_config,
+        metrics_dict=eval_metrics_dict_w_avgs,
         iteration=iteration,
-        target_columns=c.target_columns,
-        all_val_metrics_dict=eval_metrics_dict,
+        write_header=write_eval_header,
+        prefixes={"metrics": "v_", "writer": "validation"},
     )
 
     save_evaluation_results_wrapper(
@@ -87,28 +90,6 @@ def evaluation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
     )
 
 
-def write_eval_metrics(
-    run_folder: Path,
-    write_header: bool,
-    iteration: int,
-    target_columns,
-    all_val_metrics_dict,
-):
-    metrics_files = get_metrics_files(
-        target_columns=target_columns, run_folder=run_folder, target_prefix="v_"
-    )
-
-    for metrics_name, metrics_history_file in metrics_files.items():
-        cur_metrics = all_val_metrics_dict[metrics_name]
-
-        append_metrics_to_file(
-            filepath=metrics_history_file,
-            metrics=cur_metrics,
-            iteration=iteration,
-            write_header=write_header,
-        )
-
-
 def save_evaluation_results_wrapper(
     val_outputs: Dict[str, torch.Tensor],
     val_labels: Dict[str, torch.Tensor],
@@ -118,55 +99,61 @@ def save_evaluation_results_wrapper(
 ):
 
     target_columns_gen = get_target_columns_generator(config.target_columns)
+    transformers = config.target_transformers
 
     for column_type, column_name in target_columns_gen:
-        cur_val_outputs = val_outputs[column_name]
-        cur_val_labels = val_labels[column_name]
-        cur_transformer = config.target_transformers[column_name]
-        cur_output_folder = (
-            get_run_folder(config.cl_args.run_name) / "results" / column_name
+        cur_sample_outfolder = utils.prep_sample_outfolder(
+            run_name=config.cl_args.run_name,
+            column_name=column_name,
+            iteration=iteration,
         )
 
-        save_evaluation_results(
+        cur_val_outputs = val_outputs[column_name].cpu().numpy()
+        cur_val_labels = val_labels[column_name].cpu().numpy()
+
+        plot_config = PerformancePlotConfig(
             val_outputs=cur_val_outputs,
             val_labels=cur_val_labels,
             val_ids=val_ids,
             iteration=iteration,
+            column_name=column_name,
             column_type=column_type,
-            transformer=cur_transformer,
-            output_folder=cur_output_folder,
+            target_transformer=transformers[column_name],
+            output_folder=cur_sample_outfolder,
         )
 
+        save_evaluation_results(plot_config=plot_config)
 
-def save_evaluation_results(
-    val_outputs: torch.Tensor,
-    val_labels: torch.Tensor,
-    val_ids: List[str],
-    iteration: int,
-    column_type: str,
-    transformer,
-    output_folder: Path,
-) -> None:
 
-    sample_outfolder = Path(output_folder, "samples", str(iteration))
-    ensure_path_exists(sample_outfolder, is_folder=True)
+@dataclass
+class PerformancePlotConfig:
+    val_outputs: np.ndarray
+    val_labels: np.ndarray
+    val_ids: List[str]
+    iteration: int
+    column_name: str
+    column_type: str
+    target_transformer: al_label_transformers
+    output_folder: Path
 
-    val_outputs = val_outputs.cpu().numpy()
-    val_labels = val_labels.cpu().numpy()
+
+def save_evaluation_results(plot_config: PerformancePlotConfig,) -> None:
+
+    pc = plot_config
 
     common_args = {
-        "val_outputs": val_outputs,
-        "val_labels": val_labels,
-        "val_ids": val_ids,
-        "outfolder": sample_outfolder,
-        "transformer": transformer,
+        "val_outputs": pc.val_outputs,
+        "val_labels": pc.val_labels,
+        "val_ids": pc.val_ids,
+        "outfolder": pc.output_folder,
+        "transformer": pc.target_transformer,
     }
 
-    vf.gen_eval_graphs(column_type=column_type, **common_args)
+    vf.gen_eval_graphs(plot_config=pc)
 
-    if column_type == "cat":
+    if pc.column_type == "cat":
         get_most_wrong_wrapper(**common_args)
-    elif column_type == "con":
+    elif pc.column_type == "con":
         scale_and_save_regression_preds(**common_args)
 
 
