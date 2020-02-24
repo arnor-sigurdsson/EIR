@@ -13,7 +13,7 @@ from sklearn.preprocessing import LabelEncoder, StandardScaler
 from human_origins_supervised.data_load.data_utils import get_target_columns_generator
 from human_origins_supervised.data_load.datasets import al_label_transformers
 from human_origins_supervised.models import model_utils
-from human_origins_supervised.train_utils import metric_funcs
+from human_origins_supervised.train_utils import metrics
 from human_origins_supervised.train_utils import utils
 from human_origins_supervised.visualization import visualization_funcs as vf
 
@@ -51,12 +51,12 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
         target_columns=c.target_columns, device=cl_args.device, labels=val_labels_total
     )
 
-    val_losses = metric_funcs.calculate_losses(
+    val_losses = metrics.calculate_losses(
         criterions=c.criterions, labels=val_labels_total, outputs=val_outputs_total
     )
-    val_loss_avg = metric_funcs.aggregate_losses(val_losses)
+    val_loss_avg = metrics.aggregate_losses(val_losses)
 
-    eval_metrics_dict = metric_funcs.calculate_batch_metrics(
+    eval_metrics_dict = metrics.calculate_batch_metrics(
         target_columns=c.target_columns,
         target_transformers=c.target_transformers,
         losses=val_losses,
@@ -65,7 +65,7 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
         prefix="v_",
     )
 
-    eval_metrics_dict_w_avgs = metric_funcs.add_multi_task_average_metrics(
+    eval_metrics_dict_w_avgs = metrics.add_multi_task_average_metrics(
         batch_metrics_dict=eval_metrics_dict,
         target_columns=c.target_columns,
         prefix="v_",
@@ -73,7 +73,7 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
     )
 
     write_eval_header = True if iteration == cl_args.sample_interval else False
-    utils.persist_metrics(
+    metrics.persist_metrics(
         handler_config=handler_config,
         metrics_dict=eval_metrics_dict_w_avgs,
         iteration=iteration,

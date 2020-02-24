@@ -1,5 +1,3 @@
 [run]
 omit = 
     human_origins_supervised/visualization/*
-    human_origins_supervised/data_load/__init__.py
-    *custom_*.py
