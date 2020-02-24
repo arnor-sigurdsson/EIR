@@ -1,15 +1,20 @@
+import math
 from copy import deepcopy
+from pathlib import Path
+from typing import Dict, Tuple
 
+import pandas as pd
+import pytest
 import torch
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 
 from human_origins_supervised import train
-from human_origins_supervised.train_utils import metric_funcs
+from human_origins_supervised.train_utils import metrics
 
 
 def test_calculate_batch_metrics():
     test_kwargs = get_calculate_batch_metrics_data_test_kwargs()
-    test_batch_metrics = metric_funcs.calculate_batch_metrics(**test_kwargs)
+    test_batch_metrics = metrics.calculate_batch_metrics(**test_kwargs)
 
     assert test_batch_metrics["Origin"]["v_Origin_mcc"] == 1.0
     assert test_batch_metrics["Origin"]["v_Origin_loss"] == 0.0
@@ -84,7 +89,7 @@ def test_calculate_losses_good():
         label_values=common_values, output_values=common_values
     )
 
-    perfect_pred_loss = metric_funcs.calculate_losses(
+    perfect_pred_loss = metrics.calculate_losses(
         criterions=test_criterions, labels=test_labels, outputs=test_outputs
     )
 
@@ -104,7 +109,7 @@ def test_calculate_losses_bad():
         label_values=label_values, output_values=output_values
     )
 
-    bad_pred_loss = metric_funcs.calculate_losses(
+    bad_pred_loss = metrics.calculate_losses(
         criterions=test_criterions, labels=test_labels, outputs=test_outputs
     )
 
@@ -156,5 +161,55 @@ def test_aggregate_losses():
     # expected average of [0,1,2,3,4] = 2.0
     losses_dict = {str(i): torch.tensor(i, dtype=torch.float32) for i in range(5)}
 
-    test_aggregated_losses = metric_funcs.aggregate_losses(losses_dict)
+    test_aggregated_losses = metrics.aggregate_losses(losses_dict)
     assert test_aggregated_losses.item() == 2.0
+
+
+@pytest.fixture
+def get_performance_average_files(tmp_path) -> Tuple[Dict[str, Path], Dict]:
+    test_list = [[0.1], [0.3], [0.2], [0.4]]
+
+    files = {}
+    columns = ["v_Origin_mcc", "v_Height_loss", "v_ExtraOrigin_mcc"]
+    target_columns = {"con": ["Height"], "cat": ["Origin", "ExtraOrigin"]}
+    for i in range(3):
+
+        cur_column = columns[i]
+
+        df = pd.DataFrame(test_list, columns=[cur_column])
+
+        df.index.name = "iteration"
+        file_path = tmp_path / f"test_val_{i}.csv"
+        df.to_csv(file_path)
+
+        target_name = cur_column.split("_")[1]
+        files[target_name] = file_path
+
+    return files, target_columns
+
+
+def test_get_best_average_performance(get_performance_average_files):
+    test_dict, test_target_columns = get_performance_average_files
+
+    test_best_performance = metrics.get_best_average_performance(
+        val_metrics_files=test_dict, target_columns=test_target_columns
+    )
+    assert math.isclose(0.466666, test_best_performance, rel_tol=1e-5)
+
+
+def test_get_overall_performance(get_performance_average_files):
+    """
+    Remember that the continuous loss performance is 1 - loss.
+    """
+
+    test_dict, test_target_columns = get_performance_average_files
+
+    test_df_perfs = metrics._get_overall_performance(
+        val_metrics_files=test_dict, target_columns=test_target_columns
+    )
+
+    assert (test_df_perfs["Height"].values == [0.9, 0.7, 0.8, 0.6]).all()
+
+    expected_cat_columns = [0.1, 0.3, 0.2, 0.4]
+    assert (test_df_perfs["Origin"].values == expected_cat_columns).all()
+    assert (test_df_perfs["ExtraOrigin"].values == expected_cat_columns).all()

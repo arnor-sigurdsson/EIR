@@ -1,17 +1,23 @@
-from functools import partial
-from typing import Dict, Union, TYPE_CHECKING, List
+import csv
 import warnings
+from functools import partial
+from pathlib import Path
+from typing import Dict, Union, TYPE_CHECKING, List, Tuple
 
 import numpy as np
+import pandas as pd
 import torch
+from aislib.misc_utils import ensure_path_exists
 from scipy.stats import pearsonr
 from sklearn.metrics import matthews_corrcoef, r2_score, mean_squared_error
 from sklearn.preprocessing import StandardScaler, LabelEncoder
+from torch.utils.tensorboard import SummaryWriter
 
 from human_origins_supervised.data_load.data_utils import get_target_columns_generator
 
 if TYPE_CHECKING:
     from human_origins_supervised.train import al_criterions
+    from human_origins_supervised.train_utils.train_handlers import HandlerConfig
     from human_origins_supervised.data_load.label_setup import (  # noqa: F401
         al_target_columns,
         al_label_transformers,
@@ -169,3 +175,156 @@ def aggregate_losses(losses_dict: Dict[str, torch.Tensor]) -> torch.Tensor:
     average_loss = torch.mean(torch.stack(losses_values))
 
     return average_loss
+
+
+def get_best_average_performance(
+    val_metrics_files: Dict[str, Path], target_columns: "al_target_columns"
+):
+    df_performances = _get_overall_performance(
+        val_metrics_files=val_metrics_files, target_columns=target_columns
+    )
+    best_performance = df_performances["Performance_Average"].max()
+
+    return best_performance
+
+
+def _get_overall_performance(
+    val_metrics_files: Dict[str, Path], target_columns: "al_target_columns"
+) -> pd.DataFrame:
+    """
+    With continuous columns, we use the distance the MSE is from 1 as "performance".
+    """
+    target_columns_gen = get_target_columns_generator(target_columns)
+
+    df_performances = pd.DataFrame()
+    for column_type, column_name in target_columns_gen:
+        cur_metric_df = pd.read_csv(val_metrics_files[column_name])
+
+        if column_type == "con":
+            df_performances[column_name] = 1 - cur_metric_df[f"v_{column_name}_loss"]
+
+        elif column_type == "cat":
+            df_performances[column_name] = cur_metric_df[f"v_{column_name}_mcc"]
+
+        else:
+            raise ValueError()
+
+    df_performances["Performance_Average"] = df_performances.mean(axis=1)
+
+    return df_performances
+
+
+def persist_metrics(
+    handler_config: "HandlerConfig",
+    metrics_dict: "al_step_metric_dict",
+    iteration: int,
+    write_header: bool,
+    prefixes: Dict[str, str],
+):
+
+    hc = handler_config
+    c = handler_config.config
+    cl_args = c.cl_args
+
+    metrics_files = get_metrics_files(
+        target_columns=c.target_columns,
+        run_folder=hc.run_folder,
+        target_prefix=f"{prefixes['metrics']}",
+    )
+
+    if write_header:
+        _ensure_metrics_paths_exists(metrics_files)
+
+    for metrics_name, metrics_history_file in metrics_files.items():
+        cur_metric_dict = metrics_dict[metrics_name]
+
+        _add_metrics_to_writer(
+            name=f"{prefixes['writer']}/{metrics_name}",
+            metric_dict=cur_metric_dict,
+            iteration=iteration,
+            writer=c.writer,
+            plot_skip_steps=cl_args.plot_skip_steps,
+        )
+
+        _append_metrics_to_file(
+            filepath=metrics_history_file,
+            metrics=cur_metric_dict,
+            iteration=iteration,
+            write_header=write_header,
+        )
+
+
+def get_metrics_files(
+    target_columns: "al_target_columns", run_folder: Path, target_prefix: str
+) -> Dict[str, Path]:
+    all_target_columns = target_columns["con"] + target_columns["cat"]
+
+    path_dict = {}
+    for target_column in all_target_columns:
+        cur_fname = target_prefix + target_column + "_history.log"
+        cur_path = Path(run_folder, "results", target_column, cur_fname)
+        path_dict[target_column] = cur_path
+
+    average_loss_training_metrics_file = Path(
+        run_folder, f"{target_prefix}average_history.log"
+    )
+    path_dict[f"{target_prefix}average"] = average_loss_training_metrics_file
+
+    return path_dict
+
+
+def _ensure_metrics_paths_exists(metrics_files: Dict[str, Path]) -> None:
+    for path in metrics_files.values():
+        ensure_path_exists(path)
+
+
+def _add_metrics_to_writer(
+    name: str,
+    metric_dict: Dict[str, float],
+    iteration: int,
+    writer: SummaryWriter,
+    plot_skip_steps: int,
+) -> None:
+    """
+    We do %10 to reduce the amount of training data going to tensorboard, otherwise
+    it slows down with many large experiments.
+    """
+    if iteration >= plot_skip_steps and iteration % 10 == 0:
+        for metric_name, metric_value in metric_dict.items():
+            cur_name = name + f"/{metric_name}"
+            writer.add_scalar(
+                tag=cur_name, scalar_value=metric_value, global_step=iteration
+            )
+
+
+def _append_metrics_to_file(
+    filepath: Path, metrics: Dict[str, float], iteration: int, write_header=False
+):
+    with open(str(filepath), "a") as logfile:
+        fieldnames = ["iteration"] + sorted(metrics.keys())
+        writer = csv.DictWriter(logfile, fieldnames=fieldnames)
+
+        if write_header:
+            writer.writeheader()
+
+        dict_to_write = {**{"iteration": iteration}, **metrics}
+        writer.writerow(dict_to_write)
+
+
+def read_metrics_history_file(file_path: Path) -> pd.DataFrame:
+    df = pd.read_csv(file_path, index_col="iteration")
+
+    return df
+
+
+def get_metrics_dataframes(
+    results_dir: Path, target_string: str
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    train_history_path = read_metrics_history_file(
+        results_dir / f"t_{target_string}_history.log"
+    )
+    valid_history_path = read_metrics_history_file(
+        results_dir / f"v_{target_string}_history.log"
+    )
+
+    return train_history_path, valid_history_path

@@ -375,7 +375,8 @@ def check_dataset(
 
     assert (tt_it(range(len(classes_tested))) == classes_tested).all()
 
-    test_sample, test_label, test_id = dataset[0]
+    test_array, test_label, test_id = dataset[0]
 
+    assert (test_array.sum(1) == 1).all()
     assert test_label[target_column] in expected_transformed_values
     assert test_id == dataset.samples[0].sample_id

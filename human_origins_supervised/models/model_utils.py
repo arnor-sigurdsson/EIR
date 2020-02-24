@@ -16,7 +16,7 @@ from human_origins_supervised.data_load.label_setup import al_target_columns
 from human_origins_supervised.data_load.data_utils import get_target_columns_generator
 from human_origins_supervised.models.extra_inputs_module import get_extra_inputs
 from human_origins_supervised.train_utils.utils import get_run_folder
-from human_origins_supervised.train_utils.metric_funcs import (
+from human_origins_supervised.train_utils.metrics import (
     calculate_losses,
     aggregate_losses,
 )
