@@ -37,7 +37,7 @@ from human_origins_supervised.models.extra_inputs_module import (
 from human_origins_supervised.models.model_utils import get_model_params, test_lr_range
 from human_origins_supervised.models.models import get_model_class
 from human_origins_supervised.train_utils import utils
-from human_origins_supervised.train_utils.metric_funcs import (
+from human_origins_supervised.train_utils.metrics import (
     calculate_batch_metrics,
     calculate_losses,
     aggregate_losses,
@@ -46,7 +46,7 @@ from human_origins_supervised.train_utils.metric_funcs import (
 from human_origins_supervised.train_utils.train_handlers import configure_trainer
 
 if TYPE_CHECKING:
-    from human_origins_supervised.train_utils.metric_funcs import al_step_metric_dict
+    from human_origins_supervised.train_utils.metrics import al_step_metric_dict
 
 # aliases
 al_criterions = Dict[str, Union[nn.CrossEntropyLoss, nn.MSELoss]]

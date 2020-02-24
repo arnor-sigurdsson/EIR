@@ -24,19 +24,22 @@ from human_origins_supervised.train_utils.lr_scheduling import (
     set_up_scheduler,
     attach_lr_scheduler,
 )
-from human_origins_supervised.train_utils.metric_funcs import get_train_metrics
+from human_origins_supervised.train_utils.metrics import get_train_metrics
 from human_origins_supervised.train_utils.utils import (
     get_custom_module_submodule,
-    read_metrics_history_file,
     get_run_folder,
-    get_metrics_files,
-    persist_metrics,
 )
 from human_origins_supervised.visualization import visualization_funcs as vf
+from human_origins_supervised.train_utils.metrics import (
+    get_metrics_dataframes,
+    get_best_average_performance,
+    persist_metrics,
+    get_metrics_files,
+)
 
 if TYPE_CHECKING:
     from human_origins_supervised.train import Config
-    from human_origins_supervised.train_utils.metric_funcs import al_step_metric_dict
+    from human_origins_supervised.train_utils.metrics import al_step_metric_dict
 
 # Aliases
 al_get_custom_handles_return_value = Union[Tuple[Callable, ...], Tuple[None]]
@@ -230,7 +233,7 @@ def _write_training_metrics_handler(engine: Engine, handler_config: HandlerConfi
     in.
 
     The main "problem" here is that we lose the structure of the metrics dict that
-    we get from `train_utils.metric_funcs.calculate_batch_metrics`, so we have to
+    we get from `train_utils.metrics.calculate_batch_metrics`, so we have to
     filter all metrics for a given target column specifically, from the 1d array
     trainer.state.metrics gives us.
     """
@@ -239,7 +242,7 @@ def _write_training_metrics_handler(engine: Engine, handler_config: HandlerConfi
 
     is_first_iteration = True if iteration == 1 else False
 
-    running_average_metrics = unflatten_engine_metrics_dict(
+    running_average_metrics = _unflatten_engine_metrics_dict(
         step_base=engine.state.output, engine_metrics_dict=engine.state.metrics
     )
     persist_metrics(
@@ -251,7 +254,7 @@ def _write_training_metrics_handler(engine: Engine, handler_config: HandlerConfi
     )
 
 
-def unflatten_engine_metrics_dict(
+def _unflatten_engine_metrics_dict(
     step_base: "al_step_metric_dict", engine_metrics_dict: Dict[str, float]
 ) -> "al_step_metric_dict":
     """
@@ -277,7 +280,7 @@ def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> Non
     for results_dir in (run_folder / "results").iterdir():
         target_column = results_dir.name
 
-        train_history_df, valid_history_df = _get_metrics_dataframes(
+        train_history_df, valid_history_df = get_metrics_dataframes(
             results_dir=results_dir, target_string=target_column
         )
 
@@ -289,7 +292,7 @@ def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> Non
             plot_skip_steps=cl_args.plot_skip_steps,
         )
 
-    train_avg_history_df, valid_avg_history_df = _get_metrics_dataframes(
+    train_avg_history_df, valid_avg_history_df = get_metrics_dataframes(
         results_dir=run_folder, target_string="average"
     )
 
@@ -303,115 +306,6 @@ def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> Non
 
     with open(Path(handler_config.run_folder, "model_info.txt"), "w") as mfile:
         mfile.write(str(handler_config.config.model))
-
-
-def _get_metrics_dataframes(
-    results_dir: Path, target_string: str
-) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    train_history_path = read_metrics_history_file(
-        results_dir / f"t_{target_string}_history.log"
-    )
-    valid_history_path = read_metrics_history_file(
-        results_dir / f"v_{target_string}_history.log"
-    )
-
-    return train_history_path, valid_history_path
-
-
-def add_hparams_to_tensorboard(
-    h_params: List[str], config: "Config", writer: SummaryWriter
-) -> None:
-
-    logger.debug(
-        "Exiting and logging best hyperparameters for best average loss "
-        "to tensorboard."
-    )
-
-    c = config
-    run_folder = get_run_folder(c.cl_args.run_name)
-
-    metrics_files = get_metrics_files(
-        target_columns=c.target_columns, run_folder=run_folder, target_prefix="v_"
-    )
-
-    try:
-        best_overall_performance = _get_best_average_performance(
-            val_metrics_files=metrics_files, target_columns=c.target_columns
-        )
-        average_loss_file = metrics_files["v_average"]
-        average_loss_df = pd.read_csv(average_loss_file)
-
-    except FileNotFoundError as e:
-        logger.debug(
-            "Could not find %s at exit. " "Tensorboard hyper parameters not logged.",
-            e.filename,
-        )
-        return
-
-    h_param_dict = _generate_h_param_dict(cl_args=c.cl_args, h_params=h_params)
-    min_loss = average_loss_df["v_loss-average"].min()
-
-    writer.add_hparams(
-        h_param_dict,
-        {
-            "v_loss-overall_min": min_loss,
-            "best_overall_performance": best_overall_performance,
-        },
-    )
-
-
-def _get_best_average_performance(val_metrics_files: Dict[str, Path], target_columns):
-    df_performances = _get_overall_performance(
-        val_metrics_files=val_metrics_files, target_columns=target_columns
-    )
-    best_performance = df_performances["Performance_Average"].max()
-
-    return best_performance
-
-
-def _get_overall_performance(
-    val_metrics_files: Dict[str, Path], target_columns
-) -> pd.DataFrame:
-    """
-    With continuous columns, we use the distance the MSE is from 1 as "performance".
-    """
-    target_columns_gen = get_target_columns_generator(target_columns)
-
-    df_performances = pd.DataFrame()
-    for column_type, column_name in target_columns_gen:
-        cur_metric_df = pd.read_csv(val_metrics_files[column_name])
-
-        if column_type == "con":
-            df_performances[column_name] = 1 - cur_metric_df[f"v_{column_name}_loss"]
-
-        elif column_type == "cat":
-            df_performances[column_name] = cur_metric_df[f"v_{column_name}_mcc"]
-
-        else:
-            raise ValueError()
-
-    df_performances["Performance_Average"] = df_performances.mean(axis=1)
-
-    return df_performances
-
-
-def _generate_h_param_dict(
-    cl_args: Namespace, h_params: List[str]
-) -> Dict[str, Union[str, float, int]]:
-
-    h_param_dict = {}
-
-    for param_name in h_params:
-        param_value = getattr(cl_args, param_name)
-
-        if isinstance(param_value, List):
-            param_value = "_".join(param_value)
-        elif param_value is None:
-            param_value = str(param_value)
-
-        h_param_dict[param_name] = param_value
-
-    return h_param_dict
 
 
 def _get_custom_handlers(handler_config: "HandlerConfig"):
@@ -442,3 +336,64 @@ def _attach_custom_handlers(trainer: Engine, handler_config, custom_handlers):
         trainer = custom_handler_attacher(trainer, handler_config)
 
     return trainer
+
+
+def add_hparams_to_tensorboard(
+    h_params: List[str], config: "Config", writer: SummaryWriter
+) -> None:
+
+    logger.debug(
+        "Exiting and logging best hyperparameters for best average loss "
+        "to tensorboard."
+    )
+
+    c = config
+    run_folder = get_run_folder(c.cl_args.run_name)
+
+    metrics_files = get_metrics_files(
+        target_columns=c.target_columns, run_folder=run_folder, target_prefix="v_"
+    )
+
+    try:
+        best_overall_performance = get_best_average_performance(
+            val_metrics_files=metrics_files, target_columns=c.target_columns
+        )
+        average_loss_file = metrics_files["v_average"]
+        average_loss_df = pd.read_csv(average_loss_file)
+
+    except FileNotFoundError as e:
+        logger.debug(
+            "Could not find %s at exit. " "Tensorboard hyper parameters not logged.",
+            e.filename,
+        )
+        return
+
+    h_param_dict = _generate_h_param_dict(cl_args=c.cl_args, h_params=h_params)
+    min_loss = average_loss_df["v_loss-average"].min()
+
+    writer.add_hparams(
+        h_param_dict,
+        {
+            "v_loss-overall_min": min_loss,
+            "best_overall_performance": best_overall_performance,
+        },
+    )
+
+
+def _generate_h_param_dict(
+    cl_args: Namespace, h_params: List[str]
+) -> Dict[str, Union[str, float, int]]:
+
+    h_param_dict = {}
+
+    for param_name in h_params:
+        param_value = getattr(cl_args, param_name)
+
+        if isinstance(param_value, List):
+            param_value = "_".join(param_value)
+        elif param_value is None:
+            param_value = str(param_value)
+
+        h_param_dict[param_name] = param_value
+
+    return h_param_dict
