@@ -226,12 +226,17 @@ def get_model_params(model: nn.Module, wd: float) -> List[Dict[str, Union[str, i
 def _check_named_modules(model: nn.Module):
     """
     We have this function as a safeguard to check that activations that have learnable
-    parameters are named correctly (so that WD is not applied to them).
+    parameters are named correctly (so that WD is not applied to them). Also, we want
+    to make sure we don't have modules that are named 'incorrectly' and have the WD
+    skipped when they should have it.
     """
 
     for name, module in model.named_modules():
+        if "act_" in name:
+            assert isinstance(module, (Swish, nn.PReLU))
+
         if isinstance(module, (Swish, nn.PReLU)):
-            assert name.startswith("act_")
+            assert "act_" in name, name
 
 
 def test_lr_range(config: "Config") -> None:

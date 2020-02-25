@@ -173,7 +173,7 @@ def grab_latest_model_path(saved_models_folder: Path):
     ],
     indirect=True,
 )
-def test_predict_new(keep_outputs, prep_modelling_test_configs):
+def test_predict(keep_outputs, prep_modelling_test_configs):
     config, test_config = prep_modelling_test_configs
     test_path = Path(config.cl_args.data_folder).parent
 
