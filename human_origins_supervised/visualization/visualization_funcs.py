@@ -30,8 +30,8 @@ def generate_training_curve(
     train_series: pd.Series,
     valid_series: pd.Series,
     output_folder: Path,
+    title_extra: str = "",
     skiprows: int = 200,
-    hook_funcs: List[Callable] = None,
 ) -> None:
 
     fig, ax_1 = plt.subplots()
@@ -73,6 +73,8 @@ def generate_training_curve(
 
     ax_1.axhline(y=extreme_valid_value, linewidth=0.4, c="red", linestyle="dashed")
 
+    ax_1.set(title=title_extra)
+
     ax_1.set_xlabel("Iteration")
     y_label = _parse_metrics_colname(train_series_cut.name)
     ax_1.set_ylabel(y_label)
@@ -85,10 +87,6 @@ def generate_training_curve(
     lines = line_1a + line_1b
     labels = [l.get_label() for l in lines]
     ax_1.legend(lines, labels)
-
-    if hook_funcs:
-        for func in hook_funcs:
-            func(ax_1, target=valid_series_cut.name)
 
     plt.grid()
 
@@ -498,9 +496,9 @@ def generate_confusion_matrix(
 def generate_all_training_curves(
     training_history_df: pd.DataFrame,
     valid_history_df: pd.DataFrame,
-    hook_funcs: List[Callable],
     output_folder: Path,
     plot_skip_steps: int,
+    title_extra: str = "",
 ) -> None:
     metrics = ["_".join(i.split("_")[1:]) for i in training_history_df.columns]
 
@@ -514,6 +512,6 @@ def generate_all_training_curves(
             train_series=train_series,
             valid_series=valid_series,
             output_folder=output_folder,
-            hook_funcs=hook_funcs,
+            title_extra=title_extra,
             skiprows=plot_skip_steps,
         )

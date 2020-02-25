@@ -200,11 +200,16 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
         handler=_write_training_metrics_handler,
         handler_config=handler_config,
     )
-    trainer.add_event_handler(
-        event_name=Events.ITERATION_COMPLETED(every=cl_args.sample_interval),
-        handler=_plot_progress_handler,
-        handler_config=handler_config,
-    )
+
+    for plot_event in [
+        Events.ITERATION_COMPLETED(every=cl_args.sample_interval),
+        Events.COMPLETED,
+    ]:
+        trainer.add_event_handler(
+            event_name=plot_event,
+            handler=_plot_progress_handler,
+            handler_config=handler_config,
+        )
 
     if cl_args.custom_lib:
         custom_handlers = _get_custom_handlers(handler_config)
@@ -273,7 +278,6 @@ def _unflatten_engine_metrics_dict(
 
 def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> None:
     cl_args = handler_config.config.cl_args
-    hook_funcs = []
 
     run_folder = get_run_folder(cl_args.run_name)
 
@@ -288,7 +292,7 @@ def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> Non
             training_history_df=train_history_df,
             valid_history_df=valid_history_df,
             output_folder=results_dir,
-            hook_funcs=hook_funcs,
+            title_extra=target_column,
             plot_skip_steps=cl_args.plot_skip_steps,
         )
 
@@ -300,7 +304,7 @@ def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> Non
         training_history_df=train_avg_history_df,
         valid_history_df=valid_avg_history_df,
         output_folder=run_folder,
-        hook_funcs=hook_funcs,
+        title_extra="Multi Task Average",
         plot_skip_steps=cl_args.plot_skip_steps,
     )
 

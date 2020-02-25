@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader
 from torch_lr_finder import LRFinder
 
 from aislib.misc_utils import get_logger
+from aislib.pytorch_modules import Swish
 from human_origins_supervised.data_load.label_setup import al_label_dict
 from human_origins_supervised.data_load.label_setup import al_target_columns
 from human_origins_supervised.data_load.data_utils import get_target_columns_generator
@@ -206,6 +207,8 @@ def get_model_params(model: nn.Module, wd: float) -> List[Dict[str, Union[str, i
     We want to skip adding weight decay to learnable activation parameters so as
     not to bias them towards 0.
     """
+    _check_named_modules(model)
+
     params = []
     for name, param in model.named_parameters():
         cur_dict = {"params": param}
@@ -218,6 +221,17 @@ def get_model_params(model: nn.Module, wd: float) -> List[Dict[str, Union[str, i
         params.append(cur_dict)
 
     return params
+
+
+def _check_named_modules(model: nn.Module):
+    """
+    We have this function as a safeguard to check that activations that have learnable
+    parameters are named correctly (so that WD is not applied to them).
+    """
+
+    for name, module in model.named_modules():
+        if isinstance(module, (Swish, nn.PReLU)):
+            assert name.startswith("act_")
 
 
 def test_lr_range(config: "Config") -> None:
