@@ -296,6 +296,10 @@ def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> Non
             plot_skip_steps=cl_args.plot_skip_steps,
         )
 
+    # if no val data is available yet
+    if engine.state.iteration < cl_args.sample_interval:
+        return
+
     train_avg_history_df, valid_avg_history_df = get_metrics_dataframes(
         results_dir=run_folder, target_string="average"
     )
