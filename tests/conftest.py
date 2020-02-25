@@ -90,7 +90,8 @@ def args_config():
             "multi_gpu": False,
             "n_cpu": 8,
             "n_epochs": 10,
-            "na_augment": 0.0,
+            "na_augment_perc": 0.0,
+            "na_augment_prob": 0.0,
             "optimizer": "adamw",
             "plot_skip_steps": 50,
             "rb_do": 0.0,
@@ -328,7 +329,8 @@ def create_test_cl_args(request, args_config, create_test_data):
     args_config.rb_do = 0.00
     args_config.fc_do = 0.00
     args_config.wd = 0.00
-    args_config.na_augment = 0.00
+    args_config.na_augment_perc = 0.00
+    args_config.na_augment_prob = 0.00
 
     args_config.sample_interval = 100
     args_config.target_width = n_snps

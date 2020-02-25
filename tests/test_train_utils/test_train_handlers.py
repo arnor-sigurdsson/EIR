@@ -26,11 +26,11 @@ def test_unflatten_engine_metrics_dict():
 
 
 def test_generate_h_param_dict(args_config):
-    test_h_params = ["lr", "na_augment", "channel_exp_base"]
+    test_h_params = ["lr", "na_augment_perc", "channel_exp_base"]
     test_h_dict = train_handlers._generate_h_param_dict(
         cl_args=args_config, h_params=test_h_params
     )
 
     assert test_h_dict["lr"] == 0.01
-    assert test_h_dict["na_augment"] == 0.0
+    assert test_h_dict["na_augment_perc"] == 0.0
     assert test_h_dict["channel_exp_base"] == 5

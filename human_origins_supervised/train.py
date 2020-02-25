@@ -522,10 +522,18 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--na_augment",
+        "--na_augment_perc",
         default=0.0,
         type=float,
-        help="Percentage of SNPs to convert to NA in training set as data augmentation",
+        help="Percentage of array to make missing when using na_augmentation.",
+    )
+
+    parser.add_argument(
+        "--na_augment_prob",
+        default=0.5,
+        type=float,
+        help="Probability of applying an na_augmentation of percentage as given in "
+        "--na_augment_perc.",
     )
 
     parser.add_argument(
