@@ -51,7 +51,13 @@ def get_weighted_random_sampler(train_dataset: "ArrayDatasetBase", target_column
     return sampler
 
 
-def make_random_snps_missing(array, percentage=0.05):
+def make_random_snps_missing(
+    array: torch.Tensor, percentage: float = 0.05, probability: float = 1.0
+) -> torch.Tensor:
+    random_draw = np.random.uniform()
+    if random_draw > probability:
+        return array
+
     n_snps = array.shape[2]
     n_to_drop = (int(n_snps * percentage),)
     random_to_drop = np.random.choice(n_snps, n_to_drop, replace=False)
