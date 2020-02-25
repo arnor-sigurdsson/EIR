@@ -51,7 +51,7 @@ def set_up_datasets(cl_args: Namespace) -> Tuple[al_datasets, al_datasets]:
     train_dataset = dataset_class(
         **dataset_class_common_args,
         labels_dict=train_labels,
-        na_augment=cl_args.na_augment,
+        na_augment=(cl_args.na_augment_perc, cl_args.na_augment_prob),
     )
 
     valid_dataset = dataset_class(**dataset_class_common_args, labels_dict=valid_labels)
@@ -171,7 +171,7 @@ class ArrayDatasetBase(Dataset):
         extra_con_transformers: Dict[str, StandardScaler] = None,
         target_height: int = 4,
         target_width: int = None,
-        na_augment: float = 0.0,
+        na_augment: Tuple[float] = (0.0, 0.0),
     ):
         super().__init__()
 
@@ -344,8 +344,12 @@ class MemoryArrayDataset(ArrayDatasetBase):
             right_padding = self.target_width - array.shape[2]
             array = pad(array, [0, right_padding])
 
-        if self.na_augment:
-            array = make_random_snps_missing(array, self.na_augment)
+        if self.na_augment[0]:
+            array = make_random_snps_missing(
+                array=array,
+                percentage=self.na_augment[0],
+                probability=self.na_augment[1],
+            )
 
         return array, labels, sample_id
 
@@ -377,8 +381,12 @@ class DiskArrayDataset(ArrayDatasetBase):
         sample_id = sample.sample_id
 
         array = torch.from_numpy(array).unsqueeze(0)
-        if self.na_augment:
-            array = make_random_snps_missing(array, self.na_augment)
+        if self.na_augment[0]:
+            array = make_random_snps_missing(
+                array=array,
+                percentage=self.na_augment[0],
+                probability=self.na_augment[1],
+            )
 
         if self.target_width:
             right_padding = self.target_width - array.shape[2]
