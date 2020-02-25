@@ -99,7 +99,7 @@ class SEBlock(nn.Module):
             padding=0,
             bias=False,
         )
-        self.act = Swish()
+        self.act_1 = Swish()
 
         self.conv_up = nn.Conv2d(
             in_channels=reduced_channels,
@@ -115,7 +115,7 @@ class SEBlock(nn.Module):
         out = self.avg_pool(x)
 
         out = self.conv_down(out)
-        out = self.act(out)
+        out = self.act_1(out)
 
         out = self.conv_up(out)
         out = self.sigmoid(out)
