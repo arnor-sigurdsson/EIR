@@ -178,8 +178,8 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
     cl_args = handler_config.config.cl_args
 
     checkpoint_handler = ModelCheckpoint(
-        Path(handler_config.run_folder, "saved_models"),
-        cl_args.run_name,
+        dirname=Path(handler_config.run_folder, "saved_models"),
+        filename_prefix=Path(cl_args.run_name).name,
         create_dir=True,
         n_saved=100,
         save_as_state_dict=True,
