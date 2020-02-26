@@ -273,8 +273,8 @@ def _get_criterions(target_columns: al_target_columns) -> al_criterions:
     return criterions_dict
 
 
-def get_summary_writer(cl_args: argparse.Namespace) -> SummaryWriter:
-    log_dir = Path("./runs", "tensorboard_logs", "active", cl_args.run_name)
+def get_summary_writer(run_folder: Path) -> SummaryWriter:
+    log_dir = Path(run_folder / "tensorboard_logs")
     writer = SummaryWriter(log_dir=str(log_dir))
 
     return writer
@@ -324,7 +324,7 @@ def main(cl_args: argparse.Namespace) -> None:
 
     criterions = _get_criterions(train_dataset.target_columns)
 
-    writer = get_summary_writer(cl_args=cl_args)
+    writer = get_summary_writer(run_folder=run_folder)
 
     config = Config(
         cl_args=cl_args,
