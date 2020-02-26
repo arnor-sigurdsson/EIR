@@ -397,8 +397,8 @@ def _generate_h_param_dict(
     for param_name in h_params:
         param_value = getattr(cl_args, param_name)
 
-        if isinstance(param_value, List):
-            param_value = "_".join(param_value)
+        if isinstance(param_value, (tuple, list)):
+            param_value = "_".join([str(p) for p in param_value])
         elif param_value is None:
             param_value = str(param_value)
 

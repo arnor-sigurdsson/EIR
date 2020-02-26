@@ -115,8 +115,12 @@ def set_up_scheduler(
         )
 
     elif cl_args.lr_schedule == "plateau":
+        patience_steps = _calc_plateu_patience(
+            steps_per_epoch=len(c.train_loader), sample_interval=cl_args.sample_interval
+        )
+        logger.info("Plateau patience set to %d.", patience_steps)
         lr_scheduler = ReduceLROnPlateau(
-            c.optimizer, "min", patience=10, min_lr=lr_lower_bound
+            c.optimizer, "min", patience=patience_steps, min_lr=lr_lower_bound
         )
 
     else:
@@ -203,6 +207,15 @@ def _plot_lr_schedule(
     plt.plot(simulated_vals[:, 0], simulated_vals[:, 1])
     plt.savefig(output_folder / "lr_schedule.png")
     plt.close("all")
+
+
+def _calc_plateu_patience(steps_per_epoch: int, sample_interval: int):
+    """
+    For example if we have 15000 iterations and sample every 1000 we have
+    (15000 / 1000) * 2 = 30 patience steps.
+    """
+    num_epochs_patience = 2
+    return int(steps_per_epoch / sample_interval) * num_epochs_patience
 
 
 def _attach_warmup_to_scheduler(
