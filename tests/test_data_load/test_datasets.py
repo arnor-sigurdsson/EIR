@@ -62,7 +62,7 @@ def test_construct_dataset_init_params_from_cl_args(args_config):
         "TestSample_3": {"Origin": "Africa", "Height": 190, "BMI": 2},
     }
     args_config.target_con_columns = ["Height"]
-    args_config.contn_columns = ["BMI"]
+    args_config.extra_con_columns = ["BMI"]
 
     constructed_args = datasets._construct_common_dataset_init_params(
         cl_args=args_config, train_labels=test_train_labels

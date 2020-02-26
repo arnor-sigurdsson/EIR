@@ -126,7 +126,7 @@ def test_label_df_parse_wrapper(
         (
             {
                 "target_cat_columns": ["Origin"],
-                "contn_columns": ["OriginExtraColumnsPartial1"],
+                "extra_con_columns": ["OriginExtraColumnsPartial1"],
             },
             ["Origin", "OriginExtraColumnsPartial1", "ExtraCol1", "ExtraCol2"],
         ),
@@ -134,8 +134,8 @@ def test_label_df_parse_wrapper(
             {
                 "target_con_columns": ["Origin"],
                 "target_cat_columns": ["OriginExtraColumnsAll"],
-                "contn_columns": ["OriginExtraColumnsPartial1"],
-                "embed_columns": ["OriginExtraColumnsPartial2"],
+                "extra_con_columns": ["OriginExtraColumnsPartial1"],
+                "extra_cat_columns": ["OriginExtraColumnsPartial2"],
             },
             [
                 "Origin",
@@ -173,7 +173,7 @@ def test_get_all_label_columns_needed(
         (
             {
                 "target_cat_columns": ["Origin"],
-                "contn_columns": ["OriginExtraColumnsPartial1"],
+                "extra_con_columns": ["OriginExtraColumnsPartial1"],
             },
             ["Origin", "OriginExtraColumnsPartial1"],
         ),
@@ -181,8 +181,8 @@ def test_get_all_label_columns_needed(
             {
                 "target_con_columns": ["Origin"],
                 "target_cat_columns": ["OriginExtraColumnsAll"],
-                "contn_columns": ["OriginExtraColumnsPartial1"],
-                "embed_columns": ["OriginExtraColumnsPartial2"],
+                "extra_con_columns": ["OriginExtraColumnsPartial1"],
+                "extra_cat_columns": ["OriginExtraColumnsPartial2"],
             },
             [
                 "Origin",
@@ -545,9 +545,9 @@ def get_test_nan_args():
     cl_args = Namespace(
         **{
             "target_cat_columns": ["A"],
-            "embed_columns": ["B"],
+            "extra_cat_columns": ["B"],
             "target_con_columns": ["C"],
-            "contn_columns": ["D"],
+            "extra_con_columns": ["D"],
         }
     )
 
