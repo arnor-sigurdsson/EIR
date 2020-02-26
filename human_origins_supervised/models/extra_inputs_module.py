@@ -190,26 +190,28 @@ def get_extra_inputs(
     We want to have a wrapper function to gather all extra inputs needed by the model.
     """
     extra_embeddings = None
-    if cl_args.embed_columns:
+    if cl_args.extra_cat_columns:
 
         extra_embeddings = get_embeddings_from_ids(
             labels_dict=labels_dict,
             ids=ids,
-            embed_columns=cl_args.embed_columns,
+            embed_columns=cl_args.extra_cat_columns,
             model=model,
             device=cl_args.device,
         ).to(device=cl_args.device)
 
-        if not cl_args.contn_columns:
+        if not cl_args.extra_con_columns:
             return extra_embeddings.to(device=cl_args.device)
 
     extra_continuous = None
-    if cl_args.contn_columns:
+    if cl_args.extra_con_columns:
         extra_continuous = get_extra_continuous_inputs_from_ids(
-            labels_dict=labels_dict, ids=ids, continuous_columns=cl_args.contn_columns
+            labels_dict=labels_dict,
+            ids=ids,
+            continuous_columns=cl_args.extra_con_columns,
         ).to(device=cl_args.device)
 
-        if not cl_args.embed_columns:
+        if not cl_args.extra_cat_columns:
             return extra_continuous.to(device=cl_args.device)
 
     if extra_continuous is not None and extra_embeddings is not None:

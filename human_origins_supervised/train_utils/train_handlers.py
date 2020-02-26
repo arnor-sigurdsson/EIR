@@ -279,6 +279,10 @@ def _unflatten_engine_metrics_dict(
 def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> None:
     cl_args = handler_config.config.cl_args
 
+    # if no val data is available yet
+    if engine.state.iteration < cl_args.sample_interval:
+        return
+
     run_folder = get_run_folder(cl_args.run_name)
 
     for results_dir in (run_folder / "results").iterdir():

@@ -27,7 +27,7 @@ def test_load_model(args_config, tmp_path):
         cl_args=cl_args,
         num_classes=num_classes,
         embeddings_dict=None,
-        extra_continuous_inputs_columns=cl_args.contn_columns,
+        extra_continuous_inputs_columns=cl_args.extra_con_columns,
     ).to(device=cl_args.device)
 
     model_path = tmp_path / "model.pt"
@@ -70,7 +70,7 @@ def test_modify_train_cl_args_for_testing():
     [
         {
             "custom_cl_args": {
-                "contn_columns": ["ExtraTarget"],
+                "extra_con_columns": ["ExtraTarget"],
                 "target_con_columns": ["Height"],
                 "target_cat_columns": ["Origin"],
             }
@@ -173,7 +173,7 @@ def grab_latest_model_path(saved_models_folder: Path):
     ],
     indirect=True,
 )
-def test_predict_new(keep_outputs, prep_modelling_test_configs):
+def test_predict(keep_outputs, prep_modelling_test_configs):
     config, test_config = prep_modelling_test_configs
     test_path = Path(config.cl_args.data_folder).parent
 

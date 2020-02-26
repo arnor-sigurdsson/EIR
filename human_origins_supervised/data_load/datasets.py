@@ -85,7 +85,7 @@ def _construct_common_dataset_init_params(
         labels_dict=train_labels, label_columns=target_columns
     )
 
-    contn_columns_dict = {"extra_con": cl_args.contn_columns}
+    contn_columns_dict = {"extra_con": cl_args.extra_con_columns}
     extra_con_transformers_fit_on_train = set_up_label_transformers(
         labels_dict=train_labels, label_columns=contn_columns_dict
     )

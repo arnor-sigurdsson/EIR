@@ -164,8 +164,8 @@ def _check_test_performance_results(
             "custom_cl_args": {
                 "model_type": "cnn",
                 "target_cat_columns": ["Origin"],
-                "contn_columns": ["ExtraTarget"],
-                "embed_columns": ["OriginExtraCol"],
+                "extra_con_columns": ["ExtraTarget"],
+                "extra_cat_columns": ["OriginExtraCol"],
                 "target_con_columns": ["Height"],
                 "run_name": "extra_inputs",
             }
@@ -195,7 +195,7 @@ def test_multi_task(keep_outputs, prep_modelling_test_configs):
 
     for cat_column in config.cl_args.target_cat_columns:
         threshold, at_least_n = _get_multi_task_test_args(
-            extra_columns=cl_args.contn_columns, target_copy="OriginExtraColumn"
+            extra_columns=cl_args.extra_con_columns, target_copy="OriginExtraColumn"
         )
 
         _check_test_performance_results(
@@ -215,7 +215,7 @@ def test_multi_task(keep_outputs, prep_modelling_test_configs):
 
     for con_column in config.cl_args.target_con_columns:
         threshold, at_least_n = _get_multi_task_test_args(
-            extra_columns=cl_args.contn_columns, target_copy="ExtraTarget"
+            extra_columns=cl_args.extra_con_columns, target_copy="ExtraTarget"
         )
 
         _check_test_performance_results(
