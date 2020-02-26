@@ -96,7 +96,7 @@ def _get_all_label_columns_needed(
 
 def _get_label_columns_from_cl_args(cl_args: Namespace) -> List[str]:
     target_columns = cl_args.target_con_columns + cl_args.target_cat_columns
-    extra_input_columns = cl_args.contn_columns + cl_args.embed_columns
+    extra_input_columns = cl_args.extra_con_columns + cl_args.extra_cat_columns
 
     all_label_columns = target_columns + extra_input_columns
 
@@ -345,7 +345,7 @@ def _process_train_and_label_dfs(
     cl_args: Namespace, df_labels_train: pd.DataFrame, df_labels_valid: pd.DataFrame
 ) -> al_train_val_dfs:
 
-    con_columns = cl_args.target_con_columns + cl_args.contn_columns
+    con_columns = cl_args.target_con_columns + cl_args.extra_con_columns
     train_con_means = _get_con_manual_vals_dict(
         df=df_labels_train, con_columns=con_columns
     )
@@ -381,8 +381,8 @@ def handle_missing_label_values_in_df(
     name: str = "df",
 ) -> pd.DataFrame:
 
-    cat_label_columns = cl_args.embed_columns + cl_args.target_cat_columns
-    con_label_columns = cl_args.contn_columns + cl_args.target_con_columns
+    cat_label_columns = cl_args.extra_cat_columns + cl_args.target_cat_columns
+    con_label_columns = cl_args.extra_con_columns + cl_args.target_con_columns
 
     df_filled_cat = _fill_categorical_nans(
         df=df, column_names=cat_label_columns, name=name

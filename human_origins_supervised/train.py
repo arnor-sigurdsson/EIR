@@ -243,7 +243,7 @@ def get_model(
     embedding_dict: Union[al_emb_lookup_dict, None],
 ) -> Union[nn.Module, nn.DataParallel]:
     model_class = get_model_class(cl_args.model_type)
-    model = model_class(cl_args, num_classes, embedding_dict, cl_args.contn_columns)
+    model = model_class(cl_args, num_classes, embedding_dict, cl_args.extra_con_columns)
 
     if cl_args.model_type == "cnn":
         assert model.data_size_after_conv >= 8
@@ -311,7 +311,7 @@ def main(cl_args: argparse.Namespace) -> None:
     )
 
     embedding_dict = set_up_and_save_embeddings_dict(
-        cl_args.embed_columns, train_dataset.labels_dict, run_folder
+        cl_args.extra_cat_columns, train_dataset.labels_dict, run_folder
     )
 
     model = get_model(
@@ -554,15 +554,16 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--embed_columns",
+        "--extra_cat_columns",
         type=str,
         nargs="+",
         default=[],
-        help="What columns to embed and add to fully connected layer at end of model.",
+        help="What columns of categorical variables to add to fully connected layer at "
+        "end of model.",
     )
 
     parser.add_argument(
-        "--contn_columns",
+        "--extra_con_columns",
         type=str,
         nargs="+",
         default=[],

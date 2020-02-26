@@ -167,7 +167,7 @@ def _load_model(
     """
 
     embeddings_dict = _load_saved_embeddings_dict(
-        embed_columns=train_cl_args.embed_columns, run_name=train_cl_args.run_name
+        embed_columns=train_cl_args.extra_cat_columns, run_name=train_cl_args.run_name
     )
 
     mode_class = get_model_class(train_cl_args.model_type)
@@ -176,7 +176,7 @@ def _load_model(
         cl_args=train_cl_args,
         num_classes=num_classes,
         embeddings_dict=embeddings_dict,
-        extra_continuous_inputs_columns=train_cl_args.contn_columns,
+        extra_continuous_inputs_columns=train_cl_args.extra_con_columns,
     )
 
     model = _load_model_weights(
@@ -257,7 +257,7 @@ def _load_labels_for_testing(test_train_cl_args_mix: Namespace) -> al_label_dict
 
 def _prep_missing_con_dict(test_train_cl_args_mix: Namespace) -> Dict[str, float]:
     a = test_train_cl_args_mix
-    con_columns = a.contn_columns + a.target_con_columns
+    con_columns = a.extra_con_columns + a.target_con_columns
 
     extra_con_transformers = _load_transformers(
         cl_args=a, transformers_to_load=con_columns
@@ -293,7 +293,7 @@ def _set_up_test_dataset(
     )
 
     extra_con_transformers = _load_transformers(
-        cl_args=a, transformers_to_load=a.contn_columns
+        cl_args=a, transformers_to_load=a.extra_con_columns
     )
 
     test_dataset = datasets.DiskArrayDataset(

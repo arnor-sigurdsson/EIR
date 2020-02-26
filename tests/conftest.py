@@ -67,13 +67,13 @@ def args_config():
             "batch_size": 64,
             "channel_exp_base": 5,
             "checkpoint_interval": 100,
-            "contn_columns": [],
+            "extra_con_columns": [],
             "custom_lib": None,
             "data_folder": "REPLACE_ME",
             "data_width": 1000,
             "device": "cuda:0" if cuda.is_available() else "cpu",
             "down_stride": 4,
-            "embed_columns": [],
+            "extra_cat_columns": [],
             "fc_dim": 128,
             "fc_do": 0.0,
             "first_kernel_expansion": 1,
@@ -362,7 +362,7 @@ def create_test_model(create_test_cl_args, create_test_datasets):
     run_folder = get_run_folder(cl_args.run_name)
 
     embedding_dict = set_up_and_save_embeddings_dict(
-        embedding_columns=cl_args.embed_columns,
+        embedding_columns=cl_args.extra_cat_columns,
         labels_dict=train_dataset.labels_dict,
         run_folder=run_folder,
     )
