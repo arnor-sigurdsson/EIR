@@ -420,7 +420,14 @@ if __name__ == "__main__":
     parser.add_argument("--wd", type=float, default=0.00, help="Weight decay.")
 
     parser.add_argument(
-        "--fc_dim",
+        "--fc_repr_dim",
+        type=int,
+        default=512,
+        help="base dimensionality of fully connected layers at the end of the network",
+    )
+
+    parser.add_argument(
+        "--fc_task_dim",
         type=int,
         default=128,
         help="base dimensionality of fully connected layers at the end of the network",
