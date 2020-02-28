@@ -213,9 +213,13 @@ def _calc_plateu_patience(steps_per_epoch: int, sample_interval: int):
     """
     For example if we have 15000 iterations and sample every 1000 we have
     (15000 / 1000) * 2 = 30 patience steps.
+
+    In the case we have a sample interval higher than steps per epoch, we
+    make sure that the patience is at least 2 epochs as well.
     """
     num_epochs_patience = 2
-    return int(steps_per_epoch / sample_interval) * num_epochs_patience
+    samples_per_epoch = max((1, int(steps_per_epoch / sample_interval)))
+    return samples_per_epoch * num_epochs_patience
 
 
 def _attach_warmup_to_scheduler(
