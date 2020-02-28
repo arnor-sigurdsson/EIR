@@ -319,8 +319,8 @@ class ModelBase(nn.Module):
             self.fc_extra = nn.Linear(extra_dim, extra_dim, bias=False)
             self.fc_base += extra_dim
 
-        self.fc_3_last_module = _get_module_dict_from_target_columns(
-            num_classes=self.num_classes, fc_in=self.fc_base
+        self.multi_task_branches = _get_multi_task_branches(
+            num_classes=num_classes, fc_in=self.fc_base, fc_do=cl_args.fc_do
         )
 
     @property
@@ -333,6 +333,31 @@ def _get_module_dict_from_target_columns(num_classes: al_num_classes, fc_in: int
     module_dict = {}
     for key, num_classes in num_classes.items():
         module_dict[key] = nn.Linear(fc_in, num_classes)
+
+    return nn.ModuleDict(module_dict)
+
+
+def _get_multi_task_branches(
+    num_classes: al_num_classes, fc_in: int, fc_do: float
+) -> nn.ModuleDict:
+
+    module_dict = {}
+    for key, num_classes in num_classes.items():
+        task_layer_branch = nn.Sequential(
+            OrderedDict(
+                {
+                    "fc_2_bn_1": nn.BatchNorm1d(fc_in),
+                    "fc_2_act_1": Swish(),
+                    "fc_2_linear_1": nn.Linear(fc_in, fc_in, bias=False),
+                    "fc_3_bn_1": nn.BatchNorm1d(fc_in),
+                    "fc_3_act_1": Swish(),
+                    "fc_3_do_1": nn.Dropout(fc_do),
+                    "fc_3_": nn.Linear(fc_in, num_classes),
+                }
+            )
+        )
+
+        module_dict[key] = task_layer_branch
 
     return nn.ModuleDict(module_dict)
 
@@ -360,30 +385,6 @@ class CNNModel(ModelBase):
             )
         )
 
-        self.fc_2 = nn.Sequential(
-            OrderedDict(
-                {
-                    "fc_2_bn_1": nn.BatchNorm1d(self.fc_base),
-                    "fc_2_act_1": Swish(),
-                    "fc_2_linear_1": nn.Linear(self.fc_base, self.fc_base, bias=False),
-                }
-            )
-        )
-
-        # Note that extra_fc os called here between fc_1 and fc_2
-
-        self.fc_3 = nn.Sequential(
-            OrderedDict(
-                {
-                    "fc_3_bn_1": nn.BatchNorm1d(self.fc_base),
-                    "fc_3_act_1": Swish(),
-                    "fc_3_do_1": nn.Dropout(self.cl_args.fc_do),
-                }
-            )
-        )
-
-        # Note that fc_3_last module gets called here
-
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 # Swish slope is roughly 0.5 around 0
@@ -406,11 +407,8 @@ class CNNModel(ModelBase):
             out_extra = self.fc_extra(extra_inputs)
             out = torch.cat((out_extra, out), dim=1)
 
-        out = self.fc_2(out)
-        out = self.fc_3(out)
-
         final_out = _calculate_final_multi_output(
-            input_=out, last_module=self.fc_3_last_module
+            input_=out, last_module=self.multi_task_branches
         )
 
         return final_out
