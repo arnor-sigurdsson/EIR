@@ -119,7 +119,7 @@ def _get_extra_columns(
     """
 
     extra_columns = []
-    for column in label_columns:
+    for column in label_columns + ["base"]:
 
         if column in all_column_ops:
             cur_ops = all_column_ops.get(column)
