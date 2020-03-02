@@ -180,28 +180,35 @@ def aggregate_losses(losses_dict: Dict[str, torch.Tensor]) -> torch.Tensor:
 
 class UncertaintyMultiTaskLoss(nn.Module):
     def __init__(
-        self, target_columns: "al_target_columns", criterions: "al_criterions"
+        self,
+        target_columns: "al_target_columns",
+        criterions: "al_criterions",
+        device: str,
     ):
         super().__init__()
 
         self.target_columns = target_columns
         self.criterions = criterions
+        self.device = device
 
         self.log_vars = self._construct_params(
-            target_columns["cat"] + target_columns["con"]
+            cur_target_columns=target_columns["cat"] + target_columns["con"],
+            device=self.device,
         )
 
     @staticmethod
-    def _construct_params(cur_target_columns: List[str]):
+    def _construct_params(cur_target_columns: List[str], device: str):
         param_dict = {}
         for column_name in cur_target_columns:
-            param_dict[column_name] = nn.Parameter(torch.zeros(1), requires_grad=True)
+            param_dict[column_name] = nn.Parameter(
+                torch.zeros(1), requires_grad=True
+            ).to(device=device)
 
         return param_dict
 
     def _calc_uncertrainty_loss(self, name, loss_value):
         log_var = self.log_vars[name]
-        scalar = 2 if name in self.target_columns["cat"] else 1
+        scalar = 2.0 if name in self.target_columns["cat"] else 1.0
 
         precision = torch.exp(-log_var)
         loss = scalar * torch.sum(precision * loss_value + log_var)
