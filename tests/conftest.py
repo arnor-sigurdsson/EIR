@@ -430,7 +430,7 @@ def create_test_optimizer(
     """
 
     loss_module = train._get_loss_callable(
-        target_columns=target_columns, criterions=criterions
+        target_columns=target_columns, criterions=criterions, device=cl_args.device
     )
 
     optimizer = train.get_optimizer(

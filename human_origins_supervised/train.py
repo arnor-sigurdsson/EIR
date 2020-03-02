@@ -291,11 +291,13 @@ def _get_criterions(target_columns: al_target_columns) -> al_criterions:
     return criterions_dict
 
 
-def _get_loss_callable(target_columns: al_target_columns, criterions: al_criterions):
+def _get_loss_callable(
+    target_columns: al_target_columns, criterions: al_criterions, device: str
+):
     num_tasks = len(list(target_columns.values()))
     if num_tasks > 1:
         multi_task_loss_module = UncertaintyMultiTaskLoss(
-            target_columns=target_columns, criterions=criterions
+            target_columns=target_columns, criterions=criterions, device=device
         )
         return multi_task_loss_module
     elif num_tasks == 1:
@@ -353,7 +355,9 @@ def main(cl_args: argparse.Namespace) -> None:
     criterions = _get_criterions(target_columns=train_dataset.target_columns)
 
     loss_func = _get_loss_callable(
-        target_columns=train_dataset.target_columns, criterions=criterions
+        target_columns=train_dataset.target_columns,
+        criterions=criterions,
+        device=cl_args.device,
     )
 
     optimizer = get_optimizer(model=model, loss_callable=loss_func, cl_args=cl_args)
