@@ -1,10 +1,11 @@
 import argparse
 import sys
 from dataclasses import dataclass
+from functools import partial
 from os.path import abspath
 from pathlib import Path
 from sys import platform
-from typing import Union, Tuple, List, Dict, overload, TYPE_CHECKING
+from typing import Callable, Union, Tuple, List, Dict, overload, TYPE_CHECKING
 
 import numpy as np
 import torch
@@ -40,6 +41,7 @@ from human_origins_supervised.train_utils import utils
 from human_origins_supervised.train_utils.metrics import (
     calculate_batch_metrics,
     calculate_losses,
+    aggregate_losses,
     add_multi_task_average_metrics,
     UncertaintyMultiTaskLoss,
 )
@@ -47,6 +49,7 @@ from human_origins_supervised.train_utils.train_handlers import configure_traine
 
 if TYPE_CHECKING:
     from human_origins_supervised.train_utils.metrics import al_step_metric_dict
+    from human_origins_supervised.models.models import CNNModel, MLPModel  # noqa: F401
 
 # aliases
 al_criterions = Dict[str, Union[nn.CrossEntropyLoss, nn.MSELoss]]
@@ -71,10 +74,9 @@ class Config:
     train_loader: torch.utils.data.DataLoader
     valid_loader: torch.utils.data.DataLoader
     valid_dataset: torch.utils.data.Dataset
-    model: nn.Module
+    model: Union["CNNModel", "MLPModel"]
     optimizer: Optimizer
-    criterions: al_criterions
-    loss_module: nn.Module
+    loss_module: Callable
     labels_dict: Dict
     target_transformers: Dict[str, al_label_transformers]
     target_columns: al_target_columns
@@ -101,16 +103,16 @@ def train_ignite(config: Config) -> None:
             target_columns=c.target_columns, device=cl_args.device, labels=train_labels
         )
 
-        extra_inputs = get_extra_inputs(cl_args, train_ids, c.labels_dict, c.model)
+        extra_inputs = get_extra_inputs(
+            cl_args=cl_args, ids=train_ids, labels_dict=c.labels_dict, model=c.model
+        )
 
         c.optimizer.zero_grad()
         train_outputs = c.model(train_seqs, extra_inputs)
 
-        train_losses = calculate_losses(
-            criterions=c.criterions, labels=train_labels, outputs=train_outputs
-        )
-        # train_loss_avg = aggregate_losses(train_losses)
-        train_loss_avg = c.loss_module.calc_multi_task_loss(train_losses)
+        train_losses = c.loss_module(inputs=train_outputs, targets=train_labels)
+        train_loss_avg = aggregate_losses(losses_dict=train_losses)
+
         train_loss_avg.backward()
         c.optimizer.step()
 
@@ -225,12 +227,18 @@ def _modify_bs_for_multi_gpu(multi_gpu: bool, batch_size: int) -> int:
 
 
 def get_optimizer(
-    model: nn.Module, loss_module, cl_args: argparse.Namespace
+    model: nn.Module, loss_callable: Callable, cl_args: argparse.Namespace
 ) -> Optimizer:
-    model_params = get_model_params(model, cl_args.wd)
-    loss_params = [{"params": p} for p in loss_module.parameters()]
+    def get_all_params():
+        model_params = get_model_params(model, cl_args.wd)
 
-    all_params = model_params + loss_params
+        loss_params = []
+        if isinstance(loss_callable, nn.Module):
+            loss_params = [{"params": p} for p in loss_callable.parameters()]
+
+        return model_params + loss_params
+
+    all_params = get_all_params()
 
     if cl_args.optimizer == "adamw":
         optimizer = AdamW(
@@ -265,11 +273,14 @@ def get_model(
 def _get_criterions(target_columns: al_target_columns) -> al_criterions:
     criterions_dict = {}
 
+    con_criterion = nn.MSELoss(reduction="mean")
+    cat_criterion = nn.CrossEntropyLoss()
+
     def get_criterion(column_type_):
         if column_type_ == "con":
-            return nn.MSELoss(reduction="mean")
+            return con_criterion
         elif column_type_ == "cat":
-            return nn.CrossEntropyLoss()
+            return cat_criterion
 
     target_columns_gen = data_utils.get_target_columns_generator(target_columns)
 
@@ -278,6 +289,18 @@ def _get_criterions(target_columns: al_target_columns) -> al_criterions:
         criterions_dict[column_name] = criterion
 
     return criterions_dict
+
+
+def _get_loss_callable(target_columns: al_target_columns, criterions: al_criterions):
+    num_tasks = len(list(target_columns.values()))
+    if num_tasks > 1:
+        multi_task_loss_module = UncertaintyMultiTaskLoss(
+            target_columns=target_columns, criterions=criterions
+        )
+        return multi_task_loss_module
+    elif num_tasks == 1:
+        single_task_loss_func = partial(calculate_losses, criterions=criterions)
+        return single_task_loss_func
 
 
 def get_summary_writer(run_folder: Path) -> SummaryWriter:
@@ -327,13 +350,13 @@ def main(cl_args: argparse.Namespace) -> None:
         embedding_dict=embedding_dict,
     )
 
-    loss_module = UncertaintyMultiTaskLoss(
-        len(cl_args.target_cat_columns + cl_args.target_con_columns)
+    criterions = _get_criterions(target_columns=train_dataset.target_columns)
+
+    loss_func = _get_loss_callable(
+        target_columns=train_dataset.target_columns, criterions=criterions
     )
 
-    optimizer = get_optimizer(model, loss_module, cl_args)
-
-    criterions = _get_criterions(train_dataset.target_columns)
+    optimizer = get_optimizer(model=model, loss_callable=loss_func, cl_args=cl_args)
 
     writer = get_summary_writer(run_folder=run_folder)
 
@@ -344,8 +367,7 @@ def main(cl_args: argparse.Namespace) -> None:
         valid_dataset=valid_dataset,
         model=model,
         optimizer=optimizer,
-        criterions=criterions,
-        loss_module=loss_module,
+        loss_module=loss_func,
         labels_dict=train_dataset.labels_dict,
         target_transformers=train_dataset.target_transformers,
         target_columns=train_dataset.target_columns,
@@ -353,10 +375,10 @@ def main(cl_args: argparse.Namespace) -> None:
         writer=writer,
     )
 
-    _log_params(model)
+    _log_params(model=model)
 
     if cl_args.find_lr:
-        test_lr_range(config)
+        test_lr_range(config=config)
         sys.exit(0)
 
     if cl_args.debug:

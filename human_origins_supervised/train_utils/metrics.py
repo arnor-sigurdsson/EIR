@@ -7,11 +7,11 @@ from typing import Dict, Union, TYPE_CHECKING, List, Tuple
 import numpy as np
 import pandas as pd
 import torch
-from torch import nn
 from aislib.misc_utils import ensure_path_exists
 from scipy.stats import pearsonr
 from sklearn.metrics import matthews_corrcoef, r2_score, mean_squared_error
 from sklearn.preprocessing import StandardScaler, LabelEncoder
+from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 
 from human_origins_supervised.data_load.data_utils import get_target_columns_generator
@@ -179,23 +179,50 @@ def aggregate_losses(losses_dict: Dict[str, torch.Tensor]) -> torch.Tensor:
 
 
 class UncertaintyMultiTaskLoss(nn.Module):
-    def __init__(self, num_tasks: int):
+    def __init__(
+        self, target_columns: "al_target_columns", criterions: "al_criterions"
+    ):
         super().__init__()
 
-        self.log_vars = nn.Parameter(torch.zeros(num_tasks), requires_grad=True)
+        self.target_columns = target_columns
+        self.criterions = criterions
 
-    def calc_multi_task_loss(self, losses_dict: Dict[str, torch.Tensor]):
-        """
-        TODO: Make losses dict ordered or log_vars a dict (probably 2 is better).
-        """
-        loss = 0
-        for idx, (target_name, loss_value) in enumerate(losses_dict.items()):
-            scalar = 2 if target_name == "Origin" else 1
-            precision = torch.exp(-self.log_vars[idx])
-            cur_loss = scalar * torch.sum(precision * loss_value + self.log_vars[idx])
-            loss += cur_loss
+        self.log_vars = self._construct_params(
+            target_columns["cat"] + target_columns["con"]
+        )
+
+    @staticmethod
+    def _construct_params(cur_target_columns: List[str]):
+        param_dict = {}
+        for column_name in cur_target_columns:
+            param_dict[column_name] = nn.Parameter(torch.zeros(1), requires_grad=True)
+
+        return param_dict
+
+    def _calc_uncertrainty_loss(self, name, loss_value):
+        log_var = self.log_vars[name]
+        scalar = 2 if name in self.target_columns["cat"] else 1
+
+        precision = torch.exp(-log_var)
+        loss = scalar * torch.sum(precision * loss_value + log_var)
 
         return loss
+
+    def forward(self, inputs, targets):
+        losses_dict = {}
+
+        for target_column, criterion in self.criterions.items():
+            cur_target_col_labels = targets[target_column]
+            cur_target_col_outputs = inputs[target_column]
+            loss_value_base = criterion(
+                input=cur_target_col_outputs, target=cur_target_col_labels
+            )
+            loss_value_uncertain = self._calc_uncertrainty_loss(
+                name=target_column, loss_value=loss_value_base
+            )
+            losses_dict[target_column] = loss_value_uncertain
+
+        return losses_dict
 
 
 def get_best_average_performance(

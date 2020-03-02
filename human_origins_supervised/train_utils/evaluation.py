@@ -51,9 +51,7 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
         target_columns=c.target_columns, device=cl_args.device, labels=val_labels_total
     )
 
-    val_losses = metrics.calculate_losses(
-        criterions=c.criterions, labels=val_labels_total, outputs=val_outputs_total
-    )
+    val_losses = c.loss_module(inputs=val_outputs_total, targets=val_labels_total)
     val_loss_avg = metrics.aggregate_losses(val_losses)
 
     eval_metrics_dict = metrics.calculate_batch_metrics(

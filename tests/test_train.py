@@ -101,11 +101,15 @@ def test_get_optimizer(args_config):
     model = FakeModel()
 
     args_config.optimizer = "adamw"
-    adamw_optimizer = train.get_optimizer(model, args_config)
+    adamw_optimizer = train.get_optimizer(
+        model=model, loss_callable=lambda x: x, cl_args=args_config
+    )
     assert isinstance(adamw_optimizer, AdamW)
 
     args_config.optimizer = "sgdm"
-    sgdm_optimizer = train.get_optimizer(model, args_config)
+    sgdm_optimizer = train.get_optimizer(
+        model=model, loss_callable=lambda x: x, cl_args=args_config
+    )
     assert isinstance(sgdm_optimizer, SGD)
     assert sgdm_optimizer.param_groups[0]["momentum"] == 0.9
 
