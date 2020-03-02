@@ -311,17 +311,14 @@ class ModelBase(nn.Module):
         if extra_continuous_inputs_columns:
             con_total_dim = len(self.extra_continuous_inputs_columns)
 
-        self.fc_base = cl_args.fc_dim
+        self.fc_repr_and_extra_dim = cl_args.fc_repr_dim
+        self.fc_task_dim = cl_args.fc_task_dim
 
         # TODO: Better to have this a method so fc_extra is explicitly defined?
         if emb_total_dim or con_total_dim:
             extra_dim = emb_total_dim + con_total_dim
             self.fc_extra = nn.Linear(extra_dim, extra_dim, bias=False)
-            self.fc_base += extra_dim
-
-        self.fc_3_last_module = _get_module_dict_from_target_columns(
-            num_classes=self.num_classes, fc_in=self.fc_base
-        )
+            self.fc_repr_and_extra_dim += extra_dim
 
     @property
     def fc_1_in_features(self):
@@ -333,6 +330,25 @@ def _get_module_dict_from_target_columns(num_classes: al_num_classes, fc_in: int
     module_dict = {}
     for key, num_classes in num_classes.items():
         module_dict[key] = nn.Linear(fc_in, num_classes)
+
+    return nn.ModuleDict(module_dict)
+
+
+def _get_multi_task_branches(
+    branch_layers: "OrderedDict[str, nn.Module]",
+    num_classes: al_num_classes,
+    fc_in: int,
+) -> nn.ModuleDict:
+
+    module_dict = {}
+    for key, num_classes in num_classes.items():
+        task_layer_branch = nn.Sequential(
+            OrderedDict(
+                **branch_layers, **{"fc_3_final": nn.Linear(fc_in, num_classes)}
+            )
+        )
+
+        module_dict[key] = task_layer_branch
 
     return nn.ModuleDict(module_dict)
 
@@ -354,35 +370,30 @@ class CNNModel(ModelBase):
                     "fc_1_bn_1": nn.BatchNorm1d(self.fc_1_in_features),
                     "fc_1_act_1": Swish(),
                     "fc_1_linear_1": nn.Linear(
-                        self.fc_1_in_features, self.cl_args.fc_dim, bias=False
+                        self.fc_1_in_features, self.cl_args.fc_repr_dim, bias=False
                     ),
                 }
             )
         )
 
-        self.fc_2 = nn.Sequential(
-            OrderedDict(
-                {
-                    "fc_2_bn_1": nn.BatchNorm1d(self.fc_base),
-                    "fc_2_act_1": Swish(),
-                    "fc_2_linear_1": nn.Linear(self.fc_base, self.fc_base, bias=False),
-                }
-            )
+        cnn_task_branch_layers = OrderedDict(
+            {
+                "fc_2_bn_1": nn.BatchNorm1d(self.fc_repr_and_extra_dim),
+                "fc_2_act_1": Swish(),
+                "fc_2_linear_1": nn.Linear(
+                    self.fc_repr_and_extra_dim, self.fc_task_dim, bias=False
+                ),
+                "fc_3_bn_1": nn.BatchNorm1d(self.fc_task_dim),
+                "fc_3_act_1": Swish(),
+                "fc_3_do_1": nn.Dropout(self.cl_args.fc_do),
+            }
         )
 
-        # Note that extra_fc os called here between fc_1 and fc_2
-
-        self.fc_3 = nn.Sequential(
-            OrderedDict(
-                {
-                    "fc_3_bn_1": nn.BatchNorm1d(self.fc_base),
-                    "fc_3_act_1": Swish(),
-                    "fc_3_do_1": nn.Dropout(self.cl_args.fc_do),
-                }
-            )
+        self.multi_task_branches = _get_multi_task_branches(
+            branch_layers=cnn_task_branch_layers,
+            num_classes=self.num_classes,
+            fc_in=self.fc_task_dim,
         )
-
-        # Note that fc_3_last module gets called here
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -406,14 +417,11 @@ class CNNModel(ModelBase):
             out_extra = self.fc_extra(extra_inputs)
             out = torch.cat((out_extra, out), dim=1)
 
-        out = self.fc_2(out)
-        out = self.fc_3(out)
-
-        final_out = _calculate_final_multi_output(
-            input_=out, last_module=self.fc_3_last_module
+        out = _calculate_task_branch_outputs(
+            input_=out, last_module=self.multi_task_branches
         )
 
-        return final_out
+        return out
 
     @property
     def resblocks(self):
@@ -440,31 +448,30 @@ class MLPModel(ModelBase):
             OrderedDict(
                 {
                     "fc_1_linear_1": nn.Linear(
-                        self.fc_1_in_features, self.cl_args.fc_dim, bias=False
+                        self.fc_1_in_features, self.cl_args.fc_repr_dim, bias=False
                     ),
                     "fc_1_act_1": Swish(),
-                    "fc_1_bn_1": nn.BatchNorm1d(self.cl_args.fc_dim),
+                    "fc_1_bn_1": nn.BatchNorm1d(self.cl_args.fc_repr_dim),
                 }
             )
         )
 
-        # Note that extra_fc os called here between fc_1 and fc_2
-
-        self.fc_2 = nn.Sequential(
-            OrderedDict(
-                {
-                    "fc_2_linear_1": nn.Linear(self.fc_base, self.fc_base, bias=False),
-                    "fc_2_act_1": Swish(),
-                    "fc_2_bn_1": nn.BatchNorm1d(self.fc_base),
-                }
-            )
+        mlp_task_branch_base = OrderedDict(
+            {
+                "fc_2_linear_1": nn.Linear(
+                    self.fc_repr_and_extra_dim, self.fc_repr_and_extra_dim, bias=False
+                ),
+                "fc_2_act_1": Swish(),
+                "fc_2_bn_1": nn.BatchNorm1d(self.fc_repr_and_extra_dim),
+                "fc_3_do_1": nn.Dropout(self.cl_args.fc_do),
+            }
         )
 
-        self.fc_3 = nn.Sequential(
-            OrderedDict({"fc_3_do_1": nn.Dropout(self.cl_args.fc_do)})
+        self.multi_task_branches = _get_multi_task_branches(
+            branch_layers=mlp_task_branch_base,
+            num_classes=self.num_classes,
+            fc_in=self.fc_repr_and_extra_dim,
         )
-
-        # Note that fc_3_last module gets called here
 
     @property
     def fc_1_in_features(self):
@@ -479,17 +486,14 @@ class MLPModel(ModelBase):
             out_extra = self.fc_extra(extra_inputs)
             out = torch.cat((out_extra, out), dim=1)
 
-        out = self.fc_2(out)
-        out = self.fc_3(out)
-
-        final_out = _calculate_final_multi_output(
-            input_=out, last_module=self.fc_3_last_module
+        out = _calculate_task_branch_outputs(
+            input_=out, last_module=self.multi_task_branches
         )
 
-        return final_out
+        return out
 
 
-def _calculate_final_multi_output(
+def _calculate_task_branch_outputs(
     input_: torch.Tensor, last_module: nn.ModuleDict
 ) -> Dict[str, torch.Tensor]:
     final_out = {}

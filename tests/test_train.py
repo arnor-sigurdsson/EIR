@@ -119,14 +119,14 @@ def test_get_model(args_config):
     cnn_model = train.get_model(args_config, num_classes_dict, None)
 
     assert isinstance(cnn_model, CNNModel)
-    assert cnn_model.fc_3_last_module["Origin"].out_features == 10
-    assert cnn_model.fc_3_last_module["Height"].out_features == 1
+    assert cnn_model.multi_task_branches["Origin"].fc_3_final.out_features == 10
+    assert cnn_model.multi_task_branches["Height"].fc_3_final.out_features == 1
 
     args_config.model_type = "mlp"
     mlp_model = train.get_model(args_config, num_classes_dict, None)
     assert isinstance(mlp_model, MLPModel)
-    assert mlp_model.fc_3_last_module["Origin"].out_features == 10
-    assert mlp_model.fc_3_last_module["Height"].out_features == 1
+    assert mlp_model.multi_task_branches["Origin"].fc_3_final.out_features == 10
+    assert mlp_model.multi_task_branches["Height"].fc_3_final.out_features == 1
 
 
 def test_get_criterions():

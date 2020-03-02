@@ -62,7 +62,7 @@ def test_calculate_final_multi_output():
 
     test_input = torch.zeros(128)
 
-    test_multi_output = models._calculate_final_multi_output(
+    test_multi_output = models._calculate_task_branch_outputs(
         input_=test_input, last_module=output_layer_model_dict
     )
 
