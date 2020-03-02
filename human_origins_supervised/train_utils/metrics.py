@@ -7,6 +7,7 @@ from typing import Dict, Union, TYPE_CHECKING, List, Tuple
 import numpy as np
 import pandas as pd
 import torch
+from torch import nn
 from aislib.misc_utils import ensure_path_exists
 from scipy.stats import pearsonr
 from sklearn.metrics import matthews_corrcoef, r2_score, mean_squared_error
@@ -175,6 +176,24 @@ def aggregate_losses(losses_dict: Dict[str, torch.Tensor]) -> torch.Tensor:
     average_loss = torch.mean(torch.stack(losses_values))
 
     return average_loss
+
+
+class UncertaintyMultiTaskLoss(nn.Module):
+    def __init__(self, num_tasks: int):
+        super().__init__()
+
+        self.log_vars = nn.Parameter(torch.zeros(num_tasks), requires_grad=True)
+
+    def calc_multi_task_loss(self, losses_dict: Dict[str, torch.Tensor]):
+        """
+        TODO: Make losses dict ordered or log_vars a dict (probably 2 is better).
+        """
+        loss = 0
+        for idx, (target_name, loss_value) in enumerate(losses_dict.items()):
+            precision = torch.exp(-self.log_vars[idx])
+            loss += precision * loss_value + self.log_vars[idx]
+
+        return loss
 
 
 def get_best_average_performance(

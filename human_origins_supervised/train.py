@@ -40,8 +40,8 @@ from human_origins_supervised.train_utils import utils
 from human_origins_supervised.train_utils.metrics import (
     calculate_batch_metrics,
     calculate_losses,
-    aggregate_losses,
     add_multi_task_average_metrics,
+    UncertaintyMultiTaskLoss,
 )
 from human_origins_supervised.train_utils.train_handlers import configure_trainer
 
@@ -85,6 +85,10 @@ def train_ignite(config: Config) -> None:
     c = config
     cl_args = config.cl_args
 
+    loss_func = UncertaintyMultiTaskLoss(
+        len(cl_args.target_cat_columns + cl_args.target_con_columns)
+    )
+
     def step(
         engine: Engine, loader_batch: Tuple[torch.Tensor, al_training_labels, List[str]]
     ) -> "al_step_metric_dict":
@@ -108,7 +112,8 @@ def train_ignite(config: Config) -> None:
         train_losses = calculate_losses(
             criterions=c.criterions, labels=train_labels, outputs=train_outputs
         )
-        train_loss_avg = aggregate_losses(train_losses)
+        # train_loss_avg = aggregate_losses(train_losses)
+        train_loss_avg = loss_func.calc_multi_task_loss(train_losses)
         train_loss_avg.backward()
         c.optimizer.step()
 
