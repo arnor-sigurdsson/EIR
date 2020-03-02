@@ -66,7 +66,7 @@ def label_df_parse_wrapper(cl_args: Namespace) -> pd.DataFrame:
 
     label_columns = _get_label_columns_from_cl_args(cl_args=cl_args)
     df_labels_parsed = _parse_label_df(
-        df=df_labels_filtered, column_ops=column_ops, label_columns=label_columns
+        df=df_labels_filtered, operations_dict=column_ops, label_columns=label_columns
     )
 
     df_column_filtered = _drop_not_needed_label_columns(
@@ -119,7 +119,7 @@ def _get_extra_columns(
     """
 
     extra_columns = []
-    for column in label_columns:
+    for column in label_columns + ["base"]:
 
         if column in all_column_ops:
             cur_ops = all_column_ops.get(column)
@@ -206,7 +206,7 @@ def _filter_ids_from_label_df(
 
 
 def _parse_label_df(
-    df: pd.DataFrame, column_ops: al_all_column_ops, label_columns: List[str]
+    df: pd.DataFrame, operations_dict: al_all_column_ops, label_columns: List[str]
 ) -> pd.DataFrame:
     """
     We want to be able to dynamically apply various operations to different columns
@@ -223,47 +223,50 @@ def _parse_label_df(
     column, make sure it's not applied in other cases (e.g. if the column is a
     embedding / continuous input to another target).
 
+    Why this 'base'? In the custom column operations, we might have operations that
+    should always be called. They have the key 'base' in the column_ops dictionary.
+
     :param df: Dataframe to perform processing on.
-    :param column_ops: A dictionary of column names, where each value is a list
+    :param operations_dict: A dictionary of column names, where each value is a list
     of tuples, where each tuple is a callable as the first element and the callable's
     arguments as the second element.
     :param label_columns:
     :return: Parsed dataframe.
     """
 
-    def _is_column_candidate(column_name_: str) -> bool:
-        column_in_df = column_name_ in df.columns
+    def _is_op_candidate(op_name_: str) -> bool:
+        column_in_df = op_name_ in df.columns
         column_expected_to_be_made = (
-            column_name_ in label_columns and column_name_ not in df.columns
+            op_name_ in label_columns and op_name_ not in df.columns
         )
-        is_candidate = column_in_df or column_expected_to_be_made
+        is_candidate = column_in_df or column_expected_to_be_made or op_name_ == "base"
         return is_candidate
 
-    def _do_call_column_op(column_op_: ColumnOperation, column_name_: str) -> bool:
+    def _do_call_op(column_op_: ColumnOperation, op_name_: str) -> bool:
         only_apply_if_target = column_op_.only_apply_if_target
-        not_a_label_col = column_name_ not in label_columns
+        not_a_label_col = op_name_ not in label_columns
         do_skip = only_apply_if_target and not_a_label_col
 
-        do_call = not do_skip
+        do_call = not do_skip or op_name_ == "base"
         return do_call
 
-    for column_name, ops_funcs in column_ops.items():
+    for op_name, ops_funcs in operations_dict.items():
 
-        if _is_column_candidate(column_name_=column_name):
+        if _is_op_candidate(op_name_=op_name):
 
-            for column_op in ops_funcs:
+            for operation in ops_funcs:
 
-                if _do_call_column_op(column_op_=column_op, column_name_=column_name):
+                if _do_call_op(column_op_=operation, op_name_=op_name):
 
-                    func, args_dict = column_op.function, column_op.function_args
+                    func, args_dict = operation.function, operation.function_args
                     logger.debug(
                         "Applying func %s with args %s to column %s in pre-processing.",
                         func,
                         args_dict,
-                        column_name,
+                        op_name,
                     )
                     logger.debug("Shape before: %s", df.shape)
-                    df = func(df=df, column_name=column_name, **args_dict)
+                    df = func(df=df, column_name=op_name, **args_dict)
                     logger.debug("Shape after: %s", df.shape)
     return df
 

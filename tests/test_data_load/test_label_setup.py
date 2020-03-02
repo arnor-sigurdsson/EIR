@@ -368,7 +368,7 @@ def test_parse_label_df_applied_1(create_test_data, create_test_column_ops):
         label_fpath=label_fpath, columns=label_columns, custom_lib=None
     )
     df_labels_parsed = label_setup._parse_label_df(
-        df=df_labels, column_ops=test_column_ops, label_columns=label_columns
+        df=df_labels, operations_dict=test_column_ops, label_columns=label_columns
     )
 
     assert set(df_labels_parsed.Origin.unique()) == {"Iceland" * 2, "Asia" * 2}
@@ -402,7 +402,7 @@ def test_parse_label_df_applied_2(create_test_data, create_test_column_ops):
 
     new_label_columns = ["OriginExtraColumnsAll"]
     df_labels_parsed = label_setup._parse_label_df(
-        df=df_labels, column_ops=test_column_ops, label_columns=new_label_columns
+        df=df_labels, operations_dict=test_column_ops, label_columns=new_label_columns
     )
 
     assert df_labels_parsed["OriginExtraColumnsAll"].unique().item() == "Iceland"
@@ -452,7 +452,7 @@ def test_parse_label_df_not_applied(m_logger, create_test_data, create_test_colu
     df_labels["SomeRandomCol"] = 1
 
     df_labels_parsed = label_setup._parse_label_df(
-        df=df_labels, column_ops=test_column_ops, label_columns=label_columns
+        df=df_labels, operations_dict=test_column_ops, label_columns=label_columns
     )
 
     assert set(df_labels_parsed.Origin.unique()) == {"Iceland" * 2, "Asia" * 2}
