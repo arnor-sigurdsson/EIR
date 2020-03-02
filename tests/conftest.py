@@ -19,6 +19,7 @@ from human_origins_supervised.data_load import datasets
 from human_origins_supervised.models.extra_inputs_module import (
     set_up_and_save_embeddings_dict,
 )
+from human_origins_supervised.train_utils.metrics import UncertaintyMultiTaskLoss
 from human_origins_supervised.train import Config, get_model
 from human_origins_supervised.train_utils.utils import configure_root_logger
 from human_origins_supervised.train_utils.utils import get_run_folder
@@ -422,9 +423,13 @@ def create_test_optimizer(create_test_cl_args, create_test_model):
     cl_args = create_test_cl_args
     model = create_test_model
 
-    optimizer = train.get_optimizer(model, cl_args)
+    loss_module = UncertaintyMultiTaskLoss(
+        len(cl_args.target_cat_columns + cl_args.target_con_columns)
+    )
 
-    return optimizer
+    optimizer = train.get_optimizer(model, loss_module, cl_args)
+
+    return optimizer, loss_module
 
 
 @dataclass
@@ -452,7 +457,7 @@ def prep_modelling_test_configs(
     cl_args = create_test_cl_args
     train_loader, valid_loader, train_dataset, valid_dataset = create_test_dloaders
     model = create_test_model
-    optimizer = create_test_optimizer
+    optimizer, loss_module = create_test_optimizer
     criterions = train._get_criterions(train_dataset.target_columns)
 
     train_dataset, valid_dataset = create_test_datasets
@@ -465,6 +470,7 @@ def prep_modelling_test_configs(
         model=model,
         optimizer=optimizer,
         criterions=criterions,
+        loss_module=loss_module,
         labels_dict=train_dataset.labels_dict,
         target_transformers=train_dataset.target_transformers,
         target_columns=train_dataset.target_columns,

@@ -190,8 +190,10 @@ class UncertaintyMultiTaskLoss(nn.Module):
         """
         loss = 0
         for idx, (target_name, loss_value) in enumerate(losses_dict.items()):
+            scalar = 2 if target_name == "Origin" else 1
             precision = torch.exp(-self.log_vars[idx])
-            loss += precision * loss_value + self.log_vars[idx]
+            cur_loss = scalar * torch.sum(precision * loss_value + self.log_vars[idx])
+            loss += cur_loss
 
         return loss
 

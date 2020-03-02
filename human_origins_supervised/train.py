@@ -74,6 +74,7 @@ class Config:
     model: nn.Module
     optimizer: Optimizer
     criterions: al_criterions
+    loss_module: nn.Module
     labels_dict: Dict
     target_transformers: Dict[str, al_label_transformers]
     target_columns: al_target_columns
@@ -84,10 +85,6 @@ class Config:
 def train_ignite(config: Config) -> None:
     c = config
     cl_args = config.cl_args
-
-    loss_func = UncertaintyMultiTaskLoss(
-        len(cl_args.target_cat_columns + cl_args.target_con_columns)
-    )
 
     def step(
         engine: Engine, loader_batch: Tuple[torch.Tensor, al_training_labels, List[str]]
@@ -113,7 +110,7 @@ def train_ignite(config: Config) -> None:
             criterions=c.criterions, labels=train_labels, outputs=train_outputs
         )
         # train_loss_avg = aggregate_losses(train_losses)
-        train_loss_avg = loss_func.calc_multi_task_loss(train_losses)
+        train_loss_avg = c.loss_module.calc_multi_task_loss(train_losses)
         train_loss_avg.backward()
         c.optimizer.step()
 
@@ -227,15 +224,20 @@ def _modify_bs_for_multi_gpu(multi_gpu: bool, batch_size: int) -> int:
     return batch_size
 
 
-def get_optimizer(model: nn.Module, cl_args: argparse.Namespace) -> Optimizer:
-    params = get_model_params(model, cl_args.wd)
+def get_optimizer(
+    model: nn.Module, loss_module, cl_args: argparse.Namespace
+) -> Optimizer:
+    model_params = get_model_params(model, cl_args.wd)
+    loss_params = [{"params": p} for p in loss_module.parameters()]
+
+    all_params = model_params + loss_params
 
     if cl_args.optimizer == "adamw":
         optimizer = AdamW(
-            params, lr=cl_args.lr, betas=(cl_args.b1, cl_args.b2), amsgrad=True
+            all_params, lr=cl_args.lr, betas=(cl_args.b1, cl_args.b2), amsgrad=True
         )
     elif cl_args.optimizer == "sgdm":
-        optimizer = SGD(params, lr=cl_args.lr, momentum=0.9)
+        optimizer = SGD(all_params, lr=cl_args.lr, momentum=0.9)
     else:
         raise ValueError()
 
@@ -265,7 +267,7 @@ def _get_criterions(target_columns: al_target_columns) -> al_criterions:
 
     def get_criterion(column_type_):
         if column_type_ == "con":
-            return nn.MSELoss()
+            return nn.MSELoss(reduction="mean")
         elif column_type_ == "cat":
             return nn.CrossEntropyLoss()
 
@@ -325,7 +327,11 @@ def main(cl_args: argparse.Namespace) -> None:
         embedding_dict=embedding_dict,
     )
 
-    optimizer = get_optimizer(model, cl_args)
+    loss_module = UncertaintyMultiTaskLoss(
+        len(cl_args.target_cat_columns + cl_args.target_con_columns)
+    )
+
+    optimizer = get_optimizer(model, loss_module, cl_args)
 
     criterions = _get_criterions(train_dataset.target_columns)
 
@@ -339,6 +345,7 @@ def main(cl_args: argparse.Namespace) -> None:
         model=model,
         optimizer=optimizer,
         criterions=criterions,
+        loss_module=loss_module,
         labels_dict=train_dataset.labels_dict,
         target_transformers=train_dataset.target_transformers,
         target_columns=train_dataset.target_columns,
