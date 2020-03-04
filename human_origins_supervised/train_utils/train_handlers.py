@@ -82,9 +82,16 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
             handler_config=handler_config,
         )
 
-        trainer.add_event_handler(
-            event_name=Events.COMPLETED, handler=handler, handler_config=handler_config
-        )
+        if _do_run_completed_handler(
+            iter_per_epoch=len(config.train_loader),
+            n_epochs=cl_args.n_epochs,
+            sample_interval=cl_args.sample_interval,
+        ):
+            trainer.add_event_handler(
+                event_name=Events.COMPLETED,
+                handler=handler,
+                handler_config=handler_config,
+            )
 
     if cl_args.lr_schedule != "same":
         lr_scheduler = set_up_scheduler(handler_config=handler_config)
@@ -107,6 +114,17 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
         )
 
     return trainer
+
+
+def _do_run_completed_handler(iter_per_epoch: int, n_epochs: int, sample_interval: int):
+    """
+    We need this function to avoid running handlers twice in cases where the total
+    number of iterations has a remainder of 0 w.r.t. the sample interval.
+    """
+    if (iter_per_epoch * n_epochs) % sample_interval != 0:
+        return True
+
+    return False
 
 
 def _get_monitoring_metrics(target_columns) -> List[Tuple[str, str]]:
@@ -175,6 +193,7 @@ def _log_stats_to_pbar(engine: Engine, handler_config: HandlerConfig) -> None:
 
 
 def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
+    c = handler_config.config
     cl_args = handler_config.config.cl_args
 
     checkpoint_handler = ModelCheckpoint(
@@ -205,6 +224,13 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
         Events.ITERATION_COMPLETED(every=cl_args.sample_interval),
         Events.COMPLETED,
     ]:
+        if plot_event == Events.COMPLETED and not _do_run_completed_handler(
+            iter_per_epoch=len(c.train_loader),
+            n_epochs=cl_args.n_epochs,
+            sample_interval=cl_args.sample_interval,
+        ):
+            continue
+
         trainer.add_event_handler(
             event_name=plot_event,
             handler=_plot_progress_handler,
