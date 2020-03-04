@@ -90,7 +90,7 @@ def args_config():
             "model_type": "cnn",
             "multi_gpu": False,
             "n_cpu": 8,
-            "n_epochs": 10,
+            "n_epochs": 5,
             "na_augment_perc": 0.0,
             "na_augment_prob": 0.0,
             "optimizer": "adamw",
@@ -99,7 +99,7 @@ def args_config():
             "resblocks": None,
             "run_name": "test_run",
             "sa": False,
-            "sample_interval": 20,
+            "sample_interval": 100,
             "target_cat_columns": ["Origin"],
             "target_con_columns": [],
             "target_width": 1000,
@@ -325,15 +325,7 @@ def create_test_cl_args(request, args_config, create_test_data):
     args_config.snp_file = str(test_path / "test_snps.bim")
     args_config.model_task = c.task_type
     args_config.label_file = str(test_path / "labels.csv")
-    args_config.n_epochs = 5
 
-    args_config.rb_do = 0.00
-    args_config.fc_do = 0.00
-    args_config.wd = 0.00
-    args_config.na_augment_perc = 0.00
-    args_config.na_augment_prob = 0.00
-
-    args_config.sample_interval = 100
     args_config.target_width = n_snps
     args_config.data_width = n_snps
 
@@ -456,6 +448,8 @@ def prep_modelling_test_configs(
     criterions = train._get_criterions(train_dataset.target_columns)
 
     train_dataset, valid_dataset = create_test_datasets
+
+    train._log_params(model)
 
     config = Config(
         cl_args=cl_args,
