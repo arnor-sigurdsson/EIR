@@ -377,21 +377,48 @@ def _get_module_dict_from_target_columns(num_classes: al_num_classes, fc_in: int
 
 
 def _get_multi_task_branches(
-    branch_layers: "OrderedDict[str, nn.Module]",
+    fc_repr_and_extra_dim: int,
+    fc_task_dim: int,
+    fc_do: float,
     num_classes: al_num_classes,
-    fc_in: int,
 ) -> nn.ModuleDict:
+    def _assert_uniqueness():
+        ids = [id(cur_dict) for cur_dict in module_dict.values()]
+        assert len(ids) == len(set(ids))
+
+        module_ids = []
+        for cur_modules in module_dict.values():
+            module_ids += [id(mod) for mod in cur_modules]
+
+        num_unique_modules = len(set(module_ids))
+        num_modules_per_task = len(cur_modules)
+        num_tasks = len(module_dict.keys())
+        assert num_unique_modules == num_modules_per_task * num_tasks
 
     module_dict = {}
     for key, num_classes in num_classes.items():
+        branch_layers = OrderedDict(
+            {
+                "fc_2_bn_1": nn.BatchNorm1d(fc_repr_and_extra_dim),
+                "fc_2_act_1": Swish(),
+                "fc_2_linear_1": nn.Linear(
+                    fc_repr_and_extra_dim, fc_task_dim, bias=False
+                ),
+                "fc_3_bn_1": nn.BatchNorm1d(fc_task_dim),
+                "fc_3_act_1": Swish(),
+                "fc_3_do_1": nn.Dropout(fc_do),
+            }
+        )
+
         task_layer_branch = nn.Sequential(
             OrderedDict(
-                **branch_layers, **{"fc_3_final": nn.Linear(fc_in, num_classes)}
+                **branch_layers, **{"fc_3_final": nn.Linear(fc_task_dim, num_classes)}
             )
         )
 
         module_dict[key] = task_layer_branch
 
+    _assert_uniqueness()
     return nn.ModuleDict(module_dict)
 
 
@@ -418,23 +445,11 @@ class CNNModel(ModelBase):
             )
         )
 
-        cnn_task_branch_layers = OrderedDict(
-            {
-                "fc_2_bn_1": nn.BatchNorm1d(self.fc_repr_and_extra_dim),
-                "fc_2_act_1": Swish(),
-                "fc_2_linear_1": nn.Linear(
-                    self.fc_repr_and_extra_dim, self.fc_task_dim, bias=False
-                ),
-                "fc_3_bn_1": nn.BatchNorm1d(self.fc_task_dim),
-                "fc_3_act_1": Swish(),
-                "fc_3_do_1": nn.Dropout(self.cl_args.fc_do),
-            }
-        )
-
         self.multi_task_branches = _get_multi_task_branches(
-            branch_layers=cnn_task_branch_layers,
             num_classes=self.num_classes,
-            fc_in=self.fc_task_dim,
+            fc_task_dim=self.fc_task_dim,
+            fc_repr_and_extra_dim=self.fc_repr_and_extra_dim,
+            fc_do=self.cl_args.fc_do,
         )
 
         for m in self.modules():
@@ -498,21 +513,11 @@ class MLPModel(ModelBase):
             )
         )
 
-        mlp_task_branch_base = OrderedDict(
-            {
-                "fc_2_linear_1": nn.Linear(
-                    self.fc_repr_and_extra_dim, self.fc_repr_and_extra_dim, bias=False
-                ),
-                "fc_2_act_1": Swish(),
-                "fc_2_bn_1": nn.BatchNorm1d(self.fc_repr_and_extra_dim),
-                "fc_3_do_1": nn.Dropout(self.cl_args.fc_do),
-            }
-        )
-
         self.multi_task_branches = _get_multi_task_branches(
-            branch_layers=mlp_task_branch_base,
             num_classes=self.num_classes,
-            fc_in=self.fc_repr_and_extra_dim,
+            fc_task_dim=self.fc_task_dim,
+            fc_repr_and_extra_dim=self.fc_repr_and_extra_dim,
+            fc_do=self.cl_args.fc_do,
         )
 
     @property
