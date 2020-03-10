@@ -26,16 +26,17 @@ class SelfAttention(nn.Module):
     def __init__(self, in_channels):
         super(SelfAttention, self).__init__()
         self.in_channels = in_channels
+        self.reduction = max(self.in_channels // 8, 1)
 
         self.conv_theta = nn.Conv2d(
             in_channels=in_channels,
-            out_channels=in_channels // 8,
+            out_channels=self.reduction,
             kernel_size=1,
             bias=False,
         )
         self.conv_phi = nn.Conv2d(
             in_channels=in_channels,
-            out_channels=in_channels // 8,
+            out_channels=self.reduction,
             kernel_size=1,
             bias=False,
         )
@@ -60,12 +61,12 @@ class SelfAttention(nn.Module):
 
         # Theta path
         theta = self.conv_theta(x)
-        theta = theta.view(-1, ch // 8, h * w)
+        theta = theta.view(-1, self.reduction, h * w)
 
         # Phi path
         phi = self.conv_phi(x)
         phi = self.pool(phi)
-        phi = phi.view(-1, ch // 8, h * w // 4)
+        phi = phi.view(-1, self.reduction, h * w // 4)
 
         # Attn map
         attn = torch.bmm(theta.permute(0, 2, 1), phi)
