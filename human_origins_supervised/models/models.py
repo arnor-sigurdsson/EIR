@@ -262,6 +262,7 @@ def make_conv_layers(residual_blocks: List[int], cl_args: Namespace) -> List[nn.
 
     down_stride_w = ca.down_stride
 
+    first_conv_channels = 2 ** ca.channel_exp_base * ca.first_channel_expansion
     first_conv_kernel = ca.kernel_width * ca.first_kernel_expansion
     first_conv_stride = down_stride_w * ca.first_stride_expansion
 
@@ -275,7 +276,7 @@ def make_conv_layers(residual_blocks: List[int], cl_args: Namespace) -> List[nn.
     conv_blocks = [
         FirstBlock(
             in_channels=1,
-            out_channels=2 ** ca.channel_exp_base,
+            out_channels=first_conv_channels,
             conv_1_kernel_w=first_kernel,
             conv_1_padding=first_pad,
             down_stride_w=first_conv_stride,

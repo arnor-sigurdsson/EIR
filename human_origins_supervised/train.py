@@ -470,6 +470,13 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        "--first_channel_expansion",
+        type=int,
+        default=1,
+        help="factor by which to expand the first stride in the network",
+    )
+
+    parser.add_argument(
         "--channel_exp_base",
         type=int,
         default=5,
