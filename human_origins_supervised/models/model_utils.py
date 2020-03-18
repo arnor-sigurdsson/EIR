@@ -1,26 +1,25 @@
 from argparse import Namespace
-from functools import partial
-from typing import List, Tuple, Union, Dict, Callable, TYPE_CHECKING
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
+from typing import List, Tuple, Union, Dict, Callable, TYPE_CHECKING
 
 import torch
+from aislib.misc_utils import get_logger
+from aislib.pytorch_modules import Swish
 from torch import nn
 from torch.nn import Module
 from torch.utils.data import DataLoader
 from torch_lr_finder import LRFinder
 
-from aislib.misc_utils import get_logger
-from aislib.pytorch_modules import Swish
-from human_origins_supervised.data_load.label_setup import al_label_dict
-from human_origins_supervised.data_load.label_setup import al_target_columns
 from human_origins_supervised.data_load.data_utils import get_target_columns_generator
+from human_origins_supervised.data_load.label_setup import al_target_columns
 from human_origins_supervised.models.extra_inputs_module import get_extra_inputs
-from human_origins_supervised.train_utils.utils import get_run_folder
 from human_origins_supervised.train_utils.metrics import (
     calculate_losses,
     aggregate_losses,
 )
+from human_origins_supervised.train_utils.utils import get_run_folder
 
 if TYPE_CHECKING:
     from human_origins_supervised.train import Config
@@ -30,7 +29,7 @@ al_dloader_pred_outputs = Tuple[
     Dict[str, torch.Tensor], Union[List[str], Dict[str, torch.Tensor]], List[str]
 ]
 al_dloader_raw_outputs = Tuple[
-    torch.Tensor, Union[List[str], Dict[str, torch.Tensor]], List[str]
+    torch.Tensor, Union[List[str], "al_training_labels"], List[str]
 ]
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
@@ -85,7 +84,7 @@ def predict_on_batch(
     return val_outputs
 
 
-def cast_labels(
+def parse_target_labels(
     target_columns: al_target_columns, device: str, labels: Dict[str, torch.Tensor]
 ) -> Dict[str, torch.Tensor]:
 
@@ -108,7 +107,6 @@ def gather_pred_outputs_from_dloader(
     cl_args: Namespace,
     model: Module,
     device: str,
-    labels_dict: al_label_dict,
     with_labels: bool = True,
 ) -> al_dloader_pred_outputs:
     """
@@ -123,21 +121,27 @@ def gather_pred_outputs_from_dloader(
     for inputs, labels, ids in data_loader:
         inputs = inputs.to(device=device, dtype=torch.float32)
 
-        extra_inputs = get_extra_inputs(cl_args, ids, labels_dict, model)
+        extra_inputs = get_extra_inputs(
+            cl_args=cl_args, model=model, labels=labels["extra_labels"]
+        )
 
-        outputs = predict_on_batch(model, (inputs, extra_inputs))
+        outputs = predict_on_batch(model=model, inputs=(inputs, extra_inputs))
 
         all_output_batches.append(outputs)
 
         ids_total += [i for i in ids]
 
         if with_labels:
-            all_label_batches.append(labels)
+            all_label_batches.append(labels["target_labels"])
 
     if with_labels:
-        all_label_batches = _stack_list_of_tensor_dicts(all_label_batches)
+        all_label_batches = _stack_list_of_tensor_dicts(
+            list_of_batch_dicts=all_label_batches
+        )
 
-    all_output_batches = _stack_list_of_tensor_dicts(all_output_batches)
+    all_output_batches = _stack_list_of_tensor_dicts(
+        list_of_batch_dicts=all_output_batches
+    )
 
     return all_output_batches, all_label_batches, ids_total
 
@@ -146,15 +150,16 @@ def gather_dloader_samples(
     data_loader: DataLoader, device: str, n_samples: Union[int, None] = None
 ) -> al_dloader_raw_outputs:
     inputs_total = []
-    all_label_batches = []
+    all_label_batches = {"target_labels": [], "extra_labels": []}
     ids_total = []
 
     for inputs, labels, ids in data_loader:
         inputs = inputs.to(device=device, dtype=torch.float32)
 
         inputs_total += [i for i in inputs]
-        all_label_batches.append(labels)
         ids_total += [i for i in ids]
+        all_label_batches["target_labels"].append(labels["target_labels"])
+        all_label_batches["extra_labels"].append(labels["extra_labels"])
 
         if n_samples:
             if len(inputs_total) >= n_samples:
@@ -162,11 +167,18 @@ def gather_dloader_samples(
                 ids_total = ids_total[:n_samples]
                 break
 
-    all_label_batches = _stack_list_of_tensor_dicts(all_label_batches)
+    all_label_batches["target_labels"] = _stack_list_of_tensor_dicts(
+        all_label_batches["target_labels"]
+    )
+    all_label_batches["extra_labels"] = _stack_list_of_tensor_dicts(
+        all_label_batches["extra_labels"]
+    )
 
     if n_samples:
-        for label_key in all_label_batches:
-            all_label_batches[label_key] = all_label_batches[label_key][:n_samples]
+        for label_type in all_label_batches:
+            for label_name in all_label_batches[label_type]:
+                label_subset = all_label_batches[label_type][label_name][:n_samples]
+                all_label_batches[label_type][label_name] = label_subset
 
     return torch.stack(inputs_total), all_label_batches, ids_total
 
@@ -184,6 +196,19 @@ def _stack_list_of_tensor_dicts(
                     }
     """
 
+    def _do_stack(
+        list_of_elements: List[Union[torch.Tensor, str]]
+    ) -> Union[torch.Tensor, List[str]]:
+        # check that they're all the same type
+        list_types = set(type(i) for i in list_of_elements)
+        assert len(list_types) == 1
+
+        are_tensors = isinstance(list_of_elements[0], torch.Tensor)
+        if are_tensors:
+            return torch.stack(list_of_elements)
+
+        return list_of_elements
+
     target_columns = list_of_batch_dicts[0].keys()
     aggregated_batches = {key: [] for key in target_columns}
 
@@ -195,8 +220,8 @@ def _stack_list_of_tensor_dicts(
             aggregated_batches[column] += [i for i in cur_column_batch]
 
     stacked_outputs = {
-        key: torch.stack(list_of_tensors)
-        for key, list_of_tensors in aggregated_batches.items()
+        key: _do_stack(list_of_elements)
+        for key, list_of_elements in aggregated_batches.items()
     }
 
     return stacked_outputs
@@ -270,12 +295,10 @@ def construct_lr_finder_custom_objects(config) -> LRFinderCustomObjects:
     c = config
 
     p_label_casting = partial(
-        cast_labels, target_columns=c.target_columns, device=c.cl_args.device
+        parse_target_labels, target_columns=c.target_columns, device=c.cl_args.device
     )
 
-    p_extra_inputs_hook = partial(
-        get_extra_inputs, cl_args=c.cl_args, labels_dict=c.labels_dict, model=c.model
-    )
+    p_extra_inputs_hook = partial(get_extra_inputs, cl_args=c.cl_args, model=c.model)
 
     p_calculate_losses = partial(_calculate_losses_and_average, criterions=c.criterions)
 

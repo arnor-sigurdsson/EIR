@@ -50,11 +50,12 @@ def predict(predict_cl_args: Namespace) -> None:
         cl_args=c.train_args_modified_for_testing,
         model=c.model,
         device=predict_cl_args.device,
-        labels_dict=c.test_dataset.labels_dict,
         with_labels=predict_cl_args.evaluate,
     )
 
-    target_columns_gen = get_target_columns_generator(c.test_dataset.target_columns)
+    target_columns_gen = get_target_columns_generator(
+        target_columns=c.test_dataset.target_columns
+    )
 
     for target_column_type, target_column in target_columns_gen:
         target_preds = all_preds[target_column]

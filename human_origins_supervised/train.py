@@ -50,7 +50,7 @@ if TYPE_CHECKING:
 
 # aliases
 al_criterions = Dict[str, Union[nn.CrossEntropyLoss, nn.MSELoss]]
-al_training_labels = Dict[str, torch.Tensor]
+al_training_labels = Dict[str, Dict[str, torch.Tensor]]
 
 torch.manual_seed(0)
 np.random.seed(0)
@@ -93,20 +93,24 @@ def train_ignite(config: Config) -> None:
         """
         c.model.train()
 
-        train_seqs, train_labels, train_ids = loader_batch
+        train_seqs, labels, train_ids = loader_batch
         train_seqs = train_seqs.to(device=cl_args.device, dtype=torch.float32)
 
-        train_labels = model_utils.cast_labels(
-            target_columns=c.target_columns, device=cl_args.device, labels=train_labels
+        target_labels = model_utils.parse_target_labels(
+            target_columns=c.target_columns,
+            device=cl_args.device,
+            labels=labels["target_labels"],
         )
 
-        extra_inputs = get_extra_inputs(cl_args, train_ids, c.labels_dict, c.model)
+        extra_inputs = get_extra_inputs(
+            cl_args=cl_args, model=c.model, labels=labels["extra_labels"]
+        )
 
         c.optimizer.zero_grad()
         train_outputs = c.model(train_seqs, extra_inputs)
 
         train_losses = calculate_losses(
-            criterions=c.criterions, labels=train_labels, outputs=train_outputs
+            criterions=c.criterions, labels=target_labels, outputs=train_outputs
         )
         train_loss_avg = aggregate_losses(train_losses)
         train_loss_avg.backward()
@@ -117,7 +121,7 @@ def train_ignite(config: Config) -> None:
             target_transformers=c.target_transformers,
             losses=train_losses,
             outputs=train_outputs,
-            labels=train_labels,
+            labels=target_labels,
             prefix="t_",
         )
 
@@ -169,8 +173,10 @@ def get_train_sampler(column_to_sample, train_dataset):
     if column_to_sample is None:
         return None
 
-    loaded_label_columns = tuple(train_dataset.samples[0].labels.keys())
-    if column_to_sample not in loaded_label_columns:
+    loaded_target_columns = (
+        train_dataset.target_columns["con"] + train_dataset.target_columns["cat"]
+    )
+    if column_to_sample not in loaded_target_columns:
         raise ValueError("Weighted sampling from non-loaded columns not supported yet.")
 
     if column_to_sample is not None:

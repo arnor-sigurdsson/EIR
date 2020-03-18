@@ -37,22 +37,21 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
 
     c.model.eval()
     gather_preds = model_utils.gather_pred_outputs_from_dloader
-    val_outputs_total, val_labels_total, val_ids_total = gather_preds(
+    val_outputs_total, val_target_labels, val_ids_total = gather_preds(
         data_loader=c.valid_loader,
         cl_args=c.cl_args,
         model=c.model,
         device=cl_args.device,
-        labels_dict=c.valid_dataset.labels_dict,
         with_labels=True,
     )
     c.model.train()
 
-    val_labels_total = model_utils.cast_labels(
-        target_columns=c.target_columns, device=cl_args.device, labels=val_labels_total
+    val_target_labels = model_utils.parse_target_labels(
+        target_columns=c.target_columns, device=cl_args.device, labels=val_target_labels
     )
 
     val_losses = metrics.calculate_losses(
-        criterions=c.criterions, labels=val_labels_total, outputs=val_outputs_total
+        criterions=c.criterions, labels=val_target_labels, outputs=val_outputs_total
     )
     val_loss_avg = metrics.aggregate_losses(val_losses)
 
@@ -61,7 +60,7 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
         target_transformers=c.target_transformers,
         losses=val_losses,
         outputs=val_outputs_total,
-        labels=val_labels_total,
+        labels=val_target_labels,
         prefix="v_",
     )
 
@@ -83,7 +82,7 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
 
     save_evaluation_results_wrapper(
         val_outputs=val_outputs_total,
-        val_labels=val_labels_total,
+        val_labels=val_target_labels,
         val_ids=val_ids_total,
         iteration=iteration,
         config=handler_config.config,

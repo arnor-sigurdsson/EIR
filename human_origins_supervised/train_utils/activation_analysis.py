@@ -113,9 +113,11 @@ def accumulate_activations(
     for single_sample, sample_label, sample_id in valid_sampling_dloader:
         # we want to keep the original sample for masking
         single_sample_copy = deepcopy(single_sample).cpu().numpy().squeeze()
+        sample_target_labels = sample_label["target_labels"]
+        sample_extra_labels = sample_label["extra_labels"]
 
         cur_trn_label = get_act_condition(
-            sample_label=sample_label[target_column],
+            sample_label=sample_target_labels[target_column],
             target_transformer=c.target_transformers[target_column],
             target_classes=target_classes,
             column_type=column_type,
@@ -126,18 +128,20 @@ def accumulate_activations(
             # apply pre-processing functions on sample and input
             for pre_func in transform_funcs.get("pre", ()):
                 single_sample, sample_label = pre_func(
-                    single_sample=single_sample, sample_label=sample_label
+                    single_sample=single_sample, sample_label=sample_target_labels
                 )
 
             extra_inputs = get_extra_inputs(
-                cl_args, list(sample_id), c.valid_dataset.labels_dict, c.model
+                cl_args=cl_args, model=c.model, labels=sample_extra_labels
             )
             # detach for shap
             if extra_inputs is not None:
                 extra_inputs = extra_inputs.detach()
 
             shap_inputs = [i for i in (single_sample, extra_inputs) if i is not None]
-            single_acts = act_func(inputs=shap_inputs, sample_label=sample_label)
+            single_acts = act_func(
+                inputs=shap_inputs, sample_label=sample_target_labels[target_column]
+            )
             if single_acts is not None:
                 # currently we are only going to get acts for snps
                 # TODO: Add analysis / plots for embeddings / extra inputs.
@@ -173,11 +177,14 @@ def get_shap_object(
     c = config
     cl_args = c.cl_args
 
-    background, _, ids = gather_dloader_samples(
-        train_loader, device, n_background_samples
+    background, labels, ids = gather_dloader_samples(
+        data_loader=train_loader, device=device, n_samples=n_background_samples
     )
 
-    extra_inputs = get_extra_inputs(cl_args, ids, c.labels_dict, c.model)
+    extra_inputs = get_extra_inputs(
+        cl_args=cl_args, model=c.model, labels=labels["extra_labels"]
+    )
+
     # detach for shap
     if extra_inputs is not None:
         extra_inputs = extra_inputs.detach()
@@ -543,7 +550,7 @@ def activation_analysis_handler(
     def pre_transform(single_sample, sample_label, column_name: str):
         single_sample = single_sample.to(device=cl_args.device, dtype=torch.float32)
 
-        sample_label = model_utils.cast_labels(
+        sample_label = model_utils.parse_target_labels(
             target_columns=c.target_columns, device=cl_args.device, labels=sample_label
         )[column_name]
 
