@@ -366,7 +366,7 @@ def check_dataset(
     assert len(dataset) == exp_no_sample
 
     transformed_values_in_dataset = set(
-        i.labels[target_column] for i in dataset.samples
+        i.labels["target_labels"][target_column] for i in dataset.samples
     )
     expected_transformed_values = set(range(len(classes_tested)))
     assert transformed_values_in_dataset == expected_transformed_values
@@ -378,5 +378,5 @@ def check_dataset(
     test_array, test_label, test_id = dataset[0]
 
     assert (test_array.sum(1) == 1).all()
-    assert test_label[target_column] in expected_transformed_values
+    assert test_label["target_labels"][target_column] in expected_transformed_values
     assert test_id == dataset.samples[0].sample_id
