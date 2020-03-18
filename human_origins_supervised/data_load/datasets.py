@@ -34,6 +34,7 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 al_datasets = Union["MemoryArrayDataset", "DiskArrayDataset"]
 al_sample_label_dict = Dict[str, Union[str, float]]
 al_label_value = Union[str, float, int]
+al_getitem_return = Tuple[torch.Tensor, Dict[str, al_sample_label_dict], str]
 al_num_classes = Dict[str, int]
 
 
@@ -156,9 +157,13 @@ def _check_valid_and_train_datasets(
 
 @dataclass
 class Sample:
+    """
+    array: can be path to array or the loaded array itself
+    """
+
     sample_id: str
     array: Union[str, torch.Tensor]
-    labels: Union[Dict[str, str], float, None]
+    labels: Dict[str, al_sample_label_dict]
 
 
 class ArrayDatasetBase(Dataset):
@@ -225,10 +230,14 @@ class ArrayDatasetBase(Dataset):
                 sample_label_dict=raw_sample_labels,
             )
 
+            sample_labels = _split_labels_into_target_and_extra(
+                sample_labels=parsed_sample_labels, target_columns=self.target_columns
+            )
+
             cur_sample = Sample(
                 sample_id=sample_id,
                 array=array_hook(files.get(sample_id)),
-                labels=parsed_sample_labels,
+                labels=sample_labels,
             )
             samples.append(cur_sample)
 
@@ -251,11 +260,12 @@ def _transform_labels_in_sample(
     target_transformers: Dict[str, al_label_transformers],
     sample_label_dict: al_sample_label_dict,
     extra_con_transformers: Union[Dict[str, StandardScaler], None] = None,
-):
+) -> al_sample_label_dict:
     """
     We transform the target and extra continuous labels only because for:
 
-        - extra embed columns: We use the set up embedding dictionary.
+        - extra embed columns: We use the set up embedding dictionary attached to the
+          model itself. Since the embeddings are trainable.
     """
 
     transformed_labels = {}
@@ -275,10 +285,15 @@ def _transform_labels_in_sample(
             )
             transformed_labels[label_column] = cur_label_parsed.item()
 
+        else:
+            transformed_labels[label_column] = label_value
+
     return transformed_labels
 
 
-def _transform_single_label_value(transformer, label_value: Union[str, float, int]):
+def _transform_single_label_value(
+    transformer, label_value: al_label_value
+) -> np.ndarray:
     tt_t = transformer.transform
     label_value = np.array([label_value])
 
@@ -289,6 +304,21 @@ def _transform_single_label_value(transformer, label_value: Union[str, float, in
     label_value_transformed = tt_t(label_value_streamlined).squeeze()
 
     return label_value_transformed
+
+
+def _split_labels_into_target_and_extra(
+    sample_labels, target_columns: al_target_columns
+) -> Dict[str, al_sample_label_dict]:
+
+    target_columns_flat = target_columns["con"] + target_columns["cat"]
+    target_labels = {k: v for k, v in sample_labels.items() if k in target_columns_flat}
+    extra_labels = {
+        k: v for k, v in sample_labels.items() if k not in target_columns_flat
+    }
+
+    split_labels_dict = {"target_labels": target_labels, "extra_labels": extra_labels}
+
+    return split_labels_dict
 
 
 def _set_up_num_classes(
@@ -317,7 +347,7 @@ class MemoryArrayDataset(ArrayDatasetBase):
         self.check_non_labelled()
 
     @staticmethod
-    def _mem_sample_loader(sample_fpath):
+    def _mem_sample_loader(sample_fpath: Union[str, Path]) -> torch.Tensor:
         """
         A small hook to actually load the arrays into `self.samples` instead of just
         pointing to filenames.
@@ -333,7 +363,7 @@ class MemoryArrayDataset(ArrayDatasetBase):
         return data.shape[1]
 
     # Note that dataloaders automatically convert arrays to tensors here, for labels
-    def __getitem__(self, index: int):
+    def __getitem__(self, index: int) -> al_getitem_return:
         sample = self.samples[index]
 
         array = sample.array
@@ -373,7 +403,7 @@ class DiskArrayDataset(ArrayDatasetBase):
         return data.shape[1]
 
     # Note that dataloaders automatically convert arrays to tensors here, for labels
-    def __getitem__(self, index):
+    def __getitem__(self, index: int) -> al_getitem_return:
         sample = self.samples[index]
 
         array = np.load(sample.array)
