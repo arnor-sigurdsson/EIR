@@ -11,7 +11,7 @@ from scipy.special import softmax
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
 from human_origins_supervised.data_load.data_utils import get_target_columns_generator
-from human_origins_supervised.data_load.datasets import al_label_transformers
+from human_origins_supervised.data_load.datasets import al_label_transformers_object
 from human_origins_supervised.models import model_utils
 from human_origins_supervised.train_utils import metrics
 from human_origins_supervised.train_utils import utils
@@ -132,7 +132,7 @@ class PerformancePlotConfig:
     iteration: int
     column_name: str
     column_type: str
-    target_transformer: al_label_transformers
+    target_transformer: al_label_transformers_object
     output_folder: Path
 
 

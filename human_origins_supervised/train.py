@@ -50,7 +50,12 @@ if TYPE_CHECKING:
 
 # aliases
 al_criterions = Dict[str, Union[nn.CrossEntropyLoss, nn.MSELoss]]
-al_training_labels = Dict[str, Dict[str, torch.Tensor]]
+# these are all after being collated by torch dataloaders
+al_training_labels_target = Dict[str, Union[torch.LongTensor, torch.Tensor]]
+al_training_labels_extra = Dict[str, Union[List[str], torch.Tensor]]
+al_training_labels_batch = Dict[
+    str, Union[al_training_labels_target, al_training_labels_extra]
+]
 
 torch.manual_seed(0)
 np.random.seed(0)
@@ -75,7 +80,7 @@ class Config:
     optimizer: Optimizer
     criterions: al_criterions
     labels_dict: Dict
-    target_transformers: Dict[str, al_label_transformers]
+    target_transformers: al_label_transformers
     target_columns: al_target_columns
     data_width: int
     writer: SummaryWriter
@@ -86,7 +91,8 @@ def train_ignite(config: Config) -> None:
     cl_args = config.cl_args
 
     def step(
-        engine: Engine, loader_batch: Tuple[torch.Tensor, al_training_labels, List[str]]
+        engine: Engine,
+        loader_batch: Tuple[torch.Tensor, al_training_labels_batch, List[str]],
     ) -> "al_step_metric_dict":
         """
         The output here goes to trainer.output.

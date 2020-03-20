@@ -2,7 +2,7 @@ from argparse import Namespace
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
-from typing import List, Tuple, Union, Dict, Callable, TYPE_CHECKING
+from typing import List, Tuple, Union, Dict, Callable, overload, TYPE_CHECKING
 
 import torch
 from aislib.misc_utils import get_logger
@@ -22,15 +22,19 @@ from human_origins_supervised.train_utils.metrics import (
 from human_origins_supervised.train_utils.utils import get_run_folder
 
 if TYPE_CHECKING:
-    from human_origins_supervised.train import Config
+    # noinspection PyUnresolvedReferences
+    from human_origins_supervised.train import (  # noqa: F401
+        Config,
+        al_training_labels_batch,
+        al_training_labels_target,
+        al_training_labels_extra,
+    )
 
 # Aliases
-al_dloader_pred_outputs = Tuple[
+al_dloader_gathered_preds = Tuple[
     Dict[str, torch.Tensor], Union[List[str], Dict[str, torch.Tensor]], List[str]
 ]
-al_dloader_raw_outputs = Tuple[
-    torch.Tensor, Union[List[str], "al_training_labels"], List[str]
-]
+al_dloader_gathered_raw = Tuple[torch.Tensor, "al_training_labels_batch", List[str]]
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -108,7 +112,7 @@ def gather_pred_outputs_from_dloader(
     model: Module,
     device: str,
     with_labels: bool = True,
-) -> al_dloader_pred_outputs:
+) -> al_dloader_gathered_preds:
     """
     Used to gather predictions from a dataloader, normally for evaluation – hence the
     assertion that we are in eval mode.
@@ -148,7 +152,7 @@ def gather_pred_outputs_from_dloader(
 
 def gather_dloader_samples(
     data_loader: DataLoader, device: str, n_samples: Union[int, None] = None
-) -> al_dloader_raw_outputs:
+) -> al_dloader_gathered_raw:
     inputs_total = []
     all_label_batches = {"target_labels": [], "extra_labels": []}
     ids_total = []
@@ -183,9 +187,21 @@ def gather_dloader_samples(
     return torch.stack(inputs_total), all_label_batches, ids_total
 
 
+@overload
 def _stack_list_of_tensor_dicts(
-    list_of_batch_dicts: List[Dict[str, torch.Tensor]]
-) -> Dict[str, torch.Tensor]:
+    list_of_batch_dicts: List["al_training_labels_target"],
+) -> "al_training_labels_target":
+    ...
+
+
+@overload
+def _stack_list_of_tensor_dicts(
+    list_of_batch_dicts: List["al_training_labels_extra"],
+) -> "al_training_labels_extra":
+    ...
+
+
+def _stack_list_of_tensor_dicts(list_of_batch_dicts):
     """
     Spec:
         [batch_1, batch_2, batch_3]
@@ -197,13 +213,13 @@ def _stack_list_of_tensor_dicts(
     """
 
     def _do_stack(
-        list_of_elements: List[Union[torch.Tensor, str]]
+        list_of_elements: List[Union[torch.Tensor, torch.LongTensor, str]]
     ) -> Union[torch.Tensor, List[str]]:
         # check that they're all the same type
         list_types = set(type(i) for i in list_of_elements)
         assert len(list_types) == 1
 
-        are_tensors = isinstance(list_of_elements[0], torch.Tensor)
+        are_tensors = isinstance(list_of_elements[0], (torch.Tensor, torch.LongTensor))
         if are_tensors:
             return torch.stack(list_of_elements)
 

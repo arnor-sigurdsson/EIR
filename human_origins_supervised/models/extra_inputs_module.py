@@ -1,7 +1,7 @@
 from argparse import Namespace
 from collections import OrderedDict
 from pathlib import Path
-from typing import List, Dict, Set, Union, overload
+from typing import List, Dict, Set, Union, overload, TYPE_CHECKING
 
 import joblib
 import torch
@@ -10,10 +10,12 @@ from torch import nn
 
 from human_origins_supervised.data_load.label_setup import al_label_dict
 
+if TYPE_CHECKING:
+    from human_origins_supervised.train import al_training_labels_extra
+
 # Aliases
 al_unique_embed_vals = Dict[str, Set[str]]
 al_emb_lookup_dict = Dict[str, Dict[str, Dict[str, int]]]
-al_dataloader_collated_sample_labels = Dict[str, Union[List[str], torch.Tensor]]
 
 
 def get_unique_embed_values(
@@ -166,7 +168,7 @@ def get_embeddings_from_labels(
 
 
 def get_extra_inputs(
-    cl_args: Namespace, model: nn.Module, labels: al_dataloader_collated_sample_labels
+    cl_args: Namespace, model: nn.Module, labels: "al_training_labels_extra"
 ) -> Union[torch.Tensor, None]:
     """
     We want to have a wrapper function to gather all extra inputs needed by the model.

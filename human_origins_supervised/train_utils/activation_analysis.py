@@ -35,8 +35,9 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 # would be better to use Tuple here, but shap does literal type check for list, i.e.
 # if type(data) == list:
 al_model_inputs = List[Union[torch.Tensor, Union[torch.Tensor, None]]]
-al_gradients_dict = Dict[str, List[np.array]]
-al_top_gradients_dict = Dict[str, Dict[str, np.array]]
+al_gradients_dict = Dict[str, List[np.ndarray]]
+al_top_gradients_dict = Dict[str, Dict[str, np.ndarray]]
+al_scaled_grads_dict = Dict[str, Dict[str, np.ndarray]]
 al_transform_funcs = Dict[str, Tuple[Callable]]
 
 
@@ -372,7 +373,7 @@ def gather_and_rescale_snps(
     all_gradients_dict: al_gradients_dict,
     top_gradients_dict: al_top_gradients_dict,
     classes: List[str],
-) -> al_top_gradients_dict:
+) -> al_scaled_grads_dict:
     """
     `accumulated_grads` specs:
 
@@ -460,14 +461,16 @@ def save_masked_grads(
 
     classes = sorted(list(top_gradients_dict.keys()))
     scaled_grads = gather_and_rescale_snps(
-        acc_grads_times_inp, top_grads_msk_inputs, classes
+        all_gradients_dict=acc_grads_times_inp,
+        top_gradients_dict=top_grads_msk_inputs,
+        classes=classes,
     )
     av.plot_top_gradients(
-        scaled_grads,
-        top_grads_msk_inputs,
-        snp_df,
-        sample_outfolder,
-        "top_snps_masked.png",
+        gathered_scaled_grads=scaled_grads,
+        top_gradients_dict=top_grads_msk_inputs,
+        snp_df=snp_df,
+        output_folder=sample_outfolder,
+        fname="top_snps_masked.png",
     )
 
     np.save(str(sample_outfolder / "top_acts_masked.npy"), top_grads_msk_inputs)
@@ -510,7 +513,7 @@ def analyze_activations(
         classes=classes,
     )
     av.plot_top_gradients(
-        accumulated_grads=scaled_grads,
+        gathered_scaled_grads=scaled_grads,
         top_gradients_dict=top_gradients_dict,
         snp_df=snp_df,
         output_folder=sample_outfolder,

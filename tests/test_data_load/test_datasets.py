@@ -213,7 +213,7 @@ def test_transform_all_labels_in_sample_targets_only(
 
     test_input_dict = test_labels_dict[test_input_key]
     transformed_sample_labels = datasets._transform_labels_in_sample(
-        target_transformers=target_transformers, sample_label_dict=test_input_dict
+        target_transformers=target_transformers, sample_labels_raw_dict=test_input_dict
     )
 
     assert transformed_sample_labels["Origin"] == expected["Origin_as_int"]
@@ -249,7 +249,7 @@ def test_transform_all_labels_in_sample_with_extra_con(
     test_input_dict = test_labels_dict[test_input_key]
     transformed_sample_labels = datasets._transform_labels_in_sample(
         target_transformers=target_transformers,
-        sample_label_dict=test_input_dict,
+        sample_labels_raw_dict=test_input_dict,
         extra_con_transformers=extra_con_transformers,
     )
 

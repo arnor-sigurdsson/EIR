@@ -15,7 +15,10 @@ from tqdm import tqdm
 from human_origins_supervised.data_load.label_setup import (
     set_up_train_and_valid_labels,
     al_label_dict,
+    al_label_values_raw,
+    al_sample_labels_raw,
     al_target_columns,
+    al_label_transformers_object,
     al_label_transformers,
     get_transformer_path,
 )
@@ -32,9 +35,15 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 
 # Type Aliases
 al_datasets = Union["MemoryArrayDataset", "DiskArrayDataset"]
-al_sample_label_dict = Dict[str, Union[str, float]]
-al_label_value = Union[str, float, int]
-al_getitem_return = Tuple[torch.Tensor, Dict[str, al_sample_label_dict], str]
+# embeddings --> remain str, cat targets --> int, con extra/target --> float
+al_sample_labels_transformed_all = Dict[str, Union[int, str, float]]
+al_sample_label_dict_target = Dict[str, Union[int, float]]
+al_sample_label_dict_extra = Dict[str, Union[str, float]]
+al_all_labels = Dict[
+    str, Union[al_sample_label_dict_target, al_sample_label_dict_extra]
+]
+al_getitem_return = Tuple[torch.Tensor, al_all_labels, str]
+
 al_num_classes = Dict[str, int]
 
 
@@ -119,9 +128,7 @@ def merge_target_columns(
     return all_target_columns
 
 
-def _save_transformer_set(
-    transformers: Dict[str, al_label_transformers], run_name: str
-) -> None:
+def _save_transformer_set(transformers: al_label_transformers, run_name: str) -> None:
     run_folder = get_run_folder(run_name)
 
     for (transformer_name, transformer_object) in transformers.items():
@@ -135,7 +142,7 @@ def _save_transformer_set(
 def save_label_transformer(
     run_folder: Path,
     transformer_name: str,
-    target_transformer_object: al_label_transformers,
+    target_transformer_object: al_label_transformers_object,
 ) -> Path:
     target_transformer_outpath = get_transformer_path(
         run_path=run_folder, transformer_name=transformer_name
@@ -163,7 +170,7 @@ class Sample:
 
     sample_id: str
     array: Union[str, torch.Tensor]
-    labels: Dict[str, al_sample_label_dict]
+    labels: al_all_labels
 
 
 class ArrayDatasetBase(Dataset):
@@ -172,7 +179,7 @@ class ArrayDatasetBase(Dataset):
         data_folder: Path,
         target_columns: al_target_columns,
         labels_dict: al_label_dict = None,
-        target_transformers: Dict[str, al_label_transformers] = None,
+        target_transformers: al_label_transformers = None,
         extra_con_transformers: Dict[str, StandardScaler] = None,
         target_height: int = 4,
         target_width: int = None,
@@ -227,7 +234,7 @@ class ArrayDatasetBase(Dataset):
             parsed_sample_labels = _transform_labels_in_sample(
                 target_transformers=self.target_transformers,
                 extra_con_transformers=self.extra_con_transformers,
-                sample_label_dict=raw_sample_labels,
+                sample_labels_raw_dict=raw_sample_labels,
             )
 
             sample_labels = _split_labels_into_target_and_extra(
@@ -257,10 +264,10 @@ class ArrayDatasetBase(Dataset):
 
 
 def _transform_labels_in_sample(
-    target_transformers: Dict[str, al_label_transformers],
-    sample_label_dict: al_sample_label_dict,
+    target_transformers: al_label_transformers,
+    sample_labels_raw_dict: al_sample_labels_raw,
     extra_con_transformers: Union[Dict[str, StandardScaler], None] = None,
-) -> al_sample_label_dict:
+) -> al_sample_labels_transformed_all:
     """
     We transform the target and extra continuous labels only because for:
 
@@ -275,7 +282,7 @@ def _transform_labels_in_sample(
 
     merged_transformers = {**target_transformers, **extra_con_transformers}
 
-    for label_column, label_value in sample_label_dict.items():
+    for label_column, label_value in sample_labels_raw_dict.items():
 
         if label_column in merged_transformers.keys():
 
@@ -292,7 +299,7 @@ def _transform_labels_in_sample(
 
 
 def _transform_single_label_value(
-    transformer, label_value: al_label_value
+    transformer, label_value: al_label_values_raw
 ) -> np.ndarray:
     tt_t = transformer.transform
     label_value = np.array([label_value])
@@ -307,8 +314,8 @@ def _transform_single_label_value(
 
 
 def _split_labels_into_target_and_extra(
-    sample_labels, target_columns: al_target_columns
-) -> Dict[str, al_sample_label_dict]:
+    sample_labels: al_sample_labels_transformed_all, target_columns: al_target_columns
+) -> al_all_labels:
 
     target_columns_flat = target_columns["con"] + target_columns["cat"]
     target_labels = {k: v for k, v in sample_labels.items() if k in target_columns_flat}
@@ -321,9 +328,7 @@ def _split_labels_into_target_and_extra(
     return split_labels_dict
 
 
-def _set_up_num_classes(
-    target_transformers: Dict[str, al_label_transformers]
-) -> al_num_classes:
+def _set_up_num_classes(target_transformers: al_label_transformers) -> al_num_classes:
 
     num_classes_dict = {}
     for target_column, transformer in target_transformers.items():
@@ -347,7 +352,7 @@ class MemoryArrayDataset(ArrayDatasetBase):
         self.check_non_labelled()
 
     @staticmethod
-    def _mem_sample_loader(sample_fpath: Union[str, Path]) -> torch.Tensor:
+    def _mem_sample_loader(sample_fpath: Union[str, Path]) -> torch.ByteTensor:
         """
         A small hook to actually load the arrays into `self.samples` instead of just
         pointing to filenames.
@@ -355,7 +360,8 @@ class MemoryArrayDataset(ArrayDatasetBase):
         array = np.load(sample_fpath)
 
         array = array.astype(np.uint8)
-        return torch.from_numpy(array).unsqueeze(0)
+        tensor = torch.from_numpy(array).unsqueeze(0)
+        return tensor
 
     @property
     def data_width(self):
@@ -366,7 +372,7 @@ class MemoryArrayDataset(ArrayDatasetBase):
     def __getitem__(self, index: int) -> al_getitem_return:
         sample = self.samples[index]
 
-        array = sample.array
+        array = sample.array.to(dtype=torch.float)
         labels = sample.labels
         sample_id = sample.sample_id
 
@@ -380,7 +386,6 @@ class MemoryArrayDataset(ArrayDatasetBase):
                 percentage=self.na_augment[0],
                 probability=self.na_augment[1],
             )
-
         return array, labels, sample_id
 
     def __len__(self):
@@ -410,7 +415,7 @@ class DiskArrayDataset(ArrayDatasetBase):
         labels = sample.labels
         sample_id = sample.sample_id
 
-        array = torch.from_numpy(array).unsqueeze(0)
+        array = torch.from_numpy(array).unsqueeze(0).to(dtype=torch.float)
         if self.na_augment[0]:
             array = make_random_snps_missing(
                 array=array,
