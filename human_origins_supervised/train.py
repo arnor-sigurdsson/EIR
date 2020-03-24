@@ -50,7 +50,12 @@ if TYPE_CHECKING:
 
 # aliases
 al_criterions = Dict[str, Union[nn.CrossEntropyLoss, nn.MSELoss]]
-al_training_labels = Dict[str, torch.Tensor]
+# these are all after being collated by torch dataloaders
+al_training_labels_target = Dict[str, Union[torch.LongTensor, torch.Tensor]]
+al_training_labels_extra = Dict[str, Union[List[str], torch.Tensor]]
+al_training_labels_batch = Dict[
+    str, Union[al_training_labels_target, al_training_labels_extra]
+]
 
 torch.manual_seed(0)
 np.random.seed(0)
@@ -75,7 +80,7 @@ class Config:
     optimizer: Optimizer
     criterions: al_criterions
     labels_dict: Dict
-    target_transformers: Dict[str, al_label_transformers]
+    target_transformers: al_label_transformers
     target_columns: al_target_columns
     data_width: int
     writer: SummaryWriter
@@ -86,27 +91,32 @@ def train_ignite(config: Config) -> None:
     cl_args = config.cl_args
 
     def step(
-        engine: Engine, loader_batch: Tuple[torch.Tensor, al_training_labels, List[str]]
+        engine: Engine,
+        loader_batch: Tuple[torch.Tensor, al_training_labels_batch, List[str]],
     ) -> "al_step_metric_dict":
         """
         The output here goes to trainer.output.
         """
         c.model.train()
 
-        train_seqs, train_labels, train_ids = loader_batch
+        train_seqs, labels, train_ids = loader_batch
         train_seqs = train_seqs.to(device=cl_args.device, dtype=torch.float32)
 
-        train_labels = model_utils.cast_labels(
-            target_columns=c.target_columns, device=cl_args.device, labels=train_labels
+        target_labels = model_utils.parse_target_labels(
+            target_columns=c.target_columns,
+            device=cl_args.device,
+            labels=labels["target_labels"],
         )
 
-        extra_inputs = get_extra_inputs(cl_args, train_ids, c.labels_dict, c.model)
+        extra_inputs = get_extra_inputs(
+            cl_args=cl_args, model=c.model, labels=labels["extra_labels"]
+        )
 
         c.optimizer.zero_grad()
         train_outputs = c.model(train_seqs, extra_inputs)
 
         train_losses = calculate_losses(
-            criterions=c.criterions, labels=train_labels, outputs=train_outputs
+            criterions=c.criterions, labels=target_labels, outputs=train_outputs
         )
         train_loss_avg = aggregate_losses(train_losses)
         train_loss_avg.backward()
@@ -117,7 +127,7 @@ def train_ignite(config: Config) -> None:
             target_transformers=c.target_transformers,
             losses=train_losses,
             outputs=train_outputs,
-            labels=train_labels,
+            labels=target_labels,
             prefix="t_",
         )
 
@@ -169,8 +179,10 @@ def get_train_sampler(column_to_sample, train_dataset):
     if column_to_sample is None:
         return None
 
-    loaded_label_columns = tuple(train_dataset.samples[0].labels.keys())
-    if column_to_sample not in loaded_label_columns:
+    loaded_target_columns = (
+        train_dataset.target_columns["con"] + train_dataset.target_columns["cat"]
+    )
+    if column_to_sample not in loaded_target_columns:
         raise ValueError("Weighted sampling from non-loaded columns not supported yet.")
 
     if column_to_sample is not None:

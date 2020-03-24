@@ -94,22 +94,28 @@ def test_lookup_embeddings(create_emb_test_label_data, create_test_emb_model):
     test_label_dict, emb_cols = create_emb_test_label_data
     test_model = create_test_emb_model
 
-    emb_dict = emb.get_embedding_dict(test_label_dict, emb_cols)
-    emb.attach_embeddings(test_model, emb_dict)
-
-    test_extra_labels = [{"Population": "Small"}]
+    emb_dict = emb.get_embedding_dict(
+        labels_dict=test_label_dict, embedding_cols=emb_cols
+    )
+    emb.attach_embeddings(model=test_model, embeddings_dict=emb_dict)
 
     cur_lookup_table = emb_dict["Population"]["lookup_table"]
     extra_label_emb_index = torch.tensor(cur_lookup_table["Small"], dtype=torch.long)
+
+    test_extra_labels = ["Small"]
     cur_embedding = emb.lookup_embeddings(
-        test_model, emb_dict, "Population", test_extra_labels, "cpu"
+        model=test_model,
+        embeddings_dict=emb_dict,
+        embedding_col="Population",
+        extra_labels=test_extra_labels,
+        device="cpu",
     )
 
     model_embedding = test_model.embed_Population(extra_label_emb_index)
     assert (cur_embedding == model_embedding).all()
 
 
-def test_get_embeddings_from_ids(create_emb_test_label_data, create_test_emb_model):
+def test_get_embeddings_from_labels(create_emb_test_label_data, create_test_emb_model):
     """
     id:
 
@@ -130,14 +136,18 @@ def test_get_embeddings_from_ids(create_emb_test_label_data, create_test_emb_mod
     test_label_dict, emb_cols = create_emb_test_label_data
     test_model = create_test_emb_model
 
-    emb_dict = emb.get_embedding_dict(test_label_dict, emb_cols)
-    emb.attach_embeddings(test_model, emb_dict)
+    emb_dict = emb.get_embedding_dict(
+        labels_dict=test_label_dict, embedding_cols=emb_cols
+    )
+    emb.attach_embeddings(model=test_model, embeddings_dict=emb_dict)
 
     test_model.embeddings_dict = emb_dict
 
-    test_embeddings = emb.get_embeddings_from_ids(
-        test_label_dict, ["ID1"], ["Climate", "Food", "Population"], test_model, "cpu"
+    test_extra_labels = {"Climate": ["Cool"], "Population": ["Small"], "Food": ["Fish"]}
+    test_embeddings = emb.get_embeddings_from_labels(
+        extra_labels=test_extra_labels, model=test_model, device="cpu"
     )
+
     assert test_embeddings.shape[1] == 6
 
     # check climate, "Cool" at index 0

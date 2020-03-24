@@ -1,8 +1,8 @@
 from collections import Counter
 from typing import TYPE_CHECKING
 
-import torch
 import numpy as np
+import torch
 from aislib.misc_utils import get_logger
 from torch.utils.data import WeightedRandomSampler
 
@@ -33,7 +33,9 @@ def get_weighted_random_sampler(train_dataset: "ArrayDatasetBase", target_column
 
 
     """
-    labels = list((i.labels[target_column] for i in train_dataset.samples))
+    labels = list(
+        (i.labels["target_labels"][target_column] for i in train_dataset.samples)
+    )
 
     label_counts = [i[1] for i in sorted(Counter(labels).items())]
 

@@ -22,6 +22,7 @@ def test_make_conv_layers():
         rb_do=0.1,
         first_kernel_expansion=1,
         first_stride_expansion=5,
+        first_channel_expansion=1,
         channel_exp_base=5,
         sa=True,
     )

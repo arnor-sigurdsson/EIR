@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from human_origins_supervised.train_utils.activation_analysis import (
         al_gradients_dict,
         al_top_gradients_dict,
+        al_scaled_grads_dict,
     )
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
@@ -65,7 +66,7 @@ def generate_snp_gradient_matrix(
 
 
 def plot_top_gradients(
-    accumulated_grads: "al_gradients_dict",
+    gathered_scaled_grads: "al_scaled_grads_dict",
     top_gradients_dict: "al_top_gradients_dict",
     snp_df: pd.DataFrame,
     output_folder: Path,
@@ -85,7 +86,7 @@ def plot_top_gradients(
 
         for cls_idx, row_name in enumerate(classes):
 
-            cur_grads = accumulated_grads[col_name][row_name]
+            cur_grads = gathered_scaled_grads[col_name][row_name]
 
             cur_ax = plt.subplot(gs[cls_idx, grad_idx])
             cur_ax.imshow(cur_grads, vmin=0, vmax=1)
