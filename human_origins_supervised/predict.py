@@ -25,6 +25,7 @@ from human_origins_supervised.data_load.datasets import (
 )
 from human_origins_supervised.data_load.label_setup import (
     al_label_dict,
+    al_label_transformers_object,
     al_label_transformers,
 )
 from human_origins_supervised.models.model_utils import gather_pred_outputs_from_dloader
@@ -50,11 +51,12 @@ def predict(predict_cl_args: Namespace) -> None:
         cl_args=c.train_args_modified_for_testing,
         model=c.model,
         device=predict_cl_args.device,
-        labels_dict=c.test_dataset.labels_dict,
         with_labels=predict_cl_args.evaluate,
     )
 
-    target_columns_gen = get_target_columns_generator(c.test_dataset.target_columns)
+    target_columns_gen = get_target_columns_generator(
+        target_columns=c.test_dataset.target_columns
+    )
 
     for target_column_type, target_column in target_columns_gen:
         target_preds = all_preds[target_column]
@@ -140,7 +142,9 @@ def get_test_config(run_folder: Path, predict_cl_args: Namespace):
     return test_config
 
 
-def _get_target_classnames(transformer: al_label_transformers, target_column: str):
+def _get_target_classnames(
+    transformer: al_label_transformers_object, target_column: str
+):
     if isinstance(transformer, LabelEncoder):
         return transformer.classes_
     return target_column
@@ -260,7 +264,7 @@ def _prep_missing_con_dict(test_train_cl_args_mix: Namespace) -> Dict[str, float
     con_columns = a.extra_con_columns + a.target_con_columns
 
     extra_con_transformers = _load_transformers(
-        cl_args=a, transformers_to_load=con_columns
+        run_name=a.run_name, transformers_to_load=con_columns
     )
 
     train_means = {
@@ -289,11 +293,11 @@ def _set_up_test_dataset(
 
     target_columns_flat = target_columns["con"] + target_columns["cat"]
     target_transformers = _load_transformers(
-        cl_args=a, transformers_to_load=target_columns_flat
+        run_name=a.run_name, transformers_to_load=target_columns_flat
     )
 
     extra_con_transformers = _load_transformers(
-        cl_args=a, transformers_to_load=a.extra_con_columns
+        run_name=a.run_name, transformers_to_load=a.extra_con_columns
     )
 
     test_dataset = datasets.DiskArrayDataset(
@@ -309,9 +313,9 @@ def _set_up_test_dataset(
 
 
 def _load_transformers(
-    cl_args: Namespace, transformers_to_load: List[str]
-) -> Dict[str, al_label_transformers]:
-    run_folder = get_run_folder(cl_args.run_name)
+    run_name: str, transformers_to_load: List[str]
+) -> al_label_transformers:
+    run_folder = get_run_folder(run_name)
 
     label_transformers = {}
     for transformer_name in transformers_to_load:

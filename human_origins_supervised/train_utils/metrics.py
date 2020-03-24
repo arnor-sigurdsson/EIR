@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from human_origins_supervised.train_utils.train_handlers import HandlerConfig
     from human_origins_supervised.data_load.label_setup import (  # noqa: F401
         al_target_columns,
-        al_label_transformers,
+        al_label_transformers_object,
     )
 
 # aliases
@@ -29,7 +29,7 @@ al_step_metric_dict = Dict[str, Dict[str, float]]
 
 def calculate_batch_metrics(
     target_columns: "al_target_columns",
-    target_transformers: Dict[str, "al_label_transformers"],
+    target_transformers: Dict[str, "al_label_transformers_object"],
     losses: Dict[str, torch.Tensor],
     outputs: Dict[str, torch.Tensor],
     labels: Dict[str, torch.Tensor],
