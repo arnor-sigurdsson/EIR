@@ -80,6 +80,7 @@ def args_config():
             "fc_do": 0.0,
             "first_kernel_expansion": 1,
             "first_stride_expansion": 1,
+            "first_channel_expansion": 1,
             "get_acts": True,
             "gpu_num": "0",
             "kernel_width": 12,

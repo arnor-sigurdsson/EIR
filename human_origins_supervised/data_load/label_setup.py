@@ -17,9 +17,14 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 # Type Aliases
 al_all_column_ops = Dict[str, Tuple[ColumnOperation, ...]]
 al_train_val_dfs = Tuple[pd.DataFrame, pd.DataFrame]
-al_label_dict = Dict[str, Dict[str, Union[str, float]]]
+
+# e.g. 'Asia' or '5' for categorical or 1.511 for continuous
+al_label_values_raw = Union[str, float]
+al_sample_labels_raw = Dict[str, al_label_values_raw]
+al_label_dict = Dict[str, al_sample_labels_raw]
 al_target_columns = Dict[str, List[str]]
-al_label_transformers = Union[StandardScaler, LabelEncoder]
+al_label_transformers_object = Union[StandardScaler, LabelEncoder]
+al_label_transformers = Dict[str, al_label_transformers_object]
 
 
 def set_up_train_and_valid_labels(
@@ -454,7 +459,7 @@ def get_transformer_path(run_path: Path, transformer_name: str) -> Path:
 
 def set_up_label_transformers(
     labels_dict: al_label_dict, label_columns: al_target_columns
-) -> Dict[str, al_label_transformers]:
+) -> al_label_transformers:
 
     label_transformers = {}
 
@@ -481,7 +486,7 @@ def set_up_label_transformers(
 
 def _fit_transformer_on_label_column(
     labels_dict: al_label_dict, label_column: str, column_type: str
-) -> al_label_transformers:
+) -> al_label_transformers_object:
 
     transformer = _get_transformer(column_type)
 
@@ -505,7 +510,7 @@ def _get_transformer(column_type):
 
 
 def _streamline_values_for_transformers(
-    transformer: al_label_transformers, values: np.ndarray
+    transformer: al_label_transformers_object, values: np.ndarray
 ) -> np.ndarray:
     """
     LabelEncoder() expects a 1D array, whereas StandardScaler() expects a 2D one.

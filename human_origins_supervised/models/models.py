@@ -26,16 +26,17 @@ class SelfAttention(nn.Module):
     def __init__(self, in_channels):
         super(SelfAttention, self).__init__()
         self.in_channels = in_channels
+        self.reduction = max(self.in_channels // 8, 1)
 
         self.conv_theta = nn.Conv2d(
             in_channels=in_channels,
-            out_channels=in_channels // 8,
+            out_channels=self.reduction,
             kernel_size=1,
             bias=False,
         )
         self.conv_phi = nn.Conv2d(
             in_channels=in_channels,
-            out_channels=in_channels // 8,
+            out_channels=self.reduction,
             kernel_size=1,
             bias=False,
         )
@@ -60,12 +61,12 @@ class SelfAttention(nn.Module):
 
         # Theta path
         theta = self.conv_theta(x)
-        theta = theta.view(-1, ch // 8, h * w)
+        theta = theta.view(-1, self.reduction, h * w)
 
         # Phi path
         phi = self.conv_phi(x)
         phi = self.pool(phi)
-        phi = phi.view(-1, ch // 8, h * w // 4)
+        phi = phi.view(-1, self.reduction, h * w // 4)
 
         # Attn map
         attn = torch.bmm(theta.permute(0, 2, 1), phi)
@@ -197,12 +198,10 @@ class Block(AbstractBlock):
         return out
 
 
-def set_up_conv_params(current_width: int, kernel_size: int, stride: int):
-    if current_width % 2 != 0 or stride == 1:
-        kernel_size -= 1
+def _set_up_conv_params(current_width: int, kernel_size: int, stride: int):
 
-    padding = pytorch_utils.calc_conv_padding_needed(
-        current_width, kernel_size, stride, 1
+    kernel_size, padding = pytorch_utils.calc_conv_params_needed(
+        input_width=current_width, kernel_size=kernel_size, stride=stride, dilation=1
     )
 
     return kernel_size, padding
@@ -217,9 +216,16 @@ def get_block(
     ca = cl_args
 
     cur_conv = nn.Sequential(*conv_blocks)
-    cur_width = pytorch_utils.calc_size_after_conv_sequence(ca.target_width, cur_conv)
+    cur_width = pytorch_utils.calc_size_after_conv_sequence(
+        input_width=ca.target_width, conv_sequence=cur_conv
+    )
 
-    cur_kern, cur_padd = set_up_conv_params(cur_width, ca.kernel_width, down_stride)
+    cur_kern, cur_padd = pytorch_utils.calc_conv_params_needed(
+        input_width=cur_width,
+        kernel_size=ca.kernel_width,
+        stride=down_stride,
+        dilation=1,
+    )
 
     cur_in_channels = conv_blocks[-1].out_channels
     cur_out_channels = 2 ** (ca.channel_exp_base + layer_arch_idx)
@@ -256,16 +262,21 @@ def make_conv_layers(residual_blocks: List[int], cl_args: Namespace) -> List[nn.
 
     down_stride_w = ca.down_stride
 
+    first_conv_channels = 2 ** ca.channel_exp_base * ca.first_channel_expansion
     first_conv_kernel = ca.kernel_width * ca.first_kernel_expansion
     first_conv_stride = down_stride_w * ca.first_stride_expansion
-    first_kernel, first_pad = set_up_conv_params(
-        ca.target_width, first_conv_kernel, first_conv_stride
+
+    first_kernel, first_pad = pytorch_utils.calc_conv_params_needed(
+        input_width=ca.target_width,
+        kernel_size=first_conv_kernel,
+        stride=first_conv_stride,
+        dilation=1,
     )
 
     conv_blocks = [
         FirstBlock(
             in_channels=1,
-            out_channels=2 ** ca.channel_exp_base,
+            out_channels=first_conv_channels,
             conv_1_kernel_w=first_kernel,
             conv_1_padding=first_pad,
             down_stride_w=first_conv_stride,

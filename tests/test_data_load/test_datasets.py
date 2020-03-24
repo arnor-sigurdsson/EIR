@@ -213,7 +213,7 @@ def test_transform_all_labels_in_sample_targets_only(
 
     test_input_dict = test_labels_dict[test_input_key]
     transformed_sample_labels = datasets._transform_labels_in_sample(
-        target_transformers=target_transformers, sample_label_dict=test_input_dict
+        target_transformers=target_transformers, sample_labels_raw_dict=test_input_dict
     )
 
     assert transformed_sample_labels["Origin"] == expected["Origin_as_int"]
@@ -249,7 +249,7 @@ def test_transform_all_labels_in_sample_with_extra_con(
     test_input_dict = test_labels_dict[test_input_key]
     transformed_sample_labels = datasets._transform_labels_in_sample(
         target_transformers=target_transformers,
-        sample_label_dict=test_input_dict,
+        sample_labels_raw_dict=test_input_dict,
         extra_con_transformers=extra_con_transformers,
     )
 
@@ -366,7 +366,7 @@ def check_dataset(
     assert len(dataset) == exp_no_sample
 
     transformed_values_in_dataset = set(
-        i.labels[target_column] for i in dataset.samples
+        i.labels["target_labels"][target_column] for i in dataset.samples
     )
     expected_transformed_values = set(range(len(classes_tested)))
     assert transformed_values_in_dataset == expected_transformed_values
@@ -378,5 +378,5 @@ def check_dataset(
     test_array, test_label, test_id = dataset[0]
 
     assert (test_array.sum(1) == 1).all()
-    assert test_label[target_column] in expected_transformed_values
+    assert test_label["target_labels"][target_column] in expected_transformed_values
     assert test_id == dataset.samples[0].sample_id
