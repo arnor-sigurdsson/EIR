@@ -22,8 +22,13 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from matplotlib.ticker import MaxNLocator
 
+from aislib.misc_utils import get_logger
+
 if TYPE_CHECKING:
     from human_origins_supervised.train_utils.evaluation import PerformancePlotConfig
+
+
+logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
 def generate_training_curve(
@@ -154,13 +159,20 @@ def gen_eval_graphs(plot_config: "PerformancePlotConfig"):
     )
 
     for plot_func in plot_funcs:
-        plot_func(
-            y_true=pc.val_labels,
-            y_outp=pc.val_outputs,
-            outfolder=pc.output_folder,
-            transformer=pc.target_transformer,
-            title_extra=pc.column_name,
-        )
+        try:
+            plot_func(
+                y_true=pc.val_labels,
+                y_outp=pc.val_outputs,
+                outfolder=pc.output_folder,
+                transformer=pc.target_transformer,
+                title_extra=pc.column_name,
+            )
+        except Exception as e:
+            logger.error(
+                "Call to function %s resulted in error %s. No plot will be generated.",
+                plot_func,
+                e,
+            )
 
 
 def select_performance_curve_funcs(
