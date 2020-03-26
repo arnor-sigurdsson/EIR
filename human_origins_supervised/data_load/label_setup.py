@@ -65,6 +65,10 @@ def label_df_parse_wrapper(cl_args: Namespace) -> pd.DataFrame:
         label_fpath=cl_args.label_file, columns=all_cols, custom_lib=cl_args.custom_lib
     )
 
+    df_labels = _cast_label_df_dtypes(
+        df_labels=df_labels, extra_cat_columns=cl_args.extra_cat_columns
+    )
+
     df_labels_filtered = _filter_ids_from_label_df(
         df_labels=df_labels, ids_to_keep=available_ids
     )
@@ -163,9 +167,23 @@ def _load_label_df(
         custom_lib=custom_lib,
     )
 
-    df_labels = pd.read_csv(label_fpath, usecols=available_columns, dtype={"ID": str})
+    df_labels = pd.read_csv(
+        label_fpath, usecols=available_columns, dtype={"ID": str}, low_memory=False
+    )
 
     df_labels = df_labels.set_index("ID")
+
+    return df_labels
+
+
+def _cast_label_df_dtypes(df_labels: pd.DataFrame, extra_cat_columns: List[str]):
+    """
+    We want to make sure cat columns are str as the default pytorch collate func might
+    otherwise convert them to tensors, which cause errors downstream (e.g. in embedding
+    dict lookup).
+    """
+    dtypes = {col: str for col in extra_cat_columns}
+    df_labels = df_labels.astype(dtypes)
 
     return df_labels
 

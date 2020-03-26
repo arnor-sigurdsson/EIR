@@ -319,6 +319,28 @@ def test_load_label_extra_target_extra_col(parse_test_cl_args, create_test_data)
 @pytest.mark.parametrize(
     "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
 )
+def test_cast_label_df_dtypes(parse_test_cl_args, create_test_data):
+    c = create_test_data
+
+    label_fpath = c.scoped_tmp_path / "labels.csv"
+
+    label_columns = ["Origin", "OriginExtraCol", "Height", "ExtraTarget"]
+    df_label_multi_target = label_setup._load_label_df(
+        label_fpath=label_fpath, columns=label_columns, custom_lib=None
+    )
+
+    df_label_multi_target["OriginExtraCol"] = 10
+
+    df_label_multi_target = label_setup._cast_label_df_dtypes(
+        df_labels=df_label_multi_target, extra_cat_columns=["OriginExtraCol"]
+    )
+
+    assert df_label_multi_target["OriginExtraCol"].dtype.name == "object"
+
+
+@pytest.mark.parametrize(
+    "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
+)
 def test_get_currently_available_columns_pass(parse_test_cl_args, create_test_data):
     c = create_test_data
 
