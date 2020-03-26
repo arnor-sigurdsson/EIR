@@ -7,7 +7,7 @@ from human_origins_supervised.data_load import data_loading_funcs
 
 
 def test_make_random_snps_missing_some():
-    test_array = torch.zeros((1, 4, 1000), dtype=torch.uint8)
+    test_array = torch.zeros((1, 4, 1000), dtype=torch.float)
     test_array[:, 0, :] = 1
 
     patch_target = (
@@ -22,12 +22,12 @@ def test_make_random_snps_missing_some():
         # check that all columns have one filled value
         assert (array.sum(1) != 1).sum() == 0
 
-        expected_missing = torch.tensor([1] * 5, dtype=torch.uint8)
+        expected_missing = torch.tensor([1] * 5, dtype=torch.float)
         assert (array[:, 3, mock_return] == expected_missing).all()
 
 
 def test_make_random_snps_missing_all():
-    test_array = torch.zeros((1, 4, 1000), dtype=torch.uint8)
+    test_array = torch.zeros((1, 4, 1000), dtype=torch.float)
     test_array[:, 0, :] = 1
 
     array = data_loading_funcs.make_random_snps_missing(
@@ -39,7 +39,7 @@ def test_make_random_snps_missing_all():
 
 
 def test_make_random_snps_missing_none():
-    test_array = torch.zeros((1, 4, 1000), dtype=torch.uint8)
+    test_array = torch.zeros((1, 4, 1000), dtype=torch.float)
     test_array[:, 0, :] = 1
 
     array = data_loading_funcs.make_random_snps_missing(
