@@ -32,7 +32,7 @@ def test_generate_h_param_dict(args_config):
         cl_args=args_config, h_params=test_h_params
     )
 
-    assert test_h_dict["lr"] == 0.01
-    assert test_h_dict["na_augment_perc"] == 0.0
-    assert test_h_dict["channel_exp_base"] == 5
+    assert test_h_dict["lr"] == args_config.lr
+    assert test_h_dict["na_augment_perc"] == args_config.na_augment_perc
+    assert test_h_dict["channel_exp_base"] == args_config.channel_exp_base
     assert test_h_dict["resblocks"] == "2_2_4"
