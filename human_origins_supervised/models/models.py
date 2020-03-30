@@ -93,6 +93,7 @@ class AbstractBlock(nn.Module):
         in_channels: int,
         out_channels: int,
         rb_do: float,
+        dilation: int,
         conv_1_kernel_w: int = 12,
         conv_1_padding: int = 4,
         down_stride_w: int = 4,
@@ -133,7 +134,8 @@ class AbstractBlock(nn.Module):
             out_channels,
             kernel_size=(1, conv_2_kernel_w),
             stride=(1, 1),
-            padding=(0, conv_2_padding),
+            padding=(0, conv_2_padding * dilation),
+            dilation=(1, dilation),
             bias=False,
         )
 
@@ -198,16 +200,7 @@ class Block(AbstractBlock):
         return out
 
 
-def _set_up_conv_params(current_width: int, kernel_size: int, stride: int):
-
-    kernel_size, padding = pytorch_utils.calc_conv_params_needed(
-        input_width=current_width, kernel_size=kernel_size, stride=stride, dilation=1
-    )
-
-    return kernel_size, padding
-
-
-def get_block(
+def _get_block(
     conv_blocks: List[nn.Module],
     layer_arch_idx: int,
     down_stride: int,
@@ -229,12 +222,18 @@ def get_block(
 
     cur_in_channels = conv_blocks[-1].out_channels
     cur_out_channels = 2 ** (ca.channel_exp_base + layer_arch_idx)
+    cur_dilation_factor = _get_cur_dilation(
+        dilation_factor=cl_args.dilation_factor,
+        width=cur_width,
+        block_number=len(conv_blocks),
+    )
     cur_layer = Block(
         in_channels=cur_in_channels,
         out_channels=cur_out_channels,
         conv_1_kernel_w=cur_kern,
         conv_1_padding=cur_padd,
         down_stride_w=down_stride,
+        dilation=cur_dilation_factor,
         full_preact=True if len(conv_blocks) == 1 else False,
         rb_do=ca.rb_do,
     )
@@ -242,7 +241,18 @@ def get_block(
     return cur_layer, cur_width
 
 
-def make_conv_layers(residual_blocks: List[int], cl_args: Namespace) -> List[nn.Module]:
+def _get_cur_dilation(dilation_factor: int, width: int, block_number: int):
+    dilation = dilation_factor ** block_number
+
+    while dilation >= width:
+        dilation = dilation // dilation_factor
+
+    return dilation
+
+
+def _make_conv_layers(
+    residual_blocks: List[int], cl_args: Namespace
+) -> List[nn.Module]:
     """
     Used to set up the convolutional layers for the model. Based on the passed in
     residual blocks, we want to set up the actual blocks with all the relevant
@@ -280,6 +290,7 @@ def make_conv_layers(residual_blocks: List[int], cl_args: Namespace) -> List[nn.
             conv_1_kernel_w=first_kernel,
             conv_1_padding=first_pad,
             down_stride_w=first_conv_stride,
+            dilation=1,
             rb_do=ca.rb_do,
         )
     ]
@@ -287,8 +298,11 @@ def make_conv_layers(residual_blocks: List[int], cl_args: Namespace) -> List[nn.
     sa_added = False
     for layer_arch_idx, layer_arch_layers in enumerate(residual_blocks):
         for layer in range(layer_arch_layers):
-            cur_layer, cur_width = get_block(
-                conv_blocks, layer_arch_idx, down_stride_w, ca
+            cur_layer, cur_width = _get_block(
+                conv_blocks=conv_blocks,
+                layer_arch_idx=layer_arch_idx,
+                down_stride=down_stride_w,
+                cl_args=ca,
             )
 
             if cl_args.sa and cur_width < 1024 and not sa_added:
@@ -395,7 +409,7 @@ class CNNModel(ModelBase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.conv = nn.Sequential(*make_conv_layers(self.resblocks, self.cl_args))
+        self.conv = nn.Sequential(*_make_conv_layers(self.resblocks, self.cl_args))
 
         self.data_size_after_conv = pytorch_utils.calc_size_after_conv_sequence(
             self.cl_args.target_width, self.conv
