@@ -73,6 +73,7 @@ def args_config():
             "data_folder": "REPLACE_ME",
             "data_width": 1000,
             "device": "cuda:0" if cuda.is_available() else "cpu",
+            "dilation_factor": 1,
             "down_stride": 4,
             "extra_cat_columns": [],
             "fc_repr_dim": 64,

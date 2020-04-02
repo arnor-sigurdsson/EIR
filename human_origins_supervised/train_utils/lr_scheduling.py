@@ -173,7 +173,10 @@ def _get_warmup_steps_from_cla(warmup_steps_arg, optimizer):
     if warmup_steps_arg is None:
         return warmup_steps_arg
     elif warmup_steps_arg == "auto":
-        return _calculate_auto_warmup_steps(optimizer=optimizer)
+        auto_steps = _calculate_auto_warmup_steps(optimizer=optimizer)
+        logger.info(
+            "Using %d steps for learning rate due to 'auto' option warmup.", auto_steps
+        )
     else:
         return int(warmup_steps_arg)
 

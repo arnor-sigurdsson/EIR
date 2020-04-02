@@ -504,6 +504,13 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        "--dilation_factor",
+        type=int,
+        default=1,
+        help="factor to dilate convolutions by in each successive block",
+    )
+
+    parser.add_argument(
         "--first_kernel_expansion",
         type=int,
         default=1,
