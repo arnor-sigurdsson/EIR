@@ -78,8 +78,8 @@ def test_calculate_final_multi_output():
 @pytest.mark.parametrize(
     "test_input,expected",
     [
-        ({"dilation_factor": 2, "block_number": 1, "width": 1000}, 4),
-        ({"dilation_factor": 4, "block_number": 2, "width": 1000}, 64),
+        ({"dilation_factor": 2, "block_number": 1, "width": 1000}, 2),
+        ({"dilation_factor": 4, "block_number": 2, "width": 1000}, 16),
         ({"dilation_factor": 5, "block_number": 5, "width": 100}, 25),
     ],
 )

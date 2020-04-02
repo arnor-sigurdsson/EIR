@@ -4,6 +4,7 @@ H_PARAMS = [
     "batch_size",
     "channel_exp_base",
     "down_stride",
+    "dilation_factor",
     "fc_repr_dim",
     "fc_do",
     "first_kernel_expansion",

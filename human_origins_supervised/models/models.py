@@ -220,13 +220,16 @@ def _get_block(
         dilation=1,
     )
 
-    cur_in_channels = conv_blocks[-1].out_channels
-    cur_out_channels = 2 ** (ca.channel_exp_base + layer_arch_idx)
+    cur_block_number = len([i for i in conv_blocks if isinstance(i, Block)]) + 1
     cur_dilation_factor = _get_cur_dilation(
         dilation_factor=cl_args.dilation_factor,
         width=cur_width,
-        block_number=len(conv_blocks),
+        block_number=cur_block_number,
     )
+
+    cur_in_channels = conv_blocks[-1].out_channels
+    cur_out_channels = 2 ** (ca.channel_exp_base + layer_arch_idx)
+
     cur_layer = Block(
         in_channels=cur_in_channels,
         out_channels=cur_out_channels,
@@ -242,6 +245,10 @@ def _get_block(
 
 
 def _get_cur_dilation(dilation_factor: int, width: int, block_number: int):
+    """
+    Note that block_number refers to the number of residual blocks (not first block
+    or self attention).
+    """
     dilation = dilation_factor ** block_number
 
     while dilation >= width:
