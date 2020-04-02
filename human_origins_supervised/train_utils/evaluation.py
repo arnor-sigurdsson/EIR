@@ -156,6 +156,50 @@ def save_evaluation_results(plot_config: PerformancePlotConfig,) -> None:
         scale_and_save_regression_preds(**common_args)
 
 
+def get_most_wrong_wrapper(
+    val_labels: np.ndarray,
+    val_outputs: np.ndarray,
+    val_ids: List[str],
+    transformer: LabelEncoder,
+    outfolder: Path,
+) -> None:
+    val_preds_total = val_outputs.argmax(axis=1)
+
+    some_are_incorrect = (val_labels != val_preds_total).sum() > 0
+    if some_are_incorrect:
+        df_most_wrong = get_most_wrong_cls_preds(
+            val_true=val_labels,
+            val_preds=val_preds_total,
+            val_outputs=val_outputs,
+            ids=np.array(val_ids),
+        )
+
+        df_most_wrong = _inverse_numerical_labels_hook(
+            df=df_most_wrong, target_transformer=transformer
+        )
+        _check_df_most_wrong(df=df_most_wrong, outfolder=outfolder)
+        df_most_wrong.to_csv(outfolder / "wrong_preds.csv")
+
+
+def _check_df_most_wrong(df: pd.DataFrame, outfolder: Path) -> None:
+    try:
+        assert not (df["True_Label"] == df["Wrong_Label"]).any()
+
+        assert (df["True_Prob"] < 0.5).all()
+
+        min_prob_for_wrong = 1 / len(df["True_Label"].unique())
+        assert (df["Wrong_Prob"] > min_prob_for_wrong).all()
+
+    except AssertionError as e:
+        logger.error(
+            "Got AssertionError (%s) when checking for probabilities in. Something"
+            "might be weird, or a rare event where probabilities are exactly"
+            "equal happened. The file is wrong_preds.csv in %s.",
+            e,
+            outfolder,
+        )
+
+
 def get_most_wrong_cls_preds(
     val_true: np.ndarray,
     val_preds: np.ndarray,
@@ -164,55 +208,39 @@ def get_most_wrong_cls_preds(
 ) -> pd.DataFrame:
     wrong_mask = val_preds != val_true
     wrong_indices = np.where(wrong_mask)[0]
-    all_probs = softmax(val_outputs[wrong_indices], axis=1)
+    all_wrong_probs = softmax(val_outputs[wrong_indices], axis=1)
 
     correct_labels_for_misclassified = val_true[wrong_indices]
-    assert (correct_labels_for_misclassified == val_preds[wrong_indices]).sum() == 0
 
-    # select prob model gave for correct class
-    correct_label_prob = all_probs[
+    correct_label_prob = all_wrong_probs[
         np.arange(wrong_indices.shape[0]), correct_labels_for_misclassified
     ]
     assert correct_label_prob.max() < 0.5
 
     wrong_pred_labels = val_preds[wrong_indices]
-    wrong_label_pred_prob = all_probs[
+    wrong_label_pred_prob = all_wrong_probs[
         np.arange(wrong_indices.shape[0]), wrong_pred_labels
     ]
-    assert (wrong_label_pred_prob > (1 / len(np.unique(val_true)))).all()
 
     columns = ["Sample_ID", "True_Label", "True_Prob", "Wrong_Label", "Wrong_Prob"]
+    column_values = [
+        ids[wrong_indices],
+        correct_labels_for_misclassified,
+        correct_label_prob,
+        wrong_pred_labels,
+        wrong_label_pred_prob,
+    ]
+
     df = pd.DataFrame(columns=columns)
 
-    for col_name, data in zip(
-        columns,
-        [
-            ids[wrong_indices],
-            correct_labels_for_misclassified,
-            correct_label_prob,
-            wrong_pred_labels,
-            wrong_label_pred_prob,
-        ],
-    ):
+    for col_name, data in zip(columns, column_values):
         df[col_name] = data
 
     df = df.sort_values(by=["True_Prob"])
     return df
 
 
-def get_most_wrong_wrapper(val_labels, val_outputs, val_ids, transformer, outfolder):
-    val_preds_total = val_outputs.argmax(axis=1)
-
-    if (val_labels != val_preds_total).sum() > 0:
-        df_most_wrong = get_most_wrong_cls_preds(
-            val_labels, val_preds_total, val_outputs, np.array(val_ids)
-        )
-
-        df_most_wrong = inverse_numerical_labels_hook(df_most_wrong, transformer)
-        df_most_wrong.to_csv(outfolder / "wrong_preds.csv")
-
-
-def inverse_numerical_labels_hook(
+def _inverse_numerical_labels_hook(
     df: pd.DataFrame, target_transformer: LabelEncoder
 ) -> pd.DataFrame:
     for column in ["True_Label", "Wrong_Label"]:
