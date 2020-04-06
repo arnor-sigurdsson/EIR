@@ -1,10 +1,11 @@
 from pathlib import Path
-from typing import List, Callable, Union, Tuple, TYPE_CHECKING
 from textwrap import wrap
+from typing import List, Callable, Union, Tuple, TYPE_CHECKING
 
 import matplotlib
 import numpy as np
 import pandas as pd
+from scipy.special import softmax
 from scipy.stats import pearsonr
 from sklearn.metrics import (
     roc_curve,
@@ -183,7 +184,11 @@ def select_performance_curve_funcs(
             raise ValueError("Expected number of classes to be not None and >2.")
 
         if n_classes == 2:
-            return [generate_binary_roc_curve, generate_binary_pr_curve]
+            return [
+                generate_binary_roc_curve,
+                generate_binary_pr_curve,
+                generate_binary_prediction_probabilities,
+            ]
         else:
             return [generate_multi_class_roc_curve, generate_multi_class_pr_curve]
     elif column_type == "con":
@@ -282,6 +287,47 @@ def generate_binary_pr_curve(
 
     plt.tight_layout()
     plt.savefig(outfolder / "bin_pr_curve.png", dpi=200)
+    plt.close("all")
+
+
+def generate_binary_prediction_probabilities(
+    y_true: np.ndarray,
+    y_outp: np.ndarray,
+    outfolder: Path,
+    title_extra: str,
+    transformer: LabelEncoder,
+    *args,
+    **kwargs,
+):
+    y_prob = softmax(y_outp, axis=1)
+
+    y_true_bin = label_binarize(y_true, classes=[0, 1])
+    fpr, tpr, _ = roc_curve(y_true_bin, y_prob[:, 1])
+    roc_auc = auc(fpr, tpr)
+
+    classes = transformer.classes_
+    fig, ax = plt.subplots()
+
+    for class_index, class_name in zip(range(2), classes):
+        cur_class_mask = np.argwhere(y_true == class_index)
+        cur_probabilities = y_prob[cur_class_mask, 1]
+
+        ax.hist(cur_probabilities, density=True, label=class_name, alpha=0.5)
+
+    ax.legend(loc="upper left")
+    ax.text(
+        0.85,
+        0.95,
+        f"AUC: {roc_auc:0.4g}",
+        transform=ax.transAxes,
+        verticalalignment="top",
+    )
+    ax.set_ylabel("Frequency")
+    ax.set_xlabel(f"PGS of class {classes[1]}")
+    ax.set_title(title_extra + " PGS")
+
+    plt.tight_layout()
+    plt.savefig(outfolder / "prediction_probabilities.png", dpi=200)
     plt.close("all")
 
 
