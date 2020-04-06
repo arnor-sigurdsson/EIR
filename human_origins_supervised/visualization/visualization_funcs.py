@@ -312,15 +312,17 @@ def generate_binary_prediction_probabilities(
         cur_class_mask = np.argwhere(y_true == class_index)
         cur_probabilities = y_prob[cur_class_mask, 1]
 
-        ax.hist(cur_probabilities, density=True, label=class_name, alpha=0.5)
+        ax.hist(cur_probabilities, label=class_name, alpha=0.5, bins=30)
 
     ax.legend(loc="upper left")
+    props = dict(boxstyle="round", facecolor="none", alpha=0.25, edgecolor="gray")
     ax.text(
-        0.85,
+        0.80,
         0.95,
         f"AUC: {roc_auc:0.4g}",
         transform=ax.transAxes,
         verticalalignment="top",
+        bbox=props,
     )
     ax.set_ylabel("Frequency")
     ax.set_xlabel(f"PGS of class {classes[1]}")
