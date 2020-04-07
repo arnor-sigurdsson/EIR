@@ -312,7 +312,7 @@ def generate_binary_prediction_probabilities(
         cur_class_mask = np.argwhere(y_true == class_index)
         cur_probabilities = y_prob[cur_class_mask, 1]
 
-        ax.hist(cur_probabilities, label=class_name, alpha=0.5, bins=30)
+        ax.hist(cur_probabilities, rwidth=0.90, label=class_name, alpha=0.5)
 
     ax.legend(loc="upper left")
     props = dict(boxstyle="round", facecolor="none", alpha=0.25, edgecolor="gray")
