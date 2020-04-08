@@ -38,6 +38,7 @@ aislib = {ref = "dev",git = "ssh://git@github.com/arnor-sigurdsson/aislib.git",e
 joblib = "*"
 lr-finder = {git = "ssh://git@github.com/arnor-sigurdsson/lr-finder.git",editable = true}
 tensorboard = "*"
+configargparse = "*"
 
 [requires]
 python_version = "3.7"
