@@ -177,7 +177,7 @@ def test_predict(keep_outputs, prep_modelling_test_configs):
     config, test_config = prep_modelling_test_configs
     test_path = Path(config.cl_args.data_folder).parent
 
-    train.train_ignite(config)
+    train.train(config)
 
     model_path = grab_latest_model_path(test_config.run_path / "saved_models")
     predict_cl_args = Namespace(

@@ -59,7 +59,7 @@ def parse_test_cl_args(request):
 
 @pytest.fixture
 def args_config():
-    config = SimpleNamespace(
+    test_cl_args = SimpleNamespace(
         **{
             "act_classes": None,
             "b1": 0.9,
@@ -70,7 +70,6 @@ def args_config():
             "extra_con_columns": [],
             "custom_lib": None,
             "data_folder": "REPLACE_ME",
-            "data_width": 1000,
             "device": "cuda:0" if cuda.is_available() else "cpu",
             "dilation_factor": 1,
             "down_stride": 4,
@@ -112,7 +111,7 @@ def args_config():
         }
     )
 
-    return config
+    return test_cl_args
 
 
 @pytest.fixture(scope="module")
@@ -329,7 +328,6 @@ def create_test_cl_args(request, args_config, create_test_data):
     args_config.label_file = str(test_path / "labels.csv")
 
     args_config.target_width = n_snps
-    args_config.data_width = n_snps
 
     # If tests need to have their own config different from the base defined above,
     # only supporting custom_cl_args hardcoded for now
@@ -451,7 +449,7 @@ def prep_modelling_test_configs(
 
     train_dataset, valid_dataset = create_test_datasets
 
-    train._log_params(model)
+    train._log_num_params(model)
 
     config = Config(
         cl_args=cl_args,
@@ -464,7 +462,7 @@ def prep_modelling_test_configs(
         labels_dict=train_dataset.labels_dict,
         target_transformers=train_dataset.target_transformers,
         target_columns=train_dataset.target_columns,
-        data_width=cl_args.data_width,
+        data_width=train_dataset.data_width,
         writer=train.get_summary_writer(run_folder=Path("runs", cl_args.run_name)),
     )
 
