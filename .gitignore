@@ -78,6 +78,7 @@ target/
 # exclude data from source control by default
 data
 runs/
+config/custom_configs
 /*.png
 
 # exclude custom modules
