@@ -21,6 +21,7 @@ from human_origins_supervised.data_load.label_setup import (
     al_label_transformers_object,
     al_label_transformers,
     get_transformer_path,
+    get_array_path_iterator,
 )
 from human_origins_supervised.data_load.data_loading_funcs import (
     make_random_snps_missing,
@@ -223,8 +224,8 @@ class ArrayDatasetBase(Dataset):
         """
 
         logger.debug("Setting up samples in current dataset.")
-
-        files = {i.stem: i for i in Path(self.data_folder).iterdir()}
+        path_iterator = get_array_path_iterator(data_source=Path(self.data_folder))
+        files = {i.stem: i for i in path_iterator}
 
         sample_id_iter = self.labels_dict if self.labels_dict else files
         samples = []

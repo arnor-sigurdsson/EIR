@@ -143,10 +143,28 @@ def _get_extra_columns(
 
 
 def _gather_ids_from_folder(data_folder: Path):
+    iterator = get_array_path_iterator(Path(data_folder))
     logger.debug("Gathering IDs from %s.", data_folder)
-    all_ids = tuple(i.stem for i in tqdm(data_folder.iterdir(), desc="Progress"))
+    all_ids = tuple(i.stem for i in tqdm(iterator, desc="Progress"))
 
     return all_ids
+
+
+def get_array_path_iterator(data_source: Path):
+    def fileiterator(file_path: Path):
+        with open(str(file_path), "r") as infile:
+            for line in infile:
+                line = line.strip()
+                yield Path(line)
+
+    if data_source.is_dir():
+        return data_source.iterdir()
+    elif data_source.is_file():
+        if not data_source.suffix == ".csv":
+            raise ValueError()
+        return fileiterator(file_path=data_source)
+
+    raise ValueError()
 
 
 def _load_label_df(
