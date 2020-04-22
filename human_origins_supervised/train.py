@@ -254,6 +254,22 @@ def get_model(
 
     if cl_args.multi_gpu:
         model = nn.DataParallel(module=model)
+
+    if model_class == "logreg":
+        if (
+            len(
+                cl_args.target_cat_columns
+                + cl_args.target_con_columns
+                + cl_args.extra_cat_columns
+                + cl_args.extra_con_columns
+            )
+            != 1
+        ):
+            raise ValueError()
+
+        if len(cl_args.target_cat_columns != 1):
+            raise ValueError()
+
     model = model.to(device=cl_args.device)
 
     return model
@@ -467,7 +483,7 @@ def _get_train_argument_parser() -> configargparse.ArgumentParser:
         "--model_type",
         type=str,
         default="cnn",
-        choices=["cnn", "mlp"],
+        choices=["cnn", "mlp", "logreg"],
         help="whether to use a convolutional neural network (cnn) or multilayer "
         "perceptron (mlp)",
     )

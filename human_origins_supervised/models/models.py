@@ -7,6 +7,7 @@ from aislib import pytorch_utils
 from aislib.misc_utils import get_logger
 from aislib.pytorch_modules import Swish
 from torch import nn
+from torch.nn.functional import sigmoid
 
 from human_origins_supervised.data_load.datasets import al_num_classes
 from . import extra_inputs_module
@@ -22,7 +23,10 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 def get_model_class(model_type: str) -> al_models:
     if model_type == "cnn":
         return CNNModel
-    return MLPModel
+    elif model_type == "mlp":
+        return MLPModel
+
+    return LogisticRegression
 
 
 class SelfAttention(nn.Module):
@@ -541,3 +545,21 @@ def _calculate_task_branch_outputs(
         final_out[target_column] = linear_layer(input_)
 
     return final_out
+
+
+class LogisticRegression(nn.Module):
+    def __init__(self, cl_args: Namespace, *args, **kwargs):
+        super().__init__()
+
+        self.cl_args = cl_args
+        self.fc_1_in_features = self.cl_args.target_width * 4
+
+        self.fc_1 = nn.Linear(self.fc_1_in_features, 1, bias=False)
+
+    def forward(self, x: torch.Tensor, *args, **kwargs):
+        out = x.view(x.shape[0], -1)
+        out = self.fc_1(out)
+        out = sigmoid(out)
+        out = torch.cat((out, (1 - out[:, 0]).unsqueeze(1)), 1)
+        out = {self.cl_args.target_cat_columns[0]: out}
+        return out

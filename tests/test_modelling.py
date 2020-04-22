@@ -15,7 +15,7 @@ from human_origins_supervised import train
 @pytest.mark.parametrize(
     "create_test_cl_args",
     [
-        {"custom_cl_args": {"model_type": "cnn"}},
+        {"custom_cl_args": {"model_type": "logreg"}},
         {"custom_cl_args": {"model_type": "mlp"}},
     ],
     indirect=True,
