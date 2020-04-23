@@ -123,7 +123,9 @@ def main(cl_args: argparse.Namespace) -> None:
 
     optimizer = get_optimizer(model=model, cl_args=cl_args)
 
-    criterions = _get_criterions(target_columns=train_dataset.target_columns)
+    criterions = _get_criterions(
+        target_columns=train_dataset.target_columns, model_type=cl_args.model_type
+    )
 
     writer = get_summary_writer(run_folder=run_folder)
 
@@ -290,10 +292,21 @@ def get_optimizer(model: nn.Module, cl_args: argparse.Namespace) -> Optimizer:
     return optimizer
 
 
-def _get_criterions(target_columns: al_target_columns) -> al_criterions:
+def _get_criterions(
+    target_columns: al_target_columns, model_type: str
+) -> al_criterions:
     criterions_dict = {}
 
+    bce_loss_func = nn.BCELoss()
+
+    def calc_bce(input, target):
+        return bce_loss_func(input[:, 1], target.to(dtype=torch.float))
+
     def get_criterion(column_type_):
+
+        if model_type == "logreg":
+            return calc_bce
+
         if column_type_ == "con":
             return nn.MSELoss()
         elif column_type_ == "cat":

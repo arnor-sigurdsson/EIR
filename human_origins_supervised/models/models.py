@@ -6,10 +6,9 @@ import torch
 from aislib import pytorch_utils
 from aislib.misc_utils import get_logger
 from aislib.pytorch_modules import Swish
-from torch import nn
-from torch.nn.functional import sigmoid
-
 from human_origins_supervised.data_load.datasets import al_num_classes
+from torch import nn
+
 from . import extra_inputs_module
 from .extra_inputs_module import al_emb_lookup_dict
 from .model_utils import find_no_resblocks_needed
@@ -554,12 +553,12 @@ class LogisticRegression(nn.Module):
         self.cl_args = cl_args
         self.fc_1_in_features = self.cl_args.target_width * 4
 
-        self.fc_1 = nn.Linear(self.fc_1_in_features, 1, bias=False)
+        self.fc_1 = nn.Linear(self.fc_1_in_features, 1)
 
     def forward(self, x: torch.Tensor, *args, **kwargs):
         out = x.view(x.shape[0], -1)
         out = self.fc_1(out)
-        out = sigmoid(out)
-        out = torch.cat((out, (1 - out[:, 0]).unsqueeze(1)), 1)
+        out = torch.sigmoid(out)
+        out = torch.cat(((1 - out[:, 0]).unsqueeze(1), out), 1)
         out = {self.cl_args.target_cat_columns[0]: out}
         return out

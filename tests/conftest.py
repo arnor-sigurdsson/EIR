@@ -445,7 +445,7 @@ def prep_modelling_test_configs(
     train_loader, valid_loader, train_dataset, valid_dataset = create_test_dloaders
     model = create_test_model
     optimizer = create_test_optimizer
-    criterions = train._get_criterions(train_dataset.target_columns)
+    criterions = train._get_criterions(train_dataset.target_columns, cl_args.model_type)
 
     train_dataset, valid_dataset = create_test_datasets
 
