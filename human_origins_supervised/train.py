@@ -370,6 +370,8 @@ def train(config: Config) -> None:
             criterions=c.criterions, labels=target_labels, outputs=train_outputs
         )
         train_loss_avg = aggregate_losses(train_losses)
+        l1_loss = torch.norm(c.model.fc_1.weight, p=1) * 0.1
+        train_loss_avg += l1_loss
         train_loss_avg.backward()
         c.optimizer.step()
 
