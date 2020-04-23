@@ -53,7 +53,7 @@ def set_up_train_and_valid_labels(
 
 
 def label_df_parse_wrapper(cl_args: Namespace) -> pd.DataFrame:
-    available_ids = _gather_ids_from_folder(Path(cl_args.data_folder))
+    available_ids = _gather_ids_from_folder(data_source=Path(cl_args.data_source))
 
     column_ops = {}
     if cl_args.custom_lib:
@@ -87,6 +87,34 @@ def label_df_parse_wrapper(cl_args: Namespace) -> pd.DataFrame:
     )
 
     return df_final
+
+
+def _gather_ids_from_folder(data_source: Path):
+    iterator = get_array_path_iterator(data_source=data_source)
+    logger.debug("Gathering IDs from %s.", data_source)
+    all_ids = tuple(i.stem for i in tqdm(iterator, desc="Progress"))
+
+    return all_ids
+
+
+def get_array_path_iterator(data_source: Path):
+    def fileiterator(file_path: Path):
+        with open(str(file_path), "r") as infile:
+            for line in infile:
+                path = Path(line.strip())
+                if not path.exists():
+                    raise FileNotFoundError(
+                        f"Could not find array {path} listed in {data_source}."
+                    )
+
+                yield path
+
+    if data_source.is_dir():
+        return data_source.rglob("*")
+    elif data_source.is_file():
+        return fileiterator(file_path=data_source)
+
+    raise ValueError()
 
 
 def _get_all_label_columns_needed(
@@ -140,13 +168,6 @@ def _get_extra_columns(
             extra_columns += cur_extra_columns_flat
 
     return extra_columns
-
-
-def _gather_ids_from_folder(data_folder: Path):
-    logger.debug("Gathering IDs from %s.", data_folder)
-    all_ids = tuple(i.stem for i in tqdm(data_folder.iterdir(), desc="Progress"))
-
-    return all_ids
 
 
 def _load_label_df(

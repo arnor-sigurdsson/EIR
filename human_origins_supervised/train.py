@@ -552,10 +552,12 @@ def _get_train_argument_parser() -> configargparse.ArgumentParser:
         help="Total width of input sequence after padding.",
     )
     parser_.add_argument(
-        "--data_folder",
+        "--data_source",
         type=str,
         required=True,
-        help="Data folder to load inputs from.",
+        help="Data source to load inputs from. Can either be (a) a folder in which"
+        "files will be gathered from the folder recursively and (b) a simple text"
+        "file with each line having a path for a sample array.",
     )
 
     parser_.add_argument(
