@@ -53,7 +53,7 @@ def set_up_train_and_valid_labels(
 
 
 def label_df_parse_wrapper(cl_args: Namespace) -> pd.DataFrame:
-    available_ids = _gather_ids_from_folder(data_source=Path(cl_args.data_source))
+    available_ids = _gather_ids_from_data_source(data_source=Path(cl_args.data_source))
 
     column_ops = {}
     if cl_args.custom_lib:
@@ -89,7 +89,7 @@ def label_df_parse_wrapper(cl_args: Namespace) -> pd.DataFrame:
     return df_final
 
 
-def _gather_ids_from_folder(data_source: Path):
+def _gather_ids_from_data_source(data_source: Path):
     iterator = get_array_path_iterator(data_source=data_source)
     logger.debug("Gathering IDs from %s.", data_source)
     all_ids = tuple(i.stem for i in tqdm(iterator, desc="Progress"))
