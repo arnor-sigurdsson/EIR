@@ -69,7 +69,7 @@ def test_construct_dataset_init_params_from_cl_args(args_config):
     )
 
     assert len(constructed_args) == 5
-    assert constructed_args["data_folder"] == args_config.data_folder
+    assert constructed_args["data_source"] == args_config.data_source
     assert constructed_args["target_width"] == args_config.target_width
 
     expected_target_cols = {"con": ["Height"], "cat": ["Origin"]}

@@ -292,20 +292,20 @@ def get_snp_cols_w_top_grads(
     return top_snps_per_class
 
 
-def infer_snp_file_path(data_folder: Path):
-    if not data_folder:
+def infer_snp_file_path(data_source: Path):
+    if not data_source:
         raise ValueError(
-            f"'data_folder' variable must be set with 'infer'"
+            f"'data_source' variable must be set with 'infer'"
             f" as snp_file parameter."
         )
 
-    snp_size = data_folder.parts[3]
-    ind_size = data_folder.parts[4]
+    snp_size = data_source.parts[3]
+    ind_size = data_source.parts[4]
     assert snp_size.startswith("full") or int(snp_size.split("_")[0])
     assert ind_size.startswith("full") or int(ind_size.split("_")[0])
 
     inferred_snp_string = f"parsed_files/{ind_size}/{snp_size}/data_final.snp"
-    inferred_snp_file = Path(data_folder).parents[2] / inferred_snp_string
+    inferred_snp_file = Path(data_source).parents[2] / inferred_snp_string
 
     logger.info(
         "SNP file path not passed in as CL argument, will try inferred path: %s",
@@ -321,7 +321,7 @@ def infer_snp_file_path(data_folder: Path):
 
 
 def read_snp_df(
-    snp_file_path: Path, data_folder: Union[Path, None] = None
+    snp_file_path: Path, data_source: Union[Path, None] = None
 ) -> pd.DataFrame:
     """
     TODO: Deprecate support for .snp files – see hacky note below.
@@ -344,7 +344,7 @@ def read_snp_df(
     """
 
     if not snp_file_path:
-        snp_file_path = infer_snp_file_path(data_folder)
+        snp_file_path = infer_snp_file_path(data_source)
 
     bim_columns = ["CHR_CODE", "VAR_ID", "POS_CM", "BP_COORD", "ALT", "REF"]
     eig_snp_file_columns = ["VAR_ID", "CHR_CODE", "POS_CM", "BP_COORD", "ALT", "REF"]
@@ -503,7 +503,7 @@ def analyze_activations(
     )
 
     snp_df = read_snp_df(
-        snp_file_path=Path(cl_args.snp_file), data_folder=Path(cl_args.data_folder)
+        snp_file_path=Path(cl_args.snp_file), data_source=Path(cl_args.data_source)
     )
 
     classes = sorted(list(top_gradients_dict.keys()))

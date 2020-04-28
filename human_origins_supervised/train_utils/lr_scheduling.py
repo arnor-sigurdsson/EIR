@@ -177,6 +177,7 @@ def _get_warmup_steps_from_cla(warmup_steps_arg, optimizer):
         logger.info(
             "Using %d steps for learning rate due to 'auto' option warmup.", auto_steps
         )
+        return auto_steps
     else:
         return int(warmup_steps_arg)
 

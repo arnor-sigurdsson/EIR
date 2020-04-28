@@ -54,13 +54,13 @@ def test_load_model(args_config, tmp_path):
 
 
 def test_modify_train_cl_args_for_testing():
-    cl_args_from_train = Namespace(data_folder="train/data/folder", lr=1e-3)
-    cl_args_from_predict = Namespace(data_folder="test/data/folder")
+    cl_args_from_train = Namespace(data_source="train/data/folder", lr=1e-3)
+    cl_args_from_predict = Namespace(data_source="test/data/folder")
 
     mixed_args = predict._modify_train_cl_args_for_testing(
         cl_args_from_train, cl_args_from_predict
     )
-    assert mixed_args.data_folder == "test/data/folder"
+    assert mixed_args.data_source == "test/data/folder"
     assert mixed_args.lr == 1e-3
 
 
@@ -175,7 +175,7 @@ def grab_latest_model_path(saved_models_folder: Path):
 )
 def test_predict(keep_outputs, prep_modelling_test_configs):
     config, test_config = prep_modelling_test_configs
-    test_path = Path(config.cl_args.data_folder).parent
+    test_path = Path(config.cl_args.data_source).parent
 
     train.train(config)
 
@@ -184,7 +184,7 @@ def test_predict(keep_outputs, prep_modelling_test_configs):
         model_path=model_path,
         batch_size=64,
         evaluate=True,
-        data_folder=test_path / "test_arrays_test_set",
+        data_source=test_path / "test_arrays_test_set",
         output_folder=test_path,
         device="cpu",
     )
