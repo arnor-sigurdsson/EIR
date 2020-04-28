@@ -90,6 +90,43 @@ class SelfAttention(nn.Module):
         return out
 
 
+class SEBlock(nn.Module):
+    def __init__(self, channels: int, reduction: int):
+        super(SEBlock, self).__init__()
+        reduced_channels = channels // reduction
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+
+        self.conv_down = nn.Conv2d(
+            in_channels=channels,
+            out_channels=reduced_channels,
+            kernel_size=1,
+            padding=0,
+            bias=False,
+        )
+        self.act_1 = Swish()
+
+        self.conv_up = nn.Conv2d(
+            in_channels=reduced_channels,
+            out_channels=channels,
+            kernel_size=1,
+            padding=0,
+            bias=False,
+        )
+
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        out = self.avg_pool(x)
+
+        out = self.conv_down(out)
+        out = self.act_1(out)
+
+        out = self.conv_up(out)
+        out = self.sigmoid(out)
+
+        return out
+
+
 class AbstractBlock(nn.Module):
     def __init__(
         self,
@@ -153,6 +190,8 @@ class AbstractBlock(nn.Module):
             )
         )
 
+        self.se_block = SEBlock(channels=out_channels, reduction=16)
+
     def forward(self, x: torch.Tensor):
         raise NotImplementedError
 
@@ -197,6 +236,9 @@ class Block(AbstractBlock):
 
         out = self.rb_do(out)
         out = self.conv_2(out)
+
+        channel_recalibrations = self.se_block(out)
+        out = out * channel_recalibrations
 
         out = out + identity
 
