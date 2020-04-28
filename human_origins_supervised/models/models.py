@@ -13,10 +13,13 @@ from . import extra_inputs_module
 from .extra_inputs_module import al_emb_lookup_dict
 from .model_utils import find_no_resblocks_needed
 
+# type aliases
+al_models = Union["CNNModel", "MLPModel"]
+
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
-def get_model_class(model_type: str) -> Union["CNNModel", "MLPModel"]:
+def get_model_class(model_type: str) -> al_models:
     if model_type == "cnn":
         return CNNModel
     return MLPModel

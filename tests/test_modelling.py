@@ -39,7 +39,7 @@ def test_classification(keep_outputs, prep_modelling_test_configs):
     """
     config, test_config = prep_modelling_test_configs
 
-    train.train_ignite(config)
+    train.train(config)
 
     target_column = config.cl_args.target_cat_columns[0]
 
@@ -116,7 +116,7 @@ def _check_snps_wrapper(
 def test_regression(keep_outputs, prep_modelling_test_configs):
     config, test_config = prep_modelling_test_configs
 
-    train.train_ignite(config)
+    train.train(config)
 
     target_column = config.cl_args.target_con_columns[0]
 
@@ -191,7 +191,7 @@ def test_multi_task(keep_outputs, prep_modelling_test_configs):
     config, test_config = prep_modelling_test_configs
     cl_args = config.cl_args
 
-    train.train_ignite(config)
+    train.train(config)
 
     for cat_column in config.cl_args.target_cat_columns:
         threshold, at_least_n = _get_multi_task_test_args(

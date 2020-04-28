@@ -224,12 +224,12 @@ def _modify_train_cl_args_for_testing(
     """
     When initalizing the datasets and model classes, we want to make sure we have the
     same configuration as when training the model, with the exception of which
-    data_folder to get observations from (i.e. here we want the test set folder).
+    data_source to get observations from (i.e. here we want the test set folder).
 
     We use deepcopy to make sure the training configuration stays frozen.
     """
     train_cl_args_mod = deepcopy(train_cl_args)
-    train_cl_args_mod.data_folder = predict_cl_args.data_folder
+    train_cl_args_mod.data_source = predict_cl_args.data_source
 
     return train_cl_args_mod
 
@@ -238,7 +238,7 @@ def _load_labels_for_testing(test_train_cl_args_mix: Namespace) -> al_label_dict
     """
     Used when doing an evaluation on test set.
 
-    :param test_train_cl_args_mix: Training CL arguments with the data_folder
+    :param test_train_cl_args_mix: Training CL arguments with the data_source
     replaced with testing one.
     :return: Testing labels for performance measurement.
     """
@@ -279,7 +279,7 @@ def _set_up_test_dataset(
     test_train_cl_args_mix: Namespace, test_labels_dict: Union[None, al_label_dict]
 ) -> al_datasets:
     """
-    :param test_train_cl_args_mix: Training CL arguments with the data_folder
+    :param test_train_cl_args_mix: Training CL arguments with the data_source
     replaced with testing one.
     :param test_labels_dict: None if we are predicting on unknown data,
     otherwise a dictionary of labels (if evaluating on test set).
@@ -301,7 +301,7 @@ def _set_up_test_dataset(
     )
 
     test_dataset = datasets.DiskArrayDataset(
-        data_folder=a.data_folder,
+        data_source=a.data_source,
         target_columns=target_columns,
         labels_dict=test_labels_dict,
         target_transformers=target_transformers,
@@ -355,7 +355,7 @@ if __name__ == "__main__":
     parser.set_defaults(evaluate=False)
 
     parser.add_argument(
-        "--data_folder",
+        "--data_source",
         type=str,
         required=True,
         help="Path to folder with samples to predict on.",
