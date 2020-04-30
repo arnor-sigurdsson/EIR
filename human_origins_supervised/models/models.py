@@ -93,7 +93,7 @@ class SelfAttention(nn.Module):
 class SEBlock(nn.Module):
     def __init__(self, channels: int, reduction: int):
         super(SEBlock, self).__init__()
-        reduced_channels = channels // reduction
+        reduced_channels = max(1, channels // reduction)
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
 
         self.conv_down = nn.Conv2d(
