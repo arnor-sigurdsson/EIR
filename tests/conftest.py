@@ -69,7 +69,7 @@ def args_config():
             "checkpoint_interval": 100,
             "extra_con_columns": [],
             "custom_lib": None,
-            "data_folder": "REPLACE_ME",
+            "data_source": "REPLACE_ME",
             "device": "cuda:0" if cuda.is_available() else "cpu",
             "dilation_factor": 1,
             "down_stride": 4,
@@ -322,7 +322,7 @@ def create_test_cl_args(request, args_config, create_test_data):
 
     n_snps = request.config.getoption("--num_snps")
 
-    args_config.data_folder = str(test_path / "test_arrays")
+    args_config.data_source = str(test_path / "test_arrays")
     args_config.snp_file = str(test_path / "test_snps.bim")
     args_config.model_task = c.task_type
     args_config.label_file = str(test_path / "labels.csv")
@@ -378,7 +378,7 @@ def create_test_datasets(create_test_data, create_test_cl_args):
     c = create_test_data
 
     cl_args = create_test_cl_args
-    cl_args.data_folder = str(c.scoped_tmp_path / "test_arrays")
+    cl_args.data_source = str(c.scoped_tmp_path / "test_arrays")
 
     run_path = Path(f"runs/{cl_args.run_name}/")
 
