@@ -142,8 +142,10 @@ def set_up_calculate_losses_data(
 
         return base_dict
 
-    test_criterions = train._get_criterions(test_target_columns_dict)
-    test_labels = generate_base_dict(label_values)
+    test_criterions = train._get_criterions(
+        target_columns=test_target_columns_dict, model_type="cnn"
+    )
+    test_labels = generate_base_dict(values=label_values)
 
     test_outputs = generate_base_dict(output_values)
 

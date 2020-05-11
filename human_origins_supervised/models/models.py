@@ -6,9 +6,9 @@ import torch
 from aislib import pytorch_utils
 from aislib.misc_utils import get_logger
 from aislib.pytorch_modules import Swish
-from human_origins_supervised.data_load.datasets import al_num_classes
 from torch import nn
 
+from human_origins_supervised.data_load.datasets import al_num_classes
 from . import extra_inputs_module
 from .extra_inputs_module import al_emb_lookup_dict
 from .model_utils import find_no_resblocks_needed
@@ -25,7 +25,7 @@ def get_model_class(model_type: str) -> al_models:
     elif model_type == "mlp":
         return MLPModel
 
-    return LogisticRegression
+    return Linear
 
 
 class SelfAttention(nn.Module):
@@ -588,19 +588,57 @@ def _calculate_task_branch_outputs(
     return final_out
 
 
-class LogisticRegression(nn.Module):
+class Linear(nn.Module):
     def __init__(self, cl_args: Namespace, *args, **kwargs):
         super().__init__()
 
         self.cl_args = cl_args
         self.fc_1_in_features = self.cl_args.target_width * 4
 
-        self.fc_1 = nn.Linear(self.fc_1_in_features, 1)
+        self.fc_1 = nn.Sequential(nn.Linear(self.fc_1_in_features, 1))
+        self.act = self._get_act()
+
+        self.output_parser = self._get_output_parser()
+
+    def _get_act(self):
+        if self.cl_args.target_cat_columns:
+            logger.info(
+                "Using logistic regression model on categorical column: %s.",
+                self.cl_args.target_cat_columns,
+            )
+            return torch.sigmoid
+
+        # no activation for linear regression
+        elif self.cl_args.target_con_columns:
+            logger.info(
+                "Using linear regression model on continuous column: %s.",
+                self.cl_args.target_con_columns,
+            )
+            return lambda x: x
+
+        raise ValueError()
+
+    def _get_output_parser(self):
+        def _parse_categorical(out: torch.Tensor) -> Dict[str, torch.Tensor]:
+            # we create a 2D output from 1D for compatibility with visualization funcs
+            out = torch.cat(((1 - out[:, 0]).unsqueeze(1), out), 1)
+            out = {self.cl_args.target_cat_columns[0]: out}
+            return out
+
+        def _parse_continuous(out: torch.Tensor):
+            out = {self.cl_args.target_con_columns[0]: out}
+            return out
+
+        if self.cl_args.target_cat_columns:
+            return _parse_categorical
+        return _parse_continuous
 
     def forward(self, x: torch.Tensor, *args, **kwargs):
         out = x.view(x.shape[0], -1)
+
         out = self.fc_1(out)
-        out = torch.sigmoid(out)
-        out = torch.cat(((1 - out[:, 0]).unsqueeze(1), out), 1)
-        out = {self.cl_args.target_cat_columns[0]: out}
+        out = self.act(out)
+
+        out = self.output_parser(out)
+
         return out

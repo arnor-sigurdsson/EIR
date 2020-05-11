@@ -248,8 +248,14 @@ def get_model(
     num_classes: al_num_classes,
     embedding_dict: Union[al_emb_lookup_dict, None],
 ) -> Union[nn.Module, nn.DataParallel]:
-    model_class = get_model_class(cl_args.model_type)
-    model = model_class(cl_args, num_classes, embedding_dict, cl_args.extra_con_columns)
+
+    model_class = get_model_class(model_type=cl_args.model_type)
+    model = model_class(
+        cl_args=cl_args,
+        num_classes=num_classes,
+        embeddings_dict=embedding_dict,
+        extra_continuous_inputs_columns=cl_args.extra_con_columns,
+    )
 
     if cl_args.model_type == "cnn":
         assert model.data_size_after_conv >= 8
@@ -257,24 +263,32 @@ def get_model(
     if cl_args.multi_gpu:
         model = nn.DataParallel(module=model)
 
-    if model_class == "logreg":
-        if (
-            len(
-                cl_args.target_cat_columns
-                + cl_args.target_con_columns
-                + cl_args.extra_cat_columns
-                + cl_args.extra_con_columns
-            )
-            != 1
-        ):
-            raise ValueError()
-
-        if len(cl_args.target_cat_columns != 1):
-            raise ValueError()
+    if model_class == "linear":
+        _check_linear_model_columns(cl_args=cl_args)
 
     model = model.to(device=cl_args.device)
 
     return model
+
+
+def _check_linear_model_columns(cl_args: argparse.Namespace) -> None:
+    if (
+        len(
+            cl_args.target_cat_columns
+            + cl_args.target_con_columns
+            + cl_args.extra_cat_columns
+            + cl_args.extra_con_columns
+        )
+        != 1
+    ):
+        raise NotImplementedError(
+            "Linear model only supports one target column currently."
+        )
+
+    if len(cl_args.extra_cat_columns + cl_args.extra_con_columns) != 0:
+        raise NotImplementedError(
+            "Extra columns not supported for linear model currently."
+        )
 
 
 def get_optimizer(model: nn.Module, cl_args: argparse.Namespace) -> Optimizer:
@@ -297,15 +311,19 @@ def _get_criterions(
 ) -> al_criterions:
     criterions_dict = {}
 
-    bce_loss_func = nn.BCELoss()
-
     def calc_bce(input, target):
+        # note we use input and not e.g. input_ here because torch uses name "input"
+        # in loss functions for compatibility
+        bce_loss_func = nn.BCELoss()
         return bce_loss_func(input[:, 1], target.to(dtype=torch.float))
 
     def get_criterion(column_type_):
 
-        if model_type == "logreg":
-            return calc_bce
+        if model_type == "linear":
+            if column_type_ == "cat":
+                return calc_bce
+            else:
+                return nn.MSELoss()
 
         if column_type_ == "con":
             return nn.MSELoss()
@@ -370,8 +388,11 @@ def train(config: Config) -> None:
             criterions=c.criterions, labels=target_labels, outputs=train_outputs
         )
         train_loss_avg = aggregate_losses(train_losses)
-        l1_loss = torch.norm(c.model.fc_1.weight, p=1) * 0.1
-        train_loss_avg += l1_loss
+
+        # l1_loss = torch.norm(c.model.conv[0].mask.weight, p=1) * 0.001
+        # l1_loss = torch.norm(c.model.mask.weight, p=1) * 0.1
+        # train_loss_avg += l1_loss
+
         train_loss_avg.backward()
         c.optimizer.step()
 
@@ -498,7 +519,7 @@ def _get_train_argument_parser() -> configargparse.ArgumentParser:
         "--model_type",
         type=str,
         default="cnn",
-        choices=["cnn", "mlp", "logreg"],
+        choices=["cnn", "mlp", "linear"],
         help="whether to use a convolutional neural network (cnn) or multilayer "
         "perceptron (mlp)",
     )
