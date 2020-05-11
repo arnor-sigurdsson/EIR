@@ -43,6 +43,8 @@ from human_origins_supervised.train_utils.metrics import (
     calculate_losses,
     aggregate_losses,
     add_multi_task_average_metrics,
+    get_extra_loss_term_functions,
+    add_extra_losses,
 )
 from human_origins_supervised.train_utils.train_handlers import configure_trainer
 
@@ -359,6 +361,10 @@ def train(config: Config) -> None:
     c = config
     cl_args = config.cl_args
 
+    extra_loss_functions = get_extra_loss_term_functions(
+        model=c.model, l1_weight=cl_args.l1
+    )
+
     def step(
         engine: Engine,
         loader_batch: Tuple[torch.Tensor, al_training_labels_batch, List[str]],
@@ -382,18 +388,17 @@ def train(config: Config) -> None:
         )
 
         c.optimizer.zero_grad()
-        train_outputs = c.model(train_seqs, extra_inputs)
+        train_outputs = c.model(x=train_seqs, extra_inputs=extra_inputs)
 
         train_losses = calculate_losses(
             criterions=c.criterions, labels=target_labels, outputs=train_outputs
         )
-        train_loss_avg = aggregate_losses(train_losses)
+        train_loss_avg = aggregate_losses(losses_dict=train_losses)
+        train_loss_final = add_extra_losses(
+            total_loss=train_loss_avg, extra_loss_functions=extra_loss_functions
+        )
 
-        # l1_loss = torch.norm(c.model.conv[0].mask.weight, p=1) * 0.001
-        # l1_loss = torch.norm(c.model.mask.weight, p=1) * 0.1
-        # train_loss_avg += l1_loss
-
-        train_loss_avg.backward()
+        train_loss_final.backward()
         c.optimizer.step()
 
         batch_metrics_dict = calculate_batch_metrics(

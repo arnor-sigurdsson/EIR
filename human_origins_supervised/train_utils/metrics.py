@@ -2,12 +2,12 @@ import csv
 import warnings
 from functools import partial
 from pathlib import Path
-from typing import Dict, Union, TYPE_CHECKING, List, Tuple
+from typing import Dict, Union, TYPE_CHECKING, List, Tuple, Callable
 
 import numpy as np
 import pandas as pd
 import torch
-from aislib.misc_utils import ensure_path_exists
+from aislib.misc_utils import ensure_path_exists, get_logger
 from scipy.stats import pearsonr
 from sklearn.metrics import matthews_corrcoef, r2_score, mean_squared_error
 from sklearn.preprocessing import StandardScaler, LabelEncoder
@@ -25,6 +25,8 @@ if TYPE_CHECKING:
 
 # aliases
 al_step_metric_dict = Dict[str, Dict[str, float]]
+
+logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
 def calculate_batch_metrics(
@@ -175,6 +177,39 @@ def aggregate_losses(losses_dict: Dict[str, torch.Tensor]) -> torch.Tensor:
     average_loss = torch.mean(torch.stack(losses_values))
 
     return average_loss
+
+
+def get_extra_loss_term_functions(model, l1_weight: float) -> List[Callable]:
+    extra_loss_funcs = []
+
+    def add_l1_loss(*args, **kwargs):
+        l1_loss = torch.norm(model.l1_penalized_weights, p=1) * l1_weight
+        return l1_loss
+
+    if l1_weight > 0.0:
+        if not hasattr(model, "l1_penalized_weights"):
+            raise AttributeError(
+                f"Model {model} does not have attribute 'l1_penalized_weights' which is"
+                f" required to calculate L1 loss with passed in {l1_weight} L1 weight."
+            )
+        logger.debug(
+            "Penalizing weights of shape %s with L1 loss with weight %f.",
+            model.l1_penalized_weights.shape,
+            l1_weight,
+        )
+        extra_loss_funcs.append(add_l1_loss)
+
+    return extra_loss_funcs
+
+
+def add_extra_losses(total_loss: torch.Tensor, extra_loss_functions: List[Callable]):
+    """
+    TODO: Possibly add inputs and labels as arguments here if needed later.
+    """
+    for loss_func in extra_loss_functions:
+        total_loss += loss_func()
+
+    return total_loss
 
 
 def get_best_average_performance(

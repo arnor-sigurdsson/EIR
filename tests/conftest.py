@@ -84,6 +84,7 @@ def args_config():
             "gpu_num": "0",
             "kernel_width": 12,
             "label_file": "REPLACE_ME",
+            "l1": 0.0,
             "lr": 1e-2,
             "lr_lb": 1e-5,
             "lr_schedule": "plateau",

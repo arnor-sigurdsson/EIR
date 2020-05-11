@@ -14,7 +14,7 @@ from .extra_inputs_module import al_emb_lookup_dict
 from .model_utils import find_no_resblocks_needed
 
 # type aliases
-al_models = Union["CNNModel", "MLPModel"]
+al_models = Union["CNNModel", "MLPModel", "LinearModel"]
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -25,7 +25,7 @@ def get_model_class(model_type: str) -> al_models:
     elif model_type == "mlp":
         return MLPModel
 
-    return Linear
+    return LinearModel
 
 
 class SelfAttention(nn.Module):
@@ -210,6 +210,7 @@ class FirstBlock(AbstractBlock):
         delattr(self, "act_2")
         delattr(self, "rb_do")
         delattr(self, "conv_2")
+        delattr(self, "se_block")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         out = self.conv_1(x)
@@ -502,6 +503,10 @@ class CNNModel(ModelBase):
     def fc_1_in_features(self):
         return self.no_out_channels * self.data_size_after_conv
 
+    @property
+    def l1_penalized_weights(self):
+        return self.conv[0].conv_1.weight
+
     def forward(self, x: torch.Tensor, extra_inputs: torch.Tensor = None):
         out = self.conv(x)
         out = out.view(out.shape[0], -1)
@@ -562,6 +567,10 @@ class MLPModel(ModelBase):
     def fc_1_in_features(self):
         return self.cl_args.target_width * 4
 
+    @property
+    def l1_penalized_weights(self):
+        return self.fc_1.fc_1_linear_1.weight
+
     def forward(self, x: torch.Tensor, extra_inputs: torch.Tensor = None):
         out = x.view(x.shape[0], -1)
 
@@ -588,17 +597,21 @@ def _calculate_task_branch_outputs(
     return final_out
 
 
-class Linear(nn.Module):
+class LinearModel(nn.Module):
     def __init__(self, cl_args: Namespace, *args, **kwargs):
         super().__init__()
 
         self.cl_args = cl_args
         self.fc_1_in_features = self.cl_args.target_width * 4
 
-        self.fc_1 = nn.Sequential(nn.Linear(self.fc_1_in_features, 1))
+        self.fc_1 = nn.Linear(self.fc_1_in_features, 1)
         self.act = self._get_act()
 
         self.output_parser = self._get_output_parser()
+
+    @property
+    def l1_penalized_weights(self):
+        return self.fc_1.weight
 
     def _get_act(self):
         if self.cl_args.target_cat_columns:
