@@ -1,6 +1,6 @@
 from argparse import Namespace
 from collections import OrderedDict
-from typing import List, Union, Tuple, Dict
+from typing import List, Union, Tuple, Dict, Callable
 
 import torch
 from aislib import pytorch_utils
@@ -402,7 +402,7 @@ class ModelBase(nn.Module):
             self.fc_repr_and_extra_dim += extra_dim
 
     @property
-    def fc_1_in_features(self):
+    def fc_1_in_features(self) -> int:
         raise NotImplementedError
 
 
@@ -500,14 +500,16 @@ class CNNModel(ModelBase):
                 nn.init.constant_(m.bias, 0)
 
     @property
-    def fc_1_in_features(self):
+    def fc_1_in_features(self) -> int:
         return self.no_out_channels * self.data_size_after_conv
 
     @property
-    def l1_penalized_weights(self):
+    def l1_penalized_weights(self) -> torch.Tensor:
         return self.conv[0].conv_1.weight
 
-    def forward(self, x: torch.Tensor, extra_inputs: torch.Tensor = None):
+    def forward(
+        self, x: torch.Tensor, extra_inputs: torch.Tensor = None
+    ) -> Dict[str, torch.Tensor]:
         out = self.conv(x)
         out = out.view(out.shape[0], -1)
 
@@ -524,7 +526,7 @@ class CNNModel(ModelBase):
         return out
 
     @property
-    def resblocks(self):
+    def resblocks(self) -> List[int]:
         if not self.cl_args.resblocks:
             residual_blocks = find_no_resblocks_needed(
                 self.cl_args.target_width,
@@ -564,14 +566,16 @@ class MLPModel(ModelBase):
         )
 
     @property
-    def fc_1_in_features(self):
+    def fc_1_in_features(self) -> int:
         return self.cl_args.target_width * 4
 
     @property
-    def l1_penalized_weights(self):
+    def l1_penalized_weights(self) -> torch.Tensor:
         return self.fc_1.fc_1_linear_1.weight
 
-    def forward(self, x: torch.Tensor, extra_inputs: torch.Tensor = None):
+    def forward(
+        self, x: torch.Tensor, extra_inputs: torch.Tensor = None
+    ) -> Dict[str, torch.Tensor]:
         out = x.view(x.shape[0], -1)
 
         out = self.fc_1(out)
@@ -610,16 +614,16 @@ class LinearModel(nn.Module):
         self.output_parser = self._get_output_parser()
 
     @property
-    def l1_penalized_weights(self):
+    def l1_penalized_weights(self) -> torch.Tensor:
         return self.fc_1.weight
 
-    def _get_act(self):
+    def _get_act(self) -> Callable[[torch.Tensor], torch.Tensor]:
         if self.cl_args.target_cat_columns:
             logger.info(
                 "Using logistic regression model on categorical column: %s.",
                 self.cl_args.target_cat_columns,
             )
-            return torch.sigmoid
+            return nn.Sigmoid()
 
         # no activation for linear regression
         elif self.cl_args.target_con_columns:
@@ -631,14 +635,14 @@ class LinearModel(nn.Module):
 
         raise ValueError()
 
-    def _get_output_parser(self):
+    def _get_output_parser(self) -> Callable[[torch.Tensor], Dict[str, torch.Tensor]]:
         def _parse_categorical(out: torch.Tensor) -> Dict[str, torch.Tensor]:
             # we create a 2D output from 1D for compatibility with visualization funcs
             out = torch.cat(((1 - out[:, 0]).unsqueeze(1), out), 1)
             out = {self.cl_args.target_cat_columns[0]: out}
             return out
 
-        def _parse_continuous(out: torch.Tensor):
+        def _parse_continuous(out: torch.Tensor) -> Dict[str, torch.Tensor]:
             out = {self.cl_args.target_con_columns[0]: out}
             return out
 
@@ -646,7 +650,7 @@ class LinearModel(nn.Module):
             return _parse_categorical
         return _parse_continuous
 
-    def forward(self, x: torch.Tensor, *args, **kwargs):
+    def forward(self, x: torch.Tensor, *args, **kwargs) -> Dict[str, torch.Tensor]:
         out = x.view(x.shape[0], -1)
 
         out = self.fc_1(out)

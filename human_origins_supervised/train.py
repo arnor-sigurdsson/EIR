@@ -503,6 +503,10 @@ def _get_train_argument_parser() -> configargparse.ArgumentParser:
     parser_.add_argument("--wd", type=float, default=0.00, help="Weight decay.")
 
     parser_.add_argument(
+        "--l1", type=float, default=0.00, help="L1 regularization for chosen layer."
+    )
+
+    parser_.add_argument(
         "--fc_repr_dim",
         type=int,
         default=512,
