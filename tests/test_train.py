@@ -1,3 +1,4 @@
+from argparse import Namespace
 from unittest.mock import patch
 
 import pytest
@@ -129,16 +130,73 @@ def test_get_model(args_config):
     assert mlp_model.multi_task_branches["Height"].fc_3_final.out_features == 1
 
 
-def test_get_criterions():
+def test_get_criterions_nonlinear():
 
     test_target_columns_dict = {
         "con": ["Height", "BMI"],
         "cat": ["Origin", "HairColor"],
     }
 
-    test_criterions = train._get_criterions(test_target_columns_dict)
+    test_criterions = train._get_criterions(test_target_columns_dict, model_type="cnn")
     for column_name in test_target_columns_dict["con"]:
         assert isinstance(test_criterions[column_name], nn.MSELoss)
 
     for column_name in test_target_columns_dict["cat"]:
         assert isinstance(test_criterions[column_name], nn.CrossEntropyLoss)
+
+
+def test_get_criterions_linear_pass():
+
+    test_target_columns_dict_con = {"con": ["Height"], "cat": []}
+
+    test_criterions_con = train._get_criterions(
+        test_target_columns_dict_con, model_type="linear"
+    )
+
+    assert len(test_criterions_con) == 1
+    for column_name in test_target_columns_dict_con["con"]:
+        assert isinstance(test_criterions_con[column_name], nn.MSELoss)
+
+    test_target_columns_dict_cat = {"con": [], "cat": ["Origin"]}
+
+    test_criterions_cat = train._get_criterions(
+        test_target_columns_dict_cat, model_type="linear"
+    )
+    assert len(test_criterions_cat) == 1
+    for column_name in test_target_columns_dict_cat["cat"]:
+        # TODO: Do this better, a bit hacky currently as calc_bce is private
+        assert test_criterions_cat[column_name].__name__ == "calc_bce"
+
+
+def test_check_linear_model_columns_pass():
+    extra = {"extra_cat_columns": [], "extra_con_columns": []}
+    test_input_cat = Namespace(
+        target_cat_columns=["Origin"], target_con_columns=[], **extra
+    )
+    train._check_linear_model_columns(cl_args=test_input_cat)
+
+    test_input_con = Namespace(
+        target_con_columns=["Height"], target_cat_columns=[], **extra
+    )
+    train._check_linear_model_columns(cl_args=test_input_con)
+
+
+def test_check_linear_model_columns_fail():
+    extra = {"extra_cat_columns": [], "extra_con_columns": []}
+    test_input_cat = Namespace(
+        target_cat_columns=["Origin", "Height"], target_con_columns=[], **extra
+    )
+    with pytest.raises(NotImplementedError):
+        train._check_linear_model_columns(cl_args=test_input_cat)
+
+    test_input_con = Namespace(
+        target_con_columns=["Height", "BMI"], target_cat_columns=[], **extra
+    )
+    with pytest.raises(NotImplementedError):
+        train._check_linear_model_columns(cl_args=test_input_con)
+
+    test_input_mixed = Namespace(
+        target_con_columns=["Height", "BMI"], target_cat_columns=["Height"], **extra
+    )
+    with pytest.raises(NotImplementedError):
+        train._check_linear_model_columns(cl_args=test_input_mixed)

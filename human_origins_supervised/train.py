@@ -43,6 +43,8 @@ from human_origins_supervised.train_utils.metrics import (
     calculate_losses,
     aggregate_losses,
     add_multi_task_average_metrics,
+    get_extra_loss_term_functions,
+    add_extra_losses,
 )
 from human_origins_supervised.train_utils.train_handlers import configure_trainer
 
@@ -123,7 +125,9 @@ def main(cl_args: argparse.Namespace) -> None:
 
     optimizer = get_optimizer(model=model, cl_args=cl_args)
 
-    criterions = _get_criterions(target_columns=train_dataset.target_columns)
+    criterions = _get_criterions(
+        target_columns=train_dataset.target_columns, model_type=cl_args.model_type
+    )
 
     writer = get_summary_writer(run_folder=run_folder)
 
@@ -246,17 +250,47 @@ def get_model(
     num_classes: al_num_classes,
     embedding_dict: Union[al_emb_lookup_dict, None],
 ) -> Union[nn.Module, nn.DataParallel]:
-    model_class = get_model_class(cl_args.model_type)
-    model = model_class(cl_args, num_classes, embedding_dict, cl_args.extra_con_columns)
+
+    model_class = get_model_class(model_type=cl_args.model_type)
+    model = model_class(
+        cl_args=cl_args,
+        num_classes=num_classes,
+        embeddings_dict=embedding_dict,
+        extra_continuous_inputs_columns=cl_args.extra_con_columns,
+    )
 
     if cl_args.model_type == "cnn":
         assert model.data_size_after_conv >= 8
 
     if cl_args.multi_gpu:
         model = nn.DataParallel(module=model)
+
+    if model_class == "linear":
+        _check_linear_model_columns(cl_args=cl_args)
+
     model = model.to(device=cl_args.device)
 
     return model
+
+
+def _check_linear_model_columns(cl_args: argparse.Namespace) -> None:
+    if (
+        len(
+            cl_args.target_cat_columns
+            + cl_args.target_con_columns
+            + cl_args.extra_cat_columns
+            + cl_args.extra_con_columns
+        )
+        != 1
+    ):
+        raise NotImplementedError(
+            "Linear model only supports one target column currently."
+        )
+
+    if len(cl_args.extra_cat_columns + cl_args.extra_con_columns) != 0:
+        raise NotImplementedError(
+            "Extra columns not supported for linear model currently."
+        )
 
 
 def get_optimizer(model: nn.Module, cl_args: argparse.Namespace) -> Optimizer:
@@ -274,10 +308,25 @@ def get_optimizer(model: nn.Module, cl_args: argparse.Namespace) -> Optimizer:
     return optimizer
 
 
-def _get_criterions(target_columns: al_target_columns) -> al_criterions:
+def _get_criterions(
+    target_columns: al_target_columns, model_type: str
+) -> al_criterions:
     criterions_dict = {}
 
+    def calc_bce(input, target):
+        # note we use input and not e.g. input_ here because torch uses name "input"
+        # in loss functions for compatibility
+        bce_loss_func = nn.BCELoss()
+        return bce_loss_func(input[:, 1], target.to(dtype=torch.float))
+
     def get_criterion(column_type_):
+
+        if model_type == "linear":
+            if column_type_ == "cat":
+                return calc_bce
+            else:
+                return nn.MSELoss()
+
         if column_type_ == "con":
             return nn.MSELoss()
         elif column_type_ == "cat":
@@ -312,6 +361,10 @@ def train(config: Config) -> None:
     c = config
     cl_args = config.cl_args
 
+    extra_loss_functions = get_extra_loss_term_functions(
+        model=c.model, l1_weight=cl_args.l1
+    )
+
     def step(
         engine: Engine,
         loader_batch: Tuple[torch.Tensor, al_training_labels_batch, List[str]],
@@ -335,13 +388,17 @@ def train(config: Config) -> None:
         )
 
         c.optimizer.zero_grad()
-        train_outputs = c.model(train_seqs, extra_inputs)
+        train_outputs = c.model(x=train_seqs, extra_inputs=extra_inputs)
 
         train_losses = calculate_losses(
             criterions=c.criterions, labels=target_labels, outputs=train_outputs
         )
-        train_loss_avg = aggregate_losses(train_losses)
-        train_loss_avg.backward()
+        train_loss_avg = aggregate_losses(losses_dict=train_losses)
+        train_loss_final = add_extra_losses(
+            total_loss=train_loss_avg, extra_loss_functions=extra_loss_functions
+        )
+
+        train_loss_final.backward()
         c.optimizer.step()
 
         batch_metrics_dict = calculate_batch_metrics(
@@ -446,6 +503,10 @@ def _get_train_argument_parser() -> configargparse.ArgumentParser:
     parser_.add_argument("--wd", type=float, default=0.00, help="Weight decay.")
 
     parser_.add_argument(
+        "--l1", type=float, default=0.00, help="L1 regularization for chosen layer."
+    )
+
+    parser_.add_argument(
         "--fc_repr_dim",
         type=int,
         default=512,
@@ -467,7 +528,7 @@ def _get_train_argument_parser() -> configargparse.ArgumentParser:
         "--model_type",
         type=str,
         default="cnn",
-        choices=["cnn", "mlp"],
+        choices=["cnn", "mlp", "linear"],
         help="whether to use a convolutional neural network (cnn) or multilayer "
         "perceptron (mlp)",
     )

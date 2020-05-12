@@ -142,8 +142,10 @@ def set_up_calculate_losses_data(
 
         return base_dict
 
-    test_criterions = train._get_criterions(test_target_columns_dict)
-    test_labels = generate_base_dict(label_values)
+    test_criterions = train._get_criterions(
+        target_columns=test_target_columns_dict, model_type="cnn"
+    )
+    test_labels = generate_base_dict(values=label_values)
 
     test_outputs = generate_base_dict(output_values)
 
@@ -163,6 +165,84 @@ def test_aggregate_losses():
 
     test_aggregated_losses = metrics.aggregate_losses(losses_dict)
     assert test_aggregated_losses.item() == 2.0
+
+
+@pytest.fixture()
+def get_l1_test_model():
+    class TestModel(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+
+            self.fc_1 = torch.nn.Linear(10, 1)
+            self.l1_penalized_weights = self.fc_1.weight
+
+        def forward(self, x):
+            return x
+
+    return TestModel()
+
+
+def test_get_extra_loss_term_functions_pass(get_l1_test_model):
+
+    test_model = get_l1_test_model
+
+    extra_loss_functions_with_l1 = metrics.get_extra_loss_term_functions(
+        model=test_model, l1_weight=1.0
+    )
+    assert len(extra_loss_functions_with_l1) == 1
+
+
+def test_get_extra_loss_term_functions_fail(get_l1_test_model):
+
+    test_model = get_l1_test_model
+    delattr(test_model, "l1_penalized_weights")
+
+    with pytest.raises(AttributeError):
+        metrics.get_extra_loss_term_functions(model=test_model, l1_weight=1.0)
+
+
+def test_l1_extra_loss(get_l1_test_model):
+    test_model = get_l1_test_model
+
+    torch.nn.init.ones_(test_model.fc_1.weight)
+    extra_loss_functions_with_l1 = metrics.get_extra_loss_term_functions(
+        model=test_model, l1_weight=1.0
+    )
+
+    l1_loss_func = extra_loss_functions_with_l1[0]
+    l1_loss = l1_loss_func()
+    assert l1_loss == 10.0
+
+    torch.nn.init.zeros_(test_model.fc_1.weight)
+    extra_loss_functions_with_l1 = metrics.get_extra_loss_term_functions(
+        model=test_model, l1_weight=1.0
+    )
+
+    l1_loss_func = extra_loss_functions_with_l1[0]
+    l1_loss = l1_loss_func()
+    assert l1_loss == 0.0
+
+
+def test_add_extra_losses(get_l1_test_model):
+
+    test_model = get_l1_test_model
+
+    torch.nn.init.ones_(test_model.fc_1.weight)
+    extra_loss_functions_with_l1 = metrics.get_extra_loss_term_functions(
+        model=test_model, l1_weight=1.0
+    )
+    total_loss = metrics.add_extra_losses(
+        total_loss=torch.tensor(0.0), extra_loss_functions=extra_loss_functions_with_l1
+    )
+    assert total_loss == 10.0
+
+    # test that multiple losses are aggregated correctly
+    extra_loss_functions_with_l1_multiple = extra_loss_functions_with_l1 * 3
+    total_loss = metrics.add_extra_losses(
+        total_loss=torch.tensor(0.0),
+        extra_loss_functions=extra_loss_functions_with_l1_multiple,
+    )
+    assert total_loss == 30.0
 
 
 @pytest.fixture
