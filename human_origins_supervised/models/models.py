@@ -546,14 +546,18 @@ class MLPModel(ModelBase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        self.fc_0 = nn.Linear(
+            self.fc_1_in_features, self.cl_args.fc_repr_dim, bias=False
+        )
+
         self.fc_1 = nn.Sequential(
             OrderedDict(
                 {
-                    "fc_1_linear_1": nn.Linear(
-                        self.fc_1_in_features, self.cl_args.fc_repr_dim, bias=False
-                    ),
-                    "fc_1_act_1": Swish(),
                     "fc_1_bn_1": nn.BatchNorm1d(self.cl_args.fc_repr_dim),
+                    "fc_1_act_1": Swish(),
+                    "fc_1_linear_1": nn.Linear(
+                        self.cl_args.fc_repr_dim, self.cl_args.fc_repr_dim, bias=False
+                    ),
                 }
             )
         )
@@ -578,6 +582,7 @@ class MLPModel(ModelBase):
     ) -> Dict[str, torch.Tensor]:
         out = x.view(x.shape[0], -1)
 
+        out = self.fc_0(out)
         out = self.fc_1(out)
 
         if extra_inputs is not None:
