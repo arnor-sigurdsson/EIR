@@ -519,8 +519,8 @@ class CNNModel(ModelBase):
             out_extra = self.fc_extra(extra_inputs)
             out = torch.cat((out_extra, out), dim=1)
 
-        out = _calculate_task_branch_outputs(
-            input_=out, last_module=self.multi_task_branches
+        out = _calculate_module_dict_outputs(
+            input_=out, module_dict=self.multi_task_branches
         )
 
         return out
@@ -548,6 +548,10 @@ class MLPModel(ModelBase):
 
         self.fc_0 = nn.Linear(
             self.fc_1_in_features, self.cl_args.fc_repr_dim, bias=False
+        )
+
+        self.downsample_fc_0_identities = _get_mlp_downsample_identities_moduledict(
+            num_classes=self.num_classes, fc_repr_dim=self.cl_args.fc_repr_dim
         )
 
         self.fc_1 = nn.Sequential(
@@ -583,24 +587,45 @@ class MLPModel(ModelBase):
         out = x.view(x.shape[0], -1)
 
         out = self.fc_0(out)
+        identities = _calculate_module_dict_outputs(
+            input_=out, module_dict=self.downsample_fc_0_identities
+        )
+
         out = self.fc_1(out)
 
         if extra_inputs is not None:
             out_extra = self.fc_extra(extra_inputs)
             out = torch.cat((out_extra, out), dim=1)
 
-        out = _calculate_task_branch_outputs(
-            input_=out, last_module=self.multi_task_branches
+        out = _calculate_module_dict_outputs(
+            input_=out, module_dict=self.multi_task_branches
         )
+
+        out = {
+            column_name: feature + identities[column_name]
+            for column_name, feature in out.items()
+        }
 
         return out
 
 
-def _calculate_task_branch_outputs(
-    input_: torch.Tensor, last_module: nn.ModuleDict
+def _get_mlp_downsample_identities_moduledict(
+    num_classes: Dict[str, int], fc_repr_dim: int
+) -> nn.ModuleDict:
+    module_dict = {}
+    for key, cur_num_output_classes in num_classes.items():
+        module_dict[key] = nn.Linear(
+            in_features=fc_repr_dim, out_features=cur_num_output_classes, bias=True
+        )
+
+    return nn.ModuleDict(module_dict)
+
+
+def _calculate_module_dict_outputs(
+    input_: torch.Tensor, module_dict: nn.ModuleDict
 ) -> Dict[str, torch.Tensor]:
     final_out = {}
-    for target_column, linear_layer in last_module.items():
+    for target_column, linear_layer in module_dict.items():
         final_out[target_column] = linear_layer(input_)
 
     return final_out
