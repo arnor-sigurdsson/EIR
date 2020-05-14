@@ -575,7 +575,7 @@ class MLPModel(ModelBase):
 
     @property
     def l1_penalized_weights(self) -> torch.Tensor:
-        return self.fc_1.fc_1_linear_1.weight
+        return self.fc_0.weight
 
     def forward(
         self, x: torch.Tensor, extra_inputs: torch.Tensor = None
