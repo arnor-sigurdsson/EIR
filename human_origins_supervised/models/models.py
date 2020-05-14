@@ -573,6 +573,8 @@ class MLPModel(ModelBase):
             fc_do=self.cl_args.fc_do,
         )
 
+        self._init_weights()
+
     @property
     def fc_1_in_features(self) -> int:
         return self.cl_args.target_width * 4
@@ -580,6 +582,10 @@ class MLPModel(ModelBase):
     @property
     def l1_penalized_weights(self) -> torch.Tensor:
         return self.fc_0.weight
+
+    def _init_weights(self):
+        for task_branch in self.multi_task_branches.values():
+            nn.init.zeros_(task_branch.fc_3_bn_1.weight)
 
     def forward(
         self, x: torch.Tensor, extra_inputs: torch.Tensor = None
