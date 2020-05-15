@@ -458,7 +458,26 @@ def _get_multi_task_branches(
         module_dict[key] = task_layer_branch
 
     _assert_uniqueness()
+    _assert_module_dict_uniqueness(module_dict)
     return nn.ModuleDict(module_dict)
+
+
+def _assert_module_dict_uniqueness(module_dict: Dict[str, nn.Sequential]):
+    """
+    We have this function as a safeguard to help us catch if we are reusing modules
+    when they should not be (i.e. if splitting into multiple branches with same layers,
+    one could accidentally reuse the instantiated nn.Modules across branches).
+    """
+    branch_ids = [id(sequential_branch) for sequential_branch in module_dict.values()]
+    assert len(branch_ids) == len(set(branch_ids))
+
+    module_ids = []
+    for sequential_branch in module_dict.values():
+        module_ids += [id(module) for module in sequential_branch]
+
+    num_total_modules = len(module_ids)
+    num_unique_modules = len(set(module_ids))
+    assert num_unique_modules == num_total_modules
 
 
 class CNNModel(ModelBase):
@@ -491,6 +510,17 @@ class CNNModel(ModelBase):
             fc_do=self.cl_args.fc_do,
         )
 
+        self._init_weights()
+
+    @property
+    def fc_1_in_features(self) -> int:
+        return self.no_out_channels * self.data_size_after_conv
+
+    @property
+    def l1_penalized_weights(self) -> torch.Tensor:
+        return self.conv[0].conv_1.weight
+
+    def _init_weights(self):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 # Swish slope is roughly 0.5 around 0
@@ -500,12 +530,20 @@ class CNNModel(ModelBase):
                 nn.init.constant_(m.bias, 0)
 
     @property
-    def fc_1_in_features(self) -> int:
-        return self.no_out_channels * self.data_size_after_conv
-
-    @property
-    def l1_penalized_weights(self) -> torch.Tensor:
-        return self.conv[0].conv_1.weight
+    def resblocks(self) -> List[int]:
+        if not self.cl_args.resblocks:
+            residual_blocks = find_no_resblocks_needed(
+                self.cl_args.target_width,
+                self.cl_args.down_stride,
+                self.cl_args.first_stride_expansion,
+            )
+            logger.info(
+                "No residual blocks specified in CL args, using input "
+                "%s based on width approximation calculation.",
+                residual_blocks,
+            )
+            return residual_blocks
+        return self.cl_args.resblocks
 
     def forward(
         self, x: torch.Tensor, extra_inputs: torch.Tensor = None
@@ -525,22 +563,6 @@ class CNNModel(ModelBase):
 
         return out
 
-    @property
-    def resblocks(self) -> List[int]:
-        if not self.cl_args.resblocks:
-            residual_blocks = find_no_resblocks_needed(
-                self.cl_args.target_width,
-                self.cl_args.down_stride,
-                self.cl_args.first_stride_expansion,
-            )
-            logger.info(
-                "No residual blocks specified in CL args, using input "
-                "%s based on width approximation calculation.",
-                residual_blocks,
-            )
-            return residual_blocks
-        return self.cl_args.resblocks
-
 
 class MLPModel(ModelBase):
     def __init__(self, *args, **kwargs):
@@ -551,7 +573,7 @@ class MLPModel(ModelBase):
         )
 
         self.downsample_fc_0_identities = _get_mlp_downsample_identities_moduledict(
-            num_classes=self.num_classes, fc_repr_dim=self.cl_args.fc_repr_dim
+            num_classes=self.num_classes, in_features=self.fc_repr_and_extra_dim
         )
 
         self.fc_1 = nn.Sequential(
@@ -593,8 +615,10 @@ class MLPModel(ModelBase):
         out = x.view(x.shape[0], -1)
 
         out = self.fc_0(out)
+
+        identity_inputs = torch.cat((extra_inputs, out), dim=1)
         identities = _calculate_module_dict_outputs(
-            input_=out, module_dict=self.downsample_fc_0_identities
+            input_=identity_inputs, module_dict=self.downsample_fc_0_identities
         )
 
         out = self.fc_1(out)
@@ -616,14 +640,21 @@ class MLPModel(ModelBase):
 
 
 def _get_mlp_downsample_identities_moduledict(
-    num_classes: Dict[str, int], fc_repr_dim: int
+    num_classes: Dict[str, int], in_features: int
 ) -> nn.ModuleDict:
+    """
+    Currently redundant cast to `nn.Sequential` here for compatibility with
+    `assert_module_dict_uniqueness`.
+    """
     module_dict = {}
     for key, cur_num_output_classes in num_classes.items():
-        module_dict[key] = nn.Linear(
-            in_features=fc_repr_dim, out_features=cur_num_output_classes, bias=True
+        module_dict[key] = nn.Sequential(
+            nn.Linear(
+                in_features=in_features, out_features=cur_num_output_classes, bias=True
+            )
         )
 
+    _assert_module_dict_uniqueness(module_dict)
     return nn.ModuleDict(module_dict)
 
 
