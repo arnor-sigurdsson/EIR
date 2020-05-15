@@ -398,6 +398,8 @@ class ModelBase(nn.Module):
         # TODO: Better to have this a method so fc_extra is explicitly defined?
         if emb_total_dim or con_total_dim:
             extra_dim = emb_total_dim + con_total_dim
+            # we have a specific layer for fc_extra in case it's going straight
+            # to bn or act, ensuring linear before
             self.fc_extra = nn.Linear(extra_dim, extra_dim, bias=False)
             self.fc_repr_and_extra_dim += extra_dim
 
@@ -616,7 +618,10 @@ class MLPModel(ModelBase):
 
         out = self.fc_0(out)
 
-        identity_inputs = torch.cat((extra_inputs, out), dim=1)
+        identity_inputs = out
+        if extra_inputs is not None:
+            identity_inputs = torch.cat((extra_inputs, identity_inputs), dim=1)
+
         identities = _calculate_module_dict_outputs(
             input_=identity_inputs, module_dict=self.downsample_fc_0_identities
         )
