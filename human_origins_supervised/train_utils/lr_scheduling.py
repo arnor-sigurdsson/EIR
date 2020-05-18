@@ -38,7 +38,7 @@ def attach_lr_scheduler(
     """
     cl_args = config.cl_args
 
-    if cl_args.lr_schedule == "cycle":
+    if cl_args.lr_schedule in ["cycle", "cosine"]:
         engine.add_event_handler(
             event_name=Events.ITERATION_STARTED, handler=lr_scheduler
         )
@@ -54,6 +54,8 @@ def attach_lr_scheduler(
             reduce_on_plateau_scheduler=lr_scheduler,
             **step_scheduler_params
         )
+    else:
+        raise ValueError()
 
 
 def _get_reduce_lr_on_plateu_step_params(cl_args: Namespace, config: "Config") -> Dict:
@@ -75,7 +77,7 @@ def _get_reduce_lr_on_plateu_step_params(cl_args: Namespace, config: "Config") -
     return params
 
 
-def set_up_scheduler(
+def set_up_lr_scheduler(
     handler_config: "HandlerConfig",
 ) -> Union[ConcatScheduler, CosineAnnealingScheduler, ReduceLROnPlateau]:
 
@@ -85,20 +87,29 @@ def set_up_scheduler(
     lr_lower_bound = c.cl_args.lr_lb
     lr_upper_bound = c.cl_args.lr
 
-    if cl_args.lr_schedule == "cycle":
+    def _get_cycle_iter_size(warmup_steps_: int) -> int:
+        steps = len(c.train_loader)
+        if cl_args.lr_schedule == "cosine":
+            steps = steps * c.cl_args.n_epochs - warmup_steps_
 
-        lr_scheduler, lr_scheduler_args = _get_cyclic_lr_scheduler(
-            optimizer=c.optimizer,
-            lr_upper_bound=lr_upper_bound,
-            lr_lower_bound=lr_lower_bound,
-            cycle_iter_size=len(c.train_loader),
-        )
+        return steps
 
+    if cl_args.lr_schedule in ["cycle", "cosine"]:
         warmup_steps = _get_warmup_steps_from_cla(
             warmup_steps_arg=cl_args.warmup_steps, optimizer=c.optimizer
         )
 
-        if warmup_steps is not None:
+        cycle_iter_size = _get_cycle_iter_size(warmup_steps_=warmup_steps)
+
+        lr_scheduler, lr_scheduler_args = _get_cosine_lr_scheduler(
+            optimizer=c.optimizer,
+            lr_upper_bound=lr_upper_bound,
+            lr_lower_bound=lr_lower_bound,
+            cycle_iter_size=cycle_iter_size,
+            schedule=cl_args.lr_schedule,
+        )
+
+        if warmup_steps:
             lr_scheduler, lr_scheduler_args = _attach_warmup_to_scheduler(
                 lr_scheduler=lr_scheduler,
                 lr_lower_bound=lr_lower_bound,
@@ -109,7 +120,7 @@ def set_up_scheduler(
         _plot_lr_schedule(
             lr_scheduler=lr_scheduler,
             n_epochs=cl_args.n_epochs,
-            cycle_iter_size=len(c.train_loader),
+            n_iter_per_epoch=len(c.train_loader),
             output_folder=handler_config.run_folder,
             lr_scheduler_args=lr_scheduler_args,
         )
@@ -129,11 +140,12 @@ def set_up_scheduler(
     return lr_scheduler
 
 
-def _get_cyclic_lr_scheduler(
+def _get_cosine_lr_scheduler(
     optimizer: Optimizer,
     lr_upper_bound: float,
     lr_lower_bound: float,
     cycle_iter_size: int,
+    schedule: str,
 ) -> Tuple[CosineAnnealingScheduler, Dict]:
 
     """
@@ -151,9 +163,12 @@ def _get_cyclic_lr_scheduler(
         "start_value": lr_upper_bound,
         "end_value": lr_lower_bound,
         "cycle_size": cycle_iter_size,
-        "cycle_mult": 2,
-        "start_value_mult": 1,
     }
+
+    if schedule == "cycle":
+        cosine_scheduler_kwargs["cycle_mult"] = 2
+        cosine_scheduler_kwargs["start_value_mult"] = 1
+
     lr_scheduler = CosineAnnealingScheduler(**cosine_scheduler_kwargs)
 
     return lr_scheduler, cosine_scheduler_kwargs
@@ -197,14 +212,14 @@ def _calculate_auto_warmup_steps(optimizer: Optimizer) -> int:
 def _plot_lr_schedule(
     lr_scheduler: Union[ConcatScheduler, CosineAnnealingScheduler],
     n_epochs: int,
-    cycle_iter_size: int,
+    n_iter_per_epoch: int,
     lr_scheduler_args: Dict,
     output_folder: Path,
 ):
 
     simulated_vals = np.array(
         lr_scheduler.simulate_values(
-            num_events=n_epochs * cycle_iter_size, **lr_scheduler_args
+            num_events=n_epochs * n_iter_per_epoch, **lr_scheduler_args
         )
     )
 
