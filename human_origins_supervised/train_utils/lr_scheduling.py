@@ -94,6 +94,9 @@ def set_up_lr_scheduler(
 
         return steps
 
+    def _get_total_num_events(n_epochs: int, iter_per_epoch: int) -> int:
+        return n_epochs * iter_per_epoch
+
     if cl_args.lr_schedule in ["cycle", "cosine"]:
         warmup_steps = _get_warmup_steps_from_cla(
             warmup_steps_arg=cl_args.warmup_steps, optimizer=c.optimizer
@@ -117,10 +120,12 @@ def set_up_lr_scheduler(
                 duration=warmup_steps,
             )
 
+        num_events = _get_total_num_events(
+            n_epochs=cl_args.n_epochs, iter_per_epoch=len(c.train_loader)
+        )
         _plot_lr_schedule(
             lr_scheduler=lr_scheduler,
-            n_epochs=cl_args.n_epochs,
-            n_iter_per_epoch=len(c.train_loader),
+            num_events=num_events,
             output_folder=handler_config.run_folder,
             lr_scheduler_args=lr_scheduler_args,
         )
@@ -131,7 +136,10 @@ def set_up_lr_scheduler(
         )
         logger.info("Plateau patience set to %d.", patience_steps)
         lr_scheduler = ReduceLROnPlateau(
-            c.optimizer, "min", patience=patience_steps, min_lr=lr_lower_bound
+            optimizer=c.optimizer,
+            mode="min",
+            patience=patience_steps,
+            min_lr=lr_lower_bound,
         )
 
     else:
@@ -211,16 +219,13 @@ def _calculate_auto_warmup_steps(optimizer: Optimizer) -> int:
 
 def _plot_lr_schedule(
     lr_scheduler: Union[ConcatScheduler, CosineAnnealingScheduler],
-    n_epochs: int,
-    n_iter_per_epoch: int,
+    num_events: int,
     lr_scheduler_args: Dict,
     output_folder: Path,
 ):
 
     simulated_vals = np.array(
-        lr_scheduler.simulate_values(
-            num_events=n_epochs * n_iter_per_epoch, **lr_scheduler_args
-        )
+        lr_scheduler.simulate_values(num_events=num_events, **lr_scheduler_args)
     )
 
     plt.plot(simulated_vals[:, 0], simulated_vals[:, 1])
@@ -277,9 +282,13 @@ def _step_reduce_on_plateau_scheduler(
     We do the warmup manually here because currently ignite does not support warmup
     with ReduceLROnPlateau through create_lr_scheduler_with_warmup because
     ReduceLROnPlateau does not inherit from _LRScheduler.
+
+    TODO:   Possibly use average performance here as measure of whether to step (instead
+            of loss)?
     """
     iteration = engine.state.iteration
 
+    # manual warmup
     if warmup_steps is not None and iteration <= warmup_steps:
         step_size = (lr_upper_bound - lr_lower_bound) / warmup_steps
         cur_lr = lr_lower_bound + step_size * iteration
