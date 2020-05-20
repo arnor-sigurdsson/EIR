@@ -299,15 +299,19 @@ def generate_binary_prediction_probabilities(
     *args,
     **kwargs,
 ):
-    y_prob = softmax(y_outp, axis=1)
+    """
+    We do softmax after calculating the AUC (as opposed to before) to avoid shifting
+    the probabilities for the positive class.
+    """
 
     y_true_bin = label_binarize(y_true, classes=[0, 1])
-    fpr, tpr, _ = roc_curve(y_true_bin, y_prob[:, 1])
+    fpr, tpr, _ = roc_curve(y_true_bin, y_outp[:, 1])
     roc_auc = auc(fpr, tpr)
 
     classes = transformer.classes_
     fig, ax = plt.subplots()
 
+    y_prob = softmax(y_outp, axis=1)
     for class_index, class_name in zip(range(2), classes):
         cur_class_mask = np.argwhere(y_true == class_index)
         cur_probabilities = y_prob[cur_class_mask, 1]
