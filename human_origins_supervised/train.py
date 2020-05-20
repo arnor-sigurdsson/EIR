@@ -101,7 +101,7 @@ def main(cl_args: argparse.Namespace) -> None:
     )
 
     train_sampler = get_train_sampler(
-        column_to_sample=cl_args.weighted_sampling_column, train_dataset=train_dataset
+        columns_to_sample=cl_args.weighted_sampling_column, train_dataset=train_dataset
     )
 
     train_dloader, valid_dloader = get_dataloaders(
@@ -193,24 +193,30 @@ def get_train_sampler(
 
 @overload
 def get_train_sampler(
-    column_to_sample: str, train_dataset: datasets.ArrayDatasetBase
+    column_to_sample: List[str], train_dataset: datasets.ArrayDatasetBase
 ) -> WeightedRandomSampler:
     ...
 
 
-def get_train_sampler(column_to_sample, train_dataset):
-    if column_to_sample is None:
+def get_train_sampler(columns_to_sample, train_dataset):
+    if columns_to_sample is None:
         return None
 
     loaded_target_columns = (
         train_dataset.target_columns["con"] + train_dataset.target_columns["cat"]
     )
-    if column_to_sample not in loaded_target_columns:
+    if not set(columns_to_sample).issubset(
+        set(loaded_target_columns)
+    ) and columns_to_sample != ["all"]:
         raise ValueError("Weighted sampling from non-loaded columns not supported yet.")
 
-    if column_to_sample is not None:
+    if columns_to_sample is not None:
+
+        if columns_to_sample == ["all"]:
+            columns_to_sample = train_dataset.target_columns["cat"]
+
         train_sampler = get_weighted_random_sampler(
-            train_dataset=train_dataset, target_column=column_to_sample
+            train_dataset=train_dataset, target_columns=columns_to_sample
         )
         return train_sampler
 
@@ -633,6 +639,7 @@ def _get_train_argument_parser() -> configargparse.ArgumentParser:
         "--weighted_sampling_column",
         type=str,
         default=None,
+        nargs="*",
         help="Target column to apply weighted sampling on.",
     )
 

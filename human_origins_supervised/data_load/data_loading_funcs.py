@@ -1,5 +1,5 @@
 from collections import Counter
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Tuple, Union, Dict
 
 import numpy as np
 import torch
@@ -12,7 +12,9 @@ if TYPE_CHECKING:
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
-def get_weighted_random_sampler(train_dataset: "ArrayDatasetBase", target_column: str):
+def get_weighted_random_sampler(
+    train_dataset: "ArrayDatasetBase", target_columns: List[str]
+):
     """
     Labels spec:
 
@@ -30,27 +32,59 @@ def get_weighted_random_sampler(train_dataset: "ArrayDatasetBase", target_column
 
     The list comprehension is going over all the label dicts associated with the IDs,
     then just parsing the label (converting to int in the case of classification).
-
-
     """
-    labels = list(
-        (i.labels["target_labels"][target_column] for i in train_dataset.samples)
+    samples_weighted, num_sample_per_epoch = _aggregate_column_sampling_weights(
+        train_dataset=train_dataset, target_columns=target_columns
     )
 
-    label_counts = [i[1] for i in sorted(Counter(labels).items())]
-
-    logger.debug("Using weighted sampling with label counts %s", label_counts)
-
-    weights = 1.0 / torch.tensor(label_counts, dtype=torch.float32)
-    samples_weighted = weights[labels]
-
-    num_sample_per_epoch = min(label_counts) * len(weights)
     logger.debug("Num samples per epoch: %d", num_sample_per_epoch)
     sampler = WeightedRandomSampler(
         samples_weighted, num_samples=num_sample_per_epoch, replacement=True
     )
 
     return sampler
+
+
+def _aggregate_column_sampling_weights(
+    train_dataset: "ArrayDatasetBase", target_columns: List[str]
+) -> Tuple[torch.Tensor, int]:
+    all_target_columns = {}
+    for column in target_columns:
+        cur_weight_dict = _get_column_sample_weights(
+            train_dataset=train_dataset, target_column=column
+        )
+        all_target_columns[column] = cur_weight_dict
+
+    all_weights = torch.stack(
+        [i["samples_weighted"] for i in all_target_columns.values()], dim=1
+    )
+    all_weights_summed = all_weights.sum(dim=1)
+    samples_per_epoch = sum(min(i["label_counts"]) for i in all_target_columns.values())
+
+    return all_weights_summed, samples_per_epoch
+
+
+def _get_column_sample_weights(
+    train_dataset: "ArrayDatasetBase", target_column: str
+) -> Dict[str, Union[torch.Tensor, List[int]]]:
+    """
+    TODO:   Optimize so we do just one pass over `train_dataset.samples` if this becomes
+            a bottleneck.
+    """
+
+    labels = list(
+        (i.labels["target_labels"][target_column] for i in train_dataset.samples)
+    )
+
+    label_counts = [i[1] for i in sorted(Counter(labels).items())]
+
+    logger.debug("Label counts in column %s:  %s", target_column, label_counts)
+
+    weights = 1.0 / torch.tensor(label_counts, dtype=torch.float32)
+    samples_weighted = weights[labels]
+
+    output_dict = {"samples_weighted": samples_weighted, "label_counts": label_counts}
+    return output_dict
 
 
 def make_random_snps_missing(

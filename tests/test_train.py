@@ -42,13 +42,13 @@ def test_get_train_sampler(args_config, create_test_data, create_test_datasets):
     cl_args.weighted_sampling_column = "Origin"
 
     test_sampler = train.get_train_sampler(
-        column_to_sample=cl_args.weighted_sampling_column, train_dataset=train_dataset
+        columns_to_sample=cl_args.weighted_sampling_column, train_dataset=train_dataset
     )
     assert isinstance(test_sampler, WeightedRandomSampler)
 
     cl_args.weighted_sampling_column = None
     test_sampler = train.get_train_sampler(
-        column_to_sample=cl_args.weighted_sampling_column, train_dataset=train_dataset
+        columns_to_sample=cl_args.weighted_sampling_column, train_dataset=train_dataset
     )
     assert test_sampler is None
 
