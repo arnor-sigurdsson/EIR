@@ -460,7 +460,7 @@ def _get_train_argument_parser() -> configargparse.ArgumentParser:
         "--lr_schedule",
         type=str,
         default="same",
-        choices=["cycle", "plateau", "same"],
+        choices=["cycle", "plateau", "same", "cosine"],
         help="Whether to use cyclical or reduce on plateau learning rate schedule. "
         "Otherwise keeps same learning rate.",
     )
@@ -468,7 +468,7 @@ def _get_train_argument_parser() -> configargparse.ArgumentParser:
     parser_.add_argument(
         "--warmup_steps",
         type=str,
-        default="auto",
+        default=None,
         help="How many steps to use in warmup.",
     )
 
