@@ -1,4 +1,5 @@
 from argparse import Namespace
+from math import isclose
 from pathlib import Path
 from typing import Tuple, Union, Dict, TYPE_CHECKING, overload
 
@@ -46,7 +47,7 @@ def attach_lr_scheduler(
     elif cl_args.lr_schedule == "plateau":
 
         step_scheduler_params = _get_reduce_lr_on_plateu_step_params(
-            cl_args=cl_args, config=config
+            cl_args=cl_args, optimizer=config.optimizer
         )
         engine.add_event_handler(
             event_name=Events.ITERATION_COMPLETED,
@@ -58,16 +59,18 @@ def attach_lr_scheduler(
         raise ValueError()
 
 
-def _get_reduce_lr_on_plateu_step_params(cl_args: Namespace, config: "Config") -> Dict:
+def _get_reduce_lr_on_plateu_step_params(
+    cl_args: Namespace, optimizer: Optimizer
+) -> Dict:
     eval_history_fpath = get_run_folder(cl_args.run_name) / "v_average_history.log"
 
     warmup_steps = _get_warmup_steps_from_cla(
-        warmup_steps_arg=cl_args.warmup_steps, optimizer=config.optimizer
+        warmup_steps_arg=cl_args.warmup_steps, optimizer=optimizer
     )
 
     params = {
         "eval_history_fpath": eval_history_fpath,
-        "optimizer": config.optimizer,
+        "optimizer": optimizer,
         "sample_interval": cl_args.sample_interval,
         "lr_upper_bound": cl_args.lr,
         "lr_lower_bound": cl_args.lr_lb,
@@ -247,7 +250,7 @@ def _calc_plateu_patience(steps_per_epoch: int, sample_interval: int):
 
 
 def _attach_warmup_to_scheduler(
-    lr_scheduler: Union[CosineAnnealingScheduler, ReduceLROnPlateau],
+    lr_scheduler: CosineAnnealingScheduler,
     lr_lower_bound: float,
     lr_upper_bound: float,
     duration: int,
@@ -296,7 +299,9 @@ def _step_reduce_on_plateau_scheduler(
             param_group["lr"] = cur_lr
 
     else:
-        if iteration % sample_interval == 0:
+        cur_lr = get_optimizer_lr(optimizer=optimizer)
+
+        if iteration % sample_interval == 0 and not isclose(cur_lr, lr_lower_bound):
             _log_reduce_on_plateu_step(reduce_on_plateau_scheduler, iteration)
 
             eval_df = read_metrics_history_file(eval_history_fpath)
@@ -304,12 +309,16 @@ def _step_reduce_on_plateau_scheduler(
             reduce_on_plateau_scheduler.step(latest_val_loss)
 
 
+def get_optimizer_lr(optimizer: Optimizer):
+    return optimizer.param_groups[0]["lr"]
+
+
 def _log_reduce_on_plateu_step(
     reduce_on_plateau_scheduler: ReduceLROnPlateau, iteration: int
 ) -> None:
     sched = reduce_on_plateau_scheduler
 
-    prev_lr = sched.optimizer.param_groups[0]["lr"]
+    prev_lr = get_optimizer_lr(optimizer=sched.optimizer)
     new_lr = prev_lr * sched.factor
     if sched.num_bad_epochs >= sched.patience and prev_lr > sched.min_lrs[0]:
         logger.info(
