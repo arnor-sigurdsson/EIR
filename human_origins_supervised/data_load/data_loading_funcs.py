@@ -1,5 +1,5 @@
 from collections import Counter
-from typing import TYPE_CHECKING, List, Tuple, Union, Dict
+from typing import TYPE_CHECKING, List, Tuple, Union, Dict, Iterable
 
 import numpy as np
 import torch
@@ -39,7 +39,7 @@ def get_weighted_random_sampler(
 
     logger.debug("Num samples per epoch: %d", num_sample_per_epoch)
     sampler = WeightedRandomSampler(
-        samples_weighted, num_samples=num_sample_per_epoch, replacement=True
+        weights=samples_weighted, num_samples=num_sample_per_epoch, replacement=True
     )
 
     return sampler
@@ -48,37 +48,74 @@ def get_weighted_random_sampler(
 def _aggregate_column_sampling_weights(
     train_dataset: "ArrayDatasetBase", target_columns: List[str]
 ) -> Tuple[torch.Tensor, int]:
+    """
+    We sum up the normalized weights for each target column to create the final sampling
+    weights.
+
+    As for the samples per epoch, we want to take the sum of the class with the fewest
+    counts over all target columns to sample on.
+    """
+
     all_target_columns = {}
     for column in target_columns:
-        cur_weight_dict = _get_column_sample_weights(
-            train_dataset=train_dataset, target_column=column
+        cur_label_iterable = (
+            i.labels["target_labels"][column] for i in train_dataset.samples
         )
+        cur_weight_dict = _get_column_sample_weights(label_iterable=cur_label_iterable)
+
+        logger.debug(
+            "Label counts in column %s:  %s", column, cur_weight_dict["label_counts"]
+        )
+
         all_target_columns[column] = cur_weight_dict
 
     all_weights = torch.stack(
         [i["samples_weighted"] for i in all_target_columns.values()], dim=1
     )
     all_weights_summed = all_weights.sum(dim=1)
+
     samples_per_epoch = sum(min(i["label_counts"]) for i in all_target_columns.values())
 
     return all_weights_summed, samples_per_epoch
 
 
+def _gather_column_sampling_weights(target_columns, train_dataset):
+    all_target_columns = {}
+
+    for column in target_columns:
+        cur_label_iterable = (
+            i.labels["target_labels"][column] for i in train_dataset.samples
+        )
+        cur_weight_dict = _get_column_sample_weights(label_iterable=cur_label_iterable)
+
+        logger.debug(
+            "Label counts in column %s:  %s", column, cur_weight_dict["label_counts"]
+        )
+
+        all_target_columns[column] = cur_weight_dict
+
+    return all_target_columns
+
+
 def _get_column_sample_weights(
-    train_dataset: "ArrayDatasetBase", target_column: str
+    label_iterable: Iterable[int],
 ) -> Dict[str, Union[torch.Tensor, List[int]]]:
     """
+    We have the assertion to make sure we have a unique integer for each label, starting
+    with 0 as we use it to index into the weights directly.
+
     TODO:   Optimize so we do just one pass over `train_dataset.samples` if this becomes
             a bottleneck.
     """
 
-    labels = list(
-        (i.labels["target_labels"][target_column] for i in train_dataset.samples)
-    )
+    def _check_labels(label_list: List[int]):
+        labels_set = set(labels)
+        assert sorted(list(labels_set)) == list(range(len(labels_set)))
+
+    labels = list(label_iterable)
+    _check_labels(label_list=labels)
 
     label_counts = [i[1] for i in sorted(Counter(labels).items())]
-
-    logger.debug("Label counts in column %s:  %s", target_column, label_counts)
 
     weights = 1.0 / torch.tensor(label_counts, dtype=torch.float32)
     samples_weighted = weights[labels]

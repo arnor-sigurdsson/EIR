@@ -39,16 +39,16 @@ def test_prepare_run_folder_fail(patched_get_run_folder, tmp_path):
 def test_get_train_sampler(args_config, create_test_data, create_test_datasets):
     cl_args = args_config
     train_dataset, *_ = create_test_datasets
-    cl_args.weighted_sampling_column = "Origin"
+    cl_args.weighted_sampling_columns = ["Origin"]
 
     test_sampler = train.get_train_sampler(
-        columns_to_sample=cl_args.weighted_sampling_column, train_dataset=train_dataset
+        columns_to_sample=cl_args.weighted_sampling_columns, train_dataset=train_dataset
     )
     assert isinstance(test_sampler, WeightedRandomSampler)
 
-    cl_args.weighted_sampling_column = None
+    cl_args.weighted_sampling_columns = None
     test_sampler = train.get_train_sampler(
-        columns_to_sample=cl_args.weighted_sampling_column, train_dataset=train_dataset
+        columns_to_sample=cl_args.weighted_sampling_columns, train_dataset=train_dataset
     )
     assert test_sampler is None
 
@@ -56,11 +56,11 @@ def test_get_train_sampler(args_config, create_test_data, create_test_datasets):
 @pytest.mark.parametrize("create_test_data", [{"task_type": "multi"}], indirect=True)
 def test_get_dataloaders(create_test_cl_args, create_test_data, create_test_datasets):
     cl_args = create_test_cl_args
-    cl_args.weighted_sampling_column = "Origin"
+    cl_args.weighted_sampling_columns = ["Origin"]
 
     train_dataset, valid_dataset = create_test_datasets
     train_sampler = train.get_train_sampler(
-        cl_args.weighted_sampling_column, train_dataset
+        columns_to_sample=cl_args.weighted_sampling_columns, train_dataset=train_dataset
     )
 
     train_dataloader, valid_dataloader = train.get_dataloaders(

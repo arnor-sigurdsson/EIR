@@ -186,14 +186,14 @@ def _modify_bs_for_multi_gpu(multi_gpu: bool, batch_size: int) -> int:
 
 @overload
 def get_train_sampler(
-    column_to_sample: None, train_dataset: datasets.ArrayDatasetBase
+    columns_to_sample: None, train_dataset: datasets.ArrayDatasetBase
 ) -> None:
     ...
 
 
 @overload
 def get_train_sampler(
-    column_to_sample: List[str], train_dataset: datasets.ArrayDatasetBase
+    columns_to_sample: List[str], train_dataset: datasets.ArrayDatasetBase
 ) -> WeightedRandomSampler:
     ...
 
@@ -205,20 +205,26 @@ def get_train_sampler(columns_to_sample, train_dataset):
     loaded_target_columns = (
         train_dataset.target_columns["con"] + train_dataset.target_columns["cat"]
     )
-    if not set(columns_to_sample).issubset(
+
+    is_sample_column_loaded = set(columns_to_sample).issubset(
         set(loaded_target_columns)
-    ) and columns_to_sample != ["all"]:
-        raise ValueError("Weighted sampling from non-loaded columns not supported yet.")
+    )
+    is_sample_all_cols = columns_to_sample == ["all"]
 
-    if columns_to_sample is not None:
-
-        if columns_to_sample == ["all"]:
-            columns_to_sample = train_dataset.target_columns["cat"]
-
-        train_sampler = get_weighted_random_sampler(
-            train_dataset=train_dataset, target_columns=columns_to_sample
+    if not is_sample_column_loaded and not is_sample_all_cols:
+        raise ValueError(
+            f"Weighted sampling from non-loaded columns not supported yet "
+            f"(could not find %s).",
+            columns_to_sample,
         )
-        return train_sampler
+
+    if is_sample_all_cols:
+        columns_to_sample = train_dataset.target_columns["cat"]
+
+    train_sampler = get_weighted_random_sampler(
+        train_dataset=train_dataset, target_columns=columns_to_sample
+    )
+    return train_sampler
 
 
 def get_dataloaders(
