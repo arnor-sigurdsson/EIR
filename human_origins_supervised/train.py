@@ -472,10 +472,7 @@ def _get_train_argument_parser() -> configargparse.ArgumentParser:
     )
 
     parser_.add_argument(
-        "--warmup_steps",
-        type=str,
-        default=None,
-        help="How many steps to use in warmup.",
+        "--warmup_steps", type=str, default=0, help="How many steps to use in warmup."
     )
 
     parser_.add_argument(

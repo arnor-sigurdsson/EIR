@@ -197,7 +197,7 @@ def _get_warmup_steps_from_cla(warmup_steps_arg: str, optimizer: Optimizer) -> i
 
 def _get_warmup_steps_from_cla(warmup_steps_arg, optimizer):
     if warmup_steps_arg is None:
-        return warmup_steps_arg
+        return 0
     elif warmup_steps_arg == "auto":
         auto_steps = _calculate_auto_warmup_steps(optimizer=optimizer)
         logger.info(
