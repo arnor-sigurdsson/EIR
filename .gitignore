@@ -93,3 +93,6 @@ config/custom_configs
 
 # Mypy cache
 .mypy_cache/
+
+# Hypothesis
+.hypothesis/

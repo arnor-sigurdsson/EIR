@@ -101,7 +101,7 @@ def main(cl_args: argparse.Namespace) -> None:
     )
 
     train_sampler = get_train_sampler(
-        column_to_sample=cl_args.weighted_sampling_column, train_dataset=train_dataset
+        columns_to_sample=cl_args.weighted_sampling_column, train_dataset=train_dataset
     )
 
     train_dloader, valid_dloader = get_dataloaders(
@@ -186,33 +186,44 @@ def _modify_bs_for_multi_gpu(multi_gpu: bool, batch_size: int) -> int:
 
 @overload
 def get_train_sampler(
-    column_to_sample: None, train_dataset: datasets.ArrayDatasetBase
+    columns_to_sample: None, train_dataset: datasets.ArrayDatasetBase
 ) -> None:
     ...
 
 
 @overload
 def get_train_sampler(
-    column_to_sample: str, train_dataset: datasets.ArrayDatasetBase
+    columns_to_sample: List[str], train_dataset: datasets.ArrayDatasetBase
 ) -> WeightedRandomSampler:
     ...
 
 
-def get_train_sampler(column_to_sample, train_dataset):
-    if column_to_sample is None:
+def get_train_sampler(columns_to_sample, train_dataset):
+    if columns_to_sample is None:
         return None
 
     loaded_target_columns = (
         train_dataset.target_columns["con"] + train_dataset.target_columns["cat"]
     )
-    if column_to_sample not in loaded_target_columns:
-        raise ValueError("Weighted sampling from non-loaded columns not supported yet.")
 
-    if column_to_sample is not None:
-        train_sampler = get_weighted_random_sampler(
-            train_dataset=train_dataset, target_column=column_to_sample
+    is_sample_column_loaded = set(columns_to_sample).issubset(
+        set(loaded_target_columns)
+    )
+    is_sample_all_cols = columns_to_sample == ["all"]
+
+    if not is_sample_column_loaded and not is_sample_all_cols:
+        raise ValueError(
+            "Weighted sampling from non-loaded columns not supported yet "
+            f"(could not find {columns_to_sample})."
         )
-        return train_sampler
+
+    if is_sample_all_cols:
+        columns_to_sample = train_dataset.target_columns["cat"]
+
+    train_sampler = get_weighted_random_sampler(
+        train_dataset=train_dataset, target_columns=columns_to_sample
+    )
+    return train_sampler
 
 
 def get_dataloaders(
@@ -466,10 +477,7 @@ def _get_train_argument_parser() -> configargparse.ArgumentParser:
     )
 
     parser_.add_argument(
-        "--warmup_steps",
-        type=str,
-        default=None,
-        help="How many steps to use in warmup.",
+        "--warmup_steps", type=str, default=0, help="How many steps to use in warmup."
     )
 
     parser_.add_argument(
@@ -633,6 +641,7 @@ def _get_train_argument_parser() -> configargparse.ArgumentParser:
         "--weighted_sampling_column",
         type=str,
         default=None,
+        nargs="*",
         help="Target column to apply weighted sampling on.",
     )
 

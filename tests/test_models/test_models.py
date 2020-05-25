@@ -3,7 +3,7 @@ from argparse import Namespace
 import pytest
 import torch
 
-from human_origins_supervised.models import models
+from human_origins_supervised.models import models, layers
 
 
 def test_make_conv_layers():
@@ -32,8 +32,8 @@ def test_make_conv_layers():
 
     # account for first block, add +2 instead if using SA
     assert len(conv_layers) == len(conv_layer_list) + 2
-    assert isinstance(conv_layers[0], models.FirstBlock)
-    assert isinstance(conv_layers[-2], models.SelfAttention)
+    assert isinstance(conv_layers[0], layers.FirstBlock)
+    assert isinstance(conv_layers[-2], layers.SelfAttention)
 
 
 def get_test_module_dict_data():

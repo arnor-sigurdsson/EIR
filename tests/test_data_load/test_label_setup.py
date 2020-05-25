@@ -173,7 +173,7 @@ def test_get_array_path_iterator_fail(create_test_data):
 
     with open(test_label_file_path, "w") as test_label_file:
         for i in range(5):
-            test_label_file.write(f"non/existent/path.npy" + "\n")
+            test_label_file.write("non/existent/path.npy" + "\n")
 
     with pytest.raises(FileNotFoundError):
         iterator = label_setup.get_array_path_iterator(data_source=test_label_file_path)
