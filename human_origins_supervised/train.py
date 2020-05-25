@@ -213,9 +213,8 @@ def get_train_sampler(columns_to_sample, train_dataset):
 
     if not is_sample_column_loaded and not is_sample_all_cols:
         raise ValueError(
-            f"Weighted sampling from non-loaded columns not supported yet "
-            f"(could not find %s).",
-            columns_to_sample,
+            "Weighted sampling from non-loaded columns not supported yet "
+            f"(could not find {columns_to_sample})."
         )
 
     if is_sample_all_cols:

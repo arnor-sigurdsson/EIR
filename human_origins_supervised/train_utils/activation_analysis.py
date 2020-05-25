@@ -295,8 +295,7 @@ def get_snp_cols_w_top_grads(
 def infer_snp_file_path(data_source: Path):
     if not data_source:
         raise ValueError(
-            f"'data_source' variable must be set with 'infer'"
-            f" as snp_file parameter."
+            "'data_source' variable must be set with 'infer'" " as snp_file parameter."
         )
 
     snp_size = data_source.parts[3]

@@ -91,7 +91,7 @@ def generate_training_curve(
         ax_1.ticklabel_format(style="sci", axis="x", scilimits=(0, 0))
 
     lines = line_1a + line_1b
-    labels = [l.get_label() for l in lines]
+    labels = [line.get_label() for line in lines]
     ax_1.legend(lines, labels)
 
     plt.grid()
