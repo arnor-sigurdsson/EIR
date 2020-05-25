@@ -198,7 +198,7 @@ def test_get_cosine_lr_scheduler_cosine(test_schedule, create_dummy_test_optimiz
     indirect=True,
 )
 @pytest.mark.parametrize(
-    "test_input,expected", [(None, None), ("auto", 2000), ("100", 100)]
+    "test_input,expected", [(None, 0), ("auto", 2000), ("100", 100)]
 )
 def test_get_warmup_steps_from_cla_pass(
     test_input, expected, create_dummy_test_optimizer
