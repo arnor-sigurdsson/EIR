@@ -351,7 +351,7 @@ class MLPModel(ModelBase):
         super().__init__(*args, **kwargs)
 
         self.fc_0 = nn.Linear(
-            self.fc_1_in_features, self.cl_args.fc_repr_dim, bias=False
+            self.fc_1_in_features, self.cl_args.fc_repr_dim, bias=True
         )
 
         self.downsample_fc_0_identities = _get_mlp_downsample_identities_moduledict(
