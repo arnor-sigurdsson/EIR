@@ -5,7 +5,6 @@ from typing import List, Callable, Union, Tuple, TYPE_CHECKING
 import matplotlib
 import numpy as np
 import pandas as pd
-from scipy.special import softmax
 from scipy.stats import pearsonr
 from sklearn.metrics import (
     roc_curve,
@@ -187,7 +186,7 @@ def select_performance_curve_funcs(
             return [
                 generate_binary_roc_curve,
                 generate_binary_pr_curve,
-                generate_binary_prediction_probabilities,
+                generate_binary_prediction_distribution,
             ]
         else:
             return [generate_multi_class_roc_curve, generate_multi_class_pr_curve]
@@ -290,7 +289,7 @@ def generate_binary_pr_curve(
     plt.close("all")
 
 
-def generate_binary_prediction_probabilities(
+def generate_binary_prediction_distribution(
     y_true: np.ndarray,
     y_outp: np.ndarray,
     outfolder: Path,
@@ -299,11 +298,6 @@ def generate_binary_prediction_probabilities(
     *args,
     **kwargs,
 ):
-    """
-    We do softmax after calculating the AUC (as opposed to before) to avoid shifting
-    the probabilities for the positive class.
-    """
-
     y_true_bin = label_binarize(y_true, classes=[0, 1])
     fpr, tpr, _ = roc_curve(y_true_bin, y_outp[:, 1])
     roc_auc = auc(fpr, tpr)
@@ -311,10 +305,9 @@ def generate_binary_prediction_probabilities(
     classes = transformer.classes_
     fig, ax = plt.subplots()
 
-    y_prob = softmax(y_outp, axis=1)
     for class_index, class_name in zip(range(2), classes):
         cur_class_mask = np.argwhere(y_true == class_index)
-        cur_probabilities = y_prob[cur_class_mask, 1]
+        cur_probabilities = y_outp[cur_class_mask, 1]
 
         ax.hist(cur_probabilities, rwidth=0.90, label=class_name, alpha=0.5)
 
@@ -333,7 +326,7 @@ def generate_binary_prediction_probabilities(
     ax.set_title(title_extra + " PGS")
 
     plt.tight_layout()
-    plt.savefig(outfolder / "prediction_probabilities.png", dpi=200)
+    plt.savefig(outfolder / "positive_prediction_distribution.png", dpi=200)
     plt.close("all")
 
 
