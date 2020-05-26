@@ -78,18 +78,8 @@ target/
 # exclude data from source control by default
 data
 runs/
+config/custom_configs
 /*.png
-
-# exclude custom modules for label file processing
-label_loading_ops/
-!label_loading_ops/common_ops.py
-
-# exclude custom modules for label file processing
-human_origins_supervised/data_load/*
-!human_origins_supervised/data_load/common_ops.py
-!human_origins_supervised/data_load/label_setup.py
-!human_origins_supervised/data_load/datasets.py
-!human_origins_supervised/data_load/data_loading_funcs.py
 
 # exclude custom modules
 *custom_*.py
@@ -103,3 +93,6 @@ human_origins_supervised/data_load/*
 
 # Mypy cache
 .mypy_cache/
+
+# Hypothesis
+.hypothesis/

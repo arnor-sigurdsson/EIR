@@ -1,37 +1,320 @@
 from pathlib import Path
-from typing import Union
+from typing import Union, Tuple, Dict, List
 
 import numpy as np
 import pandas as pd
 import pytest
-from torch.nn import CrossEntropyLoss, MSELoss
 
+from conftest import cleanup, ModelTestConfig
 from human_origins_supervised import train
-from conftest import cleanup
 
 
-def check_snp_types(cls_name, top_grads_msk, expected_idxs, at_least_n):
+@pytest.mark.parametrize(
+    "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
+)
+@pytest.mark.parametrize(
+    "create_test_cl_args",
+    [
+        {"custom_cl_args": {"model_type": "mlp"}},
+        {"custom_cl_args": {"model_type": "cnn"}},
+    ],
+    indirect=True,
+)
+def test_classification_nonlinear(keep_outputs, prep_modelling_test_configs):
     """
-    Adds an additional check for SNP types (i.e. reference homozygous, heterozygous,
-    alternative homozygous, missing).
+    NOTE:
+        We probably cannot check directly if the gradients for a given SNP
+        form are highest when that SNP form is present. E.g. if Asia has form
+        [0, 0, 1, 0] in certain positions, it's not automatic that index 2
+        in that position has the highest gradient, because the absence of a 1
+        in at index 1 for example contributes to the decision as well.
 
-    Used when we have masked out the SNPs (otherwise the 0s in the one hot might have
-    a high activation, since they're saying the same thing as a 1 being in a spot).
+        This can be circumvented by zero-ing out non-matches, i.e. multiplying
+        the gradients with the one-hot inputs, but in that case we might
+        be throwing important information away.
+
+    NOTE:
+        The indirect parametrization passes the arguments over to the fixtures used
+        in _prep_modelling_test_config.
     """
-    top_idxs = np.array(top_grads_msk[cls_name]["top_n_grads"].argmax(0))
-    expected_idxs = np.array(expected_idxs)
+    config, test_config = prep_modelling_test_configs
 
-    if at_least_n == "all":
-        assert (top_idxs == expected_idxs).all()
+    train.train(config)
+
+    target_column = config.cl_args.target_cat_columns[0]
+
+    _check_test_performance_results(
+        run_path=test_config.run_path,
+        target_column=target_column,
+        metric="mcc",
+        threshold=0.8,
+    )
+
+    top_row_grads_dict = {"Asia": [0] * 10, "Europe": [1] * 10, "Africa": [2] * 10}
+    _check_snps_wrapper(
+        test_config=test_config,
+        target_column=target_column,
+        top_row_grads_dict=top_row_grads_dict,
+    )
+
+    if not keep_outputs:
+        cleanup(test_config.run_path)
+
+
+@pytest.mark.parametrize("create_test_data", [{"task_type": "binary"}], indirect=True)
+@pytest.mark.parametrize(
+    "create_test_cl_args", [{"custom_cl_args": {"model_type": "linear"}}], indirect=True
+)
+def test_classification_linear(keep_outputs, prep_modelling_test_configs):
+    """
+    Largely duplicated from `test_classification_nonlinear` as currently linear model
+    only support regression or binary classification.
+    """
+    config, test_config = prep_modelling_test_configs
+
+    train.train(config)
+
+    target_column = config.cl_args.target_cat_columns[0]
+
+    _check_test_performance_results(
+        run_path=test_config.run_path,
+        target_column=target_column,
+        metric="mcc",
+        threshold=0.8,
+    )
+
+    top_row_grads_dict = {"Asia": [0] * 10, "Europe": [1] * 10, "Africa": [2] * 10}
+    _check_snps_wrapper(
+        test_config=test_config,
+        target_column=target_column,
+        top_row_grads_dict=top_row_grads_dict,
+    )
+
+    if not keep_outputs:
+        cleanup(test_config.run_path)
+
+
+def _check_snps_wrapper(
+    test_config: ModelTestConfig,
+    target_column: str,
+    top_row_grads_dict: Dict[str, List[int]],
+    at_least_n: Union[str, int] = "all",
+):
+    expected_top_indxs = list(range(50, 1000, 100))
+
+    for paths in [test_config.activations_path, test_config.masked_activations_path]:
+        check_types = True if paths == test_config.masked_activations_path else False
+        cur_path = paths[target_column]
+        _check_identified_snps(
+            arrpath=cur_path,
+            expected_top_indxs=expected_top_indxs,
+            top_row_grads_dict=top_row_grads_dict,
+            check_types=check_types,
+            at_least_n=at_least_n,
+        )
+
+
+@pytest.mark.parametrize(
+    "create_test_data", [{"task_type": "regression"}], indirect=True
+)
+@pytest.mark.parametrize(
+    "create_test_cl_args",
+    [
+        {
+            "custom_cl_args": {
+                "model_type": "linear",
+                "target_cat_columns": [],
+                "target_con_columns": ["Height"],
+            }
+        },
+        {
+            "custom_cl_args": {
+                "model_type": "cnn",
+                "target_cat_columns": [],
+                "target_con_columns": ["Height"],
+            }
+        },
+        {
+            "custom_cl_args": {
+                "model_type": "mlp",
+                "target_cat_columns": [],
+                "target_con_columns": ["Height"],
+            }
+        },
+        {
+            "custom_cl_args": {
+                "model_type": "cnn",
+                "target_cat_columns": [],
+                "target_con_columns": ["Height"],
+                "lr_schedule": "cycle",
+                "run_name": "test_cycle",
+            }
+        },
+    ],
+    indirect=True,
+)
+def test_regression(keep_outputs, prep_modelling_test_configs):
+    config, test_config = prep_modelling_test_configs
+
+    train.train(config)
+
+    target_column = config.cl_args.target_con_columns[0]
+
+    # linear regression performs slightly worse, but we don't want to lower expectations
+    # other models
+    threshold = 0.70 if config.cl_args.model_type == "linear" else 0.8
+    _check_test_performance_results(
+        run_path=test_config.run_path,
+        target_column=target_column,
+        metric="r2",
+        threshold=threshold,
+    )
+
+    top_height_snp_index = 2
+    top_row_grads_dict = {target_column: [top_height_snp_index] * 10}
+    _check_snps_wrapper(
+        test_config=test_config,
+        target_column=target_column,
+        top_row_grads_dict=top_row_grads_dict,
+        at_least_n=8,
+    )
+
+    if not keep_outputs:
+        cleanup(test_config.run_path)
+
+
+def _check_test_performance_results(
+    run_path: Path, target_column: str, metric: str, threshold: float
+):
+    target_column_results_folder = run_path / "results" / target_column
+    train_history_path = target_column_results_folder / f"t_{target_column}_history.log"
+    valid_history_path = target_column_results_folder / f"v_{target_column}_history.log"
+
+    df_train = pd.read_csv(train_history_path)
+    assert df_train.loc[:, f"t_{target_column}_{metric}"].max() > threshold
+
+    df_valid = pd.read_csv(valid_history_path)
+    assert df_valid.loc[:, f"v_{target_column}_{metric}"].max() > threshold
+
+
+@pytest.mark.parametrize(
+    "create_test_data", [{"task_type": "multi_task"}], indirect=True
+)
+@pytest.mark.parametrize(
+    "create_test_cl_args",
+    [
+        {  # Case 1: Check that we add and use extra inputs.
+            "custom_cl_args": {
+                "model_type": "cnn",
+                "target_cat_columns": ["Origin"],
+                "extra_con_columns": ["ExtraTarget"],
+                "extra_cat_columns": ["OriginExtraCol"],
+                "target_con_columns": ["Height"],
+                "run_name": "extra_inputs",
+            }
+        },
+        {
+            "custom_cl_args": {
+                "model_type": "cnn",
+                "target_cat_columns": ["Origin"],
+                "target_con_columns": ["Height", "ExtraTarget"],
+            }
+        },
+        {
+            "custom_cl_args": {
+                "model_type": "mlp",
+                "target_cat_columns": ["Origin"],
+                "target_con_columns": ["Height", "ExtraTarget"],
+            }
+        },
+    ],
+    indirect=True,
+)
+def test_multi_task(keep_outputs, prep_modelling_test_configs):
+    config, test_config = prep_modelling_test_configs
+    cl_args = config.cl_args
+
+    train.train(config)
+
+    for cat_column in config.cl_args.target_cat_columns:
+        threshold, at_least_n = _get_multi_task_test_args(
+            extra_columns=cl_args.extra_con_columns, target_copy="OriginExtraColumn"
+        )
+
+        _check_test_performance_results(
+            run_path=test_config.run_path,
+            target_column=cat_column,
+            metric="mcc",
+            threshold=threshold,
+        )
+
+        top_row_grads_dict = {"Asia": [0] * 10, "Europe": [1] * 10, "Africa": [2] * 10}
+        _check_snps_wrapper(
+            test_config=test_config,
+            target_column=cat_column,
+            top_row_grads_dict=top_row_grads_dict,
+            at_least_n=at_least_n,
+        )
+
+    for con_column in config.cl_args.target_con_columns:
+        threshold, at_least_n = _get_multi_task_test_args(
+            extra_columns=cl_args.extra_con_columns, target_copy="ExtraTarget"
+        )
+
+        _check_test_performance_results(
+            run_path=test_config.run_path,
+            target_column=con_column,
+            metric="r2",
+            threshold=threshold,
+        )
+
+        top_height_snp_index = 2
+        top_row_grads_dict = {con_column: [top_height_snp_index] * 10}
+        _check_snps_wrapper(
+            test_config=test_config,
+            target_column=con_column,
+            top_row_grads_dict=top_row_grads_dict,
+            at_least_n=at_least_n,
+        )
+
+    if not keep_outputs:
+        cleanup(test_config.run_path)
+
+
+def _get_multi_task_test_args(
+    extra_columns: List[str], target_copy: str
+) -> Tuple[float, int]:
+    """
+    We use 0 for at_least_n in the case we have correlated input columns because
+    in that case the model is not actually using any of the SNPs (better to use
+    the correlated column), hence we do not expect SNPs to be highly activated.
+    """
+
+    an_extra_col_is_correlated_with_target = target_copy in extra_columns
+    if an_extra_col_is_correlated_with_target:
+        threshold, at_least_n = 0.9, 0
     else:
-        assert len(set(top_idxs).intersection(set(expected_idxs))) >= at_least_n
+        threshold, at_least_n = 0.8, 8
+
+    return threshold, at_least_n
 
 
-def check_identified_snps(
-    arrpath,
-    expected_top_indxs,
-    top_row_grads_dict,
-    check_types,
+def _get_test_activation_arrs(
+    run_path: Path, iteration: int, column_name: str
+) -> Tuple[Path, Path]:
+    results_path = run_path / f"results/{column_name}/samples/{iteration}"
+
+    arrpath = results_path / "top_acts.npy"
+    arrpath_masked = results_path / "top_acts_masked.npy"
+
+    return arrpath, arrpath_masked
+
+
+def _check_identified_snps(
+    arrpath: Path,
+    expected_top_indxs: List[int],
+    top_row_grads_dict: Dict[str, List[int]],
+    check_types: bool,
     at_least_n: Union[str, int] = "all",
 ):
     """
@@ -50,7 +333,7 @@ def check_identified_snps(
     :param at_least_n: At least how many SNPs must be identified to pass the test.
     :return:
     """
-    top_grads_array = np.load(arrpath, allow_pickle=True)
+    top_grads_array = np.load(str(arrpath), allow_pickle=True)
 
     # get dict from array
     top_grads_dict: dict = top_grads_array[()]
@@ -63,147 +346,23 @@ def check_identified_snps(
         else:
             assert len(set(actual_top).intersection(set(expected_top))) >= at_least_n
 
-        expected_top_rows = top_row_grads_dict[cls]
-
         if check_types:
-            check_snp_types(cls, top_grads_dict, expected_top_rows, at_least_n)
+            expected_top_rows = top_row_grads_dict[cls]
+            _check_snp_types(cls, top_grads_dict, expected_top_rows, at_least_n)
 
 
-@pytest.mark.parametrize(
-    "create_test_data",
-    [{"class_type": "binary"}, {"class_type": "multi"}],
-    indirect=True,
-)
-@pytest.mark.parametrize(
-    "create_test_cl_args",
-    [
-        {"custom_cl_args": {"model_type": "cnn"}},
-        {"custom_cl_args": {"model_type": "mlp"}},
-    ],
-    indirect=True,
-)
-def test_classification_snp_identification(
-    create_test_data,
-    create_test_cl_args,
-    create_test_dloaders,
-    create_test_model,
-    create_test_optimizer,
-    create_test_datasets,
-    keep_outputs,
-):
+def _check_snp_types(cls_name: str, top_grads_msk, expected_idxs, at_least_n: int):
     """
-    NOTE:
-        We probably cannot check directly if the gradients for a given SNP
-        form are highest when that SNP form is present. E.g. if Asia has form
-        [0, 0, 1, 0] in certain positions, it's not automatic that index 2
-        in that position has the highest gradient, because the absence of a 1
-        in at index 1 for example contributes to the decision as well.
+    Adds an additional check for SNP types (i.e. reference homozygous, heterozygous,
+    alternative homozygous, missing).
 
-        This can be circumvented by zero-ing out non-matches, i.e. multiplying
-        the gradients with the one-hot inputs, but in that case we might
-        be throwing important information away.
+    Used when we have masked out the SNPs (otherwise the 0s in the one hot might have
+    a high activation, since they're saying the same thing as a 1 being in a spot).
     """
-    cl_args = create_test_cl_args
-    train_dloader, valid_dloader, train_dataset, valid_dataset = create_test_dloaders
-    model = create_test_model
-    optimizer = create_test_optimizer
-    criterion = CrossEntropyLoss()
+    top_idxs = np.array(top_grads_msk[cls_name]["top_n_grads"].argmax(0))
+    expected_idxs = np.array(expected_idxs)
 
-    train_dataset, valid_dataset = create_test_datasets
-    target_transformer = train_dataset.target_transformer
-
-    run_path = Path(f"runs/{cl_args.run_name}/")
-
-    config = train.Config(
-        cl_args,
-        train_dloader,
-        valid_dloader,
-        valid_dataset,
-        model,
-        optimizer,
-        criterion,
-        train_dataset.labels_dict,
-        target_transformer,
-        cl_args.data_width,
-    )
-
-    train.train_ignite(config)
-
-    last_iter = len(train_dloader) * cl_args.n_epochs
-    arrpath = run_path / f"samples/{last_iter}/top_acts.npy"
-    arrpath_msk = run_path / f"samples/{last_iter}/top_grads_masked.npy"
-    expected_top_indxs = list(range(50, 1000, 100))
-    top_row_grads_dict = {"Asia": [1] * 10, "Europe": [2] * 10, "Africa": [0] * 10}
-
-    for path in [arrpath, arrpath_msk]:
-        check_types = True if path == arrpath_msk else False
-        check_identified_snps(path, expected_top_indxs, top_row_grads_dict, check_types)
-
-    if not keep_outputs:
-        cleanup(run_path)
-
-
-@pytest.mark.parametrize(
-    "create_test_data", [{"class_type": "regression"}], indirect=True
-)
-@pytest.mark.parametrize(
-    "create_test_cl_args",
-    [
-        {"custom_cl_args": {"model_type": "cnn"}},
-        {"custom_cl_args": {"model_type": "mlp"}},
-    ],
-    indirect=True,
-)
-def test_regression(
-    create_test_data,
-    create_test_cl_args,
-    create_test_dloaders,
-    create_test_model,
-    create_test_optimizer,
-    create_test_datasets,
-    keep_outputs,
-):
-
-    cl_args = create_test_cl_args
-    run_path = Path(f"runs/{cl_args.run_name}/")
-
-    train_dloader, valid_dloader, train_dataset, valid_dataset = create_test_dloaders
-    model = create_test_model
-    optimizer = create_test_optimizer
-    criterion = CrossEntropyLoss() if cl_args.model_task == "cls" else MSELoss()
-
-    train_dataset, valid_dataset = create_test_datasets
-    target_transformer = train_dataset.target_transformer
-
-    config = train.Config(
-        cl_args,
-        train_dloader,
-        valid_dloader,
-        valid_dataset,
-        model,
-        optimizer,
-        criterion,
-        train_dataset.labels_dict,
-        target_transformer,
-        cl_args.data_width,
-    )
-
-    train.train_ignite(config)
-
-    df_train = pd.read_csv(run_path / "training_history.log")
-    assert df_train.loc[:, "t_r2"].max() > 0.8
-
-    df_valid = pd.read_csv(run_path / "eval_history.log")
-    assert df_valid.loc[:, "v_r2"].max() > 0.8
-
-    last_iter = len(train_dloader) * cl_args.n_epochs
-    arrpath = run_path / f"samples/{last_iter}/top_acts.npy"
-    arrpath_msk = run_path / f"samples/{last_iter}/top_grads_masked.npy"
-    expected_top_indxs = list(range(50, 1000, 100))
-    top_row_grads_dict = {"Regression": [0] * 10}
-
-    for path in [arrpath, arrpath_msk]:
-        check_identified_snps(path, expected_top_indxs, top_row_grads_dict, False, 1)
-
-    if not keep_outputs:
-        cleanup(run_path)
+    if at_least_n == "all":
+        assert (top_idxs == expected_idxs).all()
+    else:
+        assert (top_idxs == expected_idxs).sum() >= at_least_n

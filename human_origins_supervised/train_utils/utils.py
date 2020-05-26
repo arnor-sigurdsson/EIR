@@ -1,12 +1,11 @@
-import csv
-import sys
-from typing import List, Dict, TYPE_CHECKING
 import importlib
 import importlib.util
+import logging
+import sys
 from pathlib import Path
+from typing import List, Dict, TYPE_CHECKING
 
-import pandas as pd
-from aislib.misc_utils import get_logger
+from aislib.misc_utils import get_logger, ensure_path_exists
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -75,21 +74,26 @@ def get_run_folder(run_name: str) -> Path:
     return Path("runs", run_name)
 
 
-def append_metrics_to_file(
-    filepath: Path, metrics: Dict, iteration: int, write_header=False
-):
-    with open(str(filepath), "a") as logfile:
-        fieldnames = ["iteration"] + sorted(metrics.keys())
-        writer = csv.DictWriter(logfile, fieldnames=fieldnames)
+def prep_sample_outfolder(run_name: str, column_name: str, iteration: int) -> Path:
+    sample_outfolder = (
+        get_run_folder(run_name) / "results" / column_name / "samples" / str(iteration)
+    )
+    ensure_path_exists(sample_outfolder, is_folder=True)
 
-        if write_header:
-            writer.writeheader()
-
-        dict_to_write = {**{"iteration": iteration}, **metrics}
-        writer.writerow(dict_to_write)
+    return sample_outfolder
 
 
-def read_metrics_history_file(file_path: Path) -> pd.DataFrame:
-    df = pd.read_csv(file_path, index_col="iteration")
+def configure_root_logger(run_name: str):
 
-    return df
+    logfile_path = get_run_folder(run_name=run_name) / "logging_history.log"
+
+    ensure_path_exists(logfile_path)
+    file_handler = logging.FileHandler(str(logfile_path))
+    file_handler.setLevel(logging.DEBUG)
+
+    formatter = logging.Formatter(
+        "%(asctime)s - %(levelname)s - %(name)s - %(message)s", "%H:%M:%S"
+    )
+    file_handler.setFormatter(formatter)
+
+    logging.getLogger("").addHandler(file_handler)

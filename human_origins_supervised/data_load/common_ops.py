@@ -28,9 +28,6 @@ def streamline_df(
 
         df = df_func(*args, df=df, column_name=column_name, **kwargs)
 
-        # Remove NaNs in target column.
-        df = df.dropna(subset=[column_name])
-
         return df
 
     return wrapper
@@ -138,7 +135,7 @@ def get_ids_from_values(
 
     :param df: Dataframe to grab values from.
     :param column_name: Which columns to match values to.
-    :param values_to_grab: Values to check in `column_name`.
+    :param values_to_grab: Values to check in `transformer_name`.
     :return: List of IDs matching the values we're interested in.
     """
 

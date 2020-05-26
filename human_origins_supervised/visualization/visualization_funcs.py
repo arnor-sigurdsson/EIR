@@ -1,5 +1,6 @@
 from pathlib import Path
-from typing import List, Callable, Union, Tuple
+from textwrap import wrap
+from typing import List, Callable, Union, Tuple, TYPE_CHECKING
 
 import matplotlib
 import numpy as np
@@ -21,28 +22,42 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from matplotlib.ticker import MaxNLocator
 
+from aislib.misc_utils import get_logger
+
+if TYPE_CHECKING:
+    from human_origins_supervised.train_utils.evaluation import PerformancePlotConfig
+
+
+logger = get_logger(name=__name__, tqdm_compatible=True)
+
 
 def generate_training_curve(
     train_series: pd.Series,
     valid_series: pd.Series,
     output_folder: Path,
+    title_extra: str = "",
     skiprows: int = 200,
-    hook_funcs: List[Callable] = None,
 ) -> None:
 
     fig, ax_1 = plt.subplots()
 
-    xlim_upper = train_series.shape[0] + skiprows
-    xticks = np.arange(1 + skiprows, xlim_upper + 1)
+    train_series_cut = train_series[train_series.index > skiprows]
+    valid_series_cut = valid_series[valid_series.index > skiprows]
 
-    extreme_func = _get_min_or_max_funcs(train_series.name)
+    if len(train_series_cut) == 0:
+        return
+
+    extreme_func = _get_min_or_max_funcs(train_series_cut.name)
     extreme_valid_idx, extreme_valid_value = _get_validation_extreme_value_and_iter(
-        extreme_func, valid_series
+        extreme_func, valid_series_cut
     )
+
+    xlim_upper = train_series_cut.shape[0] + skiprows
+    xticks = np.arange(1 + skiprows, xlim_upper + 1)
 
     line_1a = ax_1.plot(
         xticks,
-        train_series.values,
+        train_series_cut.values,
         c="orange",
         label="Train",
         zorder=1,
@@ -50,10 +65,10 @@ def generate_training_curve(
         linewidth=0.8,
     )
 
-    validation_xticks = valid_series.index
+    validation_xticks = valid_series_cut.index
     line_1b = ax_1.plot(
         validation_xticks,
-        valid_series.values,
+        valid_series_cut.values,
         c="red",
         linewidth=0.8,
         alpha=1.0,
@@ -63,8 +78,10 @@ def generate_training_curve(
 
     ax_1.axhline(y=extreme_valid_value, linewidth=0.4, c="red", linestyle="dashed")
 
+    ax_1.set(title=title_extra)
+
     ax_1.set_xlabel("Iteration")
-    y_label = _parse_metrics_colname(train_series.name)
+    y_label = _parse_metrics_colname(train_series_cut.name)
     ax_1.set_ylabel(y_label)
 
     ax_1.set_xlim(left=skiprows + 1, right=xlim_upper)
@@ -73,17 +90,13 @@ def generate_training_curve(
         ax_1.ticklabel_format(style="sci", axis="x", scilimits=(0, 0))
 
     lines = line_1a + line_1b
-    labels = [l.get_label() for l in lines]
+    labels = [line.get_label() for line in lines]
     ax_1.legend(lines, labels)
-
-    if hook_funcs:
-        for func in hook_funcs:
-            func(ax_1, target=valid_series.name)
 
     plt.grid()
 
     plt.savefig(output_folder / f"training_curve_{y_label}.png", dpi=200)
-    plt.close()
+    plt.close("all")
 
 
 def _get_min_or_max_funcs(
@@ -95,7 +108,7 @@ def _get_min_or_max_funcs(
 
     func = pd.Series.idxmax
     metric = _parse_metrics_colname(column_name)
-    if metric in ["LOSS", "RMSE"]:
+    if metric in ["LOSS", "RMSE", "LOSS-AVERAGE"]:
         return pd.Series.idxmin
 
     return func
@@ -117,61 +130,82 @@ def _get_validation_extreme_value_and_iter(
     return extreme_index, extreme_value
 
 
-def gen_eval_graphs(
-    val_labels: np.ndarray,
-    val_outputs: np.ndarray,
-    val_ids: list,
-    outfolder: Path,
-    encoder: Union[LabelEncoder, StandardScaler],
-    model_task,
-):
+def gen_eval_graphs(plot_config: "PerformancePlotConfig"):
     """
     TODO:
-        - Clean this function up – expecially when it comes to target_transformer.
+        - Clean this function up – especially when it comes to target_transformers.
         - Use val_ids_total to hook into other labels for plotting.
     """
-    if model_task == "cls":
-        n_classes = len(encoder.classes_)
-        val_pred = val_outputs.argmax(axis=1)
-        generate_confusion_matrix(val_labels, val_pred, encoder.classes_, outfolder)
-    else:
-        n_classes = None
 
-    plot_funcs = select_performance_curve_funcs(model_task, n_classes)
-    for plot_func in plot_funcs:
-        plot_func(
-            y_true=val_labels, y_outp=val_outputs, outfolder=outfolder, encoder=encoder
+    pc = plot_config
+
+    if pc.column_type == "cat":
+        n_classes = len(pc.target_transformer.classes_)
+        val_argmaxed = pc.val_outputs.argmax(axis=1)
+        generate_confusion_matrix(
+            y_true=pc.val_labels,
+            y_outp=val_argmaxed,
+            classes=pc.target_transformer.classes_,
+            outfolder=pc.output_folder,
+            title_extra=pc.column_name,
         )
+    elif pc.column_type == "con":
+        n_classes = None
+    else:
+        raise ValueError()
+
+    plot_funcs = select_performance_curve_funcs(
+        column_type=pc.column_type, n_classes=n_classes
+    )
+
+    for plot_func in plot_funcs:
+        try:
+            plot_func(
+                y_true=pc.val_labels,
+                y_outp=pc.val_outputs,
+                outfolder=pc.output_folder,
+                transformer=pc.target_transformer,
+                title_extra=pc.column_name,
+            )
+        except Exception as e:
+            logger.error(
+                "Call to function %s resulted in error %s. No plot will be generated.",
+                plot_func,
+                e,
+            )
 
 
 def select_performance_curve_funcs(
-    model_task: str, n_classes: int = None
+    column_type: str, n_classes: int = None
 ) -> List[Callable]:
-    if model_task == "cls":
+    if column_type == "cat":
         if not n_classes or n_classes < 2:
             raise ValueError("Expected number of classes to be not None and >2.")
 
         if n_classes == 2:
-            return [generate_binary_roc_curve, generate_binary_pr_curve]
+            return [
+                generate_binary_roc_curve,
+                generate_binary_pr_curve,
+                generate_binary_prediction_distribution,
+            ]
         else:
             return [generate_multi_class_roc_curve, generate_multi_class_pr_curve]
-    elif model_task == "reg":
+    elif column_type == "con":
         return [generate_regression_prediction_plot]
 
 
 def generate_regression_prediction_plot(
     y_true: np.ndarray,
     y_outp: np.ndarray,
-    encoder: StandardScaler,
+    transformer: StandardScaler,
     outfolder: Path,
     title_extra: str = "",
     *args,
     **kwargs,
 ):
-
     fig, ax = plt.subplots()
-    y_true = encoder.inverse_transform(y_true.reshape(-1, 1))
-    y_outp = encoder.inverse_transform(y_outp.reshape(-1, 1))
+    y_true = transformer.inverse_transform(y_true.reshape(-1, 1))
+    y_outp = transformer.inverse_transform(y_outp.reshape(-1, 1))
 
     r2 = r2_score(y_true, y_outp)
     pcc = pearsonr(y_true.squeeze(), y_outp.squeeze())[0]
@@ -193,11 +227,16 @@ def generate_regression_prediction_plot(
 
     plt.tight_layout()
     plt.savefig(outfolder / "regression_predictions.png", dpi=200)
-    plt.close()
+    plt.close("all")
 
 
 def generate_binary_roc_curve(
-    y_true: np.ndarray, y_outp: np.ndarray, outfolder: Path, *args, **kwargs
+    y_true: np.ndarray,
+    y_outp: np.ndarray,
+    outfolder: Path,
+    title_extra: str,
+    *args,
+    **kwargs,
 ):
     y_true_bin = label_binarize(y_true, classes=[0, 1])
     fpr, tpr, _ = roc_curve(y_true_bin, y_outp[:, 1])
@@ -210,15 +249,22 @@ def generate_binary_roc_curve(
     plt.ylim([0.0, 1.05])
     plt.xlabel("False Positive Rate")
     plt.ylabel("True Positive Rate")
-    plt.title("ROC curve")
+    plt.title(f"ROC curve – {title_extra}")
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5), prop={"size": 8})
 
     plt.tight_layout()
     plt.savefig(outfolder / "bin_roc_curve.png", dpi=200)
-    plt.close()
+    plt.close("all")
 
 
-def generate_binary_pr_curve(y_true, y_outp, outfolder, *args, **kwargs):
+def generate_binary_pr_curve(
+    y_true: np.ndarray,
+    y_outp: np.ndarray,
+    outfolder: Path,
+    title_extra: str,
+    *args,
+    **kwargs,
+):
     y_true_bin = label_binarize(y_true, classes=[0, 1])
     precision, recall, _ = precision_recall_curve(y_true_bin, y_outp[:, 1])
     average_precision = average_precision_score(y_true_bin, y_outp[:, 1])
@@ -235,19 +281,61 @@ def generate_binary_pr_curve(y_true, y_outp, outfolder, *args, **kwargs):
     plt.ylim([0.0, 1.05])
     plt.xlabel("Recall")
     plt.ylabel("Precision")
-    plt.title("Precision-Recall curve")
+    plt.title(f"Precision-Recall curve – {title_extra}")
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5), prop={"size": 8})
 
     plt.tight_layout()
     plt.savefig(outfolder / "bin_pr_curve.png", dpi=200)
-    plt.close()
+    plt.close("all")
+
+
+def generate_binary_prediction_distribution(
+    y_true: np.ndarray,
+    y_outp: np.ndarray,
+    outfolder: Path,
+    title_extra: str,
+    transformer: LabelEncoder,
+    *args,
+    **kwargs,
+):
+    y_true_bin = label_binarize(y_true, classes=[0, 1])
+    fpr, tpr, _ = roc_curve(y_true_bin, y_outp[:, 1])
+    roc_auc = auc(fpr, tpr)
+
+    classes = transformer.classes_
+    fig, ax = plt.subplots()
+
+    for class_index, class_name in zip(range(2), classes):
+        cur_class_mask = np.argwhere(y_true == class_index)
+        cur_probabilities = y_outp[cur_class_mask, 1]
+
+        ax.hist(cur_probabilities, rwidth=0.90, label=class_name, alpha=0.5)
+
+    ax.legend(loc="upper left")
+    props = dict(boxstyle="round", facecolor="none", alpha=0.25, edgecolor="gray")
+    ax.text(
+        0.80,
+        0.95,
+        f"AUC: {roc_auc:0.4g}",
+        transform=ax.transAxes,
+        verticalalignment="top",
+        bbox=props,
+    )
+    ax.set_ylabel("Frequency")
+    ax.set_xlabel(f"PGS of class {classes[1]}")
+    ax.set_title(title_extra + " PGS")
+
+    plt.tight_layout()
+    plt.savefig(outfolder / "positive_prediction_distribution.png", dpi=200)
+    plt.close("all")
 
 
 def generate_multi_class_roc_curve(
     y_true: np.ndarray,
     y_outp: np.ndarray,
-    encoder: LabelEncoder,
+    transformer: LabelEncoder,
     outfolder: Path,
+    title_extra: str,
     *args,
     **kwargs,
 ):
@@ -255,7 +343,7 @@ def generate_multi_class_roc_curve(
     tpr = dict()
     roc_auc = dict()
 
-    unique_classes = sorted(encoder.classes_)
+    unique_classes = sorted(transformer.classes_)
     n_classes = len(unique_classes)
     assert len(np.unique(y_true)) == n_classes
 
@@ -308,7 +396,7 @@ def generate_multi_class_roc_curve(
             tpr[i],
             color=color,
             lw=2,
-            label=f"{encoder.inverse_transform([i])[0]} "
+            label=f"{transformer.inverse_transform([i])[0]} "
             f"({np.count_nonzero(y_true == i)}) "
             f"(area = {roc_auc[i]:0.4g})",
         )
@@ -318,26 +406,27 @@ def generate_multi_class_roc_curve(
     plt.ylim([0.0, 1.05])
     plt.xlabel("False Positive Rate", fontsize=14)
     plt.ylabel("True Positive Rate", fontsize=14)
-    plt.title("ROC curve", fontsize=20)
+    plt.title(f"ROC curve – {title_extra}", fontsize=20)
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
 
     plt.tight_layout()
     plt.savefig(outfolder / "mc_roc_curve.png", dpi=200)
-    plt.close()
+    plt.close("all")
 
 
 def generate_multi_class_pr_curve(
     y_true: np.ndarray,
     y_outp: np.ndarray,
-    encoder: LabelEncoder,
+    transformer: LabelEncoder,
     outfolder: Path,
+    title_extra: str,
     *args,
     **kwargs,
 ):
     precision = dict()
     recall = dict()
 
-    unique_classes = sorted(encoder.classes_)
+    unique_classes = sorted(transformer.classes_)
     n_classes = len(unique_classes)
     assert len(np.unique(y_true)) == n_classes
 
@@ -375,7 +464,7 @@ def generate_multi_class_pr_curve(
             precision[i],
             color=color,
             lw=2,
-            label=f"{encoder.inverse_transform([i])[0]} "
+            label=f"{transformer.inverse_transform([i])[0]} "
             f"({np.count_nonzero(y_true == i)}) "
             f"(area = {average_precision[i]:0.4g})",
         )
@@ -384,33 +473,34 @@ def generate_multi_class_pr_curve(
     plt.ylim([0.0, 1.05])
     plt.xlabel("Recall", fontsize=14)
     plt.ylabel("Precision", fontsize=14)
-    plt.title("Precision-Recall curve", fontsize=20)
+    plt.title(f"Precision-Recall curve – {title_extra}", fontsize=20)
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
 
     plt.tight_layout()
     plt.savefig(outfolder / "mc_pr_curve.png", dpi=200)
-    plt.close()
+    plt.close("all")
 
 
 def generate_confusion_matrix(
     y_true: np.ndarray,
     y_outp: np.ndarray,
-    classes,
+    classes: List[str],
     outfolder: Path,
     normalize: bool = False,
-    title: str = "",
+    title_extra: str = "",
     cmap: plt = plt.cm.Blues,
 ):
-    if not title:
+    if not title_extra:
         if normalize:
-            title = "Normalized confusion matrix"
+            title_extra = "Normalized confusion matrix"
         else:
-            title = "Confusion matrix, without normalization"
+            title_extra = "Confusion matrix, without normalization"
 
     conf_mat = confusion_matrix(y_true, y_outp)
 
     # Only use the labels that appear in the data
     classes = classes[unique_labels(y_true, y_outp)]
+    classes_wrapped = ["\n".join(wrap(c, 20)) for c in classes]
     if normalize:
         conf_mat = conf_mat.astype("float") / conf_mat.sum(axis=1)[:, np.newaxis]
 
@@ -423,15 +513,23 @@ def generate_confusion_matrix(
         xticks=np.arange(conf_mat.shape[1]),
         yticks=np.arange(conf_mat.shape[0]),
         # ... and label them with the respective list entries
-        xticklabels=classes,
-        yticklabels=classes,
-        title=title,
+        xticklabels=classes_wrapped,
+        yticklabels=classes_wrapped,
+        title=title_extra,
         ylabel="True label",
         xlabel="Predicted label",
     )
 
     # Rotate the tick labels and set their alignment.
-    plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
+    plt.setp(
+        ax.get_xticklabels(),
+        rotation=45,
+        ha="right",
+        rotation_mode="anchor",
+        fontsize=8,
+    )
+
+    plt.setp(ax.get_yticklabels(), fontsize=8)
 
     # Loop over data dimensions and create text annotations.
     fmt = ".2f" if normalize else "d"
@@ -449,26 +547,28 @@ def generate_confusion_matrix(
 
     fig.tight_layout()
     plt.savefig(outfolder / "confusion_matrix.png", dpi=200)
-    plt.close()
+    plt.close("all")
 
 
-def generate_all_plots(
-    training_history: pd.DataFrame,
-    valid_history: pd.DataFrame,
-    hook_funcs: List[Callable],
+def generate_all_training_curves(
+    training_history_df: pd.DataFrame,
+    valid_history_df: pd.DataFrame,
     output_folder: Path,
+    plot_skip_steps: int,
+    title_extra: str = "",
 ) -> None:
-    metrics = [i.split("_")[-1] for i in training_history.columns]
+    metrics = ["_".join(i.split("_")[1:]) for i in training_history_df.columns]
 
     for metric_suffix in metrics:
         train_colname = "t_" + metric_suffix
         valid_colname = "v_" + metric_suffix
-        train_series = training_history[train_colname]
-        valid_series = valid_history[valid_colname]
+        train_series = training_history_df[train_colname]
+        valid_series = valid_history_df[valid_colname]
 
         generate_training_curve(
             train_series=train_series,
             valid_series=valid_series,
             output_folder=output_folder,
-            hook_funcs=hook_funcs,
+            title_extra=title_extra,
+            skiprows=plot_skip_steps,
         )

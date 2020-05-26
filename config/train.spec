@@ -7,7 +7,7 @@ sys.setrecursionlimit(5000)
 
 # work-around for https://github.com/pyinstaller/pyinstaller/issues/4064
 import distutils
-if distutils.distutils_path.endswith('__init__.py'):
+if hasattr(distutils, 'distutils_path') and distutils.distutils_path.endswith('__init__.py'):
     distutils.distutils_path = os.path.dirname(distutils.distutils_path)
 
 # See: https://stackoverflow.com/questions/57517371/matplotlibdeprecationwarning-with-pyinstaller-exe 
@@ -17,10 +17,19 @@ options = [('W ignore', None, 'OPTION')]
 
 block_cipher = None
 
-a = Analysis(['../human_origins_supervised/predict.py'],
+a = Analysis(['../human_origins_supervised/train.py'],
              binaries=[],
              datas=[],
-             hiddenimports=['sklearn.utils._cython_blas', 'pkg_resources.py2_warn'],
+             hiddenimports=[
+                 'sklearn.utils._cython_blas',
+                 'pkg_resources.py2_warn',
+                 'sklearn.neighbors._typedefs',
+                 'sklearn.neighbors._quad_tree',
+                 'sklearn.neighbors',
+                 'sklearn.tree._utils',
+                 'sklearn.tree',
+                 'ray.async_compat',
+             ],
              hookspath=[],
              runtime_hooks=[],
              excludes=[],
@@ -37,7 +46,7 @@ exe = EXE(pyz,
           a.zipfiles,
           a.datas,
           [],
-          name='predict',
+          name='train',
           debug=False,
           bootloader_ignore_signals=False,
           strip=False,

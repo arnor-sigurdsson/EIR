@@ -36,7 +36,10 @@ def test_get_most_wrong_preds():
         autospec=True,
     ):
         df_most_wrong = evaluation.get_most_wrong_cls_preds(
-            test_val_true, test_val_preds, test_val_probs, test_ids
+            val_true=test_val_true,
+            val_preds=test_val_preds,
+            val_outputs=test_val_probs,
+            ids=test_ids,
         )
 
     assert df_most_wrong.shape[0] == 6
@@ -59,43 +62,9 @@ def test_inverse_numerical_labels_hook():
         columns=["True_Label", "Wrong_Label"], data=[[0, 1], [0, 1], [1, 0], [1, 0]]
     )
 
-    test_df_encoded = evaluation.inverse_numerical_labels_hook(
+    test_df_encoded = evaluation._inverse_numerical_labels_hook(
         test_df, test_target_transformer
     )
 
     assert list(test_df_encoded["True_Label"]) == ["Asia"] * 2 + ["Europe"] * 2
     assert list(test_df_encoded["Wrong_Label"]) == ["Europe"] * 2 + ["Asia"] * 2
-
-
-def test_anno_meta_hook(tmp_path):
-    test_anno_data = [
-        ["S1", "GL_Asia", "Tokyo", "Japan"],
-        ["S2", "GL_Europe", "Hafnarfjordur", "Iceland"],
-        ["S3", "GL_Africa", "Nairobi", "Kenya"],
-        ["S4", "GL_Asia", "Tokyo", "Japan"],
-        ["S5", "GL_Europe", "Hafnarfjordur", "Iceland"],
-    ]
-
-    anno_columns = ["Instance ID", "Group Label", "Location", "Country"]
-
-    test_df_anno = pd.DataFrame(columns=anno_columns, data=test_anno_data)
-    test_anno_fpath = tmp_path / "test_anno.csv"
-    test_df_anno.to_csv(test_anno_fpath, sep="\t", index=False)
-
-    data_base = ["S1_-_Asia", "S2_-_Europe", "S3_-_Africa", "S4_-_Asia", "S5_-_Europe"]
-    data = [[i, "TestValue"] for i in data_base]
-    test_df = pd.DataFrame(columns=["Sample_ID", "TestColumn"], data=data)
-
-    anno_metad_df = evaluation.anno_meta_hook(test_df, anno_fpath=test_anno_fpath)
-
-    assert anno_metad_df.shape[0] == 5
-
-    assert set(anno_metad_df["TestColumn"]) == {"TestValue"}
-
-    s1_row = anno_metad_df.loc[anno_metad_df["Sample_ID"] == "S1"]
-    assert s1_row.Location.values[0] == "Tokyo"
-    assert s1_row.Country.values[0] == "Japan"
-
-    s5_row = anno_metad_df.loc[anno_metad_df["Sample_ID"] == "S5"]
-    assert s5_row.Location.values[0] == "Hafnarfjordur"
-    assert s5_row.Country.values[0] == "Iceland"

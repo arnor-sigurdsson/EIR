@@ -11,16 +11,19 @@ from typing import Union, Callable, Dict, Tuple, List, TYPE_CHECKING
 import numpy as np
 import pandas as pd
 import torch
-from aislib.misc_utils import ensure_path_exists, get_logger
+from aislib.misc_utils import get_logger
 from ignite.engine import Engine
 from shap import DeepExplainer
 from sklearn.preprocessing import StandardScaler, LabelEncoder
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader
 
 import human_origins_supervised.visualization.activation_visualization as av
+from human_origins_supervised.data_load.data_utils import get_target_columns_generator
 from human_origins_supervised.models import model_utils
 from human_origins_supervised.models.extra_inputs_module import get_extra_inputs
 from human_origins_supervised.models.model_utils import gather_dloader_samples
+from human_origins_supervised.models.models import CNNModel, MLPModel
+from human_origins_supervised.train_utils.utils import prep_sample_outfolder
 
 if TYPE_CHECKING:
     from human_origins_supervised.train_utils.train_handlers import HandlerConfig
@@ -32,8 +35,9 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 # would be better to use Tuple here, but shap does literal type check for list, i.e.
 # if type(data) == list:
 al_model_inputs = List[Union[torch.Tensor, Union[torch.Tensor, None]]]
-al_gradients_dict = Dict[str, List[np.array]]
-al_top_gradients_dict = Dict[str, Dict[str, np.array]]
+al_gradients_dict = Dict[str, List[np.ndarray]]
+al_top_gradients_dict = Dict[str, Dict[str, np.ndarray]]
+al_scaled_grads_dict = Dict[str, Dict[str, np.ndarray]]
 al_transform_funcs = Dict[str, Tuple[Callable]]
 
 
@@ -49,11 +53,14 @@ def suppress_stdout() -> None:
 
 
 def get_target_classes(
-    cl_args: Namespace, target_transformer: Union[StandardScaler, LabelEncoder]
+    cl_args: Namespace,
+    column_type: str,
+    target_column_name: str,
+    target_transformer: Union[StandardScaler, LabelEncoder],
 ) -> List[str]:
 
-    if cl_args.model_task == "reg":
-        return ["Regression"]
+    if column_type == "con":
+        return [target_column_name]
 
     if cl_args.act_classes:
         target_classes = cl_args.act_classes
@@ -67,10 +74,11 @@ def get_act_condition(
     sample_label: torch.Tensor,
     target_transformer: Union[StandardScaler, LabelEncoder],
     target_classes: List[str],
-    model_task: str,
+    column_type: str,
+    target_column_name: str,
 ):
-    if model_task == "reg":
-        return "Regression"
+    if column_type == "con":
+        return target_column_name
 
     tt_it = target_transformer.inverse_transform
     cur_trn_label = tt_it([sample_label.item()])[0]
@@ -82,43 +90,59 @@ def get_act_condition(
 
 def accumulate_activations(
     config: "Config",
-    valid_dataset: Dataset,
+    target_column: str,
+    column_type: str,
     act_func: Callable,
     transform_funcs: al_transform_funcs,
 ) -> Tuple[Dict, Dict]:
+
     c = config
     cl_args = c.cl_args
 
-    target_classes = get_target_classes(c.cl_args, c.target_transformer)
+    target_classes = get_target_classes(
+        cl_args=c.cl_args,
+        column_type=column_type,
+        target_column_name=target_column,
+        target_transformer=c.target_transformers[target_column],
+    )
 
-    valid_sampling_dloader = DataLoader(valid_dataset, batch_size=1, shuffle=False)
+    valid_sampling_dloader = DataLoader(c.valid_dataset, batch_size=1, shuffle=False)
 
     acc_acts = {name: [] for name in target_classes}
     acc_acts_masked = {name: [] for name in target_classes}
 
     for single_sample, sample_label, sample_id in valid_sampling_dloader:
         # we want to keep the original sample for masking
-        single_sample_org = deepcopy(single_sample).cpu().numpy().squeeze()
+        single_sample_copy = deepcopy(single_sample).cpu().numpy().squeeze()
+        sample_target_labels = sample_label["target_labels"]
+        sample_extra_labels = sample_label["extra_labels"]
+
         cur_trn_label = get_act_condition(
-            sample_label, c.target_transformer, target_classes, c.cl_args.model_task
+            sample_label=sample_target_labels[target_column],
+            target_transformer=c.target_transformers[target_column],
+            target_classes=target_classes,
+            column_type=column_type,
+            target_column_name=target_column,
         )
 
         if cur_trn_label:
             # apply pre-processing functions on sample and input
             for pre_func in transform_funcs.get("pre", ()):
                 single_sample, sample_label = pre_func(
-                    single_sample=single_sample, sample_label=sample_label
+                    single_sample=single_sample, sample_label=sample_target_labels
                 )
 
             extra_inputs = get_extra_inputs(
-                cl_args, list(sample_id), c.valid_dataset.labels_dict, c.model
+                cl_args=cl_args, model=c.model, labels=sample_extra_labels
             )
             # detach for shap
             if extra_inputs is not None:
                 extra_inputs = extra_inputs.detach()
 
             shap_inputs = [i for i in (single_sample, extra_inputs) if i is not None]
-            single_acts = act_func(inputs=shap_inputs, sample_label=sample_label)
+            single_acts = act_func(
+                inputs=shap_inputs, sample_label=sample_target_labels[target_column]
+            )
             if single_acts is not None:
                 # currently we are only going to get acts for snps
                 # TODO: Add analysis / plots for embeddings / extra inputs.
@@ -131,7 +155,7 @@ def accumulate_activations(
 
                 acc_acts[cur_trn_label].append(single_acts.squeeze())
 
-                single_acts_masked = single_sample_org * single_acts
+                single_acts_masked = single_sample_copy * single_acts
                 acc_acts_masked[cur_trn_label].append(single_acts_masked.squeeze())
 
     return acc_acts, acc_acts_masked
@@ -145,7 +169,8 @@ def rescale_gradients(gradients: np.ndarray) -> np.ndarray:
 
 def get_shap_object(
     config: "Config",
-    model: torch.nn.Module,
+    model: Union[CNNModel, MLPModel],
+    column_name: str,
     device: str,
     train_loader: DataLoader,
     n_background_samples: int = 64,
@@ -153,25 +178,44 @@ def get_shap_object(
     c = config
     cl_args = c.cl_args
 
-    background, _, ids = gather_dloader_samples(
-        train_loader, device, n_background_samples
+    background, labels, ids = gather_dloader_samples(
+        data_loader=train_loader, device=device, n_samples=n_background_samples
     )
 
-    extra_inputs = get_extra_inputs(cl_args, ids, c.labels_dict, c.model)
+    extra_inputs = get_extra_inputs(
+        cl_args=cl_args, model=c.model, labels=labels["extra_labels"]
+    )
+
     # detach for shap
     if extra_inputs is not None:
         extra_inputs = extra_inputs.detach()
 
     shap_inputs = [i for i in (background, extra_inputs) if i is not None]
-    explainer = DeepExplainer(model, shap_inputs)
-    return explainer
+
+    hook_partial = partial(
+        _grab_single_target_from_model_output_hook, output_target_column=column_name
+    )
+    hook_handle = model.register_forward_hook(hook_partial)
+
+    explainer = DeepExplainer(model=model, data=shap_inputs)
+
+    return explainer, hook_handle
+
+
+def _grab_single_target_from_model_output_hook(
+    self: Union[CNNModel, MLPModel],
+    input_: torch.Tensor,
+    output: Dict[str, torch.Tensor],
+    output_target_column: str,
+) -> torch.Tensor:
+    return output[output_target_column]
 
 
 def get_shap_sample_acts_deep(
     explainer: DeepExplainer,
     inputs: al_model_inputs,
     sample_label: torch.Tensor,
-    model_task: str,
+    column_type: str,
 ):
     """
     Note: We only get the grads for a correct prediction.
@@ -181,7 +225,7 @@ def get_shap_sample_acts_deep(
     with suppress_stdout():
         output = explainer.shap_values(inputs, ranked_outputs=1)
 
-    if model_task == "reg":
+    if column_type == "con":
         assert isinstance(output[0], np.ndarray)
         return output
 
@@ -248,20 +292,19 @@ def get_snp_cols_w_top_grads(
     return top_snps_per_class
 
 
-def infer_snp_file_path(data_folder: Path):
-    if not data_folder:
+def infer_snp_file_path(data_source: Path):
+    if not data_source:
         raise ValueError(
-            f"'data_folder' variable must be set with 'infer'"
-            f" as snp_file parameter."
+            "'data_source' variable must be set with 'infer'" " as snp_file parameter."
         )
 
-    snp_size = data_folder.parts[3]
-    ind_size = data_folder.parts[4]
+    snp_size = data_source.parts[3]
+    ind_size = data_source.parts[4]
     assert snp_size.startswith("full") or int(snp_size.split("_")[0])
     assert ind_size.startswith("full") or int(ind_size.split("_")[0])
 
     inferred_snp_string = f"parsed_files/{ind_size}/{snp_size}/data_final.snp"
-    inferred_snp_file = Path(data_folder).parents[2] / inferred_snp_string
+    inferred_snp_file = Path(data_source).parents[2] / inferred_snp_string
 
     logger.info(
         "SNP file path not passed in as CL argument, will try inferred path: %s",
@@ -277,7 +320,7 @@ def infer_snp_file_path(data_folder: Path):
 
 
 def read_snp_df(
-    snp_file_path: Path, data_folder: Union[Path, None] = None
+    snp_file_path: Path, data_source: Union[Path, None] = None
 ) -> pd.DataFrame:
     """
     TODO: Deprecate support for .snp files – see hacky note below.
@@ -300,7 +343,7 @@ def read_snp_df(
     """
 
     if not snp_file_path:
-        snp_file_path = infer_snp_file_path(data_folder)
+        snp_file_path = infer_snp_file_path(data_source)
 
     bim_columns = ["CHR_CODE", "VAR_ID", "POS_CM", "BP_COORD", "ALT", "REF"]
     eig_snp_file_columns = ["VAR_ID", "CHR_CODE", "POS_CM", "BP_COORD", "ALT", "REF"]
@@ -329,7 +372,7 @@ def gather_and_rescale_snps(
     all_gradients_dict: al_gradients_dict,
     top_gradients_dict: al_top_gradients_dict,
     classes: List[str],
-) -> al_top_gradients_dict:
+) -> al_scaled_grads_dict:
     """
     `accumulated_grads` specs:
 
@@ -417,47 +460,79 @@ def save_masked_grads(
 
     classes = sorted(list(top_gradients_dict.keys()))
     scaled_grads = gather_and_rescale_snps(
-        acc_grads_times_inp, top_grads_msk_inputs, classes
+        all_gradients_dict=acc_grads_times_inp,
+        top_gradients_dict=top_grads_msk_inputs,
+        classes=classes,
     )
     av.plot_top_gradients(
-        scaled_grads,
-        top_grads_msk_inputs,
-        snp_df,
-        sample_outfolder,
-        "top_snps_masked.png",
+        gathered_scaled_grads=scaled_grads,
+        top_gradients_dict=top_grads_msk_inputs,
+        snp_df=snp_df,
+        output_folder=sample_outfolder,
+        fname="top_snps_masked.png",
     )
 
-    np.save(str(sample_outfolder / "top_grads_masked.npy"), top_grads_msk_inputs)
+    np.save(str(sample_outfolder / "top_acts_masked.npy"), top_grads_msk_inputs)
 
 
 def analyze_activations(
     config: "Config",
     act_func: Callable,
     proc_funcs: al_transform_funcs,
-    outfolder: Path,
+    column_name: str,
+    column_type: str,
+    sample_outfolder: Path,
 ) -> None:
     c = config
     cl_args = config.cl_args
 
     acc_acts, acc_acts_masked = accumulate_activations(
-        c, c.valid_dataset, act_func, proc_funcs
+        config=c,
+        target_column=column_name,
+        column_type=column_type,
+        act_func=act_func,
+        transform_funcs=proc_funcs,
     )
-    np.save(str(outfolder / "all_acts.npy"), acc_acts)
 
-    abs_grads = True if cl_args.model_task == "reg" else False
-    top_gradients_dict = get_snp_cols_w_top_grads(acc_acts, abs_grads=abs_grads)
+    np.save(str(sample_outfolder / "all_acts.npy"), acc_acts)
 
-    snp_df = read_snp_df(Path(cl_args.snp_file), Path(cl_args.data_folder))
+    abs_grads = True if column_type == "con" else False
+    top_gradients_dict = get_snp_cols_w_top_grads(
+        accumulated_grads=acc_acts, abs_grads=abs_grads
+    )
+
+    snp_df = read_snp_df(
+        snp_file_path=Path(cl_args.snp_file), data_source=Path(cl_args.data_source)
+    )
 
     classes = sorted(list(top_gradients_dict.keys()))
-    scaled_grads = gather_and_rescale_snps(acc_acts, top_gradients_dict, classes)
-    av.plot_top_gradients(scaled_grads, top_gradients_dict, snp_df, outfolder)
+    scaled_grads = gather_and_rescale_snps(
+        all_gradients_dict=acc_acts,
+        top_gradients_dict=top_gradients_dict,
+        classes=classes,
+    )
+    av.plot_top_gradients(
+        gathered_scaled_grads=scaled_grads,
+        top_gradients_dict=top_gradients_dict,
+        snp_df=snp_df,
+        output_folder=sample_outfolder,
+    )
 
-    np.save(str(outfolder / "top_acts.npy"), top_gradients_dict)
+    np.save(file=str(sample_outfolder / "top_acts.npy"), arr=top_gradients_dict)
 
-    save_masked_grads(acc_acts_masked, top_gradients_dict, snp_df, outfolder)
+    save_masked_grads(
+        acc_grads_times_inp=acc_acts_masked,
+        top_gradients_dict=top_gradients_dict,
+        snp_df=snp_df,
+        sample_outfolder=sample_outfolder,
+    )
 
-    av.plot_snp_gradients(acc_acts, outfolder, "avg")
+    av.plot_snp_gradients(
+        accumulated_grads=acc_acts,
+        outfolder=sample_outfolder,
+        title=column_name,
+        type_="avg",
+    )
 
 
 def activation_analysis_handler(
@@ -467,43 +542,54 @@ def activation_analysis_handler(
     We need to copy the model to avoid affecting the actual model during
     training (e.g. zero-ing out gradients).
 
-    TODO: Refactor this function further – reuse for parts for benchmarking.
+    TODO: Refactor this function further.
     """
 
     c = handler_config.config
     cl_args = c.cl_args
     iteration = engine.state.iteration
 
-    def pre_transform(single_sample, sample_label):
+    def pre_transform(single_sample, sample_label, column_name: str):
         single_sample = single_sample.to(device=cl_args.device, dtype=torch.float32)
 
-        sample_label = sample_label.to(device=cl_args.device)
-        sample_label = model_utils.cast_labels(cl_args.model_task, sample_label)
+        sample_label = model_utils.parse_target_labels(
+            target_columns=c.target_columns, device=cl_args.device, labels=sample_label
+        )[column_name]
 
         return single_sample, sample_label
 
-    do_acts = cl_args.get_acts
-
-    sample_outfolder = Path(handler_config.run_folder, "samples", str(iteration))
-    ensure_path_exists(sample_outfolder, is_folder=True)
-
-    if do_acts:
+    if cl_args.get_acts:
         model_copy = copy.deepcopy(c.model)
+        target_columns_gen = get_target_columns_generator(c.target_columns)
 
-        no_explainer_background_samples = np.max([int(cl_args.batch_size / 8), 16])
-        explainer = get_shap_object(
-            c,
-            model_copy,
-            cl_args.device,
-            c.train_loader,
-            no_explainer_background_samples,
-        )
+        for column_type, column_name in target_columns_gen:
+            sample_outfolder = prep_sample_outfolder(
+                run_name=cl_args.run_name, column_name=column_name, iteration=iteration
+            )
 
-        proc_funcs = {"pre": (pre_transform,)}
-        act_func = partial(
-            get_shap_sample_acts_deep,
-            explainer=explainer,
-            model_task=cl_args.model_task,
-        )
+            no_explainer_background_samples = np.max([int(cl_args.batch_size / 8), 16])
 
-        analyze_activations(c, act_func, proc_funcs, sample_outfolder)
+            explainer, hook_handle = get_shap_object(
+                config=c,
+                model=model_copy,
+                column_name=column_name,
+                device=cl_args.device,
+                train_loader=c.train_loader,
+                n_background_samples=no_explainer_background_samples,
+            )
+
+            proc_funcs = {"pre": (partial(pre_transform, column_name=column_name),)}
+            act_func = partial(
+                get_shap_sample_acts_deep, explainer=explainer, column_type=column_type
+            )
+
+            analyze_activations(
+                config=c,
+                act_func=act_func,
+                proc_funcs=proc_funcs,
+                column_name=column_name,
+                column_type=column_type,
+                sample_outfolder=sample_outfolder,
+            )
+
+            hook_handle.remove()

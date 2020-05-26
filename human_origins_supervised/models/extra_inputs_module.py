@@ -1,14 +1,17 @@
-import joblib
-from pathlib import Path
 from argparse import Namespace
 from collections import OrderedDict
-from typing import List, Dict, Set, Union, overload
+from pathlib import Path
+from typing import List, Dict, Set, Union, overload, TYPE_CHECKING
 
+import joblib
 import torch
-from torch import nn
-from human_origins_supervised.data_load.label_setup import al_label_dict
-from human_origins_supervised.train_utils.utils import get_extra_labels_from_ids
 from aislib.misc_utils import ensure_path_exists
+from torch import nn
+
+from human_origins_supervised.data_load.label_setup import al_label_dict
+
+if TYPE_CHECKING:
+    from human_origins_supervised.train import al_training_labels_extra
 
 # Aliases
 al_unique_embed_vals = Dict[str, Set[str]]
@@ -29,7 +32,7 @@ def get_unique_embed_values(
 
 
 def set_up_embedding_lookups(
-    unique_emb_dict: al_unique_embed_vals
+    unique_emb_dict: al_unique_embed_vals,
 ) -> al_emb_lookup_dict:
     emb_lookup_dict = {}
 
@@ -101,15 +104,32 @@ def attach_embeddings(model: nn.Module, embeddings_dict: al_emb_lookup_dict) -> 
     return total_emb_dimension
 
 
+def get_extra_continuous_inputs_from_labels(
+    extra_labels: Dict[str, torch.Tensor], continuous_columns: List[str]
+) -> torch.Tensor:
+
+    extra_continuous = []
+    for col in continuous_columns:
+        cur_con_labels = extra_labels[col].unsqueeze(1).to(dtype=torch.float)
+        extra_continuous.append(cur_con_labels)
+
+    extra_continuous = torch.cat(extra_continuous, dim=1)
+
+    return extra_continuous
+
+
 def lookup_embeddings(
     model: nn.Module,
     embeddings_dict: al_emb_lookup_dict,
     embedding_col: str,
-    extra_labels: List[Dict[str, str]],
+    extra_labels: List[str],
     device: str,
 ) -> torch.Tensor:
+    """
+    This produces a batch of embeddings, with dimensions N x embed_dim.
+    """
     cur_lookup_table = embeddings_dict[embedding_col]["lookup_table"]
-    cur_lookup_indexes = [cur_lookup_table.get(i[embedding_col]) for i in extra_labels]
+    cur_lookup_indexes = [cur_lookup_table.get(i) for i in extra_labels]
     cur_lookup_indexes = torch.tensor(cur_lookup_indexes, dtype=torch.long)
     cur_lookup_indexes = cur_lookup_indexes.to(device)
 
@@ -119,29 +139,14 @@ def lookup_embeddings(
     return cur_embedding
 
 
-def get_embeddings_from_ids(
-    labels_dict: al_label_dict,
-    ids: List[str],
-    embed_columns: List[str],
-    model: nn.Module,
-    device: str,
+def get_embeddings_from_labels(
+    extra_labels: Dict[str, List[str]], model: nn.Module, device: str
 ) -> torch.Tensor:
-    """
-    A wrapper function that gathers the extra labels for passed in IDs and returns all
-    embeddings.
 
-    Note that lookup_embeddings here gets embeddings for all IDs, i.e. each element
-    for extra_embreddings before the `.cat` is a NxK_i tensor where N is number of IDs
-    and K_i is the embedding dimension for a given embedding.
-
-    :param labels_dict: Label including all IDs passed to this function.
-    :param ids: The IDs to look up embeddings for.
-    :param embed_columns: Column names to grab embeddings for.
-    :param model: Model that has the embeddings as attributes attached to it.
-    :param device: Device to move the embeddings to.
-    :return:
     """
-    extra_labels = get_extra_labels_from_ids(labels_dict, ids, embed_columns)
+    Note that the extra_embeddings is a list of tensors, where each tensor is a batch
+    of embeddings for a given extra categorical column.
+    """
 
     if not extra_labels:
         raise ValueError("No extra labels found for when looking up embeddings.")
@@ -149,7 +154,11 @@ def get_embeddings_from_ids(
     extra_embeddings = []
     for col_key in model.embeddings_dict:
         cur_embedding = lookup_embeddings(
-            model, model.embeddings_dict, col_key, extra_labels, device
+            model=model,
+            embeddings_dict=model.embeddings_dict,
+            embedding_col=col_key,
+            extra_labels=extra_labels[col_key],
+            device=device,
         )
         extra_embeddings.append(cur_embedding)
 
@@ -158,48 +167,30 @@ def get_embeddings_from_ids(
     return extra_embeddings
 
 
-def get_extra_continuous_inputs_from_ids(
-    labels_dict: al_label_dict, ids: List[str], continuous_columns: List[str]
-) -> torch.Tensor:
-    """
-    TODO:   Do the casting to torch tensors when the labels are being set up for the
-            first time instead of having to cast on every batch.
-    """
-    extra_labels = get_extra_labels_from_ids(labels_dict, ids, continuous_columns)
-
-    extra_continuous = []
-    for col in continuous_columns:
-        extra_continuous_cur_column = torch.tensor(
-            [torch.tensor(sample[col], dtype=torch.float) for sample in extra_labels]
-        ).unsqueeze(1)
-        extra_continuous.append(extra_continuous_cur_column)
-
-    extra_continuous = torch.cat(extra_continuous, dim=1)
-
-    return extra_continuous
-
-
 def get_extra_inputs(
-    cl_args: Namespace, ids: List[str], labels_dict: al_label_dict, model: nn.Module
+    cl_args: Namespace, model: nn.Module, labels: "al_training_labels_extra"
 ) -> Union[torch.Tensor, None]:
     """
     We want to have a wrapper function to gather all extra inputs needed by the model.
     """
     extra_embeddings = None
-    if cl_args.embed_columns:
-        extra_embeddings = get_embeddings_from_ids(
-            labels_dict, ids, cl_args.embed_columns, model, cl_args.device
-        ).to(device=cl_args.device)
-        if not cl_args.contn_columns:
+    if cl_args.extra_cat_columns:
+
+        extra_embeddings = get_embeddings_from_labels(
+            extra_labels=labels, model=model, device=cl_args.device
+        )
+
+        if not cl_args.extra_con_columns:
             return extra_embeddings.to(device=cl_args.device)
 
     extra_continuous = None
-    if cl_args.contn_columns:
-        extra_continuous = get_extra_continuous_inputs_from_ids(
-            labels_dict, ids, cl_args.contn_columns
-        ).to(device=cl_args.device)
+    if cl_args.extra_con_columns:
 
-        if not cl_args.embed_columns:
+        extra_continuous = get_extra_continuous_inputs_from_labels(
+            extra_labels=labels, continuous_columns=cl_args.extra_con_columns
+        )
+
+        if not cl_args.extra_cat_columns:
             return extra_continuous.to(device=cl_args.device)
 
     if extra_continuous is not None and extra_embeddings is not None:
