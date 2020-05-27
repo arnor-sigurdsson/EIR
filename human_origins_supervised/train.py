@@ -4,14 +4,15 @@ from dataclasses import dataclass
 from os.path import abspath
 from pathlib import Path
 from sys import platform
-from typing import Union, Tuple, List, Dict, overload, TYPE_CHECKING
+from functools import partial
+from typing import Union, Tuple, List, Dict, Callable, overload, TYPE_CHECKING
 
 import configargparse
 import numpy as np
-import torch
 from aislib.misc_utils import ensure_path_exists
 from aislib.misc_utils import get_logger
 from ignite.engine import Engine
+import torch
 from torch import nn
 from torch.optim import SGD
 from torch.optim.adamw import AdamW
@@ -45,6 +46,13 @@ from human_origins_supervised.train_utils.metrics import (
     add_multi_task_average_metrics,
     get_extra_loss_term_functions,
     add_extra_losses,
+    calc_mcc,
+    calc_roc_auc,
+    calc_acc,
+    calc_rmse,
+    calc_pcc,
+    calc_r2,
+    calc_average_precision,
 )
 from human_origins_supervised.train_utils.train_handlers import configure_trainer
 
@@ -64,6 +72,11 @@ torch.manual_seed(0)
 np.random.seed(0)
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
+
+
+@dataclass
+class CustomHooks:
+    metrics: Dict
 
 
 @dataclass
@@ -87,9 +100,15 @@ class Config:
     target_columns: al_target_columns
     data_width: int
     writer: SummaryWriter
+    metrics: Dict[
+        str, Dict[str, Union[Dict, Callable[[np.ndarray], float]]]
+    ]  # TODO: Spec this better
+    custom_hooks: Union[CustomHooks, None]
 
 
-def main(cl_args: argparse.Namespace) -> None:
+def main(
+    cl_args: argparse.Namespace, custom_hooks: Union[CustomHooks, None] = None
+) -> None:
     run_folder = _prepare_run_folder(run_name=cl_args.run_name)
 
     train_dataset, valid_dataset = datasets.set_up_datasets(cl_args=cl_args)
@@ -131,6 +150,24 @@ def main(cl_args: argparse.Namespace) -> None:
 
     writer = get_summary_writer(run_folder=run_folder)
 
+    # tmp_custom_hooks = CustomHooks()
+    tmp_metrics = {
+        "cat": {
+            "mcc": calc_mcc,
+            "roc-auc-macro": calc_roc_auc,
+            "ap-macro": calc_average_precision,
+            "acc": calc_acc,
+        },
+        "con": {
+            "rmse": partial(
+                calc_rmse, target_transformers=train_dataset.target_transformers
+            ),
+            "r2": calc_r2,
+            "pcc": calc_pcc,
+        },
+        "only_val": ["r2", "pcc", "roc-auc-macro", "ap-macro"],
+        "average_targets": {"con": "loss", "cat": "mcc"},
+    }
     config = Config(
         cl_args=cl_args,
         train_loader=train_dloader,
@@ -144,6 +181,8 @@ def main(cl_args: argparse.Namespace) -> None:
         target_columns=train_dataset.target_columns,
         data_width=train_dataset.data_width,
         writer=writer,
+        metrics=tmp_metrics,
+        custom_hooks=None,
     )
 
     _log_num_params(model=model)
@@ -361,6 +400,10 @@ def get_summary_writer(run_folder: Path) -> SummaryWriter:
     return writer
 
 
+def _set_up_default_custom_hooks():
+    pass
+
+
 def _log_num_params(model: nn.Module) -> None:
     no_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     logger.info(
@@ -414,11 +457,11 @@ def train(config: Config) -> None:
 
         batch_metrics_dict = calculate_batch_metrics(
             target_columns=c.target_columns,
-            target_transformers=c.target_transformers,
             losses=train_losses,
             outputs=train_outputs,
             labels=target_labels,
             prefix="t_",
+            metrics_function_dict=c.metrics,
         )
 
         batch_metrics_dict_w_avgs = add_multi_task_average_metrics(
@@ -426,6 +469,7 @@ def train(config: Config) -> None:
             target_columns=c.target_columns,
             prefix="t_",
             loss=train_loss_avg.item(),
+            average_targets=c.metrics["average_targets"],
         )
 
         return batch_metrics_dict_w_avgs

@@ -1,16 +1,23 @@
 import csv
 import warnings
-from functools import partial
 from pathlib import Path
-from typing import Dict, Union, TYPE_CHECKING, List, Tuple, Callable
+from typing import Dict, TYPE_CHECKING, List, Tuple, Callable
 
 import numpy as np
 import pandas as pd
 import torch
 from aislib.misc_utils import ensure_path_exists, get_logger
+from scipy.special import softmax
 from scipy.stats import pearsonr
-from sklearn.metrics import matthews_corrcoef, r2_score, mean_squared_error
-from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.metrics import (
+    matthews_corrcoef,
+    r2_score,
+    mean_squared_error,
+    roc_auc_score,
+    average_precision_score,
+    accuracy_score,
+)
+from sklearn.preprocessing import StandardScaler, label_binarize
 from torch.utils.tensorboard import SummaryWriter
 
 from human_origins_supervised.data_load.data_utils import get_target_columns_generator
@@ -31,24 +38,35 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 
 def calculate_batch_metrics(
     target_columns: "al_target_columns",
-    target_transformers: Dict[str, "al_label_transformers_object"],
     losses: Dict[str, torch.Tensor],
     outputs: Dict[str, torch.Tensor],
     labels: Dict[str, torch.Tensor],
     prefix: str,
+    metrics_function_dict: Dict,
 ) -> al_step_metric_dict:
+    """
+    """
     target_columns_gen = get_target_columns_generator(target_columns)
 
     master_metric_dict = {}
+
     for column_type, column_name in target_columns_gen:
+        cur_metric_dict = {}
 
-        metric_func = select_metric_func(column_type, target_transformers[column_name])
-        cur_outputs = outputs[column_name]
-        cur_labels = labels[column_name]
+        cur_funcs = metrics_function_dict[column_type]
+        cur_outputs = outputs[column_name].detach().cpu().numpy()
+        cur_labels = labels[column_name].cpu().numpy()
 
-        cur_metric_dict = metric_func(
-            outputs=cur_outputs, labels=cur_labels, prefix=f"{prefix}{column_name}"
-        )
+        for metric_name, metric_func in cur_funcs.items():
+
+            if metric_name in metrics_function_dict["only_val"] and prefix == "t_":
+                continue
+
+            cur_key = f"{prefix}{column_name}_{metric_name}"
+            cur_metric_dict[cur_key] = metric_func(
+                outputs=cur_outputs, labels=cur_labels, column_name=column_name
+            )
+
         cur_metric_dict[f"{prefix}{column_name}_loss"] = losses[column_name].item()
 
         master_metric_dict[column_name] = cur_metric_dict
@@ -61,9 +79,13 @@ def add_multi_task_average_metrics(
     target_columns: "al_target_columns",
     prefix: str,
     loss: float,
+    average_targets: Dict[str, Dict[str, str]],
 ):
     average_performance = average_performances(
-        metric_dict=batch_metrics_dict, target_columns=target_columns, prefix=prefix
+        metric_dict=batch_metrics_dict,
+        target_columns=target_columns,
+        prefix=prefix,
+        average_targets=average_targets,
     )
     batch_metrics_dict[f"{prefix}average"] = {
         f"{prefix}loss-average": loss,
@@ -74,16 +96,23 @@ def add_multi_task_average_metrics(
 
 
 def average_performances(
-    metric_dict: al_step_metric_dict, target_columns: "al_target_columns", prefix: str
+    metric_dict: al_step_metric_dict,
+    target_columns: "al_target_columns",
+    prefix: str,
+    average_targets: Dict[str, Dict[str, str]],
 ) -> float:
     target_columns_gen = get_target_columns_generator(target_columns)
 
     all_metrics = []
     for column_type, column_name in target_columns_gen:
         if column_type == "con":
-            value = 1 - metric_dict[column_name][f"{prefix}{column_name}_loss"]
+            target_string = average_targets["con"]
+            value = (
+                1 - metric_dict[column_name][f"{prefix}{column_name}_{target_string}"]
+            )
         elif column_type == "cat":
-            value = metric_dict[column_name][f"{prefix}{column_name}_mcc"]
+            target_string = average_targets["cat"]
+            value = metric_dict[column_name][f"{prefix}{column_name}_{target_string}"]
         else:
             raise ValueError()
 
@@ -94,65 +123,78 @@ def average_performances(
     return average
 
 
-def select_metric_func(
-    target_column_type: str, target_transformer: Union[StandardScaler, LabelEncoder]
-):
-    if target_column_type == "cat":
-        return calc_multiclass_metrics
-
-    return partial(calc_regression_metrics, target_transformer=target_transformer)
-
-
-def get_train_metrics(column_type: str, prefix: str = "t") -> List[str]:
-    if column_type == "con":
-        base = [f"{prefix}_r2", f"{prefix}_rmse", f"{prefix}_pcc"]
-    elif column_type == "cat":
-        base = [f"{prefix}_mcc"]
-    else:
-        raise ValueError()
-
-    all_metrics = base + [f"{prefix}_loss"]
-
-    return all_metrics
-
-
-def calc_multiclass_metrics(
-    outputs: torch.Tensor, labels: torch.Tensor, prefix: str
-) -> Dict[str, float]:
-
-    _, pred = torch.max(outputs, 1)
-
-    pred = pred.cpu().numpy()
-    labels = labels.cpu().numpy()
+def calc_mcc(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
+    pred = np.argmax(a=outputs, axis=1)
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=RuntimeWarning)
         mcc = matthews_corrcoef(labels, pred)
 
-    return {f"{prefix}_mcc": mcc}
+    return mcc
 
 
-def calc_regression_metrics(
+def calc_roc_auc(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
+
+    if outputs.shape[1] > 2:
+        outputs = softmax(outputs, axis=1)
+
+    roc_auc = roc_auc_score(
+        y_true=labels, y_score=outputs, multi_class="ovr", average="macro"
+    )
+    return roc_auc
+
+
+def calc_average_precision(
+    outputs: np.ndarray, labels: np.ndarray, *args, **kwargs
+) -> float:
+
+    pred = np.argmax(outputs, axis=1)
+    labels_bin = label_binarize(y=labels, classes=sorted(np.unique(pred)))
+    average_precision = average_precision_score(y_true=labels_bin, y_score=outputs)
+
+    return average_precision
+
+
+def calc_acc(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
+    pred = np.argmax(outputs, axis=1)
+
+    accuracy = accuracy_score(y_true=labels, y_pred=pred)
+    return accuracy
+
+
+def calc_pcc(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
+
+    if len(outputs) < 2:
+        return 0.0
+
+    pcc = pearsonr(x=labels, y=outputs)[0]
+    return pcc
+
+
+def calc_r2(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
+
+    if len(outputs) < 2:
+        return 0.0
+
+    r2 = r2_score(y_true=labels, y_pred=outputs)
+    return r2
+
+
+def calc_rmse(
     outputs: torch.Tensor,
     labels: torch.Tensor,
-    prefix: str,
-    target_transformer: StandardScaler,
-) -> Dict[str, float]:
-    preds = outputs.detach().cpu().numpy()
-    labels = labels.cpu().numpy()
+    target_transformers: Dict[str, StandardScaler],
+    column_name: str,
+    *args,
+    **kwargs,
+) -> float:
+    cur_target_transformer = target_transformers[column_name]
 
-    labels = target_transformer.inverse_transform(labels).squeeze()
-    preds = target_transformer.inverse_transform(preds).squeeze()
+    labels = cur_target_transformer.inverse_transform(labels).squeeze()
+    preds = cur_target_transformer.inverse_transform(outputs).squeeze()
 
-    if len(preds) < 2:
-        r2 = 0
-        pcc = 0
-    else:
-        r2 = r2_score(y_true=labels, y_pred=preds)
-        pcc = pearsonr(x=labels, y=preds)[0]
     rmse = np.sqrt(mean_squared_error(y_true=labels, y_pred=preds))
-
-    return {f"{prefix}_r2": r2, f"{prefix}_rmse": rmse, f"{prefix}_pcc": pcc}
+    return rmse
 
 
 def calculate_losses(

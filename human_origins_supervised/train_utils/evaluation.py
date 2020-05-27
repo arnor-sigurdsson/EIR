@@ -57,11 +57,11 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
 
     eval_metrics_dict = metrics.calculate_batch_metrics(
         target_columns=c.target_columns,
-        target_transformers=c.target_transformers,
         losses=val_losses,
         outputs=val_outputs_total,
         labels=val_target_labels,
         prefix="v_",
+        metrics_function_dict=c.metrics,
     )
 
     eval_metrics_dict_w_avgs = metrics.add_multi_task_average_metrics(
@@ -69,6 +69,7 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
         target_columns=c.target_columns,
         prefix="v_",
         loss=val_loss_avg.item(),
+        average_targets=c.metrics["average_targets"],
     )
 
     write_eval_header = True if iteration == cl_args.sample_interval else False

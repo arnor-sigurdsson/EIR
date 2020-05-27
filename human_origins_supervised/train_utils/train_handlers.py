@@ -15,6 +15,7 @@ from ignite.metrics import RunningAverage
 from torch.utils.tensorboard import SummaryWriter
 
 from human_origins_supervised.data_load.data_utils import get_target_columns_generator
+from human_origins_supervised.data_load.label_setup import al_target_columns
 from human_origins_supervised.train_utils import H_PARAMS
 from human_origins_supervised.train_utils.activation_analysis import (
     activation_analysis_handler,
@@ -24,18 +25,17 @@ from human_origins_supervised.train_utils.lr_scheduling import (
     set_up_lr_scheduler,
     attach_lr_scheduler,
 )
-from human_origins_supervised.train_utils.metrics import get_train_metrics
-from human_origins_supervised.train_utils.utils import (
-    get_custom_module_submodule,
-    get_run_folder,
-)
-from human_origins_supervised.visualization import visualization_funcs as vf
 from human_origins_supervised.train_utils.metrics import (
     get_metrics_dataframes,
     get_best_average_performance,
     persist_metrics,
     get_metrics_files,
 )
+from human_origins_supervised.train_utils.utils import (
+    get_custom_module_submodule,
+    get_run_folder,
+)
+from human_origins_supervised.visualization import visualization_funcs as vf
 
 if TYPE_CHECKING:
     from human_origins_supervised.train import Config
@@ -65,7 +65,9 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
     pbar = ProgressBar()
     run_name = cl_args.run_name
 
-    monitoring_metrics = _get_monitoring_metrics(target_columns=config.target_columns)
+    monitoring_metrics = _get_monitoring_metrics(
+        target_columns=config.target_columns, metric_func_dict=config.metrics
+    )
 
     handler_config = HandlerConfig(
         config=config,
@@ -127,26 +129,33 @@ def _do_run_completed_handler(iter_per_epoch: int, n_epochs: int, sample_interva
     return False
 
 
-def _get_monitoring_metrics(target_columns) -> List[Tuple[str, str]]:
+def _get_monitoring_metrics(
+    target_columns: al_target_columns, metric_func_dict
+) -> List[Tuple[str, str]]:
     """
     The spec for the tuple here follows the metric dict spec, i.e. the tuple is:
     (column_name, metric).
     """
-    target_columns_gen = get_target_columns_generator(target_columns)
+    target_columns_gen = get_target_columns_generator(target_columns=target_columns)
 
     loss_average_metrics = tuple(["t_average", "t_loss-average"])
     perf_average_metrics = tuple(["t_average", "t_perf-average"])
     monitoring_metrics = [loss_average_metrics, perf_average_metrics]
 
+    def _parse_target_metrics(metric_name: str, column_name_: str) -> str:
+        return f"t_{column_name_}_{metric_name}"
+
     for column_type, column_name in target_columns_gen:
 
-        cur_metrics = get_train_metrics(
-            column_type=column_type, prefix=f"t_{column_name}"
-        )
+        cur_metrics = list(metric_func_dict[column_type].keys()) + ["loss"]
 
         for metric in cur_metrics:
-            cur_tuple = tuple([column_name, metric])
-            monitoring_metrics.append(cur_tuple)
+            if metric not in metric_func_dict["only_val"]:
+                parsed_metric = _parse_target_metrics(
+                    metric_name=metric, column_name_=column_name
+                )
+                cur_tuple = tuple([column_name, parsed_metric])
+                monitoring_metrics.append(cur_tuple)
 
     return monitoring_metrics
 

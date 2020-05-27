@@ -1,5 +1,6 @@
 from pathlib import Path
 from textwrap import wrap
+from functools import partial
 from typing import List, Callable, Union, Tuple, TYPE_CHECKING
 
 import matplotlib
@@ -90,6 +91,64 @@ def generate_training_curve(
         ax_1.ticklabel_format(style="sci", axis="x", scilimits=(0, 0))
 
     lines = line_1a + line_1b
+    labels = [line.get_label() for line in lines]
+    ax_1.legend(lines, labels)
+
+    plt.grid()
+
+    plt.savefig(output_folder / f"training_curve_{y_label}.png", dpi=200)
+    plt.close("all")
+
+
+def generate_training_curve_val_only(
+    valid_series: pd.Series,
+    output_folder: Path,
+    title_extra: str = "",
+    skiprows: int = 200,
+) -> None:
+    """
+    TODO:   Return plot object from this function and append training data if we want
+            to plot that for a given metric.
+    """
+    fig, ax_1 = plt.subplots()
+
+    valid_series_cut = valid_series[valid_series.index > skiprows]
+
+    if len(valid_series_cut) == 0:
+        return
+
+    extreme_func = _get_min_or_max_funcs(valid_series_cut.name)
+    extreme_valid_idx, extreme_valid_value = _get_validation_extreme_value_and_iter(
+        extreme_func, valid_series_cut
+    )
+
+    xlim_upper = valid_series_cut.index.max()
+
+    validation_xticks = valid_series_cut.index
+    line_1b = ax_1.plot(
+        validation_xticks,
+        valid_series_cut.values,
+        c="red",
+        linewidth=0.8,
+        alpha=1.0,
+        label=f"Validation (best: {extreme_valid_value:.4g} at {extreme_valid_idx})",
+        zorder=0,
+    )
+
+    ax_1.axhline(y=extreme_valid_value, linewidth=0.4, c="red", linestyle="dashed")
+
+    ax_1.set(title=title_extra)
+
+    ax_1.set_xlabel("Iteration")
+    y_label = _parse_metrics_colname(valid_series_cut.name)
+    ax_1.set_ylabel(y_label)
+
+    ax_1.set_xlim(left=skiprows + 1, right=xlim_upper)
+    ax_1.xaxis.set_major_locator(MaxNLocator(integer=True))
+    if xlim_upper > 1e4:
+        ax_1.ticklabel_format(style="sci", axis="x", scilimits=(0, 0))
+
+    lines = line_1b
     labels = [line.get_label() for line in lines]
     ax_1.legend(lines, labels)
 
@@ -557,16 +616,24 @@ def generate_all_training_curves(
     plot_skip_steps: int,
     title_extra: str = "",
 ) -> None:
-    metrics = ["_".join(i.split("_")[1:]) for i in training_history_df.columns]
+    metrics = ["_".join(i.split("_")[1:]) for i in valid_history_df.columns]
+
+    def _select_func(train_colname_: str):
+        if train_colname_ in training_history_df.columns:
+            return partial(
+                generate_training_curve,
+                train_series=training_history_df[train_colname_],
+            )
+        return generate_training_curve_val_only
 
     for metric_suffix in metrics:
         train_colname = "t_" + metric_suffix
         valid_colname = "v_" + metric_suffix
-        train_series = training_history_df[train_colname]
         valid_series = valid_history_df[valid_colname]
 
-        generate_training_curve(
-            train_series=train_series,
+        plotting_func = _select_func(train_colname_=train_colname)
+
+        plotting_func(
             valid_series=valid_series,
             output_folder=output_folder,
             title_extra=title_extra,
