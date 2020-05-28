@@ -47,12 +47,13 @@ from human_origins_supervised.train_utils.metrics import (
     get_extra_loss_term_functions,
     add_extra_losses,
     calc_mcc,
-    calc_roc_auc,
+    calc_roc_auc_ovr,
     calc_acc,
     calc_rmse,
     calc_pcc,
     calc_r2,
-    calc_average_precision,
+    calc_average_precision_ovr,
+    MetricRecord,
 )
 from human_origins_supervised.train_utils.train_handlers import configure_trainer
 
@@ -79,7 +80,7 @@ class CustomHooks:
     metrics: Dict
 
 
-@dataclass
+@dataclass(frozen=True)
 class Config:
     """
     The idea of this class is to keep track of objects that need to be used
@@ -150,24 +151,10 @@ def main(
 
     writer = get_summary_writer(run_folder=run_folder)
 
-    # tmp_custom_hooks = CustomHooks()
-    tmp_metrics = {
-        "cat": {
-            "mcc": calc_mcc,
-            "roc-auc-macro": calc_roc_auc,
-            "ap-macro": calc_average_precision,
-            "acc": calc_acc,
-        },
-        "con": {
-            "rmse": partial(
-                calc_rmse, target_transformers=train_dataset.target_transformers
-            ),
-            "r2": calc_r2,
-            "pcc": calc_pcc,
-        },
-        "only_val": ["r2", "pcc", "roc-auc-macro", "ap-macro"],
-        "average_targets": {"con": "loss", "cat": "mcc"},
-    }
+    metrics = _get_default_metrics(
+        target_transformers=train_dataset.target_transformers
+    )
+
     config = Config(
         cl_args=cl_args,
         train_loader=train_dloader,
@@ -181,8 +168,8 @@ def main(
         target_columns=train_dataset.target_columns,
         data_width=train_dataset.data_width,
         writer=writer,
-        metrics=tmp_metrics,
-        custom_hooks=None,
+        metrics=metrics,
+        custom_hooks=custom_hooks,
     )
 
     _log_num_params(model=model)
@@ -400,8 +387,35 @@ def get_summary_writer(run_folder: Path) -> SummaryWriter:
     return writer
 
 
-def _set_up_default_custom_hooks():
-    pass
+def _get_default_metrics(target_transformers: al_label_transformers) -> Dict:
+    mcc = MetricRecord(name="mcc", function=calc_mcc)
+    acc = MetricRecord(name="acc", function=calc_acc)
+    rmse = MetricRecord(
+        name="rmse",
+        function=partial(calc_rmse, target_transformers=target_transformers),
+        minimize_goal=True,
+    )
+    default_metrics = {
+        "cat": (mcc, acc),
+        "con": (rmse,),
+        "average_targets": {"con": "loss", "cat": "acc"},
+    }
+
+    # TODO: temporary metrics for testing
+    roc_auc_macro = MetricRecord(
+        name="roc-auc-macro", function=calc_roc_auc_ovr, only_val=True
+    )
+    ap_macro = MetricRecord(
+        name="ap-macro", function=calc_average_precision_ovr, only_val=True
+    )
+    r2 = MetricRecord(name="r2", function=calc_r2, only_val=True)
+    pcc = MetricRecord(name="pcc", function=calc_pcc, only_val=True)
+    default_metrics = {
+        "cat": (mcc, acc, roc_auc_macro, ap_macro),
+        "con": (rmse, r2, pcc),
+        "average_targets": {"con": "loss", "cat": "acc"},
+    }
+    return default_metrics
 
 
 def _log_num_params(model: nn.Module) -> None:
@@ -461,7 +475,7 @@ def train(config: Config) -> None:
             outputs=train_outputs,
             labels=target_labels,
             prefix="t_",
-            metrics_function_dict=c.metrics,
+            metric_record_dict=c.metrics,
         )
 
         batch_metrics_dict_w_avgs = add_multi_task_average_metrics(

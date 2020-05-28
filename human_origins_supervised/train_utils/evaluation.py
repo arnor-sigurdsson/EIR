@@ -61,7 +61,7 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
         outputs=val_outputs_total,
         labels=val_target_labels,
         prefix="v_",
-        metrics_function_dict=c.metrics,
+        metric_record_dict=c.metrics,
     )
 
     eval_metrics_dict_w_avgs = metrics.add_multi_task_average_metrics(

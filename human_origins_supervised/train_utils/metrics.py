@@ -1,13 +1,13 @@
 import csv
 import warnings
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, TYPE_CHECKING, List, Tuple, Callable
+from typing import Dict, TYPE_CHECKING, List, Tuple, Callable, Union
 
 import numpy as np
 import pandas as pd
 import torch
 from aislib.misc_utils import ensure_path_exists, get_logger
-from scipy.special import softmax
 from scipy.stats import pearsonr
 from sklearn.metrics import (
     matthews_corrcoef,
@@ -32,8 +32,17 @@ if TYPE_CHECKING:
 
 # aliases
 al_step_metric_dict = Dict[str, Dict[str, float]]
+al_metric_record_dict = Dict[str, Union[Tuple["MetricRecord", ...], Dict[str, str]]]
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
+
+
+@dataclass()
+class MetricRecord:
+    name: str
+    function: Callable
+    only_val: bool = False
+    minimize_goal: bool = False
 
 
 def calculate_batch_metrics(
@@ -42,7 +51,7 @@ def calculate_batch_metrics(
     outputs: Dict[str, torch.Tensor],
     labels: Dict[str, torch.Tensor],
     prefix: str,
-    metrics_function_dict: Dict,
+    metric_record_dict: al_metric_record_dict,
 ) -> al_step_metric_dict:
     """
     """
@@ -53,17 +62,17 @@ def calculate_batch_metrics(
     for column_type, column_name in target_columns_gen:
         cur_metric_dict = {}
 
-        cur_funcs = metrics_function_dict[column_type]
+        cur_metric_records: Tuple[MetricRecord, ...] = metric_record_dict[column_type]
         cur_outputs = outputs[column_name].detach().cpu().numpy()
         cur_labels = labels[column_name].cpu().numpy()
 
-        for metric_name, metric_func in cur_funcs.items():
+        for metric_record in cur_metric_records:
 
-            if metric_name in metrics_function_dict["only_val"] and prefix == "t_":
+            if metric_record.only_val and prefix == "t_":
                 continue
 
-            cur_key = f"{prefix}{column_name}_{metric_name}"
-            cur_metric_dict[cur_key] = metric_func(
+            cur_key = f"{prefix}{column_name}_{metric_record.name}"
+            cur_metric_dict[cur_key] = metric_record.function(
                 outputs=cur_outputs, labels=cur_labels, column_name=column_name
             )
 
@@ -133,24 +142,28 @@ def calc_mcc(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
     return mcc
 
 
-def calc_roc_auc(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
+def calc_roc_auc_ovr(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
 
     if outputs.shape[1] > 2:
-        outputs = softmax(outputs, axis=1)
+        labels = label_binarize(y=labels, classes=sorted(np.unique(labels)))
+    else:
+        outputs = outputs[:, 1]
 
-    roc_auc = roc_auc_score(
-        y_true=labels, y_score=outputs, multi_class="ovr", average="macro"
-    )
+    roc_auc = roc_auc_score(y_true=labels, y_score=outputs, average="macro")
     return roc_auc
 
 
-def calc_average_precision(
+def calc_average_precision_ovr(
     outputs: np.ndarray, labels: np.ndarray, *args, **kwargs
 ) -> float:
 
-    pred = np.argmax(outputs, axis=1)
-    labels_bin = label_binarize(y=labels, classes=sorted(np.unique(pred)))
-    average_precision = average_precision_score(y_true=labels_bin, y_score=outputs)
+    labels_bin = label_binarize(y=labels, classes=sorted(np.unique(labels)))
+    if outputs.shape[1] == 2:
+        outputs = outputs[:, 1]
+
+    average_precision = average_precision_score(
+        y_true=labels_bin, y_score=outputs, average="macro"
+    )
 
     return average_precision
 

@@ -30,6 +30,8 @@ from human_origins_supervised.train_utils.metrics import (
     get_best_average_performance,
     persist_metrics,
     get_metrics_files,
+    al_metric_record_dict,
+    MetricRecord,
 )
 from human_origins_supervised.train_utils.utils import (
     get_custom_module_submodule,
@@ -66,7 +68,7 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
     run_name = cl_args.run_name
 
     monitoring_metrics = _get_monitoring_metrics(
-        target_columns=config.target_columns, metric_func_dict=config.metrics
+        target_columns=config.target_columns, metric_record_dict=config.metrics
     )
 
     handler_config = HandlerConfig(
@@ -130,7 +132,7 @@ def _do_run_completed_handler(iter_per_epoch: int, n_epochs: int, sample_interva
 
 
 def _get_monitoring_metrics(
-    target_columns: al_target_columns, metric_func_dict
+    target_columns: al_target_columns, metric_record_dict: al_metric_record_dict
 ) -> List[Tuple[str, str]]:
     """
     The spec for the tuple here follows the metric dict spec, i.e. the tuple is:
@@ -147,15 +149,20 @@ def _get_monitoring_metrics(
 
     for column_type, column_name in target_columns_gen:
 
-        cur_metrics = list(metric_func_dict[column_type].keys()) + ["loss"]
+        cur_metric_records: Tuple[MetricRecord, ...] = metric_record_dict[column_type]
 
-        for metric in cur_metrics:
-            if metric not in metric_func_dict["only_val"]:
+        for metric in cur_metric_records:
+            if not metric.only_val:
+
                 parsed_metric = _parse_target_metrics(
-                    metric_name=metric, column_name_=column_name
+                    metric_name=metric.name, column_name_=column_name
                 )
                 cur_tuple = tuple([column_name, parsed_metric])
                 monitoring_metrics.append(cur_tuple)
+
+        # manually add loss record as it's not in metric records, but from criterions
+        loss_name = _parse_target_metrics(metric_name="loss", column_name_=column_name)
+        monitoring_metrics.append(tuple([column_name, loss_name]))
 
     return monitoring_metrics
 
