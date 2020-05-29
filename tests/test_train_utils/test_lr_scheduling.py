@@ -60,7 +60,7 @@ def test_get_reduce_lr_on_plateu_step_params(args_config, create_dummy_test_opti
     assert params["sample_interval"] == cl_args.sample_interval
     assert params["warmup_steps"] == cl_args.warmup_steps
     assert params["optimizer"] == optimizer
-    assert params["eval_history_fpath"].name == "v_average_history.log"
+    assert params["validation_history_fpath"].name == "validation_average_history.log"
 
 
 @pytest.fixture()
@@ -368,7 +368,7 @@ def create_dummy_val_history_file(tmp_path):
     # should get called
     tmp_file = tmp_path / "dummy_val_history.csv"
     with open(str(tmp_file), "w") as outfile:
-        outfile.write("iteration,v_loss-average\n")
+        outfile.write("iteration,loss-average\n")
 
         for iteration in range(100):
             outfile.write(f"{iteration},{float(iteration)*2}\n")
