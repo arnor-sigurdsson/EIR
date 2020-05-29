@@ -1,44 +1,39 @@
-import math
 from copy import deepcopy
+from math import isclose
 from pathlib import Path
 from typing import Dict, Tuple
 
 import pandas as pd
 import pytest
 import torch
-from sklearn.preprocessing import StandardScaler, LabelEncoder
-
 from human_origins_supervised import train
 from human_origins_supervised.train_utils import metrics
+from sklearn.preprocessing import StandardScaler, LabelEncoder
 
 
 def test_calculate_batch_metrics():
     test_kwargs = get_calculate_batch_metrics_data_test_kwargs()
     test_batch_metrics = metrics.calculate_batch_metrics(**test_kwargs)
 
-    assert test_batch_metrics["Origin"]["v_Origin_mcc"] == 1.0
-    assert test_batch_metrics["Origin"]["v_Origin_loss"] == 0.0
+    assert test_batch_metrics["Origin"]["Origin_mcc"] == 1.0
+    assert test_batch_metrics["Origin"]["Origin_loss"] == 0.0
 
-    assert test_batch_metrics["BMI"]["v_BMI_r2"] == 1.0
-    assert test_batch_metrics["BMI"]["v_BMI_rmse"] == 0.0
-    assert test_batch_metrics["BMI"]["v_BMI_pcc"] == 1.0
-    assert test_batch_metrics["BMI"]["v_BMI_loss"] == 0.0
+    assert test_batch_metrics["BMI"]["BMI_r2"] == 1.0
+    assert test_batch_metrics["BMI"]["BMI_rmse"] == 0.0
+    # sometimes slight numerical instability with scipy pearsonr
+    assert isclose(test_batch_metrics["BMI"]["BMI_pcc"], 1.0)
+    assert test_batch_metrics["BMI"]["BMI_loss"] == 0.0
 
-    assert test_batch_metrics["Height"]["v_Height_r2"] < 0
-    assert test_batch_metrics["Height"]["v_Height_rmse"] > 0.0
-    assert test_batch_metrics["Height"]["v_Height_pcc"] == -1.0
-    assert test_batch_metrics["Height"]["v_Height_loss"] == 1.0
+    assert test_batch_metrics["Height"]["Height_r2"] < 0
+    assert test_batch_metrics["Height"]["Height_rmse"] > 0.0
+    assert isclose(test_batch_metrics["Height"]["Height_pcc"], -1.0)
+    assert test_batch_metrics["Height"]["Height_loss"] == 1.0
 
 
 def get_calculate_batch_metrics_data_test_kwargs():
     target_columns = {"cat": ["Origin"], "con": ["BMI", "Height"]}
 
     standard_scaler_fit_arr = [[0.0], [1.0], [2.0]]
-    target_transformers = {
-        "Origin": LabelEncoder().fit([1, 2, 3]),
-        "BMI": StandardScaler().fit(standard_scaler_fit_arr),
-        "Height": StandardScaler().fit(standard_scaler_fit_arr),
-    }
 
     losses = {
         "Origin": torch.tensor(0.0),
@@ -58,13 +53,20 @@ def get_calculate_batch_metrics_data_test_kwargs():
         "Height": torch.tensor([-1.0, -2.0, -3.0]).unsqueeze(1),
     }
 
+    target_transformers = {
+        "Origin": LabelEncoder().fit([1, 2, 3]),
+        "BMI": StandardScaler().fit(standard_scaler_fit_arr),
+        "Height": StandardScaler().fit(standard_scaler_fit_arr),
+    }
+    metrics = train._get_default_metrics(target_transformers=target_transformers)
+
     batch_metrics_function_kwargs = {
         "target_columns": target_columns,
-        "target_transformers": target_transformers,
         "losses": losses,
         "outputs": outputs,
         "labels": labels,
-        "prefix": "v_",
+        "mode": "val",
+        "metric_record_dict": metrics,
     }
 
     return batch_metrics_function_kwargs
@@ -250,7 +252,7 @@ def get_performance_average_files(tmp_path) -> Tuple[Dict[str, Path], Dict]:
     test_list = [[0.1], [0.3], [0.2], [0.4]]
 
     files = {}
-    columns = ["v_Origin_mcc", "v_Height_loss", "v_ExtraOrigin_mcc"]
+    columns = ["Origin_mcc", "Height_loss", "ExtraOrigin_mcc"]
     target_columns = {"con": ["Height"], "cat": ["Origin", "ExtraOrigin"]}
     for i in range(3):
 
@@ -262,7 +264,7 @@ def get_performance_average_files(tmp_path) -> Tuple[Dict[str, Path], Dict]:
         file_path = tmp_path / f"test_val_{i}.csv"
         df.to_csv(file_path)
 
-        target_name = cur_column.split("_")[1]
+        target_name = cur_column.split("_")[0]
         files[target_name] = file_path
 
     return files, target_columns
@@ -274,7 +276,7 @@ def test_get_best_average_performance(get_performance_average_files):
     test_best_performance = metrics.get_best_average_performance(
         val_metrics_files=test_dict, target_columns=test_target_columns
     )
-    assert math.isclose(0.466666, test_best_performance, rel_tol=1e-5)
+    assert isclose(0.466666, test_best_performance, rel_tol=1e-5)
 
 
 def test_get_overall_performance(get_performance_average_files):
