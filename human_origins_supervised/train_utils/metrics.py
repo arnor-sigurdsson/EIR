@@ -96,9 +96,9 @@ def add_multi_task_average_metrics(
         target_columns=target_columns,
         average_targets=average_targets,
     )
-    batch_metrics_dict[f"average"] = {
-        f"loss-average": loss,
-        f"perf-average": average_performance,
+    batch_metrics_dict["average"] = {
+        "loss-average": loss,
+        "perf-average": average_performance,
     }
 
     return batch_metrics_dict
@@ -139,27 +139,32 @@ def calc_mcc(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
     return mcc
 
 
-def calc_roc_auc_ovr(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
+def calc_roc_auc_ovr(
+    outputs: np.ndarray, labels: np.ndarray, average: str = "macro", *args, **kwargs
+) -> float:
+    assert average in ["micro", "macro"]
 
     if outputs.shape[1] > 2:
         labels = label_binarize(y=labels, classes=sorted(np.unique(labels)))
     else:
         outputs = outputs[:, 1]
 
-    roc_auc = roc_auc_score(y_true=labels, y_score=outputs, average="macro")
+    roc_auc = roc_auc_score(y_true=labels, y_score=outputs, average=average)
     return roc_auc
 
 
 def calc_average_precision_ovr(
-    outputs: np.ndarray, labels: np.ndarray, *args, **kwargs
+    outputs: np.ndarray, labels: np.ndarray, average: str = "macro", *args, **kwargs
 ) -> float:
+
+    assert average in ["micro", "macro"]
 
     labels_bin = label_binarize(y=labels, classes=sorted(np.unique(labels)))
     if outputs.shape[1] == 2:
         outputs = outputs[:, 1]
 
     average_precision = average_precision_score(
-        y_true=labels_bin, y_score=outputs, average="macro"
+        y_true=labels_bin, y_score=outputs, average=average
     )
 
     return average_precision
@@ -177,7 +182,7 @@ def calc_pcc(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
     if len(outputs) < 2:
         return 0.0
 
-    pcc = pearsonr(x=labels, y=outputs)[0]
+    pcc = pearsonr(x=labels.squeeze(), y=outputs.squeeze())[0]
     return pcc
 
 

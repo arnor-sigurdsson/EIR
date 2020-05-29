@@ -67,7 +67,7 @@ def _get_reduce_lr_on_plateu_step_params(
 ) -> Dict:
 
     run_folder = get_run_folder(run_name=cl_args.run_name)
-    eval_history_fpath = get_average_history_filepath(
+    validation_history_fpath = get_average_history_filepath(
         run_folder=run_folder, train_or_val_target_prefix="validation_"
     )
 
@@ -76,7 +76,7 @@ def _get_reduce_lr_on_plateu_step_params(
     )
 
     params = {
-        "eval_history_fpath": eval_history_fpath,
+        "validation_history_fpath": validation_history_fpath,
         "optimizer": optimizer,
         "sample_interval": cl_args.sample_interval,
         "lr_upper_bound": cl_args.lr,

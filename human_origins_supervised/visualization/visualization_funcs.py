@@ -5,10 +5,8 @@ from typing import List, Callable, Union, Tuple, TYPE_CHECKING, Dict
 import matplotlib
 import numpy as np
 import pandas as pd
-from scipy.stats import pearsonr
 from sklearn.metrics import (
     roc_curve,
-    r2_score,
     auc,
     precision_recall_curve,
     average_precision_score,
@@ -23,6 +21,8 @@ import matplotlib.cm as cm
 from matplotlib.ticker import MaxNLocator
 
 from aislib.misc_utils import get_logger
+
+from human_origins_supervised.train_utils import metrics
 
 if TYPE_CHECKING:
     from human_origins_supervised.train_utils.evaluation import PerformancePlotConfig
@@ -215,10 +215,10 @@ def generate_regression_prediction_plot(
     y_true = transformer.inverse_transform(y_true.reshape(-1, 1))
     y_outp = transformer.inverse_transform(y_outp.reshape(-1, 1))
 
-    r2 = r2_score(y_true, y_outp)
-    pcc = pearsonr(y_true.squeeze(), y_outp.squeeze())[0]
+    r2 = metrics.calc_r2(outputs=y_outp, labels=y_true)
+    pcc = metrics.calc_pcc(outputs=y_outp, labels=y_true)
 
-    ax.scatter(y_outp, y_true, edgecolors=(0, 0, 0), alpha=0.2, s=10)
+    ax.scatter(x=y_outp, y=y_true, edgecolors=(0, 0, 0), alpha=0.2, s=10)
     ax.text(
         x=0.05,
         y=0.95,
@@ -248,7 +248,7 @@ def generate_binary_roc_curve(
 ):
     y_true_bin = label_binarize(y_true, classes=[0, 1])
     fpr, tpr, _ = roc_curve(y_true_bin, y_outp[:, 1])
-    roc_auc = auc(fpr, tpr)
+    roc_auc = metrics.calc_roc_auc_ovr(outputs=y_outp, labels=y_true)
 
     plt.plot(fpr, tpr, lw=2, label=f"(area = {roc_auc:0.4g})")
 
@@ -275,7 +275,9 @@ def generate_binary_pr_curve(
 ):
     y_true_bin = label_binarize(y_true, classes=[0, 1])
     precision, recall, _ = precision_recall_curve(y_true_bin, y_outp[:, 1])
-    average_precision = average_precision_score(y_true_bin, y_outp[:, 1])
+    average_precision = metrics.calc_average_precision_ovr(
+        outputs=y_outp, labels=y_true
+    )
 
     plt.step(
         recall,
@@ -308,7 +310,7 @@ def generate_binary_prediction_distribution(
 ):
     y_true_bin = label_binarize(y_true, classes=[0, 1])
     fpr, tpr, _ = roc_curve(y_true_bin, y_outp[:, 1])
-    roc_auc = auc(fpr, tpr)
+    roc_auc = metrics.calc_roc_auc_ovr(outputs=y_outp, labels=y_true)
 
     classes = transformer.classes_
     fig, ax = plt.subplots()
@@ -362,7 +364,6 @@ def generate_multi_class_roc_curve(
         roc_auc[i] = auc(fpr[i], tpr[i])
 
     fpr["micro"], tpr["micro"], _ = roc_curve(y_true_bin.ravel(), y_outp.ravel())
-    roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
 
     all_fpr = np.unique(np.concatenate([fpr[i] for i in range(n_classes)]))
 
@@ -376,13 +377,18 @@ def generate_multi_class_roc_curve(
 
     fpr["macro"] = all_fpr
     tpr["macro"] = mean_tpr
-    roc_auc["macro"] = auc(fpr["macro"], tpr["macro"])
+    roc_auc_macro = metrics.calc_roc_auc_ovr(
+        outputs=y_outp, labels=y_true, average="macro"
+    )
+    roc_auc_micro = metrics.calc_roc_auc_ovr(
+        outputs=y_outp, labels=y_true, average="micro"
+    )
 
     plt.figure(figsize=(12, 8))
     plt.plot(
         fpr["micro"],
         tpr["micro"],
-        label=f'micro-average ROC curve (area = {roc_auc["micro"]:0.4g})',
+        label=f"micro-average ROC curve (area = {roc_auc_micro:0.4g})",
         color="deeppink",
         linestyle=":",
         linewidth=4,
@@ -391,7 +397,7 @@ def generate_multi_class_roc_curve(
     plt.plot(
         fpr["macro"],
         tpr["macro"],
-        label=f'macro-average ROC curve (area = {roc_auc["macro"]:0.4g})',
+        label=f"macro-average ROC curve (area = {roc_auc_macro:0.4g})",
         color="navy",
         linestyle=":",
         linewidth=4,
@@ -451,9 +457,10 @@ def generate_multi_class_pr_curve(
     precision["micro"], recall["micro"], _ = precision_recall_curve(
         y_true_bin.ravel(), y_outp.ravel()
     )
-    average_precision["micro"] = average_precision_score(
-        y_true_bin, y_outp, average="micro"
+    average_precision_micro = metrics.calc_average_precision_ovr(
+        outputs=y_outp, labels=y_true, average="micro"
     )
+
     plt.figure(figsize=(12, 8))
 
     plt.plot(
@@ -462,7 +469,7 @@ def generate_multi_class_pr_curve(
         color="gold",
         lw=2,
         label=f"Micro-Average Precision-Recall "
-        f'(area = {average_precision["micro"]:0.4g})',
+        f"(area = {average_precision_micro:0.4g})",
     )
 
     colors = iter(cm.tab20(np.arange(n_classes)))
