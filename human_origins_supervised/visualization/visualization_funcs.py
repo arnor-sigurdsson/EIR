@@ -123,8 +123,7 @@ def _get_min_or_max_funcs(
     return func
 
 
-def _parse_metrics_colname(column_name: str):
-    assert column_name.startswith("v_") or column_name.startswith("t_")
+def _parse_metrics_colname(column_name: str) -> str:
 
     return column_name.split("_")[-1].upper()
 
@@ -570,19 +569,17 @@ def generate_all_training_curves(
     if training_history_df.shape[0] <= plot_skip_steps:
         return
 
-    metrics = ["_".join(i.split("_")[1:]) for i in valid_history_df.columns]
+    metrics = ["_".join(i.split("_")[:]) for i in valid_history_df.columns]
 
     for metric_suffix in metrics:
-        train_colname = "t_" + metric_suffix
-        valid_colname = "v_" + metric_suffix
-        valid_series = valid_history_df[valid_colname]
+        valid_series = valid_history_df[metric_suffix]
 
         figure_object, axis_object = generate_validation_curve_from_series(
             series=valid_series, title_extra=title_extra, skiprows=plot_skip_steps
         )
 
-        if train_colname in training_history_df.columns:
-            train_series = training_history_df[train_colname]
+        if metric_suffix in training_history_df.columns:
+            train_series = training_history_df[metric_suffix]
             _ = add_series_to_axis(
                 ax_object=axis_object,
                 series=train_series,

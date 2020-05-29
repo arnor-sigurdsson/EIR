@@ -1,18 +1,18 @@
 import argparse
 import sys
 from dataclasses import dataclass
+from functools import partial
 from os.path import abspath
 from pathlib import Path
 from sys import platform
-from functools import partial
-from typing import Union, Tuple, List, Dict, Callable, overload, TYPE_CHECKING
+from typing import Union, Tuple, List, Dict, overload, TYPE_CHECKING
 
 import configargparse
 import numpy as np
+import torch
 from aislib.misc_utils import ensure_path_exists
 from aislib.misc_utils import get_logger
 from ignite.engine import Engine
-import torch
 from torch import nn
 from torch.optim import SGD
 from torch.optim.adamw import AdamW
@@ -46,6 +46,7 @@ from human_origins_supervised.train_utils.metrics import (
     add_multi_task_average_metrics,
     get_extra_loss_term_functions,
     add_extra_losses,
+    get_average_history_filepath,
     calc_mcc,
     calc_roc_auc_ovr,
     calc_acc,
@@ -58,7 +59,10 @@ from human_origins_supervised.train_utils.metrics import (
 from human_origins_supervised.train_utils.train_handlers import configure_trainer
 
 if TYPE_CHECKING:
-    from human_origins_supervised.train_utils.metrics import al_step_metric_dict
+    from human_origins_supervised.train_utils.metrics import (
+        al_step_metric_dict,
+        al_metric_record_dict,
+    )
 
 # aliases
 al_criterions = Dict[str, Union[nn.CrossEntropyLoss, nn.MSELoss]]
@@ -101,9 +105,7 @@ class Config:
     target_columns: al_target_columns
     data_width: int
     writer: SummaryWriter
-    metrics: Dict[
-        str, Dict[str, Union[Dict, Callable[[np.ndarray], float]]]
-    ]  # TODO: Spec this better
+    metrics: "al_metric_record_dict"
     custom_hooks: Union[CustomHooks, None]
 
 
@@ -186,7 +188,9 @@ def main(
 
 def _prepare_run_folder(run_name: str) -> Path:
     run_folder = utils.get_run_folder(run_name=run_name)
-    history_file = run_folder / "t_average_history.log"
+    history_file = get_average_history_filepath(
+        run_folder=run_folder, train_or_val_target_prefix="train_"
+    )
     if history_file.exists():
         raise FileExistsError(
             f"There already exists a run with that name: {history_file}. Please choose "
@@ -387,7 +391,9 @@ def get_summary_writer(run_folder: Path) -> SummaryWriter:
     return writer
 
 
-def _get_default_metrics(target_transformers: al_label_transformers) -> Dict:
+def _get_default_metrics(
+    target_transformers: al_label_transformers,
+) -> "al_metric_record_dict":
     mcc = MetricRecord(name="mcc", function=calc_mcc)
     acc = MetricRecord(name="acc", function=calc_acc)
     rmse = MetricRecord(
@@ -469,24 +475,23 @@ def train(config: Config) -> None:
         train_loss_final.backward()
         c.optimizer.step()
 
-        batch_metrics_dict = calculate_batch_metrics(
+        train_batch_metrics = calculate_batch_metrics(
             target_columns=c.target_columns,
             losses=train_losses,
             outputs=train_outputs,
             labels=target_labels,
-            prefix="t_",
+            mode="train",
             metric_record_dict=c.metrics,
         )
 
-        batch_metrics_dict_w_avgs = add_multi_task_average_metrics(
-            batch_metrics_dict=batch_metrics_dict,
+        train_batch_metrics_with_averages = add_multi_task_average_metrics(
+            batch_metrics_dict=train_batch_metrics,
             target_columns=c.target_columns,
-            prefix="t_",
             loss=train_loss_avg.item(),
             average_targets=c.metrics["average_targets"],
         )
 
-        return batch_metrics_dict_w_avgs
+        return train_batch_metrics_with_averages
 
     trainer = Engine(process_function=step)
 

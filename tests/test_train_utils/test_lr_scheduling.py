@@ -327,7 +327,7 @@ def test_step_reduce_on_plateau_scheduler(
             lr_lower_bound=lr_lb,
             sample_interval=sample_interval,
             reduce_on_plateau_scheduler=test_scheduler,
-            eval_history_fpath=hist_file,
+            validation_history_fpath=hist_file,
             warmup_steps=warmup_steps,
         )
         test_engine.state.iteration += 1

@@ -104,7 +104,7 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
     _attach_running_average_metrics(
         engine=trainer, monitoring_metrics=monitoring_metrics
     )
-    pbar.attach(engine=trainer, metric_names=["t_loss-average"])
+    pbar.attach(engine=trainer, metric_names=["loss-average"])
 
     trainer.add_event_handler(
         event_name=Events.EPOCH_COMPLETED,
@@ -140,12 +140,12 @@ def _get_monitoring_metrics(
     """
     target_columns_gen = get_target_columns_generator(target_columns=target_columns)
 
-    loss_average_metrics = tuple(["t_average", "t_loss-average"])
-    perf_average_metrics = tuple(["t_average", "t_perf-average"])
+    loss_average_metrics = tuple(["average", "loss-average"])
+    perf_average_metrics = tuple(["average", "perf-average"])
     monitoring_metrics = [loss_average_metrics, perf_average_metrics]
 
     def _parse_target_metrics(metric_name: str, column_name_: str) -> str:
-        return f"t_{column_name_}_{metric_name}"
+        return f"{column_name_}_{metric_name}"
 
     for column_type, column_name in target_columns_gen:
 
@@ -201,7 +201,7 @@ def _attach_running_average_metrics(
 def _log_stats_to_pbar(engine: Engine, handler_config: HandlerConfig) -> None:
     log_string = f"[Epoch {engine.state.epoch}/{engine.state.max_epochs}]"
 
-    key = "t_loss-average"
+    key = "loss-average"
     value = engine.state.metrics[key]
     log_string += f" | {key}: {value:.4g}"
 
@@ -297,7 +297,7 @@ def _write_training_metrics_handler(engine: Engine, handler_config: HandlerConfi
         metrics_dict=running_average_metrics,
         iteration=iteration,
         write_header=is_first_iteration,
-        prefixes={"metrics": "t_", "writer": "train"},
+        prefixes={"metrics": "train_", "writer": "train"},
     )
 
 
@@ -398,33 +398,35 @@ def add_hparams_to_tensorboard(
     )
 
     c = config
-    run_folder = get_run_folder(c.cl_args.run_name)
+    run_folder = get_run_folder(run_name=c.cl_args.run_name)
 
     metrics_files = get_metrics_files(
-        target_columns=c.target_columns, run_folder=run_folder, target_prefix="v_"
+        target_columns=c.target_columns,
+        run_folder=run_folder,
+        train_or_val_target_prefix="validation_",
     )
 
     try:
         best_overall_performance = get_best_average_performance(
             val_metrics_files=metrics_files, target_columns=c.target_columns
         )
-        average_loss_file = metrics_files["v_average"]
+        average_loss_file = metrics_files["average"]
         average_loss_df = pd.read_csv(average_loss_file)
 
     except FileNotFoundError as e:
         logger.debug(
-            "Could not find %s at exit. " "Tensorboard hyper parameters not logged.",
+            "Could not find %s at exit. Tensorboard hyper parameters not logged.",
             e.filename,
         )
         return
 
     h_param_dict = _generate_h_param_dict(cl_args=c.cl_args, h_params=h_params)
-    min_loss = average_loss_df["v_loss-average"].min()
+    min_loss = average_loss_df["loss-average"].min()
 
     writer.add_hparams(
         h_param_dict,
         {
-            "v_loss-overall_min": min_loss,
+            "valiation_loss-overall_min": min_loss,
             "best_overall_performance": best_overall_performance,
         },
     )
