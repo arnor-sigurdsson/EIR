@@ -19,6 +19,7 @@ black = "==19.10b0"
 pre-commit = "*"
 gpustat = "*"
 pyinstaller = "*"
+hypothesis = "*"
 
 [packages]
 pandas = "*"
@@ -38,6 +39,8 @@ aislib = {ref = "dev",git = "ssh://git@github.com/arnor-sigurdsson/aislib.git",e
 joblib = "*"
 lr-finder = {git = "ssh://git@github.com/arnor-sigurdsson/lr-finder.git",editable = true}
 tensorboard = "*"
+configargparse = "*"
+future="*" # Not actually needed here, but due to a pipenv error, see: https://github.com/pypa/pipenv/issues/3404
 
 [requires]
 python_version = "3.7"

@@ -60,7 +60,7 @@ def parse_test_cl_args(request):
 
 @pytest.fixture
 def args_config():
-    config = SimpleNamespace(
+    test_cl_args = SimpleNamespace(
         **{
             "act_classes": None,
             "b1": 0.9,
@@ -70,8 +70,7 @@ def args_config():
             "checkpoint_interval": 100,
             "extra_con_columns": [],
             "custom_lib": None,
-            "data_folder": "REPLACE_ME",
-            "data_width": 1000,
+            "data_source": "REPLACE_ME",
             "device": "cuda:0" if cuda.is_available() else "cpu",
             "dilation_factor": 1,
             "down_stride": 4,
@@ -86,6 +85,7 @@ def args_config():
             "gpu_num": "0",
             "kernel_width": 12,
             "label_file": "REPLACE_ME",
+            "l1": 0.0,
             "lr": 1e-2,
             "lr_lb": 1e-5,
             "lr_schedule": "plateau",
@@ -113,7 +113,7 @@ def args_config():
         }
     )
 
-    return config
+    return test_cl_args
 
 
 @pytest.fixture(scope="module")
@@ -324,13 +324,12 @@ def create_test_cl_args(request, args_config, create_test_data):
 
     n_snps = request.config.getoption("--num_snps")
 
-    args_config.data_folder = str(test_path / "test_arrays")
+    args_config.data_source = str(test_path / "test_arrays")
     args_config.snp_file = str(test_path / "test_snps.bim")
     args_config.model_task = c.task_type
     args_config.label_file = str(test_path / "labels.csv")
 
     args_config.target_width = n_snps
-    args_config.data_width = n_snps
 
     # If tests need to have their own config different from the base defined above,
     # only supporting custom_cl_args hardcoded for now
@@ -381,7 +380,7 @@ def create_test_datasets(create_test_data, create_test_cl_args):
     c = create_test_data
 
     cl_args = create_test_cl_args
-    cl_args.data_folder = str(c.scoped_tmp_path / "test_arrays")
+    cl_args.data_source = str(c.scoped_tmp_path / "test_arrays")
 
     run_path = Path(f"runs/{cl_args.run_name}/")
 
@@ -458,7 +457,9 @@ def prep_modelling_test_configs(
     cl_args = create_test_cl_args
     train_loader, valid_loader, train_dataset, valid_dataset = create_test_dloaders
     model = create_test_model
-    criterions = train._get_criterions(train_dataset.target_columns)
+
+    optimizer = create_test_optimizer
+    criterions = train._get_criterions(train_dataset.target_columns, cl_args.model_type)
 
     optimizer, loss_module = create_test_optimizer(
         cl_args=cl_args,
@@ -469,7 +470,7 @@ def prep_modelling_test_configs(
 
     train_dataset, valid_dataset = create_test_datasets
 
-    train._log_params(model)
+    train._log_num_params(model)
 
     config = Config(
         cl_args=cl_args,
@@ -478,11 +479,12 @@ def prep_modelling_test_configs(
         valid_dataset=valid_dataset,
         model=model,
         optimizer=optimizer,
-        loss_module=loss_module,
+        criterions=criterions,
+        loss_function=loss_module,
         labels_dict=train_dataset.labels_dict,
         target_transformers=train_dataset.target_transformers,
         target_columns=train_dataset.target_columns,
-        data_width=cl_args.data_width,
+        data_width=train_dataset.data_width,
         writer=train.get_summary_writer(run_folder=Path("runs", cl_args.run_name)),
     )
 

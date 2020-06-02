@@ -1,3 +1,4 @@
+from pathlib import Path
 from unittest.mock import patch
 import pytest
 import numpy as np
@@ -113,6 +114,70 @@ def test_label_df_parse_wrapper(
 
     assert df_labels.shape == (n_total, 1)
     assert set(df_labels[test_target_column].unique()) == {"Asia", "Europe"}
+
+
+@pytest.mark.parametrize("create_test_data", [{"task_type": "binary"}], indirect=True)
+def test_gather_ids_from_data_source(create_test_data):
+    c = create_test_data
+
+    test_path = c.scoped_tmp_path / "test_arrays"
+    expected_num_samples = c.n_per_class * len(c.target_classes)
+
+    test_ids = label_setup._gather_ids_from_data_source(data_source=test_path)
+
+    assert len(test_ids) == expected_num_samples
+
+    # check that ids are properly formatted, not paths
+    assert not any(".npy" in i for i in test_ids)
+
+
+@pytest.mark.parametrize("create_test_data", [{"task_type": "binary"}], indirect=True)
+def test_get_array_path_iterator_file(create_test_data):
+    c = create_test_data
+
+    test_path = c.scoped_tmp_path / "test_arrays"
+    test_label_file_path = c.scoped_tmp_path / "test_paths.txt"
+
+    with open(test_label_file_path, "w") as test_label_file:
+        for path in test_path.iterdir():
+            test_label_file.write(str(path) + "\n")
+
+    expected_num_samples = c.n_per_class * len(c.target_classes)
+    text_file_iterator = label_setup.get_array_path_iterator(
+        data_source=test_label_file_path
+    )
+
+    assert len([i for i in text_file_iterator]) == expected_num_samples
+
+
+@pytest.mark.parametrize("create_test_data", [{"task_type": "binary"}], indirect=True)
+def test_get_array_path_iterator_folder(create_test_data):
+    c = create_test_data
+
+    test_path = c.scoped_tmp_path / "test_arrays"
+
+    expected_num_samples = c.n_per_class * len(c.target_classes)
+    folder_iterator = label_setup.get_array_path_iterator(data_source=test_path)
+
+    assert len([i for i in folder_iterator]) == expected_num_samples
+
+
+@pytest.mark.parametrize("create_test_data", [{"task_type": "binary"}], indirect=True)
+def test_get_array_path_iterator_fail(create_test_data):
+    c = create_test_data
+
+    with pytest.raises(ValueError):
+        label_setup.get_array_path_iterator(data_source=Path("does/not/exist"))
+
+    test_label_file_path = c.scoped_tmp_path / "test_paths_fail.txt"
+
+    with open(test_label_file_path, "w") as test_label_file:
+        for i in range(5):
+            test_label_file.write("non/existent/path.npy" + "\n")
+
+    with pytest.raises(FileNotFoundError):
+        iterator = label_setup.get_array_path_iterator(data_source=test_label_file_path)
+        _ = [i for i in iterator]
 
 
 @pytest.mark.parametrize(

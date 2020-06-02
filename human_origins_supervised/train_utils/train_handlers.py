@@ -21,7 +21,7 @@ from human_origins_supervised.train_utils.activation_analysis import (
 )
 from human_origins_supervised.train_utils.evaluation import validation_handler
 from human_origins_supervised.train_utils.lr_scheduling import (
-    set_up_scheduler,
+    set_up_lr_scheduler,
     attach_lr_scheduler,
 )
 from human_origins_supervised.train_utils.metrics import get_train_metrics
@@ -94,7 +94,7 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
             )
 
     if cl_args.lr_schedule != "same":
-        lr_scheduler = set_up_scheduler(handler_config=handler_config)
+        lr_scheduler = set_up_lr_scheduler(handler_config=handler_config)
         attach_lr_scheduler(engine=trainer, lr_scheduler=lr_scheduler, config=config)
 
     _attach_running_average_metrics(

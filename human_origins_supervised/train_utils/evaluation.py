@@ -50,8 +50,8 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
         target_columns=c.target_columns, device=cl_args.device, labels=val_target_labels
     )
 
-    val_losses = c.loss_module(inputs=val_outputs_total, targets=val_target_labels)
-    val_loss_avg = metrics.aggregate_losses(val_losses)
+    val_losses = c.loss_function(inputs=val_outputs_total, targets=val_target_labels)
+    val_loss_avg = metrics.aggregate_losses(losses_dict=val_losses)
 
     eval_metrics_dict = metrics.calculate_batch_metrics(
         target_columns=c.target_columns,
@@ -181,18 +181,16 @@ def get_most_wrong_wrapper(
 
 def _check_df_most_wrong(df: pd.DataFrame, outfolder: Path) -> None:
     try:
-        assert not (df["True_Label"] == df["Wrong_Label"]).any()
+        assert_1_string = "True label equal predicted labels."
+        assert not (df["True_Label"] == df["Wrong_Label"]).any(), assert_1_string
 
-        assert (df["True_Prob"] < 0.5).all()
-
-        min_prob_for_wrong = 1 / len(df["True_Label"].unique())
-        assert (df["Wrong_Prob"] > min_prob_for_wrong).all()
+        assert (df["True_Prob"] < 0.5).all(), "True predicted over 0.5."
 
     except AssertionError as e:
         logger.error(
-            "Got AssertionError (%s) when checking for probabilities in. Something"
-            "might be weird, or a rare event where probabilities are exactly"
-            "equal happened. The file is wrong_preds.csv in %s.",
+            "Got AssertionError ('%s') when checking for probabilities of wrong "
+            "predictions. Something might be weird, or a rare event where probabilities"
+            "are exactly equal happened. The file is wrong_preds.csv in %s.",
             e,
             outfolder,
         )

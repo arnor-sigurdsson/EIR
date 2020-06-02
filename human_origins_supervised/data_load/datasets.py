@@ -21,6 +21,7 @@ from human_origins_supervised.data_load.label_setup import (
     al_label_transformers_object,
     al_label_transformers,
     get_transformer_path,
+    get_array_path_iterator,
 )
 from human_origins_supervised.data_load.data_loading_funcs import (
     make_random_snps_missing,
@@ -101,7 +102,7 @@ def _construct_common_dataset_init_params(
     )
 
     dataset_class_common_args = {
-        "data_folder": cl_args.data_folder,
+        "data_source": cl_args.data_source,
         "target_width": cl_args.target_width,
         "target_columns": target_columns,
         "target_transformers": target_transformers_fit_on_train,
@@ -176,7 +177,7 @@ class Sample:
 class ArrayDatasetBase(Dataset):
     def __init__(
         self,
-        data_folder: Path,
+        data_source: Path,
         target_columns: al_target_columns,
         labels_dict: al_label_dict = None,
         target_transformers: al_label_transformers = None,
@@ -187,7 +188,7 @@ class ArrayDatasetBase(Dataset):
     ):
         super().__init__()
 
-        self.data_folder = data_folder
+        self.data_source = data_source
         self.target_height = target_height
         self.target_width = target_width
 
@@ -223,8 +224,8 @@ class ArrayDatasetBase(Dataset):
         """
 
         logger.debug("Setting up samples in current dataset.")
-
-        files = {i.stem: i for i in Path(self.data_folder).iterdir()}
+        path_iterator = get_array_path_iterator(data_source=Path(self.data_source))
+        files = {i.stem: i for i in path_iterator}
 
         sample_id_iter = self.labels_dict if self.labels_dict else files
         samples = []

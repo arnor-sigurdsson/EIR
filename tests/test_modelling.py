@@ -15,12 +15,12 @@ from human_origins_supervised import train
 @pytest.mark.parametrize(
     "create_test_cl_args",
     [
-        {"custom_cl_args": {"model_type": "cnn"}},
         {"custom_cl_args": {"model_type": "mlp"}},
+        {"custom_cl_args": {"model_type": "cnn"}},
     ],
     indirect=True,
 )
-def test_classification(keep_outputs, prep_modelling_test_configs):
+def test_classification_nonlinear(keep_outputs, prep_modelling_test_configs):
     """
     NOTE:
         We probably cannot check directly if the gradients for a given SNP
@@ -39,7 +39,40 @@ def test_classification(keep_outputs, prep_modelling_test_configs):
     """
     config, test_config = prep_modelling_test_configs
 
-    train.train_ignite(config)
+    train.train(config)
+
+    target_column = config.cl_args.target_cat_columns[0]
+
+    _check_test_performance_results(
+        run_path=test_config.run_path,
+        target_column=target_column,
+        metric="mcc",
+        threshold=0.8,
+    )
+
+    top_row_grads_dict = {"Asia": [0] * 10, "Europe": [1] * 10, "Africa": [2] * 10}
+    _check_snps_wrapper(
+        test_config=test_config,
+        target_column=target_column,
+        top_row_grads_dict=top_row_grads_dict,
+    )
+
+    if not keep_outputs:
+        cleanup(test_config.run_path)
+
+
+@pytest.mark.parametrize("create_test_data", [{"task_type": "binary"}], indirect=True)
+@pytest.mark.parametrize(
+    "create_test_cl_args", [{"custom_cl_args": {"model_type": "linear"}}], indirect=True
+)
+def test_classification_linear(keep_outputs, prep_modelling_test_configs):
+    """
+    Largely duplicated from `test_classification_nonlinear` as currently linear model
+    only support regression or binary classification.
+    """
+    config, test_config = prep_modelling_test_configs
+
+    train.train(config)
 
     target_column = config.cl_args.target_cat_columns[0]
 
@@ -89,6 +122,13 @@ def _check_snps_wrapper(
     [
         {
             "custom_cl_args": {
+                "model_type": "linear",
+                "target_cat_columns": [],
+                "target_con_columns": ["Height"],
+            }
+        },
+        {
+            "custom_cl_args": {
                 "model_type": "cnn",
                 "target_cat_columns": [],
                 "target_con_columns": ["Height"],
@@ -116,15 +156,18 @@ def _check_snps_wrapper(
 def test_regression(keep_outputs, prep_modelling_test_configs):
     config, test_config = prep_modelling_test_configs
 
-    train.train_ignite(config)
+    train.train(config)
 
     target_column = config.cl_args.target_con_columns[0]
 
+    # linear regression performs slightly worse, but we don't want to lower expectations
+    # other models
+    threshold = 0.70 if config.cl_args.model_type == "linear" else 0.8
     _check_test_performance_results(
         run_path=test_config.run_path,
         target_column=target_column,
         metric="r2",
-        threshold=0.8,
+        threshold=threshold,
     )
 
     top_height_snp_index = 2
@@ -191,7 +234,7 @@ def test_multi_task(keep_outputs, prep_modelling_test_configs):
     config, test_config = prep_modelling_test_configs
     cl_args = config.cl_args
 
-    train.train_ignite(config)
+    train.train(config)
 
     for cat_column in config.cl_args.target_cat_columns:
         threshold, at_least_n = _get_multi_task_test_args(
