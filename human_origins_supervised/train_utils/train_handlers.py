@@ -348,7 +348,7 @@ def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> Non
         training_history_df=train_avg_history_df,
         valid_history_df=valid_avg_history_df,
         output_folder=run_folder,
-        title_extra=f"Multi Task Average - {'MCC'}",
+        title_extra="Multi Task Average",
         plot_skip_steps=cl_args.plot_skip_steps,
     )
 
