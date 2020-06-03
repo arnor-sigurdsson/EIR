@@ -100,7 +100,7 @@ def set_up_lr_scheduler(
     def _get_cycle_iter_size(warmup_steps_: int) -> int:
         steps = len(c.train_loader)
         if cl_args.lr_schedule == "cosine":
-            steps = steps * c.cl_args.n_epochs - warmup_steps_
+            steps = max(2, steps * c.cl_args.n_epochs - warmup_steps_)
 
         return steps
 

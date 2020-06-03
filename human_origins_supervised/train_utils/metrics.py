@@ -23,7 +23,10 @@ from torch.utils.tensorboard import SummaryWriter
 from human_origins_supervised.data_load.data_utils import get_target_columns_generator
 
 if TYPE_CHECKING:
-    from human_origins_supervised.train import al_criterions
+    from human_origins_supervised.train import (  # noqa: F401
+        al_criterions,
+        al_averaging_functions_dict,
+    )
     from human_origins_supervised.train_utils.train_handlers import HandlerConfig
     from human_origins_supervised.data_load.label_setup import (  # noqa: F401
         al_target_columns,
@@ -32,7 +35,9 @@ if TYPE_CHECKING:
 
 # aliases
 al_step_metric_dict = Dict[str, Dict[str, float]]
-al_metric_record_dict = Dict[str, Union[Tuple["MetricRecord", ...], Dict[str, str]]]
+al_metric_record_dict = Dict[
+    str, Union[Tuple["MetricRecord", ...], "al_averaging_functions_dict"]
+]
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -89,12 +94,12 @@ def add_multi_task_average_metrics(
     batch_metrics_dict: al_step_metric_dict,
     target_columns: "al_target_columns",
     loss: float,
-    average_targets: Dict[str, str],
+    performance_average_functions: Dict[str, Callable[[al_step_metric_dict], float]],
 ):
-    average_performance = average_performances(
+    average_performance = average_performances_across_tasks(
         metric_dict=batch_metrics_dict,
         target_columns=target_columns,
-        average_targets=average_targets,
+        performance_calculation_functions=performance_average_functions,
     )
     batch_metrics_dict["average"] = {
         "loss-average": loss,
@@ -104,25 +109,25 @@ def add_multi_task_average_metrics(
     return batch_metrics_dict
 
 
-def average_performances(
+def average_performances_across_tasks(
     metric_dict: al_step_metric_dict,
     target_columns: "al_target_columns",
-    average_targets: Dict[str, str],
+    performance_calculation_functions: Dict[
+        str, Callable[[al_step_metric_dict], float]
+    ],
 ) -> float:
     target_columns_gen = get_target_columns_generator(target_columns)
 
     all_metrics = []
-    for column_type, column_name in target_columns_gen:
-        if column_type == "con":
-            target_string = average_targets["con"]
-            value = 1 - metric_dict[column_name][f"{column_name}_{target_string}"]
-        elif column_type == "cat":
-            target_string = average_targets["cat"]
-            value = metric_dict[column_name][f"{column_name}_{target_string}"]
-        else:
-            raise ValueError()
 
-        all_metrics.append(value)
+    for column_type, column_name in target_columns_gen:
+        cur_metric_func = performance_calculation_functions.get(column_type)
+
+        metric_func_args = {"metric_dict": metric_dict, "column_name": column_name}
+        cur_value = cur_metric_func(**metric_func_args)
+        all_metrics.append(cur_value)
+
+        all_metrics.append(cur_value)
 
     average = np.array(all_metrics).mean()
 
@@ -267,43 +272,6 @@ def add_extra_losses(total_loss: torch.Tensor, extra_loss_functions: List[Callab
         total_loss += loss_func()
 
     return total_loss
-
-
-def get_best_average_performance(
-    val_metrics_files: Dict[str, Path], target_columns: "al_target_columns"
-):
-    df_performances = _get_overall_performance(
-        val_metrics_files=val_metrics_files, target_columns=target_columns
-    )
-    best_performance = df_performances["Performance_Average"].max()
-
-    return best_performance
-
-
-def _get_overall_performance(
-    val_metrics_files: Dict[str, Path], target_columns: "al_target_columns"
-) -> pd.DataFrame:
-    """
-    With continuous columns, we use the distance the MSE is from 1 as "performance".
-    """
-    target_columns_gen = get_target_columns_generator(target_columns)
-
-    df_performances = pd.DataFrame()
-    for column_type, column_name in target_columns_gen:
-        cur_metric_df = pd.read_csv(val_metrics_files[column_name])
-
-        if column_type == "con":
-            df_performances[column_name] = 1 - cur_metric_df[f"{column_name}_loss"]
-
-        elif column_type == "cat":
-            df_performances[column_name] = cur_metric_df[f"{column_name}_mcc"]
-
-        else:
-            raise ValueError()
-
-    df_performances["Performance_Average"] = df_performances.mean(axis=1)
-
-    return df_performances
 
 
 def persist_metrics(

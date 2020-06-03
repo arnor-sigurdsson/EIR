@@ -1,14 +1,12 @@
 from copy import deepcopy
 from math import isclose
-from pathlib import Path
-from typing import Dict, Tuple
 
-import pandas as pd
 import pytest
 import torch
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+
 from human_origins_supervised import train
 from human_origins_supervised.train_utils import metrics
-from sklearn.preprocessing import StandardScaler, LabelEncoder
 
 
 def test_calculate_batch_metrics():
@@ -245,53 +243,3 @@ def test_add_extra_losses(get_l1_test_model):
         extra_loss_functions=extra_loss_functions_with_l1_multiple,
     )
     assert total_loss == 30.0
-
-
-@pytest.fixture
-def get_performance_average_files(tmp_path) -> Tuple[Dict[str, Path], Dict]:
-    test_list = [[0.1], [0.3], [0.2], [0.4]]
-
-    files = {}
-    columns = ["Origin_mcc", "Height_loss", "ExtraOrigin_mcc"]
-    target_columns = {"con": ["Height"], "cat": ["Origin", "ExtraOrigin"]}
-    for i in range(3):
-
-        cur_column = columns[i]
-
-        df = pd.DataFrame(test_list, columns=[cur_column])
-
-        df.index.name = "iteration"
-        file_path = tmp_path / f"test_val_{i}.csv"
-        df.to_csv(file_path)
-
-        target_name = cur_column.split("_")[0]
-        files[target_name] = file_path
-
-    return files, target_columns
-
-
-def test_get_best_average_performance(get_performance_average_files):
-    test_dict, test_target_columns = get_performance_average_files
-
-    test_best_performance = metrics.get_best_average_performance(
-        val_metrics_files=test_dict, target_columns=test_target_columns
-    )
-    assert isclose(0.466666, test_best_performance, rel_tol=1e-5)
-
-
-def test_get_overall_performance(get_performance_average_files):
-    """
-    Remember that the continuous loss performance is 1 - loss.
-    """
-
-    test_dict, test_target_columns = get_performance_average_files
-
-    test_df_perfs = metrics._get_overall_performance(
-        val_metrics_files=test_dict, target_columns=test_target_columns
-    )
-
-    assert (test_df_perfs["Height"].values == [0.9, 0.7, 0.8, 0.6]).all()
-
-    expected_cat_columns = [0.1, 0.3, 0.2, 0.4]
-    assert (test_df_perfs["Origin"].values == expected_cat_columns).all()
-    assert (test_df_perfs["ExtraOrigin"].values == expected_cat_columns).all()
