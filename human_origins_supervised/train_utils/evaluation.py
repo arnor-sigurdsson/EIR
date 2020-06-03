@@ -213,7 +213,7 @@ def get_most_wrong_cls_preds(
     correct_label_prob = all_wrong_probs[
         np.arange(wrong_indices.shape[0]), correct_labels_for_misclassified
     ]
-    assert correct_label_prob.max() < 0.5
+    assert correct_label_prob.max() <= 0.5
 
     wrong_pred_labels = val_preds[wrong_indices]
     wrong_label_pred_prob = all_wrong_probs[
