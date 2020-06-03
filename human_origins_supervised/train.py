@@ -5,7 +5,7 @@ from functools import partial
 from os.path import abspath
 from pathlib import Path
 from sys import platform
-from typing import Callable, Union, Tuple, List, Dict, overload, TYPE_CHECKING
+from typing import Union, Tuple, List, Dict, overload, TYPE_CHECKING, Callable
 
 import configargparse
 import numpy as np
@@ -47,12 +47,23 @@ from human_origins_supervised.train_utils.metrics import (
     UncertaintyMultiTaskLoss,
     get_extra_loss_term_functions,
     add_extra_losses,
+    get_average_history_filepath,
+    calc_mcc,
+    calc_roc_auc_ovr,
+    calc_acc,
+    calc_rmse,
+    calc_pcc,
+    calc_r2,
+    calc_average_precision_ovr,
+    MetricRecord,
 )
 from human_origins_supervised.train_utils.train_handlers import configure_trainer
 
 if TYPE_CHECKING:
-    from human_origins_supervised.train_utils.metrics import al_step_metric_dict
-    from human_origins_supervised.models.models import CNNModel, MLPModel  # noqa: F401
+    from human_origins_supervised.train_utils.metrics import (
+        al_step_metric_dict,
+        al_metric_record_dict,
+    )
 
 # aliases
 al_criterions = Dict[str, Union[nn.CrossEntropyLoss, nn.MSELoss]]
@@ -62,6 +73,9 @@ al_training_labels_extra = Dict[str, Union[List[str], torch.Tensor]]
 al_training_labels_batch = Dict[
     str, Union[al_training_labels_target, al_training_labels_extra]
 ]
+al_averaging_functions_dict = Dict[
+    str, Callable[["al_step_metric_dict", str, str], float]
+]
 
 torch.manual_seed(0)
 np.random.seed(0)
@@ -70,6 +84,11 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
 @dataclass
+class CustomHooks:
+    metrics: Dict
+
+
+@dataclass(frozen=True)
 class Config:
     """
     The idea of this class is to keep track of objects that need to be used
@@ -91,9 +110,13 @@ class Config:
     target_columns: al_target_columns
     data_width: int
     writer: SummaryWriter
+    metrics: "al_metric_record_dict"
+    custom_hooks: Union[CustomHooks, None]
 
 
-def main(cl_args: argparse.Namespace) -> None:
+def main(
+    cl_args: argparse.Namespace, custom_hooks: Union[CustomHooks, None] = None
+) -> None:
     run_folder = _prepare_run_folder(run_name=cl_args.run_name)
 
     train_dataset, valid_dataset = datasets.set_up_datasets(cl_args=cl_args)
@@ -141,6 +164,10 @@ def main(cl_args: argparse.Namespace) -> None:
 
     optimizer = get_optimizer(model=model, loss_callable=loss_func, cl_args=cl_args)
 
+    metrics = _get_default_metrics(
+        target_transformers=train_dataset.target_transformers
+    )
+
     config = Config(
         cl_args=cl_args,
         train_loader=train_dloader,
@@ -155,6 +182,8 @@ def main(cl_args: argparse.Namespace) -> None:
         target_columns=train_dataset.target_columns,
         data_width=train_dataset.data_width,
         writer=writer,
+        metrics=metrics,
+        custom_hooks=custom_hooks,
     )
 
     _log_num_params(model=model)
@@ -171,7 +200,9 @@ def main(cl_args: argparse.Namespace) -> None:
 
 def _prepare_run_folder(run_name: str) -> Path:
     run_folder = utils.get_run_folder(run_name=run_name)
-    history_file = run_folder / "t_average_history.log"
+    history_file = get_average_history_filepath(
+        run_folder=run_folder, train_or_val_target_prefix="train_"
+    )
     if history_file.exists():
         raise FileExistsError(
             f"There already exists a run with that name: {history_file}. Please choose "
@@ -422,6 +453,61 @@ def get_summary_writer(run_folder: Path) -> SummaryWriter:
     return writer
 
 
+def _get_default_metrics(
+    target_transformers: al_label_transformers,
+) -> "al_metric_record_dict":
+    mcc = MetricRecord(name="mcc", function=calc_mcc)
+    acc = MetricRecord(name="acc", function=calc_acc)
+    rmse = MetricRecord(
+        name="rmse",
+        function=partial(calc_rmse, target_transformers=target_transformers),
+        minimize_goal=True,
+    )
+
+    default_metrics = {
+        "cat": (mcc, acc),
+        "con": (rmse,),
+        "averaging_functions": {"con": "loss", "cat": "acc"},
+    }
+
+    # TODO: temporary metrics for testing
+    roc_auc_macro = MetricRecord(
+        name="roc-auc-macro", function=calc_roc_auc_ovr, only_val=True
+    )
+    ap_macro = MetricRecord(
+        name="ap-macro", function=calc_average_precision_ovr, only_val=True
+    )
+    r2 = MetricRecord(name="r2", function=calc_r2, only_val=True)
+    pcc = MetricRecord(name="pcc", function=calc_pcc, only_val=True)
+
+    averaging_functions = _get_default_performance_averaging_functions()
+    default_metrics = {
+        "cat": (mcc, acc, roc_auc_macro, ap_macro),
+        "con": (rmse, r2, pcc),
+        "averaging_functions": averaging_functions,
+    }
+    return default_metrics
+
+
+def _get_default_performance_averaging_functions() -> al_averaging_functions_dict:
+    def _calc_cat_averaging_value(
+        metric_dict: "al_step_metric_dict", column_name: str, metric_name: str
+    ) -> float:
+        return metric_dict[column_name][f"{column_name}_{metric_name}"]
+
+    def _calc_con_averaging_value(
+        metric_dict: "al_step_metric_dict", column_name: str, metric_name: str
+    ) -> float:
+        return 1 - metric_dict[column_name][f"{column_name}_{metric_name}"]
+
+    performance_averaging_functions = {
+        "cat": partial(_calc_cat_averaging_value, metric_name="mcc"),
+        "con": partial(_calc_con_averaging_value, metric_name="loss"),
+    }
+
+    return performance_averaging_functions
+
+
 def _log_num_params(model: nn.Module) -> None:
     no_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     logger.info(
@@ -471,23 +557,23 @@ def train(config: Config) -> None:
         train_loss_final.backward()
         c.optimizer.step()
 
-        batch_metrics_dict = calculate_batch_metrics(
+        train_batch_metrics = calculate_batch_metrics(
             target_columns=c.target_columns,
-            target_transformers=c.target_transformers,
             losses=train_losses,
             outputs=train_outputs,
             labels=target_labels,
-            prefix="t_",
+            mode="train",
+            metric_record_dict=c.metrics,
         )
 
-        batch_metrics_dict_w_avgs = add_multi_task_average_metrics(
-            batch_metrics_dict=batch_metrics_dict,
+        train_batch_metrics_with_averages = add_multi_task_average_metrics(
+            batch_metrics_dict=train_batch_metrics,
             target_columns=c.target_columns,
-            prefix="t_",
             loss=train_loss_avg.item(),
+            performance_average_functions=c.metrics["averaging_functions"],
         )
 
-        return batch_metrics_dict_w_avgs
+        return train_batch_metrics_with_averages
 
     trainer = Engine(process_function=step)
 

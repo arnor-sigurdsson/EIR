@@ -6,6 +6,7 @@ from random import shuffle
 from shutil import rmtree
 from types import SimpleNamespace
 from typing import List, Tuple, Dict
+import warnings
 
 import numpy as np
 import pytest
@@ -459,7 +460,13 @@ def prep_modelling_test_configs(
     model = create_test_model
 
     optimizer = create_test_optimizer
-    criterions = train._get_criterions(train_dataset.target_columns, cl_args.model_type)
+    criterions = train._get_criterions(
+        target_columns=train_dataset.target_columns, model_type=cl_args.model_type
+    )
+    metrics = train._get_default_metrics(
+        target_transformers=train_dataset.target_transformers
+    )
+    metrics = _patch_metrics(metrics=metrics)
 
     optimizer, loss_module = create_test_optimizer(
         cl_args=cl_args,
@@ -470,7 +477,7 @@ def prep_modelling_test_configs(
 
     train_dataset, valid_dataset = create_test_datasets
 
-    train._log_num_params(model)
+    train._log_num_params(model=model)
 
     config = Config(
         cl_args=cl_args,
@@ -481,11 +488,13 @@ def prep_modelling_test_configs(
         optimizer=optimizer,
         criterions=criterions,
         loss_function=loss_module,
+        metrics=metrics,
         labels_dict=train_dataset.labels_dict,
         target_transformers=train_dataset.target_transformers,
         target_columns=train_dataset.target_columns,
         data_width=train_dataset.data_width,
         writer=train.get_summary_writer(run_folder=Path("runs", cl_args.run_name)),
+        custom_hooks=None,
     )
 
     test_config = _get_cur_modelling_test_config(
@@ -493,6 +502,19 @@ def prep_modelling_test_configs(
     )
 
     return config, test_config
+
+
+def _patch_metrics(metrics):
+    warnings.warn(
+        "This function will soon be deprecated as conftest will need to "
+        "create its own metrics when train.py default metrics will be "
+        "minimal.",
+        category=DeprecationWarning,
+    )
+    for type_ in ("cat", "con"):
+        for metric_record in metrics[type_]:
+            metric_record.only_val = False
+    return metrics
 
 
 def _get_cur_modelling_test_config(

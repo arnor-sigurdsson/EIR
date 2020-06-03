@@ -16,7 +16,10 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim.optimizer import Optimizer
 
 from human_origins_supervised.train_utils.utils import get_run_folder
-from human_origins_supervised.train_utils.metrics import read_metrics_history_file
+from human_origins_supervised.train_utils.metrics import (
+    read_metrics_history_file,
+    get_average_history_filepath,
+)
 
 if TYPE_CHECKING:
     from human_origins_supervised.train_utils.train_handlers import HandlerConfig
@@ -62,14 +65,18 @@ def attach_lr_scheduler(
 def _get_reduce_lr_on_plateu_step_params(
     cl_args: Namespace, optimizer: Optimizer
 ) -> Dict:
-    eval_history_fpath = get_run_folder(cl_args.run_name) / "v_average_history.log"
+
+    run_folder = get_run_folder(run_name=cl_args.run_name)
+    validation_history_fpath = get_average_history_filepath(
+        run_folder=run_folder, train_or_val_target_prefix="validation_"
+    )
 
     warmup_steps = _get_warmup_steps_from_cla(
         warmup_steps_arg=cl_args.warmup_steps, optimizer=optimizer
     )
 
     params = {
-        "eval_history_fpath": eval_history_fpath,
+        "validation_history_fpath": validation_history_fpath,
         "optimizer": optimizer,
         "sample_interval": cl_args.sample_interval,
         "lr_upper_bound": cl_args.lr,
@@ -93,7 +100,7 @@ def set_up_lr_scheduler(
     def _get_cycle_iter_size(warmup_steps_: int) -> int:
         steps = len(c.train_loader)
         if cl_args.lr_schedule == "cosine":
-            steps = steps * c.cl_args.n_epochs - warmup_steps_
+            steps = max(2, steps * c.cl_args.n_epochs - warmup_steps_)
 
         return steps
 
@@ -282,7 +289,7 @@ def _step_reduce_on_plateau_scheduler(
     lr_lower_bound: float,
     sample_interval: int,
     reduce_on_plateau_scheduler: ReduceLROnPlateau,
-    eval_history_fpath: Path,
+    validation_history_fpath: Path,
     warmup_steps: Union[None, int],
 ) -> None:
     """
@@ -308,8 +315,10 @@ def _step_reduce_on_plateau_scheduler(
         if iteration % sample_interval == 0 and not isclose(cur_lr, lr_lower_bound):
             _log_reduce_on_plateu_step(reduce_on_plateau_scheduler, iteration)
 
-            eval_df = read_metrics_history_file(eval_history_fpath)
-            latest_val_loss = eval_df["v_loss-average"].iloc[-1]
+            validation_df = read_metrics_history_file(
+                file_path=validation_history_fpath
+            )
+            latest_val_loss = validation_df["loss-average"].iloc[-1]
             reduce_on_plateau_scheduler.step(latest_val_loss)
 
 

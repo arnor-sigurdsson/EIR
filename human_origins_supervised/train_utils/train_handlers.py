@@ -8,13 +8,8 @@ from typing import List, Callable, Union, Tuple, TYPE_CHECKING, Dict
 
 import pandas as pd
 from aislib.misc_utils import get_logger
-from ignite.contrib.handlers import ProgressBar
-from ignite.engine import Events, Engine
-from ignite.handlers import ModelCheckpoint
-from ignite.metrics import RunningAverage
-from torch.utils.tensorboard import SummaryWriter
-
 from human_origins_supervised.data_load.data_utils import get_target_columns_generator
+from human_origins_supervised.data_load.label_setup import al_target_columns
 from human_origins_supervised.train_utils import H_PARAMS
 from human_origins_supervised.train_utils.activation_analysis import (
     activation_analysis_handler,
@@ -24,18 +19,23 @@ from human_origins_supervised.train_utils.lr_scheduling import (
     set_up_lr_scheduler,
     attach_lr_scheduler,
 )
-from human_origins_supervised.train_utils.metrics import get_train_metrics
+from human_origins_supervised.train_utils.metrics import (
+    get_metrics_dataframes,
+    persist_metrics,
+    get_metrics_files,
+    al_metric_record_dict,
+    MetricRecord,
+)
 from human_origins_supervised.train_utils.utils import (
     get_custom_module_submodule,
     get_run_folder,
 )
 from human_origins_supervised.visualization import visualization_funcs as vf
-from human_origins_supervised.train_utils.metrics import (
-    get_metrics_dataframes,
-    get_best_average_performance,
-    persist_metrics,
-    get_metrics_files,
-)
+from ignite.contrib.handlers import ProgressBar
+from ignite.engine import Events, Engine
+from ignite.handlers import ModelCheckpoint
+from ignite.metrics import RunningAverage
+from torch.utils.tensorboard import SummaryWriter
 
 if TYPE_CHECKING:
     from human_origins_supervised.train import Config
@@ -65,7 +65,9 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
     pbar = ProgressBar()
     run_name = cl_args.run_name
 
-    monitoring_metrics = _get_monitoring_metrics(target_columns=config.target_columns)
+    monitoring_metrics = _get_monitoring_metrics(
+        target_columns=config.target_columns, metric_record_dict=config.metrics
+    )
 
     handler_config = HandlerConfig(
         config=config,
@@ -100,7 +102,7 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
     _attach_running_average_metrics(
         engine=trainer, monitoring_metrics=monitoring_metrics
     )
-    pbar.attach(engine=trainer, metric_names=["t_loss-average"])
+    pbar.attach(engine=trainer, metric_names=["loss-average"])
 
     trainer.add_event_handler(
         event_name=Events.EPOCH_COMPLETED,
@@ -127,26 +129,38 @@ def _do_run_completed_handler(iter_per_epoch: int, n_epochs: int, sample_interva
     return False
 
 
-def _get_monitoring_metrics(target_columns) -> List[Tuple[str, str]]:
+def _get_monitoring_metrics(
+    target_columns: al_target_columns, metric_record_dict: al_metric_record_dict
+) -> List[Tuple[str, str]]:
     """
     The spec for the tuple here follows the metric dict spec, i.e. the tuple is:
     (column_name, metric).
     """
-    target_columns_gen = get_target_columns_generator(target_columns)
+    target_columns_gen = get_target_columns_generator(target_columns=target_columns)
 
-    loss_average_metrics = tuple(["t_average", "t_loss-average"])
-    perf_average_metrics = tuple(["t_average", "t_perf-average"])
+    loss_average_metrics = tuple(["average", "loss-average"])
+    perf_average_metrics = tuple(["average", "perf-average"])
     monitoring_metrics = [loss_average_metrics, perf_average_metrics]
+
+    def _parse_target_metrics(metric_name: str, column_name_: str) -> str:
+        return f"{column_name_}_{metric_name}"
 
     for column_type, column_name in target_columns_gen:
 
-        cur_metrics = get_train_metrics(
-            column_type=column_type, prefix=f"t_{column_name}"
-        )
+        cur_metric_records: Tuple[MetricRecord, ...] = metric_record_dict[column_type]
 
-        for metric in cur_metrics:
-            cur_tuple = tuple([column_name, metric])
-            monitoring_metrics.append(cur_tuple)
+        for metric in cur_metric_records:
+            if not metric.only_val:
+
+                parsed_metric = _parse_target_metrics(
+                    metric_name=metric.name, column_name_=column_name
+                )
+                cur_tuple = tuple([column_name, parsed_metric])
+                monitoring_metrics.append(cur_tuple)
+
+        # manually add loss record as it's not in metric records, but from criterions
+        loss_name = _parse_target_metrics(metric_name="loss", column_name_=column_name)
+        monitoring_metrics.append(tuple([column_name, loss_name]))
 
     return monitoring_metrics
 
@@ -185,7 +199,7 @@ def _attach_running_average_metrics(
 def _log_stats_to_pbar(engine: Engine, handler_config: HandlerConfig) -> None:
     log_string = f"[Epoch {engine.state.epoch}/{engine.state.max_epochs}]"
 
-    key = "t_loss-average"
+    key = "loss-average"
     value = engine.state.metrics[key]
     log_string += f" | {key}: {value:.4g}"
 
@@ -281,7 +295,7 @@ def _write_training_metrics_handler(engine: Engine, handler_config: HandlerConfi
         metrics_dict=running_average_metrics,
         iteration=iteration,
         write_header=is_first_iteration,
-        prefixes={"metrics": "t_", "writer": "train"},
+        prefixes={"metrics": "train_", "writer": "train"},
     )
 
 
@@ -382,35 +396,33 @@ def add_hparams_to_tensorboard(
     )
 
     c = config
-    run_folder = get_run_folder(c.cl_args.run_name)
+    run_folder = get_run_folder(run_name=c.cl_args.run_name)
 
     metrics_files = get_metrics_files(
-        target_columns=c.target_columns, run_folder=run_folder, target_prefix="v_"
+        target_columns=c.target_columns,
+        run_folder=run_folder,
+        train_or_val_target_prefix="validation_",
     )
 
     try:
-        best_overall_performance = get_best_average_performance(
-            val_metrics_files=metrics_files, target_columns=c.target_columns
-        )
-        average_loss_file = metrics_files["v_average"]
+        average_loss_file = metrics_files["average"]
         average_loss_df = pd.read_csv(average_loss_file)
 
     except FileNotFoundError as e:
         logger.debug(
-            "Could not find %s at exit. " "Tensorboard hyper parameters not logged.",
+            "Could not find %s at exit. Tensorboard hyper parameters not logged.",
             e.filename,
         )
         return
 
     h_param_dict = _generate_h_param_dict(cl_args=c.cl_args, h_params=h_params)
-    min_loss = average_loss_df["v_loss-average"].min()
+
+    min_loss = average_loss_df["loss-average"].min()
+    max_perf = average_loss_df["perf-average"].max()
 
     writer.add_hparams(
         h_param_dict,
-        {
-            "v_loss-overall_min": min_loss,
-            "best_overall_performance": best_overall_performance,
-        },
+        {"validation_loss-overall_min": min_loss, "best_overall_performance": max_perf},
     )
 
 

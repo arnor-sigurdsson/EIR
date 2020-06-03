@@ -187,14 +187,18 @@ def _check_test_performance_results(
     run_path: Path, target_column: str, metric: str, threshold: float
 ):
     target_column_results_folder = run_path / "results" / target_column
-    train_history_path = target_column_results_folder / f"t_{target_column}_history.log"
-    valid_history_path = target_column_results_folder / f"v_{target_column}_history.log"
+    train_history_path = (
+        target_column_results_folder / f"train_{target_column}_history.log"
+    )
+    valid_history_path = (
+        target_column_results_folder / f"validation_{target_column}_history.log"
+    )
 
     df_train = pd.read_csv(train_history_path)
-    assert df_train.loc[:, f"t_{target_column}_{metric}"].max() > threshold
+    assert df_train.loc[:, f"{target_column}_{metric}"].max() > threshold
 
     df_valid = pd.read_csv(valid_history_path)
-    assert df_valid.loc[:, f"v_{target_column}_{metric}"].max() > threshold
+    assert df_valid.loc[:, f"{target_column}_{metric}"].max() > threshold
 
 
 @pytest.mark.parametrize(
