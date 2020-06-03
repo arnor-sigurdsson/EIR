@@ -3,14 +3,14 @@ from human_origins_supervised.train_utils import train_handlers
 
 def test_unflatten_engine_metrics_dict():
     test_step_base = {
-        "Origin": {"t_Origin_mcc": 0.9, "t_Origin_loss": 0.1},
-        "Height": {"t_Height_pcc": 0.9, "t_Height_rmse": 0.1},
+        "Origin": {"Origin_mcc": 0.9, "Origin_loss": 0.1},
+        "Height": {"Height_pcc": 0.9, "Height_rmse": 0.1},
     }
     test_flat_metrics_dict = {
-        "t_Origin_mcc": 0.99,
-        "t_Origin_loss": 0.11,
-        "t_Height_pcc": 0.99,
-        "t_Height_rmse": 0.11,
+        "Origin_mcc": 0.99,
+        "Origin_loss": 0.11,
+        "Height_pcc": 0.99,
+        "Height_rmse": 0.11,
     }
 
     test_output = train_handlers._unflatten_engine_metrics_dict(
@@ -18,11 +18,11 @@ def test_unflatten_engine_metrics_dict():
     )
 
     # we want to make sure the original values are present
-    assert test_output["Origin"]["t_Origin_mcc"] == 0.99
-    assert test_output["Height"]["t_Height_pcc"] == 0.99
+    assert test_output["Origin"]["Origin_mcc"] == 0.99
+    assert test_output["Height"]["Height_pcc"] == 0.99
 
-    assert test_output["Origin"]["t_Origin_loss"] == 0.11
-    assert test_output["Height"]["t_Height_rmse"] == 0.11
+    assert test_output["Origin"]["Origin_loss"] == 0.11
+    assert test_output["Height"]["Height_rmse"] == 0.11
 
 
 def test_generate_h_param_dict(args_config):

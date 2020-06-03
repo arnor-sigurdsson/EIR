@@ -1,14 +1,12 @@
 from pathlib import Path
 from textwrap import wrap
-from typing import List, Callable, Union, Tuple, TYPE_CHECKING
+from typing import List, Callable, Union, Tuple, TYPE_CHECKING, Dict
 
 import matplotlib
 import numpy as np
 import pandas as pd
-from scipy.stats import pearsonr
 from sklearn.metrics import (
     roc_curve,
-    r2_score,
     auc,
     precision_recall_curve,
     average_precision_score,
@@ -24,6 +22,8 @@ from matplotlib.ticker import MaxNLocator
 
 from aislib.misc_utils import get_logger
 
+from human_origins_supervised.train_utils import metrics
+
 if TYPE_CHECKING:
     from human_origins_supervised.train_utils.evaluation import PerformancePlotConfig
 
@@ -31,42 +31,53 @@ if TYPE_CHECKING:
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
-def generate_training_curve(
-    train_series: pd.Series,
-    valid_series: pd.Series,
-    output_folder: Path,
-    title_extra: str = "",
-    skiprows: int = 200,
-) -> None:
+def add_series_to_axis(
+    ax_object: plt.Axes,
+    series: pd.Series,
+    skiprows: int,
+    ax_plot_kwargs: Union[Dict, None] = None,
+) -> plt.Axes:
 
-    fig, ax_1 = plt.subplots()
+    if ax_plot_kwargs is None:
+        ax_plot_kwargs = {}
+    series_cut = series[series.index > skiprows]
 
-    train_series_cut = train_series[train_series.index > skiprows]
-    valid_series_cut = valid_series[valid_series.index > skiprows]
+    xlim_upper = series_cut.shape[0] + skiprows
+    xticks = np.arange(1 + skiprows, xlim_upper + 1)
 
-    if len(train_series_cut) == 0:
-        return
+    if ax_plot_kwargs is None:
+        ax_plot_kwargs = {}
 
-    extreme_func = _get_min_or_max_funcs(train_series_cut.name)
+    ax_object.plot(
+        xticks, series_cut.values, zorder=1, alpha=0.5, linewidth=0.8, **ax_plot_kwargs
+    )
+
+    # plt actually uses the '_' internally
+    lines_to_legend = [
+        line for line in ax_object.lines if not line.get_label().startswith("_")
+    ]
+    labels_to_legend = [line.get_label() for line in lines_to_legend]
+    ax_object.legend(lines_to_legend, labels_to_legend)
+
+    return ax_object
+
+
+def generate_validation_curve_from_series(
+    series: pd.Series, title_extra: str = "", skiprows: int = 200
+) -> Tuple[plt.Figure, plt.Axes]:
+    fig, ax = plt.subplots()
+
+    valid_series_cut = series[series.index > skiprows]
+
+    extreme_func = _get_min_or_max_funcs(valid_series_cut.name)
     extreme_valid_idx, extreme_valid_value = _get_validation_extreme_value_and_iter(
         extreme_func, valid_series_cut
     )
 
-    xlim_upper = train_series_cut.shape[0] + skiprows
-    xticks = np.arange(1 + skiprows, xlim_upper + 1)
-
-    line_1a = ax_1.plot(
-        xticks,
-        train_series_cut.values,
-        c="orange",
-        label="Train",
-        zorder=1,
-        alpha=0.5,
-        linewidth=0.8,
-    )
+    xlim_upper = valid_series_cut.index.max()
 
     validation_xticks = valid_series_cut.index
-    line_1b = ax_1.plot(
+    lines = ax.plot(
         validation_xticks,
         valid_series_cut.values,
         c="red",
@@ -76,27 +87,25 @@ def generate_training_curve(
         zorder=0,
     )
 
-    ax_1.axhline(y=extreme_valid_value, linewidth=0.4, c="red", linestyle="dashed")
+    ax.axhline(y=extreme_valid_value, linewidth=0.4, c="red", linestyle="dashed")
 
-    ax_1.set(title=title_extra)
+    ax.set(title=title_extra)
 
-    ax_1.set_xlabel("Iteration")
-    y_label = _parse_metrics_colname(train_series_cut.name)
-    ax_1.set_ylabel(y_label)
+    ax.set_xlabel("Iteration")
+    y_label = _parse_metrics_colname(valid_series_cut.name)
+    ax.set_ylabel(y_label)
 
-    ax_1.set_xlim(left=skiprows + 1, right=xlim_upper)
-    ax_1.xaxis.set_major_locator(MaxNLocator(integer=True))
+    ax.set_xlim(left=skiprows + 1, right=xlim_upper)
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     if xlim_upper > 1e4:
-        ax_1.ticklabel_format(style="sci", axis="x", scilimits=(0, 0))
+        ax.ticklabel_format(style="sci", axis="x", scilimits=(0, 0))
 
-    lines = line_1a + line_1b
     labels = [line.get_label() for line in lines]
-    ax_1.legend(lines, labels)
+    ax.legend(lines, labels)
 
     plt.grid()
 
-    plt.savefig(output_folder / f"training_curve_{y_label}.png", dpi=200)
-    plt.close("all")
+    return fig, ax
 
 
 def _get_min_or_max_funcs(
@@ -114,8 +123,7 @@ def _get_min_or_max_funcs(
     return func
 
 
-def _parse_metrics_colname(column_name: str):
-    assert column_name.startswith("v_") or column_name.startswith("t_")
+def _parse_metrics_colname(column_name: str) -> str:
 
     return column_name.split("_")[-1].upper()
 
@@ -207,10 +215,10 @@ def generate_regression_prediction_plot(
     y_true = transformer.inverse_transform(y_true.reshape(-1, 1))
     y_outp = transformer.inverse_transform(y_outp.reshape(-1, 1))
 
-    r2 = r2_score(y_true, y_outp)
-    pcc = pearsonr(y_true.squeeze(), y_outp.squeeze())[0]
+    r2 = metrics.calc_r2(outputs=y_outp, labels=y_true)
+    pcc = metrics.calc_pcc(outputs=y_outp, labels=y_true)
 
-    ax.scatter(y_outp, y_true, edgecolors=(0, 0, 0), alpha=0.2, s=10)
+    ax.scatter(x=y_outp, y=y_true, edgecolors=(0, 0, 0), alpha=0.2, s=10)
     ax.text(
         x=0.05,
         y=0.95,
@@ -240,7 +248,7 @@ def generate_binary_roc_curve(
 ):
     y_true_bin = label_binarize(y_true, classes=[0, 1])
     fpr, tpr, _ = roc_curve(y_true_bin, y_outp[:, 1])
-    roc_auc = auc(fpr, tpr)
+    roc_auc = metrics.calc_roc_auc_ovr(outputs=y_outp, labels=y_true)
 
     plt.plot(fpr, tpr, lw=2, label=f"(area = {roc_auc:0.4g})")
 
@@ -267,7 +275,9 @@ def generate_binary_pr_curve(
 ):
     y_true_bin = label_binarize(y_true, classes=[0, 1])
     precision, recall, _ = precision_recall_curve(y_true_bin, y_outp[:, 1])
-    average_precision = average_precision_score(y_true_bin, y_outp[:, 1])
+    average_precision = metrics.calc_average_precision_ovr(
+        outputs=y_outp, labels=y_true
+    )
 
     plt.step(
         recall,
@@ -300,7 +310,7 @@ def generate_binary_prediction_distribution(
 ):
     y_true_bin = label_binarize(y_true, classes=[0, 1])
     fpr, tpr, _ = roc_curve(y_true_bin, y_outp[:, 1])
-    roc_auc = auc(fpr, tpr)
+    roc_auc = metrics.calc_roc_auc_ovr(outputs=y_outp, labels=y_true)
 
     classes = transformer.classes_
     fig, ax = plt.subplots()
@@ -354,7 +364,6 @@ def generate_multi_class_roc_curve(
         roc_auc[i] = auc(fpr[i], tpr[i])
 
     fpr["micro"], tpr["micro"], _ = roc_curve(y_true_bin.ravel(), y_outp.ravel())
-    roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
 
     all_fpr = np.unique(np.concatenate([fpr[i] for i in range(n_classes)]))
 
@@ -368,13 +377,18 @@ def generate_multi_class_roc_curve(
 
     fpr["macro"] = all_fpr
     tpr["macro"] = mean_tpr
-    roc_auc["macro"] = auc(fpr["macro"], tpr["macro"])
+    roc_auc_macro = metrics.calc_roc_auc_ovr(
+        outputs=y_outp, labels=y_true, average="macro"
+    )
+    roc_auc_micro = metrics.calc_roc_auc_ovr(
+        outputs=y_outp, labels=y_true, average="micro"
+    )
 
     plt.figure(figsize=(12, 8))
     plt.plot(
         fpr["micro"],
         tpr["micro"],
-        label=f'micro-average ROC curve (area = {roc_auc["micro"]:0.4g})',
+        label=f"micro-average ROC curve (area = {roc_auc_micro:0.4g})",
         color="deeppink",
         linestyle=":",
         linewidth=4,
@@ -383,7 +397,7 @@ def generate_multi_class_roc_curve(
     plt.plot(
         fpr["macro"],
         tpr["macro"],
-        label=f'macro-average ROC curve (area = {roc_auc["macro"]:0.4g})',
+        label=f"macro-average ROC curve (area = {roc_auc_macro:0.4g})",
         color="navy",
         linestyle=":",
         linewidth=4,
@@ -443,9 +457,10 @@ def generate_multi_class_pr_curve(
     precision["micro"], recall["micro"], _ = precision_recall_curve(
         y_true_bin.ravel(), y_outp.ravel()
     )
-    average_precision["micro"] = average_precision_score(
-        y_true_bin, y_outp, average="micro"
+    average_precision_micro = metrics.calc_average_precision_ovr(
+        outputs=y_outp, labels=y_true, average="micro"
     )
+
     plt.figure(figsize=(12, 8))
 
     plt.plot(
@@ -454,7 +469,7 @@ def generate_multi_class_pr_curve(
         color="gold",
         lw=2,
         label=f"Micro-Average Precision-Recall "
-        f'(area = {average_precision["micro"]:0.4g})',
+        f"(area = {average_precision_micro:0.4g})",
     )
 
     colors = iter(cm.tab20(np.arange(n_classes)))
@@ -557,18 +572,30 @@ def generate_all_training_curves(
     plot_skip_steps: int,
     title_extra: str = "",
 ) -> None:
-    metrics = ["_".join(i.split("_")[1:]) for i in training_history_df.columns]
+
+    if training_history_df.shape[0] <= plot_skip_steps:
+        return
+
+    metrics = ["_".join(i.split("_")[:]) for i in valid_history_df.columns]
 
     for metric_suffix in metrics:
-        train_colname = "t_" + metric_suffix
-        valid_colname = "v_" + metric_suffix
-        train_series = training_history_df[train_colname]
-        valid_series = valid_history_df[valid_colname]
+        valid_series = valid_history_df[metric_suffix]
 
-        generate_training_curve(
-            train_series=train_series,
-            valid_series=valid_series,
-            output_folder=output_folder,
-            title_extra=title_extra,
-            skiprows=plot_skip_steps,
+        figure_object, axis_object = generate_validation_curve_from_series(
+            series=valid_series, title_extra=title_extra, skiprows=plot_skip_steps
         )
+
+        if metric_suffix in training_history_df.columns:
+            train_series = training_history_df[metric_suffix]
+            _ = add_series_to_axis(
+                ax_object=axis_object,
+                series=train_series,
+                skiprows=plot_skip_steps,
+                ax_plot_kwargs={"label": "Train", "c": "orange"},
+            )
+
+        fname_identifier = _parse_metrics_colname(column_name=valid_series.name)
+        figure_object.savefig(
+            output_folder / f"training_curve_{fname_identifier}.png", dpi=200
+        )
+        plt.close("all")
