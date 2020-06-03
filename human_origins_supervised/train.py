@@ -5,7 +5,7 @@ from functools import partial
 from os.path import abspath
 from pathlib import Path
 from sys import platform
-from typing import Union, Tuple, List, Dict, overload, TYPE_CHECKING
+from typing import Union, Tuple, List, Dict, overload, TYPE_CHECKING, Callable
 
 import configargparse
 import numpy as np
@@ -71,6 +71,9 @@ al_training_labels_target = Dict[str, Union[torch.LongTensor, torch.Tensor]]
 al_training_labels_extra = Dict[str, Union[List[str], torch.Tensor]]
 al_training_labels_batch = Dict[
     str, Union[al_training_labels_target, al_training_labels_extra]
+]
+al_averaging_functions_dict = Dict[
+    str, Callable[["al_step_metric_dict", str, str], float]
 ]
 
 torch.manual_seed(0)
@@ -401,10 +404,11 @@ def _get_default_metrics(
         function=partial(calc_rmse, target_transformers=target_transformers),
         minimize_goal=True,
     )
+
     default_metrics = {
         "cat": (mcc, acc),
         "con": (rmse,),
-        "average_targets": {"con": "loss", "cat": "acc"},
+        "averaging_functions": {"con": "loss", "cat": "acc"},
     }
 
     # TODO: temporary metrics for testing
@@ -416,12 +420,33 @@ def _get_default_metrics(
     )
     r2 = MetricRecord(name="r2", function=calc_r2, only_val=True)
     pcc = MetricRecord(name="pcc", function=calc_pcc, only_val=True)
+
+    averaging_functions = _get_default_performance_averaging_functions()
     default_metrics = {
         "cat": (mcc, acc, roc_auc_macro, ap_macro),
         "con": (rmse, r2, pcc),
-        "average_targets": {"con": "loss", "cat": "acc"},
+        "averaging_functions": averaging_functions,
     }
     return default_metrics
+
+
+def _get_default_performance_averaging_functions() -> al_averaging_functions_dict:
+    def _calc_cat_averaging_value(
+        metric_dict: "al_step_metric_dict", column_name: str, metric_name: str
+    ) -> float:
+        return metric_dict[column_name][f"{column_name}_{metric_name}"]
+
+    def _calc_con_averaging_value(
+        metric_dict: "al_step_metric_dict", column_name: str, metric_name: str
+    ) -> float:
+        return 1 - metric_dict[column_name][f"{column_name}_{metric_name}"]
+
+    performance_averaging_functions = {
+        "cat": partial(_calc_cat_averaging_value, metric_name="mcc"),
+        "con": partial(_calc_con_averaging_value, metric_name="loss"),
+    }
+
+    return performance_averaging_functions
 
 
 def _log_num_params(model: nn.Module) -> None:
@@ -488,7 +513,7 @@ def train(config: Config) -> None:
             batch_metrics_dict=train_batch_metrics,
             target_columns=c.target_columns,
             loss=train_loss_avg.item(),
-            average_targets=c.metrics["average_targets"],
+            performance_average_functions=c.metrics["averaging_functions"],
         )
 
         return train_batch_metrics_with_averages

@@ -8,12 +8,6 @@ from typing import List, Callable, Union, Tuple, TYPE_CHECKING, Dict
 
 import pandas as pd
 from aislib.misc_utils import get_logger
-from ignite.contrib.handlers import ProgressBar
-from ignite.engine import Events, Engine
-from ignite.handlers import ModelCheckpoint
-from ignite.metrics import RunningAverage
-from torch.utils.tensorboard import SummaryWriter
-
 from human_origins_supervised.data_load.data_utils import get_target_columns_generator
 from human_origins_supervised.data_load.label_setup import al_target_columns
 from human_origins_supervised.train_utils import H_PARAMS
@@ -27,7 +21,6 @@ from human_origins_supervised.train_utils.lr_scheduling import (
 )
 from human_origins_supervised.train_utils.metrics import (
     get_metrics_dataframes,
-    get_best_average_performance,
     persist_metrics,
     get_metrics_files,
     al_metric_record_dict,
@@ -38,6 +31,11 @@ from human_origins_supervised.train_utils.utils import (
     get_run_folder,
 )
 from human_origins_supervised.visualization import visualization_funcs as vf
+from ignite.contrib.handlers import ProgressBar
+from ignite.engine import Events, Engine
+from ignite.handlers import ModelCheckpoint
+from ignite.metrics import RunningAverage
+from torch.utils.tensorboard import SummaryWriter
 
 if TYPE_CHECKING:
     from human_origins_supervised.train import Config
@@ -350,7 +348,7 @@ def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> Non
         training_history_df=train_avg_history_df,
         valid_history_df=valid_avg_history_df,
         output_folder=run_folder,
-        title_extra="Multi Task Average",
+        title_extra=f"Multi Task Average - {'MCC'}",
         plot_skip_steps=cl_args.plot_skip_steps,
     )
 
@@ -407,9 +405,6 @@ def add_hparams_to_tensorboard(
     )
 
     try:
-        best_overall_performance = get_best_average_performance(
-            val_metrics_files=metrics_files, target_columns=c.target_columns
-        )
         average_loss_file = metrics_files["average"]
         average_loss_df = pd.read_csv(average_loss_file)
 
@@ -421,14 +416,13 @@ def add_hparams_to_tensorboard(
         return
 
     h_param_dict = _generate_h_param_dict(cl_args=c.cl_args, h_params=h_params)
+
     min_loss = average_loss_df["loss-average"].min()
+    max_perf = average_loss_df["perf-average"].max()
 
     writer.add_hparams(
         h_param_dict,
-        {
-            "valiation_loss-overall_min": min_loss,
-            "best_overall_performance": best_overall_performance,
-        },
+        {"validation_loss-overall_min": min_loss, "best_overall_performance": max_perf},
     )
 
 

@@ -68,7 +68,7 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
         batch_metrics_dict=eval_metrics_dict,
         target_columns=c.target_columns,
         loss=val_loss_avg.item(),
-        average_targets=c.metrics["average_targets"],
+        performance_average_functions=c.metrics["averaging_functions"],
     )
 
     write_eval_header = True if iteration == cl_args.sample_interval else False
