@@ -217,16 +217,19 @@ def _check_test_performance_results(
                 "run_name": "extra_inputs",
             }
         },
-        {
+        {  # Case 2: Normal multi task with CNN
             "custom_cl_args": {
                 "model_type": "cnn",
                 "target_cat_columns": ["Origin"],
                 "target_con_columns": ["Height", "ExtraTarget"],
             }
         },
-        {
+        {  # Case 3: Normal multi task with MLP, note we have to reduce the LR for
+            # stability and add L1 for regularization
             "custom_cl_args": {
                 "model_type": "mlp",
+                "l1": 1e-3,
+                "lr": 1e-3,
                 "target_cat_columns": ["Origin"],
                 "target_con_columns": ["Height", "ExtraTarget"],
             }

@@ -65,8 +65,8 @@ def test_calculate_final_multi_output():
 
     test_input = torch.zeros(128)
 
-    test_multi_output = models._calculate_task_branch_outputs(
-        input_=test_input, last_module=output_layer_model_dict
+    test_multi_output = models._calculate_module_dict_outputs(
+        input_=test_input, module_dict=output_layer_model_dict
     )
 
     # since the input is zero, we only get the bias
@@ -87,3 +87,44 @@ def test_get_cur_dilation(test_input, expected):
     test_dilation = models._get_cur_dilation(**test_input)
 
     assert test_dilation == expected
+
+
+@pytest.mark.parametrize(
+    "create_test_data", [{"task_type": "multi_task"}], indirect=True
+)
+@pytest.mark.parametrize(
+    "create_test_cl_args",
+    [
+        {  # Case 1: Check that we add and use extra inputs.
+            "custom_cl_args": {
+                "model_type": "cnn",
+                "target_cat_columns": ["Origin"],
+                "extra_con_columns": ["ExtraTarget"],
+                "extra_cat_columns": ["OriginExtraCol"],
+                "target_con_columns": ["Height"],
+                "run_name": "extra_inputs",
+            }
+        }
+    ],
+    indirect=True,
+)
+def test_cnn_model(
+    parse_test_cl_args, create_test_data, create_test_cl_args, create_test_model
+):
+    cnn_test_model = create_test_model
+
+    assert isinstance(cnn_test_model.conv[0], models.FirstBlock)
+    assert True
+
+
+def test_mlp_model(parse_test_cl_args):
+    # parse_test_cl_args to have access to input size for checking dimensions
+    pass
+
+
+def test_logistic_regression_model():
+    pass
+
+
+def test_linear_regression_model():
+    pass

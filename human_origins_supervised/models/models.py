@@ -178,6 +178,8 @@ class ModelBase(nn.Module):
         # TODO: Better to have this a method so fc_extra is explicitly defined?
         if emb_total_dim or con_total_dim:
             extra_dim = emb_total_dim + con_total_dim
+            # we have a specific layer for fc_extra in case it's going straight
+            # to bn or act, ensuring linear before
             self.fc_extra = nn.Linear(extra_dim, extra_dim, bias=False)
             self.fc_repr_and_extra_dim += extra_dim
 
@@ -238,7 +240,26 @@ def _get_multi_task_branches(
         module_dict[key] = task_layer_branch
 
     _assert_uniqueness()
+    _assert_module_dict_uniqueness(module_dict)
     return nn.ModuleDict(module_dict)
+
+
+def _assert_module_dict_uniqueness(module_dict: Dict[str, nn.Sequential]):
+    """
+    We have this function as a safeguard to help us catch if we are reusing modules
+    when they should not be (i.e. if splitting into multiple branches with same layers,
+    one could accidentally reuse the instantiated nn.Modules across branches).
+    """
+    branch_ids = [id(sequential_branch) for sequential_branch in module_dict.values()]
+    assert len(branch_ids) == len(set(branch_ids))
+
+    module_ids = []
+    for sequential_branch in module_dict.values():
+        module_ids += [id(module) for module in sequential_branch]
+
+    num_total_modules = len(module_ids)
+    num_unique_modules = len(set(module_ids))
+    assert num_unique_modules == num_total_modules
 
 
 class CNNModel(ModelBase):
@@ -271,13 +292,7 @@ class CNNModel(ModelBase):
             fc_do=self.cl_args.fc_do,
         )
 
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                # Swish slope is roughly 0.5 around 0
-                nn.init.kaiming_normal_(m.weight, a=0.5, mode="fan_out")
-            elif isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.BatchNorm1d):
-                nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0)
+        self._init_weights()
 
     @property
     def fc_1_in_features(self) -> int:
@@ -287,23 +302,14 @@ class CNNModel(ModelBase):
     def l1_penalized_weights(self) -> torch.Tensor:
         return self.conv[0].conv_1.weight
 
-    def forward(
-        self, x: torch.Tensor, extra_inputs: torch.Tensor = None
-    ) -> Dict[str, torch.Tensor]:
-        out = self.conv(x)
-        out = out.view(out.shape[0], -1)
-
-        out = self.fc_1(out)
-
-        if extra_inputs is not None:
-            out_extra = self.fc_extra(extra_inputs)
-            out = torch.cat((out_extra, out), dim=1)
-
-        out = _calculate_task_branch_outputs(
-            input_=out, last_module=self.multi_task_branches
-        )
-
-        return out
+    def _init_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                # Swish slope is roughly 0.5 around 0
+                nn.init.kaiming_normal_(m.weight, a=0.5, mode="fan_out")
+            elif isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.BatchNorm1d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
 
     @property
     def resblocks(self) -> List[int]:
@@ -321,19 +327,45 @@ class CNNModel(ModelBase):
             return residual_blocks
         return self.cl_args.resblocks
 
+    def forward(
+        self, x: torch.Tensor, extra_inputs: torch.Tensor = None
+    ) -> Dict[str, torch.Tensor]:
+        out = self.conv(x)
+        out = out.view(out.shape[0], -1)
+
+        out = self.fc_1(out)
+
+        if extra_inputs is not None:
+            out_extra = self.fc_extra(extra_inputs)
+            out = torch.cat((out_extra, out), dim=1)
+
+        out = _calculate_module_dict_outputs(
+            input_=out, module_dict=self.multi_task_branches
+        )
+
+        return out
+
 
 class MLPModel(ModelBase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        self.fc_0 = nn.Linear(
+            self.fc_1_in_features, self.cl_args.fc_repr_dim, bias=False
+        )
+
+        self.downsample_fc_0_identities = _get_mlp_downsample_identities_moduledict(
+            num_classes=self.num_classes, in_features=self.fc_repr_and_extra_dim
+        )
+
         self.fc_1 = nn.Sequential(
             OrderedDict(
                 {
-                    "fc_1_linear_1": nn.Linear(
-                        self.fc_1_in_features, self.cl_args.fc_repr_dim, bias=False
-                    ),
-                    "fc_1_act_1": Swish(),
                     "fc_1_bn_1": nn.BatchNorm1d(self.cl_args.fc_repr_dim),
+                    "fc_1_act_1": Swish(),
+                    "fc_1_linear_1": nn.Linear(
+                        self.cl_args.fc_repr_dim, self.cl_args.fc_repr_dim, bias=False
+                    ),
                 }
             )
         )
@@ -345,18 +377,34 @@ class MLPModel(ModelBase):
             fc_do=self.cl_args.fc_do,
         )
 
+        self._init_weights()
+
     @property
     def fc_1_in_features(self) -> int:
         return self.cl_args.target_width * 4
 
     @property
     def l1_penalized_weights(self) -> torch.Tensor:
-        return self.fc_1.fc_1_linear_1.weight
+        return self.fc_0.weight
+
+    def _init_weights(self):
+        for task_branch in self.multi_task_branches.values():
+            nn.init.zeros_(task_branch.fc_3_bn_1.weight)
 
     def forward(
         self, x: torch.Tensor, extra_inputs: torch.Tensor = None
     ) -> Dict[str, torch.Tensor]:
         out = x.view(x.shape[0], -1)
+
+        out = self.fc_0(out)
+
+        identity_inputs = out
+        if extra_inputs is not None:
+            identity_inputs = torch.cat((extra_inputs, identity_inputs), dim=1)
+
+        identities = _calculate_module_dict_outputs(
+            input_=identity_inputs, module_dict=self.downsample_fc_0_identities
+        )
 
         out = self.fc_1(out)
 
@@ -364,18 +412,42 @@ class MLPModel(ModelBase):
             out_extra = self.fc_extra(extra_inputs)
             out = torch.cat((out_extra, out), dim=1)
 
-        out = _calculate_task_branch_outputs(
-            input_=out, last_module=self.multi_task_branches
+        out = _calculate_module_dict_outputs(
+            input_=out, module_dict=self.multi_task_branches
         )
+
+        out = {
+            column_name: feature + identities[column_name]
+            for column_name, feature in out.items()
+        }
 
         return out
 
 
-def _calculate_task_branch_outputs(
-    input_: torch.Tensor, last_module: nn.ModuleDict
+def _get_mlp_downsample_identities_moduledict(
+    num_classes: Dict[str, int], in_features: int
+) -> nn.ModuleDict:
+    """
+    Currently redundant cast to `nn.Sequential` here for compatibility with
+    `assert_module_dict_uniqueness`.
+    """
+    module_dict = {}
+    for key, cur_num_output_classes in num_classes.items():
+        module_dict[key] = nn.Sequential(
+            nn.Linear(
+                in_features=in_features, out_features=cur_num_output_classes, bias=True
+            )
+        )
+
+    _assert_module_dict_uniqueness(module_dict)
+    return nn.ModuleDict(module_dict)
+
+
+def _calculate_module_dict_outputs(
+    input_: torch.Tensor, module_dict: nn.ModuleDict
 ) -> Dict[str, torch.Tensor]:
     final_out = {}
-    for target_column, linear_layer in last_module.items():
+    for target_column, linear_layer in module_dict.items():
         final_out[target_column] = linear_layer(input_)
 
     return final_out
