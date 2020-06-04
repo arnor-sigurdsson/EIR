@@ -22,3 +22,4 @@ repos:
         name: Update requirements.txt
         entry: ./misc/update_reqs.sh
         language: system
+        stages: [manual]

@@ -143,7 +143,7 @@ def _check_warmup_concat_scheduler(
     assert isinstance(warmup_scheduler, PiecewiseLinear)
     assert isinstance(cosine_scheduler, CosineAnnealingScheduler)
 
-    assert lr_scheduler.durations[0] == warmup_steps - 1
+    assert lr_scheduler.durations[0] == warmup_steps
 
 
 def _check_cosine_scheduler(
