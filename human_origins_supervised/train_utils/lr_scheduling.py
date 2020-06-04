@@ -98,6 +98,12 @@ def set_up_lr_scheduler(
     lr_upper_bound = c.cl_args.lr
 
     def _get_cycle_iter_size(warmup_steps_: int) -> int:
+        """
+        Why this weird max(2, ...)? This is because the `ignite`
+        `CosineAnnealingScheduler` expects at least 2 steps, so if we have fewer steps
+        than the warmup period, we have max(2, negative number) = 2 for
+        compatibility.
+        """
         steps = len(c.train_loader)
         if cl_args.lr_schedule == "cosine":
             steps = max(2, steps * c.cl_args.n_epochs - warmup_steps_)
@@ -167,10 +173,6 @@ def _get_cosine_lr_scheduler(
 ) -> Tuple[CosineAnnealingScheduler, Dict]:
 
     """
-    Note that the full cycle of the linear lr_scheduler increases and decreases, hence
-    we use durations as cycle_iter_size // 2 to make the first lr_scheduler only go for
-    the increasing phase.
-
     We return the arguments because the simulate_values are classmethods, which
     we need to pass the arguments too.
     """
@@ -266,17 +268,40 @@ def _attach_warmup_to_scheduler(
     lr_upper_bound: float,
     duration: int,
 ) -> Tuple[ConcatScheduler, Dict]:
+    """
+    We have `patched_duration_for_cosine_end` because attaching a warmup to a cosine
+    scheduler seems to 'offset' it's length by one step. This means that if we have
+    100 warmup steps, and 125 cosine steps, iteration 225 will be in the next cycle
+    of a cosine annealing schedule, meaning the LR upper bound.
 
+    This can be seen by monitoring the iteration and current optimizer LR, which shows
+    e.g. (LR=0.01 iteration=225) when printing the values.
+
+    This happens because internally, the `create_lr_scheduler_with_warmup` `ignite`
+    function reduces the duration of the warmup by one step. That is if we pass in 100
+    warmup steps, steps 1-98 will be in the warmup phase (99 steps in total). This
+    happens because of the following line in `ignite` 0.3:
+
+    milestones_values[-1] = (warmup_duration - 2, warmup_end_value - d)
+
+    So since the warmup steps are 1 less, it means that the cosine annealing will be
+    one step more, meaning that the last step is a new cycle.
+
+    This can be tested quite easily with the `output_simulated_values` argument,
+    which shows the jump in LR in the last cycle if we pass in `durations` unpatched.
+    """
+
+    patched_duration_for_cosine_end = duration + 1
     scheduler_w_warmup = create_lr_scheduler_with_warmup(
         lr_scheduler=lr_scheduler,
         warmup_start_value=lr_lower_bound,
         warmup_end_value=lr_upper_bound,
-        warmup_duration=duration,
+        warmup_duration=patched_duration_for_cosine_end,
     )
 
     concat_scheduler_args = {
         "schedulers": scheduler_w_warmup.schedulers,
-        "durations": [duration],
+        "durations": [patched_duration_for_cosine_end],
     }
 
     return scheduler_w_warmup, concat_scheduler_args
