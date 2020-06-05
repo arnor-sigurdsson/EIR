@@ -11,7 +11,7 @@ from torch import nn
 from human_origins_supervised.data_load.datasets import al_num_classes
 from . import extra_inputs_module
 from .extra_inputs_module import al_emb_lookup_dict
-from .layers import SelfAttention, FirstBlock, Block
+from .layers import SelfAttention, FirstBlock, Block, SplitLinear
 from .model_utils import find_no_resblocks_needed
 
 # type aliases
@@ -387,6 +387,87 @@ class MLPModel(ModelBase):
             num_classes=self.num_classes,
             fc_task_dim=self.fc_task_dim,
             fc_repr_and_extra_dim=self.fc_repr_and_extra_dim,
+            fc_do=self.cl_args.fc_do,
+        )
+
+        self._init_weights()
+
+    @property
+    def fc_1_in_features(self) -> int:
+        return self.cl_args.target_width * 4
+
+    @property
+    def l1_penalized_weights(self) -> torch.Tensor:
+        return self.fc_0.weight
+
+    def _init_weights(self):
+        for task_branch in self.multi_task_branches.values():
+            nn.init.zeros_(task_branch.fc_3_bn_1.weight)
+
+    def forward(
+        self, x: torch.Tensor, extra_inputs: torch.Tensor = None
+    ) -> Dict[str, torch.Tensor]:
+        out = x.view(x.shape[0], -1)
+
+        out = self.fc_0(out)
+
+        identity_inputs = out
+        if extra_inputs is not None:
+            identity_inputs = torch.cat((extra_inputs, identity_inputs), dim=1)
+
+        identities = _calculate_module_dict_outputs(
+            input_=identity_inputs, module_dict=self.downsample_fc_0_identities
+        )
+
+        out = self.fc_1(out)
+
+        if extra_inputs is not None:
+            out_extra = self.fc_extra(extra_inputs)
+            out = torch.cat((out_extra, out), dim=1)
+
+        out = _calculate_module_dict_outputs(
+            input_=out, module_dict=self.multi_task_branches
+        )
+
+        out = {
+            column_name: feature + identities[column_name]
+            for column_name, feature in out.items()
+        }
+
+        return out
+
+
+class SplitMLPModel(ModelBase):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # TODO: Create constructor for MLP models
+
+        self.fc_0 = SplitLinear(
+            self.fc_1_in_features, self.cl_args.fc_repr_dim, bias=True
+        )
+
+        if_feat = 8 * self.cl_args.fc_repr_dim  # TODO: Make dynamic
+        self.downsample_fc_0_identities = _get_downsample_identities_moduledict(
+            num_classes=self.num_classes, in_features=if_feat
+        )
+
+        self.fc_1 = nn.Sequential(
+            OrderedDict(
+                {
+                    "fc_1_bn_1": nn.BatchNorm1d(if_feat),
+                    "fc_1_act_1": Swish(),
+                    "fc_1_linear_1": nn.Linear(
+                        if_feat, self.cl_args.fc_repr_dim, bias=False
+                    ),
+                }
+            )
+        )
+
+        self.multi_task_branches = _get_multi_task_branches(
+            num_classes=self.num_classes,
+            fc_task_dim=self.fc_task_dim,
+            fc_repr_and_extra_dim=self.cl_args.fc_repr_dim,
             fc_do=self.cl_args.fc_do,
         )
 

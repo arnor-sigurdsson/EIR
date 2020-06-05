@@ -1,6 +1,9 @@
+import math
+
 import torch
 from aislib.pytorch_modules import Swish
 from torch import nn
+from torch.nn import Parameter
 
 
 class SelfAttention(nn.Module):
@@ -222,3 +225,66 @@ class Block(AbstractBlock):
         out = out + identity
 
         return out
+
+
+class SplitLinear(nn.Module):
+    __constants__ = ["bias", "in_features", "out_features"]
+
+    def __init__(
+        self,
+        in_features: int,
+        out_features: int,
+        split_size: int = 1000,
+        bias: bool = True,
+    ):
+        super().__init__()
+
+        self.in_features = in_features
+        self.out_features = out_features
+        self.split_size = split_size
+
+        self.weight = Parameter(
+            torch.Tensor(out_features, in_features), requires_grad=True
+        )
+        if bias:
+            self.bias = Parameter(
+                torch.Tensor(out_features * in_features // split_size),
+                requires_grad=True,
+            )
+        else:
+            self.register_parameter("bias", None)
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))
+        if self.bias is not None:
+            fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.weight)
+            bound = 1 / math.sqrt(fan_in)
+            nn.init.uniform_(self.bias, -bound, bound)
+
+    def forward(self, input: torch.Tensor):
+        out = calc_split_input(
+            input=input,
+            weight=self.weight,
+            split_size=self.split_size,
+            bias=self.bias,
+            out_features=self.out_features,
+        )
+        return out
+
+    def extra_repr(self):
+        return "in_features={}, out_features={}, bias={}".format(
+            self.in_features, self.out_features, self.bias is not None
+        )
+
+
+def calc_split_input(
+    input: torch.Tensor, weight: torch.Tensor, split_size: int, bias, out_features: int
+) -> torch.Tensor:
+    out = torch.cat(tuple(input * weight[i] for i in range(out_features)), dim=1)
+    out_split = torch.split(tensor=out, split_size_or_sections=split_size, dim=1)
+    out_aggregated = torch.stack([torch.sum(i, dim=1) for i in out_split], dim=1)
+    if bias is not None:
+        out_aggregated += bias
+
+    return out_aggregated
