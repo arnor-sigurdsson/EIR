@@ -273,6 +273,10 @@ class CNNModel(ModelBase):
         )
         self.no_out_channels = self.conv[-1].out_channels
 
+        self.downsample_conv_identities = _get_downsample_identities_moduledict(
+            num_classes=self.num_classes, in_features=self.fc_1_in_features
+        )
+
         self.fc_1 = nn.Sequential(
             OrderedDict(
                 {
@@ -333,6 +337,10 @@ class CNNModel(ModelBase):
         out = self.conv(x)
         out = out.view(out.shape[0], -1)
 
+        identities = _calculate_module_dict_outputs(
+            input_=out, module_dict=self.downsample_conv_identities
+        )
+
         out = self.fc_1(out)
 
         if extra_inputs is not None:
@@ -342,6 +350,11 @@ class CNNModel(ModelBase):
         out = _calculate_module_dict_outputs(
             input_=out, module_dict=self.multi_task_branches
         )
+
+        out = {
+            column_name: feature + identities[column_name]
+            for column_name, feature in out.items()
+        }
 
         return out
 
@@ -354,7 +367,7 @@ class MLPModel(ModelBase):
             self.fc_1_in_features, self.cl_args.fc_repr_dim, bias=False
         )
 
-        self.downsample_fc_0_identities = _get_mlp_downsample_identities_moduledict(
+        self.downsample_fc_0_identities = _get_downsample_identities_moduledict(
             num_classes=self.num_classes, in_features=self.fc_repr_and_extra_dim
         )
 
@@ -424,7 +437,7 @@ class MLPModel(ModelBase):
         return out
 
 
-def _get_mlp_downsample_identities_moduledict(
+def _get_downsample_identities_moduledict(
     num_classes: Dict[str, int], in_features: int
 ) -> nn.ModuleDict:
     """
