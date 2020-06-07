@@ -234,27 +234,26 @@ class SplitLinear(nn.Module):
     def __init__(
         self,
         in_features: int,
-        out_features: int,
+        out_feature_sets: int,
         num_chunks: int = 10,
         bias: bool = True,
     ):
         super().__init__()
 
         self.in_features = in_features
-        self.out_features = out_features
+        self.out_feature_sets = out_feature_sets
         self.num_chunks = num_chunks
+        self.out_features = self.out_feature_sets * self.num_chunks
         self.padding, self.split_size = calc_dimensions_for_reshape(
             input_width=in_features, denominator=num_chunks
         )
 
         self.weight = Parameter(
-            torch.Tensor(self.out_features, self.split_size, self.num_chunks),
+            torch.Tensor(self.out_feature_sets, self.split_size, self.num_chunks),
             requires_grad=True,
         )
         if bias:
-            self.bias = Parameter(
-                torch.Tensor(self.out_features * self.num_chunks), requires_grad=True
-            )
+            self.bias = Parameter(torch.Tensor(self.out_features), requires_grad=True)
         else:
             self.register_parameter("bias", None)
         self.reset_parameters()
@@ -272,13 +271,21 @@ class SplitLinear(nn.Module):
     def forward(self, input: torch.Tensor):
         input = F.pad(input=input, pad=[0, self.padding, 0, 0])
         input = input.reshape(-1, 1, self.split_size, self.num_chunks)
-        input = input.expand(-1, self.out_features, -1, -1)
+        input = input.expand(-1, self.out_feature_sets, -1, -1)
         out = calc_split_input(input=input, weight=self.weight, bias=self.bias)
         return out
 
     def extra_repr(self):
-        return "in_features={}, out_features={}, bias={}".format(
-            self.in_features, self.out_features, self.bias is not None
+        return (
+            "in_features={}, num_chunks={}, split_size={}, "
+            "out_feature_sets={}, out_features={}, bias={}".format(
+                self.in_features,
+                self.num_chunks,
+                self.split_size,
+                self.out_feature_sets,
+                self.out_features,
+                self.bias is not None,
+            )
         )
 
 

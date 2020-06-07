@@ -225,9 +225,10 @@ def _get_multi_task_branches(
                 "fc_2_linear_1": nn.Linear(
                     fc_repr_and_extra_dim, fc_task_dim, bias=False
                 ),
+                "fc_2_do_1": nn.Dropout(p=fc_do),
                 "fc_3_bn_1": nn.BatchNorm1d(fc_task_dim),
                 "fc_3_act_1": Swish(),
-                "fc_3_do_1": nn.Dropout(fc_do),
+                "fc_3_do_1": nn.Dropout(p=fc_do),
             }
         )
 
@@ -449,17 +450,20 @@ class SplitMLPModel(ModelBase):
                 {
                     "fc_0": SplitLinear(
                         in_features=self.fc_1_in_features,
-                        out_features=self.cl_args.fc_repr_dim,
+                        out_feature_sets=self.cl_args.fc_repr_dim,
                         num_chunks=num_chunks,
                         bias=True,
-                    )
+                    ),
+                    "fc_0_do": nn.Dropout(p=self.cl_args.fc_do),
                 }
             )
         )
 
         in_feat = num_chunks * self.cl_args.fc_repr_dim
         self.downsample_fc_0_identities = _get_downsample_identities_moduledict(
-            num_classes=self.num_classes, in_features=in_feat
+            num_classes=self.num_classes,
+            in_features=in_feat,
+            dropout=self.cl_args.fc_do,
         )
 
         self.fc_1 = nn.Sequential(
@@ -470,6 +474,7 @@ class SplitMLPModel(ModelBase):
                     "fc_1_linear_1": nn.Linear(
                         in_feat, self.cl_args.fc_repr_dim, bias=False
                     ),
+                    "fc_1_do_1": nn.Dropout(self.cl_args.fc_do),
                 }
             )
         )
@@ -529,7 +534,7 @@ class SplitMLPModel(ModelBase):
 
 
 def _get_downsample_identities_moduledict(
-    num_classes: Dict[str, int], in_features: int
+    num_classes: Dict[str, int], in_features: int, dropout: float = 0.0
 ) -> nn.ModuleDict:
     """
     Currently redundant cast to `nn.Sequential` here for compatibility with
@@ -540,7 +545,8 @@ def _get_downsample_identities_moduledict(
         module_dict[key] = nn.Sequential(
             nn.Linear(
                 in_features=in_features, out_features=cur_num_output_classes, bias=True
-            )
+            ),
+            nn.Dropout(p=dropout),
         )
 
     _assert_module_dict_uniqueness(module_dict)
