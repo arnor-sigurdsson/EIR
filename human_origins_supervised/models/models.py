@@ -24,7 +24,7 @@ def get_model_class(model_type: str) -> al_models:
     if model_type == "cnn":
         return CNNModel
     elif model_type == "mlp":
-        return MLPModel
+        return SplitMLPModel
 
     return LinearModel
 

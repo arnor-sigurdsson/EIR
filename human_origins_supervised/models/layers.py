@@ -4,6 +4,7 @@ import torch
 from aislib.pytorch_modules import Swish
 from torch import nn
 from torch.nn import Parameter
+import torch.nn.functional as F
 
 
 class SelfAttention(nn.Module):
@@ -269,6 +270,7 @@ class SplitLinear(nn.Module):
             nn.init.uniform_(self.bias, -bound, bound)
 
     def forward(self, input: torch.Tensor):
+        input = F.pad(input=input, pad=[0, self.padding, 0, 0])
         input = input.reshape(-1, 1, self.split_size, self.num_chunks)
         input = input.expand(-1, self.out_features, -1, -1)
         out = calc_split_input(input=input, weight=self.weight, bias=self.bias)
