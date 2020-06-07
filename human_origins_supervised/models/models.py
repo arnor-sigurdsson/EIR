@@ -24,7 +24,7 @@ def get_model_class(model_type: str) -> al_models:
     if model_type == "cnn":
         return CNNModel
     elif model_type == "mlp":
-        return MLPModel
+        return SplitMLPModel
 
     return LinearModel
 
@@ -443,22 +443,27 @@ class SplitMLPModel(ModelBase):
 
         # TODO: Create constructor for MLP models
 
+        split_size = int(1e3)
         self.fc_0 = SplitLinear(
-            self.fc_1_in_features, self.cl_args.fc_repr_dim, bias=True
+            self.fc_1_in_features,
+            self.cl_args.fc_repr_dim,
+            bias=True,
+            split_size=split_size,
         )
 
-        if_feat = 8 * self.cl_args.fc_repr_dim  # TODO: Make dynamic
+        num_chunks = 4 * self.cl_args.target_width // split_size
+        in_feat = num_chunks * self.cl_args.fc_repr_dim  # TODO: Make dynamic
         self.downsample_fc_0_identities = _get_downsample_identities_moduledict(
-            num_classes=self.num_classes, in_features=if_feat
+            num_classes=self.num_classes, in_features=in_feat
         )
 
         self.fc_1 = nn.Sequential(
             OrderedDict(
                 {
-                    "fc_1_bn_1": nn.BatchNorm1d(if_feat),
+                    "fc_1_bn_1": nn.BatchNorm1d(in_feat),
                     "fc_1_act_1": Swish(),
                     "fc_1_linear_1": nn.Linear(
-                        if_feat, self.cl_args.fc_repr_dim, bias=False
+                        in_feat, self.cl_args.fc_repr_dim, bias=False
                     ),
                 }
             )
