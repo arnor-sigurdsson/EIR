@@ -234,28 +234,34 @@ class SplitLinear(nn.Module):
         self,
         in_features: int,
         out_features: int,
-        split_size: int = 1000,
+        num_chunks: int = 10,
         bias: bool = True,
     ):
         super().__init__()
 
         self.in_features = in_features
         self.out_features = out_features
-        self.split_size = split_size
+        self.num_chunks = num_chunks
+        self.padding, self.split_size = calc_dimensions_for_reshape(
+            input_width=in_features, denominator=num_chunks
+        )
 
         self.weight = Parameter(
-            torch.Tensor(out_features, in_features), requires_grad=True
+            torch.Tensor(self.out_features, self.split_size, self.num_chunks),
+            requires_grad=True,
         )
         if bias:
             self.bias = Parameter(
-                torch.Tensor(out_features * in_features // split_size),
-                requires_grad=True,
+                torch.Tensor(self.out_features * self.num_chunks), requires_grad=True
             )
         else:
             self.register_parameter("bias", None)
         self.reset_parameters()
 
     def reset_parameters(self):
+        """
+        TODO: Fix to account for chunks.
+        """
         nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))
         if self.bias is not None:
             fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.weight)
@@ -263,13 +269,9 @@ class SplitLinear(nn.Module):
             nn.init.uniform_(self.bias, -bound, bound)
 
     def forward(self, input: torch.Tensor):
-        out = calc_split_input(
-            input=input,
-            weight=self.weight,
-            split_size=self.split_size,
-            bias=self.bias,
-            out_features=self.out_features,
-        )
+        input = input.reshape(-1, 1, self.split_size, self.num_chunks)
+        input = input.expand(-1, self.out_features, -1, -1)
+        out = calc_split_input(input=input, weight=self.weight, bias=self.bias)
         return out
 
     def extra_repr(self):
@@ -278,13 +280,15 @@ class SplitLinear(nn.Module):
         )
 
 
-def calc_split_input(
-    input: torch.Tensor, weight: torch.Tensor, split_size: int, bias, out_features: int
-) -> torch.Tensor:
-    out = torch.cat(tuple(input * weight[i] for i in range(out_features)), dim=1)
-    out_split = torch.split(tensor=out, split_size_or_sections=split_size, dim=1)
-    out_aggregated = torch.stack([torch.sum(i, dim=1) for i in out_split], dim=1)
-    if bias is not None:
-        out_aggregated += bias
+def calc_dimensions_for_reshape(input_width: int, denominator: int):
+    split_size = int(math.ceil(input_width / denominator))
+    padding = split_size * denominator - input_width
+    return padding, split_size
 
-    return out_aggregated
+
+def calc_split_input(input: torch.Tensor, weight: torch.Tensor, bias):
+    mul = torch.mul(input, weight, out=None)
+    sum = torch.sum(mul, dim=2)
+    flattened = sum.flatten(start_dim=1)
+    biased = flattened + bias
+    return biased
