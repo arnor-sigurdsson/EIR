@@ -305,3 +305,15 @@ def calc_split_input(input: torch.Tensor, weight: torch.Tensor, bias):
     stacked = torch.cat(out, dim=1)
     final = stacked + bias
     return final
+
+
+def calc_split_input_prev(
+    input: torch.Tensor, weight: torch.Tensor, split_size: int, bias, out_features: int
+) -> torch.Tensor:
+    out = torch.cat(tuple(input * weight[i] for i in range(out_features)), dim=1)
+    out_split = torch.split(tensor=out, split_size_or_sections=split_size, dim=1)
+    out_aggregated = torch.stack([torch.sum(i, dim=1) for i in out_split], dim=1)
+    if bias is not None:
+        out_aggregated += bias
+
+    return out_aggregated

@@ -177,11 +177,11 @@ class ModelBase(nn.Module):
 
         # TODO: Better to have this a method so fc_extra is explicitly defined?
         if emb_total_dim or con_total_dim:
-            extra_dim = emb_total_dim + con_total_dim
+            self.extra_dim = emb_total_dim + con_total_dim
             # we have a specific layer for fc_extra in case it's going straight
             # to bn or act, ensuring linear before
-            self.fc_extra = nn.Linear(extra_dim, extra_dim, bias=False)
-            self.fc_repr_and_extra_dim += extra_dim
+            self.fc_extra = nn.Linear(self.extra_dim, self.extra_dim, bias=False)
+            self.fc_repr_and_extra_dim += self.extra_dim
 
     @property
     def fc_1_in_features(self) -> int:
@@ -443,6 +443,7 @@ class SplitMLPModel(ModelBase):
         super().__init__(*args, **kwargs)
 
         # TODO: Create constructor for MLP models
+        # TODO: Account for extra inputs here
 
         num_chunks = 50
         self.fc_0 = nn.Sequential(
@@ -461,9 +462,7 @@ class SplitMLPModel(ModelBase):
 
         in_feat = num_chunks * self.cl_args.fc_repr_dim
         self.downsample_fc_0_identities = _get_downsample_identities_moduledict(
-            num_classes=self.num_classes,
-            in_features=in_feat,
-            dropout=self.cl_args.fc_do,
+            num_classes=self.num_classes, in_features=in_feat
         )
 
         self.fc_1 = nn.Sequential(
@@ -471,9 +470,7 @@ class SplitMLPModel(ModelBase):
                 {
                     "fc_1_bn_1": nn.BatchNorm1d(in_feat),
                     "fc_1_act_1": Swish(),
-                    "fc_1_linear_1": nn.Linear(
-                        in_feat, self.cl_args.fc_repr_dim, bias=False
-                    ),
+                    "fc_1_linear_1": nn.Linear(in_feat, in_feat, bias=False),
                     "fc_1_do_1": nn.Dropout(self.cl_args.fc_do),
                 }
             )
@@ -481,8 +478,8 @@ class SplitMLPModel(ModelBase):
 
         self.multi_task_branches = _get_multi_task_branches(
             num_classes=self.num_classes,
+            fc_repr_and_extra_dim=in_feat,
             fc_task_dim=self.fc_task_dim,
-            fc_repr_and_extra_dim=self.cl_args.fc_repr_dim,
             fc_do=self.cl_args.fc_do,
         )
 
@@ -534,7 +531,7 @@ class SplitMLPModel(ModelBase):
 
 
 def _get_downsample_identities_moduledict(
-    num_classes: Dict[str, int], in_features: int, dropout: float = 0.0
+    num_classes: Dict[str, int], in_features: int
 ) -> nn.ModuleDict:
     """
     Currently redundant cast to `nn.Sequential` here for compatibility with
@@ -545,8 +542,7 @@ def _get_downsample_identities_moduledict(
         module_dict[key] = nn.Sequential(
             nn.Linear(
                 in_features=in_features, out_features=cur_num_output_classes, bias=True
-            ),
-            nn.Dropout(p=dropout),
+            )
         )
 
     _assert_module_dict_uniqueness(module_dict)
