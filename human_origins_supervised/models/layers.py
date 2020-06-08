@@ -271,7 +271,6 @@ class SplitLinear(nn.Module):
     def forward(self, input: torch.Tensor):
         input = F.pad(input=input, pad=[0, self.padding, 0, 0])
         input = input.reshape(-1, 1, self.split_size, self.num_chunks)
-        input = input.expand(-1, self.out_feature_sets, -1, -1)
         out = calc_split_input(input=input, weight=self.weight, bias=self.bias)
         return out
 
@@ -296,8 +295,13 @@ def calc_dimensions_for_reshape(input_width: int, denominator: int):
 
 
 def calc_split_input(input: torch.Tensor, weight: torch.Tensor, bias):
-    mul = torch.mul(input, weight, out=None)
-    sum = torch.sum(mul, dim=2)
-    flattened = sum.flatten(start_dim=1)
-    biased = flattened + bias
-    return biased
+    out = []
+    for i in range(weight.shape[0]):
+        mul = torch.mul(input, weight[i], out=None)
+        sum = torch.sum(mul, dim=2)
+        flattened = sum.flatten(start_dim=1)
+        out.append(flattened)
+
+    stacked = torch.cat(out, dim=1)
+    final = stacked + bias
+    return final
