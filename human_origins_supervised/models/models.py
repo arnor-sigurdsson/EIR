@@ -24,7 +24,7 @@ def get_model_class(model_type: str) -> al_models:
     if model_type == "cnn":
         return CNNModel
     elif model_type == "mlp":
-        return SplitMLPModel
+        return MGMoEModel
 
     return LinearModel
 
@@ -528,6 +528,123 @@ class SplitMLPModel(ModelBase):
         }
 
         return out
+
+
+class MGMoEModel(ModelBase):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # TODO: Create constructor for MLP  models
+        # TODO: Account for extra inputs here
+
+        num_chunks = 50
+        self.fc_0 = nn.Sequential(
+            OrderedDict(
+                {
+                    "fc_0": SplitLinear(
+                        in_features=self.fc_1_in_features,
+                        out_feature_sets=self.cl_args.fc_repr_dim,
+                        num_chunks=num_chunks,
+                        bias=True,
+                    ),
+                    "fc_0_do": nn.Dropout(p=self.cl_args.fc_do),
+                }
+            )
+        )
+
+        in_feat = num_chunks * self.cl_args.fc_repr_dim
+
+        self.fc_1 = nn.Sequential(
+            OrderedDict(
+                {
+                    "fc_1_bn_1": nn.BatchNorm1d(in_feat),
+                    "fc_1_act_1": Swish(),
+                    "fc_1_linear_1": nn.Linear(in_feat, in_feat, bias=False),
+                    "fc_1_do_1": nn.Dropout(self.cl_args.fc_do),
+                }
+            )
+        )
+
+        num_experts = 8
+        gates_dict = {i: num_experts for i in self.num_classes}
+        self.gates = _get_downsample_identities_moduledict(
+            num_classes=gates_dict, in_features=in_feat
+        )
+        self.gate_attention = nn.Softmax(dim=1)
+
+        # get expert branches, another call to get_multi_task branches
+        experts_dict = {str(i): self.fc_task_dim for i in range(num_experts)}
+        self.expert_branches = _get_multi_task_branches(
+            num_classes=experts_dict,
+            fc_repr_and_extra_dim=in_feat,
+            fc_task_dim=self.fc_task_dim,
+            fc_do=self.cl_args.fc_do,
+        )
+
+        self.multi_task_branches = _get_multi_task_branches(
+            num_classes=self.num_classes,
+            fc_repr_and_extra_dim=self.fc_task_dim,
+            fc_task_dim=self.fc_task_dim,
+            fc_do=self.cl_args.fc_do,
+        )
+
+        self._init_weights()
+
+    @property
+    def fc_1_in_features(self) -> int:
+        return self.cl_args.target_width * 4
+
+    @property
+    def l1_penalized_weights(self) -> torch.Tensor:
+        return self.fc_0[0].weight
+
+    def _init_weights(self):
+        for task_branch in self.multi_task_branches.values():
+            nn.init.zeros_(task_branch.fc_3_bn_1.weight)
+
+    def forward(
+        self, x: torch.Tensor, extra_inputs: torch.Tensor = None
+    ) -> Dict[str, torch.Tensor]:
+        out = x.view(x.shape[0], -1)
+
+        out = self.fc_0(out)
+
+        identity_inputs = out
+        if extra_inputs is not None:
+            identity_inputs = torch.cat((extra_inputs, identity_inputs), dim=1)
+
+        gate_attention_dict = _calculate_module_dict_outputs(
+            input_=identity_inputs, module_dict=self.gates
+        )
+        gate_attention_dict = {
+            key: self.gate_attention(t) for key, t in gate_attention_dict.items()
+        }
+
+        # TODO: Figure out where to put this.
+        out = self.fc_1(out)
+
+        expert_outputs = _calculate_module_dict_outputs(
+            input_=out, module_dict=self.expert_branches
+        )
+
+        task_inputs = {}
+        stacked_expert_outputs = torch.stack(list(expert_outputs.values()), dim=2)
+        for task_name, task_attention in gate_attention_dict.items():
+            weighted_expert_outputs = (
+                task_attention.unsqueeze(1) * stacked_expert_outputs
+            )
+            task_inputs[task_name] = weighted_expert_outputs.sum(dim=2)
+
+        # TODO: this must be updated for MGMoE architecture
+        if extra_inputs is not None:
+            out_extra = self.fc_extra(extra_inputs)
+            out = torch.cat((out_extra, out), dim=1)
+
+        final_out = {}
+        for task_name, module in self.multi_task_branches.items():
+            final_out[task_name] = module(task_inputs[task_name])
+
+        return final_out
 
 
 def _get_downsample_identities_moduledict(
