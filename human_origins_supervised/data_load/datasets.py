@@ -373,7 +373,7 @@ class MemoryArrayDataset(ArrayDatasetBase):
     def __getitem__(self, index: int) -> al_getitem_return:
         sample = self.samples[index]
 
-        array = sample.array.to(dtype=torch.float)
+        array = sample.array.to(dtype=torch.bool)
         labels = sample.labels
         sample_id = sample.sample_id
 
@@ -416,7 +416,7 @@ class DiskArrayDataset(ArrayDatasetBase):
         labels = sample.labels
         sample_id = sample.sample_id
 
-        array = torch.from_numpy(array).unsqueeze(0).to(dtype=torch.float)
+        array = torch.from_numpy(array).unsqueeze(0).to(dtype=torch.bool)
         if self.na_augment[0]:
             array = make_random_snps_missing(
                 array=array,

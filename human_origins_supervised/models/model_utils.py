@@ -123,7 +123,8 @@ def gather_pred_outputs_from_dloader(
 
     assert not model.training
     for inputs, labels, ids in data_loader:
-        inputs = inputs.to(device=device, dtype=torch.float32)
+        inputs = inputs.to(device=device)
+        inputs = inputs.to(dtype=torch.float32)
 
         extra_inputs = get_extra_inputs(
             cl_args=cl_args, model=model, labels=labels["extra_labels"]

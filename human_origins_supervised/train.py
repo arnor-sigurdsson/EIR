@@ -474,7 +474,8 @@ def train(config: Config) -> None:
         c.model.train()
 
         train_seqs, labels, train_ids = loader_batch
-        train_seqs = train_seqs.to(device=cl_args.device, dtype=torch.float32)
+        train_seqs = train_seqs.to(device=cl_args.device)
+        train_seqs = train_seqs.to(dtype=torch.float32)
 
         target_labels = model_utils.parse_target_labels(
             target_columns=c.target_columns,
