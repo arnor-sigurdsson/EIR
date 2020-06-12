@@ -176,8 +176,8 @@ class ModelBase(nn.Module):
         self.fc_task_dim = cl_args.fc_task_dim
 
         # TODO: Better to have this a method so fc_extra is explicitly defined?
+        self.extra_dim = emb_total_dim + con_total_dim
         if emb_total_dim or con_total_dim:
-            self.extra_dim = emb_total_dim + con_total_dim
             # we have a specific layer for fc_extra in case it's going straight
             # to bn or act, ensuring linear before
             self.fc_extra = nn.Linear(self.extra_dim, self.extra_dim, bias=False)
@@ -203,18 +203,6 @@ def _get_multi_task_branches(
     fc_do: float,
     num_classes: al_num_classes,
 ) -> nn.ModuleDict:
-    def _assert_uniqueness():
-        ids = [id(cur_dict) for cur_dict in module_dict.values()]
-        assert len(ids) == len(set(ids))
-
-        module_ids = []
-        for cur_modules in module_dict.values():
-            module_ids += [id(mod) for mod in cur_modules]
-
-        num_unique_modules = len(set(module_ids))
-        num_modules_per_task = len(cur_modules)
-        num_tasks = len(module_dict.keys())
-        assert num_unique_modules == num_modules_per_task * num_tasks
 
     module_dict = {}
     for key, num_classes in num_classes.items():
@@ -240,7 +228,6 @@ def _get_multi_task_branches(
 
         module_dict[key] = task_layer_branch
 
-    _assert_uniqueness()
     _assert_module_dict_uniqueness(module_dict)
     return nn.ModuleDict(module_dict)
 
@@ -531,13 +518,16 @@ class SplitMLPModel(ModelBase):
 
 
 class MGMoEModel(ModelBase):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, num_chunks: int = 50, num_experts: int = 8, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # TODO: Create constructor for MLP  models
+        # TODO: Create constructor for MLP models
         # TODO: Account for extra inputs here
 
-        num_chunks = 50
+        self.num_chunks = num_chunks
+        self.num_experts = num_experts
+
+        fc_0_out_feat = self.num_chunks * self.cl_args.fc_repr_dim
         self.fc_0 = nn.Sequential(
             OrderedDict(
                 {
@@ -547,48 +537,76 @@ class MGMoEModel(ModelBase):
                         num_chunks=num_chunks,
                         bias=True,
                     ),
+                    "fc_0_bn_1": nn.BatchNorm1d(fc_0_out_feat),
+                    "fc_0_act_1": Swish(),
                     "fc_0_do": nn.Dropout(p=self.cl_args.fc_do),
                 }
             )
         )
 
-        in_feat = num_chunks * self.cl_args.fc_repr_dim
-
-        self.fc_1 = nn.Sequential(
-            OrderedDict(
+        gate_names = tuple(self.num_classes.keys())
+        self.gates = construct_multi_branches(
+            branch_names=gate_names,
+            branch_layer_base=OrderedDict(
                 {
-                    "fc_1_bn_1": nn.BatchNorm1d(in_feat),
-                    "fc_1_act_1": Swish(),
-                    "fc_1_linear_1": nn.Linear(in_feat, in_feat, bias=False),
-                    "fc_1_do_1": nn.Dropout(self.cl_args.fc_do),
+                    "gate_fc": (
+                        nn.Linear,
+                        {
+                            "in_features": fc_0_out_feat,
+                            "out_features": self.num_experts,
+                            "bias": True,
+                        },
+                    ),
+                    "gate_attention": (nn.Softmax, {"dim": 1}),
                 }
+            ),
+        )
+
+        expert_names = tuple(f"expert_{i}" for i in range(self.num_experts))
+        self.expert_branches = construct_multi_branches(
+            branch_names=expert_names,
+            branch_layer_base=self.get_multi_task_branch_base(
+                in_features=fc_0_out_feat + self.extra_dim,
+                out_features=self.fc_task_dim,
+            ),
+        )
+
+        task_names = tuple(self.num_classes.keys())
+        self.multi_task_branches = construct_multi_branches(
+            branch_names=task_names,
+            branch_layer_base=self.get_multi_task_branch_base(
+                in_features=self.fc_task_dim, out_features=self.fc_task_dim
+            ),
+        )
+
+        for task, num_outputs in self.num_classes.items():
+            self.multi_task_branches[task].add_module(
+                "final_fc", nn.Linear(self.fc_task_dim, num_outputs, bias=True)
             )
-        )
-
-        num_experts = 8
-        gates_dict = {i: num_experts for i in self.num_classes}
-        self.gates = _get_downsample_identities_moduledict(
-            num_classes=gates_dict, in_features=in_feat
-        )
-        self.gate_attention = nn.Softmax(dim=1)
-
-        # get expert branches, another call to get_multi_task branches
-        experts_dict = {str(i): self.fc_task_dim for i in range(num_experts)}
-        self.expert_branches = _get_multi_task_branches(
-            num_classes=experts_dict,
-            fc_repr_and_extra_dim=in_feat,
-            fc_task_dim=self.fc_task_dim,
-            fc_do=self.cl_args.fc_do,
-        )
-
-        self.multi_task_branches = _get_multi_task_branches(
-            num_classes=self.num_classes,
-            fc_repr_and_extra_dim=self.fc_task_dim,
-            fc_task_dim=self.fc_task_dim,
-            fc_do=self.cl_args.fc_do,
-        )
 
         self._init_weights()
+
+    def get_multi_task_branch_base(
+        self, in_features, out_features
+    ) -> "OrderedDict[str, Tuple[nn.Module, Dict]]":
+
+        base = OrderedDict(
+            {
+                "fc_1_linear_1": (
+                    nn.Linear,
+                    {
+                        "in_features": in_features,
+                        "out_features": out_features,
+                        "bias": False,
+                    },
+                ),
+                "fc_1_bn_1": (nn.BatchNorm1d, {"num_features": out_features}),
+                "fc_1_act_1": (Swish, {}),
+                "fc_1_do_1": (nn.Dropout, {"p": self.cl_args.fc_do}),
+            }
+        )
+
+        return base
 
     @property
     def fc_1_in_features(self) -> int:
@@ -600,7 +618,8 @@ class MGMoEModel(ModelBase):
 
     def _init_weights(self):
         for task_branch in self.multi_task_branches.values():
-            nn.init.zeros_(task_branch.fc_3_bn_1.weight)
+            pass
+            # nn.init.zeros_(task_branch.fc_3_bn_1.weight)
 
     def forward(
         self, x: torch.Tensor, extra_inputs: torch.Tensor = None
@@ -609,42 +628,58 @@ class MGMoEModel(ModelBase):
 
         out = self.fc_0(out)
 
-        identity_inputs = out
         if extra_inputs is not None:
-            identity_inputs = torch.cat((extra_inputs, identity_inputs), dim=1)
+            out = torch.cat((extra_inputs, out), dim=1)
 
-        gate_attention_dict = _calculate_module_dict_outputs(
-            input_=identity_inputs, module_dict=self.gates
-        )
-        gate_attention_dict = {
-            key: self.gate_attention(t) for key, t in gate_attention_dict.items()
-        }
-
-        # TODO: Figure out where to put this.
-        out = self.fc_1(out)
+        identity_inputs = out
+        # TODO: Add identity skip here
 
         expert_outputs = _calculate_module_dict_outputs(
             input_=out, module_dict=self.expert_branches
         )
 
+        gate_attentions = _calculate_module_dict_outputs(
+            input_=identity_inputs, module_dict=self.gates
+        )
+
         task_inputs = {}
         stacked_expert_outputs = torch.stack(list(expert_outputs.values()), dim=2)
-        for task_name, task_attention in gate_attention_dict.items():
+        for task_name, task_attention in gate_attentions.items():
             weighted_expert_outputs = (
                 task_attention.unsqueeze(1) * stacked_expert_outputs
             )
             task_inputs[task_name] = weighted_expert_outputs.sum(dim=2)
-
-        # TODO: this must be updated for MGMoE architecture
-        if extra_inputs is not None:
-            out_extra = self.fc_extra(extra_inputs)
-            out = torch.cat((out_extra, out), dim=1)
 
         final_out = {}
         for task_name, module in self.multi_task_branches.items():
             final_out[task_name] = module(task_inputs[task_name])
 
         return final_out
+
+
+def construct_multi_branches(
+    branch_names: Tuple[str, ...],
+    branch_layer_base: "OrderedDict[str, Tuple[nn.Module, Dict]]",
+    extra_hooks: List[Callable] = None,
+) -> nn.ModuleDict:
+    def _initialize_module(module: nn.Module, module_args: Dict) -> nn.Module:
+        return module(**module_args)
+
+    module_dict = {}
+    for name in branch_names:
+        cur_branch = OrderedDict()
+
+        for module_name, module_recipe in branch_layer_base.items():
+            cur_module = module_recipe[0]
+            cur_module_args = module_recipe[1]
+            cur_branch[module_name] = _initialize_module(
+                module=cur_module, module_args=cur_module_args
+            )
+
+        module_dict[name] = nn.Sequential(cur_branch)
+
+    _assert_module_dict_uniqueness(module_dict)
+    return nn.ModuleDict(module_dict)
 
 
 def _get_downsample_identities_moduledict(
