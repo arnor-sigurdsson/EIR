@@ -522,7 +522,6 @@ class MGMoEModel(ModelBase):
         super().__init__(*args, **kwargs)
 
         # TODO: Create constructor for MLP models
-        # TODO: Account for extra inputs here
 
         self.num_chunks = num_chunks
         self.num_experts = num_experts
@@ -542,6 +541,10 @@ class MGMoEModel(ModelBase):
                     "fc_0_do": nn.Dropout(p=self.cl_args.fc_do),
                 }
             )
+        )
+
+        self.downsample_identities = _get_downsample_identities_moduledict(
+            num_classes=self.num_classes, in_features=fc_0_out_feat
         )
 
         gate_names = tuple(self.num_classes.keys())
@@ -589,6 +592,11 @@ class MGMoEModel(ModelBase):
     def get_multi_task_branch_base(
         self, in_features, out_features
     ) -> "OrderedDict[str, Tuple[nn.Module, Dict]]":
+        # TODO: Move out of this class.
+        # TODO: Make prefix an argument to this function, instead of hard-coding fc_1
+        # TODO: Add constructor to work on the output of this function, can inject
+        #       before, after and add repeats of this base by calling this with diff
+        #       names
 
         base = OrderedDict(
             {
@@ -618,8 +626,7 @@ class MGMoEModel(ModelBase):
 
     def _init_weights(self):
         for task_branch in self.multi_task_branches.values():
-            pass
-            # nn.init.zeros_(task_branch.fc_3_bn_1.weight)
+            nn.init.zeros_(task_branch.fc_1_bn_1.weight)
 
     def forward(
         self, x: torch.Tensor, extra_inputs: torch.Tensor = None
@@ -632,7 +639,9 @@ class MGMoEModel(ModelBase):
             out = torch.cat((extra_inputs, out), dim=1)
 
         identity_inputs = out
-        # TODO: Add identity skip here
+        identites = _calculate_module_dict_outputs(
+            input_=out.detach(), module_dict=self.downsample_identities
+        )
 
         expert_outputs = _calculate_module_dict_outputs(
             input_=out, module_dict=self.expert_branches
@@ -652,7 +661,7 @@ class MGMoEModel(ModelBase):
 
         final_out = {}
         for task_name, module in self.multi_task_branches.items():
-            final_out[task_name] = module(task_inputs[task_name])
+            final_out[task_name] = module(task_inputs[task_name]) + identites[task_name]
 
         return final_out
 
@@ -660,7 +669,7 @@ class MGMoEModel(ModelBase):
 def construct_multi_branches(
     branch_names: Tuple[str, ...],
     branch_layer_base: "OrderedDict[str, Tuple[nn.Module, Dict]]",
-    extra_hooks: List[Callable] = None,
+    extra_hooks: List[Callable] = (),
 ) -> nn.ModuleDict:
     def _initialize_module(module: nn.Module, module_args: Dict) -> nn.Module:
         return module(**module_args)
@@ -677,6 +686,9 @@ def construct_multi_branches(
             )
 
         module_dict[name] = nn.Sequential(cur_branch)
+
+    for hook in extra_hooks:
+        module_dict = hook(module_dict)
 
     _assert_module_dict_uniqueness(module_dict)
     return nn.ModuleDict(module_dict)
