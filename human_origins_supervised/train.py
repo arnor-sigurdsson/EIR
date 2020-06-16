@@ -622,10 +622,21 @@ def _get_train_argument_parser() -> configargparse.ArgumentParser:
     )
 
     parser_.add_argument(
+        "--mg_num_experts", type=int, default=8, help="Number of experts to use."
+    )
+
+    parser_.add_argument(
+        "--split_mlp_num_splits",
+        type=int,
+        default=50,
+        help="Number of splits in split MLP layer.",
+    )
+
+    parser_.add_argument(
         "--model_type",
         type=str,
         default="cnn",
-        choices=["cnn", "mlp", "linear"],
+        choices=["cnn", "mlp", "mlp-split", "mlp-mgmoe", "linear"],
         help="whether to use a convolutional neural network (cnn) or multilayer "
         "perceptron (mlp)",
     )

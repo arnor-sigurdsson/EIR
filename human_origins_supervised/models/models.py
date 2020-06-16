@@ -24,6 +24,10 @@ def get_model_class(model_type: str) -> al_models:
     if model_type == "cnn":
         return CNNModel
     elif model_type == "mlp":
+        return MLPModel
+    elif model_type == "mlp-split":
+        return SplitMLPModel
+    elif model_type == "mlp-mgmoe":
         return MGMoEModel
 
     return LinearModel
@@ -432,7 +436,7 @@ class SplitMLPModel(ModelBase):
         # TODO: Create constructor for MLP models
         # TODO: Account for extra inputs here
 
-        num_chunks = 50
+        num_chunks = self.cl_args.split_mlp_num_splits
         self.fc_0 = nn.Sequential(
             OrderedDict(
                 {
@@ -523,8 +527,8 @@ class MGMoEModel(ModelBase):
 
         # TODO: Create constructor for MLP models
 
-        self.num_chunks = num_chunks
-        self.num_experts = num_experts
+        self.num_chunks = self.cl_args.split_mlp_num_splits
+        self.num_experts = self.cl_args.mg_num_experts
 
         fc_0_out_feat = self.num_chunks * self.cl_args.fc_repr_dim
         self.fc_0 = nn.Sequential(
@@ -533,7 +537,7 @@ class MGMoEModel(ModelBase):
                     "fc_0": SplitLinear(
                         in_features=self.fc_1_in_features,
                         out_feature_sets=self.cl_args.fc_repr_dim,
-                        num_chunks=num_chunks,
+                        num_chunks=self.num_chunks,
                         bias=True,
                     ),
                     "fc_0_bn_1": nn.BatchNorm1d(fc_0_out_feat),

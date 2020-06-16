@@ -13,6 +13,8 @@ H_PARAMS = [
     "kernel_width",
     "l1",
     "lr",
+    "split_mlp_num_splits",
+    "mg_num_experts",
     "lr_schedule",
     "model_type",
     "na_augment_perc",
