@@ -522,7 +522,7 @@ class SplitMLPModel(ModelBase):
 
 
 class MGMoEModel(ModelBase):
-    def __init__(self, num_chunks: int = 50, num_experts: int = 8, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         # TODO: Create constructor for MLP models
@@ -620,6 +620,9 @@ class MGMoEModel(ModelBase):
 
         return base
 
+    def _init_weights(self):
+        pass
+
     @property
     def fc_1_in_features(self) -> int:
         return self.cl_args.target_width * 4
@@ -627,10 +630,6 @@ class MGMoEModel(ModelBase):
     @property
     def l1_penalized_weights(self) -> torch.Tensor:
         return self.fc_0[0].weight
-
-    def _init_weights(self):
-        for task_branch in self.multi_task_branches.values():
-            nn.init.zeros_(task_branch.fc_1_bn_1.weight)
 
     def forward(
         self, x: torch.Tensor, extra_inputs: torch.Tensor = None
@@ -642,30 +641,24 @@ class MGMoEModel(ModelBase):
         if extra_inputs is not None:
             out = torch.cat((extra_inputs, out), dim=1)
 
-        identity_inputs = out
-        identites = _calculate_module_dict_outputs(
-            input_=out.detach(), module_dict=self.downsample_identities
+        gate_attentions = _calculate_module_dict_outputs(
+            input_=out, module_dict=self.gates
         )
 
         expert_outputs = _calculate_module_dict_outputs(
             input_=out, module_dict=self.expert_branches
         )
 
-        gate_attentions = _calculate_module_dict_outputs(
-            input_=identity_inputs, module_dict=self.gates
-        )
-
-        task_inputs = {}
+        final_out = {}
         stacked_expert_outputs = torch.stack(list(expert_outputs.values()), dim=2)
         for task_name, task_attention in gate_attentions.items():
             weighted_expert_outputs = (
                 task_attention.unsqueeze(1) * stacked_expert_outputs
             )
-            task_inputs[task_name] = weighted_expert_outputs.sum(dim=2)
+            weighted_expert_sum = weighted_expert_outputs.sum(dim=2)
 
-        final_out = {}
-        for task_name, module in self.multi_task_branches.items():
-            final_out[task_name] = module(task_inputs[task_name]) + identites[task_name]
+            cur_task_branch = self.multi_task_branches[task_name]
+            final_out[task_name] = cur_task_branch(weighted_expert_sum)
 
         return final_out
 
