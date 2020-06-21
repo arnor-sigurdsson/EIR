@@ -547,10 +547,6 @@ class MGMoEModel(ModelBase):
             )
         )
 
-        self.downsample_identities = _get_downsample_identities_moduledict(
-            num_classes=self.num_classes, in_features=fc_0_out_feat
-        )
-
         gate_names = tuple(self.num_classes.keys())
         self.gates = construct_multi_branches(
             branch_names=gate_names,
