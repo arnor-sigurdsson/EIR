@@ -41,9 +41,10 @@ from human_origins_supervised.models.models import get_model_class, al_models
 from human_origins_supervised.train_utils import utils
 from human_origins_supervised.train_utils.metrics import (
     calculate_batch_metrics,
-    calculate_losses,
+    calculate_prediction_losses,
     aggregate_losses,
     add_multi_task_average_metrics,
+    UncertaintyMultiTaskLoss,
     get_extra_loss_term_functions,
     add_extra_losses,
     get_average_history_filepath,
@@ -103,6 +104,7 @@ class Config:
     model: al_models
     optimizer: Optimizer
     criterions: al_criterions
+    loss_function: Callable
     labels_dict: Dict
     target_transformers: al_label_transformers
     target_columns: al_target_columns
@@ -148,13 +150,19 @@ def main(
         embedding_dict=embedding_dict,
     )
 
-    optimizer = get_optimizer(model=model, cl_args=cl_args)
-
     criterions = _get_criterions(
         target_columns=train_dataset.target_columns, model_type=cl_args.model_type
     )
 
     writer = get_summary_writer(run_folder=run_folder)
+
+    loss_func = _get_loss_callable(
+        target_columns=train_dataset.target_columns,
+        criterions=criterions,
+        device=cl_args.device,
+    )
+
+    optimizer = get_optimizer(model=model, loss_callable=loss_func, cl_args=cl_args)
 
     metrics = _get_default_metrics(
         target_transformers=train_dataset.target_transformers
@@ -168,6 +176,7 @@ def main(
         model=model,
         optimizer=optimizer,
         criterions=criterions,
+        loss_function=loss_func,
         labels_dict=train_dataset.labels_dict,
         target_transformers=train_dataset.target_transformers,
         target_columns=train_dataset.target_columns,
@@ -337,7 +346,41 @@ def _check_linear_model_columns(cl_args: argparse.Namespace) -> None:
         )
 
 
-def get_optimizer(model: nn.Module, cl_args: argparse.Namespace) -> Optimizer:
+def get_optimizer(
+    model: nn.Module, loss_callable: Callable, cl_args: argparse.Namespace
+) -> Optimizer:
+    """
+    TODO:   Make this just return the optimizer instance, another function
+            to add loss callable.
+    """
+
+    def get_all_params():
+        model_params = get_model_params(model=model, wd=cl_args.wd)
+
+        loss_params = []
+        if isinstance(loss_callable, nn.Module):
+            loss_params = [{"params": p} for p in loss_callable.parameters()]
+
+        return model_params + loss_params
+
+    all_params = get_all_params()
+
+    if cl_args.optimizer == "adamw":
+        optimizer = AdamW(
+            params=all_params,
+            lr=cl_args.lr,
+            betas=(cl_args.b1, cl_args.b2),
+            amsgrad=True,
+        )
+    elif cl_args.optimizer == "sgdm":
+        optimizer = SGD(params=all_params, lr=cl_args.lr, momentum=0.9)
+    else:
+        raise ValueError()
+
+    return optimizer
+
+
+def get_optimizer_prev(model: nn.Module, cl_args: argparse.Namespace) -> Optimizer:
     params = get_model_params(model=model, wd=cl_args.wd)
 
     if cl_args.optimizer == "adamw":
@@ -369,7 +412,7 @@ def _get_criterions(
             if column_type_ == "cat":
                 return calc_bce
             else:
-                return nn.MSELoss()
+                return nn.MSELoss(reduction="mean")
 
         if column_type_ == "con":
             return nn.MSELoss()
@@ -385,6 +428,22 @@ def _get_criterions(
         criterions_dict[column_name] = criterion
 
     return criterions_dict
+
+
+def _get_loss_callable(
+    target_columns: al_target_columns, criterions: al_criterions, device: str
+):
+    num_tasks = len(list(target_columns.values()))
+    if num_tasks > 1:
+        multi_task_loss_module = UncertaintyMultiTaskLoss(
+            target_columns=target_columns, criterions=criterions, device=device
+        )
+        return multi_task_loss_module
+    elif num_tasks == 1:
+        single_task_loss_func = partial(
+            calculate_prediction_losses, criterions=criterions
+        )
+        return single_task_loss_func
 
 
 def get_summary_writer(run_folder: Path) -> SummaryWriter:
@@ -490,9 +549,7 @@ def train(config: Config) -> None:
         c.optimizer.zero_grad()
         train_outputs = c.model(x=train_seqs, extra_inputs=extra_inputs)
 
-        train_losses = calculate_losses(
-            criterions=c.criterions, labels=target_labels, outputs=train_outputs
-        )
+        train_losses = c.loss_function(inputs=train_outputs, targets=target_labels)
         train_loss_avg = aggregate_losses(losses_dict=train_losses)
         train_loss_final = add_extra_losses(
             total_loss=train_loss_avg, extra_loss_functions=extra_loss_functions

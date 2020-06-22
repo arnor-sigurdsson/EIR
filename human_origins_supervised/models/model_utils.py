@@ -16,7 +16,7 @@ from human_origins_supervised.data_load.data_utils import get_target_columns_gen
 from human_origins_supervised.data_load.label_setup import al_target_columns
 from human_origins_supervised.models.extra_inputs_module import get_extra_inputs
 from human_origins_supervised.train_utils.metrics import (
-    calculate_losses,
+    calculate_prediction_losses,
     aggregate_losses,
 )
 from human_origins_supervised.train_utils.utils import get_run_folder
@@ -332,7 +332,9 @@ def construct_lr_finder_custom_objects(config) -> LRFinderCustomObjects:
 
 
 def _calculate_losses_and_average(criterions, outputs, labels) -> torch.Tensor:
-    all_losses = calculate_losses(criterions=criterions, labels=labels, outputs=outputs)
+    all_losses = calculate_prediction_losses(
+        criterions=criterions, labels=labels, outputs=outputs
+    )
     average_loss = aggregate_losses(all_losses)
 
     return average_loss

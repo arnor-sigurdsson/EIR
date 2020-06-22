@@ -13,6 +13,7 @@ import pytest
 from _pytest.fixtures import SubRequest
 from aislib.misc_utils import ensure_path_exists
 from torch import cuda
+from torch import nn
 from torch.utils.data import DataLoader
 
 from human_origins_supervised import train
@@ -411,14 +412,26 @@ def create_test_dloaders(create_test_cl_args, create_test_datasets):
     return train_dloader, valid_dloader, train_dataset, valid_dataset
 
 
-@pytest.fixture()
-def create_test_optimizer(create_test_cl_args, create_test_model):
-    cl_args = create_test_cl_args
-    model = create_test_model
+def create_test_optimizer(
+    cl_args: Namespace,
+    model: nn.Module,
+    target_columns: Dict[str, List[str]],
+    criterions,
+):
 
-    optimizer = train.get_optimizer(model, cl_args)
+    """
+    TODO: Refactor loss module construction out of this function.
+    """
 
-    return optimizer
+    loss_module = train._get_loss_callable(
+        target_columns=target_columns, criterions=criterions, device=cl_args.device
+    )
+
+    optimizer = train.get_optimizer(
+        model=model, loss_callable=loss_module, cl_args=cl_args
+    )
+
+    return optimizer, loss_module
 
 
 @dataclass
@@ -436,7 +449,6 @@ def prep_modelling_test_configs(
     create_test_cl_args,
     create_test_dloaders,
     create_test_model,
-    create_test_optimizer,
     create_test_datasets,
 ) -> Tuple[Config, ModelTestConfig]:
     """
@@ -446,6 +458,7 @@ def prep_modelling_test_configs(
     cl_args = create_test_cl_args
     train_loader, valid_loader, train_dataset, valid_dataset = create_test_dloaders
     model = create_test_model
+
     optimizer = create_test_optimizer
     criterions = train._get_criterions(
         target_columns=train_dataset.target_columns, model_type=cl_args.model_type
@@ -454,6 +467,13 @@ def prep_modelling_test_configs(
         target_transformers=train_dataset.target_transformers
     )
     metrics = _patch_metrics(metrics=metrics)
+
+    optimizer, loss_module = create_test_optimizer(
+        cl_args=cl_args,
+        model=model,
+        target_columns=train_dataset.target_columns,
+        criterions=criterions,
+    )
 
     train_dataset, valid_dataset = create_test_datasets
 
@@ -467,6 +487,7 @@ def prep_modelling_test_configs(
         model=model,
         optimizer=optimizer,
         criterions=criterions,
+        loss_function=loss_module,
         metrics=metrics,
         labels_dict=train_dataset.labels_dict,
         target_transformers=train_dataset.target_transformers,

@@ -89,7 +89,7 @@ def test_calculate_losses_good():
         label_values=common_values, output_values=common_values
     )
 
-    perfect_pred_loss = metrics.calculate_losses(
+    perfect_pred_loss = metrics.calculate_prediction_losses(
         criterions=test_criterions, labels=test_labels, outputs=test_outputs
     )
 
@@ -109,7 +109,7 @@ def test_calculate_losses_bad():
         label_values=label_values, output_values=output_values
     )
 
-    bad_pred_loss = metrics.calculate_losses(
+    bad_pred_loss = metrics.calculate_prediction_losses(
         criterions=test_criterions, labels=test_labels, outputs=test_outputs
     )
 
