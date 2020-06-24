@@ -259,14 +259,14 @@ class SplitLinear(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        fan = nn.init._calculate_correct_fan(self.weight[0], "fan_out")
-        gain = nn.init.calculate_gain("leaky_relu", 0.5)
-        std = gain / math.sqrt(fan)
-
-        nn.init.normal_(self.weight, 0, std)
-
+        """
+        TODO: Fix to account for chunks.
+        """
+        nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))
         if self.bias is not None:
-            nn.init.zeros_(self.bias)
+            fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.weight)
+            bound = 1 / math.sqrt(fan_in)
+            nn.init.uniform_(self.bias, -bound, bound)
 
     def forward(self, input: torch.Tensor):
         input = F.pad(input=input, pad=[0, self.padding, 0, 0])
