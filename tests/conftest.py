@@ -10,6 +10,7 @@ import warnings
 
 import numpy as np
 import pytest
+import train_utils.optimizers
 from _pytest.fixtures import SubRequest
 from aislib.misc_utils import ensure_path_exists
 from torch import cuda
@@ -427,7 +428,7 @@ def create_test_optimizer(
         target_columns=target_columns, criterions=criterions, device=cl_args.device
     )
 
-    optimizer = train.get_optimizer(
+    optimizer = train_utils.optimizers.get_optimizer(
         model=model, loss_callable=loss_module, cl_args=cl_args
     )
 

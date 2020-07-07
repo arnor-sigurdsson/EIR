@@ -12,14 +12,6 @@ import numpy as np
 import torch
 from aislib.misc_utils import ensure_path_exists
 from aislib.misc_utils import get_logger
-from ignite.engine import Engine
-from torch import nn
-from torch.optim import SGD
-from torch.optim.adamw import AdamW
-from torch.optim.optimizer import Optimizer
-from torch.utils.data import DataLoader, WeightedRandomSampler
-from torch.utils.tensorboard import SummaryWriter
-
 from human_origins_supervised.data_load import data_utils
 from human_origins_supervised.data_load import datasets
 from human_origins_supervised.data_load.data_loading_funcs import (
@@ -36,7 +28,7 @@ from human_origins_supervised.models.extra_inputs_module import (
     get_extra_inputs,
     al_emb_lookup_dict,
 )
-from human_origins_supervised.models.model_utils import get_model_params, test_lr_range
+from human_origins_supervised.models.model_utils import test_lr_range
 from human_origins_supervised.models.models import get_model_class, al_models
 from human_origins_supervised.train_utils import utils
 from human_origins_supervised.train_utils.metrics import (
@@ -58,6 +50,12 @@ from human_origins_supervised.train_utils.metrics import (
     MetricRecord,
 )
 from human_origins_supervised.train_utils.train_handlers import configure_trainer
+from human_origins_supervised.train_utils.optimizers import get_optimizer
+from ignite.engine import Engine
+from torch import nn
+from torch.optim.optimizer import Optimizer
+from torch.utils.data import DataLoader, WeightedRandomSampler
+from torch.utils.tensorboard import SummaryWriter
 
 if TYPE_CHECKING:
     from human_origins_supervised.train_utils.metrics import (
@@ -346,55 +344,6 @@ def _check_linear_model_columns(cl_args: argparse.Namespace) -> None:
         )
 
 
-def get_optimizer(
-    model: nn.Module, loss_callable: Callable, cl_args: argparse.Namespace
-) -> Optimizer:
-    """
-    TODO:   Make this just return the optimizer instance, another function
-            to add loss callable.
-    """
-
-    def get_all_params():
-        model_params = get_model_params(model=model, wd=cl_args.wd)
-
-        loss_params = []
-        if isinstance(loss_callable, nn.Module):
-            loss_params = [{"params": p} for p in loss_callable.parameters()]
-
-        return model_params + loss_params
-
-    all_params = get_all_params()
-
-    if cl_args.optimizer == "adamw":
-        optimizer = AdamW(
-            params=all_params,
-            lr=cl_args.lr,
-            betas=(cl_args.b1, cl_args.b2),
-            amsgrad=True,
-        )
-    elif cl_args.optimizer == "sgdm":
-        optimizer = SGD(params=all_params, lr=cl_args.lr, momentum=0.9)
-    else:
-        raise ValueError()
-
-    return optimizer
-
-
-def get_optimizer_prev(model: nn.Module, cl_args: argparse.Namespace) -> Optimizer:
-    params = get_model_params(model=model, wd=cl_args.wd)
-
-    if cl_args.optimizer == "adamw":
-        optimizer = AdamW(
-            params=params, lr=cl_args.lr, betas=(cl_args.b1, cl_args.b2), amsgrad=True
-        )
-    elif cl_args.optimizer == "sgdm":
-        optimizer = SGD(params=params, lr=cl_args.lr, momentum=0.9)
-    else:
-        raise ValueError()
-
-    return optimizer
-
-
 def _get_criterions(
     target_columns: al_target_columns, model_type: str
 ) -> al_criterions:
@@ -470,7 +419,7 @@ def _get_default_metrics(
         "averaging_functions": {"con": "loss", "cat": "acc"},
     }
 
-    # TODO: temporary metrics for testing
+    # TODO: Remove and use default metrics, currently temporary for testing
     roc_auc_macro = MetricRecord(
         name="roc-auc-macro", function=calc_roc_auc_ovr, only_val=True
     )
@@ -636,7 +585,7 @@ def _get_train_argument_parser() -> configargparse.ArgumentParser:
     parser_.add_argument(
         "--optimizer",
         type=str,
-        choices=["adamw", "sgdm"],
+        choices=_get_optimizer_cl_arg_choices(),
         default="adamw",
         help="Whether to use AdamW or SGDM optimizer.",
     )
@@ -925,6 +874,26 @@ def _get_train_argument_parser() -> configargparse.ArgumentParser:
         help="How many iterations to skip in in plots.",
     )
     return parser_
+
+
+def _get_optimizer_cl_arg_choices():
+    """
+    Currently just going to hardcode the main default optimizers. Later we can do
+    something fancy with inspect and issubclass of Optimizer to get names of all
+    PyTorch built-in optimizers.
+    """
+    default = ["sgdm", "adamw", "adam"]
+    external = _get_custom_opt_names()
+    return default + external
+
+
+def _get_custom_opt_names():
+    # import here to keep separated from main codebase
+    from torch_optimizer import _NAME_OPTIM_MAP as CUSTOM_OPT_NAME_MAP
+
+    custom_optim_list = list(CUSTOM_OPT_NAME_MAP.keys())
+    custom_optim_list = [i for i in custom_optim_list if i != "lookahead"]
+    return custom_optim_list
 
 
 def _modify_train_arguments(cl_args: argparse.Namespace) -> argparse.Namespace:

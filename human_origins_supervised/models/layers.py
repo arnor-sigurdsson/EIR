@@ -260,7 +260,10 @@ class SplitLinear(nn.Module):
 
     def reset_parameters(self):
         """
-        TODO: Fix to account for chunks.
+        NOTE: This default init actually works quite well, as compared to initializing
+        for each chunk (meaning higher weights at init). In that case, the model takes
+        longer to get to a good performance as it spends a while driving the weights
+        down.
         """
         nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))
         if self.bias is not None:
@@ -303,17 +306,6 @@ def calc_split_input(input: torch.Tensor, weight: torch.Tensor, bias):
         out.append(flattened)
 
     stacked = torch.cat(out, dim=1)
-    final = stacked + bias
-    return final
-
-
-def calc_split_input_prev(
-    input: torch.Tensor, weight: torch.Tensor, split_size: int, bias, out_features: int
-) -> torch.Tensor:
-    out = torch.cat(tuple(input * weight[i] for i in range(out_features)), dim=1)
-    out_split = torch.split(tensor=out, split_size_or_sections=split_size, dim=1)
-    out_aggregated = torch.stack([torch.sum(i, dim=1) for i in out_split], dim=1)
     if bias is not None:
-        out_aggregated += bias
-
-    return out_aggregated
+        final = stacked + bias
+    return final
