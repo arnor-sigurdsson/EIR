@@ -305,7 +305,7 @@ def calc_split_input(input: torch.Tensor, weight: torch.Tensor, bias):
         flattened = sum.flatten(start_dim=1)
         out.append(flattened)
 
-    stacked = torch.cat(out, dim=1)
+    final = torch.cat(out, dim=1)
     if bias is not None:
-        final = stacked + bias
+        final = final + bias
     return final
