@@ -1,3 +1,4 @@
+from functools import partial
 from argparse import Namespace
 from collections import OrderedDict
 from typing import List, Union, Tuple, Dict, Callable
@@ -33,7 +34,7 @@ def get_model_class(model_type: str) -> al_models:
     return LinearModel
 
 
-def _get_block(
+def _get_conv_resblock(
     conv_blocks: List[nn.Module],
     layer_arch_idx: int,
     down_stride: int,
@@ -138,7 +139,7 @@ def _make_conv_layers(
     sa_added = False
     for layer_arch_idx, layer_arch_layers in enumerate(residual_blocks):
         for layer in range(layer_arch_layers):
-            cur_layer, cur_width = _get_block(
+            cur_layer, cur_width = _get_conv_resblock(
                 conv_blocks=conv_blocks,
                 layer_arch_idx=layer_arch_idx,
                 down_stride=down_stride_w,
@@ -190,68 +191,6 @@ class ModelBase(nn.Module):
     @property
     def fc_1_in_features(self) -> int:
         raise NotImplementedError
-
-
-def _get_module_dict_from_target_columns(num_classes: al_num_classes, fc_in: int):
-
-    module_dict = {}
-    for key, num_classes in num_classes.items():
-        module_dict[key] = nn.Linear(fc_in, num_classes)
-
-    return nn.ModuleDict(module_dict)
-
-
-def _get_multi_task_branches(
-    fc_repr_and_extra_dim: int,
-    fc_task_dim: int,
-    fc_do: float,
-    num_classes: al_num_classes,
-) -> nn.ModuleDict:
-
-    module_dict = {}
-    for key, num_classes in num_classes.items():
-        branch_layers = OrderedDict(
-            {
-                "fc_2_bn_1": nn.BatchNorm1d(fc_repr_and_extra_dim),
-                "fc_2_act_1": Swish(),
-                "fc_2_linear_1": nn.Linear(
-                    fc_repr_and_extra_dim, fc_task_dim, bias=False
-                ),
-                "fc_2_do_1": nn.Dropout(p=fc_do),
-                "fc_3_bn_1": nn.BatchNorm1d(fc_task_dim),
-                "fc_3_act_1": Swish(),
-                "fc_3_do_1": nn.Dropout(p=fc_do),
-            }
-        )
-
-        task_layer_branch = nn.Sequential(
-            OrderedDict(
-                **branch_layers, **{"fc_3_final": nn.Linear(fc_task_dim, num_classes)}
-            )
-        )
-
-        module_dict[key] = task_layer_branch
-
-    _assert_module_dict_uniqueness(module_dict)
-    return nn.ModuleDict(module_dict)
-
-
-def _assert_module_dict_uniqueness(module_dict: Dict[str, nn.Sequential]):
-    """
-    We have this function as a safeguard to help us catch if we are reusing modules
-    when they should not be (i.e. if splitting into multiple branches with same layers,
-    one could accidentally reuse the instantiated nn.Modules across branches).
-    """
-    branch_ids = [id(sequential_branch) for sequential_branch in module_dict.values()]
-    assert len(branch_ids) == len(set(branch_ids))
-
-    module_ids = []
-    for sequential_branch in module_dict.values():
-        module_ids += [id(module) for module in sequential_branch]
-
-    num_total_modules = len(module_ids)
-    num_unique_modules = len(set(module_ids))
-    assert num_unique_modules == num_total_modules
 
 
 class CNNModel(ModelBase):
@@ -521,11 +460,63 @@ class SplitMLPModel(ModelBase):
         return out
 
 
+class MLPResidualBlock(nn.Module):
+    def __init__(
+        self,
+        in_features: int,
+        out_features: int,
+        layer_factory: Callable[..., nn.Module],
+    ):
+        super().__init__()
+
+        self.in_features = in_features
+        self.out_features = out_features
+
+        self.layer = layer_factory(in_features=in_features, out_features=out_features)
+
+        if in_features == out_features:
+            self.downsample_identity = lambda x: x
+        else:
+            self.downsample_identity = nn.Linear(
+                in_features=in_features, out_features=out_features
+            )
+
+    def forward(self, x):
+        identity = self.downsample_identity(x)
+        out = self.layer(x)
+
+        return out + identity
+
+
+def construct_resblocks(
+    num_blocks: int,
+    in_features: int,
+    out_features: int,
+    block_layer_factory: Callable[..., nn.Module],
+    block_class: nn.Module,
+):
+    blocks = []
+    first_block = block_class(
+        in_features=in_features,
+        out_features=out_features,
+        layer_factory=block_layer_factory,
+    )
+    blocks.append(first_block)
+
+    for i in range(num_blocks - 1):
+        cur_block = block_class(
+            in_features=out_features,
+            out_features=out_features,
+            layer_factory=block_layer_factory,
+        )
+        blocks.append(cur_block)
+
+    return nn.Sequential(*blocks)
+
+
 class MGMoEModel(ModelBase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
-        # TODO: Create constructor for MLP models
 
         self.num_chunks = self.cl_args.split_mlp_num_splits
         self.num_experts = self.cl_args.mg_num_experts
@@ -548,38 +539,40 @@ class MGMoEModel(ModelBase):
         )
 
         gate_names = tuple(self.num_classes.keys())
+        gate_spec = self.get_gate_spec(
+            in_features=fc_0_out_feat, out_features=self.num_experts
+        )
+        gate_factory = partial(initialize_modules_from_spec, spec=gate_spec)
         self.gates = construct_multi_branches(
-            branch_names=gate_names,
-            branch_layer_base=OrderedDict(
-                {
-                    "gate_fc": (
-                        nn.Linear,
-                        {
-                            "in_features": fc_0_out_feat,
-                            "out_features": self.num_experts,
-                            "bias": True,
-                        },
-                    ),
-                    "gate_attention": (nn.Softmax, {"dim": 1}),
-                }
-            ),
+            branch_names=gate_names, branch_factory=gate_factory
         )
 
+        layer_factory = partial(self.layer_factory, dropout=self.cl_args.fc_do)
+
         expert_names = tuple(f"expert_{i}" for i in range(self.num_experts))
+        expert_branch_factory = partial(
+            construct_resblocks,
+            num_blocks=self.cl_args.resblocks[0],
+            in_features=fc_0_out_feat + self.extra_dim,
+            out_features=self.fc_task_dim,
+            block_layer_factory=layer_factory,
+            block_class=MLPResidualBlock,
+        )
         self.expert_branches = construct_multi_branches(
-            branch_names=expert_names,
-            branch_layer_base=self.get_multi_task_branch_base(
-                in_features=fc_0_out_feat + self.extra_dim,
-                out_features=self.fc_task_dim,
-            ),
+            branch_names=expert_names, branch_factory=expert_branch_factory
         )
 
         task_names = tuple(self.num_classes.keys())
+        task_branch_factory = partial(
+            construct_resblocks,
+            num_blocks=self.cl_args.resblocks[1],
+            in_features=self.fc_task_dim,
+            out_features=self.fc_task_dim,
+            block_layer_factory=layer_factory,
+            block_class=MLPResidualBlock,
+        )
         self.multi_task_branches = construct_multi_branches(
-            branch_names=task_names,
-            branch_layer_base=self.get_multi_task_branch_base(
-                in_features=self.fc_task_dim, out_features=self.fc_task_dim
-            ),
+            branch_names=task_names, branch_factory=task_branch_factory
         )
 
         for task, num_outputs in self.num_classes.items():
@@ -589,16 +582,27 @@ class MGMoEModel(ModelBase):
 
         self._init_weights()
 
-    def get_multi_task_branch_base(
-        self, in_features, out_features
-    ) -> "OrderedDict[str, Tuple[nn.Module, Dict]]":
-        # TODO: Move out of this class.
-        # TODO: Make prefix an argument to this function, instead of hard-coding fc_1
-        # TODO: Add constructor to work on the output of this function, can inject
-        #       before, after and add repeats of this base by calling this with diff
-        #       names
+    def get_gate_spec(self, in_features: int, out_features: int):
+        spec = OrderedDict(
+            {
+                "gate_fc": (
+                    nn.Linear,
+                    {
+                        "in_features": in_features,
+                        "out_features": out_features,
+                        "bias": True,
+                    },
+                ),
+                "gate_attention": (nn.Softmax, {"dim": 1}),
+            }
+        )
 
-        base = OrderedDict(
+        return spec
+
+    @staticmethod
+    def layer_factory(in_features: int, out_features: int, dropout: float) -> nn.Module:
+        # TODO: Split into two
+        spec = OrderedDict(
             {
                 "fc_1_linear_1": (
                     nn.Linear,
@@ -610,11 +614,13 @@ class MGMoEModel(ModelBase):
                 ),
                 "fc_1_bn_1": (nn.BatchNorm1d, {"num_features": out_features}),
                 "fc_1_act_1": (Swish, {}),
-                "fc_1_do_1": (nn.Dropout, {"p": self.cl_args.fc_do}),
+                "fc_1_do_1": (nn.Dropout, {"p": dropout}),
             }
         )
 
-        return base
+        module = nn.Sequential(initialize_modules_from_spec(spec=spec))
+
+        return module
 
     def _init_weights(self):
         pass
@@ -659,25 +665,69 @@ class MGMoEModel(ModelBase):
         return final_out
 
 
+def _get_multi_task_branches(
+    fc_repr_and_extra_dim: int,
+    fc_task_dim: int,
+    fc_do: float,
+    num_classes: al_num_classes,
+) -> nn.ModuleDict:
+
+    module_dict = {}
+    for key, num_classes in num_classes.items():
+        branch_layers = OrderedDict(
+            {
+                "fc_2_bn_1": nn.BatchNorm1d(fc_repr_and_extra_dim),
+                "fc_2_act_1": Swish(),
+                "fc_2_linear_1": nn.Linear(
+                    fc_repr_and_extra_dim, fc_task_dim, bias=False
+                ),
+                "fc_2_do_1": nn.Dropout(p=fc_do),
+                "fc_3_bn_1": nn.BatchNorm1d(fc_task_dim),
+                "fc_3_act_1": Swish(),
+                "fc_3_do_1": nn.Dropout(p=fc_do),
+            }
+        )
+
+        task_layer_branch = nn.Sequential(
+            OrderedDict(
+                **branch_layers, **{"fc_3_final": nn.Linear(fc_task_dim, num_classes)}
+            )
+        )
+
+        module_dict[key] = task_layer_branch
+
+    _assert_module_dict_uniqueness(module_dict)
+    return nn.ModuleDict(module_dict)
+
+
+def _assert_module_dict_uniqueness(module_dict: Dict[str, nn.Sequential]):
+    """
+    We have this function as a safeguard to help us catch if we are reusing modules
+    when they should not be (i.e. if splitting into multiple branches with same layers,
+    one could accidentally reuse the instantiated nn.Modules across branches).
+    """
+    branch_ids = [id(sequential_branch) for sequential_branch in module_dict.values()]
+    assert len(branch_ids) == len(set(branch_ids))
+
+    module_ids = []
+    for sequential_branch in module_dict.values():
+        module_ids += [id(module) for module in sequential_branch]
+
+    num_total_modules = len(module_ids)
+    num_unique_modules = len(set(module_ids))
+    assert num_unique_modules == num_total_modules
+
+
 def construct_multi_branches(
     branch_names: Tuple[str, ...],
-    branch_layer_base: "OrderedDict[str, Tuple[nn.Module, Dict]]",
+    branch_factory: Callable,
     extra_hooks: List[Callable] = (),
 ) -> nn.ModuleDict:
-    def _initialize_module(module: nn.Module, module_args: Dict) -> nn.Module:
-        return module(**module_args)
 
     module_dict = {}
     for name in branch_names:
-        cur_branch = OrderedDict()
 
-        for module_name, module_recipe in branch_layer_base.items():
-            cur_module = module_recipe[0]
-            cur_module_args = module_recipe[1]
-            cur_branch[module_name] = _initialize_module(
-                module=cur_module, module_args=cur_module_args
-            )
-
+        cur_branch = branch_factory()
         module_dict[name] = nn.Sequential(cur_branch)
 
     for hook in extra_hooks:
@@ -685,6 +735,26 @@ def construct_multi_branches(
 
     _assert_module_dict_uniqueness(module_dict)
     return nn.ModuleDict(module_dict)
+
+
+def initialize_modules_from_spec(
+    spec: "OrderedDict[str, Tuple[nn.Module, Dict]]",
+) -> nn.ModuleDict:
+    # TODO: Fix type hint
+    module_dict = OrderedDict()
+    for name, recipe in spec.items():
+        module_class = recipe[0]
+        module_args = recipe[1]
+
+        module = _initialize_module(module=module_class, module_args=module_args)
+
+        module_dict[name] = module
+
+    return module_dict
+
+
+def _initialize_module(module: nn.Module, module_args: Dict) -> nn.Module:
+    return module(**module_args)
 
 
 def _get_downsample_identities_moduledict(
