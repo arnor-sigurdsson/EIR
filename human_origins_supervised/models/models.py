@@ -1,22 +1,29 @@
-from functools import partial
 from argparse import Namespace
 from collections import OrderedDict
-from typing import List, Union, Tuple, Dict, Callable
+from copy import deepcopy
+from dataclasses import dataclass
+from typing import List, Union, Tuple, Dict, Callable, Iterable, Any
 
 import torch
 from aislib import pytorch_utils
 from aislib.misc_utils import get_logger
 from aislib.pytorch_modules import Swish
+from human_origins_supervised.data_load.datasets import al_num_classes
 from torch import nn
 
-from human_origins_supervised.data_load.datasets import al_num_classes
 from . import extra_inputs_module
 from .extra_inputs_module import al_emb_lookup_dict
-from .layers import SelfAttention, FirstBlock, Block, SplitLinear
+from .layers import (
+    SelfAttention,
+    FirstCNNBlock,
+    CNNResidualBlock,
+    SplitLinear,
+    MLPResidualBlock,
+)
 from .model_utils import find_no_resblocks_needed
 
 # type aliases
-al_models = Union["CNNModel", "MLPModel", "LinearModel"]
+al_models = Union["CNNModel", "MLPModel", "LinearModel", "SplitMLPModel", "MGMoEModel"]
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -32,128 +39,6 @@ def get_model_class(model_type: str) -> al_models:
         return MGMoEModel
 
     return LinearModel
-
-
-def _get_conv_resblock(
-    conv_blocks: List[nn.Module],
-    layer_arch_idx: int,
-    down_stride: int,
-    cl_args: Namespace,
-) -> Tuple[Block, int]:
-    ca = cl_args
-
-    cur_conv = nn.Sequential(*conv_blocks)
-    cur_width = pytorch_utils.calc_size_after_conv_sequence(
-        input_width=ca.target_width, conv_sequence=cur_conv
-    )
-
-    cur_kern, cur_padd = pytorch_utils.calc_conv_params_needed(
-        input_width=cur_width,
-        kernel_size=ca.kernel_width,
-        stride=down_stride,
-        dilation=1,
-    )
-
-    cur_block_number = len([i for i in conv_blocks if isinstance(i, Block)]) + 1
-    cur_dilation_factor = _get_cur_dilation(
-        dilation_factor=cl_args.dilation_factor,
-        width=cur_width,
-        block_number=cur_block_number,
-    )
-
-    cur_in_channels = conv_blocks[-1].out_channels
-    cur_out_channels = 2 ** (ca.channel_exp_base + layer_arch_idx)
-
-    cur_layer = Block(
-        in_channels=cur_in_channels,
-        out_channels=cur_out_channels,
-        conv_1_kernel_w=cur_kern,
-        conv_1_padding=cur_padd,
-        down_stride_w=down_stride,
-        dilation=cur_dilation_factor,
-        full_preact=True if len(conv_blocks) == 1 else False,
-        rb_do=ca.rb_do,
-    )
-
-    return cur_layer, cur_width
-
-
-def _get_cur_dilation(dilation_factor: int, width: int, block_number: int):
-    """
-    Note that block_number refers to the number of residual blocks (not first block
-    or self attention).
-    """
-    dilation = dilation_factor ** block_number
-
-    while dilation >= width:
-        dilation = dilation // dilation_factor
-
-    return dilation
-
-
-def _make_conv_layers(
-    residual_blocks: List[int], cl_args: Namespace
-) -> List[nn.Module]:
-    """
-    Used to set up the convolutional layers for the model. Based on the passed in
-    residual blocks, we want to set up the actual blocks with all the relevant
-    convolution parameters.
-
-    We start with a base channel number of 2**5 == 32.
-
-    Also inserts a self-attention layer in just before the last residual block.
-
-    :param residual_blocks: List of ints, where each int indicates number of blocks w.
-    that channel dimension.
-    :param cl_args: Experiment hyperparameters / configuration needed for the
-    convolution setup.
-    :return: A list of `nn.Module` objects to be passed to `nn.Sequential`.
-    """
-    ca = cl_args
-
-    down_stride_w = ca.down_stride
-
-    first_conv_channels = 2 ** ca.channel_exp_base * ca.first_channel_expansion
-    first_conv_kernel = ca.kernel_width * ca.first_kernel_expansion
-    first_conv_stride = down_stride_w * ca.first_stride_expansion
-
-    first_kernel, first_pad = pytorch_utils.calc_conv_params_needed(
-        input_width=ca.target_width,
-        kernel_size=first_conv_kernel,
-        stride=first_conv_stride,
-        dilation=1,
-    )
-
-    conv_blocks = [
-        FirstBlock(
-            in_channels=1,
-            out_channels=first_conv_channels,
-            conv_1_kernel_w=first_kernel,
-            conv_1_padding=first_pad,
-            down_stride_w=first_conv_stride,
-            dilation=1,
-            rb_do=ca.rb_do,
-        )
-    ]
-
-    sa_added = False
-    for layer_arch_idx, layer_arch_layers in enumerate(residual_blocks):
-        for layer in range(layer_arch_layers):
-            cur_layer, cur_width = _get_conv_resblock(
-                conv_blocks=conv_blocks,
-                layer_arch_idx=layer_arch_idx,
-                down_stride=down_stride_w,
-                cl_args=ca,
-            )
-
-            if cl_args.sa and cur_width < 1024 and not sa_added:
-                attention_channels = conv_blocks[-1].out_channels
-                conv_blocks.append(SelfAttention(attention_channels))
-                sa_added = True
-
-            conv_blocks.append(cur_layer)
-
-    return conv_blocks
 
 
 class ModelBase(nn.Module):
@@ -290,6 +175,130 @@ class CNNModel(ModelBase):
         return out
 
 
+def _make_conv_layers(
+    residual_blocks: List[int], cl_args: Namespace
+) -> List[nn.Module]:
+    """
+    Used to set up the convolutional layers for the model. Based on the passed in
+    residual blocks, we want to set up the actual blocks with all the relevant
+    convolution parameters.
+
+    We start with a base channel number of 2**5 == 32.
+
+    Also inserts a self-attention layer in just before the last residual block.
+
+    :param residual_blocks: List of ints, where each int indicates number of blocks w.
+    that channel dimension.
+    :param cl_args: Experiment hyperparameters / configuration needed for the
+    convolution setup.
+    :return: A list of `nn.Module` objects to be passed to `nn.Sequential`.
+    """
+    ca = cl_args
+
+    down_stride_w = ca.down_stride
+
+    first_conv_channels = 2 ** ca.channel_exp_base * ca.first_channel_expansion
+    first_conv_kernel = ca.kernel_width * ca.first_kernel_expansion
+    first_conv_stride = down_stride_w * ca.first_stride_expansion
+
+    first_kernel, first_pad = pytorch_utils.calc_conv_params_needed(
+        input_width=ca.target_width,
+        kernel_size=first_conv_kernel,
+        stride=first_conv_stride,
+        dilation=1,
+    )
+
+    conv_blocks = [
+        FirstCNNBlock(
+            in_channels=1,
+            out_channels=first_conv_channels,
+            conv_1_kernel_w=first_kernel,
+            conv_1_padding=first_pad,
+            down_stride_w=first_conv_stride,
+            dilation=1,
+            rb_do=ca.rb_do,
+        )
+    ]
+
+    sa_added = False
+    for layer_arch_idx, layer_arch_layers in enumerate(residual_blocks):
+        for layer in range(layer_arch_layers):
+            cur_layer, cur_width = _get_conv_resblock(
+                conv_blocks=conv_blocks,
+                layer_arch_idx=layer_arch_idx,
+                down_stride=down_stride_w,
+                cl_args=ca,
+            )
+
+            if cl_args.sa and cur_width < 1024 and not sa_added:
+                attention_channels = conv_blocks[-1].out_channels
+                conv_blocks.append(SelfAttention(attention_channels))
+                sa_added = True
+
+            conv_blocks.append(cur_layer)
+
+    return conv_blocks
+
+
+def _get_conv_resblock(
+    conv_blocks: List[nn.Module],
+    layer_arch_idx: int,
+    down_stride: int,
+    cl_args: Namespace,
+) -> Tuple[CNNResidualBlock, int]:
+    ca = cl_args
+
+    cur_conv = nn.Sequential(*conv_blocks)
+    cur_width = pytorch_utils.calc_size_after_conv_sequence(
+        input_width=ca.target_width, conv_sequence=cur_conv
+    )
+
+    cur_kern, cur_padd = pytorch_utils.calc_conv_params_needed(
+        input_width=cur_width,
+        kernel_size=ca.kernel_width,
+        stride=down_stride,
+        dilation=1,
+    )
+
+    cur_block_number = (
+        len([i for i in conv_blocks if isinstance(i, CNNResidualBlock)]) + 1
+    )
+    cur_dilation_factor = _get_cur_dilation(
+        dilation_factor=cl_args.dilation_factor,
+        width=cur_width,
+        block_number=cur_block_number,
+    )
+
+    cur_in_channels = conv_blocks[-1].out_channels
+    cur_out_channels = 2 ** (ca.channel_exp_base + layer_arch_idx)
+
+    cur_layer = CNNResidualBlock(
+        in_channels=cur_in_channels,
+        out_channels=cur_out_channels,
+        conv_1_kernel_w=cur_kern,
+        conv_1_padding=cur_padd,
+        down_stride_w=down_stride,
+        dilation=cur_dilation_factor,
+        full_preact=True if len(conv_blocks) == 1 else False,
+        rb_do=ca.rb_do,
+    )
+
+    return cur_layer, cur_width
+
+
+def _get_cur_dilation(dilation_factor: int, width: int, block_number: int):
+    """
+    Note that block_number refers to the number of residual blocks (not first block
+    or self attention).
+    """
+    dilation = dilation_factor ** block_number
+
+    while dilation >= width:
+        dilation = dilation // dilation_factor
+
+    return dilation
+
+
 class MLPModel(ModelBase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -302,24 +311,40 @@ class MLPModel(ModelBase):
             num_classes=self.num_classes, in_features=self.fc_repr_and_extra_dim
         )
 
-        self.fc_1 = nn.Sequential(
+        self.fc_0_act = nn.Sequential(
             OrderedDict(
                 {
                     "fc_1_bn_1": nn.BatchNorm1d(self.cl_args.fc_repr_dim),
                     "fc_1_act_1": Swish(),
-                    "fc_1_linear_1": nn.Linear(
-                        self.cl_args.fc_repr_dim, self.cl_args.fc_repr_dim, bias=False
-                    ),
+                    "fc_1_do_1": nn.Dropout(p=self.cl_args.fc_do),
                 }
             )
         )
 
-        self.multi_task_branches = _get_multi_task_branches(
-            num_classes=self.num_classes,
-            fc_task_dim=self.fc_task_dim,
-            fc_repr_and_extra_dim=self.fc_repr_and_extra_dim,
-            fc_do=self.cl_args.fc_do,
+        first_layer_spec = get_basic_multi_branch_spec(
+            in_features=self.fc_repr_and_extra_dim,
+            out_features=self.fc_task_dim,
+            dropout_p=self.cl_args.fc_do,
         )
+        layer_spec = get_basic_multi_branch_spec(
+            in_features=self.fc_task_dim,
+            out_features=self.fc_task_dim,
+            dropout_p=self.cl_args.fc_do,
+        )
+
+        branches = create_blocks_with_first_adaptor_block(
+            num_blocks=self.cl_args.resblocks[0],
+            branch_names=self.num_classes.keys(),
+            block_constructor=initialize_modules_from_spec,
+            block_constructor_kwargs={"spec": layer_spec},
+            first_layer_kwargs_overload={"spec": first_layer_spec},
+        )
+
+        final_layer = get_final_layer(
+            in_features=self.fc_task_dim, num_classes=self.num_classes
+        )
+
+        self.multi_task_branches = merge_module_dicts((branches, final_layer))
 
         self._init_weights()
 
@@ -332,8 +357,7 @@ class MLPModel(ModelBase):
         return self.fc_0.weight
 
     def _init_weights(self):
-        for task_branch in self.multi_task_branches.values():
-            nn.init.zeros_(task_branch.fc_3_bn_1.weight)
+        pass
 
     def forward(
         self, x: torch.Tensor, extra_inputs: torch.Tensor = None
@@ -350,7 +374,7 @@ class MLPModel(ModelBase):
             input_=identity_inputs, module_dict=self.downsample_fc_0_identities
         )
 
-        out = self.fc_1(out)
+        out = self.fc_0_act(out)
 
         if extra_inputs is not None:
             out_extra = self.fc_extra(extra_inputs)
@@ -372,7 +396,6 @@ class SplitMLPModel(ModelBase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # TODO: Create constructor for MLP models
         # TODO: Account for extra inputs here
 
         num_chunks = self.cl_args.split_mlp_num_splits
@@ -383,9 +406,8 @@ class SplitMLPModel(ModelBase):
                         in_features=self.fc_1_in_features,
                         out_feature_sets=self.cl_args.fc_repr_dim,
                         num_chunks=num_chunks,
-                        bias=True,
-                    ),
-                    "fc_0_do": nn.Dropout(p=self.cl_args.fc_do),
+                        bias=False,
+                    )
                 }
             )
         )
@@ -395,25 +417,55 @@ class SplitMLPModel(ModelBase):
             num_classes=self.num_classes, in_features=in_feat
         )
 
-        self.fc_1 = nn.Sequential(
-            OrderedDict(
-                {
-                    "fc_1_bn_1": nn.BatchNorm1d(in_feat),
-                    "fc_1_act_1": Swish(),
-                    "fc_1_linear_1": nn.Linear(in_feat, in_feat, bias=False),
-                    "fc_1_do_1": nn.Dropout(self.cl_args.fc_do),
-                }
-            )
+        task_names = tuple(self.num_classes.keys())
+        task_resblocks_kwargs = {
+            "in_features": self.fc_task_dim,
+            "out_features": self.fc_task_dim,
+            "dropout_p": self.cl_args.rb_do,
+            "full_preactivation": False,
+        }
+        multi_task_branches = create_blocks_with_first_adaptor_block(
+            num_blocks=self.cl_args.resblocks[0],
+            branch_names=task_names,
+            block_constructor=MLPResidualBlock,
+            block_constructor_kwargs=task_resblocks_kwargs,
+            first_layer_kwargs_overload={
+                "full_preactivation": True,
+                "in_features": in_feat + self.extra_dim,
+            },
         )
 
-        self.multi_task_branches = _get_multi_task_branches(
-            num_classes=self.num_classes,
-            fc_repr_and_extra_dim=in_feat,
-            fc_task_dim=self.fc_task_dim,
-            fc_do=self.cl_args.fc_do,
+        final_act_spec = self.get_final_act_spec(
+            in_features=self.fc_task_dim, dropout_p=self.cl_args.fc_do
+        )
+        final_act = construct_multi_branches(
+            branch_names=task_names,
+            branch_factory=initialize_modules_from_spec,
+            branch_factory_kwargs={"spec": final_act_spec},
+        )
+
+        final_layer = get_final_layer(
+            in_features=self.fc_task_dim, num_classes=self.num_classes
+        )
+
+        self.multi_task_branches = merge_module_dicts(
+            (multi_task_branches, final_act, final_layer)
         )
 
         self._init_weights()
+
+    @staticmethod
+    def get_final_act_spec(in_features: int, dropout_p: float):
+
+        spec = OrderedDict(
+            {
+                "bn_final": (nn.BatchNorm1d, {"num_features": in_features}),
+                "act_final": (Swish, {}),
+                "do_final": (nn.Dropout, {"p": dropout_p}),
+            }
+        )
+
+        return spec
 
     @property
     def fc_1_in_features(self) -> int:
@@ -425,7 +477,8 @@ class SplitMLPModel(ModelBase):
 
     def _init_weights(self):
         for task_branch in self.multi_task_branches.values():
-            nn.init.zeros_(task_branch.fc_3_bn_1.weight)
+            pass
+            # nn.init.zeros_(task_branch.fc_3_bn_1.weight)
 
     def forward(
         self, x: torch.Tensor, extra_inputs: torch.Tensor = None
@@ -441,8 +494,6 @@ class SplitMLPModel(ModelBase):
         identities = _calculate_module_dict_outputs(
             input_=identity_inputs, module_dict=self.downsample_fc_0_identities
         )
-
-        out = self.fc_1(out)
 
         if extra_inputs is not None:
             out_extra = self.fc_extra(extra_inputs)
@@ -460,58 +511,74 @@ class SplitMLPModel(ModelBase):
         return out
 
 
-class MLPResidualBlock(nn.Module):
-    def __init__(
-        self,
-        in_features: int,
-        out_features: int,
-        layer_factory: Callable[..., nn.Module],
-    ):
-        super().__init__()
+def merge_module_dicts(module_dicts: Tuple[nn.ModuleDict, ...]):
+    def check_inputs():
+        assert all(i.keys() == module_dicts[0].keys() for i in module_dicts)
 
-        self.in_features = in_features
-        self.out_features = out_features
+    check_inputs()
 
-        self.layer = layer_factory(in_features=in_features, out_features=out_features)
+    new_module_dicts = deepcopy(module_dicts)
+    final_module_dict = nn.ModuleDict()
 
-        if in_features == out_features:
-            self.downsample_identity = lambda x: x
-        else:
-            self.downsample_identity = nn.Linear(
-                in_features=in_features, out_features=out_features
-            )
+    keys = new_module_dicts[0].keys()
+    for key in keys:
+        final_module_dict[key] = nn.Sequential()
 
-    def forward(self, x):
-        identity = self.downsample_identity(x)
-        out = self.layer(x)
+        for index, module_dict in enumerate(new_module_dicts):
+            cur_module = module_dict[key]
+            final_module_dict[key].add_module(str(index), cur_module)
 
-        return out + identity
+    return final_module_dict
 
 
-def construct_resblocks(
-    num_blocks: int,
-    in_features: int,
-    out_features: int,
-    block_layer_factory: Callable[..., nn.Module],
-    block_class: nn.Module,
-):
+def construct_blocks(
+    num_blocks: int, block_constructor: Callable, block_kwargs: Dict
+) -> nn.Sequential:
     blocks = []
-    first_block = block_class(
-        in_features=in_features,
-        out_features=out_features,
-        layer_factory=block_layer_factory,
-    )
-    blocks.append(first_block)
-
-    for i in range(num_blocks - 1):
-        cur_block = block_class(
-            in_features=out_features,
-            out_features=out_features,
-            layer_factory=block_layer_factory,
-        )
+    for i in range(num_blocks):
+        cur_block = block_constructor(**block_kwargs)
         blocks.append(cur_block)
-
     return nn.Sequential(*blocks)
+
+
+def create_blocks_with_first_adaptor_block(
+    num_blocks: int,
+    branch_names,
+    block_constructor: Callable,
+    block_constructor_kwargs: Dict,
+    first_layer_kwargs_overload: Dict,
+):
+
+    adaptor_block = construct_multi_branches(
+        branch_names=branch_names,
+        branch_factory=construct_blocks,
+        branch_factory_kwargs={
+            "num_blocks": 1,
+            "block_constructor": block_constructor,
+            "block_kwargs": {**block_constructor_kwargs, **first_layer_kwargs_overload},
+        },
+    )
+
+    blocks = construct_multi_branches(
+        branch_names=branch_names,
+        branch_factory=construct_blocks,
+        branch_factory_kwargs={
+            "num_blocks": num_blocks - 1,
+            "block_constructor": block_constructor,
+            "block_kwargs": {**block_constructor_kwargs},
+        },
+    )
+
+    merged_blocks = merge_module_dicts((adaptor_block, blocks))
+
+    return merged_blocks
+
+
+@dataclass
+class LayerSpec:
+    name: str
+    module: nn.Module
+    module_kwargs: Dict
 
 
 class MGMoEModel(ModelBase):
@@ -530,10 +597,7 @@ class MGMoEModel(ModelBase):
                         out_feature_sets=self.cl_args.fc_repr_dim,
                         num_chunks=self.num_chunks,
                         bias=True,
-                    ),
-                    "fc_0_bn_1": nn.BatchNorm1d(fc_0_out_feat),
-                    "fc_0_act_1": Swish(),
-                    "fc_0_do": nn.Dropout(p=self.cl_args.fc_do),
+                    )
                 }
             )
         )
@@ -542,47 +606,69 @@ class MGMoEModel(ModelBase):
         gate_spec = self.get_gate_spec(
             in_features=fc_0_out_feat, out_features=self.num_experts
         )
-        gate_factory = partial(initialize_modules_from_spec, spec=gate_spec)
         self.gates = construct_multi_branches(
-            branch_names=gate_names, branch_factory=gate_factory
+            branch_names=gate_names,
+            branch_factory=initialize_modules_from_spec,
+            branch_factory_kwargs={"spec": gate_spec},
         )
-
-        layer_factory = partial(self.layer_factory, dropout=self.cl_args.fc_do)
 
         expert_names = tuple(f"expert_{i}" for i in range(self.num_experts))
-        expert_branch_factory = partial(
-            construct_resblocks,
+        layer_kwargs = {
+            "in_features": self.fc_task_dim,
+            "out_features": self.fc_task_dim,
+            "dropout_p": self.cl_args.rb_do,
+            "full_preactivation": False,
+        }
+        self.expert_branches = create_blocks_with_first_adaptor_block(
             num_blocks=self.cl_args.resblocks[0],
-            in_features=fc_0_out_feat + self.extra_dim,
-            out_features=self.fc_task_dim,
-            block_layer_factory=layer_factory,
-            block_class=MLPResidualBlock,
-        )
-        self.expert_branches = construct_multi_branches(
-            branch_names=expert_names, branch_factory=expert_branch_factory
+            branch_names=expert_names,
+            block_constructor=MLPResidualBlock,
+            block_constructor_kwargs=layer_kwargs,
+            first_layer_kwargs_overload={
+                "full_preactivation": True,
+                "in_features": fc_0_out_feat + self.extra_dim,
+            },
         )
 
         task_names = tuple(self.num_classes.keys())
-        task_branch_factory = partial(
-            construct_resblocks,
-            num_blocks=self.cl_args.resblocks[1],
-            in_features=self.fc_task_dim,
-            out_features=self.fc_task_dim,
-            block_layer_factory=layer_factory,
-            block_class=MLPResidualBlock,
-        )
-        self.multi_task_branches = construct_multi_branches(
-            branch_names=task_names, branch_factory=task_branch_factory
+        task_resblocks_kwargs = {
+            "in_features": self.fc_task_dim,
+            "out_features": self.fc_task_dim,
+            "dropout_p": self.cl_args.rb_do,
+            "full_preactivation": False,
+        }
+        multi_task_branches = construct_multi_branches(
+            branch_names=task_names,
+            branch_factory=construct_blocks,
+            branch_factory_kwargs={
+                "num_blocks": self.cl_args.resblocks[1],
+                "block_constructor": MLPResidualBlock,
+                "block_kwargs": task_resblocks_kwargs,
+            },
         )
 
-        for task, num_outputs in self.num_classes.items():
-            self.multi_task_branches[task].add_module(
-                "final_fc", nn.Linear(self.fc_task_dim, num_outputs, bias=True)
-            )
+        final_act_spec = self.get_final_act_spec(
+            in_features=self.fc_task_dim, dropout_p=self.cl_args.fc_do
+        )
+        final_act = construct_multi_branches(
+            branch_names=task_names,
+            branch_factory=initialize_modules_from_spec,
+            branch_factory_kwargs={"spec": final_act_spec},
+        )
+
+        final_layer = get_final_layer(
+            in_features=self.fc_task_dim, num_classes=self.num_classes
+        )
+
+        self.multi_task_branches = merge_module_dicts(
+            (multi_task_branches, final_act, final_layer)
+        )
 
         self._init_weights()
 
-    def get_gate_spec(self, in_features: int, out_features: int):
+    @staticmethod
+    def get_gate_spec(in_features: int, out_features: int):
+
         spec = OrderedDict(
             {
                 "gate_fc": (
@@ -600,27 +686,17 @@ class MGMoEModel(ModelBase):
         return spec
 
     @staticmethod
-    def layer_factory(in_features: int, out_features: int, dropout: float) -> nn.Module:
-        # TODO: Split into two
+    def get_final_act_spec(in_features: int, dropout_p: float):
+
         spec = OrderedDict(
             {
-                "fc_1_linear_1": (
-                    nn.Linear,
-                    {
-                        "in_features": in_features,
-                        "out_features": out_features,
-                        "bias": False,
-                    },
-                ),
-                "fc_1_bn_1": (nn.BatchNorm1d, {"num_features": out_features}),
-                "fc_1_act_1": (Swish, {}),
-                "fc_1_do_1": (nn.Dropout, {"p": dropout}),
+                "bn_final": (nn.BatchNorm1d, {"num_features": in_features}),
+                "act_final": (Swish, {}),
+                "do_final": (nn.Dropout, {"p": dropout_p}),
             }
         )
 
-        module = nn.Sequential(initialize_modules_from_spec(spec=spec))
-
-        return module
+        return spec
 
     def _init_weights(self):
         pass
@@ -700,6 +776,26 @@ def _get_multi_task_branches(
     return nn.ModuleDict(module_dict)
 
 
+def get_basic_multi_branch_spec(in_features: int, out_features: int, dropout_p: float):
+    base_spec = OrderedDict(
+        {
+            "fc_1_linear_1": (
+                nn.Linear,
+                {
+                    "in_features": in_features,
+                    "out_features": out_features,
+                    "bias": False,
+                },
+            ),
+            "fc_1_bn_1": (nn.BatchNorm1d, {"num_features": out_features}),
+            "fc_1_act_1": (Swish, {}),
+            "fc_1_do_1": (nn.Dropout, {"p": dropout_p}),
+        }
+    )
+
+    return base_spec
+
+
 def _assert_module_dict_uniqueness(module_dict: Dict[str, nn.Sequential]):
     """
     We have this function as a safeguard to help us catch if we are reusing modules
@@ -711,7 +807,7 @@ def _assert_module_dict_uniqueness(module_dict: Dict[str, nn.Sequential]):
 
     module_ids = []
     for sequential_branch in module_dict.values():
-        module_ids += [id(module) for module in sequential_branch]
+        module_ids += [id(module) for module in sequential_branch.modules()]
 
     num_total_modules = len(module_ids)
     num_unique_modules = len(set(module_ids))
@@ -719,28 +815,52 @@ def _assert_module_dict_uniqueness(module_dict: Dict[str, nn.Sequential]):
 
 
 def construct_multi_branches(
-    branch_names: Tuple[str, ...],
-    branch_factory: Callable,
+    branch_names: Iterable[str],
+    branch_factory: Callable[[Any], nn.Sequential],
+    branch_factory_kwargs,
     extra_hooks: List[Callable] = (),
 ) -> nn.ModuleDict:
 
-    module_dict = {}
+    branched_module_dict = nn.ModuleDict()
     for name in branch_names:
 
-        cur_branch = branch_factory()
-        module_dict[name] = nn.Sequential(cur_branch)
+        cur_branch = branch_factory(**branch_factory_kwargs)
+        assert callable(cur_branch)
+        branched_module_dict[name] = cur_branch
 
     for hook in extra_hooks:
-        module_dict = hook(module_dict)
+        branched_module_dict = hook(branched_module_dict)
 
-    _assert_module_dict_uniqueness(module_dict)
-    return nn.ModuleDict(module_dict)
+    _assert_module_dict_uniqueness(branched_module_dict)
+    return branched_module_dict
+
+
+def get_final_layer(in_features, num_classes):
+    final_module_dict = nn.ModuleDict()
+
+    for task, num_outputs in num_classes.items():
+        cur_spec = OrderedDict(
+            {
+                "fc_final": (
+                    nn.Linear,
+                    {
+                        "in_features": in_features,
+                        "out_features": num_outputs,
+                        "bias": True,
+                    },
+                )
+            }
+        )
+        cur_module = initialize_modules_from_spec(spec=cur_spec)
+        final_module_dict[task] = cur_module
+
+    return final_module_dict
 
 
 def initialize_modules_from_spec(
     spec: "OrderedDict[str, Tuple[nn.Module, Dict]]",
-) -> nn.ModuleDict:
-    # TODO: Fix type hint
+) -> nn.Sequential:
+
     module_dict = OrderedDict()
     for name, recipe in spec.items():
         module_class = recipe[0]
@@ -750,7 +870,7 @@ def initialize_modules_from_spec(
 
         module_dict[name] = module
 
-    return module_dict
+    return nn.Sequential(module_dict)
 
 
 def _initialize_module(module: nn.Module, module_args: Dict) -> nn.Module:

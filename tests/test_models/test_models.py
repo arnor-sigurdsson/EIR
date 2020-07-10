@@ -30,7 +30,7 @@ def test_make_conv_layers():
 
     # account for first block, add +2 instead if using SA
     assert len(conv_layers) == len(conv_layer_list) + 2
-    assert isinstance(conv_layers[0], layers.FirstBlock)
+    assert isinstance(conv_layers[0], layers.FirstCNNBlock)
     assert isinstance(conv_layers[-2], layers.SelfAttention)
 
 
@@ -79,7 +79,7 @@ def test_cnn_model(
 ):
     cnn_test_model = create_test_model
 
-    assert isinstance(cnn_test_model.conv[0], models.FirstBlock)
+    assert isinstance(cnn_test_model.conv[0], models.FirstCNNBlock)
     assert True
 
 

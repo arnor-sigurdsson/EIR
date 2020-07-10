@@ -128,7 +128,7 @@ class AbstractBlock(nn.Module):
         self.conv_1_padding = conv_1_padding
         self.down_stride_w = down_stride_w
 
-        self.conv_1_kernel_h = 4 if isinstance(self, FirstBlock) else 1
+        self.conv_1_kernel_h = 4 if isinstance(self, FirstCNNBlock) else 1
         self.down_stride_h = self.conv_1_kernel_h
 
         self.rb_do = nn.Dropout2d(rb_do)
@@ -178,7 +178,7 @@ class AbstractBlock(nn.Module):
         raise NotImplementedError
 
 
-class FirstBlock(AbstractBlock):
+class FirstCNNBlock(AbstractBlock):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -197,7 +197,7 @@ class FirstBlock(AbstractBlock):
         return out
 
 
-class Block(AbstractBlock):
+class CNNResidualBlock(AbstractBlock):
     def __init__(self, full_preact: bool = False, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -309,3 +309,55 @@ def calc_split_input(input: torch.Tensor, weight: torch.Tensor, bias):
     if bias is not None:
         final = final + bias
     return final
+
+
+class MLPResidualBlock(nn.Module):
+    def __init__(
+        self,
+        in_features: int,
+        out_features: int,
+        dropout_p: float = 0.0,
+        full_preactivation: bool = False,
+    ):
+        super().__init__()
+
+        self.in_features = in_features
+        self.out_features = out_features
+        self.dropout_p = dropout_p
+        self.full_preactivation = full_preactivation
+
+        self.bn_1 = nn.BatchNorm1d(num_features=in_features)
+        self.act_1 = Swish()
+        self.fc_1 = nn.Linear(
+            in_features=in_features, out_features=out_features, bias=False
+        )
+
+        self.bn_2 = nn.BatchNorm1d(num_features=out_features)
+        self.act_2 = Swish()
+        self.do = nn.Dropout(p=dropout_p)
+        self.fc_2 = nn.Linear(
+            in_features=out_features, out_features=out_features, bias=False
+        )
+
+        if in_features == out_features:
+            self.downsample_identity = lambda x: x
+        else:
+            self.downsample_identity = nn.Linear(
+                in_features=in_features, out_features=out_features, bias=False
+            )
+
+    def forward(self, x):
+        out = self.bn_1(x)
+        out = self.act_1(out)
+
+        identity = out if self.full_preactivation else x
+        identity = self.downsample_identity(identity)
+
+        out = self.fc_1(out)
+
+        out = self.bn_2(out)
+        out = self.act_2(out)
+        out = self.do(out)
+        out = self.fc_2(out)
+
+        return out + identity
