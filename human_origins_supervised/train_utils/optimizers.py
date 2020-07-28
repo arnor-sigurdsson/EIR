@@ -11,7 +11,7 @@ from torch.optim.adamw import AdamW
 
 from torch_optimizer import get as get_custom_opt
 
-from models.model_utils import get_model_params
+from human_origins_supervised.models.model_utils import get_model_params
 
 
 def get_optimizer(

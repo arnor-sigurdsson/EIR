@@ -89,10 +89,6 @@ class CNNModel(ModelBase):
         )
         self.no_out_channels = self.conv[-1].out_channels
 
-        self.downsample_conv_identities = _get_downsample_identities_moduledict(
-            num_classes=self.num_classes, in_features=self.fc_1_in_features
-        )
-
         self.fc_1 = nn.Sequential(
             OrderedDict(
                 {
@@ -133,7 +129,7 @@ class CNNModel(ModelBase):
 
     @property
     def resblocks(self) -> List[int]:
-        if not self.cl_args.resblocks:
+        if not self.cl_args.layers:
             residual_blocks = find_no_resblocks_needed(
                 self.cl_args.target_width,
                 self.cl_args.down_stride,
@@ -145,17 +141,13 @@ class CNNModel(ModelBase):
                 residual_blocks,
             )
             return residual_blocks
-        return self.cl_args.resblocks
+        return self.cl_args.layers
 
     def forward(
         self, x: torch.Tensor, extra_inputs: torch.Tensor = None
     ) -> Dict[str, torch.Tensor]:
         out = self.conv(x)
         out = out.view(out.shape[0], -1)
-
-        identities = _calculate_module_dict_outputs(
-            input_=out, module_dict=self.downsample_conv_identities
-        )
 
         out = self.fc_1(out)
 
@@ -166,11 +158,6 @@ class CNNModel(ModelBase):
         out = _calculate_module_dict_outputs(
             input_=out, module_dict=self.multi_task_branches
         )
-
-        out = {
-            column_name: feature + identities[column_name]
-            for column_name, feature in out.items()
-        }
 
         return out
 
@@ -333,7 +320,7 @@ class MLPModel(ModelBase):
         )
 
         branches = create_blocks_with_first_adaptor_block(
-            num_blocks=self.cl_args.resblocks[0],
+            num_blocks=self.cl_args.layers[0],
             branch_names=self.num_classes.keys(),
             block_constructor=initialize_modules_from_spec,
             block_constructor_kwargs={"spec": layer_spec},
@@ -344,7 +331,7 @@ class MLPModel(ModelBase):
             in_features=self.fc_task_dim, num_classes=self.num_classes
         )
 
-        self.multi_task_branches = merge_module_dicts((branches, final_layer))
+        self.multi_task_branches = _merge_module_dicts((branches, final_layer))
 
         self._init_weights()
 
@@ -357,7 +344,9 @@ class MLPModel(ModelBase):
         return self.fc_0.weight
 
     def _init_weights(self):
-        pass
+        for task, module in self.multi_task_branches.items():
+            last_bn = module[0][-1][0].fc_1_bn_1
+            nn.init.zeros_(last_bn.weight)
 
     def forward(
         self, x: torch.Tensor, extra_inputs: torch.Tensor = None
@@ -425,7 +414,7 @@ class SplitMLPModel(ModelBase):
             "full_preactivation": False,
         }
         multi_task_branches = create_blocks_with_first_adaptor_block(
-            num_blocks=self.cl_args.resblocks[0],
+            num_blocks=self.cl_args.layers[0],
             branch_names=task_names,
             block_constructor=MLPResidualBlock,
             block_constructor_kwargs=task_resblocks_kwargs,
@@ -448,7 +437,7 @@ class SplitMLPModel(ModelBase):
             in_features=self.fc_task_dim, num_classes=self.num_classes
         )
 
-        self.multi_task_branches = merge_module_dicts(
+        self.multi_task_branches = _merge_module_dicts(
             (multi_task_branches, final_act, final_layer)
         )
 
@@ -476,9 +465,7 @@ class SplitMLPModel(ModelBase):
         return self.fc_0[0].weight
 
     def _init_weights(self):
-        for task_branch in self.multi_task_branches.values():
-            pass
-            # nn.init.zeros_(task_branch.fc_3_bn_1.weight)
+        pass
 
     def forward(
         self, x: torch.Tensor, extra_inputs: torch.Tensor = None
@@ -511,7 +498,7 @@ class SplitMLPModel(ModelBase):
         return out
 
 
-def merge_module_dicts(module_dicts: Tuple[nn.ModuleDict, ...]):
+def _merge_module_dicts(module_dicts: Tuple[nn.ModuleDict, ...]):
     def check_inputs():
         assert all(i.keys() == module_dicts[0].keys() for i in module_dicts)
 
@@ -559,6 +546,9 @@ def create_blocks_with_first_adaptor_block(
         },
     )
 
+    if num_blocks == 1:
+        return _merge_module_dicts((adaptor_block,))
+
     blocks = construct_multi_branches(
         branch_names=branch_names,
         branch_factory=construct_blocks,
@@ -569,7 +559,7 @@ def create_blocks_with_first_adaptor_block(
         },
     )
 
-    merged_blocks = merge_module_dicts((adaptor_block, blocks))
+    merged_blocks = _merge_module_dicts((adaptor_block, blocks))
 
     return merged_blocks
 
@@ -620,7 +610,7 @@ class MGMoEModel(ModelBase):
             "full_preactivation": False,
         }
         self.expert_branches = create_blocks_with_first_adaptor_block(
-            num_blocks=self.cl_args.resblocks[0],
+            num_blocks=self.cl_args.layers[0],
             branch_names=expert_names,
             block_constructor=MLPResidualBlock,
             block_constructor_kwargs=layer_kwargs,
@@ -641,7 +631,7 @@ class MGMoEModel(ModelBase):
             branch_names=task_names,
             branch_factory=construct_blocks,
             branch_factory_kwargs={
-                "num_blocks": self.cl_args.resblocks[1],
+                "num_blocks": self.cl_args.layers[1],
                 "block_constructor": MLPResidualBlock,
                 "block_kwargs": task_resblocks_kwargs,
             },
@@ -660,7 +650,7 @@ class MGMoEModel(ModelBase):
             in_features=self.fc_task_dim, num_classes=self.num_classes
         )
 
-        self.multi_task_branches = merge_module_dicts(
+        self.multi_task_branches = _merge_module_dicts(
             (multi_task_branches, final_act, final_layer)
         )
 
@@ -906,17 +896,19 @@ def _calculate_module_dict_outputs(
     return final_out
 
 
-class LinearModel(nn.Module):
-    def __init__(self, cl_args: Namespace, *args, **kwargs):
-        super().__init__()
+class LinearModel(ModelBase):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-        self.cl_args = cl_args
-        self.fc_1_in_features = self.cl_args.target_width * 4
-
-        self.fc_1 = nn.Linear(self.fc_1_in_features, 1)
+        total_in_dim = self.fc_1_in_features + self.extra_dim
+        self.fc_1 = nn.Linear(total_in_dim, 1)
         self.act = self._get_act()
 
         self.output_parser = self._get_output_parser()
+
+    @property
+    def fc_1_in_features(self) -> int:
+        return self.cl_args.target_width * 4
 
     @property
     def l1_penalized_weights(self) -> torch.Tensor:
@@ -955,8 +947,12 @@ class LinearModel(nn.Module):
             return _parse_categorical
         return _parse_continuous
 
-    def forward(self, x: torch.Tensor, *args, **kwargs) -> Dict[str, torch.Tensor]:
+    def forward(
+        self, x: torch.Tensor, extra_inputs: torch.Tensor = None
+    ) -> Dict[str, torch.Tensor]:
         out = x.view(x.shape[0], -1)
+        if extra_inputs:
+            out = torch.cat((out, extra_inputs), dim=1)
 
         out = self.fc_1(out)
         out = self.act(out)

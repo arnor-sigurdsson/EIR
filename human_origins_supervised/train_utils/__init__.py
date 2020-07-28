@@ -21,7 +21,7 @@ H_PARAMS = [
     "na_augment_prob",
     "optimizer",
     "rb_do",
-    "resblocks",
+    "layers",
     "sa",
     "warmup_steps",
     "wd",

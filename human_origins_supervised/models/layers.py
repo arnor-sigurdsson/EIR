@@ -109,7 +109,7 @@ class SEBlock(nn.Module):
         return out
 
 
-class AbstractBlock(nn.Module):
+class AbstractCNNResidualBlock(nn.Module):
     def __init__(
         self,
         in_channels: int,
@@ -178,7 +178,7 @@ class AbstractBlock(nn.Module):
         raise NotImplementedError
 
 
-class FirstCNNBlock(AbstractBlock):
+class FirstCNNBlock(AbstractCNNResidualBlock):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -197,7 +197,7 @@ class FirstCNNBlock(AbstractBlock):
         return out
 
 
-class CNNResidualBlock(AbstractBlock):
+class CNNResidualBlock(AbstractCNNResidualBlock):
     def __init__(self, full_preact: bool = False, *args, **kwargs):
         super().__init__(*args, **kwargs)
 

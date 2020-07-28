@@ -12,6 +12,12 @@ import numpy as np
 import torch
 from aislib.misc_utils import ensure_path_exists
 from aislib.misc_utils import get_logger
+from ignite.engine import Engine
+from torch import nn
+from torch.optim.optimizer import Optimizer
+from torch.utils.data import DataLoader, WeightedRandomSampler
+from torch.utils.tensorboard import SummaryWriter
+
 from human_origins_supervised.data_load import data_utils
 from human_origins_supervised.data_load import datasets
 from human_origins_supervised.data_load.data_loading_funcs import (
@@ -49,13 +55,8 @@ from human_origins_supervised.train_utils.metrics import (
     calc_average_precision_ovr,
     MetricRecord,
 )
-from human_origins_supervised.train_utils.train_handlers import configure_trainer
 from human_origins_supervised.train_utils.optimizers import get_optimizer
-from ignite.engine import Engine
-from torch import nn
-from torch.optim.optimizer import Optimizer
-from torch.utils.data import DataLoader, WeightedRandomSampler
-from torch.utils.tensorboard import SummaryWriter
+from human_origins_supervised.train_utils.train_handlers import configure_trainer
 
 if TYPE_CHECKING:
     from human_origins_supervised.train_utils.metrics import (
@@ -494,7 +495,6 @@ def train(config: Config) -> None:
         extra_inputs = get_extra_inputs(
             cl_args=cl_args, model=c.model, labels=labels["extra_labels"]
         )
-
         c.optimizer.zero_grad()
         train_outputs = c.model(x=train_seqs, extra_inputs=extra_inputs)
 
@@ -696,11 +696,12 @@ def _get_train_argument_parser() -> configargparse.ArgumentParser:
         help="Exponential base for channels in first layer (i.e. default is 2**5)",
     )
 
+    # TODO: Better help message.
     parser_.add_argument(
-        "--resblocks",
+        "--layers",
         type=int,
         nargs="+",
-        help="Number of hidden convolutional layers.",
+        help="Number of layers in models where it applies.",
     )
 
     parser_.add_argument(
