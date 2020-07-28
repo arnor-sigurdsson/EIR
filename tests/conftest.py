@@ -10,7 +10,6 @@ import warnings
 
 import numpy as np
 import pytest
-import train_utils.optimizers
 from _pytest.fixtures import SubRequest
 from aislib.misc_utils import ensure_path_exists
 from torch import cuda
@@ -23,8 +22,11 @@ from human_origins_supervised.models.extra_inputs_module import (
     set_up_and_save_embeddings_dict,
 )
 from human_origins_supervised.train import Config, get_model
-from human_origins_supervised.train_utils.utils import configure_root_logger
-from human_origins_supervised.train_utils.utils import get_run_folder
+from human_origins_supervised.train_utils.utils import (
+    configure_root_logger,
+    get_run_folder,
+)
+from human_origins_supervised.train_utils import optimizers
 
 np.random.seed(0)
 
@@ -34,7 +36,7 @@ def pytest_addoption(parser):
     parser.addoption(
         "--num_samples_per_class",
         type=int,
-        default=1000,
+        default=2000,
         help="Number of samples per class.",
     )
     parser.addoption(
@@ -91,7 +93,8 @@ def args_config():
             "lr": 1e-2,
             "lr_lb": 1e-5,
             "lr_schedule": "plateau",
-            "memory_dataset": False,
+            "memory_dataset": True,
+            "mg_num_experts": 3,
             "model_type": "cnn",
             "multi_gpu": False,
             "n_cpu": 8,
@@ -100,11 +103,12 @@ def args_config():
             "na_augment_prob": 0.20,
             "optimizer": "adamw",
             "plot_skip_steps": 50,
-            "rb_do": 0.0,
-            "resblocks": None,
+            "rb_do": 0.25,
+            "layers": [1, 1],
             "run_name": "test_run",
             "sa": False,
-            "sample_interval": 100,
+            "sample_interval": 200,
+            "split_mlp_num_splits": 16,
             "target_cat_columns": ["Origin"],
             "target_con_columns": [],
             "target_width": 1000,
@@ -403,11 +407,11 @@ def create_test_dloaders(create_test_cl_args, create_test_datasets):
     train_dataset, valid_dataset = create_test_datasets
 
     train_dloader = DataLoader(
-        train_dataset, batch_size=cl_args.batch_size, shuffle=True
+        train_dataset, batch_size=cl_args.batch_size, shuffle=True, drop_last=True
     )
 
     valid_dloader = DataLoader(
-        valid_dataset, batch_size=cl_args.batch_size, shuffle=False
+        valid_dataset, batch_size=cl_args.batch_size, shuffle=False, drop_last=True
     )
 
     return train_dloader, valid_dloader, train_dataset, valid_dataset
@@ -428,7 +432,7 @@ def create_test_optimizer(
         target_columns=target_columns, criterions=criterions, device=cl_args.device
     )
 
-    optimizer = train_utils.optimizers.get_optimizer(
+    optimizer = optimizers.get_optimizer(
         model=model, loss_callable=loss_module, cl_args=cl_args
     )
 

@@ -295,6 +295,11 @@ def test_set_up_num_classes(get_transformer_test_data):
     "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
 )
 @pytest.mark.parametrize("dataset_type", ["memory", "disk"])
+@pytest.mark.parametrize(
+    "create_test_cl_args",
+    [{"custom_cl_args": {"na_augment_perc": 0.05}}],
+    indirect=True,
+)
 def test_datasets(
     patched_joblib: MagicMock,
     dataset_type: str,
@@ -302,6 +307,11 @@ def test_datasets(
     create_test_cl_args: pytest.fixture,
     parse_test_cl_args,
 ):
+    """
+    We set `na_augment_perc` here to 0.0 as a safety guard against it having be set
+    in the defined args config. This is because the `check_dataset` currently assumes
+    no SNPs have been dropped out.
+    """
     c = create_test_data
     cl_args = create_test_cl_args
     classes_tested = sorted(list(c.target_classes.keys()))
@@ -376,7 +386,6 @@ def check_dataset(
     assert (tt_it(range(len(classes_tested))) == classes_tested).all()
 
     test_array, test_label, test_id = dataset[0]
-
     assert (test_array.sum(1) == 1).all()
     assert test_label["target_labels"][target_column] in expected_transformed_values
     assert test_id == dataset.samples[0].sample_id

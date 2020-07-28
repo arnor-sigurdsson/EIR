@@ -234,6 +234,30 @@ def _check_test_performance_results(
                 "target_con_columns": ["Height", "ExtraTarget"],
             }
         },
+        {  # Case 4: Normal multi task with MLP, note we have to reduce the LR for
+            # stability and add L1 for regularization
+            "custom_cl_args": {
+                "model_type": "mlp-split",
+                "l1": 1e-3,
+                "lr": 1e-3,
+                "fc_repr_dim": 4,
+                "split_mlp_num_splits": 64,
+                "target_cat_columns": ["Origin"],
+                "target_con_columns": ["Height", "ExtraTarget"],
+            }
+        },
+        {  # Case 5: Normal multi task with MLP, note we have to reduce the LR for
+            # stability and add L1 for regularization
+            "custom_cl_args": {
+                "model_type": "mlp-mgmoe",
+                "l1": 1e-3,
+                "lr": 1e-3,
+                "fc_repr_dim": 4,
+                "split_mlp_num_splits": 64,
+                "target_cat_columns": ["Origin"],
+                "target_con_columns": ["Height", "ExtraTarget"],
+            }
+        },
     ],
     indirect=True,
 )
@@ -243,9 +267,10 @@ def test_multi_task(keep_outputs, prep_modelling_test_configs):
 
     train.train(config)
 
+    extra_columns = cl_args.extra_con_columns + cl_args.extra_cat_columns
     for cat_column in config.cl_args.target_cat_columns:
         threshold, at_least_n = _get_multi_task_test_args(
-            extra_columns=cl_args.extra_con_columns, target_copy="OriginExtraColumn"
+            extra_columns=extra_columns, target_copy="OriginExtraCol"
         )
 
         _check_test_performance_results(
@@ -265,7 +290,7 @@ def test_multi_task(keep_outputs, prep_modelling_test_configs):
 
     for con_column in config.cl_args.target_con_columns:
         threshold, at_least_n = _get_multi_task_test_args(
-            extra_columns=cl_args.extra_con_columns, target_copy="ExtraTarget"
+            extra_columns=extra_columns, target_copy="ExtraTarget"
         )
 
         _check_test_performance_results(
@@ -293,7 +318,7 @@ def _get_multi_task_test_args(
 ) -> Tuple[float, int]:
     """
     We use 0 for at_least_n in the case we have correlated input columns because
-    in that case the model is not actually using any of the SNPs (better to use
+    in that case the model might not actually be using any of the SNPs (better to use
     the correlated column), hence we do not expect SNPs to be highly activated.
     """
 

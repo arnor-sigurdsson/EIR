@@ -6,7 +6,7 @@ from ignite.contrib.handlers import (
     ProgressBar,
     ConcatScheduler,
     CosineAnnealingScheduler,
-    PiecewiseLinear,
+    ParamGroupScheduler,
 )
 from ignite.engine import Engine, State
 from torch.optim import Adam, SGD
@@ -140,7 +140,7 @@ def _check_warmup_concat_scheduler(
     assert len(scheduler_list) == 2
     warmup_scheduler = scheduler_list[0]
     cosine_scheduler = scheduler_list[1]
-    assert isinstance(warmup_scheduler, PiecewiseLinear)
+    assert isinstance(warmup_scheduler, ParamGroupScheduler)
     assert isinstance(cosine_scheduler, CosineAnnealingScheduler)
 
     assert lr_scheduler.durations[0] == warmup_steps
