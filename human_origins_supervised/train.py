@@ -1,3 +1,4 @@
+import copy
 import argparse
 import sys
 from dataclasses import dataclass
@@ -159,6 +160,7 @@ def main(
         target_columns=train_dataset.target_columns,
         criterions=criterions,
         device=cl_args.device,
+        mixup=True,
     )
 
     optimizer = get_optimizer(model=model, loss_callable=loss_func, cl_args=cl_args)
@@ -381,7 +383,10 @@ def _get_criterions(
 
 
 def _get_loss_callable(
-    target_columns: al_target_columns, criterions: al_criterions, device: str
+    target_columns: al_target_columns,
+    criterions: al_criterions,
+    device: str,
+    mixup: bool = False,
 ):
     num_tasks = len(target_columns["con"] + target_columns["cat"])
     if num_tasks > 1:
@@ -465,6 +470,91 @@ def _log_num_params(model: nn.Module) -> None:
     )
 
 
+def mixup_data(
+    inputs: torch.Tensor,
+    targets: al_training_labels_target,
+    target_columns: al_target_columns,
+    alpha: float = 1.0,
+):
+    """
+    :param inputs:
+    :param targets:
+    :param target_columns:
+    :param alpha:
+    :return:
+    """
+
+    if alpha > 0:
+        lambda_ = np.random.beta(alpha, alpha)
+    else:
+        lambda_ = 1
+
+    batch_size = inputs.size()[0]
+    random_index_for_mixing = get_random_index_for_mixing(batch_size=batch_size)
+    targets_permuted = mixup_targets(
+        targets=targets,
+        random_index_for_mixing=random_index_for_mixing,
+        target_columns=target_columns,
+    )
+
+    mixed_inputs = mixup_input(
+        input_=inputs, lambda_=lambda_, random_index_for_mixing=random_index_for_mixing
+    )
+
+    return mixed_inputs, targets, targets_permuted, lambda_
+
+
+def get_random_index_for_mixing(batch_size: int) -> torch.Tensor:
+    return torch.randperm(batch_size)
+
+
+def mixup_input(
+    input_: torch.Tensor, lambda_: float, random_index_for_mixing: torch.Tensor
+) -> torch.Tensor:
+    mixed_x = lambda_ * input_ + (1 - lambda_) * input_[random_index_for_mixing, :]
+    return mixed_x
+
+
+def mixup_targets(
+    targets: al_training_labels_target,
+    random_index_for_mixing: torch.Tensor,
+    target_columns: al_target_columns,
+) -> al_training_labels_target:
+    targets_permuted = copy.copy(targets)
+
+    for cat_target_col in target_columns["cat"]:
+
+        cur_targets = targets_permuted[cat_target_col]
+        cur_targets_permuted = cur_targets[random_index_for_mixing]
+        targets_permuted[cat_target_col] = cur_targets_permuted
+
+    return targets_permuted
+
+
+def mixup_criterion(
+    criterion: nn.CrossEntropyLoss,
+    outputs: torch.Tensor,
+    targets: torch.Tensor,
+    targets_permuted: torch.Tensor,
+    lambda_: float,
+) -> torch.Tensor:
+    """
+    :param criterion:
+    :param outputs:
+    :param targets:
+    :param targets_permuted:
+    :param lambda_:
+    :return:
+    """
+
+    base_loss = lambda_ * criterion(input=outputs, target=targets)
+    permuted_loss = (1 - lambda_) * criterion(input=outputs, target=targets_permuted)
+
+    total_loss = base_loss + permuted_loss
+
+    return total_loss
+
+
 def train(config: Config) -> None:
     c = config
     cl_args = config.cl_args
@@ -492,13 +582,36 @@ def train(config: Config) -> None:
             labels=labels["target_labels"],
         )
 
+        # TODO: Some kind of hook here, or in dataloader? Then parse_target labels
+        # TODO: must be aware of that
+        train_seqs_mixed, targets_a, targets_b, lam = mixup_data(
+            inputs=train_seqs,
+            targets=target_labels,
+            target_columns=c.target_columns,
+            alpha=0.4,
+        )
+
         extra_inputs = get_extra_inputs(
             cl_args=cl_args, model=c.model, labels=labels["extra_labels"]
         )
         c.optimizer.zero_grad()
-        train_outputs = c.model(x=train_seqs, extra_inputs=extra_inputs)
 
-        train_losses = c.loss_function(inputs=train_outputs, targets=target_labels)
+        train_outputs = c.model(x=train_seqs_mixed, extra_inputs=extra_inputs)
+
+        # train_losses = c.loss_function(inputs=train_outputs, targets=target_labels)
+
+        # ----------- TMP -----------
+        tmp_target = c.target_columns["cat"][0]
+        train_losses = mixup_criterion(
+            c.criterions[tmp_target],
+            train_outputs[tmp_target],
+            targets_a[tmp_target],
+            targets_b[tmp_target],
+            lam,
+        )
+        train_losses = {tmp_target: train_losses}
+        # ----------- TMP -----------
+
         train_loss_avg = aggregate_losses(losses_dict=train_losses)
         train_loss_final = add_extra_losses(
             total_loss=train_loss_avg, extra_loss_functions=extra_loss_functions
