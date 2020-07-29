@@ -383,7 +383,7 @@ def _get_criterions(
 def _get_loss_callable(
     target_columns: al_target_columns, criterions: al_criterions, device: str
 ):
-    num_tasks = len(list(target_columns.values()))
+    num_tasks = len(target_columns["con"] + target_columns["cat"])
     if num_tasks > 1:
         multi_task_loss_module = UncertaintyMultiTaskLoss(
             target_columns=target_columns, criterions=criterions, device=device

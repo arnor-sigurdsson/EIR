@@ -333,7 +333,7 @@ def construct_lr_finder_custom_objects(config) -> LRFinderCustomObjects:
 
 def _calculate_losses_and_average(criterions, outputs, labels) -> torch.Tensor:
     all_losses = calculate_prediction_losses(
-        criterions=criterions, labels=labels, outputs=outputs
+        criterions=criterions, targets=labels, inputs=outputs
     )
     average_loss = aggregate_losses(all_losses)
 

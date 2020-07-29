@@ -220,14 +220,14 @@ def calc_rmse(
 
 def calculate_prediction_losses(
     criterions: "al_criterions",
-    labels: Dict[str, torch.Tensor],
-    outputs: Dict[str, torch.Tensor],
+    inputs: Dict[str, torch.Tensor],
+    targets: Dict[str, torch.Tensor],
 ) -> Dict[str, torch.Tensor]:
     losses_dict = {}
 
     for target_column, criterion in criterions.items():
-        cur_target_col_labels = labels[target_column]
-        cur_target_col_outputs = outputs[target_column]
+        cur_target_col_labels = targets[target_column]
+        cur_target_col_outputs = inputs[target_column]
         losses_dict[target_column] = criterion(
             input=cur_target_col_outputs, target=cur_target_col_labels
         )
