@@ -36,7 +36,7 @@ def pytest_addoption(parser):
     parser.addoption(
         "--num_samples_per_class",
         type=int,
-        default=2000,
+        default=1000,
         help="Number of samples per class.",
     )
     parser.addoption(
@@ -69,7 +69,7 @@ def args_config():
             "act_classes": None,
             "b1": 0.9,
             "b2": 0.999,
-            "batch_size": 64,
+            "batch_size": 32,
             "channel_exp_base": 5,
             "checkpoint_interval": 100,
             "extra_con_columns": [],
