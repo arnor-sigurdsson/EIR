@@ -145,3 +145,27 @@ def make_random_snps_missing(
     array[:, :, random_to_drop] = missing_arr
 
     return array
+
+
+# def make_random_snps_missing(
+#     array: torch.Tensor, percentage: float = 0.00, probability: float = 1.0
+# ) -> torch.Tensor:
+#     random_draw = np.random.uniform()
+#     if random_draw > probability:
+#         return array
+#
+#     n_snps = array.shape[2]
+#     n_to_drop = (int(n_snps * percentage),)
+#     random_to_drop = np.random.choice(n_snps, 1, replace=False)
+#     random_to_drop = torch.tensor(random_to_drop, dtype=torch.long)
+#
+#     start = random_to_drop
+#     end = random_to_drop + n_to_drop[0]
+#
+#     missing_arr = torch.tensor([False, False, False, True], dtype=torch.bool).reshape(
+#         -1, 1
+#     )
+#     array[:, :, start:end] = missing_arr
+#
+#     return array
+#

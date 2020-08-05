@@ -7,7 +7,7 @@ from typing import List, Union, Tuple, Dict, Callable, Iterable, Any
 import torch
 from aislib import pytorch_utils
 from aislib.misc_utils import get_logger
-from aislib.pytorch_modules import Swish
+from aislib.pytorch_modules import Swish, Mish
 from human_origins_supervised.data_load.datasets import al_num_classes
 from torch import nn
 
@@ -291,7 +291,7 @@ class MLPModel(ModelBase):
         super().__init__(*args, **kwargs)
 
         self.fc_0 = nn.Linear(
-            self.fc_1_in_features, self.cl_args.fc_repr_dim, bias=False
+            self.fc_1_in_features, self.cl_args.fc_repr_dim, bias=True
         )
 
         self.downsample_fc_0_identities = _get_downsample_identities_moduledict(
@@ -301,8 +301,8 @@ class MLPModel(ModelBase):
         self.fc_0_act = nn.Sequential(
             OrderedDict(
                 {
-                    "fc_1_bn_1": nn.BatchNorm1d(self.cl_args.fc_repr_dim),
                     "fc_1_act_1": Swish(),
+                    "fc_1_bn_1": nn.BatchNorm1d(self.cl_args.fc_repr_dim),
                     "fc_1_do_1": nn.Dropout(p=self.cl_args.fc_do),
                 }
             )
@@ -341,6 +341,7 @@ class MLPModel(ModelBase):
 
     @property
     def l1_penalized_weights(self) -> torch.Tensor:
+
         return self.fc_0.weight
 
     def _init_weights(self):
@@ -352,6 +353,7 @@ class MLPModel(ModelBase):
         self, x: torch.Tensor, extra_inputs: torch.Tensor = None
     ) -> Dict[str, torch.Tensor]:
         out = x.view(x.shape[0], -1)
+
 
         out = self.fc_0(out)
 
@@ -465,7 +467,12 @@ class SplitMLPModel(ModelBase):
         return self.fc_0[0].weight
 
     def _init_weights(self):
-        pass
+        for branch, module in self.multi_task_branches.items():
+            last_bn = module[1].bn_final
+            nn.init.zeros_(last_bn.weight)
+
+    # def _init_weights(self):
+    #     pass
 
     def forward(
         self, x: torch.Tensor, extra_inputs: torch.Tensor = None
@@ -592,12 +599,12 @@ class MGMoEModel(ModelBase):
             )
         )
 
-        gate_names = tuple(self.num_classes.keys())
+        self.task_names = sorted(tuple(self.num_classes.keys()))
         gate_spec = self.get_gate_spec(
-            in_features=fc_0_out_feat, out_features=self.num_experts
+            in_features=fc_0_out_feat + self.extra_dim, out_features=self.num_experts
         )
         self.gates = construct_multi_branches(
-            branch_names=gate_names,
+            branch_names=self.task_names,
             branch_factory=initialize_modules_from_spec,
             branch_factory_kwargs={"spec": gate_spec},
         )
@@ -620,7 +627,6 @@ class MGMoEModel(ModelBase):
             },
         )
 
-        task_names = tuple(self.num_classes.keys())
         task_resblocks_kwargs = {
             "in_features": self.fc_task_dim,
             "out_features": self.fc_task_dim,
@@ -628,7 +634,7 @@ class MGMoEModel(ModelBase):
             "full_preactivation": False,
         }
         multi_task_branches = construct_multi_branches(
-            branch_names=task_names,
+            branch_names=self.task_names,
             branch_factory=construct_blocks,
             branch_factory_kwargs={
                 "num_blocks": self.cl_args.layers[1],
@@ -641,7 +647,7 @@ class MGMoEModel(ModelBase):
             in_features=self.fc_task_dim, dropout_p=self.cl_args.fc_do
         )
         final_act = construct_multi_branches(
-            branch_names=task_names,
+            branch_names=self.task_names,
             branch_factory=initialize_modules_from_spec,
             branch_factory_kwargs={"spec": final_act_spec},
         )
@@ -719,7 +725,8 @@ class MGMoEModel(ModelBase):
 
         final_out = {}
         stacked_expert_outputs = torch.stack(list(expert_outputs.values()), dim=2)
-        for task_name, task_attention in gate_attentions.items():
+        for task_name in self.task_names:
+            task_attention = gate_attentions[task_name]
             weighted_expert_outputs = (
                 task_attention.unsqueeze(1) * stacked_expert_outputs
             )
@@ -777,8 +784,8 @@ def get_basic_multi_branch_spec(in_features: int, out_features: int, dropout_p: 
                     "bias": False,
                 },
             ),
-            "fc_1_bn_1": (nn.BatchNorm1d, {"num_features": out_features}),
             "fc_1_act_1": (Swish, {}),
+            "fc_1_bn_1": (nn.BatchNorm1d, {"num_features": out_features}),
             "fc_1_do_1": (nn.Dropout, {"p": dropout_p}),
         }
     )
@@ -888,8 +895,8 @@ def _get_downsample_identities_moduledict(
 
 def _calculate_module_dict_outputs(
     input_: torch.Tensor, module_dict: nn.ModuleDict
-) -> Dict[str, torch.Tensor]:
-    final_out = {}
+) -> "OrderedDict[str, torch.Tensor]":
+    final_out = OrderedDict()
     for target_column, linear_layer in module_dict.items():
         final_out[target_column] = linear_layer(input_)
 
@@ -901,8 +908,18 @@ class LinearModel(ModelBase):
         super().__init__(*args, **kwargs)
 
         total_in_dim = self.fc_1_in_features + self.extra_dim
-        self.fc_1 = nn.Linear(total_in_dim, 1)
-        self.act = self._get_act()
+        self.fc_1 = nn.Linear(total_in_dim, 2)
+
+        num_chunks = self.cl_args.split_mlp_num_splits
+        # self.fc_1 = SplitLinear(
+        #                 in_features=self.fc_1_in_features,
+        #                 out_feature_sets=2,
+        #                 num_chunks=num_chunks,
+        #                 bias=True,
+        #             )
+        # self.act_1 = Swish()
+        self.fc_2 = nn.Linear(2*1, 2)
+        # self.act = self._get_act()
 
         self.output_parser = self._get_output_parser()
 
@@ -935,7 +952,8 @@ class LinearModel(ModelBase):
     def _get_output_parser(self) -> Callable[[torch.Tensor], Dict[str, torch.Tensor]]:
         def _parse_categorical(out: torch.Tensor) -> Dict[str, torch.Tensor]:
             # we create a 2D output from 1D for compatibility with visualization funcs
-            out = torch.cat(((1 - out[:, 0]).unsqueeze(1), out), 1)
+            # out = torch.cat(((1 - out[:, 0]).unsqueeze(1), out), 1)
+            # out = {self.cl_args.target_cat_columns[0]: out}
             out = {self.cl_args.target_cat_columns[0]: out}
             return out
 
@@ -955,7 +973,9 @@ class LinearModel(ModelBase):
             out = torch.cat((out, extra_inputs), dim=1)
 
         out = self.fc_1(out)
-        out = self.act(out)
+        # out = self.act_1(out)
+        out = self.fc_2(out)
+        # out = self.act(out)
 
         out = self.output_parser(out)
 

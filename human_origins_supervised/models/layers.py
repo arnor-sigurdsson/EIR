@@ -345,6 +345,7 @@ class MLPResidualBlock(nn.Module):
             self.downsample_identity = nn.Linear(
                 in_features=in_features, out_features=out_features, bias=False
             )
+        nn.init.zeros_(self.bn_2.weight)
 
     def forward(self, x):
         out = self.bn_1(x)

@@ -35,7 +35,8 @@ def set_up_train_and_valid_labels(
     set for regression) on the labels.
     """
 
-    df_labels = label_df_parse_wrapper(cl_args=cl_args)
+    df_labels = chunked_label_df_parse_wrapper(cl_args=cl_args)
+    # df_labels.to_csv("pre_computed_many_traits_and_diseases.csv")
 
     df_labels_train, df_labels_valid = _split_df(
         df=df_labels, valid_size=cl_args.valid_size
@@ -89,6 +90,88 @@ def label_df_parse_wrapper(cl_args: Namespace) -> pd.DataFrame:
     return df_final
 
 
+def chunked_label_df_parse_wrapper(cl_args: Namespace) -> pd.DataFrame:
+    available_ids = _gather_ids_from_data_source(data_source=Path(cl_args.data_source))
+
+    column_ops = {}
+    if cl_args.custom_lib:
+        column_ops = _get_custom_column_ops(custom_lib=cl_args.custom_lib)
+
+    all_cols = _get_all_label_columns_needed(cl_args=cl_args, column_ops=column_ops)
+
+    chunk_generator = _get_label_df_chunk_generator(
+        label_fpath=cl_args.label_file, columns=all_cols, custom_lib=cl_args.custom_lib
+    )
+
+    label_columns = _get_label_columns_from_cl_args(cl_args=cl_args)
+    processed_chunks = []
+    for chunk in chunk_generator:
+        df_labels = _cast_label_df_dtypes(
+            df_labels=chunk, extra_cat_columns=cl_args.extra_cat_columns
+        )
+
+        df_labels_filtered = _filter_ids_from_label_df(
+            df_labels=df_labels, ids_to_keep=available_ids
+        )
+
+        df_labels_parsed = _parse_label_df(
+            df=df_labels_filtered,
+            operations_dict=column_ops,
+            label_columns=label_columns,
+        )
+
+        df_column_filtered = _drop_not_needed_label_columns(
+            df=df_labels_parsed, needed_label_columns=label_columns
+        )
+        processed_chunks.append(df_column_filtered)
+
+    df_concat = pd.concat(processed_chunks)
+
+    df_final = _check_parsed_label_df(
+        df_labels=df_concat, supplied_label_columns=label_columns
+    )
+
+    return df_final
+
+
+def _get_label_df_chunk_generator(
+    label_fpath: Path, columns: List[str], custom_lib: Union[str, None]
+) -> pd.DataFrame:
+    """
+    We accept only loading the available columns at this point because the passed
+    in columns might be forward referenced, meaning that they might be created
+    by the custom library.
+    """
+
+    logger.debug("Reading in labelfile: %s", label_fpath)
+
+    columns_with_id_col = ["ID"] + columns
+    available_columns = _get_currently_available_columns(
+        label_fpath=label_fpath,
+        requested_columns=columns_with_id_col,
+        custom_lib=custom_lib,
+    )
+
+    chunksize = 20000
+    chunks_processed = 0
+    for chunk in pd.read_csv(
+        label_fpath,
+        usecols=available_columns,
+        dtype={"ID": str},
+        low_memory=False,
+        chunksize=20000,
+    ):
+        logger.debug(
+            "Processsed %d rows so far in %d chunks.",
+            chunksize * chunks_processed,
+            chunks_processed,
+        )
+        chunks_processed += 1
+
+        chunk = chunk.set_index("ID")
+        yield chunk
+
+
 def _gather_ids_from_data_source(data_source: Path):
     iterator = get_array_path_iterator(data_source=data_source)
     logger.debug("Gathering IDs from %s.", data_source)
@@ -102,10 +185,10 @@ def get_array_path_iterator(data_source: Path):
         with open(str(file_path), "r") as infile:
             for line in infile:
                 path = Path(line.strip())
-                if not path.exists():
-                    raise FileNotFoundError(
-                        f"Could not find array {path} listed in {data_source}."
-                    )
+                # if not path.exists():
+                #     raise FileNotFoundError(
+                #         f"Could not find array {path} listed in {data_source}."
+                #     )
 
                 yield path
 
@@ -379,7 +462,7 @@ def _get_custom_column_ops(custom_lib: str) -> al_all_column_ops:
 
 
 def _split_df(df: pd.DataFrame, valid_size: Union[int, float]) -> al_train_val_dfs:
-    train_ids, valid_ids = train_test_split(list(df.index), test_size=valid_size)
+    train_ids, valid_ids = train_test_split(list(df.index), test_size=valid_size, random_state=0)
 
     df_labels_train = df.loc[df.index.intersection(train_ids)]
     df_labels_valid = df.loc[df.index.intersection(valid_ids)]

@@ -298,6 +298,12 @@ def get_dataloaders(
 
     return train_dloader, valid_dloader
 
+class MyDataParallel(nn.DataParallel):
+    def __getattr__(self, name):
+        try:
+            return super().__getattr__(name)
+        except AttributeError:
+            return getattr(self.module, name)
 
 def get_model(
     cl_args: argparse.Namespace,
@@ -317,7 +323,8 @@ def get_model(
         assert model.data_size_after_conv >= 8
 
     if cl_args.multi_gpu:
-        model = nn.DataParallel(module=model)
+        model = MyDataParallel(module=model)
+        breakpoint()
 
     if model_class == "linear":
         _check_linear_model_columns(cl_args=cl_args)
@@ -352,17 +359,18 @@ def _get_criterions(
 ) -> al_criterions:
     criterions_dict = {}
 
-    def calc_bce(input, target):
-        # note we use input and not e.g. input_ here because torch uses name "input"
-        # in loss functions for compatibility
-        bce_loss_func = nn.BCELoss()
-        return bce_loss_func(input[:, 1], target.to(dtype=torch.float))
+    # def calc_bce(input, target):
+    #     # note we use input and not e.g. input_ here because torch uses name "input"
+    #     # in loss functions for compatibility
+    #     bce_loss_func = nn.BCELoss()
+    #     return bce_loss_func(input[:, 1], target.to(dtype=torch.float))
 
     def get_criterion(column_type_):
 
         if model_type == "linear":
             if column_type_ == "cat":
-                return calc_bce
+                return nn.CrossEntropyLoss()
+                # return calc_bce
             else:
                 return nn.MSELoss(reduction="mean")
 
@@ -448,7 +456,7 @@ def _get_default_performance_averaging_functions() -> al_averaging_functions_dic
     def _calc_cat_averaging_value(
         metric_dict: "al_step_metric_dict", column_name: str, metric_name: str
     ) -> float:
-        return metric_dict[column_name][f"{column_name}_{metric_name}"]
+        return metric_dict[column_name].get(f"{column_name}_{metric_name}", 0)
 
     def _calc_con_averaging_value(
         metric_dict: "al_step_metric_dict", column_name: str, metric_name: str
@@ -456,7 +464,7 @@ def _get_default_performance_averaging_functions() -> al_averaging_functions_dic
         return 1 - metric_dict[column_name][f"{column_name}_{metric_name}"]
 
     performance_averaging_functions = {
-        "cat": partial(_calc_cat_averaging_value, metric_name="mcc"),
+        "cat": partial(_calc_cat_averaging_value, metric_name="roc-auc-macro"),
         "con": partial(_calc_con_averaging_value, metric_name="loss"),
     }
 
@@ -573,7 +581,7 @@ def train(config: Config) -> None:
         c.model.train()
 
         train_seqs, labels, train_ids = loader_batch
-        train_seqs = train_seqs.to(device=cl_args.device)
+        train_seqs = train_seqs.to(device=cl_args.device, non_blocking=True)
         train_seqs = train_seqs.to(dtype=torch.float32)
 
         target_labels = model_utils.parse_target_labels(
