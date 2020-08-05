@@ -357,11 +357,11 @@ def _get_criterions(
 ) -> al_criterions:
     criterions_dict = {}
 
-    def calc_bce(input, target):
-        # note we use input and not e.g. input_ here because torch uses name "input"
-        # in loss functions for compatibility
-        bce_loss_func = nn.BCELoss()
-        return bce_loss_func(input[:, 1], target.to(dtype=torch.float))
+    # def calc_bce(input, target):
+    #     # note we use input and not e.g. input_ here because torch uses name "input"
+    #     # in loss functions for compatibility
+    #     bce_loss_func = nn.BCELoss()
+    #     return bce_loss_func(input[:, 1], target.to(dtype=torch.float))
 
     def get_criterion(column_type_):
 
