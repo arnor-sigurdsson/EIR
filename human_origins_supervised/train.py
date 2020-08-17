@@ -55,7 +55,11 @@ from human_origins_supervised.train_utils.metrics import (
     calc_average_precision_ovr,
     MetricRecord,
 )
-from human_origins_supervised.train_utils.optimizers import get_optimizer
+from human_origins_supervised.train_utils.optimizers import (
+    get_optimizer,
+    get_base_optimizers_dict,
+    get_optimizer_backward_kwargs,
+)
 from human_origins_supervised.train_utils.train_handlers import configure_trainer
 
 if TYPE_CHECKING:
@@ -472,6 +476,9 @@ def train(config: Config) -> None:
     extra_loss_functions = get_extra_loss_term_functions(
         model=c.model, l1_weight=cl_args.l1
     )
+    optimizer_backward_kwargs = get_optimizer_backward_kwargs(
+        optimizer_name=cl_args.optimizer
+    )
 
     def step(
         engine: Engine,
@@ -504,7 +511,7 @@ def train(config: Config) -> None:
             total_loss=train_loss_avg, extra_loss_functions=extra_loss_functions
         )
 
-        train_loss_final.backward()
+        train_loss_final.backward(**optimizer_backward_kwargs)
         c.optimizer.step()
 
         train_batch_metrics = calculate_batch_metrics(
@@ -883,7 +890,8 @@ def _get_optimizer_cl_arg_choices():
     something fancy with inspect and issubclass of Optimizer to get names of all
     PyTorch built-in optimizers.
     """
-    default = ["sgdm", "adamw", "adam"]
+    base_optimizer_dict = get_base_optimizers_dict()
+    default = list(base_optimizer_dict.keys())
     external = _get_custom_opt_names()
     return default + external
 

@@ -2,7 +2,7 @@ from argparse import Namespace
 from collections import OrderedDict
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import List, Union, Tuple, Dict, Callable, Iterable, Any
+from typing import List, Union, Tuple, Dict, Callable, Iterable, Any, Type
 
 import torch
 from aislib import pytorch_utils
@@ -23,7 +23,13 @@ from .layers import (
 from .model_utils import find_no_resblocks_needed
 
 # type aliases
-al_models = Union["CNNModel", "MLPModel", "LinearModel", "SplitMLPModel", "MGMoEModel"]
+al_models = Union[
+    Type["CNNModel"],
+    Type["MLPModel"],
+    Type["LinearModel"],
+    Type["SplitMLPModel"],
+    Type["MGMoEModel"],
+]
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
