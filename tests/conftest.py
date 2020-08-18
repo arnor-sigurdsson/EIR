@@ -82,6 +82,7 @@ def args_config():
             "fc_repr_dim": 64,
             "fc_task_dim": 32,
             "fc_do": 0.0,
+            "find_lr": False,
             "first_kernel_expansion": 1,
             "first_stride_expansion": 1,
             "first_channel_expansion": 1,
