@@ -74,7 +74,7 @@ def _create_optimizer_class_getter(optimizer_name: str) -> Dict[str, Type[Optimi
     they exist in the external library.
     """
     default_factory = partial(_get_external_optimizers, optimizer_name)
-    optimizer_getter = defaultdict(default_factory=default_factory)
+    optimizer_getter = defaultdict(default_factory)
 
     base_optimizers = get_base_optimizers_dict()
     optimizer_getter.update(base_optimizers)

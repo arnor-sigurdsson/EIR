@@ -34,7 +34,7 @@ from human_origins_supervised.models.extra_inputs_module import (
     get_extra_inputs,
     al_emb_lookup_dict,
 )
-from human_origins_supervised.models.model_utils import test_lr_range
+from human_origins_supervised.models.model_utils import run_lr_find
 from human_origins_supervised.models.models import get_model_class, al_models
 from human_origins_supervised.train_utils import utils
 from human_origins_supervised.train_utils.metrics import (
@@ -190,10 +190,6 @@ def main(
     )
 
     _log_num_params(model=model)
-
-    if cl_args.find_lr:
-        test_lr_range(config=config)
-        sys.exit(0)
 
     if cl_args.debug:
         breakpoint()
@@ -533,6 +529,17 @@ def train(config: Config) -> None:
         return train_batch_metrics_with_averages
 
     trainer = Engine(process_function=step)
+
+    if cl_args.find_lr:
+        logger.info("Running LR find and exiting.")
+        run_lr_find(
+            trainer_engine=trainer,
+            train_dataloader=c.train_loader,
+            model=c.model,
+            optimizer=c.optimizer,
+            output_folder=utils.get_run_folder(run_name=cl_args.run_name),
+        )
+        sys.exit(0)
 
     trainer = configure_trainer(trainer=trainer, config=config)
 
