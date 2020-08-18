@@ -298,12 +298,14 @@ def get_dataloaders(
 
     return train_dloader, valid_dloader
 
+
 class MyDataParallel(nn.DataParallel):
     def __getattr__(self, name):
         try:
             return super().__getattr__(name)
         except AttributeError:
             return getattr(self.module, name)
+
 
 def get_model(
     cl_args: argparse.Namespace,
@@ -658,14 +660,17 @@ def train(config: Config) -> None:
             labels=labels["target_labels"],
         )
 
+        # ----------- TMP -----------
         # TODO: Some kind of hook here, or in dataloader? Then parse_target labels
-        # TODO: must be aware of that
+        # TODO: must be aware of that, better to have hook here and return DTO
         train_seqs_mixed, targets_a, targets_b, lambda_ = mixup_data(
             inputs=train_seqs,
             targets=target_labels,
             target_columns=c.target_columns,
-            alpha=0.2,
+            alpha=cl_args.mixing_alpha,
+            mixing_type=cl_args.mixing_type,
         )
+        # ----------- TMP -----------
 
         extra_inputs = get_extra_inputs(
             cl_args=cl_args, model=c.model, labels=labels["extra_labels"]
@@ -965,6 +970,21 @@ def _get_train_argument_parser() -> configargparse.ArgumentParser:
         type=float,
         help="Probability of applying an na_augmentation of percentage as given in "
         "--na_augment_perc.",
+    )
+
+    parser_.add_argument(
+        "--mixing_alpha",
+        default=0.0,
+        type=float,
+        help="Alpha parameter used for mixing (higher means more mixing).",
+    )
+
+    parser_.add_argument(
+        "--mixing_type",
+        default=None,
+        type=str,
+        choices=["mixup", "cutmix-block", "cutmix-uniform"],
+        help="Type of mixing to apply when using mixup and similar approaches.",
     )
 
     parser_.add_argument(

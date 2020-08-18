@@ -362,7 +362,6 @@ class MLPModel(ModelBase):
     ) -> Dict[str, torch.Tensor]:
         out = x.view(x.shape[0], -1)
 
-
         out = self.fc_0(out)
 
         identity_inputs = out
@@ -926,7 +925,7 @@ class LinearModel(ModelBase):
         #                 bias=True,
         #             )
         # self.act_1 = Swish()
-        self.fc_2 = nn.Linear(2*1, 2)
+        self.fc_2 = nn.Linear(2 * 1, 2)
         # self.act = self._get_act()
 
         self.output_parser = self._get_output_parser()
