@@ -483,12 +483,14 @@ def mixup_data(
     targets: al_training_labels_target,
     target_columns: al_target_columns,
     alpha: float = 1.0,
+    mixing_type: str = "mixup",
 ):
     """
     :param inputs:
     :param targets:
     :param target_columns:
     :param alpha:
+    :param mixing_type:
     :return:
     """
 
@@ -505,7 +507,16 @@ def mixup_data(
         target_columns=target_columns,
     )
 
-    mixed_inputs = mixup_input(
+    if mixing_type == "mixup":
+        mixing_func = mixup_input
+    elif mixing_type == "cutmix-block":
+        mixing_func = block_cutmix_input
+    elif mixing_type == "cutmix-uniform":
+        mixing_func = uniform_cutmix_input
+    else:
+        raise ValueError()
+
+    mixed_inputs = mixing_func(
         input_=inputs, lambda_=lambda_, random_index_for_mixing=random_index_for_mixing
     )
 
@@ -521,6 +532,60 @@ def mixup_input(
 ) -> torch.Tensor:
     mixed_x = lambda_ * input_ + (1 - lambda_) * input_[random_index_for_mixing, :]
     return mixed_x
+
+
+def block_cutmix_input(
+    input_: torch.Tensor, lambda_: float, random_index_for_mixing: torch.Tensor
+) -> torch.Tensor:
+    """
+    We could even do the mixing in multiple places, even multiple SNPs like in
+    the make random snps missing? Does not necessarily have to be one block at a time
+    .
+    """
+    cut_start, cut_end = get_block_cutmix_indices(
+        input_length=input_.shape[-1], lambda_=lambda_
+    )
+    target_to_cut = input_[random_index_for_mixing, :]
+    cut_part = target_to_cut[..., cut_start:cut_end]
+    cutmixed_x = input_
+    cutmixed_x[..., cut_start:cut_end] = cut_part
+    return cutmixed_x
+
+
+def get_block_cutmix_indices(input_length: int, lambda_: float):
+    num_snps_to_mix = int(input_length * lambda_)
+    random_index_start = np.random.choice(input_length - num_snps_to_mix)
+    random_index_end = random_index_start + num_snps_to_mix
+    return random_index_start, random_index_end
+
+
+def uniform_cutmix_input(
+    input_: torch.Tensor, lambda_: float, random_index_for_mixing: torch.Tensor
+) -> torch.Tensor:
+    """
+    We could even do the mixing in multiple places, even multiple SNPs like in
+    the make random snps missing? Does not necessarily have to be one block at a time
+    .
+    """
+
+    target_to_mix = input_[random_index_for_mixing, :]
+
+    random_snp_indices_to_mix = get_uniform_cutmix_indices(
+        input_length=input_.shape[-1], lambda_=lambda_
+    )
+    cut_part = target_to_mix[..., random_snp_indices_to_mix]
+
+    cutmixed_x = input_
+    cutmixed_x[..., random_snp_indices_to_mix] = cut_part
+    return cutmixed_x
+
+
+def get_uniform_cutmix_indices(input_length: int, lambda_):
+    n_to_drop = (int(input_length * lambda_),)
+    random_to_mix = np.random.choice(input_length, n_to_drop, replace=False)
+    random_to_mix = torch.tensor(random_to_mix, dtype=torch.long)
+
+    return random_to_mix
 
 
 def mixup_targets(
@@ -595,11 +660,11 @@ def train(config: Config) -> None:
 
         # TODO: Some kind of hook here, or in dataloader? Then parse_target labels
         # TODO: must be aware of that
-        train_seqs_mixed, targets_a, targets_b, lam = mixup_data(
+        train_seqs_mixed, targets_a, targets_b, lambda_ = mixup_data(
             inputs=train_seqs,
             targets=target_labels,
             target_columns=c.target_columns,
-            alpha=0.4,
+            alpha=0.2,
         )
 
         extra_inputs = get_extra_inputs(
@@ -614,11 +679,11 @@ def train(config: Config) -> None:
         # ----------- TMP -----------
         tmp_target = c.target_columns["cat"][0]
         train_losses = mixup_criterion(
-            c.criterions[tmp_target],
-            train_outputs[tmp_target],
-            targets_a[tmp_target],
-            targets_b[tmp_target],
-            lam,
+            criterion=c.criterions[tmp_target],
+            outputs=train_outputs[tmp_target],
+            targets=targets_a[tmp_target],
+            targets_permuted=targets_b[tmp_target],
+            lambda_=lambda_,
         )
         train_losses = {tmp_target: train_losses}
         # ----------- TMP -----------
