@@ -380,25 +380,35 @@ def _parse_out_lr_find_multiple_param_groups_suggestion(
 
 
 def plot_lr_find_results(
-    lr_find_results: al_lr_find_results, lr_suggestion: float, outfolder: Path
+    lr_find_results: al_lr_find_results,
+    lr_suggestion: float,
+    outfolder: Path,
+    skip_start: int = 10,
+    skip_end: int = 8,
 ):
-    lr_values = lr_find_results["lr"]
-    loss_values = lr_find_results["loss"]
+    lr_values = copy(lr_find_results["lr"])
+    loss_values = copy(lr_find_results["loss"])
 
-    plt.xscale("log")
+    if skip_end == 0:
+        lr_values = lr_values[skip_start:]
+        loss_values = loss_values[skip_start:]
+    else:
+        lr_values = lr_values[skip_start:-skip_end]
+        loss_values = loss_values[skip_start:-skip_end]
 
-    plt.plot(
-        [i for i in lr_values],
-        loss_values,
-        lw=2,
-        label=f"Suggestion: {lr_suggestion:0.4g}",
+    fig, ax = plt.subplots()
+
+    ax.set_xscale("log")
+
+    ax.plot(
+        lr_values, loss_values, lw=2, label=f"Suggestion: {lr_suggestion:0.4g}",
     )
-    plt.axvline(x=lr_suggestion, c="r", linestyle="--")
+    ax.axvline(x=lr_suggestion, c="r", linestyle="--", lw=0.5)
 
-    plt.xlabel("Learning Rate")
-    plt.ylabel("Loss")
-    plt.title("Learning Rate Search")
-    plt.legend(loc="center left", bbox_to_anchor=(1, 0.5), prop={"size": 8})
+    ax.set_xlabel("Learning Rate")
+    ax.set_ylabel("Loss")
+    ax.set_title("Learning Rate Search")
+    ax.legend(loc="center left", bbox_to_anchor=(1, 0.5), prop={"size": 8})
 
     plt.tight_layout()
 
