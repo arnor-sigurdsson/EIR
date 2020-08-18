@@ -35,7 +35,7 @@ from human_origins_supervised.models.extra_inputs_module import (
     get_extra_inputs,
     al_emb_lookup_dict,
 )
-from human_origins_supervised.models.model_utils import test_lr_range
+from human_origins_supervised.models.model_utils import run_lr_find
 from human_origins_supervised.models.models import get_model_class, al_models
 from human_origins_supervised.train_utils import utils
 from human_origins_supervised.train_utils.metrics import (
@@ -56,7 +56,11 @@ from human_origins_supervised.train_utils.metrics import (
     calc_average_precision_ovr,
     MetricRecord,
 )
-from human_origins_supervised.train_utils.optimizers import get_optimizer
+from human_origins_supervised.train_utils.optimizers import (
+    get_optimizer,
+    get_base_optimizers_dict,
+    get_optimizer_backward_kwargs,
+)
 from human_origins_supervised.train_utils.train_handlers import configure_trainer
 
 if TYPE_CHECKING:
@@ -188,10 +192,6 @@ def main(
     )
 
     _log_num_params(model=model)
-
-    if cl_args.find_lr:
-        test_lr_range(config=config)
-        sys.exit(0)
 
     if cl_args.debug:
         breakpoint()
@@ -562,6 +562,9 @@ def train(config: Config) -> None:
     extra_loss_functions = get_extra_loss_term_functions(
         model=c.model, l1_weight=cl_args.l1
     )
+    optimizer_backward_kwargs = get_optimizer_backward_kwargs(
+        optimizer_name=cl_args.optimizer
+    )
 
     def step(
         engine: Engine,
@@ -617,7 +620,7 @@ def train(config: Config) -> None:
             total_loss=train_loss_avg, extra_loss_functions=extra_loss_functions
         )
 
-        train_loss_final.backward()
+        train_loss_final.backward(**optimizer_backward_kwargs)
         c.optimizer.step()
 
         train_batch_metrics = calculate_batch_metrics(
@@ -639,6 +642,17 @@ def train(config: Config) -> None:
         return train_batch_metrics_with_averages
 
     trainer = Engine(process_function=step)
+
+    if cl_args.find_lr:
+        logger.info("Running LR find and exiting.")
+        run_lr_find(
+            trainer_engine=trainer,
+            train_dataloader=c.train_loader,
+            model=c.model,
+            optimizer=c.optimizer,
+            output_folder=utils.get_run_folder(run_name=cl_args.run_name),
+        )
+        sys.exit(0)
 
     trainer = configure_trainer(trainer=trainer, config=config)
 
@@ -996,7 +1010,8 @@ def _get_optimizer_cl_arg_choices():
     something fancy with inspect and issubclass of Optimizer to get names of all
     PyTorch built-in optimizers.
     """
-    default = ["sgdm", "adamw", "adam"]
+    base_optimizer_dict = get_base_optimizers_dict()
+    default = list(base_optimizer_dict.keys())
     external = _get_custom_opt_names()
     return default + external
 
