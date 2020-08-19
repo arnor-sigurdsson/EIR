@@ -3,6 +3,7 @@ from copy import deepcopy, copy
 from pathlib import Path
 from typing import List, Tuple, Union, Dict, overload, TYPE_CHECKING
 
+import plotly.express as px
 import matplotlib.pyplot as plt
 import torch
 from aislib.misc_utils import get_logger
@@ -385,39 +386,34 @@ def plot_lr_find_results(
     lr_find_results: al_lr_find_results,
     lr_suggestion: float,
     outfolder: Path,
-    skip_start: int = 10,
-    skip_end: int = 8,
 ):
     lr_values = copy(lr_find_results["lr"])
     loss_values = copy(lr_find_results["loss"])
 
-    if skip_end == 0:
-        lr_values = lr_values[skip_start:]
-        loss_values = loss_values[skip_start:]
-    else:
-        lr_values = lr_values[skip_start:-skip_end]
-        loss_values = loss_values[skip_start:-skip_end]
-
-    fig, ax = plt.subplots()
-
-    ax.set_xscale("log")
-
-    ax.plot(
-        lr_values, loss_values, lw=2, label=f"Suggestion: {lr_suggestion:0.4g}",
+    fig = px.line(
+        x=lr_values,
+        y=loss_values,
+        log_x=True,
+        title="Learning Rate Search",
     )
-    ax.axvline(x=lr_suggestion, c="r", linestyle="--", lw=0.5)
+    fig.update_layout(
+        xaxis_title="Learning Rate ", yaxis_title="Loss",
+    )
 
-    ax.set_xlabel("Learning Rate")
-    ax.set_ylabel("Loss")
-    ax.set_title("Learning Rate Search")
-    ax.legend(loc="center left", bbox_to_anchor=(1, 0.5), prop={"size": 8})
+    fig.add_shape(
+        dict(
+            type="line",
+            x0=lr_suggestion,
+            y0=0,
+            x1=lr_suggestion,
+            y1=max(loss_values),
+            line=dict(
+                color="Red",
+                width=1
+            )
+        ))
 
-    plt.tight_layout()
-
-    outfile = outfolder / "lr_search.png"
-    logger.info("Saving LR range test results in %s.", outfile)
-    plt.savefig(outfile, dpi=200)
-    plt.close("all")
+    fig.write_html(str(outfolder / "lr_search.html"))
 
 
 def _calculate_losses_and_average(criterions, outputs, labels) -> torch.Tensor:
