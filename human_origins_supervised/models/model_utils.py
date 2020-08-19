@@ -246,7 +246,9 @@ def _stack_list_of_tensor_dicts(list_of_batch_dicts):
     return stacked_outputs
 
 
-def get_model_params(model: nn.Module, wd: float) -> List[Dict[str, Union[str, int]]]:
+def add_wd_to_model_params(
+    model: nn.Module, wd: float
+) -> List[Dict[str, Union[str, float]]]:
     """
     We want to skip adding weight decay to learnable activation parameters so as
     not to bias them towards 0.
@@ -258,7 +260,7 @@ def get_model_params(model: nn.Module, wd: float) -> List[Dict[str, Union[str, i
         cur_dict = {"params": param}
 
         if "act_" in name:
-            cur_dict["weight_decay"] = 0
+            cur_dict["weight_decay"] = 0.0
         else:
             cur_dict["weight_decay"] = wd
 

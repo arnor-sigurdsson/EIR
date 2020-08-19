@@ -44,7 +44,7 @@ def test_get_model_params(create_test_util_model):
     test_model = create_test_util_model
 
     weight_decay = 0.05
-    model_params = model_utils.get_model_params(model=test_model, wd=weight_decay)
+    model_params = model_utils.add_wd_to_model_params(model=test_model, wd=weight_decay)
 
     # BN has weight and bias, hence 6 + 2 = 8 parameter groups
     assert len(model_params) == 8
