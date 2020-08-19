@@ -499,7 +499,7 @@ def mixup_data(
     if alpha > 0:
         lambda_ = np.random.beta(alpha, alpha)
     else:
-        lambda_ = 1
+        lambda_ = 1.0
 
     batch_size = inputs.size()[0]
     random_index_for_mixing = get_random_index_for_mixing(batch_size=batch_size)
@@ -555,8 +555,9 @@ def block_cutmix_input(
 
 
 def get_block_cutmix_indices(input_length: int, lambda_: float):
-    num_snps_to_mix = int(input_length * lambda_)
-    random_index_start = np.random.choice(input_length - num_snps_to_mix)
+    mixin_coefficient = 1 - lambda_
+    num_snps_to_mix = int(input_length * mixin_coefficient)
+    random_index_start = np.random.choice(max(1, input_length - num_snps_to_mix))
     random_index_end = random_index_start + num_snps_to_mix
     return random_index_start, random_index_end
 
@@ -583,8 +584,9 @@ def uniform_cutmix_input(
 
 
 def get_uniform_cutmix_indices(input_length: int, lambda_):
-    n_to_drop = (int(input_length * lambda_),)
-    random_to_mix = np.random.choice(input_length, n_to_drop, replace=False)
+    mixin_coefficient = 1 - lambda_
+    num_snps_to_mix = (int(input_length * mixin_coefficient),)
+    random_to_mix = np.random.choice(input_length, num_snps_to_mix, replace=False)
     random_to_mix = torch.tensor(random_to_mix, dtype=torch.long)
 
     return random_to_mix
@@ -613,17 +615,9 @@ def mixup_criterion(
     targets_permuted: torch.Tensor,
     lambda_: float,
 ) -> torch.Tensor:
-    """
-    :param criterion:
-    :param outputs:
-    :param targets:
-    :param targets_permuted:
-    :param lambda_:
-    :return:
-    """
 
     base_loss = lambda_ * criterion(input=outputs, target=targets)
-    permuted_loss = (1 - lambda_) * criterion(input=outputs, target=targets_permuted)
+    permuted_loss = (1.0 - lambda_) * criterion(input=outputs, target=targets_permuted)
 
     total_loss = base_loss + permuted_loss
 
@@ -672,9 +666,11 @@ def train(config: Config) -> None:
         )
         # ----------- TMP -----------
 
+        # TODO: We will have to mix extra inputs as well
         extra_inputs = get_extra_inputs(
             cl_args=cl_args, model=c.model, labels=labels["extra_labels"]
         )
+
         c.optimizer.zero_grad()
 
         train_outputs = c.model(x=train_seqs_mixed, extra_inputs=extra_inputs)
