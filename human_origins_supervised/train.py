@@ -551,6 +551,8 @@ def block_cutmix_input(
     cut_part = target_to_cut[..., cut_start:cut_end]
     cutmixed_x = input_
     cutmixed_x[..., cut_start:cut_end] = cut_part
+
+    assert (cutmixed_x.sum(dim=2) == 1).all()
     return cutmixed_x
 
 
@@ -580,6 +582,8 @@ def uniform_cutmix_input(
 
     cutmixed_x = input_
     cutmixed_x[..., random_snp_indices_to_mix] = cut_part
+
+    assert (cutmixed_x.sum(dim=2) == 1).all()
     return cutmixed_x
 
 
