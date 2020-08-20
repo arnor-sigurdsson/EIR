@@ -96,7 +96,7 @@ def get_base_optimizers_dict() -> Dict[str, Type[Optimizer]]:
 def _get_constructor_arguments(
     params: List, cl_args: argparse.Namespace, optimizer_class: Type[Optimizer]
 ):
-    base = {"params": params, "lr": cl_args.lr}
+    base = {"params": params, "lr": cl_args.lr, "weight_decay": cl_args.wd}
     all_extras = {"betas": (cl_args.b1, cl_args.b2), "momentum": 0.9, "amsgrad": False}
     accepted_args = signature(optimizer_class).parameters.keys()
     common_extras = {k: v for k, v in all_extras.items() if k in accepted_args}

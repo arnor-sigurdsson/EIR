@@ -253,6 +253,13 @@ def add_wd_to_model_params(
     """
     We want to skip adding weight decay to learnable activation parameters so as
     not to bias them towards 0.
+
+    TODO:   Split this function in two, one to get the parameters and one to add the
+            WD to them. Possibly we have to do it in-place here, not copy as we have
+            tensors.
+
+    Note: Since we are adding the weight decay manually here, the optimizer does not
+    touch the parameter group weight decay at initialization.
     """
     _check_named_modules(model)
 
