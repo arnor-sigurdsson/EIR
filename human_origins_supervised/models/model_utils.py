@@ -390,19 +390,12 @@ def _parse_out_lr_find_multiple_param_groups_suggestion(
 
 
 def plot_lr_find_results(
-    lr_find_results: al_lr_find_results,
-    lr_suggestion: float,
-    outfolder: Path,
+    lr_find_results: al_lr_find_results, lr_suggestion: float, outfolder: Path,
 ):
     lr_values = copy(lr_find_results["lr"])
     loss_values = copy(lr_find_results["loss"])
 
-    fig = px.line(
-        x=lr_values,
-        y=loss_values,
-        log_x=True,
-        title="Learning Rate Search",
-    )
+    fig = px.line(x=lr_values, y=loss_values, log_x=True, title="Learning Rate Search",)
     fig.update_layout(
         xaxis_title="Learning Rate ", yaxis_title="Loss",
     )
@@ -414,11 +407,9 @@ def plot_lr_find_results(
             y0=0,
             x1=lr_suggestion,
             y1=max(loss_values),
-            line=dict(
-                color="Red",
-                width=1
-            )
-        ))
+            line=dict(color="Red", width=1),
+        )
+    )
 
     fig.write_html(str(outfolder / "lr_search.html"))
 

@@ -525,20 +525,24 @@ def analyze_activations(
         sample_outfolder=sample_outfolder,
     )
 
-    av.plot_snp_gradients(
-        accumulated_grads=acc_acts,
-        outfolder=sample_outfolder,
-        title=column_name,
-        type_="avg",
-    )
-    _save_snp_gradients(
+    df_snp_grads = _save_snp_gradients(
         accumulated_grads=acc_acts, outfolder=sample_outfolder, snp_df=snp_df
+    )
+    av.plot_snp_manhattan_plots(
+        df_snp_grads=df_snp_grads,
+        outfolder=sample_outfolder,
+        title_extra=f" - {column_name}",
+    )
+    av.plot_snp_manhattan_plots_plotly(
+        df_snp_grads=df_snp_grads,
+        outfolder=sample_outfolder,
+        title_extra=f" - {column_name}",
     )
 
 
 def _save_snp_gradients(
     accumulated_grads: "al_gradients_dict", outfolder: Path, snp_df: pd.DataFrame
-) -> None:
+) -> pd.DataFrame:
 
     df_output = deepcopy(snp_df)
     for label, grads in accumulated_grads.items():
@@ -551,6 +555,7 @@ def _save_snp_gradients(
         df_output[column_name] = grads_averaged
 
     df_output.to_csv(path_or_buf=outfolder / "snp_activations.csv")
+    return df_output
 
 
 def activation_analysis_handler(
