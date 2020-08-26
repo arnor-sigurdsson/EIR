@@ -8,13 +8,12 @@ import pandas as pd
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
-import matplotlib.cm as cm
+import plotly.graph_objects as go
 
-from aislib.misc_utils import get_logger
+from aislib.misc_utils import get_logger, ensure_path_exists
 
 if TYPE_CHECKING:
     from human_origins_supervised.train_utils.activation_analysis import (
-        al_gradients_dict,
         al_top_gradients_dict,
         al_scaled_grads_dict,
     )
@@ -130,50 +129,74 @@ def plot_top_gradients(
     plt.close("all")
 
 
-def plot_snp_gradients(
-    accumulated_grads: "al_gradients_dict",
-    outfolder: Path,
-    title: str,
-    type_: str = "avg",
+def plot_snp_manhattan_plots(
+    df_snp_grads: pd.DataFrame, outfolder: Path, title_extra: str = ""
 ):
-    n_classes = len(accumulated_grads.keys())
+    activations_columns = [
+        i for i in df_snp_grads.columns if i.endswith("_activations")
+    ]
 
-    colors = iter(cm.tab20(np.arange(n_classes)))
+    for col in activations_columns:
+        label_name = col.split("_activations")[0]
+        fig, ax = plt.subplots(figsize=(12, 6))
+        ax.scatter(
+            x=df_snp_grads["BP_COORD"],
+            y=df_snp_grads[col],
+            label=label_name,
+            color="black",
+            marker=".",
+        )
+        ax.set_ylim(ymin=0.0)
 
-    fig, ax = plt.subplots(figsize=(12, 6))
+        ax.set_xlabel("BP Coordinate")
+        ax.set_ylabel("Activation")
 
-    out_path = outfolder / f"snp_grads_per_class_{type_}.png"
+        plt.title(f"Manhattan Plot{title_extra}")
+        plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+        plt.tight_layout()
 
-    for label, grads in accumulated_grads.items():
-        if grads:
-            color = next(colors)
+        out_path = outfolder / f"activations/manhattan/{label_name}_manhattan.png"
+        ensure_path_exists(path=out_path)
+        plt.savefig(out_path, bbox_inches="tight")
+        plt.close("all")
 
-            if type_ == "avg":
-                grads_averaged = np.array(grads).mean(0).sum(0)
 
-                ax.plot(grads_averaged, label=label, color=color, lw=0.5)
+def plot_snp_manhattan_plots_plotly(
+    df_snp_grads: pd.DataFrame,
+    outfolder: Path,
+    quantile: float = 0.95,
+    title_extra: str = "",
+):
+    """
+    We have the percentile here to avoid creating html files that are massive in size.
+    """
+    activations_columns = [
+        i for i in df_snp_grads.columns if i.endswith("_activations")
+    ]
 
-            elif type_ == "single":
-                for idx, single_grad in enumerate(grads):
-                    single_grad_sum = single_grad.sum(0)
+    fig = go.Figure()
 
-                    ax.plot(
-                        single_grad_sum,
-                        color=color,
-                        label=label if idx == 0 else "",
-                        lw=0.5,
-                    )
-        else:
-            logger.warning(
-                "No gradients aggregated for class %s due to no "
-                "correct predictions for the class, gradient "
-                "will not be plotted in line plot (%s).",
-                label,
-                out_path,
+    for col in activations_columns:
+        label_name = col.split("_activations")[0]
+        quantile_cutoff = df_snp_grads[col].quantile(quantile)
+        df_snp_grads_cut = df_snp_grads[df_snp_grads[col] >= quantile_cutoff]
+
+        fig.add_trace(
+            go.Scatter(
+                x=df_snp_grads_cut["BP_COORD"],
+                y=df_snp_grads_cut[col],
+                name=label_name,
+                mode="markers",
+                text=df_snp_grads_cut["VAR_ID"],
             )
+        )
 
-    plt.title(title)
-    plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
-    plt.tight_layout()
-    plt.savefig(out_path, bbox_inches="tight")
-    plt.close("all")
+    fig.update_layout(
+        title=f"Manhattan Plot (top {quantile}%){title_extra}",
+        xaxis_title="BP Coordinate",
+        yaxis_title="Activation",
+    )
+
+    out_path = outfolder / "activations/manhattan/manhattan_interactive.html"
+    ensure_path_exists(path=out_path)
+    fig.write_html(str(out_path))

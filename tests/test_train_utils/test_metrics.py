@@ -89,8 +89,8 @@ def test_calculate_losses_good():
         label_values=common_values, output_values=common_values
     )
 
-    perfect_pred_loss = metrics.calculate_losses(
-        criterions=test_criterions, labels=test_labels, outputs=test_outputs
+    perfect_pred_loss = metrics.calculate_prediction_losses(
+        criterions=test_criterions, targets=test_labels, inputs=test_outputs
     )
 
     assert perfect_pred_loss["Height"].item() == 0.0
@@ -109,8 +109,8 @@ def test_calculate_losses_bad():
         label_values=label_values, output_values=output_values
     )
 
-    bad_pred_loss = metrics.calculate_losses(
-        criterions=test_criterions, labels=test_labels, outputs=test_outputs
+    bad_pred_loss = metrics.calculate_prediction_losses(
+        criterions=test_criterions, targets=test_labels, inputs=test_outputs
     )
 
     expected_rmse = 4.0

@@ -14,8 +14,6 @@ from aislib.misc_utils import ensure_path_exists
 from aislib.misc_utils import get_logger
 from ignite.engine import Engine
 from torch import nn
-from torch.optim import SGD
-from torch.optim.adamw import AdamW
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader, WeightedRandomSampler
 from torch.utils.tensorboard import SummaryWriter
@@ -36,14 +34,15 @@ from human_origins_supervised.models.extra_inputs_module import (
     get_extra_inputs,
     al_emb_lookup_dict,
 )
-from human_origins_supervised.models.model_utils import get_model_params, test_lr_range
+from human_origins_supervised.models.model_utils import run_lr_find
 from human_origins_supervised.models.models import get_model_class, al_models
 from human_origins_supervised.train_utils import utils
 from human_origins_supervised.train_utils.metrics import (
     calculate_batch_metrics,
-    calculate_losses,
+    calculate_prediction_losses,
     aggregate_losses,
     add_multi_task_average_metrics,
+    UncertaintyMultiTaskLoss,
     get_extra_loss_term_functions,
     add_extra_losses,
     get_average_history_filepath,
@@ -55,6 +54,11 @@ from human_origins_supervised.train_utils.metrics import (
     calc_r2,
     calc_average_precision_ovr,
     MetricRecord,
+)
+from human_origins_supervised.train_utils.optimizers import (
+    get_optimizer,
+    get_base_optimizers_dict,
+    get_optimizer_backward_kwargs,
 )
 from human_origins_supervised.train_utils.train_handlers import configure_trainer
 
@@ -103,6 +107,7 @@ class Config:
     model: al_models
     optimizer: Optimizer
     criterions: al_criterions
+    loss_function: Callable
     labels_dict: Dict
     target_transformers: al_label_transformers
     target_columns: al_target_columns
@@ -148,13 +153,19 @@ def main(
         embedding_dict=embedding_dict,
     )
 
-    optimizer = get_optimizer(model=model, cl_args=cl_args)
-
     criterions = _get_criterions(
         target_columns=train_dataset.target_columns, model_type=cl_args.model_type
     )
 
     writer = get_summary_writer(run_folder=run_folder)
+
+    loss_func = _get_loss_callable(
+        target_columns=train_dataset.target_columns,
+        criterions=criterions,
+        device=cl_args.device,
+    )
+
+    optimizer = get_optimizer(model=model, loss_callable=loss_func, cl_args=cl_args)
 
     metrics = _get_default_metrics(
         target_transformers=train_dataset.target_transformers
@@ -168,6 +179,7 @@ def main(
         model=model,
         optimizer=optimizer,
         criterions=criterions,
+        loss_function=loss_func,
         labels_dict=train_dataset.labels_dict,
         target_transformers=train_dataset.target_transformers,
         target_columns=train_dataset.target_columns,
@@ -178,10 +190,6 @@ def main(
     )
 
     _log_num_params(model=model)
-
-    if cl_args.find_lr:
-        test_lr_range(config=config)
-        sys.exit(0)
 
     if cl_args.debug:
         breakpoint()
@@ -337,21 +345,6 @@ def _check_linear_model_columns(cl_args: argparse.Namespace) -> None:
         )
 
 
-def get_optimizer(model: nn.Module, cl_args: argparse.Namespace) -> Optimizer:
-    params = get_model_params(model=model, wd=cl_args.wd)
-
-    if cl_args.optimizer == "adamw":
-        optimizer = AdamW(
-            params=params, lr=cl_args.lr, betas=(cl_args.b1, cl_args.b2), amsgrad=True
-        )
-    elif cl_args.optimizer == "sgdm":
-        optimizer = SGD(params=params, lr=cl_args.lr, momentum=0.9)
-    else:
-        raise ValueError()
-
-    return optimizer
-
-
 def _get_criterions(
     target_columns: al_target_columns, model_type: str
 ) -> al_criterions:
@@ -369,7 +362,7 @@ def _get_criterions(
             if column_type_ == "cat":
                 return calc_bce
             else:
-                return nn.MSELoss()
+                return nn.MSELoss(reduction="mean")
 
         if column_type_ == "con":
             return nn.MSELoss()
@@ -385,6 +378,22 @@ def _get_criterions(
         criterions_dict[column_name] = criterion
 
     return criterions_dict
+
+
+def _get_loss_callable(
+    target_columns: al_target_columns, criterions: al_criterions, device: str
+):
+    num_tasks = len(target_columns["con"] + target_columns["cat"])
+    if num_tasks > 1:
+        multi_task_loss_module = UncertaintyMultiTaskLoss(
+            target_columns=target_columns, criterions=criterions, device=device
+        )
+        return multi_task_loss_module
+    elif num_tasks == 1:
+        single_task_loss_func = partial(
+            calculate_prediction_losses, criterions=criterions
+        )
+        return single_task_loss_func
 
 
 def get_summary_writer(run_folder: Path) -> SummaryWriter:
@@ -411,7 +420,7 @@ def _get_default_metrics(
         "averaging_functions": {"con": "loss", "cat": "acc"},
     }
 
-    # TODO: temporary metrics for testing
+    # TODO: Remove and use default metrics, currently temporary for testing
     roc_auc_macro = MetricRecord(
         name="roc-auc-macro", function=calc_roc_auc_ovr, only_val=True
     )
@@ -463,6 +472,9 @@ def train(config: Config) -> None:
     extra_loss_functions = get_extra_loss_term_functions(
         model=c.model, l1_weight=cl_args.l1
     )
+    optimizer_backward_kwargs = get_optimizer_backward_kwargs(
+        optimizer_name=cl_args.optimizer
+    )
 
     def step(
         engine: Engine,
@@ -486,19 +498,16 @@ def train(config: Config) -> None:
         extra_inputs = get_extra_inputs(
             cl_args=cl_args, model=c.model, labels=labels["extra_labels"]
         )
-
         c.optimizer.zero_grad()
         train_outputs = c.model(x=train_seqs, extra_inputs=extra_inputs)
 
-        train_losses = calculate_losses(
-            criterions=c.criterions, labels=target_labels, outputs=train_outputs
-        )
+        train_losses = c.loss_function(inputs=train_outputs, targets=target_labels)
         train_loss_avg = aggregate_losses(losses_dict=train_losses)
         train_loss_final = add_extra_losses(
             total_loss=train_loss_avg, extra_loss_functions=extra_loss_functions
         )
 
-        train_loss_final.backward()
+        train_loss_final.backward(**optimizer_backward_kwargs)
         c.optimizer.step()
 
         train_batch_metrics = calculate_batch_metrics(
@@ -520,6 +529,17 @@ def train(config: Config) -> None:
         return train_batch_metrics_with_averages
 
     trainer = Engine(process_function=step)
+
+    if cl_args.find_lr:
+        logger.info("Running LR find and exiting.")
+        run_lr_find(
+            trainer_engine=trainer,
+            train_dataloader=c.train_loader,
+            model=c.model,
+            optimizer=c.optimizer,
+            output_folder=utils.get_run_folder(run_name=cl_args.run_name),
+        )
+        sys.exit(0)
 
     trainer = configure_trainer(trainer=trainer, config=config)
 
@@ -579,7 +599,7 @@ def _get_train_argument_parser() -> configargparse.ArgumentParser:
     parser_.add_argument(
         "--optimizer",
         type=str,
-        choices=["adamw", "sgdm"],
+        choices=_get_optimizer_cl_arg_choices(),
         default="adamw",
         help="Whether to use AdamW or SGDM optimizer.",
     )
@@ -622,10 +642,21 @@ def _get_train_argument_parser() -> configargparse.ArgumentParser:
     )
 
     parser_.add_argument(
+        "--mg_num_experts", type=int, default=8, help="Number of experts to use."
+    )
+
+    parser_.add_argument(
+        "--split_mlp_num_splits",
+        type=int,
+        default=50,
+        help="Number of splits in split MLP layer.",
+    )
+
+    parser_.add_argument(
         "--model_type",
         type=str,
         default="cnn",
-        choices=["cnn", "mlp", "linear"],
+        choices=["cnn", "mlp", "mlp-split", "mlp-mgmoe", "linear"],
         help="whether to use a convolutional neural network (cnn) or multilayer "
         "perceptron (mlp)",
     )
@@ -679,11 +710,12 @@ def _get_train_argument_parser() -> configargparse.ArgumentParser:
         help="Exponential base for channels in first layer (i.e. default is 2**5)",
     )
 
+    # TODO: Better help message.
     parser_.add_argument(
-        "--resblocks",
+        "--layers",
         type=int,
         nargs="+",
-        help="Number of hidden convolutional layers.",
+        help="Number of layers in models where it applies.",
     )
 
     parser_.add_argument(
@@ -857,6 +889,27 @@ def _get_train_argument_parser() -> configargparse.ArgumentParser:
         help="How many iterations to skip in in plots.",
     )
     return parser_
+
+
+def _get_optimizer_cl_arg_choices():
+    """
+    Currently just going to hardcode the main default optimizers. Later we can do
+    something fancy with inspect and issubclass of Optimizer to get names of all
+    PyTorch built-in optimizers.
+    """
+    base_optimizer_dict = get_base_optimizers_dict()
+    default = list(base_optimizer_dict.keys())
+    external = _get_custom_opt_names()
+    return default + external
+
+
+def _get_custom_opt_names():
+    # import here to keep separated from main codebase
+    from torch_optimizer import _NAME_OPTIM_MAP as CUSTOM_OPT_NAME_MAP
+
+    custom_optim_list = list(CUSTOM_OPT_NAME_MAP.keys())
+    custom_optim_list = [i for i in custom_optim_list if i != "lookahead"]
+    return custom_optim_list
 
 
 def _modify_train_arguments(cl_args: argparse.Namespace) -> argparse.Namespace:

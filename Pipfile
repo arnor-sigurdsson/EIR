@@ -41,6 +41,8 @@ lr-finder = {git = "ssh://git@github.com/arnor-sigurdsson/lr-finder.git",editabl
 tensorboard = "*"
 configargparse = "*"
 future="*" # Not actually needed here, but due to a pipenv error, see: https://github.com/pypa/pipenv/issues/3404
+torch-optimizer = "==0.0.1a13"
+plotly = "*"
 
 [requires]
 python_version = "3.7"

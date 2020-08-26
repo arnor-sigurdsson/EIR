@@ -139,7 +139,9 @@ def make_random_snps_missing(
     random_to_drop = np.random.choice(n_snps, n_to_drop, replace=False)
     random_to_drop = torch.tensor(random_to_drop, dtype=torch.long)
 
-    missing_arr = torch.tensor([0.0, 0.0, 0.0, 1.0], dtype=torch.float).reshape(-1, 1)
+    missing_arr = torch.tensor([False, False, False, True], dtype=torch.bool).reshape(
+        -1, 1
+    )
     array[:, :, random_to_drop] = missing_arr
 
     return array

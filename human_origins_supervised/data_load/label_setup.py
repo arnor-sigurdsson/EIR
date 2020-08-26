@@ -379,7 +379,9 @@ def _get_custom_column_ops(custom_lib: str) -> al_all_column_ops:
 
 
 def _split_df(df: pd.DataFrame, valid_size: Union[int, float]) -> al_train_val_dfs:
-    train_ids, valid_ids = train_test_split(list(df.index), test_size=valid_size)
+    train_ids, valid_ids = train_test_split(
+        list(df.index), test_size=valid_size, random_state=0
+    )
 
     df_labels_train = df.loc[df.index.intersection(train_ids)]
     df_labels_valid = df.loc[df.index.intersection(valid_ids)]

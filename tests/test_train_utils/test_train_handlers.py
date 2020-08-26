@@ -26,8 +26,8 @@ def test_unflatten_engine_metrics_dict():
 
 
 def test_generate_h_param_dict(args_config):
-    args_config.resblocks = [2, 2, 4]
-    test_h_params = ["lr", "na_augment_perc", "channel_exp_base", "resblocks"]
+    args_config.layers = [2, 2, 4]
+    test_h_params = ["lr", "na_augment_perc", "channel_exp_base", "layers"]
     test_h_dict = train_handlers._generate_h_param_dict(
         cl_args=args_config, h_params=test_h_params
     )
@@ -35,4 +35,4 @@ def test_generate_h_param_dict(args_config):
     assert test_h_dict["lr"] == args_config.lr
     assert test_h_dict["na_augment_perc"] == args_config.na_augment_perc
     assert test_h_dict["channel_exp_base"] == args_config.channel_exp_base
-    assert test_h_dict["resblocks"] == "2_2_4"
+    assert test_h_dict["layers"] == "2_2_4"

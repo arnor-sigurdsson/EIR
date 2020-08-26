@@ -1,25 +1,26 @@
 from argparse import Namespace
-from dataclasses import dataclass
-from functools import partial
+from copy import deepcopy, copy
 from pathlib import Path
-from typing import List, Tuple, Union, Dict, Callable, overload, TYPE_CHECKING
+from typing import List, Tuple, Union, Dict, overload, TYPE_CHECKING
 
+import plotly.express as px
 import torch
 from aislib.misc_utils import get_logger
 from aislib.pytorch_modules import Swish
+from ignite.contrib.handlers import FastaiLRFinder
+from ignite.engine import Engine
 from torch import nn
 from torch.nn import Module
+from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
-from torch_lr_finder import LRFinder
 
 from human_origins_supervised.data_load.data_utils import get_target_columns_generator
 from human_origins_supervised.data_load.label_setup import al_target_columns
 from human_origins_supervised.models.extra_inputs_module import get_extra_inputs
 from human_origins_supervised.train_utils.metrics import (
-    calculate_losses,
+    calculate_prediction_losses,
     aggregate_losses,
 )
-from human_origins_supervised.train_utils.utils import get_run_folder
 
 if TYPE_CHECKING:
     # noinspection PyUnresolvedReferences
@@ -35,6 +36,7 @@ al_dloader_gathered_preds = Tuple[
     Dict[str, torch.Tensor], Union[List[str], Dict[str, torch.Tensor]], List[str]
 ]
 al_dloader_gathered_raw = Tuple[torch.Tensor, "al_training_labels_batch", List[str]]
+al_lr_find_results = Dict[str, List[Union[float, List[float]]]]
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -244,10 +246,19 @@ def _stack_list_of_tensor_dicts(list_of_batch_dicts):
     return stacked_outputs
 
 
-def get_model_params(model: nn.Module, wd: float) -> List[Dict[str, Union[str, int]]]:
+def add_wd_to_model_params(
+    model: nn.Module, wd: float
+) -> List[Dict[str, Union[str, float]]]:
     """
     We want to skip adding weight decay to learnable activation parameters so as
     not to bias them towards 0.
+
+    TODO:   Split this function in two, one to get the parameters and one to add the
+            WD to them. Possibly we have to do it in-place here, not copy as we have
+            tensors.
+
+    Note: Since we are adding the weight decay manually here, the optimizer does not
+    touch the parameter group weight decay at initialization.
     """
     _check_named_modules(model)
 
@@ -256,7 +267,7 @@ def get_model_params(model: nn.Module, wd: float) -> List[Dict[str, Union[str, i
         cur_dict = {"params": param}
 
         if "act_" in name:
-            cur_dict["weight_decay"] = 0
+            cur_dict["weight_decay"] = 0.0
         else:
             cur_dict["weight_decay"] = wd
 
@@ -281,58 +292,131 @@ def _check_named_modules(model: nn.Module):
             assert "act_" in name, name
 
 
-def test_lr_range(config: "Config") -> None:
+def run_lr_find(
+    trainer_engine: Engine,
+    train_dataloader: torch.utils.data.DataLoader,
+    model: nn.Module,
+    optimizer: Optimizer,
+    output_folder: Path,
+):
+    lr_range_results, lr_suggestion = get_lr_range_results(
+        trainer_engine=trainer_engine,
+        train_dataloader=train_dataloader,
+        model=model,
+        optimizer=optimizer,
+    )
 
-    custom_lr_finder_objects = construct_lr_finder_custom_objects(config)
+    lr_range_results_parsed = _parse_out_lr_find_multiple_param_groups(
+        lr_find_results=lr_range_results
+    )
+    lr_suggestion_parsed = _parse_out_lr_find_multiple_param_groups_suggestion(
+        lr_finder_suggestion=lr_suggestion
+    )
 
+    plot_lr_find_results(
+        lr_find_results=lr_range_results_parsed,
+        lr_suggestion=lr_suggestion_parsed,
+        outfolder=output_folder,
+    )
+
+
+def get_lr_range_results(
+    trainer_engine: Engine,
+    train_dataloader: torch.utils.data.DataLoader,
+    model: nn.Module,
+    optimizer: Optimizer,
+    num_iter: int = 500,
+) -> Tuple[al_lr_find_results, List[float]]:
+    """
+    We do a little hack with max_epochs and epoch_length because we don't pass that
+    to the original trainer when running a normal training instance, which uses the
+    default of max_epochs = 1. This is normally not a problem, as 1 epoch is
+    generally more than for example 300 iterations, which should be enough for the LR
+    test.
+
+    However, in the cases where we have a small epoch length, the LR find will not
+    run to completion as it only runs for one epoch. Hence we need to patch the
+    max_epochs here for the test.
+    """
+    lr_finder = FastaiLRFinder()
+
+    to_save = {"optimizer": optimizer, "model": model}
+    with lr_finder.attach(
+        trainer_engine,
+        to_save=to_save,
+        output_transform=lambda x: x["average"]["loss-average"],
+        num_iter=num_iter,
+    ) as trainer_with_lr_finder:
+
+        logger.info("Running LR range test for max %d iterations.", num_iter)
+
+        default_max_epochs = trainer_with_lr_finder.state.max_epochs
+        trainer_with_lr_finder.state.max_epochs = 100
+        trainer_with_lr_finder.state.epoch_length = len(train_dataloader)
+
+        assert (
+            trainer_with_lr_finder.state.max_epochs
+            * trainer_with_lr_finder.state.epoch_length
+        ) >= num_iter
+
+        trainer_with_lr_finder.run(train_dataloader)
+        trainer_with_lr_finder.state.max_epochs = default_max_epochs
+
+        return deepcopy(lr_finder.get_results()), deepcopy(lr_finder.lr_suggestion())
+
+
+def _parse_out_lr_find_multiple_param_groups(lr_find_results: al_lr_find_results):
+    lr_find_results_copy = copy(lr_find_results)
+    lr_steps = lr_find_results["lr"]
     logger.info(
-        "Running learning rate range test and exiting, results will be " "saved to %s.",
-        custom_lr_finder_objects.plot_output_path,
+        "LR Find: The model has %d parameter groups which can have different "
+        "learning rates depending on implementation. For the LR find, "
+        "we are using the LR defined in group 0, so make sure that is taken "
+        "into consideration when analysing LR find results, the supplied LR "
+        "for training might have to be scaled accordingly.",
+        len(lr_steps[0]),
+    )
+    first_param_groups_lrs = [i[0] for i in lr_steps]
+
+    lr_find_results_copy["lr"] = first_param_groups_lrs
+    return lr_find_results_copy
+
+
+def _parse_out_lr_find_multiple_param_groups_suggestion(
+    lr_finder_suggestion: List[float],
+):
+    return lr_finder_suggestion[0]
+
+
+def plot_lr_find_results(
+    lr_find_results: al_lr_find_results, lr_suggestion: float, outfolder: Path,
+):
+    lr_values = copy(lr_find_results["lr"])
+    loss_values = copy(lr_find_results["loss"])
+
+    fig = px.line(x=lr_values, y=loss_values, log_x=True, title="Learning Rate Search",)
+    fig.update_layout(
+        xaxis_title="Learning Rate ", yaxis_title="Loss",
     )
 
-    lr_finder = LRFinder(
-        model=config.model,
-        optimizer=config.optimizer,
-        device=config.cl_args.device,
-        lr_finder_custom_objects=custom_lr_finder_objects,
-    )
-    lr_finder.range_test(config.train_loader, end_lr=10, num_iter=300)
-    lr_finder.plot()
-
-
-@dataclass
-class LRFinderCustomObjects:
-    label_casting_func: Callable
-    loss_func: Callable
-    extra_inputs_hook: Callable
-    plot_output_path: Path
-
-
-def construct_lr_finder_custom_objects(config) -> LRFinderCustomObjects:
-    c = config
-
-    p_label_casting = partial(
-        parse_target_labels, target_columns=c.target_columns, device=c.cl_args.device
+    fig.add_shape(
+        dict(
+            type="line",
+            x0=lr_suggestion,
+            y0=0,
+            x1=lr_suggestion,
+            y1=max(loss_values),
+            line=dict(color="Red", width=1),
+        )
     )
 
-    p_extra_inputs_hook = partial(get_extra_inputs, cl_args=c.cl_args, model=c.model)
-
-    p_calculate_losses = partial(_calculate_losses_and_average, criterions=c.criterions)
-
-    plot_path = get_run_folder(c.cl_args.run_name) / "lr_search.png"
-
-    custom_lr_finder_objects = LRFinderCustomObjects(
-        label_casting_func=p_label_casting,
-        loss_func=p_calculate_losses,
-        extra_inputs_hook=p_extra_inputs_hook,
-        plot_output_path=plot_path,
-    )
-
-    return custom_lr_finder_objects
+    fig.write_html(str(outfolder / "lr_search.html"))
 
 
 def _calculate_losses_and_average(criterions, outputs, labels) -> torch.Tensor:
-    all_losses = calculate_losses(criterions=criterions, labels=labels, outputs=outputs)
+    all_losses = calculate_prediction_losses(
+        criterions=criterions, targets=labels, inputs=outputs
+    )
     average_loss = aggregate_losses(all_losses)
 
     return average_loss

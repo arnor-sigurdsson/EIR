@@ -13,6 +13,7 @@ import pytest
 from _pytest.fixtures import SubRequest
 from aislib.misc_utils import ensure_path_exists
 from torch import cuda
+from torch import nn
 from torch.utils.data import DataLoader
 
 from human_origins_supervised import train
@@ -21,8 +22,11 @@ from human_origins_supervised.models.extra_inputs_module import (
     set_up_and_save_embeddings_dict,
 )
 from human_origins_supervised.train import Config, get_model
-from human_origins_supervised.train_utils.utils import configure_root_logger
-from human_origins_supervised.train_utils.utils import get_run_folder
+from human_origins_supervised.train_utils.utils import (
+    configure_root_logger,
+    get_run_folder,
+)
+from human_origins_supervised.train_utils import optimizers
 
 np.random.seed(0)
 
@@ -65,7 +69,7 @@ def args_config():
             "act_classes": None,
             "b1": 0.9,
             "b2": 0.999,
-            "batch_size": 64,
+            "batch_size": 32,
             "channel_exp_base": 5,
             "checkpoint_interval": 100,
             "extra_con_columns": [],
@@ -78,6 +82,7 @@ def args_config():
             "fc_repr_dim": 64,
             "fc_task_dim": 32,
             "fc_do": 0.0,
+            "find_lr": False,
             "first_kernel_expansion": 1,
             "first_stride_expansion": 1,
             "first_channel_expansion": 1,
@@ -89,7 +94,8 @@ def args_config():
             "lr": 1e-2,
             "lr_lb": 1e-5,
             "lr_schedule": "plateau",
-            "memory_dataset": False,
+            "memory_dataset": True,
+            "mg_num_experts": 3,
             "model_type": "cnn",
             "multi_gpu": False,
             "n_cpu": 8,
@@ -98,11 +104,12 @@ def args_config():
             "na_augment_prob": 0.20,
             "optimizer": "adamw",
             "plot_skip_steps": 50,
-            "rb_do": 0.0,
-            "resblocks": None,
+            "rb_do": 0.25,
+            "layers": [1, 1],
             "run_name": "test_run",
             "sa": False,
-            "sample_interval": 100,
+            "sample_interval": 200,
+            "split_mlp_num_splits": 16,
             "target_cat_columns": ["Origin"],
             "target_con_columns": [],
             "target_width": 1000,
@@ -237,7 +244,6 @@ def _save_test_array_to_disk(
     base_array, snp_idxs_candidates = _set_up_base_test_array(c.n_snps)
 
     cur_test_array, snps_this_sample = _create_test_array(
-        test_task=c.task_type,
         base_array=base_array,
         snp_idxs_candidates=snp_idxs_candidates,
         snp_row_idx=active_snp_row_idx,
@@ -259,13 +265,8 @@ def _set_up_base_test_array(n_snps: int) -> Tuple[np.ndarray, np.ndarray]:
 
 
 def _create_test_array(
-    test_task: str,
-    base_array: np.ndarray,
-    snp_idxs_candidates: np.ndarray,
-    snp_row_idx: int,
+    base_array: np.ndarray, snp_idxs_candidates: np.ndarray, snp_row_idx: int,
 ) -> Tuple[np.ndarray, List[int]]:
-    """
-    """
     # make samples have missing for chosen, otherwise might have alleles chosen
     # below by random, without having the phenotype
     base_array[:, snp_idxs_candidates] = 0
@@ -293,13 +294,23 @@ def _set_up_test_data_array_outpath(base_folder: Path) -> Path:
 
 
 def write_test_data_snp_file(base_folder: Path, n_snps: int) -> None:
+    """
+    BIM specs:
+        0. Chromosome code
+        1. Variant ID
+        2. Position in centi-morgans
+        3. Base-pair coordinate (1-based)
+        4. ALT allele cod
+        5. REF allele code
+    """
     snp_file = base_folder / "test_snps.bim"
-    base_snp_string_list = ["1", "REPLACE_W_IDX", "0.1", "10", "A", "T"]
+    base_snp_string_list = ["1", "REPLACE_W_IDX", "0.1", "REPLACE_W_IDX", "A", "T"]
 
     with open(str(snp_file), "w") as snpfile:
         for snp_idx in range(n_snps):
             cur_snp_list = base_snp_string_list[:]
             cur_snp_list[1] = str(snp_idx)
+            cur_snp_list[3] = str(snp_idx)
 
             cur_snp_string = "\t".join(cur_snp_list)
             snpfile.write(cur_snp_string + "\n")
@@ -401,24 +412,36 @@ def create_test_dloaders(create_test_cl_args, create_test_datasets):
     train_dataset, valid_dataset = create_test_datasets
 
     train_dloader = DataLoader(
-        train_dataset, batch_size=cl_args.batch_size, shuffle=True
+        train_dataset, batch_size=cl_args.batch_size, shuffle=True, drop_last=True
     )
 
     valid_dloader = DataLoader(
-        valid_dataset, batch_size=cl_args.batch_size, shuffle=False
+        valid_dataset, batch_size=cl_args.batch_size, shuffle=False, drop_last=True
     )
 
     return train_dloader, valid_dloader, train_dataset, valid_dataset
 
 
-@pytest.fixture()
-def create_test_optimizer(create_test_cl_args, create_test_model):
-    cl_args = create_test_cl_args
-    model = create_test_model
+def create_test_optimizer(
+    cl_args: Namespace,
+    model: nn.Module,
+    target_columns: Dict[str, List[str]],
+    criterions,
+):
 
-    optimizer = train.get_optimizer(model, cl_args)
+    """
+    TODO: Refactor loss module construction out of this function.
+    """
 
-    return optimizer
+    loss_module = train._get_loss_callable(
+        target_columns=target_columns, criterions=criterions, device=cl_args.device
+    )
+
+    optimizer = optimizers.get_optimizer(
+        model=model, loss_callable=loss_module, cl_args=cl_args
+    )
+
+    return optimizer, loss_module
 
 
 @dataclass
@@ -436,7 +459,6 @@ def prep_modelling_test_configs(
     create_test_cl_args,
     create_test_dloaders,
     create_test_model,
-    create_test_optimizer,
     create_test_datasets,
 ) -> Tuple[Config, ModelTestConfig]:
     """
@@ -446,6 +468,7 @@ def prep_modelling_test_configs(
     cl_args = create_test_cl_args
     train_loader, valid_loader, train_dataset, valid_dataset = create_test_dloaders
     model = create_test_model
+
     optimizer = create_test_optimizer
     criterions = train._get_criterions(
         target_columns=train_dataset.target_columns, model_type=cl_args.model_type
@@ -454,6 +477,13 @@ def prep_modelling_test_configs(
         target_transformers=train_dataset.target_transformers
     )
     metrics = _patch_metrics(metrics=metrics)
+
+    optimizer, loss_module = create_test_optimizer(
+        cl_args=cl_args,
+        model=model,
+        target_columns=train_dataset.target_columns,
+        criterions=criterions,
+    )
 
     train_dataset, valid_dataset = create_test_datasets
 
@@ -467,6 +497,7 @@ def prep_modelling_test_configs(
         model=model,
         optimizer=optimizer,
         criterions=criterions,
+        loss_function=loss_module,
         metrics=metrics,
         labels_dict=train_dataset.labels_dict,
         target_transformers=train_dataset.target_transformers,

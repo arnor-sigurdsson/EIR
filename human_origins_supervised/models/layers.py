@@ -1,6 +1,10 @@
+import math
+
 import torch
+import torch.nn.functional as F
 from aislib.pytorch_modules import Swish
 from torch import nn
+from torch.nn import Parameter
 
 
 class SelfAttention(nn.Module):
@@ -105,7 +109,7 @@ class SEBlock(nn.Module):
         return out
 
 
-class AbstractBlock(nn.Module):
+class AbstractCNNResidualBlock(nn.Module):
     def __init__(
         self,
         in_channels: int,
@@ -124,7 +128,7 @@ class AbstractBlock(nn.Module):
         self.conv_1_padding = conv_1_padding
         self.down_stride_w = down_stride_w
 
-        self.conv_1_kernel_h = 4 if isinstance(self, FirstBlock) else 1
+        self.conv_1_kernel_h = 4 if isinstance(self, FirstCNNBlock) else 1
         self.down_stride_h = self.conv_1_kernel_h
 
         self.rb_do = nn.Dropout2d(rb_do)
@@ -174,7 +178,7 @@ class AbstractBlock(nn.Module):
         raise NotImplementedError
 
 
-class FirstBlock(AbstractBlock):
+class FirstCNNBlock(AbstractCNNResidualBlock):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -193,7 +197,7 @@ class FirstBlock(AbstractBlock):
         return out
 
 
-class Block(AbstractBlock):
+class CNNResidualBlock(AbstractCNNResidualBlock):
     def __init__(self, full_preact: bool = False, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -222,3 +226,143 @@ class Block(AbstractBlock):
         out = out + identity
 
         return out
+
+
+class SplitLinear(nn.Module):
+    __constants__ = ["bias", "in_features", "out_features"]
+
+    def __init__(
+        self,
+        in_features: int,
+        out_feature_sets: int,
+        num_chunks: int = 10,
+        bias: bool = True,
+    ):
+        super().__init__()
+
+        self.in_features = in_features
+        self.out_feature_sets = out_feature_sets
+        self.num_chunks = num_chunks
+        self.out_features = self.out_feature_sets * self.num_chunks
+        self.padding, self.split_size = calc_dimensions_for_reshape(
+            input_width=in_features, denominator=num_chunks
+        )
+
+        self.weight = Parameter(
+            torch.Tensor(self.out_feature_sets, self.split_size, self.num_chunks),
+            requires_grad=True,
+        )
+        if bias:
+            self.bias = Parameter(torch.Tensor(self.out_features), requires_grad=True)
+        else:
+            self.register_parameter("bias", None)
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        """
+        NOTE: This default init actually works quite well, as compared to initializing
+        for each chunk (meaning higher weights at init). In that case, the model takes
+        longer to get to a good performance as it spends a while driving the weights
+        down.
+        """
+        nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))
+        if self.bias is not None:
+            fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.weight)
+            bound = 1 / math.sqrt(fan_in)
+            nn.init.uniform_(self.bias, -bound, bound)
+
+    def forward(self, input: torch.Tensor):
+        input = F.pad(input=input, pad=[0, self.padding, 0, 0])
+        input = input.reshape(-1, 1, self.split_size, self.num_chunks)
+        out = calc_split_input(input=input, weight=self.weight, bias=self.bias)
+        return out
+
+    def extra_repr(self):
+        return (
+            "in_features={}, num_chunks={}, split_size={}, "
+            "out_feature_sets={}, out_features={}, bias={}".format(
+                self.in_features,
+                self.num_chunks,
+                self.split_size,
+                self.out_feature_sets,
+                self.out_features,
+                self.bias is not None,
+            )
+        )
+
+
+def calc_dimensions_for_reshape(input_width: int, denominator: int):
+    split_size = int(math.ceil(input_width / denominator))
+    padding = split_size * denominator - input_width
+    return padding, split_size
+
+
+def calc_split_input(input: torch.Tensor, weight: torch.Tensor, bias):
+    out = []
+    for i in range(weight.shape[0]):
+        mul = torch.mul(input, weight[i], out=None)
+        sum = torch.sum(mul, dim=2)
+        flattened = sum.flatten(start_dim=1)
+        out.append(flattened)
+
+    final = torch.cat(out, dim=1)
+    if bias is not None:
+        final = final + bias
+    return final
+
+
+class MLPResidualBlock(nn.Module):
+    def __init__(
+        self,
+        in_features: int,
+        out_features: int,
+        dropout_p: float = 0.0,
+        full_preactivation: bool = False,
+        zero_init_last_bn: bool = True,
+    ):
+        super().__init__()
+
+        self.in_features = in_features
+        self.out_features = out_features
+        self.dropout_p = dropout_p
+        self.full_preactivation = full_preactivation
+        self.zero_init_last_bn = zero_init_last_bn
+
+        self.bn_1 = nn.BatchNorm1d(num_features=in_features)
+        self.act_1 = Swish()
+        self.fc_1 = nn.Linear(
+            in_features=in_features, out_features=out_features, bias=False
+        )
+
+        self.bn_2 = nn.BatchNorm1d(num_features=out_features)
+        self.act_2 = Swish()
+        self.do = nn.Dropout(p=dropout_p)
+        self.fc_2 = nn.Linear(
+            in_features=out_features, out_features=out_features, bias=False
+        )
+
+        if in_features == out_features:
+            self.downsample_identity = lambda x: x
+        else:
+            self.downsample_identity = nn.Linear(
+                in_features=in_features, out_features=out_features, bias=False
+            )
+
+        if self.zero_init_last_bn:
+            nn.init.zeros_(self.bn_2.weight)
+
+    def forward(self, x):
+        out = self.bn_1(x)
+        out = self.act_1(out)
+
+        identity = out if self.full_preactivation else x
+        identity = self.downsample_identity(identity)
+
+        out = self.fc_1(out)
+
+        out = self.bn_2(out)
+        out = self.act_2(out)
+        out = self.do(out)
+        out = self.fc_2(out)
+
+        return out + identity

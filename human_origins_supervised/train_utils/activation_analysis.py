@@ -494,8 +494,6 @@ def analyze_activations(
         transform_funcs=proc_funcs,
     )
 
-    np.save(str(sample_outfolder / "all_acts.npy"), acc_acts)
-
     abs_grads = True if column_type == "con" else False
     top_gradients_dict = get_snp_cols_w_top_grads(
         accumulated_grads=acc_acts, abs_grads=abs_grads
@@ -527,12 +525,37 @@ def analyze_activations(
         sample_outfolder=sample_outfolder,
     )
 
-    av.plot_snp_gradients(
-        accumulated_grads=acc_acts,
-        outfolder=sample_outfolder,
-        title=column_name,
-        type_="avg",
+    df_snp_grads = _save_snp_gradients(
+        accumulated_grads=acc_acts, outfolder=sample_outfolder, snp_df=snp_df
     )
+    av.plot_snp_manhattan_plots(
+        df_snp_grads=df_snp_grads,
+        outfolder=sample_outfolder,
+        title_extra=f" - {column_name}",
+    )
+    av.plot_snp_manhattan_plots_plotly(
+        df_snp_grads=df_snp_grads,
+        outfolder=sample_outfolder,
+        title_extra=f" - {column_name}",
+    )
+
+
+def _save_snp_gradients(
+    accumulated_grads: "al_gradients_dict", outfolder: Path, snp_df: pd.DataFrame
+) -> pd.DataFrame:
+
+    df_output = deepcopy(snp_df)
+    for label, grads in accumulated_grads.items():
+
+        grads_np = np.array(grads)
+        grads_abs = np.abs(grads_np)
+        grads_averaged = grads_abs.mean(0).sum(0)
+
+        column_name = label + "_activations"
+        df_output[column_name] = grads_averaged
+
+    df_output.to_csv(path_or_buf=outfolder / "snp_activations.csv")
+    return df_output
 
 
 def activation_analysis_handler(

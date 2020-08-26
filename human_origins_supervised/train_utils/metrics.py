@@ -18,6 +18,7 @@ from sklearn.metrics import (
     accuracy_score,
 )
 from sklearn.preprocessing import StandardScaler, label_binarize
+from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 
 from human_origins_supervised.data_load.data_utils import get_target_columns_generator
@@ -217,16 +218,16 @@ def calc_rmse(
     return rmse
 
 
-def calculate_losses(
+def calculate_prediction_losses(
     criterions: "al_criterions",
-    labels: Dict[str, torch.Tensor],
-    outputs: Dict[str, torch.Tensor],
+    inputs: Dict[str, torch.Tensor],
+    targets: Dict[str, torch.Tensor],
 ) -> Dict[str, torch.Tensor]:
     losses_dict = {}
 
     for target_column, criterion in criterions.items():
-        cur_target_col_labels = labels[target_column]
-        cur_target_col_outputs = outputs[target_column]
+        cur_target_col_labels = targets[target_column]
+        cur_target_col_outputs = inputs[target_column]
         losses_dict[target_column] = criterion(
             input=cur_target_col_outputs, target=cur_target_col_labels
         )
@@ -239,6 +240,60 @@ def aggregate_losses(losses_dict: Dict[str, torch.Tensor]) -> torch.Tensor:
     average_loss = torch.mean(torch.stack(losses_values))
 
     return average_loss
+
+
+class UncertaintyMultiTaskLoss(nn.Module):
+    def __init__(
+        self,
+        target_columns: "al_target_columns",
+        criterions: "al_criterions",
+        device: str,
+    ):
+        super().__init__()
+
+        self.target_columns = target_columns
+        self.criterions = criterions
+        self.device = device
+
+        self.log_vars = self._construct_params(
+            cur_target_columns=target_columns["cat"] + target_columns["con"],
+            device=self.device,
+        )
+
+    @staticmethod
+    def _construct_params(cur_target_columns: List[str], device: str):
+        param_dict = {}
+        for column_name in cur_target_columns:
+            param_dict[column_name] = nn.Parameter(
+                torch.zeros(1), requires_grad=True
+            ).to(device=device)
+
+        return param_dict
+
+    def _calc_uncertainty_loss(self, name, loss_value):
+        log_var = self.log_vars[name]
+        scalar = 2.0 if name in self.target_columns["cat"] else 1.0
+
+        precision = torch.exp(-log_var)
+        loss = scalar * torch.sum(precision * loss_value + log_var)
+
+        return loss
+
+    def forward(self, inputs, targets):
+        losses_dict = {}
+
+        for target_column, criterion in self.criterions.items():
+            cur_target_col_labels = targets[target_column]
+            cur_target_col_outputs = inputs[target_column]
+            loss_value_base = criterion(
+                input=cur_target_col_outputs, target=cur_target_col_labels
+            )
+            loss_value_uncertain = self._calc_uncertainty_loss(
+                name=target_column, loss_value=loss_value_base
+            )
+            losses_dict[target_column] = loss_value_uncertain
+
+        return losses_dict
 
 
 def get_extra_loss_term_functions(model, l1_weight: float) -> List[Callable]:

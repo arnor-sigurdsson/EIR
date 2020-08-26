@@ -8,6 +8,12 @@ from typing import List, Callable, Union, Tuple, TYPE_CHECKING, Dict
 
 import pandas as pd
 from aislib.misc_utils import get_logger
+from ignite.contrib.handlers import ProgressBar
+from ignite.engine import Events, Engine
+from ignite.handlers import ModelCheckpoint
+from ignite.metrics import RunningAverage
+from torch.utils.tensorboard import SummaryWriter
+
 from human_origins_supervised.data_load.data_utils import get_target_columns_generator
 from human_origins_supervised.data_load.label_setup import al_target_columns
 from human_origins_supervised.train_utils import H_PARAMS
@@ -31,11 +37,6 @@ from human_origins_supervised.train_utils.utils import (
     get_run_folder,
 )
 from human_origins_supervised.visualization import visualization_funcs as vf
-from ignite.contrib.handlers import ProgressBar
-from ignite.engine import Events, Engine
-from ignite.handlers import ModelCheckpoint
-from ignite.metrics import RunningAverage
-from torch.utils.tensorboard import SummaryWriter
 
 if TYPE_CHECKING:
     from human_origins_supervised.train import Config
