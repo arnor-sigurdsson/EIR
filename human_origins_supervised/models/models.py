@@ -8,9 +8,9 @@ import torch
 from aislib import pytorch_utils
 from aislib.misc_utils import get_logger
 from aislib.pytorch_modules import Swish
-from human_origins_supervised.data_load.datasets import al_num_classes
 from torch import nn
 
+from human_origins_supervised.data_load.datasets import al_num_classes
 from . import extra_inputs_module
 from .extra_inputs_module import al_emb_lookup_dict
 from .layers import (
@@ -109,7 +109,7 @@ class CNNModel(ModelBase):
             )
         )
 
-        self.multi_task_branches = _get_multi_task_branches(
+        self.multi_task_branches = _get_cnn_multi_task_branches(
             num_classes=self.num_classes,
             fc_task_dim=self.fc_task_dim,
             fc_repr_and_extra_dim=self.fc_repr_and_extra_dim,
@@ -168,6 +168,44 @@ class CNNModel(ModelBase):
         )
 
         return out
+
+
+def _get_cnn_multi_task_branches(
+    fc_repr_and_extra_dim: int,
+    fc_task_dim: int,
+    fc_do: float,
+    num_classes: al_num_classes,
+) -> nn.ModuleDict:
+    """
+    TODO: Remove this in favor of branch factories as used in other modesl
+    """
+
+    module_dict = {}
+    for key, num_classes in num_classes.items():
+        branch_layers = OrderedDict(
+            {
+                "fc_2_bn_1": nn.BatchNorm1d(fc_repr_and_extra_dim),
+                "fc_2_act_1": Swish(),
+                "fc_2_linear_1": nn.Linear(
+                    fc_repr_and_extra_dim, fc_task_dim, bias=False
+                ),
+                "fc_2_do_1": nn.Dropout(p=fc_do),
+                "fc_3_bn_1": nn.BatchNorm1d(fc_task_dim),
+                "fc_3_act_1": Swish(),
+                "fc_3_do_1": nn.Dropout(p=fc_do),
+            }
+        )
+
+        task_layer_branch = nn.Sequential(
+            OrderedDict(
+                **branch_layers, **{"fc_3_final": nn.Linear(fc_task_dim, num_classes)}
+            )
+        )
+
+        module_dict[key] = task_layer_branch
+
+    _assert_module_dict_uniqueness(module_dict)
+    return nn.ModuleDict(module_dict)
 
 
 def _make_conv_layers(
@@ -302,10 +340,6 @@ class MLPModel(ModelBase):
             self.fc_1_in_features, self.cl_args.fc_repr_dim, bias=False
         )
 
-        self.downsample_fc_0_identities = _get_downsample_identities_moduledict(
-            num_classes=self.num_classes, in_features=self.fc_repr_and_extra_dim
-        )
-
         self.fc_0_act = nn.Sequential(
             OrderedDict(
                 {
@@ -352,9 +386,7 @@ class MLPModel(ModelBase):
         return self.fc_0.weight
 
     def _init_weights(self):
-        for task, module in self.multi_task_branches.items():
-            last_bn = module[0][-1][0].fc_1_bn_1
-            nn.init.zeros_(last_bn.weight)
+        pass
 
     def forward(
         self, x: torch.Tensor, extra_inputs: torch.Tensor = None
@@ -362,14 +394,6 @@ class MLPModel(ModelBase):
         out = x.view(x.shape[0], -1)
 
         out = self.fc_0(out)
-
-        identity_inputs = out
-        if extra_inputs is not None:
-            identity_inputs = torch.cat((extra_inputs, identity_inputs), dim=1)
-
-        identities = _calculate_module_dict_outputs(
-            input_=identity_inputs, module_dict=self.downsample_fc_0_identities
-        )
 
         out = self.fc_0_act(out)
 
@@ -381,19 +405,12 @@ class MLPModel(ModelBase):
             input_=out, module_dict=self.multi_task_branches
         )
 
-        out = {
-            column_name: feature + identities[column_name]
-            for column_name, feature in out.items()
-        }
-
         return out
 
 
 class SplitMLPModel(ModelBase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
-        # TODO: Account for extra inputs here
 
         num_chunks = self.cl_args.split_mlp_num_splits
         self.fc_0 = nn.Sequential(
@@ -410,9 +427,6 @@ class SplitMLPModel(ModelBase):
         )
 
         in_feat = num_chunks * self.cl_args.fc_repr_dim
-        self.downsample_fc_0_identities = _get_downsample_identities_moduledict(
-            num_classes=self.num_classes, in_features=in_feat
-        )
 
         task_names = tuple(self.num_classes.keys())
         task_resblocks_kwargs = {
@@ -482,14 +496,6 @@ class SplitMLPModel(ModelBase):
 
         out = self.fc_0(out)
 
-        identity_inputs = out
-        if extra_inputs is not None:
-            identity_inputs = torch.cat((extra_inputs, identity_inputs), dim=1)
-
-        identities = _calculate_module_dict_outputs(
-            input_=identity_inputs, module_dict=self.downsample_fc_0_identities
-        )
-
         if extra_inputs is not None:
             out_extra = self.fc_extra(extra_inputs)
             out = torch.cat((out_extra, out), dim=1)
@@ -497,11 +503,6 @@ class SplitMLPModel(ModelBase):
         out = _calculate_module_dict_outputs(
             input_=out, module_dict=self.multi_task_branches
         )
-
-        out = {
-            column_name: feature + identities[column_name]
-            for column_name, feature in out.items()
-        }
 
         return out
 
@@ -600,12 +601,13 @@ class MGMoEModel(ModelBase):
             )
         )
 
-        gate_names = tuple(self.num_classes.keys())
+        self.task_names = sorted(tuple(self.num_classes.keys()))
         gate_spec = self.get_gate_spec(
-            in_features=fc_0_out_feat, out_features=self.num_experts
+            in_features=fc_0_out_feat + self.extra_dim, out_features=self.num_experts
         )
+
         self.gates = construct_multi_branches(
-            branch_names=gate_names,
+            branch_names=self.task_names,
             branch_factory=initialize_modules_from_spec,
             branch_factory_kwargs={"spec": gate_spec},
         )
@@ -628,7 +630,6 @@ class MGMoEModel(ModelBase):
             },
         )
 
-        task_names = tuple(self.num_classes.keys())
         task_resblocks_kwargs = {
             "in_features": self.fc_task_dim,
             "out_features": self.fc_task_dim,
@@ -636,7 +637,7 @@ class MGMoEModel(ModelBase):
             "full_preactivation": False,
         }
         multi_task_branches = construct_multi_branches(
-            branch_names=task_names,
+            branch_names=self.task_names,
             branch_factory=construct_blocks,
             branch_factory_kwargs={
                 "num_blocks": self.cl_args.layers[1],
@@ -649,7 +650,7 @@ class MGMoEModel(ModelBase):
             in_features=self.fc_task_dim, dropout_p=self.cl_args.fc_do
         )
         final_act = construct_multi_branches(
-            branch_names=task_names,
+            branch_names=self.task_names,
             branch_factory=initialize_modules_from_spec,
             branch_factory_kwargs={"spec": final_act_spec},
         )
@@ -737,41 +738,6 @@ class MGMoEModel(ModelBase):
             final_out[task_name] = cur_task_branch(weighted_expert_sum)
 
         return final_out
-
-
-def _get_multi_task_branches(
-    fc_repr_and_extra_dim: int,
-    fc_task_dim: int,
-    fc_do: float,
-    num_classes: al_num_classes,
-) -> nn.ModuleDict:
-
-    module_dict = {}
-    for key, num_classes in num_classes.items():
-        branch_layers = OrderedDict(
-            {
-                "fc_2_bn_1": nn.BatchNorm1d(fc_repr_and_extra_dim),
-                "fc_2_act_1": Swish(),
-                "fc_2_linear_1": nn.Linear(
-                    fc_repr_and_extra_dim, fc_task_dim, bias=False
-                ),
-                "fc_2_do_1": nn.Dropout(p=fc_do),
-                "fc_3_bn_1": nn.BatchNorm1d(fc_task_dim),
-                "fc_3_act_1": Swish(),
-                "fc_3_do_1": nn.Dropout(p=fc_do),
-            }
-        )
-
-        task_layer_branch = nn.Sequential(
-            OrderedDict(
-                **branch_layers, **{"fc_3_final": nn.Linear(fc_task_dim, num_classes)}
-            )
-        )
-
-        module_dict[key] = task_layer_branch
-
-    _assert_module_dict_uniqueness(module_dict)
-    return nn.ModuleDict(module_dict)
 
 
 def get_basic_multi_branch_spec(in_features: int, out_features: int, dropout_p: float):
@@ -896,8 +862,8 @@ def _get_downsample_identities_moduledict(
 
 def _calculate_module_dict_outputs(
     input_: torch.Tensor, module_dict: nn.ModuleDict
-) -> Dict[str, torch.Tensor]:
-    final_out = {}
+) -> "OrderedDict[str, torch.Tensor]":
+    final_out = OrderedDict()
     for target_column, linear_layer in module_dict.items():
         final_out[target_column] = linear_layer(input_)
 

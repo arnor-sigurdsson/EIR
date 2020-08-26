@@ -9,7 +9,6 @@ import pandas as pd
 import torch
 from aislib.misc_utils import ensure_path_exists, get_logger
 from scipy.stats import pearsonr
-from torch import nn
 from sklearn.metrics import (
     matthews_corrcoef,
     r2_score,
@@ -19,6 +18,7 @@ from sklearn.metrics import (
     accuracy_score,
 )
 from sklearn.preprocessing import StandardScaler, label_binarize
+from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 
 from human_origins_supervised.data_load.data_utils import get_target_columns_generator

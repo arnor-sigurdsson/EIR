@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import List, Tuple, Union, Dict, overload, TYPE_CHECKING
 
 import plotly.express as px
-import matplotlib.pyplot as plt
 import torch
 from aislib.misc_utils import get_logger
 from aislib.pytorch_modules import Swish

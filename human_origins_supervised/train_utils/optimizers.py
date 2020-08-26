@@ -1,17 +1,16 @@
 import argparse
+import reprlib
 from collections import defaultdict
 from functools import partial
 from inspect import signature
-import reprlib
 from typing import Callable, List, Type, Dict
 
+from aislib.misc_utils import get_logger
+from aislib.pytorch_modules import AdaHessian
 from torch import nn
-from torch.optim.optimizer import Optimizer
 from torch.optim import SGD, Adam
 from torch.optim.adamw import AdamW
-from aislib.pytorch_modules import AdaHessian
-from aislib.misc_utils import get_logger
-
+from torch.optim.optimizer import Optimizer
 from torch_optimizer import get as get_custom_opt
 
 from human_origins_supervised.models.model_utils import add_wd_to_model_params

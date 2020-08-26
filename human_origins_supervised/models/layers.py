@@ -1,10 +1,10 @@
 import math
 
 import torch
+import torch.nn.functional as F
 from aislib.pytorch_modules import Swish
 from torch import nn
 from torch.nn import Parameter
-import torch.nn.functional as F
 
 
 class SelfAttention(nn.Module):
@@ -318,6 +318,7 @@ class MLPResidualBlock(nn.Module):
         out_features: int,
         dropout_p: float = 0.0,
         full_preactivation: bool = False,
+        zero_init_last_bn: bool = True,
     ):
         super().__init__()
 
@@ -325,6 +326,7 @@ class MLPResidualBlock(nn.Module):
         self.out_features = out_features
         self.dropout_p = dropout_p
         self.full_preactivation = full_preactivation
+        self.zero_init_last_bn = zero_init_last_bn
 
         self.bn_1 = nn.BatchNorm1d(num_features=in_features)
         self.act_1 = Swish()
@@ -345,6 +347,9 @@ class MLPResidualBlock(nn.Module):
             self.downsample_identity = nn.Linear(
                 in_features=in_features, out_features=out_features, bias=False
             )
+
+        if self.zero_init_last_bn:
+            nn.init.zeros_(self.bn_2.weight)
 
     def forward(self, x):
         out = self.bn_1(x)

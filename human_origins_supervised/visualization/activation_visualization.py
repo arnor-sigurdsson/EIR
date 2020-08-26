@@ -4,19 +4,16 @@ from typing import TYPE_CHECKING
 import matplotlib
 import numpy as np
 import pandas as pd
-from sklearn.neighbors import LocalOutlierFactor
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
-import matplotlib.cm as cm
 import plotly.graph_objects as go
 
 from aislib.misc_utils import get_logger, ensure_path_exists
 
 if TYPE_CHECKING:
     from human_origins_supervised.train_utils.activation_analysis import (
-        al_gradients_dict,
         al_top_gradients_dict,
         al_scaled_grads_dict,
     )
@@ -200,6 +197,6 @@ def plot_snp_manhattan_plots_plotly(
         yaxis_title="Activation",
     )
 
-    out_path = outfolder / f"activations/manhattan/manhattan_interactive.html"
+    out_path = outfolder / "activations/manhattan/manhattan_interactive.html"
     ensure_path_exists(path=out_path)
     fig.write_html(str(out_path))
