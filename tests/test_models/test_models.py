@@ -1,7 +1,7 @@
 from argparse import Namespace
 
 import pytest
-from human_origins_supervised.models import models, layers
+from snp_pred.models import models, layers
 
 
 def test_make_conv_layers():

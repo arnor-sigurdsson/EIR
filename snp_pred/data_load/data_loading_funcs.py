@@ -7,7 +7,7 @@ from aislib.misc_utils import get_logger
 from torch.utils.data import WeightedRandomSampler
 
 if TYPE_CHECKING:
-    from human_origins_supervised.data_load.datasets import (  # noqa: F401
+    from snp_pred.data_load.datasets import (  # noqa: F401
         ArrayDatasetBase,
         Sample,
     )

@@ -8,9 +8,9 @@ import torch
 from sklearn.preprocessing import LabelEncoder
 
 from conftest import cleanup
-from human_origins_supervised import predict
-from human_origins_supervised import train
-from human_origins_supervised.models.models import CNNModel
+from snp_pred import predict
+from snp_pred import train
+from snp_pred.models.models import CNNModel
 from test_data_load.test_datasets import check_dataset
 
 
@@ -110,7 +110,7 @@ def test_load_labels_for_testing(
         cleanup(run_path)
 
 
-@patch("human_origins_supervised.predict._load_transformers", autospec=True)
+@patch("snp_pred.predict._load_transformers", autospec=True)
 @pytest.mark.parametrize("create_test_data", [{"task_type": "multi"}], indirect=True)
 @pytest.mark.parametrize(
     "create_test_cl_args",

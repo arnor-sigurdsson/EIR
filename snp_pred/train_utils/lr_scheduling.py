@@ -15,15 +15,15 @@ from matplotlib import pyplot as plt
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim.optimizer import Optimizer
 
-from human_origins_supervised.train_utils.metrics import (
+from snp_pred.train_utils.metrics import (
     read_metrics_history_file,
     get_average_history_filepath,
 )
-from human_origins_supervised.train_utils.utils import get_run_folder
+from snp_pred.train_utils.utils import get_run_folder
 
 if TYPE_CHECKING:
-    from human_origins_supervised.train_utils.train_handlers import HandlerConfig
-    from human_origins_supervised.train import Config
+    from snp_pred.train_utils.train_handlers import HandlerConfig
+    from snp_pred.train import Config
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 

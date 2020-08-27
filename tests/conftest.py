@@ -16,17 +16,15 @@ from torch import cuda
 from torch import nn
 from torch.utils.data import DataLoader
 
-from human_origins_supervised import train
-from human_origins_supervised.data_load import datasets
-from human_origins_supervised.models.extra_inputs_module import (
-    set_up_and_save_embeddings_dict,
-)
-from human_origins_supervised.train import Config, get_model
-from human_origins_supervised.train_utils.utils import (
+from snp_pred import train
+from snp_pred.data_load import datasets
+from snp_pred.models.extra_inputs_module import set_up_and_save_embeddings_dict
+from snp_pred.train import Config, get_model
+from snp_pred.train_utils.utils import (
     configure_root_logger,
     get_run_folder,
 )
-from human_origins_supervised.train_utils import optimizers
+from snp_pred.train_utils import optimizers, metrics
 
 np.random.seed(0)
 
@@ -469,14 +467,13 @@ def prep_modelling_test_configs(
     train_loader, valid_loader, train_dataset, valid_dataset = create_test_dloaders
     model = create_test_model
 
-    optimizer = create_test_optimizer
     criterions = train._get_criterions(
         target_columns=train_dataset.target_columns, model_type=cl_args.model_type
     )
-    metrics = train._get_default_metrics(
+    test_metrics = metrics.get_default_metrics(
         target_transformers=train_dataset.target_transformers
     )
-    metrics = _patch_metrics(metrics=metrics)
+    test_metrics = _patch_metrics(metrics=test_metrics)
 
     optimizer, loss_module = create_test_optimizer(
         cl_args=cl_args,
@@ -498,7 +495,7 @@ def prep_modelling_test_configs(
         optimizer=optimizer,
         criterions=criterions,
         loss_function=loss_module,
-        metrics=metrics,
+        metrics=test_metrics,
         labels_dict=train_dataset.labels_dict,
         target_transformers=train_dataset.target_transformers,
         target_columns=train_dataset.target_columns,

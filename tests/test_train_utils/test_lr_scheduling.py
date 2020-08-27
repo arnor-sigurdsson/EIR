@@ -12,8 +12,8 @@ from ignite.engine import Engine, State
 from torch.optim import Adam, SGD
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
-from human_origins_supervised.train_utils import lr_scheduling
-from human_origins_supervised.train_utils.train_handlers import HandlerConfig
+from snp_pred.train_utils import lr_scheduling
+from snp_pred.train_utils.train_handlers import HandlerConfig
 
 
 @pytest.fixture()

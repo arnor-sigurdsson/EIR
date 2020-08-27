@@ -1,4 +1,4 @@
-from human_origins_supervised.data_load import common_ops
+from snp_pred.data_load import common_ops
 
 import torch
 import pandas as pd

@@ -17,17 +17,17 @@ from shap import DeepExplainer
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from torch.utils.data import DataLoader
 
-import human_origins_supervised.visualization.activation_visualization as av
-from human_origins_supervised.data_load.data_utils import get_target_columns_generator
-from human_origins_supervised.models import model_utils
-from human_origins_supervised.models.extra_inputs_module import get_extra_inputs
-from human_origins_supervised.models.model_utils import gather_dloader_samples
-from human_origins_supervised.models.models import CNNModel, MLPModel
-from human_origins_supervised.train_utils.utils import prep_sample_outfolder
+import snp_pred.visualization.activation_visualization as av
+from snp_pred.data_load.data_utils import get_target_columns_generator
+from snp_pred.models import model_utils
+from snp_pred.models.extra_inputs_module import get_extra_inputs
+from snp_pred.models.model_utils import gather_dloader_samples
+from snp_pred.models.models import CNNModel, MLPModel
+from snp_pred.train_utils.utils import prep_sample_outfolder
 
 if TYPE_CHECKING:
-    from human_origins_supervised.train_utils.train_handlers import HandlerConfig
-    from human_origins_supervised.train import Config
+    from snp_pred.train_utils.train_handlers import HandlerConfig
+    from snp_pred.train import Config
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 

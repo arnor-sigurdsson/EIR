@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 
 from conftest import cleanup, ModelTestConfig
-from human_origins_supervised import train
+from snp_pred import train
 
 
 @pytest.mark.parametrize(

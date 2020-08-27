@@ -32,7 +32,7 @@ pytorch-ignite = "*"
 tqdm = "*"
 sympy = "*"
 scikit-learn = "*"
-human-origins-supervised = {path = ".",editable = true}
+snp_pred = {path = ".",editable = true}
 shap = "==0.34.0"
 seaborn = "*"
 aislib = {ref = "dev",git = "ssh://git@github.com/arnor-sigurdsson/aislib.git",editable = true}

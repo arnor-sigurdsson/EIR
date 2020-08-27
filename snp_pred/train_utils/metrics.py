@@ -1,6 +1,7 @@
 import csv
 import warnings
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 from typing import Dict, TYPE_CHECKING, List, Tuple, Callable, Union
 
@@ -21,15 +22,13 @@ from sklearn.preprocessing import StandardScaler, label_binarize
 from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 
-from human_origins_supervised.data_load.data_utils import get_target_columns_generator
+from snp_pred.data_load.label_setup import al_label_transformers
+from snp_pred.data_load.data_utils import get_target_columns_generator
 
 if TYPE_CHECKING:
-    from human_origins_supervised.train import (  # noqa: F401
-        al_criterions,
-        al_averaging_functions_dict,
-    )
-    from human_origins_supervised.train_utils.train_handlers import HandlerConfig
-    from human_origins_supervised.data_load.label_setup import (  # noqa: F401
+    from snp_pred.train import al_criterions  # noqa: F401
+    from snp_pred.train_utils.train_handlers import HandlerConfig
+    from snp_pred.data_load.label_setup import (  # noqa: F401
         al_target_columns,
         al_label_transformers_object,
     )
@@ -38,6 +37,9 @@ if TYPE_CHECKING:
 al_step_metric_dict = Dict[str, Dict[str, float]]
 al_metric_record_dict = Dict[
     str, Union[Tuple["MetricRecord", ...], "al_averaging_functions_dict"]
+]
+al_averaging_functions_dict = Dict[
+    str, Callable[["al_step_metric_dict", str, str], float]
 ]
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
@@ -455,3 +457,58 @@ def get_metrics_dataframes(
     )
 
     return train_history_path, valid_history_path
+
+
+def get_default_metrics(
+    target_transformers: al_label_transformers,
+) -> "al_metric_record_dict":
+    mcc = MetricRecord(name="mcc", function=calc_mcc)
+    acc = MetricRecord(name="acc", function=calc_acc)
+    rmse = MetricRecord(
+        name="rmse",
+        function=partial(calc_rmse, target_transformers=target_transformers),
+        minimize_goal=True,
+    )
+
+    default_metrics = {
+        "cat": (mcc, acc),
+        "con": (rmse,),
+        "averaging_functions": {"con": "loss", "cat": "acc"},
+    }
+
+    # TODO: Remove and use default metrics, currently temporary for testing
+    roc_auc_macro = MetricRecord(
+        name="roc-auc-macro", function=calc_roc_auc_ovr, only_val=True
+    )
+    ap_macro = MetricRecord(
+        name="ap-macro", function=calc_average_precision_ovr, only_val=True
+    )
+    r2 = MetricRecord(name="r2", function=calc_r2, only_val=True)
+    pcc = MetricRecord(name="pcc", function=calc_pcc, only_val=True)
+
+    averaging_functions = _get_default_performance_averaging_functions()
+    default_metrics = {
+        "cat": (mcc, acc, roc_auc_macro, ap_macro),
+        "con": (rmse, r2, pcc),
+        "averaging_functions": averaging_functions,
+    }
+    return default_metrics
+
+
+def _get_default_performance_averaging_functions() -> al_averaging_functions_dict:
+    def _calc_cat_averaging_value(
+        metric_dict: "al_step_metric_dict", column_name: str, metric_name: str
+    ) -> float:
+        return metric_dict[column_name][f"{column_name}_{metric_name}"]
+
+    def _calc_con_averaging_value(
+        metric_dict: "al_step_metric_dict", column_name: str, metric_name: str
+    ) -> float:
+        return 1 - metric_dict[column_name][f"{column_name}_{metric_name}"]
+
+    performance_averaging_functions = {
+        "cat": partial(_calc_cat_averaging_value, metric_name="mcc"),
+        "con": partial(_calc_con_averaging_value, metric_name="loss"),
+    }
+
+    return performance_averaging_functions

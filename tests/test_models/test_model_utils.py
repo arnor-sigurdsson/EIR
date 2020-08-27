@@ -3,7 +3,7 @@ import pytest
 
 import torch
 from torch import nn
-from human_origins_supervised.models import model_utils
+from snp_pred.models import model_utils
 
 
 @pytest.fixture

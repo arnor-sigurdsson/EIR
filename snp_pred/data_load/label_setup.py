@@ -9,8 +9,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from tqdm import tqdm
 
-from human_origins_supervised.data_load.common_ops import ColumnOperation
-from human_origins_supervised.train_utils.utils import get_custom_module_submodule
+from snp_pred.data_load.common_ops import ColumnOperation
+from snp_pred.train_utils.utils import get_custom_module_submodule
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -98,7 +98,7 @@ def _gather_ids_from_data_source(data_source: Path):
 
 
 def get_array_path_iterator(data_source: Path):
-    def fileiterator(file_path: Path):
+    def _file_iterator(file_path: Path):
         with open(str(file_path), "r") as infile:
             for line in infile:
                 path = Path(line.strip())
@@ -112,9 +112,13 @@ def get_array_path_iterator(data_source: Path):
     if data_source.is_dir():
         return data_source.rglob("*")
     elif data_source.is_file():
-        return fileiterator(file_path=data_source)
+        return _file_iterator(file_path=data_source)
 
-    raise ValueError()
+    if not data_source.exists():
+        raise FileNotFoundError("Could not find data source %s.", data_source)
+    raise ValueError(
+        "Data source %s is neither regognized as a file not folder.", data_source
+    )
 
 
 def _get_all_label_columns_needed(

@@ -14,17 +14,17 @@ from torch.nn import Module
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 
-from human_origins_supervised.data_load.data_utils import get_target_columns_generator
-from human_origins_supervised.data_load.label_setup import al_target_columns
-from human_origins_supervised.models.extra_inputs_module import get_extra_inputs
-from human_origins_supervised.train_utils.metrics import (
+from snp_pred.data_load.data_utils import get_target_columns_generator
+from snp_pred.data_load.label_setup import al_target_columns
+from snp_pred.models.extra_inputs_module import get_extra_inputs
+from snp_pred.train_utils.metrics import (
     calculate_prediction_losses,
     aggregate_losses,
 )
 
 if TYPE_CHECKING:
     # noinspection PyUnresolvedReferences
-    from human_origins_supervised.train import (  # noqa: F401
+    from snp_pred.train import (  # noqa: F401
         Config,
         al_training_labels_batch,
         al_training_labels_target,

@@ -14,33 +14,33 @@ from ignite.handlers import ModelCheckpoint
 from ignite.metrics import RunningAverage
 from torch.utils.tensorboard import SummaryWriter
 
-from human_origins_supervised.data_load.data_utils import get_target_columns_generator
-from human_origins_supervised.data_load.label_setup import al_target_columns
-from human_origins_supervised.train_utils import H_PARAMS
-from human_origins_supervised.train_utils.activation_analysis import (
+from snp_pred.data_load.data_utils import get_target_columns_generator
+from snp_pred.data_load.label_setup import al_target_columns
+from snp_pred.train_utils import H_PARAMS
+from snp_pred.train_utils.activation_analysis import (
     activation_analysis_handler,
 )
-from human_origins_supervised.train_utils.evaluation import validation_handler
-from human_origins_supervised.train_utils.lr_scheduling import (
+from snp_pred.train_utils.evaluation import validation_handler
+from snp_pred.train_utils.lr_scheduling import (
     set_up_lr_scheduler,
     attach_lr_scheduler,
 )
-from human_origins_supervised.train_utils.metrics import (
+from snp_pred.train_utils.metrics import (
     get_metrics_dataframes,
     persist_metrics,
     get_metrics_files,
     al_metric_record_dict,
     MetricRecord,
 )
-from human_origins_supervised.train_utils.utils import (
+from snp_pred.train_utils.utils import (
     get_custom_module_submodule,
     get_run_folder,
 )
-from human_origins_supervised.visualization import visualization_funcs as vf
+from snp_pred.visualization import visualization_funcs as vf
 
 if TYPE_CHECKING:
-    from human_origins_supervised.train import Config
-    from human_origins_supervised.train_utils.metrics import al_step_metric_dict
+    from snp_pred.train import Config
+    from snp_pred.train_utils.metrics import al_step_metric_dict
 
 # Aliases
 al_get_custom_handles_return_value = Union[Tuple[Callable, ...], Tuple[None]]

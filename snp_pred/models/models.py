@@ -10,7 +10,7 @@ from aislib.misc_utils import get_logger
 from aislib.pytorch_modules import Swish
 from torch import nn
 
-from human_origins_supervised.data_load.datasets import al_num_classes
+from snp_pred.data_load.datasets import al_num_classes
 from . import extra_inputs_module
 from .extra_inputs_module import al_emb_lookup_dict
 from .layers import (

@@ -15,23 +15,23 @@ from aislib.misc_utils import get_logger
 from sklearn.preprocessing import LabelEncoder
 from torch.utils.data import DataLoader
 
-import human_origins_supervised.visualization.visualization_funcs as vf
-from human_origins_supervised.data_load import datasets, label_setup
-from human_origins_supervised.data_load.data_utils import get_target_columns_generator
-from human_origins_supervised.data_load.datasets import (
+import snp_pred.visualization.visualization_funcs as vf
+from snp_pred.data_load import datasets, label_setup
+from snp_pred.data_load.data_utils import get_target_columns_generator
+from snp_pred.data_load.datasets import (
     al_datasets,
     merge_target_columns,
 )
-from human_origins_supervised.data_load.label_setup import (
+from snp_pred.data_load.label_setup import (
     al_label_dict,
     al_label_transformers_object,
     al_label_transformers,
 )
-from human_origins_supervised.models.extra_inputs_module import al_emb_lookup_dict
-from human_origins_supervised.models.model_utils import gather_pred_outputs_from_dloader
-from human_origins_supervised.models.models import get_model_class, CNNModel, MLPModel
-from human_origins_supervised.train_utils.evaluation import PerformancePlotConfig
-from human_origins_supervised.train_utils.utils import get_run_folder
+from snp_pred.models.extra_inputs_module import al_emb_lookup_dict
+from snp_pred.models.model_utils import gather_pred_outputs_from_dloader
+from snp_pred.models.models import get_model_class, CNNModel, MLPModel
+from snp_pred.train_utils.evaluation import PerformancePlotConfig
+from snp_pred.train_utils.utils import get_run_folder
 
 torch.manual_seed(0)
 np.random.seed(0)
