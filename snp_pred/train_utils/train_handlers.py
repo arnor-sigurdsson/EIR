@@ -118,10 +118,10 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
     return trainer
 
 
-def _get_sample_interval_handlers(do_get_acts: bool):
+def _get_sample_interval_handlers(do_get_acts: bool) -> Tuple[Callable, ...]:
     if do_get_acts:
         return validation_handler, activation_analysis_handler
-    return validation_handler
+    return (validation_handler,)
 
 
 def _do_run_completed_handler(iter_per_epoch: int, n_epochs: int, sample_interval: int):

@@ -104,7 +104,7 @@ def args_config():
             "optimizer": "adamw",
             "plot_skip_steps": 50,
             "rb_do": 0.25,
-            "layers": [2, 2],
+            "layers": [1, 1],
             "run_name": "test_run",
             "sa": False,
             "sample_interval": 200,

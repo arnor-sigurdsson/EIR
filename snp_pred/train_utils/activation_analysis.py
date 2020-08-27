@@ -360,7 +360,7 @@ def accumulate_activations(
     acc_acts = {name: [] for name in target_classes}
     acc_acts_masked = {name: [] for name in target_classes}
     acc_label_counts = defaultdict(lambda: 0)
-    acc_label_limit = 5
+    acc_label_limit = cl_args.max_acts_per_class
 
     for single_sample, sample_label, sample_id in valid_sampling_dloader:
         cur_target_label = sample_label["target_labels"][target_column].item()
