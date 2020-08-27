@@ -801,6 +801,14 @@ def _get_train_argument_parser() -> configargparse.ArgumentParser:
     )
 
     parser_.add_argument(
+        "--max_acts_per_class",
+        default=None,
+        type=int,
+        help="Maximum number of samples per class to gather for activation analysis. "
+        "Good to use when modelling on imbalanced data.",
+    )
+
+    parser_.add_argument(
         "--debug",
         action="store_true",
         help="Whether to run in debug mode (w. breakpoint).",
