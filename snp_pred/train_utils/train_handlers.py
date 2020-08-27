@@ -17,9 +17,7 @@ from torch.utils.tensorboard import SummaryWriter
 from snp_pred.data_load.data_utils import get_target_columns_generator
 from snp_pred.data_load.label_setup import al_target_columns
 from snp_pred.train_utils import H_PARAMS
-from snp_pred.train_utils.activation_analysis import (
-    activation_analysis_handler,
-)
+from snp_pred.train_utils.activation_analysis import activation_analysis_handler
 from snp_pred.train_utils.evaluation import validation_handler
 from snp_pred.train_utils.lr_scheduling import (
     set_up_lr_scheduler,

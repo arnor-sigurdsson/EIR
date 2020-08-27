@@ -12,9 +12,7 @@ from torch.nn.functional import pad
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
-from snp_pred.data_load.data_loading_funcs import (
-    make_random_snps_missing,
-)
+from snp_pred.data_load.data_loading_funcs import make_random_snps_missing
 from snp_pred.data_load.label_setup import (
     set_up_label_transformers,
     _streamline_values_for_transformers,
