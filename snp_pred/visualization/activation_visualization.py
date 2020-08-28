@@ -146,7 +146,11 @@ def plot_snp_manhattan_plots(
             color="black",
             marker=".",
         )
-        ax.set_ylim(ymin=0.0)
+
+        y_ticks = ax.get_yticks()
+        y_axis_tick_spacing = y_ticks[1] - y_ticks[0]
+        y_max = df_snp_grads[col].max() + y_axis_tick_spacing
+        ax.set_ylim(ymin=0.0, ymax=y_max)
 
         ax.set_xlabel("BP Coordinate")
         ax.set_ylabel("Activation")
@@ -155,7 +159,7 @@ def plot_snp_manhattan_plots(
         plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
         plt.tight_layout()
 
-        out_path = outfolder / f"activations/manhattan/{label_name}_manhattan.png"
+        out_path = outfolder / f"manhattan/{label_name}_manhattan.png"
         ensure_path_exists(path=out_path)
         plt.savefig(out_path, bbox_inches="tight")
         plt.close("all")
@@ -197,6 +201,6 @@ def plot_snp_manhattan_plots_plotly(
         yaxis_title="Activation",
     )
 
-    out_path = outfolder / "activations/manhattan/manhattan_interactive.html"
+    out_path = outfolder / "manhattan/manhattan_interactive.html"
     ensure_path_exists(path=out_path)
     fig.write_html(str(out_path))

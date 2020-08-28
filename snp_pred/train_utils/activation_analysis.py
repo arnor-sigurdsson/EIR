@@ -11,7 +11,7 @@ from typing import Union, Callable, Dict, Tuple, List, TYPE_CHECKING, Sequence
 import numpy as np
 import pandas as pd
 import torch
-from aislib.misc_utils import get_logger
+from aislib.misc_utils import get_logger, ensure_path_exists
 from ignite.engine import Engine
 from shap import DeepExplainer
 from sklearn.preprocessing import StandardScaler, LabelEncoder
@@ -72,10 +72,6 @@ def activation_analysis_handler(
 
     for column_type, column_name in target_columns_gen:
 
-        sample_outfolder = prep_sample_outfolder(
-            run_name=cl_args.run_name, column_name=column_name, iteration=iteration
-        )
-
         no_explainer_background_samples = _get_background_samples_for_shap_object(
             batch_size=cl_args.batch_size
         )
@@ -106,13 +102,17 @@ def activation_analysis_handler(
             act_samples_per_class_limit=cl_args.max_acts_per_class,
         )
 
+        activation_outfolder = _prepare_activation_outfolder(
+            run_name=cl_args.run_name, column_name=column_name, iteration=iteration
+        )
+
         analyze_activations(
             config=c,
             act_func=act_func,
             proc_funcs=proc_funcs,
             column_name=column_name,
             column_type=column_type,
-            sample_outfolder=sample_outfolder,
+            activation_outfolder=activation_outfolder,
         )
 
         hook_handle.remove()
@@ -187,13 +187,23 @@ def _get_shap_activation_function(
     return act_func_partial
 
 
+def _prepare_activation_outfolder(run_name: str, column_name: str, iteration: int):
+    sample_outfolder = prep_sample_outfolder(
+        run_name=run_name, column_name=column_name, iteration=iteration
+    )
+    activation_outfolder = sample_outfolder / "activations"
+    ensure_path_exists(path=activation_outfolder, is_folder=True)
+
+    return activation_outfolder
+
+
 def analyze_activations(
     config: "Config",
     act_func: Callable,
     proc_funcs: al_transform_funcs,
     column_name: str,
     column_type: str,
-    sample_outfolder: Path,
+    activation_outfolder: Path,
 ) -> None:
     c = config
     cl_args = config.cl_args
@@ -225,29 +235,29 @@ def analyze_activations(
         gathered_scaled_grads=scaled_grads,
         top_gradients_dict=top_gradients_dict,
         snp_df=snp_df,
-        output_folder=sample_outfolder,
+        output_folder=activation_outfolder,
     )
 
-    np.save(file=str(sample_outfolder / "top_acts.npy"), arr=top_gradients_dict)
+    np.save(file=str(activation_outfolder / "top_acts.npy"), arr=top_gradients_dict)
 
     save_masked_grads(
         acc_grads_times_inp=acc_acts_masked,
         top_gradients_dict=top_gradients_dict,
         snp_df=snp_df,
-        sample_outfolder=sample_outfolder,
+        sample_outfolder=activation_outfolder,
     )
 
     df_snp_grads = _save_snp_gradients(
-        accumulated_grads=acc_acts, outfolder=sample_outfolder, snp_df=snp_df
+        accumulated_grads=acc_acts, outfolder=activation_outfolder, snp_df=snp_df
     )
     av.plot_snp_manhattan_plots(
         df_snp_grads=df_snp_grads,
-        outfolder=sample_outfolder,
+        outfolder=activation_outfolder,
         title_extra=f" - {column_name}",
     )
     av.plot_snp_manhattan_plots_plotly(
         df_snp_grads=df_snp_grads,
-        outfolder=sample_outfolder,
+        outfolder=activation_outfolder,
         title_extra=f" - {column_name}",
     )
 

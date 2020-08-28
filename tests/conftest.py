@@ -538,8 +538,10 @@ def _get_cur_modelling_test_config(
     )
 
     gen = last_sample_folders.items
-    activations_path = {k: folder / "top_acts.npy" for k, folder in gen()}
-    masked_activations_path = {k: folder / "top_acts_masked.npy" for k, folder in gen()}
+    activations_path = {k: folder / "activations/top_acts.npy" for k, folder in gen()}
+    masked_activations_path = {
+        k: folder / "activations/top_acts_masked.npy" for k, folder in gen()
+    }
 
     test_config = ModelTestConfig(
         iteration=last_iter,
