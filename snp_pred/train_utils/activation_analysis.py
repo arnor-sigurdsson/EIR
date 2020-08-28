@@ -1,13 +1,12 @@
 import copy
 import os
 import sys
-from argparse import Namespace
+from collections import defaultdict
 from contextlib import contextmanager
 from copy import deepcopy
 from functools import partial
 from pathlib import Path
-from typing import Union, Callable, Dict, Tuple, List, TYPE_CHECKING
-from collections import defaultdict
+from typing import Union, Callable, Dict, Tuple, List, TYPE_CHECKING, Sequence
 
 import numpy as np
 import pandas as pd
@@ -16,10 +15,11 @@ from aislib.misc_utils import get_logger
 from ignite.engine import Engine
 from shap import DeepExplainer
 from sklearn.preprocessing import StandardScaler, LabelEncoder
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 
 import snp_pred.visualization.activation_visualization as av
 from snp_pred.data_load.data_utils import get_target_columns_generator
+from snp_pred.data_load.datasets import al_datasets
 from snp_pred.models import model_utils
 from snp_pred.models.extra_inputs_module import get_extra_inputs
 from snp_pred.models.model_utils import gather_dloader_samples
@@ -319,24 +319,6 @@ def _save_snp_gradients(
     return df_output
 
 
-def get_target_classes(
-    cl_args: Namespace,
-    column_type: str,
-    target_column_name: str,
-    target_transformer: Union[StandardScaler, LabelEncoder],
-) -> List[str]:
-
-    if column_type == "con":
-        return [target_column_name]
-
-    if cl_args.act_classes:
-        target_classes = cl_args.act_classes
-    else:
-        target_classes = target_transformer.classes_
-
-    return target_classes
-
-
 def accumulate_activations(
     config: "Config",
     target_column: str,
@@ -347,84 +329,158 @@ def accumulate_activations(
 
     c = config
     cl_args = c.cl_args
+    target_transformer = c.target_transformers[target_column]
 
-    target_classes = get_target_classes(
-        cl_args=c.cl_args,
-        column_type=column_type,
-        target_column_name=target_column,
-        target_transformer=c.target_transformers[target_column],
+    acc_acts = defaultdict(list)
+    acc_acts_masked = defaultdict(list)
+
+    target_classes_numerical = _get_numerical_target_classes(
+        target_transformer=target_transformer, column_type=column_type,
     )
 
-    valid_sampling_dloader = DataLoader(c.valid_dataset, batch_size=1, shuffle=False)
+    activations_data_loader = _get_activations_dataloader(
+        validation_dataset=c.valid_dataset,
+        max_acts_per_class=cl_args.max_acts_per_class,
+        target_column=target_column,
+        column_type=column_type,
+        target_classes_numerical=target_classes_numerical,
+    )
 
-    acc_acts = {name: [] for name in target_classes}
-    acc_acts_masked = {name: [] for name in target_classes}
-    acc_label_counts = defaultdict(lambda: 0)
-    acc_label_limit = cl_args.max_acts_per_class
-
-    for single_sample, sample_label, sample_id in valid_sampling_dloader:
-        cur_target_label = sample_label["target_labels"][target_column].item()
-        if (
-            acc_label_limit is not None
-            and acc_label_counts[cur_target_label] == acc_label_limit
-        ):
-            continue
-        else:
-            acc_label_counts[cur_target_label] += 1
-
+    for single_sample, sample_label, sample_id in activations_data_loader:
         # we want to keep the original sample for masking
         single_sample_copy = deepcopy(single_sample).cpu().numpy().squeeze()
         sample_target_labels = sample_label["target_labels"]
         sample_extra_labels = sample_label["extra_labels"]
 
-        cur_trn_label = get_act_condition(
+        cur_label_name = _get_target_class_name(
             sample_label=sample_target_labels[target_column],
-            target_transformer=c.target_transformers[target_column],
-            target_classes=target_classes,
+            target_transformer=target_transformer,
             column_type=column_type,
             target_column_name=target_column,
         )
 
-        if cur_trn_label:
-            # apply pre-processing functions on sample and input
-            for pre_func in transform_funcs.get("pre", ()):
-                single_sample, sample_label = pre_func(
-                    single_sample=single_sample, sample_label=sample_target_labels
-                )
-
-            extra_inputs = get_extra_inputs(
-                cl_args=cl_args, model=c.model, labels=sample_extra_labels
+        # apply pre-processing functions on sample and input
+        for pre_func in transform_funcs.get("pre", ()):
+            single_sample, sample_label = pre_func(
+                single_sample=single_sample, sample_label=sample_target_labels
             )
-            # detach for shap
-            if extra_inputs is not None:
-                extra_inputs = extra_inputs.detach()
 
-            shap_inputs = [i for i in (single_sample, extra_inputs) if i is not None]
-            single_acts = act_func(
-                inputs=shap_inputs, sample_label=sample_target_labels[target_column]
-            )
-            if single_acts is not None:
-                # currently we are only going to get acts for snps
-                # TODO: Add analysis / plots for embeddings / extra inputs.
-                if isinstance(single_acts, list):
-                    single_acts = single_acts[0]
+        extra_inputs = get_extra_inputs(
+            cl_args=cl_args, model=c.model, labels=sample_extra_labels
+        )
+        # detach for shap
+        if extra_inputs is not None:
+            extra_inputs = extra_inputs.detach()
 
-                # apply post-processing functions on activations
-                for post_func in transform_funcs.get("post", ()):
-                    single_acts = post_func(single_acts)
+        shap_inputs = [i for i in (single_sample, extra_inputs) if i is not None]
+        sample_acts = act_func(
+            inputs=shap_inputs, sample_label=sample_target_labels[target_column]
+        )
+        if sample_acts is not None:
+            # currently we are only going to get acts for snps
+            # TODO: Add analysis / plots for embeddings / extra inputs.
+            if isinstance(sample_acts, list):
+                sample_acts = sample_acts[0]
 
-                acc_acts[cur_trn_label].append(single_acts.squeeze())
+            # apply post-processing functions on activations
+            for post_func in transform_funcs.get("post", ()):
+                sample_acts = post_func(sample_acts)
 
-                single_acts_masked = single_sample_copy * single_acts
-                acc_acts_masked[cur_trn_label].append(single_acts_masked.squeeze())
+            acc_acts[cur_label_name].append(sample_acts.squeeze())
+
+            single_acts_masked = single_sample_copy * sample_acts
+            acc_acts_masked[cur_label_name].append(single_acts_masked.squeeze())
 
     return acc_acts, acc_acts_masked
 
 
-def get_act_condition(
+def _get_numerical_target_classes(target_transformer, column_type: str):
+    if column_type == "con":
+        return [None]
+
+    return target_transformer.transform(target_transformer.classes_)
+
+
+def _get_activations_dataloader(
+    validation_dataset: al_datasets,
+    max_acts_per_class: int,
+    target_column: str,
+    column_type: str,
+    target_classes_numerical: Sequence[int],
+) -> DataLoader:
+    common_args = {"batch_size": 1, "shuffle": False}
+
+    if max_acts_per_class is None:
+        data_loader = DataLoader(dataset=validation_dataset, **common_args)
+        return data_loader
+
+    indices_func = _get_categorical_sample_indices_for_activations
+    if column_type == "con":
+        indices_func = _get_continuous_sample_indices_for_activations
+
+    subset_indices = indices_func(
+        dataset=validation_dataset,
+        max_acts_per_class=max_acts_per_class,
+        target_column=target_column,
+        target_classes_numerical=target_classes_numerical,
+    )
+    subset_dataset = _subsample_dataset(
+        dataset=validation_dataset, indices=subset_indices
+    )
+    data_loader = DataLoader(dataset=subset_dataset, **common_args)
+    return data_loader
+
+
+def _get_activations_base_structure() -> Dict:
+    pass
+
+
+def _get_categorical_sample_indices_for_activations(
+    dataset: al_datasets,
+    max_acts_per_class: int,
+    target_column: str,
+    target_classes_numerical: Sequence[int],
+) -> Tuple[int, ...]:
+    acc_label_counts = defaultdict(lambda: 0)
+    acc_label_limit = max_acts_per_class
+    indices = []
+
+    for index, sample in enumerate(dataset.samples):
+        target_labels = sample.labels["target_labels"]
+        cur_sample_target_label = target_labels[target_column]
+
+        is_over_limit = acc_label_counts[cur_sample_target_label] == acc_label_limit
+        is_not_in_target_classes = (
+            cur_sample_target_label not in target_classes_numerical
+        )
+        if is_over_limit or is_not_in_target_classes:
+            continue
+
+        indices.append(index)
+        acc_label_counts[cur_sample_target_label] += 1
+
+    return tuple(indices)
+
+
+def _get_continuous_sample_indices_for_activations(
+    dataset: al_datasets, max_acts_per_class: int, *args, **kwargs
+) -> Tuple[int, ...]:
+
+    acc_label_limit = max_acts_per_class
+    num_sample = len(dataset)
+    indices = np.random.choice(num_sample, acc_label_limit)
+
+    return tuple(indices)
+
+
+def _subsample_dataset(dataset: al_datasets, indices: Sequence[int]):
+    dataset_subset = Subset(dataset=dataset, indices=indices)
+    return dataset_subset
+
+
+def _get_target_class_name(
     sample_label: torch.Tensor,
     target_transformer: Union[StandardScaler, LabelEncoder],
-    target_classes: List[str],
     column_type: str,
     target_column_name: str,
 ):
@@ -433,10 +489,8 @@ def get_act_condition(
 
     tt_it = target_transformer.inverse_transform
     cur_trn_label = tt_it([sample_label.item()])[0]
-    if cur_trn_label in target_classes:
-        return cur_trn_label
 
-    return None
+    return cur_trn_label
 
 
 def rescale_gradients(gradients: np.ndarray) -> np.ndarray:

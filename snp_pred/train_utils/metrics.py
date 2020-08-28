@@ -22,8 +22,8 @@ from sklearn.preprocessing import StandardScaler, label_binarize
 from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 
-from snp_pred.data_load.label_setup import al_label_transformers
 from snp_pred.data_load.data_utils import get_target_columns_generator
+from snp_pred.data_load.label_setup import al_label_transformers
 
 if TYPE_CHECKING:
     from snp_pred.train import al_criterions  # noqa: F401
