@@ -33,7 +33,7 @@ tqdm = "*"
 sympy = "*"
 scikit-learn = "*"
 snp_pred = {path = ".",editable = true}
-shap = "==0.34.0"
+shap = "==0.36.0"
 seaborn = "*"
 aislib = {ref = "dev",git = "ssh://git@github.com/arnor-sigurdsson/aislib.git",editable = true}
 joblib = "*"

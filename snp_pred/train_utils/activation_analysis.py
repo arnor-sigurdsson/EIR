@@ -319,8 +319,7 @@ def _save_snp_gradients(
     for label, grads in accumulated_grads.items():
 
         grads_np = np.array(grads)
-        grads_abs = np.abs(grads_np)
-        grads_averaged = grads_abs.mean(0).sum(0)
+        grads_averaged = grads_np.mean(0).sum(0)
 
         column_name = label + "_activations"
         df_output[column_name] = grads_averaged
