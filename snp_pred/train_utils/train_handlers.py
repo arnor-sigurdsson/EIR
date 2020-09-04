@@ -76,7 +76,8 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
         monitoring_metrics=monitoring_metrics,
     )
 
-    for handler in validation_handler, activation_analysis_handler:
+    sample_handlers = _get_sample_interval_handlers(do_get_acts=cl_args.get_acts)
+    for handler in sample_handlers:
         trainer.add_event_handler(
             event_name=Events.ITERATION_COMPLETED(every=cl_args.sample_interval),
             handler=handler,
@@ -115,6 +116,12 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
         )
 
     return trainer
+
+
+def _get_sample_interval_handlers(do_get_acts: bool) -> Tuple[Callable, ...]:
+    if do_get_acts:
+        return validation_handler, activation_analysis_handler
+    return (validation_handler,)
 
 
 def _do_run_completed_handler(iter_per_epoch: int, n_epochs: int, sample_interval: int):

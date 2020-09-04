@@ -205,7 +205,7 @@ def test_predict(keep_outputs, prep_modelling_test_configs):
         num_correct = (df_cur_class.idxmax(axis=1) == cls).sum()
 
         # check that most were correct
-        assert num_correct / df_cur_class.shape[0] > 0.85
+        assert num_correct / df_cur_class.shape[0] > 0.80
 
     if not keep_outputs:
         cleanup(test_config.run_path)
