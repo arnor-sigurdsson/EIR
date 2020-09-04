@@ -236,6 +236,7 @@ class SplitLinear(nn.Module):
         in_features: int,
         out_feature_sets: int,
         num_chunks: int = 10,
+        split_size: int = None,
         bias: bool = True,
     ):
         super().__init__()
@@ -243,9 +244,18 @@ class SplitLinear(nn.Module):
         self.in_features = in_features
         self.out_feature_sets = out_feature_sets
         self.num_chunks = num_chunks
+
+        if split_size:
+            print(
+                "Setting num chunks to {} as split size of {} was passed in.".format(
+                    self.num_chunks, split_size
+                )
+            )
+            self.num_chunks = in_features // split_size
+
         self.out_features = self.out_feature_sets * self.num_chunks
         self.padding, self.split_size = calc_dimensions_for_reshape(
-            input_width=in_features, denominator=num_chunks
+            input_width=in_features, denominator=self.num_chunks
         )
 
         self.weight = Parameter(
@@ -301,8 +311,8 @@ def calc_split_input(input: torch.Tensor, weight: torch.Tensor, bias):
     out = []
     for i in range(weight.shape[0]):
         mul = torch.mul(input, weight[i], out=None)
-        sum = torch.sum(mul, dim=2)
-        flattened = sum.flatten(start_dim=1)
+        summed = torch.sum(mul, dim=2)
+        flattened = summed.flatten(start_dim=1)
         out.append(flattened)
 
     final = torch.cat(out, dim=1)
@@ -366,3 +376,87 @@ class MLPResidualBlock(nn.Module):
         out = self.fc_2(out)
 
         return out + identity
+
+
+class SplitMLPResidualBlock(nn.Module):
+    def __init__(
+        self,
+        in_features: int,
+        out_feature_sets: int,
+        split_size: int,
+        dropout_p: float = 0.0,
+        full_preactivation: bool = False,
+        zero_init_last_bn: bool = True,
+    ):
+        super().__init__()
+
+        self.in_features = in_features
+        self.split_size = split_size
+        self.out_feature_sets = out_feature_sets
+
+        self.dropout_p = dropout_p
+        self.full_preactivation = full_preactivation
+        self.zero_init_last_bn = zero_init_last_bn
+
+        self.bn_1 = nn.BatchNorm1d(num_features=in_features)
+        self.act_1 = Swish()
+        self.fc_1 = SplitLinear(
+            in_features=in_features,
+            out_feature_sets=out_feature_sets,
+            bias=False,
+            split_size=split_size,
+        )
+
+        self.bn_2 = nn.BatchNorm1d(num_features=self.fc_1.out_features)
+        self.act_2 = Swish()
+        self.do = nn.Dropout(p=dropout_p)
+
+        fc_2_chunks = _calculate_num_chunks_for_equal_split_out_features(
+            in_features=self.fc_1.out_features, out_feature_sets=out_feature_sets
+        )
+        self.fc_2 = SplitLinear(
+            in_features=self.fc_1.out_features,
+            out_feature_sets=out_feature_sets,
+            bias=False,
+            num_chunks=fc_2_chunks,
+        )
+
+        if in_features == out_feature_sets:
+            self.downsample_identity = lambda x: x
+        else:
+            self.downsample_identity = SplitLinear(
+                in_features=in_features,
+                out_feature_sets=out_feature_sets,
+                bias=False,
+                split_size=split_size,
+            )
+
+        self.out_features = self.fc_1.out_features
+
+        if self.zero_init_last_bn:
+            nn.init.zeros_(self.bn_2.weight)
+
+    def forward(self, x):
+        out = self.bn_1(x)
+        out = self.act_1(out)
+
+        identity = out if self.full_preactivation else x
+        identity = self.downsample_identity(identity)
+
+        out = self.fc_1(out)
+
+        out = self.bn_2(out)
+        out = self.act_2(out)
+        out = self.do(out)
+        out = self.fc_2(out)
+
+        return out + identity
+
+
+def _calculate_num_chunks_for_equal_split_out_features(
+    in_features: int, out_feature_sets: int,
+) -> int:
+    """
+    Ensure total out features are equal to in features.
+    """
+    return in_features // out_feature_sets
