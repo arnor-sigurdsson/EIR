@@ -19,17 +19,24 @@ from .layers import (
     CNNResidualBlock,
     SplitLinear,
     MLPResidualBlock,
-    SplitMLPResidualBlock,
 )
 from .model_utils import find_no_resblocks_needed
 
 # type aliases
-al_models = Union["CNNModel", "MLPModel", "LinearModel", "SplitMLPModel", "MGMoEModel"]
+al_models = Union[
+    "CNNModel",
+    "MLPModel",
+    "LinearModel",
+    "SplitMLPModel",
+    "FullySplitMLPModel",
+    "MGMoEModel",
+]
 al_models_classes = Union[
     Type["CNNModel"],
     Type["MLPModel"],
     Type["LinearModel"],
     Type["SplitMLPModel"],
+    Type["FullySplitMLPModel"],
     Type["MGMoEModel"],
 ]
 
@@ -43,6 +50,8 @@ def get_model_class(model_type: str) -> al_models_classes:
     elif model_type == "mlp":
         return MLPModel
     elif model_type == "mlp-split":
+        return SplitMLPModel
+    elif model_type == "mlp-fully-split":
         return FullySplitMLPModel
     elif model_type == "mlp-mgmoe":
         return MGMoEModel
@@ -512,76 +521,55 @@ class FullySplitMLPModel(ModelBase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        num_chunks = self.cl_args.split_mlp_num_splits
         self.fc_0 = nn.Sequential(
             OrderedDict(
                 {
                     "fc_0": SplitLinear(
                         in_features=self.fc_1_in_features,
                         out_feature_sets=self.cl_args.fc_repr_dim,
-                        split_size=self.cl_args.kernel_width,
-                        num_chunks=num_chunks,
+                        split_size=self.cl_args.kernel_width * 4,
                         bias=False,
                     )
                 }
             )
         )
 
-        in_feat = self.fc_0[0].out_features
+        cur_dim = self.fc_0[-1].out_features
+        cutoff_threshold = 1024
+        while cur_dim >= cutoff_threshold:
+
+            cur_spec = self.get_split_extractor_spec(
+                in_features=cur_dim,
+                out_feature_sets=self.cl_args.fc_repr_dim,
+                split_size=self.cl_args.kernel_width * 4,
+                dropout_p=self.cl_args.rb_do,
+            )
+            next_module = initialize_modules_from_spec(spec=cur_spec)
+
+            self.fc_0.add_module(name=str(cur_dim), module=next_module)
+
+            cur_dim = next_module[-1].out_features
 
         task_names = tuple(self.num_classes.keys())
-
-        split_branches = {}
-        for i in range(self.cl_args.layers[0]):
-            if split_branches:
-                random_key = list(split_branches.keys())[0]
-                last_out_feature = split_branches[random_key][-1][-1].out_features
-
-                task_resblocks_kwargs = {
-                    "in_features": last_out_feature,
-                    "out_feature_sets": self.fc_task_dim,
-                    "dropout_p": self.cl_args.rb_do,
-                    "full_preactivation": False,
-                    "split_size": self.cl_args.kernel_width,
-                }
-
-                cur_split_branches = create_blocks_with_first_adaptor_block(
-                    num_blocks=1,
-                    branch_names=task_names,
-                    block_constructor=SplitMLPResidualBlock,
-                    block_constructor_kwargs=task_resblocks_kwargs,
-                    first_layer_kwargs_overload={
-                        "full_preactivation": True,
-                        "in_features": last_out_feature,
-                    },
-                )
-                split_branches = _merge_module_dicts(
-                    (split_branches, cur_split_branches)
-                )
-            else:
-                task_resblocks_kwargs = {
-                    "in_features": self.fc_task_dim,
-                    "out_feature_sets": self.fc_task_dim,
-                    "dropout_p": self.cl_args.rb_do,
-                    "full_preactivation": False,
-                    "split_size": self.cl_args.kernel_width,
-                }
-                split_branches = create_blocks_with_first_adaptor_block(
-                    num_blocks=1,
-                    branch_names=task_names,
-                    block_constructor=SplitMLPResidualBlock,
-                    block_constructor_kwargs=task_resblocks_kwargs,
-                    first_layer_kwargs_overload={
-                        "full_preactivation": True,
-                        "in_features": in_feat + self.extra_dim,
-                    },
-                )
-
-        random_key = list(split_branches.keys())[0]
-        split_out_features = split_branches[random_key][-1][-1][-1].out_features
+        task_resblocks_kwargs = {
+            "in_features": self.fc_task_dim,
+            "out_features": self.fc_task_dim,
+            "dropout_p": self.cl_args.rb_do,
+            "full_preactivation": False,
+        }
+        multi_task_branches = create_blocks_with_first_adaptor_block(
+            num_blocks=self.cl_args.layers[0],
+            branch_names=task_names,
+            block_constructor=MLPResidualBlock,
+            block_constructor_kwargs=task_resblocks_kwargs,
+            first_layer_kwargs_overload={
+                "full_preactivation": True,
+                "in_features": cur_dim + self.extra_dim,
+            },
+        )
 
         final_act_spec = self.get_final_act_spec(
-            in_features=split_out_features, dropout_p=self.cl_args.fc_do
+            in_features=self.fc_task_dim, dropout_p=self.cl_args.fc_do
         )
         final_act = construct_multi_branches(
             branch_names=task_names,
@@ -590,19 +578,36 @@ class FullySplitMLPModel(ModelBase):
         )
 
         final_layer = get_final_layer(
-            in_features=split_out_features, num_classes=self.num_classes
+            in_features=self.fc_task_dim, num_classes=self.num_classes
         )
 
         self.multi_task_branches = _merge_module_dicts(
-            (split_branches, final_act, final_layer)
+            (multi_task_branches, final_act, final_layer)
         )
 
         self._init_weights()
 
-    def _get_split_resblocks_needed(
-        self, cutoff, input_size,
+    @staticmethod
+    def get_split_extractor_spec(
+        in_features: int, out_feature_sets: int, split_size: int, dropout_p: float
     ):
-        pass
+        spec = OrderedDict(
+            {
+                "bn_1": (nn.BatchNorm1d, {"num_features": in_features}),
+                "act_1": (Swish, {}),
+                "do_1": (nn.Dropout, {"p": dropout_p}),
+                "split_1": (
+                    SplitLinear,
+                    {
+                        "in_features": in_features,
+                        "out_feature_sets": out_feature_sets,
+                        "split_size": split_size,
+                        "bias": False,
+                    },
+                ),
+            }
+        )
+        return spec
 
     @staticmethod
     def get_final_act_spec(in_features: int, dropout_p: float):

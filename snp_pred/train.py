@@ -587,7 +587,7 @@ def _get_train_argument_parser() -> configargparse.ArgumentParser:
         "--model_type",
         type=str,
         default="cnn",
-        choices=["cnn", "mlp", "mlp-split", "mlp-mgmoe", "linear"],
+        choices=["cnn", "mlp", "mlp-split", "mlp-fully-split", "mlp-mgmoe", "linear"],
         help="whether to use a convolutional neural network (cnn) or multilayer "
         "perceptron (mlp)",
     )
