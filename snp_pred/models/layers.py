@@ -307,17 +307,15 @@ def calc_dimensions_for_reshape(input_width: int, denominator: int):
     return padding, split_size
 
 
-def calc_split_input(input: torch.Tensor, weight: torch.Tensor, bias):
-    out = []
-    for i in range(weight.shape[0]):
-        mul = torch.mul(input, weight[i], out=None)
-        summed = torch.sum(mul, dim=2)
-        flattened = summed.flatten(start_dim=1)
-        out.append(flattened)
+def calc_split_input(input: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor):
+    mul = torch.mul(input, weight)
+    summed = torch.sum(mul, dim=2)
+    flattened = summed.flatten(start_dim=1)
 
-    final = torch.cat(out, dim=1)
+    final = flattened
     if bias is not None:
-        final = final + bias
+        final = flattened + bias
+
     return final
 
 
