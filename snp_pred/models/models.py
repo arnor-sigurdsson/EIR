@@ -521,13 +521,16 @@ class FullySplitMLPModel(ModelBase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        fc_0_split_size = (
+            self.cl_args.kernel_width * 4 * self.cl_args.first_kernel_expansion
+        )
         self.fc_0 = nn.Sequential(
             OrderedDict(
                 {
                     "fc_0": SplitLinear(
                         in_features=self.fc_1_in_features,
                         out_feature_sets=self.cl_args.fc_repr_dim,
-                        split_size=self.cl_args.kernel_width * 4,
+                        split_size=fc_0_split_size,
                         bias=False,
                     )
                 }
