@@ -4,20 +4,20 @@
 -e git+ssh://git@github.com/arnor-sigurdsson/aislib.git@98caada18b77e3d3e694e40b1a8c9ede5223af0b#egg=aislib
 -e git+ssh://git@github.com/arnor-sigurdsson/lr-finder.git@f667211fe65f08e242f8945ac883156204060f8f#egg=lr-finder
 absl-py==0.10.0
-attrs==20.1.0; python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2, 3.3'
+attrs==20.2.0; python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2, 3.3'
 cachetools==4.1.1; python_version ~= '3.5'
 certifi==2020.6.20
 cffi==1.14.2
 chardet==3.0.4
 configargparse==1.2.3
 cycler==0.10.0
-dask[array,dataframe]==2.25.0; python_version >= '3.6'
+dask[array,dataframe]==2.26.0; python_version >= '3.6'
 deprecated==1.2.10; python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2, 3.3'
-fsspec==0.8.0
+fsspec==0.8.2
 future==0.18.2
 google-auth-oauthlib==0.4.1
-google-auth==1.21.0; python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2, 3.3'
-grpcio==1.31.0
+google-auth==1.21.2; python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2, 3.3'
+grpcio==1.32.0
 idna==2.10; python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2, 3.3'
 importlib-metadata==1.7.0; python_version < '3.8'
 iniconfig==1.0.1
@@ -26,18 +26,18 @@ kiwisolver==1.2.0; python_version >= '3.6'
 llvmlite==0.34.0; python_version >= '3.6'
 locket==0.2.0
 markdown==3.2.2; python_version >= '3.5'
-matplotlib==3.1.3
+matplotlib==3.3.2
 more-itertools==8.5.0; python_version >= '3.5'
 mpmath==1.1.0
-numba==0.51.1; python_version >= '3.6'
-numpy==1.19.1
+numba==0.51.2; python_version >= '3.6'
+numpy==1.19.2
 oauthlib==3.1.0; python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2, 3.3'
 packaging==20.4; python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2, 3.3'
 pandas-plink==2.0.5
-pandas==1.1.1
+pandas==1.1.2
 partd==1.1.0
 pillow==7.2.0; python_version >= '3.5'
-plotly==4.9.0
+plotly==4.10.0
 pluggy==0.13.1; python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2, 3.3'
 protobuf==3.13.0
 py==1.9.0
@@ -45,7 +45,7 @@ pyasn1-modules==0.2.8
 pyasn1==0.4.8
 pycparser==2.20; python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2, 3.3'
 pyparsing==2.4.7; python_version >= '2.6' and python_version not in '3.0, 3.1, 3.2, 3.3'
-pytest==6.0.1; python_version >= '3.5'
+pytest==6.0.2; python_version >= '3.5'
 python-dateutil==2.8.1; python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2, 3.3'
 pytorch-ignite==0.4.1
 pytorch-ranger==0.1.1; python_version >= '3.5'
@@ -57,11 +57,11 @@ retrying==1.3.3
 rsa==4.6; python_version >= '3.5'
 scikit-learn==0.23.2
 scipy==1.5.2; python_version >= '3.6'
-seaborn==0.10.1
+seaborn==0.11.0
 shap==0.36.0
 six==1.15.0; python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2, 3.3'
 sklearn==0.0
-slicer==0.0.3; python_version >= '3.6'
+slicer==0.0.4; python_version >= '3.6'
 sympy==1.6.2
 tensorboard-plugin-wit==1.7.0
 tensorboard==2.3.0
@@ -69,9 +69,9 @@ threadpoolctl==2.1.0; python_version >= '3.5'
 toml==0.10.1
 toolz==0.10.0
 torch-optimizer==0.0.1a13
-torch==1.3.0
-torchvision==0.4.1
-tqdm==4.48.2
+torch==1.6.0
+torchvision==0.7.0
+tqdm==4.49.0
 urllib3==1.25.10; python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2, 3.3, 3.4' and python_version < '4'
 werkzeug==1.0.1; python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2, 3.3, 3.4'
 wheel==0.35.1; python_version >= '3'
