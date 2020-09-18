@@ -1,7 +1,9 @@
 from argparse import Namespace
 
 import pytest
-from snp_pred.models import models, layers
+
+from snp_pred.models import layers
+from snp_pred.models import models_cnn
 
 
 def test_make_conv_layers():
@@ -26,7 +28,7 @@ def test_make_conv_layers():
         channel_exp_base=5,
         sa=True,
     )
-    conv_layers = models._make_conv_layers(conv_layer_list, test_cl_args)
+    conv_layers = models_cnn._make_conv_layers(conv_layer_list, test_cl_args)
 
     # account for first block, add +2 instead if using SA
     assert len(conv_layers) == len(conv_layer_list) + 2
@@ -50,7 +52,7 @@ def get_test_module_dict_data():
     ],
 )
 def test_get_cur_dilation(test_input, expected):
-    test_dilation = models._get_cur_dilation(**test_input)
+    test_dilation = models_cnn._get_cur_dilation(**test_input)
 
     assert test_dilation == expected
 
@@ -79,7 +81,7 @@ def test_cnn_model(
 ):
     cnn_test_model = create_test_model
 
-    assert isinstance(cnn_test_model.conv[0], models.FirstCNNBlock)
+    assert isinstance(cnn_test_model.conv[0], models_cnn.FirstCNNBlock)
     assert True
 
 

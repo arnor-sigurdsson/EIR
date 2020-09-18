@@ -340,7 +340,8 @@ def calc_split_input_loop(
 def calc_split_input_einsum(
     input: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor
 ):
-    summed = torch.einsum("abc, dbc -> adc", input.squeeze(), weight)
+
+    summed = torch.einsum("abc, dbc -> adc", input.squeeze(1), weight)
     flattened = summed.flatten(start_dim=1)
 
     final = flattened

@@ -1,9 +1,10 @@
+from argparse import Namespace
 from pathlib import Path
 from unittest.mock import patch
-import pytest
+
 import numpy as np
 import pandas as pd
-from argparse import Namespace
+import pytest
 
 from snp_pred.data_load import label_setup
 from snp_pred.data_load.common_ops import ColumnOperation

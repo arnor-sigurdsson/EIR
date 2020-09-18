@@ -7,11 +7,11 @@ import pytest
 import torch
 from sklearn.preprocessing import LabelEncoder
 
-from conftest import cleanup
 from snp_pred import predict
 from snp_pred import train
-from snp_pred.models.models import CNNModel
-from test_data_load.test_datasets import check_dataset
+from snp_pred.models.models_cnn import CNNModel
+from tests.conftest import cleanup
+from tests.test_data_load.test_datasets import check_dataset
 
 
 def test_load_model(args_config, tmp_path):

@@ -28,8 +28,10 @@ from snp_pred.data_load.label_setup import (
     al_label_transformers,
 )
 from snp_pred.models.extra_inputs_module import al_emb_lookup_dict
-from snp_pred.models.model_utils import gather_pred_outputs_from_dloader
-from snp_pred.models.models import get_model_class, CNNModel, MLPModel
+from snp_pred.models.model_training_utils import gather_pred_outputs_from_dloader
+from snp_pred.models.models import get_model_class
+from snp_pred.models.models_cnn import CNNModel
+from snp_pred.models.models_mlp import MLPModel
 from snp_pred.train_utils.evaluation import PerformancePlotConfig
 from snp_pred.train_utils.utils import get_run_folder
 

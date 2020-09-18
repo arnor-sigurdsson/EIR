@@ -1,7 +1,7 @@
 import pytest
-
 import torch
 from torch import nn
+
 from snp_pred.models import extra_inputs_module as emb
 
 

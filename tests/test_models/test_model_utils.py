@@ -1,9 +1,11 @@
 from copy import deepcopy
-import pytest
 
+import pytest
 import torch
 from torch import nn
-from snp_pred.models import model_utils
+
+from snp_pred.models import model_training_utils
+from snp_pred.models import models_cnn
 
 
 @pytest.fixture
@@ -37,14 +39,16 @@ def create_test_util_model():
     ],
 )
 def test_find_no_resblocks_needed(test_input, expected):
-    assert model_utils.find_no_resblocks_needed(**test_input) == expected
+    assert models_cnn.find_no_cnn_resblocks_needed(**test_input) == expected
 
 
 def test_get_model_params(create_test_util_model):
     test_model = create_test_util_model
 
     weight_decay = 0.05
-    model_params = model_utils.add_wd_to_model_params(model=test_model, wd=weight_decay)
+    model_params = model_training_utils.add_wd_to_model_params(
+        model=test_model, wd=weight_decay
+    )
 
     # BN has weight and bias, hence 6 + 2 = 8 parameter groups
     assert len(model_params) == 8
@@ -74,7 +78,7 @@ def set_up_stack_list_of_tensors_dicts_data():
 def test_stack_list_of_tensor_dicts():
     test_input = set_up_stack_list_of_tensors_dicts_data()
 
-    test_output = model_utils._stack_list_of_tensor_dicts(test_input)
+    test_output = model_training_utils._stack_list_of_tensor_dicts(test_input)
 
     assert (test_output["Target_Column_1"][0] == 0.0).all()
     assert (test_output["Target_Column_1"][5] == 1.0).all()

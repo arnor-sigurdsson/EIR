@@ -1,4 +1,5 @@
 import csv
+import warnings
 from argparse import Namespace
 from dataclasses import dataclass
 from pathlib import Path
@@ -6,7 +7,6 @@ from random import shuffle
 from shutil import rmtree
 from types import SimpleNamespace
 from typing import List, Tuple, Dict
-import warnings
 
 import numpy as np
 import pytest
@@ -20,11 +20,11 @@ from snp_pred import train
 from snp_pred.data_load import datasets
 from snp_pred.models.extra_inputs_module import set_up_and_save_embeddings_dict
 from snp_pred.train import Config, get_model
+from snp_pred.train_utils import optimizers, metrics
 from snp_pred.train_utils.utils import (
     configure_root_logger,
     get_run_folder,
 )
-from snp_pred.train_utils import optimizers, metrics
 
 np.random.seed(0)
 
