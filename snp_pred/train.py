@@ -18,6 +18,7 @@ from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader, WeightedRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
+from snp_pred.models.models import al_models
 from snp_pred.data_load import data_utils
 from snp_pred.data_load import datasets
 from snp_pred.data_load.data_loading_funcs import get_weighted_random_sampler
@@ -26,14 +27,14 @@ from snp_pred.data_load.label_setup import (
     al_target_columns,
     al_label_transformers,
 )
-from snp_pred.models import model_utils
+from snp_pred.models import model_training_utils
 from snp_pred.models.extra_inputs_module import (
     set_up_and_save_embeddings_dict,
     get_extra_inputs,
     al_emb_lookup_dict,
 )
-from snp_pred.models.model_utils import run_lr_find
-from snp_pred.models.models import get_model_class, al_models
+from snp_pred.models.model_training_utils import run_lr_find
+from snp_pred.models.models import get_model_class
 from snp_pred.train_utils import utils
 from snp_pred.train_utils.metrics import (
     calculate_batch_metrics,
@@ -420,7 +421,7 @@ def train(config: Config) -> None:
         train_seqs = train_seqs.to(device=cl_args.device)
         train_seqs = train_seqs.to(dtype=torch.float32)
 
-        target_labels = model_utils.parse_target_labels(
+        target_labels = model_training_utils.parse_target_labels(
             target_columns=c.target_columns,
             device=cl_args.device,
             labels=labels["target_labels"],

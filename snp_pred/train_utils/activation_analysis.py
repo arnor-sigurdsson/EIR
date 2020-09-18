@@ -20,10 +20,11 @@ from torch.utils.data import DataLoader, Subset
 import snp_pred.visualization.activation_visualization as av
 from snp_pred.data_load.data_utils import get_target_columns_generator
 from snp_pred.data_load.datasets import al_datasets
-from snp_pred.models import model_utils
+from snp_pred.models import model_training_utils
 from snp_pred.models.extra_inputs_module import get_extra_inputs
-from snp_pred.models.model_utils import gather_dloader_samples
-from snp_pred.models.models import CNNModel, MLPModel
+from snp_pred.models.model_training_utils import gather_dloader_samples
+from snp_pred.models.models_cnn import CNNModel
+from snp_pred.models.models_mlp import MLPModel
 from snp_pred.train_utils.utils import prep_sample_outfolder
 
 if TYPE_CHECKING:
@@ -163,7 +164,7 @@ def _pre_transform_sample_before_activation(
 ):
     single_sample = single_sample.to(device=device, dtype=torch.float32)
 
-    sample_label = model_utils.parse_target_labels(
+    sample_label = model_training_utils.parse_target_labels(
         target_columns=target_columns, device=device, labels=sample_label
     )[column_name]
 

@@ -5,8 +5,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from conftest import cleanup, ModelTestConfig
 from snp_pred import train
+from tests.conftest import cleanup, ModelTestConfig
 
 
 @pytest.mark.parametrize(

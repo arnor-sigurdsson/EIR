@@ -41,46 +41,6 @@ al_lr_find_results = Dict[str, List[Union[float, List[float]]]]
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
-def find_no_resblocks_needed(
-    width: int, stride: int, first_stride_expansion: int
-) -> List[int]:
-    """
-    Used in order to calculate / set up residual blocks specifications as a list
-    automatically when they are not passed in as CL args, based on the minimum
-    width after the resblock convolutions.
-
-    We have 2 resblocks per channel depth until we have a total of 8 blocks,
-    then the rest is put in the third depth index (following resnet convention).
-
-    That is with a base channel depth of 32, we have these depths in the list:
-    [32, 64, 128, 256].
-
-    Examples
-    ------
-    3 blocks --> [2, 1]
-    7 blocks --> [2, 2, 2, 1]
-    10 blocks --> [2, 2, 4, 2]
-    """
-
-    min_size = 8 * stride
-    # account for first conv
-    cur_width = width // (stride * first_stride_expansion)
-
-    resblocks = [0] * 4
-    while cur_width >= min_size:
-        cur_no_blocks = sum(resblocks)
-
-        if cur_no_blocks >= 8:
-            resblocks[2] += 1
-        else:
-            cur_index = cur_no_blocks // 2
-            resblocks[cur_index] += 1
-
-        cur_width = cur_width // stride
-
-    return [i for i in resblocks if i != 0]
-
-
 def predict_on_batch(
     model: Module, inputs: Tuple[torch.Tensor, ...]
 ) -> Dict[str, torch.Tensor]:

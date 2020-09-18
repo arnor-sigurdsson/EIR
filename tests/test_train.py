@@ -8,7 +8,8 @@ from torch.optim.adamw import AdamW
 from torch.utils.data import WeightedRandomSampler, SequentialSampler, RandomSampler
 
 from snp_pred import train
-from snp_pred.models.models import CNNModel, MLPModel
+from snp_pred.models.models_cnn import CNNModel
+from snp_pred.models.models_mlp import MLPModel
 from snp_pred.train_utils import optimizers
 
 
