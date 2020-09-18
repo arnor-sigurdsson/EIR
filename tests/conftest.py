@@ -69,7 +69,7 @@ def args_config():
             "b2": 0.999,
             "batch_size": 32,
             "channel_exp_base": 5,
-            "checkpoint_interval": 100,
+            "checkpoint_interval": 10000,
             "extra_con_columns": [],
             "custom_lib": None,
             "data_source": "REPLACE_ME",
