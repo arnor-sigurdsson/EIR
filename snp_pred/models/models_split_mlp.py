@@ -237,7 +237,7 @@ class FullySplitMLPModel(ModelBase):
 
     @property
     def l1_penalized_weights(self) -> torch.Tensor:
-        return self.fc_0[0].weight
+        return self.fc_0.weight
 
     def _init_weights(self):
         pass
@@ -282,10 +282,10 @@ def _generate_split_resblocks(
     residual_modules = [first_block]
     residual_blocks_spec_copy[0] -= 1
 
-    for cur_layer_index, block_dim in enumerate(residual_blocks_spec_copy, 1):
+    for cur_layer_index, block_dim in enumerate(residual_blocks_spec_copy):
         for residual_block in range(block_dim):
 
-            cur_out_feature_sets = channel_exp_base ** cur_layer_index
+            cur_out_feature_sets = 2 ** (channel_exp_base + cur_layer_index)
             cur_kernel_width = kernel_width
             while cur_out_feature_sets >= cur_kernel_width:
                 cur_kernel_width *= 2
