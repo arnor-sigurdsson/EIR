@@ -134,8 +134,9 @@ class FullySplitMLPModel(ModelBase):
             bias=False,
         )
 
+        resblocks_spec = self.get_resblocks_spec(in_features=self.fc_0.out_features)
         self.split_resblocks = _generate_split_resblocks(
-            residual_blocks_spec=self.resblocks,
+            residual_blocks_spec=resblocks_spec,
             in_features=self.fc_0.out_features,
             kernel_width=self.cl_args.kernel_width,
             channel_exp_base=self.cl_args.channel_exp_base,
@@ -180,11 +181,10 @@ class FullySplitMLPModel(ModelBase):
 
         self._init_weights()
 
-    @property
-    def resblocks(self) -> List[int]:
+    def get_resblocks_spec(self, in_features: int) -> List[int]:
         if len(self.cl_args.layers) == 1:
             residual_blocks = _find_no_split_mlp_resblocks_needed(
-                in_features=self.cl_args.target_width,
+                in_features=in_features,
                 kernel_width=self.cl_args.kernel_width,
                 channel_exp_base=self.cl_args.channel_exp_base,
             )
@@ -310,7 +310,13 @@ def _find_no_split_mlp_resblocks_needed(
     """
 
     resblocks = [0] * 4
-    cur_size = in_features
+
+    # account for first layer
+    cur_size = _calc_out_features_after_split_layer(
+        in_features=in_features,
+        split_size=kernel_width,
+        out_feature_sets=(2 ** channel_exp_base),
+    )
 
     while cur_size >= cutoff:
         cur_no_blocks = sum(resblocks)
@@ -321,13 +327,23 @@ def _find_no_split_mlp_resblocks_needed(
 
         resblocks[cur_index] += 1
 
-        cur_exponent = max(len([i for i in resblocks if i != 0]), 1)
-        cur_out_feature_sets = channel_exp_base ** cur_exponent
+        cur_exponent = len([i for i in resblocks if i != 0])
+        cur_out_feature_sets = 2 ** (channel_exp_base + cur_exponent)
 
         cur_kernel_width = kernel_width
         while cur_out_feature_sets >= cur_kernel_width:
             cur_kernel_width *= 2
 
-        cur_size = (cur_size // cur_kernel_width) * cur_out_feature_sets
+        cur_size = _calc_out_features_after_split_layer(
+            in_features=cur_size,
+            split_size=cur_kernel_width,
+            out_feature_sets=cur_out_feature_sets,
+        )
 
     return resblocks
+
+
+def _calc_out_features_after_split_layer(
+    in_features: int, split_size: int, out_feature_sets: int
+) -> int:
+    return (in_features // split_size) * out_feature_sets
