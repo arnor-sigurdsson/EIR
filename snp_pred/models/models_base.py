@@ -85,7 +85,7 @@ def construct_blocks(
     return nn.Sequential(*blocks)
 
 
-def create_blocks_with_first_adaptor_block(
+def create_multi_task_blocks_with_first_adaptor_block(
     num_blocks: int,
     branch_names,
     block_constructor: Callable,
@@ -207,6 +207,12 @@ def get_final_layer(in_features, num_classes):
         final_module_dict[task] = cur_module
 
     return final_module_dict
+
+
+def compose_spec_creation_and_initalization(spec_func, **spec_kwargs):
+    spec = spec_func(**spec_kwargs)
+    module = initialize_modules_from_spec(spec=spec)
+    return module
 
 
 def initialize_modules_from_spec(

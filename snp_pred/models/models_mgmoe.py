@@ -10,7 +10,7 @@ from snp_pred.models.models_base import (
     ModelBase,
     construct_multi_branches,
     initialize_modules_from_spec,
-    create_blocks_with_first_adaptor_block,
+    create_multi_task_blocks_with_first_adaptor_block,
     construct_blocks,
     get_final_layer,
     merge_module_dicts,
@@ -57,7 +57,7 @@ class MGMoEModel(ModelBase):
             "dropout_p": self.cl_args.rb_do,
             "full_preactivation": False,
         }
-        self.expert_branches = create_blocks_with_first_adaptor_block(
+        self.expert_branches = create_multi_task_blocks_with_first_adaptor_block(
             num_blocks=self.cl_args.layers[0],
             branch_names=expert_names,
             block_constructor=MLPResidualBlock,
