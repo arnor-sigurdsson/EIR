@@ -273,7 +273,7 @@ def _generate_split_resblocks(
 
     first_block = SplitMLPResidualBlock(
         in_features=in_features,
-        out_feature_sets=channel_exp_base,
+        out_feature_sets=2 ** channel_exp_base,
         split_size=kernel_width,
         dropout_p=dropout_p,
         full_preactivation=True,
