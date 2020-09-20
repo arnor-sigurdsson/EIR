@@ -16,7 +16,6 @@ from snp_pred.models.models_base import (
     get_final_layer,
     merge_module_dicts,
     calculate_module_dict_outputs,
-    compose_spec_creation_and_initalization,
 )
 
 logger = get_logger(__name__)
@@ -138,7 +137,6 @@ class FullySplitMLPModel(ModelBase):
         blocks_spec = self.get_block_spec(in_features=self.fc_0.out_features)
         self.split_blocks = _generate_split_blocks(
             block_layer_spec=blocks_spec,
-            block_factory=compose_spec_creation_and_initalization,
             in_features=self.fc_0.out_features,
             kernel_width=self.cl_args.kernel_width,
             channel_exp_base=self.cl_args.channel_exp_base,
