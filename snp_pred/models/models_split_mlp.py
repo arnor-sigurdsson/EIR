@@ -1,11 +1,13 @@
+from copy import copy
 from collections import OrderedDict
-from typing import Dict
+from typing import Dict, List
 
 import torch
 from aislib.pytorch_modules import Swish
+from aislib.misc_utils import get_logger
 from torch import nn
 
-from snp_pred.models.layers import SplitLinear, MLPResidualBlock
+from snp_pred.models.layers import SplitLinear, MLPResidualBlock, SplitMLPResidualBlock
 from snp_pred.models.models_base import (
     ModelBase,
     create_blocks_with_first_adaptor_block,
@@ -15,6 +17,8 @@ from snp_pred.models.models_base import (
     merge_module_dicts,
     calculate_module_dict_outputs,
 )
+
+logger = get_logger(__name__)
 
 
 class SplitMLPModel(ModelBase):
@@ -121,37 +125,24 @@ class FullySplitMLPModel(ModelBase):
         super().__init__(*args, **kwargs)
 
         fc_0_split_size = (
-            self.cl_args.kernel_width * 4 * self.cl_args.first_kernel_expansion
+            self.cl_args.kernel_width * self.cl_args.first_kernel_expansion
         )
-        self.fc_0 = nn.Sequential(
-            OrderedDict(
-                {
-                    "fc_0": SplitLinear(
-                        in_features=self.fc_1_in_features,
-                        out_feature_sets=self.cl_args.fc_repr_dim,
-                        split_size=fc_0_split_size,
-                        bias=False,
-                    )
-                }
-            )
+        self.fc_0 = SplitLinear(
+            in_features=self.fc_1_in_features,
+            out_feature_sets=2 ** self.cl_args.channel_exp_base,
+            split_size=fc_0_split_size,
+            bias=False,
         )
 
-        cur_dim = self.fc_0[-1].out_features
-        cutoff_threshold = 1024
-        while cur_dim >= cutoff_threshold:
+        self.split_resblocks = _generate_split_resblocks(
+            residual_blocks_spec=self.resblocks,
+            in_features=self.fc_0.out_features,
+            kernel_width=self.cl_args.kernel_width,
+            channel_exp_base=self.cl_args.channel_exp_base,
+            dropout_p=self.cl_args.rb_do,
+        )
 
-            cur_spec = self.get_split_extractor_spec(
-                in_features=cur_dim,
-                out_feature_sets=self.cl_args.fc_repr_dim,
-                split_size=self.cl_args.kernel_width * 4,
-                dropout_p=self.cl_args.rb_do,
-            )
-            next_module = initialize_modules_from_spec(spec=cur_spec)
-
-            self.fc_0.add_module(name=str(cur_dim), module=next_module)
-
-            cur_dim = next_module[-1].out_features
-
+        cur_dim = self.split_resblocks[-1].out_features
         task_names = tuple(self.num_classes.keys())
         task_resblocks_kwargs = {
             "in_features": self.fc_task_dim,
@@ -160,7 +151,7 @@ class FullySplitMLPModel(ModelBase):
             "full_preactivation": False,
         }
         multi_task_branches = create_blocks_with_first_adaptor_block(
-            num_blocks=self.cl_args.layers[0],
+            num_blocks=self.cl_args.layers[-1],
             branch_names=task_names,
             block_constructor=MLPResidualBlock,
             block_constructor_kwargs=task_resblocks_kwargs,
@@ -188,6 +179,22 @@ class FullySplitMLPModel(ModelBase):
         )
 
         self._init_weights()
+
+    @property
+    def resblocks(self) -> List[int]:
+        if len(self.cl_args.layers) == 1:
+            residual_blocks = _find_no_split_mlp_resblocks_needed(
+                in_features=self.cl_args.target_width,
+                kernel_width=self.cl_args.kernel_width,
+                channel_exp_base=self.cl_args.channel_exp_base,
+            )
+            logger.info(
+                "No residual blocks specified in CL args, using input "
+                "%s based on width approximation calculation.",
+                residual_blocks,
+            )
+            return residual_blocks
+        return self.cl_args.layers
 
     @staticmethod
     def get_split_extractor_spec(
@@ -241,6 +248,7 @@ class FullySplitMLPModel(ModelBase):
         out = x.view(x.shape[0], -1)
 
         out = self.fc_0(out)
+        out = self.split_resblocks(out)
 
         if extra_inputs is not None:
             out_extra = self.fc_extra(extra_inputs)
@@ -251,3 +259,75 @@ class FullySplitMLPModel(ModelBase):
         )
 
         return out
+
+
+def _generate_split_resblocks(
+    residual_blocks_spec: List[int],
+    in_features: int,
+    kernel_width: int,
+    channel_exp_base: int,
+    dropout_p: float,
+) -> nn.Sequential:
+
+    residual_blocks_spec_copy = copy(residual_blocks_spec)
+
+    first_block = SplitMLPResidualBlock(
+        in_features=in_features,
+        out_feature_sets=channel_exp_base,
+        split_size=kernel_width,
+        dropout_p=dropout_p,
+        full_preactivation=True,
+    )
+
+    residual_modules = [first_block]
+    residual_blocks_spec_copy[0] -= 1
+
+    for cur_layer_index, block_dim in enumerate(residual_blocks_spec_copy, 1):
+        for residual_block in range(block_dim):
+
+            cur_out_feature_sets = channel_exp_base ** cur_layer_index
+            cur_kernel_width = kernel_width
+            while cur_out_feature_sets >= cur_kernel_width:
+                cur_kernel_width *= 2
+
+            cur_size = residual_modules[-1].out_features
+            cur_block = SplitMLPResidualBlock(
+                in_features=cur_size,
+                out_feature_sets=cur_out_feature_sets,
+                split_size=cur_kernel_width,
+                dropout_p=dropout_p,
+            )
+            residual_modules.append(cur_block)
+
+    return nn.Sequential(*residual_modules)
+
+
+def _find_no_split_mlp_resblocks_needed(
+    in_features: int, kernel_width: int, channel_exp_base: int, cutoff: int = 16384
+):
+    """
+    Need to add in same rule here for expanding kernel width.
+    """
+
+    resblocks = [0] * 4
+    cur_size = in_features
+
+    while cur_size >= cutoff:
+        cur_no_blocks = sum(resblocks)
+        cur_index = cur_no_blocks // 2
+
+        if cur_no_blocks >= 8:
+            cur_index = 2
+
+        resblocks[cur_index] += 1
+
+        cur_exponent = max(len([i for i in resblocks if i != 0]), 1)
+        cur_out_feature_sets = channel_exp_base ** cur_exponent
+
+        cur_kernel_width = kernel_width
+        while cur_out_feature_sets >= cur_kernel_width:
+            cur_kernel_width *= 2
+
+        cur_size = (cur_size // cur_kernel_width) * cur_out_feature_sets
+
+    return resblocks
