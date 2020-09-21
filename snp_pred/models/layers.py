@@ -310,6 +310,10 @@ class SplitLinear(nn.Module):
 
 
 def _find_split_padding_needed(input_size: int, split_size: int):
+
+    if input_size % split_size == 0:
+        return 0
+
     size_after_padding = (input_size + split_size) - (input_size % split_size)
     padding = size_after_padding - input_size
     return padding

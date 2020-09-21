@@ -124,8 +124,9 @@ class FullySplitMLPModel(ModelBase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        fc_0_split_size = (
-            self.cl_args.kernel_width * self.cl_args.first_kernel_expansion
+        fc_0_split_size = calc_fc_0_split_size_after_expansion(
+            kernel_width=self.cl_args.kernel_width,
+            expansion=self.cl_args.first_kernel_expansion,
         )
         self.fc_0 = SplitLinear(
             in_features=self.fc_1_in_features,
@@ -237,6 +238,14 @@ class FullySplitMLPModel(ModelBase):
         )
 
         return out
+
+
+def calc_fc_0_split_size_after_expansion(kernel_width: int, expansion: int) -> int:
+    if expansion > 0:
+        return kernel_width * expansion
+    elif expansion < 0:
+        return abs(kernel_width // expansion)
+    return kernel_width
 
 
 def get_split_extractor_spec(
