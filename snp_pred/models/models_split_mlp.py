@@ -289,7 +289,6 @@ def _generate_split_blocks(
     first_block = initialize_modules_from_spec(spec=first_spec)
 
     block_modules = [first_block]
-    block_layer_spec_copy[0] -= 1
 
     for cur_layer_index, block_dim in enumerate(block_layer_spec_copy):
         for block in range(block_dim):
