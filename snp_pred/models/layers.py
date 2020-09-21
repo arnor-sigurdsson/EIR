@@ -3,8 +3,11 @@ import math
 import torch
 import torch.nn.functional as F
 from aislib.pytorch_modules import Swish
+from aislib.misc_utils import get_logger
 from torch import nn
 from torch.nn import Parameter
+
+logger = get_logger(__name__)
 
 
 class SelfAttention(nn.Module):
@@ -244,18 +247,21 @@ class SplitLinear(nn.Module):
         self.in_features = in_features
         self.out_feature_sets = out_feature_sets
         self.num_chunks = num_chunks
+        self.split_size = split_size
 
         if split_size:
-            print(
-                "Setting num chunks to {} as split size of {} was passed in.".format(
-                    self.num_chunks, split_size
-                )
+            self.num_chunks = int(math.ceil(in_features / split_size))
+            logger.info(
+                "Setting num chunks to %d as split size of %d was passed in.",
+                self.num_chunks,
+                split_size,
             )
-            self.num_chunks = in_features // split_size
+        else:
+            self.split_size = self.in_features // self.num_chunks
 
         self.out_features = self.out_feature_sets * self.num_chunks
-        self.padding, self.split_size = calc_dimensions_for_reshape(
-            input_width=in_features, denominator=self.num_chunks
+        self.padding = _find_split_padding_needed(
+            input_size=self.in_features, split_size=self.split_size
         )
 
         self.weight = Parameter(
@@ -281,12 +287,6 @@ class SplitLinear(nn.Module):
             bound = 1 / math.sqrt(fan_in)
             nn.init.uniform_(self.bias, -bound, bound)
 
-    def forward(self, input: torch.Tensor):
-        input = F.pad(input=input, pad=[0, self.padding, 0, 0])
-        input = input.reshape(-1, 1, self.split_size, self.num_chunks)
-        out = calc_split_input_einsum(input=input, weight=self.weight, bias=self.bias)
-        return out
-
     def extra_repr(self):
         return (
             "in_features={}, num_chunks={}, split_size={}, "
@@ -300,11 +300,19 @@ class SplitLinear(nn.Module):
             )
         )
 
+    def forward(self, input: torch.Tensor):
+        input_padded = F.pad(input=input, pad=[0, self.padding, 0, 0])
+        input_reshaped = input_padded.reshape(-1, 1, self.split_size, self.num_chunks)
+        out = calc_split_input_einsum(
+            input=input_reshaped, weight=self.weight, bias=self.bias
+        )
+        return out
 
-def calc_dimensions_for_reshape(input_width: int, denominator: int):
-    split_size = int(math.ceil(input_width / denominator))
-    padding = split_size * denominator - input_width
-    return padding, split_size
+
+def _find_split_padding_needed(input_size: int, split_size: int):
+    size_after_padding = (input_size + split_size) - (input_size % split_size)
+    padding = size_after_padding - input_size
+    return padding
 
 
 def calc_split_input_torch(
