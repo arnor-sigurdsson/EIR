@@ -299,7 +299,7 @@ def _generate_split_blocks(
             while cur_out_feature_sets >= cur_kernel_width:
                 cur_kernel_width *= 2
 
-            cur_size = block_modules[-1].out_features
+            cur_size = block_modules[-1][-1].out_features
 
             cur_spec = get_split_extractor_spec(
                 in_features=cur_size,
