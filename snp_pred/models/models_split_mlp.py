@@ -322,13 +322,7 @@ def _find_no_split_mlp_blocks_needed(
 
     blocks = [0] * 4
 
-    # account for first layer
-    cur_size = _calc_out_features_after_split_layer(
-        in_features=in_features,
-        split_size=kernel_width,
-        out_feature_sets=(2 ** channel_exp_base),
-    )
-
+    cur_size = in_features
     while cur_size >= cutoff:
         cur_no_blocks = sum(blocks)
         cur_index = cur_no_blocks // 2
