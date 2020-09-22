@@ -135,7 +135,9 @@ class FullySplitMLPModel(ModelBase):
             bias=False,
         )
 
-        blocks_spec = self.get_block_spec(in_features=self.fc_0.out_features)
+        blocks_spec = self.get_block_spec(
+            in_features=self.fc_0.out_features, cutoff=1024 * 16
+        )
         self.split_blocks = _generate_split_blocks(
             block_layer_spec=blocks_spec,
             in_features=self.fc_0.out_features,
@@ -179,12 +181,13 @@ class FullySplitMLPModel(ModelBase):
 
         self._init_weights()
 
-    def get_block_spec(self, in_features: int) -> List[int]:
+    def get_block_spec(self, in_features: int, cutoff: int = 16384) -> List[int]:
         if len(self.cl_args.layers) == 1:
             residual_blocks = _find_no_split_mlp_blocks_needed(
                 in_features=in_features,
                 kernel_width=self.cl_args.kernel_width,
                 channel_exp_base=self.cl_args.channel_exp_base,
+                cutoff=cutoff,
             )
             logger.info(
                 "No residual blocks specified in CL args, using input "
@@ -311,7 +314,7 @@ def _generate_split_blocks(
 
 
 def _find_no_split_mlp_blocks_needed(
-    in_features: int, kernel_width: int, channel_exp_base: int, cutoff: int = 16384
+    in_features: int, kernel_width: int, channel_exp_base: int, cutoff: int
 ):
     """
     Need to add in same rule here for expanding kernel width.
