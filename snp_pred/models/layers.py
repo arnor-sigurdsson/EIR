@@ -251,17 +251,26 @@ class SplitLinear(nn.Module):
 
         if split_size:
             self.num_chunks = int(math.ceil(in_features / split_size))
-            logger.info(
-                "Setting num chunks to %d as split size of %d was passed in.",
+            logger.debug(
+                "%s: Setting num chunks to %d as split size of %d was passed in.",
+                self.__class__,
                 self.num_chunks,
-                split_size,
+                self.split_size,
             )
         else:
-            self.split_size = self.in_features // self.num_chunks
+            self.split_size = int(math.ceil(self.in_features / self.num_chunks))
+            logger.debug(
+                "%s :Setting split size to %d as number of chunks of %d was passed in.",
+                self.__class__,
+                self.split_size,
+                self.num_chunks,
+            )
 
         self.out_features = self.out_feature_sets * self.num_chunks
         self.padding = _find_split_padding_needed(
-            input_size=self.in_features, split_size=self.split_size
+            input_size=self.in_features,
+            split_size=self.split_size,
+            num_chunks=self.num_chunks,
         )
 
         self.weight = Parameter(
@@ -302,21 +311,18 @@ class SplitLinear(nn.Module):
 
     def forward(self, input: torch.Tensor):
         input_padded = F.pad(input=input, pad=[0, self.padding, 0, 0])
-        input_reshaped = input_padded.reshape(-1, 1, self.split_size, self.num_chunks)
+        input_reshaped = input_padded.reshape(
+            input.shape[0], 1, self.split_size, self.num_chunks
+        )
         out = calc_split_input_einsum(
             input=input_reshaped, weight=self.weight, bias=self.bias
         )
         return out
 
 
-def _find_split_padding_needed(input_size: int, split_size: int):
+def _find_split_padding_needed(input_size: int, split_size: int, num_chunks: int):
 
-    if input_size % split_size == 0:
-        return 0
-
-    size_after_padding = (input_size + split_size) - (input_size % split_size)
-    padding = size_after_padding - input_size
-    return padding
+    return num_chunks * split_size - input_size
 
 
 def calc_split_input_torch(
