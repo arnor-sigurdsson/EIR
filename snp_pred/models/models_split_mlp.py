@@ -332,8 +332,7 @@ def _find_no_split_mlp_blocks_needed(
 
         blocks[cur_index] += 1
 
-        cur_exponent = len([i for i in blocks if i != 0])
-        cur_out_feature_sets = 2 ** (channel_exp_base + cur_exponent)
+        cur_out_feature_sets = 2 ** (channel_exp_base + cur_index)
 
         cur_kernel_width = kernel_width
         while cur_out_feature_sets >= cur_kernel_width:
