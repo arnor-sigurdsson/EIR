@@ -282,6 +282,7 @@ def _generate_split_blocks(
         split_size=kernel_width,
         out_feature_sets=2 ** channel_exp_base,
         dropout_p=dropout_p,
+        full_preactivation=True,
     )
 
     block_modules = [first_block]
