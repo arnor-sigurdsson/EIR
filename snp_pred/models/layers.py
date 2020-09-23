@@ -474,12 +474,12 @@ class SplitMLPResidualBlock(nn.Module):
         else:
             self.downsample_identity = SplitLinear(
                 in_features=in_features,
-                out_feature_sets=out_feature_sets,
+                out_feature_sets=1,
                 bias=False,
-                split_size=split_size,
+                num_chunks=self.fc_1.out_features,
             )
 
-        self.out_features = self.fc_1.out_features
+        self.out_features = self.fc_2.out_features
 
         if self.zero_init_last_bn:
             nn.init.zeros_(self.bn_2.weight)
