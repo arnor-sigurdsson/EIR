@@ -376,7 +376,7 @@ class MLPResidualBlock(nn.Module):
         out_features: int,
         dropout_p: float = 0.0,
         full_preactivation: bool = False,
-        zero_init_last_bn: bool = True,
+        zero_init_last_bn: bool = False,
     ):
         super().__init__()
 
@@ -434,7 +434,7 @@ class SplitMLPResidualBlock(nn.Module):
         split_size: int,
         dropout_p: float = 0.0,
         full_preactivation: bool = False,
-        zero_init_last_bn: bool = True,
+        zero_init_last_bn: bool = False,
     ):
         super().__init__()
 
