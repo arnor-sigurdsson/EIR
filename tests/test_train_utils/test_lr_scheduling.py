@@ -3,7 +3,6 @@ from math import isclose
 import pytest
 import torch
 from ignite.contrib.handlers import (
-    ProgressBar,
     ConcatScheduler,
     CosineAnnealingScheduler,
     ParamGroupScheduler,
@@ -72,7 +71,6 @@ def get_dummy_handler_config(prep_modelling_test_configs) -> HandlerConfig:
         config=config,
         run_folder=test_config.run_path,
         run_name=cl_args.run_name,
-        pbar=ProgressBar(),
         monitoring_metrics=[("tmp_var", "tmp_var")],
     )
 
