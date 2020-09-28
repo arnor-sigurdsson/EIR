@@ -139,7 +139,7 @@ class FullySplitMLPModel(ModelBase):
             in_features=self.fc_0.out_features, cutoff=1024 * 16
         )
         self.split_blocks = _generate_split_blocks(
-            block_layer_spec=blocks_spec,
+            block_layer_spec=blocks_spec[:-1],
             in_features=self.fc_0.out_features,
             kernel_width=self.cl_args.kernel_width,
             channel_exp_base=self.cl_args.channel_exp_base,
@@ -155,7 +155,7 @@ class FullySplitMLPModel(ModelBase):
             "full_preactivation": False,
         }
         multi_task_branches = create_multi_task_blocks_with_first_adaptor_block(
-            num_blocks=self.cl_args.layers[-1],
+            num_blocks=blocks_spec[-1],
             branch_names=task_names,
             block_constructor=MLPResidualBlock,
             block_constructor_kwargs=task_resblocks_kwargs,
@@ -183,18 +183,19 @@ class FullySplitMLPModel(ModelBase):
 
     def get_block_spec(self, in_features: int, cutoff: int = 16384) -> List[int]:
         if len(self.cl_args.layers) == 1:
-            residual_blocks = _find_no_split_mlp_blocks_needed(
+            split_blocks = _find_no_split_mlp_blocks_needed(
                 in_features=in_features,
                 kernel_width=self.cl_args.kernel_width,
                 channel_exp_base=self.cl_args.channel_exp_base,
                 cutoff=cutoff,
             )
+            all_blocks = split_blocks + self.cl_args.layers
             logger.info(
                 "No residual blocks specified in CL args, using input "
                 "%s based on width approximation calculation.",
-                residual_blocks,
+                all_blocks,
             )
-            return residual_blocks
+            return all_blocks
         return self.cl_args.layers
 
     @staticmethod
