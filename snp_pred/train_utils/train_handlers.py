@@ -10,7 +10,7 @@ import pandas as pd
 from aislib.misc_utils import get_logger
 from ignite.contrib.handlers import ProgressBar
 from ignite.engine import Events, Engine
-from ignite.handlers import ModelCheckpoint
+from ignite.handlers import ModelCheckpoint, EarlyStopping
 from ignite.metrics import RunningAverage
 from torch.utils.tensorboard import SummaryWriter
 
@@ -29,6 +29,8 @@ from snp_pred.train_utils.metrics import (
     get_metrics_files,
     al_metric_record_dict,
     MetricRecord,
+    read_metrics_history_file,
+    get_average_history_filepath,
 )
 from snp_pred.train_utils.utils import (
     get_custom_module_submodule,
@@ -53,16 +55,13 @@ class HandlerConfig:
     config: "Config"
     run_folder: Path
     run_name: str
-    pbar: ProgressBar
     monitoring_metrics: List[Tuple[str, str]]
 
 
 def configure_trainer(trainer: Engine, config: "Config") -> Engine:
 
-    cl_args = config.cl_args
-    run_folder = Path("runs/", cl_args.run_name)
-    pbar = ProgressBar()
-    run_name = cl_args.run_name
+    ca = config.cl_args
+    run_folder = get_run_folder(run_name=ca.run_name)
 
     monitoring_metrics = _get_monitoring_metrics(
         target_columns=config.target_columns, metric_record_dict=config.metrics
@@ -71,44 +70,61 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
     handler_config = HandlerConfig(
         config=config,
         run_folder=run_folder,
-        run_name=run_name,
-        pbar=pbar,
+        run_name=ca.run_name,
         monitoring_metrics=monitoring_metrics,
     )
 
-    sample_handlers = _get_sample_interval_handlers(do_get_acts=cl_args.get_acts)
+    sample_handlers = _get_sample_interval_handlers(do_get_acts=ca.get_acts)
     for handler in sample_handlers:
         trainer.add_event_handler(
-            event_name=Events.ITERATION_COMPLETED(every=cl_args.sample_interval),
+            event_name=Events.ITERATION_COMPLETED(every=ca.sample_interval),
             handler=handler,
             handler_config=handler_config,
         )
 
-        if _do_run_completed_handler(
+        do_run_when_training_complete = _do_run_completed_handler(
             iter_per_epoch=len(config.train_loader),
-            n_epochs=cl_args.n_epochs,
-            sample_interval=cl_args.sample_interval,
-        ):
+            n_epochs=ca.n_epochs,
+            sample_interval=ca.sample_interval,
+        )
+
+        # we need no `ca.early_stopping_patience` because early stopping will only
+        # trigger a termination (complete state) at a `sample_interval` point,
+        # meaning that both `sample_interval` and Events.COMPLETED triggers will be
+        # active when the early stopping is triggered, meaning double entry in the
+        # validation history file
+        if do_run_when_training_complete and not ca.early_stopping_patience:
             trainer.add_event_handler(
                 event_name=Events.COMPLETED,
                 handler=handler,
                 handler_config=handler_config,
             )
 
-    if cl_args.lr_schedule != "same":
+    if ca.early_stopping_patience:
+        early_stopping_handler = get_early_stopping_handler(
+            trainer=trainer,
+            handler_config=handler_config,
+            patience_steps=ca.early_stopping_patience,
+        )
+        trainer.add_event_handler(
+            Events.ITERATION_COMPLETED(every=ca.sample_interval),
+            early_stopping_handler,
+        )
+
+    if ca.lr_schedule != "same":
         lr_scheduler = set_up_lr_scheduler(handler_config=handler_config)
         attach_lr_scheduler(engine=trainer, lr_scheduler=lr_scheduler, config=config)
 
     _attach_running_average_metrics(
         engine=trainer, monitoring_metrics=monitoring_metrics
     )
-    pbar.attach(engine=trainer, metric_names=["loss-average"])
 
-    trainer.add_event_handler(
-        event_name=Events.EPOCH_COMPLETED,
-        handler=_log_stats_to_pbar,
-        handler_config=handler_config,
-    )
+    if not ca.no_pbar:
+        pbar = ProgressBar()
+        pbar.attach(engine=trainer, metric_names=["loss-average"])
+        trainer.add_event_handler(
+            event_name=Events.EPOCH_COMPLETED, handler=_log_stats_to_pbar, pbar=pbar,
+        )
 
     if handler_config.run_name:
         trainer = _attach_run_event_handlers(
@@ -171,6 +187,30 @@ def _get_monitoring_metrics(
     return monitoring_metrics
 
 
+def get_early_stopping_handler(
+    trainer: Engine, handler_config: HandlerConfig, patience_steps: int
+):
+    eval_history_fpath = get_average_history_filepath(
+        run_folder=handler_config.run_folder, train_or_val_target_prefix="validation_"
+    )
+
+    def scoring_function(engine):
+        eval_df = read_metrics_history_file(eval_history_fpath)
+        latest_val_loss = eval_df["perf-average"].iloc[-1]
+        return latest_val_loss
+
+    logger.info(
+        "Setting early stopping patience to %d validation steps.", patience_steps
+    )
+
+    handler = EarlyStopping(
+        patience=patience_steps, score_function=scoring_function, trainer=trainer
+    )
+    handler.logger = logger
+
+    return handler
+
+
 def _attach_running_average_metrics(
     engine: Engine, monitoring_metrics: List[Tuple[str, str]]
 ) -> None:
@@ -202,14 +242,14 @@ def _attach_running_average_metrics(
         ).attach(engine, name=metric_name)
 
 
-def _log_stats_to_pbar(engine: Engine, handler_config: HandlerConfig) -> None:
+def _log_stats_to_pbar(engine: Engine, pbar: ProgressBar) -> None:
     log_string = f"[Epoch {engine.state.epoch}/{engine.state.max_epochs}]"
 
     key = "loss-average"
     value = engine.state.metrics[key]
     log_string += f" | {key}: {value:.4g}"
 
-    handler_config.pbar.log_message(log_string)
+    pbar.log_message(log_string)
 
 
 def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
@@ -232,18 +272,17 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
         to_save={"model": handler_config.config.model},
     )
 
-    # *gotcha*: write_metrics needs to be attached before plot progress so we have the
-    # last row when plotting
+    # *gotcha*: write_training_metrics needs to be attached before plot progress so we
+    # have the last row when plotting
+    # TODO: Make this more explicit in the code itself
     trainer.add_event_handler(
         event_name=Events.ITERATION_COMPLETED,
         handler=_write_training_metrics_handler,
         handler_config=handler_config,
     )
 
-    for plot_event in [
-        Events.ITERATION_COMPLETED(every=cl_args.sample_interval),
-        Events.COMPLETED,
-    ]:
+    for plot_event in _get_plot_events(sample_interval=cl_args.sample_interval):
+
         if plot_event == Events.COMPLETED and not _do_run_completed_handler(
             iter_per_epoch=len(c.train_loader),
             n_epochs=cl_args.n_epochs,
@@ -258,8 +297,12 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
         )
 
     if cl_args.custom_lib:
-        custom_handlers = _get_custom_handlers(handler_config)
-        trainer = _attach_custom_handlers(trainer, handler_config, custom_handlers)
+        custom_handlers = _get_custom_handlers(handler_config=handler_config)
+        trainer = _attach_custom_handlers(
+            trainer=trainer,
+            handler_config=handler_config,
+            custom_handlers=custom_handlers,
+        )
 
     log_tb_hparams_on_exit_func = partial(
         add_hparams_to_tensorboard,
@@ -320,6 +363,14 @@ def _unflatten_engine_metrics_dict(
             unflattened_dict[column_name][column_metric_name] = eng_run_avg_value
 
     return unflattened_dict
+
+
+def _get_plot_events(sample_interval: int):
+    plot_events = (
+        Events.ITERATION_COMPLETED(every=sample_interval),
+        Events.COMPLETED,
+    )
+    return plot_events
 
 
 def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> None:

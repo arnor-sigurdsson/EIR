@@ -517,6 +517,14 @@ def _get_train_argument_parser() -> configargparse.ArgumentParser:
         "Otherwise keeps same learning rate.",
     )
 
+    # TODO: Change this to patience steps, so it is configurable
+    parser_.add_argument(
+        "--early_stopping_patience",
+        type=int,
+        default=None,
+        help="Whether to terminate training early if performance stops improving.",
+    )
+
     parser_.add_argument(
         "--warmup_steps", type=str, default=0, help="How many steps to use in warmup."
     )
@@ -811,6 +819,12 @@ def _get_train_argument_parser() -> configargparse.ArgumentParser:
 
     parser_.add_argument(
         "--debug",
+        action="store_true",
+        help="Whether to run in debug mode (w. breakpoint).",
+    )
+
+    parser_.add_argument(
+        "--no_pbar",
         action="store_true",
         help="Whether to run in debug mode (w. breakpoint).",
     )
