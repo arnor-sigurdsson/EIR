@@ -816,6 +816,12 @@ def _get_train_argument_parser() -> configargparse.ArgumentParser:
     )
 
     parser_.add_argument(
+        "--no_pbar",
+        action="store_true",
+        help="Whether to run in debug mode (w. breakpoint).",
+    )
+
+    parser_.add_argument(
         "--custom_lib",
         type=str,
         default=None,

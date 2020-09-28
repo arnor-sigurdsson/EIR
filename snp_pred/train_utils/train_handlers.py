@@ -53,16 +53,13 @@ class HandlerConfig:
     config: "Config"
     run_folder: Path
     run_name: str
-    pbar: ProgressBar
     monitoring_metrics: List[Tuple[str, str]]
 
 
 def configure_trainer(trainer: Engine, config: "Config") -> Engine:
 
-    cl_args = config.cl_args
-    run_folder = Path("runs/", cl_args.run_name)
-    pbar = ProgressBar()
-    run_name = cl_args.run_name
+    ca = config.cl_args
+    run_folder = get_run_folder(run_name=ca.run_name)
 
     monitoring_metrics = _get_monitoring_metrics(
         target_columns=config.target_columns, metric_record_dict=config.metrics
@@ -71,23 +68,22 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
     handler_config = HandlerConfig(
         config=config,
         run_folder=run_folder,
-        run_name=run_name,
-        pbar=pbar,
+        run_name=ca.run_name,
         monitoring_metrics=monitoring_metrics,
     )
 
-    sample_handlers = _get_sample_interval_handlers(do_get_acts=cl_args.get_acts)
+    sample_handlers = _get_sample_interval_handlers(do_get_acts=ca.get_acts)
     for handler in sample_handlers:
         trainer.add_event_handler(
-            event_name=Events.ITERATION_COMPLETED(every=cl_args.sample_interval),
+            event_name=Events.ITERATION_COMPLETED(every=ca.sample_interval),
             handler=handler,
             handler_config=handler_config,
         )
 
         if _do_run_completed_handler(
             iter_per_epoch=len(config.train_loader),
-            n_epochs=cl_args.n_epochs,
-            sample_interval=cl_args.sample_interval,
+            n_epochs=ca.n_epochs,
+            sample_interval=ca.sample_interval,
         ):
             trainer.add_event_handler(
                 event_name=Events.COMPLETED,
@@ -95,20 +91,20 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
                 handler_config=handler_config,
             )
 
-    if cl_args.lr_schedule != "same":
+    if ca.lr_schedule != "same":
         lr_scheduler = set_up_lr_scheduler(handler_config=handler_config)
         attach_lr_scheduler(engine=trainer, lr_scheduler=lr_scheduler, config=config)
 
     _attach_running_average_metrics(
         engine=trainer, monitoring_metrics=monitoring_metrics
     )
-    pbar.attach(engine=trainer, metric_names=["loss-average"])
 
-    trainer.add_event_handler(
-        event_name=Events.EPOCH_COMPLETED,
-        handler=_log_stats_to_pbar,
-        handler_config=handler_config,
-    )
+    if not ca.no_pbar:
+        pbar = ProgressBar()
+        pbar.attach(engine=trainer, metric_names=["loss-average"])
+        trainer.add_event_handler(
+            event_name=Events.EPOCH_COMPLETED, handler=_log_stats_to_pbar, pbar=pbar,
+        )
 
     if handler_config.run_name:
         trainer = _attach_run_event_handlers(
@@ -202,14 +198,14 @@ def _attach_running_average_metrics(
         ).attach(engine, name=metric_name)
 
 
-def _log_stats_to_pbar(engine: Engine, handler_config: HandlerConfig) -> None:
+def _log_stats_to_pbar(engine: Engine, pbar: ProgressBar) -> None:
     log_string = f"[Epoch {engine.state.epoch}/{engine.state.max_epochs}]"
 
     key = "loss-average"
     value = engine.state.metrics[key]
     log_string += f" | {key}: {value:.4g}"
 
-    handler_config.pbar.log_message(log_string)
+    pbar.log_message(log_string)
 
 
 def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
