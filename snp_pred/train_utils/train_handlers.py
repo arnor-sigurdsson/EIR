@@ -228,18 +228,17 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
         to_save={"model": handler_config.config.model},
     )
 
-    # *gotcha*: write_metrics needs to be attached before plot progress so we have the
-    # last row when plotting
+    # *gotcha*: write_training_metrics needs to be attached before plot progress so we
+    # have the last row when plotting
+    # TODO: Make this more explicit in the code itself
     trainer.add_event_handler(
         event_name=Events.ITERATION_COMPLETED,
         handler=_write_training_metrics_handler,
         handler_config=handler_config,
     )
 
-    for plot_event in [
-        Events.ITERATION_COMPLETED(every=cl_args.sample_interval),
-        Events.COMPLETED,
-    ]:
+    for plot_event in _get_plot_events(sample_interval=cl_args.sample_interval):
+
         if plot_event == Events.COMPLETED and not _do_run_completed_handler(
             iter_per_epoch=len(c.train_loader),
             n_epochs=cl_args.n_epochs,
@@ -254,8 +253,12 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
         )
 
     if cl_args.custom_lib:
-        custom_handlers = _get_custom_handlers(handler_config)
-        trainer = _attach_custom_handlers(trainer, handler_config, custom_handlers)
+        custom_handlers = _get_custom_handlers(handler_config=handler_config)
+        trainer = _attach_custom_handlers(
+            trainer=trainer,
+            handler_config=handler_config,
+            custom_handlers=custom_handlers,
+        )
 
     log_tb_hparams_on_exit_func = partial(
         add_hparams_to_tensorboard,
@@ -316,6 +319,14 @@ def _unflatten_engine_metrics_dict(
             unflattened_dict[column_name][column_metric_name] = eng_run_avg_value
 
     return unflattened_dict
+
+
+def _get_plot_events(sample_interval: int):
+    plot_events = (
+        Events.ITERATION_COMPLETED(every=sample_interval),
+        Events.COMPLETED,
+    )
+    return plot_events
 
 
 def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> None:
