@@ -459,14 +459,11 @@ class SplitMLPResidualBlock(nn.Module):
         self.act_2 = Swish()
         self.do = nn.Dropout(p=dropout_p)
 
-        fc_2_chunks = _calculate_num_chunks_for_equal_split_out_features(
-            in_features=self.fc_1.out_features, out_feature_sets=out_feature_sets
-        )
         self.fc_2 = SplitLinear(
             in_features=self.fc_1.out_features,
             out_feature_sets=out_feature_sets,
             bias=False,
-            num_chunks=fc_2_chunks,
+            split_size=split_size,
         )
 
         if in_features == out_feature_sets:
@@ -476,7 +473,7 @@ class SplitMLPResidualBlock(nn.Module):
                 in_features=in_features,
                 out_feature_sets=1,
                 bias=False,
-                num_chunks=self.fc_1.out_features,
+                num_chunks=self.fc_2.out_features,
             )
 
         self.out_features = self.fc_2.out_features
