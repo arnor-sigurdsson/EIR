@@ -93,7 +93,7 @@ def test_set_up_lr_scheduler_plateau(get_dummy_handler_config):
     lr_scheduler = lr_scheduling.set_up_lr_scheduler(handler_config=handler_config)
     assert isinstance(lr_scheduler, ReduceLROnPlateau)
 
-    expected_patience = lr_scheduling._calc_plateu_patience(
+    expected_patience = lr_scheduling.calc_plateu_patience(
         steps_per_epoch=len(handler_config.config.train_loader),
         sample_interval=cl_args.sample_interval,
     )
@@ -253,7 +253,7 @@ def test_calculate_auto_warmup_steps_adaptive(create_dummy_test_optimizer):
     ],
 )
 def test_calc_plateau_patience(test_input, expected):
-    patience = lr_scheduling._calc_plateu_patience(**test_input)
+    patience = lr_scheduling.calc_plateu_patience(**test_input)
     assert patience == expected
 
 

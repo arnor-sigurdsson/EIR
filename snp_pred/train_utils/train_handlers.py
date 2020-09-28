@@ -10,7 +10,7 @@ import pandas as pd
 from aislib.misc_utils import get_logger
 from ignite.contrib.handlers import ProgressBar
 from ignite.engine import Events, Engine
-from ignite.handlers import ModelCheckpoint
+from ignite.handlers import ModelCheckpoint, EarlyStopping
 from ignite.metrics import RunningAverage
 from torch.utils.tensorboard import SummaryWriter
 
@@ -29,6 +29,8 @@ from snp_pred.train_utils.metrics import (
     get_metrics_files,
     al_metric_record_dict,
     MetricRecord,
+    read_metrics_history_file,
+    get_average_history_filepath,
 )
 from snp_pred.train_utils.utils import (
     get_custom_module_submodule,
@@ -80,16 +82,34 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
             handler_config=handler_config,
         )
 
-        if _do_run_completed_handler(
+        do_run_when_training_complete = _do_run_completed_handler(
             iter_per_epoch=len(config.train_loader),
             n_epochs=ca.n_epochs,
             sample_interval=ca.sample_interval,
-        ):
+        )
+
+        # we need no `ca.early_stopping_patience` because early stopping will only
+        # trigger a termination (complete state) at a `sample_interval` point,
+        # meaning that both `sample_interval` and Events.COMPLETED triggers will be
+        # active when the early stopping is triggered, meaning double entry in the
+        # validation history file
+        if do_run_when_training_complete and not ca.early_stopping_patience:
             trainer.add_event_handler(
                 event_name=Events.COMPLETED,
                 handler=handler,
                 handler_config=handler_config,
             )
+
+    if ca.early_stopping_patience:
+        early_stopping_handler = get_early_stopping_handler(
+            trainer=trainer,
+            handler_config=handler_config,
+            patience_steps=ca.early_stopping_patience,
+        )
+        trainer.add_event_handler(
+            Events.ITERATION_COMPLETED(every=ca.sample_interval),
+            early_stopping_handler,
+        )
 
     if ca.lr_schedule != "same":
         lr_scheduler = set_up_lr_scheduler(handler_config=handler_config)
@@ -165,6 +185,30 @@ def _get_monitoring_metrics(
         monitoring_metrics.append(tuple([column_name, loss_name]))
 
     return monitoring_metrics
+
+
+def get_early_stopping_handler(
+    trainer: Engine, handler_config: HandlerConfig, patience_steps: int
+):
+    eval_history_fpath = get_average_history_filepath(
+        run_folder=handler_config.run_folder, train_or_val_target_prefix="validation_"
+    )
+
+    def scoring_function(engine):
+        eval_df = read_metrics_history_file(eval_history_fpath)
+        latest_val_loss = eval_df["perf-average"].iloc[-1]
+        return latest_val_loss
+
+    logger.info(
+        "Setting early stopping patience to %d validation steps.", patience_steps
+    )
+
+    handler = EarlyStopping(
+        patience=patience_steps, score_function=scoring_function, trainer=trainer
+    )
+    handler.logger = logger
+
+    return handler
 
 
 def _attach_running_average_metrics(

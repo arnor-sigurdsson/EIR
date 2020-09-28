@@ -18,7 +18,6 @@ from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader, WeightedRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
-from snp_pred.models.models import al_models
 from snp_pred.data_load import data_utils
 from snp_pred.data_load import datasets
 from snp_pred.data_load.data_loading_funcs import get_weighted_random_sampler
@@ -34,6 +33,7 @@ from snp_pred.models.extra_inputs_module import (
     al_emb_lookup_dict,
 )
 from snp_pred.models.model_training_utils import run_lr_find
+from snp_pred.models.models import al_models
 from snp_pred.models.models import get_model_class
 from snp_pred.train_utils import utils
 from snp_pred.train_utils.metrics import (
@@ -515,6 +515,14 @@ def _get_train_argument_parser() -> configargparse.ArgumentParser:
         choices=["cycle", "plateau", "same", "cosine"],
         help="Whether to use cyclical or reduce on plateau learning rate schedule. "
         "Otherwise keeps same learning rate.",
+    )
+
+    # TODO: Change this to patience steps, so it is configurable
+    parser_.add_argument(
+        "--early_stopping_patience",
+        type=int,
+        default=None,
+        help="Whether to terminate training early if performance stops improving.",
     )
 
     parser_.add_argument(
