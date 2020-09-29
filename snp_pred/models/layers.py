@@ -314,9 +314,7 @@ class SplitLinear(nn.Module):
         input_reshaped = input_padded.reshape(
             input.shape[0], 1, self.split_size, self.num_chunks
         )
-        out = calc_split_input_einsum(
-            input=input_reshaped, weight=self.weight, bias=self.bias
-        )
+        out = calc_split_input(input=input_reshaped, weight=self.weight, bias=self.bias)
         return out
 
 
@@ -325,39 +323,7 @@ def _find_split_padding_needed(input_size: int, split_size: int, num_chunks: int
     return num_chunks * split_size - input_size
 
 
-def calc_split_input_torch(
-    input: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor
-):
-    mul = torch.mul(input, weight)
-    summed = torch.sum(mul, dim=2)
-    flattened = summed.flatten(start_dim=1)
-
-    final = flattened
-    if bias is not None:
-        final = flattened + bias
-
-    return final
-
-
-def calc_split_input_loop(
-    input: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor
-):
-    out = []
-    for i in range(weight.shape[0]):
-        mul = torch.mul(input, weight[i], out=None)
-        sum = torch.sum(mul, dim=2)
-        flattened = sum.flatten(start_dim=1)
-        out.append(flattened)
-
-    final = torch.cat(out, dim=1)
-    if bias is not None:
-        final = final + bias
-    return final
-
-
-def calc_split_input_einsum(
-    input: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor
-):
+def calc_split_input(input: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor):
 
     summed = torch.einsum("abc, dbc -> adc", input.squeeze(1), weight)
     flattened = summed.flatten(start_dim=1)
