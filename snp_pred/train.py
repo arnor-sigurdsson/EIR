@@ -149,6 +149,7 @@ def main(
 
     writer = get_summary_writer(run_folder=run_folder)
 
+    # TODO: Actually add support for mixup in this function
     loss_func = _get_loss_callable(
         target_columns=train_dataset.target_columns,
         criterions=criterions,
@@ -313,7 +314,6 @@ def get_model(
 
     if cl_args.multi_gpu:
         model = MyDataParallel(module=model)
-        breakpoint()
 
     if model_class == "linear":
         _check_linear_model_columns(cl_args=cl_args)
@@ -348,18 +348,17 @@ def _get_criterions(
 ) -> al_criterions:
     criterions_dict = {}
 
-    # def calc_bce(input, target):
-    #     # note we use input and not e.g. input_ here because torch uses name "input"
-    #     # in loss functions for compatibility
-    #     bce_loss_func = nn.BCELoss()
-    #     return bce_loss_func(input[:, 1], target.to(dtype=torch.float))
+    def calc_bce(input, target):
+        # note we use input and not e.g. input_ here because torch uses name "input"
+        # in loss functions for compatibility
+        bce_loss_func = nn.BCELoss()
+        return bce_loss_func(input[:, 1], target.to(dtype=torch.float))
 
     def get_criterion(column_type_):
 
         if model_type == "linear":
             if column_type_ == "cat":
-                return nn.CrossEntropyLoss()
-                # return calc_bce
+                return calc_bce
             else:
                 return nn.MSELoss(reduction="mean")
 
@@ -581,7 +580,7 @@ def train(config: Config) -> None:
         c.model.train()
 
         train_seqs, labels, train_ids = loader_batch
-        train_seqs = train_seqs.to(device=cl_args.device, non_blocking=True)
+        train_seqs = train_seqs.to(device=cl_args.device)
         train_seqs = train_seqs.to(dtype=torch.float32)
 
         target_labels = model_training_utils.parse_target_labels(

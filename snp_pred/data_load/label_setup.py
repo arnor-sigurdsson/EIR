@@ -35,8 +35,7 @@ def set_up_train_and_valid_labels(
     set for regression) on the labels.
     """
 
-    df_labels = chunked_label_df_parse_wrapper(cl_args=cl_args)
-    # df_labels.to_csv("pre_computed_many_traits_and_diseases.csv")
+    df_labels = label_df_parse_wrapper(cl_args=cl_args)
 
     df_labels_train, df_labels_valid = _split_df(
         df=df_labels, valid_size=cl_args.valid_size
