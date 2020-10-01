@@ -3,7 +3,7 @@ from copy import deepcopy, copy
 from pathlib import Path
 from typing import List, Tuple, Union, Dict, overload, TYPE_CHECKING
 
-import matplotlib.pyplot as plt
+import plotly.express as px
 import torch
 from aislib.misc_utils import get_logger
 from aislib.pytorch_modules import Swish
@@ -14,17 +14,17 @@ from torch.nn import Module
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 
-from human_origins_supervised.data_load.data_utils import get_target_columns_generator
-from human_origins_supervised.data_load.label_setup import al_target_columns
-from human_origins_supervised.models.extra_inputs_module import get_extra_inputs
-from human_origins_supervised.train_utils.metrics import (
+from snp_pred.data_load.data_utils import get_target_columns_generator
+from snp_pred.data_load.label_setup import al_target_columns
+from snp_pred.models.extra_inputs_module import get_extra_inputs
+from snp_pred.train_utils.metrics import (
     calculate_prediction_losses,
     aggregate_losses,
 )
 
 if TYPE_CHECKING:
     # noinspection PyUnresolvedReferences
-    from human_origins_supervised.train import (  # noqa: F401
+    from snp_pred.train import (  # noqa: F401
         Config,
         al_training_labels_batch,
         al_training_labels_target,
@@ -39,46 +39,6 @@ al_dloader_gathered_raw = Tuple[torch.Tensor, "al_training_labels_batch", List[s
 al_lr_find_results = Dict[str, List[Union[float, List[float]]]]
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
-
-
-def find_no_resblocks_needed(
-    width: int, stride: int, first_stride_expansion: int
-) -> List[int]:
-    """
-    Used in order to calculate / set up residual blocks specifications as a list
-    automatically when they are not passed in as CL args, based on the minimum
-    width after the resblock convolutions.
-
-    We have 2 resblocks per channel depth until we have a total of 8 blocks,
-    then the rest is put in the third depth index (following resnet convention).
-
-    That is with a base channel depth of 32, we have these depths in the list:
-    [32, 64, 128, 256].
-
-    Examples
-    ------
-    3 blocks --> [2, 1]
-    7 blocks --> [2, 2, 2, 1]
-    10 blocks --> [2, 2, 4, 2]
-    """
-
-    min_size = 8 * stride
-    # account for first conv
-    cur_width = width // (stride * first_stride_expansion)
-
-    resblocks = [0] * 4
-    while cur_width >= min_size:
-        cur_no_blocks = sum(resblocks)
-
-        if cur_no_blocks >= 8:
-            resblocks[2] += 1
-        else:
-            cur_index = cur_no_blocks // 2
-            resblocks[cur_index] += 1
-
-        cur_width = cur_width // stride
-
-    return [i for i in resblocks if i != 0]
 
 
 def predict_on_batch(
@@ -246,10 +206,19 @@ def _stack_list_of_tensor_dicts(list_of_batch_dicts):
     return stacked_outputs
 
 
-def get_model_params(model: nn.Module, wd: float) -> List[Dict[str, Union[str, int]]]:
+def add_wd_to_model_params(
+    model: nn.Module, wd: float
+) -> List[Dict[str, Union[str, float]]]:
     """
     We want to skip adding weight decay to learnable activation parameters so as
     not to bias them towards 0.
+
+    TODO:   Split this function in two, one to get the parameters and one to add the
+            WD to them. Possibly we have to do it in-place here, not copy as we have
+            tensors.
+
+    Note: Since we are adding the weight decay manually here, the optimizer does not
+    touch the parameter group weight decay at initialization.
     """
     _check_named_modules(model)
 
@@ -258,7 +227,7 @@ def get_model_params(model: nn.Module, wd: float) -> List[Dict[str, Union[str, i
         cur_dict = {"params": param}
 
         if "act_" in name:
-            cur_dict["weight_decay"] = 0
+            cur_dict["weight_decay"] = 0.0
         else:
             cur_dict["weight_decay"] = wd
 
@@ -380,42 +349,28 @@ def _parse_out_lr_find_multiple_param_groups_suggestion(
 
 
 def plot_lr_find_results(
-    lr_find_results: al_lr_find_results,
-    lr_suggestion: float,
-    outfolder: Path,
-    skip_start: int = 10,
-    skip_end: int = 8,
+    lr_find_results: al_lr_find_results, lr_suggestion: float, outfolder: Path,
 ):
     lr_values = copy(lr_find_results["lr"])
     loss_values = copy(lr_find_results["loss"])
 
-    if skip_end == 0:
-        lr_values = lr_values[skip_start:]
-        loss_values = loss_values[skip_start:]
-    else:
-        lr_values = lr_values[skip_start:-skip_end]
-        loss_values = loss_values[skip_start:-skip_end]
-
-    fig, ax = plt.subplots()
-
-    ax.set_xscale("log")
-
-    ax.plot(
-        lr_values, loss_values, lw=2, label=f"Suggestion: {lr_suggestion:0.4g}",
+    fig = px.line(x=lr_values, y=loss_values, log_x=True, title="Learning Rate Search",)
+    fig.update_layout(
+        xaxis_title="Learning Rate ", yaxis_title="Loss",
     )
-    ax.axvline(x=lr_suggestion, c="r", linestyle="--", lw=0.5)
 
-    ax.set_xlabel("Learning Rate")
-    ax.set_ylabel("Loss")
-    ax.set_title("Learning Rate Search")
-    ax.legend(loc="center left", bbox_to_anchor=(1, 0.5), prop={"size": 8})
+    fig.add_shape(
+        dict(
+            type="line",
+            x0=lr_suggestion,
+            y0=0,
+            x1=lr_suggestion,
+            y1=max(loss_values),
+            line=dict(color="Red", width=1),
+        )
+    )
 
-    plt.tight_layout()
-
-    outfile = outfolder / "lr_search.png"
-    logger.info("Saving LR range test results in %s.", outfile)
-    plt.savefig(outfile, dpi=200)
-    plt.close("all")
+    fig.write_html(str(outfolder / "lr_search.html"))
 
 
 def _calculate_losses_and_average(criterions, outputs, labels) -> torch.Tensor:

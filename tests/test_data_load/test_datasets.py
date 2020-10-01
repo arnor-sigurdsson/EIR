@@ -7,12 +7,12 @@ import numpy as np
 import pytest
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 
-from human_origins_supervised.data_load import datasets, label_setup
-from human_origins_supervised.data_load.datasets import al_datasets
+from snp_pred.data_load import datasets, label_setup
+from snp_pred.data_load.datasets import al_datasets
 
 
 def get_joblib_patch_target():
-    return "human_origins_supervised.data_load.datasets.joblib"
+    return "snp_pred.data_load.datasets.joblib"
 
 
 @patch(get_joblib_patch_target(), autospec=True)

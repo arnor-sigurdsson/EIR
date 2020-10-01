@@ -3,7 +3,6 @@ from math import isclose
 import pytest
 import torch
 from ignite.contrib.handlers import (
-    ProgressBar,
     ConcatScheduler,
     CosineAnnealingScheduler,
     ParamGroupScheduler,
@@ -12,8 +11,8 @@ from ignite.engine import Engine, State
 from torch.optim import Adam, SGD
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
-from human_origins_supervised.train_utils import lr_scheduling
-from human_origins_supervised.train_utils.train_handlers import HandlerConfig
+from snp_pred.train_utils import lr_scheduling
+from snp_pred.train_utils.train_handlers import HandlerConfig
 
 
 @pytest.fixture()
@@ -72,7 +71,6 @@ def get_dummy_handler_config(prep_modelling_test_configs) -> HandlerConfig:
         config=config,
         run_folder=test_config.run_path,
         run_name=cl_args.run_name,
-        pbar=ProgressBar(),
         monitoring_metrics=[("tmp_var", "tmp_var")],
     )
 
@@ -93,7 +91,7 @@ def test_set_up_lr_scheduler_plateau(get_dummy_handler_config):
     lr_scheduler = lr_scheduling.set_up_lr_scheduler(handler_config=handler_config)
     assert isinstance(lr_scheduler, ReduceLROnPlateau)
 
-    expected_patience = lr_scheduling._calc_plateu_patience(
+    expected_patience = lr_scheduling.calc_plateu_patience(
         steps_per_epoch=len(handler_config.config.train_loader),
         sample_interval=cl_args.sample_interval,
     )
@@ -253,7 +251,7 @@ def test_calculate_auto_warmup_steps_adaptive(create_dummy_test_optimizer):
     ],
 )
 def test_calc_plateau_patience(test_input, expected):
-    patience = lr_scheduling._calc_plateu_patience(**test_input)
+    patience = lr_scheduling.calc_plateu_patience(**test_input)
     assert patience == expected
 
 

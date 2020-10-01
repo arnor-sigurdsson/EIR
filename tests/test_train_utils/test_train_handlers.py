@@ -1,4 +1,4 @@
-from human_origins_supervised.train_utils import train_handlers
+from snp_pred.train_utils import train_handlers
 
 
 def test_unflatten_engine_metrics_dict():

@@ -22,10 +22,10 @@ from matplotlib.ticker import MaxNLocator
 
 from aislib.misc_utils import get_logger
 
-from human_origins_supervised.train_utils import metrics
+from snp_pred.train_utils import metrics
 
 if TYPE_CHECKING:
-    from human_origins_supervised.train_utils.evaluation import PerformancePlotConfig
+    from snp_pred.train_utils.evaluation import PerformancePlotConfig
 
 
 logger = get_logger(name=__name__, tqdm_compatible=True)

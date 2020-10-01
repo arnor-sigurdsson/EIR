@@ -1,5 +1,5 @@
-from math import isclose
 from collections import Counter
+from math import isclose
 from typing import List
 from unittest.mock import patch
 
@@ -9,9 +9,9 @@ import torch
 from hypothesis import given
 from hypothesis.strategies import lists, integers
 
-from human_origins_supervised.data_load import data_loading_funcs
-from human_origins_supervised.data_load.datasets import Sample
-from human_origins_supervised.train import get_dataloaders
+from snp_pred.data_load import data_loading_funcs
+from snp_pred.data_load.datasets import Sample
+from snp_pred.train import get_dataloaders
 
 
 @pytest.mark.parametrize(
@@ -235,9 +235,7 @@ def test_make_random_snps_missing_some():
     test_array = torch.zeros((1, 4, 1000), dtype=torch.bool)
     test_array[:, 0, :] = True
 
-    patch_target = (
-        "human_origins_supervised.data_load.data_loading_funcs.np.random.choice"
-    )
+    patch_target = "snp_pred.data_load.data_loading_funcs.np.random.choice"
     with patch(patch_target, autospec=True) as mock_target:
         mock_return = np.array([1, 2, 3, 4, 5])
         mock_target.return_value = mock_return

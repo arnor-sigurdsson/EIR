@@ -19,26 +19,25 @@ from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader, WeightedRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
-from human_origins_supervised.data_load import data_utils
-from human_origins_supervised.data_load import datasets
-from human_origins_supervised.data_load.data_loading_funcs import (
-    get_weighted_random_sampler,
-)
-from human_origins_supervised.data_load.datasets import al_num_classes
-from human_origins_supervised.data_load.label_setup import (
+from snp_pred.data_load import data_utils
+from snp_pred.data_load import datasets
+from snp_pred.data_load.data_loading_funcs import get_weighted_random_sampler
+from snp_pred.data_load.datasets import al_num_classes
+from snp_pred.data_load.label_setup import (
     al_target_columns,
     al_label_transformers,
 )
-from human_origins_supervised.models import model_utils
-from human_origins_supervised.models.extra_inputs_module import (
+from snp_pred.models import model_training_utils
+from snp_pred.models.extra_inputs_module import (
     set_up_and_save_embeddings_dict,
     get_extra_inputs,
     al_emb_lookup_dict,
 )
-from human_origins_supervised.models.model_utils import run_lr_find
-from human_origins_supervised.models.models import get_model_class, al_models
-from human_origins_supervised.train_utils import utils
-from human_origins_supervised.train_utils.metrics import (
+from snp_pred.models.model_training_utils import run_lr_find
+from snp_pred.models.models import al_models
+from snp_pred.models.models import get_model_class
+from snp_pred.train_utils import utils
+from snp_pred.train_utils.metrics import (
     calculate_batch_metrics,
     calculate_prediction_losses,
     aggregate_losses,
@@ -47,24 +46,17 @@ from human_origins_supervised.train_utils.metrics import (
     get_extra_loss_term_functions,
     add_extra_losses,
     get_average_history_filepath,
-    calc_mcc,
-    calc_roc_auc_ovr,
-    calc_acc,
-    calc_rmse,
-    calc_pcc,
-    calc_r2,
-    calc_average_precision_ovr,
-    MetricRecord,
+    get_default_metrics,
 )
-from human_origins_supervised.train_utils.optimizers import (
+from snp_pred.train_utils.optimizers import (
     get_optimizer,
     get_base_optimizers_dict,
     get_optimizer_backward_kwargs,
 )
-from human_origins_supervised.train_utils.train_handlers import configure_trainer
+from snp_pred.train_utils.train_handlers import configure_trainer
 
 if TYPE_CHECKING:
-    from human_origins_supervised.train_utils.metrics import (
+    from snp_pred.train_utils.metrics import (
         al_step_metric_dict,
         al_metric_record_dict,
     )
@@ -76,9 +68,6 @@ al_training_labels_target = Dict[str, Union[torch.LongTensor, torch.Tensor]]
 al_training_labels_extra = Dict[str, Union[List[str], torch.Tensor]]
 al_training_labels_batch = Dict[
     str, Union[al_training_labels_target, al_training_labels_extra]
-]
-al_averaging_functions_dict = Dict[
-    str, Callable[["al_step_metric_dict", str, str], float]
 ]
 
 torch.manual_seed(0)
@@ -169,9 +158,7 @@ def main(
 
     optimizer = get_optimizer(model=model, loss_callable=loss_func, cl_args=cl_args)
 
-    metrics = _get_default_metrics(
-        target_transformers=train_dataset.target_transformers
-    )
+    metrics = get_default_metrics(target_transformers=train_dataset.target_transformers)
 
     config = Config(
         cl_args=cl_args,
@@ -418,61 +405,6 @@ def get_summary_writer(run_folder: Path) -> SummaryWriter:
     return writer
 
 
-def _get_default_metrics(
-    target_transformers: al_label_transformers,
-) -> "al_metric_record_dict":
-    mcc = MetricRecord(name="mcc", function=calc_mcc)
-    acc = MetricRecord(name="acc", function=calc_acc)
-    rmse = MetricRecord(
-        name="rmse",
-        function=partial(calc_rmse, target_transformers=target_transformers),
-        minimize_goal=True,
-    )
-
-    default_metrics = {
-        "cat": (mcc, acc),
-        "con": (rmse,),
-        "averaging_functions": {"con": "loss", "cat": "acc"},
-    }
-
-    # TODO: Remove and use default metrics, currently temporary for testing
-    roc_auc_macro = MetricRecord(
-        name="roc-auc-macro", function=calc_roc_auc_ovr, only_val=True
-    )
-    ap_macro = MetricRecord(
-        name="ap-macro", function=calc_average_precision_ovr, only_val=True
-    )
-    r2 = MetricRecord(name="r2", function=calc_r2, only_val=True)
-    pcc = MetricRecord(name="pcc", function=calc_pcc, only_val=True)
-
-    averaging_functions = _get_default_performance_averaging_functions()
-    default_metrics = {
-        "cat": (mcc, acc, roc_auc_macro, ap_macro),
-        "con": (rmse, r2, pcc),
-        "averaging_functions": averaging_functions,
-    }
-    return default_metrics
-
-
-def _get_default_performance_averaging_functions() -> al_averaging_functions_dict:
-    def _calc_cat_averaging_value(
-        metric_dict: "al_step_metric_dict", column_name: str, metric_name: str
-    ) -> float:
-        return metric_dict[column_name].get(f"{column_name}_{metric_name}", 0)
-
-    def _calc_con_averaging_value(
-        metric_dict: "al_step_metric_dict", column_name: str, metric_name: str
-    ) -> float:
-        return 1 - metric_dict[column_name][f"{column_name}_{metric_name}"]
-
-    performance_averaging_functions = {
-        "cat": partial(_calc_cat_averaging_value, metric_name="roc-auc-macro"),
-        "con": partial(_calc_con_averaging_value, metric_name="loss"),
-    }
-
-    return performance_averaging_functions
-
-
 def _log_num_params(model: nn.Module) -> None:
     no_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     logger.info(
@@ -652,7 +584,7 @@ def train(config: Config) -> None:
         train_seqs = train_seqs.to(device=cl_args.device, non_blocking=True)
         train_seqs = train_seqs.to(dtype=torch.float32)
 
-        target_labels = model_utils.parse_target_labels(
+        target_labels = model_training_utils.parse_target_labels(
             target_columns=c.target_columns,
             device=cl_args.device,
             labels=labels["target_labels"],
@@ -681,6 +613,7 @@ def train(config: Config) -> None:
 
         # train_losses = c.loss_function(inputs=train_outputs, targets=target_labels)
 
+        # TODO: This could be the "loss_callable" in config?
         # ----------- TMP -----------
         tmp_target = c.target_columns["cat"][0]
         train_losses = mixup_criterion(
@@ -776,6 +709,14 @@ def _get_train_argument_parser() -> configargparse.ArgumentParser:
         "Otherwise keeps same learning rate.",
     )
 
+    # TODO: Change this to patience steps, so it is configurable
+    parser_.add_argument(
+        "--early_stopping_patience",
+        type=int,
+        default=None,
+        help="Whether to terminate training early if performance stops improving.",
+    )
+
     parser_.add_argument(
         "--warmup_steps", type=str, default=0, help="How many steps to use in warmup."
     )
@@ -847,7 +788,7 @@ def _get_train_argument_parser() -> configargparse.ArgumentParser:
         "--model_type",
         type=str,
         default="cnn",
-        choices=["cnn", "mlp", "mlp-split", "mlp-mgmoe", "linear"],
+        choices=["cnn", "mlp", "mlp-split", "mlp-fully-split", "mlp-mgmoe", "linear"],
         help="whether to use a convolutional neural network (cnn) or multilayer "
         "perceptron (mlp)",
     )
@@ -1076,7 +1017,21 @@ def _get_train_argument_parser() -> configargparse.ArgumentParser:
     )
 
     parser_.add_argument(
+        "--max_acts_per_class",
+        default=None,
+        type=int,
+        help="Maximum number of samples per class to gather for activation analysis. "
+        "Good to use when modelling on imbalanced data.",
+    )
+
+    parser_.add_argument(
         "--debug",
+        action="store_true",
+        help="Whether to run in debug mode (w. breakpoint).",
+    )
+
+    parser_.add_argument(
+        "--no_pbar",
         action="store_true",
         help="Whether to run in debug mode (w. breakpoint).",
     )

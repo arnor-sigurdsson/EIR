@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from human_origins_supervised.train_utils import activation_analysis as av
+from snp_pred.train_utils import activation_analysis as av
 
 
 def test_rescale_gradients():

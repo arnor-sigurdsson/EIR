@@ -12,7 +12,12 @@ from torch.nn.functional import pad
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
-from human_origins_supervised.data_load.label_setup import (
+from snp_pred.data_load.data_loading_funcs import make_random_snps_missing
+from snp_pred.data_load.label_setup import (
+    set_up_label_transformers,
+    _streamline_values_for_transformers,
+)
+from snp_pred.data_load.label_setup import (
     set_up_train_and_valid_labels,
     al_label_dict,
     al_label_values_raw,
@@ -23,14 +28,7 @@ from human_origins_supervised.data_load.label_setup import (
     get_transformer_path,
     get_array_path_iterator,
 )
-from human_origins_supervised.data_load.data_loading_funcs import (
-    make_random_snps_missing,
-)
-from human_origins_supervised.train_utils.utils import get_run_folder
-from human_origins_supervised.data_load.label_setup import (
-    set_up_label_transformers,
-    _streamline_values_for_transformers,
-)
+from snp_pred.train_utils.utils import get_run_folder
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 

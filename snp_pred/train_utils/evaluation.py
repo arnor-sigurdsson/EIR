@@ -10,16 +10,16 @@ from ignite.engine import Engine
 from scipy.special import softmax
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
-from human_origins_supervised.data_load.data_utils import get_target_columns_generator
-from human_origins_supervised.data_load.datasets import al_label_transformers_object
-from human_origins_supervised.models import model_utils
-from human_origins_supervised.train_utils import metrics
-from human_origins_supervised.train_utils import utils
-from human_origins_supervised.visualization import visualization_funcs as vf
+from snp_pred.data_load.data_utils import get_target_columns_generator
+from snp_pred.data_load.datasets import al_label_transformers_object
+from snp_pred.models import model_training_utils
+from snp_pred.train_utils import metrics
+from snp_pred.train_utils import utils
+from snp_pred.visualization import visualization_funcs as vf
 
 if TYPE_CHECKING:
-    from human_origins_supervised.train_utils.train_handlers import HandlerConfig
-    from human_origins_supervised.train import Config
+    from snp_pred.train_utils.train_handlers import HandlerConfig
+    from snp_pred.train import Config
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -36,7 +36,7 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
     iteration = engine.state.iteration
 
     c.model.eval()
-    gather_preds = model_utils.gather_pred_outputs_from_dloader
+    gather_preds = model_training_utils.gather_pred_outputs_from_dloader
     val_outputs_total, val_target_labels, val_ids_total = gather_preds(
         data_loader=c.valid_loader,
         cl_args=c.cl_args,
@@ -46,7 +46,7 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
     )
     c.model.train()
 
-    val_target_labels = model_utils.parse_target_labels(
+    val_target_labels = model_training_utils.parse_target_labels(
         target_columns=c.target_columns, device=cl_args.device, labels=val_target_labels
     )
 

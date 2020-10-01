@@ -5,8 +5,8 @@ import pytest
 import torch
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 
-from human_origins_supervised import train
-from human_origins_supervised.train_utils import metrics
+from snp_pred import train
+from snp_pred.train_utils import metrics
 
 
 def test_calculate_batch_metrics():
@@ -56,7 +56,7 @@ def get_calculate_batch_metrics_data_test_kwargs():
         "BMI": StandardScaler().fit(standard_scaler_fit_arr),
         "Height": StandardScaler().fit(standard_scaler_fit_arr),
     }
-    metrics = train._get_default_metrics(target_transformers=target_transformers)
+    metrics_ = metrics.get_default_metrics(target_transformers=target_transformers)
 
     batch_metrics_function_kwargs = {
         "target_columns": target_columns,
@@ -64,7 +64,7 @@ def get_calculate_batch_metrics_data_test_kwargs():
         "outputs": outputs,
         "labels": labels,
         "mode": "val",
-        "metric_record_dict": metrics,
+        "metric_record_dict": metrics_,
     }
 
     return batch_metrics_function_kwargs

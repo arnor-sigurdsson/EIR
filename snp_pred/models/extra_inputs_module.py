@@ -8,10 +8,10 @@ import torch
 from aislib.misc_utils import ensure_path_exists
 from torch import nn
 
-from human_origins_supervised.data_load.label_setup import al_label_dict
+from snp_pred.data_load.label_setup import al_label_dict
 
 if TYPE_CHECKING:
-    from human_origins_supervised.train import al_training_labels_extra
+    from snp_pred.train import al_training_labels_extra
 
 # Aliases
 al_unique_embed_vals = Dict[str, Set[str]]

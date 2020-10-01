@@ -1,4 +1,5 @@
 import csv
+import warnings
 from argparse import Namespace
 from dataclasses import dataclass
 from pathlib import Path
@@ -6,7 +7,6 @@ from random import shuffle
 from shutil import rmtree
 from types import SimpleNamespace
 from typing import List, Tuple, Dict
-import warnings
 
 import numpy as np
 import pytest
@@ -16,17 +16,15 @@ from torch import cuda
 from torch import nn
 from torch.utils.data import DataLoader
 
-from human_origins_supervised import train
-from human_origins_supervised.data_load import datasets
-from human_origins_supervised.models.extra_inputs_module import (
-    set_up_and_save_embeddings_dict,
-)
-from human_origins_supervised.train import Config, get_model
-from human_origins_supervised.train_utils.utils import (
+from snp_pred import train
+from snp_pred.data_load import datasets
+from snp_pred.models.extra_inputs_module import set_up_and_save_embeddings_dict
+from snp_pred.train import Config, get_model
+from snp_pred.train_utils import optimizers, metrics
+from snp_pred.train_utils.utils import (
     configure_root_logger,
     get_run_folder,
 )
-from human_origins_supervised.train_utils import optimizers
 
 np.random.seed(0)
 
@@ -71,7 +69,7 @@ def args_config():
             "b2": 0.999,
             "batch_size": 32,
             "channel_exp_base": 5,
-            "checkpoint_interval": 100,
+            "checkpoint_interval": 10000,
             "extra_con_columns": [],
             "custom_lib": None,
             "data_source": "REPLACE_ME",
@@ -79,6 +77,7 @@ def args_config():
             "dilation_factor": 1,
             "down_stride": 4,
             "extra_cat_columns": [],
+            "early_stopping_patience": None,
             "fc_repr_dim": 64,
             "fc_task_dim": 32,
             "fc_do": 0.0,
@@ -94,6 +93,7 @@ def args_config():
             "lr": 1e-2,
             "lr_lb": 1e-5,
             "lr_schedule": "plateau",
+            "max_acts_per_class": None,
             "memory_dataset": True,
             "mg_num_experts": 3,
             "model_type": "cnn",
@@ -102,6 +102,7 @@ def args_config():
             "n_epochs": 5,
             "na_augment_perc": 0.05,
             "na_augment_prob": 0.20,
+            "no_pbar": False,
             "optimizer": "adamw",
             "plot_skip_steps": 50,
             "rb_do": 0.25,
@@ -244,7 +245,6 @@ def _save_test_array_to_disk(
     base_array, snp_idxs_candidates = _set_up_base_test_array(c.n_snps)
 
     cur_test_array, snps_this_sample = _create_test_array(
-        test_task=c.task_type,
         base_array=base_array,
         snp_idxs_candidates=snp_idxs_candidates,
         snp_row_idx=active_snp_row_idx,
@@ -266,13 +266,8 @@ def _set_up_base_test_array(n_snps: int) -> Tuple[np.ndarray, np.ndarray]:
 
 
 def _create_test_array(
-    test_task: str,
-    base_array: np.ndarray,
-    snp_idxs_candidates: np.ndarray,
-    snp_row_idx: int,
+    base_array: np.ndarray, snp_idxs_candidates: np.ndarray, snp_row_idx: int,
 ) -> Tuple[np.ndarray, List[int]]:
-    """
-    """
     # make samples have missing for chosen, otherwise might have alleles chosen
     # below by random, without having the phenotype
     base_array[:, snp_idxs_candidates] = 0
@@ -300,13 +295,23 @@ def _set_up_test_data_array_outpath(base_folder: Path) -> Path:
 
 
 def write_test_data_snp_file(base_folder: Path, n_snps: int) -> None:
+    """
+    BIM specs:
+        0. Chromosome code
+        1. Variant ID
+        2. Position in centi-morgans
+        3. Base-pair coordinate (1-based)
+        4. ALT allele cod
+        5. REF allele code
+    """
     snp_file = base_folder / "test_snps.bim"
-    base_snp_string_list = ["1", "REPLACE_W_IDX", "0.1", "10", "A", "T"]
+    base_snp_string_list = ["1", "REPLACE_W_IDX", "0.1", "REPLACE_W_IDX", "A", "T"]
 
     with open(str(snp_file), "w") as snpfile:
         for snp_idx in range(n_snps):
             cur_snp_list = base_snp_string_list[:]
             cur_snp_list[1] = str(snp_idx)
+            cur_snp_list[3] = str(snp_idx)
 
             cur_snp_string = "\t".join(cur_snp_list)
             snpfile.write(cur_snp_string + "\n")
@@ -465,14 +470,13 @@ def prep_modelling_test_configs(
     train_loader, valid_loader, train_dataset, valid_dataset = create_test_dloaders
     model = create_test_model
 
-    optimizer = create_test_optimizer
     criterions = train._get_criterions(
         target_columns=train_dataset.target_columns, model_type=cl_args.model_type
     )
-    metrics = train._get_default_metrics(
+    test_metrics = metrics.get_default_metrics(
         target_transformers=train_dataset.target_transformers
     )
-    metrics = _patch_metrics(metrics=metrics)
+    test_metrics = _patch_metrics(metrics=test_metrics)
 
     optimizer, loss_module = create_test_optimizer(
         cl_args=cl_args,
@@ -494,7 +498,7 @@ def prep_modelling_test_configs(
         optimizer=optimizer,
         criterions=criterions,
         loss_function=loss_module,
-        metrics=metrics,
+        metrics=test_metrics,
         labels_dict=train_dataset.labels_dict,
         target_transformers=train_dataset.target_transformers,
         target_columns=train_dataset.target_columns,
@@ -536,8 +540,10 @@ def _get_cur_modelling_test_config(
     )
 
     gen = last_sample_folders.items
-    activations_path = {k: folder / "top_acts.npy" for k, folder in gen()}
-    masked_activations_path = {k: folder / "top_acts_masked.npy" for k, folder in gen()}
+    activations_path = {k: folder / "activations/top_acts.npy" for k, folder in gen()}
+    masked_activations_path = {
+        k: folder / "activations/top_acts_masked.npy" for k, folder in gen()
+    }
 
     test_config = ModelTestConfig(
         iteration=last_iter,

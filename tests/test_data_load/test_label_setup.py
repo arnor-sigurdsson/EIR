@@ -1,12 +1,13 @@
+from argparse import Namespace
 from pathlib import Path
 from unittest.mock import patch
-import pytest
+
 import numpy as np
 import pandas as pd
-from argparse import Namespace
+import pytest
 
-from human_origins_supervised.data_load import label_setup
-from human_origins_supervised.data_load.common_ops import ColumnOperation
+from snp_pred.data_load import label_setup
+from snp_pred.data_load.common_ops import ColumnOperation
 
 
 @pytest.fixture()
@@ -166,7 +167,7 @@ def test_get_array_path_iterator_folder(create_test_data):
 def test_get_array_path_iterator_fail(create_test_data):
     c = create_test_data
 
-    with pytest.raises(ValueError):
+    with pytest.raises(FileNotFoundError):
         label_setup.get_array_path_iterator(data_source=Path("does/not/exist"))
 
     test_label_file_path = c.scoped_tmp_path / "test_paths_fail.txt"
@@ -495,7 +496,7 @@ def test_parse_label_df_applied_2(create_test_data, create_test_column_ops):
     assert df_labels_parsed["OriginExtraColumnsAll"].unique().item() == "Iceland"
 
 
-@patch("human_origins_supervised.data_load.label_setup.logger.debug", autospec=True)
+@patch("snp_pred.data_load.label_setup.logger.debug", autospec=True)
 @pytest.mark.parametrize("create_test_data", [{"task_type": "binary"}], indirect=True)
 def test_parse_label_df_not_applied(m_logger, create_test_data, create_test_column_ops):
     """
