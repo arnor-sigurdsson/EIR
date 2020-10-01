@@ -8,7 +8,7 @@ from torch import nn
 from snp_pred.models.models_base import (
     ModelBase,
     get_basic_multi_branch_spec,
-    create_blocks_with_first_adaptor_block,
+    create_multi_task_blocks_with_first_adaptor_block,
     initialize_modules_from_spec,
     get_final_layer,
     merge_module_dicts,
@@ -45,7 +45,7 @@ class MLPModel(ModelBase):
             dropout_p=self.cl_args.fc_do,
         )
 
-        branches = create_blocks_with_first_adaptor_block(
+        branches = create_multi_task_blocks_with_first_adaptor_block(
             num_blocks=self.cl_args.layers[0],
             branch_names=self.num_classes.keys(),
             block_constructor=initialize_modules_from_spec,
