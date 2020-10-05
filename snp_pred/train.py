@@ -268,7 +268,6 @@ def main(cl_args: argparse.Namespace, hooks: Union[Hooks, None] = None) -> None:
         target_columns=train_dataset.target_columns,
         criterions=criterions,
         device=cl_args.device,
-        mixup=True,
     )
 
     optimizer = get_optimizer(model=model, loss_callable=loss_func, cl_args=cl_args)
@@ -487,10 +486,7 @@ def _get_criterions(
 
 
 def _get_loss_callable(
-    target_columns: al_target_columns,
-    criterions: al_criterions,
-    device: str,
-    mixup: bool = False,
+    target_columns: al_target_columns, criterions: al_criterions, device: str,
 ):
     num_tasks = len(target_columns["con"] + target_columns["cat"])
     if num_tasks > 1:
