@@ -5,7 +5,17 @@ from functools import partial
 from os.path import abspath
 from pathlib import Path
 from sys import platform
-from typing import Union, Tuple, List, Dict, overload, TYPE_CHECKING, Callable
+from typing import (
+    Union,
+    Tuple,
+    List,
+    Dict,
+    overload,
+    TYPE_CHECKING,
+    Callable,
+    Any,
+    Iterable,
+)
 
 import configargparse
 import numpy as np
@@ -80,31 +90,49 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
 # Have to have clearly defined stages here
+# TODO: Make step_func_hooks a dataclass of stages
 @dataclass
 class Hooks:
     step_func_hooks: Dict
 
 
-@dataclass
-class Hook:
-    func: Callable
-    func_kwargs: Dict
+def call_hooks_stage_iterable(
+    hook_iterable: Iterable[Callable],
+    common_kwargs: Dict,
+    state: Union[None, Dict[str, Any]],
+):
+    for hook in hook_iterable:
+        _, state = state_registered_hook_call(
+            hook_func=hook, **common_kwargs, state=state
+        )
+
+    return state
 
 
-# Use a cached call function, to call all hook functions, and cache the results
-# because all hook functions will be called through some wrapper functions anyway,
-# e.g. we can have a general function that calls and caches all hooks in a given stage
+def state_registered_hook_call(
+    hook_func: Callable,
+    config: "Config",
+    batch: "Batch",
+    state: Union[Dict[str, Any], None],
+    *args,
+    **kwargs,
+) -> Tuple[Any, Dict[str, Any]]:
+    """
+    TODO: Add inspection of hook signature
+    TODO: Even better, do it when hooks are initialized for the first time.
+    """
+
+    if state is None:
+        state = {}
+
+    state_updates = hook_func(config=config, batch=batch, state=state, *args, **kwargs)
+
+    state = {**state, **state_updates}
+
+    return state_updates, state
 
 
-def cached_hook_call(hook_func, config, batch, cache, *args, **kwargs):
-    result = hook_func(config=config, batch=batch, *args, **kwargs)
-
-    cache[hook_func.__name__] = result
-
-    return result, cache
-
-
-def hook_mixup(config: "Config", batch: "Batch", *args, **kwargs):
+def hook_mix_data(config: "Config", batch: "Batch", *args, **kwargs) -> Dict:
 
     mixed_object = mixup_data(
         inputs=batch.inputs,
@@ -114,7 +142,59 @@ def hook_mixup(config: "Config", batch: "Batch", *args, **kwargs):
         mixing_type=config.cl_args.mixing_type,
     )
 
-    return mixed_object
+    state_updates = {"model_inputs": mixed_object.inputs, "mixed_data": mixed_object}
+
+    return state_updates
+
+
+def hook_mix_loss(config: "Config", state: Dict, *args, **kwargs) -> Dict:
+
+    mixed_losses = calc_all_mixed_losses(
+        target_columns=config.target_columns,
+        criterions=config.criterions,
+        outputs=state["model_outputs"],
+        mixed_object=state["mixed_data"],
+    )
+
+    state_updates = {"train_losses": mixed_losses}
+
+    return state_updates
+
+
+def hook_default_data(batch: "Batch", *args, **kwargs) -> Dict:
+    state_updates = {"model_inputs": batch.inputs}
+    return state_updates
+
+
+def hook_default_loss(
+    config: "Config", batch: "Batch", state: Dict, *args, **kwargs
+) -> Dict:
+
+    mixed_losses = config.loss_function(
+        inputs=state["model_outputs"], targets=batch.target_labels
+    )
+
+    state_updates = {"train_losses": mixed_losses}
+
+    return state_updates
+
+
+def hook_final_loss(config: "Config", state: Dict, *args, **kwargs) -> Dict:
+    """
+    TODO: Separate the extra loss term functions into own hooks?
+    """
+
+    extra_loss_functions = get_extra_loss_term_functions(
+        model=config.model, l1_weight=config.cl_args.l1
+    )
+
+    train_loss_final = add_extra_losses(
+        total_loss=state["loss_average"], extra_loss_functions=extra_loss_functions
+    )
+
+    state_updates = {"loss_final": train_loss_final}
+
+    return state_updates
 
 
 @dataclass(frozen=True)
@@ -140,10 +220,10 @@ class Config:
     data_width: int
     writer: SummaryWriter
     metrics: "al_metric_record_dict"
-    hooks: Union[Hooks, None]
+    hooks_: Union[Hooks, None]
 
 
-def main(cl_args: argparse.Namespace, custom_hooks: Union[Hooks, None] = None) -> None:
+def main(cl_args: argparse.Namespace, hooks: Union[Hooks, None] = None) -> None:
     run_folder = _prepare_run_folder(run_name=cl_args.run_name)
 
     train_dataset, valid_dataset = datasets.set_up_datasets(cl_args=cl_args)
@@ -210,7 +290,7 @@ def main(cl_args: argparse.Namespace, custom_hooks: Union[Hooks, None] = None) -
         data_width=train_dataset.data_width,
         writer=writer,
         metrics=metrics,
-        hooks=custom_hooks,
+        hooks=hooks,
     )
 
     _log_num_params(model=model)
@@ -443,22 +523,50 @@ def _log_num_params(model: nn.Module) -> None:
 class Batch:
     inputs: torch.Tensor
     target_labels: Dict[str, torch.Tensor]
+    extra_inputs: Union[Dict[str, torch.Tensor], None]
     ids: List[str]
+
+
+def _prepare_batch(
+    loader_batch: Tuple[torch.Tensor, al_training_labels_batch, List[str]],
+    config,
+    cl_args,
+) -> Batch:
+
+    train_seqs, labels, train_ids = loader_batch
+    train_seqs = train_seqs.to(device=cl_args.device)
+    train_seqs = train_seqs.to(dtype=torch.float32)
+
+    target_labels = model_training_utils.parse_target_labels(
+        target_columns=config.target_columns,
+        device=cl_args.device,
+        labels=labels["target_labels"],
+    )
+
+    # TODO: We will have to mix extra inputs as well
+    # TODO: Here we have extra_inputs hook
+    extra_inputs = get_extra_inputs(
+        cl_args=cl_args, model=config.model, labels=labels["extra_labels"]
+    )
+
+    batch = Batch(
+        inputs=train_seqs,
+        target_labels=target_labels,
+        extra_inputs=extra_inputs,
+        ids=train_ids,
+    )
+
+    return batch
 
 
 def train(config: Config) -> None:
     c = config
     cl_args = config.cl_args
+    step_hooks = c.hooks.step_func_hooks
 
-    # can be hook
-    extra_loss_functions = get_extra_loss_term_functions(
-        model=c.model, l1_weight=cl_args.l1
-    )
     optimizer_backward_kwargs = get_optimizer_backward_kwargs(
         optimizer_name=cl_args.optimizer
     )
-
-    # step_function_cache = {}
 
     def step(
         engine: Engine,
@@ -469,85 +577,49 @@ def train(config: Config) -> None:
         """
         c.model.train()
 
-        train_seqs, labels, train_ids = loader_batch
-        train_seqs = train_seqs.to(device=cl_args.device)
-        train_seqs = train_seqs.to(dtype=torch.float32)
-
-        target_labels = model_training_utils.parse_target_labels(
-            target_columns=c.target_columns,
-            device=cl_args.device,
-            labels=labels["target_labels"],
+        batch = _prepare_batch(
+            loader_batch=loader_batch, config=config, cl_args=cl_args
         )
 
-        # ----------- TMP -----------
-        # TODO: Some kind of hook here, or in dataloader? Then parse_target labels
-        # TODO: must be aware of that, better to have hook here and return DTO
-        # TODO: Definitely have as hook here
-        # TODO: Convert to data object returned by hook
-        # TODO: Just create something like an input_hook
-
-        # STAGE: LOADED INPUTS
-        # NEEDS: config, train_seqs, target_labels
-        mixed_object = mixup_data(
-            inputs=train_seqs,
-            targets=target_labels,
-            target_columns=c.target_columns,
-            alpha=cl_args.mixing_alpha,
-            mixing_type=cl_args.mixing_type,
+        loaded_inputs_stage = step_hooks["loaded_batch"]
+        state = call_hooks_stage_iterable(
+            hook_iterable=loaded_inputs_stage,
+            common_kwargs={"config": config, "batch": batch},
+            state=None,
         )
-        # ----------- TMP -----------
-
-        # TODO: We will have to mix extra inputs as well
-        # TODO: Here we have extra_inputs hook
-
-        extra_inputs = get_extra_inputs(
-            cl_args=cl_args, model=c.model, labels=labels["extra_labels"]
-        )
-        # STAGE: LOADED EXTRA INPUTS
-        # NEEDS: Extra input, prev hook outputs,
 
         c.optimizer.zero_grad()
 
-        train_outputs = c.model(x=mixed_object.inputs, extra_inputs=extra_inputs)
-
-        # train_losses = c.loss_function(inputs=train_outputs, targets=target_labels)
-
-        # TODO: This could be the "loss_callable" in config?
-        # TODO: The key is figuring out a way to pass outputs from hook to here.
-        # TODO: Because it's a partial mix of config, model outputs and mixing outputs
-
-        # TODO: Also, passing information between, meaning output from one to another
-        # TODO: This will mean some kind of data structure (i.e. dict) that other
-        # TODO: Hooks can pull output from
-        # TODO: Some kind of closure? Or bound argument to dict?S
-        # TODO: Basically an object where downstream hooks can check outputs
-
-        # STAGE: PER TARGET LOSSES
-        # NEEDS: config, train outputs, prev hook outputs
-        # ----------- TMP -----------
-        train_losses = calc_all_mixed_losses(
-            target_columns=c.target_columns,
-            criterions=c.criterions,
-            outputs=train_outputs,
-            mixed_object=mixed_object,
+        train_outputs = c.model(
+            x=state["model_inputs"], extra_inputs=batch.extra_inputs
         )
-        # ----------- TMP -----------
+        state["model_outputs"] = train_outputs
 
-        train_loss_avg = aggregate_losses(losses_dict=train_losses)
-        # STAGE: FINAL LOSS
-        train_loss_final = add_extra_losses(
-            total_loss=train_loss_avg, extra_loss_functions=extra_loss_functions
+        per_target_loss_stage = step_hooks["per_target_loss"]
+        state = call_hooks_stage_iterable(
+            hook_iterable=per_target_loss_stage,
+            common_kwargs={"config": config, "batch": batch},
+            state=state,
         )
 
-        # NO MORE HOOKS AFTER THIS STAGE?
-        train_loss_final.backward(**optimizer_backward_kwargs)
+        train_loss_avg = aggregate_losses(losses_dict=state["train_losses"])
+        state["loss_average"] = train_loss_avg
+
+        final_loss_stage = step_hooks["final_loss"]
+        state = call_hooks_stage_iterable(
+            hook_iterable=final_loss_stage,
+            common_kwargs={"config": config, "batch": batch},
+            state=state,
+        )
+
+        state["loss_final"].backward(**optimizer_backward_kwargs)
         c.optimizer.step()
 
         train_batch_metrics = calculate_batch_metrics(
             target_columns=c.target_columns,
-            losses=train_losses,
+            losses=state["train_losses"],
             outputs=train_outputs,
-            labels=target_labels,
+            labels=batch.target_labels,
             mode="train",
             metric_record_dict=c.metrics,
         )
@@ -1002,6 +1074,33 @@ def _modify_train_arguments(cl_args: argparse.Namespace) -> argparse.Namespace:
     return cl_args
 
 
+def _get_step_func_hooks(cl_args: argparse.Namespace):
+    """
+    TODO: Add validation, inspect that outputs have correct names.
+    TODO: Make the hooks a dataclass
+    """
+
+    step_func_hooks_ = {
+        "loaded_batch": [hook_default_data],
+        "per_target_loss": [hook_default_loss],
+        "final_loss": [hook_final_loss],
+    }
+
+    if cl_args.mixing_type is not None:
+        logger.debug("Setting up hooks for mixing.")
+        step_func_hooks_["loaded_batch"] = [hook_mix_data]
+        step_func_hooks_["per_target_loss"] = [hook_mix_loss]
+
+    return step_func_hooks_
+
+
+def _get_hooks(cl_args_: argparse.Namespace):
+    step_func_hooks = _get_step_func_hooks(cl_args=cl_args_)
+    hooks_object = Hooks(step_func_hooks=step_func_hooks)
+
+    return hooks_object
+
+
 if __name__ == "__main__":
 
     parser = _get_train_argument_parser()
@@ -1010,4 +1109,6 @@ if __name__ == "__main__":
 
     utils.configure_root_logger(run_name=cur_cl_args.run_name)
 
-    main(cl_args=cur_cl_args)
+    hooks_ = _get_hooks(cl_args_=cur_cl_args)
+
+    main(cl_args=cur_cl_args, hooks=hooks_)
