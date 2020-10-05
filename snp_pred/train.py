@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from functools import partial
 from os.path import abspath
 from pathlib import Path
-from sys import platform
 from typing import (
     Union,
     Tuple,
@@ -243,6 +242,7 @@ def main(cl_args: argparse.Namespace, hooks: Union[Hooks, None] = None) -> None:
         train_sampler=train_sampler,
         valid_dataset=valid_dataset,
         batch_size=batch_size,
+        num_workers=cl_args.dataloader_workers,
     )
 
     embedding_dict = set_up_and_save_embeddings_dict(
@@ -375,17 +375,15 @@ def get_dataloaders(
     train_sampler: Union[None, WeightedRandomSampler],
     valid_dataset: datasets.ArrayDatasetBase,
     batch_size: int,
+    num_workers: int = 8,
 ) -> Tuple:
 
-    # Currently as bug with OSX in torch 1.3.0:
-    # https://github.com/pytorch/pytorch/issues/2125
-    nw = 0 if platform == "darwin" else 8
     train_dloader = DataLoader(
         dataset=train_dataset,
         batch_size=batch_size,
         sampler=train_sampler,
         shuffle=False if train_sampler else True,
-        num_workers=nw,
+        num_workers=num_workers,
         pin_memory=False,
     )
 
@@ -393,7 +391,7 @@ def get_dataloaders(
         dataset=valid_dataset,
         batch_size=batch_size,
         shuffle=False,
-        num_workers=nw,
+        num_workers=num_workers,
         pin_memory=False,
     )
 
@@ -666,7 +664,16 @@ def _get_train_argument_parser() -> configargparse.ArgumentParser:
     parser_.add_argument(
         "--batch_size", type=int, default=64, help="size of the batches"
     )
-    parser_.add_argument("--lr", type=float, default=1e-3, help="adam: learning rate")
+
+    parser_.add_argument(
+        "--dataloader_workers",
+        type=int,
+        default=8,
+        help="Number of workers for training and validation dataloaders.",
+    )
+    parser_.add_argument(
+        "--lr", type=float, default=1e-3, help="Base learning rate for optimizer."
+    )
 
     parser_.add_argument(
         "--find_lr",

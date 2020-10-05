@@ -75,6 +75,7 @@ def args_config():
             "data_source": "REPLACE_ME",
             "device": "cuda:0" if cuda.is_available() else "cpu",
             "dilation_factor": 1,
+            "dataloader_workers": 1,
             "down_stride": 4,
             "extra_cat_columns": [],
             "early_stopping_patience": None,
