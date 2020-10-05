@@ -9,6 +9,7 @@ import torch
 from hypothesis import given
 from hypothesis.strategies import lists, integers
 
+from snp_pred.data_load import data_augmentation
 from snp_pred.data_load import data_loading_funcs
 from snp_pred.data_load.datasets import Sample
 from snp_pred.train import get_dataloaders
@@ -240,7 +241,7 @@ def test_make_random_snps_missing_some():
         mock_return = np.array([1, 2, 3, 4, 5])
         mock_target.return_value = mock_return
 
-        array = data_loading_funcs.make_random_snps_missing(test_array)
+        array = data_augmentation.make_random_snps_missing(test_array)
 
         # check that all columns have one filled value
         assert (array.sum(1) != 1).sum() == 0
@@ -253,7 +254,7 @@ def test_make_random_snps_missing_all():
     test_array = torch.zeros((1, 4, 1000), dtype=torch.bool)
     test_array[:, 0, :] = True
 
-    array = data_loading_funcs.make_random_snps_missing(
+    array = data_augmentation.make_random_snps_missing(
         array=test_array, percentage=1.0, probability=1.0
     )
 
@@ -265,7 +266,7 @@ def test_make_random_snps_missing_none():
     test_array = torch.zeros((1, 4, 1000), dtype=torch.bool)
     test_array[:, 0, :] = True
 
-    array = data_loading_funcs.make_random_snps_missing(
+    array = data_augmentation.make_random_snps_missing(
         array=test_array, percentage=1.0, probability=0.0
     )
 

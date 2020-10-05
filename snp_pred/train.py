@@ -1,4 +1,3 @@
-import copy
 import argparse
 import sys
 from dataclasses import dataclass
@@ -21,6 +20,10 @@ from torch.utils.tensorboard import SummaryWriter
 
 from snp_pred.data_load import data_utils
 from snp_pred.data_load import datasets
+from snp_pred.data_load.data_augmentation import (
+    mixup_data,
+    calc_all_mixed_losses,
+)
 from snp_pred.data_load.data_loading_funcs import get_weighted_random_sampler
 from snp_pred.data_load.datasets import al_num_classes
 from snp_pred.data_load.label_setup import (
@@ -76,9 +79,42 @@ np.random.seed(0)
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
+# Have to have clearly defined stages here
 @dataclass
-class CustomHooks:
-    metrics: Dict
+class Hooks:
+    step_func_hooks: Dict
+
+
+@dataclass
+class Hook:
+    func: Callable
+    func_kwargs: Dict
+
+
+# Use a cached call function, to call all hook functions, and cache the results
+# because all hook functions will be called through some wrapper functions anyway,
+# e.g. we can have a general function that calls and caches all hooks in a given stage
+
+
+def cached_hook_call(hook_func, config, batch, cache, *args, **kwargs):
+    result = hook_func(config=config, batch=batch, *args, **kwargs)
+
+    cache[hook_func.__name__] = result
+
+    return result, cache
+
+
+def hook_mixup(config: "Config", batch: "Batch", *args, **kwargs):
+
+    mixed_object = mixup_data(
+        inputs=batch.inputs,
+        targets=batch.target_labels,
+        target_columns=config.target_columns,
+        alpha=config.cl_args.mixing_alpha,
+        mixing_type=config.cl_args.mixing_type,
+    )
+
+    return mixed_object
 
 
 @dataclass(frozen=True)
@@ -94,7 +130,7 @@ class Config:
     train_loader: torch.utils.data.DataLoader
     valid_loader: torch.utils.data.DataLoader
     valid_dataset: torch.utils.data.Dataset
-    model: al_models
+    model: Union[al_models, nn.DataParallel]
     optimizer: Optimizer
     criterions: al_criterions
     loss_function: Callable
@@ -104,12 +140,10 @@ class Config:
     data_width: int
     writer: SummaryWriter
     metrics: "al_metric_record_dict"
-    custom_hooks: Union[CustomHooks, None]
+    hooks: Union[Hooks, None]
 
 
-def main(
-    cl_args: argparse.Namespace, custom_hooks: Union[CustomHooks, None] = None
-) -> None:
+def main(cl_args: argparse.Namespace, custom_hooks: Union[Hooks, None] = None) -> None:
     run_folder = _prepare_run_folder(run_name=cl_args.run_name)
 
     train_dataset, valid_dataset = datasets.set_up_datasets(cl_args=cl_args)
@@ -176,7 +210,7 @@ def main(
         data_width=train_dataset.data_width,
         writer=writer,
         metrics=metrics,
-        custom_hooks=custom_hooks,
+        hooks=custom_hooks,
     )
 
     _log_num_params(model=model)
@@ -287,7 +321,7 @@ def get_dataloaders(
     return train_dloader, valid_dloader
 
 
-class MyDataParallel(nn.DataParallel):
+class GetAttrDelegatedDataParallel(nn.DataParallel):
     def __getattr__(self, name):
         try:
             return super().__getattr__(name)
@@ -313,7 +347,7 @@ def get_model(
         assert model.data_size_after_conv >= 8
 
     if cl_args.multi_gpu:
-        model = MyDataParallel(module=model)
+        model = GetAttrDelegatedDataParallel(module=model)
 
     if model_class == "linear":
         _check_linear_model_columns(cl_args=cl_args)
@@ -324,20 +358,14 @@ def get_model(
 
 
 def _check_linear_model_columns(cl_args: argparse.Namespace) -> None:
-    if (
-        len(
-            cl_args.target_cat_columns
-            + cl_args.target_con_columns
-            + cl_args.extra_cat_columns
-            + cl_args.extra_con_columns
-        )
-        != 1
-    ):
+    num_label_cols = len(cl_args.target_cat_columns + cl_args.target_con_columns)
+    if num_label_cols != 1:
         raise NotImplementedError(
             "Linear model only supports one target column currently."
         )
 
-    if len(cl_args.extra_cat_columns + cl_args.extra_con_columns) != 0:
+    num_extra_cols = len(cl_args.extra_cat_columns + cl_args.extra_con_columns)
+    if num_extra_cols != 0:
         raise NotImplementedError(
             "Extra columns not supported for linear model currently."
         )
@@ -411,164 +439,26 @@ def _log_num_params(model: nn.Module) -> None:
     )
 
 
-def mixup_data(
-    inputs: torch.Tensor,
-    targets: al_training_labels_target,
-    target_columns: al_target_columns,
-    alpha: float = 1.0,
-    mixing_type: str = "mixup",
-):
-    """
-    :param inputs:
-    :param targets:
-    :param target_columns:
-    :param alpha:
-    :param mixing_type:
-    :return:
-    """
-
-    if alpha > 0:
-        lambda_ = np.random.beta(alpha, alpha)
-    else:
-        lambda_ = 1.0
-
-    batch_size = inputs.size()[0]
-    random_index_for_mixing = get_random_index_for_mixing(batch_size=batch_size)
-    targets_permuted = mixup_targets(
-        targets=targets,
-        random_index_for_mixing=random_index_for_mixing,
-        target_columns=target_columns,
-    )
-
-    if mixing_type == "mixup":
-        mixing_func = mixup_input
-    elif mixing_type == "cutmix-block":
-        mixing_func = block_cutmix_input
-    elif mixing_type == "cutmix-uniform":
-        mixing_func = uniform_cutmix_input
-    else:
-        raise ValueError()
-
-    mixed_inputs = mixing_func(
-        input_=inputs, lambda_=lambda_, random_index_for_mixing=random_index_for_mixing
-    )
-
-    return mixed_inputs, targets, targets_permuted, lambda_
-
-
-def get_random_index_for_mixing(batch_size: int) -> torch.Tensor:
-    return torch.randperm(batch_size)
-
-
-def mixup_input(
-    input_: torch.Tensor, lambda_: float, random_index_for_mixing: torch.Tensor
-) -> torch.Tensor:
-    mixed_x = lambda_ * input_ + (1 - lambda_) * input_[random_index_for_mixing, :]
-    return mixed_x
-
-
-def block_cutmix_input(
-    input_: torch.Tensor, lambda_: float, random_index_for_mixing: torch.Tensor
-) -> torch.Tensor:
-    """
-    We could even do the mixing in multiple places, even multiple SNPs like in
-    the make random snps missing? Does not necessarily have to be one block at a time
-    .
-    """
-    cut_start, cut_end = get_block_cutmix_indices(
-        input_length=input_.shape[-1], lambda_=lambda_
-    )
-    target_to_cut = input_[random_index_for_mixing, :]
-    cut_part = target_to_cut[..., cut_start:cut_end]
-    cutmixed_x = input_
-    cutmixed_x[..., cut_start:cut_end] = cut_part
-
-    assert (cutmixed_x.sum(dim=2) == 1).all()
-    return cutmixed_x
-
-
-def get_block_cutmix_indices(input_length: int, lambda_: float):
-    mixin_coefficient = 1 - lambda_
-    num_snps_to_mix = int(input_length * mixin_coefficient)
-    random_index_start = np.random.choice(max(1, input_length - num_snps_to_mix))
-    random_index_end = random_index_start + num_snps_to_mix
-    return random_index_start, random_index_end
-
-
-def uniform_cutmix_input(
-    input_: torch.Tensor, lambda_: float, random_index_for_mixing: torch.Tensor
-) -> torch.Tensor:
-    """
-    We could even do the mixing in multiple places, even multiple SNPs like in
-    the make random snps missing? Does not necessarily have to be one block at a time
-    .
-    """
-
-    target_to_mix = input_[random_index_for_mixing, :]
-
-    random_snp_indices_to_mix = get_uniform_cutmix_indices(
-        input_length=input_.shape[-1], lambda_=lambda_
-    )
-    cut_part = target_to_mix[..., random_snp_indices_to_mix]
-
-    cutmixed_x = input_
-    cutmixed_x[..., random_snp_indices_to_mix] = cut_part
-
-    assert (cutmixed_x.sum(dim=2) == 1).all()
-    return cutmixed_x
-
-
-def get_uniform_cutmix_indices(input_length: int, lambda_):
-    mixin_coefficient = 1 - lambda_
-    num_snps_to_mix = (int(input_length * mixin_coefficient),)
-    random_to_mix = np.random.choice(input_length, num_snps_to_mix, replace=False)
-    random_to_mix = torch.tensor(random_to_mix, dtype=torch.long)
-
-    return random_to_mix
-
-
-def mixup_targets(
-    targets: al_training_labels_target,
-    random_index_for_mixing: torch.Tensor,
-    target_columns: al_target_columns,
-) -> al_training_labels_target:
-    targets_permuted = copy.copy(targets)
-
-    for cat_target_col in target_columns["cat"]:
-
-        cur_targets = targets_permuted[cat_target_col]
-        cur_targets_permuted = cur_targets[random_index_for_mixing]
-        targets_permuted[cat_target_col] = cur_targets_permuted
-
-    return targets_permuted
-
-
-def mixup_criterion(
-    criterion: nn.CrossEntropyLoss,
-    outputs: torch.Tensor,
-    targets: torch.Tensor,
-    targets_permuted: torch.Tensor,
-    lambda_: float,
-) -> torch.Tensor:
-
-    base_loss = lambda_ * criterion(input=outputs, target=targets)
-    permuted_loss = (1.0 - lambda_) * criterion(input=outputs, target=targets_permuted)
-
-    total_loss = base_loss + permuted_loss
-
-    return total_loss
+@dataclass
+class Batch:
+    inputs: torch.Tensor
+    target_labels: Dict[str, torch.Tensor]
+    ids: List[str]
 
 
 def train(config: Config) -> None:
     c = config
     cl_args = config.cl_args
 
+    # can be hook
     extra_loss_functions = get_extra_loss_term_functions(
         model=c.model, l1_weight=cl_args.l1
     )
     optimizer_backward_kwargs = get_optimizer_backward_kwargs(
         optimizer_name=cl_args.optimizer
     )
+
+    # step_function_cache = {}
 
     def step(
         engine: Engine,
@@ -592,7 +482,13 @@ def train(config: Config) -> None:
         # ----------- TMP -----------
         # TODO: Some kind of hook here, or in dataloader? Then parse_target labels
         # TODO: must be aware of that, better to have hook here and return DTO
-        train_seqs_mixed, targets_a, targets_b, lambda_ = mixup_data(
+        # TODO: Definitely have as hook here
+        # TODO: Convert to data object returned by hook
+        # TODO: Just create something like an input_hook
+
+        # STAGE: LOADED INPUTS
+        # NEEDS: config, train_seqs, target_labels
+        mixed_object = mixup_data(
             inputs=train_seqs,
             targets=target_labels,
             target_columns=c.target_columns,
@@ -602,34 +498,48 @@ def train(config: Config) -> None:
         # ----------- TMP -----------
 
         # TODO: We will have to mix extra inputs as well
+        # TODO: Here we have extra_inputs hook
+
         extra_inputs = get_extra_inputs(
             cl_args=cl_args, model=c.model, labels=labels["extra_labels"]
         )
+        # STAGE: LOADED EXTRA INPUTS
+        # NEEDS: Extra input, prev hook outputs,
 
         c.optimizer.zero_grad()
 
-        train_outputs = c.model(x=train_seqs_mixed, extra_inputs=extra_inputs)
+        train_outputs = c.model(x=mixed_object.inputs, extra_inputs=extra_inputs)
 
         # train_losses = c.loss_function(inputs=train_outputs, targets=target_labels)
 
         # TODO: This could be the "loss_callable" in config?
+        # TODO: The key is figuring out a way to pass outputs from hook to here.
+        # TODO: Because it's a partial mix of config, model outputs and mixing outputs
+
+        # TODO: Also, passing information between, meaning output from one to another
+        # TODO: This will mean some kind of data structure (i.e. dict) that other
+        # TODO: Hooks can pull output from
+        # TODO: Some kind of closure? Or bound argument to dict?S
+        # TODO: Basically an object where downstream hooks can check outputs
+
+        # STAGE: PER TARGET LOSSES
+        # NEEDS: config, train outputs, prev hook outputs
         # ----------- TMP -----------
-        tmp_target = c.target_columns["cat"][0]
-        train_losses = mixup_criterion(
-            criterion=c.criterions[tmp_target],
-            outputs=train_outputs[tmp_target],
-            targets=targets_a[tmp_target],
-            targets_permuted=targets_b[tmp_target],
-            lambda_=lambda_,
+        train_losses = calc_all_mixed_losses(
+            target_columns=c.target_columns,
+            criterions=c.criterions,
+            outputs=train_outputs,
+            mixed_object=mixed_object,
         )
-        train_losses = {tmp_target: train_losses}
         # ----------- TMP -----------
 
         train_loss_avg = aggregate_losses(losses_dict=train_losses)
+        # STAGE: FINAL LOSS
         train_loss_final = add_extra_losses(
             total_loss=train_loss_avg, extra_loss_functions=extra_loss_functions
         )
 
+        # NO MORE HOOKS AFTER THIS STAGE?
         train_loss_final.backward(**optimizer_backward_kwargs)
         c.optimizer.step()
 
