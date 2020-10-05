@@ -220,7 +220,7 @@ class Config:
     data_width: int
     writer: SummaryWriter
     metrics: "al_metric_record_dict"
-    hooks_: Union[Hooks, None]
+    hooks: Union[Hooks, None]
 
 
 def main(cl_args: argparse.Namespace, hooks: Union[Hooks, None] = None) -> None:
@@ -1105,6 +1105,6 @@ if __name__ == "__main__":
 
     utils.configure_root_logger(run_name=cur_cl_args.run_name)
 
-    hooks_ = _get_hooks(cl_args_=cur_cl_args)
+    hooks = _get_hooks(cl_args_=cur_cl_args)
 
-    main(cl_args=cur_cl_args, hooks=hooks_)
+    main(cl_args=cur_cl_args, hooks=hooks)
