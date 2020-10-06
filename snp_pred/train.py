@@ -81,6 +81,7 @@ al_training_labels_extra = Dict[str, Union[List[str], torch.Tensor]]
 al_training_labels_batch = Dict[
     str, Union[al_training_labels_target, al_training_labels_extra]
 ]
+al_dataloader_getitem_batch = Tuple[torch.Tensor, al_training_labels_batch, List[str]]
 
 torch.manual_seed(0)
 np.random.seed(0)
@@ -92,7 +93,7 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 # TODO: Make step_func_hooks a dataclass of stages
 @dataclass
 class Hooks:
-    step_func_hooks: Dict
+    step_func_hooks: "StepFunctionHookStages"
 
 
 def call_hooks_stage_iterable(
@@ -109,12 +110,7 @@ def call_hooks_stage_iterable(
 
 
 def state_registered_hook_call(
-    hook_func: Callable,
-    config: "Config",
-    batch: "Batch",
-    state: Union[Dict[str, Any], None],
-    *args,
-    **kwargs,
+    hook_func: Callable, state: Union[Dict[str, Any], None], *args, **kwargs,
 ) -> Tuple[Any, Dict[str, Any]]:
     """
     TODO: Add inspection of hook signature
@@ -124,14 +120,16 @@ def state_registered_hook_call(
     if state is None:
         state = {}
 
-    state_updates = hook_func(config=config, batch=batch, state=state, *args, **kwargs)
+    state_updates = hook_func(state=state, *args, **kwargs)
 
     state = {**state, **state_updates}
 
     return state_updates, state
 
 
-def hook_mix_data(config: "Config", batch: "Batch", *args, **kwargs) -> Dict:
+def hook_mix_data(config: "Config", state: Dict, *args, **kwargs) -> Dict:
+
+    batch = state["batch"]
 
     mixed_object = mixup_data(
         inputs=batch.inputs,
@@ -141,7 +139,14 @@ def hook_mix_data(config: "Config", batch: "Batch", *args, **kwargs) -> Dict:
         mixing_type=config.cl_args.mixing_type,
     )
 
-    state_updates = {"model_inputs": mixed_object.inputs, "mixed_data": mixed_object}
+    batch_mixed = Batch(
+        inputs=mixed_object.inputs,
+        target_labels=batch.target_labels,
+        extra_inputs=batch.extra_inputs,
+        ids=batch.ids,
+    )
+
+    state_updates = {"batch": batch_mixed, "mixed_data": mixed_object}
 
     return state_updates
 
@@ -160,8 +165,44 @@ def hook_mix_loss(config: "Config", state: Dict, *args, **kwargs) -> Dict:
     return state_updates
 
 
-def hook_default_data(batch: "Batch", *args, **kwargs) -> Dict:
-    state_updates = {"model_inputs": batch.inputs}
+def hook_default_model_inputs(state, batch: "Batch", *args, **kwargs) -> Dict:
+    state_updates = {"model_inputs": batch.inputs, "extra_inputs": batch.extra_inputs}
+    return state_updates
+
+
+def hook_default_prepare_batch(
+    config: "Config",
+    loader_batch: al_dataloader_getitem_batch,
+    state: Dict,
+    *args,
+    **kwargs,
+) -> Dict:
+
+    cl_args = config.cl_args
+
+    train_seqs, labels, train_ids = loader_batch
+    train_seqs = train_seqs.to(device=cl_args.device)
+    train_seqs = train_seqs.to(dtype=torch.float32)
+
+    target_labels = model_training_utils.parse_target_labels(
+        target_columns=config.target_columns,
+        device=cl_args.device,
+        labels=labels["target_labels"],
+    )
+
+    extra_inputs = get_extra_inputs(
+        cl_args=cl_args, model=config.model, labels=labels["extra_labels"]
+    )
+
+    batch = Batch(
+        inputs=train_seqs,
+        target_labels=target_labels,
+        extra_inputs=extra_inputs,
+        ids=train_ids,
+    )
+
+    state_updates = {"batch": batch}
+
     return state_updates
 
 
@@ -571,25 +612,20 @@ def train(config: Config) -> None:
         """
         c.model.train()
 
-        batch = _prepare_batch(
-            loader_batch=loader_batch, config=config, cl_args=cl_args
-        )
-
-        loaded_inputs_stage = step_hooks["loaded_batch"]
+        loaded_inputs_stage = step_hooks.prepare_batch
         state = call_hooks_stage_iterable(
             hook_iterable=loaded_inputs_stage,
-            common_kwargs={"config": config, "batch": batch},
+            common_kwargs={"config": config, "loader_batch": loader_batch},
             state=None,
         )
+        batch = state["batch"]
 
         c.optimizer.zero_grad()
 
-        train_outputs = c.model(
-            x=state["model_inputs"], extra_inputs=batch.extra_inputs
-        )
+        train_outputs = c.model(x=batch.inputs, extra_inputs=batch.extra_inputs)
         state["model_outputs"] = train_outputs
 
-        per_target_loss_stage = step_hooks["per_target_loss"]
+        per_target_loss_stage = step_hooks.per_target_loss
         state = call_hooks_stage_iterable(
             hook_iterable=per_target_loss_stage,
             common_kwargs={"config": config, "batch": batch},
@@ -599,7 +635,7 @@ def train(config: Config) -> None:
         train_loss_avg = aggregate_losses(losses_dict=state["train_losses"])
         state["loss_average"] = train_loss_avg
 
-        final_loss_stage = step_hooks["final_loss"]
+        final_loss_stage = step_hooks.final_loss
         state = call_hooks_stage_iterable(
             hook_iterable=final_loss_stage,
             common_kwargs={"config": config, "batch": batch},
@@ -1077,24 +1113,32 @@ def _modify_train_arguments(cl_args: argparse.Namespace) -> argparse.Namespace:
     return cl_args
 
 
+@dataclass
+class StepFunctionHookStages:
+    prepare_batch: List[Callable]
+    per_target_loss: List[Callable]
+    final_loss: List[Callable]
+
+
 def _get_step_func_hooks(cl_args: argparse.Namespace):
     """
     TODO: Add validation, inspect that outputs have correct names.
-    TODO: Make the hooks a dataclass
     """
 
-    step_func_hooks_ = {
-        "loaded_batch": [hook_default_data],
+    init_kwargs = {
+        "prepare_batch": [hook_default_prepare_batch],
         "per_target_loss": [hook_default_loss],
         "final_loss": [hook_final_loss],
     }
 
     if cl_args.mixing_type is not None:
         logger.debug("Setting up hooks for mixing.")
-        step_func_hooks_["loaded_batch"] = [hook_mix_data]
-        step_func_hooks_["per_target_loss"] = [hook_mix_loss]
+        init_kwargs["prepare_batch"].append(hook_mix_data)
+        init_kwargs["per_target_loss"] = [hook_mix_loss]
 
-    return step_func_hooks_
+    step_func_hooks = StepFunctionHookStages(**init_kwargs)
+
+    return step_func_hooks
 
 
 def _get_hooks(cl_args_: argparse.Namespace):
