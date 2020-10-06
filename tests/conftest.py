@@ -104,7 +104,7 @@ def args_config():
             "na_augment_perc": 0.05,
             "na_augment_prob": 0.20,
             "no_pbar": False,
-            "optimizer": "adamw",
+            "optimizer": "adam",
             "plot_skip_steps": 50,
             "rb_do": 0.25,
             "layers": [1, 1],

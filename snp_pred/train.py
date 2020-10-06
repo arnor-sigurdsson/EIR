@@ -27,12 +27,10 @@ from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader, WeightedRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
+from snp_pred.data_load.data_augmentation import hook_mix_loss, get_mix_data_hook
+from snp_pred.data_load.data_utils import Batch
 from snp_pred.data_load import data_utils
 from snp_pred.data_load import datasets
-from snp_pred.data_load.data_augmentation import (
-    mixup_data,
-    calc_all_mixed_losses,
-)
 from snp_pred.data_load.data_loading_funcs import get_weighted_random_sampler
 from snp_pred.data_load.datasets import al_num_classes
 from snp_pred.data_load.label_setup import (
@@ -89,8 +87,6 @@ np.random.seed(0)
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
-# Have to have clearly defined stages here
-# TODO: Make step_func_hooks a dataclass of stages
 @dataclass
 class Hooks:
     step_func_hooks: "StepFunctionHookStages"
@@ -112,10 +108,6 @@ def call_hooks_stage_iterable(
 def state_registered_hook_call(
     hook_func: Callable, state: Union[Dict[str, Any], None], *args, **kwargs,
 ) -> Tuple[Any, Dict[str, Any]]:
-    """
-    TODO: Add inspection of hook signature
-    TODO: Even better, do it when hooks are initialized for the first time.
-    """
 
     if state is None:
         state = {}
@@ -125,44 +117,6 @@ def state_registered_hook_call(
     state = {**state, **state_updates}
 
     return state_updates, state
-
-
-def hook_mix_data(config: "Config", state: Dict, *args, **kwargs) -> Dict:
-
-    batch = state["batch"]
-
-    mixed_object = mixup_data(
-        inputs=batch.inputs,
-        targets=batch.target_labels,
-        target_columns=config.target_columns,
-        alpha=config.cl_args.mixing_alpha,
-        mixing_type=config.cl_args.mixing_type,
-    )
-
-    batch_mixed = Batch(
-        inputs=mixed_object.inputs,
-        target_labels=batch.target_labels,
-        extra_inputs=batch.extra_inputs,
-        ids=batch.ids,
-    )
-
-    state_updates = {"batch": batch_mixed, "mixed_data": mixed_object}
-
-    return state_updates
-
-
-def hook_mix_loss(config: "Config", state: Dict, *args, **kwargs) -> Dict:
-
-    mixed_losses = calc_all_mixed_losses(
-        target_columns=config.target_columns,
-        criterions=config.criterions,
-        outputs=state["model_outputs"],
-        mixed_object=state["mixed_data"],
-    )
-
-    state_updates = {"train_losses": mixed_losses}
-
-    return state_updates
 
 
 def hook_default_model_inputs(state, batch: "Batch", *args, **kwargs) -> Dict:
@@ -554,14 +508,6 @@ def _log_num_params(model: nn.Module) -> None:
     )
 
 
-@dataclass
-class Batch:
-    inputs: torch.Tensor
-    target_labels: Dict[str, torch.Tensor]
-    extra_inputs: Union[Dict[str, torch.Tensor], None]
-    ids: List[str]
-
-
 def _prepare_batch(
     loader_batch: Tuple[torch.Tensor, al_training_labels_batch, List[str]],
     config,
@@ -578,8 +524,6 @@ def _prepare_batch(
         labels=labels["target_labels"],
     )
 
-    # TODO: We will have to mix extra inputs as well
-    # TODO: Here we have extra_inputs hook
     extra_inputs = get_extra_inputs(
         cl_args=cl_args, model=config.model, labels=labels["extra_labels"]
     )
@@ -1133,7 +1077,9 @@ def _get_step_func_hooks(cl_args: argparse.Namespace):
 
     if cl_args.mixing_type is not None:
         logger.debug("Setting up hooks for mixing.")
-        init_kwargs["prepare_batch"].append(hook_mix_data)
+        mix_hook = get_mix_data_hook(mixing_type=cl_args.mixing_type)
+
+        init_kwargs["prepare_batch"].append(mix_hook)
         init_kwargs["per_target_loss"] = [hook_mix_loss]
 
     step_func_hooks = StepFunctionHookStages(**init_kwargs)

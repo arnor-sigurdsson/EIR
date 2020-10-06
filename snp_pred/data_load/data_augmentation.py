@@ -1,15 +1,17 @@
 from copy import copy
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Union, Dict
+from functools import partial
+from typing import TYPE_CHECKING, Union, Dict, Callable, Sequence
 
 import numpy as np
 import torch
 from torch import nn
 
 from snp_pred.data_load.label_setup import al_target_columns
+from snp_pred.data_load.data_utils import Batch
 
 if TYPE_CHECKING:
-    from train import al_training_labels_target, al_criterions
+    from train import al_training_labels_target, al_criterions, Config
 
 al_target_values = Union[torch.LongTensor, torch.Tensor]
 
@@ -20,14 +22,81 @@ class MixupOutput:
     targets: "al_training_labels_target"
     targets_permuted: "al_training_labels_target"
     lambda_: float
+    permuted_indexes: Sequence[int]
 
 
-def mixup_data(
+def get_mix_data_hook(mixing_type: str):
+    mixing_func_mapping = _get_mixing_function_map()
+    mixing_func = mixing_func_mapping.get(mixing_type)
+
+    bound_hook = partial(hook_mix_data, mixing_func=mixing_func)
+
+    return bound_hook
+
+
+def hook_mix_data(
+    config: "Config", state: Dict, mixing_func: Callable, *args, **kwargs
+) -> Dict:
+
+    batch = state["batch"]
+
+    mixed_object = mixup_snp_data(
+        inputs=batch.inputs,
+        targets=batch.target_labels,
+        target_columns=config.target_columns,
+        alpha=config.cl_args.mixing_alpha,
+        mixing_func=mixing_func,
+    )
+
+    mixed_extra_input = batch.extra_inputs
+    if batch.extra_inputs is not None:
+        mixed_extra_input = mixup_tensor(
+            tensor=batch.extra_inputs,
+            lambda_=mixed_object.lambda_,
+            random_index_for_mixing=mixed_object.permuted_indexes,
+        )
+
+    batch_mixed = Batch(
+        inputs=mixed_object.inputs,
+        target_labels=batch.target_labels,
+        extra_inputs=mixed_extra_input,
+        ids=batch.ids,
+    )
+
+    state_updates = {"batch": batch_mixed, "mixed_snp_data": mixed_object}
+
+    return state_updates
+
+
+def hook_mix_loss(config: "Config", state: Dict, *args, **kwargs) -> Dict:
+
+    mixed_losses = calc_all_mixed_losses(
+        target_columns=config.target_columns,
+        criterions=config.criterions,
+        outputs=state["model_outputs"],
+        mixed_object=state["mixed_snp_data"],
+    )
+
+    state_updates = {"train_losses": mixed_losses}
+
+    return state_updates
+
+
+def _get_mixing_function_map():
+    mapping = {
+        "cutmix-uniform": uniform_cutmix_input,
+        "cutmix-block": block_cutmix_input,
+        "mixup": mixup_snp_data,
+    }
+    return mapping
+
+
+def mixup_snp_data(
     inputs: torch.Tensor,
     targets: "al_training_labels_target",
     target_columns: al_target_columns,
+    mixing_func: Callable[[torch.Tensor, float, torch.Tensor], torch.Tensor],
     alpha: float = 1.0,
-    mixing_type: str = "mixup",
 ) -> MixupOutput:
 
     if alpha > 0:
@@ -43,15 +112,6 @@ def mixup_data(
         target_columns=target_columns,
     )
 
-    if mixing_type == "mixup":
-        mixing_func = mixup_input
-    elif mixing_type == "cutmix-block":
-        mixing_func = block_cutmix_input
-    elif mixing_type == "cutmix-uniform":
-        mixing_func = uniform_cutmix_input
-    else:
-        raise ValueError()
-
     mixed_inputs = mixing_func(
         input_=inputs, lambda_=lambda_, random_index_for_mixing=random_index_for_mixing
     )
@@ -61,6 +121,7 @@ def mixup_data(
         targets=targets,
         targets_permuted=targets_permuted,
         lambda_=lambda_,
+        permuted_indexes=random_index_for_mixing,
     )
 
     return mixing_output
@@ -68,6 +129,15 @@ def mixup_data(
 
 def get_random_index_for_mixing(batch_size: int) -> torch.Tensor:
     return torch.randperm(batch_size)
+
+
+def mixup_tensor(
+    tensor: torch.Tensor, lambda_: float, random_index_for_mixing
+) -> torch.Tensor:
+    mixed_tensor = mixup_input(
+        input_=tensor, lambda_=lambda_, random_index_for_mixing=random_index_for_mixing,
+    )
+    return mixed_tensor
 
 
 def mixup_input(
@@ -80,11 +150,7 @@ def mixup_input(
 def block_cutmix_input(
     input_: torch.Tensor, lambda_: float, random_index_for_mixing: torch.Tensor
 ) -> torch.Tensor:
-    """
-    We could even do the mixing in multiple places, even multiple SNPs like in
-    the make random snps missing? Does not necessarily have to be one block at a time
-    .
-    """
+
     cut_start, cut_end = get_block_cutmix_indices(
         input_length=input_.shape[-1], lambda_=lambda_
     )
@@ -108,11 +174,6 @@ def get_block_cutmix_indices(input_length: int, lambda_: float):
 def uniform_cutmix_input(
     input_: torch.Tensor, lambda_: float, random_index_for_mixing: torch.Tensor
 ) -> torch.Tensor:
-    """
-    We could even do the mixing in multiple places, even multiple SNPs like in
-    the make random snps missing? Does not necessarily have to be one block at a time
-    .
-    """
 
     target_to_mix = input_[random_index_for_mixing, :]
 
