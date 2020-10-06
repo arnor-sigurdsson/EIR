@@ -96,6 +96,8 @@ def args_config():
             "lr_schedule": "plateau",
             "max_acts_per_class": None,
             "memory_dataset": True,
+            "mixing_type": None,
+            "mixing_alpha": 0.0,
             "mg_num_experts": 3,
             "model_type": "cnn",
             "multi_gpu": False,
@@ -490,6 +492,7 @@ def prep_modelling_test_configs(
 
     train._log_num_params(model=model)
 
+    hooks = train._get_hooks(cl_args_=cl_args)
     config = Config(
         cl_args=cl_args,
         train_loader=train_loader,
@@ -505,7 +508,7 @@ def prep_modelling_test_configs(
         target_columns=train_dataset.target_columns,
         data_width=train_dataset.data_width,
         writer=train.get_summary_writer(run_folder=Path("runs", cl_args.run_name)),
-        custom_hooks=None,
+        hooks=hooks,
     )
 
     test_config = _get_cur_modelling_test_config(

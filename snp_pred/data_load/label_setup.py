@@ -184,10 +184,10 @@ def get_array_path_iterator(data_source: Path):
         with open(str(file_path), "r") as infile:
             for line in infile:
                 path = Path(line.strip())
-                # if not path.exists():
-                #     raise FileNotFoundError(
-                #         f"Could not find array {path} listed in {data_source}."
-                #     )
+                if not path.exists():
+                    raise FileNotFoundError(
+                        f"Could not find array {path} listed in {data_source}."
+                    )
 
                 yield path
 
