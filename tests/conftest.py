@@ -490,7 +490,7 @@ def prep_modelling_test_configs(
 
     train_dataset, valid_dataset = create_test_datasets
 
-    train._log_num_params(model=model)
+    train._log_model(model=model, l1_weight=cl_args.l1)
 
     hooks = train._get_hooks(cl_args_=cl_args)
     config = Config(

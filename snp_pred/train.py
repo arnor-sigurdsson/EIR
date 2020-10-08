@@ -16,7 +16,6 @@ from typing import (
     Iterable,
 )
 
-import configargparse
 import numpy as np
 import torch
 from aislib.misc_utils import ensure_path_exists
@@ -27,11 +26,12 @@ from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader, WeightedRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
-from snp_pred.data_load.data_augmentation import hook_mix_loss, get_mix_data_hook
-from snp_pred.data_load.data_utils import Batch
+from snp_pred.configuration import _get_train_argument_parser
 from snp_pred.data_load import data_utils
 from snp_pred.data_load import datasets
+from snp_pred.data_load.data_augmentation import hook_mix_loss, get_mix_data_hook
 from snp_pred.data_load.data_loading_funcs import get_weighted_random_sampler
+from snp_pred.data_load.data_utils import Batch
 from snp_pred.data_load.datasets import al_num_classes
 from snp_pred.data_load.label_setup import (
     al_target_columns,
@@ -53,14 +53,12 @@ from snp_pred.train_utils.metrics import (
     aggregate_losses,
     add_multi_task_average_metrics,
     UncertaintyMultiTaskLoss,
-    get_extra_loss_term_functions,
-    add_extra_losses,
     get_average_history_filepath,
     get_default_metrics,
+    hook_add_l1_loss,
 )
 from snp_pred.train_utils.optimizers import (
     get_optimizer,
-    get_base_optimizers_dict,
     get_optimizer_backward_kwargs,
 )
 from snp_pred.train_utils.train_handlers import configure_trainer
@@ -87,110 +85,6 @@ np.random.seed(0)
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
-@dataclass
-class Hooks:
-    step_func_hooks: "StepFunctionHookStages"
-
-
-def call_hooks_stage_iterable(
-    hook_iterable: Iterable[Callable],
-    common_kwargs: Dict,
-    state: Union[None, Dict[str, Any]],
-):
-    for hook in hook_iterable:
-        _, state = state_registered_hook_call(
-            hook_func=hook, **common_kwargs, state=state
-        )
-
-    return state
-
-
-def state_registered_hook_call(
-    hook_func: Callable, state: Union[Dict[str, Any], None], *args, **kwargs,
-) -> Tuple[Any, Dict[str, Any]]:
-
-    if state is None:
-        state = {}
-
-    state_updates = hook_func(state=state, *args, **kwargs)
-
-    state = {**state, **state_updates}
-
-    return state_updates, state
-
-
-def hook_default_model_inputs(state, batch: "Batch", *args, **kwargs) -> Dict:
-    state_updates = {"model_inputs": batch.inputs, "extra_inputs": batch.extra_inputs}
-    return state_updates
-
-
-def hook_default_prepare_batch(
-    config: "Config",
-    loader_batch: al_dataloader_getitem_batch,
-    state: Dict,
-    *args,
-    **kwargs,
-) -> Dict:
-
-    cl_args = config.cl_args
-
-    train_seqs, labels, train_ids = loader_batch
-    train_seqs = train_seqs.to(device=cl_args.device)
-    train_seqs = train_seqs.to(dtype=torch.float32)
-
-    target_labels = model_training_utils.parse_target_labels(
-        target_columns=config.target_columns,
-        device=cl_args.device,
-        labels=labels["target_labels"],
-    )
-
-    extra_inputs = get_extra_inputs(
-        cl_args=cl_args, model=config.model, labels=labels["extra_labels"]
-    )
-
-    batch = Batch(
-        inputs=train_seqs,
-        target_labels=target_labels,
-        extra_inputs=extra_inputs,
-        ids=train_ids,
-    )
-
-    state_updates = {"batch": batch}
-
-    return state_updates
-
-
-def hook_default_loss(
-    config: "Config", batch: "Batch", state: Dict, *args, **kwargs
-) -> Dict:
-
-    mixed_losses = config.loss_function(
-        inputs=state["model_outputs"], targets=batch.target_labels
-    )
-
-    state_updates = {"train_losses": mixed_losses}
-
-    return state_updates
-
-
-def hook_final_loss(config: "Config", state: Dict, *args, **kwargs) -> Dict:
-    """
-    TODO: Separate the extra loss term functions into own hooks?
-    """
-
-    extra_loss_functions = get_extra_loss_term_functions(
-        model=config.model, l1_weight=config.cl_args.l1
-    )
-
-    train_loss_final = add_extra_losses(
-        total_loss=state["loss_average"], extra_loss_functions=extra_loss_functions
-    )
-
-    state_updates = {"loss_final": train_loss_final}
-
-    return state_updates
-
-
 @dataclass(frozen=True)
 class Config:
     """
@@ -214,10 +108,10 @@ class Config:
     data_width: int
     writer: SummaryWriter
     metrics: "al_metric_record_dict"
-    hooks: Union[Hooks, None]
+    hooks: Union["Hooks", None]
 
 
-def main(cl_args: argparse.Namespace, hooks: Union[Hooks, None] = None) -> None:
+def main(cl_args: argparse.Namespace, hooks: Union["Hooks", None] = None) -> None:
     run_folder = _prepare_run_folder(run_name=cl_args.run_name)
 
     train_dataset, valid_dataset = datasets.set_up_datasets(cl_args=cl_args)
@@ -258,7 +152,6 @@ def main(cl_args: argparse.Namespace, hooks: Union[Hooks, None] = None) -> None:
 
     writer = get_summary_writer(run_folder=run_folder)
 
-    # TODO: Actually add support for mixup in this function
     loss_func = _get_loss_callable(
         target_columns=train_dataset.target_columns,
         criterions=criterions,
@@ -287,7 +180,7 @@ def main(cl_args: argparse.Namespace, hooks: Union[Hooks, None] = None) -> None:
         hooks=hooks,
     )
 
-    _log_num_params(model=model)
+    _log_model(model=model, l1_weight=cl_args.l1)
 
     if cl_args.debug:
         breakpoint()
@@ -501,8 +394,19 @@ def get_summary_writer(run_folder: Path) -> SummaryWriter:
     return writer
 
 
-def _log_num_params(model: nn.Module) -> None:
+def _log_model(model: nn.Module, l1_weight: float) -> None:
+    """
+    TODO: Add summary of parameters
+    TODO: Add verbosity option
+    """
     no_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+    logger.debug(
+        "Penalizing weights of shape %s with L1 loss with weight %f.",
+        model.l1_penalized_weights.shape,
+        l1_weight,
+    )
+
     logger.info(
         "Starting training with a %s parameter model.", format(no_params, ",.0f")
     )
@@ -566,6 +470,7 @@ def train(config: Config) -> None:
 
         c.optimizer.zero_grad()
 
+        # TODO: Can be a hook (model forward)
         train_outputs = c.model(x=batch.inputs, extra_inputs=batch.extra_inputs)
         state["model_outputs"] = train_outputs
 
@@ -576,8 +481,9 @@ def train(config: Config) -> None:
             state=state,
         )
 
+        # TODO: Can be added to previous hook step
         train_loss_avg = aggregate_losses(losses_dict=state["train_losses"])
-        state["loss_average"] = train_loss_avg
+        state["loss"] = train_loss_avg
 
         final_loss_stage = step_hooks.final_loss
         state = call_hooks_stage_iterable(
@@ -586,9 +492,11 @@ def train(config: Config) -> None:
             state=state,
         )
 
-        state["loss_final"].backward(**optimizer_backward_kwargs)
+        # TODO: Can be a hook (optimizer backward)
+        state["loss"].backward(**optimizer_backward_kwargs)
         c.optimizer.step()
 
+        # TODO: Can be a hook (metrics finalizer)
         train_batch_metrics = calculate_batch_metrics(
             target_columns=c.target_columns,
             losses=state["train_losses"],
@@ -625,418 +533,6 @@ def train(config: Config) -> None:
     trainer.run(data=c.train_loader, max_epochs=cl_args.n_epochs)
 
 
-def _get_train_argument_parser() -> configargparse.ArgumentParser:
-
-    parser_ = configargparse.ArgumentParser(
-        config_file_parser_class=configargparse.YAMLConfigFileParser
-    )
-
-    parser_.add_argument(
-        "--config_file",
-        is_config_file=True,
-        required=False,
-        help="path to .yaml config file if using one",
-    )
-
-    parser_.add_argument(
-        "--n_epochs", type=int, default=5, help="number of epochs of training"
-    )
-    parser_.add_argument(
-        "--batch_size", type=int, default=64, help="size of the batches"
-    )
-
-    parser_.add_argument(
-        "--dataloader_workers",
-        type=int,
-        default=8,
-        help="Number of workers for training and validation dataloaders.",
-    )
-    parser_.add_argument(
-        "--lr", type=float, default=1e-3, help="Base learning rate for optimizer."
-    )
-
-    parser_.add_argument(
-        "--find_lr",
-        action="store_true",
-        help="Whether to perform a range test of different learning rates, with "
-        "the lower limit being what is passed in for the --lr flag. "
-        "Produces a plot and exits with status 0 before training if this flag "
-        "is active.",
-    )
-
-    parser_.add_argument(
-        "--lr_schedule",
-        type=str,
-        default="same",
-        choices=["cycle", "plateau", "same", "cosine"],
-        help="Whether to use cyclical or reduce on plateau learning rate schedule. "
-        "Otherwise keeps same learning rate.",
-    )
-
-    # TODO: Change this to patience steps, so it is configurable
-    parser_.add_argument(
-        "--early_stopping_patience",
-        type=int,
-        default=None,
-        help="Whether to terminate training early if performance stops improving.",
-    )
-
-    parser_.add_argument(
-        "--warmup_steps", type=str, default=0, help="How many steps to use in warmup."
-    )
-
-    parser_.add_argument(
-        "--lr_lb",
-        type=float,
-        default=0.0,
-        help="Lower bound for learning rate when using LR scheduling.",
-    )
-
-    parser_.add_argument(
-        "--optimizer",
-        type=str,
-        choices=_get_optimizer_cl_arg_choices(),
-        default="adamw",
-        help="Whether to use AdamW or SGDM optimizer.",
-    )
-
-    parser_.add_argument(
-        "--b1",
-        type=float,
-        default=0.9,
-        help="adam: decay of first order momentum of gradient",
-    )
-
-    parser_.add_argument(
-        "--b2",
-        type=float,
-        default=0.999,
-        help="adam: decay of second order momentum of gradient",
-    )
-    parser_.add_argument("--wd", type=float, default=0.00, help="Weight decay.")
-
-    parser_.add_argument(
-        "--l1", type=float, default=0.00, help="L1 regularization for chosen layer."
-    )
-
-    parser_.add_argument(
-        "--fc_repr_dim",
-        type=int,
-        default=512,
-        help="dimensionality of first fc layer in the network, this is the last shared"
-        "when running multi task training, first fc layer after convolutions when"
-        "running cnn model, and first fc layer when running mlp",
-    )
-
-    parser_.add_argument(
-        "--fc_task_dim",
-        type=int,
-        default=128,
-        help="dimensionality of (a) specific task branches in multi task setting, (b)"
-        "successive fc layers in cnn model after the first fc after the "
-        "convolutions and (c) successive fc layers in mlp after first fc layer",
-    )
-
-    parser_.add_argument(
-        "--mg_num_experts", type=int, default=8, help="Number of experts to use."
-    )
-
-    parser_.add_argument(
-        "--split_mlp_num_splits",
-        type=int,
-        default=50,
-        help="Number of splits in split MLP layer.",
-    )
-
-    parser_.add_argument(
-        "--model_type",
-        type=str,
-        default="cnn",
-        choices=["cnn", "mlp", "mlp-split", "mlp-fully-split", "mlp-mgmoe", "linear"],
-        help="whether to use a convolutional neural network (cnn) or multilayer "
-        "perceptron (mlp)",
-    )
-
-    parser_.add_argument(
-        "--kernel_width",
-        type=int,
-        default=12,
-        help="base width of the conv kernels used.",
-    )
-
-    parser_.add_argument(
-        "--down_stride",
-        type=int,
-        default=4,
-        help="down stride to use common over the network.",
-    )
-
-    parser_.add_argument(
-        "--dilation_factor",
-        type=int,
-        default=1,
-        help="factor to dilate convolutions by in each successive block",
-    )
-
-    parser_.add_argument(
-        "--first_kernel_expansion",
-        type=int,
-        default=1,
-        help="factor by which to expand the first kernel in the network",
-    )
-
-    parser_.add_argument(
-        "--first_stride_expansion",
-        type=int,
-        default=1,
-        help="factor by which to expand the first stride in the network",
-    )
-
-    parser_.add_argument(
-        "--first_channel_expansion",
-        type=int,
-        default=1,
-        help="factor by which to expand the first stride in the network",
-    )
-
-    parser_.add_argument(
-        "--channel_exp_base",
-        type=int,
-        default=5,
-        help="Exponential base for channels in first layer (i.e. default is 2**5)",
-    )
-
-    # TODO: Better help message.
-    parser_.add_argument(
-        "--layers",
-        type=int,
-        nargs="+",
-        help="Number of layers in models where it applies.",
-    )
-
-    parser_.add_argument(
-        "--rb_do", type=float, default=0.0, help="Dropout in residual blocks."
-    )
-
-    parser_.add_argument(
-        "--fc_do",
-        type=float,
-        default=0.0,
-        help="Dropout before last fully connected layer.",
-    )
-
-    parser_.add_argument(
-        "--sa",
-        action="store_true",
-        help="Whether to add self attention to the network.",
-    )
-
-    parser_.add_argument(
-        "--target_width",
-        type=int,
-        default=None,
-        help="Total width of input sequence after padding.",
-    )
-    parser_.add_argument(
-        "--data_source",
-        type=str,
-        required=True,
-        help="Data source to load inputs from. Can either be (a) a folder in which"
-        "files will be gathered from the folder recursively and (b) a simple text"
-        "file with each line having a path for a sample array.",
-    )
-
-    parser_.add_argument(
-        "--valid_size",
-        type=float,
-        default=0.05,
-        help="Size if the validaton set, if float then uses a percentage. If int, "
-        "then raw counts.",
-    )
-
-    parser_.add_argument(
-        "--weighted_sampling_column",
-        type=str,
-        default=None,
-        nargs="*",
-        help="Target column to apply weighted sampling on.",
-    )
-
-    parser_.add_argument(
-        "--na_augment_perc",
-        default=0.0,
-        type=float,
-        help="Percentage of array to make missing when using na_augmentation.",
-    )
-
-    parser_.add_argument(
-        "--na_augment_prob",
-        default=0.5,
-        type=float,
-        help="Probability of applying an na_augmentation of percentage as given in "
-        "--na_augment_perc.",
-    )
-
-    parser_.add_argument(
-        "--mixing_alpha",
-        default=0.0,
-        type=float,
-        help="Alpha parameter used for mixing (higher means more mixing).",
-    )
-
-    parser_.add_argument(
-        "--mixing_type",
-        default=None,
-        type=str,
-        choices=["mixup", "cutmix-block", "cutmix-uniform"],
-        help="Type of mixing to apply when using mixup and similar approaches.",
-    )
-
-    parser_.add_argument(
-        "--label_file", type=str, required=True, help="Which file to load labels from."
-    )
-
-    parser_.add_argument(
-        "--target_con_columns",
-        nargs="*",
-        default=[],
-        help="Continuous target columns in label file.",
-    )
-    parser_.add_argument(
-        "--target_cat_columns",
-        nargs="*",
-        default=[],
-        help="Categorical target columns in label file.",
-    )
-
-    parser_.add_argument(
-        "--extra_cat_columns",
-        type=str,
-        nargs="+",
-        default=[],
-        help="What columns of categorical variables to add to fully connected layer at "
-        "end of model.",
-    )
-
-    parser_.add_argument(
-        "--extra_con_columns",
-        type=str,
-        nargs="+",
-        default=[],
-        help="What columns of continuous variables to add to fully connected layer at "
-        "end of model.",
-    )
-
-    parser_.add_argument(
-        "--snp_file",
-        type=str,
-        default="infer",
-        help="File to load SNPs from (.snp format).",
-    )
-
-    parser_.add_argument(
-        "--memory_dataset",
-        action="store_true",
-        help="Whether to load all sample into memory during " "training.",
-    )
-
-    parser_.add_argument(
-        "--sample_interval",
-        type=int,
-        default=None,
-        help="Epoch interval to sample generated seqs.",
-    )
-    parser_.add_argument(
-        "--checkpoint_interval",
-        type=int,
-        default=5000,
-        help="Epoch to checkpoint model.",
-    )
-    parser_.add_argument(
-        "--run_name",
-        required=True,
-        type=str,
-        help="Name of the current run, specifying will save " "run info and models.",
-    )
-
-    parser_.add_argument(
-        "--gpu_num", type=str, default="0", help="Which GPU to run (according to CUDA)."
-    )
-
-    parser_.add_argument(
-        "--multi_gpu",
-        action="store_true",
-        help="Whether to run the training on " "multiple GPUs for the current node.",
-    )
-
-    parser_.add_argument(
-        "--get_acts", action="store_true", help="Whether to generate activation maps."
-    )
-
-    parser_.add_argument(
-        "--act_classes",
-        default=None,
-        nargs="+",
-        help="Classes to use for activation maps.",
-    )
-
-    parser_.add_argument(
-        "--max_acts_per_class",
-        default=None,
-        type=int,
-        help="Maximum number of samples per class to gather for activation analysis. "
-        "Good to use when modelling on imbalanced data.",
-    )
-
-    parser_.add_argument(
-        "--debug",
-        action="store_true",
-        help="Whether to run in debug mode (w. breakpoint).",
-    )
-
-    parser_.add_argument(
-        "--no_pbar",
-        action="store_true",
-        help="Whether to run in debug mode (w. breakpoint).",
-    )
-
-    parser_.add_argument(
-        "--custom_lib",
-        type=str,
-        default=None,
-        help="Path to custom library if using one.",
-    )
-
-    parser_.add_argument(
-        "--plot_skip_steps",
-        type=int,
-        default=200,
-        help="How many iterations to skip in in plots.",
-    )
-    return parser_
-
-
-def _get_optimizer_cl_arg_choices():
-    """
-    Currently just going to hardcode the main default optimizers. Later we can do
-    something fancy with inspect and issubclass of Optimizer to get names of all
-    PyTorch built-in optimizers.
-    """
-    base_optimizer_dict = get_base_optimizers_dict()
-    default = list(base_optimizer_dict.keys())
-    external = _get_custom_opt_names()
-    return default + external
-
-
-def _get_custom_opt_names():
-    # import here to keep separated from main codebase
-    from torch_optimizer import _NAME_OPTIM_MAP as CUSTOM_OPT_NAME_MAP
-
-    custom_optim_list = list(CUSTOM_OPT_NAME_MAP.keys())
-    custom_optim_list = [i for i in custom_optim_list if i != "lookahead"]
-    return custom_optim_list
-
-
 def _modify_train_arguments(cl_args: argparse.Namespace) -> argparse.Namespace:
     if cl_args.valid_size > 1.0:
         cl_args.valid_size = int(cl_args.valid_size)
@@ -1057,11 +553,16 @@ def _modify_train_arguments(cl_args: argparse.Namespace) -> argparse.Namespace:
     return cl_args
 
 
+def _get_hooks(cl_args_: argparse.Namespace):
+    step_func_hooks = _get_step_func_hooks(cl_args=cl_args_)
+    hooks_object = Hooks(step_func_hooks=step_func_hooks)
+
+    return hooks_object
+
+
 @dataclass
-class StepFunctionHookStages:
-    prepare_batch: List[Callable]
-    per_target_loss: List[Callable]
-    final_loss: List[Callable]
+class Hooks:
+    step_func_hooks: "StepFunctionHookStages"
 
 
 def _get_step_func_hooks(cl_args: argparse.Namespace):
@@ -1072,8 +573,11 @@ def _get_step_func_hooks(cl_args: argparse.Namespace):
     init_kwargs = {
         "prepare_batch": [hook_default_prepare_batch],
         "per_target_loss": [hook_default_loss],
-        "final_loss": [hook_final_loss],
+        "final_loss": [],
     }
+
+    if cl_args.l1 is not None:
+        init_kwargs["final_loss"].append(hook_add_l1_loss)
 
     if cl_args.mixing_type is not None:
         logger.debug("Setting up hooks for mixing.")
@@ -1087,11 +591,95 @@ def _get_step_func_hooks(cl_args: argparse.Namespace):
     return step_func_hooks
 
 
-def _get_hooks(cl_args_: argparse.Namespace):
-    step_func_hooks = _get_step_func_hooks(cl_args=cl_args_)
-    hooks_object = Hooks(step_func_hooks=step_func_hooks)
+@dataclass
+class StepFunctionHookStages:
+    al_hook = Callable[..., Dict]
+    al_hooks = [Iterable[al_hook]]
 
-    return hooks_object
+    prepare_batch: al_hooks
+    per_target_loss: al_hooks
+    final_loss: al_hooks
+
+
+def call_hooks_stage_iterable(
+    hook_iterable: Iterable[Callable],
+    common_kwargs: Dict,
+    state: Union[None, Dict[str, Any]],
+):
+    for hook in hook_iterable:
+        _, state = state_registered_hook_call(
+            hook_func=hook, **common_kwargs, state=state
+        )
+
+    return state
+
+
+def state_registered_hook_call(
+    hook_func: Callable, state: Union[Dict[str, Any], None], *args, **kwargs,
+) -> Tuple[Any, Dict[str, Any]]:
+
+    if state is None:
+        state = {}
+
+    state_updates = hook_func(state=state, *args, **kwargs)
+
+    state = {**state, **state_updates}
+
+    return state_updates, state
+
+
+def hook_default_model_inputs(state, batch: "Batch", *args, **kwargs) -> Dict:
+    state_updates = {"model_inputs": batch.inputs, "extra_inputs": batch.extra_inputs}
+    return state_updates
+
+
+def hook_default_prepare_batch(
+    config: "Config",
+    loader_batch: al_dataloader_getitem_batch,
+    state: Dict,
+    *args,
+    **kwargs,
+) -> Dict:
+
+    cl_args = config.cl_args
+
+    train_seqs, labels, train_ids = loader_batch
+    train_seqs = train_seqs.to(device=cl_args.device)
+    train_seqs = train_seqs.to(dtype=torch.float32)
+
+    target_labels = model_training_utils.parse_target_labels(
+        target_columns=config.target_columns,
+        device=cl_args.device,
+        labels=labels["target_labels"],
+    )
+
+    extra_inputs = get_extra_inputs(
+        cl_args=cl_args, model=config.model, labels=labels["extra_labels"]
+    )
+
+    batch = Batch(
+        inputs=train_seqs,
+        target_labels=target_labels,
+        extra_inputs=extra_inputs,
+        ids=train_ids,
+    )
+
+    state_updates = {"batch": batch}
+
+    return state_updates
+
+
+def hook_default_loss(
+    config: "Config", batch: "Batch", state: Dict, *args, **kwargs
+) -> Dict:
+
+    mixed_losses = config.loss_function(
+        inputs=state["model_outputs"], targets=batch.target_labels
+    )
+
+    state_updates = {"train_losses": mixed_losses}
+
+    return state_updates
 
 
 if __name__ == "__main__":
@@ -1102,6 +690,6 @@ if __name__ == "__main__":
 
     utils.configure_root_logger(run_name=cur_cl_args.run_name)
 
-    hooks = _get_hooks(cl_args_=cur_cl_args)
+    hooks_ = _get_hooks(cl_args_=cur_cl_args)
 
-    main(cl_args=cur_cl_args, hooks=hooks)
+    main(cl_args=cur_cl_args, hooks=hooks_)
