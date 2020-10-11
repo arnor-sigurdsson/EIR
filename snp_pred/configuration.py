@@ -73,8 +73,8 @@ def _get_train_argument_parser() -> configargparse.ArgumentParser:
         "--optimizer",
         type=str,
         choices=_get_optimizer_cl_arg_choices(),
-        default="adamw",
-        help="Whether to use AdamW or SGDM optimizer.",
+        default="adam",
+        help="What optimizer to use.",
     )
 
     parser_.add_argument(

@@ -105,18 +105,24 @@ class Config:
     labels_dict: Dict
     target_transformers: al_label_transformers
     target_columns: al_target_columns
-    data_width: int
+    data_dimension: "DataDimension"
     writer: SummaryWriter
     metrics: "al_metric_record_dict"
     hooks: Union["Hooks", None]
 
 
-def main(cl_args: argparse.Namespace, hooks: Union["Hooks", None] = None) -> None:
+def get_default_config(
+    cl_args: argparse.Namespace, hooks: Union["Hooks", None] = None
+) -> "Config":
     run_folder = _prepare_run_folder(run_name=cl_args.run_name)
 
     train_dataset, valid_dataset = datasets.set_up_datasets(cl_args=cl_args)
 
-    cl_args.target_width = train_dataset[0][0].shape[2]
+    data_dimensions = _get_data_dimensions(
+        dataset=train_dataset, target_width=cl_args.target_width
+    )
+
+    cl_args.target_width = data_dimensions.width
 
     batch_size = _modify_bs_for_multi_gpu(
         multi_gpu=cl_args.multi_gpu, batch_size=cl_args.batch_size
@@ -174,13 +180,39 @@ def main(cl_args: argparse.Namespace, hooks: Union["Hooks", None] = None) -> Non
         labels_dict=train_dataset.labels_dict,
         target_transformers=train_dataset.target_transformers,
         target_columns=train_dataset.target_columns,
-        data_width=train_dataset.data_width,
+        data_dimension=data_dimensions,
         writer=writer,
         metrics=metrics,
         hooks=hooks,
     )
 
-    _log_model(model=model, l1_weight=cl_args.l1)
+    return config
+
+
+@dataclass
+class DataDimension:
+    channels: int
+    height: int
+    width: int
+
+
+def _get_data_dimensions(
+    dataset: torch.utils.data.Dataset, target_width: Union[int, None]
+) -> DataDimension:
+    sample, *_ = dataset[0]
+    channels, height, width = sample.shape
+
+    if target_width is not None:
+        width = target_width
+
+    return DataDimension(channels=channels, height=height, width=width)
+
+
+def main(cl_args: argparse.Namespace, hooks: Union["Hooks", None] = None) -> None:
+
+    config = get_default_config(cl_args=cl_args, hooks=hooks)
+
+    _log_model(model=config.model, l1_weight=cl_args.l1)
 
     if cl_args.debug:
         breakpoint()
@@ -410,36 +442,6 @@ def _log_model(model: nn.Module, l1_weight: float) -> None:
     logger.info(
         "Starting training with a %s parameter model.", format(no_params, ",.0f")
     )
-
-
-def _prepare_batch(
-    loader_batch: Tuple[torch.Tensor, al_training_labels_batch, List[str]],
-    config,
-    cl_args,
-) -> Batch:
-
-    train_seqs, labels, train_ids = loader_batch
-    train_seqs = train_seqs.to(device=cl_args.device)
-    train_seqs = train_seqs.to(dtype=torch.float32)
-
-    target_labels = model_training_utils.parse_target_labels(
-        target_columns=config.target_columns,
-        device=cl_args.device,
-        labels=labels["target_labels"],
-    )
-
-    extra_inputs = get_extra_inputs(
-        cl_args=cl_args, model=config.model, labels=labels["extra_labels"]
-    )
-
-    batch = Batch(
-        inputs=train_seqs,
-        target_labels=target_labels,
-        extra_inputs=extra_inputs,
-        ids=train_ids,
-    )
-
-    return batch
 
 
 def train(config: Config) -> None:

@@ -471,6 +471,11 @@ def prep_modelling_test_configs(
     """
     cl_args = create_test_cl_args
     train_loader, valid_loader, train_dataset, valid_dataset = create_test_dloaders
+
+    data_dimension = train._get_data_dimensions(
+        dataset=train_dataset, target_width=cl_args.target_width
+    )
+
     model = create_test_model
 
     criterions = train._get_criterions(
@@ -479,7 +484,7 @@ def prep_modelling_test_configs(
     test_metrics = metrics.get_default_metrics(
         target_transformers=train_dataset.target_transformers
     )
-    test_metrics = _patch_metrics(metrics=test_metrics)
+    test_metrics = _patch_metrics(metrics_=test_metrics)
 
     optimizer, loss_module = create_test_optimizer(
         cl_args=cl_args,
@@ -506,7 +511,7 @@ def prep_modelling_test_configs(
         labels_dict=train_dataset.labels_dict,
         target_transformers=train_dataset.target_transformers,
         target_columns=train_dataset.target_columns,
-        data_width=train_dataset.data_width,
+        data_dimension=data_dimension,
         writer=train.get_summary_writer(run_folder=Path("runs", cl_args.run_name)),
         hooks=hooks,
     )
@@ -518,7 +523,7 @@ def prep_modelling_test_configs(
     return config, test_config
 
 
-def _patch_metrics(metrics):
+def _patch_metrics(metrics_):
     warnings.warn(
         "This function will soon be deprecated as conftest will need to "
         "create its own metrics when train.py default metrics will be "
@@ -526,9 +531,9 @@ def _patch_metrics(metrics):
         category=DeprecationWarning,
     )
     for type_ in ("cat", "con"):
-        for metric_record in metrics[type_]:
+        for metric_record in metrics_[type_]:
             metric_record.only_val = False
-    return metrics
+    return metrics_
 
 
 def _get_cur_modelling_test_config(
