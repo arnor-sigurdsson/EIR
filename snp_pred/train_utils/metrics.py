@@ -429,6 +429,10 @@ def _add_metrics_to_writer(
 def _append_metrics_to_file(
     filepath: Path, metrics: Dict[str, float], iteration: int, write_header=False
 ):
+    """
+    TODO:   Have cached file handles here instead of reopening the file at every
+            iteration.
+    """
     with open(str(filepath), "a") as logfile:
         fieldnames = ["iteration"] + sorted(metrics.keys())
         writer = csv.DictWriter(logfile, fieldnames=fieldnames)

@@ -131,6 +131,9 @@ def _gather_dataloader_label_distributions(
     ).map(lambda x: x + list(range(10)))
 )
 def test_gather_column_sampling_weights(test_labels):
+    """
+    We have the .map here to ensure that all possible values exist at least once.
+    """
     test_target_columns = ["Origin", "HairColor"]
     test_samples = generate_test_samples(
         test_labels=test_labels, target_columns=test_target_columns

@@ -7,8 +7,8 @@ import numpy as np
 import torch
 from torch import nn
 
-from snp_pred.data_load.label_setup import al_target_columns
 from snp_pred.data_load.data_utils import Batch
+from snp_pred.data_load.label_setup import al_target_columns
 
 if TYPE_CHECKING:
     from train import al_training_labels_target, al_criterions, Config
@@ -53,7 +53,7 @@ def hook_mix_data(
         mixed_extra_input = mixup_tensor(
             tensor=batch.extra_inputs,
             lambda_=mixed_object.lambda_,
-            random_index_for_mixing=mixed_object.permuted_indexes,
+            random_batch_indices_to_mix=mixed_object.permuted_indexes,
         )
 
     batch_mixed = Batch(
@@ -86,7 +86,7 @@ def _get_mixing_function_map():
     mapping = {
         "cutmix-uniform": uniform_cutmix_input,
         "cutmix-block": block_cutmix_input,
-        "mixup": mixup_snp_data,
+        "mixup": mixup_input,
     }
     return mapping
 
@@ -98,6 +98,20 @@ def mixup_snp_data(
     mixing_func: Callable[[torch.Tensor, float, torch.Tensor], torch.Tensor],
     alpha: float = 1.0,
 ) -> MixupOutput:
+    """
+    NOTE: **This function will modify the inputs in-place**
+
+    The original inputs (inputs) will be lost when calling this function, unless
+    they have been explicitly copied and stored in another variable before this call.
+
+    This is because we do not want to clone the input tensor in this (or any functions
+    called within this) function as it might mean a large memory overhead if the inputs
+    are large.
+
+    An exception is when we use the "vanilla" MixUp, as that calculates a new tensor
+    instead of cut-pasting inside an already existing tensor.
+    """
+    assert inputs.dim() == 4, "Should be called with 4 dimensions."
 
     if alpha > 0:
         lambda_ = np.random.beta(alpha, alpha)
@@ -105,15 +119,17 @@ def mixup_snp_data(
         lambda_ = 1.0
 
     batch_size = inputs.size()[0]
-    random_index_for_mixing = get_random_index_for_mixing(batch_size=batch_size)
+    random_batch_indices_to_mix = get_random_batch_indices_to_mix(batch_size=batch_size)
     targets_permuted = mixup_all_targets(
         targets=targets,
-        random_index_for_mixing=random_index_for_mixing,
+        random_index_for_mixing=random_batch_indices_to_mix,
         target_columns=target_columns,
     )
 
     mixed_inputs = mixing_func(
-        input_=inputs, lambda_=lambda_, random_index_for_mixing=random_index_for_mixing
+        input_batch=inputs,
+        lambda_=lambda_,
+        random_batch_indices_to_mix=random_batch_indices_to_mix,
     )
 
     mixing_output = MixupOutput(
@@ -121,42 +137,54 @@ def mixup_snp_data(
         targets=targets,
         targets_permuted=targets_permuted,
         lambda_=lambda_,
-        permuted_indexes=random_index_for_mixing,
+        permuted_indexes=random_batch_indices_to_mix,
     )
 
     return mixing_output
 
 
-def get_random_index_for_mixing(batch_size: int) -> torch.Tensor:
+def get_random_batch_indices_to_mix(batch_size: int) -> torch.Tensor:
     return torch.randperm(batch_size)
 
 
-def mixup_tensor(
-    tensor: torch.Tensor, lambda_: float, random_index_for_mixing
+def mixup_input(
+    input_batch: torch.Tensor, lambda_: float, random_batch_indices_to_mix: torch.Tensor
 ) -> torch.Tensor:
-    mixed_tensor = mixup_input(
-        input_=tensor, lambda_=lambda_, random_index_for_mixing=random_index_for_mixing,
+    """
+    This function is to delegate arguments from mixup_snp_data to a general mixup
+    function that is does not necessarily have an 'input_batch' argument.
+    """
+    mixed_input = mixup_tensor(
+        tensor=input_batch,
+        lambda_=lambda_,
+        random_batch_indices_to_mix=random_batch_indices_to_mix,
+    )
+
+    return mixed_input
+
+
+def mixup_tensor(
+    tensor: torch.Tensor, lambda_: float, random_batch_indices_to_mix: torch.Tensor
+) -> torch.Tensor:
+
+    mixed_tensor = (
+        lambda_ * tensor + (1 - lambda_) * tensor[random_batch_indices_to_mix, :]
     )
     return mixed_tensor
 
 
-def mixup_input(
-    input_: torch.Tensor, lambda_: float, random_index_for_mixing: torch.Tensor
-) -> torch.Tensor:
-    mixed_x = lambda_ * input_ + (1 - lambda_) * input_[random_index_for_mixing, :]
-    return mixed_x
-
-
 def block_cutmix_input(
-    input_: torch.Tensor, lambda_: float, random_index_for_mixing: torch.Tensor
+    input_batch: torch.Tensor, lambda_: float, random_batch_indices_to_mix: torch.Tensor
 ) -> torch.Tensor:
 
     cut_start, cut_end = get_block_cutmix_indices(
-        input_length=input_.shape[-1], lambda_=lambda_
+        input_length=input_batch.shape[-1], lambda_=lambda_
     )
-    target_to_cut = input_[random_index_for_mixing, :]
+    target_to_cut = input_batch[random_batch_indices_to_mix, :]
     cut_part = target_to_cut[..., cut_start:cut_end]
-    cutmixed_x = input_
+
+    # Caution: input_ will be modified as well since no .clone() below here
+    cutmixed_x = input_batch
     cutmixed_x[..., cut_start:cut_end] = cut_part
 
     assert (cutmixed_x.sum(dim=2) == 1).all()
@@ -164,7 +192,7 @@ def block_cutmix_input(
 
 
 def get_block_cutmix_indices(input_length: int, lambda_: float):
-    mixin_coefficient = 1 - lambda_
+    mixin_coefficient = 1.0 - lambda_
     num_snps_to_mix = int(input_length * mixin_coefficient)
     random_index_start = np.random.choice(max(1, input_length - num_snps_to_mix))
     random_index_end = random_index_start + num_snps_to_mix
@@ -172,25 +200,28 @@ def get_block_cutmix_indices(input_length: int, lambda_: float):
 
 
 def uniform_cutmix_input(
-    input_: torch.Tensor, lambda_: float, random_index_for_mixing: torch.Tensor
+    input_batch: torch.Tensor,
+    lambda_: float,
+    random_batch_indices_to_mix: torch.Tensor,
 ) -> torch.Tensor:
 
-    target_to_mix = input_[random_index_for_mixing, :]
+    target_to_mix = input_batch[random_batch_indices_to_mix, :]
 
     random_snp_indices_to_mix = get_uniform_cutmix_indices(
-        input_length=input_.shape[-1], lambda_=lambda_
+        input_length=input_batch.shape[-1], lambda_=lambda_
     )
     cut_part = target_to_mix[..., random_snp_indices_to_mix]
 
-    cutmixed_x = input_
+    # Caution: input_ will be modified as well since no .clone() below here
+    cutmixed_x = input_batch
     cutmixed_x[..., random_snp_indices_to_mix] = cut_part
 
     assert (cutmixed_x.sum(dim=2) == 1).all()
     return cutmixed_x
 
 
-def get_uniform_cutmix_indices(input_length: int, lambda_) -> torch.Tensor:
-    mixin_coefficient = 1 - lambda_
+def get_uniform_cutmix_indices(input_length: int, lambda_: float) -> torch.Tensor:
+    mixin_coefficient = 1.0 - lambda_
     num_snps_to_mix = (int(input_length * mixin_coefficient),)
     random_to_mix = np.random.choice(input_length, num_snps_to_mix, replace=False)
     random_to_mix = torch.tensor(random_to_mix, dtype=torch.long)
@@ -251,7 +282,7 @@ def calc_all_mixed_losses(
 
 
 def calc_mixed_loss(
-    criterion: nn.CrossEntropyLoss,
+    criterion: Union[nn.CrossEntropyLoss, nn.MSELoss],
     outputs: torch.Tensor,
     targets: torch.Tensor,
     targets_permuted: torch.Tensor,
