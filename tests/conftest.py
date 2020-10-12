@@ -90,8 +90,8 @@ def args_config():
             "gpu_num": "0",
             "kernel_width": 12,
             "label_file": "REPLACE_ME",
-            "l1": 0.0,
-            "lr": 1e-2,
+            "l1": 1e-03,
+            "lr": 1e-02,
             "lr_lb": 1e-5,
             "lr_schedule": "plateau",
             "max_acts_per_class": None,
@@ -119,7 +119,7 @@ def args_config():
             "target_width": 1000,
             "valid_size": 0.05,
             "warmup_steps": 100,
-            "wd": 0.00,
+            "wd": 1e-03,
             "weighted_sampling_column": None,
         }
     )
