@@ -1,7 +1,6 @@
 from collections import Counter
 from typing import TYPE_CHECKING, List, Tuple, Union, Dict, Iterable
 
-import numpy as np
 import torch
 from aislib.misc_utils import get_logger
 from torch.utils.data import WeightedRandomSampler
@@ -125,23 +124,3 @@ def _aggregate_column_sampling_weights(
     )
 
     return all_weights_summed, samples_per_epoch
-
-
-def make_random_snps_missing(
-    array: torch.Tensor, percentage: float = 0.05, probability: float = 1.0
-) -> torch.Tensor:
-    random_draw = np.random.uniform()
-    if random_draw > probability:
-        return array
-
-    n_snps = array.shape[2]
-    n_to_drop = (int(n_snps * percentage),)
-    random_to_drop = np.random.choice(n_snps, n_to_drop, replace=False)
-    random_to_drop = torch.tensor(random_to_drop, dtype=torch.long)
-
-    missing_arr = torch.tensor([False, False, False, True], dtype=torch.bool).reshape(
-        -1, 1
-    )
-    array[:, :, random_to_drop] = missing_arr
-
-    return array

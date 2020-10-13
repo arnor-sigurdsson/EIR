@@ -26,7 +26,8 @@ from snp_pred.data_load.data_utils import get_target_columns_generator
 from snp_pred.data_load.label_setup import al_label_transformers
 
 if TYPE_CHECKING:
-    from snp_pred.train import al_criterions  # noqa: F401
+    from snp_pred.train import al_criterions, Config  # noqa: F401
+    from snp_pred.models.models import al_models  # noqa: F401
     from snp_pred.train_utils.train_handlers import HandlerConfig
     from snp_pred.data_load.label_setup import (  # noqa: F401
         al_target_columns,
@@ -298,27 +299,26 @@ class UncertaintyMultiTaskLoss(nn.Module):
         return losses_dict
 
 
-def get_extra_loss_term_functions(model, l1_weight: float) -> List[Callable]:
-    extra_loss_funcs = []
+def hook_add_l1_loss(config: "Config", state: Dict, *args, **kwargs) -> Dict:
+    l1_loss = get_model_l1_loss(model=config.model, l1_weight=config.cl_args.l1)
 
-    def add_l1_loss(*args, **kwargs):
-        l1_loss = torch.norm(model.l1_penalized_weights, p=1) * l1_weight
-        return l1_loss
+    updated_loss = state["loss"] + l1_loss
 
-    if l1_weight > 0.0:
-        if not hasattr(model, "l1_penalized_weights"):
-            raise AttributeError(
-                f"Model {model} does not have attribute 'l1_penalized_weights' which is"
-                f" required to calculate L1 loss with passed in {l1_weight} L1 weight."
-            )
-        logger.debug(
-            "Penalizing weights of shape %s with L1 loss with weight %f.",
-            model.l1_penalized_weights.shape,
-            l1_weight,
-        )
-        extra_loss_funcs.append(add_l1_loss)
+    state_updates = {"loss": updated_loss}
 
-    return extra_loss_funcs
+    return state_updates
+
+
+def get_model_l1_loss(model: "al_models", l1_weight: float) -> torch.Tensor:
+    l1_loss = calc_l1_loss(
+        weight_tensor=model.l1_penalized_weights, l1_weight=l1_weight
+    )
+    return l1_loss
+
+
+def calc_l1_loss(weight_tensor: torch.Tensor, l1_weight: float):
+    l1_loss = torch.norm(weight_tensor, p=1) * l1_weight
+    return l1_loss
 
 
 def add_extra_losses(total_loss: torch.Tensor, extra_loss_functions: List[Callable]):
@@ -429,6 +429,10 @@ def _add_metrics_to_writer(
 def _append_metrics_to_file(
     filepath: Path, metrics: Dict[str, float], iteration: int, write_header=False
 ):
+    """
+    TODO:   Have cached file handles here instead of reopening the file at every
+            iteration.
+    """
     with open(str(filepath), "a") as logfile:
         fieldnames = ["iteration"] + sorted(metrics.keys())
         writer = csv.DictWriter(logfile, fieldnames=fieldnames)

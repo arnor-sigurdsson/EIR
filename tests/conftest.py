@@ -90,12 +90,14 @@ def args_config():
             "gpu_num": "0",
             "kernel_width": 12,
             "label_file": "REPLACE_ME",
-            "l1": 0.0,
-            "lr": 1e-2,
+            "l1": 1e-03,
+            "lr": 1e-02,
             "lr_lb": 1e-5,
             "lr_schedule": "plateau",
             "max_acts_per_class": None,
             "memory_dataset": True,
+            "mixing_type": None,
+            "mixing_alpha": 0.0,
             "mg_num_experts": 3,
             "model_type": "cnn",
             "multi_gpu": False,
@@ -104,7 +106,7 @@ def args_config():
             "na_augment_perc": 0.05,
             "na_augment_prob": 0.20,
             "no_pbar": False,
-            "optimizer": "adamw",
+            "optimizer": "adam",
             "plot_skip_steps": 50,
             "rb_do": 0.25,
             "layers": [1, 1],
@@ -117,7 +119,7 @@ def args_config():
             "target_width": 1000,
             "valid_size": 0.05,
             "warmup_steps": 100,
-            "wd": 0.00,
+            "wd": 1e-03,
             "weighted_sampling_column": None,
         }
     )
@@ -469,6 +471,11 @@ def prep_modelling_test_configs(
     """
     cl_args = create_test_cl_args
     train_loader, valid_loader, train_dataset, valid_dataset = create_test_dloaders
+
+    data_dimension = train._get_data_dimensions(
+        dataset=train_dataset, target_width=cl_args.target_width
+    )
+
     model = create_test_model
 
     criterions = train._get_criterions(
@@ -477,7 +484,7 @@ def prep_modelling_test_configs(
     test_metrics = metrics.get_default_metrics(
         target_transformers=train_dataset.target_transformers
     )
-    test_metrics = _patch_metrics(metrics=test_metrics)
+    test_metrics = _patch_metrics(metrics_=test_metrics)
 
     optimizer, loss_module = create_test_optimizer(
         cl_args=cl_args,
@@ -488,8 +495,9 @@ def prep_modelling_test_configs(
 
     train_dataset, valid_dataset = create_test_datasets
 
-    train._log_num_params(model=model)
+    train._log_model(model=model, l1_weight=cl_args.l1)
 
+    hooks = train._get_hooks(cl_args_=cl_args)
     config = Config(
         cl_args=cl_args,
         train_loader=train_loader,
@@ -503,9 +511,9 @@ def prep_modelling_test_configs(
         labels_dict=train_dataset.labels_dict,
         target_transformers=train_dataset.target_transformers,
         target_columns=train_dataset.target_columns,
-        data_width=train_dataset.data_width,
+        data_dimension=data_dimension,
         writer=train.get_summary_writer(run_folder=Path("runs", cl_args.run_name)),
-        custom_hooks=None,
+        hooks=hooks,
     )
 
     test_config = _get_cur_modelling_test_config(
@@ -515,7 +523,7 @@ def prep_modelling_test_configs(
     return config, test_config
 
 
-def _patch_metrics(metrics):
+def _patch_metrics(metrics_):
     warnings.warn(
         "This function will soon be deprecated as conftest will need to "
         "create its own metrics when train.py default metrics will be "
@@ -523,9 +531,9 @@ def _patch_metrics(metrics):
         category=DeprecationWarning,
     )
     for type_ in ("cat", "con"):
-        for metric_record in metrics[type_]:
+        for metric_record in metrics_[type_]:
             metric_record.only_val = False
-    return metrics
+    return metrics_
 
 
 def _get_cur_modelling_test_config(
