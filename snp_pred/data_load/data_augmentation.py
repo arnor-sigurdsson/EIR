@@ -1,7 +1,7 @@
 from copy import copy
 from dataclasses import dataclass
 from functools import partial
-from typing import TYPE_CHECKING, Union, Dict, Callable, Sequence
+from typing import TYPE_CHECKING, Union, Dict, Callable, Sequence, Tuple
 
 import numpy as np
 import torch
@@ -168,7 +168,7 @@ def mixup_tensor(
 ) -> torch.Tensor:
 
     mixed_tensor = (
-        lambda_ * tensor + (1 - lambda_) * tensor[random_batch_indices_to_mix, :]
+        lambda_ * tensor + (1.0 - lambda_) * tensor[random_batch_indices_to_mix, :]
     )
     return mixed_tensor
 
@@ -191,9 +191,9 @@ def block_cutmix_input(
     return cutmixed_x
 
 
-def get_block_cutmix_indices(input_length: int, lambda_: float):
+def get_block_cutmix_indices(input_length: int, lambda_: float) -> Tuple[int, int]:
     mixin_coefficient = 1.0 - lambda_
-    num_snps_to_mix = int(input_length * mixin_coefficient)
+    num_snps_to_mix = int(round(input_length * mixin_coefficient))
     random_index_start = np.random.choice(max(1, input_length - num_snps_to_mix))
     random_index_end = random_index_start + num_snps_to_mix
     return random_index_start, random_index_end
@@ -222,7 +222,7 @@ def uniform_cutmix_input(
 
 def get_uniform_cutmix_indices(input_length: int, lambda_: float) -> torch.Tensor:
     mixin_coefficient = 1.0 - lambda_
-    num_snps_to_mix = (int(input_length * mixin_coefficient),)
+    num_snps_to_mix = int(round(input_length * mixin_coefficient))
     random_to_mix = np.random.choice(input_length, num_snps_to_mix, replace=False)
     random_to_mix = torch.tensor(random_to_mix, dtype=torch.long)
 

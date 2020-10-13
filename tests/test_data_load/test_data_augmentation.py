@@ -1,4 +1,5 @@
 from itertools import combinations
+from typing import List
 from unittest.mock import patch
 
 import numpy as np
@@ -7,6 +8,7 @@ import torch
 from hypothesis import given
 from hypothesis.strategies import lists, integers, floats
 from torch import nn
+from torch.nn import functional as F
 
 from snp_pred.data_load import data_augmentation
 from tests.conftest import _set_up_base_test_array
@@ -28,24 +30,127 @@ def test_mixup_snp_data():
     pass
 
 
-def test_get_random_index_for_mixing():
-    pass
+@given(test_batch_size=integers(min_value=8, max_value=128))
+def test_get_random_batch_indices_to_mix(test_batch_size):
+    random_indices = data_augmentation.get_random_batch_indices_to_mix(
+        batch_size=test_batch_size
+    )
+
+    indices_as_list = random_indices.tolist()
+
+    assert len(set(indices_as_list)) == test_batch_size
+    assert sorted(indices_as_list) == list(range(test_batch_size))
 
 
-def test_mixup_tensor():
-    pass
+@given(
+    input_length=integers(min_value=10, max_value=int(1e3)),
+    input_height=integers(min_value=1, max_value=10),
+    lambda_=floats(min_value=0.0, max_value=1.0),
+)
+def test_mixup_tensor(input_length: int, input_height: int, lambda_: float) -> None:
+
+    tensor_1_one_hot_indices = torch.randint(0, input_height, (input_length,))
+    tensor_2_one_hot_indices = torch.randint(0, input_height, (input_length,))
+
+    guaranteed_indices = torch.arange(0, input_height).to(dtype=torch.long)
+
+    # We need to make sure each one-hot index appears at least once, otherwise
+    # the one-hot dimensions will not match
+    tensor_1_one_hot_indices = torch.cat((tensor_1_one_hot_indices, guaranteed_indices))
+    tensor_2_one_hot_indices = torch.cat((tensor_2_one_hot_indices, guaranteed_indices))
+
+    tensor_1 = F.one_hot(tensor_1_one_hot_indices).T
+    tensor_2 = F.one_hot(tensor_2_one_hot_indices).T
+
+    assert tensor_1.shape == tensor_2.shape
+
+    tensor_1_w_batch_dim = tensor_1.unsqueeze(0)
+    tensor_2_w_batch_dim = tensor_2.unsqueeze(0)
+
+    test_batch = torch.cat((tensor_1_w_batch_dim, tensor_2_w_batch_dim))
+    batch_indices_for_mixing = torch.LongTensor([1, 0])
+
+    mixed_tensor = data_augmentation.mixup_tensor(
+        tensor=test_batch,
+        lambda_=lambda_,
+        random_batch_indices_to_mix=batch_indices_for_mixing,
+    )
+
+    assert (mixed_tensor.sum(dim=1) == 1.0).all()
 
 
-def test_mixup_input():
-    pass
+@given(
+    patched_indices=lists(
+        elements=integers(min_value=0, max_value=999),
+        min_size=2,
+        max_size=2,
+        unique=True,
+    ).map(lambda x: sorted(x))
+)
+def test_block_cutmix_input(patched_indices: List[int]) -> None:
+    """
+    We need it to be sorted here to avoid indexing with e.g. [521:3]
+    """
+    test_arrays = []
+    for i in range(2):
+        test_array, *_ = _set_up_base_test_array(n_snps=1000)
+        test_array = torch.tensor(test_array).unsqueeze(0)
+        test_arrays.append(test_array)
+
+    test_batch = torch.stack(test_arrays)
+
+    # Needed since mixing overwrites input
+    test_batch_original = test_batch.clone()
+
+    batch_indices_for_mixing = torch.LongTensor([1, 0])
+
+    with patch(
+        "snp_pred.data_load.data_augmentation.get_block_cutmix_indices",
+        return_value=patched_indices,
+        autospec=True,
+    ):
+        block_cutmixed_test_arrays = data_augmentation.block_cutmix_input(
+            input_batch=test_batch,
+            lambda_=1.0,
+            random_batch_indices_to_mix=batch_indices_for_mixing,
+        )
+
+    patched_start, patched_end = patched_indices
+    base_0 = test_batch_original[0, ..., patched_start:patched_end]
+    base_1 = test_batch_original[1, ..., patched_start:patched_end]
+    mixed_0 = block_cutmixed_test_arrays[0, ..., patched_start:patched_end]
+    mixed_1 = block_cutmixed_test_arrays[1, ..., patched_start:patched_end]
+
+    assert (base_0 == mixed_1).all()
+    assert (base_1 == mixed_0).all()
+
+    # NOTE: Currently we only have a probabilistic guarantee for the code below to pass,
+    # as e.g. if we only have 1 SNP, it can be quite likely that they match only by
+    # change. This is less likely if we have >1, but at some point we should probably
+    # make this more concrete.
+    if patched_end - patched_start > 1:
+        assert not (base_0 == mixed_0).all()
+        assert not (base_1 == mixed_1).all()
+
+        all_arrays = torch.cat((test_batch_original, block_cutmixed_test_arrays))
+        for tensor_1, tensor_2 in combinations(all_arrays, r=2):
+            assert not (tensor_1 == tensor_2).all()
 
 
-def test_block_cutmix_input():
-    pass
+@given(
+    input_length=integers(min_value=10, max_value=int(1e4)),
+    lambda_=floats(min_value=0.0, max_value=1.0),
+)
+def test_get_block_cutmix_indices(input_length: int, lambda_: float):
+    random_index_start, random_index_end = data_augmentation.get_block_cutmix_indices(
+        input_length=input_length, lambda_=lambda_
+    )
 
+    assert random_index_start <= random_index_end
 
-def test_get_block_cutmix_indices():
-    pass
+    num_snps_in_mixed_block = random_index_end - random_index_start
+    num_snps_from_original = input_length - num_snps_in_mixed_block
+    assert num_snps_from_original == int(round(lambda_ * input_length))
 
 
 @given(
@@ -53,7 +158,7 @@ def test_get_block_cutmix_indices():
         elements=integers(min_value=0, max_value=999), min_size=10, max_size=1000
     )
 )
-def test_uniform_cutmix_input(patched_indices):
+def test_uniform_cutmix_input(patched_indices: List[int]):
     """
     Here we explicitly cut from 1 --> 0 and vice versa.
 
@@ -71,7 +176,7 @@ def test_uniform_cutmix_input(patched_indices):
     # Needed since mixing overwrites input
     test_batch_original = test_batch.clone()
 
-    indices_for_mixing = torch.LongTensor([1, 0])
+    batch_indices_for_mixing = torch.LongTensor([1, 0])
 
     # Ensure that we have at least 10 unique, otherwise e.g. if we only have 1
     # value, it's quite likely that the arrays can be the same in that once place
@@ -84,7 +189,7 @@ def test_uniform_cutmix_input(patched_indices):
         uniform_cutmixed_test_arrays = data_augmentation.uniform_cutmix_input(
             input_batch=test_batch,
             lambda_=1.0,
-            random_batch_indices_to_mix=indices_for_mixing,
+            random_batch_indices_to_mix=batch_indices_for_mixing,
         )
 
     base_0 = test_batch_original[0, ..., patched_indices_tensor]
@@ -103,14 +208,18 @@ def test_uniform_cutmix_input(patched_indices):
 
 
 @given(
-    test_lambda=floats(min_value=0.0, max_value=1.0),
-    test_num_snps=integers(min_value=100, max_value=int(1e4)),
+    lambda_=floats(min_value=0.0, max_value=1.0),
+    input_length=integers(min_value=100, max_value=int(1e4)),
 )
-def test_get_uniform_cutmix_indices(test_lambda, test_num_snps):
+def test_get_uniform_cutmix_indices(lambda_, input_length):
     test_random_indices = data_augmentation.get_uniform_cutmix_indices(
-        input_length=test_num_snps, lambda_=test_lambda
+        input_length=input_length, lambda_=lambda_
     )
     assert len(test_random_indices.unique()) == len(test_random_indices)
+
+    num_mixed_snps = len(test_random_indices)
+    num_snps_from_original = input_length - num_mixed_snps
+    assert num_snps_from_original == int(round(lambda_ * input_length))
 
 
 @given(
