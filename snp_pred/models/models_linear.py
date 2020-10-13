@@ -64,7 +64,8 @@ class LinearModel(ModelBase):
         self, x: torch.Tensor, extra_inputs: torch.Tensor = None
     ) -> Dict[str, torch.Tensor]:
         out = x.view(x.shape[0], -1)
-        if extra_inputs:
+
+        if extra_inputs is not None:
             out = torch.cat((out, extra_inputs), dim=1)
 
         out = self.fc_1(out)

@@ -2,8 +2,8 @@ import math
 
 import torch
 import torch.nn.functional as F
-from aislib.pytorch_modules import Swish
 from aislib.misc_utils import get_logger
+from aislib.pytorch_modules import Swish
 from torch import nn
 from torch.nn import Parameter
 

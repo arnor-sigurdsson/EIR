@@ -15,8 +15,8 @@ from tests.conftest import cleanup, ModelTestConfig
 @pytest.mark.parametrize(
     "create_test_cl_args",
     [
-        {"custom_cl_args": {"model_type": "mlp"}},
-        {"custom_cl_args": {"model_type": "cnn"}},
+        {"custom_cl_args": {"model_type": "mlp", "lr": 1e-03}},
+        {"custom_cl_args": {"model_type": "cnn", "lr": 1e-03, "fc_do": 0.25}},
     ],
     indirect=True,
 )
@@ -47,7 +47,7 @@ def test_classification_nonlinear(keep_outputs, prep_modelling_test_configs):
         run_path=test_config.run_path,
         target_column=target_column,
         metric="mcc",
-        threshold=0.8,
+        thresholds=(0.8, 0.8),
     )
 
     top_row_grads_dict = {"Asia": [0] * 10, "Europe": [1] * 10, "Africa": [2] * 10}
@@ -55,6 +55,7 @@ def test_classification_nonlinear(keep_outputs, prep_modelling_test_configs):
         test_config=test_config,
         target_column=target_column,
         top_row_grads_dict=top_row_grads_dict,
+        at_least_n=8,
     )
 
     if not keep_outputs:
@@ -80,7 +81,7 @@ def test_classification_linear(keep_outputs, prep_modelling_test_configs):
         run_path=test_config.run_path,
         target_column=target_column,
         metric="mcc",
-        threshold=0.8,
+        thresholds=(0.8, 0.8),
     )
 
     top_row_grads_dict = {"Asia": [0] * 10, "Europe": [1] * 10, "Africa": [2] * 10}
@@ -123,6 +124,7 @@ def _check_snps_wrapper(
         {
             "custom_cl_args": {
                 "model_type": "linear",
+                "lr": 1e-03,
                 "target_cat_columns": [],
                 "target_con_columns": ["Height"],
             }
@@ -162,12 +164,12 @@ def test_regression(keep_outputs, prep_modelling_test_configs):
 
     # linear regression performs slightly worse, but we don't want to lower expectations
     # other models
-    threshold = 0.70 if config.cl_args.model_type == "linear" else 0.8
+    thresholds = (0.70, 0.70) if config.cl_args.model_type == "linear" else (0.8, 0.8)
     _check_test_performance_results(
         run_path=test_config.run_path,
         target_column=target_column,
         metric="r2",
-        threshold=threshold,
+        thresholds=thresholds,
     )
 
     top_height_snp_index = 2
@@ -184,7 +186,7 @@ def test_regression(keep_outputs, prep_modelling_test_configs):
 
 
 def _check_test_performance_results(
-    run_path: Path, target_column: str, metric: str, threshold: float
+    run_path: Path, target_column: str, metric: str, thresholds: Tuple[float, float]
 ):
     target_column_results_folder = run_path / "results" / target_column
     train_history_path = (
@@ -194,11 +196,13 @@ def _check_test_performance_results(
         target_column_results_folder / f"validation_{target_column}_history.log"
     )
 
+    threshold_train, threshold_valid = thresholds
+
     df_train = pd.read_csv(train_history_path)
-    assert df_train.loc[:, f"{target_column}_{metric}"].max() > threshold
+    assert df_train.loc[:, f"{target_column}_{metric}"].max() > threshold_train
 
     df_valid = pd.read_csv(valid_history_path)
-    assert df_valid.loc[:, f"{target_column}_{metric}"].max() > threshold
+    assert df_valid.loc[:, f"{target_column}_{metric}"].max() > threshold_valid
 
 
 @pytest.mark.parametrize(
@@ -234,8 +238,7 @@ def _check_test_performance_results(
                 "target_con_columns": ["Height", "ExtraTarget"],
             }
         },
-        {  # Case 4: Normal multi task with MLP, note we have to reduce the LR for
-            # stability and add L1 for regularization
+        {  # Case 4: Using the split model
             "custom_cl_args": {
                 "model_type": "mlp-split",
                 "l1": 1e-3,
@@ -246,13 +249,39 @@ def _check_test_performance_results(
                 "target_con_columns": ["Height", "ExtraTarget"],
             }
         },
-        {  # Case 5: Normal multi task with MLP, note we have to reduce the LR for
+        {  # Case 5: Using the fully-split model
+            "custom_cl_args": {
+                "model_type": "mlp-fully-split",
+                "l1": 1e-3,
+                "lr": 1e-3,
+                "kernel_width": 12,
+                "channel_exp_base": 2,
+                "target_cat_columns": ["Origin"],
+                "target_con_columns": ["Height", "ExtraTarget"],
+            }
+        },
+        {  # Case 6: Normal multi task with MLP, note we have to reduce the LR for
             # stability and add L1 for regularization
             "custom_cl_args": {
                 "model_type": "mlp-mgmoe",
                 "l1": 1e-3,
                 "lr": 1e-3,
                 "fc_repr_dim": 8,
+                "split_mlp_num_splits": 64,
+                "target_cat_columns": ["Origin"],
+                "target_con_columns": ["Height", "ExtraTarget"],
+            }
+        },
+        {  # Case 7: Fully split with mixup
+            "custom_cl_args": {
+                "model_type": "mlp-fully-split",
+                "l1": 1e-3,
+                "lr": 1e-3,
+                "kernel_width": 12,
+                "channel_exp_base": 2,
+                "mixing_type": "cutmix-uniform",
+                "mixing_alpha": 1.0,
+                "n_epochs": 10,
                 "split_mlp_num_splits": 64,
                 "target_cat_columns": ["Origin"],
                 "target_con_columns": ["Height", "ExtraTarget"],
@@ -270,14 +299,16 @@ def test_multi_task(keep_outputs, prep_modelling_test_configs):
     extra_columns = cl_args.extra_con_columns + cl_args.extra_cat_columns
     for cat_column in config.cl_args.target_cat_columns:
         threshold, at_least_n = _get_multi_task_test_args(
-            extra_columns=extra_columns, target_copy="OriginExtraCol"
+            extra_columns=extra_columns,
+            target_copy="OriginExtraCol",
+            mixing=cl_args.mixing_type,
         )
 
         _check_test_performance_results(
             run_path=test_config.run_path,
             target_column=cat_column,
             metric="mcc",
-            threshold=threshold,
+            thresholds=threshold,
         )
 
         top_row_grads_dict = {"Asia": [0] * 10, "Europe": [1] * 10, "Africa": [2] * 10}
@@ -290,14 +321,16 @@ def test_multi_task(keep_outputs, prep_modelling_test_configs):
 
     for con_column in config.cl_args.target_con_columns:
         threshold, at_least_n = _get_multi_task_test_args(
-            extra_columns=extra_columns, target_copy="ExtraTarget"
+            extra_columns=extra_columns,
+            target_copy="ExtraTarget",
+            mixing=cl_args.mixing_type,
         )
 
         _check_test_performance_results(
             run_path=test_config.run_path,
             target_column=con_column,
             metric="r2",
-            threshold=threshold,
+            thresholds=threshold,
         )
 
         top_height_snp_index = 2
@@ -314,21 +347,27 @@ def test_multi_task(keep_outputs, prep_modelling_test_configs):
 
 
 def _get_multi_task_test_args(
-    extra_columns: List[str], target_copy: str
-) -> Tuple[float, int]:
+    extra_columns: List[str], target_copy: str, mixing: Union[None, str]
+) -> Tuple[Tuple[float, float], int]:
     """
     We use 0 for at_least_n in the case we have correlated input columns because
     in that case the model might not actually be using any of the SNPs (better to use
     the correlated column), hence we do not expect SNPs to be highly activated.
+
+    When mixing, the train performance (loss is OK) for e.g. accuracy is expected to be
+    relatively low, as we do not have discrete inputs but a mix.
     """
 
     an_extra_col_is_correlated_with_target = target_copy in extra_columns
     if an_extra_col_is_correlated_with_target:
-        threshold, at_least_n = 0.9, 0
+        thresholds, at_least_n = (0.9, 0.9), 0
     else:
-        threshold, at_least_n = 0.8, 8
+        thresholds, at_least_n = (0.8, 0.8), 8
 
-    return threshold, at_least_n
+    if mixing is not None:
+        thresholds, at_least_n = (0.0, 0.8), 8
+
+    return thresholds, at_least_n
 
 
 def _get_test_activation_arrs(
