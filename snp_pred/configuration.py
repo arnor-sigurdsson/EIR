@@ -3,7 +3,7 @@ import configargparse
 from snp_pred.train_utils.optimizers import get_base_optimizers_dict
 
 
-def _get_train_argument_parser() -> configargparse.ArgumentParser:
+def get_train_argument_parser() -> configargparse.ArgumentParser:
 
     parser_ = configargparse.ArgumentParser(
         config_file_parser_class=configargparse.YAMLConfigFileParser

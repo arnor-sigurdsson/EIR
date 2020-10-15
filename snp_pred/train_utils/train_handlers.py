@@ -433,7 +433,9 @@ def _get_custom_handlers(handler_config: "HandlerConfig"):
     return custom_handlers
 
 
-def _attach_custom_handlers(trainer: Engine, handler_config, custom_handlers):
+def _attach_custom_handlers(
+    trainer: Engine, handler_config: "HandlerConfig", custom_handlers
+):
     if not custom_handlers:
         return trainer
 

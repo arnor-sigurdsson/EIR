@@ -26,7 +26,7 @@ from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader, WeightedRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
-from snp_pred.configuration import _get_train_argument_parser
+from snp_pred.configuration import get_train_argument_parser
 from snp_pred.data_load import data_utils
 from snp_pred.data_load import datasets
 from snp_pred.data_load.data_augmentation import hook_mix_loss, get_mix_data_hook
@@ -521,7 +521,7 @@ def train(config: Config) -> None:
     trainer.run(data=c.train_loader, max_epochs=cl_args.n_epochs)
 
 
-def _modify_train_arguments(cl_args: argparse.Namespace) -> argparse.Namespace:
+def modify_train_arguments(cl_args: argparse.Namespace) -> argparse.Namespace:
     if cl_args.valid_size > 1.0:
         cl_args.valid_size = int(cl_args.valid_size)
 
@@ -541,7 +541,7 @@ def _modify_train_arguments(cl_args: argparse.Namespace) -> argparse.Namespace:
     return cl_args
 
 
-def _get_hooks(cl_args_: argparse.Namespace):
+def get_hooks(cl_args_: argparse.Namespace):
     step_func_hooks = _get_step_func_hooks(cl_args=cl_args_)
     hooks_object = Hooks(step_func_hooks=step_func_hooks)
 
@@ -682,12 +682,12 @@ def hook_default_loss(
 
 if __name__ == "__main__":
 
-    parser = _get_train_argument_parser()
+    parser = get_train_argument_parser()
     cur_cl_args = parser.parse_args()
-    cur_cl_args = _modify_train_arguments(cl_args=cur_cl_args)
+    cur_cl_args = modify_train_arguments(cl_args=cur_cl_args)
 
     utils.configure_root_logger(run_name=cur_cl_args.run_name)
 
-    hooks_ = _get_hooks(cl_args_=cur_cl_args)
+    hooks_ = get_hooks(cl_args_=cur_cl_args)
 
     main(cl_args=cur_cl_args, hooks=hooks_)

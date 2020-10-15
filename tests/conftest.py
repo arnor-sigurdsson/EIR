@@ -489,7 +489,7 @@ def prep_modelling_test_configs(
 
     train._log_model(model=model, l1_weight=cl_args.l1)
 
-    hooks = train._get_hooks(cl_args_=cl_args)
+    hooks = train.get_hooks(cl_args_=cl_args)
     config = Config(
         cl_args=cl_args,
         train_loader=train_loader,
