@@ -52,10 +52,10 @@ from snp_pred.train_utils.metrics import (
     calculate_prediction_losses,
     aggregate_losses,
     add_multi_task_average_metrics,
-    UncertaintyMultiTaskLoss,
     get_average_history_filepath,
     get_default_metrics,
     hook_add_l1_loss,
+    get_uncertainty_loss_hook,
 )
 from snp_pred.train_utils.optimizers import (
     get_optimizer,
@@ -158,11 +158,7 @@ def get_default_config(
 
     writer = get_summary_writer(run_folder=run_folder)
 
-    loss_func = _get_loss_callable(
-        target_columns=train_dataset.target_columns,
-        criterions=criterions,
-        device=cl_args.device,
-    )
+    loss_func = _get_loss_callable(criterions=criterions,)
 
     optimizer = get_optimizer(model=model, loss_callable=loss_func, cl_args=cl_args)
 
@@ -295,7 +291,7 @@ def get_dataloaders(
     train_sampler: Union[None, WeightedRandomSampler],
     valid_dataset: datasets.ArrayDatasetBase,
     batch_size: int,
-    num_workers: int = 8,
+    num_workers: int = 0,
 ) -> Tuple:
 
     train_dloader = DataLoader(
@@ -403,20 +399,10 @@ def _get_criterions(
     return criterions_dict
 
 
-def _get_loss_callable(
-    target_columns: al_target_columns, criterions: al_criterions, device: str,
-):
-    num_tasks = len(target_columns["con"] + target_columns["cat"])
-    if num_tasks > 1:
-        multi_task_loss_module = UncertaintyMultiTaskLoss(
-            target_columns=target_columns, criterions=criterions, device=device
-        )
-        return multi_task_loss_module
-    elif num_tasks == 1:
-        single_task_loss_func = partial(
-            calculate_prediction_losses, criterions=criterions
-        )
-        return single_task_loss_func
+def _get_loss_callable(criterions: al_criterions):
+
+    single_task_loss_func = partial(calculate_prediction_losses, criterions=criterions)
+    return single_task_loss_func
 
 
 def get_summary_writer(run_folder: Path) -> SummaryWriter:
@@ -570,6 +556,7 @@ class Hooks:
 def _get_step_func_hooks(cl_args: argparse.Namespace):
     """
     TODO: Add validation, inspect that outputs have correct names.
+    TODO: Refactor, split into smaller functions e.g. for L1, mixing and uncertainty.
     """
 
     init_kwargs = {
@@ -587,6 +574,15 @@ def _get_step_func_hooks(cl_args: argparse.Namespace):
 
         init_kwargs["prepare_batch"].append(mix_hook)
         init_kwargs["per_target_loss"] = [hook_mix_loss]
+
+    if len(cl_args.target_con_columns + cl_args.target_cat_columns) > 1:
+        logger.debug("Using uncertainty weighted loss for multi task modelling.")
+        uncertainty_hook = get_uncertainty_loss_hook(
+            target_cat_columns=cl_args.target_cat_columns,
+            target_con_columns=cl_args.target_con_columns,
+            device=cl_args.device,
+        )
+        init_kwargs["per_target_loss"].append(uncertainty_hook)
 
     step_func_hooks = StepFunctionHookStages(**init_kwargs)
 
@@ -675,11 +671,11 @@ def hook_default_loss(
     config: "Config", batch: "Batch", state: Dict, *args, **kwargs
 ) -> Dict:
 
-    mixed_losses = config.loss_function(
+    train_losses = config.loss_function(
         inputs=state["model_outputs"], targets=batch.target_labels
     )
 
-    state_updates = {"train_losses": mixed_losses}
+    state_updates = {"train_losses": train_losses}
 
     return state_updates
 
