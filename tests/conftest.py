@@ -427,19 +427,14 @@ def create_test_dloaders(create_test_cl_args, create_test_datasets):
 
 
 def create_test_optimizer(
-    cl_args: Namespace,
-    model: nn.Module,
-    target_columns: Dict[str, List[str]],
-    criterions,
+    cl_args: Namespace, model: nn.Module, criterions,
 ):
 
     """
     TODO: Refactor loss module construction out of this function.
     """
 
-    loss_module = train._get_loss_callable(
-        target_columns=target_columns, criterions=criterions, device=cl_args.device
-    )
+    loss_module = train._get_loss_callable(criterions=criterions)
 
     optimizer = optimizers.get_optimizer(
         model=model, loss_callable=loss_module, cl_args=cl_args
@@ -487,10 +482,7 @@ def prep_modelling_test_configs(
     test_metrics = _patch_metrics(metrics_=test_metrics)
 
     optimizer, loss_module = create_test_optimizer(
-        cl_args=cl_args,
-        model=model,
-        target_columns=train_dataset.target_columns,
-        criterions=criterions,
+        cl_args=cl_args, model=model, criterions=criterions,
     )
 
     train_dataset, valid_dataset = create_test_datasets
