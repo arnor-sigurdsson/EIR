@@ -85,7 +85,7 @@ def test_set_up_train_and_valid_labels(
     n_classes = len(c.target_classes)
 
     train_labels_dict, valid_labels_dict = label_setup.set_up_train_and_valid_labels(
-        cl_args
+        cl_args=cl_args, custom_label_ops=None
     )
 
     assert len(train_labels_dict) + len(valid_labels_dict) == n_classes * c.n_per_class
@@ -296,7 +296,7 @@ def test_load_label_df_one_target_no_extra_col(parse_test_cl_args, create_test_d
 
     label_columns = ["Origin"]
     df_label = label_setup._load_label_df(
-        label_fpath=label_fpath, columns=label_columns, custom_lib=None
+        label_fpath=label_fpath, columns=label_columns, custom_label_ops=None
     )
 
     assert df_label.shape[0] == c.n_per_class * n_classes
@@ -315,7 +315,7 @@ def test_load_label_df_one_target_one_extra_col(parse_test_cl_args, create_test_
     label_columns = ["Origin", "OriginExtraCol"]
 
     df_label_extra = label_setup._load_label_df(
-        label_fpath=label_fpath, columns=label_columns, custom_lib=None
+        label_fpath=label_fpath, columns=label_columns, custom_label_ops=None
     )
 
     assert df_label_extra.shape[1] == 2
@@ -336,14 +336,16 @@ def test_load_label_df_missing_col_fail(parse_test_cl_args, create_test_data):
 
     with pytest.raises(ValueError):
         label_setup._load_label_df(
-            label_fpath=label_fpath, columns=label_columns, custom_lib=None
+            label_fpath=label_fpath, columns=label_columns, custom_label_ops=None
         )
 
 
 @pytest.mark.parametrize(
     "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
 )
-def test_load_label_df_missing_col_pass(parse_test_cl_args, create_test_data):
+def test_load_label_df_missing_col_pass(
+    parse_test_cl_args, create_test_data, test_column_operations
+):
     c = create_test_data
 
     label_fpath = c.scoped_tmp_path / "labels.csv"
@@ -351,7 +353,9 @@ def test_load_label_df_missing_col_pass(parse_test_cl_args, create_test_data):
     label_columns = ["Origin", "NonExistentColumn"]
 
     df_labels = label_setup._load_label_df(
-        label_fpath=label_fpath, columns=label_columns, custom_lib="fake/lib"
+        label_fpath=label_fpath,
+        columns=label_columns,
+        custom_label_ops=test_column_operations,
     )
     assert df_labels.shape[1] == 1
 
@@ -366,7 +370,7 @@ def test_load_label_extra_target_extra_col(parse_test_cl_args, create_test_data)
 
     label_columns = ["Origin", "OriginExtraCol", "Height", "ExtraTarget"]
     df_label_multi_target = label_setup._load_label_df(
-        label_fpath=label_fpath, columns=label_columns, custom_lib=None
+        label_fpath=label_fpath, columns=label_columns, custom_label_ops=None
     )
 
     assert df_label_multi_target.shape[1] == 4
@@ -392,7 +396,7 @@ def test_cast_label_df_dtypes(parse_test_cl_args, create_test_data):
 
     label_columns = ["Origin", "OriginExtraCol", "Height", "ExtraTarget"]
     df_label_multi_target = label_setup._load_label_df(
-        label_fpath=label_fpath, columns=label_columns, custom_lib=None
+        label_fpath=label_fpath, columns=label_columns, custom_label_ops=None
     )
 
     df_label_multi_target["OriginExtraCol"] = 10
@@ -404,17 +408,31 @@ def test_cast_label_df_dtypes(parse_test_cl_args, create_test_data):
     assert df_label_multi_target["OriginExtraCol"].dtype.name == "object"
 
 
+@pytest.fixture
+def test_column_operations():
+    def _dummy_func(df, column_name):
+        return df
+
+    test_column_ops = (ColumnOperation(function=_dummy_func, function_args={}),)
+
+    return test_column_ops
+
+
 @pytest.mark.parametrize(
     "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
 )
-def test_get_currently_available_columns_pass(parse_test_cl_args, create_test_data):
+def test_get_currently_available_columns_pass(
+    parse_test_cl_args, create_test_data, test_column_operations
+):
     c = create_test_data
 
     label_fpath = c.scoped_tmp_path / "labels.csv"
     label_columns = ["Origin", "NotExisting1", "NotExisting2"]
 
     available_columns = label_setup._get_currently_available_columns(
-        label_fpath=label_fpath, requested_columns=label_columns, custom_lib="fake/lob"
+        label_fpath=label_fpath,
+        requested_columns=label_columns,
+        custom_label_ops=test_column_operations,
     )
 
     assert available_columns == ["Origin"]
@@ -431,7 +449,9 @@ def test_get_currently_available_columns_fail(parse_test_cl_args, create_test_da
 
     with pytest.raises(ValueError):
         label_setup._get_currently_available_columns(
-            label_fpath=label_fpath, requested_columns=label_columns, custom_lib=None
+            label_fpath=label_fpath,
+            requested_columns=label_columns,
+            custom_label_ops=None,
         )
 
 
@@ -453,7 +473,7 @@ def test_parse_label_df_applied_1(create_test_data, create_test_column_ops):
 
     label_columns = ["Origin"]
     df_labels = label_setup._load_label_df(
-        label_fpath=label_fpath, columns=label_columns, custom_lib=None
+        label_fpath=label_fpath, columns=label_columns, custom_label_ops=None
     )
     df_labels_parsed = label_setup._parse_label_df(
         df=df_labels, operations_dict=test_column_ops, label_columns=label_columns
@@ -479,7 +499,7 @@ def test_parse_label_df_applied_2(create_test_data, create_test_column_ops):
 
     label_columns = ["Origin"]
     df_labels = label_setup._load_label_df(
-        label_fpath=label_fpath, columns=label_columns, custom_lib=None
+        label_fpath=label_fpath, columns=label_columns, custom_label_ops=None
     )
 
     extra_cols = ("ExtraCol3",)
@@ -498,7 +518,9 @@ def test_parse_label_df_applied_2(create_test_data, create_test_column_ops):
 
 @patch("snp_pred.data_load.label_setup.logger.debug", autospec=True)
 @pytest.mark.parametrize("create_test_data", [{"task_type": "binary"}], indirect=True)
-def test_parse_label_df_not_applied(m_logger, create_test_data, create_test_column_ops):
+def test_parse_label_df_not_applied(
+    m_logger, create_test_data, create_test_column_ops, test_column_operations
+):
     """
     Here we run column operations for 'Origin'. Hence we expect to apply:
 
@@ -534,7 +556,9 @@ def test_parse_label_df_not_applied(m_logger, create_test_data, create_test_colu
 
     label_columns = ["Origin"]
     df_labels = label_setup._load_label_df(
-        label_fpath=label_fpath, columns=label_columns, custom_lib="fake/lib"
+        label_fpath=label_fpath,
+        columns=label_columns,
+        custom_label_ops=test_column_operations,
     )
     df_labels["OnlyApplyIfTarget"] = 1
     df_labels["SomeRandomCol"] = 1
@@ -559,7 +583,7 @@ def test_check_parsed_label_df_pass(parse_test_cl_args, create_test_data):
     label_columns = ["Origin", "ExtraTarget"]
 
     df_labels = label_setup._load_label_df(
-        label_fpath=label_fpath, columns=label_columns, custom_lib=None
+        label_fpath=label_fpath, columns=label_columns, custom_label_ops=None
     )
 
     df_labels_checked = label_setup._check_parsed_label_df(
@@ -571,14 +595,18 @@ def test_check_parsed_label_df_pass(parse_test_cl_args, create_test_data):
 @pytest.mark.parametrize(
     "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
 )
-def test_check_parsed_label_df_fail(parse_test_cl_args, create_test_data):
+def test_check_parsed_label_df_fail(
+    parse_test_cl_args, create_test_data, test_column_operations
+):
     c = create_test_data
     label_fpath = c.scoped_tmp_path / "labels.csv"
 
     label_columns = ["Origin", "ExtraTarget", "NotExisting"]
 
     df_labels = label_setup._load_label_df(
-        label_fpath=label_fpath, columns=label_columns, custom_lib="fake/lib"
+        label_fpath=label_fpath,
+        columns=label_columns,
+        custom_label_ops=test_column_operations,
     )
 
     with pytest.raises(ValueError):

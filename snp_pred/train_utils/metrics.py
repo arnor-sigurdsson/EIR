@@ -62,8 +62,7 @@ def calculate_batch_metrics(
     mode: str,
     metric_record_dict: al_metric_record_dict,
 ) -> al_step_metric_dict:
-    """
-    """
+    """"""
     assert mode in ["val", "train"]
 
     target_columns_gen = get_target_columns_generator(target_columns)

@@ -1,6 +1,20 @@
+import argparse
+
 import configargparse
+import torch
+from aislib.misc_utils import get_logger
 
 from snp_pred.train_utils.optimizers import get_base_optimizers_dict
+
+logger = get_logger(name=__name__)
+
+
+def get_default_cl_args():
+    parser = get_train_argument_parser()
+    cl_args = parser.parse_args()
+    cl_args = modify_train_arguments(cl_args=cl_args)
+
+    return cl_args
 
 
 def get_train_argument_parser() -> configargparse.ArgumentParser:
@@ -378,13 +392,6 @@ def get_train_argument_parser() -> configargparse.ArgumentParser:
     )
 
     parser_.add_argument(
-        "--custom_lib",
-        type=str,
-        default=None,
-        help="Path to custom library if using one.",
-    )
-
-    parser_.add_argument(
         "--plot_skip_steps",
         type=int,
         default=200,
@@ -412,3 +419,19 @@ def _get_custom_opt_names():
     custom_optim_list = list(CUSTOM_OPT_NAME_MAP.keys())
     custom_optim_list = [i for i in custom_optim_list if i != "lookahead"]
     return custom_optim_list
+
+
+def modify_train_arguments(cl_args: argparse.Namespace) -> argparse.Namespace:
+    if cl_args.valid_size > 1.0:
+        cl_args.valid_size = int(cl_args.valid_size)
+
+    cl_args.device = "cuda:" + cl_args.gpu_num if torch.cuda.is_available() else "cpu"
+
+    # benchmark breaks if we run it with multiple GPUs
+    if not cl_args.multi_gpu:
+        torch.backends.cudnn.benchmark = True
+    else:
+        logger.debug("Setting device to cuda:0 since running with multiple GPUs.")
+        cl_args.device = "cuda:0"
+
+    return cl_args

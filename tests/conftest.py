@@ -405,7 +405,9 @@ def create_test_datasets(create_test_data, create_test_cl_args):
 
     ensure_path_exists(run_path, is_folder=True)
 
-    train_dataset, valid_dataset = datasets.set_up_datasets(cl_args)
+    train_dataset, valid_dataset = datasets.set_up_datasets(
+        cl_args=cl_args, custom_label_ops=None
+    )
 
     return train_dataset, valid_dataset
 
@@ -489,7 +491,7 @@ def prep_modelling_test_configs(
 
     train._log_model(model=model, l1_weight=cl_args.l1)
 
-    hooks = train.get_hooks(cl_args_=cl_args)
+    hooks = train.get_default_hooks(cl_args_=cl_args)
     config = Config(
         cl_args=cl_args,
         train_loader=train_loader,

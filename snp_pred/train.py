@@ -2,7 +2,6 @@ import argparse
 import sys
 from dataclasses import dataclass
 from functools import partial
-from os.path import abspath
 from pathlib import Path
 from typing import (
     Union,
@@ -26,7 +25,7 @@ from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader, WeightedRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
-from snp_pred.configuration import get_train_argument_parser
+from snp_pred.configuration import get_default_cl_args
 from snp_pred.data_load import data_utils
 from snp_pred.data_load import datasets
 from snp_pred.data_load.data_augmentation import hook_mix_loss, get_mix_data_hook
@@ -36,6 +35,7 @@ from snp_pred.data_load.datasets import al_num_classes
 from snp_pred.data_load.label_setup import (
     al_target_columns,
     al_label_transformers,
+    al_all_column_ops,
 )
 from snp_pred.models import model_training_utils
 from snp_pred.models.extra_inputs_module import (
@@ -61,6 +61,7 @@ from snp_pred.train_utils.optimizers import (
     get_optimizer,
     get_optimizer_backward_kwargs,
 )
+from snp_pred.train_utils.train_handlers import HandlerConfig
 from snp_pred.train_utils.train_handlers import configure_trainer
 
 if TYPE_CHECKING:
@@ -116,7 +117,9 @@ def get_default_config(
 ) -> "Config":
     run_folder = _prepare_run_folder(run_name=cl_args.run_name)
 
-    train_dataset, valid_dataset = datasets.set_up_datasets(cl_args=cl_args)
+    train_dataset, valid_dataset = datasets.set_up_datasets(
+        cl_args=cl_args, custom_label_ops=hooks.custom_column_label_parsing_ops
+    )
 
     data_dimensions = _get_data_dimensions(
         dataset=train_dataset, target_width=cl_args.target_width
@@ -204,9 +207,7 @@ def _get_data_dimensions(
     return DataDimension(channels=channels, height=height, width=width)
 
 
-def main(cl_args: argparse.Namespace, hooks: Union["Hooks", None] = None) -> None:
-
-    config = get_default_config(cl_args=cl_args, hooks=hooks)
+def main(cl_args: argparse.Namespace, config: Config) -> None:
 
     _log_model(model=config.model, l1_weight=cl_args.l1)
 
@@ -521,27 +522,7 @@ def train(config: Config) -> None:
     trainer.run(data=c.train_loader, max_epochs=cl_args.n_epochs)
 
 
-def modify_train_arguments(cl_args: argparse.Namespace) -> argparse.Namespace:
-    if cl_args.valid_size > 1.0:
-        cl_args.valid_size = int(cl_args.valid_size)
-
-    cl_args.device = "cuda:" + cl_args.gpu_num if torch.cuda.is_available() else "cpu"
-
-    # to make sure importlib gets absolute paths
-    if cl_args.custom_lib is not None:
-        cl_args.custom_lib = abspath(cl_args.custom_lib)
-
-    # benchmark breaks if we run it with multiple GPUs
-    if not cl_args.multi_gpu:
-        torch.backends.cudnn.benchmark = True
-    else:
-        logger.debug("Setting device to cuda:0 since running with multiple GPUs.")
-        cl_args.device = "cuda:0"
-
-    return cl_args
-
-
-def get_hooks(cl_args_: argparse.Namespace):
+def get_default_hooks(cl_args_: argparse.Namespace):
     step_func_hooks = _get_step_func_hooks(cl_args=cl_args_)
     hooks_object = Hooks(step_func_hooks=step_func_hooks)
 
@@ -550,7 +531,11 @@ def get_hooks(cl_args_: argparse.Namespace):
 
 @dataclass
 class Hooks:
+    al_handler_attachers = Iterable[Callable[[Engine, HandlerConfig], Engine]]
+
     step_func_hooks: "StepFunctionHookStages"
+    custom_column_label_parsing_ops: Union[None, al_all_column_ops] = None
+    custom_handler_attachers: Union[None, al_handler_attachers] = None
 
 
 def _get_step_func_hooks(cl_args: argparse.Namespace):
@@ -682,12 +667,10 @@ def hook_default_loss(
 
 if __name__ == "__main__":
 
-    parser = get_train_argument_parser()
-    cur_cl_args = parser.parse_args()
-    cur_cl_args = modify_train_arguments(cl_args=cur_cl_args)
+    default_cl_args = get_default_cl_args()
+    utils.configure_root_logger(run_name=default_cl_args.run_name)
 
-    utils.configure_root_logger(run_name=cur_cl_args.run_name)
+    default_hooks = get_default_hooks(cl_args_=default_cl_args)
+    default_config = get_default_config(cl_args=default_cl_args, hooks=default_hooks)
 
-    hooks_ = get_hooks(cl_args_=cur_cl_args)
-
-    main(cl_args=cur_cl_args, hooks=hooks_)
+    main(cl_args=default_cl_args, config=default_config)

@@ -27,7 +27,9 @@ def test_set_up_datasets(
 
     cl_args = create_test_cl_args
 
-    train_dataset, valid_dataset = datasets.set_up_datasets(cl_args)
+    train_dataset, valid_dataset = datasets.set_up_datasets(
+        cl_args, custom_label_ops=None
+    )
     assert patched_joblib.dump.call_count == 1
 
     assert len(train_dataset) + len(valid_dataset) == c.n_per_class * n_classes
@@ -324,7 +326,9 @@ def test_datasets(
     )
     valid_no_sample = int(len(classes_tested) * c.n_per_class * cl_args.valid_size)
 
-    train_dataset, valid_dataset = datasets.set_up_datasets(cl_args)
+    train_dataset, valid_dataset = datasets.set_up_datasets(
+        cl_args=cl_args, custom_label_ops=None
+    )
 
     assert patched_joblib.dump.call_count == 1
 
@@ -359,7 +363,9 @@ def test_dataset_padding(
 
     cl_args.target_width = 1200
 
-    train_dataset, valid_dataset = datasets.set_up_datasets(cl_args)
+    train_dataset, valid_dataset = datasets.set_up_datasets(
+        cl_args=cl_args, custom_label_ops=None
+    )
     assert patched_joblib.dump.call_count == 1
 
     test_sample_pad, test_label_pad, test_id_pad = train_dataset[0]
