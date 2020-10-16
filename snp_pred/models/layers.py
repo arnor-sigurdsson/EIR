@@ -465,7 +465,8 @@ class SplitMLPResidualBlock(nn.Module):
 
 
 def _calculate_num_chunks_for_equal_split_out_features(
-    in_features: int, out_feature_sets: int,
+    in_features: int,
+    out_feature_sets: int,
 ) -> int:
     """
     Ensure total out features are equal to in features.

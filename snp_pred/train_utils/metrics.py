@@ -62,8 +62,7 @@ def calculate_batch_metrics(
     mode: str,
     metric_record_dict: al_metric_record_dict,
 ) -> al_step_metric_dict:
-    """
-    """
+    """"""
     assert mode in ["val", "train"]
 
     target_columns_gen = get_target_columns_generator(target_columns)
@@ -245,21 +244,52 @@ def aggregate_losses(losses_dict: Dict[str, torch.Tensor]) -> torch.Tensor:
     return average_loss
 
 
+def get_uncertainty_loss_hook(
+    target_cat_columns: List[str],
+    target_con_columns: List[str],
+    device: str,
+):
+    loss_module = UncertaintyMultiTaskLoss(
+        target_cat_columns=target_cat_columns,
+        target_con_columns=target_con_columns,
+        device=device,
+    )
+
+    hook = partial(hook_add_uncertainty_loss, uncertainty_module=loss_module)
+
+    return hook
+
+
+def hook_add_uncertainty_loss(
+    state: Dict,
+    uncertainty_module: "UncertaintyMultiTaskLoss",
+    *args,
+    **kwargs,
+):
+    base_losses_dict = state["train_losses"]
+
+    uncertainty_losses = uncertainty_module(losses_dict=base_losses_dict)
+
+    state_updates = {"train_losses": uncertainty_losses}
+
+    return state_updates
+
+
 class UncertaintyMultiTaskLoss(nn.Module):
     def __init__(
         self,
-        target_columns: "al_target_columns",
-        criterions: "al_criterions",
+        target_cat_columns: List[str],
+        target_con_columns: List[str],
         device: str,
     ):
         super().__init__()
 
-        self.target_columns = target_columns
-        self.criterions = criterions
+        self.target_cat_columns = target_cat_columns
+        self.target_con_columns = target_con_columns
         self.device = device
 
         self.log_vars = self._construct_params(
-            cur_target_columns=target_columns["cat"] + target_columns["con"],
+            cur_target_columns=self.target_cat_columns + self.target_con_columns,
             device=self.device,
         )
 
@@ -275,28 +305,23 @@ class UncertaintyMultiTaskLoss(nn.Module):
 
     def _calc_uncertainty_loss(self, name, loss_value):
         log_var = self.log_vars[name]
-        scalar = 2.0 if name in self.target_columns["cat"] else 1.0
+        scalar = 2.0 if name in self.target_cat_columns else 1.0
 
         precision = torch.exp(-log_var)
         loss = scalar * torch.sum(precision * loss_value + log_var)
 
         return loss
 
-    def forward(self, inputs, targets):
-        losses_dict = {}
+    def forward(self, losses_dict: Dict):
+        losses_uncertain = {}
 
-        for target_column, criterion in self.criterions.items():
-            cur_target_col_labels = targets[target_column]
-            cur_target_col_outputs = inputs[target_column]
-            loss_value_base = criterion(
-                input=cur_target_col_outputs, target=cur_target_col_labels
-            )
+        for target_column, loss_value_base in losses_dict.items():
             loss_value_uncertain = self._calc_uncertainty_loss(
                 name=target_column, loss_value=loss_value_base
             )
-            losses_dict[target_column] = loss_value_uncertain
+            losses_uncertain[target_column] = loss_value_uncertain
 
-        return losses_dict
+        return losses_uncertain
 
 
 def hook_add_l1_loss(config: "Config", state: Dict, *args, **kwargs) -> Dict:

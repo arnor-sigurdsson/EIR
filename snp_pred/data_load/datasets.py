@@ -46,11 +46,15 @@ al_getitem_return = Tuple[torch.Tensor, al_all_labels, str]
 al_num_classes = Dict[str, int]
 
 
-def set_up_datasets(cl_args: Namespace) -> Tuple[al_datasets, al_datasets]:
+def set_up_datasets(
+    cl_args: Namespace, custom_label_ops: Union[None, Callable]
+) -> Tuple[al_datasets, al_datasets]:
     """
     This function is only ever called if we have labels.
     """
-    train_labels, valid_labels = set_up_train_and_valid_labels(cl_args)
+    train_labels, valid_labels = set_up_train_and_valid_labels(
+        cl_args=cl_args, custom_label_ops=custom_label_ops
+    )
 
     dataset_class_common_args = _construct_common_dataset_init_params(
         cl_args=cl_args, train_labels=train_labels

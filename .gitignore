@@ -96,3 +96,6 @@ config/custom_configs
 
 # Hypothesis
 .hypothesis/
+
+# pytest-testmon
+.testmondata

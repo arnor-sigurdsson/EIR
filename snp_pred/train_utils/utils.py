@@ -13,6 +13,24 @@ if TYPE_CHECKING:
     from snp_pred.data_load.label_setup import al_label_dict
 
 
+def get_custom_module_submodule(custom_lib: str, submodule_name: str):
+    module_path = custom_lib + "/__init__.py"
+    module_name = Path(custom_lib).name
+
+    custom_module = import_custom_module_as_package(module_path, module_name)
+
+    if not hasattr(custom_module, submodule_name):
+        logger.debug(
+            f"Could not find function {submodule_name} in {module_path}."
+            f"Either it is not defined (which is fine) or something went"
+            f"wrong. Please check that it is in the correct location"
+            f"and that {module_path} actually imports it."
+        )
+        return None
+
+    return getattr(custom_module, submodule_name)
+
+
 def import_custom_module_as_package(module_path, module_name):
     """
     We need to make sure sys.modules[spec.name] = module is called when importing
@@ -33,24 +51,6 @@ def import_custom_module_as_package(module_path, module_name):
         raise
 
     return module
-
-
-def get_custom_module_submodule(custom_lib: str, submodule_name: str):
-    module_path = custom_lib + "/__init__.py"
-    module_name = Path(custom_lib).name
-
-    custom_module = import_custom_module_as_package(module_path, module_name)
-
-    if not hasattr(custom_module, submodule_name):
-        logger.debug(
-            f"Could not find function {submodule_name} in {module_path}."
-            f"Either it is not defined (which is fine) or something went"
-            f"wrong. Please check that it is in the correct location"
-            f"and that {module_path} actually imports it."
-        )
-        return None
-
-    return getattr(custom_module, submodule_name)
 
 
 def get_extra_labels_from_ids(

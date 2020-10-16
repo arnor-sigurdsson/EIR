@@ -2,7 +2,6 @@ import argparse
 import sys
 from dataclasses import dataclass
 from functools import partial
-from os.path import abspath
 from pathlib import Path
 from typing import (
     Union,
@@ -26,7 +25,7 @@ from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader, WeightedRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
-from snp_pred.configuration import _get_train_argument_parser
+from snp_pred.configuration import get_default_cl_args
 from snp_pred.data_load import data_utils
 from snp_pred.data_load import datasets
 from snp_pred.data_load.data_augmentation import hook_mix_loss, get_mix_data_hook
@@ -36,6 +35,7 @@ from snp_pred.data_load.datasets import al_num_classes
 from snp_pred.data_load.label_setup import (
     al_target_columns,
     al_label_transformers,
+    al_all_column_ops,
 )
 from snp_pred.models import model_training_utils
 from snp_pred.models.extra_inputs_module import (
@@ -52,15 +52,16 @@ from snp_pred.train_utils.metrics import (
     calculate_prediction_losses,
     aggregate_losses,
     add_multi_task_average_metrics,
-    UncertaintyMultiTaskLoss,
     get_average_history_filepath,
     get_default_metrics,
     hook_add_l1_loss,
+    get_uncertainty_loss_hook,
 )
 from snp_pred.train_utils.optimizers import (
     get_optimizer,
     get_optimizer_backward_kwargs,
 )
+from snp_pred.train_utils.train_handlers import HandlerConfig
 from snp_pred.train_utils.train_handlers import configure_trainer
 
 if TYPE_CHECKING:
@@ -116,7 +117,9 @@ def get_default_config(
 ) -> "Config":
     run_folder = _prepare_run_folder(run_name=cl_args.run_name)
 
-    train_dataset, valid_dataset = datasets.set_up_datasets(cl_args=cl_args)
+    train_dataset, valid_dataset = datasets.set_up_datasets(
+        cl_args=cl_args, custom_label_ops=hooks.custom_column_label_parsing_ops
+    )
 
     data_dimensions = _get_data_dimensions(
         dataset=train_dataset, target_width=cl_args.target_width
@@ -159,9 +162,7 @@ def get_default_config(
     writer = get_summary_writer(run_folder=run_folder)
 
     loss_func = _get_loss_callable(
-        target_columns=train_dataset.target_columns,
         criterions=criterions,
-        device=cl_args.device,
     )
 
     optimizer = get_optimizer(model=model, loss_callable=loss_func, cl_args=cl_args)
@@ -208,9 +209,7 @@ def _get_data_dimensions(
     return DataDimension(channels=channels, height=height, width=width)
 
 
-def main(cl_args: argparse.Namespace, hooks: Union["Hooks", None] = None) -> None:
-
-    config = get_default_config(cl_args=cl_args, hooks=hooks)
+def main(cl_args: argparse.Namespace, config: Config) -> None:
 
     _log_model(model=config.model, l1_weight=cl_args.l1)
 
@@ -295,7 +294,7 @@ def get_dataloaders(
     train_sampler: Union[None, WeightedRandomSampler],
     valid_dataset: datasets.ArrayDatasetBase,
     batch_size: int,
-    num_workers: int = 8,
+    num_workers: int = 0,
 ) -> Tuple:
 
     train_dloader = DataLoader(
@@ -403,20 +402,10 @@ def _get_criterions(
     return criterions_dict
 
 
-def _get_loss_callable(
-    target_columns: al_target_columns, criterions: al_criterions, device: str,
-):
-    num_tasks = len(target_columns["con"] + target_columns["cat"])
-    if num_tasks > 1:
-        multi_task_loss_module = UncertaintyMultiTaskLoss(
-            target_columns=target_columns, criterions=criterions, device=device
-        )
-        return multi_task_loss_module
-    elif num_tasks == 1:
-        single_task_loss_func = partial(
-            calculate_prediction_losses, criterions=criterions
-        )
-        return single_task_loss_func
+def _get_loss_callable(criterions: al_criterions):
+
+    single_task_loss_func = partial(calculate_prediction_losses, criterions=criterions)
+    return single_task_loss_func
 
 
 def get_summary_writer(run_folder: Path) -> SummaryWriter:
@@ -535,27 +524,7 @@ def train(config: Config) -> None:
     trainer.run(data=c.train_loader, max_epochs=cl_args.n_epochs)
 
 
-def _modify_train_arguments(cl_args: argparse.Namespace) -> argparse.Namespace:
-    if cl_args.valid_size > 1.0:
-        cl_args.valid_size = int(cl_args.valid_size)
-
-    cl_args.device = "cuda:" + cl_args.gpu_num if torch.cuda.is_available() else "cpu"
-
-    # to make sure importlib gets absolute paths
-    if cl_args.custom_lib is not None:
-        cl_args.custom_lib = abspath(cl_args.custom_lib)
-
-    # benchmark breaks if we run it with multiple GPUs
-    if not cl_args.multi_gpu:
-        torch.backends.cudnn.benchmark = True
-    else:
-        logger.debug("Setting device to cuda:0 since running with multiple GPUs.")
-        cl_args.device = "cuda:0"
-
-    return cl_args
-
-
-def _get_hooks(cl_args_: argparse.Namespace):
+def get_default_hooks(cl_args_: argparse.Namespace):
     step_func_hooks = _get_step_func_hooks(cl_args=cl_args_)
     hooks_object = Hooks(step_func_hooks=step_func_hooks)
 
@@ -564,12 +533,17 @@ def _get_hooks(cl_args_: argparse.Namespace):
 
 @dataclass
 class Hooks:
+    al_handler_attachers = Iterable[Callable[[Engine, HandlerConfig], Engine]]
+
     step_func_hooks: "StepFunctionHookStages"
+    custom_column_label_parsing_ops: Union[None, al_all_column_ops] = None
+    custom_handler_attachers: Union[None, al_handler_attachers] = None
 
 
 def _get_step_func_hooks(cl_args: argparse.Namespace):
     """
     TODO: Add validation, inspect that outputs have correct names.
+    TODO: Refactor, split into smaller functions e.g. for L1, mixing and uncertainty.
     """
 
     init_kwargs = {
@@ -582,11 +556,26 @@ def _get_step_func_hooks(cl_args: argparse.Namespace):
         init_kwargs["final_loss"].append(hook_add_l1_loss)
 
     if cl_args.mixing_type is not None:
-        logger.debug("Setting up hooks for mixing.")
+        logger.debug(
+            "Setting up hooks for mixing with %s with α=%.2g.",
+            cl_args.mixing_type,
+            cl_args.mixing_alpha,
+        )
         mix_hook = get_mix_data_hook(mixing_type=cl_args.mixing_type)
 
         init_kwargs["prepare_batch"].append(mix_hook)
         init_kwargs["per_target_loss"] = [hook_mix_loss]
+
+    if len(cl_args.target_con_columns + cl_args.target_cat_columns) > 1:
+        logger.debug(
+            "Setting up hook for uncertainty weighted loss for multi task modelling."
+        )
+        uncertainty_hook = get_uncertainty_loss_hook(
+            target_cat_columns=cl_args.target_cat_columns,
+            target_con_columns=cl_args.target_con_columns,
+            device=cl_args.device,
+        )
+        init_kwargs["per_target_loss"].append(uncertainty_hook)
 
     step_func_hooks = StepFunctionHookStages(**init_kwargs)
 
@@ -617,7 +606,10 @@ def call_hooks_stage_iterable(
 
 
 def state_registered_hook_call(
-    hook_func: Callable, state: Union[Dict[str, Any], None], *args, **kwargs,
+    hook_func: Callable,
+    state: Union[Dict[str, Any], None],
+    *args,
+    **kwargs,
 ) -> Tuple[Any, Dict[str, Any]]:
 
     if state is None:
@@ -675,23 +667,21 @@ def hook_default_loss(
     config: "Config", batch: "Batch", state: Dict, *args, **kwargs
 ) -> Dict:
 
-    mixed_losses = config.loss_function(
+    train_losses = config.loss_function(
         inputs=state["model_outputs"], targets=batch.target_labels
     )
 
-    state_updates = {"train_losses": mixed_losses}
+    state_updates = {"train_losses": train_losses}
 
     return state_updates
 
 
 if __name__ == "__main__":
 
-    parser = _get_train_argument_parser()
-    cur_cl_args = parser.parse_args()
-    cur_cl_args = _modify_train_arguments(cl_args=cur_cl_args)
+    default_cl_args = get_default_cl_args()
+    utils.configure_root_logger(run_name=default_cl_args.run_name)
 
-    utils.configure_root_logger(run_name=cur_cl_args.run_name)
+    default_hooks = get_default_hooks(cl_args_=default_cl_args)
+    default_config = get_default_config(cl_args=default_cl_args, hooks=default_hooks)
 
-    hooks_ = _get_hooks(cl_args_=cur_cl_args)
-
-    main(cl_args=cur_cl_args, hooks=hooks_)
+    main(cl_args=default_cl_args, config=default_config)

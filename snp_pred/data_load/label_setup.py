@@ -1,6 +1,6 @@
 from argparse import Namespace
 from pathlib import Path
-from typing import Tuple, Dict, Union, List
+from typing import Tuple, Dict, Union, List, Callable
 
 import numpy as np
 import pandas as pd
@@ -15,7 +15,7 @@ from snp_pred.train_utils.utils import get_custom_module_submodule
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 # Type Aliases
-al_all_column_ops = Dict[str, Tuple[ColumnOperation, ...]]
+al_all_column_ops = Union[None, Dict[str, Tuple[ColumnOperation, ...]]]
 al_train_val_dfs = Tuple[pd.DataFrame, pd.DataFrame]
 
 # e.g. 'Asia' or '5' for categorical or 1.511 for continuous
@@ -28,14 +28,16 @@ al_label_transformers = Dict[str, al_label_transformers_object]
 
 
 def set_up_train_and_valid_labels(
-    cl_args: Namespace,
+    cl_args: Namespace, custom_label_ops: Union[None, al_all_column_ops]
 ) -> Tuple[al_label_dict, al_label_dict]:
     """
     Splits and does split based processing (e.g. scaling validation set with training
     set for regression) on the labels.
     """
 
-    df_labels = label_df_parse_wrapper(cl_args=cl_args)
+    df_labels = label_df_parse_wrapper(
+        cl_args=cl_args, custom_label_ops=custom_label_ops
+    )
 
     df_labels_train, df_labels_valid = _split_df(
         df=df_labels, valid_size=cl_args.valid_size
@@ -52,17 +54,21 @@ def set_up_train_and_valid_labels(
     return train_labels_dict, valid_labels_dict
 
 
-def label_df_parse_wrapper(cl_args: Namespace) -> pd.DataFrame:
+def label_df_parse_wrapper(
+    cl_args: Namespace, custom_label_ops: Union[None, al_all_column_ops] = None
+) -> pd.DataFrame:
     available_ids = _gather_ids_from_data_source(data_source=Path(cl_args.data_source))
 
     column_ops = {}
-    if cl_args.custom_lib:
-        column_ops = _get_custom_column_ops(custom_lib=cl_args.custom_lib)
+    if custom_label_ops is not None:
+        column_ops = custom_label_ops
 
     all_cols = _get_all_label_columns_needed(cl_args=cl_args, column_ops=column_ops)
 
     df_labels = _load_label_df(
-        label_fpath=cl_args.label_file, columns=all_cols, custom_lib=cl_args.custom_lib
+        label_fpath=cl_args.label_file,
+        columns=all_cols,
+        custom_label_ops=column_ops,
     )
 
     df_labels = _cast_label_df_dtypes(
@@ -99,7 +105,9 @@ def chunked_label_df_parse_wrapper(cl_args: Namespace) -> pd.DataFrame:
     all_cols = _get_all_label_columns_needed(cl_args=cl_args, column_ops=column_ops)
 
     chunk_generator = _get_label_df_chunk_generator(
-        label_fpath=cl_args.label_file, columns=all_cols, custom_lib=cl_args.custom_lib
+        label_fpath=cl_args.label_file,
+        columns=all_cols,
+        custom_label_ops=cl_args.custom_lib,
     )
 
     label_columns = _get_label_columns_from_cl_args(cl_args=cl_args)
@@ -134,7 +142,7 @@ def chunked_label_df_parse_wrapper(cl_args: Namespace) -> pd.DataFrame:
 
 
 def _get_label_df_chunk_generator(
-    label_fpath: Path, columns: List[str], custom_lib: Union[str, None]
+    label_fpath: Path, columns: List[str], custom_label_ops: Union[None, Callable]
 ) -> pd.DataFrame:
     """
     We accept only loading the available columns at this point because the passed
@@ -148,7 +156,7 @@ def _get_label_df_chunk_generator(
     available_columns = _get_currently_available_columns(
         label_fpath=label_fpath,
         requested_columns=columns_with_id_col,
-        custom_lib=custom_lib,
+        custom_label_ops=custom_label_ops,
     )
 
     chunksize = 20000
@@ -199,7 +207,7 @@ def get_array_path_iterator(data_source: Path):
     if not data_source.exists():
         raise FileNotFoundError("Could not find data source %s.", data_source)
     raise ValueError(
-        "Data source %s is neither regognized as a file not folder.", data_source
+        "Data source %s is neither recognized as a file nor folder.", data_source
     )
 
 
@@ -257,7 +265,7 @@ def _get_extra_columns(
 
 
 def _load_label_df(
-    label_fpath: Path, columns: List[str], custom_lib: Union[str, None]
+    label_fpath: Path, columns: List[str], custom_label_ops: al_all_column_ops
 ) -> pd.DataFrame:
     """
     We accept only loading the available columns at this point because the passed
@@ -271,7 +279,7 @@ def _load_label_df(
     available_columns = _get_currently_available_columns(
         label_fpath=label_fpath,
         requested_columns=columns_with_id_col,
-        custom_lib=custom_lib,
+        custom_label_ops=custom_label_ops,
     )
 
     df_labels = pd.read_csv(
@@ -296,14 +304,24 @@ def _cast_label_df_dtypes(df_labels: pd.DataFrame, extra_cat_columns: List[str])
 
 
 def _get_currently_available_columns(
-    label_fpath: Path, requested_columns: List[str], custom_lib: Union[str, None]
+    label_fpath: Path,
+    requested_columns: List[str],
+    custom_label_ops: al_all_column_ops,
 ) -> List[str]:
+    """
+    If custom label operations are specified, the requested columns could be forward
+    references. Hence we should not raise an error if there is a possibility of them
+    being created at runtime.
+
+    However if no custom operations are specified, we should fail here if columns
+    are not found.
+    """
 
     label_file_columns_set = set(pd.read_csv(label_fpath, dtype={"ID": str}, nrows=0))
 
     requested_columns_set = set(requested_columns)
 
-    if not custom_lib:
+    if custom_label_ops is None:
         missing_columns = requested_columns_set - label_file_columns_set
         if missing_columns:
             raise ValueError(
@@ -324,7 +342,10 @@ def _filter_ids_from_label_df(
         return df_labels
 
     no_labels = df_labels.shape[0]
-    df_filtered = df_labels[df_labels.index.isin(ids_to_keep)]
+
+    mask = df_labels.index.isin(ids_to_keep)
+    df_filtered = df_labels.loc[mask, :].copy()
+
     no_dropped = no_labels - df_filtered.shape[0]
 
     logger.debug(

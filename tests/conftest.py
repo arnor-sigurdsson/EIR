@@ -269,7 +269,9 @@ def _set_up_base_test_array(n_snps: int) -> Tuple[np.ndarray, np.ndarray]:
 
 
 def _create_test_array(
-    base_array: np.ndarray, snp_idxs_candidates: np.ndarray, snp_row_idx: int,
+    base_array: np.ndarray,
+    snp_idxs_candidates: np.ndarray,
+    snp_row_idx: int,
 ) -> Tuple[np.ndarray, List[int]]:
     # make samples have missing for chosen, otherwise might have alleles chosen
     # below by random, without having the phenotype
@@ -405,7 +407,9 @@ def create_test_datasets(create_test_data, create_test_cl_args):
 
     ensure_path_exists(run_path, is_folder=True)
 
-    train_dataset, valid_dataset = datasets.set_up_datasets(cl_args)
+    train_dataset, valid_dataset = datasets.set_up_datasets(
+        cl_args=cl_args, custom_label_ops=None
+    )
 
     return train_dataset, valid_dataset
 
@@ -429,7 +433,6 @@ def create_test_dloaders(create_test_cl_args, create_test_datasets):
 def create_test_optimizer(
     cl_args: Namespace,
     model: nn.Module,
-    target_columns: Dict[str, List[str]],
     criterions,
 ):
 
@@ -437,9 +440,7 @@ def create_test_optimizer(
     TODO: Refactor loss module construction out of this function.
     """
 
-    loss_module = train._get_loss_callable(
-        target_columns=target_columns, criterions=criterions, device=cl_args.device
-    )
+    loss_module = train._get_loss_callable(criterions=criterions)
 
     optimizer = optimizers.get_optimizer(
         model=model, loss_callable=loss_module, cl_args=cl_args
@@ -489,7 +490,6 @@ def prep_modelling_test_configs(
     optimizer, loss_module = create_test_optimizer(
         cl_args=cl_args,
         model=model,
-        target_columns=train_dataset.target_columns,
         criterions=criterions,
     )
 
@@ -497,7 +497,7 @@ def prep_modelling_test_configs(
 
     train._log_model(model=model, l1_weight=cl_args.l1)
 
-    hooks = train._get_hooks(cl_args_=cl_args)
+    hooks = train.get_default_hooks(cl_args_=cl_args)
     config = Config(
         cl_args=cl_args,
         train_loader=train_loader,

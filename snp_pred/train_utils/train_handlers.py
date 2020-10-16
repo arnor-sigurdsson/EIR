@@ -32,10 +32,7 @@ from snp_pred.train_utils.metrics import (
     read_metrics_history_file,
     get_average_history_filepath,
 )
-from snp_pred.train_utils.utils import (
-    get_custom_module_submodule,
-    get_run_folder,
-)
+from snp_pred.train_utils.utils import get_run_folder
 from snp_pred.visualization import visualization_funcs as vf
 
 if TYPE_CHECKING:
@@ -123,7 +120,9 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
         pbar = ProgressBar()
         pbar.attach(engine=trainer, metric_names=["loss-average"])
         trainer.add_event_handler(
-            event_name=Events.EPOCH_COMPLETED, handler=_log_stats_to_pbar, pbar=pbar,
+            event_name=Events.EPOCH_COMPLETED,
+            handler=_log_stats_to_pbar,
+            pbar=pbar,
         )
 
     if handler_config.run_name:
@@ -296,7 +295,7 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
             handler_config=handler_config,
         )
 
-    if cl_args.custom_lib:
+    if c.hooks.custom_handler_attachers is not None:
         custom_handlers = _get_custom_handlers(handler_config=handler_config)
         trainer = _attach_custom_handlers(
             trainer=trainer,
@@ -414,26 +413,15 @@ def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> Non
 
 
 def _get_custom_handlers(handler_config: "HandlerConfig"):
-    custom_lib = handler_config.config.cl_args.custom_lib
 
-    custom_handlers_module = get_custom_module_submodule(custom_lib, "custom_handlers")
-
-    if not custom_handlers_module:
-        return None
-
-    if not hasattr(custom_handlers_module, "get_custom_handlers"):
-        raise ImportError(
-            f"'get_custom_handlers' function must be defined in "
-            f"{custom_handlers_module} for custom handler attachment."
-        )
-
-    custom_handlers_getter = custom_handlers_module.get_custom_handlers
-    custom_handlers = custom_handlers_getter(handler_config)
+    custom_handlers = handler_config.config.hooks.custom_handler_attachers
 
     return custom_handlers
 
 
-def _attach_custom_handlers(trainer: Engine, handler_config, custom_handlers):
+def _attach_custom_handlers(
+    trainer: Engine, handler_config: "HandlerConfig", custom_handlers
+):
     if not custom_handlers:
         return trainer
 

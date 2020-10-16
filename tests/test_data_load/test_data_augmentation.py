@@ -304,7 +304,8 @@ def _get_mixed_loss_test_cases_for_parametrization():
 
 
 @pytest.mark.parametrize(
-    "test_inputs,expected_output", _get_mixed_loss_test_cases_for_parametrization(),
+    "test_inputs,expected_output",
+    _get_mixed_loss_test_cases_for_parametrization(),
 )
 def test_calc_all_mixed_losses(test_inputs, expected_output):
     target_columns = {
@@ -336,7 +337,8 @@ def test_calc_all_mixed_losses(test_inputs, expected_output):
 
 
 @pytest.mark.parametrize(
-    "test_inputs,expected_output", _get_mixed_loss_test_cases_for_parametrization(),
+    "test_inputs,expected_output",
+    _get_mixed_loss_test_cases_for_parametrization(),
 )
 def test_calc_mixed_loss(test_inputs, expected_output):
     criterion = nn.MSELoss()

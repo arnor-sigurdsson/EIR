@@ -7,6 +7,7 @@ from typing import Callable, List, Type, Dict
 
 from aislib.misc_utils import get_logger
 from aislib.pytorch_modules import AdaHessian
+from adabelief_pytorch import AdaBelief
 from torch import nn
 from torch.optim import SGD, Adam
 from torch.optim.adamw import AdamW
@@ -88,6 +89,8 @@ def get_base_optimizers_dict() -> Dict[str, Type[Optimizer]]:
         "adam": Adam,
         "adamw": AdamW,
         "adahessian": AdaHessian,
+        "adabelief": AdaBelief,
+        "adabeliefw": partial(AdaBelief, weight_decouple=True),
     }
     return base_optimizers
 

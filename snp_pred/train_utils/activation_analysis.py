@@ -183,7 +183,9 @@ def _get_shap_activation_function(
         act_sample_func = get_shap_sample_acts_deep_all_classes
 
     act_func_partial = partial(
-        act_sample_func, explainer=explainer, column_type=column_type,
+        act_sample_func,
+        explainer=explainer,
+        column_type=column_type,
     )
     return act_func_partial
 
@@ -345,7 +347,8 @@ def accumulate_activations(
     acc_acts_masked = defaultdict(list)
 
     target_classes_numerical = _get_numerical_target_classes(
-        target_transformer=target_transformer, column_type=column_type,
+        target_transformer=target_transformer,
+        column_type=column_type,
     )
 
     activations_data_loader = _get_activations_dataloader(

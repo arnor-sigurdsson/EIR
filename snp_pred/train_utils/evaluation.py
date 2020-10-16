@@ -30,6 +30,8 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
     don't want to evaluate as a running average (i.e. do it in the step
     function), but rather run over the whole validation dataset as we do
     in this function.
+
+    TODO: Streamline with hooks.
     """
     c = handler_config.config
     cl_args = c.cl_args
@@ -134,7 +136,9 @@ class PerformancePlotConfig:
     output_folder: Path
 
 
-def save_evaluation_results(plot_config: PerformancePlotConfig,) -> None:
+def save_evaluation_results(
+    plot_config: PerformancePlotConfig,
+) -> None:
 
     pc = plot_config
 

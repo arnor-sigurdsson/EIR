@@ -49,6 +49,7 @@ def test_get_weighted_random_sampler(
         train_sampler=random_sampler,
         valid_dataset=valid_dataset,
         batch_size=64,
+        num_workers=0,
     )
 
     label_counts = _gather_dataloader_label_distributions(
@@ -65,6 +66,7 @@ def test_get_weighted_random_sampler(
         train_sampler=None,
         valid_dataset=valid_dataset,
         batch_size=64,
+        num_workers=0,
     )
 
     label_counts_imbalanced = _gather_dataloader_label_distributions(
