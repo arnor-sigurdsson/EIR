@@ -25,6 +25,7 @@ plotly = "^4.11.0"
 aislib = {git = "ssh://git@github.com/arnor-sigurdsson/aislib.git", rev = "dev"}
 torch-optimizer = "^0.0.1-alpha.15"
 black = "^20.8b1"
+adabelief-pytorch = "^0.0.5"
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.1.1"
@@ -36,6 +37,7 @@ Sphinx = "^3.2.1"
 coverage = "^5.3"
 snakeviz = "^2.1.0"
 pytest-cov = "^2.10.1"
+pytest-testmon = "^1.0.3"
 pynvim = "^0.4.2"
 visidata = "^2.0.1"
 pre-commit = "^2.7.1"

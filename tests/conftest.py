@@ -269,7 +269,9 @@ def _set_up_base_test_array(n_snps: int) -> Tuple[np.ndarray, np.ndarray]:
 
 
 def _create_test_array(
-    base_array: np.ndarray, snp_idxs_candidates: np.ndarray, snp_row_idx: int,
+    base_array: np.ndarray,
+    snp_idxs_candidates: np.ndarray,
+    snp_row_idx: int,
 ) -> Tuple[np.ndarray, List[int]]:
     # make samples have missing for chosen, otherwise might have alleles chosen
     # below by random, without having the phenotype
@@ -429,7 +431,9 @@ def create_test_dloaders(create_test_cl_args, create_test_datasets):
 
 
 def create_test_optimizer(
-    cl_args: Namespace, model: nn.Module, criterions,
+    cl_args: Namespace,
+    model: nn.Module,
+    criterions,
 ):
 
     """
@@ -484,7 +488,9 @@ def prep_modelling_test_configs(
     test_metrics = _patch_metrics(metrics_=test_metrics)
 
     optimizer, loss_module = create_test_optimizer(
-        cl_args=cl_args, model=model, criterions=criterions,
+        cl_args=cl_args,
+        model=model,
+        criterions=criterions,
     )
 
     train_dataset, valid_dataset = create_test_datasets

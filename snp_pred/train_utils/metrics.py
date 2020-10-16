@@ -245,7 +245,9 @@ def aggregate_losses(losses_dict: Dict[str, torch.Tensor]) -> torch.Tensor:
 
 
 def get_uncertainty_loss_hook(
-    target_cat_columns: List[str], target_con_columns: List[str], device: str,
+    target_cat_columns: List[str],
+    target_con_columns: List[str],
+    device: str,
 ):
     loss_module = UncertaintyMultiTaskLoss(
         target_cat_columns=target_cat_columns,
@@ -259,7 +261,10 @@ def get_uncertainty_loss_hook(
 
 
 def hook_add_uncertainty_loss(
-    state: Dict, uncertainty_module: "UncertaintyMultiTaskLoss", *args, **kwargs,
+    state: Dict,
+    uncertainty_module: "UncertaintyMultiTaskLoss",
+    *args,
+    **kwargs,
 ):
     base_losses_dict = state["train_losses"]
 
@@ -272,7 +277,10 @@ def hook_add_uncertainty_loss(
 
 class UncertaintyMultiTaskLoss(nn.Module):
     def __init__(
-        self, target_cat_columns: List[str], target_con_columns: List[str], device: str,
+        self,
+        target_cat_columns: List[str],
+        target_con_columns: List[str],
+        device: str,
     ):
         super().__init__()
 

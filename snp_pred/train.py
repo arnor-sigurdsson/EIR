@@ -161,7 +161,9 @@ def get_default_config(
 
     writer = get_summary_writer(run_folder=run_folder)
 
-    loss_func = _get_loss_callable(criterions=criterions,)
+    loss_func = _get_loss_callable(
+        criterions=criterions,
+    )
 
     optimizer = get_optimizer(model=model, loss_callable=loss_func, cl_args=cl_args)
 
@@ -554,14 +556,20 @@ def _get_step_func_hooks(cl_args: argparse.Namespace):
         init_kwargs["final_loss"].append(hook_add_l1_loss)
 
     if cl_args.mixing_type is not None:
-        logger.debug("Setting up hooks for mixing.")
+        logger.debug(
+            "Setting up hooks for mixing with %s with α=%.2g.",
+            cl_args.mixing_type,
+            cl_args.mixing_alpha,
+        )
         mix_hook = get_mix_data_hook(mixing_type=cl_args.mixing_type)
 
         init_kwargs["prepare_batch"].append(mix_hook)
         init_kwargs["per_target_loss"] = [hook_mix_loss]
 
     if len(cl_args.target_con_columns + cl_args.target_cat_columns) > 1:
-        logger.debug("Using uncertainty weighted loss for multi task modelling.")
+        logger.debug(
+            "Setting up hook for uncertainty weighted loss for multi task modelling."
+        )
         uncertainty_hook = get_uncertainty_loss_hook(
             target_cat_columns=cl_args.target_cat_columns,
             target_con_columns=cl_args.target_con_columns,
@@ -598,7 +606,10 @@ def call_hooks_stage_iterable(
 
 
 def state_registered_hook_call(
-    hook_func: Callable, state: Union[Dict[str, Any], None], *args, **kwargs,
+    hook_func: Callable,
+    state: Union[Dict[str, Any], None],
+    *args,
+    **kwargs,
 ) -> Tuple[Any, Dict[str, Any]]:
 
     if state is None:

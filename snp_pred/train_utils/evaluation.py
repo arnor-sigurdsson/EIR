@@ -136,7 +136,9 @@ class PerformancePlotConfig:
     output_folder: Path
 
 
-def save_evaluation_results(plot_config: PerformancePlotConfig,) -> None:
+def save_evaluation_results(
+    plot_config: PerformancePlotConfig,
+) -> None:
 
     pc = plot_config
 

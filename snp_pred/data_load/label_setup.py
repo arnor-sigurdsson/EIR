@@ -66,7 +66,9 @@ def label_df_parse_wrapper(
     all_cols = _get_all_label_columns_needed(cl_args=cl_args, column_ops=column_ops)
 
     df_labels = _load_label_df(
-        label_fpath=cl_args.label_file, columns=all_cols, custom_label_ops=column_ops,
+        label_fpath=cl_args.label_file,
+        columns=all_cols,
+        custom_label_ops=column_ops,
     )
 
     df_labels = _cast_label_df_dtypes(
@@ -340,7 +342,10 @@ def _filter_ids_from_label_df(
         return df_labels
 
     no_labels = df_labels.shape[0]
-    df_filtered = df_labels[df_labels.index.isin(ids_to_keep)]
+
+    mask = df_labels.index.isin(ids_to_keep)
+    df_filtered = df_labels.loc[mask, :].copy()
+
     no_dropped = no_labels - df_filtered.shape[0]
 
     logger.debug(

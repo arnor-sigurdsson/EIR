@@ -120,7 +120,9 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
         pbar = ProgressBar()
         pbar.attach(engine=trainer, metric_names=["loss-average"])
         trainer.add_event_handler(
-            event_name=Events.EPOCH_COMPLETED, handler=_log_stats_to_pbar, pbar=pbar,
+            event_name=Events.EPOCH_COMPLETED,
+            handler=_log_stats_to_pbar,
+            pbar=pbar,
         )
 
     if handler_config.run_name:

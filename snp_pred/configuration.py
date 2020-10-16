@@ -1,5 +1,4 @@
 import argparse
-
 import configargparse
 import torch
 from aislib.misc_utils import get_logger

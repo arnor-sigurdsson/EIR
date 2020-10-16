@@ -249,7 +249,8 @@ def mixup_all_targets(
 
 
 def mixup_targets(
-    targets: al_target_values, random_index_for_mixing: torch.Tensor,
+    targets: al_target_values,
+    random_index_for_mixing: torch.Tensor,
 ) -> al_target_values:
 
     targets_permuted = copy(targets)
