@@ -493,19 +493,13 @@ def get_default_metrics(
 ) -> "al_metric_record_dict":
     mcc = MetricRecord(name="mcc", function=calc_mcc)
     acc = MetricRecord(name="acc", function=calc_acc)
+
     rmse = MetricRecord(
         name="rmse",
         function=partial(calc_rmse, target_transformers=target_transformers),
         minimize_goal=True,
     )
 
-    default_metrics = {
-        "cat": (mcc, acc),
-        "con": (rmse,),
-        "averaging_functions": {"con": "loss", "cat": "acc"},
-    }
-
-    # TODO: Remove and use default metrics, currently temporary for testing
     roc_auc_macro = MetricRecord(
         name="roc-auc-macro", function=calc_roc_auc_ovr, only_val=True
     )
@@ -515,7 +509,9 @@ def get_default_metrics(
     r2 = MetricRecord(name="r2", function=calc_r2, only_val=True)
     pcc = MetricRecord(name="pcc", function=calc_pcc, only_val=True)
 
-    averaging_functions = _get_default_performance_averaging_functions()
+    averaging_functions = get_default_performance_averaging_functions(
+        cat_metric_name="mcc", con_metric_name="loss"
+    )
     default_metrics = {
         "cat": (mcc, acc, roc_auc_macro, ap_macro),
         "con": (rmse, r2, pcc),
@@ -524,7 +520,9 @@ def get_default_metrics(
     return default_metrics
 
 
-def _get_default_performance_averaging_functions() -> al_averaging_functions_dict:
+def get_default_performance_averaging_functions(
+    cat_metric_name: str, con_metric_name: str
+) -> al_averaging_functions_dict:
     def _calc_cat_averaging_value(
         metric_dict: "al_step_metric_dict", column_name: str, metric_name: str
     ) -> float:
@@ -536,8 +534,8 @@ def _get_default_performance_averaging_functions() -> al_averaging_functions_dic
         return 1 - metric_dict[column_name][f"{column_name}_{metric_name}"]
 
     performance_averaging_functions = {
-        "cat": partial(_calc_cat_averaging_value, metric_name="mcc"),
-        "con": partial(_calc_con_averaging_value, metric_name="loss"),
+        "cat": partial(_calc_cat_averaging_value, metric_name=cat_metric_name),
+        "con": partial(_calc_con_averaging_value, metric_name=con_metric_name),
     }
 
     return performance_averaging_functions

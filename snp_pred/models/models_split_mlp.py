@@ -267,7 +267,8 @@ class SplitParameterSpec:
 
 
 def _get_split_blocks(
-    split_parameter_spec: SplitParameterSpec, block_layer_spec: Sequence[int],
+    split_parameter_spec: SplitParameterSpec,
+    block_layer_spec: Sequence[int],
 ) -> nn.Sequential:
     factory = _get_split_block_factory(block_layer_spec=block_layer_spec)
 
@@ -290,7 +291,8 @@ def _get_split_block_factory(
 
 
 def _generate_split_blocks_from_spec(
-    split_parameter_spec: SplitParameterSpec, block_layer_spec: List[int],
+    split_parameter_spec: SplitParameterSpec,
+    block_layer_spec: List[int],
 ) -> nn.Sequential:
 
     s = split_parameter_spec
