@@ -1,6 +1,7 @@
 from argparse import Namespace
 from pathlib import Path
 from typing import Tuple, Dict, Union, List, Callable
+import reprlib
 
 import numpy as np
 import pandas as pd
@@ -425,7 +426,7 @@ def _parse_label_df(
                     logger.debug(
                         "Applying func %s with args %s to column %s in pre-processing.",
                         func,
-                        args_dict,
+                        reprlib.repr(args_dict),
                         op_name,
                     )
                     logger.debug("Shape before: %s", df.shape)
