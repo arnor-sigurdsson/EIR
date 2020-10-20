@@ -62,6 +62,9 @@ def parse_test_cl_args(request):
 
 @pytest.fixture
 def args_config():
+    """
+    TODO: Get from configuration.py, and then modify?
+    """
     test_cl_args = SimpleNamespace(
         **{
             "act_classes": None,
@@ -90,6 +93,7 @@ def args_config():
             "gpu_num": "0",
             "kernel_width": 12,
             "label_file": "REPLACE_ME",
+            "label_parsing_chunk_size": None,
             "l1": 1e-03,
             "lr": 1e-02,
             "lr_lb": 1e-5,

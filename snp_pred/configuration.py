@@ -287,6 +287,13 @@ def get_train_argument_parser() -> configargparse.ArgumentParser:
     )
 
     parser_.add_argument(
+        "--label_parsing_chunk_size",
+        type=int,
+        default=None,
+        help="Number of rows to load at a time from label file before processing.",
+    )
+
+    parser_.add_argument(
         "--target_con_columns",
         nargs="*",
         default=[],

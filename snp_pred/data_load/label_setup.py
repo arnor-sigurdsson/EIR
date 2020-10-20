@@ -35,9 +35,8 @@ def set_up_train_and_valid_labels(
     set for regression) on the labels.
     """
 
-    df_labels = label_df_parse_wrapper(
-        cl_args=cl_args, custom_label_ops=custom_label_ops
-    )
+    parse_wrapper = _get_label_parsing_wrapper(cl_args=cl_args)
+    df_labels = parse_wrapper(cl_args=cl_args, custom_label_ops=custom_label_ops)
 
     df_labels_train, df_labels_valid = _split_df(
         df=df_labels, valid_size=cl_args.valid_size
@@ -52,6 +51,14 @@ def set_up_train_and_valid_labels(
     train_labels_dict = df_labels_train.to_dict("index")
     valid_labels_dict = df_labels_valid.to_dict("index")
     return train_labels_dict, valid_labels_dict
+
+
+def _get_label_parsing_wrapper(
+    cl_args: Namespace,
+) -> Callable[[Namespace, Union[None, al_all_column_ops]], pd.DataFrame]:
+    if cl_args.label_parsing_chunk_size is None:
+        return label_df_parse_wrapper
+    return chunked_label_df_parse_wrapper
 
 
 def label_df_parse_wrapper(
@@ -95,19 +102,22 @@ def label_df_parse_wrapper(
     return df_final
 
 
-def chunked_label_df_parse_wrapper(cl_args: Namespace) -> pd.DataFrame:
+def chunked_label_df_parse_wrapper(
+    cl_args: Namespace, custom_label_ops: Union[None, al_all_column_ops] = None
+) -> pd.DataFrame:
     available_ids = _gather_ids_from_data_source(data_source=Path(cl_args.data_source))
 
     column_ops = {}
-    if cl_args.custom_lib:
-        column_ops = _get_custom_column_ops(custom_lib=cl_args.custom_lib)
+    if custom_label_ops is not None:
+        column_ops = custom_label_ops
 
     all_cols = _get_all_label_columns_needed(cl_args=cl_args, column_ops=column_ops)
 
     chunk_generator = _get_label_df_chunk_generator(
+        chunk_size=cl_args.label_parsing_chunk_size,
         label_fpath=cl_args.label_file,
         columns=all_cols,
-        custom_label_ops=cl_args.custom_lib,
+        custom_label_ops=column_ops,
     )
 
     label_columns = _get_label_columns_from_cl_args(cl_args=cl_args)
@@ -142,7 +152,10 @@ def chunked_label_df_parse_wrapper(cl_args: Namespace) -> pd.DataFrame:
 
 
 def _get_label_df_chunk_generator(
-    label_fpath: Path, columns: List[str], custom_label_ops: Union[None, Callable]
+    chunk_size: int,
+    label_fpath: Path,
+    columns: List[str],
+    custom_label_ops: Union[None, al_all_column_ops],
 ) -> pd.DataFrame:
     """
     We accept only loading the available columns at this point because the passed
@@ -159,18 +172,17 @@ def _get_label_df_chunk_generator(
         custom_label_ops=custom_label_ops,
     )
 
-    chunksize = 20000
     chunks_processed = 0
     for chunk in pd.read_csv(
         label_fpath,
         usecols=available_columns,
         dtype={"ID": str},
         low_memory=False,
-        chunksize=20000,
+        chunksize=chunk_size,
     ):
         logger.debug(
             "Processsed %d rows so far in %d chunks.",
-            chunksize * chunks_processed,
+            chunk_size * chunks_processed,
             chunks_processed,
         )
         chunks_processed += 1

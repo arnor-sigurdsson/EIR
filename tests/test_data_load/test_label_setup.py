@@ -75,6 +75,22 @@ def create_test_column_ops():
 
 
 @pytest.mark.parametrize(
+    "create_test_cl_args",
+    [
+        {
+            "custom_cl_args": {
+                "label_parsing_chunk_size": None,
+            }
+        },
+        {
+            "custom_cl_args": {
+                "label_parsing_chunk_size": 50,
+            }
+        },
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize(
     "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
 )
 def test_set_up_train_and_valid_labels(
