@@ -386,6 +386,13 @@ def get_train_argument_parser() -> configargparse.ArgumentParser:
     )
 
     parser_.add_argument(
+        "--act_every_sample_factor",
+        type=int,
+        default=1,
+        help="Number of rows to load at a time from label file before processing.",
+    )
+
+    parser_.add_argument(
         "--debug",
         action="store_true",
         help="Whether to run in debug mode (w. breakpoint).",

@@ -68,6 +68,7 @@ def args_config():
     test_cl_args = SimpleNamespace(
         **{
             "act_classes": None,
+            "act_every_sample_factor": 1,
             "b1": 0.9,
             "b2": 0.999,
             "batch_size": 32,

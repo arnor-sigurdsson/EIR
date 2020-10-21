@@ -349,6 +349,7 @@ def accumulate_activations(
     target_classes_numerical = _get_numerical_target_classes(
         target_transformer=target_transformer,
         column_type=column_type,
+        act_classes=cl_args.act_classes,
     )
 
     activations_data_loader = _get_activations_dataloader(
@@ -407,9 +408,14 @@ def accumulate_activations(
     return acc_acts, acc_acts_masked
 
 
-def _get_numerical_target_classes(target_transformer, column_type: str):
+def _get_numerical_target_classes(
+    target_transformer, column_type: str, act_classes: Union[List[str], None]
+):
     if column_type == "con":
         return [None]
+
+    if act_classes is not None:
+        target_transformer.transform(act_classes)
 
     return target_transformer.transform(target_transformer.classes_)
 

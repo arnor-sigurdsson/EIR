@@ -40,8 +40,9 @@ if TYPE_CHECKING:
     from snp_pred.train_utils.metrics import al_step_metric_dict
 
 # Aliases
-al_get_custom_handles_return_value = Union[Tuple[Callable, ...], Tuple[None]]
-al_get_custom_handlers = Callable[["HandlerConfig"], al_get_custom_handles_return_value]
+al_sample_interval_handlers = Tuple[
+    Tuple[Callable[[Engine, "HandlerConfig"], None], int], ...
+]
 
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
@@ -71,31 +72,22 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
         monitoring_metrics=monitoring_metrics,
     )
 
-    sample_handlers = _get_sample_interval_handlers(do_get_acts=ca.get_acts)
-    for handler in sample_handlers:
+    _attach_running_average_metrics(
+        engine=trainer, monitoring_metrics=monitoring_metrics
+    )
+
+    if not ca.no_pbar:
+        pbar = ProgressBar()
+        pbar.attach(engine=trainer, metric_names=["loss-average"])
         trainer.add_event_handler(
-            event_name=Events.ITERATION_COMPLETED(every=ca.sample_interval),
-            handler=handler,
-            handler_config=handler_config,
+            event_name=Events.EPOCH_COMPLETED,
+            handler=_log_stats_to_pbar,
+            pbar=pbar,
         )
 
-        do_run_when_training_complete = _do_run_completed_handler(
-            iter_per_epoch=len(config.train_loader),
-            n_epochs=ca.n_epochs,
-            sample_interval=ca.sample_interval,
-        )
-
-        # we need no `ca.early_stopping_patience` because early stopping will only
-        # trigger a termination (complete state) at a `sample_interval` point,
-        # meaning that both `sample_interval` and Events.COMPLETED triggers will be
-        # active when the early stopping is triggered, meaning double entry in the
-        # validation history file
-        if do_run_when_training_complete and not ca.early_stopping_patience:
-            trainer.add_event_handler(
-                event_name=Events.COMPLETED,
-                handler=handler,
-                handler_config=handler_config,
-            )
+    trainer = _attach_sample_interval_handlers(
+        trainer=trainer, handler_config=handler_config
+    )
 
     if ca.early_stopping_patience:
         early_stopping_handler = get_early_stopping_handler(
@@ -112,19 +104,6 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
         lr_scheduler = set_up_lr_scheduler(handler_config=handler_config)
         attach_lr_scheduler(engine=trainer, lr_scheduler=lr_scheduler, config=config)
 
-    _attach_running_average_metrics(
-        engine=trainer, monitoring_metrics=monitoring_metrics
-    )
-
-    if not ca.no_pbar:
-        pbar = ProgressBar()
-        pbar.attach(engine=trainer, metric_names=["loss-average"])
-        trainer.add_event_handler(
-            event_name=Events.EPOCH_COMPLETED,
-            handler=_log_stats_to_pbar,
-            pbar=pbar,
-        )
-
     if handler_config.run_name:
         trainer = _attach_run_event_handlers(
             trainer=trainer, handler_config=handler_config
@@ -133,10 +112,92 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
     return trainer
 
 
-def _get_sample_interval_handlers(do_get_acts: bool) -> Tuple[Callable, ...]:
+def _attach_sample_interval_handlers(
+    trainer: Engine,
+    handler_config: "HandlerConfig",
+) -> Engine:
+
+    config = handler_config.config
+    cl_args = config.cl_args
+
+    sample_handlers = _get_sample_interval_handlers(
+        do_get_acts=cl_args.get_acts,
+        sample_interval_base=cl_args.sample_interval,
+        act_every_sample_factor=cl_args.act_every_sample_factor,
+    )
+
+    for handler, handler_interval in sample_handlers:
+
+        trainer = _attach_sample_interval_handler(
+            trainer=trainer,
+            handler=handler,
+            handler_config=handler_config,
+            handler_interval=handler_interval,
+        )
+
+    return trainer
+
+
+def _attach_sample_interval_handler(
+    trainer: Engine,
+    handler: Callable,
+    handler_config: "HandlerConfig",
+    handler_interval: int,
+):
+    """
+    We need no `ca.early_stopping_patience` because early stopping will only
+    trigger a termination (complete state) at a `sample_interval` point,
+    meaning that both `sample_interval` and Events.COMPLETED triggers will be
+    active when the early stopping is triggered, meaning double entry in the
+    validation history file
+    """
+
+    config = handler_config.config
+    cl_args = config.cl_args
+
+    trainer.add_event_handler(
+        event_name=Events.ITERATION_COMPLETED(every=handler_interval),
+        handler=handler,
+        handler_config=handler_config,
+    )
+
+    do_run_when_training_complete = _do_run_completed_handler(
+        iter_per_epoch=len(config.train_loader),
+        n_epochs=cl_args.n_epochs,
+        sample_interval=handler_interval,
+    )
+
+    if do_run_when_training_complete and not cl_args.early_stopping_patience:
+        trainer.add_event_handler(
+            event_name=Events.COMPLETED,
+            handler=handler,
+            handler_config=handler_config,
+        )
+
+    return trainer
+
+
+def _get_sample_interval_handlers(
+    do_get_acts: bool, sample_interval_base: int, act_every_sample_factor: int
+) -> al_sample_interval_handlers:
+
+    validation_handler_tuple = (validation_handler, sample_interval_base)
+
     if do_get_acts:
-        return validation_handler, activation_analysis_handler
-    return (validation_handler,)
+
+        activation_handler_interval = sample_interval_base * act_every_sample_factor
+        activation_handler_tuple = (
+            activation_analysis_handler,
+            activation_handler_interval,
+        )
+        logger.debug(
+            "Activations will be computed every %d iterations.",
+            activation_handler_interval,
+        )
+
+        return validation_handler_tuple, activation_handler_tuple
+
+    return (validation_handler_tuple,)
 
 
 def _do_run_completed_handler(iter_per_epoch: int, n_epochs: int, sample_interval: int):
