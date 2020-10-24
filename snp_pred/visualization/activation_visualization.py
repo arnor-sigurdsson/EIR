@@ -136,6 +136,8 @@ def plot_snp_manhattan_plots(
         i for i in df_snp_grads.columns if i.endswith("_activations")
     ]
 
+    df_snp_grads = df_snp_grads.sort_values(by=["CHR_CODE", "BP_COORD"])
+
     for col in activations_columns:
         label_name = col.split("_activations")[0]
         fig, ax = plt.subplots(figsize=(12, 6))
@@ -177,6 +179,8 @@ def plot_snp_manhattan_plots_plotly(
     activations_columns = [
         i for i in df_snp_grads.columns if i.endswith("_activations")
     ]
+
+    df_snp_grads = df_snp_grads.sort_values(by=["CHR_CODE", "BP_COORD"])
 
     fig = go.Figure()
 
