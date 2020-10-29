@@ -263,14 +263,15 @@ def get_uncertainty_loss_hook(
 def hook_add_uncertainty_loss(
     state: Dict,
     uncertainty_module: "UncertaintyMultiTaskLoss",
+    loss_key: str = "per_target_train_losses",
     *args,
     **kwargs,
 ):
-    base_losses_dict = state["train_losses"]
+    base_losses_dict = state[loss_key]
 
     uncertainty_losses = uncertainty_module(losses_dict=base_losses_dict)
 
-    state_updates = {"train_losses": uncertainty_losses}
+    state_updates = {loss_key: uncertainty_losses}
 
     return state_updates
 
@@ -324,12 +325,18 @@ class UncertaintyMultiTaskLoss(nn.Module):
         return losses_uncertain
 
 
-def hook_add_l1_loss(config: "Config", state: Dict, *args, **kwargs) -> Dict:
+def hook_add_l1_loss(
+    config: "Config",
+    state: Dict,
+    loss_key: str = "loss",
+    *args,
+    **kwargs,
+) -> Dict:
     l1_loss = get_model_l1_loss(model=config.model, l1_weight=config.cl_args.l1)
 
-    updated_loss = state["loss"] + l1_loss
+    updated_loss = state[loss_key] + l1_loss
 
-    state_updates = {"loss": updated_loss}
+    state_updates = {loss_key: updated_loss}
 
     return state_updates
 

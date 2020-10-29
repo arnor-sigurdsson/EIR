@@ -14,6 +14,14 @@ if TYPE_CHECKING:
     from train import al_training_labels_target, al_criterions, Config
 
 al_target_values = Union[torch.LongTensor, torch.Tensor]
+al_int_tensors = Union[
+    torch.ByteTensor,
+    torch.CharTensor,
+    torch.ShortTensor,
+    torch.IntTensor,
+    torch.LongTensor,
+    torch.BoolTensor,
+]
 
 
 @dataclass
@@ -22,7 +30,7 @@ class MixupOutput:
     targets: "al_training_labels_target"
     targets_permuted: "al_training_labels_target"
     lambda_: float
-    permuted_indexes: Sequence[int]
+    permuted_indexes: Sequence[al_int_tensors]
 
 
 def get_mix_data_hook(mixing_type: str):
@@ -77,7 +85,7 @@ def hook_mix_loss(config: "Config", state: Dict, *args, **kwargs) -> Dict:
         mixed_object=state["mixed_snp_data"],
     )
 
-    state_updates = {"train_losses": mixed_losses}
+    state_updates = {"per_target_train_losses": mixed_losses}
 
     return state_updates
 
@@ -148,7 +156,9 @@ def get_random_batch_indices_to_mix(batch_size: int) -> torch.Tensor:
 
 
 def mixup_input(
-    input_batch: torch.Tensor, lambda_: float, random_batch_indices_to_mix: torch.Tensor
+    input_batch: torch.Tensor,
+    lambda_: float,
+    random_batch_indices_to_mix: al_int_tensors,
 ) -> torch.Tensor:
     """
     This function is to delegate arguments from mixup_snp_data to a general mixup
@@ -164,7 +174,9 @@ def mixup_input(
 
 
 def mixup_tensor(
-    tensor: torch.Tensor, lambda_: float, random_batch_indices_to_mix: torch.Tensor
+    tensor: torch.Tensor,
+    lambda_: float,
+    random_batch_indices_to_mix: Sequence[al_int_tensors],
 ) -> torch.Tensor:
 
     mixed_tensor = (

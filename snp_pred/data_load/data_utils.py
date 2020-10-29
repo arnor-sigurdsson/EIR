@@ -12,7 +12,7 @@ def get_target_columns_generator(target_columns: al_target_columns) -> Tuple[str
             yield column_type, cur_column
 
 
-@dataclass
+@dataclass(frozen=True)
 class Batch:
     inputs: torch.Tensor
     target_labels: Dict[str, torch.Tensor]
