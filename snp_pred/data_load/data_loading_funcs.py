@@ -122,5 +122,6 @@ def _aggregate_column_sampling_weights(
     samples_per_epoch = sum(
         min(i["label_counts"]) for i in all_target_columns_weights_and_counts.values()
     )
+    samples_per_epoch = min(len(all_weights_summed), samples_per_epoch)
 
     return all_weights_summed, samples_per_epoch
