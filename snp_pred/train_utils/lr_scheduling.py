@@ -12,14 +12,13 @@ from ignite.contrib.handlers import (
 )
 from ignite.engine import Engine, Events
 from matplotlib import pyplot as plt
-from torch.optim.lr_scheduler import ReduceLROnPlateau
-from torch.optim.optimizer import Optimizer
-
 from snp_pred.train_utils.metrics import (
     read_metrics_history_file,
     get_average_history_filepath,
 )
 from snp_pred.train_utils.utils import get_run_folder
+from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.optim.optimizer import Optimizer
 
 if TYPE_CHECKING:
     from snp_pred.train_utils.train_handlers import HandlerConfig
@@ -139,12 +138,14 @@ def set_up_lr_scheduler(
         num_events = _get_total_num_events(
             n_epochs=cl_args.n_epochs, iter_per_epoch=len(c.train_loader)
         )
-        _plot_lr_schedule(
-            lr_scheduler=lr_scheduler,
-            num_events=num_events,
-            output_folder=handler_config.run_folder,
-            lr_scheduler_args=lr_scheduler_args,
-        )
+
+        if cl_args.debug:
+            _plot_lr_schedule(
+                lr_scheduler=lr_scheduler,
+                num_events=num_events,
+                output_folder=handler_config.run_folder,
+                lr_scheduler_args=lr_scheduler_args,
+            )
 
     elif cl_args.lr_schedule == "plateau":
         patience_steps = calc_plateu_patience(

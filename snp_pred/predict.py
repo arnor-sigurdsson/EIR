@@ -9,13 +9,11 @@ from typing import Union, List, Dict
 import joblib
 import numpy as np
 import pandas as pd
+import snp_pred.visualization.visualization_funcs as vf
 import torch
 import torch.nn.functional as F
 from aislib.misc_utils import get_logger
 from sklearn.preprocessing import LabelEncoder
-from torch.utils.data import DataLoader
-
-import snp_pred.visualization.visualization_funcs as vf
 from snp_pred.data_load import datasets, label_setup
 from snp_pred.data_load.data_utils import get_target_columns_generator
 from snp_pred.data_load.datasets import (
@@ -34,6 +32,7 @@ from snp_pred.models.models_cnn import CNNModel
 from snp_pred.models.models_mlp import MLPModel
 from snp_pred.train_utils.evaluation import PerformancePlotConfig
 from snp_pred.train_utils.utils import get_run_folder
+from torch.utils.data import DataLoader
 
 torch.manual_seed(0)
 np.random.seed(0)
@@ -175,9 +174,9 @@ def _load_model(
         embed_columns=train_cl_args.extra_cat_columns, run_name=train_cl_args.run_name
     )
 
-    mode_class = get_model_class(train_cl_args.model_type)
+    model_class = get_model_class(train_cl_args.model_type)
 
-    model: torch.nn.Module = mode_class(
+    model: torch.nn.Module = model_class(
         cl_args=train_cl_args,
         num_classes=num_classes,
         embeddings_dict=embeddings_dict,

@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from typing import Tuple, Dict, Union, List
 
 import torch
-
 from snp_pred.data_load.label_setup import al_target_columns
 
 

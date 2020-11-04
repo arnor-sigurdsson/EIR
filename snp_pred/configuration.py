@@ -1,8 +1,8 @@
 import argparse
+
 import configargparse
 import torch
 from aislib.misc_utils import get_logger
-
 from snp_pred.train_utils.optimizers import get_base_optimizers_dict
 
 logger = get_logger(name=__name__)

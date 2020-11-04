@@ -12,8 +12,6 @@ from ignite.contrib.handlers import ProgressBar
 from ignite.engine import Events, Engine
 from ignite.handlers import ModelCheckpoint, EarlyStopping
 from ignite.metrics import RunningAverage
-from torch.utils.tensorboard import SummaryWriter
-
 from snp_pred.data_load.data_utils import get_target_columns_generator
 from snp_pred.data_load.label_setup import al_target_columns
 from snp_pred.train_utils import H_PARAMS
@@ -34,6 +32,7 @@ from snp_pred.train_utils.metrics import (
 )
 from snp_pred.train_utils.utils import get_run_folder
 from snp_pred.visualization import visualization_funcs as vf
+from torch.utils.tensorboard import SummaryWriter
 
 if TYPE_CHECKING:
     from snp_pred.train import Config

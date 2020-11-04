@@ -9,7 +9,6 @@ from aislib.misc_utils import get_logger
 from ignite.engine import Engine
 from scipy.special import softmax
 from sklearn.preprocessing import LabelEncoder, StandardScaler
-
 from snp_pred.data_load.data_utils import get_target_columns_generator
 from snp_pred.data_load.datasets import al_label_transformers_object
 from snp_pred.models import model_training_utils

@@ -35,7 +35,7 @@ def test_load_model(args_config, tmp_path):
 
     loaded_model = predict._load_model(
         model_path=model_path,
-        num_classes=model.num_classes,
+        num_classes=model.target_class_mapping,
         train_cl_args=cl_args,
         device=cl_args.device,
     )

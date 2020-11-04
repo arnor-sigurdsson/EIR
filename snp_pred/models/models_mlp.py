@@ -3,8 +3,6 @@ from typing import Dict
 
 import torch
 from aislib.pytorch_modules import Swish
-from torch import nn
-
 from snp_pred.models.models_base import (
     ModelBase,
     get_basic_multi_branch_spec,
@@ -14,6 +12,7 @@ from snp_pred.models.models_base import (
     merge_module_dicts,
     calculate_module_dict_outputs,
 )
+from torch import nn
 
 
 class MLPModel(ModelBase):
@@ -47,14 +46,14 @@ class MLPModel(ModelBase):
 
         branches = create_multi_task_blocks_with_first_adaptor_block(
             num_blocks=self.cl_args.layers[0],
-            branch_names=self.num_classes.keys(),
+            branch_names=self.target_class_mapping.keys(),
             block_constructor=initialize_modules_from_spec,
             block_constructor_kwargs={"spec": layer_spec},
             first_layer_kwargs_overload={"spec": first_layer_spec},
         )
 
         final_layer = get_final_layer(
-            in_features=self.fc_task_dim, num_classes=self.num_classes
+            in_features=self.fc_task_dim, num_classes=self.target_class_mapping
         )
 
         self.multi_task_branches = merge_module_dicts((branches, final_layer))

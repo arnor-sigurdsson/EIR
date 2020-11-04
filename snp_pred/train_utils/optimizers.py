@@ -5,16 +5,15 @@ from functools import partial
 from inspect import signature
 from typing import Callable, List, Type, Dict
 
+from adabelief_pytorch import AdaBelief
 from aislib.misc_utils import get_logger
 from aislib.pytorch_modules import AdaHessian
-from adabelief_pytorch import AdaBelief
+from snp_pred.models.model_training_utils import add_wd_to_model_params
 from torch import nn
 from torch.optim import SGD, Adam
 from torch.optim.adamw import AdamW
 from torch.optim.optimizer import Optimizer
 from torch_optimizer import get as get_custom_opt
-
-from snp_pred.models.model_training_utils import add_wd_to_model_params
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 

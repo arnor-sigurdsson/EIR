@@ -9,11 +9,6 @@ from aislib.misc_utils import get_logger
 from aislib.pytorch_modules import Swish
 from ignite.contrib.handlers import FastaiLRFinder
 from ignite.engine import Engine
-from torch import nn
-from torch.nn import Module
-from torch.optim.optimizer import Optimizer
-from torch.utils.data import DataLoader
-
 from snp_pred.data_load.data_utils import get_target_columns_generator
 from snp_pred.data_load.label_setup import al_target_columns
 from snp_pred.models.extra_inputs_module import get_extra_inputs
@@ -21,6 +16,10 @@ from snp_pred.train_utils.metrics import (
     calculate_prediction_losses,
     aggregate_losses,
 )
+from torch import nn
+from torch.nn import Module
+from torch.optim.optimizer import Optimizer
+from torch.utils.data import DataLoader
 
 if TYPE_CHECKING:
     # noinspection PyUnresolvedReferences
@@ -78,6 +77,9 @@ def gather_pred_outputs_from_dloader(
     """
     Used to gather predictions from a dataloader, normally for evaluation – hence the
     assertion that we are in eval mode.
+
+    Why the deepcopy when appending labels? See:
+    https://github.com/pytorch/pytorch/issues/973#issuecomment-459398189
     """
     all_output_batches = []
     all_label_batches = []
@@ -96,10 +98,14 @@ def gather_pred_outputs_from_dloader(
 
         all_output_batches.append(outputs)
 
-        ids_total += [i for i in ids]
+        ids_total += [i for i in deepcopy(ids)]
 
         if with_labels:
-            all_label_batches.append(labels["target_labels"])
+            all_label_batches.append(deepcopy(labels["target_labels"]))
+
+        del inputs
+        del labels
+        del ids
 
     if with_labels:
         all_label_batches = _stack_list_of_tensor_dicts(

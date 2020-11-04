@@ -2,9 +2,8 @@ from typing import Callable, Dict
 
 import torch
 from aislib.misc_utils import get_logger
-from torch import nn
-
 from snp_pred.models.models_base import ModelBase
+from torch import nn
 
 logger = get_logger(__name__)
 

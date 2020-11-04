@@ -6,9 +6,8 @@ from typing import List, Dict, Set, Union, overload, TYPE_CHECKING
 import joblib
 import torch
 from aislib.misc_utils import ensure_path_exists
-from torch import nn
-
 from snp_pred.data_load.label_setup import al_label_dict
+from torch import nn
 
 if TYPE_CHECKING:
     from snp_pred.train import al_training_labels_extra

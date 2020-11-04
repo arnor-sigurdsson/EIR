@@ -7,11 +7,10 @@ from typing import List, Union, Tuple, Dict, Callable, Iterable, Any
 import torch
 from aislib.misc_utils import get_logger
 from aislib.pytorch_modules import Swish
-from torch import nn
-
 from snp_pred.data_load.datasets import al_num_classes
 from snp_pred.models import extra_inputs_module
 from snp_pred.models.extra_inputs_module import al_emb_lookup_dict
+from torch import nn
 
 # type aliases
 
@@ -22,14 +21,14 @@ class ModelBase(nn.Module):
     def __init__(
         self,
         cl_args: Namespace,
-        num_classes: al_num_classes,
+        target_class_mapping: al_num_classes,
         embeddings_dict: Union[al_emb_lookup_dict, None] = None,
         extra_continuous_inputs_columns: Union[List[str], None] = None,
     ):
         super().__init__()
 
         self.cl_args = cl_args
-        self.num_classes = num_classes
+        self.target_class_mapping = target_class_mapping
         self.embeddings_dict = embeddings_dict
         self.extra_continuous_inputs_columns = extra_continuous_inputs_columns
 

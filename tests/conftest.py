@@ -386,7 +386,7 @@ def create_test_model(create_test_cl_args, create_test_datasets):
 
     model = get_model(
         cl_args=cl_args,
-        num_classes=train_dataset.num_classes,
+        target_class_mapping=train_dataset.num_classes,
         embedding_dict=embedding_dict,
     )
 

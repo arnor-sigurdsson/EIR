@@ -10,14 +10,12 @@ from typing import Union, Callable, Dict, Tuple, List, TYPE_CHECKING, Sequence
 
 import numpy as np
 import pandas as pd
+import snp_pred.visualization.activation_visualization as av
 import torch
 from aislib.misc_utils import get_logger, ensure_path_exists
 from ignite.engine import Engine
 from shap import DeepExplainer
 from sklearn.preprocessing import StandardScaler, LabelEncoder
-from torch.utils.data import DataLoader, Subset
-
-import snp_pred.visualization.activation_visualization as av
 from snp_pred.data_load.data_utils import get_target_columns_generator
 from snp_pred.data_load.datasets import al_datasets
 from snp_pred.models import model_training_utils
@@ -26,6 +24,7 @@ from snp_pred.models.model_training_utils import gather_dloader_samples
 from snp_pred.models.models_cnn import CNNModel
 from snp_pred.models.models_mlp import MLPModel
 from snp_pred.train_utils.utils import prep_sample_outfolder
+from torch.utils.data import DataLoader, Subset
 
 if TYPE_CHECKING:
     from snp_pred.train_utils.train_handlers import HandlerConfig

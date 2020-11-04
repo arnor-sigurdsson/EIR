@@ -8,10 +8,6 @@ import numpy as np
 import torch
 from aislib.misc_utils import get_logger, ensure_path_exists
 from sklearn.preprocessing import StandardScaler
-from torch.nn.functional import pad
-from torch.utils.data import Dataset
-from tqdm import tqdm
-
 from snp_pred.data_load.data_augmentation import make_random_snps_missing
 from snp_pred.data_load.label_setup import (
     set_up_label_transformers,
@@ -29,6 +25,9 @@ from snp_pred.data_load.label_setup import (
     get_array_path_iterator,
 )
 from snp_pred.train_utils.utils import get_run_folder
+from torch.nn.functional import pad
+from torch.utils.data import Dataset
+from tqdm import tqdm
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 

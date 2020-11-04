@@ -3,8 +3,6 @@ from typing import Dict
 
 import torch
 from aislib.pytorch_modules import Swish
-from torch import nn
-
 from snp_pred.models.layers import SplitLinear, MLPResidualBlock
 from snp_pred.models.models_base import (
     ModelBase,
@@ -16,6 +14,7 @@ from snp_pred.models.models_base import (
     merge_module_dicts,
     calculate_module_dict_outputs,
 )
+from torch import nn
 
 
 class MGMoEModel(ModelBase):
@@ -39,7 +38,7 @@ class MGMoEModel(ModelBase):
             )
         )
 
-        self.task_names = sorted(tuple(self.num_classes.keys()))
+        self.task_names = sorted(tuple(self.target_class_mapping.keys()))
         gate_spec = self.get_gate_spec(
             in_features=fc_0_out_feat + self.extra_dim, out_features=self.num_experts
         )
@@ -94,7 +93,7 @@ class MGMoEModel(ModelBase):
         )
 
         final_layer = get_final_layer(
-            in_features=self.fc_task_dim, num_classes=self.num_classes
+            in_features=self.fc_task_dim, num_classes=self.target_class_mapping
         )
 
         self.multi_task_branches = merge_module_dicts(

@@ -1,14 +1,12 @@
 from collections import OrderedDict
 from copy import copy
 from dataclasses import dataclass
-from typing import Dict, List, Callable, Sequence
 from functools import partial
+from typing import Dict, List, Callable, Sequence
 
 import torch
 from aislib.misc_utils import get_logger
 from aislib.pytorch_modules import Swish
-from torch import nn
-
 from snp_pred.models.layers import SplitLinear, MLPResidualBlock, SplitMLPResidualBlock
 from snp_pred.models.models_base import (
     ModelBase,
@@ -19,6 +17,7 @@ from snp_pred.models.models_base import (
     merge_module_dicts,
     calculate_module_dict_outputs,
 )
+from torch import nn
 
 logger = get_logger(__name__)
 
@@ -43,7 +42,7 @@ class SplitMLPModel(ModelBase):
 
         in_feat = num_chunks * self.cl_args.fc_repr_dim
 
-        task_names = tuple(self.num_classes.keys())
+        task_names = tuple(self.target_class_mapping.keys())
         task_resblocks_kwargs = {
             "in_features": self.fc_task_dim,
             "out_features": self.fc_task_dim,
@@ -71,7 +70,7 @@ class SplitMLPModel(ModelBase):
         )
 
         final_layer = get_final_layer(
-            in_features=self.fc_task_dim, num_classes=self.num_classes
+            in_features=self.fc_task_dim, num_classes=self.target_class_mapping
         )
 
         self.multi_task_branches = merge_module_dicts(
@@ -142,7 +141,7 @@ class FullySplitMLPModel(ModelBase):
             kernel_width=self.cl_args.kernel_width,
             channel_exp_base=self.cl_args.channel_exp_base,
             dropout_p=self.cl_args.rb_do,
-            cutoff=1024 * 16,
+            cutoff=1024 * 4,
         )
         self.split_blocks = _get_split_blocks(
             split_parameter_spec=split_parameter_spec,
@@ -150,7 +149,7 @@ class FullySplitMLPModel(ModelBase):
         )
 
         cur_dim = self.split_blocks[-1].out_features
-        task_names = tuple(self.num_classes.keys())
+        task_names = tuple(self.target_class_mapping.keys())
         task_resblocks_kwargs = {
             "in_features": self.fc_task_dim,
             "out_features": self.fc_task_dim,
@@ -175,7 +174,7 @@ class FullySplitMLPModel(ModelBase):
         )
 
         final_layer = get_final_layer(
-            in_features=self.fc_task_dim, num_classes=self.num_classes
+            in_features=self.fc_task_dim, num_classes=self.target_class_mapping
         )
 
         self.multi_task_branches = merge_module_dicts(

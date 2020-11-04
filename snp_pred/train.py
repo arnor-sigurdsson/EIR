@@ -21,11 +21,7 @@ import torch
 from aislib.misc_utils import ensure_path_exists
 from aislib.misc_utils import get_logger
 from ignite.engine import Engine
-from torch import nn
-from torch.optim.optimizer import Optimizer
-from torch.utils.data import DataLoader, WeightedRandomSampler
-from torch.utils.tensorboard import SummaryWriter
-
+from sklearn.preprocessing import StandardScaler
 from snp_pred.configuration import get_default_cl_args
 from snp_pred.data_load import data_utils
 from snp_pred.data_load import datasets
@@ -64,6 +60,10 @@ from snp_pred.train_utils.optimizers import (
 )
 from snp_pred.train_utils.train_handlers import HandlerConfig
 from snp_pred.train_utils.train_handlers import configure_trainer
+from torch import nn
+from torch.optim.optimizer import Optimizer
+from torch.utils.data import DataLoader, WeightedRandomSampler
+from torch.utils.tensorboard import SummaryWriter
 
 if TYPE_CHECKING:
     from snp_pred.train_utils.metrics import (
@@ -80,11 +80,22 @@ al_training_labels_batch = Dict[
     str, Union[al_training_labels_target, al_training_labels_extra]
 ]
 al_dataloader_getitem_batch = Tuple[torch.Tensor, al_training_labels_batch, List[str]]
+al_target_class_number_mapping = Dict[str, int]
 
 torch.manual_seed(0)
 np.random.seed(0)
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
+
+
+def main(cl_args: argparse.Namespace, config: "Config") -> None:
+
+    _log_model(model=config.model, l1_weight=cl_args.l1)
+
+    if cl_args.debug:
+        breakpoint()
+
+    train(config=config)
 
 
 @dataclass(frozen=True)
@@ -100,14 +111,15 @@ class Config:
     train_loader: torch.utils.data.DataLoader
     valid_loader: torch.utils.data.DataLoader
     valid_dataset: torch.utils.data.Dataset
+    labels_dict: Dict
+    target_transformers: al_label_transformers
+    target_columns: al_target_columns
+    target_class_mapping: al_target_class_number_mapping
+    data_dimension: "DataDimension"
     model: Union[al_models, nn.DataParallel]
     optimizer: Optimizer
     criterions: al_criterions
     loss_function: Callable
-    labels_dict: Dict
-    target_transformers: al_label_transformers
-    target_columns: al_target_columns
-    data_dimension: "DataDimension"
     writer: SummaryWriter
     metrics: "al_metric_record_dict"
     hooks: Union["Hooks", None]
@@ -150,9 +162,13 @@ def get_default_config(
         run_folder=run_folder,
     )
 
+    target_class_mapping = _set_up_target_class_number_mapping(
+        train_dataset.target_transformers
+    )
+
     model = get_model(
         cl_args=cl_args,
-        num_classes=train_dataset.num_classes,
+        target_class_mapping=target_class_mapping,
         embedding_dict=embedding_dict,
     )
 
@@ -175,14 +191,15 @@ def get_default_config(
         train_loader=train_dloader,
         valid_loader=valid_dloader,
         valid_dataset=valid_dataset,
+        labels_dict=train_dataset.labels_dict,
+        target_transformers=train_dataset.target_transformers,
+        target_class_mapping=target_class_mapping,
+        data_dimension=data_dimensions,
+        target_columns=train_dataset.target_columns,
         model=model,
         optimizer=optimizer,
         criterions=criterions,
         loss_function=loss_func,
-        labels_dict=train_dataset.labels_dict,
-        target_transformers=train_dataset.target_transformers,
-        target_columns=train_dataset.target_columns,
-        data_dimension=data_dimensions,
         writer=writer,
         metrics=metrics,
         hooks=hooks,
@@ -210,14 +227,28 @@ def _get_data_dimensions(
     return DataDimension(channels=channels, height=height, width=width)
 
 
-def main(cl_args: argparse.Namespace, config: Config) -> None:
+def _set_up_target_class_number_mapping(
+    target_transformers: al_label_transformers,
+) -> al_target_class_number_mapping:
 
-    _log_model(model=config.model, l1_weight=cl_args.l1)
+    num_classes_dict = {}
+    for target_column, transformer in target_transformers.items():
+        if isinstance(transformer, StandardScaler):
+            num_classes = 1
+        else:
+            num_classes = len(transformer.classes_)
 
-    if cl_args.debug:
-        breakpoint()
+            if num_classes < 2:
+                logger.warning(
+                    f"Only {num_classes} unique values found in categorical label "
+                    f"column {target_column} (returned by {transformer}). This means "
+                    f"that most likely an error will be raised if e.g. using "
+                    f"nn.CrossEntropyLoss as it expects an output dimension of >=2."
+                )
 
-    train(config=config)
+        num_classes_dict[target_column] = num_classes
+
+    return num_classes_dict
 
 
 def _prepare_run_folder(run_name: str) -> Path:
@@ -328,14 +359,14 @@ class GetAttrDelegatedDataParallel(nn.DataParallel):
 
 def get_model(
     cl_args: argparse.Namespace,
-    num_classes: al_num_classes,
+    target_class_mapping: al_num_classes,
     embedding_dict: Union[al_emb_lookup_dict, None],
 ) -> Union[nn.Module, nn.DataParallel]:
 
     model_class = get_model_class(model_type=cl_args.model_type)
     model = model_class(
         cl_args=cl_args,
-        num_classes=num_classes,
+        target_class_mapping=target_class_mapping,
         embeddings_dict=embedding_dict,
         extra_continuous_inputs_columns=cl_args.extra_con_columns,
     )

@@ -1,17 +1,16 @@
+import reprlib
 from argparse import Namespace
 from pathlib import Path
 from typing import Tuple, Dict, Union, List, Callable
-import reprlib
 
 import numpy as np
 import pandas as pd
 from aislib.misc_utils import get_logger
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, LabelEncoder
-from tqdm import tqdm
-
 from snp_pred.data_load.common_ops import ColumnOperation
 from snp_pred.train_utils.utils import get_custom_module_submodule
+from tqdm import tqdm
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
