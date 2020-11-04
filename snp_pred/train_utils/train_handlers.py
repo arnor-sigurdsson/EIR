@@ -2,17 +2,18 @@ import atexit
 import json
 from argparse import Namespace
 from dataclasses import dataclass
-from functools import partial
+from functools import partial, wraps
 from pathlib import Path
-from typing import List, Callable, Union, Tuple, TYPE_CHECKING, Dict
+from typing import List, Callable, Union, Tuple, TYPE_CHECKING, Dict, Sequence
 
 import pandas as pd
 from aislib.misc_utils import get_logger
 from ignite.contrib.handlers import ProgressBar
-from ignite.engine import Events, Engine
+from ignite.engine import Events, Engine, events
 from ignite.handlers import ModelCheckpoint, EarlyStopping
 from ignite.metrics import RunningAverage
 from torch.utils.tensorboard import SummaryWriter
+from torch import nn
 
 from snp_pred.data_load.data_utils import get_target_columns_generator
 from snp_pred.data_load.label_setup import al_target_columns
@@ -250,14 +251,10 @@ def _get_monitoring_metrics(
 def get_early_stopping_handler(
     trainer: Engine, handler_config: HandlerConfig, patience_steps: int
 ):
-    eval_history_fpath = get_average_history_filepath(
-        run_folder=handler_config.run_folder, train_or_val_target_prefix="validation_"
-    )
 
-    def scoring_function(engine):
-        eval_df = read_metrics_history_file(eval_history_fpath)
-        latest_val_loss = eval_df["perf-average"].iloc[-1]
-        return latest_val_loss
+    scoring_function = _get_latest_validation_value_score_function(
+        run_folder=handler_config.run_folder, column="perf-average"
+    )
 
     logger.info(
         "Setting early stopping patience to %d validation steps.", patience_steps
@@ -269,6 +266,19 @@ def get_early_stopping_handler(
     handler.logger = logger
 
     return handler
+
+
+def _get_latest_validation_value_score_function(run_folder: Path, column: str):
+    eval_history_fpath = get_average_history_filepath(
+        run_folder=run_folder, train_or_val_target_prefix="validation_"
+    )
+
+    def scoring_function(engine):
+        eval_df = read_metrics_history_file(eval_history_fpath)
+        latest_val_loss = eval_df[column].iloc[-1]
+        return latest_val_loss
+
+    return scoring_function
 
 
 def _attach_running_average_metrics(
@@ -316,25 +326,19 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
     c = handler_config.config
     cl_args = handler_config.config.cl_args
 
-    checkpoint_handler = ModelCheckpoint(
-        dirname=Path(handler_config.run_folder, "saved_models"),
-        filename_prefix=Path(cl_args.run_name).name,
-        create_dir=True,
-        n_saved=100,
-        save_as_state_dict=True,
-    )
-
     _save_config(run_folder=handler_config.run_folder, cl_args=cl_args)
 
-    trainer.add_event_handler(
-        event_name=Events.ITERATION_COMPLETED(every=cl_args.checkpoint_interval),
-        handler=checkpoint_handler,
-        to_save={"model": handler_config.config.model},
-    )
+    if cl_args.checkpoint_interval is not None:
+        trainer = _add_checkpoint_handler_wrapper(
+            trainer=trainer,
+            run_folder=handler_config.run_folder,
+            run_name=Path(cl_args.run_name),
+            n_to_save=cl_args.n_saved_models,
+            checkpoint_interval=cl_args.checkpoint_interval,
+            sample_interval=cl_args.sample_interval,
+            model=c.model,
+        )
 
-    # *gotcha*: write_training_metrics needs to be attached before plot progress so we
-    # have the last row when plotting
-    # TODO: Make this more explicit in the code itself
     trainer.add_event_handler(
         event_name=Events.ITERATION_COMPLETED,
         handler=_write_training_metrics_handler,
@@ -350,10 +354,8 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
         ):
             continue
 
-        trainer.add_event_handler(
-            event_name=plot_event,
-            handler=_plot_progress_handler,
-            handler_config=handler_config,
+        trainer = _attach_plot_progress_handler(
+            trainer=trainer, plot_event=plot_event, handler_config=handler_config
         )
 
     if c.hooks.custom_handler_attachers is not None:
@@ -379,6 +381,124 @@ def _save_config(run_folder: Path, cl_args: Namespace):
     with open(str(run_folder / "cl_args.json"), "w") as config_file:
         config_dict = vars(cl_args)
         json.dump(config_dict, config_file, sort_keys=True, indent=4)
+
+
+class MissingHandlerDependencyError(Exception):
+    pass
+
+
+def validate_handler_dependencies(handler_dependencies: Sequence[Callable]):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            argument_iterable = tuple(args) + tuple(kwargs.values())
+            engine_object = next(i for i in argument_iterable if isinstance(i, Engine))
+
+            for dep in handler_dependencies:
+                if not engine_object.has_event_handler(dep):
+                    raise MissingHandlerDependencyError(
+                        f"Dependency '{dep.__name__}' missing from engine."
+                    )
+
+            func_output = func(*args, **kwargs)
+            return func_output
+
+        return wrapper
+
+    return decorator
+
+
+def _add_checkpoint_handler_wrapper(
+    trainer: Engine,
+    run_folder: Path,
+    run_name: Path,
+    n_to_save: Union[int, None],
+    checkpoint_interval: int,
+    sample_interval: int,
+    model: nn.Module,
+) -> Engine:
+
+    checkpoint_score_function, score_name = None, None
+    if n_to_save is not None:
+        logger.debug(
+            "Setting up scoring function for checkpoint interval, "
+            "keeping top %d models.",
+            n_to_save,
+        )
+
+        if checkpoint_interval % sample_interval != 0:
+            raise ValueError(
+                f"The checkpoint interval ({checkpoint_interval}) is not "
+                f"a multiplication of the sample interval "
+                f"({sample_interval}) and top n saved models are being "
+                f"requested. This means the scoring functions would give"
+                f"a wrong result for the checkpoint (as a validation step"
+                f"is not performed at the checkpoint interval)."
+            )
+
+        score_name = "perf-average"
+        checkpoint_score_function = _get_latest_validation_value_score_function(
+            run_folder=run_folder, column=score_name
+        )
+
+    checkpoint_handler = _get_checkpoint_handler(
+        run_folder=run_folder,
+        run_name=run_name,
+        n_to_save=n_to_save,
+        score_function=checkpoint_score_function,
+        score_name=score_name,
+    )
+
+    trainer = _attach_checkpoint_handler(
+        trainer=trainer,
+        checkpoint_handler=checkpoint_handler,
+        checkpoint_interval=checkpoint_interval,
+        model=model,
+    )
+
+    return trainer
+
+
+def _get_checkpoint_handler(
+    run_folder: Path,
+    run_name: Path,
+    n_to_save: int,
+    score_function: Callable = None,
+    score_name: str = None,
+) -> ModelCheckpoint:
+    def _default_global_step_transform(engine: Engine, event_name: str) -> int:
+        return engine.state.iteration
+
+    checkpoint_handler = ModelCheckpoint(
+        dirname=Path(run_folder, "saved_models"),
+        filename_prefix=run_name.name,
+        create_dir=True,
+        score_name=score_name,
+        n_saved=n_to_save,
+        score_function=score_function,
+        global_step_transform=_default_global_step_transform,
+    )
+
+    return checkpoint_handler
+
+
+@validate_handler_dependencies(
+    [validation_handler],
+)
+def _attach_checkpoint_handler(
+    trainer: Engine,
+    checkpoint_handler: ModelCheckpoint,
+    checkpoint_interval: int,
+    model: nn.Module,
+) -> Engine:
+
+    trainer.add_event_handler(
+        event_name=Events.ITERATION_COMPLETED(every=checkpoint_interval),
+        handler=checkpoint_handler,
+        to_save={"model": model},
+    )
+
+    return trainer
 
 
 def _write_training_metrics_handler(engine: Engine, handler_config: HandlerConfig):
@@ -425,12 +545,29 @@ def _unflatten_engine_metrics_dict(
     return unflattened_dict
 
 
-def _get_plot_events(sample_interval: int):
+def _get_plot_events(
+    sample_interval: int,
+) -> Tuple[events.CallableEventWithFilter, events.CallableEventWithFilter]:
     plot_events = (
         Events.ITERATION_COMPLETED(every=sample_interval),
         Events.COMPLETED,
     )
     return plot_events
+
+
+@validate_handler_dependencies([_write_training_metrics_handler])
+def _attach_plot_progress_handler(
+    trainer: Engine,
+    plot_event: events.CallableEventWithFilter,
+    handler_config: HandlerConfig,
+):
+    trainer.add_event_handler(
+        event_name=plot_event,
+        handler=_plot_progress_handler,
+        handler_config=handler_config,
+    )
+
+    return trainer
 
 
 def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> None:

@@ -343,12 +343,21 @@ def get_train_argument_parser() -> configargparse.ArgumentParser:
         default=None,
         help="Epoch interval to sample generated seqs.",
     )
+
     parser_.add_argument(
         "--checkpoint_interval",
         type=int,
-        default=5000,
-        help="Epoch to checkpoint model.",
+        default=None,
+        help="Iteration to checkpoint model.",
     )
+
+    parser_.add_argument(
+        "--n_saved_models",
+        type=int,
+        default=None,
+        help="Iteration to checkpoint model.",
+    )
+
     parser_.add_argument(
         "--run_name",
         required=True,
