@@ -305,6 +305,7 @@ def get_dataloaders(
         shuffle=False if train_sampler else True,
         num_workers=num_workers,
         pin_memory=False,
+        drop_last=True,
     )
 
     valid_dloader = DataLoader(
@@ -313,6 +314,7 @@ def get_dataloaders(
         shuffle=False,
         num_workers=num_workers,
         pin_memory=False,
+        drop_last=True,
     )
 
     return train_dloader, valid_dloader
