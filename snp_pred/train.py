@@ -33,7 +33,6 @@ from snp_pred.data_load import datasets
 from snp_pred.data_load.data_augmentation import hook_mix_loss, get_mix_data_hook
 from snp_pred.data_load.data_loading_funcs import get_weighted_random_sampler
 from snp_pred.data_load.data_utils import Batch
-from snp_pred.data_load.datasets import al_num_classes
 from snp_pred.data_load.label_setup import (
     al_target_columns,
     al_label_transformers,
@@ -81,7 +80,7 @@ al_training_labels_batch = Dict[
     str, Union[al_training_labels_target, al_training_labels_extra]
 ]
 al_dataloader_getitem_batch = Tuple[torch.Tensor, al_training_labels_batch, List[str]]
-al_target_class_number_mapping = Dict[str, int]
+al_num_outputs_per_target = Dict[str, int]
 
 torch.manual_seed(0)
 np.random.seed(0)
@@ -115,7 +114,7 @@ class Config:
     labels_dict: Dict
     target_transformers: al_label_transformers
     target_columns: al_target_columns
-    target_class_mapping: al_target_class_number_mapping
+    num_outputs_per_target: al_num_outputs_per_target
     data_dimension: "DataDimension"
     model: Union[al_models, nn.DataParallel]
     optimizer: Optimizer
@@ -163,13 +162,13 @@ def get_default_config(
         run_folder=run_folder,
     )
 
-    target_class_mapping = _set_up_target_class_number_mapping(
-        train_dataset.target_transformers
+    num_outputs_per_target = _set_up_num_outputs_per_target(
+        target_transformers=train_dataset.target_transformers
     )
 
     model = get_model(
         cl_args=cl_args,
-        target_class_mapping=target_class_mapping,
+        num_outputs_per_target=num_outputs_per_target,
         embedding_dict=embedding_dict,
     )
 
@@ -194,7 +193,7 @@ def get_default_config(
         valid_dataset=valid_dataset,
         labels_dict=train_dataset.labels_dict,
         target_transformers=train_dataset.target_transformers,
-        target_class_mapping=target_class_mapping,
+        num_outputs_per_target=num_outputs_per_target,
         data_dimension=data_dimensions,
         target_columns=train_dataset.target_columns,
         model=model,
@@ -228,28 +227,28 @@ def _get_data_dimensions(
     return DataDimension(channels=channels, height=height, width=width)
 
 
-def _set_up_target_class_number_mapping(
+def _set_up_num_outputs_per_target(
     target_transformers: al_label_transformers,
-) -> al_target_class_number_mapping:
+) -> al_num_outputs_per_target:
 
-    num_classes_dict = {}
+    num_outputs_per_target_dict = {}
     for target_column, transformer in target_transformers.items():
         if isinstance(transformer, StandardScaler):
-            num_classes = 1
+            num_outputs = 1
         else:
-            num_classes = len(transformer.classes_)
+            num_outputs = len(transformer.classes_)
 
-            if num_classes < 2:
+            if num_outputs < 2:
                 logger.warning(
-                    f"Only {num_classes} unique values found in categorical label "
+                    f"Only {num_outputs} unique values found in categorical label "
                     f"column {target_column} (returned by {transformer}). This means "
                     f"that most likely an error will be raised if e.g. using "
                     f"nn.CrossEntropyLoss as it expects an output dimension of >=2."
                 )
 
-        num_classes_dict[target_column] = num_classes
+        num_outputs_per_target_dict[target_column] = num_outputs
 
-    return num_classes_dict
+    return num_outputs_per_target_dict
 
 
 def _prepare_run_folder(run_name: str) -> Path:
@@ -360,14 +359,14 @@ class GetAttrDelegatedDataParallel(nn.DataParallel):
 
 def get_model(
     cl_args: argparse.Namespace,
-    target_class_mapping: al_num_classes,
+    num_outputs_per_target: al_num_outputs_per_target,
     embedding_dict: Union[al_emb_lookup_dict, None],
 ) -> Union[nn.Module, nn.DataParallel]:
 
     model_class = get_model_class(model_type=cl_args.model_type)
     model = model_class(
         cl_args=cl_args,
-        target_class_mapping=target_class_mapping,
+        num_outputs_per_target=num_outputs_per_target,
         embeddings_dict=embedding_dict,
         extra_continuous_inputs_columns=cl_args.extra_con_columns,
     )

@@ -2,16 +2,18 @@ from argparse import Namespace
 from collections import OrderedDict
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import List, Union, Tuple, Dict, Callable, Iterable, Any
+from typing import List, Union, Tuple, Dict, Callable, Iterable, Any, TYPE_CHECKING
 
 import torch
 from aislib.misc_utils import get_logger
 from aislib.pytorch_modules import Swish
 from torch import nn
 
-from snp_pred.data_load.datasets import al_num_classes
 from snp_pred.models import extra_inputs_module
 from snp_pred.models.extra_inputs_module import al_emb_lookup_dict
+
+if TYPE_CHECKING:
+    from snp_pred.train import al_num_outputs_per_target
 
 # type aliases
 
@@ -22,14 +24,14 @@ class ModelBase(nn.Module):
     def __init__(
         self,
         cl_args: Namespace,
-        target_class_mapping: al_num_classes,
+        num_outputs_per_target: al_num_outputs_per_target,
         embeddings_dict: Union[al_emb_lookup_dict, None] = None,
         extra_continuous_inputs_columns: Union[List[str], None] = None,
     ):
         super().__init__()
 
         self.cl_args = cl_args
-        self.target_class_mapping = target_class_mapping
+        self.num_outputs_per_target = num_outputs_per_target
         self.embeddings_dict = embeddings_dict
         self.extra_continuous_inputs_columns = extra_continuous_inputs_columns
 
@@ -187,10 +189,12 @@ def construct_multi_branches(
     return branched_module_dict
 
 
-def get_final_layer(in_features, num_classes):
+def get_final_layer(
+    in_features: int, num_outputs_per_target: "al_num_outputs_per_target"
+):
     final_module_dict = nn.ModuleDict()
 
-    for task, num_outputs in num_classes.items():
+    for task, num_outputs in num_outputs_per_target.items():
         cur_spec = OrderedDict(
             {
                 "fc_final": (

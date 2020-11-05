@@ -127,7 +127,7 @@ def get_test_config(run_folder: Path, predict_cl_args: Namespace):
 
     model = _load_model(
         model_path=Path(predict_cl_args.model_path),
-        num_classes=test_dataset.num_classes,
+        num_outputs_per_target=test_dataset.num_classes,
         train_cl_args=train_cl_args,
         device=predict_cl_args.device,
     )
@@ -159,12 +159,12 @@ def _load_cl_args_config(cl_args_config_path: Path) -> Namespace:
 
 
 def _load_model(
-    model_path: Path, num_classes: int, train_cl_args: Namespace, device: str
+    model_path: Path, num_outputs_per_target: int, train_cl_args: Namespace, device: str
 ) -> torch.nn.Module:
     """
     :param model_path: Path to the model as passed in CL arguments.
-    :param num_classes: Number of classes the model was trained on, used to set up last
-    layer neurons.
+    :param num_outputs_per_target: Number of classes the model was trained on,
+    used to set up last layer neurons.
     :param train_cl_args: CL arguments used during training, used to set up various
     aspects of model architecture.
     :param device: Which device to cast the model to.
@@ -179,7 +179,7 @@ def _load_model(
 
     model: torch.nn.Module = model_class(
         cl_args=train_cl_args,
-        num_classes=num_classes,
+        num_outputs_per_target=num_outputs_per_target,
         embeddings_dict=embeddings_dict,
         extra_continuous_inputs_columns=train_cl_args.extra_con_columns,
     )

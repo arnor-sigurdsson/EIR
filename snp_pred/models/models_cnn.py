@@ -8,13 +8,13 @@ from aislib.misc_utils import get_logger
 from aislib.pytorch_modules import Swish
 from torch import nn
 
-from snp_pred.data_load.datasets import al_num_classes
 from snp_pred.models.layers import FirstCNNBlock, SelfAttention, CNNResidualBlock
 from snp_pred.models.models_base import (
     ModelBase,
     calculate_module_dict_outputs,
     assert_module_dict_uniqueness,
 )
+from train import al_num_outputs_per_target
 
 logger = get_logger(__name__)
 
@@ -43,7 +43,7 @@ class CNNModel(ModelBase):
         )
 
         self.multi_task_branches = _get_cnn_multi_task_branches(
-            target_class_mapping=self.target_class_mapping,
+            num_outputs_per_target=self.num_outputs_per_target,
             fc_task_dim=self.fc_task_dim,
             fc_repr_and_extra_dim=self.fc_repr_and_extra_dim,
             fc_do=self.cl_args.fc_do,
@@ -107,14 +107,14 @@ def _get_cnn_multi_task_branches(
     fc_repr_and_extra_dim: int,
     fc_task_dim: int,
     fc_do: float,
-    target_class_mapping: al_num_classes,
+    num_outputs_per_target: al_num_outputs_per_target,
 ) -> nn.ModuleDict:
     """
     TODO: Remove this in favor of branch factories as used in other modesl
     """
 
     module_dict = {}
-    for key, target_class_mapping in target_class_mapping.items():
+    for key, num_outputs_per_target in num_outputs_per_target.items():
         branch_layers = OrderedDict(
             {
                 "fc_2_bn_1": nn.BatchNorm1d(fc_repr_and_extra_dim),
@@ -132,7 +132,7 @@ def _get_cnn_multi_task_branches(
         task_layer_branch = nn.Sequential(
             OrderedDict(
                 **branch_layers,
-                **{"fc_3_final": nn.Linear(fc_task_dim, target_class_mapping)}
+                **{"fc_3_final": nn.Linear(fc_task_dim, num_outputs_per_target)}
             )
         )
 

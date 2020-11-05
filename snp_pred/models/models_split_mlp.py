@@ -43,7 +43,7 @@ class SplitMLPModel(ModelBase):
 
         in_feat = num_chunks * self.cl_args.fc_repr_dim
 
-        task_names = tuple(self.target_class_mapping.keys())
+        task_names = tuple(self.num_outputs_per_target.keys())
         task_resblocks_kwargs = {
             "in_features": self.fc_task_dim,
             "out_features": self.fc_task_dim,
@@ -71,7 +71,8 @@ class SplitMLPModel(ModelBase):
         )
 
         final_layer = get_final_layer(
-            in_features=self.fc_task_dim, num_classes=self.target_class_mapping
+            in_features=self.fc_task_dim,
+            num_outputs_per_target=self.num_outputs_per_target,
         )
 
         self.multi_task_branches = merge_module_dicts(
@@ -150,7 +151,7 @@ class FullySplitMLPModel(ModelBase):
         )
 
         cur_dim = self.split_blocks[-1].out_features
-        task_names = tuple(self.target_class_mapping.keys())
+        task_names = tuple(self.num_outputs_per_target.keys())
         task_resblocks_kwargs = {
             "in_features": self.fc_task_dim,
             "out_features": self.fc_task_dim,
@@ -175,7 +176,8 @@ class FullySplitMLPModel(ModelBase):
         )
 
         final_layer = get_final_layer(
-            in_features=self.fc_task_dim, num_classes=self.target_class_mapping
+            in_features=self.fc_task_dim,
+            num_outputs_per_target=self.num_outputs_per_target,
         )
 
         self.multi_task_branches = merge_module_dicts(

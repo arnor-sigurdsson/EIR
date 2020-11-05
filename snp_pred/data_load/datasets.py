@@ -29,6 +29,7 @@ from snp_pred.data_load.label_setup import (
     get_array_path_iterator,
 )
 from snp_pred.train_utils.utils import get_run_folder
+from train import al_num_outputs_per_target
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -42,8 +43,6 @@ al_all_labels = Dict[
     str, Union[al_sample_label_dict_target, al_sample_label_dict_extra]
 ]
 al_getitem_return = Tuple[torch.Tensor, al_all_labels, str]
-
-al_num_classes = Dict[str, int]
 
 
 def set_up_datasets(
@@ -331,7 +330,9 @@ def _split_labels_into_target_and_extra(
     return split_labels_dict
 
 
-def _set_up_num_classes(target_transformers: al_label_transformers) -> al_num_classes:
+def _set_up_num_classes(
+    target_transformers: al_label_transformers,
+) -> al_num_outputs_per_target:
 
     num_classes_dict = {}
     for target_column, transformer in target_transformers.items():

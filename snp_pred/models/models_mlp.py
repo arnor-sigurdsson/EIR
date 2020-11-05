@@ -47,14 +47,15 @@ class MLPModel(ModelBase):
 
         branches = create_multi_task_blocks_with_first_adaptor_block(
             num_blocks=self.cl_args.layers[0],
-            branch_names=self.target_class_mapping.keys(),
+            branch_names=self.num_outputs_per_target.keys(),
             block_constructor=initialize_modules_from_spec,
             block_constructor_kwargs={"spec": layer_spec},
             first_layer_kwargs_overload={"spec": first_layer_spec},
         )
 
         final_layer = get_final_layer(
-            in_features=self.fc_task_dim, num_classes=self.target_class_mapping
+            in_features=self.fc_task_dim,
+            num_outputs_per_target=self.num_outputs_per_target,
         )
 
         self.multi_task_branches = merge_module_dicts((branches, final_layer))

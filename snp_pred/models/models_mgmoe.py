@@ -39,7 +39,7 @@ class MGMoEModel(ModelBase):
             )
         )
 
-        self.task_names = sorted(tuple(self.target_class_mapping.keys()))
+        self.task_names = sorted(tuple(self.num_outputs_per_target.keys()))
         gate_spec = self.get_gate_spec(
             in_features=fc_0_out_feat + self.extra_dim, out_features=self.num_experts
         )
@@ -94,7 +94,8 @@ class MGMoEModel(ModelBase):
         )
 
         final_layer = get_final_layer(
-            in_features=self.fc_task_dim, num_classes=self.target_class_mapping
+            in_features=self.fc_task_dim,
+            num_outputs_per_target=self.num_outputs_per_target,
         )
 
         self.multi_task_branches = merge_module_dicts(

@@ -122,15 +122,15 @@ def test_get_model(args_config):
     # TODO: Refactor checking of fc_3 into separate test.
 
     args_config.model_type = "cnn"
-    num_classes_dict = {"Origin": 10, "Height": 1}
-    cnn_model = train.get_model(args_config, num_classes_dict, None)
+    num_outputs_per_target_dict = {"Origin": 10, "Height": 1}
+    cnn_model = train.get_model(args_config, num_outputs_per_target_dict, None)
 
     assert isinstance(cnn_model, CNNModel)
     assert cnn_model.multi_task_branches["Origin"].fc_3_final.out_features == 10
     assert cnn_model.multi_task_branches["Height"].fc_3_final.out_features == 1
 
     args_config.model_type = "mlp"
-    mlp_model = train.get_model(args_config, num_classes_dict, None)
+    mlp_model = train.get_model(args_config, num_outputs_per_target_dict, None)
     assert isinstance(mlp_model, MLPModel)
     # assert mlp_model.multi_task_branches["Origin"].fc_3_final.out_features == 10
     # assert mlp_model.multi_task_branches["Height"].fc_3_final.out_features == 1

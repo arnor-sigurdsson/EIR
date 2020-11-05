@@ -19,7 +19,7 @@ from torch.utils.data import DataLoader
 from snp_pred import train
 from snp_pred.data_load import datasets
 from snp_pred.models.extra_inputs_module import set_up_and_save_embeddings_dict
-from snp_pred.train import Config, get_model
+from snp_pred.train import Config, get_model, _set_up_num_outputs_per_target
 from snp_pred.train_utils import optimizers, metrics
 from snp_pred.train_utils.utils import (
     configure_root_logger,
@@ -77,6 +77,7 @@ def args_config():
             "extra_con_columns": [],
             "custom_lib": None,
             "data_source": "REPLACE_ME",
+            "debug": False,
             "device": "cuda:0" if cuda.is_available() else "cpu",
             "dilation_factor": 1,
             "dataloader_workers": 1,
@@ -387,7 +388,7 @@ def create_test_model(create_test_cl_args, create_test_datasets):
 
     model = get_model(
         cl_args=cl_args,
-        target_class_mapping=train_dataset.num_classes,
+        num_outputs_per_target=train_dataset.num_classes,
         embedding_dict=embedding_dict,
     )
 
@@ -485,6 +486,10 @@ def prep_modelling_test_configs(
 
     model = create_test_model
 
+    num_outputs_per_target = _set_up_num_outputs_per_target(
+        target_transformers=train_dataset.target_transformers
+    )
+
     criterions = train._get_criterions(
         target_columns=train_dataset.target_columns, model_type=cl_args.model_type
     )
@@ -516,6 +521,7 @@ def prep_modelling_test_configs(
         metrics=test_metrics,
         labels_dict=train_dataset.labels_dict,
         target_transformers=train_dataset.target_transformers,
+        num_outputs_per_target=num_outputs_per_target,
         target_columns=train_dataset.target_columns,
         data_dimension=data_dimension,
         writer=train.get_summary_writer(run_folder=Path("runs", cl_args.run_name)),

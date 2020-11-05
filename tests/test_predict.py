@@ -22,10 +22,10 @@ def test_load_model(args_config, tmp_path):
     """
 
     cl_args = args_config
-    num_classes = {"Origin": 3}
+    num_outputs_per_target = {"Origin": 3}
     model: torch.nn.Module = CNNModel(
         cl_args=cl_args,
-        num_classes=num_classes,
+        num_outputs_per_target=num_outputs_per_target,
         embeddings_dict=None,
         extra_continuous_inputs_columns=cl_args.extra_con_columns,
     ).to(device=cl_args.device)
@@ -35,7 +35,7 @@ def test_load_model(args_config, tmp_path):
 
     loaded_model = predict._load_model(
         model_path=model_path,
-        num_classes=model.target_class_mapping,
+        num_outputs_per_target=model.num_outputs_per_target,
         train_cl_args=cl_args,
         device=cl_args.device,
     )
