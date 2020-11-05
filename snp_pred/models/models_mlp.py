@@ -3,6 +3,8 @@ from typing import Dict
 
 import torch
 from aislib.pytorch_modules import Swish
+from torch import nn
+
 from snp_pred.models.models_base import (
     ModelBase,
     get_basic_multi_branch_spec,
@@ -12,7 +14,6 @@ from snp_pred.models.models_base import (
     merge_module_dicts,
     calculate_module_dict_outputs,
 )
-from torch import nn
 
 
 class MLPModel(ModelBase):

@@ -22,6 +22,11 @@ from aislib.misc_utils import ensure_path_exists
 from aislib.misc_utils import get_logger
 from ignite.engine import Engine
 from sklearn.preprocessing import StandardScaler
+from torch import nn
+from torch.optim.optimizer import Optimizer
+from torch.utils.data import DataLoader, WeightedRandomSampler
+from torch.utils.tensorboard import SummaryWriter
+
 from snp_pred.configuration import get_default_cl_args
 from snp_pred.data_load import data_utils
 from snp_pred.data_load import datasets
@@ -60,10 +65,6 @@ from snp_pred.train_utils.optimizers import (
 )
 from snp_pred.train_utils.train_handlers import HandlerConfig
 from snp_pred.train_utils.train_handlers import configure_trainer
-from torch import nn
-from torch.optim.optimizer import Optimizer
-from torch.utils.data import DataLoader, WeightedRandomSampler
-from torch.utils.tensorboard import SummaryWriter
 
 if TYPE_CHECKING:
     from snp_pred.train_utils.metrics import (

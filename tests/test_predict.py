@@ -166,6 +166,7 @@ def grab_latest_model_path(saved_models_folder: Path):
                 "run_name": "test_run_predict",
                 "n_epochs": 2,
                 "checkpoint_interval": 50,
+                "sample_interval": 50,
                 # to save time since we're not testing the modelling
                 "get_acts": False,
             }

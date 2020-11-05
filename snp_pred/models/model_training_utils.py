@@ -9,6 +9,11 @@ from aislib.misc_utils import get_logger
 from aislib.pytorch_modules import Swish
 from ignite.contrib.handlers import FastaiLRFinder
 from ignite.engine import Engine
+from torch import nn
+from torch.nn import Module
+from torch.optim.optimizer import Optimizer
+from torch.utils.data import DataLoader
+
 from snp_pred.data_load.data_utils import get_target_columns_generator
 from snp_pred.data_load.label_setup import al_target_columns
 from snp_pred.models.extra_inputs_module import get_extra_inputs
@@ -16,10 +21,6 @@ from snp_pred.train_utils.metrics import (
     calculate_prediction_losses,
     aggregate_losses,
 )
-from torch import nn
-from torch.nn import Module
-from torch.optim.optimizer import Optimizer
-from torch.utils.data import DataLoader
 
 if TYPE_CHECKING:
     # noinspection PyUnresolvedReferences

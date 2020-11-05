@@ -5,9 +5,10 @@ from typing import TYPE_CHECKING, Union, Dict, Callable, Sequence, Tuple
 
 import numpy as np
 import torch
+from torch import nn
+
 from snp_pred.data_load.data_utils import Batch
 from snp_pred.data_load.label_setup import al_target_columns
-from torch import nn
 
 if TYPE_CHECKING:
     from train import al_training_labels_target, al_criterions, Config

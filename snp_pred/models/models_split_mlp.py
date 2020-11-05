@@ -7,6 +7,8 @@ from typing import Dict, List, Callable, Sequence
 import torch
 from aislib.misc_utils import get_logger
 from aislib.pytorch_modules import Swish
+from torch import nn
+
 from snp_pred.models.layers import SplitLinear, MLPResidualBlock, SplitMLPResidualBlock
 from snp_pred.models.models_base import (
     ModelBase,
@@ -17,7 +19,6 @@ from snp_pred.models.models_base import (
     merge_module_dicts,
     calculate_module_dict_outputs,
 )
-from torch import nn
 
 logger = get_logger(__name__)
 

@@ -7,10 +7,11 @@ from typing import List, Union, Tuple, Dict, Callable, Iterable, Any
 import torch
 from aislib.misc_utils import get_logger
 from aislib.pytorch_modules import Swish
+from torch import nn
+
 from snp_pred.data_load.datasets import al_num_classes
 from snp_pred.models import extra_inputs_module
 from snp_pred.models.extra_inputs_module import al_emb_lookup_dict
-from torch import nn
 
 # type aliases
 

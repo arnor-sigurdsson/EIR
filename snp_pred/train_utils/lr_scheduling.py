@@ -12,13 +12,14 @@ from ignite.contrib.handlers import (
 )
 from ignite.engine import Engine, Events
 from matplotlib import pyplot as plt
+from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.optim.optimizer import Optimizer
+
 from snp_pred.train_utils.metrics import (
     read_metrics_history_file,
     get_average_history_filepath,
 )
 from snp_pred.train_utils.utils import get_run_folder
-from torch.optim.lr_scheduler import ReduceLROnPlateau
-from torch.optim.optimizer import Optimizer
 
 if TYPE_CHECKING:
     from snp_pred.train_utils.train_handlers import HandlerConfig

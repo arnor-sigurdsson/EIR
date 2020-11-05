@@ -6,6 +6,8 @@ import torch
 from aislib import pytorch_utils
 from aislib.misc_utils import get_logger
 from aislib.pytorch_modules import Swish
+from torch import nn
+
 from snp_pred.data_load.datasets import al_num_classes
 from snp_pred.models.layers import FirstCNNBlock, SelfAttention, CNNResidualBlock
 from snp_pred.models.models_base import (
@@ -13,7 +15,6 @@ from snp_pred.models.models_base import (
     calculate_module_dict_outputs,
     assert_module_dict_uniqueness,
 )
-from torch import nn
 
 logger = get_logger(__name__)
 
