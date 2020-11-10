@@ -569,7 +569,7 @@ class Hooks:
     al_handler_attachers = Iterable[Callable[[Engine, HandlerConfig], Engine]]
 
     step_func_hooks: "StepFunctionHookStages"
-    custom_column_label_parsing_ops: Union[None, al_all_column_ops] = None
+    custom_column_label_parsing_ops: al_all_column_ops = None
     custom_handler_attachers: Union[None, al_handler_attachers] = None
 
 

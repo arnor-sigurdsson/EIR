@@ -26,6 +26,7 @@ from snp_pred.data_load.label_setup import (
     al_label_dict,
     al_label_transformers_object,
     al_label_transformers,
+    al_all_column_ops,
 )
 from snp_pred.models.extra_inputs_module import al_emb_lookup_dict
 from snp_pred.models.model_training_utils import gather_pred_outputs_from_dloader
@@ -41,11 +42,17 @@ np.random.seed(0)
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
-def predict(predict_cl_args: Namespace) -> None:
+def predict(
+    predict_cl_args: Namespace, custom_label_ops: al_all_column_ops = None
+) -> None:
     outfolder = Path(predict_cl_args.output_folder)
     run_folder = Path(predict_cl_args.model_path).parents[1]
 
-    c = get_test_config(run_folder=run_folder, predict_cl_args=predict_cl_args)
+    c = get_test_config(
+        run_folder=run_folder,
+        predict_cl_args=predict_cl_args,
+        custom_label_ops=custom_label_ops,
+    )
 
     all_preds, all_labels, all_ids = gather_pred_outputs_from_dloader(
         data_loader=c.test_dataloader,
@@ -101,7 +108,11 @@ class TestConfig:
     model: Union[CNNModel, MLPModel]
 
 
-def get_test_config(run_folder: Path, predict_cl_args: Namespace):
+def get_test_config(
+    run_folder: Path,
+    predict_cl_args: Namespace,
+    custom_label_ops: al_all_column_ops = None,
+):
     train_cl_args = _load_cl_args_config(
         cl_args_config_path=run_folder / "cl_args.json"
     )
@@ -113,7 +124,8 @@ def get_test_config(run_folder: Path, predict_cl_args: Namespace):
     test_labels_dict = None
     if predict_cl_args.evaluate:
         test_labels_dict = _load_labels_for_testing(
-            test_train_cl_args_mix=test_train_mixed_cl_args
+            test_train_cl_args_mix=test_train_mixed_cl_args,
+            custom_label_ops=custom_label_ops,
         )
 
     test_dataset = _set_up_test_dataset(
@@ -235,7 +247,9 @@ def _modify_train_cl_args_for_testing(
     return train_cl_args_mod
 
 
-def _load_labels_for_testing(test_train_cl_args_mix: Namespace) -> al_label_dict:
+def _load_labels_for_testing(
+    test_train_cl_args_mix: Namespace, custom_label_ops: al_all_column_ops = None
+) -> al_label_dict:
     """
     Used when doing an evaluation on test set.
 
@@ -246,7 +260,9 @@ def _load_labels_for_testing(test_train_cl_args_mix: Namespace) -> al_label_dict
 
     a = test_train_cl_args_mix
 
-    df_labels_test = label_setup.label_df_parse_wrapper(cl_args=a)
+    df_labels_test = label_setup.label_df_parse_wrapper(
+        cl_args=a, custom_label_ops=custom_label_ops
+    )
 
     train_con_column_means = _prep_missing_con_dict(test_train_cl_args_mix=a)
     df_labels_test = label_setup.handle_missing_label_values_in_df(
@@ -397,4 +413,4 @@ if __name__ == "__main__":
                 torch.cuda.device_count(),
             )
 
-    predict(cl_args)
+    predict(predict_cl_args=cl_args)
