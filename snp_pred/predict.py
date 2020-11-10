@@ -13,6 +13,7 @@ import torch
 import torch.nn.functional as F
 from aislib.misc_utils import get_logger
 from sklearn.preprocessing import LabelEncoder
+from torch import nn
 from torch.utils.data import DataLoader
 
 import snp_pred.visualization.visualization_funcs as vf
@@ -30,8 +31,7 @@ from snp_pred.data_load.label_setup import (
 from snp_pred.models.extra_inputs_module import al_emb_lookup_dict
 from snp_pred.models.model_training_utils import gather_pred_outputs_from_dloader
 from snp_pred.models.models import get_model_class
-from snp_pred.models.models_cnn import CNNModel
-from snp_pred.models.models_mlp import MLPModel
+from snp_pred.train import set_up_num_outputs_per_target
 from snp_pred.train_utils.evaluation import PerformancePlotConfig
 from snp_pred.train_utils.utils import get_run_folder
 
@@ -98,7 +98,7 @@ class TestConfig:
     train_args_modified_for_testing: Namespace
     test_dataset: datasets.DiskArrayDataset
     test_dataloader: DataLoader
-    model: Union[CNNModel, MLPModel]
+    model: nn.Module
 
 
 def get_test_config(run_folder: Path, predict_cl_args: Namespace):
@@ -125,9 +125,13 @@ def get_test_config(run_folder: Path, predict_cl_args: Namespace):
         dataset=test_dataset, batch_size=predict_cl_args.batch_size, shuffle=False
     )
 
+    num_outputs_per_target = set_up_num_outputs_per_target(
+        test_dataset.target_transformers
+    )
+
     model = _load_model(
         model_path=Path(predict_cl_args.model_path),
-        num_outputs_per_target=test_dataset.num_classes,
+        num_outputs_per_target=num_outputs_per_target,
         train_cl_args=train_cl_args,
         device=predict_cl_args.device,
     )
@@ -194,8 +198,8 @@ def _load_model(
 
 
 def _load_model_weights(
-    model: Union[CNNModel, MLPModel], model_state_dict_path: Path, device: str
-) -> Union[CNNModel, MLPModel]:
+    model: nn.Module, model_state_dict_path: Path, device: str
+) -> nn.Module:
     device_for_load = torch.device(device)
     model.load_state_dict(
         state_dict=torch.load(model_state_dict_path, map_location=device_for_load)

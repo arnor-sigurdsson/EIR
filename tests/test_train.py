@@ -7,6 +7,7 @@ from torch.optim import SGD
 from torch.optim.adamw import AdamW
 from torch.utils.data import WeightedRandomSampler, SequentialSampler, RandomSampler
 
+from snp_pred.data_load import label_setup
 from snp_pred import train
 from snp_pred.models.models_cnn import CNNModel
 from snp_pred.models.models_mlp import MLPModel
@@ -206,3 +207,19 @@ def test_check_linear_model_columns_fail():
     )
     with pytest.raises(NotImplementedError):
         train._check_linear_model_columns(cl_args=test_input_mixed)
+
+
+def test_set_up_num_classes(get_transformer_test_data):
+    test_labels_dict, test_target_columns_dict = get_transformer_test_data
+
+    target_transformers = label_setup.set_up_label_transformers(
+        labels_dict=test_labels_dict, label_columns=test_target_columns_dict
+    )
+
+    # TODO: Move to test_train and use that function
+    num_classes = train.set_up_num_outputs_per_target(
+        target_transformers=target_transformers
+    )
+
+    assert num_classes["Height"] == 1
+    assert num_classes["Origin"] == 3

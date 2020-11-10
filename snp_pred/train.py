@@ -162,7 +162,7 @@ def get_default_config(
         run_folder=run_folder,
     )
 
-    num_outputs_per_target = _set_up_num_outputs_per_target(
+    num_outputs_per_target = set_up_num_outputs_per_target(
         target_transformers=train_dataset.target_transformers
     )
 
@@ -227,7 +227,7 @@ def _get_data_dimensions(
     return DataDimension(channels=channels, height=height, width=width)
 
 
-def _set_up_num_outputs_per_target(
+def set_up_num_outputs_per_target(
     target_transformers: al_label_transformers,
 ) -> al_num_outputs_per_target:
 

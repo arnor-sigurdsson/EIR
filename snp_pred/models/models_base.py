@@ -24,7 +24,7 @@ class ModelBase(nn.Module):
     def __init__(
         self,
         cl_args: Namespace,
-        num_outputs_per_target: al_num_outputs_per_target,
+        num_outputs_per_target: "al_num_outputs_per_target",
         embeddings_dict: Union[al_emb_lookup_dict, None] = None,
         extra_continuous_inputs_columns: Union[List[str], None] = None,
     ):

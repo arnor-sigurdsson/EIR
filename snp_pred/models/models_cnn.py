@@ -1,6 +1,6 @@
 from argparse import Namespace
 from collections import OrderedDict
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, TYPE_CHECKING
 
 import torch
 from aislib import pytorch_utils
@@ -14,7 +14,10 @@ from snp_pred.models.models_base import (
     calculate_module_dict_outputs,
     assert_module_dict_uniqueness,
 )
-from train import al_num_outputs_per_target
+
+if TYPE_CHECKING:
+    from snp_pred.train import al_num_outputs_per_target
+
 
 logger = get_logger(__name__)
 
@@ -107,7 +110,7 @@ def _get_cnn_multi_task_branches(
     fc_repr_and_extra_dim: int,
     fc_task_dim: int,
     fc_do: float,
-    num_outputs_per_target: al_num_outputs_per_target,
+    num_outputs_per_target: "al_num_outputs_per_target",
 ) -> nn.ModuleDict:
     """
     TODO: Remove this in favor of branch factories as used in other modesl

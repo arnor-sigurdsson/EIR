@@ -19,7 +19,7 @@ from torch.utils.data import DataLoader
 from snp_pred import train
 from snp_pred.data_load import datasets
 from snp_pred.models.extra_inputs_module import set_up_and_save_embeddings_dict
-from snp_pred.train import Config, get_model, _set_up_num_outputs_per_target
+from snp_pred.train import Config, get_model, set_up_num_outputs_per_target
 from snp_pred.train_utils import optimizers, metrics
 from snp_pred.train_utils.utils import (
     configure_root_logger,
@@ -386,9 +386,13 @@ def create_test_model(create_test_cl_args, create_test_datasets):
         run_folder=run_folder,
     )
 
+    num_outputs_per_class = set_up_num_outputs_per_target(
+        target_transformers=train_dataset.target_transformers
+    )
+
     model = get_model(
         cl_args=cl_args,
-        num_outputs_per_target=train_dataset.num_classes,
+        num_outputs_per_target=num_outputs_per_class,
         embedding_dict=embedding_dict,
     )
 
@@ -486,7 +490,7 @@ def prep_modelling_test_configs(
 
     model = create_test_model
 
-    num_outputs_per_target = _set_up_num_outputs_per_target(
+    num_outputs_per_target = set_up_num_outputs_per_target(
         target_transformers=train_dataset.target_transformers
     )
 
@@ -593,3 +597,16 @@ def _get_test_sample_folder(run_path: Path, iteration: int, column_name: str) ->
     sample_folder = run_path / f"results/{column_name}/samples/{iteration}"
 
     return sample_folder
+
+
+@pytest.fixture()
+def get_transformer_test_data():
+    test_labels_dict = {
+        "1": {"Origin": "Asia", "Height": 150},
+        "2": {"Origin": "Africa", "Height": 190},
+        "3": {"Origin": "Europe", "Height": 170},
+    }
+
+    test_target_columns_dict = {"con": ["Height"], "cat": ["Origin"]}
+
+    return test_labels_dict, test_target_columns_dict

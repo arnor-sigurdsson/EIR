@@ -130,19 +130,6 @@ def test_save_target_transformer(patched_joblib):
     assert m_kwargs["filename"].name == "harry_du_bois.save"
 
 
-@pytest.fixture()
-def get_transformer_test_data():
-    test_labels_dict = {
-        "1": {"Origin": "Asia", "Height": 150},
-        "2": {"Origin": "Africa", "Height": 190},
-        "3": {"Origin": "Europe", "Height": 170},
-    }
-
-    test_target_columns_dict = {"con": ["Height"], "cat": ["Origin"]}
-
-    return test_labels_dict, test_target_columns_dict
-
-
 def test_set_up_all_target_transformers(get_transformer_test_data):
     test_labels_dict, test_target_columns_dict = get_transformer_test_data
 
@@ -277,19 +264,6 @@ def test_transform_single_label_value(test_input, expected):
     )
 
     assert transformed_value == expected
-
-
-def test_set_up_num_classes(get_transformer_test_data):
-    test_labels_dict, test_target_columns_dict = get_transformer_test_data
-
-    target_transformers = label_setup.set_up_label_transformers(
-        labels_dict=test_labels_dict, label_columns=test_target_columns_dict
-    )
-
-    num_classes = datasets._set_up_num_classes(target_transformers=target_transformers)
-
-    assert num_classes["Height"] == 1
-    assert num_classes["Origin"] == 3
 
 
 @patch(get_joblib_patch_target(), autospec=True)

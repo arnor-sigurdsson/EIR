@@ -29,7 +29,6 @@ from snp_pred.data_load.label_setup import (
     get_array_path_iterator,
 )
 from snp_pred.train_utils.utils import get_run_folder
-from train import al_num_outputs_per_target
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -199,16 +198,12 @@ class ArrayDatasetBase(Dataset):
         self.labels_dict = labels_dict if labels_dict else {}
         self.target_transformers = target_transformers
         self.extra_con_transformers = extra_con_transformers
-        self.num_classes = None
 
         self.na_augment = na_augment
 
     def init_label_attributes(self):
         if not self.target_columns:
             raise ValueError("Please specify label column name.")
-
-        # TODO: Rename to be more descriptive, dict now instead of int.
-        self.num_classes = _set_up_num_classes(self.target_transformers)
 
     def set_up_samples(self, array_hook: Callable = lambda x: x) -> List[Sample]:
         """
@@ -328,21 +323,6 @@ def _split_labels_into_target_and_extra(
     split_labels_dict = {"target_labels": target_labels, "extra_labels": extra_labels}
 
     return split_labels_dict
-
-
-def _set_up_num_classes(
-    target_transformers: al_label_transformers,
-) -> al_num_outputs_per_target:
-
-    num_classes_dict = {}
-    for target_column, transformer in target_transformers.items():
-        if isinstance(transformer, StandardScaler):
-            num_classes = 1
-        else:
-            num_classes = len(transformer.classes_)
-        num_classes_dict[target_column] = num_classes
-
-    return num_classes_dict
 
 
 class MemoryArrayDataset(ArrayDatasetBase):
