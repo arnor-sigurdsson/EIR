@@ -134,7 +134,10 @@ def get_test_config(
     )
 
     test_dataloader = DataLoader(
-        dataset=test_dataset, batch_size=predict_cl_args.batch_size, shuffle=False
+        dataset=test_dataset,
+        batch_size=predict_cl_args.batch_size,
+        shuffle=False,
+        num_workers=predict_cl_args.num_workers,
     )
 
     model = _load_model(
@@ -260,9 +263,10 @@ def _load_labels_for_testing(
 
     a = test_train_cl_args_mix
 
-    df_labels_test = label_setup.label_df_parse_wrapper(
-        cl_args=a, custom_label_ops=custom_label_ops
+    parse_wrapper = label_setup.get_label_parsing_wrapper(
+        cl_args=test_train_cl_args_mix
     )
+    df_labels_test = parse_wrapper(cl_args=a, custom_label_ops=custom_label_ops)
 
     train_con_column_means = _prep_missing_con_dict(test_train_cl_args_mix=a)
     df_labels_test = label_setup.handle_missing_label_values_in_df(
@@ -396,6 +400,13 @@ if __name__ == "__main__":
         default="0",
         help="Which GPU to run (according to CUDA) if running with flat "
         "'--device gpu'.",
+    )
+
+    parser.add_argument(
+        "--num_workers",
+        type=int,
+        default=0,
+        help="Number of workers for dataloader.",
     )
 
     cl_args = parser.parse_args()

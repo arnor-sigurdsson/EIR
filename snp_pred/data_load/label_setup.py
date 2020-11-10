@@ -36,7 +36,7 @@ def set_up_train_and_valid_labels(
     set for regression) on the labels.
     """
 
-    parse_wrapper = _get_label_parsing_wrapper(cl_args=cl_args)
+    parse_wrapper = get_label_parsing_wrapper(cl_args=cl_args)
     df_labels = parse_wrapper(cl_args=cl_args, custom_label_ops=custom_label_ops)
 
     df_labels_train, df_labels_valid = _split_df(
@@ -54,7 +54,7 @@ def set_up_train_and_valid_labels(
     return train_labels_dict, valid_labels_dict
 
 
-def _get_label_parsing_wrapper(
+def get_label_parsing_wrapper(
     cl_args: Namespace,
 ) -> Callable[[Namespace, al_all_column_ops], pd.DataFrame]:
     if cl_args.label_parsing_chunk_size is None:
