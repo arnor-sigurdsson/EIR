@@ -4,7 +4,7 @@ from argparse import Namespace
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
-from typing import List, Callable, Union, Tuple, TYPE_CHECKING, Dict
+from typing import List, Callable, Union, Tuple, TYPE_CHECKING, Dict, overload
 
 import pandas as pd
 from aislib.misc_utils import get_logger
@@ -254,14 +254,14 @@ def _attach_early_stopping_handler(trainer: Engine, handler_config: "HandlerConf
         patience_steps=cl_args.early_stopping_patience,
     )
 
-    early_stopping_filter = _get_early_stopping_event_filter(
+    early_stopping_event_kwargs = _get_early_stopping_event_kwargs(
         early_stopping_iteration_buffer=cl_args.early_stopping_buffer,
         sample_interval=cl_args.sample_interval,
     )
 
     trainer.add_event_handler(
         event_name=Events.ITERATION_COMPLETED(
-            event_filter=early_stopping_filter,
+            **early_stopping_event_kwargs,
         ),
         handler=early_stopping_handler,
     )
@@ -289,9 +289,24 @@ def _get_early_stopping_handler(
     return handler
 
 
-def _get_early_stopping_event_filter(
-    early_stopping_iteration_buffer: Union[int, None], sample_interval: int
-):
+@overload
+def _get_early_stopping_event_kwargs(
+    early_stopping_iteration_buffer: None, sample_interval: int
+) -> Dict[str, int]:
+    ...
+
+
+@overload
+def _get_early_stopping_event_kwargs(
+    early_stopping_iteration_buffer: int, sample_interval: int
+) -> Dict[str, Callable[[Engine, int], bool]]:
+    ...
+
+
+def _get_early_stopping_event_kwargs(early_stopping_iteration_buffer, sample_interval):
+
+    if early_stopping_iteration_buffer is None:
+        return {"every": sample_interval}
 
     logger.info(
         "Early stopping checks will be activated after %d iterations.",
@@ -315,9 +330,10 @@ def _get_early_stopping_event_filter(
 
         if iteration % sample_interval == 0:
             return True
+
         return False
 
-    return _early_stopping_event_filter
+    return {"event_filter": _early_stopping_event_filter}
 
 
 def _get_latest_validation_value_score_function(run_folder: Path, column: str):
