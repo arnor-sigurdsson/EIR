@@ -25,7 +25,12 @@ from snp_pred.models.extra_inputs_module import get_extra_inputs
 from snp_pred.models.model_training_utils import gather_dloader_samples
 from snp_pred.models.models_cnn import CNNModel
 from snp_pred.models.models_mlp import MLPModel
-from snp_pred.train_utils.utils import prep_sample_outfolder
+from snp_pred.train_utils.evaluation import validation_handler
+from snp_pred.train_utils.utils import (
+    prep_sample_outfolder,
+    validate_handler_dependencies,
+)
+
 
 if TYPE_CHECKING:
     from snp_pred.train_utils.train_handlers import HandlerConfig
@@ -54,6 +59,7 @@ def suppress_stdout() -> None:
             sys.stdout = old_stdout
 
 
+@validate_handler_dependencies([validation_handler])
 def activation_analysis_handler(
     engine: Engine, handler_config: "HandlerConfig"
 ) -> None:

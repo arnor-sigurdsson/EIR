@@ -65,10 +65,35 @@ def get_train_argument_parser() -> configargparse.ArgumentParser:
     )
 
     parser_.add_argument(
+        "--lr_plateau_patience",
+        type=int,
+        default=10,
+        help="Number of validation performance steps without improvement over "
+        "best performance before reducing LR (only relevant when --lr_schedule is "
+        "'plateau'.",
+    )
+
+    parser_.add_argument(
+        "--lr_plateau_factor",
+        type=float,
+        default=0.1,
+        help="Factor to reduce LR when runnig with plateau schedule.",
+    )
+
+    parser_.add_argument(
         "--early_stopping_patience",
         type=int,
         default=None,
-        help="Whether to terminate training early if performance stops improving.",
+        help="Number of validation performance steps without improvement over "
+        "best performance before terminating run.",
+    )
+
+    parser_.add_argument(
+        "--early_stopping_buffer",
+        type=int,
+        default=None,
+        help="Number of iterations to run before activation early stopping checks, "
+        "useful if networks take a while to 'kick into gear'.",
     )
 
     parser_.add_argument(

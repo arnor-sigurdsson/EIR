@@ -15,11 +15,12 @@ from matplotlib import pyplot as plt
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim.optimizer import Optimizer
 
+from snp_pred.train_utils.evaluation import validation_handler
 from snp_pred.train_utils.metrics import (
     read_metrics_history_file,
     get_average_history_filepath,
 )
-from snp_pred.train_utils.utils import get_run_folder
+from snp_pred.train_utils.utils import get_run_folder, validate_handler_dependencies
 
 if TYPE_CHECKING:
     from snp_pred.train_utils.train_handlers import HandlerConfig
@@ -28,6 +29,7 @@ if TYPE_CHECKING:
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
+@validate_handler_dependencies([validation_handler])
 def attach_lr_scheduler(
     engine: Engine,
     lr_scheduler: Union[ConcatScheduler, CosineAnnealingScheduler, ReduceLROnPlateau],
@@ -147,13 +149,20 @@ def set_up_lr_scheduler(
         )
 
     elif cl_args.lr_schedule == "plateau":
-        patience_steps = calc_plateu_patience(
-            steps_per_epoch=len(c.train_loader), sample_interval=cl_args.sample_interval
-        )
-        logger.info("Plateau patience set to %d.", patience_steps)
+        logger.info("Plateau patience set to %d.", cl_args.lr_plateau_patience)
+
+        """
+        For compatibility with ignite EarlyStopping handler, we reduce the plateau
+        patience steps passed into the ReduceLROnPlateau constructor. This is because
+        EarlyStopping uses bad_steps >= patience, while ReduceLROnPlateau uses bad_steps
+        > patience. In order to have a common interface when passing in any type of
+        patience steps, we are going to reduce the passed in steps here.
+        """
+        patience_steps = cl_args.lr_plateau_patience - 1
         lr_scheduler = ReduceLROnPlateau(
             optimizer=c.optimizer,
-            mode="min",
+            mode="max",
+            factor=cl_args.lr_plateau_factor,
             patience=patience_steps,
             min_lr=lr_lower_bound,
         )
@@ -210,7 +219,9 @@ def _get_warmup_steps_from_cla(warmup_steps_arg, optimizer):
     elif warmup_steps_arg == "auto":
         auto_steps = _calculate_auto_warmup_steps(optimizer=optimizer)
         logger.info(
-            "Using %d steps for learning rate due to 'auto' option warmup.", auto_steps
+            "Using calculated %d steps for learning rate due to 'auto' option for "
+            "warmup.",
+            auto_steps,
         )
         return auto_steps
     else:
@@ -247,20 +258,6 @@ def _plot_lr_schedule(
 
     plt.savefig(output_folder / "lr_schedule.png")
     plt.close("all")
-
-
-def calc_plateu_patience(
-    steps_per_epoch: int, sample_interval: int, patience_for_n_epochs: int = 2
-):
-    """
-    For example if we have 15000 iterations and sample every 1000 we have
-    (15000 / 1000) * 2 = 30 patience steps.
-
-    In the case we have a sample interval higher than steps per epoch, we
-    make sure that the patience is at least 2 epochs as well.
-    """
-    samples_per_epoch = max((1, int(steps_per_epoch / sample_interval)))
-    return samples_per_epoch * patience_for_n_epochs
 
 
 def _attach_warmup_to_scheduler(
@@ -322,9 +319,6 @@ def _step_reduce_on_plateau_scheduler(
     We do the warmup manually here because currently ignite does not support warmup
     with ReduceLROnPlateau through create_lr_scheduler_with_warmup because
     ReduceLROnPlateau does not inherit from _LRScheduler.
-
-    TODO:   Possibly use average performance here as measure of whether to step (instead
-            of loss)?
     """
     iteration = engine.state.iteration
 
@@ -336,33 +330,65 @@ def _step_reduce_on_plateau_scheduler(
             param_group["lr"] = cur_lr
 
     else:
-        cur_lr = get_optimizer_lr(optimizer=optimizer)
+        prev_lr = get_optimizer_lr(optimizer=optimizer)
+        cur_bad_steps = reduce_on_plateau_scheduler.num_bad_epochs
 
-        if iteration % sample_interval == 0 and not isclose(cur_lr, lr_lower_bound):
-            _log_reduce_on_plateu_step(reduce_on_plateau_scheduler, iteration)
+        if iteration % sample_interval == 0 and not isclose(prev_lr, lr_lower_bound):
 
             validation_df = read_metrics_history_file(
                 file_path=validation_history_fpath
             )
-            latest_val_loss = validation_df["loss-average"].iloc[-1]
-            reduce_on_plateau_scheduler.step(latest_val_loss)
+            latest_val_performance = validation_df["perf-average"].iloc[-1]
+
+            reduce_on_plateau_scheduler.step(metrics=latest_val_performance)
+
+            # See comment in set_up_lr_scheduler for +1 explanation
+            streamlined_patience = reduce_on_plateau_scheduler.patience + 1
+            _log_plateu_bad_step(
+                prev_bad_steps=cur_bad_steps,
+                cur_bad_steps=reduce_on_plateau_scheduler.num_bad_epochs,
+                patience=streamlined_patience,
+            )
+
+            new_lr = get_optimizer_lr(optimizer=optimizer)
+            _log_reduce_on_plateu_step(
+                reduce_on_plateau_scheduler=reduce_on_plateau_scheduler,
+                iteration=iteration,
+                prev_lr=prev_lr,
+                cur_lr=new_lr,
+            )
 
 
-def get_optimizer_lr(optimizer: Optimizer):
+def get_optimizer_lr(optimizer: Optimizer) -> float:
     return optimizer.param_groups[0]["lr"]
 
 
-def _log_reduce_on_plateu_step(
-    reduce_on_plateau_scheduler: ReduceLROnPlateau, iteration: int
+def _log_plateu_bad_step(
+    prev_bad_steps: int, cur_bad_steps: int, patience: int
 ) -> None:
+    if cur_bad_steps > prev_bad_steps:
+        logger.debug("Reduce LR On Plateau: %d / %d", cur_bad_steps, patience)
+    elif cur_bad_steps == 0 and prev_bad_steps > 0:
+        logger.debug("Reduce LR On Plateau: %d / %d", patience, patience)
+
+
+def _log_reduce_on_plateu_step(
+    reduce_on_plateau_scheduler: ReduceLROnPlateau,
+    iteration: int,
+    prev_lr: float,
+    cur_lr: float,
+) -> None:
+    """
+    NOTE: The ReduceLROnPlateau works differently from ignite's EarlyStopping in the
+    sense that EarlyStopping will trigger when bad steps are >= patience, while
+    ReduceLROnPlateau will trigger when bad steps are *>* patience.
+    """
     sched = reduce_on_plateau_scheduler
 
-    prev_lr = get_optimizer_lr(optimizer=sched.optimizer)
-    new_lr = prev_lr * sched.factor
-    if sched.num_bad_epochs > sched.patience and prev_lr > sched.min_lrs[0]:
+    if not isclose(prev_lr, cur_lr) and cur_lr > sched.min_lrs[0]:
         logger.info(
-            "Iter %d: Reducing learning rate from %.0e to %.0e.",
+            "Iter %d: Reduced learning rate from %.0e to %.0e.",
             iteration,
             prev_lr,
-            new_lr,
+            cur_lr,
         )
