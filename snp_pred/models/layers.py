@@ -274,9 +274,10 @@ class SplitLinear(nn.Module):
         )
 
         self.weight = Parameter(
-            torch.Tensor(self.out_feature_sets, self.split_size, self.num_chunks),
+            torch.Tensor(self.out_feature_sets, self.num_chunks, self.split_size),
             requires_grad=True,
         )
+
         if bias:
             self.bias = Parameter(torch.Tensor(self.out_features), requires_grad=True)
         else:
@@ -311,9 +312,11 @@ class SplitLinear(nn.Module):
 
     def forward(self, input: torch.Tensor):
         input_padded = F.pad(input=input, pad=[0, self.padding, 0, 0])
+
         input_reshaped = input_padded.reshape(
-            input.shape[0], 1, self.split_size, self.num_chunks
+            input.shape[0], 1, self.num_chunks, self.split_size
         )
+
         out = calc_split_input(input=input_reshaped, weight=self.weight, bias=self.bias)
         return out
 
@@ -325,7 +328,8 @@ def _find_split_padding_needed(input_size: int, split_size: int, num_chunks: int
 
 def calc_split_input(input: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor):
 
-    summed = torch.einsum("abc, dbc -> adc", input.squeeze(1), weight)
+    summed = torch.einsum("abc, dbc -> adb", input.squeeze(1), weight)
+    # TODO: figure out what kind of flatten here
     flattened = summed.flatten(start_dim=1)
 
     final = flattened

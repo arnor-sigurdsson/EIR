@@ -107,7 +107,7 @@ class SplitMLPModel(ModelBase):
     def forward(
         self, x: torch.Tensor, extra_inputs: torch.Tensor = None
     ) -> Dict[str, torch.Tensor]:
-        out = x.view(x.shape[0], -1)
+        out = flatten_h_w_fortran(x=x)
 
         out = self.fc_0(out)
 
@@ -215,7 +215,7 @@ class FullySplitMLPModel(ModelBase):
     def forward(
         self, x: torch.Tensor, extra_inputs: torch.Tensor = None
     ) -> Dict[str, torch.Tensor]:
-        out = x.view(x.shape[0], -1)
+        out = flatten_h_w_fortran(x=x)
 
         out = self.fc_0(out)
         out = self.split_blocks(out)
@@ -229,6 +229,15 @@ class FullySplitMLPModel(ModelBase):
         )
 
         return out
+
+
+def flatten_h_w_fortran(x: torch.Tensor) -> torch.Tensor:
+    """
+    This is needed when e.g. flattening one-hot inputs, and we want to make sure the
+    first part of the flattened tensor is the first column, i.e. first one-hot element.
+    """
+    column_order_flattened = x.transpose(2, 3).flatten(1)
+    return column_order_flattened
 
 
 def calc_value_after_expansion(base: int, expansion: int, min_value: int = 0) -> int:
