@@ -345,6 +345,7 @@ def _step_reduce_on_plateau_scheduler(
             # See comment in set_up_lr_scheduler for +1 explanation
             streamlined_patience = reduce_on_plateau_scheduler.patience + 1
             _log_plateu_bad_step(
+                iteration=iteration,
                 prev_bad_steps=cur_bad_steps,
                 cur_bad_steps=reduce_on_plateau_scheduler.num_bad_epochs,
                 patience=streamlined_patience,
@@ -356,6 +357,7 @@ def _step_reduce_on_plateau_scheduler(
                 iteration=iteration,
                 prev_lr=prev_lr,
                 cur_lr=new_lr,
+                patience=streamlined_patience,
             )
 
 
@@ -364,16 +366,20 @@ def get_optimizer_lr(optimizer: Optimizer) -> float:
 
 
 def _log_plateu_bad_step(
-    prev_bad_steps: int, cur_bad_steps: int, patience: int
+    iteration: int, prev_bad_steps: int, cur_bad_steps: int, patience: int
 ) -> None:
     if cur_bad_steps > prev_bad_steps:
-        logger.debug("Reduce LR On Plateau: %d / %d", cur_bad_steps, patience)
-    elif cur_bad_steps == 0 and prev_bad_steps > 0:
-        logger.debug("Reduce LR On Plateau: %d / %d", patience, patience)
+        logger.debug(
+            "Iteration %d: Reduce LR On Plateau: %d / %d",
+            iteration,
+            cur_bad_steps,
+            patience,
+        )
 
 
 def _log_reduce_on_plateu_step(
     reduce_on_plateau_scheduler: ReduceLROnPlateau,
+    patience: int,
     iteration: int,
     prev_lr: float,
     cur_lr: float,
@@ -387,8 +393,11 @@ def _log_reduce_on_plateu_step(
 
     if not isclose(prev_lr, cur_lr) and cur_lr > sched.min_lrs[0]:
         logger.info(
-            "Iter %d: Reduced learning rate from %.0e to %.0e.",
+            "Iteration %d: Reduce LR On Plateau %d / %d. "
+            "Reduced learning rate from %.0e to %.0e.",
             iteration,
+            patience,
+            patience,
             prev_lr,
             cur_lr,
         )
