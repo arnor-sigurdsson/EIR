@@ -146,7 +146,7 @@ class FullySplitMLPModel(ModelBase):
             kernel_width=self.cl_args.kernel_width,
             channel_exp_base=self.cl_args.channel_exp_base,
             dropout_p=self.cl_args.rb_do,
-            cutoff=1024 * 16,
+            cutoff=1024 * 4,
         )
         self.split_blocks = _get_split_blocks(
             split_parameter_spec=split_parameter_spec,

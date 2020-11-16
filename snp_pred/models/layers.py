@@ -491,13 +491,12 @@ def _get_split_fc_2_kwargs(
     }
 
     if reduce_both:
+        common_kwargs["split_size"] = split_size
+    else:
         num_chunks = _calculate_num_chunks_for_equal_split_out_features(
             in_features=in_features, out_feature_sets=out_feature_sets
         )
         common_kwargs["num_chunks"] = num_chunks
-
-    else:
-        common_kwargs["split_size"] = split_size
 
     return common_kwargs
 
