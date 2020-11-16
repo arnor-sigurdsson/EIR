@@ -112,7 +112,7 @@ class SEBlock(nn.Module):
         return out
 
 
-class AbstractCNNResidualBlock(nn.Module):
+class CNNResidualBlockBase(nn.Module):
     def __init__(
         self,
         in_channels: int,
@@ -181,7 +181,7 @@ class AbstractCNNResidualBlock(nn.Module):
         raise NotImplementedError
 
 
-class FirstCNNBlock(AbstractCNNResidualBlock):
+class FirstCNNBlock(CNNResidualBlockBase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -200,7 +200,7 @@ class FirstCNNBlock(AbstractCNNResidualBlock):
         return out
 
 
-class CNNResidualBlock(AbstractCNNResidualBlock):
+class CNNResidualBlock(CNNResidualBlockBase):
     def __init__(self, full_preact: bool = False, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -327,9 +327,14 @@ def _find_split_padding_needed(input_size: int, split_size: int, num_chunks: int
 
 
 def calc_split_input(input: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor):
+    """
+    n: num samples
+    c: num chunks (height)
+    s: split size (width)
+    o: output sets
+    """
 
-    summed = torch.einsum("abc, dbc -> adb", input.squeeze(1), weight)
-    # TODO: figure out what kind of flatten here
+    summed = torch.einsum("nhw, ohw -> noh", input.squeeze(1), weight)
     flattened = summed.flatten(start_dim=1)
 
     final = flattened
@@ -405,6 +410,7 @@ class SplitMLPResidualBlock(nn.Module):
         dropout_p: float = 0.0,
         full_preactivation: bool = False,
         zero_init_last_bn: bool = False,
+        reduce_both: bool = False,
     ):
         super().__init__()
 
@@ -415,32 +421,35 @@ class SplitMLPResidualBlock(nn.Module):
         self.dropout_p = dropout_p
         self.full_preactivation = full_preactivation
         self.zero_init_last_bn = zero_init_last_bn
+        self.reduce_both = reduce_both
 
         self.bn_1 = nn.BatchNorm1d(num_features=in_features)
         self.act_1 = Swish()
         self.fc_1 = SplitLinear(
-            in_features=in_features,
-            out_feature_sets=out_feature_sets,
+            in_features=self.in_features,
+            out_feature_sets=self.out_feature_sets,
             bias=False,
-            split_size=split_size,
+            split_size=self.split_size,
         )
 
         self.bn_2 = nn.BatchNorm1d(num_features=self.fc_1.out_features)
         self.act_2 = Swish()
         self.do = nn.Dropout(p=dropout_p)
 
-        self.fc_2 = SplitLinear(
+        fc_2_kwargs = _get_split_fc_2_kwargs(
             in_features=self.fc_1.out_features,
-            out_feature_sets=out_feature_sets,
+            out_feature_sets=self.out_feature_sets,
             bias=False,
-            split_size=split_size,
+            split_size=self.split_size,
+            reduce_both=self.reduce_both,
         )
+        self.fc_2 = SplitLinear(**fc_2_kwargs)
 
         if in_features == out_feature_sets:
             self.downsample_identity = lambda x: x
         else:
             self.downsample_identity = SplitLinear(
-                in_features=in_features,
+                in_features=self.in_features,
                 out_feature_sets=1,
                 bias=False,
                 num_chunks=self.fc_2.out_features,
@@ -466,6 +475,31 @@ class SplitMLPResidualBlock(nn.Module):
         out = self.fc_2(out)
 
         return out + identity
+
+
+def _get_split_fc_2_kwargs(
+    in_features: int,
+    out_feature_sets: int,
+    bias: bool,
+    reduce_both: bool,
+    split_size: int,
+):
+    common_kwargs = {
+        "in_features": in_features,
+        "out_feature_sets": out_feature_sets,
+        "bias": bias,
+    }
+
+    if reduce_both:
+        num_chunks = _calculate_num_chunks_for_equal_split_out_features(
+            in_features=in_features, out_feature_sets=out_feature_sets
+        )
+        common_kwargs["num_chunks"] = num_chunks
+
+    else:
+        common_kwargs["split_size"] = split_size
+
+    return common_kwargs
 
 
 def _calculate_num_chunks_for_equal_split_out_features(
