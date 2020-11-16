@@ -52,7 +52,7 @@ def test_get_reduce_lr_on_plateu_step_params(args_config, create_dummy_test_opti
     cl_args = args_config
     optimizer = create_dummy_test_optimizer
 
-    params = lr_scheduling._get_reduce_lr_on_plateu_step_params(
+    params = lr_scheduling._get_reduce_lr_on_plateau_step_params(
         cl_args=cl_args, optimizer=optimizer
     )
 

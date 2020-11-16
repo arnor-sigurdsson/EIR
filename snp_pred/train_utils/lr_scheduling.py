@@ -37,7 +37,9 @@ def attach_lr_scheduler(
 ) -> None:
     """
     We use Events.ITERATION_COMPLETED for the plateau lr_scheduler to be in sync with
-    the evaluation handler (which runs on completed iteration as well).
+    the evaluation handler (which runs on completed iteration as well). To make sure
+    we start at the lower bound, we manually set the LR below (in the case of warmup
+    being used).
 
     We use iteration started for the cycle lr_scheduler, to make sure we start at the
     lower bound of the learning rate when using warmup for the first iteration.
@@ -51,7 +53,11 @@ def attach_lr_scheduler(
 
     elif cl_args.lr_schedule == "plateau":
 
-        step_scheduler_params = _get_reduce_lr_on_plateu_step_params(
+        if cl_args.warmup_steps:
+            logger.debug("Setting first iteration optimizer LR to %.0e.", cl_args.lr_lb)
+            update_optimizer_lr(lr=cl_args.lr_lb, optimizer=config.optimizer)
+
+        step_scheduler_params = _get_reduce_lr_on_plateau_step_params(
             cl_args=cl_args, optimizer=config.optimizer
         )
         engine.add_event_handler(
@@ -64,7 +70,7 @@ def attach_lr_scheduler(
         raise ValueError()
 
 
-def _get_reduce_lr_on_plateu_step_params(
+def _get_reduce_lr_on_plateau_step_params(
     cl_args: Namespace, optimizer: Optimizer
 ) -> Dict:
 
@@ -322,12 +328,14 @@ def _step_reduce_on_plateau_scheduler(
     """
     iteration = engine.state.iteration
 
-    # manual warmup
     if warmup_steps is not None and iteration <= warmup_steps:
-        step_size = (lr_upper_bound - lr_lower_bound) / warmup_steps
-        cur_lr = lr_lower_bound + step_size * iteration
-        for param_group in optimizer.param_groups:
-            param_group["lr"] = cur_lr
+        cur_lr = calculate_lr_after_linear_step(
+            lr_start=lr_lower_bound,
+            lr_end=lr_upper_bound,
+            warmup_steps=warmup_steps,
+            iteration=iteration,
+        )
+        update_optimizer_lr(lr=cur_lr, optimizer=optimizer)
 
     else:
         prev_lr = get_optimizer_lr(optimizer=optimizer)
@@ -359,6 +367,23 @@ def _step_reduce_on_plateau_scheduler(
                 cur_lr=new_lr,
                 patience=streamlined_patience,
             )
+
+
+def update_optimizer_lr(lr: float, optimizer: Optimizer) -> None:
+    for param_group in optimizer.param_groups:
+        param_group["lr"] = lr
+
+
+def calculate_lr_after_linear_step(
+    lr_start: float,
+    lr_end: float,
+    warmup_steps: int,
+    iteration: int,
+) -> float:
+    step_size = (lr_end - lr_start) / warmup_steps
+    cur_lr = lr_start + (step_size * iteration)
+
+    return cur_lr
 
 
 def get_optimizer_lr(optimizer: Optimizer) -> float:
