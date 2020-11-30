@@ -188,6 +188,7 @@ def test_predict(keep_outputs, prep_modelling_test_configs):
         data_source=test_path / "test_arrays_test_set",
         output_folder=test_path,
         device="cpu",
+        num_workers=0,
     )
 
     predict.predict(predict_cl_args=predict_cl_args)

@@ -2,9 +2,9 @@ import atexit
 import json
 from argparse import Namespace
 from dataclasses import dataclass
-from functools import partial, wraps
+from functools import partial
 from pathlib import Path
-from typing import List, Callable, Union, Tuple, TYPE_CHECKING, Dict, Sequence
+from typing import List, Callable, Union, Tuple, TYPE_CHECKING, Dict, overload
 
 import pandas as pd
 from aislib.misc_utils import get_logger
@@ -33,7 +33,7 @@ from snp_pred.train_utils.metrics import (
     read_metrics_history_file,
     get_average_history_filepath,
 )
-from snp_pred.train_utils.utils import get_run_folder
+from snp_pred.train_utils.utils import get_run_folder, validate_handler_dependencies
 from snp_pred.visualization import visualization_funcs as vf
 
 if TYPE_CHECKING:
@@ -91,19 +91,16 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
     )
 
     if ca.early_stopping_patience:
-        early_stopping_handler = get_early_stopping_handler(
-            trainer=trainer,
-            handler_config=handler_config,
-            patience_steps=ca.early_stopping_patience,
-        )
-        trainer.add_event_handler(
-            Events.ITERATION_COMPLETED(every=ca.sample_interval),
-            early_stopping_handler,
+        trainer = _attach_early_stopping_handler(
+            trainer=trainer, handler_config=handler_config
         )
 
+    # TODO: Implement warmup for LR scheduling
     if ca.lr_schedule != "same":
         lr_scheduler = set_up_lr_scheduler(handler_config=handler_config)
         attach_lr_scheduler(engine=trainer, lr_scheduler=lr_scheduler, config=config)
+    elif ca.lr_schedule == "same" and ca.warmup_steps is not None:
+        raise NotImplementedError("Warmup not yet implemented for 'same' LR schedule.")
 
     if handler_config.run_name:
         trainer = _attach_run_event_handlers(
@@ -248,7 +245,34 @@ def _get_monitoring_metrics(
     return monitoring_metrics
 
 
-def get_early_stopping_handler(
+@validate_handler_dependencies(
+    [validation_handler],
+)
+def _attach_early_stopping_handler(trainer: Engine, handler_config: "HandlerConfig"):
+    cl_args = handler_config.config.cl_args
+
+    early_stopping_handler = _get_early_stopping_handler(
+        trainer=trainer,
+        handler_config=handler_config,
+        patience_steps=cl_args.early_stopping_patience,
+    )
+
+    early_stopping_event_kwargs = _get_early_stopping_event_kwargs(
+        early_stopping_iteration_buffer=cl_args.early_stopping_buffer,
+        sample_interval=cl_args.sample_interval,
+    )
+
+    trainer.add_event_handler(
+        event_name=Events.ITERATION_COMPLETED(
+            **early_stopping_event_kwargs,
+        ),
+        handler=early_stopping_handler,
+    )
+
+    return trainer
+
+
+def _get_early_stopping_handler(
     trainer: Engine, handler_config: HandlerConfig, patience_steps: int
 ):
 
@@ -266,6 +290,53 @@ def get_early_stopping_handler(
     handler.logger = logger
 
     return handler
+
+
+@overload
+def _get_early_stopping_event_kwargs(
+    early_stopping_iteration_buffer: None, sample_interval: int
+) -> Dict[str, int]:
+    ...
+
+
+@overload
+def _get_early_stopping_event_kwargs(
+    early_stopping_iteration_buffer: int, sample_interval: int
+) -> Dict[str, Callable[[Engine, int], bool]]:
+    ...
+
+
+def _get_early_stopping_event_kwargs(early_stopping_iteration_buffer, sample_interval):
+
+    if early_stopping_iteration_buffer is None:
+        return {"every": sample_interval}
+
+    logger.info(
+        "Early stopping checks will be activated after %d iterations.",
+        early_stopping_iteration_buffer,
+    )
+    has_checked = False
+
+    def _early_stopping_event_filter(engine: Engine, event: int) -> bool:
+        iteration = event
+
+        if iteration < early_stopping_iteration_buffer:
+            return False
+
+        nonlocal has_checked
+        if not has_checked:
+            logger.debug(
+                "%d iterations done, early stopping checks activated from now on.",
+                iteration,
+            )
+            has_checked = True
+
+        if iteration % sample_interval == 0:
+            return True
+
+        return False
+
+    return {"event_filter": _early_stopping_event_filter}
 
 
 def _get_latest_validation_value_score_function(run_folder: Path, column: str):
@@ -381,31 +452,6 @@ def _save_config(run_folder: Path, cl_args: Namespace):
     with open(str(run_folder / "cl_args.json"), "w") as config_file:
         config_dict = vars(cl_args)
         json.dump(config_dict, config_file, sort_keys=True, indent=4)
-
-
-class MissingHandlerDependencyError(Exception):
-    pass
-
-
-def validate_handler_dependencies(handler_dependencies: Sequence[Callable]):
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            argument_iterable = tuple(args) + tuple(kwargs.values())
-            engine_object = next(i for i in argument_iterable if isinstance(i, Engine))
-
-            for dep in handler_dependencies:
-                if not engine_object.has_event_handler(dep):
-                    raise MissingHandlerDependencyError(
-                        f"Dependency '{dep.__name__}' missing from engine."
-                    )
-
-            func_output = func(*args, **kwargs)
-            return func_output
-
-        return wrapper
-
-    return decorator
 
 
 def _add_checkpoint_handler_wrapper(

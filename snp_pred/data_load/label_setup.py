@@ -29,14 +29,14 @@ al_label_transformers = Dict[str, al_label_transformers_object]
 
 
 def set_up_train_and_valid_labels(
-    cl_args: Namespace, custom_label_ops: Union[None, al_all_column_ops]
+    cl_args: Namespace, custom_label_ops: al_all_column_ops
 ) -> Tuple[al_label_dict, al_label_dict]:
     """
     Splits and does split based processing (e.g. scaling validation set with training
     set for regression) on the labels.
     """
 
-    parse_wrapper = _get_label_parsing_wrapper(cl_args=cl_args)
+    parse_wrapper = get_label_parsing_wrapper(cl_args=cl_args)
     df_labels = parse_wrapper(cl_args=cl_args, custom_label_ops=custom_label_ops)
 
     df_labels_train, df_labels_valid = _split_df(
@@ -54,16 +54,16 @@ def set_up_train_and_valid_labels(
     return train_labels_dict, valid_labels_dict
 
 
-def _get_label_parsing_wrapper(
+def get_label_parsing_wrapper(
     cl_args: Namespace,
-) -> Callable[[Namespace, Union[None, al_all_column_ops]], pd.DataFrame]:
+) -> Callable[[Namespace, al_all_column_ops], pd.DataFrame]:
     if cl_args.label_parsing_chunk_size is None:
         return label_df_parse_wrapper
     return chunked_label_df_parse_wrapper
 
 
 def label_df_parse_wrapper(
-    cl_args: Namespace, custom_label_ops: Union[None, al_all_column_ops] = None
+    cl_args: Namespace, custom_label_ops: al_all_column_ops = None
 ) -> pd.DataFrame:
     available_ids = _gather_ids_from_data_source(data_source=Path(cl_args.data_source))
 
@@ -104,7 +104,7 @@ def label_df_parse_wrapper(
 
 
 def chunked_label_df_parse_wrapper(
-    cl_args: Namespace, custom_label_ops: Union[None, al_all_column_ops] = None
+    cl_args: Namespace, custom_label_ops: al_all_column_ops = None
 ) -> pd.DataFrame:
     available_ids = _gather_ids_from_data_source(data_source=Path(cl_args.data_source))
 
@@ -156,7 +156,7 @@ def _get_label_df_chunk_generator(
     chunk_size: int,
     label_fpath: Path,
     columns: List[str],
-    custom_label_ops: Union[None, al_all_column_ops],
+    custom_label_ops: al_all_column_ops,
 ) -> pd.DataFrame:
     """
     We accept only loading the available columns at this point because the passed

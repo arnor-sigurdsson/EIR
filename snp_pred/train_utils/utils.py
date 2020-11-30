@@ -2,10 +2,12 @@ import importlib
 import importlib.util
 import logging
 import sys
+from functools import wraps
 from pathlib import Path
-from typing import List, Dict, TYPE_CHECKING
+from typing import List, Dict, TYPE_CHECKING, Sequence, Callable
 
 from aislib.misc_utils import get_logger, ensure_path_exists
+from ignite.engine import Engine
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -97,3 +99,32 @@ def configure_root_logger(run_name: str):
     file_handler.setFormatter(formatter)
 
     logging.getLogger("").addHandler(file_handler)
+
+
+def validate_handler_dependencies(handler_dependencies: Sequence[Callable]):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            argument_iterable = tuple(args) + tuple(kwargs.values())
+
+            engine_objects = [i for i in argument_iterable if isinstance(i, Engine)]
+            assert len(engine_objects) == 1
+
+            engine_object = engine_objects[0]
+
+            for dep in handler_dependencies:
+                if not engine_object.has_event_handler(dep):
+                    raise MissingHandlerDependencyError(
+                        f"Dependency '{dep.__name__}' missing from engine."
+                    )
+
+            func_output = func(*args, **kwargs)
+            return func_output
+
+        return wrapper
+
+    return decorator
+
+
+class MissingHandlerDependencyError(Exception):
+    pass
