@@ -7,6 +7,8 @@ import numpy as np
 import pytest
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 
+import data_load.label_setup
+from snp_pred.data_load.label_setup import merge_target_columns
 from snp_pred.data_load import datasets, label_setup
 from snp_pred.data_load.datasets import al_datasets
 
@@ -102,13 +104,13 @@ def test_construct_dataset_init_params_from_cl_args(args_config):
     ],
 )
 def test_merge_target_columns_pass(test_input, expected):
-    test_output = datasets.merge_target_columns(*test_input)
+    test_output = merge_target_columns(*test_input)
     assert test_output == expected
 
 
 def test_merge_target_columns_fail():
     with pytest.raises(ValueError):
-        datasets.merge_target_columns([], [])
+        merge_target_columns([], [])
 
 
 @patch(get_joblib_patch_target(), autospec=True)
@@ -117,7 +119,7 @@ def test_save_target_transformer(patched_joblib):
     test_transformer = StandardScaler()
     test_transformer.fit([[1, 2, 3, 4, 5]])
 
-    datasets.save_label_transformer(
+    data_load.label_setup.save_label_transformer(
         run_folder=Path("/tmp/"),
         transformer_name="harry_du_bois",
         target_transformer_object=test_transformer,

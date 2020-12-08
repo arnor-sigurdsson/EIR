@@ -107,7 +107,7 @@ def test_lookup_embeddings(create_emb_test_label_data, create_test_emb_model):
         model=test_model,
         embeddings_dict=emb_dict,
         embedding_col="Population",
-        extra_labels=test_extra_labels,
+        labels=test_extra_labels,
         device="cpu",
     )
 
@@ -145,7 +145,7 @@ def test_get_embeddings_from_labels(create_emb_test_label_data, create_test_emb_
 
     test_extra_labels = {"Climate": ["Cool"], "Population": ["Small"], "Food": ["Fish"]}
     test_embeddings = emb.get_embeddings_from_labels(
-        extra_labels=test_extra_labels, model=test_model, device="cpu"
+        labels=test_extra_labels, model=test_model, device="cpu"
     )
 
     assert test_embeddings.shape[1] == 6

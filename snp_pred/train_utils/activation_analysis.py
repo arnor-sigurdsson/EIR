@@ -31,7 +31,6 @@ from snp_pred.train_utils.utils import (
     validate_handler_dependencies,
 )
 
-
 if TYPE_CHECKING:
     from snp_pred.train_utils.train_handlers import HandlerConfig
     from snp_pred.train import Config
@@ -87,7 +86,6 @@ def activation_analysis_handler(
             config=c,
             model=model_copy,
             column_name=column_name,
-            device=cl_args.device,
             train_loader=c.train_loader,
             n_background_samples=no_explainer_background_samples,
         )
@@ -134,7 +132,6 @@ def get_shap_object(
     config: "Config",
     model: Union[CNNModel, MLPModel],
     column_name: str,
-    device: str,
     train_loader: DataLoader,
     n_background_samples: int = 64,
 ):
@@ -142,12 +139,13 @@ def get_shap_object(
     cl_args = c.cl_args
 
     background, labels, ids = gather_dloader_samples(
-        data_loader=train_loader, device=device, n_samples=n_background_samples
+        batch_prep_hook=c.hooks.step_func_hooks.base_prepare_batch,
+        batch_prep_hook_kwargs={"config": c, "state": None},
+        data_loader=train_loader,
+        n_samples=n_background_samples,
     )
 
-    extra_inputs = get_extra_inputs(
-        cl_args=cl_args, model=c.model, labels=labels["extra_labels"]
-    )
+    extra_inputs = get_extra_inputs(cl_args=cl_args, model=c.model, labels=None)
 
     # detach for shap
     if extra_inputs is not None:

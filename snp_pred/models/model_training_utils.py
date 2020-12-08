@@ -1,7 +1,16 @@
-from argparse import Namespace
 from copy import deepcopy, copy
 from pathlib import Path
-from typing import List, Tuple, Union, Dict, overload, TYPE_CHECKING
+from typing import (
+    List,
+    Tuple,
+    Union,
+    Dict,
+    overload,
+    TYPE_CHECKING,
+    Callable,
+    Any,
+    Sequence,
+)
 
 import plotly.express as px
 import torch
@@ -16,10 +25,12 @@ from torch.utils.data import DataLoader
 
 from snp_pred.data_load.data_utils import get_target_columns_generator
 from snp_pred.data_load.label_setup import al_target_columns
-from snp_pred.models.extra_inputs_module import get_extra_inputs
 from snp_pred.train_utils.metrics import (
     calculate_prediction_losses,
     aggregate_losses,
+)
+from snp_pred.train_utils.utils import (
+    call_hooks_stage_iterable,
 )
 
 if TYPE_CHECKING:
@@ -29,13 +40,16 @@ if TYPE_CHECKING:
         al_training_labels_batch,
         al_training_labels_target,
         al_training_labels_extra,
+        Batch,
     )
 
 # Aliases
 al_dloader_gathered_preds = Tuple[
     Dict[str, torch.Tensor], Union[List[str], Dict[str, torch.Tensor]], List[str]
 ]
-al_dloader_gathered_raw = Tuple[torch.Tensor, "al_training_labels_batch", List[str]]
+al_dloader_gathered_raw = Tuple[
+    Dict[str, torch.Tensor], "al_training_labels_target", Sequence[str]
+]
 al_lr_find_results = Dict[str, List[Union[float, List[float]]]]
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
@@ -44,6 +58,7 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 def predict_on_batch(
     model: Module, inputs: Tuple[torch.Tensor, ...]
 ) -> Dict[str, torch.Tensor]:
+    assert not model.training
     with torch.no_grad():
         val_outputs = model(*inputs)
 
@@ -54,7 +69,7 @@ def parse_target_labels(
     target_columns: al_target_columns, device: str, labels: Dict[str, torch.Tensor]
 ) -> Dict[str, torch.Tensor]:
 
-    target_columns_gen = get_target_columns_generator(target_columns)
+    target_columns_gen = get_target_columns_generator(target_columns=target_columns)
 
     labels_casted = {}
     for column_type, column_name in target_columns_gen:
@@ -70,9 +85,9 @@ def parse_target_labels(
 
 def gather_pred_outputs_from_dloader(
     data_loader: DataLoader,
-    cl_args: Namespace,
+    batch_prep_hook: Sequence[Callable],
+    batch_prep_hook_kwargs: Dict[str, Any],
     model: Module,
-    device: str,
     with_labels: bool = True,
 ) -> al_dloader_gathered_preds:
     """
@@ -87,25 +102,32 @@ def gather_pred_outputs_from_dloader(
     ids_total = []
 
     assert not model.training
-    for inputs, labels, ids in data_loader:
-        inputs = inputs.to(device=device)
-        inputs = inputs.to(dtype=torch.float32)
+    for loader_batch in data_loader:
 
-        extra_inputs = get_extra_inputs(
-            cl_args=cl_args, model=model, labels=labels["extra_labels"]
+        state = call_hooks_stage_iterable(
+            hook_iterable=batch_prep_hook,
+            common_kwargs={"loader_batch": loader_batch, **batch_prep_hook_kwargs},
+            state=None,
         )
+        batch = state["batch"]
 
-        outputs = predict_on_batch(model=model, inputs=(inputs, extra_inputs))
+        inputs = batch.inputs
+        target_labels = batch.target_labels
+        ids = batch.ids
+
+        outputs = predict_on_batch(
+            model=model, inputs=(inputs["genotype"], inputs["tabular"])
+        )
 
         all_output_batches.append(outputs)
 
         ids_total += [i for i in deepcopy(ids)]
 
         if with_labels:
-            all_label_batches.append(deepcopy(labels["target_labels"]))
+            all_label_batches.append(deepcopy(target_labels))
 
         del inputs
-        del labels
+        del target_labels
         del ids
 
     if with_labels:
@@ -121,40 +143,60 @@ def gather_pred_outputs_from_dloader(
 
 
 def gather_dloader_samples(
-    data_loader: DataLoader, device: str, n_samples: Union[int, None] = None
+    data_loader: DataLoader,
+    batch_prep_hook: Sequence[Callable],
+    batch_prep_hook_kwargs: Dict[str, Any],
+    n_samples: Union[int, None] = None,
 ) -> al_dloader_gathered_raw:
+    """
+    TODO: Test after refactor.
+    """
     inputs_total = []
-    all_label_batches = {"target_labels": [], "extra_labels": []}
+    target_labels_total = []
     ids_total = []
 
-    for inputs, labels, ids in data_loader:
-        inputs = inputs.to(device=device, dtype=torch.float32)
+    for loader_batch in data_loader:
 
-        inputs_total += [i for i in inputs]
+        state = call_hooks_stage_iterable(
+            hook_iterable=batch_prep_hook,
+            common_kwargs={"loader_batch": loader_batch, **batch_prep_hook_kwargs},
+            state=None,
+        )
+        batch = state["batch"]
+
+        inputs: Dict[str, torch.Tensor] = batch.inputs
+        target_labels: Dict[str, torch.Tensor] = batch.target_labels
+        ids: Sequence[str] = batch.ids
+
+        inputs_total.append(inputs)
+        target_labels_total.append(target_labels)
         ids_total += [i for i in ids]
-        all_label_batches["target_labels"].append(labels["target_labels"])
-        all_label_batches["extra_labels"].append(labels["extra_labels"])
 
         if n_samples:
-            if len(inputs_total) >= n_samples:
-                inputs_total = inputs_total[:n_samples]
+            if len(ids_total) >= n_samples:
                 ids_total = ids_total[:n_samples]
                 break
 
-    all_label_batches["target_labels"] = _stack_list_of_tensor_dicts(
-        all_label_batches["target_labels"]
+    target_labels_total = _stack_list_of_tensor_dicts(
+        list_of_batch_dicts=target_labels_total
     )
-    all_label_batches["extra_labels"] = _stack_list_of_tensor_dicts(
-        all_label_batches["extra_labels"]
-    )
+    inputs_total = _stack_list_of_tensor_dicts(list_of_batch_dicts=inputs_total)
 
     if n_samples:
-        for label_type in all_label_batches:
-            for label_name in all_label_batches[label_type]:
-                label_subset = all_label_batches[label_type][label_name][:n_samples]
-                all_label_batches[label_type][label_name] = label_subset
+        inputs_final, target_labels_final = {}, {}
 
-    return torch.stack(inputs_total), all_label_batches, ids_total
+        for input_name in inputs_total.keys():
+            input_subset = inputs_total[input_name][:n_samples]
+            inputs_final[input_name] = input_subset
+
+        for target_name in target_labels_total.keys():
+            target_subset = target_labels_total[target_name][:n_samples]
+            target_labels_final[target_name] = target_subset
+
+    else:
+        inputs_final, target_labels_final = inputs_total, target_labels_total
+
+    return inputs_final, target_labels_final, ids_total
 
 
 @overload

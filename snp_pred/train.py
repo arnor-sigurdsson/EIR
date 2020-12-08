@@ -3,6 +3,7 @@ import sys
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
+from types import SimpleNamespace
 from typing import (
     Union,
     Tuple,
@@ -11,11 +12,12 @@ from typing import (
     overload,
     TYPE_CHECKING,
     Callable,
-    Any,
     Iterable,
     Sequence,
+    Any,
 )
 
+import dill
 import numpy as np
 import torch
 from aislib.misc_utils import ensure_path_exists
@@ -37,6 +39,13 @@ from snp_pred.data_load.label_setup import (
     al_target_columns,
     al_label_transformers,
     al_all_column_ops,
+    get_array_path_iterator,
+    set_up_train_and_valid_tabular_data,
+    gather_ids_from_data_source,
+    split_ids,
+    TabularFileInfo,
+    save_transformer_set,
+    Labels,
 )
 from snp_pred.models import model_training_utils
 from snp_pred.models.extra_inputs_module import (
@@ -64,6 +73,9 @@ from snp_pred.train_utils.optimizers import (
 )
 from snp_pred.train_utils.train_handlers import HandlerConfig
 from snp_pred.train_utils.train_handlers import configure_trainer
+from snp_pred.train_utils.utils import (
+    call_hooks_stage_iterable,
+)
 
 if TYPE_CHECKING:
     from snp_pred.train_utils.metrics import (
@@ -79,7 +91,11 @@ al_training_labels_extra = Dict[str, Union[List[str], torch.Tensor]]
 al_training_labels_batch = Dict[
     str, Union[al_training_labels_target, al_training_labels_extra]
 ]
-al_dataloader_getitem_batch = Tuple[torch.Tensor, al_training_labels_batch, List[str]]
+al_dataloader_getitem_batch = Tuple[
+    Union[Dict[str, torch.Tensor], Dict[str, Any]],
+    al_training_labels_target,
+    List[str],
+]
 al_num_outputs_per_target = Dict[str, int]
 
 torch.manual_seed(0)
@@ -94,6 +110,12 @@ def main(cl_args: argparse.Namespace, config: "Config") -> None:
 
     if cl_args.debug:
         breakpoint()
+
+    run_folder = utils.get_run_folder(run_name=cl_args.run_name)
+    keys_to_serialize = get_default_config_keys_to_serialize()
+    serialize_config(
+        config=config, run_folder=run_folder, keys_to_serialize=keys_to_serialize
+    )
 
     train(config=config)
 
@@ -115,7 +137,6 @@ class Config:
     target_transformers: al_label_transformers
     target_columns: al_target_columns
     num_outputs_per_target: al_num_outputs_per_target
-    data_dimension: "DataDimension"
     model: Union[al_models, nn.DataParallel]
     optimizer: Optimizer
     criterions: al_criterions
@@ -125,20 +146,74 @@ class Config:
     hooks: Union["Hooks", None]
 
 
+def serialize_config(
+    config: "Config", run_folder: Path, keys_to_serialize: Union[Iterable[str], None]
+) -> None:
+    serialization_path = run_folder / "serializations" / "filtered_config.dill"
+    ensure_path_exists(path=serialization_path)
+
+    filtered_config = filter_config_by_keys(config=config, keys=keys_to_serialize)
+    serialize_namespace(namespace=filtered_config, output_path=serialization_path)
+
+
+def get_default_config_keys_to_serialize() -> Iterable[str]:
+    return (
+        "cl_args",
+        "num_outputs_per_target",
+        "target_transformers",
+        "target_columns",
+        "metrics",
+        "hooks",
+    )
+
+
+def filter_config_by_keys(
+    config: "Config", keys: Union[None, Iterable[str]] = None
+) -> SimpleNamespace:
+    filtered = {}
+
+    annotations = config.__annotations__
+    iterable = keys if keys is not None else annotations.keys()
+
+    for k in iterable:
+        filtered[k] = getattr(config, k)
+
+    namespace = SimpleNamespace(**filtered)
+
+    return namespace
+
+
+def serialize_namespace(namespace: SimpleNamespace, output_path: Path) -> None:
+    with open(output_path, "wb") as outfile:
+        dill.dump(namespace, outfile)
+
+
 def get_default_config(
     cl_args: argparse.Namespace, hooks: Union["Hooks", None] = None
 ) -> "Config":
     run_folder = _prepare_run_folder(run_name=cl_args.run_name)
 
-    train_dataset, valid_dataset = datasets.set_up_datasets(
-        cl_args=cl_args, custom_label_ops=hooks.custom_column_label_parsing_ops
+    target_labels, tabular_input_labels = get_target_and_extra_labels(
+        cl_args=cl_args,
+        custom_label_parsing_operations=hooks.custom_column_label_parsing_ops,
+    )
+    save_transformer_set(
+        transformers=target_labels.label_transformers, run_folder=run_folder
+    )
+    save_transformer_set(
+        transformers=tabular_input_labels.label_transformers, run_folder=run_folder
     )
 
     data_dimensions = _get_data_dimensions(
-        dataset=train_dataset, target_width=cl_args.target_width
+        data_source=Path(cl_args.data_source), target_width=cl_args.target_width
     )
-
     cl_args.target_width = data_dimensions.width
+
+    train_dataset, valid_dataset = datasets.set_up_datasets(
+        cl_args=cl_args,
+        target_labels=target_labels,
+        tabular_inputs_labels=tabular_input_labels,
+    )
 
     batch_size = _modify_bs_for_multi_gpu(
         multi_gpu=cl_args.multi_gpu, batch_size=cl_args.batch_size
@@ -158,12 +233,12 @@ def get_default_config(
 
     embedding_dict = set_up_and_save_embeddings_dict(
         embedding_columns=cl_args.extra_cat_columns,
-        labels_dict=train_dataset.labels_dict,
+        labels_dict=tabular_input_labels.train_labels,
         run_folder=run_folder,
     )
 
     num_outputs_per_target = set_up_num_outputs_per_target(
-        target_transformers=train_dataset.target_transformers
+        target_transformers=target_labels.label_transformers
     )
 
     model = get_model(
@@ -184,17 +259,16 @@ def get_default_config(
 
     optimizer = get_optimizer(model=model, loss_callable=loss_func, cl_args=cl_args)
 
-    metrics = get_default_metrics(target_transformers=train_dataset.target_transformers)
+    metrics = get_default_metrics(target_transformers=target_labels.label_transformers)
 
     config = Config(
         cl_args=cl_args,
         train_loader=train_dloader,
         valid_loader=valid_dloader,
         valid_dataset=valid_dataset,
-        labels_dict=train_dataset.labels_dict,
-        target_transformers=train_dataset.target_transformers,
+        labels_dict=train_dataset.target_labels_dict,
+        target_transformers=target_labels.label_transformers,
         num_outputs_per_target=num_outputs_per_target,
-        data_dimension=data_dimensions,
         target_columns=train_dataset.target_columns,
         model=model,
         optimizer=optimizer,
@@ -208,23 +282,84 @@ def get_default_config(
     return config
 
 
+def get_target_and_extra_labels(
+    cl_args: argparse.Namespace, custom_label_parsing_operations: al_all_column_ops
+) -> Tuple[Labels, Labels]:
+    all_array_ids = gather_ids_from_data_source(data_source=Path(cl_args.data_source))
+    train_ids, valid_ids = split_ids(ids=all_array_ids, valid_size=cl_args.valid_size)
+
+    target_labels_info = set_up_target_label_data(cl_args=cl_args)
+    target_labels = set_up_train_and_valid_tabular_data(
+        tabular_info=target_labels_info,
+        custom_label_ops=custom_label_parsing_operations,
+        train_ids=train_ids,
+        valid_ids=valid_ids,
+    )
+
+    extra_labels_info = get_tabular_inputs_label_data(cl_args=cl_args)
+    extra_labels = set_up_train_and_valid_tabular_data(
+        tabular_info=extra_labels_info,
+        custom_label_ops=custom_label_parsing_operations,
+        train_ids=train_ids,
+        valid_ids=valid_ids,
+    )
+
+    return target_labels, extra_labels
+
+
+def set_up_target_label_data(cl_args: argparse.Namespace) -> TabularFileInfo:
+
+    table_info = TabularFileInfo(
+        file_path=cl_args.label_file,
+        con_columns=cl_args.target_con_columns,
+        cat_columns=cl_args.target_cat_columns,
+        parsing_chunk_size=cl_args.label_parsing_chunk_size,
+    )
+
+    return table_info
+
+
+def get_tabular_inputs_label_data(cl_args: argparse.Namespace) -> TabularFileInfo:
+
+    table_info = TabularFileInfo(
+        file_path=cl_args.label_file,
+        con_columns=cl_args.extra_con_columns,
+        cat_columns=cl_args.extra_cat_columns,
+        parsing_chunk_size=cl_args.label_parsing_chunk_size,
+    )
+
+    return table_info
+
+
 @dataclass
-class DataDimension:
+class DataDimensions:
     channels: int
     height: int
     width: int
 
 
 def _get_data_dimensions(
-    dataset: torch.utils.data.Dataset, target_width: Union[int, None]
-) -> DataDimension:
-    sample, *_ = dataset[0]
-    channels, height, width = sample.shape
+    data_source: Path, target_width: Union[int, None]
+) -> DataDimensions:
+    """
+    TODO: Make more dynamic / robust.
+    """
+
+    iterator = get_array_path_iterator(data_source=data_source)
+    path = next(iterator)
+    shape = np.load(file=path).shape
+
+    if len(shape) == 2:
+        channels, height, width = None, shape[0], shape[1]
+    elif len(shape) == 3:
+        channels, height, width = shape
+    else:
+        raise ValueError()
 
     if target_width is not None:
         width = target_width
 
-    return DataDimension(channels=channels, height=height, width=width)
+    return DataDimensions(channels=channels, height=height, width=width)
 
 
 def set_up_num_outputs_per_target(
@@ -281,19 +416,23 @@ def _modify_bs_for_multi_gpu(multi_gpu: bool, batch_size: int) -> int:
 
 @overload
 def get_train_sampler(
-    columns_to_sample: None, train_dataset: datasets.ArrayDatasetBase
+    columns_to_sample: None, train_dataset: datasets.DatasetBase
 ) -> None:
     ...
 
 
 @overload
 def get_train_sampler(
-    columns_to_sample: List[str], train_dataset: datasets.ArrayDatasetBase
+    columns_to_sample: List[str], train_dataset: datasets.DatasetBase
 ) -> WeightedRandomSampler:
     ...
 
 
 def get_train_sampler(columns_to_sample, train_dataset):
+    """
+    TODO:   Refactor, remove dependency on train_dataset and use instead
+            Iterable[Samples], and target_columns directly.
+    """
     if columns_to_sample is None:
         return None
 
@@ -316,15 +455,15 @@ def get_train_sampler(columns_to_sample, train_dataset):
         columns_to_sample = train_dataset.target_columns["cat"]
 
     train_sampler = get_weighted_random_sampler(
-        train_dataset=train_dataset, target_columns=columns_to_sample
+        samples=train_dataset.samples, target_columns=columns_to_sample
     )
     return train_sampler
 
 
 def get_dataloaders(
-    train_dataset: datasets.ArrayDatasetBase,
+    train_dataset: datasets.DatasetBase,
     train_sampler: Union[None, WeightedRandomSampler],
-    valid_dataset: datasets.ArrayDatasetBase,
+    valid_dataset: datasets.DatasetBase,
     batch_size: int,
     num_workers: int = 0,
 ) -> Tuple:
@@ -482,11 +621,19 @@ def train(config: Config) -> None:
         c.model.train()
         c.optimizer.zero_grad()
 
-        loaded_inputs_stage = step_hooks.prepare_batch
+        base_prepare_inputs_stage = step_hooks.base_prepare_batch
         state = call_hooks_stage_iterable(
-            hook_iterable=loaded_inputs_stage,
+            hook_iterable=base_prepare_inputs_stage,
             common_kwargs={"config": config, "loader_batch": loader_batch},
             state=None,
+        )
+        base_batch = state["batch"]
+
+        post_prepare_inputs_stage = step_hooks.post_prepare_batch
+        state = call_hooks_stage_iterable(
+            hook_iterable=post_prepare_inputs_stage,
+            common_kwargs={"config": config, "loader_batch": base_batch},
+            state=state,
         )
         batch = state["batch"]
 
@@ -538,11 +685,150 @@ def train(config: Config) -> None:
     trainer.run(data=c.train_loader, max_epochs=cl_args.n_epochs)
 
 
+def get_default_hooks(cl_args_: argparse.Namespace):
+    step_func_hooks = _get_default_step_function_hooks(cl_args=cl_args_)
+    hooks_object = Hooks(step_func_hooks=step_func_hooks)
+
+    return hooks_object
+
+
+@dataclass
+class Hooks:
+    al_handler_attachers = Iterable[Callable[[Engine, HandlerConfig], Engine]]
+
+    step_func_hooks: "StepFunctionHookStages"
+    custom_column_label_parsing_ops: al_all_column_ops = None
+    custom_handler_attachers: Union[None, al_handler_attachers] = None
+
+
+def _get_default_step_function_hooks(cl_args: argparse.Namespace):
+    """
+    TODO: Add validation, inspect that outputs have correct names.
+    TODO: Refactor, split into smaller functions e.g. for L1, mixing and uncertainty.
+    """
+
+    init_kwargs = _get_default_step_function_hooks_init_kwargs(cl_args=cl_args)
+
+    step_func_hooks = StepFunctionHookStages(**init_kwargs)
+
+    return step_func_hooks
+
+
+def _get_default_step_function_hooks_init_kwargs(
+    cl_args: argparse.Namespace,
+) -> Dict[str, Sequence[Callable]]:
+
+    init_kwargs = {
+        "base_prepare_batch": [hook_default_prepare_batch],
+        "post_prepare_batch": [],
+        "model_forward": [hook_default_model_forward],
+        "loss": [hook_default_per_target_loss],
+        "optimizer_backward": [hook_default_optimizer_backward],
+        "metrics": [hook_default_compute_metrics],
+    }
+
+    if cl_args.mixing_type is not None:
+        logger.debug(
+            "Setting up hooks for mixing with %s with α=%.2g.",
+            cl_args.mixing_type,
+            cl_args.mixing_alpha,
+        )
+        mix_hook = get_mix_data_hook(mixing_type=cl_args.mixing_type)
+
+        init_kwargs["post_prepare_batch"].append(mix_hook)
+        init_kwargs["loss"][0] = hook_mix_loss
+
+    if len(cl_args.target_con_columns + cl_args.target_cat_columns) > 1:
+        logger.debug(
+            "Setting up hook for uncertainty weighted loss for multi task modelling."
+        )
+        uncertainty_hook = get_uncertainty_loss_hook(
+            target_cat_columns=cl_args.target_cat_columns,
+            target_con_columns=cl_args.target_con_columns,
+            device=cl_args.device,
+        )
+        init_kwargs["loss"].append(uncertainty_hook)
+
+    init_kwargs["loss"].append(hook_default_aggregate_losses)
+
+    if cl_args.l1 is not None:
+        init_kwargs["loss"].append(hook_add_l1_loss)
+
+    return init_kwargs
+
+
+@dataclass
+class StepFunctionHookStages:
+
+    al_hook = Callable[..., Dict]
+    al_hooks = [Iterable[al_hook]]
+
+    base_prepare_batch: al_hooks
+    post_prepare_batch: al_hooks
+    model_forward: al_hooks
+    loss: al_hooks
+    optimizer_backward: al_hooks
+    metrics: al_hooks
+
+
+def hook_default_prepare_batch(
+    config: "Config",
+    loader_batch: al_dataloader_getitem_batch,
+    *args,
+    **kwargs,
+) -> Dict:
+
+    batch = prepare_base_batch_default(
+        loader_batch=loader_batch,
+        cl_args=config.cl_args,
+        target_columns=config.target_columns,
+        model=config.model,
+    )
+
+    state_updates = {"batch": batch}
+
+    return state_updates
+
+
+def prepare_base_batch_default(
+    loader_batch: al_dataloader_getitem_batch,
+    cl_args: argparse.Namespace,
+    target_columns: al_target_columns,
+    model: nn.Module,
+):
+
+    inputs, target_labels, train_ids = loader_batch
+
+    train_seqs = inputs["genotype"]
+    train_seqs = train_seqs.to(device=cl_args.device)
+    train_seqs = train_seqs.to(dtype=torch.float32)
+
+    if target_labels:
+        target_labels = model_training_utils.parse_target_labels(
+            target_columns=target_columns,
+            device=cl_args.device,
+            labels=target_labels,
+        )
+
+    tabular = get_extra_inputs(cl_args=cl_args, model=model, labels=inputs["tabular"])
+
+    inputs = {"genotype": train_seqs, "tabular": tabular}
+
+    batch = Batch(
+        inputs=inputs,
+        target_labels=target_labels,
+        ids=train_ids,
+    )
+
+    return batch
+
+
 def hook_default_model_forward(
     config: "Config", batch: "Batch", *args, **kwargs
 ) -> Dict:
 
-    train_outputs = config.model(x=batch.inputs, extra_inputs=batch.extra_inputs)
+    inputs = batch.inputs
+    train_outputs = config.model(x=inputs["genotype"], extra_inputs=inputs["tabular"])
 
     state_updates = {"model_outputs": train_outputs}
 
@@ -584,156 +870,6 @@ def hook_default_compute_metrics(
     )
 
     state_updates = {"metrics": train_batch_metrics_with_averages}
-
-    return state_updates
-
-
-def get_default_hooks(cl_args_: argparse.Namespace):
-    step_func_hooks = _get_default_step_function_hooks(cl_args=cl_args_)
-    hooks_object = Hooks(step_func_hooks=step_func_hooks)
-
-    return hooks_object
-
-
-@dataclass
-class Hooks:
-    al_handler_attachers = Iterable[Callable[[Engine, HandlerConfig], Engine]]
-
-    step_func_hooks: "StepFunctionHookStages"
-    custom_column_label_parsing_ops: al_all_column_ops = None
-    custom_handler_attachers: Union[None, al_handler_attachers] = None
-
-
-def _get_default_step_function_hooks(cl_args: argparse.Namespace):
-    """
-    TODO: Add validation, inspect that outputs have correct names.
-    TODO: Refactor, split into smaller functions e.g. for L1, mixing and uncertainty.
-    """
-
-    init_kwargs = _get_default_step_function_hooks_init_kwargs(cl_args=cl_args)
-
-    step_func_hooks = StepFunctionHookStages(**init_kwargs)
-
-    return step_func_hooks
-
-
-def _get_default_step_function_hooks_init_kwargs(
-    cl_args: argparse.Namespace,
-) -> Dict[str, Sequence[Callable]]:
-
-    init_kwargs = {
-        "prepare_batch": [hook_default_prepare_batch],
-        "model_forward": [hook_default_model_forward],
-        "loss": [hook_default_per_target_loss],
-        "optimizer_backward": [hook_default_optimizer_backward],
-        "metrics": [hook_default_compute_metrics],
-    }
-
-    if cl_args.mixing_type is not None:
-        logger.debug(
-            "Setting up hooks for mixing with %s with α=%.2g.",
-            cl_args.mixing_type,
-            cl_args.mixing_alpha,
-        )
-        mix_hook = get_mix_data_hook(mixing_type=cl_args.mixing_type)
-
-        init_kwargs["prepare_batch"].append(mix_hook)
-        init_kwargs["loss"][0] = hook_mix_loss
-
-    if len(cl_args.target_con_columns + cl_args.target_cat_columns) > 1:
-        logger.debug(
-            "Setting up hook for uncertainty weighted loss for multi task modelling."
-        )
-        uncertainty_hook = get_uncertainty_loss_hook(
-            target_cat_columns=cl_args.target_cat_columns,
-            target_con_columns=cl_args.target_con_columns,
-            device=cl_args.device,
-        )
-        init_kwargs["loss"].append(uncertainty_hook)
-
-    init_kwargs["loss"].append(hook_default_aggregate_losses)
-
-    if cl_args.l1 is not None:
-        init_kwargs["loss"].append(hook_add_l1_loss)
-
-    return init_kwargs
-
-
-@dataclass
-class StepFunctionHookStages:
-
-    al_hook = Callable[..., Dict]
-    al_hooks = [Iterable[al_hook]]
-
-    prepare_batch: al_hooks
-    model_forward: al_hooks
-    loss: al_hooks
-    optimizer_backward: al_hooks
-    metrics: al_hooks
-
-
-def call_hooks_stage_iterable(
-    hook_iterable: Iterable[Callable],
-    common_kwargs: Dict,
-    state: Union[None, Dict[str, Any]],
-):
-    for hook in hook_iterable:
-        _, state = state_registered_hook_call(
-            hook_func=hook, **common_kwargs, state=state
-        )
-
-    return state
-
-
-def state_registered_hook_call(
-    hook_func: Callable,
-    state: Union[Dict[str, Any], None],
-    *args,
-    **kwargs,
-) -> Tuple[Any, Dict[str, Any]]:
-
-    if state is None:
-        state = {}
-
-    state_updates = hook_func(state=state, *args, **kwargs)
-
-    state = {**state, **state_updates}
-
-    return state_updates, state
-
-
-def hook_default_prepare_batch(
-    config: "Config",
-    loader_batch: al_dataloader_getitem_batch,
-    state: Dict,
-    *args,
-    **kwargs,
-) -> Dict:
-
-    cl_args = config.cl_args
-
-    train_seqs, labels, train_ids = loader_batch
-    train_seqs = train_seqs.to(device=cl_args.device)
-    train_seqs = train_seqs.to(dtype=torch.float32)
-
-    target_labels = model_training_utils.parse_target_labels(
-        target_columns=config.target_columns,
-        device=cl_args.device,
-        labels=labels["target_labels"],
-    )
-
-    extra_inputs = get_extra_inputs(
-        cl_args=cl_args, model=config.model, labels=labels["extra_labels"]
-    )
-
-    batch = Batch(
-        inputs=train_seqs,
-        target_labels=target_labels,
-        extra_inputs=extra_inputs,
-        ids=train_ids,
-    )
-
-    state_updates = {"batch": batch}
 
     return state_updates
 

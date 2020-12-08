@@ -11,7 +11,7 @@ from scipy.special import softmax
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
 from snp_pred.data_load.data_utils import get_target_columns_generator
-from snp_pred.data_load.datasets import al_label_transformers_object
+from snp_pred.data_load.label_setup import al_label_transformers_object
 from snp_pred.models import model_training_utils
 from snp_pred.train_utils import metrics
 from snp_pred.train_utils import utils
@@ -39,11 +39,12 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
 
     c.model.eval()
     gather_preds = model_training_utils.gather_pred_outputs_from_dloader
+
     val_outputs_total, val_target_labels, val_ids_total = gather_preds(
         data_loader=c.valid_loader,
-        cl_args=c.cl_args,
+        batch_prep_hook=c.hooks.step_func_hooks.base_prepare_batch,
+        batch_prep_hook_kwargs={"config": c},
         model=c.model,
-        device=cl_args.device,
         with_labels=True,
     )
     c.model.train()

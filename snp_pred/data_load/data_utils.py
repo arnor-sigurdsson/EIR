@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Tuple, Dict, Union, List
+from typing import Tuple, Dict, List
 
 import torch
 
@@ -14,7 +14,6 @@ def get_target_columns_generator(target_columns: al_target_columns) -> Tuple[str
 
 @dataclass(frozen=True)
 class Batch:
-    inputs: torch.Tensor
+    inputs: Dict[str, torch.Tensor]
     target_labels: Dict[str, torch.Tensor]
-    extra_inputs: Union[torch.Tensor, None]
     ids: List[str]

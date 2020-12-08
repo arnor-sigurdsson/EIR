@@ -4,7 +4,17 @@ import logging
 import sys
 from functools import wraps
 from pathlib import Path
-from typing import List, Dict, TYPE_CHECKING, Sequence, Callable
+from typing import (
+    List,
+    Dict,
+    TYPE_CHECKING,
+    Sequence,
+    Callable,
+    Iterable,
+    Union,
+    Any,
+    Tuple,
+)
 
 from aislib.misc_utils import get_logger, ensure_path_exists
 from ignite.engine import Engine
@@ -128,3 +138,33 @@ def validate_handler_dependencies(handler_dependencies: Sequence[Callable]):
 
 class MissingHandlerDependencyError(Exception):
     pass
+
+
+def call_hooks_stage_iterable(
+    hook_iterable: Iterable[Callable],
+    common_kwargs: Dict,
+    state: Union[None, Dict[str, Any]],
+):
+    for hook in hook_iterable:
+        _, state = state_registered_hook_call(
+            hook_func=hook, **common_kwargs, state=state
+        )
+
+    return state
+
+
+def state_registered_hook_call(
+    hook_func: Callable,
+    state: Union[Dict[str, Any], None],
+    *args,
+    **kwargs,
+) -> Tuple[Any, Dict[str, Any]]:
+
+    if state is None:
+        state = {}
+
+    state_updates = hook_func(state=state, *args, **kwargs)
+
+    state = {**state, **state_updates}
+
+    return state_updates, state

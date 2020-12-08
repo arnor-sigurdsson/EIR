@@ -100,7 +100,10 @@ def test_set_up_train_and_valid_labels(
     cl_args = create_test_cl_args
     n_classes = len(c.target_classes)
 
-    train_labels_dict, valid_labels_dict = label_setup.set_up_train_and_valid_labels(
+    (
+        train_labels_dict,
+        valid_labels_dict,
+    ) = label_setup.set_up_train_and_valid_tabular_data(
         cl_args=cl_args, custom_label_ops=None
     )
 
@@ -140,7 +143,7 @@ def test_gather_ids_from_data_source(create_test_data):
     test_path = c.scoped_tmp_path / "test_arrays"
     expected_num_samples = c.n_per_class * len(c.target_classes)
 
-    test_ids = label_setup._gather_ids_from_data_source(data_source=test_path)
+    test_ids = label_setup.gather_ids_from_data_source(data_source=test_path)
 
     assert len(test_ids) == expected_num_samples
 
@@ -238,7 +241,7 @@ def test_get_all_label_columns_needed(
     for key, columns in test_input_args.items():
         setattr(args_config, key, columns)
 
-    all_cols = label_setup._get_all_label_columns_needed(
+    all_cols = label_setup._get_label_columns_and_dtypes(
         cl_args=args_config, column_ops=create_test_column_ops
     )
     assert set(all_cols) == set(expected)

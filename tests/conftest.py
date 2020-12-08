@@ -385,7 +385,7 @@ def create_test_model(create_test_cl_args, create_test_datasets):
 
     embedding_dict = set_up_and_save_embeddings_dict(
         embedding_columns=cl_args.extra_cat_columns,
-        labels_dict=train_dataset.labels_dict,
+        labels_dict=train_dataset.target_labels_dict,
         run_folder=run_folder,
     )
 
@@ -526,7 +526,7 @@ def prep_modelling_test_configs(
         criterions=criterions,
         loss_function=loss_module,
         metrics=test_metrics,
-        labels_dict=train_dataset.labels_dict,
+        labels_dict=train_dataset.target_labels_dict,
         target_transformers=train_dataset.target_transformers,
         num_outputs_per_target=num_outputs_per_target,
         target_columns=train_dataset.target_columns,
