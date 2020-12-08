@@ -25,7 +25,7 @@ al_int_tensors = Union[
 
 
 @dataclass
-class MixupOutput:
+class OmicsMixupOutput:
     inputs: torch.Tensor
     targets: "al_training_labels_target"
     targets_permuted: "al_training_labels_target"
@@ -37,43 +37,56 @@ def get_mix_data_hook(mixing_type: str):
     mixing_func_mapping = _get_mixing_function_map()
     mixing_func = mixing_func_mapping.get(mixing_type)
 
-    bound_hook = partial(hook_mix_data, mixing_func=mixing_func)
+    bound_hook = partial(hook_default_mix_data, mixing_func=mixing_func)
 
     return bound_hook
 
 
-def hook_mix_data(
+def hook_default_mix_data(
     config: "Config", state: Dict, mixing_func: Callable, *args, **kwargs
 ) -> Dict:
 
-    batch = state["batch"]
+    lambda_ = _sample_lambda(mixing_alpha=config.cl_args.mixing_alpha)
 
-    mixed_object = mixup_snp_data(
-        inputs=batch.inputs,
+    batch = state["batch"]
+    mixed_inputs = {}
+
+    mixed_omics_object = mixup_omics_data(
+        inputs=batch.inputs["genotype"],
         targets=batch.target_labels,
         target_columns=config.target_columns,
-        alpha=config.cl_args.mixing_alpha,
         mixing_func=mixing_func,
+        lambda_=lambda_,
     )
+    mixed_inputs["genotype"] = mixed_omics_object.inputs
 
-    mixed_extra_input = batch.extra_inputs
-    if batch.extra_inputs is not None:
-        mixed_extra_input = mixup_tensor(
-            tensor=batch.extra_inputs,
-            lambda_=mixed_object.lambda_,
-            random_batch_indices_to_mix=mixed_object.permuted_indexes,
+    if "tabular" in batch.inputs.keys():
+        tabular_input_tensor = batch.inputs["tabular"]
+        mixed_tabular_input_tensor = mixup_tensor(
+            tensor=tabular_input_tensor,
+            lambda_=lambda_,
+            random_batch_indices_to_mix=mixed_omics_object.permuted_indexes,
         )
+        mixed_inputs["tabular"] = mixed_tabular_input_tensor
 
     batch_mixed = Batch(
-        inputs=mixed_object.inputs,
+        inputs=mixed_inputs,
         target_labels=batch.target_labels,
-        extra_inputs=mixed_extra_input,
         ids=batch.ids,
     )
 
-    state_updates = {"batch": batch_mixed, "mixed_snp_data": mixed_object}
+    state_updates = {"batch": batch_mixed, "mixed_snp_data": mixed_omics_object}
 
     return state_updates
+
+
+def _sample_lambda(mixing_alpha: float) -> float:
+    if mixing_alpha > 0:
+        lambda_ = np.random.beta(mixing_alpha, mixing_alpha)
+    else:
+        lambda_ = 1.0
+
+    return lambda_
 
 
 def hook_mix_loss(config: "Config", state: Dict, *args, **kwargs) -> Dict:
@@ -92,20 +105,20 @@ def hook_mix_loss(config: "Config", state: Dict, *args, **kwargs) -> Dict:
 
 def _get_mixing_function_map():
     mapping = {
-        "cutmix-uniform": uniform_cutmix_input,
-        "cutmix-block": block_cutmix_input,
+        "cutmix-uniform": uniform_cutmix_omics_input,
+        "cutmix-block": block_cutmix_omics_input,
         "mixup": mixup_input,
     }
     return mapping
 
 
-def mixup_snp_data(
+def mixup_omics_data(
     inputs: torch.Tensor,
     targets: "al_training_labels_target",
     target_columns: al_target_columns,
     mixing_func: Callable[[torch.Tensor, float, torch.Tensor], torch.Tensor],
-    alpha: float = 1.0,
-) -> MixupOutput:
+    lambda_: float,
+) -> OmicsMixupOutput:
     """
     NOTE: **This function will modify the inputs in-place**
 
@@ -118,13 +131,10 @@ def mixup_snp_data(
 
     An exception is when we use the "vanilla" MixUp, as that calculates a new tensor
     instead of cut-pasting inside an already existing tensor.
+
+    TODO: Refactor lambda_ creation outside of this object.
     """
     assert inputs.dim() == 4, "Should be called with 4 dimensions."
-
-    if alpha > 0:
-        lambda_ = np.random.beta(alpha, alpha)
-    else:
-        lambda_ = 1.0
 
     batch_size = inputs.size()[0]
     random_batch_indices_to_mix = get_random_batch_indices_to_mix(batch_size=batch_size)
@@ -140,7 +150,7 @@ def mixup_snp_data(
         random_batch_indices_to_mix=random_batch_indices_to_mix,
     )
 
-    mixing_output = MixupOutput(
+    mixing_output = OmicsMixupOutput(
         inputs=mixed_inputs,
         targets=targets,
         targets_permuted=targets_permuted,
@@ -185,7 +195,7 @@ def mixup_tensor(
     return mixed_tensor
 
 
-def block_cutmix_input(
+def block_cutmix_omics_input(
     input_batch: torch.Tensor, lambda_: float, random_batch_indices_to_mix: torch.Tensor
 ) -> torch.Tensor:
 
@@ -211,7 +221,7 @@ def get_block_cutmix_indices(input_length: int, lambda_: float) -> Tuple[int, in
     return random_index_start, random_index_end
 
 
-def uniform_cutmix_input(
+def uniform_cutmix_omics_input(
     input_batch: torch.Tensor,
     lambda_: float,
     random_batch_indices_to_mix: torch.Tensor,
@@ -275,7 +285,7 @@ def calc_all_mixed_losses(
     target_columns: al_target_columns,
     criterions: "al_criterions",
     outputs: Dict[str, torch.Tensor],
-    mixed_object: MixupOutput,
+    mixed_object: OmicsMixupOutput,
 ):
 
     losses = {}
