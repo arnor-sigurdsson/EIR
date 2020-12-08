@@ -193,7 +193,7 @@ def get_default_config(
 ) -> "Config":
     run_folder = _prepare_run_folder(run_name=cl_args.run_name)
 
-    target_labels, tabular_input_labels = get_target_and_extra_labels(
+    target_labels, tabular_input_labels = get_target_and_tabular_input_labels(
         cl_args=cl_args,
         custom_label_parsing_operations=hooks.custom_column_label_parsing_ops,
     )
@@ -282,7 +282,7 @@ def get_default_config(
     return config
 
 
-def get_target_and_extra_labels(
+def get_target_and_tabular_input_labels(
     cl_args: argparse.Namespace, custom_label_parsing_operations: al_all_column_ops
 ) -> Tuple[Labels, Labels]:
     all_array_ids = gather_ids_from_data_source(data_source=Path(cl_args.data_source))
@@ -296,15 +296,15 @@ def get_target_and_extra_labels(
         valid_ids=valid_ids,
     )
 
-    extra_labels_info = get_tabular_inputs_label_data(cl_args=cl_args)
-    extra_labels = set_up_train_and_valid_tabular_data(
-        tabular_info=extra_labels_info,
+    tabular_inputs_info = get_tabular_inputs_label_data(cl_args=cl_args)
+    tabular_inputs = set_up_train_and_valid_tabular_data(
+        tabular_info=tabular_inputs_info,
         custom_label_ops=custom_label_parsing_operations,
         train_ids=train_ids,
         valid_ids=valid_ids,
     )
 
-    return target_labels, extra_labels
+    return target_labels, tabular_inputs
 
 
 def set_up_target_label_data(cl_args: argparse.Namespace) -> TabularFileInfo:

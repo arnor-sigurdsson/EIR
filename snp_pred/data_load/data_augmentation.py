@@ -320,14 +320,14 @@ def calc_mixed_loss(
     return total_loss
 
 
-def make_random_snps_missing(
-    array: torch.Tensor, percentage: float = 0.05, probability: float = 1.0
+def make_random_omics_columns_missing(
+    omics_array: torch.Tensor, percentage: float = 0.05, probability: float = 1.0
 ) -> torch.Tensor:
     random_draw = np.random.uniform()
     if random_draw > probability:
-        return array
+        return omics_array
 
-    n_snps = array.shape[2]
+    n_snps = omics_array.shape[2]
     n_to_drop = (int(n_snps * percentage),)
     random_to_drop = np.random.choice(n_snps, n_to_drop, replace=False)
     random_to_drop = torch.tensor(random_to_drop, dtype=torch.long)
@@ -335,6 +335,6 @@ def make_random_snps_missing(
     missing_arr = torch.tensor([False, False, False, True], dtype=torch.bool).reshape(
         -1, 1
     )
-    array[:, :, random_to_drop] = missing_arr
+    omics_array[:, :, random_to_drop] = missing_arr
 
-    return array
+    return omics_array

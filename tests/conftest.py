@@ -421,8 +421,14 @@ def create_test_datasets(create_test_data, create_test_cl_args):
 
     ensure_path_exists(run_path, is_folder=True)
 
+    target_labels, tabular_input_labels = train.get_target_and_tabular_input_labels(
+        cl_args=cl_args, custom_label_parsing_operations=None
+    )
+
     train_dataset, valid_dataset = datasets.set_up_datasets(
-        cl_args=cl_args, custom_label_ops=None
+        cl_args=cl_args,
+        target_labels=target_labels,
+        tabular_inputs_labels=tabular_input_labels,
     )
 
     return train_dataset, valid_dataset

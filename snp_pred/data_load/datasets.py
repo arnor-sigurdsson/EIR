@@ -11,7 +11,7 @@ from torch.nn.functional import pad
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
-from snp_pred.data_load.data_augmentation import make_random_snps_missing
+from snp_pred.data_load.data_augmentation import make_random_omics_columns_missing
 from snp_pred.data_load.label_setup import (
     al_label_dict,
     al_target_columns,
@@ -269,12 +269,12 @@ def _prepare_genotype_array(
     array_bool = genotype_array.to(dtype=torch.bool)
 
     if target_width:
-        right_padding = target_width - genotype_array.shape[2]
-        array_bool = pad(genotype_array, [0, right_padding])
+        right_padding = target_width - array_bool.shape[2]
+        array_bool = pad(array_bool, [False, right_padding])
 
     if na_augment_perc > 0 and na_augment_prob > 0:
-        array_bool = make_random_snps_missing(
-            array=genotype_array,
+        array_bool = make_random_omics_columns_missing(
+            omics_array=array_bool,
             percentage=na_augment_perc,
             probability=na_augment_prob,
         )

@@ -39,7 +39,7 @@ def test_get_weighted_random_sampler(
 
     patched_train_dataset = patch_dataset_to_be_unbalanced(dataset=train_dataset)
     random_sampler = data_loading_funcs.get_weighted_random_sampler(
-        train_dataset=patched_train_dataset, target_columns=target_columns
+        samples=patched_train_dataset.samples, target_columns=target_columns
     )
 
     assert random_sampler.replacement
@@ -52,7 +52,7 @@ def test_get_weighted_random_sampler(
         num_workers=0,
     )
 
-    label_counts = _gather_dataloader_label_distributions(
+    label_counts = _gather_dataloader_target_label_distributions(
         dataloader=train_dataloader, target_col="Origin"
     )
     are_close = _check_if_all_numbers_close(
@@ -69,7 +69,7 @@ def test_get_weighted_random_sampler(
         num_workers=0,
     )
 
-    label_counts_imbalanced = _gather_dataloader_label_distributions(
+    label_counts_imbalanced = _gather_dataloader_target_label_distributions(
         dataloader=train_dataloader, target_col="Origin"
     )
     are_close_imb = _check_if_all_numbers_close(
@@ -95,7 +95,7 @@ def patch_dataset_to_be_unbalanced(dataset):
     cur_values = 0
     for sample in dataset.samples:
 
-        if sample.labels["target_labels"]["Origin"] == 1:
+        if sample.target_labels["Origin"] == 1:
             if cur_values < max_values:
                 new_samples.append(sample)
                 cur_values += 1
@@ -107,7 +107,7 @@ def patch_dataset_to_be_unbalanced(dataset):
     return dataset
 
 
-def _gather_dataloader_label_distributions(
+def _gather_dataloader_target_label_distributions(
     dataloader, target_col: str, num_epochs: int = 5
 ):
     total_counts = {}  # above step function
@@ -117,7 +117,7 @@ def _gather_dataloader_label_distributions(
         for batch in dataloader:
             _, labels, _ = batch
 
-            counts = Counter(labels["target_labels"][target_col].numpy())
+            counts = Counter(labels[target_col].numpy())
             for key, item in counts.items():
                 if key not in total_counts:
                     total_counts[key] = item
@@ -153,12 +153,10 @@ def test_gather_column_sampling_weights(test_labels):
 def generate_test_samples(test_labels: List[int], target_columns: List[str]):
     test_samples = []
     for idx, label in enumerate(test_labels):
-        cur_label_dict = {
-            "target_labels": {column_name: label for column_name in target_columns},
-            "extra_labels": {},
-        }
+        cur_label_dict = {column_name: label for column_name in target_columns}
+        cur_inputs = {"genotype": f"fake_path_{idx}.npy"}
         cur_test_sample = Sample(
-            sample_id=str(idx), array=f"fake_path_{idx}.npy", labels=cur_label_dict
+            sample_id=str(idx), inputs=cur_inputs, target_labels=cur_label_dict
         )
         test_samples.append(cur_test_sample)
 
