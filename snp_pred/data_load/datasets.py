@@ -65,10 +65,6 @@ def set_up_datasets(
 
 
 def _construct_common_dataset_init_params(cl_args: Namespace) -> Dict:
-    """
-    We do not use extra embed columns here because they do not have a transformer
-    associated with them.
-    """
     target_columns = merge_target_columns(
         target_con_columns=cl_args.target_con_columns,
         target_cat_columns=cl_args.target_cat_columns,
@@ -192,21 +188,6 @@ class DatasetBase(Dataset):
                 f"Expected all observations to have a label associated "
                 f"with them, but got {non_labelled}."
             )
-
-
-def _split_labels_into_target_and_extra(
-    sample_labels: al_sample_labels_transformed_all, target_columns: al_target_columns
-) -> al_all_labels:
-
-    target_columns_flat = target_columns["con"] + target_columns["cat"]
-    target_labels = {k: v for k, v in sample_labels.items() if k in target_columns_flat}
-    extra_labels = {
-        k: v for k, v in sample_labels.items() if k not in target_columns_flat
-    }
-
-    split_labels_dict = {"target_labels": target_labels, "extra_labels": extra_labels}
-
-    return split_labels_dict
 
 
 class MemoryDataset(DatasetBase):

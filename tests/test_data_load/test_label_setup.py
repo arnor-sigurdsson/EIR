@@ -5,7 +5,9 @@ from unittest.mock import patch
 import numpy as np
 import pandas as pd
 import pytest
+from sklearn.preprocessing import StandardScaler, LabelEncoder
 
+from data_load.label_setup import merge_target_columns
 from snp_pred.data_load import label_setup
 from snp_pred.data_load.common_ops import ColumnOperation
 
@@ -760,3 +762,163 @@ def test_fill_continuous_nans(get_test_nan_df):
     assert test_df_filled["A"].loc[1] == 3.0
     assert test_df_filled["B"].loc[2] == 2.0
     assert (test_df_filled["C"] == 3.0).all()
+
+
+def get_joblib_patch_target():
+    return "snp_pred.data_load.label_setup.joblib"
+
+
+@patch(get_joblib_patch_target(), autospec=True)
+def test_save_target_transformer(patched_joblib):
+
+    test_transformer = StandardScaler()
+    test_transformer.fit([[1, 2, 3, 4, 5]])
+
+    label_setup.save_label_transformer(
+        run_folder=Path("/tmp/"),
+        transformer_name="harry_du_bois",
+        target_transformer_object=test_transformer,
+    )
+    assert patched_joblib.dump.call_count == 1
+
+    _, m_kwargs = patched_joblib.dump.call_args
+    # check that we have correct name, with target_transformers tagged on
+    assert m_kwargs["filename"].name == "harry_du_bois.save"
+
+
+def test_set_up_all_target_transformers(get_transformer_test_data):
+    df_test_labels, test_target_columns_dict = get_transformer_test_data
+
+    all_target_transformers = label_setup._get_fit_label_transformers(
+        df_labels=df_test_labels, label_columns=test_target_columns_dict
+    )
+
+    height_transformer = all_target_transformers["Height"]
+    assert isinstance(height_transformer, StandardScaler)
+
+    origin_transformer = all_target_transformers["Origin"]
+    assert isinstance(origin_transformer, LabelEncoder)
+
+
+def test_fit_scaler_transformer_on_target_column(get_transformer_test_data):
+    df_test_labels, test_target_columns_dict = get_transformer_test_data
+
+    transformer = label_setup._get_transformer(column_type="con")
+
+    height_transformer = label_setup._fit_transformer_on_label_column(
+        column_series=df_test_labels["Height"], transformer=transformer
+    )
+
+    assert height_transformer.n_samples_seen_ == 3
+    assert height_transformer.mean_ == 170
+    assert height_transformer.transform([[170]]) == 0
+
+
+def test_fit_labelencoder_transformer_on_target_column(get_transformer_test_data):
+    df_test_labels, test_target_columns_dict = get_transformer_test_data
+
+    transformer = label_setup._get_transformer(column_type="cat")
+
+    origin_transformer = label_setup._fit_transformer_on_label_column(
+        column_series=df_test_labels["Origin"], transformer=transformer
+    )
+
+    assert origin_transformer.transform(["Africa"]).item() == 0
+    assert origin_transformer.transform(["Europe"]).item() == 2
+
+
+def test_streamline_values_for_transformer():
+    test_values = np.array([1, 2, 3, 4, 5])
+
+    scaler_transformer = StandardScaler()
+    streamlined_values_scaler = label_setup._streamline_values_for_transformers(
+        transformer=scaler_transformer, values=test_values
+    )
+    assert streamlined_values_scaler.shape == (5, 1)
+
+    encoder_transformer = LabelEncoder()
+    streamlined_values_encoder = label_setup._streamline_values_for_transformers(
+        transformer=encoder_transformer, values=test_values
+    )
+    assert streamlined_values_encoder.shape == (5,)
+
+
+@pytest.mark.parametrize(
+    "test_input_key,expected",
+    [
+        ("1", {"Origin_as_int": 1, "Scaled_height_int": -1}),  # asia
+        ("2", {"Origin_as_int": 0, "Scaled_height_int": 1}),  # africa
+        ("3", {"Origin_as_int": 2, "Scaled_height_int": 0}),  # europe
+    ],
+)
+def test_transform_all_labels_in_sample_targets_only(
+    test_input_key, expected, get_transformer_test_data
+):
+    df_test_labels, test_target_columns_dict = get_transformer_test_data
+
+    target_transformers = label_setup._get_fit_label_transformers(
+        df_labels=df_test_labels,
+        label_columns=test_target_columns_dict,
+    )
+
+    transformed_df = label_setup.transform_label_df(
+        df_labels=df_test_labels, label_transformers=target_transformers
+    )
+
+    transformed_sample_labels = transformed_df.loc[test_input_key].to_dict()
+
+    assert transformed_sample_labels["Origin"] == expected["Origin_as_int"]
+    assert int(transformed_sample_labels["Height"]) == expected["Scaled_height_int"]
+
+
+@pytest.mark.parametrize(
+    "test_input_key,expected",
+    [
+        ("1", {"Extra_con_int": -1}),  # asia
+        ("2", {"Extra_con_int": 1}),  # africa
+        ("3", {"Extra_con_int": 0}),  # europe
+    ],
+)
+def test_transform_all_labels_in_sample_with_extra_con(
+    test_input_key, expected, get_transformer_test_data
+):
+    df_test_labels, test_target_columns_dict = get_transformer_test_data
+
+    df_test_labels["Extra_Con"] = np.nan
+    df_test_labels.loc["1", "Extra_Con"] = 130
+    df_test_labels.loc["2", "Extra_Con"] = 170
+    df_test_labels.loc["3", "Extra_Con"] = 150
+
+    test_target_columns_dict["con"].append("Extra_Con")
+    label_transformers = label_setup._get_fit_label_transformers(
+        df_labels=df_test_labels, label_columns=test_target_columns_dict
+    )
+
+    df_test_labels_transformed = label_setup.transform_label_df(
+        df_labels=df_test_labels, label_transformers=label_transformers
+    )
+
+    transformed_sample_labels = df_test_labels_transformed.loc[test_input_key].to_dict()
+
+    assert int(transformed_sample_labels["Extra_Con"]) == expected["Extra_con_int"]
+
+
+@pytest.mark.parametrize(
+    "test_input,expected",
+    [  # test case 1
+        (
+            (["con_1", "con_2"], ["cat_1", "cat_2"]),
+            {"con": ["con_1", "con_2"], "cat": ["cat_1", "cat_2"]},
+        ),
+        # test case 2
+        ((["con_1", "con_2"], []), {"con": ["con_1", "con_2"], "cat": []}),
+    ],
+)
+def test_merge_target_columns_pass(test_input, expected):
+    test_output = merge_target_columns(*test_input)
+    assert test_output == expected
+
+
+def test_merge_target_columns_fail():
+    with pytest.raises(ValueError):
+        merge_target_columns([], [])

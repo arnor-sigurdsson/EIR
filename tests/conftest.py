@@ -8,6 +8,7 @@ from shutil import rmtree
 from types import SimpleNamespace
 from typing import List, Tuple, Dict
 
+import pandas as pd
 import numpy as np
 import pytest
 from _pytest.fixtures import SubRequest
@@ -615,7 +616,8 @@ def get_transformer_test_data():
         "2": {"Origin": "Africa", "Height": 190},
         "3": {"Origin": "Europe", "Height": 170},
     }
+    test_labels_df = pd.DataFrame(test_labels_dict).T
 
     test_target_columns_dict = {"con": ["Height"], "cat": ["Origin"]}
 
-    return test_labels_dict, test_target_columns_dict
+    return test_labels_df, test_target_columns_dict
