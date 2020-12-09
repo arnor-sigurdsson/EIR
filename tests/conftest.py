@@ -5,11 +5,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from random import shuffle
 from shutil import rmtree
-from types import SimpleNamespace
 from typing import List, Tuple, Dict
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 import pytest
 from _pytest.fixtures import SubRequest
 from aislib.misc_utils import ensure_path_exists
@@ -62,11 +61,11 @@ def parse_test_cl_args(request):
 
 
 @pytest.fixture
-def args_config() -> SimpleNamespace:
+def args_config() -> Namespace:
     """
     TODO: Get from configuration.py, and then modify?
     """
-    test_cl_args = SimpleNamespace(
+    test_cl_args = Namespace(
         **{
             "act_classes": None,
             "act_every_sample_factor": 1,
@@ -346,7 +345,7 @@ def split_test_array_folder(test_folder: Path) -> None:
 
 
 @pytest.fixture()
-def create_test_cl_args(request, args_config, create_test_data) -> SimpleNamespace:
+def create_test_cl_args(request, args_config, create_test_data) -> Namespace:
     c = create_test_data
     test_path = c.scoped_tmp_path
 
@@ -378,20 +377,20 @@ def create_test_cl_args(request, args_config, create_test_data) -> SimpleNamespa
 
 
 @pytest.fixture()
-def create_test_model(create_test_cl_args, create_test_datasets):
+def create_test_model(create_test_cl_args, create_test_labels):
     cl_args = create_test_cl_args
-    train_dataset, _ = create_test_datasets
+    target_labels, tabular_input_labels = create_test_labels
 
-    run_folder = get_run_folder(cl_args.run_name)
+    run_folder = get_run_folder(run_name=cl_args.run_name)
 
     embedding_dict = set_up_and_save_embeddings_dict(
         embedding_columns=cl_args.extra_cat_columns,
-        labels_dict=train_dataset.target_labels_dict,
+        labels_dict=tabular_input_labels.train_labels,
         run_folder=run_folder,
     )
 
     num_outputs_per_class = set_up_num_outputs_per_target(
-        target_transformers=train_dataset.target_transformers
+        target_transformers=target_labels.label_transformers
     )
 
     model = get_model(
@@ -408,7 +407,7 @@ def cleanup(run_path):
 
 
 @pytest.fixture()
-def create_test_datasets(create_test_data, create_test_cl_args):
+def create_test_labels(create_test_data, create_test_cl_args):
     c = create_test_data
 
     cl_args = create_test_cl_args
@@ -425,6 +424,15 @@ def create_test_datasets(create_test_data, create_test_cl_args):
     target_labels, tabular_input_labels = train.get_target_and_tabular_input_labels(
         cl_args=cl_args, custom_label_parsing_operations=None
     )
+
+    return target_labels, tabular_input_labels
+
+
+@pytest.fixture()
+def create_test_datasets(create_test_labels, create_test_cl_args):
+
+    cl_args = create_test_cl_args
+    target_labels, tabular_input_labels = create_test_labels
 
     train_dataset, valid_dataset = datasets.set_up_datasets(
         cl_args=cl_args,
@@ -482,6 +490,7 @@ class ModelTestConfig:
 @pytest.fixture()
 def prep_modelling_test_configs(
     create_test_data,
+    create_test_labels,
     create_test_cl_args,
     create_test_dloaders,
     create_test_model,
@@ -493,22 +502,19 @@ def prep_modelling_test_configs(
     """
     cl_args = create_test_cl_args
     train_loader, valid_loader, train_dataset, valid_dataset = create_test_dloaders
-
-    data_dimension = train._get_data_dimensions(
-        dataset=train_dataset, target_width=cl_args.target_width
-    )
+    target_labels, tabular_inputs_labels = create_test_labels
 
     model = create_test_model
 
     num_outputs_per_target = set_up_num_outputs_per_target(
-        target_transformers=train_dataset.target_transformers
+        target_transformers=target_labels.label_transformers
     )
 
     criterions = train._get_criterions(
         target_columns=train_dataset.target_columns, model_type=cl_args.model_type
     )
     test_metrics = metrics.get_default_metrics(
-        target_transformers=train_dataset.target_transformers
+        target_transformers=target_labels.label_transformers,
     )
     test_metrics = _patch_metrics(metrics_=test_metrics)
 
@@ -533,11 +539,10 @@ def prep_modelling_test_configs(
         criterions=criterions,
         loss_function=loss_module,
         metrics=test_metrics,
-        labels_dict=train_dataset.target_labels_dict,
-        target_transformers=train_dataset.target_transformers,
+        labels_dict=target_labels.train_labels,
+        target_transformers=target_labels.label_transformers,
         num_outputs_per_target=num_outputs_per_target,
         target_columns=train_dataset.target_columns,
-        data_dimension=data_dimension,
         writer=train.get_summary_writer(run_folder=Path("runs", cl_args.run_name)),
         hooks=hooks,
     )

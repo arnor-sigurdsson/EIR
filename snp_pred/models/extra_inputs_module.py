@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 # Aliases
 al_unique_embed_vals = Dict[str, Set[str]]
-al_emb_lookup_dict = Dict[str, Dict[str, Dict[str, int]]]
+al_emb_lookup_dict = Dict[str, Dict[str, Dict[int, int]]]
 
 
 def get_unique_embed_values(
