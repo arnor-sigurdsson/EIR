@@ -40,7 +40,7 @@ from snp_pred.models.models import get_model_class
 from snp_pred.train import (
     prepare_base_batch_default,
     Hooks,
-    set_up_target_label_data,
+    get_tabular_target_label_data,
     get_tabular_inputs_label_data,
 )
 from snp_pred.train_utils.evaluation import PerformancePlotConfig
@@ -229,7 +229,7 @@ def get_target_and_extra_labels_for_predict(
         transformers_to_load=target_cols,
     )
 
-    target_labels_info = set_up_target_label_data(cl_args=train_cl_args)
+    target_labels_info = get_tabular_target_label_data(cl_args=train_cl_args)
     df_target_labels_predict = _load_labels_for_testing(
         tabular_info=target_labels_info,
         ids_to_keep=ids,

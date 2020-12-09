@@ -288,7 +288,7 @@ def get_target_and_tabular_input_labels(
     all_array_ids = gather_ids_from_data_source(data_source=Path(cl_args.data_source))
     train_ids, valid_ids = split_ids(ids=all_array_ids, valid_size=cl_args.valid_size)
 
-    target_labels_info = set_up_target_label_data(cl_args=cl_args)
+    target_labels_info = get_tabular_target_label_data(cl_args=cl_args)
     target_labels = set_up_train_and_valid_tabular_data(
         tabular_info=target_labels_info,
         custom_label_ops=custom_label_parsing_operations,
@@ -307,7 +307,7 @@ def get_target_and_tabular_input_labels(
     return target_labels, tabular_inputs
 
 
-def set_up_target_label_data(cl_args: argparse.Namespace) -> TabularFileInfo:
+def get_tabular_target_label_data(cl_args: argparse.Namespace) -> TabularFileInfo:
 
     table_info = TabularFileInfo(
         file_path=cl_args.label_file,

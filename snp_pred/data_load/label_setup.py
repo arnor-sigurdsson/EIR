@@ -12,7 +12,6 @@ from sklearn.preprocessing import StandardScaler, LabelEncoder
 from tqdm import tqdm
 
 from snp_pred.data_load.common_ops import ColumnOperation
-from snp_pred.train_utils.utils import get_custom_module_submodule
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -54,8 +53,6 @@ def set_up_train_and_valid_tabular_data(
     """
     Splits and does split based processing (e.g. scaling validation set with training
     set for regression) on the labels.
-
-    TODO: Refactor.
     """
 
     parse_wrapper = get_label_parsing_wrapper(
@@ -72,19 +69,10 @@ def set_up_train_and_valid_tabular_data(
         df=df_labels, train_ids=train_ids, valid_ids=valid_ids
     )
 
-    label_columns = {
-        "con": list(tabular_info.con_columns),
-        "cat": list(tabular_info.cat_columns),
-    }
-    label_transformers = _get_fit_label_transformers(
-        df_labels=df_labels_train, label_columns=label_columns
-    )
-
-    df_labels_train, df_labels_valid = _process_train_and_label_dfs(
+    df_labels_train, df_labels_valid, label_transformers = _process_train_and_label_dfs(
         tabular_info=tabular_info,
         df_labels_train=df_labels_train,
         df_labels_valid=df_labels_valid,
-        label_transformers=label_transformers,
     )
 
     train_labels_dict = df_labels_train.to_dict("index")
@@ -128,12 +116,35 @@ def _get_fit_label_transformers(
     return label_transformers
 
 
+def _get_transformer(column_type):
+    if column_type in ("con", "extra_con"):
+        return StandardScaler()
+    elif column_type == "cat":
+        return LabelEncoder()
+
+    raise ValueError()
+
+
 def _fit_transformer_on_label_column(
     column_series: pd.Series,
     transformer: al_label_transformers_object,
 ) -> al_label_transformers_object:
+    """
+    TODO:   Possibly use the categorical codes here directly in the fit call. Then we
+            don't do another pass over all values, and we ensure that the encoder
+            encounters 'NA'.
 
-    series_values = column_series.values
+    If we have a label file, and a column only consists of integers, and we are reading
+    it as a categorical columns. Then, the values of that categorical column are
+    going to be INT. This is still a categorical column, the key element is, how
+    do we change the values of a categorical column?
+    """
+
+    if isinstance(column_series.dtype, pd.CategoricalDtype):
+        series_values = column_series.cat.categories.values
+    else:
+        series_values = column_series.values
+
     series_values_streamlined = _streamline_values_for_transformers(
         transformer=transformer, values=series_values
     )
@@ -141,6 +152,20 @@ def _fit_transformer_on_label_column(
     transformer.fit(series_values_streamlined)
 
     return transformer
+
+
+def _streamline_values_for_transformers(
+    transformer: al_label_transformers_object, values: np.ndarray
+) -> np.ndarray:
+    """
+    LabelEncoder() expects a 1D array, whereas StandardScaler() expects a 2D one.
+    """
+
+    if isinstance(transformer, StandardScaler):
+        values_reshaped = values.reshape(-1, 1)
+        return values_reshaped
+
+    return values
 
 
 def transform_label_df(
@@ -172,16 +197,12 @@ def get_label_parsing_wrapper(
 
 def label_df_parse_wrapper(
     label_file_tabular_info: TabularFileInfo,
-    ids_to_keep: Sequence[str],
+    ids_to_keep: Union[None, Sequence[str]],
     custom_label_ops: al_all_column_ops = None,
 ) -> pd.DataFrame:
     """
-    Note: Here the genomic arrays are the dominant in determining whether we drop or
-    not.
-
-    We have to be careful here that we are not leaking from the test set! Possibly
-    pass in IDs! Then we can have some heuristic upstream to make sure, or split
-    on test IDs. The IDs are really the main "ground truth".
+    Note: Here the genomic arrays are the dominant factor
+    in determining whether we drop or not.
 
     If we start doing multimodal data, we no longer can say that the genomic test set
     is the test set, unless we are careful about syncing all data sources (e.g. images,
@@ -192,7 +213,7 @@ def label_df_parse_wrapper(
     if custom_label_ops is not None:
         column_ops = custom_label_ops
 
-    label_columns, dtypes = _get_label_columns_and_dtypes(
+    label_columns, dtypes = _get_all_label_columns_and_dtypes(
         cat_columns=label_file_tabular_info.cat_columns,
         con_columns=label_file_tabular_info.con_columns,
         column_ops=column_ops,
@@ -206,10 +227,10 @@ def label_df_parse_wrapper(
     )
 
     df_labels_filtered = _filter_ids_from_label_df(
-        df_labels=df_labels, ids_to_keep=tuple(ids_to_keep)
+        df_labels=df_labels, ids_to_keep=ids_to_keep
     )
 
-    df_labels_parsed = _parse_label_df(
+    df_labels_parsed = _apply_column_operations_to_df(
         df=df_labels_filtered, operations_dict=column_ops, label_columns=label_columns
     )
 
@@ -217,8 +238,10 @@ def label_df_parse_wrapper(
         df=df_labels_parsed, needed_label_columns=label_columns
     )
 
+    df_cat_str = ensure_categorical_columns_are_str(df=df_column_filtered)
+
     df_final = _check_parsed_label_df(
-        df_labels=df_column_filtered, supplied_label_columns=label_columns
+        df_labels=df_cat_str, supplied_label_columns=label_columns
     )
 
     return df_final
@@ -226,7 +249,7 @@ def label_df_parse_wrapper(
 
 def chunked_label_df_parse_wrapper(
     label_file_tabular_info: TabularFileInfo,
-    ids_to_keep: Sequence[str],
+    ids_to_keep: Union[None, Sequence[str]],
     custom_label_ops: al_all_column_ops = None,
 ) -> pd.DataFrame:
     """
@@ -245,7 +268,7 @@ def chunked_label_df_parse_wrapper(
     if custom_label_ops is not None:
         column_ops = custom_label_ops
 
-    label_columns, dtypes = _get_label_columns_and_dtypes(
+    label_columns, dtypes = _get_all_label_columns_and_dtypes(
         cat_columns=label_file_tabular_info.cat_columns,
         con_columns=label_file_tabular_info.con_columns,
         column_ops=column_ops,
@@ -263,10 +286,10 @@ def chunked_label_df_parse_wrapper(
     for chunk in chunk_generator:
 
         df_labels_filtered = _filter_ids_from_label_df(
-            df_labels=chunk, ids_to_keep=tuple(ids_to_keep)
+            df_labels=chunk, ids_to_keep=ids_to_keep
         )
 
-        df_labels_parsed = _parse_label_df(
+        df_labels_parsed = _apply_column_operations_to_df(
             df=df_labels_filtered,
             operations_dict=column_ops,
             label_columns=label_columns,
@@ -283,8 +306,10 @@ def chunked_label_df_parse_wrapper(
     dtype_cast = {k: v for k, v in dtypes.items() if k in df_concat.columns}
     df_concat = df_concat.astype(dtype=dtype_cast)
 
+    df_cat_str = ensure_categorical_columns_are_str(df=df_concat)
+
     df_final = _check_parsed_label_df(
-        df_labels=df_concat, supplied_label_columns=label_columns
+        df_labels=df_cat_str, supplied_label_columns=label_columns
     )
 
     return df_final
@@ -333,6 +358,18 @@ def _get_label_df_chunk_generator(
         yield chunk
 
 
+def ensure_categorical_columns_are_str(df: pd.DataFrame) -> pd.DataFrame:
+
+    df_copy = df.copy()
+
+    for column in df_copy.columns:
+        if isinstance(df_copy[column].dtype, pd.CategoricalDtype):
+            mapping = {k: str(k) for k in df_copy[column].cat.categories}
+            df_copy[column] = df_copy[column].cat.rename_categories(mapping)
+
+    return df_copy
+
+
 def gather_ids_from_data_source(data_source: Path):
     iterator = get_array_path_iterator(data_source=data_source)
     logger.debug("Gathering IDs from %s.", data_source)
@@ -365,7 +402,7 @@ def get_array_path_iterator(data_source: Path):
     )
 
 
-def _get_label_columns_and_dtypes(
+def _get_all_label_columns_and_dtypes(
     cat_columns: Sequence[str],
     con_columns: Sequence[str],
     column_ops: al_all_column_ops,
@@ -512,7 +549,7 @@ def _get_currently_available_columns(
 
 
 def _filter_ids_from_label_df(
-    df_labels: pd.DataFrame, ids_to_keep: Tuple[str, ...] = ()
+    df_labels: pd.DataFrame, ids_to_keep: Union[None, Tuple[str, ...]] = None
 ) -> pd.DataFrame:
 
     if not ids_to_keep:
@@ -533,7 +570,7 @@ def _filter_ids_from_label_df(
     return df_filtered
 
 
-def _parse_label_df(
+def _apply_column_operations_to_df(
     df: pd.DataFrame, operations_dict: al_all_column_ops, label_columns: Sequence[str]
 ) -> pd.DataFrame:
     """
@@ -617,8 +654,12 @@ def _check_parsed_label_df(
 
     column_dtypes = df_labels.dtypes.to_dict()
 
-    for dtype in column_dtypes.values():
+    for column, dtype in column_dtypes.items():
         assert isinstance(dtype, pd.CategoricalDtype) or dtype == float
+
+        if isinstance(dtype, pd.CategoricalDtype):
+            categories = df_labels[column].cat.categories
+            assert all(isinstance(i, str) for i in categories)
 
     return df_labels
 
@@ -633,52 +674,6 @@ def _drop_not_needed_label_columns(
         df = df.drop(to_drop, axis=1)
 
     return df
-
-
-def _get_custom_column_ops(custom_lib: str) -> al_all_column_ops:
-    """
-    We want to grab operations from a custom library for the current run, as defined
-    by the COLUMN_OPS specifications.
-
-    :param custom_lib: Path to the custom library to try loading custom column
-    operations from.
-    :return: Loaded CUSTOM_OPS variable to be used by other functions to process label
-    columns.
-    """
-    custom_column_ops_module = get_custom_module_submodule(
-        custom_lib, "custom_column_ops"
-    )
-
-    # If the user has not defined custom_column_ops, we're fine with that
-    if not custom_column_ops_module:
-        return {}
-
-    if not hasattr(custom_column_ops_module, "COLUMN_OPS"):
-        raise ImportError(
-            f"'COLUMN_OPS' variable must be defined in "
-            f"{custom_column_ops_module} for custom label operations."
-            f""
-        )
-
-    column_ops: al_all_column_ops = custom_column_ops_module.COLUMN_OPS
-
-    # Also if they have defined an empty COLUMN_OPS, we don't want things to break
-    if column_ops is None:
-        return {}
-
-    return column_ops
-
-
-def _split_df(df: pd.DataFrame, valid_size: Union[int, float]) -> al_train_val_dfs:
-    train_ids, valid_ids = train_test_split(
-        list(df.index), test_size=valid_size, random_state=0
-    )
-
-    df_labels_train = df.loc[df.index.intersection(train_ids)]
-    df_labels_valid = df.loc[df.index.intersection(valid_ids)]
-    assert len(df_labels_train) + len(df_labels_valid) == len(df)
-
-    return df_labels_train, df_labels_valid
 
 
 def _split_df_by_ids(
@@ -709,14 +704,13 @@ def _process_train_and_label_dfs(
     tabular_info: TabularFileInfo,
     df_labels_train: pd.DataFrame,
     df_labels_valid: pd.DataFrame,
-    label_transformers: al_label_transformers,
-) -> al_train_val_dfs:
+) -> Tuple[pd.DataFrame, pd.DataFrame, al_label_transformers]:
 
     train_con_means = _get_con_manual_vals_dict(
         df=df_labels_train, con_columns=tabular_info.con_columns
     )
 
-    df_labels_train = handle_missing_label_values_in_df(
+    df_labels_train_no_nan = handle_missing_label_values_in_df(
         df=df_labels_train,
         cat_label_columns=tabular_info.cat_columns,
         con_label_columns=tabular_info.con_columns,
@@ -724,7 +718,7 @@ def _process_train_and_label_dfs(
         name="train df",
     )
 
-    df_labels_valid = handle_missing_label_values_in_df(
+    df_labels_valid_no_nan = handle_missing_label_values_in_df(
         df=df_labels_valid,
         cat_label_columns=tabular_info.cat_columns,
         con_label_columns=tabular_info.con_columns,
@@ -732,14 +726,21 @@ def _process_train_and_label_dfs(
         name="valid df",
     )
 
-    df_labels_train_transformed = transform_label_df(
-        df_labels=df_labels_train, label_transformers=label_transformers
+    label_columns = {
+        "con": list(tabular_info.con_columns),
+        "cat": list(tabular_info.cat_columns),
+    }
+    fit_label_transformers = _get_fit_label_transformers(
+        df_labels=df_labels_train_no_nan, label_columns=label_columns
     )
-    df_labels_valid_transformed = transform_label_df(
-        df_labels=df_labels_valid, label_transformers=label_transformers
+    df_train_final = transform_label_df(
+        df_labels=df_labels_train_no_nan, label_transformers=fit_label_transformers
+    )
+    df_valid_final = transform_label_df(
+        df_labels=df_labels_valid_no_nan, label_transformers=fit_label_transformers
     )
 
-    return df_labels_train_transformed, df_labels_valid_transformed
+    return df_train_final, df_valid_final, fit_label_transformers
 
 
 def _get_con_manual_vals_dict(
@@ -826,28 +827,6 @@ def get_transformer_path(run_path: Path, transformer_name: str) -> Path:
     transformer_path = run_path / "transformers" / f"{transformer_name}.save"
 
     return transformer_path
-
-
-def _get_transformer(column_type):
-    if column_type in ("con", "extra_con"):
-        return StandardScaler()
-    elif column_type == "cat":
-        return LabelEncoder()
-
-    raise ValueError()
-
-
-def _streamline_values_for_transformers(
-    transformer: al_label_transformers_object, values: np.ndarray
-) -> np.ndarray:
-    """
-    LabelEncoder() expects a 1D array, whereas StandardScaler() expects a 2D one.
-    """
-
-    if isinstance(transformer, StandardScaler):
-        values_reshaped = values.reshape(-1, 1)
-        return values_reshaped
-    return values
 
 
 def merge_target_columns(

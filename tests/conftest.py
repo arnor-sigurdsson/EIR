@@ -62,7 +62,7 @@ def parse_test_cl_args(request):
 
 
 @pytest.fixture
-def args_config():
+def args_config() -> SimpleNamespace:
     """
     TODO: Get from configuration.py, and then modify?
     """
@@ -346,7 +346,7 @@ def split_test_array_folder(test_folder: Path) -> None:
 
 
 @pytest.fixture()
-def create_test_cl_args(request, args_config, create_test_data):
+def create_test_cl_args(request, args_config, create_test_data) -> SimpleNamespace:
     c = create_test_data
     test_path = c.scoped_tmp_path
 
