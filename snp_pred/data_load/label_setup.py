@@ -364,6 +364,7 @@ def ensure_categorical_columns_are_str(df: pd.DataFrame) -> pd.DataFrame:
 
     for column in df_copy.columns:
         if isinstance(df_copy[column].dtype, pd.CategoricalDtype):
+
             mapping = {k: str(k) for k in df_copy[column].cat.categories}
             df_copy[column] = df_copy[column].cat.rename_categories(mapping)
 
@@ -705,6 +706,14 @@ def _process_train_and_label_dfs(
     df_labels_train: pd.DataFrame,
     df_labels_valid: pd.DataFrame,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, al_label_transformers]:
+    """
+    NOTE: Possibly, we will run into problem here in the future in the scenario that
+    we have NA in the df_valid, but not in df_train. Then, we will have to add call
+    to a helper function (e.g. _match_df_category_columns). Another even more
+    problematic scenario is if we only have NA in the test set (because here we have
+    knowledge of both train / valid, so we can match them, but we cannot assume we
+    have access to the test set at the time of training).
+    """
 
     train_con_means = _get_con_manual_vals_dict(
         df=df_labels_train, con_columns=tabular_info.con_columns
@@ -773,7 +782,9 @@ def handle_missing_label_values_in_df(
 
 
 def _fill_categorical_nans(
-    df: pd.DataFrame, column_names: Sequence[str], name: str = "df"
+    df: pd.DataFrame,
+    column_names: Sequence[str],
+    name: str = "df",
 ) -> pd.DataFrame:
     """
     Note when dealing with categories, we have to make sure it exists in the parent
@@ -788,7 +799,10 @@ def _fill_categorical_nans(
         name,
     )
     for column in column_names:
-        df[column] = df[column].cat.add_categories("NA").fillna("NA")
+
+        na_found = df[column].isna().sum() != 0
+        if na_found:
+            df[column] = df[column].cat.add_categories("NA").fillna("NA")
 
     return df
 
@@ -818,7 +832,7 @@ def _get_missing_stats_string(
 ) -> Dict[str, int]:
     missing_count_dict = {}
     for col in columns_to_check:
-        missing_count_dict[col] = int(df[col].isnull().sum())
+        missing_count_dict[col] = int(df[col].isna().sum())
 
     return missing_count_dict
 

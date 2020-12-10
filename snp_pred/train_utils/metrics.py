@@ -150,6 +150,15 @@ def calc_mcc(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
 def calc_roc_auc_ovr(
     outputs: np.ndarray, labels: np.ndarray, average: str = "macro", *args, **kwargs
 ) -> float:
+    """
+    TODO:   In rare scenarios, we might run into the issue of not having all labels
+            represented in the labels array (i.e. labels were in train, but not in
+            valid). This is not a problem for metrics like MCC / accuracy, but we
+            will have to account for this here and in the AP calculation, possibly
+            by ignoring columns in outputs and label_binarize outputs where the columns
+            returned from label_binarize are all 0.
+    """
+
     assert average in ["micro", "macro"]
 
     if outputs.shape[1] > 2:
@@ -167,12 +176,13 @@ def calc_average_precision_ovr(
 
     assert average in ["micro", "macro"]
 
-    labels_bin = label_binarize(y=labels, classes=sorted(np.unique(labels)))
-    if outputs.shape[1] == 2:
+    if outputs.shape[1] > 2:
+        labels = label_binarize(y=labels, classes=sorted(np.unique(labels)))
+    else:
         outputs = outputs[:, 1]
 
     average_precision = average_precision_score(
-        y_true=labels_bin, y_score=outputs, average=average
+        y_true=labels, y_score=outputs, average=average
     )
 
     return average_precision

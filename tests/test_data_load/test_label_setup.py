@@ -977,6 +977,11 @@ def get_test_nan_args():
 
 
 def test_process_train_and_label_dfs(get_test_nan_df, get_test_nan_args):
+    """
+    NOTE:   Here we have the situation where we have NA in valid, but not in train. This
+            means that we have to make sure we have manually added the 'NA' to train.
+    """
+
     test_df = get_test_nan_df
     cl_args = get_test_nan_args
 
@@ -985,11 +990,13 @@ def test_process_train_and_label_dfs(get_test_nan_df, get_test_nan_args):
     )
 
     train_df = test_df.copy()
+    valid_df = test_df.copy()
+
     for cat_col in label_info.cat_columns:
         train_df[cat_col] = train_df[cat_col].cat.add_categories(5)
-    train_df = train_df.fillna(5)
+        train_df[cat_col] = train_df[cat_col].cat.add_categories("NA")
 
-    valid_df = test_df
+    train_df = train_df.fillna(5)
 
     train_df = label_setup.ensure_categorical_columns_are_str(df=train_df)
     valid_df = label_setup.ensure_categorical_columns_are_str(df=valid_df)
