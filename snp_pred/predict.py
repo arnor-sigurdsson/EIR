@@ -230,7 +230,7 @@ def get_target_and_extra_labels_for_predict(
     )
 
     target_labels_info = get_tabular_target_label_data(cl_args=train_cl_args)
-    df_target_labels_predict = _load_labels_for_testing(
+    df_target_labels_predict = _load_labels_for_predict(
         tabular_info=target_labels_info,
         ids_to_keep=ids,
         custom_label_ops=custom_column_label_parsing_ops,
@@ -242,21 +242,24 @@ def get_target_and_extra_labels_for_predict(
     )
 
     tabular_cols = train_cl_args.extra_cat_columns + train_cl_args.extra_con_columns
-    extra_transformers = _load_transformers(
-        run_name=train_cl_args.run_name,
-        transformers_to_load=tabular_cols,
-    )
-    extra_labels_info = get_tabular_inputs_label_data(cl_args=train_cl_args)
-    df_extra_labels_predict = _load_labels_for_testing(
-        tabular_info=extra_labels_info,
-        ids_to_keep=ids,
-        custom_label_ops=custom_column_label_parsing_ops,
-    )
-    extra_labels_dict = parse_labels_for_testing(
-        tabular_info=extra_labels_info,
-        df_labels_test=df_extra_labels_predict,
-        label_transformers=extra_transformers,
-    )
+    if len(tabular_cols) > 0:
+        extra_transformers = _load_transformers(
+            run_name=train_cl_args.run_name,
+            transformers_to_load=tabular_cols,
+        )
+        extra_labels_info = get_tabular_inputs_label_data(cl_args=train_cl_args)
+        df_extra_labels_predict = _load_labels_for_predict(
+            tabular_info=extra_labels_info,
+            ids_to_keep=ids,
+            custom_label_ops=custom_column_label_parsing_ops,
+        )
+        extra_labels_dict = parse_labels_for_testing(
+            tabular_info=extra_labels_info,
+            df_labels_test=df_extra_labels_predict,
+            label_transformers=extra_transformers,
+        )
+    else:
+        extra_labels_dict = {}
 
     return target_labels_dict, extra_labels_dict
 
@@ -387,7 +390,7 @@ def _modify_train_cl_args_for_testing(
     return train_cl_args_mod
 
 
-def _load_labels_for_testing(
+def _load_labels_for_predict(
     tabular_info: TabularFileInfo,
     ids_to_keep: Sequence[str],
     custom_label_ops: al_all_column_ops = None,

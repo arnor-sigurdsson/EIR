@@ -1,6 +1,5 @@
 from argparse import Namespace
 from pathlib import Path
-from unittest.mock import patch
 
 import pandas as pd
 import pytest
@@ -78,7 +77,7 @@ def test_modify_train_cl_args_for_testing():
     ],
     indirect=True,
 )
-def test_load_labels_for_testing(
+def test_load_labels_for_predict(
     create_test_data, create_test_datasets, create_test_cl_args, keep_outputs
 ):
     """
@@ -86,12 +85,17 @@ def test_load_labels_for_testing(
     as the testing-set.
     """
     cl_args = create_test_cl_args
-    # so we test the scaling of the test set as well
 
     run_path = Path(f"runs/{cl_args.run_name}/")
 
-    test_labels_dict = predict._load_labels_for_testing(test_train_cl_args_mix=cl_args)
-    df_test = pd.DataFrame.from_dict(test_labels_dict, orient="index")
+    test_ids = predict.gather_ids_from_data_source(
+        data_source=Path(cl_args.data_source)
+    )
+    tabular_info = predict.set_up_all_label_data(cl_args=cl_args)
+
+    df_test = predict._load_labels_for_predict(
+        tabular_info=tabular_info, ids_to_keep=test_ids
+    )
 
     # make sure that target column is unchanged (within expected bounds)
     con_target_column = cl_args.target_con_columns[0]
@@ -110,7 +114,6 @@ def test_load_labels_for_testing(
         cleanup(run_path)
 
 
-@patch("snp_pred.predict._load_transformers", autospec=True)
 @pytest.mark.parametrize("create_test_data", [{"task_type": "multi"}], indirect=True)
 @pytest.mark.parametrize(
     "create_test_cl_args",
@@ -120,22 +123,35 @@ def test_load_labels_for_testing(
     ],
     indirect=True,
 )
-def test_set_up_test_dataset(
-    mocked_load_transformers, create_test_data, create_test_cl_args
-):
+def test_set_up_test_dataset(create_test_data, create_test_cl_args):
     test_data_config = create_test_data
     c = test_data_config
     cl_args = create_test_cl_args
     classes_tested = sorted(list(c.target_classes.keys()))
 
-    test_labels_dict = predict._load_labels_for_testing(test_train_cl_args_mix=cl_args)
+    test_ids = predict.gather_ids_from_data_source(
+        data_source=Path(cl_args.data_source)
+    )
+    tabular_info = predict.set_up_all_label_data(cl_args=cl_args)
+
+    df_test = predict._load_labels_for_predict(
+        tabular_info=tabular_info, ids_to_keep=test_ids
+    )
 
     target_column = create_test_cl_args.target_cat_columns[0]
     mock_encoder = LabelEncoder().fit(["Asia", "Europe", "Africa"])
-    mocked_load_transformers.return_value = {target_column: mock_encoder}
+    transformers = {target_column: mock_encoder}
+
+    df_test_dict = predict.parse_labels_for_testing(
+        tabular_info=tabular_info,
+        df_labels_test=df_test,
+        label_transformers=transformers,
+    )
 
     test_dataset = predict._set_up_test_dataset(
-        test_train_cl_args_mix=cl_args, test_labels_dict=test_labels_dict
+        test_train_cl_args_mix=cl_args,
+        test_labels_dict=df_test_dict,
+        tabular_inputs_labels_dict=None,
     )
 
     exp_no_samples = c.n_per_class * len(classes_tested)
@@ -144,6 +160,7 @@ def test_set_up_test_dataset(
         dataset=test_dataset,
         exp_no_sample=exp_no_samples,
         classes_tested=classes_tested,
+        target_transformers=transformers,
         target_column=target_column,
     )
 
@@ -191,7 +208,11 @@ def test_predict(keep_outputs, prep_modelling_test_configs):
         num_workers=0,
     )
 
-    predict.predict(predict_cl_args=predict_cl_args)
+    predict_config = predict.get_default_predict_config(
+        run_folder=test_config.run_path, predict_cl_args=predict_cl_args
+    )
+
+    predict.predict(predict_cl_args=predict_cl_args, predict_config=predict_config)
 
     df_test = pd.read_csv(test_path / "predictions.csv", index_col="ID")
 

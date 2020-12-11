@@ -413,16 +413,22 @@ def create_test_labels(create_test_data, create_test_cl_args):
     cl_args = create_test_cl_args
     cl_args.data_source = str(c.scoped_tmp_path / "test_arrays")
 
-    run_path = Path(f"runs/{cl_args.run_name}/")
+    run_folder = get_run_folder(run_name=cl_args.run_name)
 
     # TODO: Use better logic here, to do the cleanup. Should not be in this fixture.
-    if run_path.exists():
-        cleanup(run_path)
+    if run_folder.exists():
+        cleanup(run_folder)
 
-    ensure_path_exists(run_path, is_folder=True)
+    ensure_path_exists(run_folder, is_folder=True)
 
     target_labels, tabular_input_labels = train.get_target_and_tabular_input_labels(
         cl_args=cl_args, custom_label_parsing_operations=None
+    )
+    train.save_transformer_set(
+        transformers=target_labels.label_transformers, run_folder=run_folder
+    )
+    train.save_transformer_set(
+        transformers=tabular_input_labels.label_transformers, run_folder=run_folder
     )
 
     return target_labels, tabular_input_labels
@@ -545,6 +551,13 @@ def prep_modelling_test_configs(
         target_columns=train_dataset.target_columns,
         writer=train.get_summary_writer(run_folder=Path("runs", cl_args.run_name)),
         hooks=hooks,
+    )
+
+    keys_to_serialize = train.get_default_config_keys_to_serialize()
+    train.serialize_config(
+        config=config,
+        run_folder=get_run_folder(cl_args.run_name),
+        keys_to_serialize=keys_to_serialize,
     )
 
     test_config = _get_cur_modelling_test_config(
