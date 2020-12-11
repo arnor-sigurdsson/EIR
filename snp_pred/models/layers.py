@@ -410,7 +410,7 @@ class SplitMLPResidualBlock(nn.Module):
         dropout_p: float = 0.0,
         full_preactivation: bool = False,
         zero_init_last_bn: bool = False,
-        reduce_both: bool = False,
+        reduce_both: bool = True,
     ):
         super().__init__()
 
