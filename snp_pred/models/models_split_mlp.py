@@ -1,8 +1,8 @@
 from collections import OrderedDict
 from copy import copy
 from dataclasses import dataclass
-from typing import Dict, List, Callable, Sequence
 from functools import partial
+from typing import Dict, List, Callable, Sequence
 
 import torch
 from aislib.misc_utils import get_logger
@@ -43,7 +43,7 @@ class SplitMLPModel(ModelBase):
 
         in_feat = num_chunks * self.cl_args.fc_repr_dim
 
-        task_names = tuple(self.num_classes.keys())
+        task_names = tuple(self.num_outputs_per_target.keys())
         task_resblocks_kwargs = {
             "in_features": self.fc_task_dim,
             "out_features": self.fc_task_dim,
@@ -71,7 +71,8 @@ class SplitMLPModel(ModelBase):
         )
 
         final_layer = get_final_layer(
-            in_features=self.fc_task_dim, num_classes=self.num_classes
+            in_features=self.fc_task_dim,
+            num_outputs_per_target=self.num_outputs_per_target,
         )
 
         self.multi_task_branches = merge_module_dicts(
@@ -104,15 +105,15 @@ class SplitMLPModel(ModelBase):
     def _init_weights(self):
         pass
 
-    def forward(
-        self, x: torch.Tensor, extra_inputs: torch.Tensor = None
-    ) -> Dict[str, torch.Tensor]:
-        out = flatten_h_w_fortran(x=x)
+    def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        genotype = inputs["genotype"]
+        out = flatten_h_w_fortran(x=genotype)
 
         out = self.fc_0(out)
 
-        if extra_inputs is not None:
-            out_extra = self.fc_extra(extra_inputs)
+        tabular = inputs.get("tabular", None)
+        if tabular is not None:
+            out_extra = self.fc_extra(tabular)
             out = torch.cat((out_extra, out), dim=1)
 
         out = calculate_module_dict_outputs(
@@ -154,7 +155,7 @@ class FullySplitMLPModel(ModelBase):
         )
 
         cur_dim = self.split_blocks[-1].out_features
-        task_names = tuple(self.num_classes.keys())
+        task_names = tuple(self.num_outputs_per_target.keys())
         task_resblocks_kwargs = {
             "in_features": self.fc_task_dim,
             "out_features": self.fc_task_dim,
@@ -179,7 +180,8 @@ class FullySplitMLPModel(ModelBase):
         )
 
         final_layer = get_final_layer(
-            in_features=self.fc_task_dim, num_classes=self.num_classes
+            in_features=self.fc_task_dim,
+            num_outputs_per_target=self.num_outputs_per_target,
         )
 
         self.multi_task_branches = merge_module_dicts(
@@ -212,16 +214,16 @@ class FullySplitMLPModel(ModelBase):
     def _init_weights(self):
         pass
 
-    def forward(
-        self, x: torch.Tensor, extra_inputs: torch.Tensor = None
-    ) -> Dict[str, torch.Tensor]:
-        out = flatten_h_w_fortran(x=x)
+    def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        genotype = inputs["genotype"]
+        out = flatten_h_w_fortran(x=genotype)
 
         out = self.fc_0(out)
         out = self.split_blocks(out)
 
-        if extra_inputs is not None:
-            out_extra = self.fc_extra(extra_inputs)
+        tabular = inputs.get("tabular", None)
+        if tabular is not None:
+            out_extra = self.fc_extra(tabular)
             out = torch.cat((out_extra, out), dim=1)
 
         out = calculate_module_dict_outputs(

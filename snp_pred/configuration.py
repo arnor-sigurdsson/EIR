@@ -1,4 +1,5 @@
 import argparse
+
 import configargparse
 import torch
 from aislib.misc_utils import get_logger
@@ -252,6 +253,7 @@ def get_train_argument_parser() -> configargparse.ArgumentParser:
         default=None,
         help="Total width of input sequence after padding.",
     )
+
     parser_.add_argument(
         "--data_source",
         type=str,

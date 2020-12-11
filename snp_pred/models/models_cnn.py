@@ -1,6 +1,6 @@
 from argparse import Namespace
 from collections import OrderedDict
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, TYPE_CHECKING
 
 import torch
 from aislib import pytorch_utils
@@ -8,13 +8,16 @@ from aislib.misc_utils import get_logger
 from aislib.pytorch_modules import Swish
 from torch import nn
 
-from snp_pred.data_load.datasets import al_num_classes
 from snp_pred.models.layers import FirstCNNBlock, SelfAttention, CNNResidualBlock
 from snp_pred.models.models_base import (
     ModelBase,
     calculate_module_dict_outputs,
     assert_module_dict_uniqueness,
 )
+
+if TYPE_CHECKING:
+    from snp_pred.train import al_num_outputs_per_target
+
 
 logger = get_logger(__name__)
 
@@ -43,7 +46,7 @@ class CNNModel(ModelBase):
         )
 
         self.multi_task_branches = _get_cnn_multi_task_branches(
-            num_classes=self.num_classes,
+            num_outputs_per_target=self.num_outputs_per_target,
             fc_task_dim=self.fc_task_dim,
             fc_repr_and_extra_dim=self.fc_repr_and_extra_dim,
             fc_do=self.cl_args.fc_do,
@@ -84,17 +87,18 @@ class CNNModel(ModelBase):
             return residual_blocks
         return self.cl_args.layers
 
-    def forward(
-        self, x: torch.Tensor, extra_inputs: torch.Tensor = None
-    ) -> Dict[str, torch.Tensor]:
-        out = self.conv(x)
+    def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        genotype = inputs["genotype"]
+
+        out = self.conv(genotype)
         out = out.view(out.shape[0], -1)
 
         out = self.fc_1(out)
 
-        if extra_inputs is not None:
-            out_extra = self.fc_extra(extra_inputs)
-            out = torch.cat((out_extra, out), dim=1)
+        tabular = inputs.get("tabular")
+        if tabular is not None:
+            out_tabular = self.fc_extra(tabular)
+            out = torch.cat((out_tabular, out), dim=1)
 
         out = calculate_module_dict_outputs(
             input_=out, module_dict=self.multi_task_branches
@@ -107,14 +111,14 @@ def _get_cnn_multi_task_branches(
     fc_repr_and_extra_dim: int,
     fc_task_dim: int,
     fc_do: float,
-    num_classes: al_num_classes,
+    num_outputs_per_target: "al_num_outputs_per_target",
 ) -> nn.ModuleDict:
     """
     TODO: Remove this in favor of branch factories as used in other modesl
     """
 
     module_dict = {}
-    for key, num_classes in num_classes.items():
+    for key, num_outputs_per_target in num_outputs_per_target.items():
         branch_layers = OrderedDict(
             {
                 "fc_2_bn_1": nn.BatchNorm1d(fc_repr_and_extra_dim),
@@ -131,7 +135,8 @@ def _get_cnn_multi_task_branches(
 
         task_layer_branch = nn.Sequential(
             OrderedDict(
-                **branch_layers, **{"fc_3_final": nn.Linear(fc_task_dim, num_classes)}
+                **branch_layers,
+                **{"fc_3_final": nn.Linear(fc_task_dim, num_outputs_per_target)}
             )
         )
 

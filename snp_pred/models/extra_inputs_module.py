@@ -1,7 +1,7 @@
 from argparse import Namespace
 from collections import OrderedDict
 from pathlib import Path
-from typing import List, Dict, Set, Union, overload, TYPE_CHECKING
+from typing import List, Dict, Set, Union, overload, TYPE_CHECKING, Sequence
 
 import joblib
 import torch
@@ -15,17 +15,18 @@ if TYPE_CHECKING:
 
 # Aliases
 al_unique_embed_vals = Dict[str, Set[str]]
-al_emb_lookup_dict = Dict[str, Dict[str, Dict[str, int]]]
+al_emb_lookup_dict = Dict[str, Dict[str, Dict[int, int]]]
 
 
 def get_unique_embed_values(
-    labels_dict: al_label_dict, embedding_cols: List[str]
+    labels_dict: al_label_dict, embedding_cols: Sequence[str]
 ) -> al_unique_embed_vals:
     unique_embeddings_dict = OrderedDict((i, set()) for i in sorted(embedding_cols))
 
     for sample_labels in labels_dict.values():
         for key, value in sample_labels.items():
             if key in embedding_cols:
+                assert isinstance(value, int)
                 unique_embeddings_dict[key].add(value)
 
     return unique_embeddings_dict
@@ -51,8 +52,10 @@ def get_embedding_dict(
     Simple wrapper function to call other embedding functions to create embedding
     dictionary.
     """
-    unique_embs = get_unique_embed_values(labels_dict, embedding_cols)
-    emb_lookup_dict = set_up_embedding_lookups(unique_embs)
+    unique_embs = get_unique_embed_values(
+        labels_dict=labels_dict, embedding_cols=embedding_cols
+    )
+    emb_lookup_dict = set_up_embedding_lookups(unique_emb_dict=unique_embs)
 
     return emb_lookup_dict
 
@@ -76,10 +79,12 @@ def set_up_and_save_embeddings_dict(embedding_columns, labels_dict, run_folder):
     We need to save it for test time models to be able to load.
     """
     if embedding_columns:
-        embedding_dict = get_embedding_dict(labels_dict, embedding_columns)
+        embedding_dict = get_embedding_dict(
+            labels_dict=labels_dict, embedding_cols=embedding_columns
+        )
         outpath = run_folder / "extra_inputs" / "embeddings.save"
-        ensure_path_exists(outpath)
-        joblib.dump(embedding_dict, outpath)
+        ensure_path_exists(path=outpath)
+        joblib.dump(value=embedding_dict, filename=outpath)
         return embedding_dict
 
     return None
@@ -120,27 +125,21 @@ def get_extra_continuous_inputs_from_labels(
 
 def lookup_embeddings(
     model: nn.Module,
-    embeddings_dict: al_emb_lookup_dict,
     embedding_col: str,
-    extra_labels: List[str],
-    device: str,
+    labels: Sequence[torch.Tensor],
 ) -> torch.Tensor:
     """
     This produces a batch of embeddings, with dimensions N x embed_dim.
     """
-    cur_lookup_table = embeddings_dict[embedding_col]["lookup_table"]
-    cur_lookup_indexes = [cur_lookup_table.get(i) for i in extra_labels]
-    cur_lookup_indexes = torch.tensor(cur_lookup_indexes, dtype=torch.long)
-    cur_lookup_indexes = cur_lookup_indexes.to(device)
 
-    cur_embedding_module = getattr(model, "embed_" + embedding_col)
-    cur_embedding = cur_embedding_module(cur_lookup_indexes)
+    cur_embedding_module: nn.Embedding = getattr(model, "embed_" + embedding_col)
+    cur_embedding = cur_embedding_module(labels)
 
     return cur_embedding
 
 
 def get_embeddings_from_labels(
-    extra_labels: Dict[str, List[str]], model: nn.Module, device: str
+    labels: Dict[str, Sequence[torch.Tensor]], model: nn.Module
 ) -> torch.Tensor:
 
     """
@@ -148,17 +147,15 @@ def get_embeddings_from_labels(
     of embeddings for a given extra categorical column.
     """
 
-    if not extra_labels:
+    if labels is None:
         raise ValueError("No extra labels found for when looking up embeddings.")
 
     extra_embeddings = []
     for col_key in model.embeddings_dict:
         cur_embedding = lookup_embeddings(
             model=model,
-            embeddings_dict=model.embeddings_dict,
             embedding_col=col_key,
-            extra_labels=extra_labels[col_key],
-            device=device,
+            labels=labels[col_key],
         )
         extra_embeddings.append(cur_embedding)
 
@@ -168,7 +165,7 @@ def get_embeddings_from_labels(
 
 
 def get_extra_inputs(
-    cl_args: Namespace, model: nn.Module, labels: "al_training_labels_extra"
+    cl_args: Namespace, model: nn.Module, tabular_input: "al_training_labels_extra"
 ) -> Union[torch.Tensor, None]:
     """
     We want to have a wrapper function to gather all extra inputs needed by the model.
@@ -176,9 +173,7 @@ def get_extra_inputs(
     extra_embeddings = None
     if cl_args.extra_cat_columns:
 
-        extra_embeddings = get_embeddings_from_labels(
-            extra_labels=labels, model=model, device=cl_args.device
-        )
+        extra_embeddings = get_embeddings_from_labels(labels=tabular_input, model=model)
 
         if not cl_args.extra_con_columns:
             return extra_embeddings.to(device=cl_args.device)
@@ -187,7 +182,7 @@ def get_extra_inputs(
     if cl_args.extra_con_columns:
 
         extra_continuous = get_extra_continuous_inputs_from_labels(
-            extra_labels=labels, continuous_columns=cl_args.extra_con_columns
+            extra_labels=tabular_input, continuous_columns=cl_args.extra_con_columns
         )
 
         if not cl_args.extra_cat_columns:

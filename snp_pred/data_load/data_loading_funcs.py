@@ -7,7 +7,7 @@ from torch.utils.data import WeightedRandomSampler
 
 if TYPE_CHECKING:
     from snp_pred.data_load.datasets import (  # noqa: F401
-        ArrayDatasetBase,
+        DatasetBase,
         Sample,
     )
 
@@ -18,9 +18,7 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 al_sample_weight_and_counts = Dict[str, Union[torch.Tensor, List[int]]]
 
 
-def get_weighted_random_sampler(
-    train_dataset: "ArrayDatasetBase", target_columns: List[str]
-):
+def get_weighted_random_sampler(samples: Iterable["Sample"], target_columns: List[str]):
     """
     Labels spec:
 
@@ -40,7 +38,7 @@ def get_weighted_random_sampler(
     then just parsing the label (converting to int in the case of classification).
     """
     all_column_weights = _gather_column_sampling_weights(
-        samples=train_dataset.samples, target_columns=target_columns
+        samples=samples, target_columns=target_columns
     )
 
     samples_weighted, num_sample_per_epoch = _aggregate_column_sampling_weights(
@@ -56,12 +54,12 @@ def get_weighted_random_sampler(
 
 
 def _gather_column_sampling_weights(
-    samples: List["Sample"], target_columns: List[str]
+    samples: Iterable["Sample"], target_columns: Iterable[str]
 ) -> Dict[str, al_sample_weight_and_counts]:
     all_target_label_weight_dicts = {}
 
     for column in target_columns:
-        cur_label_iterable = (i.labels["target_labels"][column] for i in samples)
+        cur_label_iterable = (i.target_labels[column] for i in samples)
         cur_weight_dict = _get_column_label_weights_and_counts(
             label_iterable=cur_label_iterable
         )

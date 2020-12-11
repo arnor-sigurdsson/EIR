@@ -22,11 +22,19 @@ def test_hook_mix_data():
     pass
 
 
+def test_sample_lambda():
+    no_alpha = data_augmentation._sample_lambda(mixing_alpha=0)
+    assert no_alpha == 1.0
+
+    alpha = data_augmentation._sample_lambda(mixing_alpha=1.0)
+    assert alpha != 1.0
+
+
 def test_hook_mix_loss():
     pass
 
 
-def test_mixup_snp_data():
+def test_mixup_omics_data():
     pass
 
 
@@ -87,7 +95,7 @@ def test_mixup_tensor(input_length: int, input_height: int, lambda_: float) -> N
         unique=True,
     ).map(lambda x: sorted(x))
 )
-def test_block_cutmix_input(patched_indices: List[int]) -> None:
+def test_block_cutmix_omics_input(patched_indices: List[int]) -> None:
     """
     We need it to be sorted here to avoid indexing with e.g. [521:3]
     """
@@ -109,7 +117,7 @@ def test_block_cutmix_input(patched_indices: List[int]) -> None:
         return_value=patched_indices,
         autospec=True,
     ):
-        block_cutmixed_test_arrays = data_augmentation.block_cutmix_input(
+        block_cutmixed_test_arrays = data_augmentation.block_cutmix_omics_input(
             input_batch=test_batch,
             lambda_=1.0,
             random_batch_indices_to_mix=batch_indices_for_mixing,
@@ -158,7 +166,7 @@ def test_get_block_cutmix_indices(input_length: int, lambda_: float):
         elements=integers(min_value=0, max_value=999), min_size=10, max_size=1000
     )
 )
-def test_uniform_cutmix_input(patched_indices: List[int]):
+def test_uniform_cutmix_omics_input(patched_indices: List[int]):
     """
     Here we explicitly cut from 1 --> 0 and vice versa.
 
@@ -186,7 +194,7 @@ def test_uniform_cutmix_input(patched_indices: List[int]):
         return_value=patched_indices_tensor,
         autospec=True,
     ):
-        uniform_cutmixed_test_arrays = data_augmentation.uniform_cutmix_input(
+        uniform_cutmixed_test_arrays = data_augmentation.uniform_cutmix_omics_input(
             input_batch=test_batch,
             lambda_=1.0,
             random_batch_indices_to_mix=batch_indices_for_mixing,
@@ -316,7 +324,7 @@ def test_calc_all_mixed_losses(test_inputs, expected_output):
 
     targets = {c: test_inputs["targets"] for c in all_target_columns}
     targets_permuted = {c: test_inputs["targets_permuted"] for c in all_target_columns}
-    mixed_object = data_augmentation.MixupOutput(
+    mixed_object = data_augmentation.OmicsMixupOutput(
         inputs=torch.zeros(0),
         targets=targets,
         targets_permuted=targets_permuted,
@@ -356,7 +364,7 @@ def test_make_random_snps_missing_some():
         mock_return = np.array([1, 2, 3, 4, 5])
         mock_target.return_value = mock_return
 
-        array = data_augmentation.make_random_snps_missing(test_array)
+        array = data_augmentation.make_random_omics_columns_missing(test_array)
 
         # check that all columns have one filled value
         assert (array.sum(1) != 1).sum() == 0
@@ -369,8 +377,8 @@ def test_make_random_snps_missing_all():
     test_array = torch.zeros((1, 4, 1000), dtype=torch.bool)
     test_array[:, 0, :] = True
 
-    array = data_augmentation.make_random_snps_missing(
-        array=test_array, percentage=1.0, probability=1.0
+    array = data_augmentation.make_random_omics_columns_missing(
+        omics_array=test_array, percentage=1.0, probability=1.0
     )
 
     assert (array.sum(1) != 1).sum() == 0
@@ -381,8 +389,8 @@ def test_make_random_snps_missing_none():
     test_array = torch.zeros((1, 4, 1000), dtype=torch.bool)
     test_array[:, 0, :] = True
 
-    array = data_augmentation.make_random_snps_missing(
-        array=test_array, percentage=1.0, probability=0.0
+    array = data_augmentation.make_random_omics_columns_missing(
+        omics_array=test_array, percentage=1.0, probability=0.0
     )
 
     assert (array.sum(1) != 1).sum() == 0

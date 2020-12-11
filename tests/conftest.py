@@ -5,10 +5,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from random import shuffle
 from shutil import rmtree
-from types import SimpleNamespace
 from typing import List, Tuple, Dict
 
 import numpy as np
+import pandas as pd
 import pytest
 from _pytest.fixtures import SubRequest
 from aislib.misc_utils import ensure_path_exists
@@ -19,7 +19,7 @@ from torch.utils.data import DataLoader
 from snp_pred import train
 from snp_pred.data_load import datasets
 from snp_pred.models.extra_inputs_module import set_up_and_save_embeddings_dict
-from snp_pred.train import Config, get_model
+from snp_pred.train import Config, get_model, set_up_num_outputs_per_target
 from snp_pred.train_utils import optimizers, metrics
 from snp_pred.train_utils.utils import (
     configure_root_logger,
@@ -61,11 +61,11 @@ def parse_test_cl_args(request):
 
 
 @pytest.fixture
-def args_config():
+def args_config() -> Namespace:
     """
     TODO: Get from configuration.py, and then modify?
     """
-    test_cl_args = SimpleNamespace(
+    test_cl_args = Namespace(
         **{
             "act_classes": None,
             "act_every_sample_factor": 1,
@@ -77,6 +77,7 @@ def args_config():
             "extra_con_columns": [],
             "custom_lib": None,
             "data_source": "REPLACE_ME",
+            "debug": False,
             "device": "cuda:0" if cuda.is_available() else "cpu",
             "dilation_factor": 1,
             "dataloader_workers": 1,
@@ -344,7 +345,7 @@ def split_test_array_folder(test_folder: Path) -> None:
 
 
 @pytest.fixture()
-def create_test_cl_args(request, args_config, create_test_data):
+def create_test_cl_args(request, args_config, create_test_data) -> Namespace:
     c = create_test_data
     test_path = c.scoped_tmp_path
 
@@ -376,21 +377,25 @@ def create_test_cl_args(request, args_config, create_test_data):
 
 
 @pytest.fixture()
-def create_test_model(create_test_cl_args, create_test_datasets):
+def create_test_model(create_test_cl_args, create_test_labels):
     cl_args = create_test_cl_args
-    train_dataset, _ = create_test_datasets
+    target_labels, tabular_input_labels = create_test_labels
 
-    run_folder = get_run_folder(cl_args.run_name)
+    run_folder = get_run_folder(run_name=cl_args.run_name)
 
     embedding_dict = set_up_and_save_embeddings_dict(
         embedding_columns=cl_args.extra_cat_columns,
-        labels_dict=train_dataset.labels_dict,
+        labels_dict=tabular_input_labels.train_labels,
         run_folder=run_folder,
+    )
+
+    num_outputs_per_class = set_up_num_outputs_per_target(
+        target_transformers=target_labels.label_transformers
     )
 
     model = get_model(
         cl_args=cl_args,
-        num_classes=train_dataset.num_classes,
+        num_outputs_per_target=num_outputs_per_class,
         embedding_dict=embedding_dict,
     )
 
@@ -402,22 +407,43 @@ def cleanup(run_path):
 
 
 @pytest.fixture()
-def create_test_datasets(create_test_data, create_test_cl_args):
+def create_test_labels(create_test_data, create_test_cl_args):
     c = create_test_data
 
     cl_args = create_test_cl_args
     cl_args.data_source = str(c.scoped_tmp_path / "test_arrays")
 
-    run_path = Path(f"runs/{cl_args.run_name}/")
+    run_folder = get_run_folder(run_name=cl_args.run_name)
 
     # TODO: Use better logic here, to do the cleanup. Should not be in this fixture.
-    if run_path.exists():
-        cleanup(run_path)
+    if run_folder.exists():
+        cleanup(run_folder)
 
-    ensure_path_exists(run_path, is_folder=True)
+    ensure_path_exists(run_folder, is_folder=True)
+
+    target_labels, tabular_input_labels = train.get_target_and_tabular_input_labels(
+        cl_args=cl_args, custom_label_parsing_operations=None
+    )
+    train.save_transformer_set(
+        transformers=target_labels.label_transformers, run_folder=run_folder
+    )
+    train.save_transformer_set(
+        transformers=tabular_input_labels.label_transformers, run_folder=run_folder
+    )
+
+    return target_labels, tabular_input_labels
+
+
+@pytest.fixture()
+def create_test_datasets(create_test_labels, create_test_cl_args):
+
+    cl_args = create_test_cl_args
+    target_labels, tabular_input_labels = create_test_labels
 
     train_dataset, valid_dataset = datasets.set_up_datasets(
-        cl_args=cl_args, custom_label_ops=None
+        cl_args=cl_args,
+        target_labels=target_labels,
+        tabular_inputs_labels=tabular_input_labels,
     )
 
     return train_dataset, valid_dataset
@@ -470,6 +496,7 @@ class ModelTestConfig:
 @pytest.fixture()
 def prep_modelling_test_configs(
     create_test_data,
+    create_test_labels,
     create_test_cl_args,
     create_test_dloaders,
     create_test_model,
@@ -481,18 +508,19 @@ def prep_modelling_test_configs(
     """
     cl_args = create_test_cl_args
     train_loader, valid_loader, train_dataset, valid_dataset = create_test_dloaders
-
-    data_dimension = train._get_data_dimensions(
-        dataset=train_dataset, target_width=cl_args.target_width
-    )
+    target_labels, tabular_inputs_labels = create_test_labels
 
     model = create_test_model
+
+    num_outputs_per_target = set_up_num_outputs_per_target(
+        target_transformers=target_labels.label_transformers
+    )
 
     criterions = train._get_criterions(
         target_columns=train_dataset.target_columns, model_type=cl_args.model_type
     )
     test_metrics = metrics.get_default_metrics(
-        target_transformers=train_dataset.target_transformers
+        target_transformers=target_labels.label_transformers,
     )
     test_metrics = _patch_metrics(metrics_=test_metrics)
 
@@ -517,12 +545,19 @@ def prep_modelling_test_configs(
         criterions=criterions,
         loss_function=loss_module,
         metrics=test_metrics,
-        labels_dict=train_dataset.labels_dict,
-        target_transformers=train_dataset.target_transformers,
+        labels_dict=target_labels.train_labels,
+        target_transformers=target_labels.label_transformers,
+        num_outputs_per_target=num_outputs_per_target,
         target_columns=train_dataset.target_columns,
-        data_dimension=data_dimension,
         writer=train.get_summary_writer(run_folder=Path("runs", cl_args.run_name)),
         hooks=hooks,
+    )
+
+    keys_to_serialize = train.get_default_config_keys_to_serialize()
+    train.serialize_config(
+        config=config,
+        run_folder=get_run_folder(cl_args.run_name),
+        keys_to_serialize=keys_to_serialize,
     )
 
     test_config = _get_cur_modelling_test_config(
@@ -590,3 +625,17 @@ def _get_test_sample_folder(run_path: Path, iteration: int, column_name: str) ->
     sample_folder = run_path / f"results/{column_name}/samples/{iteration}"
 
     return sample_folder
+
+
+@pytest.fixture()
+def get_transformer_test_data():
+    test_labels_dict = {
+        "1": {"Origin": "Asia", "Height": 150},
+        "2": {"Origin": "Africa", "Height": 190},
+        "3": {"Origin": "Europe", "Height": 170},
+    }
+    test_labels_df = pd.DataFrame(test_labels_dict).T
+
+    test_target_columns_dict = {"con": ["Height"], "cat": ["Origin"]}
+
+    return test_labels_df, test_target_columns_dict

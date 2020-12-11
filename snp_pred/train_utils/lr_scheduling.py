@@ -147,12 +147,14 @@ def set_up_lr_scheduler(
         num_events = _get_total_num_events(
             n_epochs=cl_args.n_epochs, iter_per_epoch=len(c.train_loader)
         )
-        _plot_lr_schedule(
-            lr_scheduler=lr_scheduler,
-            num_events=num_events,
-            output_folder=handler_config.run_folder,
-            lr_scheduler_args=lr_scheduler_args,
-        )
+
+        if cl_args.debug:
+            _plot_lr_schedule(
+                lr_scheduler=lr_scheduler,
+                num_events=num_events,
+                output_folder=handler_config.run_folder,
+                lr_scheduler_args=lr_scheduler_args,
+            )
 
     elif cl_args.lr_schedule == "plateau":
         logger.info("Plateau patience set to %d.", cl_args.lr_plateau_patience)

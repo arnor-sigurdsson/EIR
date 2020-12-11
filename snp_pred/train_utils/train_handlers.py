@@ -12,8 +12,8 @@ from ignite.contrib.handlers import ProgressBar
 from ignite.engine import Events, Engine, events
 from ignite.handlers import ModelCheckpoint, EarlyStopping
 from ignite.metrics import RunningAverage
-from torch.utils.tensorboard import SummaryWriter
 from torch import nn
+from torch.utils.tensorboard import SummaryWriter
 
 from snp_pred.data_load.data_utils import get_target_columns_generator
 from snp_pred.data_load.label_setup import al_target_columns

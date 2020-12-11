@@ -47,14 +47,15 @@ class MLPModel(ModelBase):
 
         branches = create_multi_task_blocks_with_first_adaptor_block(
             num_blocks=self.cl_args.layers[0],
-            branch_names=self.num_classes.keys(),
+            branch_names=self.num_outputs_per_target.keys(),
             block_constructor=initialize_modules_from_spec,
             block_constructor_kwargs={"spec": layer_spec},
             first_layer_kwargs_overload={"spec": first_layer_spec},
         )
 
         final_layer = get_final_layer(
-            in_features=self.fc_task_dim, num_classes=self.num_classes
+            in_features=self.fc_task_dim,
+            num_outputs_per_target=self.num_outputs_per_target,
         )
 
         self.multi_task_branches = merge_module_dicts((branches, final_layer))
@@ -72,17 +73,17 @@ class MLPModel(ModelBase):
     def _init_weights(self):
         pass
 
-    def forward(
-        self, x: torch.Tensor, extra_inputs: torch.Tensor = None
-    ) -> Dict[str, torch.Tensor]:
-        out = x.view(x.shape[0], -1)
+    def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        genotype = inputs["genotype"]
+        out = genotype.view(genotype.shape[0], -1)
 
         out = self.fc_0(out)
 
         out = self.fc_0_act(out)
 
-        if extra_inputs is not None:
-            out_extra = self.fc_extra(extra_inputs)
+        tabular = inputs.get("tabular", None)
+        if tabular is not None:
+            out_extra = self.fc_extra(tabular)
             out = torch.cat((out_extra, out), dim=1)
 
         out = calculate_module_dict_outputs(

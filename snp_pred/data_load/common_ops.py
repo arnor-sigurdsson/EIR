@@ -18,6 +18,7 @@ class ColumnOperation:
     function_args: Dict[str, Any]
     extra_columns_deps: Union[Tuple[str, ...], None] = ()
     only_apply_if_target: bool = False
+    column_dtypes: Union[Dict[str, Any], None] = None
 
 
 def streamline_df(
