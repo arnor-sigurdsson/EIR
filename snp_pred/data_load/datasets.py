@@ -154,13 +154,16 @@ class DatasetBase(Dataset):
         for sample_id in tqdm(sample_id_iter, desc="Progress"):
             sample_target_labels = self.target_labels_dict.get(sample_id, {})
 
-            sample_tabular_inputs = self.extra_tabular_labels_dict.get(sample_id, {})
             sample_array_input = array_hook(files.get(sample_id))
 
             sample_inputs = {
                 "genotype": sample_array_input,
-                "tabular": sample_tabular_inputs,
             }
+            if self.extra_tabular_labels_dict:
+                sample_tabular_inputs = self.extra_tabular_labels_dict.get(
+                    sample_id, {}
+                )
+                sample_inputs["tabular"] = sample_tabular_inputs
 
             cur_sample = Sample(
                 sample_id=sample_id,

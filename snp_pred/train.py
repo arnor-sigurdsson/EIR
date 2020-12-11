@@ -288,6 +288,7 @@ def get_target_and_tabular_input_labels(
     all_array_ids = gather_ids_from_data_source(data_source=Path(cl_args.data_source))
     train_ids, valid_ids = split_ids(ids=all_array_ids, valid_size=cl_args.valid_size)
 
+    logger.info("Setting up target labels.")
     target_labels_info = get_tabular_target_label_data(cl_args=cl_args)
     target_labels = set_up_train_and_valid_tabular_data(
         tabular_info=target_labels_info,
@@ -297,12 +298,19 @@ def get_target_and_tabular_input_labels(
     )
 
     tabular_inputs_info = get_tabular_inputs_label_data(cl_args=cl_args)
-    tabular_inputs = set_up_train_and_valid_tabular_data(
-        tabular_info=tabular_inputs_info,
-        custom_label_ops=custom_label_parsing_operations,
-        train_ids=train_ids,
-        valid_ids=valid_ids,
-    )
+
+    n_cat_tabular = len(tabular_inputs_info.cat_columns)
+    n_con_tabular = len(tabular_inputs_info.con_columns)
+    if n_cat_tabular + n_con_tabular > 0:
+        logger.info("Setting up tabular inputs.")
+        tabular_inputs = set_up_train_and_valid_tabular_data(
+            tabular_info=tabular_inputs_info,
+            custom_label_ops=custom_label_parsing_operations,
+            train_ids=train_ids,
+            valid_ids=valid_ids,
+        )
+    else:
+        tabular_inputs = Labels(train_labels={}, valid_labels={}, label_transformers={})
 
     return target_labels, tabular_inputs
 
@@ -545,22 +553,16 @@ def _get_criterions(
 ) -> al_criterions:
     criterions_dict = {}
 
-    def calc_bce(input, target):
-        # note we use input and not e.g. input_ here because torch uses name "input"
-        # in loss functions for compatibility
-        bce_loss_func = nn.BCELoss()
-        return bce_loss_func(input[:, 1], target.to(dtype=torch.float))
-
     def get_criterion(column_type_):
 
         if model_type == "linear":
             if column_type_ == "cat":
-                return calc_bce
+                return _calc_bce
             else:
-                return nn.MSELoss(reduction="mean")
+                return partial(_calc_mse, mse_loss_func=nn.MSELoss(reduction="mean"))
 
         if column_type_ == "con":
-            return nn.MSELoss()
+            return partial(_calc_mse, mse_loss_func=nn.MSELoss())
         elif column_type_ == "cat":
             return nn.CrossEntropyLoss()
 
@@ -573,6 +575,17 @@ def _get_criterions(
         criterions_dict[column_name] = criterion
 
     return criterions_dict
+
+
+def _calc_bce(input, target):
+    # note we use input and not e.g. input_ here because torch uses name "input"
+    # in loss functions for compatibility
+    bce_loss_func = nn.BCELoss()
+    return bce_loss_func(input[:, 1], target.to(dtype=torch.float))
+
+
+def _calc_mse(input, target, mse_loss_func: nn.MSELoss):
+    return mse_loss_func(input=input.squeeze(), target=target.squeeze())
 
 
 def _get_loss_callable(criterions: al_criterions):
@@ -810,12 +823,16 @@ def prepare_base_batch_default(
             labels=target_labels,
         )
 
-    tabular = get_extra_inputs(cl_args=cl_args, model=model, labels=inputs["tabular"])
+    inputs_prepared = {"genotype": train_seqs}
 
-    inputs = {"genotype": train_seqs, "tabular": tabular}
+    if "tabular" in inputs:
+        tabular = get_extra_inputs(
+            cl_args=cl_args, model=model, tabular_input=inputs["tabular"]
+        )
+        inputs_prepared["tabular"] = tabular
 
     batch = Batch(
-        inputs=inputs,
+        inputs=inputs_prepared,
         target_labels=target_labels,
         ids=train_ids,
     )
@@ -828,7 +845,7 @@ def hook_default_model_forward(
 ) -> Dict:
 
     inputs = batch.inputs
-    train_outputs = config.model(x=inputs["genotype"], extra_inputs=inputs["tabular"])
+    train_outputs = config.model(inputs=inputs)
 
     state_updates = {"model_outputs": train_outputs}
 

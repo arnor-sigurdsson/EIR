@@ -60,13 +60,13 @@ class LinearModel(ModelBase):
             return _parse_categorical
         return _parse_continuous
 
-    def forward(
-        self, x: torch.Tensor, extra_inputs: torch.Tensor = None
-    ) -> Dict[str, torch.Tensor]:
-        out = x.view(x.shape[0], -1)
+    def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        genotype = inputs["genotype"]
+        out = genotype.view(genotype.shape[0], -1)
 
-        if extra_inputs is not None:
-            out = torch.cat((out, extra_inputs), dim=1)
+        tabular = inputs.get("tabular", None)
+        if tabular is not None:
+            out = torch.cat((out, tabular), dim=1)
 
         out = self.fc_1(out)
         out = self.act(out)

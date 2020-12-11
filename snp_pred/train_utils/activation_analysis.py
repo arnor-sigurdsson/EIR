@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from copy import deepcopy
 from functools import partial
 from pathlib import Path
-from typing import Union, Callable, Dict, Tuple, List, TYPE_CHECKING, Sequence
+from typing import Union, Callable, Dict, Tuple, List, TYPE_CHECKING, Sequence, Iterable
 
 import numpy as np
 import pandas as pd
@@ -15,13 +15,13 @@ from aislib.misc_utils import get_logger, ensure_path_exists
 from ignite.engine import Engine
 from shap import DeepExplainer
 from sklearn.preprocessing import StandardScaler, LabelEncoder
+from torch import nn
 from torch.utils.data import DataLoader, Subset
 
 import snp_pred.visualization.activation_visualization as av
 from snp_pred.data_load.data_utils import get_target_columns_generator
 from snp_pred.data_load.datasets import al_datasets
 from snp_pred.models import model_training_utils
-from snp_pred.models.extra_inputs_module import get_extra_inputs
 from snp_pred.models.model_training_utils import gather_dloader_samples
 from snp_pred.models.models_cnn import CNNModel
 from snp_pred.models.models_mlp import MLPModel
@@ -29,6 +29,7 @@ from snp_pred.train_utils.evaluation import validation_handler
 from snp_pred.train_utils.utils import (
     prep_sample_outfolder,
     validate_handler_dependencies,
+    call_hooks_stage_iterable,
 )
 
 if TYPE_CHECKING:
@@ -45,6 +46,37 @@ al_gradients_dict = Dict[str, List[np.ndarray]]
 al_top_gradients_dict = Dict[str, Dict[str, np.ndarray]]
 al_scaled_grads_dict = Dict[str, Dict[str, np.ndarray]]
 al_transform_funcs = Dict[str, Tuple[Callable]]
+
+
+class WrapperModelForSHAP(nn.Module):
+    """
+    We need this wrapper module because SHAP only handles torch.Tensor or
+    List[torch.Tensor] inputs (literally checks for list). However, we do not want to
+    restrict our modules to only accept those formats, rather using a dict. Hence
+    we use this module to accept the list SHAP expects, but call the wrapped model with
+    a matched dict.
+    """
+
+    def __init__(self, wrapped_model, input_names: Iterable[str], *args, **kwargs):
+        super().__init__()
+        self.wrapped_model = wrapped_model
+        self.input_names = input_names
+
+    def match_tuple_inputs_and_names(
+        self, input_sequence: Sequence[torch.Tensor]
+    ) -> Dict[str, torch.Tensor]:
+
+        if isinstance(input_sequence, torch.Tensor):
+            input_sequence = list(input_sequence)
+
+        matched = {k: v for k, v in zip(self.input_names, input_sequence)}
+
+        return matched
+
+    def forward(self, *inputs):
+        matched_inputs = self.match_tuple_inputs_and_names(input_sequence=inputs)
+
+        return self.wrapped_model(matched_inputs)
 
 
 @contextmanager
@@ -124,41 +156,40 @@ def activation_analysis_handler(
 
 
 def _get_background_samples_for_shap_object(batch_size: int):
-    no_explainer_background_samples = np.max([int(batch_size / 8), 16])
+    no_explainer_background_samples = np.max([int(batch_size / 8), 32])
     return no_explainer_background_samples
 
 
 def get_shap_object(
     config: "Config",
-    model: Union[CNNModel, MLPModel],
+    model: nn.Module,
     column_name: str,
     train_loader: DataLoader,
     n_background_samples: int = 64,
 ):
     c = config
-    cl_args = c.cl_args
 
     background, labels, ids = gather_dloader_samples(
         batch_prep_hook=c.hooks.step_func_hooks.base_prepare_batch,
-        batch_prep_hook_kwargs={"config": c, "state": None},
+        batch_prep_hook_kwargs={"config": c},
         data_loader=train_loader,
         n_samples=n_background_samples,
     )
 
-    extra_inputs = get_extra_inputs(cl_args=cl_args, model=c.model, labels=None)
-
-    # detach for shap
-    if extra_inputs is not None:
-        extra_inputs = extra_inputs.detach()
-
-    shap_inputs = [i for i in (background, extra_inputs) if i is not None]
+    if "tabular" in background:
+        background["tabular"] = background["tabular"].detach()
 
     hook_partial = partial(
         _grab_single_target_from_model_output_hook, output_target_column=column_name
     )
     hook_handle = model.register_forward_hook(hook_partial)
 
-    explainer = DeepExplainer(model=model, data=shap_inputs)
+    # Convert to list for wrapper model
+    input_names, input_values = zip(*background.items())
+    input_names, input_values = list(input_names), list(input_values)
+
+    wrapped_model = WrapperModelForSHAP(wrapped_model=model, input_names=input_names)
+    explainer = DeepExplainer(model=wrapped_model, data=input_values)
 
     return explainer, hook_handle
 
@@ -364,35 +395,35 @@ def accumulate_activations(
         target_classes_numerical=target_classes_numerical,
     )
 
-    for single_sample, sample_label, sample_id in activations_data_loader:
-        # we want to keep the original sample for masking
-        single_sample_copy = deepcopy(single_sample).cpu().numpy().squeeze()
-        sample_target_labels = sample_label["target_labels"]
-        sample_extra_labels = sample_label["extra_labels"]
+    for loader_batch in activations_data_loader:
 
-        cur_label_name = _get_target_class_name(
-            sample_label=sample_target_labels[target_column],
-            target_transformer=target_transformer,
-            column_type=column_type,
-            target_column_name=target_column,
+        state = call_hooks_stage_iterable(
+            hook_iterable=c.hooks.step_func_hooks.base_prepare_batch,
+            common_kwargs={"config": c, "loader_batch": loader_batch},
+            state=None,
         )
+        batch = state["batch"]
+
+        sample_inputs = batch.inputs
+        sample_target_labels = batch.target_labels
+
+        # we want to keep the original sample for masking
+        inputs_genotype = sample_inputs["genotype"]
+        single_sample_copy = deepcopy(inputs_genotype).cpu().numpy().squeeze()
 
         # apply pre-processing functions on sample and input
+        # TODO: Update to account for all inputs, so don't use extra tabular
         for pre_func in transform_funcs.get("pre", ()):
-            single_sample, sample_label = pre_func(
-                single_sample=single_sample, sample_label=sample_target_labels
+            inputs_genotype, _ = pre_func(
+                single_sample=inputs_genotype, sample_label=sample_target_labels
             )
+            sample_inputs["genotype"] = inputs_genotype
 
-        extra_inputs = get_extra_inputs(
-            cl_args=cl_args, model=c.model, labels=sample_extra_labels
-        )
-        # detach for shap
-        if extra_inputs is not None:
-            extra_inputs = extra_inputs.detach()
+        if "tabular" in sample_inputs:
+            sample_inputs["tabular"] = sample_inputs["tabular"].detach()
 
-        shap_inputs = [i for i in (single_sample, extra_inputs) if i is not None]
         sample_acts = act_func(
-            inputs=shap_inputs, sample_label=sample_target_labels[target_column]
+            inputs=sample_inputs, sample_label=sample_target_labels[target_column]
         )
         if sample_acts is not None:
             # currently we are only going to get acts for snps
@@ -403,6 +434,13 @@ def accumulate_activations(
             # apply post-processing functions on activations
             for post_func in transform_funcs.get("post", ()):
                 sample_acts = post_func(sample_acts)
+
+            cur_label_name = _get_target_class_name(
+                sample_label=sample_target_labels[target_column],
+                target_transformer=target_transformer,
+                column_type=column_type,
+                target_column_name=target_column,
+            )
 
             acc_acts[cur_label_name].append(sample_acts.squeeze())
 
@@ -452,10 +490,6 @@ def _get_activations_dataloader(
     )
     data_loader = DataLoader(dataset=subset_dataset, **common_args)
     return data_loader
-
-
-def _get_activations_base_structure() -> Dict:
-    pass
 
 
 def _get_categorical_sample_indices_for_activations(
@@ -543,7 +577,9 @@ def get_shap_sample_acts_deep_correct_only(
     TODO: Add functionality to use ranked_outputs or all outputs.
     """
     with suppress_stdout():
-        output = explainer.shap_values(inputs, ranked_outputs=1)
+        explained_input_order = explainer.explainer.model.input_names
+        list_inputs = [inputs[n] for n in explained_input_order]
+        output = explainer.shap_values(list_inputs, ranked_outputs=1)
 
     if column_type == "con":
         assert isinstance(output[0], np.ndarray)
@@ -564,7 +600,9 @@ def get_shap_sample_acts_deep_all_classes(
     column_type: str,
 ):
     with suppress_stdout():
-        output = explainer.shap_values(inputs)
+        explained_input_order = explainer.explainer.model.input_names
+        list_inputs = [inputs[n] for n in explained_input_order]
+        output = explainer.shap_values(list_inputs)
 
     if column_type == "con":
         assert isinstance(output[0], np.ndarray)

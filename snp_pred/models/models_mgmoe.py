@@ -147,15 +147,15 @@ class MGMoEModel(ModelBase):
     def l1_penalized_weights(self) -> torch.Tensor:
         return self.fc_0[0].weight
 
-    def forward(
-        self, x: torch.Tensor, extra_inputs: torch.Tensor = None
-    ) -> Dict[str, torch.Tensor]:
-        out = x.view(x.shape[0], -1)
+    def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        genotype = inputs["genotype"]
+        out = genotype.view(genotype.shape[0], -1)
 
         out = self.fc_0(out)
 
-        if extra_inputs is not None:
-            out = torch.cat((extra_inputs, out), dim=1)
+        tabular = inputs.get("tabular", None)
+        if tabular is not None:
+            out = torch.cat((tabular, out), dim=1)
 
         gate_attentions = calculate_module_dict_outputs(
             input_=out, module_dict=self.gates

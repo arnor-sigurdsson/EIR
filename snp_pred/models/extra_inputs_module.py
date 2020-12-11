@@ -147,7 +147,7 @@ def get_embeddings_from_labels(
     of embeddings for a given extra categorical column.
     """
 
-    if not labels:
+    if labels is None:
         raise ValueError("No extra labels found for when looking up embeddings.")
 
     extra_embeddings = []
@@ -165,7 +165,7 @@ def get_embeddings_from_labels(
 
 
 def get_extra_inputs(
-    cl_args: Namespace, model: nn.Module, labels: "al_training_labels_extra"
+    cl_args: Namespace, model: nn.Module, tabular_input: "al_training_labels_extra"
 ) -> Union[torch.Tensor, None]:
     """
     We want to have a wrapper function to gather all extra inputs needed by the model.
@@ -173,7 +173,7 @@ def get_extra_inputs(
     extra_embeddings = None
     if cl_args.extra_cat_columns:
 
-        extra_embeddings = get_embeddings_from_labels(labels=labels, model=model)
+        extra_embeddings = get_embeddings_from_labels(labels=tabular_input, model=model)
 
         if not cl_args.extra_con_columns:
             return extra_embeddings.to(device=cl_args.device)
@@ -182,7 +182,7 @@ def get_extra_inputs(
     if cl_args.extra_con_columns:
 
         extra_continuous = get_extra_continuous_inputs_from_labels(
-            extra_labels=labels, continuous_columns=cl_args.extra_con_columns
+            extra_labels=tabular_input, continuous_columns=cl_args.extra_con_columns
         )
 
         if not cl_args.extra_cat_columns:

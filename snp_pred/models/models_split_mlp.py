@@ -105,15 +105,15 @@ class SplitMLPModel(ModelBase):
     def _init_weights(self):
         pass
 
-    def forward(
-        self, x: torch.Tensor, extra_inputs: torch.Tensor = None
-    ) -> Dict[str, torch.Tensor]:
-        out = flatten_h_w_fortran(x=x)
+    def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        genotype = inputs["genotype"]
+        out = flatten_h_w_fortran(x=genotype)
 
         out = self.fc_0(out)
 
-        if extra_inputs is not None:
-            out_extra = self.fc_extra(extra_inputs)
+        tabular = inputs.get("tabular", None)
+        if tabular is not None:
+            out_extra = self.fc_extra(tabular)
             out = torch.cat((out_extra, out), dim=1)
 
         out = calculate_module_dict_outputs(
@@ -214,16 +214,16 @@ class FullySplitMLPModel(ModelBase):
     def _init_weights(self):
         pass
 
-    def forward(
-        self, x: torch.Tensor, extra_inputs: torch.Tensor = None
-    ) -> Dict[str, torch.Tensor]:
-        out = flatten_h_w_fortran(x=x)
+    def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        genotype = inputs["genotype"]
+        out = flatten_h_w_fortran(x=genotype)
 
         out = self.fc_0(out)
         out = self.split_blocks(out)
 
-        if extra_inputs is not None:
-            out_extra = self.fc_extra(extra_inputs)
+        tabular = inputs.get("tabular", None)
+        if tabular is not None:
+            out_extra = self.fc_extra(tabular)
             out = torch.cat((out_extra, out), dim=1)
 
         out = calculate_module_dict_outputs(

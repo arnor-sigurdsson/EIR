@@ -87,17 +87,18 @@ class CNNModel(ModelBase):
             return residual_blocks
         return self.cl_args.layers
 
-    def forward(
-        self, x: torch.Tensor, extra_inputs: torch.Tensor = None
-    ) -> Dict[str, torch.Tensor]:
-        out = self.conv(x)
+    def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        genotype = inputs["genotype"]
+
+        out = self.conv(genotype)
         out = out.view(out.shape[0], -1)
 
         out = self.fc_1(out)
 
-        if extra_inputs is not None:
-            out_extra = self.fc_extra(extra_inputs)
-            out = torch.cat((out_extra, out), dim=1)
+        tabular = inputs.get("tabular")
+        if tabular is not None:
+            out_tabular = self.fc_extra(tabular)
+            out = torch.cat((out_tabular, out), dim=1)
 
         out = calculate_module_dict_outputs(
             input_=out, module_dict=self.multi_task_branches

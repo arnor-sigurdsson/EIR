@@ -56,11 +56,11 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
 def predict_on_batch(
-    model: Module, inputs: Tuple[torch.Tensor, ...]
+    model: Module, inputs: Dict[str, torch.Tensor]
 ) -> Dict[str, torch.Tensor]:
     assert not model.training
     with torch.no_grad():
-        val_outputs = model(*inputs)
+        val_outputs = model(inputs)
 
     return val_outputs
 
@@ -76,7 +76,7 @@ def parse_target_labels(
         cur_labels = labels[column_name]
         cur_labels = cur_labels.to(device=device)
         if column_type == "con":
-            labels_casted[column_name] = cur_labels.to(dtype=torch.float).unsqueeze(1)
+            labels_casted[column_name] = cur_labels.to(dtype=torch.float)
         elif column_type == "cat":
             labels_casted[column_name] = cur_labels.to(dtype=torch.long)
 
@@ -96,6 +96,8 @@ def gather_pred_outputs_from_dloader(
 
     Why the deepcopy when appending labels? See:
     https://github.com/pytorch/pytorch/issues/973#issuecomment-459398189
+
+    TODO: Use hook model forward here.
     """
     all_output_batches = []
     all_label_batches = []
@@ -115,9 +117,7 @@ def gather_pred_outputs_from_dloader(
         target_labels = batch.target_labels
         ids = batch.ids
 
-        outputs = predict_on_batch(
-            model=model, inputs=(inputs["genotype"], inputs["tabular"])
-        )
+        outputs = predict_on_batch(model=model, inputs=inputs)
 
         all_output_batches.append(outputs)
 
@@ -151,8 +151,8 @@ def gather_dloader_samples(
     """
     TODO: Test after refactor.
     """
-    inputs_total = []
-    target_labels_total = []
+    all_input_batches = []
+    all_label_batches = []
     ids_total = []
 
     for loader_batch in data_loader:
@@ -168,8 +168,8 @@ def gather_dloader_samples(
         target_labels: Dict[str, torch.Tensor] = batch.target_labels
         ids: Sequence[str] = batch.ids
 
-        inputs_total.append(inputs)
-        target_labels_total.append(target_labels)
+        all_input_batches.append(inputs)
+        all_label_batches.append(target_labels)
         ids_total += [i for i in ids]
 
         if n_samples:
@@ -177,24 +177,26 @@ def gather_dloader_samples(
                 ids_total = ids_total[:n_samples]
                 break
 
-    target_labels_total = _stack_list_of_tensor_dicts(
-        list_of_batch_dicts=target_labels_total
+    all_label_batches = _stack_list_of_tensor_dicts(
+        list_of_batch_dicts=all_label_batches
     )
-    inputs_total = _stack_list_of_tensor_dicts(list_of_batch_dicts=inputs_total)
+    all_input_batches = _stack_list_of_tensor_dicts(
+        list_of_batch_dicts=all_input_batches
+    )
 
     if n_samples:
         inputs_final, target_labels_final = {}, {}
 
-        for input_name in inputs_total.keys():
-            input_subset = inputs_total[input_name][:n_samples]
+        for input_name in all_input_batches.keys():
+            input_subset = all_input_batches[input_name][:n_samples]
             inputs_final[input_name] = input_subset
 
-        for target_name in target_labels_total.keys():
-            target_subset = target_labels_total[target_name][:n_samples]
+        for target_name in all_label_batches.keys():
+            target_subset = all_label_batches[target_name][:n_samples]
             target_labels_final[target_name] = target_subset
 
     else:
-        inputs_final, target_labels_final = inputs_total, target_labels_total
+        inputs_final, target_labels_final = all_input_batches, all_label_batches
 
     return inputs_final, target_labels_final, ids_total
 

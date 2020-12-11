@@ -209,7 +209,7 @@ def calc_r2(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
     if len(outputs) < 2:
         return 0.0
 
-    r2 = r2_score(y_true=labels, y_pred=outputs)
+    r2 = r2_score(y_true=labels.squeeze(), y_pred=outputs.squeeze())
     return r2
 
 

@@ -73,17 +73,17 @@ class MLPModel(ModelBase):
     def _init_weights(self):
         pass
 
-    def forward(
-        self, x: torch.Tensor, extra_inputs: torch.Tensor = None
-    ) -> Dict[str, torch.Tensor]:
-        out = x.view(x.shape[0], -1)
+    def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        genotype = inputs["genotype"]
+        out = genotype.view(genotype.shape[0], -1)
 
         out = self.fc_0(out)
 
         out = self.fc_0_act(out)
 
-        if extra_inputs is not None:
-            out_extra = self.fc_extra(extra_inputs)
+        tabular = inputs.get("tabular", None)
+        if tabular is not None:
+            out_extra = self.fc_extra(tabular)
             out = torch.cat((out_extra, out), dim=1)
 
         out = calculate_module_dict_outputs(

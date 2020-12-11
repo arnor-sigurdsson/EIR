@@ -146,7 +146,7 @@ def test_get_criterions_nonlinear():
 
     test_criterions = train._get_criterions(test_target_columns_dict, model_type="cnn")
     for column_name in test_target_columns_dict["con"]:
-        assert isinstance(test_criterions[column_name], nn.MSELoss)
+        assert test_criterions[column_name].func is train._calc_mse
 
     for column_name in test_target_columns_dict["cat"]:
         assert isinstance(test_criterions[column_name], nn.CrossEntropyLoss)
@@ -162,7 +162,7 @@ def test_get_criterions_linear_pass():
 
     assert len(test_criterions_con) == 1
     for column_name in test_target_columns_dict_con["con"]:
-        assert isinstance(test_criterions_con[column_name], nn.MSELoss)
+        assert test_criterions_con[column_name].func is train._calc_mse
 
     test_target_columns_dict_cat = {"con": [], "cat": ["Origin"]}
 
@@ -171,8 +171,7 @@ def test_get_criterions_linear_pass():
     )
     assert len(test_criterions_cat) == 1
     for column_name in test_target_columns_dict_cat["cat"]:
-        # TODO: Do this better, a bit hacky currently as calc_bce is private
-        assert test_criterions_cat[column_name].__name__ == "calc_bce"
+        assert test_criterions_cat[column_name] is train._calc_bce
 
 
 def test_check_linear_model_columns_pass():

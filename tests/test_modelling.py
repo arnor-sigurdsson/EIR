@@ -252,19 +252,17 @@ def _check_test_performance_results(
         {  # Case 5: Using the fully-split model
             "custom_cl_args": {
                 "model_type": "mlp-fully-split",
-                "l1": 1e-3,
                 "lr": 1e-3,
-                "kernel_width": 12,
+                "kernel_width": 8,
                 "channel_exp_base": 2,
+                "layers": [1],
                 "target_cat_columns": ["Origin"],
                 "target_con_columns": ["Height", "ExtraTarget"],
             }
         },
-        {  # Case 6: Normal multi task with MLP, note we have to reduce the LR for
-            # stability and add L1 for regularization
+        {  # Case 6: MGMOE
             "custom_cl_args": {
                 "model_type": "mlp-mgmoe",
-                "l1": 1e-3,
                 "lr": 1e-3,
                 "fc_repr_dim": 8,
                 "split_mlp_num_splits": 64,
@@ -275,15 +273,15 @@ def _check_test_performance_results(
         {  # Case 7: Fully split with mixup
             "custom_cl_args": {
                 "model_type": "mlp-fully-split",
-                "l1": 1e-3,
                 "lr": 1e-3,
-                "kernel_width": 12,
+                "kernel_width": 8,
                 "channel_exp_base": 2,
                 "mixing_type": "cutmix-uniform",
+                "layers": [1],
                 "mixing_alpha": 1.0,
                 "n_epochs": 10,
-                "split_mlp_num_splits": 64,
                 "target_cat_columns": ["Origin"],
+                "run_name": "test-mixing",
                 "target_con_columns": ["Height", "ExtraTarget"],
             }
         },
