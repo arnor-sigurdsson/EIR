@@ -2,7 +2,7 @@ import pytest
 import torch
 from torch import nn
 
-from snp_pred.models import extra_inputs_module as emb
+from snp_pred.models import tabular as emb
 
 
 @pytest.fixture
@@ -56,7 +56,7 @@ def test_set_up_embedding_lookups(create_emb_test_label_data):
     test_label_dict, emb_cols = create_emb_test_label_data
 
     unique_emb_dict = emb.get_unique_embed_values(test_label_dict, emb_cols)
-    emb_lookup_dict = emb.set_up_embedding_lookups(unique_emb_dict)
+    emb_lookup_dict = emb.set_up_embedding_dict(unique_emb_dict)
     assert len(emb_lookup_dict) == 3
 
     for key, value_dict in emb_lookup_dict.items():

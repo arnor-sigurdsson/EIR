@@ -1,6 +1,6 @@
 from argparse import Namespace
 from collections import OrderedDict
-from typing import List, Dict, Tuple, TYPE_CHECKING
+from typing import List, Tuple, TYPE_CHECKING
 
 import torch
 from aislib import pytorch_utils
@@ -11,12 +11,10 @@ from torch import nn
 from snp_pred.models.layers import FirstCNNBlock, SelfAttention, CNNResidualBlock
 from snp_pred.models.models_base import (
     ModelBase,
-    calculate_module_dict_outputs,
-    assert_module_dict_uniqueness,
 )
 
 if TYPE_CHECKING:
-    from snp_pred.train import al_num_outputs_per_target
+    pass
 
 
 logger = get_logger(__name__)
@@ -33,7 +31,7 @@ class CNNModel(ModelBase):
         )
         self.no_out_channels = self.conv[-1].out_channels
 
-        self.fc_1 = nn.Sequential(
+        self.fc = nn.Sequential(
             OrderedDict(
                 {
                     "fc_1_bn_1": nn.BatchNorm1d(self.fc_1_in_features),
@@ -45,13 +43,6 @@ class CNNModel(ModelBase):
             )
         )
 
-        self.multi_task_branches = _get_cnn_multi_task_branches(
-            num_outputs_per_target=self.num_outputs_per_target,
-            fc_task_dim=self.fc_task_dim,
-            fc_repr_and_extra_dim=self.fc_repr_and_extra_dim,
-            fc_do=self.cl_args.fc_do,
-        )
-
         self._init_weights()
 
     @property
@@ -61,6 +52,10 @@ class CNNModel(ModelBase):
     @property
     def l1_penalized_weights(self) -> torch.Tensor:
         return self.conv[0].conv_1.weight
+
+    @property
+    def num_out_features(self) -> int:
+        return self.cl_args.fc_repr_dim
 
     def _init_weights(self):
         for m in self.modules():
@@ -87,63 +82,14 @@ class CNNModel(ModelBase):
             return residual_blocks
         return self.cl_args.layers
 
-    def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
-        genotype = inputs["genotype"]
+    def forward(self, input: torch.Tensor) -> torch.Tensor:
 
-        out = self.conv(genotype)
+        out = self.conv(input)
         out = out.view(out.shape[0], -1)
 
-        out = self.fc_1(out)
-
-        tabular = inputs.get("tabular")
-        if tabular is not None:
-            out_tabular = self.fc_extra(tabular)
-            out = torch.cat((out_tabular, out), dim=1)
-
-        out = calculate_module_dict_outputs(
-            input_=out, module_dict=self.multi_task_branches
-        )
+        out = self.fc(out)
 
         return out
-
-
-def _get_cnn_multi_task_branches(
-    fc_repr_and_extra_dim: int,
-    fc_task_dim: int,
-    fc_do: float,
-    num_outputs_per_target: "al_num_outputs_per_target",
-) -> nn.ModuleDict:
-    """
-    TODO: Remove this in favor of branch factories as used in other modesl
-    """
-
-    module_dict = {}
-    for key, num_outputs_per_target in num_outputs_per_target.items():
-        branch_layers = OrderedDict(
-            {
-                "fc_2_bn_1": nn.BatchNorm1d(fc_repr_and_extra_dim),
-                "fc_2_act_1": Swish(),
-                "fc_2_linear_1": nn.Linear(
-                    fc_repr_and_extra_dim, fc_task_dim, bias=False
-                ),
-                "fc_2_do_1": nn.Dropout(p=fc_do),
-                "fc_3_bn_1": nn.BatchNorm1d(fc_task_dim),
-                "fc_3_act_1": Swish(),
-                "fc_3_do_1": nn.Dropout(p=fc_do),
-            }
-        )
-
-        task_layer_branch = nn.Sequential(
-            OrderedDict(
-                **branch_layers,
-                **{"fc_3_final": nn.Linear(fc_task_dim, num_outputs_per_target)}
-            )
-        )
-
-        module_dict[key] = task_layer_branch
-
-    assert_module_dict_uniqueness(module_dict)
-    return nn.ModuleDict(module_dict)
 
 
 def _make_conv_layers(

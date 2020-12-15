@@ -168,9 +168,16 @@ def get_train_argument_parser() -> configargparse.ArgumentParser:
         "--model_type",
         type=str,
         default="cnn",
-        choices=["cnn", "mlp", "mlp-split", "mlp-fully-split", "mlp-mgmoe", "linear"],
-        help="whether to use a convolutional neural network (cnn) or multilayer "
-        "perceptron (mlp)",
+        choices=["cnn", "mlp", "mlp-split", "mlp-fully-split", "linear"],
+        help="Model type for omics model.",
+    )
+
+    parser_.add_argument(
+        "--fusion_model_type",
+        type=str,
+        default="default",
+        choices=["default", "mgmoe"],
+        help="What type of fusion model to use.",
     )
 
     parser_.add_argument(

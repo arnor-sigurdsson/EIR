@@ -79,9 +79,10 @@ def test_get_cur_dilation(test_input, expected):
 def test_cnn_model(
     parse_test_cl_args, create_test_data, create_test_cl_args, create_test_model
 ):
-    cnn_test_model = create_test_model
+    fusion_model = create_test_model
+    cnn_model = fusion_model.modules_to_fuse["genotype"]
 
-    assert isinstance(cnn_test_model.conv[0], models_cnn.FirstCNNBlock)
+    assert isinstance(cnn_model.conv[0], models_cnn.FirstCNNBlock)
     assert True
 
 

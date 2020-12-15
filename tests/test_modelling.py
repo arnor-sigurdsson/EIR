@@ -211,7 +211,7 @@ def _check_test_performance_results(
 @pytest.mark.parametrize(
     "create_test_cl_args",
     [
-        {  # Case 1: Check that we add and use extra inputs.
+        {  # Case 0: Check that we add and use extra inputs.
             "custom_cl_args": {
                 "model_type": "cnn",
                 "target_cat_columns": ["Origin"],
@@ -221,14 +221,14 @@ def _check_test_performance_results(
                 "run_name": "extra_inputs",
             }
         },
-        {  # Case 2: Normal multi task with CNN
+        {  # Case 1: Normal multi task with CNN
             "custom_cl_args": {
                 "model_type": "cnn",
                 "target_cat_columns": ["Origin"],
                 "target_con_columns": ["Height", "ExtraTarget"],
             }
         },
-        {  # Case 3: Normal multi task with MLP, note we have to reduce the LR for
+        {  # Case 2: Normal multi task with MLP, note we have to reduce the LR for
             # stability and add L1 for regularization
             "custom_cl_args": {
                 "model_type": "mlp",
@@ -238,7 +238,7 @@ def _check_test_performance_results(
                 "target_con_columns": ["Height", "ExtraTarget"],
             }
         },
-        {  # Case 4: Using the split model
+        {  # Case 3: Using the split model
             "custom_cl_args": {
                 "model_type": "mlp-split",
                 "l1": 1e-3,
@@ -249,7 +249,7 @@ def _check_test_performance_results(
                 "target_con_columns": ["Height", "ExtraTarget"],
             }
         },
-        {  # Case 5: Using the fully-split model
+        {  # Case 4: Using the fully-split model
             "custom_cl_args": {
                 "model_type": "mlp-fully-split",
                 "lr": 1e-3,
@@ -260,17 +260,19 @@ def _check_test_performance_results(
                 "target_con_columns": ["Height", "ExtraTarget"],
             }
         },
-        {  # Case 6: MGMOE
+        {  # Case 5: MGMOE
             "custom_cl_args": {
-                "model_type": "mlp-mgmoe",
+                "fusion_model_type": "mgmoe",
+                "model_type": "mlp-split",
                 "lr": 1e-3,
                 "fc_repr_dim": 8,
                 "split_mlp_num_splits": 64,
+                "run_name": "test_mgmoe_fusion",
                 "target_cat_columns": ["Origin"],
                 "target_con_columns": ["Height", "ExtraTarget"],
             }
         },
-        {  # Case 7: Fully split with mixup
+        {  # Case 6: Fully split with mixup
             "custom_cl_args": {
                 "model_type": "mlp-fully-split",
                 "lr": 1e-3,

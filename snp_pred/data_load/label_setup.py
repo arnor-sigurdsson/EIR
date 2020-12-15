@@ -55,6 +55,9 @@ def set_up_train_and_valid_tabular_data(
     set for regression) on the labels.
     """
 
+    if len(tabular_info.con_columns) + len(tabular_info.cat_columns) < 1:
+        raise ValueError(f"No label columns specified in {tabular_info}.")
+
     parse_wrapper = get_label_parsing_wrapper(
         label_parsing_chunk_size=tabular_info.parsing_chunk_size
     )

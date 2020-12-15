@@ -18,8 +18,11 @@ from torch.utils.data import DataLoader
 
 from snp_pred import train
 from snp_pred.data_load import datasets
-from snp_pred.models.extra_inputs_module import set_up_and_save_embeddings_dict
-from snp_pred.train import Config, get_model, set_up_num_outputs_per_target
+from snp_pred.train import (
+    Config,
+    get_default_model,
+    set_up_num_outputs_per_target,
+)
 from snp_pred.train_utils import optimizers, metrics
 from snp_pred.train_utils.utils import (
     configure_root_logger,
@@ -92,6 +95,7 @@ def args_config() -> Namespace:
             "first_kernel_expansion": 1,
             "first_stride_expansion": 1,
             "first_channel_expansion": 1,
+            "fusion_model_type": "default",
             "get_acts": True,
             "gpu_num": "0",
             "kernel_width": 12,
@@ -377,26 +381,18 @@ def create_test_cl_args(request, args_config, create_test_data) -> Namespace:
 
 
 @pytest.fixture()
-def create_test_model(create_test_cl_args, create_test_labels):
+def create_test_model(create_test_cl_args, create_test_labels) -> nn.Module:
     cl_args = create_test_cl_args
     target_labels, tabular_input_labels = create_test_labels
-
-    run_folder = get_run_folder(run_name=cl_args.run_name)
-
-    embedding_dict = set_up_and_save_embeddings_dict(
-        embedding_columns=cl_args.extra_cat_columns,
-        labels_dict=tabular_input_labels.train_labels,
-        run_folder=run_folder,
-    )
 
     num_outputs_per_class = set_up_num_outputs_per_target(
         target_transformers=target_labels.label_transformers
     )
 
-    model = get_model(
+    model = get_default_model(
         cl_args=cl_args,
         num_outputs_per_target=num_outputs_per_class,
-        embedding_dict=embedding_dict,
+        tabular_label_transformers=tabular_input_labels.label_transformers,
     )
 
     return model

@@ -45,6 +45,11 @@ def get_mix_data_hook(mixing_type: str):
 def hook_default_mix_data(
     config: "Config", state: Dict, mixing_func: Callable, *args, **kwargs
 ) -> Dict:
+    """
+    TODO:   Perhaps make this work on more inputs, given we have some key in the input
+            names to tell us what kind of mixing to use? E.g. we cannot really cutmix
+            tabular inputs.
+    """
 
     lambda_ = _sample_lambda(mixing_alpha=config.cl_args.mixing_alpha)
 

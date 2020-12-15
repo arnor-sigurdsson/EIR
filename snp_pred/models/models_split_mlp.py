@@ -2,22 +2,16 @@ from collections import OrderedDict
 from copy import copy
 from dataclasses import dataclass
 from functools import partial
-from typing import Dict, List, Callable, Sequence
+from typing import List, Callable, Sequence
 
 import torch
 from aislib.misc_utils import get_logger
 from aislib.pytorch_modules import Swish
 from torch import nn
 
-from snp_pred.models.layers import SplitLinear, MLPResidualBlock, SplitMLPResidualBlock
+from snp_pred.models.layers import SplitLinear, SplitMLPResidualBlock
 from snp_pred.models.models_base import (
     ModelBase,
-    create_multi_task_blocks_with_first_adaptor_block,
-    construct_multi_branches,
-    initialize_modules_from_spec,
-    get_final_layer,
-    merge_module_dicts,
-    calculate_module_dict_outputs,
 )
 
 logger = get_logger(__name__)
@@ -28,71 +22,14 @@ class SplitMLPModel(ModelBase):
         super().__init__(*args, **kwargs)
 
         num_chunks = self.cl_args.split_mlp_num_splits
-        self.fc_0 = nn.Sequential(
-            OrderedDict(
-                {
-                    "fc_0": SplitLinear(
-                        in_features=self.fc_1_in_features,
-                        out_feature_sets=self.cl_args.fc_repr_dim,
-                        num_chunks=num_chunks,
-                        bias=False,
-                    )
-                }
-            )
-        )
-
-        in_feat = num_chunks * self.cl_args.fc_repr_dim
-
-        task_names = tuple(self.num_outputs_per_target.keys())
-        task_resblocks_kwargs = {
-            "in_features": self.fc_task_dim,
-            "out_features": self.fc_task_dim,
-            "dropout_p": self.cl_args.rb_do,
-            "full_preactivation": False,
-        }
-        multi_task_branches = create_multi_task_blocks_with_first_adaptor_block(
-            num_blocks=self.cl_args.layers[0],
-            branch_names=task_names,
-            block_constructor=MLPResidualBlock,
-            block_constructor_kwargs=task_resblocks_kwargs,
-            first_layer_kwargs_overload={
-                "full_preactivation": True,
-                "in_features": in_feat + self.extra_dim,
-            },
-        )
-
-        final_act_spec = self.get_final_act_spec(
-            in_features=self.fc_task_dim, dropout_p=self.cl_args.fc_do
-        )
-        final_act = construct_multi_branches(
-            branch_names=task_names,
-            branch_factory=initialize_modules_from_spec,
-            branch_factory_kwargs={"spec": final_act_spec},
-        )
-
-        final_layer = get_final_layer(
-            in_features=self.fc_task_dim,
-            num_outputs_per_target=self.num_outputs_per_target,
-        )
-
-        self.multi_task_branches = merge_module_dicts(
-            (multi_task_branches, final_act, final_layer)
+        self.fc_0 = SplitLinear(
+            in_features=self.fc_1_in_features,
+            out_feature_sets=self.cl_args.fc_repr_dim,
+            num_chunks=num_chunks,
+            bias=False,
         )
 
         self._init_weights()
-
-    @staticmethod
-    def get_final_act_spec(in_features: int, dropout_p: float):
-
-        spec = OrderedDict(
-            {
-                "bn_final": (nn.BatchNorm1d, {"num_features": in_features}),
-                "act_final": (Swish, {}),
-                "do_final": (nn.Dropout, {"p": dropout_p}),
-            }
-        )
-
-        return spec
 
     @property
     def fc_1_in_features(self) -> int:
@@ -100,25 +37,19 @@ class SplitMLPModel(ModelBase):
 
     @property
     def l1_penalized_weights(self) -> torch.Tensor:
-        return self.fc_0[0].weight
+        return self.fc_0.weight
+
+    @property
+    def num_out_features(self) -> int:
+        return self.fc_0.out_features
 
     def _init_weights(self):
         pass
 
-    def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
-        genotype = inputs["genotype"]
-        out = flatten_h_w_fortran(x=genotype)
+    def forward(self, input: torch.Tensor) -> torch.Tensor:
+        out = flatten_h_w_fortran(x=input)
 
         out = self.fc_0(out)
-
-        tabular = inputs.get("tabular", None)
-        if tabular is not None:
-            out_extra = self.fc_extra(tabular)
-            out = torch.cat((out_extra, out), dim=1)
-
-        out = calculate_module_dict_outputs(
-            input_=out, module_dict=self.multi_task_branches
-        )
 
         return out
 
@@ -147,61 +78,14 @@ class FullySplitMLPModel(ModelBase):
             kernel_width=self.cl_args.kernel_width,
             channel_exp_base=self.cl_args.channel_exp_base,
             dropout_p=self.cl_args.rb_do,
-            cutoff=1024 * 4,
+            cutoff=1024 * 1,
         )
         self.split_blocks = _get_split_blocks(
             split_parameter_spec=split_parameter_spec,
             block_layer_spec=self.cl_args.layers,
         )
 
-        cur_dim = self.split_blocks[-1].out_features
-        task_names = tuple(self.num_outputs_per_target.keys())
-        task_resblocks_kwargs = {
-            "in_features": self.fc_task_dim,
-            "out_features": self.fc_task_dim,
-            "dropout_p": self.cl_args.rb_do,
-            "full_preactivation": False,
-        }
-        multi_task_branches = create_multi_task_blocks_with_first_adaptor_block(
-            num_blocks=self.cl_args.layers[-1],
-            branch_names=task_names,
-            block_constructor=MLPResidualBlock,
-            block_constructor_kwargs=task_resblocks_kwargs,
-            first_layer_kwargs_overload={"in_features": cur_dim + self.extra_dim},
-        )
-
-        final_act_spec = self.get_final_act_spec(
-            in_features=self.fc_task_dim, dropout_p=self.cl_args.fc_do
-        )
-        final_act = construct_multi_branches(
-            branch_names=task_names,
-            branch_factory=initialize_modules_from_spec,
-            branch_factory_kwargs={"spec": final_act_spec},
-        )
-
-        final_layer = get_final_layer(
-            in_features=self.fc_task_dim,
-            num_outputs_per_target=self.num_outputs_per_target,
-        )
-
-        self.multi_task_branches = merge_module_dicts(
-            (multi_task_branches, final_act, final_layer)
-        )
-
         self._init_weights()
-
-    @staticmethod
-    def get_final_act_spec(in_features: int, dropout_p: float):
-
-        spec = OrderedDict(
-            {
-                "bn_final": (nn.BatchNorm1d, {"num_features": in_features}),
-                "act_final": (Swish, {}),
-                "do_final": (nn.Dropout, {"p": dropout_p}),
-            }
-        )
-
-        return spec
 
     @property
     def fc_1_in_features(self) -> int:
@@ -211,32 +95,28 @@ class FullySplitMLPModel(ModelBase):
     def l1_penalized_weights(self) -> torch.Tensor:
         return self.fc_0.weight
 
+    @property
+    def num_out_features(self) -> int:
+        return self.split_blocks[-1].out_features
+
     def _init_weights(self):
         pass
 
-    def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
-        genotype = inputs["genotype"]
-        out = flatten_h_w_fortran(x=genotype)
+    def forward(self, input: torch.Tensor) -> torch.Tensor:
+        out = flatten_h_w_fortran(x=input)
 
         out = self.fc_0(out)
         out = self.split_blocks(out)
-
-        tabular = inputs.get("tabular", None)
-        if tabular is not None:
-            out_extra = self.fc_extra(tabular)
-            out = torch.cat((out_extra, out), dim=1)
-
-        out = calculate_module_dict_outputs(
-            input_=out, module_dict=self.multi_task_branches
-        )
 
         return out
 
 
 def flatten_h_w_fortran(x: torch.Tensor) -> torch.Tensor:
     """
-    This is needed when e.g. flattening one-hot inputs, and we want to make sure the
-    first part of the flattened tensor is the first column, i.e. first one-hot element.
+    This is needed when e.g. flattening one-hot inputs that are ordered in a columns
+    wise fasion (meaning that each column is a one-hot feature),
+    and we want to make sure the first part of the flattened tensor is the first column,
+    i.e. first one-hot element.
     """
     column_order_flattened = x.transpose(2, 3).flatten(1)
     return column_order_flattened

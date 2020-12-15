@@ -13,8 +13,7 @@ class LinearModel(ModelBase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        total_in_dim = self.fc_1_in_features + self.extra_dim
-        self.fc_1 = nn.Linear(total_in_dim, 1)
+        self.fc_1 = nn.Linear(self.fc_1_in_features, 1)
         self.act = self._get_act()
 
         self.output_parser = self._get_output_parser()
@@ -26,6 +25,12 @@ class LinearModel(ModelBase):
     @property
     def l1_penalized_weights(self) -> torch.Tensor:
         return self.fc_1.weight
+
+    @property
+    def num_out_features(self) -> int:
+        if self.cl_args.target_cat_columns:
+            return 2
+        return 1
 
     def _get_act(self) -> Callable[[torch.Tensor], torch.Tensor]:
         if self.cl_args.target_cat_columns:

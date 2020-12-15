@@ -15,6 +15,8 @@ from typing import (
     Iterable,
     Sequence,
     Any,
+    Set,
+    Type,
 )
 
 import dill
@@ -47,15 +49,16 @@ from snp_pred.data_load.label_setup import (
     save_transformer_set,
     Labels,
 )
+from snp_pred.models import fusion, fusion_mgmoe
 from snp_pred.models import model_training_utils
-from snp_pred.models.extra_inputs_module import (
-    set_up_and_save_embeddings_dict,
-    get_extra_inputs,
-    al_emb_lookup_dict,
-)
 from snp_pred.models.model_training_utils import run_lr_find
-from snp_pred.models.models import al_models
 from snp_pred.models.models import get_model_class
+from snp_pred.models.models_linear import LinearModel
+from snp_pred.models.tabular import (
+    get_tabular_inputs,
+    TabularModel,
+    get_unique_values_from_transformers,
+)
 from snp_pred.train_utils import utils
 from snp_pred.train_utils.metrics import (
     calculate_batch_metrics,
@@ -137,7 +140,7 @@ class Config:
     target_transformers: al_label_transformers
     target_columns: al_target_columns
     num_outputs_per_target: al_num_outputs_per_target
-    model: Union[al_models, nn.DataParallel]
+    model: Union[fusion.FusionModel, nn.DataParallel]
     optimizer: Optimizer
     criterions: al_criterions
     loss_function: Callable
@@ -231,20 +234,14 @@ def get_default_config(
         num_workers=cl_args.dataloader_workers,
     )
 
-    embedding_dict = set_up_and_save_embeddings_dict(
-        embedding_columns=cl_args.extra_cat_columns,
-        labels_dict=tabular_input_labels.train_labels,
-        run_folder=run_folder,
-    )
-
     num_outputs_per_target = set_up_num_outputs_per_target(
         target_transformers=target_labels.label_transformers
     )
 
-    model = get_model(
+    model = get_default_model(
         cl_args=cl_args,
         num_outputs_per_target=num_outputs_per_target,
-        embedding_dict=embedding_dict,
+        tabular_label_transformers=tabular_input_labels.label_transformers,
     )
 
     criterions = _get_criterions(
@@ -506,32 +503,129 @@ class GetAttrDelegatedDataParallel(nn.DataParallel):
             return getattr(self.module, name)
 
 
-def get_model(
+def get_default_model(
     cl_args: argparse.Namespace,
     num_outputs_per_target: al_num_outputs_per_target,
-    embedding_dict: Union[al_emb_lookup_dict, None],
+    tabular_label_transformers: al_label_transformers,
 ) -> Union[nn.Module, nn.DataParallel]:
+    """
+    Note:   If we have a linear model, we just return that because that takes care of
+            fusing tabular and genotype data by itself.
+    """
 
-    model_class = get_model_class(model_type=cl_args.model_type)
-    model = model_class(
+    if cl_args.model_type == "linear":
+        linear_model = _get_linear_model(
+            cl_args=cl_args, num_outputs_per_target=num_outputs_per_target
+        )
+        return linear_model
+
+    modules_to_fuse = get_modules_to_fuse(
         cl_args=cl_args,
         num_outputs_per_target=num_outputs_per_target,
-        embeddings_dict=embedding_dict,
-        extra_continuous_inputs_columns=cl_args.extra_con_columns,
+        tabular_label_transformers=tabular_label_transformers,
     )
 
-    if cl_args.model_type == "cnn":
-        assert model.data_size_after_conv >= 8
+    fusion_class = get_fusion_class(fusion_model_type=cl_args.fusion_model_type)
+    fusion_model = fusion_class(
+        cl_args=cl_args,
+        num_outputs_per_target=num_outputs_per_target,
+        modules_to_fuse=modules_to_fuse,
+    )
 
-    if cl_args.multi_gpu:
-        model = GetAttrDelegatedDataParallel(module=model)
+    return fusion_model
 
-    if model_class == "linear":
-        _check_linear_model_columns(cl_args=cl_args)
 
+def _get_linear_model(
+    cl_args: argparse.Namespace, num_outputs_per_target: al_num_outputs_per_target
+) -> LinearModel:
+    _check_linear_model_columns(cl_args=cl_args)
+
+    model = LinearModel(cl_args=cl_args, num_outputs_per_target=num_outputs_per_target)
     model = model.to(device=cl_args.device)
 
     return model
+
+
+def get_modules_to_fuse(
+    cl_args: argparse.Namespace,
+    num_outputs_per_target: al_num_outputs_per_target,
+    tabular_label_transformers: al_label_transformers,
+):
+    models = nn.ModuleDict()
+
+    genotype_model = get_omics_model(
+        cl_args=cl_args, num_outputs_per_target=num_outputs_per_target
+    )
+
+    models["genotype"] = genotype_model
+
+    if cl_args.extra_con_columns or cl_args.extra_cat_columns:
+        unique_tabular_values = get_unique_values_from_transformers(
+            transformers=tabular_label_transformers,
+            keys_to_use=cl_args.extra_cat_columns,
+        )
+
+        tabular_model = get_tabular_model(
+            con_columns=cl_args.extra_con_columns,
+            cat_columns=cl_args.extra_cat_columns,
+            device=cl_args.device,
+            unique_label_values=unique_tabular_values,
+        )
+        models["tabular"] = tabular_model
+
+    return models
+
+
+def get_tabular_model(
+    con_columns: Sequence[str],
+    cat_columns: Sequence[str],
+    device: str,
+    unique_label_values: Dict[str, Set[str]],
+) -> TabularModel:
+    tabular_model = TabularModel(
+        con_columns=con_columns,
+        cat_columns=cat_columns,
+        unique_label_values=unique_label_values,
+        device=device,
+    )
+
+    return tabular_model
+
+
+def get_omics_model(
+    cl_args: argparse.Namespace, num_outputs_per_target: al_num_outputs_per_target
+):
+    """
+    TODO: Refactor out dependency on CL args, both from here and from omics models
+          pass in dataclass / DTO of configuration, since now don't want to rely
+          on CL args for everything.
+    """
+
+    omics_model_class = get_model_class(model_type=cl_args.model_type)
+    omics_model = omics_model_class(
+        cl_args=cl_args,
+        num_outputs_per_target=num_outputs_per_target,
+    )
+
+    if cl_args.model_type == "cnn":
+        assert omics_model.data_size_after_conv >= 8
+
+    if cl_args.multi_gpu:
+        omics_model = GetAttrDelegatedDataParallel(module=omics_model)
+
+    omics_model = omics_model.to(device=cl_args.device)
+
+    return omics_model
+
+
+def get_fusion_class(
+    fusion_model_type: str,
+) -> Type[nn.Module]:
+    if fusion_model_type == "mgmoe":
+        return fusion_mgmoe.MGMoEModel
+    elif fusion_model_type == "default":
+        return fusion.FusionModel
+    raise ValueError(f"Unrecognized fusion model type: {fusion_model_type}.")
 
 
 def _check_linear_model_columns(cl_args: argparse.Namespace) -> None:
@@ -807,7 +901,7 @@ def prepare_base_batch_default(
     loader_batch: al_dataloader_getitem_batch,
     cl_args: argparse.Namespace,
     target_columns: al_target_columns,
-    model: nn.Module,
+    model: fusion.FusionModel,
 ):
 
     inputs, target_labels, train_ids = loader_batch
@@ -826,8 +920,12 @@ def prepare_base_batch_default(
     inputs_prepared = {"genotype": train_seqs}
 
     if "tabular" in inputs:
-        tabular = get_extra_inputs(
-            cl_args=cl_args, model=model, tabular_input=inputs["tabular"]
+        tabular = get_tabular_inputs(
+            extra_cat_columns=cl_args.extra_cat_columns,
+            extra_con_columns=cl_args.extra_con_columns,
+            tabular_model=model.modules_to_fuse["tabular"],
+            tabular_input=inputs["tabular"],
+            device=cl_args.device,
         )
         inputs_prepared["tabular"] = tabular
 

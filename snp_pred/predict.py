@@ -4,7 +4,7 @@ from argparse import Namespace
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Union, List, Dict, Sequence, Callable, Iterable, Tuple
+from typing import Union, List, Dict, Sequence, Callable, Iterable, Tuple, Type, Any
 
 import dill
 import joblib
@@ -34,14 +34,16 @@ from snp_pred.data_load.label_setup import (
     transform_label_df,
     TabularFileInfo,
 )
-from snp_pred.models.extra_inputs_module import al_emb_lookup_dict
 from snp_pred.models.model_training_utils import gather_pred_outputs_from_dloader
-from snp_pred.models.models import get_model_class
+from snp_pred.models.tabular import al_emb_lookup_dict
 from snp_pred.train import (
     prepare_base_batch_default,
     Hooks,
     get_tabular_target_label_data,
     get_tabular_inputs_label_data,
+    get_fusion_class,
+    al_num_outputs_per_target,
+    get_modules_to_fuse,
 )
 from snp_pred.train_utils.evaluation import PerformancePlotConfig
 from snp_pred.train_utils.utils import get_run_folder
@@ -139,16 +141,10 @@ class PredictHookStages:
     model_forward: al_hooks
 
 
-def set_up_all_label_data(cl_args: argparse.Namespace) -> TabularFileInfo:
-
-    table_info = TabularFileInfo(
-        file_path=cl_args.label_file,
-        con_columns=cl_args.target_con_columns + cl_args.extra_con_columns,
-        cat_columns=cl_args.target_cat_columns + cl_args.extra_cat_columns,
-        parsing_chunk_size=cl_args.label_parsing_chunk_size,
-    )
-
-    return table_info
+@dataclass
+class PredictLabels:
+    label_dict: al_label_dict
+    transformers: al_label_transformers
 
 
 def get_default_predict_config(
@@ -169,14 +165,14 @@ def get_default_predict_config(
 
     default_train_hooks = train_config.hooks
 
-    target_labels_dict, extra_labels_dict = None, None
+    target_labels, tabular_input_labels = None, None
     if predict_cl_args.evaluate:
         test_ids = gather_ids_from_data_source(
             data_source=Path(predict_cl_args.data_source)
         )
 
         label_ops = default_train_hooks.custom_column_label_parsing_ops
-        target_labels_dict, extra_labels_dict = get_target_and_extra_labels_for_predict(
+        target_labels, tabular_input_labels = get_target_and_extra_labels_for_predict(
             train_cl_args=train_cl_args,
             custom_column_label_parsing_ops=label_ops,
             ids=test_ids,
@@ -184,8 +180,8 @@ def get_default_predict_config(
 
     test_dataset = _set_up_test_dataset(
         test_train_cl_args_mix=test_train_mixed_cl_args,
-        test_labels_dict=target_labels_dict,
-        tabular_inputs_labels_dict=extra_labels_dict,
+        test_labels_dict=target_labels.label_dict,
+        tabular_inputs_labels_dict=tabular_input_labels.label_dict,
     )
 
     test_dataloader = DataLoader(
@@ -195,10 +191,16 @@ def get_default_predict_config(
         num_workers=predict_cl_args.num_workers,
     )
 
+    fusion_model_class, fusion_model_kwargs = _get_fusion_model_class_and_kwargs(
+        train_cl_args=train_cl_args,
+        num_outputs_per_target=train_config.num_outputs_per_target,
+        tabular_input_transformers=tabular_input_labels.transformers,
+    )
+
     model = _load_model(
         model_path=Path(predict_cl_args.model_path),
-        num_outputs_per_target=train_config.num_outputs_per_target,
-        train_cl_args=train_cl_args,
+        model_class=fusion_model_class,
+        model_init_kwargs=fusion_model_kwargs,
         device=predict_cl_args.device,
     )
     assert not model.training
@@ -217,11 +219,11 @@ def get_default_predict_config(
     return test_config
 
 
-def get_target_and_extra_labels_for_predict(
+def get_target_and_extra_labels_for_predict_old(
     train_cl_args: Namespace,
     custom_column_label_parsing_ops: al_all_column_ops,
     ids: Sequence[str],
-) -> Tuple[Dict, Dict]:
+) -> Tuple[PredictLabels, PredictLabels]:
 
     target_cols = train_cl_args.target_cat_columns + train_cl_args.target_con_columns
     target_transformers = _load_transformers(
@@ -241,6 +243,10 @@ def get_target_and_extra_labels_for_predict(
         label_transformers=target_transformers,
     )
 
+    target_labels = PredictLabels(
+        label_dict=target_labels_dict, transformers=target_transformers
+    )
+
     tabular_cols = train_cl_args.extra_cat_columns + train_cl_args.extra_con_columns
     if len(tabular_cols) > 0:
         extra_transformers = _load_transformers(
@@ -258,10 +264,82 @@ def get_target_and_extra_labels_for_predict(
             df_labels_test=df_extra_labels_predict,
             label_transformers=extra_transformers,
         )
+        extra_labels = PredictLabels(
+            label_dict=extra_labels_dict, transformers=extra_transformers
+        )
     else:
-        extra_labels_dict = {}
+        extra_labels = PredictLabels(label_dict={}, transformers={})
 
-    return target_labels_dict, extra_labels_dict
+    return target_labels, extra_labels
+
+
+def get_target_and_extra_labels_for_predict(
+    train_cl_args: Namespace,
+    custom_column_label_parsing_ops: al_all_column_ops,
+    ids: Sequence[str],
+) -> Tuple[PredictLabels, PredictLabels]:
+    """
+    NOTE:   This can be extended to more tabular data, including other files, if we
+            update the parameters slightly.
+    """
+
+    target_info = get_tabular_target_label_data(cl_args=train_cl_args)
+
+    target_labels = get_labels_for_predict(
+        run_name=train_cl_args.run_name,
+        tabular_file_info=target_info,
+        custom_column_label_parsing_ops=custom_column_label_parsing_ops,
+        ids=ids,
+    )
+
+    tabular_input_info = get_tabular_inputs_label_data(cl_args=train_cl_args)
+
+    if tabular_input_info.con_columns or tabular_input_info.cat_columns:
+        tabular_input_labels = get_labels_for_predict(
+            run_name=train_cl_args.run_name,
+            tabular_file_info=tabular_input_info,
+            custom_column_label_parsing_ops=custom_column_label_parsing_ops,
+            ids=ids,
+        )
+    else:
+        tabular_input_labels = PredictLabels(label_dict={}, transformers={})
+
+    return target_labels, tabular_input_labels
+
+
+def get_labels_for_predict(
+    run_name: str,
+    tabular_file_info: TabularFileInfo,
+    custom_column_label_parsing_ops: al_all_column_ops,
+    ids: Sequence[str],
+) -> PredictLabels:
+
+    all_columns = list(tabular_file_info.cat_columns) + list(
+        tabular_file_info.con_columns
+    )
+
+    if not all_columns:
+        raise ValueError(f"No columns specified in {tabular_file_info}.")
+
+    transformers = _load_transformers(
+        run_name=run_name,
+        transformers_to_load=all_columns,
+    )
+
+    df_labels = _load_labels_for_predict(
+        tabular_info=tabular_file_info,
+        ids_to_keep=ids,
+        custom_label_ops=custom_column_label_parsing_ops,
+    )
+    labels_dict = parse_labels_for_testing(
+        tabular_info=tabular_file_info,
+        df_labels_test=df_labels,
+        label_transformers=transformers,
+    )
+
+    labels = PredictLabels(label_dict=labels_dict, transformers=transformers)
+
+    return labels
 
 
 def _get_default_predict_hooks(train_hooks: "Hooks") -> PredictHooks:
@@ -310,34 +388,39 @@ def _load_cl_args_config(cl_args_config_path: Path) -> Namespace:
     return Namespace(**loaded_cl_args)
 
 
-def _load_model(
-    model_path: Path,
-    num_outputs_per_target: Dict[str, int],
+def _get_fusion_model_class_and_kwargs(
     train_cl_args: Namespace,
-    device: str,
-) -> torch.nn.Module:
-    """
-    :param model_path: Path to the model as passed in CL arguments.
-    :param num_outputs_per_target: Number of classes the model was trained on,
-    used to set up last layer neurons.
-    :param train_cl_args: CL arguments used during training, used to set up various
-    aspects of model architecture.
-    :param device: Which device to cast the model to.
-    :return: Loaded model initialized with saved weights.
-    """
+    num_outputs_per_target: al_num_outputs_per_target,
+    tabular_input_transformers: al_label_transformers,
+) -> Tuple[Type[nn.Module], Dict[str, Any]]:
 
-    embeddings_dict = _load_saved_embeddings_dict(
-        embed_columns=train_cl_args.extra_cat_columns, run_name=train_cl_args.run_name
+    fusion_model_class = get_fusion_class(
+        fusion_model_type=train_cl_args.fusion_model_type
     )
 
-    model_class = get_model_class(train_cl_args.model_type)
-
-    model: torch.nn.Module = model_class(
+    modules_to_fuse = get_modules_to_fuse(
         cl_args=train_cl_args,
         num_outputs_per_target=num_outputs_per_target,
-        embeddings_dict=embeddings_dict,
-        extra_continuous_inputs_columns=train_cl_args.extra_con_columns,
+        tabular_label_transformers=tabular_input_transformers,
     )
+
+    fusion_model_kwargs = {
+        "cl_args": train_cl_args,
+        "num_outputs_per_target": num_outputs_per_target,
+        "modules_to_fuse": modules_to_fuse,
+    }
+
+    return fusion_model_class, fusion_model_kwargs
+
+
+def _load_model(
+    model_path: Path,
+    model_class: Type[nn.Module],
+    model_init_kwargs: Dict,
+    device: str,
+) -> torch.nn.Module:
+
+    model = model_class(**model_init_kwargs)
 
     model = _load_model_weights(
         model=model, model_state_dict_path=model_path, device=device
