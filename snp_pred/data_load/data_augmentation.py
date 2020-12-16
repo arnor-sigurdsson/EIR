@@ -42,6 +42,7 @@ def get_mix_data_hook(mixing_type: str):
     return bound_hook
 
 
+# TODO: Add in support for mixing multi modal data, with prefixes _omics, _tabular, etc.
 def hook_default_mix_data(
     config: "Config", state: Dict, mixing_func: Callable, *args, **kwargs
 ) -> Dict:
@@ -57,22 +58,22 @@ def hook_default_mix_data(
     mixed_inputs = {}
 
     mixed_omics_object = mixup_omics_data(
-        inputs=batch.inputs["genotype"],
+        inputs=batch.inputs["omics_cl_args"],
         targets=batch.target_labels,
         target_columns=config.target_columns,
         mixing_func=mixing_func,
         lambda_=lambda_,
     )
-    mixed_inputs["genotype"] = mixed_omics_object.inputs
+    mixed_inputs["omics_cl_args"] = mixed_omics_object.inputs
 
-    if "tabular" in batch.inputs.keys():
-        tabular_input_tensor = batch.inputs["tabular"]
+    if "tabular_cl_args" in batch.inputs.keys():
+        tabular_input_tensor = batch.inputs["tabular_cl_args"]
         mixed_tabular_input_tensor = mixup_tensor(
             tensor=tabular_input_tensor,
             lambda_=lambda_,
             random_batch_indices_to_mix=mixed_omics_object.permuted_indexes,
         )
-        mixed_inputs["tabular"] = mixed_tabular_input_tensor
+        mixed_inputs["tabular_cl_args"] = mixed_tabular_input_tensor
 
     batch_mixed = Batch(
         inputs=mixed_inputs,
@@ -136,8 +137,6 @@ def mixup_omics_data(
 
     An exception is when we use the "vanilla" MixUp, as that calculates a new tensor
     instead of cut-pasting inside an already existing tensor.
-
-    TODO: Refactor lambda_ creation outside of this object.
     """
     assert inputs.dim() == 4, "Should be called with 4 dimensions."
 

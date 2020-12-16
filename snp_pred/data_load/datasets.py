@@ -7,7 +7,6 @@ from typing import List, Dict, Union, Tuple, Callable, Any
 import numpy as np
 import torch
 from aislib.misc_utils import get_logger
-from torch.nn.functional import pad
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
@@ -71,7 +70,6 @@ def _construct_common_dataset_init_params(cl_args: Namespace) -> Dict:
     )
 
     dataset_class_common_args = {
-        "target_width": cl_args.target_width,
         "target_columns": target_columns,
         "data_source": cl_args.data_source,
     }
@@ -99,12 +97,16 @@ class Sample:
     target_labels: al_sample_label_dict_target
 
 
+# TODO: Update to work with data_sources, Dict[str, Path], use prefixes, e.g. omics_
+#       We can also add tabular_inputs_labels_dict in there, with tabular_ prefix
+#       Then we have assumptions, e.g. omics is always on disk, tabular is always a dict
+
+# TODO: Add in support for missing input modalities
 class DatasetBase(Dataset):
     def __init__(
         self,
         data_source: Path,
         target_columns: al_target_columns,
-        target_width: int,
         target_labels_dict: al_label_dict = None,
         tabular_inputs_labels_dict: al_label_dict = None,
         na_augment: Tuple[float] = (0.0, 0.0),
@@ -112,7 +114,6 @@ class DatasetBase(Dataset):
         super().__init__()
 
         self.data_source = data_source
-        self.target_width = target_width
 
         self.samples: Union[List[Sample], None] = None
 
@@ -157,13 +158,13 @@ class DatasetBase(Dataset):
             sample_array_input = array_hook(files.get(sample_id))
 
             sample_inputs = {
-                "genotype": sample_array_input,
+                "omics_cl_args": sample_array_input,
             }
             if self.extra_tabular_labels_dict:
                 sample_tabular_inputs = self.extra_tabular_labels_dict.get(
                     sample_id, {}
                 )
-                sample_inputs["tabular"] = sample_tabular_inputs
+                sample_inputs["tabular_cl_args"] = sample_tabular_inputs
 
             cur_sample = Sample(
                 sample_id=sample_id,
@@ -217,7 +218,7 @@ class MemoryDataset(DatasetBase):
 
     @property
     def data_width(self):
-        data = self.samples[0].inputs["genotype"]
+        data = self.samples[0].inputs["omics_cl_args"]
         return data.shape[1]
 
     # Note that dataloaders automatically convert arrays to tensors here, for labels
@@ -226,14 +227,13 @@ class MemoryDataset(DatasetBase):
 
         inputs_prepared = copy(sample.inputs)
 
-        genotype_array_raw = sample.inputs["genotype"]
-        genotype_array_prepared = _prepare_genotype_array(
+        genotype_array_raw = sample.inputs["omics_cl_args"]
+        genotype_array_prepared = prepare_one_hot_omics_data(
             genotype_array=genotype_array_raw,
-            target_width=self.target_width,
             na_augment_perc=self.na_augment[0],
             na_augment_prob=self.na_augment[1],
         )
-        inputs_prepared["genotype"] = genotype_array_prepared
+        inputs_prepared["omics_cl_args"] = genotype_array_prepared
 
         target_labels = sample.target_labels
         sample_id = sample.sample_id
@@ -244,17 +244,12 @@ class MemoryDataset(DatasetBase):
         return len(self.samples)
 
 
-def _prepare_genotype_array(
+def prepare_one_hot_omics_data(
     genotype_array: torch.Tensor,
-    target_width: int,
     na_augment_perc: float,
     na_augment_prob: float,
 ) -> torch.BoolTensor:
     array_bool = genotype_array.to(dtype=torch.bool)
-
-    if target_width:
-        right_padding = target_width - array_bool.shape[2]
-        array_bool = pad(array_bool, [False, right_padding])
 
     if na_augment_perc > 0 and na_augment_prob > 0:
         array_bool = make_random_omics_columns_missing(
@@ -278,7 +273,7 @@ class DiskDataset(DatasetBase):
 
     @property
     def data_width(self):
-        data = np.load(self.samples[0].inputs["genotype"])
+        data = np.load(self.samples[0].inputs["omics_cl_args"])
         return data.shape[1]
 
     # Note that dataloaders automatically convert arrays to tensors here, for labels
@@ -288,16 +283,15 @@ class DiskDataset(DatasetBase):
         inputs_prepared = copy(sample.inputs)
 
         # TODO: Refactor np.load --> torch and reuse in memory dataset
-        genotype_array_raw = np.load(sample.inputs["genotype"])
+        genotype_array_raw = np.load(sample.inputs["omics_cl_args"])
         genotype_array_raw = torch.from_numpy(genotype_array_raw).unsqueeze(0)
 
-        genotype_array_prepared = _prepare_genotype_array(
+        genotype_array_prepared = prepare_one_hot_omics_data(
             genotype_array=genotype_array_raw,
-            target_width=self.target_width,
             na_augment_perc=self.na_augment[0],
             na_augment_prob=self.na_augment[1],
         )
-        inputs_prepared["genotype"] = genotype_array_prepared
+        inputs_prepared["omics_cl_args"] = genotype_array_prepared
 
         target_labels = sample.target_labels
         sample_id = sample.sample_id
@@ -306,3 +300,7 @@ class DiskDataset(DatasetBase):
 
     def __len__(self):
         return len(self.samples)
+
+
+def _load_one_hot_array():
+    pass

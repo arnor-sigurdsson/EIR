@@ -1,9 +1,8 @@
-from argparse import Namespace
-
 import pytest
 
 from snp_pred.models import layers
-from snp_pred.models import models_cnn
+from snp_pred.models.omics import models_cnn
+from snp_pred.train import DataDimensions
 
 
 def test_make_conv_layers():
@@ -16,10 +15,12 @@ def test_make_conv_layers():
 
     """
     conv_layer_list = [1, 1, 1, 1]
-    test_cl_args = Namespace(
+    test_model_config = models_cnn.CNNModelConfig(
         kernel_width=5,
+        layers=None,
+        fc_repr_dim=512,
+        data_dimensions=DataDimensions(channels=1, height=4, width=int(8e5)),
         down_stride=4,
-        target_width=int(8e5),
         rb_do=0.1,
         first_kernel_expansion=1,
         first_stride_expansion=5,
@@ -28,7 +29,9 @@ def test_make_conv_layers():
         channel_exp_base=5,
         sa=True,
     )
-    conv_layers = models_cnn._make_conv_layers(conv_layer_list, test_cl_args)
+    conv_layers = models_cnn._make_conv_layers(
+        residual_blocks=conv_layer_list, cnn_model_configuration=test_model_config
+    )
 
     # account for first block, add +2 instead if using SA
     assert len(conv_layers) == len(conv_layer_list) + 2
@@ -80,7 +83,7 @@ def test_cnn_model(
     parse_test_cl_args, create_test_data, create_test_cl_args, create_test_model
 ):
     fusion_model = create_test_model
-    cnn_model = fusion_model.modules_to_fuse["genotype"]
+    cnn_model = fusion_model.modules_to_fuse["omics_cl_args"]
 
     assert isinstance(cnn_model.conv[0], models_cnn.FirstCNNBlock)
     assert True

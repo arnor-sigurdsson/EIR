@@ -27,7 +27,7 @@ from snp_pred.data_load.label_setup import al_label_transformers
 
 if TYPE_CHECKING:
     from snp_pred.train import al_criterions, Config  # noqa: F401
-    from snp_pred.models.models import al_models  # noqa: F401
+    from snp_pred.models.omics.omics_models import al_models  # noqa: F401
     from snp_pred.train_utils.train_handlers import HandlerConfig
     from snp_pred.data_load.label_setup import (  # noqa: F401
         al_target_columns,

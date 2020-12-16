@@ -1,44 +1,24 @@
-from argparse import Namespace
 from collections import OrderedDict
 from copy import deepcopy
-from dataclasses import dataclass
-from typing import List, Tuple, Dict, Callable, Iterable, Any, TYPE_CHECKING
+from typing import (
+    List,
+    Tuple,
+    Dict,
+    Callable,
+    Iterable,
+    Any,
+    TYPE_CHECKING,
+)
 
 import torch
 from aislib.misc_utils import get_logger
-from aislib.pytorch_modules import Swish
 from torch import nn
 
 if TYPE_CHECKING:
     from snp_pred.train import al_num_outputs_per_target
 
-# type aliases
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
-
-
-class ModelBase(nn.Module):
-    def __init__(
-        self,
-        cl_args: Namespace,
-        num_outputs_per_target: "al_num_outputs_per_target",
-    ):
-        # TODO: Deprecate
-        super().__init__()
-
-        self.cl_args = cl_args
-        self.num_outputs_per_target = num_outputs_per_target
-
-        self.fc_repr_and_extra_dim = cl_args.fc_repr_dim
-        self.fc_task_dim = cl_args.fc_task_dim
-
-    @property
-    def fc_1_in_features(self) -> int:
-        raise NotImplementedError
-
-    @property
-    def num_out_features(self) -> int:
-        raise NotImplementedError
 
 
 def merge_module_dicts(module_dicts: Tuple[nn.ModuleDict, ...]):
@@ -105,33 +85,6 @@ def create_multi_task_blocks_with_first_adaptor_block(
     merged_blocks = merge_module_dicts((adaptor_block, blocks))
 
     return merged_blocks
-
-
-@dataclass
-class LayerSpec:
-    name: str
-    module: nn.Module
-    module_kwargs: Dict
-
-
-def get_basic_multi_branch_spec(in_features: int, out_features: int, dropout_p: float):
-    base_spec = OrderedDict(
-        {
-            "fc_1_linear_1": (
-                nn.Linear,
-                {
-                    "in_features": in_features,
-                    "out_features": out_features,
-                    "bias": False,
-                },
-            ),
-            "fc_1_bn_1": (nn.BatchNorm1d, {"num_features": out_features}),
-            "fc_1_act_1": (Swish, {}),
-            "fc_1_do_1": (nn.Dropout, {"p": dropout_p}),
-        }
-    )
-
-    return base_spec
 
 
 def assert_module_dict_uniqueness(module_dict: Dict[str, nn.Sequential]):

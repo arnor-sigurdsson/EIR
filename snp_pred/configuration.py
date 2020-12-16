@@ -255,13 +255,6 @@ def get_train_argument_parser() -> configargparse.ArgumentParser:
     )
 
     parser_.add_argument(
-        "--target_width",
-        type=int,
-        default=None,
-        help="Total width of input sequence after padding.",
-    )
-
-    parser_.add_argument(
         "--data_source",
         type=str,
         required=True,

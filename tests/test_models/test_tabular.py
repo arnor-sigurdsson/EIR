@@ -2,7 +2,7 @@ import pytest
 import torch
 from torch import nn
 
-from snp_pred.models import tabular as emb
+from snp_pred.models.tabular import tabular as tab
 
 
 @pytest.fixture
@@ -43,7 +43,7 @@ def create_test_emb_model():
 def test_get_unique_embed_values(create_emb_test_label_data):
     test_label_dict, emb_cols = create_emb_test_label_data
 
-    unique_emb_dict = emb.get_unique_embed_values(
+    unique_emb_dict = tab.get_unique_embed_values(
         labels_dict=test_label_dict, embedding_cols=emb_cols
     )
     assert len(unique_emb_dict) == 3
@@ -55,8 +55,8 @@ def test_get_unique_embed_values(create_emb_test_label_data):
 def test_set_up_embedding_lookups(create_emb_test_label_data):
     test_label_dict, emb_cols = create_emb_test_label_data
 
-    unique_emb_dict = emb.get_unique_embed_values(test_label_dict, emb_cols)
-    emb_lookup_dict = emb.set_up_embedding_dict(unique_emb_dict)
+    unique_emb_dict = tab.get_unique_embed_values(test_label_dict, emb_cols)
+    emb_lookup_dict = tab.set_up_embedding_dict(unique_emb_dict)
     assert len(emb_lookup_dict) == 3
 
     for key, value_dict in emb_lookup_dict.items():
@@ -67,17 +67,17 @@ def test_set_up_embedding_lookups(create_emb_test_label_data):
 
 
 def test_calc_embedding_dimension():
-    assert emb.calc_embedding_dimension(2) == 2
-    assert emb.calc_embedding_dimension(60) > 10
+    assert tab.calc_embedding_dimension(2) == 2
+    assert tab.calc_embedding_dimension(60) > 10
 
 
 def test_attach_embeddings(create_emb_test_label_data, create_test_emb_model):
     test_label_dict, emb_cols = create_emb_test_label_data
     test_model = create_test_emb_model
 
-    emb_dict = emb.get_embedding_dict(test_label_dict, emb_cols)
+    emb_dict = tab.get_embedding_dict(test_label_dict, emb_cols)
 
-    total_emb_dimensions = emb.attach_embeddings(test_model, emb_dict)
+    total_emb_dimensions = tab.attach_embeddings(test_model, emb_dict)
 
     # 2 for each column
     assert total_emb_dimensions == 6
@@ -96,16 +96,16 @@ def test_lookup_embeddings(create_emb_test_label_data, create_test_emb_model):
     test_label_dict, emb_cols = create_emb_test_label_data
     test_model = create_test_emb_model
 
-    emb_dict = emb.get_embedding_dict(
+    emb_dict = tab.get_embedding_dict(
         labels_dict=test_label_dict, embedding_cols=emb_cols
     )
-    emb.attach_embeddings(model=test_model, embeddings_dict=emb_dict)
+    tab.attach_embeddings(model=test_model, embeddings_dict=emb_dict)
 
     cur_lookup_table = emb_dict["Population"]["lookup_table"]
     extra_label_emb_index = torch.tensor(cur_lookup_table[0], dtype=torch.long)
 
     test_extra_labels = torch.LongTensor([0])
-    cur_embedding = emb.lookup_embeddings(
+    cur_embedding = tab.lookup_embeddings(
         model=test_model,
         embedding_col="Population",
         labels=test_extra_labels,
@@ -142,10 +142,10 @@ def test_get_embeddings_from_labels(create_emb_test_label_data, create_test_emb_
     test_label_dict, emb_cols = create_emb_test_label_data
     test_model = create_test_emb_model
 
-    emb_dict = emb.get_embedding_dict(
+    emb_dict = tab.get_embedding_dict(
         labels_dict=test_label_dict, embedding_cols=emb_cols
     )
-    emb.attach_embeddings(model=test_model, embeddings_dict=emb_dict)
+    tab.attach_embeddings(model=test_model, embeddings_dict=emb_dict)
 
     test_model.embeddings_dict = emb_dict
 
@@ -153,7 +153,7 @@ def test_get_embeddings_from_labels(create_emb_test_label_data, create_test_emb_
         k: torch.LongTensor([0]) for k in ("Climate", "Food", "Population")
     }
 
-    test_embeddings = emb.get_embeddings_from_labels(
+    test_embeddings = tab.get_embeddings_from_labels(
         labels=test_extra_labels, model=test_model
     )
 

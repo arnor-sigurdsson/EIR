@@ -1,5 +1,6 @@
 from collections import OrderedDict
-from typing import Dict
+from dataclasses import dataclass
+from typing import Dict, Sequence, TYPE_CHECKING
 
 import torch
 from aislib.pytorch_modules import Swish
@@ -8,7 +9,6 @@ from torch import nn
 from snp_pred.models.fusion import default_fuse_features, al_features
 from snp_pred.models.layers import MLPResidualBlock
 from snp_pred.models.models_base import (
-    ModelBase,
     construct_multi_branches,
     initialize_modules_from_spec,
     create_multi_task_blocks_with_first_adaptor_block,
@@ -18,23 +18,39 @@ from snp_pred.models.models_base import (
     calculate_module_dict_outputs,
 )
 
+if TYPE_CHECKING:
+    from snp_pred.train import al_num_outputs_per_target
 
-# TODO: Deprecate ModelBase
-class MGMoEModel(ModelBase):
+
+@dataclass
+class MGMoEModelConfig:
+    layers: Sequence[int]
+    fc_task_dim: int
+
+    split_mlp_num_splits: int
+    mg_num_experts: int
+
+    rb_do: float
+    fc_do: float
+
+
+class MGMoEModel(nn.Module):
     def __init__(
         self,
+        model_config: MGMoEModelConfig,
+        num_outputs_per_target: "al_num_outputs_per_target",
         modules_to_fuse: nn.ModuleDict,
         fusion_callable: al_features = default_fuse_features,
-        *args,
-        **kwargs,
     ):
-        super().__init__(*args, **kwargs)
+        super().__init__()
 
+        self.model_config = model_config
+        self.num_outputs_per_target = num_outputs_per_target
         self.modules_to_fuse = modules_to_fuse
         self.fusion_callable = fusion_callable
 
-        self.num_chunks = self.cl_args.split_mlp_num_splits
-        self.num_experts = self.cl_args.mg_num_experts
+        self.num_chunks = self.model_config.split_mlp_num_splits
+        self.num_experts = self.model_config.mg_num_experts
 
         cur_dim = sum(i.num_out_features for i in self.modules_to_fuse.values())
 
@@ -51,13 +67,13 @@ class MGMoEModel(ModelBase):
 
         expert_names = tuple(f"expert_{i}" for i in range(self.num_experts))
         layer_kwargs = {
-            "in_features": self.fc_task_dim,
-            "out_features": self.fc_task_dim,
-            "dropout_p": self.cl_args.rb_do,
+            "in_features": self.model_config.fc_task_dim,
+            "out_features": self.model_config.fc_task_dim,
+            "dropout_p": self.model_config.rb_do,
             "full_preactivation": False,
         }
         self.expert_branches = create_multi_task_blocks_with_first_adaptor_block(
-            num_blocks=self.cl_args.layers[0],
+            num_blocks=self.model_config.layers[0],
             branch_names=expert_names,
             block_constructor=MLPResidualBlock,
             block_constructor_kwargs=layer_kwargs,
@@ -68,23 +84,23 @@ class MGMoEModel(ModelBase):
         )
 
         task_resblocks_kwargs = {
-            "in_features": self.fc_task_dim,
-            "out_features": self.fc_task_dim,
-            "dropout_p": self.cl_args.rb_do,
+            "in_features": self.model_config.fc_task_dim,
+            "out_features": self.model_config.fc_task_dim,
+            "dropout_p": self.model_config.rb_do,
             "full_preactivation": False,
         }
         multi_task_branches = construct_multi_branches(
             branch_names=self.task_names,
             branch_factory=construct_blocks,
             branch_factory_kwargs={
-                "num_blocks": self.cl_args.layers[1],
+                "num_blocks": self.model_config.layers[1],
                 "block_constructor": MLPResidualBlock,
                 "block_kwargs": task_resblocks_kwargs,
             },
         )
 
         final_act_spec = self.get_final_act_spec(
-            in_features=self.fc_task_dim, dropout_p=self.cl_args.fc_do
+            in_features=self.model_config.fc_task_dim, dropout_p=self.model_config.fc_do
         )
         final_act = construct_multi_branches(
             branch_names=self.task_names,
@@ -93,7 +109,7 @@ class MGMoEModel(ModelBase):
         )
 
         final_layer = get_final_layer(
-            in_features=self.fc_task_dim,
+            in_features=self.model_config.fc_task_dim,
             num_outputs_per_target=self.num_outputs_per_target,
         )
 
@@ -124,7 +140,7 @@ class MGMoEModel(ModelBase):
 
     @staticmethod
     def get_final_act_spec(in_features: int, dropout_p: float):
-        # TODO: Refactor, duplicated form fusion.py
+        # TODO: Refactor, duplicated from fusion.py
 
         spec = OrderedDict(
             {

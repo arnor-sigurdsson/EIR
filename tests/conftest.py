@@ -20,7 +20,7 @@ from snp_pred import train
 from snp_pred.data_load import datasets
 from snp_pred.train import (
     Config,
-    get_default_model,
+    get_model_from_cl_args,
     set_up_num_outputs_per_target,
 )
 from snp_pred.train_utils import optimizers, metrics
@@ -130,7 +130,6 @@ def args_config() -> Namespace:
             "split_mlp_num_splits": 16,
             "target_cat_columns": ["Origin"],
             "target_con_columns": [],
-            "target_width": 1000,
             "valid_size": 0.05,
             "warmup_steps": 100,
             "wd": 1e-03,
@@ -353,14 +352,10 @@ def create_test_cl_args(request, args_config, create_test_data) -> Namespace:
     c = create_test_data
     test_path = c.scoped_tmp_path
 
-    n_snps = request.config.getoption("--num_snps")
-
     args_config.data_source = str(test_path / "test_arrays")
     args_config.snp_file = str(test_path / "test_snps.bim")
     args_config.model_task = c.task_type
     args_config.label_file = str(test_path / "labels.csv")
-
-    args_config.target_width = n_snps
 
     # If tests need to have their own config different from the base defined above,
     # only supporting custom_cl_args hardcoded for now
@@ -381,16 +376,32 @@ def create_test_cl_args(request, args_config, create_test_data) -> Namespace:
 
 
 @pytest.fixture()
-def create_test_model(create_test_cl_args, create_test_labels) -> nn.Module:
+def create_test_data_dimensions(create_test_cl_args, create_test_data):
+
+    cl_args = create_test_cl_args
+
+    data_dimensions = train._get_data_dimension_from_data_source(
+        data_source=Path(cl_args.data_source)
+    )
+
+    return data_dimensions
+
+
+@pytest.fixture()
+def create_test_model(
+    create_test_cl_args, create_test_labels, create_test_data_dimensions
+) -> nn.Module:
     cl_args = create_test_cl_args
     target_labels, tabular_input_labels = create_test_labels
+    data_dimensions = create_test_data_dimensions
 
     num_outputs_per_class = set_up_num_outputs_per_target(
         target_transformers=target_labels.label_transformers
     )
 
-    model = get_default_model(
+    model = get_model_from_cl_args(
         cl_args=cl_args,
+        omics_data_dimensions=data_dimensions,
         num_outputs_per_target=num_outputs_per_class,
         tabular_label_transformers=tabular_input_labels.label_transformers,
     )
@@ -497,6 +508,7 @@ def prep_modelling_test_configs(
     create_test_dloaders,
     create_test_model,
     create_test_datasets,
+    create_test_data_dimensions,
 ) -> Tuple[Config, ModelTestConfig]:
     """
     Note that the fixtures used in this fixture get indirectly parametrized by
@@ -505,6 +517,7 @@ def prep_modelling_test_configs(
     cl_args = create_test_cl_args
     train_loader, valid_loader, train_dataset, valid_dataset = create_test_dloaders
     target_labels, tabular_inputs_labels = create_test_labels
+    data_dimensions = create_test_data_dimensions
 
     model = create_test_model
 
@@ -536,6 +549,7 @@ def prep_modelling_test_configs(
         train_loader=train_loader,
         valid_loader=valid_loader,
         valid_dataset=valid_dataset,
+        data_dimensions={"omics_cl_args": data_dimensions},
         model=model,
         optimizer=optimizer,
         criterions=criterions,

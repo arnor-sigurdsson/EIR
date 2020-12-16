@@ -10,7 +10,8 @@ from sklearn.preprocessing import LabelEncoder
 from snp_pred import predict
 from snp_pred import train
 from snp_pred.data_load.label_setup import TabularFileInfo
-from snp_pred.models.models_cnn import CNNModel
+from snp_pred.models.omics.models_cnn import CNNModel
+from snp_pred.models.omics.omics_models import get_omics_model_init_kwargs
 from tests.conftest import cleanup
 from tests.test_data_load.test_datasets import check_dataset
 
@@ -24,11 +25,11 @@ def test_load_model(args_config, tmp_path):
 
     cl_args = args_config
 
-    num_outputs_per_target = {"Origin": 3}
-    model = CNNModel(
-        cl_args=cl_args,
-        num_outputs_per_target=num_outputs_per_target,
+    data_dimension = train.DataDimensions(channels=1, height=4, width=1000)
+    cnn_init_kwargs = get_omics_model_init_kwargs(
+        model_type="cnn", cl_args=cl_args, data_dimensions=data_dimension
     )
+    model = CNNModel(**cnn_init_kwargs)
     model = model.to(device=cl_args.device)
 
     model_path = tmp_path / "model.pt"
@@ -37,10 +38,7 @@ def test_load_model(args_config, tmp_path):
     loaded_model = predict._load_model(
         model_path=model_path,
         model_class=CNNModel,
-        model_init_kwargs={
-            "cl_args": cl_args,
-            "num_outputs_per_target": num_outputs_per_target,
-        },
+        model_init_kwargs=cnn_init_kwargs,
         device=cl_args.device,
     )
     # make sure we're in eval model

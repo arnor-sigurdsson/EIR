@@ -35,15 +35,16 @@ from snp_pred.data_load.label_setup import (
     TabularFileInfo,
 )
 from snp_pred.models.model_training_utils import gather_pred_outputs_from_dloader
-from snp_pred.models.tabular import al_emb_lookup_dict
+from snp_pred.models.tabular.tabular import al_emb_lookup_dict
 from snp_pred.train import (
     prepare_base_batch_default,
     Hooks,
     get_tabular_target_label_data,
     get_tabular_inputs_label_data,
-    get_fusion_class,
+    get_fusion_class_from_cl_args,
+    get_fusion_kwargs_from_cl_args,
     al_num_outputs_per_target,
-    get_modules_to_fuse,
+    DataDimensions,
 )
 from snp_pred.train_utils.evaluation import PerformancePlotConfig
 from snp_pred.train_utils.utils import get_run_folder
@@ -191,10 +192,12 @@ def get_default_predict_config(
         num_workers=predict_cl_args.num_workers,
     )
 
-    fusion_model_class, fusion_model_kwargs = _get_fusion_model_class_and_kwargs(
+    func = _get_fusion_model_class_and_kwargs_from_cl_args
+    fusion_model_class, fusion_model_kwargs = func(
         train_cl_args=train_cl_args,
         num_outputs_per_target=train_config.num_outputs_per_target,
         tabular_input_transformers=tabular_input_labels.transformers,
+        omics_data_dimensions=train_config.data_dimensions["omics_cl_args"],
     )
 
     model = _load_model(
@@ -388,27 +391,23 @@ def _load_cl_args_config(cl_args_config_path: Path) -> Namespace:
     return Namespace(**loaded_cl_args)
 
 
-def _get_fusion_model_class_and_kwargs(
+def _get_fusion_model_class_and_kwargs_from_cl_args(
     train_cl_args: Namespace,
     num_outputs_per_target: al_num_outputs_per_target,
     tabular_input_transformers: al_label_transformers,
+    omics_data_dimensions: DataDimensions,
 ) -> Tuple[Type[nn.Module], Dict[str, Any]]:
 
-    fusion_model_class = get_fusion_class(
+    fusion_model_class = get_fusion_class_from_cl_args(
         fusion_model_type=train_cl_args.fusion_model_type
     )
 
-    modules_to_fuse = get_modules_to_fuse(
+    fusion_model_kwargs = get_fusion_kwargs_from_cl_args(
         cl_args=train_cl_args,
+        omics_data_dimensions=omics_data_dimensions,
         num_outputs_per_target=num_outputs_per_target,
         tabular_label_transformers=tabular_input_transformers,
     )
-
-    fusion_model_kwargs = {
-        "cl_args": train_cl_args,
-        "num_outputs_per_target": num_outputs_per_target,
-        "modules_to_fuse": modules_to_fuse,
-    }
 
     return fusion_model_class, fusion_model_kwargs
 
@@ -549,7 +548,6 @@ def _set_up_test_dataset(
     test_dataset = datasets.DiskDataset(
         data_source=a.data_source,
         target_columns=target_columns,
-        target_width=a.target_width,
         target_labels_dict=test_labels_dict,
         tabular_inputs_labels_dict=tabular_inputs_labels_dict,
     )

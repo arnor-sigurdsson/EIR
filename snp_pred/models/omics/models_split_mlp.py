@@ -2,7 +2,7 @@ from collections import OrderedDict
 from copy import copy
 from dataclasses import dataclass
 from functools import partial
-from typing import List, Callable, Sequence
+from typing import List, Callable, Sequence, TYPE_CHECKING
 
 import torch
 from aislib.misc_utils import get_logger
@@ -10,21 +10,31 @@ from aislib.pytorch_modules import Swish
 from torch import nn
 
 from snp_pred.models.layers import SplitLinear, SplitMLPResidualBlock
-from snp_pred.models.models_base import (
-    ModelBase,
-)
+
+if TYPE_CHECKING:
+    from snp_pred.train import DataDimensions
 
 logger = get_logger(__name__)
 
 
-class SplitMLPModel(ModelBase):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+@dataclass
+class SplitMLPModelConfig:
 
-        num_chunks = self.cl_args.split_mlp_num_splits
+    fc_repr_dim: int
+    split_mlp_num_splits: int
+    data_dimensions: "DataDimensions"
+
+
+class SplitMLPModel(nn.Module):
+    def __init__(self, model_config: SplitMLPModelConfig):
+        super().__init__()
+
+        self.model_config = model_config
+
+        num_chunks = self.model_config.split_mlp_num_splits
         self.fc_0 = SplitLinear(
             in_features=self.fc_1_in_features,
-            out_feature_sets=self.cl_args.fc_repr_dim,
+            out_feature_sets=self.model_config.fc_repr_dim,
             num_chunks=num_chunks,
             bias=False,
         )
@@ -33,7 +43,7 @@ class SplitMLPModel(ModelBase):
 
     @property
     def fc_1_in_features(self) -> int:
-        return self.cl_args.target_width * 4
+        return self.model_config.data_dimensions.num_elements()
 
     @property
     def l1_penalized_weights(self) -> torch.Tensor:
@@ -54,17 +64,39 @@ class SplitMLPModel(ModelBase):
         return out
 
 
-class FullySplitMLPModel(ModelBase):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+@dataclass
+class FullySplitMLPModelConfig:
+    layers: List[int]
+
+    kernel_width: int
+    first_kernel_expansion: int
+
+    channel_exp_base: int
+    first_channel_expansion: int
+
+    fc_repr_dim: int
+    split_mlp_num_splits: int
+
+    data_dimensions: "DataDimensions"
+
+    rb_do: float
+
+    cutoff: int = 1024
+
+
+class FullySplitMLPModel(nn.Module):
+    def __init__(self, model_config: FullySplitMLPModelConfig):
+        super().__init__()
+
+        self.model_config = model_config
 
         fc_0_split_size = calc_value_after_expansion(
-            base=self.cl_args.kernel_width,
-            expansion=self.cl_args.first_kernel_expansion,
+            base=self.model_config.kernel_width,
+            expansion=self.model_config.first_kernel_expansion,
         )
         fc_0_channel_exponent = calc_value_after_expansion(
-            base=self.cl_args.channel_exp_base,
-            expansion=self.cl_args.first_channel_expansion,
+            base=self.model_config.channel_exp_base,
+            expansion=self.model_config.first_channel_expansion,
         )
         self.fc_0 = SplitLinear(
             in_features=self.fc_1_in_features,
@@ -75,21 +107,21 @@ class FullySplitMLPModel(ModelBase):
 
         split_parameter_spec = SplitParameterSpec(
             in_features=self.fc_0.out_features,
-            kernel_width=self.cl_args.kernel_width,
-            channel_exp_base=self.cl_args.channel_exp_base,
-            dropout_p=self.cl_args.rb_do,
-            cutoff=1024 * 1,
+            kernel_width=self.model_config.kernel_width,
+            channel_exp_base=self.model_config.channel_exp_base,
+            dropout_p=self.model_config.rb_do,
+            cutoff=self.model_config.cutoff,
         )
         self.split_blocks = _get_split_blocks(
             split_parameter_spec=split_parameter_spec,
-            block_layer_spec=self.cl_args.layers,
+            block_layer_spec=self.model_config.layers,
         )
 
         self._init_weights()
 
     @property
     def fc_1_in_features(self) -> int:
-        return self.cl_args.target_width * 4
+        return self.model_config.data_dimensions.num_elements()
 
     @property
     def l1_penalized_weights(self) -> torch.Tensor:

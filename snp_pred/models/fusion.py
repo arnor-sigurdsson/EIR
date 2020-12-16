@@ -1,5 +1,6 @@
 from collections import OrderedDict
-from typing import Dict, Callable, Sequence
+from dataclasses import dataclass
+from typing import Dict, Callable, Sequence, List, TYPE_CHECKING
 
 import torch
 from aislib.misc_utils import get_logger
@@ -8,7 +9,6 @@ from torch import nn
 
 from snp_pred.models.layers import MLPResidualBlock
 from snp_pred.models.models_base import (
-    ModelBase,
     create_multi_task_blocks_with_first_adaptor_block,
     construct_multi_branches,
     initialize_modules_from_spec,
@@ -16,6 +16,9 @@ from snp_pred.models.models_base import (
     merge_module_dicts,
     calculate_module_dict_outputs,
 )
+
+if TYPE_CHECKING:
+    from snp_pred.train import al_num_outputs_per_target
 
 al_features = Callable[[Sequence[torch.Tensor]], torch.Tensor]
 
@@ -27,33 +30,45 @@ def default_fuse_features(features: Sequence[torch.Tensor]) -> torch.Tensor:
     return torch.cat(tuple(features), dim=1)
 
 
+@dataclass
+class FusionModelConfig:
+    layers: List[int]
+
+    fc_task_dim: int
+
+    rb_do: float
+    fc_do: float
+
+
 # TODO: Deprecate ModelBase
-class FusionModel(ModelBase):
+class FusionModel(nn.Module):
     def __init__(
         self,
+        model_config: FusionModelConfig,
+        num_outputs_per_target: "al_num_outputs_per_target",
         modules_to_fuse: nn.ModuleDict,
         fusion_callable: al_features = default_fuse_features,
-        *args,
-        **kwargs
     ):
-        super().__init__(*args, **kwargs)
+        super().__init__()
 
+        self.model_config = model_config
+        self.num_outputs_per_target = num_outputs_per_target
         self.modules_to_fuse = modules_to_fuse
         self.fusion_callable = fusion_callable
 
         task_names = tuple(self.num_outputs_per_target.keys())
 
         task_resblocks_kwargs = {
-            "in_features": self.fc_task_dim,
-            "out_features": self.fc_task_dim,
-            "dropout_p": self.cl_args.rb_do,
+            "in_features": self.model_config.fc_task_dim,
+            "out_features": self.model_config.fc_task_dim,
+            "dropout_p": self.model_config.rb_do,
             "full_preactivation": False,
         }
 
         cur_dim = sum(i.num_out_features for i in self.modules_to_fuse.values())
 
         multi_task_branches = create_multi_task_blocks_with_first_adaptor_block(
-            num_blocks=self.cl_args.layers[-1],
+            num_blocks=self.model_config.layers[-1],
             branch_names=task_names,
             block_constructor=MLPResidualBlock,
             block_constructor_kwargs=task_resblocks_kwargs,
@@ -61,7 +76,7 @@ class FusionModel(ModelBase):
         )
 
         final_act_spec = self.get_final_act_spec(
-            in_features=self.fc_task_dim, dropout_p=self.cl_args.fc_do
+            in_features=self.model_config.fc_task_dim, dropout_p=self.model_config.fc_do
         )
         final_act = construct_multi_branches(
             branch_names=task_names,
@@ -70,7 +85,7 @@ class FusionModel(ModelBase):
         )
 
         final_layer = get_final_layer(
-            in_features=self.fc_task_dim,
+            in_features=self.model_config.fc_task_dim,
             num_outputs_per_target=self.num_outputs_per_target,
         )
 

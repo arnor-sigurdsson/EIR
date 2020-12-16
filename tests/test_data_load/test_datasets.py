@@ -62,9 +62,8 @@ def test_construct_dataset_init_params_from_cl_args(args_config):
         cl_args=args_config
     )
 
-    assert len(constructed_args) == 3
+    assert len(constructed_args) == 2
     assert constructed_args["data_source"] == args_config.data_source
-    assert constructed_args["target_width"] == args_config.target_width
 
     expected_target_cols = {"con": ["Height"], "cat": ["Origin"]}
     assert constructed_args["target_columns"] == expected_target_cols
@@ -125,37 +124,6 @@ def test_datasets(
     )
 
 
-@pytest.mark.parametrize(
-    "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
-)
-@pytest.mark.parametrize("dataset_type", ["memory", "disk"])
-def test_dataset_padding(
-    dataset_type: str,
-    create_test_data: pytest.fixture,
-    create_test_cl_args: pytest.fixture,
-    parse_test_cl_args,
-):
-    cl_args = create_test_cl_args
-
-    if dataset_type == "disk":
-        cl_args.memory_dataset = False
-
-    cl_args.target_width = 1200
-
-    target_labels, tabular_input_labels = train.get_target_and_tabular_input_labels(
-        cl_args=cl_args, custom_label_parsing_operations=None
-    )
-    train_dataset, valid_dataset = datasets.set_up_datasets(
-        cl_args=cl_args,
-        target_labels=target_labels,
-        tabular_inputs_labels=tabular_input_labels,
-    )
-
-    test_input_genotyped_padded, test_label_pad, test_id_pad = train_dataset[0]
-    padded_genotype = test_input_genotyped_padded["genotype"]
-    assert padded_genotype.shape[-1] == 1200
-
-
 def check_dataset(
     dataset: al_datasets,
     exp_no_sample: int,
@@ -177,24 +145,20 @@ def check_dataset(
     assert (tt_it(range(len(classes_tested))) == classes_tested).all()
 
     test_inputs, target_labels, test_id = dataset[0]
-    test_genotype = test_inputs["genotype"]
+    test_genotype = test_inputs["omics_cl_args"]
 
     assert (test_genotype.sum(1) == 1).all()
     assert target_labels[target_column] in expected_transformed_values
     assert test_id == dataset.samples[0].sample_id
 
 
-@pytest.mark.parametrize("test_target_width", [120, 1000])
-def test_prepare_genotype_array(test_target_width):
+def test_prepare_genotype_array():
     test_array = torch.zeros((1, 4, 100), dtype=torch.bool)
 
-    prepared_array = datasets._prepare_genotype_array(
+    prepared_array = datasets.prepare_one_hot_omics_data(
         genotype_array=test_array,
-        target_width=test_target_width,
         na_augment_perc=1.0,
         na_augment_prob=1.0,
     )
 
-    actual_array_width = prepared_array.shape[-1]
-    assert actual_array_width == test_target_width
     assert (prepared_array[:, -1, :] == 1).all()
