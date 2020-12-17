@@ -126,10 +126,13 @@ def test_load_labels_for_predict(
     ],
     indirect=True,
 )
-def test_set_up_test_dataset(create_test_data, create_test_cl_args):
+def test_set_up_test_dataset(
+    create_test_data, create_test_cl_args, create_test_data_dimensions
+):
     test_data_config = create_test_data
     c = test_data_config
     cl_args = create_test_cl_args
+    data_dimensions = create_test_data_dimensions
     classes_tested = sorted(list(c.target_classes.keys()))
 
     test_ids = predict.gather_ids_from_data_source(
@@ -151,7 +154,8 @@ def test_set_up_test_dataset(create_test_data, create_test_cl_args):
         label_transformers=transformers,
     )
 
-    test_dataset = predict._set_up_test_dataset(
+    test_dataset = predict._set_up_default_test_dataset(
+        data_dimensions=data_dimensions,
         test_train_cl_args_mix=cl_args,
         test_labels_dict=df_test_dict,
         tabular_inputs_labels_dict=None,

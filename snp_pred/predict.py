@@ -29,7 +29,6 @@ from snp_pred.data_load.label_setup import (
     al_target_columns,
     al_label_transformers,
     al_all_column_ops,
-    merge_target_columns,
     gather_ids_from_data_source,
     transform_label_df,
     TabularFileInfo,
@@ -179,8 +178,9 @@ def get_default_predict_config(
             ids=test_ids,
         )
 
-    test_dataset = _set_up_test_dataset(
+    test_dataset = _set_up_default_test_dataset(
         test_train_cl_args_mix=test_train_mixed_cl_args,
+        data_dimensions=train_config.data_dimensions,
         test_labels_dict=target_labels.label_dict,
         tabular_inputs_labels_dict=tabular_input_labels.label_dict,
     )
@@ -402,6 +402,7 @@ def _get_fusion_model_class_and_kwargs_from_cl_args(
         fusion_model_type=train_cl_args.fusion_model_type
     )
 
+    assert isinstance(omics_data_dimensions, DataDimensions)
     fusion_model_kwargs = get_fusion_kwargs_from_cl_args(
         cl_args=train_cl_args,
         omics_data_dimensions=omics_data_dimensions,
@@ -527,8 +528,9 @@ def _prep_missing_con_dict(con_transformers: al_label_transformers) -> Dict[str,
     return train_means
 
 
-def _set_up_test_dataset(
+def _set_up_default_test_dataset(
     test_train_cl_args_mix: Namespace,
+    data_dimensions: Dict[str, "DataDimensions"],
     test_labels_dict: Union[None, al_label_dict],
     tabular_inputs_labels_dict: Union[None, al_label_dict],
 ) -> al_datasets:
@@ -539,18 +541,16 @@ def _set_up_test_dataset(
     otherwise a dictionary of labels (if evaluating on test set).
     :return: Dataset instance to be used for loading test samples.
     """
-    a = test_train_cl_args_mix
 
-    target_columns = merge_target_columns(
-        target_con_columns=a.target_con_columns, target_cat_columns=a.target_cat_columns
-    )
-
-    test_dataset = datasets.DiskDataset(
-        data_source=a.data_source,
-        target_columns=target_columns,
+    test_dataset_kwargs = datasets.construct_default_dataset_kwargs_from_cl_args(
+        cl_args=test_train_cl_args_mix,
         target_labels_dict=test_labels_dict,
-        tabular_inputs_labels_dict=tabular_inputs_labels_dict,
+        data_dimensions=data_dimensions,
+        tabular_labels_dict=tabular_inputs_labels_dict,
+        na_augment=False,
     )
+
+    test_dataset = datasets.DiskDataset(**test_dataset_kwargs)
 
     return test_dataset
 

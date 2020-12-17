@@ -25,12 +25,11 @@ al_int_tensors = Union[
 
 
 @dataclass
-class OmicsMixupOutput:
-    inputs: torch.Tensor
+class MixingObject:
     targets: "al_training_labels_target"
     targets_permuted: "al_training_labels_target"
     lambda_: float
-    permuted_indexes: Sequence[al_int_tensors]
+    permuted_indexes: al_int_tensors
 
 
 def get_mix_data_hook(mixing_type: str):
@@ -42,38 +41,39 @@ def get_mix_data_hook(mixing_type: str):
     return bound_hook
 
 
-# TODO: Add in support for mixing multi modal data, with prefixes _omics, _tabular, etc.
 def hook_default_mix_data(
     config: "Config", state: Dict, mixing_func: Callable, *args, **kwargs
 ) -> Dict:
-    """
-    TODO:   Perhaps make this work on more inputs, given we have some key in the input
-            names to tell us what kind of mixing to use? E.g. we cannot really cutmix
-            tabular inputs.
-    """
-
-    lambda_ = _sample_lambda(mixing_alpha=config.cl_args.mixing_alpha)
 
     batch = state["batch"]
+
+    mixing_info = get_mixing_info(
+        mixing_alpha=config.cl_args.mixing_alpha,
+        batch_size=config.cl_args.batch_size,
+        target_labels=batch.target_labels,
+        target_columns=config.target_columns,
+    )
+
     mixed_inputs = {}
 
-    mixed_omics_object = mixup_omics_data(
-        inputs=batch.inputs["omics_cl_args"],
-        targets=batch.target_labels,
-        target_columns=config.target_columns,
-        mixing_func=mixing_func,
-        lambda_=lambda_,
-    )
-    mixed_inputs["omics_cl_args"] = mixed_omics_object.inputs
+    for input_name, input_data in batch.inputs.items():
+        if input_name.startswith("omics_"):
 
-    if "tabular_cl_args" in batch.inputs.keys():
-        tabular_input_tensor = batch.inputs["tabular_cl_args"]
-        mixed_tabular_input_tensor = mixup_tensor(
-            tensor=tabular_input_tensor,
-            lambda_=lambda_,
-            random_batch_indices_to_mix=mixed_omics_object.permuted_indexes,
-        )
-        mixed_inputs["tabular_cl_args"] = mixed_tabular_input_tensor
+            mixed_omics = mixup_omics_data(
+                inputs=input_data,
+                mixing_func=mixing_func,
+                mixing_info=mixing_info,
+            )
+            mixed_inputs[input_name] = mixed_omics
+
+        elif input_name.startswith("tabular_"):
+
+            mixed_tabular_input_tensor = mixup_tensor(
+                tensor=input_data,
+                lambda_=mixing_info.lambda_,
+                random_batch_indices_to_mix=mixing_info.permuted_indexes,
+            )
+            mixed_inputs[input_name] = mixed_tabular_input_tensor
 
     batch_mixed = Batch(
         inputs=mixed_inputs,
@@ -81,9 +81,37 @@ def hook_default_mix_data(
         ids=batch.ids,
     )
 
-    state_updates = {"batch": batch_mixed, "mixed_snp_data": mixed_omics_object}
+    state_updates = {
+        "batch": batch_mixed,
+        "mixing_info": mixing_info,
+    }
 
     return state_updates
+
+
+def get_mixing_info(
+    mixing_alpha: float,
+    batch_size: int,
+    target_labels: "al_training_labels_target",
+    target_columns: al_target_columns,
+) -> MixingObject:
+    lambda_ = _sample_lambda(mixing_alpha=mixing_alpha)
+
+    permuted_indexes = get_random_batch_indices_to_mix(batch_size=batch_size)
+    targets_permuted = mixup_all_targets(
+        targets=target_labels,
+        random_index_for_mixing=permuted_indexes,
+        target_columns=target_columns,
+    )
+
+    mixing_info = MixingObject(
+        targets=target_labels,
+        targets_permuted=targets_permuted,
+        lambda_=lambda_,
+        permuted_indexes=permuted_indexes,
+    )
+
+    return mixing_info
 
 
 def _sample_lambda(mixing_alpha: float) -> float:
@@ -101,7 +129,7 @@ def hook_mix_loss(config: "Config", state: Dict, *args, **kwargs) -> Dict:
         target_columns=config.target_columns,
         criterions=config.criterions,
         outputs=state["model_outputs"],
-        mixed_object=state["mixed_snp_data"],
+        mixed_object=state["mixing_info"],
     )
 
     state_updates = {"per_target_train_losses": mixed_losses}
@@ -120,11 +148,9 @@ def _get_mixing_function_map():
 
 def mixup_omics_data(
     inputs: torch.Tensor,
-    targets: "al_training_labels_target",
-    target_columns: al_target_columns,
     mixing_func: Callable[[torch.Tensor, float, torch.Tensor], torch.Tensor],
-    lambda_: float,
-) -> OmicsMixupOutput:
+    mixing_info: MixingObject,
+) -> torch.Tensor:
     """
     NOTE: **This function will modify the inputs in-place**
 
@@ -140,33 +166,17 @@ def mixup_omics_data(
     """
     assert inputs.dim() == 4, "Should be called with 4 dimensions."
 
-    batch_size = inputs.size()[0]
-    random_batch_indices_to_mix = get_random_batch_indices_to_mix(batch_size=batch_size)
-    targets_permuted = mixup_all_targets(
-        targets=targets,
-        random_index_for_mixing=random_batch_indices_to_mix,
-        target_columns=target_columns,
-    )
-
     mixed_inputs = mixing_func(
         input_batch=inputs,
-        lambda_=lambda_,
-        random_batch_indices_to_mix=random_batch_indices_to_mix,
+        lambda_=mixing_info.lambda_,
+        random_batch_indices_to_mix=mixing_info.permuted_indexes,
     )
 
-    mixing_output = OmicsMixupOutput(
-        inputs=mixed_inputs,
-        targets=targets,
-        targets_permuted=targets_permuted,
-        lambda_=lambda_,
-        permuted_indexes=random_batch_indices_to_mix,
-    )
-
-    return mixing_output
+    return mixed_inputs
 
 
-def get_random_batch_indices_to_mix(batch_size: int) -> torch.Tensor:
-    return torch.randperm(batch_size)
+def get_random_batch_indices_to_mix(batch_size: int) -> al_int_tensors:
+    return torch.randperm(batch_size).to(dtype=torch.long)
 
 
 def mixup_input(
@@ -213,7 +223,6 @@ def block_cutmix_omics_input(
     cutmixed_x = input_batch
     cutmixed_x[..., cut_start:cut_end] = cut_part
 
-    assert (cutmixed_x.sum(dim=2) == 1).all()
     return cutmixed_x
 
 
@@ -242,7 +251,6 @@ def uniform_cutmix_omics_input(
     cutmixed_x = input_batch
     cutmixed_x[..., random_snp_indices_to_mix] = cut_part
 
-    assert (cutmixed_x.sum(dim=2) == 1).all()
     return cutmixed_x
 
 
@@ -257,7 +265,7 @@ def get_uniform_cutmix_indices(input_length: int, lambda_: float) -> torch.Tenso
 
 def mixup_all_targets(
     targets: "al_training_labels_target",
-    random_index_for_mixing: torch.Tensor,
+    random_index_for_mixing: al_int_tensors,
     target_columns: al_target_columns,
 ) -> "al_training_labels_target":
     targets_permuted = copy(targets)
@@ -289,7 +297,7 @@ def calc_all_mixed_losses(
     target_columns: al_target_columns,
     criterions: "al_criterions",
     outputs: Dict[str, torch.Tensor],
-    mixed_object: OmicsMixupOutput,
+    mixed_object: MixingObject,
 ):
 
     losses = {}

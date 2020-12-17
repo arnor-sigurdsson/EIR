@@ -40,7 +40,6 @@ class FusionModelConfig:
     fc_do: float
 
 
-# TODO: Deprecate ModelBase
 class FusionModel(nn.Module):
     def __init__(
         self,
@@ -120,16 +119,19 @@ class FusionModel(nn.Module):
     def _init_weights(self):
         pass
 
-    def fill_in_missing_features(self):
-        # TODO: Figure out what flow is coming here from the inputs, e.g. if a sample
-        #       have a input part, do we get none here and fill it in?
-        pass
+    def fill_in_missing_features(
+        self, out: Dict[str, torch.Tensor]
+    ) -> Dict[str, torch.Tensor]:
+        for module_name, module in self.modules_to_fuse.items():
+            if module_name not in out:
+                num_out_features = module.num_out_features()
+                out[module_name] = torch.zeros(num_out_features)
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
 
         out = {}
-        for module_name, module in self.modules_to_fuse.items():
-            module_input = inputs[module_name]
+        for module_name, module_input in inputs.items():
+            module = self.modules_to_fuse[module_name]
             out[module] = module(module_input)
 
         fused_features = default_fuse_features(tuple(out.values()))

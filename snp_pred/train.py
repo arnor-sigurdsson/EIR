@@ -43,7 +43,7 @@ from snp_pred.data_load.label_setup import (
     al_all_column_ops,
     get_array_path_iterator,
     set_up_train_and_valid_tabular_data,
-    gather_ids_from_data_source,
+    gather_ids_from_tabular_file,
     split_ids,
     TabularFileInfo,
     save_transformer_set,
@@ -213,8 +213,14 @@ def get_default_config(
         transformers=tabular_input_labels.label_transformers, run_folder=run_folder
     )
 
-    train_dataset, valid_dataset = datasets.set_up_datasets(
+    omics_data_dimensions = _get_data_dimension_from_data_source(
+        data_source=Path(cl_args.data_source),
+    )
+    data_dimensions = {"omics_cl_args": omics_data_dimensions}
+
+    train_dataset, valid_dataset = datasets.set_up_datasets_from_cl_args(
         cl_args=cl_args,
+        data_dimensions=data_dimensions,
         target_labels=target_labels,
         tabular_inputs_labels=tabular_input_labels,
     )
@@ -238,22 +244,6 @@ def get_default_config(
     num_outputs_per_target = set_up_num_outputs_per_target(
         target_transformers=target_labels.label_transformers
     )
-
-    # TODO: Make a wrapper possibly, for using with multiple models? Then we could
-    #       maybe pass in something like --omics_data_sources [path1, path2], and
-    #       --omics_sources_names [name1, name2], which would hook into a dictionary
-    #       here? But the problem there is that we have to expand *everything* in CL
-    #       args, e.g. channel_exp_base, which is not feasible at all.
-    #       The args woule rather be made to be a config file.
-
-    # TODO: Probably it's more important next to stop depending on one genotype
-    #       data in the codesbase, e.g. when doing mixing. We need to add in some
-    #       functionality to identity different modalities of data, e.g. omics_,
-    #       tabular_, image_, text_ strings.
-    omics_data_dimensions = _get_data_dimension_from_data_source(
-        data_source=Path(cl_args.data_source),
-    )
-    data_dimensions = {"omics_cl_args": omics_data_dimensions}
 
     model = get_model_from_cl_args(
         cl_args=cl_args,
@@ -301,7 +291,7 @@ def get_default_config(
 def get_target_and_tabular_input_labels(
     cl_args: argparse.Namespace, custom_label_parsing_operations: al_all_column_ops
 ) -> Tuple[Labels, Labels]:
-    all_array_ids = gather_ids_from_data_source(data_source=Path(cl_args.data_source))
+    all_array_ids = gather_ids_from_tabular_file(file_path=cl_args.label_file)
     train_ids, valid_ids = split_ids(ids=all_array_ids, valid_size=cl_args.valid_size)
 
     logger.info("Setting up target labels.")
@@ -592,11 +582,11 @@ def get_modules_to_fuse_from_cl_args(
 ):
     models = nn.ModuleDict()
 
-    genotype_model = get_omics_model_from_cl_args(
+    omics_model = get_omics_model_from_cl_args(
         cl_args=cl_args, data_dimensions=omics_data_dimensions
     )
 
-    models["omics_cl_args"] = genotype_model
+    models["omics_cl_args"] = omics_model
 
     if cl_args.extra_con_columns or cl_args.extra_cat_columns:
         unique_tabular_values = get_unique_values_from_transformers(

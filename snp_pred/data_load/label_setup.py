@@ -379,23 +379,32 @@ def ensure_categorical_columns_are_str(df: pd.DataFrame) -> pd.DataFrame:
     return df_copy
 
 
-def gather_ids_from_data_source(data_source: Path):
-    iterator = get_array_path_iterator(data_source=data_source)
+def gather_ids_from_data_source(data_source: Path, validate: bool = True):
+    iterator = get_array_path_iterator(data_source=data_source, validate=validate)
     logger.debug("Gathering IDs from %s.", data_source)
     all_ids = tuple(i.stem for i in tqdm(iterator, desc="Progress"))
 
     return all_ids
 
 
-def get_array_path_iterator(data_source: Path):
+def gather_ids_from_tabular_file(file_path: Path):
+    df = pd.read_csv(file_path, usecols=["ID"])
+    all_ids = tuple(df["ID"])
+
+    return all_ids
+
+
+def get_array_path_iterator(data_source: Path, validate: bool = True):
     def _file_iterator(file_path: Path):
         with open(str(file_path), "r") as infile:
             for line in infile:
                 path = Path(line.strip())
-                if not path.exists():
-                    raise FileNotFoundError(
-                        f"Could not find array {path} listed in {data_source}."
-                    )
+
+                if validate:
+                    if not path.exists():
+                        raise FileNotFoundError(
+                            f"Could not find array {path} listed in {data_source}."
+                        )
 
                 yield path
 

@@ -1,8 +1,20 @@
 from argparse import Namespace
+from collections import defaultdict
 from copy import copy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Dict, Union, Tuple, Callable, Any
+from typing import (
+    List,
+    Dict,
+    Union,
+    Tuple,
+    Callable,
+    Any,
+    Sequence,
+    Generator,
+    DefaultDict,
+    TYPE_CHECKING,
+)
 
 import numpy as np
 import torch
@@ -19,6 +31,9 @@ from snp_pred.data_load.label_setup import (
 )
 from snp_pred.data_load.label_setup import merge_target_columns
 
+if TYPE_CHECKING:
+    from snp_pred.train import DataDimensions
+
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 # Type Aliases
@@ -34,27 +49,33 @@ al_inputs = Union[Dict[str, torch.Tensor], Dict[str, Any]]
 al_getitem_return = Tuple[Dict[str, torch.Tensor], al_sample_label_dict_target, str]
 
 
-def set_up_datasets(
+def set_up_datasets_from_cl_args(
     cl_args: Namespace,
     target_labels: Labels,
+    data_dimensions,
     tabular_inputs_labels: Union[Labels, None] = None,
 ) -> Tuple[al_datasets, al_datasets]:
 
-    dataset_class_common_args = _construct_common_dataset_init_params(cl_args=cl_args)
-
     dataset_class = MemoryDataset if cl_args.memory_dataset else DiskDataset
-    train_dataset = dataset_class(
-        **dataset_class_common_args,
+
+    train_kwargs = construct_default_dataset_kwargs_from_cl_args(
+        cl_args=cl_args,
         target_labels_dict=target_labels.train_labels,
-        tabular_inputs_labels_dict=tabular_inputs_labels.train_labels,
-        na_augment=(cl_args.na_augment_perc, cl_args.na_augment_prob),
+        data_dimensions=data_dimensions,
+        tabular_labels_dict=tabular_inputs_labels.train_labels,
+        na_augment=True,
     )
 
-    valid_dataset = dataset_class(
-        **dataset_class_common_args,
+    valid_kwargs = construct_default_dataset_kwargs_from_cl_args(
+        cl_args=cl_args,
         target_labels_dict=target_labels.valid_labels,
-        tabular_inputs_labels_dict=tabular_inputs_labels.valid_labels,
+        data_dimensions=data_dimensions,
+        tabular_labels_dict=tabular_inputs_labels.valid_labels,
+        na_augment=False,
     )
+
+    train_dataset = dataset_class(**train_kwargs)
+    valid_dataset = dataset_class(**valid_kwargs)
 
     _check_valid_and_train_datasets(
         train_dataset=train_dataset, valid_dataset=valid_dataset
@@ -63,18 +84,37 @@ def set_up_datasets(
     return train_dataset, valid_dataset
 
 
-def _construct_common_dataset_init_params(cl_args: Namespace) -> Dict:
+def construct_default_dataset_kwargs_from_cl_args(
+    cl_args: Namespace,
+    target_labels_dict: Union[None, al_label_dict],
+    data_dimensions: Dict[str, "DataDimensions"],
+    tabular_labels_dict: Union[None, al_label_dict],
+    na_augment: bool,
+) -> Dict[str, Any]:
+
     target_columns = merge_target_columns(
         target_con_columns=cl_args.target_con_columns,
         target_cat_columns=cl_args.target_cat_columns,
     )
 
-    dataset_class_common_args = {
+    data_sources = {"omics_cl_args": cl_args.data_source}
+    if tabular_labels_dict:
+        data_sources["tabular_cl_args"] = tabular_labels_dict
+
+    dataset_kwargs = {
         "target_columns": target_columns,
-        "data_source": cl_args.data_source,
+        "data_sources": data_sources,
+        "data_dimensions": data_dimensions,
+        "target_labels_dict": target_labels_dict,
     }
 
-    return dataset_class_common_args
+    if na_augment:
+        dataset_kwargs["na_augment"] = (
+            cl_args.na_augment_perc,
+            cl_args.na_augment_prob,
+        )
+
+    return dataset_kwargs
 
 
 def _check_valid_and_train_datasets(
@@ -97,31 +137,24 @@ class Sample:
     target_labels: al_sample_label_dict_target
 
 
-# TODO: Update to work with data_sources, Dict[str, Path], use prefixes, e.g. omics_
-#       We can also add tabular_inputs_labels_dict in there, with tabular_ prefix
-#       Then we have assumptions, e.g. omics is always on disk, tabular is always a dict
-
-# TODO: Add in support for missing input modalities
 class DatasetBase(Dataset):
     def __init__(
         self,
-        data_source: Path,
+        data_sources: Dict[str, Any],
+        data_dimensions: Dict,
         target_columns: al_target_columns,
         target_labels_dict: al_label_dict = None,
-        tabular_inputs_labels_dict: al_label_dict = None,
         na_augment: Tuple[float] = (0.0, 0.0),
     ):
         super().__init__()
 
-        self.data_source = data_source
+        self.data_sources = data_sources
+        self.data_dimensions = data_dimensions
 
         self.samples: Union[List[Sample], None] = None
 
         self.target_columns = target_columns
         self.target_labels_dict = target_labels_dict if target_labels_dict else {}
-        self.extra_tabular_labels_dict = (
-            tabular_inputs_labels_dict if tabular_inputs_labels_dict else {}
-        )
 
         self.na_augment = na_augment
 
@@ -129,69 +162,226 @@ class DatasetBase(Dataset):
         if not self.target_columns:
             raise ValueError("Please specify label column name.")
 
-    def set_up_samples(self, array_hook: Callable = lambda x: x) -> List[Sample]:
+    def set_up_samples(self, omics_hook: Callable = lambda x: x) -> List[Sample]:
         """
-        If we have initialized a labels_dict variable, we use that to iterate over IDs.
-        This is for (a) training, (b) evaluating or (c) testing on test set for
-        generalization error.
-
-        When predicting on unknown set (i.e. no labels), then we don't have a
-        labels dict, hence we refer to `files directly`. The reason why we use an
-        empty dictionary by default is that the default collate function will raise
-        an error if we return None.
-
-        We don't want to use `files` variable for train/val, as the self.samples
-        would have all obs. in both train/val, which is probably not a good idea as
-        it might pose data leakage risks.
+        We do an extra filtering step at the end to account for the situation where
+        we have a target label file with more samples than there are any inputs
+        available for. This is quite likely if we have e.g. pre-split data into
+        train/val and test folders.
         """
 
-        logger.debug("Setting up samples in current dataset.")
-        path_iterator = get_array_path_iterator(data_source=Path(self.data_source))
-        files = {i.stem: i for i in path_iterator}
+        def _default_factory() -> Sample:
+            return Sample(sample_id="", inputs={}, target_labels={})
 
-        sample_id_iter = self.target_labels_dict if self.target_labels_dict else files
-        samples = []
+        samples = defaultdict(_default_factory)
 
-        for sample_id in tqdm(sample_id_iter, desc="Progress"):
-            sample_target_labels = self.target_labels_dict.get(sample_id, {})
-
-            sample_array_input = array_hook(files.get(sample_id))
-
-            sample_inputs = {
-                "omics_cl_args": sample_array_input,
-            }
-            if self.extra_tabular_labels_dict:
-                sample_tabular_inputs = self.extra_tabular_labels_dict.get(
-                    sample_id, {}
-                )
-                sample_inputs["tabular_cl_args"] = sample_tabular_inputs
-
-            cur_sample = Sample(
-                sample_id=sample_id,
-                inputs=sample_inputs,
-                target_labels=sample_target_labels,
+        ids_to_keep = None
+        if self.target_labels_dict:
+            samples = _add_target_labels_to_samples(
+                target_labels_dict=self.target_labels_dict, samples=samples
             )
-            samples.append(cur_sample)
+            ids_to_keep = self.target_labels_dict.keys()
 
+        for source_name, source_data in self.data_sources.items():
+
+            if source_name.startswith("omics_"):
+
+                samples = _add_file_data_to_samples(
+                    source_data=source_data,
+                    samples=samples,
+                    ids_to_keep=ids_to_keep,
+                    file_loading_hook=omics_hook,
+                    source_name=source_name,
+                )
+
+            elif source_name.startswith("tabular_"):
+                samples = _add_tabular_data_to_samples(
+                    tabular_dict=source_data,
+                    samples=samples,
+                    ids_to_keep=ids_to_keep,
+                    source_name=source_name,
+                )
+
+        if self.target_labels_dict:
+            samples = list(i for i in samples.values() if i.inputs)
         return samples
-
-    @property
-    def data_width(self):
-        raise NotImplementedError
 
     def __getitem__(self, index: int):
         raise NotImplementedError
 
-    def check_non_labelled(self):
-        if not self.target_labels_dict:
-            return
+    def check_samples(self):
 
-        non_labelled = tuple(i for i in self.samples if not i.target_labels)
-        if non_labelled:
+        no_ids, no_inputs, no_target_labels = [], [], []
+
+        for s in self.samples:
+            if not s.sample_id:
+                no_ids.append(s)
+
+            if not s.inputs:
+                no_inputs.append(s)
+
+            if self.target_labels_dict:
+                if not s.target_labels:
+                    no_target_labels.append(s)
+
+        if no_ids:
             raise ValueError(
-                f"Expected all observations to have a label associated "
-                f"with them, but got {non_labelled}."
+                f"Expected all observations to have a sample ID associated "
+                f"with them, but got {no_ids}."
             )
+
+        if no_inputs:
+            raise ValueError(
+                f"Expected all observations to have an input associated "
+                f"with them, but got {no_inputs}."
+            )
+
+        if self.target_labels_dict:
+            if no_target_labels:
+                raise ValueError(
+                    f"Expected all observations to have a label associated "
+                    f"with them, but got {no_target_labels}."
+                )
+
+
+def _add_target_labels_to_samples(
+    target_labels_dict: al_label_dict, samples: DefaultDict[str, Sample]
+) -> DefaultDict[str, Sample]:
+    target_label_iterator = tqdm(target_labels_dict.items(), desc="Target Labels")
+
+    for sample_id, sample_target_labels in target_label_iterator:
+        _add_id_to_samples(samples=samples, sample_id=sample_id)
+        samples[sample_id].target_labels = sample_target_labels
+
+    return samples
+
+
+def _add_file_data_to_samples(
+    source_data: str,
+    samples: DefaultDict[str, Sample],
+    ids_to_keep: Union[None, Sequence[str]],
+    file_loading_hook: Callable,
+    source_name: str = "File Data",
+) -> DefaultDict[str, Sample]:
+
+    file_data_iterator = get_file_sample_id_iterator_basic(
+        data_source=source_data, ids_to_keep=ids_to_keep
+    )
+    omics_file_iterator_tqdm = tqdm(file_data_iterator, desc=source_name)
+
+    for sample_id, file in omics_file_iterator_tqdm:
+
+        sample_data = file_loading_hook(file)
+
+        samples = _add_id_to_samples(samples=samples, sample_id=sample_id)
+
+        samples[sample_id].inputs[source_name] = sample_data
+
+    return samples
+
+
+def _add_tabular_data_to_samples(
+    tabular_dict: al_label_dict,
+    samples: DefaultDict[str, Sample],
+    ids_to_keep: Union[None, Sequence[str]],
+    source_name: str = "Tabular Data",
+) -> DefaultDict[str, Sample]:
+
+    tabular_iterator = tqdm(tabular_dict.items(), desc=source_name)
+
+    for sample_id, tabular_inputs in tabular_iterator:
+
+        if sample_id not in ids_to_keep:
+            continue
+
+        samples = _add_id_to_samples(samples=samples, sample_id=sample_id)
+
+        samples[sample_id].inputs[source_name] = tabular_inputs
+
+    return samples
+
+
+def _add_id_to_samples(
+    samples: DefaultDict[str, Sample], sample_id: str
+) -> DefaultDict[str, Sample]:
+    """
+    This kind of weird function is used because in some cases, we cannot expect the
+    target labels to have added samples, because we could be predicting on completely
+    unknown samples without any target label data.
+
+    Hence, we might have sparse modular data available for the samples, e.g. only omics
+    for some samples, but only tabular data for others. So we want to ensure that the
+    data is filled in.
+    """
+    if not samples[sample_id].sample_id:
+        samples[sample_id].sample_id = sample_id
+    else:
+        assert samples[sample_id].sample_id == sample_id
+
+    return samples
+
+
+def get_file_sample_id_iterator_basic(
+    data_source: str,
+    ids_to_keep: Union[None, Sequence[str]],
+) -> Generator[Tuple[Any, str], None, None]:
+
+    base_file_iterator = get_array_path_iterator(
+        data_source=Path(data_source), validate=False
+    )
+
+    for file in base_file_iterator:
+        sample_id = file.stem
+
+        if ids_to_keep:
+            if sample_id in ids_to_keep:
+                yield sample_id, file
+        else:
+            yield sample_id, file
+
+
+def get_file_sample_id_iterator(
+    data_source: str, ids_to_keep: Union[None, Sequence[str]]
+) -> Generator[Tuple[Any, str], None, None]:
+    def _id_from_filename(file: Path) -> str:
+        return file.stem
+
+    def _filter_ids_callable(item, sample_id):
+        if sample_id in ids_to_keep:
+            return True
+        return False
+
+    base_file_iterator = get_array_path_iterator(
+        data_source=Path(data_source), validate=False
+    )
+
+    sample_id_and_file_iterator = _get_sample_id_data_iterator(
+        base_iterator=base_file_iterator, id_callable=_id_from_filename
+    )
+
+    if ids_to_keep:
+        final_iterator = _get_filter_iterator(
+            base_iterator=sample_id_and_file_iterator,
+            filter_callable=_filter_ids_callable,
+        )
+    else:
+        final_iterator = sample_id_and_file_iterator
+
+    yield from final_iterator
+
+
+def _get_sample_id_data_iterator(
+    base_iterator, id_callable: Callable
+) -> Generator[Tuple[Any, str], None, None]:
+    for item in base_iterator:
+        sample_id = id_callable(item)
+        yield item, sample_id
+
+
+def _get_filter_iterator(base_iterator, filter_callable) -> Generator[Any, None, None]:
+    for item in base_iterator:
+        if filter_callable(*item):
+            yield item
 
 
 class MemoryDataset(DatasetBase):
@@ -201,8 +391,8 @@ class MemoryDataset(DatasetBase):
         if self.target_labels_dict:
             self.init_label_attributes()
 
-        self.samples = self.set_up_samples(array_hook=self._mem_sample_loader)
-        self.check_non_labelled()
+        self.samples = self.set_up_samples(omics_hook=self._mem_sample_loader)
+        self.check_samples()
 
     @staticmethod
     def _mem_sample_loader(sample_fpath: Union[str, Path]) -> torch.ByteTensor:
@@ -216,29 +406,23 @@ class MemoryDataset(DatasetBase):
         tensor = torch.from_numpy(array).unsqueeze(0)
         return tensor
 
-    @property
-    def data_width(self):
-        data = self.samples[0].inputs["omics_cl_args"]
-        return data.shape[1]
-
-    # Note that dataloaders automatically convert arrays to tensors here, for labels
     def __getitem__(self, index: int) -> al_getitem_return:
         sample = self.samples[index]
 
         inputs_prepared = copy(sample.inputs)
-
-        genotype_array_raw = sample.inputs["omics_cl_args"]
-        genotype_array_prepared = prepare_one_hot_omics_data(
-            genotype_array=genotype_array_raw,
+        inputs_prepared = prepare_inputs_memory(
+            inputs=inputs_prepared,
             na_augment_perc=self.na_augment[0],
             na_augment_prob=self.na_augment[1],
         )
-        inputs_prepared["omics_cl_args"] = genotype_array_prepared
+        inputs_final = impute_missing_modalities(
+            inputs=inputs_prepared, data_dimensions=self.data_dimensions
+        )
 
         target_labels = sample.target_labels
         sample_id = sample.sample_id
 
-        return inputs_prepared, target_labels, sample_id
+        return inputs_final, target_labels, sample_id
 
     def __len__(self):
         return len(self.samples)
@@ -269,38 +453,90 @@ class DiskDataset(DatasetBase):
             self.init_label_attributes()
 
         self.samples = self.set_up_samples()
-        self.check_non_labelled()
-
-    @property
-    def data_width(self):
-        data = np.load(self.samples[0].inputs["omics_cl_args"])
-        return data.shape[1]
+        self.check_samples()
 
     # Note that dataloaders automatically convert arrays to tensors here, for labels
     def __getitem__(self, index: int) -> al_getitem_return:
         sample = self.samples[index]
 
         inputs_prepared = copy(sample.inputs)
-
-        # TODO: Refactor np.load --> torch and reuse in memory dataset
-        genotype_array_raw = np.load(sample.inputs["omics_cl_args"])
-        genotype_array_raw = torch.from_numpy(genotype_array_raw).unsqueeze(0)
-
-        genotype_array_prepared = prepare_one_hot_omics_data(
-            genotype_array=genotype_array_raw,
+        inputs_prepared = prepare_inputs_disk(
+            inputs=inputs_prepared,
             na_augment_perc=self.na_augment[0],
             na_augment_prob=self.na_augment[1],
         )
-        inputs_prepared["omics_cl_args"] = genotype_array_prepared
+        inputs_final = impute_missing_modalities(
+            inputs=inputs_prepared, data_dimensions=self.data_dimensions
+        )
 
         target_labels = sample.target_labels
         sample_id = sample.sample_id
 
-        return inputs_prepared, target_labels, sample_id
+        return inputs_final, target_labels, sample_id
 
     def __len__(self):
         return len(self.samples)
 
 
-def _load_one_hot_array():
-    pass
+def prepare_inputs_disk(
+    inputs: Dict[str, Any], na_augment_perc: float, na_augment_prob: float
+) -> Dict[str, torch.Tensor]:
+    prepared_inputs = {}
+    for name, data in inputs.items():
+
+        if name.startswith("omics_"):
+            array_raw = _load_one_hot_array(path=data)
+            array_prepared = prepare_one_hot_omics_data(
+                genotype_array=array_raw,
+                na_augment_perc=na_augment_perc,
+                na_augment_prob=na_augment_prob,
+            )
+            prepared_inputs[name] = array_prepared
+
+        else:
+            prepared_inputs[name] = inputs[name]
+
+    return prepared_inputs
+
+
+def prepare_inputs_memory(
+    inputs: Dict[str, Any], na_augment_perc: float, na_augment_prob: float
+) -> Dict[str, torch.Tensor]:
+    prepared_inputs = {}
+    for name, data in inputs.items():
+
+        if name.startswith("omics_"):
+            array_raw = data
+            array_prepared = prepare_one_hot_omics_data(
+                genotype_array=array_raw,
+                na_augment_perc=na_augment_perc,
+                na_augment_prob=na_augment_prob,
+            )
+            prepared_inputs[name] = array_prepared
+
+        else:
+            prepared_inputs[name] = inputs[name]
+
+    return prepared_inputs
+
+
+def impute_missing_modalities(
+    inputs: Dict[str, Any],
+    data_dimensions: Dict[str, "DataDimensions"],
+    fill_value: float = -1.0,
+) -> Dict[str, torch.Tensor]:
+
+    for name, dimensions in data_dimensions.items():
+        if name not in inputs:
+            shape = dimensions.channels, dimensions.height, dimensions.width
+            imputed_tensor = torch.empty(shape).fill_(fill_value)
+            inputs[name] = imputed_tensor
+
+    return inputs
+
+
+def _load_one_hot_array(path: Path) -> torch.Tensor:
+    genotype_array_raw = np.load(str(path))
+    genotype_array_raw = torch.from_numpy(genotype_array_raw).unsqueeze(0)
+
+    return genotype_array_raw

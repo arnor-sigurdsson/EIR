@@ -383,6 +383,7 @@ def create_test_data_dimensions(create_test_cl_args, create_test_data):
     data_dimensions = train._get_data_dimension_from_data_source(
         data_source=Path(cl_args.data_source)
     )
+    data_dimensions = {"omics_cl_args": data_dimensions}
 
     return data_dimensions
 
@@ -401,7 +402,7 @@ def create_test_model(
 
     model = get_model_from_cl_args(
         cl_args=cl_args,
-        omics_data_dimensions=data_dimensions,
+        omics_data_dimensions=data_dimensions["omics_cl_args"],
         num_outputs_per_target=num_outputs_per_class,
         tabular_label_transformers=tabular_input_labels.label_transformers,
     )
@@ -442,13 +443,20 @@ def create_test_labels(create_test_data, create_test_cl_args):
 
 
 @pytest.fixture()
-def create_test_datasets(create_test_labels, create_test_cl_args):
+def create_test_datasets(
+    create_test_data,
+    create_test_labels,
+    create_test_cl_args,
+    create_test_data_dimensions,
+):
 
     cl_args = create_test_cl_args
     target_labels, tabular_input_labels = create_test_labels
+    data_dimensions = create_test_data_dimensions
 
-    train_dataset, valid_dataset = datasets.set_up_datasets(
+    train_dataset, valid_dataset = datasets.set_up_datasets_from_cl_args(
         cl_args=cl_args,
+        data_dimensions=data_dimensions,
         target_labels=target_labels,
         tabular_inputs_labels=tabular_input_labels,
     )
@@ -549,7 +557,7 @@ def prep_modelling_test_configs(
         train_loader=train_loader,
         valid_loader=valid_loader,
         valid_dataset=valid_dataset,
-        data_dimensions={"omics_cl_args": data_dimensions},
+        data_dimensions=data_dimensions,
         model=model,
         optimizer=optimizer,
         criterions=criterions,
