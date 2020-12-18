@@ -7,10 +7,11 @@ from torch.optim import SGD
 from torch.optim.adamw import AdamW
 from torch.utils.data import WeightedRandomSampler, SequentialSampler, RandomSampler
 
-from snp_pred.data_load import label_setup
 from snp_pred import train
-from snp_pred.models.models_cnn import CNNModel
-from snp_pred.models.models_mlp import MLPModel
+from snp_pred.data_load import label_setup
+from snp_pred.models.fusion import FusionModel
+from snp_pred.models.omics.models_cnn import CNNModel
+from snp_pred.models.omics.models_mlp import MLPModel
 from snp_pred.train_utils import optimizers
 
 
@@ -124,17 +125,29 @@ def test_get_model(args_config):
 
     args_config.model_type = "cnn"
     num_outputs_per_target_dict = {"Origin": 10, "Height": 1}
-    cnn_model = train.get_model(args_config, num_outputs_per_target_dict, None)
 
-    assert isinstance(cnn_model, CNNModel)
-    assert cnn_model.multi_task_branches["Origin"].fc_3_final.out_features == 10
-    assert cnn_model.multi_task_branches["Height"].fc_3_final.out_features == 1
+    data_dimensions = train.DataDimensions(channels=1, height=4, width=1000)
+
+    cnn_fusion_model = train.get_model_from_cl_args(
+        cl_args=args_config,
+        omics_data_dimensions=data_dimensions,
+        num_outputs_per_target=num_outputs_per_target_dict,
+        tabular_label_transformers=None,
+    )
+
+    assert isinstance(cnn_fusion_model, FusionModel)
+    assert cnn_fusion_model.multi_task_branches["Origin"][-1][-1].out_features == 10
+    assert cnn_fusion_model.multi_task_branches["Height"][-1][-1].out_features == 1
+    assert isinstance(cnn_fusion_model.modules_to_fuse["omics_cl_args"], CNNModel)
 
     args_config.model_type = "mlp"
-    mlp_model = train.get_model(args_config, num_outputs_per_target_dict, None)
-    assert isinstance(mlp_model, MLPModel)
-    # assert mlp_model.multi_task_branches["Origin"].fc_3_final.out_features == 10
-    # assert mlp_model.multi_task_branches["Height"].fc_3_final.out_features == 1
+    mlp_fusion_model = train.get_model_from_cl_args(
+        cl_args=args_config,
+        omics_data_dimensions=data_dimensions,
+        num_outputs_per_target=num_outputs_per_target_dict,
+        tabular_label_transformers=None,
+    )
+    assert isinstance(mlp_fusion_model.modules_to_fuse["omics_cl_args"], MLPModel)
 
 
 def test_get_criterions_nonlinear():

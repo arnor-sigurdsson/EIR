@@ -23,8 +23,8 @@ from snp_pred.data_load.data_utils import get_target_columns_generator
 from snp_pred.data_load.datasets import al_datasets
 from snp_pred.models import model_training_utils
 from snp_pred.models.model_training_utils import gather_dloader_samples
-from snp_pred.models.models_cnn import CNNModel
-from snp_pred.models.models_mlp import MLPModel
+from snp_pred.models.omics.models_cnn import CNNModel
+from snp_pred.models.omics.models_mlp import MLPModel
 from snp_pred.train_utils.evaluation import validation_handler
 from snp_pred.train_utils.utils import (
     prep_sample_outfolder,
@@ -176,8 +176,8 @@ def get_shap_object(
         n_samples=n_background_samples,
     )
 
-    if "tabular" in background:
-        background["tabular"] = background["tabular"].detach()
+    if "tabular_cl_args" in background:
+        background["tabular_cl_args"] = background["tabular_cl_args"].detach()
 
     hook_partial = partial(
         _grab_single_target_from_model_output_hook, output_target_column=column_name
@@ -408,7 +408,7 @@ def accumulate_activations(
         sample_target_labels = batch.target_labels
 
         # we want to keep the original sample for masking
-        inputs_genotype = sample_inputs["genotype"]
+        inputs_genotype = sample_inputs["omics_cl_args"]
         single_sample_copy = deepcopy(inputs_genotype).cpu().numpy().squeeze()
 
         # apply pre-processing functions on sample and input
@@ -417,10 +417,10 @@ def accumulate_activations(
             inputs_genotype, _ = pre_func(
                 single_sample=inputs_genotype, sample_label=sample_target_labels
             )
-            sample_inputs["genotype"] = inputs_genotype
+            sample_inputs["omics_cl_args"] = inputs_genotype
 
-        if "tabular" in sample_inputs:
-            sample_inputs["tabular"] = sample_inputs["tabular"].detach()
+        if "tabular_cl_args" in sample_inputs:
+            sample_inputs["tabular_cl_args"] = sample_inputs["tabular_cl_args"].detach()
 
         sample_acts = act_func(
             inputs=sample_inputs, sample_label=sample_target_labels[target_column]

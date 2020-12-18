@@ -168,9 +168,16 @@ def get_train_argument_parser() -> configargparse.ArgumentParser:
         "--model_type",
         type=str,
         default="cnn",
-        choices=["cnn", "mlp", "mlp-split", "mlp-fully-split", "mlp-mgmoe", "linear"],
-        help="whether to use a convolutional neural network (cnn) or multilayer "
-        "perceptron (mlp)",
+        choices=["cnn", "mlp", "mlp-split", "mlp-fully-split", "linear"],
+        help="Model type for omics model.",
+    )
+
+    parser_.add_argument(
+        "--fusion_model_type",
+        type=str,
+        default="default",
+        choices=["default", "mgmoe"],
+        help="What type of fusion model to use.",
     )
 
     parser_.add_argument(
@@ -245,13 +252,6 @@ def get_train_argument_parser() -> configargparse.ArgumentParser:
         "--sa",
         action="store_true",
         help="Whether to add self attention to the network.",
-    )
-
-    parser_.add_argument(
-        "--target_width",
-        type=int,
-        default=None,
-        help="Total width of input sequence after padding.",
     )
 
     parser_.add_argument(

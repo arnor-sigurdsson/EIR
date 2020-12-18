@@ -1,3 +1,4 @@
+import argparse
 from argparse import Namespace
 from pathlib import Path
 
@@ -8,7 +9,9 @@ from sklearn.preprocessing import LabelEncoder
 
 from snp_pred import predict
 from snp_pred import train
-from snp_pred.models.models_cnn import CNNModel
+from snp_pred.data_load.label_setup import TabularFileInfo
+from snp_pred.models.omics.models_cnn import CNNModel
+from snp_pred.models.omics.omics_models import get_omics_model_init_kwargs
 from tests.conftest import cleanup
 from tests.test_data_load.test_datasets import check_dataset
 
@@ -21,21 +24,21 @@ def test_load_model(args_config, tmp_path):
     """
 
     cl_args = args_config
-    num_outputs_per_target = {"Origin": 3}
-    model: torch.nn.Module = CNNModel(
-        cl_args=cl_args,
-        num_outputs_per_target=num_outputs_per_target,
-        embeddings_dict=None,
-        extra_continuous_inputs_columns=cl_args.extra_con_columns,
-    ).to(device=cl_args.device)
+
+    data_dimension = train.DataDimensions(channels=1, height=4, width=1000)
+    cnn_init_kwargs = get_omics_model_init_kwargs(
+        model_type="cnn", cl_args=cl_args, data_dimensions=data_dimension
+    )
+    model = CNNModel(**cnn_init_kwargs)
+    model = model.to(device=cl_args.device)
 
     model_path = tmp_path / "model.pt"
     torch.save(obj=model.state_dict(), f=model_path)
 
     loaded_model = predict._load_model(
         model_path=model_path,
-        num_outputs_per_target=model.num_outputs_per_target,
-        train_cl_args=cl_args,
+        model_class=CNNModel,
+        model_init_kwargs=cnn_init_kwargs,
         device=cl_args.device,
     )
     # make sure we're in eval model
@@ -91,7 +94,7 @@ def test_load_labels_for_predict(
     test_ids = predict.gather_ids_from_data_source(
         data_source=Path(cl_args.data_source)
     )
-    tabular_info = predict.set_up_all_label_data(cl_args=cl_args)
+    tabular_info = set_up_all_label_data(cl_args=cl_args)
 
     df_test = predict._load_labels_for_predict(
         tabular_info=tabular_info, ids_to_keep=test_ids
@@ -123,16 +126,19 @@ def test_load_labels_for_predict(
     ],
     indirect=True,
 )
-def test_set_up_test_dataset(create_test_data, create_test_cl_args):
+def test_set_up_test_dataset(
+    create_test_data, create_test_cl_args, create_test_data_dimensions
+):
     test_data_config = create_test_data
     c = test_data_config
     cl_args = create_test_cl_args
+    data_dimensions = create_test_data_dimensions
     classes_tested = sorted(list(c.target_classes.keys()))
 
     test_ids = predict.gather_ids_from_data_source(
         data_source=Path(cl_args.data_source)
     )
-    tabular_info = predict.set_up_all_label_data(cl_args=cl_args)
+    tabular_info = set_up_all_label_data(cl_args=cl_args)
 
     df_test = predict._load_labels_for_predict(
         tabular_info=tabular_info, ids_to_keep=test_ids
@@ -148,7 +154,8 @@ def test_set_up_test_dataset(create_test_data, create_test_cl_args):
         label_transformers=transformers,
     )
 
-    test_dataset = predict._set_up_test_dataset(
+    test_dataset = predict._set_up_default_test_dataset(
+        data_dimensions=data_dimensions,
         test_train_cl_args_mix=cl_args,
         test_labels_dict=df_test_dict,
         tabular_inputs_labels_dict=None,
@@ -232,3 +239,15 @@ def test_predict(keep_outputs, prep_modelling_test_configs):
 
     if not keep_outputs:
         cleanup(test_config.run_path)
+
+
+def set_up_all_label_data(cl_args: argparse.Namespace) -> TabularFileInfo:
+
+    table_info = TabularFileInfo(
+        file_path=cl_args.label_file,
+        con_columns=cl_args.target_con_columns + cl_args.extra_con_columns,
+        cat_columns=cl_args.target_cat_columns + cl_args.extra_cat_columns,
+        parsing_chunk_size=cl_args.label_parsing_chunk_size,
+    )
+
+    return table_info

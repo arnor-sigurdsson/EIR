@@ -119,6 +119,7 @@ class CNNResidualBlockBase(nn.Module):
         out_channels: int,
         rb_do: float,
         dilation: int,
+        conv_1_kernel_h: int = 1,
         conv_1_kernel_w: int = 12,
         conv_1_padding: int = 4,
         down_stride_w: int = 4,
@@ -127,11 +128,11 @@ class CNNResidualBlockBase(nn.Module):
 
         self.in_channels = in_channels
         self.out_channels = out_channels
+        self.conv_1_kernel_h = conv_1_kernel_h
         self.conv_1_kernel_w = conv_1_kernel_w
         self.conv_1_padding = conv_1_padding
         self.down_stride_w = down_stride_w
 
-        self.conv_1_kernel_h = 4 if isinstance(self, FirstCNNBlock) else 1
         self.down_stride_h = self.conv_1_kernel_h
 
         self.rb_do = nn.Dropout2d(rb_do)

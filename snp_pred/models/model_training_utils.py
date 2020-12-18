@@ -148,9 +148,7 @@ def gather_dloader_samples(
     batch_prep_hook_kwargs: Dict[str, Any],
     n_samples: Union[int, None] = None,
 ) -> al_dloader_gathered_raw:
-    """
-    TODO: Test after refactor.
-    """
+
     all_input_batches = []
     all_label_batches = []
     ids_total = []

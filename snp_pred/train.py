@@ -1,6 +1,6 @@
 import argparse
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from functools import partial
 from pathlib import Path
 from types import SimpleNamespace
@@ -15,6 +15,8 @@ from typing import (
     Iterable,
     Sequence,
     Any,
+    Set,
+    Type,
 )
 
 import dill
@@ -41,21 +43,26 @@ from snp_pred.data_load.label_setup import (
     al_all_column_ops,
     get_array_path_iterator,
     set_up_train_and_valid_tabular_data,
-    gather_ids_from_data_source,
+    gather_ids_from_tabular_file,
     split_ids,
     TabularFileInfo,
     save_transformer_set,
     Labels,
 )
+from snp_pred.models import fusion, fusion_mgmoe
 from snp_pred.models import model_training_utils
-from snp_pred.models.extra_inputs_module import (
-    set_up_and_save_embeddings_dict,
-    get_extra_inputs,
-    al_emb_lookup_dict,
-)
 from snp_pred.models.model_training_utils import run_lr_find
-from snp_pred.models.models import al_models
-from snp_pred.models.models import get_model_class
+from snp_pred.models.models_linear import LinearModel, LinearModelConfig
+from snp_pred.models.omics.omics_models import (
+    get_model_class,
+    get_omics_model_init_kwargs,
+    match_namespace_to_dataclass,
+)
+from snp_pred.models.tabular.tabular import (
+    get_tabular_inputs,
+    TabularModel,
+    get_unique_values_from_transformers,
+)
 from snp_pred.train_utils import utils
 from snp_pred.train_utils.metrics import (
     calculate_batch_metrics,
@@ -130,6 +137,7 @@ class Config:
     """
 
     cl_args: argparse.Namespace
+    data_dimensions: Dict[str, "DataDimensions"]
     train_loader: torch.utils.data.DataLoader
     valid_loader: torch.utils.data.DataLoader
     valid_dataset: torch.utils.data.Dataset
@@ -137,7 +145,7 @@ class Config:
     target_transformers: al_label_transformers
     target_columns: al_target_columns
     num_outputs_per_target: al_num_outputs_per_target
-    model: Union[al_models, nn.DataParallel]
+    model: Union[fusion.FusionModel, nn.DataParallel]
     optimizer: Optimizer
     criterions: al_criterions
     loss_function: Callable
@@ -159,6 +167,7 @@ def serialize_config(
 def get_default_config_keys_to_serialize() -> Iterable[str]:
     return (
         "cl_args",
+        "data_dimensions",
         "num_outputs_per_target",
         "target_transformers",
         "target_columns",
@@ -172,8 +181,8 @@ def filter_config_by_keys(
 ) -> SimpleNamespace:
     filtered = {}
 
-    annotations = config.__annotations__
-    iterable = keys if keys is not None else annotations.keys()
+    config_fields = (f.name for f in fields(config))
+    iterable = keys if keys is not None else config_fields
 
     for k in iterable:
         filtered[k] = getattr(config, k)
@@ -204,13 +213,14 @@ def get_default_config(
         transformers=tabular_input_labels.label_transformers, run_folder=run_folder
     )
 
-    data_dimensions = _get_data_dimensions(
-        data_source=Path(cl_args.data_source), target_width=cl_args.target_width
+    omics_data_dimensions = _get_data_dimension_from_data_source(
+        data_source=Path(cl_args.data_source),
     )
-    cl_args.target_width = data_dimensions.width
+    data_dimensions = {"omics_cl_args": omics_data_dimensions}
 
-    train_dataset, valid_dataset = datasets.set_up_datasets(
+    train_dataset, valid_dataset = datasets.set_up_datasets_from_cl_args(
         cl_args=cl_args,
+        data_dimensions=data_dimensions,
         target_labels=target_labels,
         tabular_inputs_labels=tabular_input_labels,
     )
@@ -231,20 +241,15 @@ def get_default_config(
         num_workers=cl_args.dataloader_workers,
     )
 
-    embedding_dict = set_up_and_save_embeddings_dict(
-        embedding_columns=cl_args.extra_cat_columns,
-        labels_dict=tabular_input_labels.train_labels,
-        run_folder=run_folder,
-    )
-
     num_outputs_per_target = set_up_num_outputs_per_target(
         target_transformers=target_labels.label_transformers
     )
 
-    model = get_model(
+    model = get_model_from_cl_args(
         cl_args=cl_args,
+        omics_data_dimensions=omics_data_dimensions,
         num_outputs_per_target=num_outputs_per_target,
-        embedding_dict=embedding_dict,
+        tabular_label_transformers=tabular_input_labels.label_transformers,
     )
 
     criterions = _get_criterions(
@@ -263,6 +268,7 @@ def get_default_config(
 
     config = Config(
         cl_args=cl_args,
+        data_dimensions=data_dimensions,
         train_loader=train_dloader,
         valid_loader=valid_dloader,
         valid_dataset=valid_dataset,
@@ -285,7 +291,7 @@ def get_default_config(
 def get_target_and_tabular_input_labels(
     cl_args: argparse.Namespace, custom_label_parsing_operations: al_all_column_ops
 ) -> Tuple[Labels, Labels]:
-    all_array_ids = gather_ids_from_data_source(data_source=Path(cl_args.data_source))
+    all_array_ids = gather_ids_from_tabular_file(file_path=cl_args.label_file)
     train_ids, valid_ids = split_ids(ids=all_array_ids, valid_size=cl_args.valid_size)
 
     logger.info("Setting up target labels.")
@@ -345,27 +351,29 @@ class DataDimensions:
     height: int
     width: int
 
+    def num_elements(self):
+        return self.channels * self.height * self.width
 
-def _get_data_dimensions(
-    data_source: Path, target_width: Union[int, None]
+
+def _get_data_dimension_from_data_source(
+    data_source: Path,
 ) -> DataDimensions:
     """
-    TODO: Make more dynamic / robust.
+    TODO: Make more dynamic / robust. Also weird to say "width" for a 1D vector.
     """
 
     iterator = get_array_path_iterator(data_source=data_source)
     path = next(iterator)
     shape = np.load(file=path).shape
 
-    if len(shape) == 2:
-        channels, height, width = None, shape[0], shape[1]
+    if len(shape) == 1:
+        channels, height, width = 1, 1, shape[0]
+    elif len(shape) == 2:
+        channels, height, width = 1, shape[0], shape[1]
     elif len(shape) == 3:
         channels, height, width = shape
     else:
-        raise ValueError()
-
-    if target_width is not None:
-        width = target_width
+        raise ValueError("Currently max 3 dimensional inputs supported")
 
     return DataDimensions(channels=channels, height=height, width=width)
 
@@ -506,32 +514,169 @@ class GetAttrDelegatedDataParallel(nn.DataParallel):
             return getattr(self.module, name)
 
 
-def get_model(
+def get_model_from_cl_args(
     cl_args: argparse.Namespace,
+    omics_data_dimensions: DataDimensions,
     num_outputs_per_target: al_num_outputs_per_target,
-    embedding_dict: Union[al_emb_lookup_dict, None],
+    tabular_label_transformers: al_label_transformers,
 ) -> Union[nn.Module, nn.DataParallel]:
+    """
+    Note:   If we have a linear model, we just return that because that takes care of
+            fusing tabular and genotype data by itself.
 
-    model_class = get_model_class(model_type=cl_args.model_type)
-    model = model_class(
-        cl_args=cl_args,
-        num_outputs_per_target=num_outputs_per_target,
-        embeddings_dict=embedding_dict,
-        extra_continuous_inputs_columns=cl_args.extra_con_columns,
+    Note:   This function currently assumes 1 omics source, and one tabular source.
+            If we wanted to expand it, we would have to pass in nested configurations
+            for each data source (i.e. model), instead of just cl_args. Also we would
+            need to have nested data_dimensions, linking to models.
+    """
+
+    if cl_args.model_type == "linear":
+        linear_model = _get_linear_model(
+            target_cat_columns=cl_args.target_cat_columns,
+            target_con_columns=cl_args.target_con_columns,
+            data_dimensions=omics_data_dimensions,
+            device=cl_args.device,
+        )
+        return linear_model
+
+    fusion_class = get_fusion_class_from_cl_args(
+        fusion_model_type=cl_args.fusion_model_type
     )
-
-    if cl_args.model_type == "cnn":
-        assert model.data_size_after_conv >= 8
+    fusion_kwargs = get_fusion_kwargs_from_cl_args(
+        cl_args=cl_args,
+        omics_data_dimensions=omics_data_dimensions,
+        num_outputs_per_target=num_outputs_per_target,
+        tabular_label_transformers=tabular_label_transformers,
+    )
+    fusion_model = fusion_class(**fusion_kwargs)
 
     if cl_args.multi_gpu:
-        model = GetAttrDelegatedDataParallel(module=model)
+        fusion_model = GetAttrDelegatedDataParallel(module=fusion_model)
 
-    if model_class == "linear":
-        _check_linear_model_columns(cl_args=cl_args)
+    return fusion_model
 
-    model = model.to(device=cl_args.device)
+
+def _get_linear_model(
+    target_cat_columns: Sequence[str],
+    target_con_columns: Sequence[str],
+    data_dimensions: DataDimensions,
+    device: str,
+) -> LinearModel:
+
+    model_config = LinearModelConfig(
+        data_dimensions=data_dimensions,
+        target_cat_columns=target_cat_columns,
+        target_con_columns=target_con_columns,
+    )
+
+    model = LinearModel(model_config=model_config)
+    model = model.to(device=device)
 
     return model
+
+
+def get_modules_to_fuse_from_cl_args(
+    cl_args: argparse.Namespace,
+    omics_data_dimensions: DataDimensions,
+    tabular_label_transformers: al_label_transformers,
+):
+    models = nn.ModuleDict()
+
+    omics_model = get_omics_model_from_cl_args(
+        cl_args=cl_args, data_dimensions=omics_data_dimensions
+    )
+
+    models["omics_cl_args"] = omics_model
+
+    if cl_args.extra_con_columns or cl_args.extra_cat_columns:
+        unique_tabular_values = get_unique_values_from_transformers(
+            transformers=tabular_label_transformers,
+            keys_to_use=cl_args.extra_cat_columns,
+        )
+
+        tabular_model = get_tabular_model(
+            con_columns=cl_args.extra_con_columns,
+            cat_columns=cl_args.extra_cat_columns,
+            device=cl_args.device,
+            unique_label_values=unique_tabular_values,
+        )
+        models["tabular_cl_args"] = tabular_model
+
+    return models
+
+
+def get_tabular_model(
+    con_columns: Sequence[str],
+    cat_columns: Sequence[str],
+    device: str,
+    unique_label_values: Dict[str, Set[str]],
+) -> TabularModel:
+    tabular_model = TabularModel(
+        con_columns=con_columns,
+        cat_columns=cat_columns,
+        unique_label_values=unique_label_values,
+        device=device,
+    )
+
+    return tabular_model
+
+
+def get_omics_model_from_cl_args(
+    cl_args: argparse.Namespace, data_dimensions: DataDimensions
+):
+
+    omics_model_class = get_model_class(model_type=cl_args.model_type)
+    model_init_kwargs = get_omics_model_init_kwargs(
+        model_type=cl_args.model_type, cl_args=cl_args, data_dimensions=data_dimensions
+    )
+    omics_model = omics_model_class(**model_init_kwargs)
+
+    if cl_args.model_type == "cnn":
+        assert omics_model.data_size_after_conv >= 8
+
+    omics_model = omics_model.to(device=cl_args.device)
+
+    return omics_model
+
+
+def get_fusion_class_from_cl_args(
+    fusion_model_type: str,
+) -> Type[nn.Module]:
+    if fusion_model_type == "mgmoe":
+        return fusion_mgmoe.MGMoEModel
+    elif fusion_model_type == "default":
+        return fusion.FusionModel
+    raise ValueError(f"Unrecognized fusion model type: {fusion_model_type}.")
+
+
+def get_fusion_kwargs_from_cl_args(
+    cl_args: argparse.Namespace,
+    omics_data_dimensions: DataDimensions,
+    num_outputs_per_target: al_num_outputs_per_target,
+    tabular_label_transformers: al_label_transformers,
+) -> Dict[str, Any]:
+
+    kwargs = {}
+    modules_to_fuse = get_modules_to_fuse_from_cl_args(
+        cl_args=cl_args,
+        omics_data_dimensions=omics_data_dimensions,
+        tabular_label_transformers=tabular_label_transformers,
+    )
+    kwargs["modules_to_fuse"] = modules_to_fuse
+
+    kwargs["num_outputs_per_target"] = num_outputs_per_target
+
+    model_config_class = fusion.FusionModelConfig
+    if cl_args.fusion_model_type == "mgmoe":
+        model_config_class = fusion_mgmoe.MGMoEModelConfig
+    model_config_kwargs = match_namespace_to_dataclass(
+        namespace=cl_args, data_class=model_config_class
+    )
+    model_config = model_config_class(**model_config_kwargs)
+
+    kwargs["model_config"] = model_config
+
+    return kwargs
 
 
 def _check_linear_model_columns(cl_args: argparse.Namespace) -> None:
@@ -807,14 +952,32 @@ def prepare_base_batch_default(
     loader_batch: al_dataloader_getitem_batch,
     cl_args: argparse.Namespace,
     target_columns: al_target_columns,
-    model: nn.Module,
+    model: fusion.FusionModel,
 ):
 
     inputs, target_labels, train_ids = loader_batch
 
-    train_seqs = inputs["genotype"]
-    train_seqs = train_seqs.to(device=cl_args.device)
-    train_seqs = train_seqs.to(dtype=torch.float32)
+    inputs_prepared = {}
+    for input_name in inputs:
+
+        if input_name.startswith("omics_"):
+            cur_omics = inputs[input_name]
+            cur_omics = cur_omics.to(device=cl_args.device)
+            cur_omics = cur_omics.to(dtype=torch.float32)
+
+            inputs_prepared[input_name] = cur_omics
+
+        elif input_name.startswith("tabular_"):
+            tabular = get_tabular_inputs(
+                extra_cat_columns=cl_args.extra_cat_columns,
+                extra_con_columns=cl_args.extra_con_columns,
+                tabular_model=model.modules_to_fuse[input_name],
+                tabular_input=inputs[input_name],
+                device=cl_args.device,
+            )
+            inputs_prepared[input_name] = tabular
+        else:
+            raise ValueError(f"Unrecognized input type {input_name}.")
 
     if target_labels:
         target_labels = model_training_utils.parse_target_labels(
@@ -822,14 +985,6 @@ def prepare_base_batch_default(
             device=cl_args.device,
             labels=target_labels,
         )
-
-    inputs_prepared = {"genotype": train_seqs}
-
-    if "tabular" in inputs:
-        tabular = get_extra_inputs(
-            cl_args=cl_args, model=model, tabular_input=inputs["tabular"]
-        )
-        inputs_prepared["tabular"] = tabular
 
     batch = Batch(
         inputs=inputs_prepared,

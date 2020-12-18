@@ -240,7 +240,7 @@ def test_mixup_all_targets(test_targets):
         "con": ["test_target_1", "test_target_2"],
         "cat": ["test_target_3"],
     }
-    random_indices = torch.randperm(len(test_targets))
+    random_indices = torch.randperm(len(test_targets)).to(dtype=torch.long)
     all_target_columns = target_columns["con"] + target_columns["cat"]
     targets = {c: test_targets for c in all_target_columns}
 
@@ -324,12 +324,11 @@ def test_calc_all_mixed_losses(test_inputs, expected_output):
 
     targets = {c: test_inputs["targets"] for c in all_target_columns}
     targets_permuted = {c: test_inputs["targets_permuted"] for c in all_target_columns}
-    mixed_object = data_augmentation.OmicsMixupOutput(
-        inputs=torch.zeros(0),
+    mixed_object = data_augmentation.MixingObject(
         targets=targets,
         targets_permuted=targets_permuted,
         lambda_=test_inputs["lambda_"],
-        permuted_indexes=[0],
+        permuted_indexes=torch.LongTensor([0]),
     )
 
     test_criterions = {c: nn.MSELoss() for c in all_target_columns}

@@ -1,13 +1,14 @@
 from collections import OrderedDict
-from typing import Dict
+from dataclasses import dataclass
+from typing import Dict, Sequence, TYPE_CHECKING
 
 import torch
 from aislib.pytorch_modules import Swish
 from torch import nn
 
-from snp_pred.models.layers import SplitLinear, MLPResidualBlock
+from snp_pred.models.fusion import default_fuse_features, al_features
+from snp_pred.models.layers import MLPResidualBlock
 from snp_pred.models.models_base import (
-    ModelBase,
     construct_multi_branches,
     initialize_modules_from_spec,
     create_multi_task_blocks_with_first_adaptor_block,
@@ -17,31 +18,45 @@ from snp_pred.models.models_base import (
     calculate_module_dict_outputs,
 )
 
+if TYPE_CHECKING:
+    from snp_pred.train import al_num_outputs_per_target
 
-class MGMoEModel(ModelBase):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
 
-        self.num_chunks = self.cl_args.split_mlp_num_splits
-        self.num_experts = self.cl_args.mg_num_experts
+@dataclass
+class MGMoEModelConfig:
+    layers: Sequence[int]
+    fc_task_dim: int
 
-        fc_0_out_feat = self.num_chunks * self.cl_args.fc_repr_dim
-        self.fc_0 = nn.Sequential(
-            OrderedDict(
-                {
-                    "fc_0": SplitLinear(
-                        in_features=self.fc_1_in_features,
-                        out_feature_sets=self.cl_args.fc_repr_dim,
-                        num_chunks=self.num_chunks,
-                        bias=True,
-                    )
-                }
-            )
-        )
+    split_mlp_num_splits: int
+    mg_num_experts: int
+
+    rb_do: float
+    fc_do: float
+
+
+class MGMoEModel(nn.Module):
+    def __init__(
+        self,
+        model_config: MGMoEModelConfig,
+        num_outputs_per_target: "al_num_outputs_per_target",
+        modules_to_fuse: nn.ModuleDict,
+        fusion_callable: al_features = default_fuse_features,
+    ):
+        super().__init__()
+
+        self.model_config = model_config
+        self.num_outputs_per_target = num_outputs_per_target
+        self.modules_to_fuse = modules_to_fuse
+        self.fusion_callable = fusion_callable
+
+        self.num_chunks = self.model_config.split_mlp_num_splits
+        self.num_experts = self.model_config.mg_num_experts
+
+        cur_dim = sum(i.num_out_features for i in self.modules_to_fuse.values())
 
         self.task_names = sorted(tuple(self.num_outputs_per_target.keys()))
         gate_spec = self.get_gate_spec(
-            in_features=fc_0_out_feat + self.extra_dim, out_features=self.num_experts
+            in_features=cur_dim, out_features=self.num_experts
         )
 
         self.gates = construct_multi_branches(
@@ -52,40 +67,40 @@ class MGMoEModel(ModelBase):
 
         expert_names = tuple(f"expert_{i}" for i in range(self.num_experts))
         layer_kwargs = {
-            "in_features": self.fc_task_dim,
-            "out_features": self.fc_task_dim,
-            "dropout_p": self.cl_args.rb_do,
+            "in_features": self.model_config.fc_task_dim,
+            "out_features": self.model_config.fc_task_dim,
+            "dropout_p": self.model_config.rb_do,
             "full_preactivation": False,
         }
         self.expert_branches = create_multi_task_blocks_with_first_adaptor_block(
-            num_blocks=self.cl_args.layers[0],
+            num_blocks=self.model_config.layers[0],
             branch_names=expert_names,
             block_constructor=MLPResidualBlock,
             block_constructor_kwargs=layer_kwargs,
             first_layer_kwargs_overload={
                 "full_preactivation": True,
-                "in_features": fc_0_out_feat + self.extra_dim,
+                "in_features": cur_dim,
             },
         )
 
         task_resblocks_kwargs = {
-            "in_features": self.fc_task_dim,
-            "out_features": self.fc_task_dim,
-            "dropout_p": self.cl_args.rb_do,
+            "in_features": self.model_config.fc_task_dim,
+            "out_features": self.model_config.fc_task_dim,
+            "dropout_p": self.model_config.rb_do,
             "full_preactivation": False,
         }
         multi_task_branches = construct_multi_branches(
             branch_names=self.task_names,
             branch_factory=construct_blocks,
             branch_factory_kwargs={
-                "num_blocks": self.cl_args.layers[1],
+                "num_blocks": self.model_config.layers[1],
                 "block_constructor": MLPResidualBlock,
                 "block_kwargs": task_resblocks_kwargs,
             },
         )
 
         final_act_spec = self.get_final_act_spec(
-            in_features=self.fc_task_dim, dropout_p=self.cl_args.fc_do
+            in_features=self.model_config.fc_task_dim, dropout_p=self.model_config.fc_do
         )
         final_act = construct_multi_branches(
             branch_names=self.task_names,
@@ -94,7 +109,7 @@ class MGMoEModel(ModelBase):
         )
 
         final_layer = get_final_layer(
-            in_features=self.fc_task_dim,
+            in_features=self.model_config.fc_task_dim,
             num_outputs_per_target=self.num_outputs_per_target,
         )
 
@@ -125,6 +140,7 @@ class MGMoEModel(ModelBase):
 
     @staticmethod
     def get_final_act_spec(in_features: int, dropout_p: float):
+        # TODO: Refactor, duplicated from fusion.py
 
         spec = OrderedDict(
             {
@@ -140,29 +156,30 @@ class MGMoEModel(ModelBase):
         pass
 
     @property
-    def fc_1_in_features(self) -> int:
-        return self.cl_args.target_width * 4
-
-    @property
     def l1_penalized_weights(self) -> torch.Tensor:
-        return self.fc_0[0].weight
+        # TODO: Refactor into base class for fusion models
+        out = []
+        for module in self.modules_to_fuse.values():
+            if hasattr(module, "l1_penalized_weights"):
+                out.append(module.l1_penalized_weights)
+
+        return torch.stack(out)
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
-        genotype = inputs["genotype"]
-        out = genotype.view(genotype.shape[0], -1)
 
-        out = self.fc_0(out)
+        out = {}
+        for module_name, module in self.modules_to_fuse.items():
+            module_input = inputs[module_name]
+            out[module] = module(module_input)
 
-        tabular = inputs.get("tabular", None)
-        if tabular is not None:
-            out = torch.cat((tabular, out), dim=1)
+        fused_features = default_fuse_features(tuple(out.values()))
 
         gate_attentions = calculate_module_dict_outputs(
-            input_=out, module_dict=self.gates
+            input_=fused_features, module_dict=self.gates
         )
 
         expert_outputs = calculate_module_dict_outputs(
-            input_=out, module_dict=self.expert_branches
+            input_=fused_features, module_dict=self.expert_branches
         )
 
         final_out = {}

@@ -1,6 +1,6 @@
-from argparse import Namespace
 from collections import OrderedDict
-from typing import List, Dict, Tuple, TYPE_CHECKING
+from dataclasses import dataclass
+from typing import List, Tuple, TYPE_CHECKING, Union
 
 import torch
 from aislib import pytorch_utils
@@ -9,47 +9,60 @@ from aislib.pytorch_modules import Swish
 from torch import nn
 
 from snp_pred.models.layers import FirstCNNBlock, SelfAttention, CNNResidualBlock
-from snp_pred.models.models_base import (
-    ModelBase,
-    calculate_module_dict_outputs,
-    assert_module_dict_uniqueness,
-)
 
 if TYPE_CHECKING:
-    from snp_pred.train import al_num_outputs_per_target
-
+    from snp_pred.train import DataDimensions
 
 logger = get_logger(__name__)
 
 
-class CNNModel(ModelBase):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+@dataclass
+class CNNModelConfig:
 
-        self.conv = nn.Sequential(*_make_conv_layers(self.resblocks, self.cl_args))
+    layers: Union[None, List[int]]
+
+    fc_repr_dim: int
+
+    down_stride: int
+    first_stride_expansion: int
+
+    channel_exp_base: int
+    first_channel_expansion: int
+
+    kernel_width: int
+    first_kernel_expansion: int
+    dilation_factor: int
+
+    data_dimensions: "DataDimensions"
+
+    rb_do: float
+
+    sa: bool = False
+
+
+class CNNModel(nn.Module):
+    def __init__(self, model_config: CNNModelConfig):
+        # TODO: Make work for heights, this means modifying stuff in layers.py
+        super().__init__()
+
+        self.model_config = model_config
+        self.conv = nn.Sequential(*_make_conv_layers(self.resblocks, self.model_config))
 
         self.data_size_after_conv = pytorch_utils.calc_size_after_conv_sequence(
-            self.cl_args.target_width, self.conv
+            self.model_config.data_dimensions.width, self.conv
         )
         self.no_out_channels = self.conv[-1].out_channels
 
-        self.fc_1 = nn.Sequential(
+        self.fc = nn.Sequential(
             OrderedDict(
                 {
                     "fc_1_bn_1": nn.BatchNorm1d(self.fc_1_in_features),
                     "fc_1_act_1": Swish(),
                     "fc_1_linear_1": nn.Linear(
-                        self.fc_1_in_features, self.cl_args.fc_repr_dim, bias=False
+                        self.fc_1_in_features, self.model_config.fc_repr_dim, bias=False
                     ),
                 }
             )
-        )
-
-        self.multi_task_branches = _get_cnn_multi_task_branches(
-            num_outputs_per_target=self.num_outputs_per_target,
-            fc_task_dim=self.fc_task_dim,
-            fc_repr_and_extra_dim=self.fc_repr_and_extra_dim,
-            fc_do=self.cl_args.fc_do,
         )
 
         self._init_weights()
@@ -62,6 +75,10 @@ class CNNModel(ModelBase):
     def l1_penalized_weights(self) -> torch.Tensor:
         return self.conv[0].conv_1.weight
 
+    @property
+    def num_out_features(self) -> int:
+        return self.model_config.fc_repr_dim
+
     def _init_weights(self):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -73,11 +90,11 @@ class CNNModel(ModelBase):
 
     @property
     def resblocks(self) -> List[int]:
-        if not self.cl_args.layers:
+        if not self.model_config.layers:
             residual_blocks = find_no_cnn_resblocks_needed(
-                self.cl_args.target_width,
-                self.cl_args.down_stride,
-                self.cl_args.first_stride_expansion,
+                self.model_config.data_dimensions.width,
+                self.model_config.down_stride,
+                self.model_config.first_stride_expansion,
             )
             logger.info(
                 "No residual blocks specified in CL args, using input "
@@ -85,69 +102,20 @@ class CNNModel(ModelBase):
                 residual_blocks,
             )
             return residual_blocks
-        return self.cl_args.layers
+        return self.model_config.layers
 
-    def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
-        genotype = inputs["genotype"]
+    def forward(self, input: torch.Tensor) -> torch.Tensor:
 
-        out = self.conv(genotype)
+        out = self.conv(input)
         out = out.view(out.shape[0], -1)
 
-        out = self.fc_1(out)
-
-        tabular = inputs.get("tabular")
-        if tabular is not None:
-            out_tabular = self.fc_extra(tabular)
-            out = torch.cat((out_tabular, out), dim=1)
-
-        out = calculate_module_dict_outputs(
-            input_=out, module_dict=self.multi_task_branches
-        )
+        out = self.fc(out)
 
         return out
 
 
-def _get_cnn_multi_task_branches(
-    fc_repr_and_extra_dim: int,
-    fc_task_dim: int,
-    fc_do: float,
-    num_outputs_per_target: "al_num_outputs_per_target",
-) -> nn.ModuleDict:
-    """
-    TODO: Remove this in favor of branch factories as used in other modesl
-    """
-
-    module_dict = {}
-    for key, num_outputs_per_target in num_outputs_per_target.items():
-        branch_layers = OrderedDict(
-            {
-                "fc_2_bn_1": nn.BatchNorm1d(fc_repr_and_extra_dim),
-                "fc_2_act_1": Swish(),
-                "fc_2_linear_1": nn.Linear(
-                    fc_repr_and_extra_dim, fc_task_dim, bias=False
-                ),
-                "fc_2_do_1": nn.Dropout(p=fc_do),
-                "fc_3_bn_1": nn.BatchNorm1d(fc_task_dim),
-                "fc_3_act_1": Swish(),
-                "fc_3_do_1": nn.Dropout(p=fc_do),
-            }
-        )
-
-        task_layer_branch = nn.Sequential(
-            OrderedDict(
-                **branch_layers,
-                **{"fc_3_final": nn.Linear(fc_task_dim, num_outputs_per_target)}
-            )
-        )
-
-        module_dict[key] = task_layer_branch
-
-    assert_module_dict_uniqueness(module_dict)
-    return nn.ModuleDict(module_dict)
-
-
 def _make_conv_layers(
-    residual_blocks: List[int], cl_args: Namespace
+    residual_blocks: List[int], cnn_model_configuration: CNNModelConfig
 ) -> List[nn.Module]:
     """
     Used to set up the convolutional layers for the model. Based on the passed in
@@ -160,20 +128,20 @@ def _make_conv_layers(
 
     :param residual_blocks: List of ints, where each int indicates number of blocks w.
     that channel dimension.
-    :param cl_args: Experiment hyperparameters / configuration needed for the
-    convolution setup.
+    :param cnn_model_configuration: Experiment hyperparameters / configuration needed
+    for the convolution setup.
     :return: A list of `nn.Module` objects to be passed to `nn.Sequential`.
     """
-    ca = cl_args
+    mc = cnn_model_configuration
 
-    down_stride_w = ca.down_stride
+    down_stride_w = mc.down_stride
 
-    first_conv_channels = 2 ** ca.channel_exp_base * ca.first_channel_expansion
-    first_conv_kernel = ca.kernel_width * ca.first_kernel_expansion
-    first_conv_stride = down_stride_w * ca.first_stride_expansion
+    first_conv_channels = 2 ** mc.channel_exp_base * mc.first_channel_expansion
+    first_conv_kernel = mc.kernel_width * mc.first_kernel_expansion
+    first_conv_stride = down_stride_w * mc.first_stride_expansion
 
     first_kernel, first_pad = pytorch_utils.calc_conv_params_needed(
-        input_width=ca.target_width,
+        input_width=mc.data_dimensions.width,
         kernel_size=first_conv_kernel,
         stride=first_conv_stride,
         dilation=1,
@@ -181,13 +149,14 @@ def _make_conv_layers(
 
     conv_blocks = [
         FirstCNNBlock(
-            in_channels=1,
+            in_channels=cnn_model_configuration.data_dimensions.channels,
             out_channels=first_conv_channels,
+            conv_1_kernel_h=cnn_model_configuration.data_dimensions.height,
             conv_1_kernel_w=first_kernel,
             conv_1_padding=first_pad,
             down_stride_w=first_conv_stride,
             dilation=1,
-            rb_do=ca.rb_do,
+            rb_do=mc.rb_do,
         )
     ]
 
@@ -198,10 +167,10 @@ def _make_conv_layers(
                 conv_blocks=conv_blocks,
                 layer_arch_idx=layer_arch_idx,
                 down_stride=down_stride_w,
-                cl_args=ca,
+                cnn_config=cnn_model_configuration,
             )
 
-            if cl_args.sa and cur_width < 1024 and not sa_added:
+            if mc.sa and cur_width < 1024 and not sa_added:
                 attention_channels = conv_blocks[-1].out_channels
                 conv_blocks.append(SelfAttention(attention_channels))
                 sa_added = True
@@ -215,18 +184,18 @@ def _get_conv_resblock(
     conv_blocks: List[nn.Module],
     layer_arch_idx: int,
     down_stride: int,
-    cl_args: Namespace,
+    cnn_config: CNNModelConfig,
 ) -> Tuple[CNNResidualBlock, int]:
-    ca = cl_args
+    mc = cnn_config
 
     cur_conv = nn.Sequential(*conv_blocks)
     cur_width = pytorch_utils.calc_size_after_conv_sequence(
-        input_width=ca.target_width, conv_sequence=cur_conv
+        input_width=mc.data_dimensions.width, conv_sequence=cur_conv
     )
 
     cur_kern, cur_padd = pytorch_utils.calc_conv_params_needed(
         input_width=cur_width,
-        kernel_size=ca.kernel_width,
+        kernel_size=mc.kernel_width,
         stride=down_stride,
         dilation=1,
     )
@@ -235,23 +204,24 @@ def _get_conv_resblock(
         len([i for i in conv_blocks if isinstance(i, CNNResidualBlock)]) + 1
     )
     cur_dilation_factor = _get_cur_dilation(
-        dilation_factor=cl_args.dilation_factor,
+        dilation_factor=mc.dilation_factor,
         width=cur_width,
         block_number=cur_block_number,
     )
 
     cur_in_channels = conv_blocks[-1].out_channels
-    cur_out_channels = 2 ** (ca.channel_exp_base + layer_arch_idx)
+    cur_out_channels = 2 ** (mc.channel_exp_base + layer_arch_idx)
 
     cur_layer = CNNResidualBlock(
         in_channels=cur_in_channels,
         out_channels=cur_out_channels,
+        conv_1_kernel_h=1,
         conv_1_kernel_w=cur_kern,
         conv_1_padding=cur_padd,
         down_stride_w=down_stride,
         dilation=cur_dilation_factor,
         full_preact=True if len(conv_blocks) == 1 else False,
-        rb_do=ca.rb_do,
+        rb_do=mc.rb_do,
     )
 
     return cur_layer, cur_width

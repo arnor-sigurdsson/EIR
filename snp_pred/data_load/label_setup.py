@@ -55,6 +55,9 @@ def set_up_train_and_valid_tabular_data(
     set for regression) on the labels.
     """
 
+    if len(tabular_info.con_columns) + len(tabular_info.cat_columns) < 1:
+        raise ValueError(f"No label columns specified in {tabular_info}.")
+
     parse_wrapper = get_label_parsing_wrapper(
         label_parsing_chunk_size=tabular_info.parsing_chunk_size
     )
@@ -213,7 +216,7 @@ def label_df_parse_wrapper(
     if custom_label_ops is not None:
         column_ops = custom_label_ops
 
-    label_columns, dtypes = _get_all_label_columns_and_dtypes(
+    all_label_columns, dtypes = _get_all_label_columns_and_dtypes(
         cat_columns=label_file_tabular_info.cat_columns,
         con_columns=label_file_tabular_info.con_columns,
         column_ops=column_ops,
@@ -221,7 +224,7 @@ def label_df_parse_wrapper(
 
     df_labels = _load_label_df(
         label_fpath=label_file_tabular_info.file_path,
-        columns=label_columns,
+        columns=all_label_columns,
         custom_label_ops=column_ops,
         dtypes=dtypes,
     )
@@ -230,18 +233,21 @@ def label_df_parse_wrapper(
         df_labels=df_labels, ids_to_keep=ids_to_keep
     )
 
-    df_labels_parsed = _apply_column_operations_to_df(
-        df=df_labels_filtered, operations_dict=column_ops, label_columns=label_columns
+    df_labels_column_op_parsed = _apply_column_operations_to_df(
+        df=df_labels_filtered,
+        operations_dict=column_ops,
+        label_columns=all_label_columns,
     )
 
+    supplied_columns = get_passed_in_columns(tabular_info=label_file_tabular_info)
     df_column_filtered = _drop_not_needed_label_columns(
-        df=df_labels_parsed, needed_label_columns=label_columns
+        df=df_labels_column_op_parsed, needed_label_columns=supplied_columns
     )
 
     df_cat_str = ensure_categorical_columns_are_str(df=df_column_filtered)
 
     df_final = _check_parsed_label_df(
-        df_labels=df_cat_str, supplied_label_columns=label_columns
+        df_labels=df_cat_str, supplied_label_columns=supplied_columns
     )
 
     return df_final
@@ -283,6 +289,8 @@ def chunked_label_df_parse_wrapper(
     )
 
     processed_chunks = []
+    supplied_columns = get_passed_in_columns(tabular_info=label_file_tabular_info)
+
     for chunk in chunk_generator:
 
         df_labels_filtered = _filter_ids_from_label_df(
@@ -296,8 +304,9 @@ def chunked_label_df_parse_wrapper(
         )
 
         df_column_filtered = _drop_not_needed_label_columns(
-            df=df_labels_parsed, needed_label_columns=label_columns
+            df=df_labels_parsed, needed_label_columns=supplied_columns
         )
+
         processed_chunks.append(df_column_filtered)
 
     df_concat = pd.concat(processed_chunks)
@@ -309,7 +318,7 @@ def chunked_label_df_parse_wrapper(
     df_cat_str = ensure_categorical_columns_are_str(df=df_concat)
 
     df_final = _check_parsed_label_df(
-        df_labels=df_cat_str, supplied_label_columns=label_columns
+        df_labels=df_cat_str, supplied_label_columns=supplied_columns
     )
 
     return df_final
@@ -361,7 +370,6 @@ def _get_label_df_chunk_generator(
 def ensure_categorical_columns_are_str(df: pd.DataFrame) -> pd.DataFrame:
 
     df_copy = df.copy()
-
     for column in df_copy.columns:
         if isinstance(df_copy[column].dtype, pd.CategoricalDtype):
 
@@ -371,23 +379,32 @@ def ensure_categorical_columns_are_str(df: pd.DataFrame) -> pd.DataFrame:
     return df_copy
 
 
-def gather_ids_from_data_source(data_source: Path):
-    iterator = get_array_path_iterator(data_source=data_source)
+def gather_ids_from_data_source(data_source: Path, validate: bool = True):
+    iterator = get_array_path_iterator(data_source=data_source, validate=validate)
     logger.debug("Gathering IDs from %s.", data_source)
     all_ids = tuple(i.stem for i in tqdm(iterator, desc="Progress"))
 
     return all_ids
 
 
-def get_array_path_iterator(data_source: Path):
+def gather_ids_from_tabular_file(file_path: Path):
+    df = pd.read_csv(file_path, usecols=["ID"])
+    all_ids = tuple(df["ID"])
+
+    return all_ids
+
+
+def get_array_path_iterator(data_source: Path, validate: bool = True):
     def _file_iterator(file_path: Path):
         with open(str(file_path), "r") as infile:
             for line in infile:
                 path = Path(line.strip())
-                if not path.exists():
-                    raise FileNotFoundError(
-                        f"Could not find array {path} listed in {data_source}."
-                    )
+
+                if validate:
+                    if not path.exists():
+                        raise FileNotFoundError(
+                            f"Could not find array {path} listed in {data_source}."
+                        )
 
                 yield path
 
@@ -656,13 +673,22 @@ def _check_parsed_label_df(
     column_dtypes = df_labels.dtypes.to_dict()
 
     for column, dtype in column_dtypes.items():
-        assert isinstance(dtype, pd.CategoricalDtype) or dtype == float
+        assert isinstance(dtype, pd.CategoricalDtype) or dtype == float, (column, dtype)
 
         if isinstance(dtype, pd.CategoricalDtype):
             categories = df_labels[column].cat.categories
-            assert all(isinstance(i, str) for i in categories)
+            assert all(isinstance(i, str) for i in categories), categories
 
     return df_labels
+
+
+def get_passed_in_columns(tabular_info: TabularFileInfo) -> Sequence[str]:
+    cat_columns = tabular_info.cat_columns
+    con_columns = tabular_info.con_columns
+
+    passed_in_columns = list(cat_columns) + list(con_columns)
+
+    return passed_in_columns
 
 
 def _drop_not_needed_label_columns(

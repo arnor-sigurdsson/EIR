@@ -14,17 +14,24 @@ from snp_pred.data_load.datasets import al_datasets
 @pytest.mark.parametrize(
     "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
 )
-def test_set_up_datasets(create_test_cl_args, create_test_data, parse_test_cl_args):
+def test_set_up_datasets(
+    create_test_cl_args,
+    create_test_data,
+    parse_test_cl_args,
+    create_test_data_dimensions,
+):
     c = create_test_data
     n_classes = len(c.target_classes)
+    data_dimensions = create_test_data_dimensions
 
     cl_args = create_test_cl_args
 
     target_labels, tabular_input_labels = train.get_target_and_tabular_input_labels(
         cl_args=cl_args, custom_label_parsing_operations=None
     )
-    train_dataset, valid_dataset = datasets.set_up_datasets(
+    train_dataset, valid_dataset = datasets.set_up_datasets_from_cl_args(
         cl_args=cl_args,
+        data_dimensions=data_dimensions,
         target_labels=target_labels,
         tabular_inputs_labels=tabular_input_labels,
     )
@@ -54,17 +61,30 @@ def _set_up_bad_label_file_for_testing(label_file: Path):
             bad_label_writer.writerow([f"SampleIgnoreLABEL_{i}", "BadLabel"])
 
 
-def test_construct_dataset_init_params_from_cl_args(args_config):
+@pytest.mark.parametrize("create_test_data", [{"task_type": "binary"}], indirect=True)
+def test_construct_dataset_init_params_from_cl_args(
+    args_config, create_test_data, create_test_labels, create_test_data_dimensions
+):
+
+    target_labels, tabular_input_labels = create_test_labels
+    data_dimensions = create_test_data_dimensions
+
     args_config.target_con_columns = ["Height"]
     args_config.extra_con_columns = ["BMI"]
 
-    constructed_args = datasets._construct_common_dataset_init_params(
-        cl_args=args_config
+    constructed_args = datasets.construct_default_dataset_kwargs_from_cl_args(
+        cl_args=args_config,
+        target_labels_dict=target_labels.train_labels,
+        data_dimensions=data_dimensions,
+        tabular_labels_dict=tabular_input_labels.train_labels,
+        na_augment=True,
     )
 
-    assert len(constructed_args) == 3
-    assert constructed_args["data_source"] == args_config.data_source
-    assert constructed_args["target_width"] == args_config.target_width
+    assert len(constructed_args) == 5
+
+    assert "omics_cl_args" in constructed_args["data_sources"]
+    assert constructed_args["data_sources"]["omics_cl_args"] == args_config.data_source
+    assert "tabular_cl_args" not in constructed_args["data_sources"]
 
     expected_target_cols = {"con": ["Height"], "cat": ["Origin"]}
     assert constructed_args["target_columns"] == expected_target_cols
@@ -84,6 +104,7 @@ def test_datasets(
     create_test_data: pytest.fixture,
     create_test_cl_args: pytest.fixture,
     parse_test_cl_args,
+    create_test_data_dimensions,
 ):
     """
     We set `na_augment_perc` here to 0.0 as a safety guard against it having be set
@@ -93,6 +114,7 @@ def test_datasets(
     c = create_test_data
     cl_args = create_test_cl_args
     classes_tested = sorted(list(c.target_classes.keys()))
+    data_dimensions = create_test_data_dimensions
 
     if dataset_type == "disk":
         cl_args.memory_dataset = False
@@ -105,8 +127,9 @@ def test_datasets(
     target_labels, tabular_input_labels = train.get_target_and_tabular_input_labels(
         cl_args=cl_args, custom_label_parsing_operations=None
     )
-    train_dataset, valid_dataset = datasets.set_up_datasets(
+    train_dataset, valid_dataset = datasets.set_up_datasets_from_cl_args(
         cl_args=cl_args,
+        data_dimensions=data_dimensions,
         target_labels=target_labels,
         tabular_inputs_labels=tabular_input_labels,
     )
@@ -123,37 +146,6 @@ def test_datasets(
         classes_tested=classes_tested,
         target_transformers=target_labels.label_transformers,
     )
-
-
-@pytest.mark.parametrize(
-    "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
-)
-@pytest.mark.parametrize("dataset_type", ["memory", "disk"])
-def test_dataset_padding(
-    dataset_type: str,
-    create_test_data: pytest.fixture,
-    create_test_cl_args: pytest.fixture,
-    parse_test_cl_args,
-):
-    cl_args = create_test_cl_args
-
-    if dataset_type == "disk":
-        cl_args.memory_dataset = False
-
-    cl_args.target_width = 1200
-
-    target_labels, tabular_input_labels = train.get_target_and_tabular_input_labels(
-        cl_args=cl_args, custom_label_parsing_operations=None
-    )
-    train_dataset, valid_dataset = datasets.set_up_datasets(
-        cl_args=cl_args,
-        target_labels=target_labels,
-        tabular_inputs_labels=tabular_input_labels,
-    )
-
-    test_input_genotyped_padded, test_label_pad, test_id_pad = train_dataset[0]
-    padded_genotype = test_input_genotyped_padded["genotype"]
-    assert padded_genotype.shape[-1] == 1200
 
 
 def check_dataset(
@@ -177,24 +169,20 @@ def check_dataset(
     assert (tt_it(range(len(classes_tested))) == classes_tested).all()
 
     test_inputs, target_labels, test_id = dataset[0]
-    test_genotype = test_inputs["genotype"]
+    test_genotype = test_inputs["omics_cl_args"]
 
     assert (test_genotype.sum(1) == 1).all()
     assert target_labels[target_column] in expected_transformed_values
     assert test_id == dataset.samples[0].sample_id
 
 
-@pytest.mark.parametrize("test_target_width", [120, 1000])
-def test_prepare_genotype_array(test_target_width):
+def test_prepare_genotype_array():
     test_array = torch.zeros((1, 4, 100), dtype=torch.bool)
 
-    prepared_array = datasets._prepare_genotype_array(
+    prepared_array = datasets.prepare_one_hot_omics_data(
         genotype_array=test_array,
-        target_width=test_target_width,
         na_augment_perc=1.0,
         na_augment_prob=1.0,
     )
 
-    actual_array_width = prepared_array.shape[-1]
-    assert actual_array_width == test_target_width
     assert (prepared_array[:, -1, :] == 1).all()
