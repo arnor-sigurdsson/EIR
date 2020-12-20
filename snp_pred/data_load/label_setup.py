@@ -472,7 +472,7 @@ def _get_extra_columns(
     """
 
     extra_columns = {}
-    for column_name in label_columns + ["base"]:
+    for column_name in label_columns + ["base", "post"]:
 
         if column_name in all_column_ops:
             cur_column_operations_sequence = all_column_ops.get(column_name)
@@ -608,6 +608,8 @@ def _apply_column_operations_to_df(
 
     Why this 'base'? In the custom column operations, we might have operations that
     should always be called. They have the key 'base' in the column_ops dictionary.
+    Same logic for 'post', we might have operations that should only be applied
+    after all other stand-alone operations have been applied.
 
     :param df: Dataframe to perform processing on.
     :param operations_dict: A dictionary of column names, where each value is a list
@@ -617,40 +619,99 @@ def _apply_column_operations_to_df(
     :return: Parsed dataframe.
     """
 
-    def _is_op_candidate(op_name_: str) -> bool:
-        column_in_df = op_name_ in df.columns
-        column_expected_to_be_made = (
-            op_name_ in label_columns and op_name_ not in df.columns
+    for operation_name, operation_sequences in operations_dict.items():
+
+        if _should_apply_op_sequence(
+            operation_name=operation_name,
+            columns_in_df=df.columns,
+            label_columns=label_columns,
+        ):
+
+            df = _apply_operation_sequence(
+                df=df,
+                operation_sequence=operation_sequences,
+                operation_name=operation_name,
+                label_columns=label_columns,
+            )
+
+    if "post" in operations_dict.keys():
+        post_operations = operations_dict.get("post")
+
+        df = _apply_operation_sequence(
+            df=df,
+            operation_sequence=post_operations,
+            operation_name="post",
+            label_columns=label_columns,
         )
-        is_candidate = column_in_df or column_expected_to_be_made or op_name_ == "base"
-        return is_candidate
 
-    def _do_call_op(column_op_: ColumnOperation, op_name_: str) -> bool:
-        only_apply_if_target = column_op_.only_apply_if_target
-        not_a_label_col = op_name_ not in label_columns
-        do_skip = only_apply_if_target and not_a_label_col
+    return df
 
-        do_call = not do_skip or op_name_ == "base"
-        return do_call
 
-    for op_name, ops_funcs in operations_dict.items():
+def _should_apply_op_sequence(
+    operation_name: str, columns_in_df: Sequence[str], label_columns: Sequence[str]
+) -> bool:
+    column_in_df = operation_name in columns_in_df
+    column_expected_to_be_made = (
+        operation_name in label_columns and operation_name not in columns_in_df
+    )
+    is_candidate = (
+        column_in_df or column_expected_to_be_made or operation_name in ["base"]
+    )
+    return is_candidate
 
-        if _is_op_candidate(op_name_=op_name):
 
-            for operation in ops_funcs:
+def _apply_operation_sequence(
+    df: pd.DataFrame,
+    operation_sequence: Sequence[ColumnOperation],
+    operation_name: str,
+    label_columns: Sequence[str],
+) -> pd.DataFrame:
 
-                if _do_call_op(column_op_=operation, op_name_=op_name):
+    for operation in operation_sequence:
 
-                    func, args_dict = operation.function, operation.function_args
-                    logger.debug(
-                        "Applying func %s with args %s to column %s in pre-processing.",
-                        func,
-                        reprlib.repr(args_dict),
-                        op_name,
-                    )
-                    logger.debug("Shape before: %s", df.shape)
-                    df = func(df=df, column_name=op_name, **args_dict)
-                    logger.debug("Shape after: %s", df.shape)
+        if _should_apply_single_op(
+            column_operation=operation,
+            operation_name=operation_name,
+            label_columns=label_columns,
+        ):
+
+            df = apply_column_op(
+                df=df,
+                operation=operation,
+                operation_name=operation_name,
+            )
+
+    return df
+
+
+def _should_apply_single_op(
+    column_operation: ColumnOperation, operation_name: str, label_columns: Sequence[str]
+) -> bool:
+    only_apply_if_target = column_operation.only_apply_if_target
+    not_a_label_col = operation_name not in label_columns
+    do_skip = only_apply_if_target and not_a_label_col
+
+    do_call = not do_skip or operation_name in ["base", "post"]
+    return do_call
+
+
+def apply_column_op(
+    df: pd.DataFrame,
+    operation: ColumnOperation,
+    operation_name: str,
+) -> pd.DataFrame:
+
+    func, args_dict = operation.function, operation.function_args
+    logger.debug(
+        "Applying func %s with args %s to column %s in pre-processing.",
+        func,
+        reprlib.repr(args_dict),
+        operation_name,
+    )
+    logger.debug("Shape before: %s", df.shape)
+    df = func(df=df, column_name=operation_name, **args_dict)
+    logger.debug("Shape after: %s", df.shape)
+
     return df
 
 

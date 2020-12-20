@@ -825,6 +825,81 @@ def test_parse_label_df_not_applied(
     assert df_labels_parsed["SomeRandomCol"].unique().item() == 1
 
 
+@pytest.fixture()
+def create_test_always_applied_column_ops():
+    def test_column_op_1(df, column_name, replace_dict):
+        df = df.replace(replace_dict)
+        return df
+
+    def test_column_op_2(df, column_name, multiplier):
+        df = df * multiplier
+        return df
+
+    def test_column_op_3(df, column_name, replace_column_mapping):
+        df = df.rename(replace_column_mapping, axis="columns")
+        return df
+
+    replace_dict_args = {"replace_dict": {"Europe": "Iceland", "Iceland": "Martinaise"}}
+    multiplier_dict_arg = {"multiplier": 2}
+    replace_column_dict_arg = {
+        "replace_column_mapping": {"ExtraCol": "ExtraColRenamed"}
+    }
+
+    test_column_ops = {
+        "base": [
+            ColumnOperation(function=test_column_op_1, function_args=replace_dict_args),
+            ColumnOperation(
+                function=test_column_op_2, function_args=multiplier_dict_arg
+            ),
+        ],
+        "post": [
+            ColumnOperation(
+                function=test_column_op_3,
+                function_args=replace_column_dict_arg,
+                extra_columns_deps=("ExtraCol",),
+            ),
+        ],
+    }
+
+    return test_column_ops
+
+
+@pytest.mark.parametrize("create_test_data", [{"task_type": "binary"}], indirect=True)
+def test_apply_column_operations_to_df_always_applied(
+    create_test_data, create_test_always_applied_column_ops
+):
+    """
+    Here we run column operations that should always apply with column 'Origin'. Hence
+    we expect to apply:
+
+        - test_column_op_1: Replace "Europe with Iceland"
+        - test_column_op_2: Multiply the values by 2.
+        - test_column_op_3: Replace "ExtraCol" name with "ExtraColRenamed"
+    """
+
+    c = create_test_data
+    label_fpath = c.scoped_tmp_path / "labels.csv"
+
+    test_column_ops = create_test_always_applied_column_ops
+
+    label_columns = ["Origin"]
+    df_labels = label_setup._load_label_df(
+        label_fpath=label_fpath, columns=label_columns, custom_label_ops=None
+    )
+
+    extra_cols = ("ExtraCol",)
+    for col in extra_cols:
+        df_labels[col] = "Iceland"
+
+    df_labels_parsed = label_setup._apply_column_operations_to_df(
+        df=df_labels, operations_dict=test_column_ops, label_columns=label_columns
+    )
+
+    assert set(df_labels_parsed["Origin"].unique()) == {"Iceland" * 2, "Asia" * 2}
+    assert set(df_labels_parsed["ExtraColRenamed"].unique()) == {"Martinaise" * 2}
+    assert "ExtraCol" not in df_labels_parsed.columns
+
+
 @pytest.mark.parametrize(
     "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
 )
