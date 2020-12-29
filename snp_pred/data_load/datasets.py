@@ -9,10 +9,11 @@ from typing import (
     Union,
     Tuple,
     Callable,
-    Any,
+    Iterable,
     Sequence,
     Generator,
     DefaultDict,
+    Any,
     TYPE_CHECKING,
 )
 
@@ -203,7 +204,14 @@ class DatasetBase(Dataset):
                 )
 
         if self.target_labels_dict:
-            samples = list(i for i in samples.values() if i.inputs)
+            num_samples_raw = len(samples)
+            samples = list(i for i in samples.values() if i.inputs and i.target_labels)
+            num_missing = num_samples_raw - len(samples)
+            logger.debug(
+                "Filtered out %d samples that had no inputs or no target labels.",
+                num_missing,
+            )
+
         return samples
 
     def __getitem__(self, index: int):
@@ -415,7 +423,8 @@ class MemoryDataset(DatasetBase):
             na_augment_perc=self.na_augment[0],
             na_augment_prob=self.na_augment[1],
         )
-        inputs_final = impute_missing_modalities(
+
+        inputs_final = impute_missing_modalities_wrapper(
             inputs=inputs_prepared, data_dimensions=self.data_dimensions
         )
 
@@ -426,6 +435,28 @@ class MemoryDataset(DatasetBase):
 
     def __len__(self):
         return len(self.samples)
+
+
+def _get_default_impute_fill_values(data_sources: Iterable[str]):
+    fill_values = {}
+    for source in data_sources:
+        if source.startswith("omics_"):
+            fill_values[source] = False
+        else:
+            fill_values[source] = -1
+
+    return fill_values
+
+
+def _get_default_impute_dtypes(data_sources: Iterable[str]):
+    dtypes = {}
+    for source in data_sources:
+        if source.startswith("omics_"):
+            dtypes[source] = torch.bool
+        else:
+            dtypes[source] = torch.float
+
+    return dtypes
 
 
 def prepare_one_hot_omics_data(
@@ -465,7 +496,8 @@ class DiskDataset(DatasetBase):
             na_augment_perc=self.na_augment[0],
             na_augment_prob=self.na_augment[1],
         )
-        inputs_final = impute_missing_modalities(
+
+        inputs_final = impute_missing_modalities_wrapper(
             inputs=inputs_prepared, data_dimensions=self.data_dimensions
         )
 
@@ -520,19 +552,49 @@ def prepare_inputs_memory(
     return prepared_inputs
 
 
+def impute_missing_modalities_wrapper(
+    inputs: Dict[str, Any], data_dimensions: Dict[str, "DataDimensions"]
+):
+    impute_dtypes = _get_default_impute_dtypes(data_sources=data_dimensions.keys())
+    impute_fill_values = _get_default_impute_fill_values(
+        data_sources=data_dimensions.keys()
+    )
+    inputs_imputed = impute_missing_modalities(
+        inputs=inputs,
+        data_dimensions=data_dimensions,
+        fill_values=impute_fill_values,
+        dtypes=impute_dtypes,
+    )
+
+    return inputs_imputed
+
+
 def impute_missing_modalities(
     inputs: Dict[str, Any],
     data_dimensions: Dict[str, "DataDimensions"],
-    fill_value: float = -1.0,
+    fill_values: Dict[str, Any],
+    dtypes: Dict[str, Any],
 ) -> Dict[str, torch.Tensor]:
 
     for name, dimensions in data_dimensions.items():
         if name not in inputs:
+            fill_value = fill_values[name]
+            dtype = dtypes[name]
             shape = dimensions.channels, dimensions.height, dimensions.width
+
+            impute_single_missing_modality(
+                shape=shape, fill_value=fill_value, dtype=dtype
+            )
+
             imputed_tensor = torch.empty(shape).fill_(fill_value)
             inputs[name] = imputed_tensor
 
     return inputs
+
+
+def impute_single_missing_modality(shape: Tuple[int, ...], fill_value: Any, dtype: Any):
+    imputed_tensor = torch.empty(shape, dtype=dtype).fill_(fill_value)
+    return imputed_tensor
 
 
 def _load_one_hot_array(path: Path) -> torch.Tensor:

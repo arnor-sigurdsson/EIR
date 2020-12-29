@@ -549,6 +549,7 @@ def get_model_from_cl_args(
         tabular_label_transformers=tabular_label_transformers,
     )
     fusion_model = fusion_class(**fusion_kwargs)
+    fusion_model = fusion_model.to(device=cl_args.device)
 
     if cl_args.multi_gpu:
         fusion_model = GetAttrDelegatedDataParallel(module=fusion_model)
@@ -968,11 +969,16 @@ def prepare_base_batch_default(
             inputs_prepared[input_name] = cur_omics
 
         elif input_name.startswith("tabular_"):
+
+            tabular_source_input: Dict[str, torch.Tensor] = inputs[input_name]
+            for name, tensor in tabular_source_input.items():
+                tabular_source_input[name] = tensor.to(device=cl_args.device)
+
             tabular = get_tabular_inputs(
                 extra_cat_columns=cl_args.extra_cat_columns,
                 extra_con_columns=cl_args.extra_con_columns,
                 tabular_model=model.modules_to_fuse[input_name],
-                tabular_input=inputs[input_name],
+                tabular_input=tabular_source_input,
                 device=cl_args.device,
             )
             inputs_prepared[input_name] = tabular
