@@ -335,7 +335,7 @@ def test_label_df_parse_wrapper(
 
 def test_ensure_categorical_columns_are_str(get_test_nan_df):
     df_test = get_test_nan_df
-    df_converted = label_setup.ensure_categorical_columns_are_str(df=df_test)
+    df_converted = label_setup.ensure_categorical_columns_and_format(df=df_test)
 
     column_dtypes = df_converted.dtypes.to_dict()
 
@@ -1073,8 +1073,8 @@ def test_process_train_and_label_dfs(get_test_nan_df, get_test_nan_args):
 
     train_df = train_df.fillna(5)
 
-    train_df = label_setup.ensure_categorical_columns_are_str(df=train_df)
-    valid_df = label_setup.ensure_categorical_columns_are_str(df=valid_df)
+    train_df = label_setup.ensure_categorical_columns_and_format(df=train_df)
+    valid_df = label_setup.ensure_categorical_columns_and_format(df=valid_df)
 
     func = label_setup._process_train_and_label_dfs
     train_df_filled, valid_df_filled, label_transformers = func(

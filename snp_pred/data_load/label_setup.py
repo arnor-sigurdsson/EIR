@@ -244,7 +244,7 @@ def label_df_parse_wrapper(
         df=df_labels_column_op_parsed, needed_label_columns=supplied_columns
     )
 
-    df_cat_str = ensure_categorical_columns_are_str(df=df_column_filtered)
+    df_cat_str = ensure_categorical_columns_and_format(df=df_column_filtered)
 
     df_final = _check_parsed_label_df(
         df_labels=df_cat_str, supplied_label_columns=supplied_columns
@@ -315,7 +315,7 @@ def chunked_label_df_parse_wrapper(
     dtype_cast = {k: v for k, v in dtypes.items() if k in df_concat.columns}
     df_concat = df_concat.astype(dtype=dtype_cast)
 
-    df_cat_str = ensure_categorical_columns_are_str(df=df_concat)
+    df_cat_str = ensure_categorical_columns_and_format(df=df_concat)
 
     df_final = _check_parsed_label_df(
         df_labels=df_cat_str, supplied_label_columns=supplied_columns
@@ -367,10 +367,17 @@ def _get_label_df_chunk_generator(
         yield chunk
 
 
-def ensure_categorical_columns_are_str(df: pd.DataFrame) -> pd.DataFrame:
+def ensure_categorical_columns_and_format(df: pd.DataFrame) -> pd.DataFrame:
 
     df_copy = df.copy()
     for column in df_copy.columns:
+
+        if df_copy[column].dtype == object:
+            logger.info(
+                "Implicitly casting %s of type 'object' to categorical dtype.", column
+            )
+            df_copy[column] = df_copy[column].astype(pd.CategoricalDtype())
+
         if isinstance(df_copy[column].dtype, pd.CategoricalDtype):
 
             mapping = {k: str(k) for k in df_copy[column].cat.categories}
@@ -389,7 +396,7 @@ def gather_ids_from_data_source(data_source: Path, validate: bool = True):
 
 def gather_ids_from_tabular_file(file_path: Path):
     df = pd.read_csv(file_path, usecols=["ID"])
-    all_ids = tuple(df["ID"])
+    all_ids = tuple(df["ID"].astype(str))
 
     return all_ids
 
