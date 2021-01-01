@@ -582,11 +582,10 @@ def impute_missing_modalities(
             dtype = dtypes[name]
             shape = dimensions.channels, dimensions.height, dimensions.width
 
-            impute_single_missing_modality(
+            imputed_tensor = impute_single_missing_modality(
                 shape=shape, fill_value=fill_value, dtype=dtype
             )
 
-            imputed_tensor = torch.empty(shape).fill_(fill_value)
             inputs[name] = imputed_tensor
 
     return inputs

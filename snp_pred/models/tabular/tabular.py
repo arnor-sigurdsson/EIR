@@ -240,11 +240,18 @@ def get_embedding_dict(
 
 def get_unique_values_from_transformers(
     transformers: Dict[str, LabelEncoder],
-    keys_to_use: Union[None, Iterable[str]],
+    keys_to_use: Union[str, Iterable[str]],
 ) -> Dict[str, Any]:
-    iterable = keys_to_use if keys_to_use else transformers.keys()
 
     out = {}
+
+    if not keys_to_use:
+        return out
+
+    if keys_to_use == "all":
+        iterable = transformers.keys()
+    else:
+        iterable = keys_to_use
 
     for k in iterable:
         out[k] = set(transformers[k].classes_)
