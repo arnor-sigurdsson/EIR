@@ -667,13 +667,13 @@ def get_fusion_kwargs_from_cl_args(
 
     kwargs["num_outputs_per_target"] = num_outputs_per_target
 
-    model_config_class = fusion.FusionModelConfig
+    model_dataclass_config_class = fusion.FusionModelConfig
     if cl_args.fusion_model_type == "mgmoe":
-        model_config_class = fusion_mgmoe.MGMoEModelConfig
-    model_config_kwargs = match_namespace_to_dataclass(
-        namespace=cl_args, data_class=model_config_class
+        model_dataclass_config_class = fusion_mgmoe.MGMoEModelConfig
+    model_dataclass_config_kwargs = match_namespace_to_dataclass(
+        namespace=cl_args, data_class=model_dataclass_config_class
     )
-    model_config = model_config_class(**model_config_kwargs)
+    model_config = model_dataclass_config_class(**model_dataclass_config_kwargs)
 
     kwargs["model_config"] = model_config
 
@@ -754,11 +754,12 @@ def _log_model(model: nn.Module, l1_weight: float) -> None:
     """
     no_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
-    logger.debug(
-        "Penalizing weights of shape %s with L1 loss with weight %f.",
-        model.l1_penalized_weights.shape,
-        l1_weight,
-    )
+    if l1_weight:
+        logger.debug(
+            "Penalizing weights of shape %s with L1 loss with weight %f.",
+            model.l1_penalized_weights.shape,
+            l1_weight,
+        )
 
     logger.info(
         "Starting training with a %s parameter model.", format(no_params, ",.0f")
@@ -910,7 +911,7 @@ def _get_default_step_function_hooks_init_kwargs(
 
     init_kwargs["loss"].append(hook_default_aggregate_losses)
 
-    if cl_args.l1 is not None:
+    if cl_args.l1:
         init_kwargs["loss"].append(hook_add_l1_loss)
 
     return init_kwargs

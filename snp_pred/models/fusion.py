@@ -112,9 +112,10 @@ class FusionModel(nn.Module):
         out = []
         for module in self.modules_to_fuse.values():
             if hasattr(module, "l1_penalized_weights"):
-                out.append(module.l1_penalized_weights)
+                weight_flat = torch.flatten(module.l1_penalized_weights)
+                out.append(weight_flat)
 
-        return torch.stack(out)
+        return torch.cat(out)
 
     def _init_weights(self):
         pass

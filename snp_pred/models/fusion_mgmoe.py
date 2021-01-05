@@ -157,13 +157,14 @@ class MGMoEModel(nn.Module):
 
     @property
     def l1_penalized_weights(self) -> torch.Tensor:
-        # TODO: Refactor into base class for fusion models
+        # TODO: Refactor into class for fusion models.
         out = []
         for module in self.modules_to_fuse.values():
             if hasattr(module, "l1_penalized_weights"):
-                out.append(module.l1_penalized_weights)
+                weight_flat = torch.flatten(module.l1_penalized_weights)
+                out.append(weight_flat)
 
-        return torch.stack(out)
+        return torch.cat(out)
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
 

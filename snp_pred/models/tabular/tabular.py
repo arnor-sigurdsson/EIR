@@ -61,6 +61,10 @@ class TabularModel(nn.Module):
     def num_out_features(self) -> int:
         return self.input_dim
 
+    @property
+    def l1_penalized_weights(self) -> torch.Tensor:
+        return self.fc_extra.weight
+
     def forward(self, input: torch.Tensor) -> torch.Tensor:
 
         out = self.fc_extra(input)

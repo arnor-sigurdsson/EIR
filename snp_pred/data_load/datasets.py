@@ -53,7 +53,7 @@ al_getitem_return = Tuple[Dict[str, torch.Tensor], al_sample_label_dict_target, 
 def set_up_datasets_from_cl_args(
     cl_args: Namespace,
     target_labels: Labels,
-    data_dimensions,
+    data_dimensions: Dict[str, "DataDimensions"],
     tabular_inputs_labels: Union[Labels, None] = None,
 ) -> Tuple[al_datasets, al_datasets]:
 
