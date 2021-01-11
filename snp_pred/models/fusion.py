@@ -120,14 +120,6 @@ class FusionModel(nn.Module):
     def _init_weights(self):
         pass
 
-    def fill_in_missing_features(
-        self, out: Dict[str, torch.Tensor]
-    ) -> Dict[str, torch.Tensor]:
-        for module_name, module in self.modules_to_fuse.items():
-            if module_name not in out:
-                num_out_features = module.num_out_features()
-                out[module_name] = torch.zeros(num_out_features)
-
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
 
         out = {}
