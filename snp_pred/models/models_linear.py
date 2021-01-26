@@ -13,6 +13,7 @@ logger = get_logger(__name__)
 
 @dataclass
 class LinearModelConfig:
+    input_name: str
     data_dimensions: "DataDimensions"
     target_cat_columns: Sequence[str]
     target_con_columns: Sequence[str]
@@ -77,7 +78,7 @@ class LinearModel(nn.Module):
         return _parse_continuous
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
-        genotype = inputs["omics_cl_args"]
+        genotype = inputs[self.model_config.input_name]
         out = genotype.view(genotype.shape[0], -1)
 
         tabular = inputs.get("tabular_cl_args", None)

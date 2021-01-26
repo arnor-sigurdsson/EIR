@@ -21,8 +21,9 @@ def get_split_labels(
 
     assert "target" in label_filter or "extra" in label_filter
 
+    test_omics_input_folder = Path(cl_args.omics_sources[0])
     all_array_ids = label_setup.gather_ids_from_data_source(
-        data_source=Path(cl_args.data_source)
+        data_source=test_omics_input_folder
     )
     train_ids, valid_ids = label_setup.split_ids(
         ids=all_array_ids, valid_size=cl_args.valid_size

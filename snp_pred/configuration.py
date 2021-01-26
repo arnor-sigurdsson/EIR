@@ -1,4 +1,5 @@
 import argparse
+from copy import copy
 
 import configargparse
 import torch
@@ -255,12 +256,20 @@ def get_train_argument_parser() -> configargparse.ArgumentParser:
     )
 
     parser_.add_argument(
-        "--data_source",
+        "--omics_sources",
         type=str,
-        required=True,
-        help="Data source to load inputs from. Can either be (a) a folder in which"
-        "files will be gathered from the folder recursively and (b) a simple text"
-        "file with each line having a path for a sample array.",
+        nargs="*",
+        help="Which one-hot omics sources to load samples from for training. Can "
+        "either be (a) a folder in which files will be gathered from the folder "
+        "recursively or (b) a simple text file with each line having a path for "
+        "a sample array",
+    )
+
+    parser_.add_argument(
+        "--omics_names",
+        type=str,
+        nargs="*",
+        help="Names for the omics sources passed in the --omics_sources argument.",
     )
 
     parser_.add_argument(
@@ -471,16 +480,47 @@ def _get_custom_opt_names():
 
 
 def modify_train_arguments(cl_args: argparse.Namespace) -> argparse.Namespace:
-    if cl_args.valid_size > 1.0:
-        cl_args.valid_size = int(cl_args.valid_size)
 
-    cl_args.device = "cuda:" + cl_args.gpu_num if torch.cuda.is_available() else "cpu"
+    cl_args_copy = copy(cl_args)
+
+    if cl_args_copy.valid_size > 1.0:
+        cl_args_copy.valid_size = int(cl_args_copy.valid_size)
+
+    cl_args_copy.device = (
+        "cuda:" + cl_args_copy.gpu_num if torch.cuda.is_available() else "cpu"
+    )
 
     # benchmark breaks if we run it with multiple GPUs
-    if not cl_args.multi_gpu:
+    if not cl_args_copy.multi_gpu:
         torch.backends.cudnn.benchmark = True
     else:
         logger.debug("Setting device to cuda:0 since running with multiple GPUs.")
-        cl_args.device = "cuda:0"
+        cl_args_copy.device = "cuda:0"
 
-    return cl_args
+    cl_args_copy = append_data_source_prefixes(cl_args=cl_args_copy)
+
+    return cl_args_copy
+
+
+def append_data_source_prefixes(cl_args: argparse.Namespace) -> argparse.Namespace:
+    cl_args_copy = copy(cl_args)
+
+    keys = cl_args.__dict__.keys()
+    keys_to_change = [i for i in keys if i.endswith("_names")]
+
+    for key in keys_to_change:
+        new_names = []
+        prev_names = cl_args_copy.__getattribute__(key)
+
+        if not prev_names:
+            continue
+
+        key_type_name = key.split("_names")[0]
+
+        for name in prev_names:
+            new_name = key_type_name + "_" + name
+            new_names.append(new_name)
+
+        cl_args_copy.__setattr__(key, new_names)
+
+    return cl_args_copy

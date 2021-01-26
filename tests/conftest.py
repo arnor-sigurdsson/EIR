@@ -79,7 +79,8 @@ def args_config() -> Namespace:
             "checkpoint_interval": None,
             "extra_con_columns": [],
             "custom_lib": None,
-            "data_source": "REPLACE_ME",
+            "omics_sources": "REPLACE_ME",
+            "omics_names": "REPLACE_ME",
             "debug": False,
             "device": "cuda:0" if cuda.is_available() else "cpu",
             "dilation_factor": 1,
@@ -352,7 +353,8 @@ def create_test_cl_args(request, args_config, create_test_data) -> Namespace:
     c = create_test_data
     test_path = c.scoped_tmp_path
 
-    args_config.data_source = str(test_path / "test_arrays")
+    args_config.omics_sources = [str(test_path / "test_arrays")]
+    args_config.omics_names = ["omics_test"]
     args_config.snp_file = str(test_path / "test_snps.bim")
     args_config.model_task = c.task_type
     args_config.label_file = str(test_path / "labels.csv")
@@ -380,10 +382,9 @@ def create_test_data_dimensions(create_test_cl_args, create_test_data):
 
     cl_args = create_test_cl_args
 
-    data_dimensions = train._get_data_dimension_from_data_source(
-        data_source=Path(cl_args.data_source)
+    data_dimensions = train._gather_all_omics_data_dimensions(
+        omics_sources=cl_args.omics_sources, omics_names=cl_args.omics_names
     )
-    data_dimensions = {"omics_cl_args": data_dimensions}
 
     return data_dimensions
 
@@ -402,7 +403,7 @@ def create_test_model(
 
     model = get_model_from_cl_args(
         cl_args=cl_args,
-        omics_data_dimensions=data_dimensions["omics_cl_args"],
+        omics_data_dimensions=data_dimensions,
         num_outputs_per_target=num_outputs_per_class,
         tabular_label_transformers=tabular_input_labels.label_transformers,
     )
@@ -416,10 +417,8 @@ def cleanup(run_path):
 
 @pytest.fixture()
 def create_test_labels(create_test_data, create_test_cl_args):
-    c = create_test_data
 
     cl_args = create_test_cl_args
-    cl_args.data_source = str(c.scoped_tmp_path / "test_arrays")
 
     run_folder = get_run_folder(run_name=cl_args.run_name)
 

@@ -213,10 +213,9 @@ def get_default_config(
         transformers=tabular_input_labels.label_transformers, run_folder=run_folder
     )
 
-    omics_data_dimensions = _get_data_dimension_from_data_source(
-        data_source=Path(cl_args.data_source),
+    data_dimensions = _gather_all_omics_data_dimensions(
+        omics_sources=cl_args.omics_sources, omics_names=cl_args.omics_names
     )
-    data_dimensions = {"omics_cl_args": omics_data_dimensions}
 
     train_dataset, valid_dataset = datasets.set_up_datasets_from_cl_args(
         cl_args=cl_args,
@@ -247,7 +246,7 @@ def get_default_config(
 
     model = get_model_from_cl_args(
         cl_args=cl_args,
-        omics_data_dimensions=omics_data_dimensions,
+        omics_data_dimensions=data_dimensions,
         num_outputs_per_target=num_outputs_per_target,
         tabular_label_transformers=tabular_input_labels.label_transformers,
     )
@@ -291,6 +290,9 @@ def get_default_config(
 def get_target_and_tabular_input_labels(
     cl_args: argparse.Namespace, custom_label_parsing_operations: al_all_column_ops
 ) -> Tuple[Labels, Labels]:
+    """
+    TODO: Set up support for multiple tabular files.
+    """
     all_array_ids = gather_ids_from_tabular_file(file_path=cl_args.label_file)
     train_ids, valid_ids = split_ids(ids=all_array_ids, valid_size=cl_args.valid_size)
 
@@ -343,6 +345,24 @@ def get_tabular_inputs_label_data(cl_args: argparse.Namespace) -> TabularFileInf
     )
 
     return table_info
+
+
+def _gather_all_omics_data_dimensions(
+    omics_sources: Sequence[str], omics_names: Sequence[str]
+) -> Dict[str, "DataDimensions"]:
+
+    data_dimensions = {}
+
+    if not omics_sources and not omics_names:
+        return data_dimensions
+
+    assert len(omics_sources) == len(omics_names)
+
+    for source, name in zip(omics_sources, omics_names):
+        cur_dimension = _get_data_dimension_from_data_source(data_source=Path(source))
+        data_dimensions[name] = cur_dimension
+
+    return data_dimensions
 
 
 @dataclass
@@ -516,7 +536,7 @@ class GetAttrDelegatedDataParallel(nn.DataParallel):
 
 def get_model_from_cl_args(
     cl_args: argparse.Namespace,
-    omics_data_dimensions: DataDimensions,
+    omics_data_dimensions: Dict[str, DataDimensions],
     num_outputs_per_target: al_num_outputs_per_target,
     tabular_label_transformers: al_label_transformers,
 ) -> Union[nn.Module, nn.DataParallel]:
@@ -531,6 +551,8 @@ def get_model_from_cl_args(
     """
 
     if cl_args.model_type == "linear":
+        assert len(omics_data_dimensions) == 1
+
         linear_model = _get_linear_model(
             target_cat_columns=cl_args.target_cat_columns,
             target_con_columns=cl_args.target_con_columns,
@@ -560,12 +582,22 @@ def get_model_from_cl_args(
 def _get_linear_model(
     target_cat_columns: Sequence[str],
     target_con_columns: Sequence[str],
-    data_dimensions: DataDimensions,
+    data_dimensions: Dict[str, DataDimensions],
     device: str,
 ) -> LinearModel:
+    """
+    TODO: Update / fix when we make a more general linear model. Currently it only
+          supports one omics input and tabular data.
+    """
+
+    assert len(data_dimensions) == 1
+
+    single_input_name = list(data_dimensions.keys())[0]
+    single_input_data_dimension = list(data_dimensions.values())[0]
 
     model_config = LinearModelConfig(
-        data_dimensions=data_dimensions,
+        input_name=single_input_name,
+        data_dimensions=single_input_data_dimension,
         target_cat_columns=target_cat_columns,
         target_con_columns=target_con_columns,
     )
@@ -578,16 +610,17 @@ def _get_linear_model(
 
 def get_modules_to_fuse_from_cl_args(
     cl_args: argparse.Namespace,
-    omics_data_dimensions: DataDimensions,
+    omics_data_dimensions: Dict[str, DataDimensions],
     tabular_label_transformers: al_label_transformers,
 ):
     models = nn.ModuleDict()
 
-    omics_model = get_omics_model_from_cl_args(
-        cl_args=cl_args, data_dimensions=omics_data_dimensions
-    )
+    for name, dimensions in omics_data_dimensions.items():
+        cur_omics_model = get_omics_model_from_cl_args(
+            cl_args=cl_args, data_dimensions=dimensions
+        )
 
-    models["omics_cl_args"] = omics_model
+        models[name] = cur_omics_model
 
     if cl_args.extra_con_columns or cl_args.extra_cat_columns:
         unique_tabular_values = get_unique_values_from_transformers(
@@ -596,8 +629,8 @@ def get_modules_to_fuse_from_cl_args(
         )
 
         tabular_model = get_tabular_model(
-            con_columns=cl_args.extra_con_columns,
             cat_columns=cl_args.extra_cat_columns,
+            con_columns=cl_args.extra_con_columns,
             device=cl_args.device,
             unique_label_values=unique_tabular_values,
         )
@@ -607,14 +640,14 @@ def get_modules_to_fuse_from_cl_args(
 
 
 def get_tabular_model(
-    con_columns: Sequence[str],
     cat_columns: Sequence[str],
+    con_columns: Sequence[str],
     device: str,
     unique_label_values: Dict[str, Set[str]],
 ) -> TabularModel:
     tabular_model = TabularModel(
-        con_columns=con_columns,
         cat_columns=cat_columns,
+        con_columns=con_columns,
         unique_label_values=unique_label_values,
         device=device,
     )
@@ -652,7 +685,7 @@ def get_fusion_class_from_cl_args(
 
 def get_fusion_kwargs_from_cl_args(
     cl_args: argparse.Namespace,
-    omics_data_dimensions: DataDimensions,
+    omics_data_dimensions: Dict[str, DataDimensions],
     num_outputs_per_target: al_num_outputs_per_target,
     tabular_label_transformers: al_label_transformers,
 ) -> Dict[str, Any]:

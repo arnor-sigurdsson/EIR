@@ -126,7 +126,9 @@ def test_get_model(args_config):
     args_config.model_type = "cnn"
     num_outputs_per_target_dict = {"Origin": 10, "Height": 1}
 
-    data_dimensions = train.DataDimensions(channels=1, height=4, width=1000)
+    data_dimensions = {
+        "omics_test": train.DataDimensions(channels=1, height=4, width=1000)
+    }
 
     cnn_fusion_model = train.get_model_from_cl_args(
         cl_args=args_config,
@@ -138,7 +140,7 @@ def test_get_model(args_config):
     assert isinstance(cnn_fusion_model, FusionModel)
     assert cnn_fusion_model.multi_task_branches["Origin"][-1][-1].out_features == 10
     assert cnn_fusion_model.multi_task_branches["Height"][-1][-1].out_features == 1
-    assert isinstance(cnn_fusion_model.modules_to_fuse["omics_cl_args"], CNNModel)
+    assert isinstance(cnn_fusion_model.modules_to_fuse["omics_test"], CNNModel)
 
     args_config.model_type = "mlp"
     mlp_fusion_model = train.get_model_from_cl_args(
@@ -147,7 +149,7 @@ def test_get_model(args_config):
         num_outputs_per_target=num_outputs_per_target_dict,
         tabular_label_transformers=None,
     )
-    assert isinstance(mlp_fusion_model.modules_to_fuse["omics_cl_args"], MLPModel)
+    assert isinstance(mlp_fusion_model.modules_to_fuse["omics_test"], MLPModel)
 
 
 def test_get_criterions_nonlinear():
