@@ -82,8 +82,15 @@ def test_construct_dataset_init_params_from_cl_args(
 
     assert len(constructed_args) == 5
 
-    assert "omics_cl_args" in constructed_args["data_sources"]
-    assert constructed_args["data_sources"]["omics_cl_args"] == args_config.data_source
+    assert "omics_test" in constructed_args["data_sources"]
+
+    constructed_omics_sources_set = set(constructed_args["data_sources"].values())
+    passed_in_omics_sources = set(args_config.omics_sources)
+    assert constructed_omics_sources_set == passed_in_omics_sources
+
+    assert (
+        constructed_args["data_sources"]["omics_test"] == args_config.omics_sources[0]
+    )
     assert "tabular_cl_args" not in constructed_args["data_sources"]
 
     expected_target_cols = {"con": ["Height"], "cat": ["Origin"]}
@@ -169,7 +176,7 @@ def check_dataset(
     assert (tt_it(range(len(classes_tested))) == classes_tested).all()
 
     test_inputs, target_labels, test_id = dataset[0]
-    test_genotype = test_inputs["omics_cl_args"]
+    test_genotype = test_inputs["omics_test"]
 
     assert (test_genotype.sum(1) == 1).all()
     assert target_labels[target_column] in expected_transformed_values

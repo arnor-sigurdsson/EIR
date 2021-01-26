@@ -98,9 +98,9 @@ def construct_default_dataset_kwargs_from_cl_args(
         target_cat_columns=cl_args.target_cat_columns,
     )
 
-    data_sources = {"omics_cl_args": cl_args.data_source}
-    if tabular_labels_dict:
-        data_sources["tabular_cl_args"] = tabular_labels_dict
+    data_sources = gather_all_data_sources(
+        cl_args=cl_args, tabular_labels_dict=tabular_labels_dict
+    )
 
     dataset_kwargs = {
         "target_columns": target_columns,
@@ -116,6 +116,21 @@ def construct_default_dataset_kwargs_from_cl_args(
         )
 
     return dataset_kwargs
+
+
+def gather_all_data_sources(
+    cl_args: Namespace, tabular_labels_dict: Union[Labels, None]
+) -> Dict[str, str]:
+    all_sources = {}
+
+    if cl_args.omics_sources and cl_args.omics_names:
+        for source_on_disk, name in zip(cl_args.omics_sources, cl_args.omics_names):
+            all_sources[name] = source_on_disk
+
+    if tabular_labels_dict:
+        all_sources["tabular_cl_args"] = tabular_labels_dict
+
+    return all_sources
 
 
 def _check_valid_and_train_datasets(

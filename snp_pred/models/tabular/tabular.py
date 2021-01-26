@@ -22,8 +22,8 @@ al_emb_lookup_dict = Dict[str, Dict[str, Dict[int, int]]]
 class TabularModel(nn.Module):
     def __init__(
         self,
-        con_columns: Sequence[str],
         cat_columns: Sequence[str],
+        con_columns: Sequence[str],
         unique_label_values: Dict[str, Set[str]],
         device: str,
     ):
@@ -38,8 +38,8 @@ class TabularModel(nn.Module):
 
         super().__init__()
 
-        self.con_columns = con_columns
         self.cat_columns = cat_columns
+        self.con_columns = con_columns
         self.unique_label_values = unique_label_values
         self.device = device
 
@@ -70,6 +70,19 @@ class TabularModel(nn.Module):
         out = self.fc_extra(input)
 
         return out
+
+
+def set_up_embedding_dict(
+    unique_label_values: al_unique_embed_vals,
+) -> al_emb_lookup_dict:
+    emb_lookup_dict = {}
+
+    for emb_col, emb_uniq_values in unique_label_values.items():
+        sorted_unique_values = sorted(emb_uniq_values)
+        lookup_table = {k: idx for idx, k in enumerate(sorted_unique_values)}
+        emb_lookup_dict[emb_col] = {"lookup_table": lookup_table}
+
+    return emb_lookup_dict
 
 
 def attach_embeddings(model: nn.Module, embeddings_dict: al_emb_lookup_dict) -> int:
@@ -261,16 +274,3 @@ def get_unique_values_from_transformers(
         out[k] = set(transformers[k].classes_)
 
     return out
-
-
-def set_up_embedding_dict(
-    unique_label_values: al_unique_embed_vals,
-) -> al_emb_lookup_dict:
-    emb_lookup_dict = {}
-
-    for emb_col, emb_uniq_values in unique_label_values.items():
-        sorted_unique_values = sorted(emb_uniq_values)
-        lookup_table = {k: idx for idx, k in enumerate(sorted_unique_values)}
-        emb_lookup_dict[emb_col] = {"lookup_table": lookup_table}
-
-    return emb_lookup_dict

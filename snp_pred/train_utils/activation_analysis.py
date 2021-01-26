@@ -259,9 +259,7 @@ def analyze_activations(
         accumulated_grads=acc_acts, abs_grads=abs_grads
     )
 
-    snp_df = read_snp_df(
-        snp_file_path=Path(cl_args.snp_file), data_source=Path(cl_args.data_source)
-    )
+    snp_df = read_snp_df(snp_file_path=Path(cl_args.snp_file))
 
     classes = sorted(list(top_gradients_dict.keys()))
     scaled_grads = gather_and_rescale_snps(
@@ -395,6 +393,9 @@ def accumulate_activations(
         target_classes_numerical=target_classes_numerical,
     )
 
+    assert len(cl_args.omics_names) == 1
+    omics_name = cl_args.omics_names[0]
+
     for loader_batch in activations_data_loader:
 
         state = call_hooks_stage_iterable(
@@ -408,7 +409,7 @@ def accumulate_activations(
         sample_target_labels = batch.target_labels
 
         # we want to keep the original sample for masking
-        inputs_genotype = sample_inputs["omics_cl_args"]
+        inputs_genotype = sample_inputs[omics_name]
         single_sample_copy = deepcopy(inputs_genotype).cpu().numpy().squeeze()
 
         # apply pre-processing functions on sample and input
@@ -417,7 +418,7 @@ def accumulate_activations(
             inputs_genotype, _ = pre_func(
                 single_sample=inputs_genotype, sample_label=sample_target_labels
             )
-            sample_inputs["omics_cl_args"] = inputs_genotype
+            sample_inputs[omics_name] = inputs_genotype
 
         if "tabular_cl_args" in sample_inputs:
             sample_inputs["tabular_cl_args"] = sample_inputs["tabular_cl_args"].detach()

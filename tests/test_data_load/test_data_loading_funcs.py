@@ -154,7 +154,7 @@ def generate_test_samples(test_labels: List[int], target_columns: List[str]):
     test_samples = []
     for idx, label in enumerate(test_labels):
         cur_label_dict = {column_name: label for column_name in target_columns}
-        cur_inputs = {"omics_cl_args": f"fake_path_{idx}.npy"}
+        cur_inputs = {"omics_test": f"fake_path_{idx}.npy"}
         cur_test_sample = Sample(
             sample_id=str(idx), inputs=cur_inputs, target_labels=cur_label_dict
         )

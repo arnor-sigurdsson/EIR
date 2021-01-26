@@ -7,6 +7,7 @@ import pytest
 import torch
 from sklearn.preprocessing import LabelEncoder
 
+from snp_pred.configuration import append_data_source_prefixes
 from snp_pred import predict
 from snp_pred import train
 from snp_pred.data_load.label_setup import TabularFileInfo
@@ -56,13 +57,28 @@ def test_load_model(args_config, tmp_path):
 
 
 def test_modify_train_cl_args_for_testing():
-    cl_args_from_train = Namespace(data_source="train/data/folder", lr=1e-3)
-    cl_args_from_predict = Namespace(data_source="test/data/folder")
+    cl_args_from_train = Namespace(
+        omics_sources=["train/data/folder_1", "train/data/folder_2"],
+        omics_names=["1", "2"],
+        lr=1e-3,
+    )
+    cl_args_from_train = append_data_source_prefixes(cl_args=cl_args_from_train)
+
+    cl_args_from_predict = Namespace(
+        omics_sources=["predict/data/folder_1", "predict/data/folder_2"],
+        omics_names=["1", "2"],
+    )
 
     mixed_args = predict._modify_train_cl_args_for_testing(
-        cl_args_from_train, cl_args_from_predict
+        train_cl_args=cl_args_from_train, predict_cl_args=cl_args_from_predict
     )
-    assert mixed_args.data_source == "test/data/folder"
+
+    assert mixed_args.omics_names == ["omics_1", "omics_2"]
+    assert mixed_args.omics_sources == [
+        "predict/data/folder_1",
+        "predict/data/folder_2",
+    ]
+
     assert mixed_args.lr == 1e-3
 
 
@@ -91,9 +107,7 @@ def test_load_labels_for_predict(
 
     run_path = Path(f"runs/{cl_args.run_name}/")
 
-    test_ids = predict.gather_ids_from_data_source(
-        data_source=Path(cl_args.data_source)
-    )
+    test_ids = predict.gather_ids_from_tabular_file(file_path=Path(cl_args.label_file))
     tabular_info = set_up_all_label_data(cl_args=cl_args)
 
     df_test = predict._load_labels_for_predict(
@@ -135,9 +149,7 @@ def test_set_up_test_dataset(
     data_dimensions = create_test_data_dimensions
     classes_tested = sorted(list(c.target_classes.keys()))
 
-    test_ids = predict.gather_ids_from_data_source(
-        data_source=Path(cl_args.data_source)
-    )
+    test_ids = predict.gather_ids_from_tabular_file(file_path=Path(cl_args.label_file))
     tabular_info = set_up_all_label_data(cl_args=cl_args)
 
     df_test = predict._load_labels_for_predict(
@@ -200,7 +212,7 @@ def grab_latest_model_path(saved_models_folder: Path):
 )
 def test_predict(keep_outputs, prep_modelling_test_configs):
     config, test_config = prep_modelling_test_configs
-    test_path = Path(config.cl_args.data_source).parent
+    test_path = Path(config.cl_args.omics_sources[0]).parent
 
     train.train(config)
 
@@ -209,7 +221,9 @@ def test_predict(keep_outputs, prep_modelling_test_configs):
         model_path=model_path,
         batch_size=64,
         evaluate=True,
-        data_source=test_path / "test_arrays_test_set",
+        label_file=config.cl_args.label_file,
+        omics_sources=[test_path / "test_arrays_test_set"],
+        omics_names=["test"],
         output_folder=test_path,
         device="cpu",
         num_workers=0,

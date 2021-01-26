@@ -17,6 +17,7 @@ from sklearn.preprocessing import LabelEncoder
 from torch import nn
 from torch.utils.data import DataLoader
 
+from snp_pred.configuration import append_data_source_prefixes
 import snp_pred.visualization.visualization_funcs as vf
 from snp_pred.data_load import datasets, label_setup
 from snp_pred.data_load.data_utils import get_target_columns_generator
@@ -29,7 +30,7 @@ from snp_pred.data_load.label_setup import (
     al_target_columns,
     al_label_transformers,
     al_all_column_ops,
-    gather_ids_from_data_source,
+    gather_ids_from_tabular_file,
     transform_label_df,
     TabularFileInfo,
 )
@@ -167,9 +168,7 @@ def get_default_predict_config(
 
     target_labels, tabular_input_labels = None, None
     if predict_cl_args.evaluate:
-        test_ids = gather_ids_from_data_source(
-            data_source=Path(predict_cl_args.data_source)
-        )
+        test_ids = gather_ids_from_tabular_file(file_path=predict_cl_args.label_file)
 
         label_ops = default_train_hooks.custom_column_label_parsing_ops
         target_labels, tabular_input_labels = get_target_and_extra_labels_for_predict(
@@ -197,7 +196,7 @@ def get_default_predict_config(
         train_cl_args=train_cl_args,
         num_outputs_per_target=train_config.num_outputs_per_target,
         tabular_input_transformers=tabular_input_labels.transformers,
-        omics_data_dimensions=train_config.data_dimensions["omics_cl_args"],
+        omics_data_dimensions=train_config.data_dimensions,
     )
 
     model = _load_model(
@@ -395,14 +394,13 @@ def _get_fusion_model_class_and_kwargs_from_cl_args(
     train_cl_args: Namespace,
     num_outputs_per_target: al_num_outputs_per_target,
     tabular_input_transformers: al_label_transformers,
-    omics_data_dimensions: DataDimensions,
+    omics_data_dimensions: Dict[str, DataDimensions],
 ) -> Tuple[Type[nn.Module], Dict[str, Any]]:
 
     fusion_model_class = get_fusion_class_from_cl_args(
         fusion_model_type=train_cl_args.fusion_model_type
     )
 
-    assert isinstance(omics_data_dimensions, DataDimensions)
     fusion_model_kwargs = get_fusion_kwargs_from_cl_args(
         cl_args=train_cl_args,
         omics_data_dimensions=omics_data_dimensions,
@@ -466,9 +464,19 @@ def _modify_train_cl_args_for_testing(
     data_source to get observations from (i.e. here we want the test set folder).
 
     We use deepcopy to make sure the training configuration stays frozen.
+
+    Note: We use the assert to now force the omics inputs to match exactly. Possibly
+    we could do some sorting later, but then we need to enforce that the names
+    and sources are both sorted in same order (in append_data_source_prefixes).
     """
     train_cl_args_mod = deepcopy(train_cl_args)
-    train_cl_args_mod.data_source = predict_cl_args.data_source
+    predict_cl_args_copy = deepcopy(predict_cl_args)
+
+    predict_cl_args_copy = append_data_source_prefixes(cl_args=predict_cl_args_copy)
+
+    assert predict_cl_args_copy.omics_names == train_cl_args.omics_names
+
+    train_cl_args_mod.omics_sources = predict_cl_args_copy.omics_sources
 
     return train_cl_args_mod
 
@@ -598,15 +606,29 @@ def get_predict_cl_args() -> argparse.Namespace:
         "--batch_size", type=int, default=64, help="size of the batches"
     )
 
-    parser.add_argument("--evaluate", dest="evaluate", action="store_true")
-    parser.set_defaults(evaluate=False)
+    parser.add_argument(
+        "--label_file", type=str, help="Which file to load labels from."
+    )
 
     parser.add_argument(
-        "--data_source",
+        "--omics_sources",
         type=str,
-        required=True,
-        help="Path to folder with samples to predict on.",
+        nargs="*",
+        help="Which one-hot omics sources to load samples from for predicting. Can "
+        "either be (a) a folder in which files will be gathered from the folder "
+        "recursively or (b) a simple text file with each line having a path for "
+        "a sample array",
     )
+
+    parser.add_argument(
+        "--omics_names",
+        type=str,
+        nargs="*",
+        help="Names for the omics sources passed in the --omics_sources argument.",
+    )
+
+    parser.add_argument("--evaluate", dest="evaluate", action="store_true")
+    parser.set_defaults(evaluate=False)
 
     parser.add_argument(
         "--output_folder", type=str, help="Where to save prediction results."
