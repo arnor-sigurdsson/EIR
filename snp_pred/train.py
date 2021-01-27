@@ -157,11 +157,17 @@ class Config:
 def serialize_config(
     config: "Config", run_folder: Path, keys_to_serialize: Union[Iterable[str], None]
 ) -> None:
-    serialization_path = run_folder / "serializations" / "filtered_config.dill"
+    serialization_path = get_train_config_serialization_path(run_folder=run_folder)
     ensure_path_exists(path=serialization_path)
 
     filtered_config = filter_config_by_keys(config=config, keys=keys_to_serialize)
     serialize_namespace(namespace=filtered_config, output_path=serialization_path)
+
+
+def get_train_config_serialization_path(run_folder: Path) -> Path:
+    train_config_path = run_folder / "serializations" / "filtered_config.dill"
+
+    return train_config_path
 
 
 def get_default_config_keys_to_serialize() -> Iterable[str]:
