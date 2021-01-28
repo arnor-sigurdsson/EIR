@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn.functional as F
-from aislib.misc_utils import get_logger
+from aislib.misc_utils import get_logger, ensure_path_exists
 from sklearn.preprocessing import LabelEncoder
 from torch import nn
 from torch.utils.data import DataLoader
@@ -78,18 +78,20 @@ def predict(
         target_columns=predict_config.test_dataset.target_columns
     )
 
-    for target_column_type, target_column in target_columns_gen:
+    for target_column_type, target_column_name in target_columns_gen:
 
-        target_preds = all_preds[target_column]
+        target_preds = all_preds[target_column_name]
 
-        cur_target_transformer = predict_config.target_transformers[target_column]
+        cur_target_transformer = predict_config.target_transformers[target_column_name]
         preds_sm = F.softmax(input=target_preds, dim=1).cpu().numpy()
 
         classes = _get_target_classnames(
-            transformer=cur_target_transformer, target_column=target_column
+            transformer=cur_target_transformer, target_column=target_column_name
         )
 
-        output_folder = Path(predict_cl_args.output_folder)
+        output_folder = Path(predict_cl_args.output_folder, target_column_name)
+        ensure_path_exists(path=output_folder, is_folder=True)
+
         _save_predictions(
             preds=preds_sm,
             test_dataset=predict_config.test_dataset,
@@ -98,14 +100,14 @@ def predict(
         )
 
         if predict_cl_args.evaluate:
-            cur_labels = all_labels[target_column].cpu().numpy()
+            cur_labels = all_labels[target_column_name].cpu().numpy()
 
             plot_config = PerformancePlotConfig(
                 val_outputs=preds_sm,
                 val_labels=cur_labels,
                 val_ids=all_ids,
                 iteration=0,
-                column_name=target_column,
+                column_name=target_column_name,
                 column_type=target_column_type,
                 target_transformer=cur_target_transformer,
                 output_folder=output_folder,

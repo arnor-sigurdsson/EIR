@@ -269,7 +269,8 @@ def test_predict(keep_outputs, prep_modelling_test_configs):
 
     predict.predict(predict_cl_args=predict_cl_args, predict_config=predict_config)
 
-    df_test = pd.read_csv(test_path / "predictions.csv", index_col="ID")
+    origin_predictions_path = test_path / "Origin" / "predictions.csv"
+    df_test = pd.read_csv(origin_predictions_path, index_col="ID")
 
     target_column = config.cl_args.target_cat_columns[0]
     target_classes = sorted(config.target_transformers[target_column].classes_)
