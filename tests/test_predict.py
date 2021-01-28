@@ -1,13 +1,13 @@
 import argparse
 from argparse import Namespace
 from pathlib import Path
+from typing import Iterable
 
 import pandas as pd
 import pytest
 import torch
 from sklearn.preprocessing import LabelEncoder
 
-from snp_pred.configuration import append_data_source_prefixes
 from snp_pred import predict
 from snp_pred import train
 from snp_pred.data_load.label_setup import TabularFileInfo
@@ -56,30 +56,64 @@ def test_load_model(args_config, tmp_path):
         assert param_model.data.ne(param_loaded.data).sum() == 0
 
 
-def test_modify_train_cl_args_for_testing():
-    cl_args_from_train = Namespace(
-        omics_sources=["train/data/folder_1", "train/data/folder_2"],
-        omics_names=["1", "2"],
-        lr=1e-3,
+@pytest.mark.parametrize(
+    "train_cl_args, predict_cl_args, expected_train_after, expected_predict_after",
+    [
+        (
+            Namespace(key1=1, key2=2),
+            Namespace(key2="should_be_present_in_train", key3="unique_to_test"),
+            Namespace(key1=1, key2="should_be_present_in_train"),
+            Namespace(key3="unique_to_test"),
+        )
+    ],
+)
+def test_converge_train_and_predict_cl_args(
+    train_cl_args: Namespace,
+    predict_cl_args: Namespace,
+    expected_train_after: Namespace,
+    expected_predict_after: Namespace,
+) -> None:
+    train_converged, predict_converged = predict._converge_train_and_predict_cl_args(
+        train_cl_args=train_cl_args, predict_cl_args=predict_cl_args
     )
-    cl_args_from_train = append_data_source_prefixes(cl_args=cl_args_from_train)
 
-    cl_args_from_predict = Namespace(
-        omics_sources=["predict/data/folder_1", "predict/data/folder_2"],
-        omics_names=["1", "2"],
+    assert train_converged == expected_train_after
+    assert predict_converged == expected_predict_after
+
+
+@pytest.mark.parametrize(
+    "train_cl_args, predict_cl_args, expected_train_after_overload",
+    [
+        (
+            Namespace(key1=1, key2=2),
+            Namespace(key2="should_be_present_in_train"),
+            Namespace(key1=1, key2="should_be_present_in_train"),
+        )
+    ],
+)
+def test_overload_train_cl_args_for_predict(
+    train_cl_args: Namespace, predict_cl_args: Namespace, expected_train_after_overload
+) -> None:
+    train_after_overload = predict._overload_train_cl_args_for_predict(
+        train_cl_args=train_cl_args, predict_cl_args=predict_cl_args
     )
+    assert train_after_overload == expected_train_after_overload
 
-    mixed_args = predict._modify_train_cl_args_for_testing(
-        train_cl_args=cl_args_from_train, predict_cl_args=cl_args_from_predict
+
+@pytest.mark.parametrize(
+    "namespace, keys_to_remove, expected_namespace_after_filter",
+    [(Namespace(key1=1, key2=2), ["key1"], Namespace(key2=2))],
+)
+def test_remove_keys_from_namespace(
+    namespace: Namespace,
+    keys_to_remove: Iterable[str],
+    expected_namespace_after_filter: Namespace,
+) -> None:
+
+    test_output = predict._remove_keys_from_namespace(
+        namespace=namespace, keys_to_remove=keys_to_remove
     )
-
-    assert mixed_args.omics_names == ["omics_1", "omics_2"]
-    assert mixed_args.omics_sources == [
-        "predict/data/folder_1",
-        "predict/data/folder_2",
-    ]
-
-    assert mixed_args.lr == 1e-3
+    assert test_output == expected_namespace_after_filter
 
 
 @pytest.mark.parametrize("create_test_data", [{"task_type": "multi"}], indirect=True)
@@ -168,7 +202,7 @@ def test_set_up_test_dataset(
 
     test_dataset = predict._set_up_default_test_dataset(
         data_dimensions=data_dimensions,
-        test_train_cl_args_mix=cl_args,
+        train_cl_args_overloaded=cl_args,
         test_labels_dict=df_test_dict,
         tabular_inputs_labels_dict=None,
     )
@@ -235,7 +269,8 @@ def test_predict(keep_outputs, prep_modelling_test_configs):
 
     predict.predict(predict_cl_args=predict_cl_args, predict_config=predict_config)
 
-    df_test = pd.read_csv(test_path / "predictions.csv", index_col="ID")
+    origin_predictions_path = test_path / "Origin" / "predictions.csv"
+    df_test = pd.read_csv(origin_predictions_path, index_col="ID")
 
     target_column = config.cl_args.target_cat_columns[0]
     target_classes = sorted(config.target_transformers[target_column].classes_)

@@ -1,7 +1,7 @@
 import argparse
 import json
 from argparse import Namespace
-from copy import deepcopy
+from copy import copy
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Union, List, Dict, Sequence, Callable, Iterable, Tuple, Type, Any
@@ -12,13 +12,13 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn.functional as F
-from aislib.misc_utils import get_logger
+from aislib.misc_utils import get_logger, ensure_path_exists
 from sklearn.preprocessing import LabelEncoder
 from torch import nn
 from torch.utils.data import DataLoader
 
-from snp_pred.configuration import append_data_source_prefixes
 import snp_pred.visualization.visualization_funcs as vf
+from snp_pred.configuration import append_data_source_prefixes
 from snp_pred.data_load import datasets, label_setup
 from snp_pred.data_load.data_utils import get_target_columns_generator
 from snp_pred.data_load.datasets import (
@@ -37,6 +37,7 @@ from snp_pred.data_load.label_setup import (
 from snp_pred.models.model_training_utils import gather_pred_outputs_from_dloader
 from snp_pred.models.tabular.tabular import al_emb_lookup_dict
 from snp_pred.train import (
+    get_train_config_serialization_path,
     prepare_base_batch_default,
     Hooks,
     get_tabular_target_label_data,
@@ -77,18 +78,20 @@ def predict(
         target_columns=predict_config.test_dataset.target_columns
     )
 
-    for target_column_type, target_column in target_columns_gen:
+    for target_column_type, target_column_name in target_columns_gen:
 
-        target_preds = all_preds[target_column]
+        target_preds = all_preds[target_column_name]
 
-        cur_target_transformer = predict_config.target_transformers[target_column]
+        cur_target_transformer = predict_config.target_transformers[target_column_name]
         preds_sm = F.softmax(input=target_preds, dim=1).cpu().numpy()
 
         classes = _get_target_classnames(
-            transformer=cur_target_transformer, target_column=target_column
+            transformer=cur_target_transformer, target_column=target_column_name
         )
 
-        output_folder = Path(predict_cl_args.output_folder)
+        output_folder = Path(predict_cl_args.output_folder, target_column_name)
+        ensure_path_exists(path=output_folder, is_folder=True)
+
         _save_predictions(
             preds=preds_sm,
             test_dataset=predict_config.test_dataset,
@@ -97,14 +100,14 @@ def predict(
         )
 
         if predict_cl_args.evaluate:
-            cur_labels = all_labels[target_column].cpu().numpy()
+            cur_labels = all_labels[target_column_name].cpu().numpy()
 
             plot_config = PerformancePlotConfig(
                 val_outputs=preds_sm,
                 val_labels=cur_labels,
                 val_ids=all_ids,
                 iteration=0,
-                column_name=target_column,
+                column_name=target_column_name,
                 column_type=target_column_type,
                 target_transformer=cur_target_transformer,
                 output_folder=output_folder,
@@ -115,8 +118,7 @@ def predict(
 
 @dataclass
 class PredictConfig:
-    train_cl_args: Namespace
-    train_args_modified_for_testing: Namespace
+    train_cl_args_overloaded: Namespace
     test_dataset: datasets.DiskDataset
     target_columns: al_target_columns
     target_transformers: al_label_transformers
@@ -153,32 +155,29 @@ def get_default_predict_config(
     predict_cl_args: Namespace,
 ) -> PredictConfig:
 
-    with open(
-        str(run_folder / "serializations" / "filtered_config.dill"), "rb"
-    ) as infile:
-        train_config = dill.load(file=infile)
+    train_config = _load_serialized_train_config(run_folder=run_folder)
 
-    train_cl_args = train_config.cl_args
-
-    test_train_mixed_cl_args = _modify_train_cl_args_for_testing(
-        train_cl_args=train_cl_args, predict_cl_args=predict_cl_args
+    train_cl_args_overloaded, predict_cl_args = _converge_train_and_predict_cl_args(
+        train_cl_args=train_config.cl_args, predict_cl_args=predict_cl_args
     )
 
     default_train_hooks = train_config.hooks
 
     target_labels, tabular_input_labels = None, None
     if predict_cl_args.evaluate:
-        test_ids = gather_ids_from_tabular_file(file_path=predict_cl_args.label_file)
+        test_ids = gather_ids_from_tabular_file(
+            file_path=train_cl_args_overloaded.label_file
+        )
 
         label_ops = default_train_hooks.custom_column_label_parsing_ops
         target_labels, tabular_input_labels = get_target_and_extra_labels_for_predict(
-            train_cl_args=train_cl_args,
+            train_cl_args_overloaded=train_cl_args_overloaded,
             custom_column_label_parsing_ops=label_ops,
             ids=test_ids,
         )
 
     test_dataset = _set_up_default_test_dataset(
-        test_train_cl_args_mix=test_train_mixed_cl_args,
+        train_cl_args_overloaded=train_cl_args_overloaded,
         data_dimensions=train_config.data_dimensions,
         test_labels_dict=target_labels.label_dict,
         tabular_inputs_labels_dict=tabular_input_labels.label_dict,
@@ -186,14 +185,14 @@ def get_default_predict_config(
 
     test_dataloader = DataLoader(
         dataset=test_dataset,
-        batch_size=predict_cl_args.batch_size,
+        batch_size=train_cl_args_overloaded.batch_size,
         shuffle=False,
-        num_workers=predict_cl_args.num_workers,
+        num_workers=train_cl_args_overloaded.dataloader_workers,
     )
 
     func = _get_fusion_model_class_and_kwargs_from_cl_args
     fusion_model_class, fusion_model_kwargs = func(
-        train_cl_args=train_cl_args,
+        train_cl_args=train_cl_args_overloaded,
         num_outputs_per_target=train_config.num_outputs_per_target,
         tabular_input_transformers=tabular_input_labels.transformers,
         omics_data_dimensions=train_config.data_dimensions,
@@ -203,14 +202,13 @@ def get_default_predict_config(
         model_path=Path(predict_cl_args.model_path),
         model_class=fusion_model_class,
         model_init_kwargs=fusion_model_kwargs,
-        device=predict_cl_args.device,
+        device=train_cl_args_overloaded.device,
     )
     assert not model.training
 
     default_predict_hooks = _get_default_predict_hooks(train_hooks=default_train_hooks)
     test_config = PredictConfig(
-        train_cl_args=train_cl_args,
-        train_args_modified_for_testing=test_train_mixed_cl_args,
+        train_cl_args_overloaded=train_cl_args_overloaded,
         test_dataset=test_dataset,
         target_columns=train_config.target_columns,
         target_transformers=train_config.target_transformers,
@@ -221,62 +219,16 @@ def get_default_predict_config(
     return test_config
 
 
-def get_target_and_extra_labels_for_predict_old(
-    train_cl_args: Namespace,
-    custom_column_label_parsing_ops: al_all_column_ops,
-    ids: Sequence[str],
-) -> Tuple[PredictLabels, PredictLabels]:
+def _load_serialized_train_config(run_folder: Path):
+    train_config_path = get_train_config_serialization_path(run_folder=run_folder)
+    with open(train_config_path, "rb") as infile:
+        train_config = dill.load(file=infile)
 
-    target_cols = train_cl_args.target_cat_columns + train_cl_args.target_con_columns
-    target_transformers = _load_transformers(
-        run_name=train_cl_args.run_name,
-        transformers_to_load=target_cols,
-    )
-
-    target_labels_info = get_tabular_target_label_data(cl_args=train_cl_args)
-    df_target_labels_predict = _load_labels_for_predict(
-        tabular_info=target_labels_info,
-        ids_to_keep=ids,
-        custom_label_ops=custom_column_label_parsing_ops,
-    )
-    target_labels_dict = parse_labels_for_testing(
-        tabular_info=target_labels_info,
-        df_labels_test=df_target_labels_predict,
-        label_transformers=target_transformers,
-    )
-
-    target_labels = PredictLabels(
-        label_dict=target_labels_dict, transformers=target_transformers
-    )
-
-    tabular_cols = train_cl_args.extra_cat_columns + train_cl_args.extra_con_columns
-    if len(tabular_cols) > 0:
-        extra_transformers = _load_transformers(
-            run_name=train_cl_args.run_name,
-            transformers_to_load=tabular_cols,
-        )
-        extra_labels_info = get_tabular_inputs_label_data(cl_args=train_cl_args)
-        df_extra_labels_predict = _load_labels_for_predict(
-            tabular_info=extra_labels_info,
-            ids_to_keep=ids,
-            custom_label_ops=custom_column_label_parsing_ops,
-        )
-        extra_labels_dict = parse_labels_for_testing(
-            tabular_info=extra_labels_info,
-            df_labels_test=df_extra_labels_predict,
-            label_transformers=extra_transformers,
-        )
-        extra_labels = PredictLabels(
-            label_dict=extra_labels_dict, transformers=extra_transformers
-        )
-    else:
-        extra_labels = PredictLabels(label_dict={}, transformers={})
-
-    return target_labels, extra_labels
+    return train_config
 
 
 def get_target_and_extra_labels_for_predict(
-    train_cl_args: Namespace,
+    train_cl_args_overloaded: Namespace,
     custom_column_label_parsing_ops: al_all_column_ops,
     ids: Sequence[str],
 ) -> Tuple[PredictLabels, PredictLabels]:
@@ -285,20 +237,20 @@ def get_target_and_extra_labels_for_predict(
             update the parameters slightly.
     """
 
-    target_info = get_tabular_target_label_data(cl_args=train_cl_args)
+    target_info = get_tabular_target_label_data(cl_args=train_cl_args_overloaded)
 
     target_labels = get_labels_for_predict(
-        run_name=train_cl_args.run_name,
+        run_name=train_cl_args_overloaded.run_name,
         tabular_file_info=target_info,
         custom_column_label_parsing_ops=custom_column_label_parsing_ops,
         ids=ids,
     )
 
-    tabular_input_info = get_tabular_inputs_label_data(cl_args=train_cl_args)
+    tabular_input_info = get_tabular_inputs_label_data(cl_args=train_cl_args_overloaded)
 
     if tabular_input_info.con_columns or tabular_input_info.cat_columns:
         tabular_input_labels = get_labels_for_predict(
-            run_name=train_cl_args.run_name,
+            run_name=train_cl_args_overloaded.run_name,
             tabular_file_info=tabular_input_info,
             custom_column_label_parsing_ops=custom_column_label_parsing_ops,
             ids=ids,
@@ -365,7 +317,7 @@ def _hook_default_predict_prepare_batch(
 ):
     batch = prepare_base_batch_default(
         loader_batch=loader_batch,
-        cl_args=predict_config.train_cl_args,
+        cl_args=predict_config.train_cl_args_overloaded,
         target_columns=predict_config.target_columns,
         model=predict_config.model,
     )
@@ -455,30 +407,57 @@ def _load_saved_embeddings_dict(
     return embeddings_dict
 
 
-def _modify_train_cl_args_for_testing(
+def _converge_train_and_predict_cl_args(
+    train_cl_args: Namespace, predict_cl_args: Namespace
+) -> Tuple[Namespace, Namespace]:
+
+    train_cl_args_copy = copy(train_cl_args)
+
+    train_cl_args_overloaded = _overload_train_cl_args_for_predict(
+        train_cl_args=train_cl_args_copy, predict_cl_args=predict_cl_args
+    )
+    train_cl_args_overloaded_prefix_renamed = append_data_source_prefixes(
+        cl_args=train_cl_args_overloaded
+    )
+
+    train_keys = train_cl_args_overloaded_prefix_renamed.__dict__.keys()
+    predict_cl_args_filtered = _remove_keys_from_namespace(
+        namespace=predict_cl_args, keys_to_remove=train_keys
+    )
+
+    return train_cl_args_overloaded_prefix_renamed, predict_cl_args_filtered
+
+
+def _overload_train_cl_args_for_predict(
     train_cl_args: Namespace, predict_cl_args: Namespace
 ) -> Namespace:
-    """
-    When initalizing the datasets and model classes, we want to make sure we have the
-    same configuration as when training the model, with the exception of which
-    data_source to get observations from (i.e. here we want the test set folder).
 
-    We use deepcopy to make sure the training configuration stays frozen.
+    train_overloaded = copy(train_cl_args)
+    train_keys = set(train_overloaded.__dict__.keys())
 
-    Note: We use the assert to now force the omics inputs to match exactly. Possibly
-    we could do some sorting later, but then we need to enforce that the names
-    and sources are both sorted in same order (in append_data_source_prefixes).
-    """
-    train_cl_args_mod = deepcopy(train_cl_args)
-    predict_cl_args_copy = deepcopy(predict_cl_args)
+    predict_arg_iter = predict_cl_args.__dict__.items()
+    for predict_argument_name, predict_argument_value in predict_arg_iter:
 
-    predict_cl_args_copy = append_data_source_prefixes(cl_args=predict_cl_args_copy)
+        if predict_argument_name in train_keys:
+            train_overloaded.__setattr__(predict_argument_name, predict_argument_value)
 
-    assert predict_cl_args_copy.omics_names == train_cl_args.omics_names
+    return train_overloaded
 
-    train_cl_args_mod.omics_sources = predict_cl_args_copy.omics_sources
 
-    return train_cl_args_mod
+def _remove_keys_from_namespace(
+    namespace: Namespace, keys_to_remove: Iterable[str]
+) -> Namespace:
+    new_namespace_kwargs = {}
+
+    keys_to_remove_set = set(keys_to_remove)
+
+    for key_name, key_value in namespace.__dict__.items():
+        if key_name not in keys_to_remove_set:
+            new_namespace_kwargs[key_name] = key_value
+
+    filtered_namespace = Namespace(**new_namespace_kwargs)
+
+    return filtered_namespace
 
 
 def _load_labels_for_predict(
@@ -537,13 +516,13 @@ def _prep_missing_con_dict(con_transformers: al_label_transformers) -> Dict[str,
 
 
 def _set_up_default_test_dataset(
-    test_train_cl_args_mix: Namespace,
+    train_cl_args_overloaded: Namespace,
     data_dimensions: Dict[str, "DataDimensions"],
     test_labels_dict: Union[None, al_label_dict],
     tabular_inputs_labels_dict: Union[None, al_label_dict],
 ) -> al_datasets:
     """
-    :param test_train_cl_args_mix: Training CL arguments with the data_source
+    :param train_cl_args_overloaded: Training CL arguments with the data_source
     replaced with testing one.
     :param test_labels_dict: None if we are predicting on unknown data,
     otherwise a dictionary of labels (if evaluating on test set).
@@ -551,7 +530,7 @@ def _set_up_default_test_dataset(
     """
 
     test_dataset_kwargs = datasets.construct_default_dataset_kwargs_from_cl_args(
-        cl_args=test_train_cl_args_mix,
+        cl_args=train_cl_args_overloaded,
         target_labels_dict=test_labels_dict,
         data_dimensions=data_dimensions,
         tabular_labels_dict=tabular_inputs_labels_dict,
@@ -651,7 +630,7 @@ def get_predict_cl_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "--num_workers",
+        "--dataloader_workers",
         type=int,
         default=0,
         help="Number of workers for dataloader.",
