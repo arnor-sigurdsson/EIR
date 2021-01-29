@@ -154,7 +154,7 @@ def test_get_embeddings_from_labels(create_emb_test_label_data, create_test_emb_
     }
 
     test_embeddings = tab.get_embeddings_from_labels(
-        labels=test_extra_labels, model=test_model
+        categorical_columns=emb_cols, labels=test_extra_labels, model=test_model
     )
 
     assert test_embeddings.shape[1] == 6

@@ -1,9 +1,22 @@
 import copy
 import os
 import sys
+from collections import defaultdict
 from contextlib import contextmanager
+from dataclasses import dataclass
 from functools import partial
-from typing import Union, Dict, List, TYPE_CHECKING, Sequence, Iterable
+from typing import (
+    Union,
+    Dict,
+    List,
+    TYPE_CHECKING,
+    Sequence,
+    Iterable,
+    Tuple,
+    Generator,
+    Protocol,
+    Callable,
+)
 
 import numpy as np
 import torch
@@ -11,11 +24,12 @@ from aislib.misc_utils import get_logger, ensure_path_exists
 from ignite.engine import Engine
 from shap import DeepExplainer
 from torch import nn
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 
-from snp_pred.data_load.data_utils import get_target_columns_generator
-from snp_pred.interpretation.interpret_omics import analyze_omics_activations
-from snp_pred.models import model_training_utils
+from data_load.datasets import al_datasets
+from snp_pred.data_load.data_utils import get_target_columns_generator, Batch
+from snp_pred.interpretation.interpret_omics import analyze_omics_input_activations
+from snp_pred.interpretation.interpret_tabular import analyze_tabular_input_activations
 from snp_pred.models.model_training_utils import gather_dloader_samples
 from snp_pred.models.omics.models_cnn import CNNModel
 from snp_pred.models.omics.models_mlp import MLPModel
@@ -23,6 +37,7 @@ from snp_pred.train_utils.evaluation import validation_handler
 from snp_pred.train_utils.utils import (
     prep_sample_outfolder,
     validate_handler_dependencies,
+    call_hooks_stage_iterable,
 )
 
 if TYPE_CHECKING:
@@ -111,39 +126,60 @@ def activation_analysis_handler(
             n_background_samples=no_explainer_background_samples,
         )
 
-        proc_funcs = {
-            "pre": (
-                partial(
-                    _pre_transform_sample_before_activation,
-                    column_name=column_name,
-                    device=cl_args.device,
-                    target_columns=c.target_columns,
-                ),
-            )
-        }
+        input_names = explainer.explainer.model.input_names
 
-        act_func = _get_shap_activation_function(
+        act_producer = get_shap_activation_producer(
             explainer=explainer,
             column_type=column_type,
             act_samples_per_class_limit=cl_args.max_acts_per_class,
         )
 
-        # for omics input ...j
-
-        activation_outfolder = _prepare_activation_outfolder(
-            run_name=cl_args.run_name, column_name=column_name, iteration=iteration
+        act_func = partial(
+            get_activation,
+            activation_producer=act_producer,
+            input_names=input_names,
         )
 
-        analyze_omics_activations(
+        data_producer = _get_interpretation_data_producer(
             config=c,
-            act_func=act_func,
-            proc_funcs=proc_funcs,
             column_name=column_name,
             column_type=column_type,
-            activation_outfolder=activation_outfolder,
+            dataset=c.valid_dataset,
         )
 
-        # for tabular input ...
+        all_activations = accumulate_all_activations(
+            data_producer=data_producer,
+            act_func=act_func,
+            target_column_name=column_name,
+        )
+
+        for input_name in input_names:
+
+            activation_outfolder = _prepare_activation_outfolder(
+                run_name=cl_args.run_name,
+                input_name=input_name,
+                column_name=column_name,
+                iteration=iteration,
+            )
+
+            if input_name.startswith("omics_"):
+
+                analyze_omics_input_activations(
+                    config=c,
+                    omics_input_name=input_name,
+                    target_column_name=column_name,
+                    target_column_type=column_type,
+                    activation_outfolder=activation_outfolder,
+                    activations=all_activations,
+                )
+
+            elif input_name.startswith("tabular_"):
+                analyze_tabular_input_activations(
+                    config=c,
+                    input_name=input_name,
+                    all_activations=all_activations,
+                    activation_outfolder=activation_outfolder,
+                )
 
         hook_handle.remove()
 
@@ -161,7 +197,6 @@ def get_shap_object(
     n_background_samples: int = 64,
 ):
     c = config
-
     background, labels, ids = gather_dloader_samples(
         batch_prep_hook=c.hooks.step_func_hooks.base_prepare_batch,
         batch_prep_hook_kwargs={"config": c},
@@ -169,8 +204,7 @@ def get_shap_object(
         n_samples=n_background_samples,
     )
 
-    if "tabular_cl_args" in background:
-        background["tabular_cl_args"] = background["tabular_cl_args"].detach()
+    background = _detach_all_inputs(tensor_inputs=background)
 
     hook_partial = partial(
         _grab_single_target_from_model_output_hook, output_target_column=column_name
@@ -187,19 +221,32 @@ def get_shap_object(
     return explainer, hook_handle
 
 
-def _pre_transform_sample_before_activation(
-    single_sample, sample_label, column_name: str, device: str, target_columns
-):
-    single_sample = single_sample.to(device=device, dtype=torch.float32)
-
-    sample_label = model_training_utils.parse_target_labels(
-        target_columns=target_columns, device=device, labels=sample_label
-    )[column_name]
-
-    return single_sample, sample_label
+class ActivationCallable(Protocol):
+    def __call__(
+        self, inputs: Sequence[torch.Tensor], *args, **kwargs
+    ) -> Sequence[torch.Tensor]:
+        ...
 
 
-def _get_shap_activation_function(
+def get_activation(
+    activation_producer: ActivationCallable,
+    inputs: Sequence[torch.Tensor],
+    input_names: Sequence[torch.Tensor],
+    *args,
+    **kwargs
+) -> Union[Dict[str, torch.Tensor], None]:
+
+    input_activations = activation_producer(inputs=inputs, *args, **kwargs)
+
+    if input_activations is None:
+        return None
+
+    name_matched_activation = {k: v for k, v in zip(input_names, input_activations)}
+
+    return name_matched_activation
+
+
+def get_shap_activation_producer(
     explainer: DeepExplainer,
     column_type: str,
     act_samples_per_class_limit: Union[int, None],
@@ -218,11 +265,43 @@ def _get_shap_activation_function(
     return act_func_partial
 
 
-def _prepare_activation_outfolder(run_name: str, column_name: str, iteration: int):
+@dataclass
+class SampleActivation:
+    sample_info: "Batch"
+    sample_activations: Dict[str, torch.Tensor]
+
+
+def accumulate_all_activations(
+    data_producer: Iterable["Batch"], act_func: Callable, target_column_name: str
+) -> Sequence["SampleActivation"]:
+
+    all_activations = []
+
+    for batch in data_producer:
+        sample_target_labels = batch.target_labels
+
+        sample_all_modalities_activations = act_func(
+            inputs=batch.inputs, sample_label=sample_target_labels[target_column_name]
+        )
+
+        if sample_all_modalities_activations is None:
+            continue
+
+        cur_sample_activation_info = SampleActivation(
+            sample_info=batch, sample_activations=sample_all_modalities_activations
+        )
+        all_activations.append(cur_sample_activation_info)
+
+    return all_activations
+
+
+def _prepare_activation_outfolder(
+    run_name: str, input_name: str, column_name: str, iteration: int
+):
     sample_outfolder = prep_sample_outfolder(
         run_name=run_name, column_name=column_name, iteration=iteration
     )
-    activation_outfolder = sample_outfolder / "activations"
+    activation_outfolder = sample_outfolder / "activations" / input_name
     ensure_path_exists(path=activation_outfolder, is_folder=True)
 
     return activation_outfolder
@@ -245,6 +324,9 @@ def get_shap_sample_acts_deep_correct_only(
 ):
     """
     Note: We only get the grads for a correct prediction.
+
+    Note: We need the [0] as ranked_outputs gives us a list of lists, where the inner
+          is containing all the modalities.
 
     TODO: Add functionality to use ranked_outputs or all outputs.
     """
@@ -281,4 +363,138 @@ def get_shap_sample_acts_deep_all_classes(
         return output
 
     shap_grads = output[sample_label.item()]
-    return shap_grads[0]
+    return shap_grads
+
+
+def _get_interpretation_data_producer(
+    config: "Config",
+    column_name: str,
+    column_type: str,
+    dataset: al_datasets,
+) -> Generator["Batch", None, None]:
+
+    target_transformer = config.target_transformers[column_name]
+
+    target_classes_numerical = _get_numerical_target_classes(
+        target_transformer=target_transformer,
+        column_type=column_type,
+        act_classes=config.cl_args.act_classes,
+    )
+
+    activations_data_loader = _get_activations_dataloader(
+        validation_dataset=dataset,
+        max_acts_per_class=config.cl_args.max_acts_per_class,
+        target_column=column_name,
+        column_type=column_type,
+        target_classes_numerical=target_classes_numerical,
+    )
+
+    for loader_batch in activations_data_loader:
+        state = call_hooks_stage_iterable(
+            hook_iterable=config.hooks.step_func_hooks.base_prepare_batch,
+            common_kwargs={"config": config, "loader_batch": loader_batch},
+            state=None,
+        )
+
+        batch = state["batch"]
+
+        inputs_detached = _detach_all_inputs(tensor_inputs=batch.inputs)
+        batch_interpretation = Batch(
+            inputs=inputs_detached, target_labels=batch.target_labels, ids=batch.ids
+        )
+
+        yield batch_interpretation
+
+
+def _detach_all_inputs(tensor_inputs: Dict[str, torch.Tensor]):
+    inputs_detached = {}
+
+    for input_name, value in tensor_inputs.items():
+        inputs_detached[input_name] = value.detach()
+
+    return inputs_detached
+
+
+def _get_activations_dataloader(
+    validation_dataset: al_datasets,
+    max_acts_per_class: int,
+    target_column: str,
+    column_type: str,
+    target_classes_numerical: Sequence[int],
+) -> DataLoader:
+    common_args = {"batch_size": 1, "shuffle": False}
+
+    if max_acts_per_class is None:
+        data_loader = DataLoader(dataset=validation_dataset, **common_args)
+        return data_loader
+
+    indices_func = _get_categorical_sample_indices_for_activations
+    if column_type == "con":
+        indices_func = _get_continuous_sample_indices_for_activations
+
+    subset_indices = indices_func(
+        dataset=validation_dataset,
+        max_acts_per_class=max_acts_per_class,
+        target_column=target_column,
+        target_classes_numerical=target_classes_numerical,
+    )
+    subset_dataset = _subsample_dataset(
+        dataset=validation_dataset, indices=subset_indices
+    )
+    data_loader = DataLoader(dataset=subset_dataset, **common_args)
+    return data_loader
+
+
+def _get_categorical_sample_indices_for_activations(
+    dataset: al_datasets,
+    max_acts_per_class: int,
+    target_column: str,
+    target_classes_numerical: Sequence[int],
+) -> Tuple[int, ...]:
+    acc_label_counts = defaultdict(lambda: 0)
+    acc_label_limit = max_acts_per_class
+    indices = []
+
+    for index, sample in enumerate(dataset.samples):
+        target_labels = sample.target_labels
+        cur_sample_target_label = target_labels[target_column]
+
+        is_over_limit = acc_label_counts[cur_sample_target_label] == acc_label_limit
+        is_not_in_target_classes = (
+            cur_sample_target_label not in target_classes_numerical
+        )
+        if is_over_limit or is_not_in_target_classes:
+            continue
+
+        indices.append(index)
+        acc_label_counts[cur_sample_target_label] += 1
+
+    return tuple(indices)
+
+
+def _get_continuous_sample_indices_for_activations(
+    dataset: al_datasets, max_acts_per_class: int, *args, **kwargs
+) -> Tuple[int, ...]:
+
+    acc_label_limit = max_acts_per_class
+    num_sample = len(dataset)
+    indices = np.random.choice(num_sample, acc_label_limit)
+
+    return tuple(indices)
+
+
+def _subsample_dataset(dataset: al_datasets, indices: Sequence[int]):
+    dataset_subset = Subset(dataset=dataset, indices=indices)
+    return dataset_subset
+
+
+def _get_numerical_target_classes(
+    target_transformer, column_type: str, act_classes: Union[Sequence[str], None]
+):
+    if column_type == "con":
+        return [None]
+
+    if act_classes:
+        return target_transformer.transform(act_classes)
+
+    return target_transformer.transform(target_transformer.classes_)
