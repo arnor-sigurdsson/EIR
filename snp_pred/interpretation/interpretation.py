@@ -26,7 +26,7 @@ from shap import DeepExplainer
 from torch import nn
 from torch.utils.data import DataLoader, Subset
 
-from data_load.datasets import al_datasets
+from snp_pred.data_load.datasets import al_datasets
 from snp_pred.data_load.data_utils import get_target_columns_generator, Batch
 from snp_pred.interpretation.interpret_omics import analyze_omics_input_activations
 from snp_pred.interpretation.interpret_tabular import analyze_tabular_input_activations

@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Dict, Sequence, TYPE_CHECKING, List
 
+import shap
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -37,6 +38,27 @@ def analyze_tabular_input_activations(
         df_activations=df_activations, activation_outfolder=activation_outfolder
     )
 
+    cat_to_con_cutoff = get_cat_to_con_cutoff_from_slices(
+        slices=activation_tensor_slices,
+        cat_input_columns=config.cl_args.extra_cat_columns,
+    )
+    continuous_shap = _gather_continuous_shap_values(
+        all_activations=all_activations,
+        cat_to_con_cutoff=cat_to_con_cutoff,
+        input_name=input_name,
+    )
+    continuous_inputs = _gather_continuous_inputs(
+        all_activations=all_activations,
+        cat_to_con_cutoff=cat_to_con_cutoff,
+        con_names=config.cl_args.extra_con_columns,
+        input_name=input_name,
+    )
+    plot_tabular_beeswarm(
+        shap_values=continuous_shap,
+        features=continuous_inputs,
+        activation_outfolder=activation_outfolder,
+    )
+
 
 def set_up_tabular_tensor_slices(
     cat_input_columns: Sequence[str],
@@ -69,6 +91,19 @@ def set_up_tabular_tensor_slices(
     return slices
 
 
+def get_cat_to_con_cutoff_from_slices(
+    slices: Dict, cat_input_columns: Sequence[str]
+) -> int:
+    cutoff = 0
+
+    for cat_column in cat_input_columns:
+        cur_cat_slice = slices[cat_column]
+        slice_size = cur_cat_slice.stop - cur_cat_slice.start
+        cutoff += slice_size
+
+    return cutoff
+
+
 def parse_tabular_activations(
     activation_tensor_slices: Dict,
     all_activations: Sequence["SampleActivation"],
@@ -87,10 +122,75 @@ def parse_tabular_activations(
     finalized_activations = {}
 
     for column, aggregated_activations in column_activations.items():
-        mean_activation = np.array(column_activations[column]).mean()
+        mean_activation = np.abs(np.array(column_activations[column]).mean())
         finalized_activations[column] = [mean_activation]
 
     return finalized_activations
+
+
+def plot_tabular_beeswarm(
+    shap_values: np.ndarray,
+    features: pd.DataFrame,
+    activation_outfolder: Path,
+):
+
+    plt.close("all")
+
+    _ = shap.summary_plot(
+        shap_values=shap_values,
+        features=features,
+        show=False,
+        max_display=20,
+    )
+
+    fig = plt.gcf()
+    plt.tight_layout()
+    fig.savefig(str(activation_outfolder / "con_features_beeswarm.png"))
+
+
+def _gather_continuous_inputs(
+    all_activations: Sequence["SampleActivation"],
+    cat_to_con_cutoff: int,
+    con_names: Sequence[str],
+    input_name: str,
+) -> pd.DataFrame:
+    con_inputs = []
+
+    for sample in all_activations:
+        cur_full_input = sample.sample_info.inputs[input_name]
+        cur_con_input_part = cur_full_input.squeeze()[cat_to_con_cutoff:]
+        con_inputs.append(cur_con_input_part)
+
+    con_inputs_array = np.array([np.array(i.cpu()) for i in con_inputs])
+    df = pd.DataFrame(con_inputs_array, columns=con_names)
+
+    return df
+
+
+def _gather_continuous_shap_values(
+    all_activations: Sequence["SampleActivation"],
+    cat_to_con_cutoff: int,
+    input_name: str,
+) -> np.ndarray:
+    con_acts = []
+
+    for sample in all_activations:
+        cur_full_input = sample.sample_activations[input_name]
+        cur_con_input_part = cur_full_input.squeeze()[cat_to_con_cutoff:]
+        con_acts.append(cur_con_input_part)
+
+    return np.array(con_acts).squeeze()
+
+
+def get_tabular_activation_df(
+    parsed_activations: Dict[str, List[float]]
+) -> pd.DataFrame:
+    df_activations = pd.DataFrame.from_dict(
+        parsed_activations, orient="index", columns=["Shap_Value"]
+    )
+    df_activations = df_activations.sort_values(by="Shap_Value", ascending=False)
+
+    return df_activations
 
 
 def plot_tabular_activations(
@@ -98,23 +198,11 @@ def plot_tabular_activations(
 ) -> None:
 
     sns_plot = sns.barplot(
-        x=df_activations["Feature_Importance"],
+        x=df_activations["Shap_Value"],
         y=df_activations.index,
         palette="Blues_d",
     )
     plt.tight_layout()
     sns_figure = sns_plot.get_figure()
+    sns_figure.set_size_inches(10, 0.5 * len(df_activations))
     sns_figure.savefig(str(activation_outfolder / "feature_importance.png"))
-
-
-def get_tabular_activation_df(
-    parsed_activations: Dict[str, List[float]]
-) -> pd.DataFrame:
-    df_activations = pd.DataFrame.from_dict(
-        parsed_activations, orient="index", columns=["Feature_Importance"]
-    )
-    df_activations = df_activations.sort_values(
-        by="Feature_Importance", ascending=False
-    )
-
-    return df_activations

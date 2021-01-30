@@ -246,6 +246,14 @@ optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 
 [[package]]
+name = "cloudpickle"
+version = "1.6.0"
+description = "Extended pickling support for Python objects"
+category = "main"
+optional = false
+python-versions = ">=3.5"
+
+[[package]]
 name = "colorama"
 version = "0.4.4"
 description = "Cross-platform colored terminal text."
@@ -1661,27 +1669,28 @@ python-versions = "*"
 
 [[package]]
 name = "shap"
-version = "0.37.0"
+version = "0.38.1"
 description = "A unified approach to explain the output of any machine learning model."
 category = "main"
 optional = false
 python-versions = "*"
 
 [package.dependencies]
+cloudpickle = "*"
 numba = "*"
 numpy = "*"
 pandas = "*"
 scikit-learn = "*"
 scipy = "*"
-slicer = "0.0.3"
+slicer = "0.0.7"
 tqdm = ">4.25.0"
 
 [package.extras]
-all = ["xgboost", "pytest-mpl", "sphinx", "sphinx-rtd-theme", "pyspark", "catboost", "pytest", "lime", "numpydoc", "lightgbm", "ipython", "nbsphinx", "matplotlib", "pytest-cov"]
+all = ["xgboost", "lightgbm", "transformers", "lime", "pyspark", "torch", "pytest", "pytest-mpl", "pytest-cov", "nbsphinx", "matplotlib", "sphinx-rtd-theme", "sphinx", "catboost", "pyod", "sentencepiece", "opencv-python", "ipython", "numpydoc"]
 docs = ["matplotlib", "ipython", "numpydoc", "sphinx-rtd-theme", "sphinx", "nbsphinx"]
 others = ["lime"]
 plots = ["matplotlib", "ipython"]
-test = ["pytest", "pytest-mpl", "pytest-cov", "xgboost", "lightgbm", "catboost", "pyspark"]
+test = ["pytest", "pytest-mpl", "pytest-cov", "xgboost", "lightgbm", "catboost", "pyspark", "pyod", "transformers", "torch", "sentencepiece", "opencv-python"]
 
 [[package]]
 name = "six"
@@ -1693,7 +1702,7 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*"
 
 [[package]]
 name = "slicer"
-version = "0.0.3"
+version = "0.0.7"
 description = "A small package for big slicing."
 category = "main"
 optional = false
@@ -2165,7 +2174,7 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "69f4721c69993c1593a65898840507bfc5b1475156d398aae9114c6fb2afb500"
+content-hash = "b0120a413215baeb06356626c73b0807367827fb2be20c95797e1d1f2c414760"
 
 [metadata.files]
 absl-py = [
@@ -2300,6 +2309,10 @@ chardet = [
 click = [
     {file = "click-7.1.2-py2.py3-none-any.whl", hash = "sha256:dacca89f4bfadd5de3d7489b7c8a566eee0d3676333fbb50030263894c38c0dc"},
     {file = "click-7.1.2.tar.gz", hash = "sha256:d2b5255c7c6349bc1bd1e59e08cd12acbbd63ce649f2588755783aa94dfb6b1a"},
+]
+cloudpickle = [
+    {file = "cloudpickle-1.6.0-py3-none-any.whl", hash = "sha256:3a32d0eb0bc6f4d0c57fbc4f3e3780f7a81e6fee0fa935072884d58ae8e1cc7c"},
+    {file = "cloudpickle-1.6.0.tar.gz", hash = "sha256:9bc994f9e9447593bd0a45371f0e7ac7333710fcf64a4eb9834bf149f4ef2f32"},
 ]
 colorama = [
     {file = "colorama-0.4.4-py2.py3-none-any.whl", hash = "sha256:9f47eda37229f68eee03b24b9748937c7dc3868f906e8ba69fbcbdd3bc5dc3e2"},
@@ -3322,18 +3335,18 @@ send2trash = [
     {file = "Send2Trash-1.5.0.tar.gz", hash = "sha256:60001cc07d707fe247c94f74ca6ac0d3255aabcb930529690897ca2a39db28b2"},
 ]
 shap = [
-    {file = "shap-0.37.0-cp36-cp36m-win_amd64.whl", hash = "sha256:022c8550214ba589af6771bc36df9b30e323f3f9b11b4fbe2dd3a3de853c99e0"},
-    {file = "shap-0.37.0-cp37-cp37m-win_amd64.whl", hash = "sha256:6a323bd726f8616cad6c1f3156208ce620911994a4fcc1886a662a5f299fdc84"},
-    {file = "shap-0.37.0-cp38-cp38-win_amd64.whl", hash = "sha256:b173696e1b7f25f74446e9e70900f90df5697ae1ef967f9b3aa5b30db533027a"},
-    {file = "shap-0.37.0.tar.gz", hash = "sha256:dca8127016988d2b64895e8c2afcf8ebdef152e8e1e8bfe84201d41c89c09b0f"},
+    {file = "shap-0.38.1-cp36-cp36m-win_amd64.whl", hash = "sha256:34913391184180f9359e2627131960a473d67143e94b7f649c75a2d0c7d4cd40"},
+    {file = "shap-0.38.1-cp37-cp37m-win_amd64.whl", hash = "sha256:4cc1e1ac2e1e30aa9857fcf3fcfa0a6b2bf5e6aa0670c16a36bc28cd9b11aae5"},
+    {file = "shap-0.38.1-cp38-cp38-win_amd64.whl", hash = "sha256:0457e7fb80d2398454a16d16c7cd7934003e8c8bd9c1e002d965fce6a3815e54"},
+    {file = "shap-0.38.1.tar.gz", hash = "sha256:8f23e2ee3c80774d8c0942ecbd71b4dc0c2beba6d3de41dfc3a86e55adb9d28a"},
 ]
 six = [
     {file = "six-1.15.0-py2.py3-none-any.whl", hash = "sha256:8b74bedcbbbaca38ff6d7491d76f2b06b3592611af620f8426e82dddb04a5ced"},
     {file = "six-1.15.0.tar.gz", hash = "sha256:30639c035cdb23534cd4aa2dd52c3bf48f06e5f4a941509c8bafd8ce11080259"},
 ]
 slicer = [
-    {file = "slicer-0.0.3-py3-none-any.whl", hash = "sha256:027e87357785c1031cbeb8447a3b8c324efbb9fa184a678a4f4d9e182a62002d"},
-    {file = "slicer-0.0.3.tar.gz", hash = "sha256:c82500e0120e648dcd541f785e1c04a35fa9cd61baed5cf3f83e6b6b21667114"},
+    {file = "slicer-0.0.7-py3-none-any.whl", hash = "sha256:0b94faa5251c0f23782c03f7b7eedda91d80144059645f452c4bc80fab875976"},
+    {file = "slicer-0.0.7.tar.gz", hash = "sha256:f5d5f7b45f98d155b9c0ba6554fa9770c6b26d5793a3e77a1030fb56910ebeec"},
 ]
 snakeviz = [
     {file = "snakeviz-2.1.0-py2.py3-none-any.whl", hash = "sha256:8ce375b18ae4a749516d7e6c6fbbf8be6177c53974f53534d8eadb646cd279b1"},
