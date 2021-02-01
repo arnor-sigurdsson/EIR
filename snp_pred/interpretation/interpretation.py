@@ -166,17 +166,19 @@ def activation_analysis_handler(
 
                 analyze_omics_input_activations(
                     config=c,
-                    omics_input_name=input_name,
+                    input_name=input_name,
                     target_column_name=column_name,
                     target_column_type=column_type,
+                    all_activations=all_activations,
                     activation_outfolder=activation_outfolder,
-                    activations=all_activations,
                 )
 
             elif input_name.startswith("tabular_"):
                 analyze_tabular_input_activations(
                     config=c,
                     input_name=input_name,
+                    target_column_name=column_name,
+                    target_column_type=column_type,
                     all_activations=all_activations,
                     activation_outfolder=activation_outfolder,
                 )

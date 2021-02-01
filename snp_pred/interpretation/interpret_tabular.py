@@ -1,20 +1,29 @@
 from pathlib import Path
 from typing import Dict, Sequence, TYPE_CHECKING, List
+from collections import defaultdict
+from textwrap import wrap
 
+
+import torch
 import shap
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
 
+from snp_pred.interpretation.interpret_omics import _get_target_class_name
+
 if TYPE_CHECKING:
     from snp_pred.train import Config
+    from snp_pred.data_load.label_setup import al_label_transformers_object
     from snp_pred.interpretation.interpretation import SampleActivation
 
 
 def analyze_tabular_input_activations(
     config: "Config",
     input_name: str,
+    target_column_name: str,
+    target_column_type: str,
     activation_outfolder: Path,
     all_activations: Sequence["SampleActivation"],
 ):
@@ -38,33 +47,43 @@ def analyze_tabular_input_activations(
         df_activations=df_activations, activation_outfolder=activation_outfolder
     )
 
-    cat_to_con_cutoff = get_cat_to_con_cutoff_from_slices(
-        slices=activation_tensor_slices,
-        cat_input_columns=config.cl_args.extra_cat_columns,
-    )
-    continuous_shap = _gather_continuous_shap_values(
+    all_activations_class_stratified = stratify_activations_by_target_classes(
         all_activations=all_activations,
-        cat_to_con_cutoff=cat_to_con_cutoff,
-        input_name=input_name,
+        target_transformer=config.target_transformers[target_column_name],
+        target_column=target_column_name,
+        column_type=target_column_type,
     )
-    continuous_inputs = _gather_continuous_inputs(
-        all_activations=all_activations,
-        cat_to_con_cutoff=cat_to_con_cutoff,
-        con_names=config.cl_args.extra_con_columns,
-        input_name=input_name,
-    )
-    plot_tabular_beeswarm(
-        shap_values=continuous_shap,
-        features=continuous_inputs,
-        activation_outfolder=activation_outfolder,
-    )
+
+    for class_name, class_activations in all_activations_class_stratified.items():
+
+        cat_to_con_cutoff = get_cat_to_con_cutoff_from_slices(
+            slices=activation_tensor_slices,
+            cat_input_columns=config.cl_args.extra_cat_columns,
+        )
+        continuous_shap = _gather_continuous_shap_values(
+            all_activations=class_activations,
+            cat_to_con_cutoff=cat_to_con_cutoff,
+            input_name=input_name,
+        )
+        continuous_inputs = _gather_continuous_inputs(
+            all_activations=class_activations,
+            cat_to_con_cutoff=cat_to_con_cutoff,
+            con_names=config.cl_args.extra_con_columns,
+            input_name=input_name,
+        )
+        plot_tabular_beeswarm(
+            shap_values=continuous_shap,
+            features=continuous_inputs,
+            activation_outfolder=activation_outfolder,
+            class_name=class_name,
+        )
 
 
 def set_up_tabular_tensor_slices(
     cat_input_columns: Sequence[str],
     con_input_columns: Sequence[str],
-    embedding_module,
-) -> Dict:
+    embedding_module: torch.nn.Module,
+) -> Dict[str, slice]:
     """
     TODO: Probably better to pass in Dict[column_name, nn.Embedding]
     """
@@ -91,8 +110,28 @@ def set_up_tabular_tensor_slices(
     return slices
 
 
+def stratify_activations_by_target_classes(
+    all_activations: Sequence["SampleActivation"],
+    target_transformer: "al_label_transformers_object",
+    target_column: str,
+    column_type: str,
+) -> Dict[str, Sequence["SampleActivation"]]:
+    all_activations_class_stratified = defaultdict(list)
+
+    for sample in all_activations:
+        cur_label_name = _get_target_class_name(
+            sample_label=sample.sample_info.target_labels[target_column],
+            target_transformer=target_transformer,
+            column_type=column_type,
+            target_column_name=target_column,
+        )
+        all_activations_class_stratified[cur_label_name].append(sample)
+
+    return all_activations_class_stratified
+
+
 def get_cat_to_con_cutoff_from_slices(
-    slices: Dict, cat_input_columns: Sequence[str]
+    slices: Dict[str, slice], cat_input_columns: Sequence[str]
 ) -> int:
     cutoff = 0
 
@@ -128,24 +167,32 @@ def parse_tabular_activations(
     return finalized_activations
 
 
-def plot_tabular_beeswarm(
-    shap_values: np.ndarray,
-    features: pd.DataFrame,
-    activation_outfolder: Path,
-):
+def get_tabular_activation_df(
+    parsed_activations: Dict[str, List[float]]
+) -> pd.DataFrame:
+    df_activations = pd.DataFrame.from_dict(
+        parsed_activations, orient="index", columns=["Shap_Value"]
+    )
+    df_activations = df_activations.sort_values(by="Shap_Value", ascending=False)
+
+    return df_activations
+
+
+def plot_tabular_activations(
+    df_activations: pd.DataFrame, activation_outfolder: Path
+) -> None:
+
+    sns_plot = sns.barplot(
+        x=df_activations["Shap_Value"],
+        y=df_activations.index,
+        palette="Blues_d",
+    )
+    plt.tight_layout()
+    sns_figure = sns_plot.get_figure()
+    sns_figure.set_size_inches(10, 0.5 * len(df_activations))
+    sns_figure.savefig(str(activation_outfolder / "feature_importance.png"))
 
     plt.close("all")
-
-    _ = shap.summary_plot(
-        shap_values=shap_values,
-        features=features,
-        show=False,
-        max_display=20,
-    )
-
-    fig = plt.gcf()
-    plt.tight_layout()
-    fig.savefig(str(activation_outfolder / "con_features_beeswarm.png"))
 
 
 def _gather_continuous_inputs(
@@ -182,27 +229,45 @@ def _gather_continuous_shap_values(
     return np.array(con_acts).squeeze()
 
 
-def get_tabular_activation_df(
-    parsed_activations: Dict[str, List[float]]
-) -> pd.DataFrame:
-    df_activations = pd.DataFrame.from_dict(
-        parsed_activations, orient="index", columns=["Shap_Value"]
+def plot_tabular_beeswarm(
+    shap_values: np.ndarray,
+    features: pd.DataFrame,
+    activation_outfolder: Path,
+    class_name: str,
+):
+
+    _ = shap.summary_plot(
+        shap_values=shap_values,
+        features=features,
+        show=False,
+        title=class_name,
+        max_display=20,
     )
-    df_activations = df_activations.sort_values(by="Shap_Value", ascending=False)
 
-    return df_activations
+    fig = plt.gcf()
 
+    ax = _get_shap_main_axis(figure=fig)
+    ax_wrapped_ytick_labels = _get_wrapped_ax_ytick_text(axis=ax)
+    ax.set_yticklabels(ax_wrapped_ytick_labels)
 
-def plot_tabular_activations(
-    df_activations: pd.DataFrame, activation_outfolder: Path
-) -> None:
+    plt.title(class_name, fontsize=14)
+    plt.yticks(fontsize=10, wrap=True)
 
-    sns_plot = sns.barplot(
-        x=df_activations["Shap_Value"],
-        y=df_activations.index,
-        palette="Blues_d",
-    )
     plt.tight_layout()
-    sns_figure = sns_plot.get_figure()
-    sns_figure.set_size_inches(10, 0.5 * len(df_activations))
-    sns_figure.savefig(str(activation_outfolder / "feature_importance.png"))
+    fig.savefig(
+        str(activation_outfolder / f"con_features_beeswarm_{class_name}.png"),
+        bbox_inches="tight",
+    )
+
+    plt.close("all")
+
+
+def _get_shap_main_axis(figure: plt.Figure):
+    return figure.axes[0]
+
+
+def _get_wrapped_ax_ytick_text(axis: plt.Axes):
+    labels = [item.get_text() for item in axis.get_yticklabels()]
+    labels_wrapped = ["\n".join(wrap(label, 20)) for label in labels]
+
+    return labels_wrapped

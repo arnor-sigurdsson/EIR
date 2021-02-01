@@ -25,21 +25,21 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 
 def analyze_omics_input_activations(
     config: "Config",
-    omics_input_name: str,
+    input_name: str,
     target_column_name: str,
     target_column_type: str,
     activation_outfolder: Path,
-    activations: Sequence["SampleActivation"],
+    all_activations: Sequence["SampleActivation"],
 ) -> None:
     c = config
     cl_args = config.cl_args
 
     acc_acts, acc_acts_masked = parse_single_omics_activations(
         config=c,
-        omics_input_name=omics_input_name,
+        omics_input_name=input_name,
         target_column=target_column_name,
         column_type=target_column_type,
-        activations=activations,
+        activations=all_activations,
     )
 
     abs_grads = True if target_column_type == "con" else False
