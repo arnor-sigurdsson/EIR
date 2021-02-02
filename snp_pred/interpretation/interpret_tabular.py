@@ -190,7 +190,9 @@ def plot_tabular_activations(
     plt.tight_layout()
     sns_figure = sns_plot.get_figure()
     sns_figure.set_size_inches(10, 0.5 * len(df_activations))
-    sns_figure.savefig(str(activation_outfolder / "feature_importance.png"))
+    sns_figure.savefig(
+        str(activation_outfolder / "feature_importance.png"), bbox_inches="tight"
+    )
 
     plt.close("all")
 
@@ -219,6 +221,10 @@ def _gather_continuous_shap_values(
     cat_to_con_cutoff: int,
     input_name: str,
 ) -> np.ndarray:
+    """
+    We need to expand_dims in the case where we only have one input value, otherwise
+    shap will not accept a vector.
+    """
     con_acts = []
 
     for sample in all_activations:
@@ -226,7 +232,12 @@ def _gather_continuous_shap_values(
         cur_con_input_part = cur_full_input.squeeze()[cat_to_con_cutoff:]
         con_acts.append(cur_con_input_part)
 
-    return np.array(con_acts).squeeze()
+    array_squeezed = np.array(con_acts).squeeze()
+
+    if len(array_squeezed.shape) == 1:
+        return np.expand_dims(array_squeezed, 1)
+
+    return array_squeezed
 
 
 def plot_tabular_beeswarm(

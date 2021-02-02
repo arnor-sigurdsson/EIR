@@ -167,12 +167,14 @@ def test_get_embeddings_from_labels(create_emb_test_label_data, create_test_emb_
         .item()
     )
 
-    # check food, "Fish" at index 0
-    id1_emb_food = test_embeddings[:, 2:4]
-    assert (id1_emb_food == test_model.embed_Food(torch.LongTensor([0]))).all().item()
-
     # check population, "Small" at index 1
-    id_emb_pop = test_embeddings[:, 4:]
+    id1_emb_population = test_embeddings[:, 2:4]
     assert (
-        (id_emb_pop == test_model.embed_Population(torch.LongTensor([0]))).all().item()
+        (id1_emb_population == test_model.embed_Population(torch.LongTensor([0])))
+        .all()
+        .item()
     )
+
+    # check food, "Fish" at index 0
+    id_emb_food = test_embeddings[:, 4:]
+    assert (id_emb_food == test_model.embed_Food(torch.LongTensor([0]))).all().item()

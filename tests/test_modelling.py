@@ -370,17 +370,6 @@ def _get_multi_task_test_args(
     return thresholds, at_least_n
 
 
-def _get_test_activation_arrs(
-    run_path: Path, iteration: int, column_name: str
-) -> Tuple[Path, Path]:
-    results_path = run_path / f"results/{column_name}/samples/{iteration}"
-
-    arrpath = results_path / "top_acts.npy"
-    arrpath_masked = results_path / "top_acts_masked.npy"
-
-    return arrpath, arrpath_masked
-
-
 def _check_identified_snps(
     arrpath: Path,
     expected_top_indxs: List[int],
