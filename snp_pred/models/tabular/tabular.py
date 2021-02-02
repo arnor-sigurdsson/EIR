@@ -118,7 +118,9 @@ def get_tabular_inputs(
     if extra_cat_columns:
 
         extra_embeddings = get_embeddings_from_labels(
-            labels=tabular_input, model=tabular_model
+            categorical_columns=extra_cat_columns,
+            labels=tabular_input,
+            model=tabular_model,
         )
 
         if not extra_con_columns:
@@ -142,19 +144,25 @@ def get_tabular_inputs(
 
 
 def get_embeddings_from_labels(
-    labels: Dict[str, Sequence[torch.Tensor]], model: TabularModel
+    categorical_columns: Sequence[str],
+    labels: Dict[str, Sequence[torch.Tensor]],
+    model: TabularModel,
 ) -> torch.Tensor:
 
     """
     Note that the extra_embeddings is a list of tensors, where each tensor is a batch
     of embeddings for a given extra categorical column.
+
+    Note also that we do not need categorical_columns here, we can grab them from the
+    embeddings dict directly. But we use that so the order of embeddings in the
+    concatenated tensor is clear.
     """
 
     if labels is None:
         raise ValueError("No extra labels found for when looking up embeddings.")
 
     extra_embeddings = []
-    for col_key in model.embeddings_dict:
+    for col_key in categorical_columns:
         cur_embedding = lookup_embeddings(
             model=model,
             embedding_col=col_key,

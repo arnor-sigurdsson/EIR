@@ -13,7 +13,7 @@ import plotly.graph_objects as go
 from aislib.misc_utils import get_logger, ensure_path_exists
 
 if TYPE_CHECKING:
-    from snp_pred.train_utils.activation_analysis import (
+    from interpretation.interpret_omics import (
         al_top_gradients_dict,
         al_scaled_grads_dict,
     )
