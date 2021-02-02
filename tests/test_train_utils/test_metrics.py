@@ -10,34 +10,34 @@ from snp_pred.train_utils import metrics
 
 
 def test_calculate_batch_metrics():
-    test_kwargs = get_calculate_batch_metrics_data_test_kwargs()
-    test_batch_metrics = metrics.calculate_batch_metrics(**test_kwargs)
+    test_batch_metrics_kwargs = get_calculate_batch_metrics_data_test_kwargs()
+    test_batch_metrics = metrics.calculate_batch_metrics(**test_batch_metrics_kwargs)
 
-    assert test_batch_metrics["Origin"]["Origin_mcc"] == 1.0
-    assert test_batch_metrics["Origin"]["Origin_loss"] == 0.0
+    loss_kwargs = _get_add_loss_to_metrics_kwargs()
+    test_batch_metrics_w_loss = metrics.add_loss_to_metrics(
+        metric_dict=test_batch_metrics, **loss_kwargs
+    )
 
-    assert test_batch_metrics["BMI"]["BMI_r2"] == 1.0
-    assert test_batch_metrics["BMI"]["BMI_rmse"] == 0.0
+    assert test_batch_metrics_w_loss["Origin"]["Origin_mcc"] == 1.0
+    assert test_batch_metrics_w_loss["Origin"]["Origin_loss"] == 0.0
+
+    assert test_batch_metrics_w_loss["BMI"]["BMI_r2"] == 1.0
+    assert test_batch_metrics_w_loss["BMI"]["BMI_rmse"] == 0.0
+
     # sometimes slight numerical instability with scipy pearsonr
-    assert isclose(test_batch_metrics["BMI"]["BMI_pcc"], 1.0)
-    assert test_batch_metrics["BMI"]["BMI_loss"] == 0.0
+    assert isclose(test_batch_metrics_w_loss["BMI"]["BMI_pcc"], 1.0)
+    assert test_batch_metrics_w_loss["BMI"]["BMI_loss"] == 0.0
 
-    assert test_batch_metrics["Height"]["Height_r2"] < 0
-    assert test_batch_metrics["Height"]["Height_rmse"] > 0.0
-    assert isclose(test_batch_metrics["Height"]["Height_pcc"], -1.0)
-    assert test_batch_metrics["Height"]["Height_loss"] == 1.0
+    assert test_batch_metrics_w_loss["Height"]["Height_r2"] < 0
+    assert test_batch_metrics_w_loss["Height"]["Height_rmse"] > 0.0
+    assert isclose(test_batch_metrics_w_loss["Height"]["Height_pcc"], -1.0)
+    assert test_batch_metrics_w_loss["Height"]["Height_loss"] == 1.0
 
 
 def get_calculate_batch_metrics_data_test_kwargs():
     target_columns = {"cat": ["Origin"], "con": ["BMI", "Height"]}
 
     standard_scaler_fit_arr = [[0.0], [1.0], [2.0]]
-
-    losses = {
-        "Origin": torch.tensor(0.0),
-        "BMI": torch.tensor(0.0),
-        "Height": torch.tensor(1.0),
-    }
 
     outputs = {
         "Origin": torch.tensor([[1, 0, 0], [0, 1, 0], [0, 0, 1]]),
@@ -60,7 +60,6 @@ def get_calculate_batch_metrics_data_test_kwargs():
 
     batch_metrics_function_kwargs = {
         "target_columns": target_columns,
-        "losses": losses,
         "outputs": outputs,
         "labels": labels,
         "mode": "val",
@@ -68,6 +67,17 @@ def get_calculate_batch_metrics_data_test_kwargs():
     }
 
     return batch_metrics_function_kwargs
+
+
+def _get_add_loss_to_metrics_kwargs():
+    target_columns = {"cat": ["Origin"], "con": ["BMI", "Height"]}
+    losses = {
+        "Origin": torch.tensor(0.0),
+        "BMI": torch.tensor(0.0),
+        "Height": torch.tensor(1.0),
+    }
+
+    return {"losses": losses, "target_columns": target_columns}
 
 
 def test_calculate_losses_good():

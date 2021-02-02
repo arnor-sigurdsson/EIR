@@ -73,6 +73,7 @@ from snp_pred.train_utils.metrics import (
     get_default_metrics,
     hook_add_l1_loss,
     get_uncertainty_loss_hook,
+    add_loss_to_metrics,
 )
 from snp_pred.train_utils.optimizers import (
     get_optimizer,
@@ -1073,15 +1074,20 @@ def hook_default_compute_metrics(
 
     train_batch_metrics = calculate_batch_metrics(
         target_columns=config.target_columns,
-        losses=state["per_target_train_losses"],
         outputs=state["model_outputs"],
         labels=batch.target_labels,
         mode="train",
         metric_record_dict=config.metrics,
     )
 
+    train_batch_metrics_w_loss = add_loss_to_metrics(
+        target_columns=config.target_columns,
+        losses=state["per_target_train_losses"],
+        metric_dict=train_batch_metrics,
+    )
+
     train_batch_metrics_with_averages = add_multi_task_average_metrics(
-        batch_metrics_dict=train_batch_metrics,
+        batch_metrics_dict=train_batch_metrics_w_loss,
         target_columns=config.target_columns,
         loss=state["loss"].item(),
         performance_average_functions=config.metrics["averaging_functions"],

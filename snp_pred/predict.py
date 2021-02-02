@@ -35,6 +35,7 @@ from snp_pred.data_load.label_setup import (
     TabularFileInfo,
 )
 from snp_pred.models.model_training_utils import gather_pred_outputs_from_dloader
+from snp_pred.train_utils.metrics import al_metric_record_dict, calculate_batch_metrics
 from snp_pred.models.tabular.tabular import al_emb_lookup_dict
 from snp_pred.train import (
     get_train_config_serialization_path,
@@ -74,17 +75,30 @@ def predict(
         with_labels=predict_cl_args.evaluate,
     )
 
+    if predict_cl_args.evaluate:
+        metrics = calculate_batch_metrics(
+            target_columns=predict_config.target_columns,
+            outputs=all_preds,
+            labels=all_labels,
+            mode="val",
+            metric_record_dict=predict_config.metrics,
+        )
+        serialize_prediction_metrics(
+            output_folder=Path(predict_cl_args.output_folder), metrics=metrics
+        )
+
     target_columns_gen = get_target_columns_generator(
-        target_columns=predict_config.test_dataset.target_columns
+        target_columns=predict_config.target_columns
     )
 
     for target_column_type, target_column_name in target_columns_gen:
 
         target_preds = all_preds[target_column_name]
+        predictions = _parse_predictions(
+            target_column_type=target_column_type, target_preds=target_preds
+        )
 
         cur_target_transformer = predict_config.target_transformers[target_column_name]
-        preds_sm = F.softmax(input=target_preds, dim=1).cpu().numpy()
-
         classes = _get_target_classnames(
             transformer=cur_target_transformer, target_column=target_column_name
         )
@@ -93,7 +107,7 @@ def predict(
         ensure_path_exists(path=output_folder, is_folder=True)
 
         _save_predictions(
-            preds=preds_sm,
+            preds=predictions,
             test_dataset=predict_config.test_dataset,
             classes=classes,
             outfolder=output_folder,
@@ -103,7 +117,7 @@ def predict(
             cur_labels = all_labels[target_column_name].cpu().numpy()
 
             plot_config = PerformancePlotConfig(
-                val_outputs=preds_sm,
+                val_outputs=predictions,
                 val_labels=cur_labels,
                 val_ids=all_ids,
                 iteration=0,
@@ -116,6 +130,28 @@ def predict(
             vf.gen_eval_graphs(plot_config=plot_config)
 
 
+def serialize_prediction_metrics(
+    output_folder: Path, metrics: Dict[str, Dict[str, np.ndarray]]
+):
+    with open(str(output_folder / "calculated_metrics.json"), "w") as outfile:
+        parsed = _convert_dict_values_to_python_objects(object_=metrics)
+        json.dump(obj=parsed, fp=outfile)
+
+
+def _convert_dict_values_to_python_objects(object_):
+    """
+    Needed since json does not serialize numpy dtypes natively.
+    """
+
+    if isinstance(object_, np.number):
+        return object_.item()
+    elif isinstance(object_, dict):
+        for key, value in object_.items():
+            object_[key] = _convert_dict_values_to_python_objects(object_=value)
+
+    return object_
+
+
 @dataclass
 class PredictConfig:
     train_cl_args_overloaded: Namespace
@@ -125,6 +161,7 @@ class PredictConfig:
     test_dataloader: DataLoader
     model: nn.Module
     hooks: "PredictHooks"
+    metrics: al_metric_record_dict
 
 
 @dataclass
@@ -215,6 +252,7 @@ def get_default_predict_config(
         test_dataloader=test_dataloader,
         model=model,
         hooks=default_predict_hooks,
+        metrics=train_config.metrics,
     )
     return test_config
 
@@ -327,12 +365,23 @@ def _hook_default_predict_prepare_batch(
     return state_updates
 
 
+def _parse_predictions(
+    target_column_type: str, target_preds: torch.Tensor
+) -> np.ndarray:
+    if target_column_type == "cat":
+        predictions = F.softmax(input=target_preds, dim=1).cpu().numpy()
+    else:
+        predictions = target_preds.cpu().numpy()
+
+    return predictions
+
+
 def _get_target_classnames(
     transformer: al_label_transformers_object, target_column: str
 ):
     if isinstance(transformer, LabelEncoder):
         return transformer.classes_
-    return target_column
+    return [target_column]
 
 
 def _load_cl_args_config(cl_args_config_path: Path) -> Namespace:
@@ -563,7 +612,7 @@ def _load_transformers(
 
 
 def _save_predictions(
-    preds: torch.Tensor, test_dataset: al_datasets, classes: List[str], outfolder: Path
+    preds: np.ndarray, test_dataset: al_datasets, classes: List[str], outfolder: Path
 ) -> None:
     test_ids = [i.sample_id for i in test_dataset.samples]
     df_preds = pd.DataFrame(data=preds, index=test_ids, columns=classes)

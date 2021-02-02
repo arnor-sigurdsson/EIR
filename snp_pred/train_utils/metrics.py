@@ -1,4 +1,5 @@
 import csv
+from copy import copy
 import warnings
 from dataclasses import dataclass
 from functools import partial
@@ -56,16 +57,14 @@ class MetricRecord:
 
 def calculate_batch_metrics(
     target_columns: "al_target_columns",
-    losses: Dict[str, torch.Tensor],
     outputs: Dict[str, torch.Tensor],
     labels: Dict[str, torch.Tensor],
     mode: str,
     metric_record_dict: al_metric_record_dict,
 ) -> al_step_metric_dict:
-    """"""
     assert mode in ["val", "train"]
 
-    target_columns_gen = get_target_columns_generator(target_columns)
+    target_columns_gen = get_target_columns_generator(target_columns=target_columns)
 
     master_metric_dict = {}
 
@@ -86,11 +85,25 @@ def calculate_batch_metrics(
                 outputs=cur_outputs, labels=cur_labels, column_name=column_name
             )
 
-        cur_metric_dict[f"{column_name}_loss"] = losses[column_name].item()
-
         master_metric_dict[column_name] = cur_metric_dict
 
     return master_metric_dict
+
+
+def add_loss_to_metrics(
+    target_columns: "al_target_columns",
+    losses: Dict[str, torch.Tensor],
+    metric_dict: al_step_metric_dict,
+) -> al_step_metric_dict:
+
+    target_columns_gen = get_target_columns_generator(target_columns=target_columns)
+    metric_dict_copy = copy(metric_dict)
+
+    for column_type, column_name in target_columns_gen:
+        cur_metric_dict = metric_dict_copy[column_name]
+        cur_metric_dict[f"{column_name}_loss"] = losses[column_name].item()
+
+    return metric_dict_copy
 
 
 def add_multi_task_average_metrics(
@@ -98,7 +111,7 @@ def add_multi_task_average_metrics(
     target_columns: "al_target_columns",
     loss: float,
     performance_average_functions: Dict[str, Callable[[al_step_metric_dict], float]],
-):
+) -> al_step_metric_dict:
     average_performance = average_performances_across_tasks(
         metric_dict=batch_metrics_dict,
         target_columns=target_columns,

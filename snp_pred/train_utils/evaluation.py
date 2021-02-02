@@ -58,15 +58,20 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
 
     eval_metrics_dict = metrics.calculate_batch_metrics(
         target_columns=c.target_columns,
-        losses=val_losses,
         outputs=val_outputs_total,
         labels=val_target_labels,
         mode="val",
         metric_record_dict=c.metrics,
     )
 
+    eval_metrics_dict_w_loss = metrics.add_loss_to_metrics(
+        target_columns=c.target_columns,
+        losses=val_losses,
+        metric_dict=eval_metrics_dict,
+    )
+
     eval_metrics_dict_w_avgs = metrics.add_multi_task_average_metrics(
-        batch_metrics_dict=eval_metrics_dict,
+        batch_metrics_dict=eval_metrics_dict_w_loss,
         target_columns=c.target_columns,
         loss=val_loss_avg.item(),
         performance_average_functions=c.metrics["averaging_functions"],
