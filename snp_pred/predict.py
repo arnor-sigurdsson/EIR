@@ -21,6 +21,7 @@ import snp_pred.visualization.visualization_funcs as vf
 from snp_pred.configuration import append_data_source_prefixes
 from snp_pred.data_load import datasets, label_setup
 from snp_pred.data_load.data_utils import get_target_columns_generator
+from snp_pred.models.models_linear import LinearModel, LinearModelConfig
 from snp_pred.data_load.datasets import (
     al_datasets,
 )
@@ -227,20 +228,37 @@ def get_default_predict_config(
         num_workers=train_cl_args_overloaded.dataloader_workers,
     )
 
-    func = _get_fusion_model_class_and_kwargs_from_cl_args
-    fusion_model_class, fusion_model_kwargs = func(
-        train_cl_args=train_cl_args_overloaded,
-        num_outputs_per_target=train_config.num_outputs_per_target,
-        tabular_input_transformers=tabular_input_labels.transformers,
-        omics_data_dimensions=train_config.data_dimensions,
-    )
+    if train_cl_args_overloaded.model_type == "linear":
+        model_class = LinearModel
+        model_config = LinearModelConfig(
+            input_name=list(train_config.data_dimensions.keys())[0],
+            target_cat_columns=train_cl_args_overloaded.target_cat_columns,
+            target_con_columns=train_cl_args_overloaded.target_con_columns,
+            data_dimensions=list(train_config.data_dimensions.values())[0],
+        )
+        model_init_kwargs = {"model_config": model_config}
+        model = _load_model(
+            model_path=Path(predict_cl_args.model_path),
+            model_class=model_class,
+            model_init_kwargs=model_init_kwargs,
+            device=train_cl_args_overloaded.device,
+        )
 
-    model = _load_model(
-        model_path=Path(predict_cl_args.model_path),
-        model_class=fusion_model_class,
-        model_init_kwargs=fusion_model_kwargs,
-        device=train_cl_args_overloaded.device,
-    )
+    else:
+        func = _get_fusion_model_class_and_kwargs_from_cl_args
+        fusion_model_class, fusion_model_kwargs = func(
+            train_cl_args=train_cl_args_overloaded,
+            num_outputs_per_target=train_config.num_outputs_per_target,
+            tabular_input_transformers=tabular_input_labels.transformers,
+            omics_data_dimensions=train_config.data_dimensions,
+        )
+
+        model = _load_model(
+            model_path=Path(predict_cl_args.model_path),
+            model_class=fusion_model_class,
+            model_init_kwargs=fusion_model_kwargs,
+            device=train_cl_args_overloaded.device,
+        )
     assert not model.training
 
     default_predict_hooks = _get_default_predict_hooks(train_hooks=default_train_hooks)
