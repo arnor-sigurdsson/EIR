@@ -11,7 +11,6 @@ import joblib
 import numpy as np
 import pandas as pd
 import torch
-import torch.nn.functional as F
 from aislib.misc_utils import get_logger, ensure_path_exists
 from sklearn.preprocessing import LabelEncoder
 from torch import nn
@@ -21,7 +20,6 @@ import snp_pred.visualization.visualization_funcs as vf
 from snp_pred.configuration import append_data_source_prefixes
 from snp_pred.data_load import datasets, label_setup
 from snp_pred.data_load.data_utils import get_target_columns_generator
-from snp_pred.models.models_linear import LinearModel, LinearModelConfig
 from snp_pred.data_load.datasets import (
     al_datasets,
 )
@@ -36,7 +34,7 @@ from snp_pred.data_load.label_setup import (
     TabularFileInfo,
 )
 from snp_pred.models.model_training_utils import gather_pred_outputs_from_dloader
-from snp_pred.train_utils.metrics import al_metric_record_dict, calculate_batch_metrics
+from snp_pred.models.models_linear import LinearModel, LinearModelConfig
 from snp_pred.models.tabular.tabular import al_emb_lookup_dict
 from snp_pred.train import (
     get_train_config_serialization_path,
@@ -50,6 +48,7 @@ from snp_pred.train import (
     DataDimensions,
 )
 from snp_pred.train_utils.evaluation import PerformancePlotConfig
+from snp_pred.train_utils.metrics import al_metric_record_dict, calculate_batch_metrics
 from snp_pred.train_utils.utils import get_run_folder
 
 torch.manual_seed(0)
@@ -387,7 +386,7 @@ def _parse_predictions(
     target_column_type: str, target_preds: torch.Tensor
 ) -> np.ndarray:
     if target_column_type == "cat":
-        predictions = F.softmax(input=target_preds, dim=1).cpu().numpy()
+        predictions = target_preds.cpu().numpy()
     else:
         predictions = target_preds.cpu().numpy()
 
