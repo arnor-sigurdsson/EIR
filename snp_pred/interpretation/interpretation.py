@@ -1,6 +1,7 @@
 import copy
 import os
 import sys
+from argparse import Namespace
 from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -26,8 +27,8 @@ from shap import DeepExplainer
 from torch import nn
 from torch.utils.data import DataLoader, Subset
 
-from snp_pred.data_load.datasets import al_datasets
 from snp_pred.data_load.data_utils import get_target_columns_generator, Batch
+from snp_pred.data_load.datasets import al_datasets
 from snp_pred.interpretation.interpret_omics import analyze_omics_input_activations
 from snp_pred.interpretation.interpret_tabular import analyze_tabular_input_activations
 from snp_pred.models.model_training_utils import gather_dloader_samples
@@ -98,6 +99,32 @@ def suppress_stdout() -> None:
 def activation_analysis_handler(
     engine: Engine, handler_config: "HandlerConfig"
 ) -> None:
+
+    c = handler_config.config
+    iteration = engine.state.iteration
+
+    activation_outfolder_callable = partial(
+        _prepare_eval_activation_outfolder,
+        run_name=c.cl_args.run_name,
+        iteration=iteration,
+    )
+
+    activation_analysis_wrapper(
+        model=c.model,
+        train_config=c,
+        outfolder_target_callable=activation_outfolder_callable,
+        dataset_to_interpret=c.valid_dataset,
+        background_loader=c.train_loader,
+    )
+
+
+def activation_analysis_wrapper(
+    model: nn.Module,
+    train_config: Union["Config", Namespace],
+    outfolder_target_callable: Callable,
+    dataset_to_interpret: al_datasets,
+    background_loader: torch.utils.data.DataLoader,
+) -> None:
     """
     We need to copy the model to avoid affecting the actual model during
     training (e.g. zero-ing out gradients).
@@ -105,16 +132,15 @@ def activation_analysis_handler(
     TODO: Refactor this function further.
     """
 
-    c = handler_config.config
-    cl_args = c.cl_args
-    iteration = engine.state.iteration
+    c = train_config
+    cl_args = train_config.cl_args
 
-    model_copy = copy.deepcopy(c.model)
+    model_copy = copy.deepcopy(model)
     target_columns_gen = get_target_columns_generator(target_columns=c.target_columns)
 
     for column_type, column_name in target_columns_gen:
 
-        no_explainer_background_samples = _get_background_samples_for_shap_object(
+        no_explainer_background_samples = get_no_background_samples_for_shap_objects(
             batch_size=cl_args.batch_size
         )
 
@@ -122,7 +148,7 @@ def activation_analysis_handler(
             config=c,
             model=model_copy,
             column_name=column_name,
-            train_loader=c.train_loader,
+            background_loader=background_loader,
             n_background_samples=no_explainer_background_samples,
         )
 
@@ -144,7 +170,7 @@ def activation_analysis_handler(
             config=c,
             column_name=column_name,
             column_type=column_type,
-            dataset=c.valid_dataset,
+            dataset=dataset_to_interpret,
         )
 
         all_activations = accumulate_all_activations(
@@ -155,11 +181,8 @@ def activation_analysis_handler(
 
         for input_name in input_names:
 
-            activation_outfolder = _prepare_activation_outfolder(
-                run_name=cl_args.run_name,
-                input_name=input_name,
-                column_name=column_name,
-                iteration=iteration,
+            activation_outfolder = outfolder_target_callable(
+                column_name=column_name, input_name=input_name
             )
 
             if input_name.startswith("omics_"):
@@ -186,8 +209,8 @@ def activation_analysis_handler(
         hook_handle.remove()
 
 
-def _get_background_samples_for_shap_object(batch_size: int):
-    no_explainer_background_samples = np.max([int(batch_size / 8), 32])
+def get_no_background_samples_for_shap_objects(batch_size: int):
+    no_explainer_background_samples = np.max([int(batch_size / 8), 100])
     return no_explainer_background_samples
 
 
@@ -195,14 +218,13 @@ def get_shap_object(
     config: "Config",
     model: nn.Module,
     column_name: str,
-    train_loader: DataLoader,
+    background_loader: DataLoader,
     n_background_samples: int = 64,
 ):
-    c = config
-    background, labels, ids = gather_dloader_samples(
-        batch_prep_hook=c.hooks.step_func_hooks.base_prepare_batch,
-        batch_prep_hook_kwargs={"config": c},
-        data_loader=train_loader,
+    background, *_ = gather_dloader_samples(
+        batch_prep_hook=config.hooks.step_func_hooks.base_prepare_batch,
+        batch_prep_hook_kwargs={"config": config},
+        data_loader=background_loader,
         n_samples=n_background_samples,
     )
 
@@ -297,8 +319,8 @@ def accumulate_all_activations(
     return all_activations
 
 
-def _prepare_activation_outfolder(
-    run_name: str, input_name: str, column_name: str, iteration: int
+def _prepare_eval_activation_outfolder(
+    run_name: str, input_name: str, column_name: str, iteration: int, *args, **kwargs
 ):
     sample_outfolder = prep_sample_outfolder(
         run_name=run_name, column_name=column_name, iteration=iteration
@@ -384,7 +406,7 @@ def _get_interpretation_data_producer(
     )
 
     activations_data_loader = _get_activations_dataloader(
-        validation_dataset=dataset,
+        dataset=dataset,
         max_acts_per_class=config.cl_args.max_acts_per_class,
         target_column=column_name,
         column_type=column_type,
@@ -418,7 +440,7 @@ def _detach_all_inputs(tensor_inputs: Dict[str, torch.Tensor]):
 
 
 def _get_activations_dataloader(
-    validation_dataset: al_datasets,
+    dataset: al_datasets,
     max_acts_per_class: int,
     target_column: str,
     column_type: str,
@@ -427,7 +449,7 @@ def _get_activations_dataloader(
     common_args = {"batch_size": 1, "shuffle": False}
 
     if max_acts_per_class is None:
-        data_loader = DataLoader(dataset=validation_dataset, **common_args)
+        data_loader = DataLoader(dataset=dataset, **common_args)
         return data_loader
 
     indices_func = _get_categorical_sample_indices_for_activations
@@ -435,14 +457,12 @@ def _get_activations_dataloader(
         indices_func = _get_continuous_sample_indices_for_activations
 
     subset_indices = indices_func(
-        dataset=validation_dataset,
+        dataset=dataset,
         max_acts_per_class=max_acts_per_class,
         target_column=target_column,
         target_classes_numerical=target_classes_numerical,
     )
-    subset_dataset = _subsample_dataset(
-        dataset=validation_dataset, indices=subset_indices
-    )
+    subset_dataset = _subsample_dataset(dataset=dataset, indices=subset_indices)
     data_loader = DataLoader(dataset=subset_dataset, **common_args)
     return data_loader
 

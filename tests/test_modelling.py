@@ -148,6 +148,7 @@ def _check_snps_wrapper(
                 "model_type": "cnn",
                 "target_cat_columns": [],
                 "target_con_columns": ["Height"],
+                "n_epochs": 10,
                 "lr_schedule": "cycle",
                 "run_name": "test_cycle",
             }
