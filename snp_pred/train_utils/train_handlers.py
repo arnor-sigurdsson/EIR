@@ -41,9 +41,8 @@ if TYPE_CHECKING:
     from snp_pred.train_utils.metrics import al_step_metric_dict
 
 # Aliases
-al_sample_interval_handlers = Tuple[
-    Tuple[Callable[[Engine, "HandlerConfig"], None], int], ...
-]
+al_handler_and_event = Tuple[Callable[[Engine, "HandlerConfig"], None], Events]
+al_sample_interval_handlers = Tuple[al_handler_and_event, ...]
 
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
@@ -118,56 +117,25 @@ def _attach_sample_interval_handlers(
     config = handler_config.config
     cl_args = config.cl_args
 
-    sample_handlers = _get_sample_interval_handlers(
-        do_get_acts=cl_args.get_acts,
+    validation_handler_and_event = _get_validation_handler_and_event(
         sample_interval_base=cl_args.sample_interval,
-        act_every_sample_factor=cl_args.act_every_sample_factor,
-    )
-
-    for handler, handler_interval in sample_handlers:
-
-        trainer = _attach_sample_interval_handler(
-            trainer=trainer,
-            handler=handler,
-            handler_config=handler_config,
-            handler_interval=handler_interval,
-        )
-
-    return trainer
-
-
-def _attach_sample_interval_handler(
-    trainer: Engine,
-    handler: Callable,
-    handler_config: "HandlerConfig",
-    handler_interval: int,
-):
-    """
-    We need no `ca.early_stopping_patience` because early stopping will only
-    trigger a termination (complete state) at a `sample_interval` point,
-    meaning that both `sample_interval` and Events.COMPLETED triggers will be
-    active when the early stopping is triggered, meaning double entry in the
-    validation history file
-    """
-
-    config = handler_config.config
-    cl_args = config.cl_args
-
-    trainer.add_event_handler(
-        event_name=Events.ITERATION_COMPLETED(every=handler_interval),
-        handler=handler,
-        handler_config=handler_config,
-    )
-
-    do_run_when_training_complete = _do_run_completed_handler(
         iter_per_epoch=len(config.train_loader),
         n_epochs=cl_args.n_epochs,
-        sample_interval=handler_interval,
+        early_stopping_patience=cl_args.early_stopping_patience,
     )
 
-    if do_run_when_training_complete and not cl_args.early_stopping_patience:
+    activation_handler_and_event = _get_activation_handler_and_event(
+        iter_per_epoch=len(config.train_loader),
+        n_epochs=cl_args.n_epochs,
+        sample_interval_base=cl_args.sample_interval,
+        act_every_sample_factor=cl_args.act_every_sample_factor,
+        early_stopping_patience=cl_args.early_stopping_patience,
+    )
+
+    for handler, event in (validation_handler_and_event, activation_handler_and_event):
+
         trainer.add_event_handler(
-            event_name=Events.COMPLETED,
+            event_name=event,
             handler=handler,
             handler_config=handler_config,
         )
@@ -175,27 +143,62 @@ def _attach_sample_interval_handler(
     return trainer
 
 
-def _get_sample_interval_handlers(
-    do_get_acts: bool, sample_interval_base: int, act_every_sample_factor: int
-) -> al_sample_interval_handlers:
+def _get_validation_handler_and_event(
+    sample_interval_base: int,
+    iter_per_epoch: int,
+    n_epochs: int,
+    early_stopping_patience: int,
+) -> al_handler_and_event:
 
-    validation_handler_tuple = (validation_handler, sample_interval_base)
+    validation_handler_callable = validation_handler
+    validation_event = Events.ITERATION_COMPLETED(every=sample_interval_base)
 
-    if do_get_acts:
+    do_run_when_training_complete = _do_run_completed_handler(
+        iter_per_epoch=iter_per_epoch,
+        n_epochs=n_epochs,
+        sample_interval=sample_interval_base,
+    )
 
-        activation_handler_interval = sample_interval_base * act_every_sample_factor
-        activation_handler_tuple = (
-            activation_analysis_handler,
-            activation_handler_interval,
-        )
-        logger.debug(
-            "Activations will be computed every %d iterations.",
-            activation_handler_interval,
-        )
+    if do_run_when_training_complete and not early_stopping_patience:
+        validation_event = validation_event | Events.COMPLETED
 
-        return validation_handler_tuple, activation_handler_tuple
+    return validation_handler_callable, validation_event
 
-    return (validation_handler_tuple,)
+
+def _get_activation_handler_and_event(
+    iter_per_epoch: int,
+    n_epochs: int,
+    sample_interval_base: int,
+    act_every_sample_factor: int,
+    early_stopping_patience,
+) -> al_handler_and_event:
+
+    activation_handler_callable = activation_analysis_handler
+
+    if act_every_sample_factor == 0:
+        activation_event = Events.COMPLETED
+        logger.debug("Activations will be computed at run end.")
+
+        return activation_handler_callable, activation_event
+
+    activation_handler_interval = sample_interval_base * act_every_sample_factor
+    activation_event = Events.ITERATION_COMPLETED(every=activation_handler_interval)
+
+    do_run_when_training_complete = _do_run_completed_handler(
+        iter_per_epoch=iter_per_epoch,
+        n_epochs=n_epochs,
+        sample_interval=activation_handler_interval,
+    )
+
+    if do_run_when_training_complete and not early_stopping_patience:
+        activation_event = activation_event | Events.COMPLETED
+
+    logger.debug(
+        "Activations will be computed every %d iterations.",
+        activation_handler_interval,
+    )
+
+    return activation_handler_callable, activation_event
 
 
 def _do_run_completed_handler(iter_per_epoch: int, n_epochs: int, sample_interval: int):

@@ -71,7 +71,7 @@ def args_config() -> Namespace:
     test_cl_args = Namespace(
         **{
             "act_classes": None,
-            "act_every_sample_factor": 1,
+            "act_every_sample_factor": 0,
             "b1": 0.9,
             "b2": 0.999,
             "batch_size": 32,

@@ -202,8 +202,8 @@ def test_set_up_test_dataset(
 
     test_dataset = predict._set_up_default_test_dataset(
         data_dimensions=data_dimensions,
-        train_cl_args_overloaded=cl_args,
-        test_labels_dict=df_test_dict,
+        cl_args=cl_args,
+        target_labels_dict=df_test_dict,
         tabular_inputs_labels_dict=None,
     )
 
@@ -260,14 +260,27 @@ def test_predict(keep_outputs, prep_modelling_test_configs):
         omics_names=["test"],
         output_folder=test_path,
         device="cpu",
-        num_workers=0,
+        dataloader_workers=0,
+        get_acts=True,
+        act_classes=None,
+        max_acts_per_class=None,
+    )
+
+    train_config = predict._load_serialized_train_config(
+        run_folder=test_config.run_path
     )
 
     predict_config = predict.get_default_predict_config(
-        run_folder=test_config.run_path, predict_cl_args=predict_cl_args
+        loaded_train_config=train_config, predict_cl_args=predict_cl_args
     )
 
     predict.predict(predict_cl_args=predict_cl_args, predict_config=predict_config)
+
+    predict._compute_predict_activations(
+        train_config=train_config,
+        predict_config=predict_config,
+        predict_cl_args=predict_cl_args,
+    )
 
     origin_predictions_path = test_path / "Origin" / "predictions.csv"
     df_test = pd.read_csv(origin_predictions_path, index_col="ID")
@@ -286,6 +299,7 @@ def test_predict(keep_outputs, prep_modelling_test_configs):
         # check that most were correct
         assert num_correct / df_cur_class.shape[0] > 0.80
 
+    assert (test_path / "Origin/activations").exists()
     if not keep_outputs:
         cleanup(test_config.run_path)
 
