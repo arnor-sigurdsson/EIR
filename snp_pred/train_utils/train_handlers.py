@@ -123,16 +123,19 @@ def _attach_sample_interval_handlers(
         n_epochs=cl_args.n_epochs,
         early_stopping_patience=cl_args.early_stopping_patience,
     )
+    all_handler_events = [validation_handler_and_event]
 
-    activation_handler_and_event = _get_activation_handler_and_event(
-        iter_per_epoch=len(config.train_loader),
-        n_epochs=cl_args.n_epochs,
-        sample_interval_base=cl_args.sample_interval,
-        act_every_sample_factor=cl_args.act_every_sample_factor,
-        early_stopping_patience=cl_args.early_stopping_patience,
-    )
+    if cl_args.get_acts:
+        activation_handler_and_event = _get_activation_handler_and_event(
+            iter_per_epoch=len(config.train_loader),
+            n_epochs=cl_args.n_epochs,
+            sample_interval_base=cl_args.sample_interval,
+            act_every_sample_factor=cl_args.act_every_sample_factor,
+            early_stopping_patience=cl_args.early_stopping_patience,
+        )
+        all_handler_events.append(activation_handler_and_event)
 
-    for handler, event in (validation_handler_and_event, activation_handler_and_event):
+    for handler, event in all_handler_events:
 
         trainer.add_event_handler(
             event_name=event,

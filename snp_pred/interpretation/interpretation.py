@@ -210,7 +210,7 @@ def activation_analysis_wrapper(
 
 
 def get_no_background_samples_for_shap_objects(batch_size: int):
-    no_explainer_background_samples = np.max([int(batch_size / 8), 100])
+    no_explainer_background_samples = batch_size
     return no_explainer_background_samples
 
 
