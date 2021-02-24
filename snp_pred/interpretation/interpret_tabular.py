@@ -2,21 +2,27 @@ from pathlib import Path
 from typing import Dict, Sequence, TYPE_CHECKING, List
 from collections import defaultdict
 from textwrap import wrap
+import warnings
 
 
 import torch
 import shap
 import matplotlib.pyplot as plt
+from matplotlib import MatplotlibDeprecationWarning
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from aislib.misc_utils import get_logger, ensure_path_exists
 
 from snp_pred.interpretation.interpret_omics import _get_target_class_name
+from snp_pred.train_utils.utils import load_transformers
 
 if TYPE_CHECKING:
     from snp_pred.train import Config
     from snp_pred.data_load.label_setup import al_label_transformers_object
     from snp_pred.interpretation.interpretation import SampleActivation
+
+logger = get_logger(__name__)
 
 
 def analyze_tabular_input_activations(
@@ -56,27 +62,62 @@ def analyze_tabular_input_activations(
 
     for class_name, class_activations in all_activations_class_stratified.items():
 
-        cat_to_con_cutoff = get_cat_to_con_cutoff_from_slices(
-            slices=activation_tensor_slices,
-            cat_input_columns=config.cl_args.extra_cat_columns,
-        )
-        continuous_shap = _gather_continuous_shap_values(
-            all_activations=class_activations,
-            cat_to_con_cutoff=cat_to_con_cutoff,
-            input_name=input_name,
-        )
-        continuous_inputs = _gather_continuous_inputs(
-            all_activations=class_activations,
-            cat_to_con_cutoff=cat_to_con_cutoff,
-            con_names=config.cl_args.extra_con_columns,
-            input_name=input_name,
-        )
-        plot_tabular_beeswarm(
-            shap_values=continuous_shap,
-            features=continuous_inputs,
-            activation_outfolder=activation_outfolder,
-            class_name=class_name,
-        )
+        cur_class_outfolder = activation_outfolder / class_name
+        ensure_path_exists(path=cur_class_outfolder, is_folder=True)
+
+        if config.cl_args.extra_con_columns:
+
+            cat_to_con_cutoff = get_cat_to_con_cutoff_from_slices(
+                slices=activation_tensor_slices,
+                cat_input_columns=config.cl_args.extra_cat_columns,
+            )
+            continuous_shap = _gather_continuous_shap_values(
+                all_activations=class_activations,
+                cat_to_con_cutoff=cat_to_con_cutoff,
+                input_name=input_name,
+            )
+            continuous_inputs = _gather_continuous_inputs(
+                all_activations=class_activations,
+                cat_to_con_cutoff=cat_to_con_cutoff,
+                con_names=config.cl_args.extra_con_columns,
+                input_name=input_name,
+            )
+            plot_tabular_beeswarm(
+                shap_values=continuous_shap,
+                features=continuous_inputs,
+                activation_outfolder=cur_class_outfolder,
+                class_name=class_name,
+            )
+
+        for cat_column in config.cl_args.extra_cat_columns:
+
+            categorical_shap = _gather_categorical_shap_values(
+                all_activations=class_activations,
+                cur_slice=activation_tensor_slices[cat_column],
+                input_name=input_name,
+            )
+            categorical_inputs = _gather_categorical_inputs(
+                all_activations=class_activations,
+                cat_name=cat_column,
+                input_name=input_name,
+            )
+            cat_column_transformers = load_transformers(
+                run_name=config.cl_args.run_name, transformers_to_load=[cat_column]
+            )
+
+            categorical_inputs_mapped = map_categorical_labels_to_names(
+                cat_column_transformers=cat_column_transformers,
+                cat_column=cat_column,
+                categorical_inputs=categorical_inputs,
+            )
+
+            plot_tabular_categorical_feature(
+                shap_values=categorical_shap,
+                features=categorical_inputs_mapped,
+                feature_name_to_plot=cat_column,
+                class_name=class_name,
+                activation_outfolder=cur_class_outfolder,
+            )
 
 
 def set_up_tabular_tensor_slices(
@@ -238,6 +279,108 @@ def _gather_continuous_shap_values(
         return np.expand_dims(array_squeezed, 1)
 
     return array_squeezed
+
+
+def _gather_categorical_shap_values(
+    all_activations: Sequence["SampleActivation"],
+    cur_slice: slice,
+    input_name: str,
+) -> np.ndarray:
+    """
+    We need to expand_dims in the case where we only have one input value, otherwise
+    shap will not accept a vector.
+    """
+    cat_acts = []
+
+    for sample in all_activations:
+        cur_full_input = sample.sample_activations[input_name]
+        cur_cat_input_part = cur_full_input.squeeze()[cur_slice]
+        cur_cat_summed_act = np.sum(np.array(cur_cat_input_part))
+        cat_acts.append(cur_cat_summed_act)
+
+    array_squeezed = np.array(cat_acts).squeeze()
+
+    if len(array_squeezed.shape) == 1:
+        return np.expand_dims(array_squeezed, 1)
+
+    return array_squeezed
+
+
+def _gather_categorical_inputs(
+    all_activations: Sequence["SampleActivation"],
+    cat_name: str,
+    input_name: str,
+) -> pd.DataFrame:
+    cat_inputs = []
+
+    for sample in all_activations:
+
+        cur_raw_cat_input = sample.raw_tabular_inputs[input_name][cat_name]
+        cur_cat_input_part = cur_raw_cat_input.squeeze()
+        cat_inputs.append(cur_cat_input_part)
+
+    cat_inputs_array = np.array([np.array(i.cpu()) for i in cat_inputs])
+    df = pd.DataFrame(cat_inputs_array, columns=[cat_name])
+
+    return df
+
+
+def map_categorical_labels_to_names(
+    cat_column_transformers: Dict, cat_column: str, categorical_inputs: pd.DataFrame
+) -> pd.DataFrame:
+    cat_column_transformer = cat_column_transformers[cat_column]
+
+    categorical_inputs_copy = categorical_inputs.copy()
+
+    categorical_inputs_copy[cat_column] = cat_column_transformer.inverse_transform(
+        categorical_inputs_copy[cat_column]
+    )
+
+    return categorical_inputs_copy
+
+
+def plot_tabular_categorical_feature(
+    shap_values: np.ndarray,
+    features: pd.DataFrame,
+    feature_name_to_plot: str,
+    class_name: str,
+    activation_outfolder: Path,
+):
+    """
+    We catch the warnings there because shap is causing them in the dependence plot,
+    to avoid filling the screen with warnings.
+    """
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=MatplotlibDeprecationWarning)
+        warnings.simplefilter("ignore", category=UserWarning)
+
+        _ = shap.dependence_plot(
+            ind=feature_name_to_plot,
+            shap_values=shap_values,
+            features=features,
+        )
+
+    fig = plt.gcf()
+
+    plt.title(feature_name_to_plot, fontsize=14)
+    plt.yticks(fontsize=10, wrap=True)
+
+    plt.tight_layout()
+
+    fig_name = f"cat_features_{feature_name_to_plot}_{class_name}.png"
+    output_path = str(activation_outfolder / fig_name)
+
+    try:
+        fig.savefig(output_path, bbox_inches="tight")
+
+    # See: https://github.com/matplotlib/matplotlib/issues/17579
+    except ZeroDivisionError:
+        logger.error(
+            "Encountered ZeroDivisionError when saving %s. Skipping.", output_path
+        )
+
+    plt.close("all")
 
 
 def plot_tabular_beeswarm(

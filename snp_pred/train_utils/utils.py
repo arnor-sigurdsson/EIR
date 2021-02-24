@@ -13,8 +13,12 @@ from typing import (
     Tuple,
 )
 
+import joblib
 from aislib.misc_utils import get_logger, ensure_path_exists
 from ignite.engine import Engine
+
+from snp_pred.data_load import label_setup
+from snp_pred.data_load.label_setup import al_label_transformers
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -125,3 +129,23 @@ def state_registered_hook_call(
     state = {**state, **state_updates}
 
     return state_updates, state
+
+
+def load_transformers(
+    run_name: str, transformers_to_load: Union[Sequence[str], None]
+) -> al_label_transformers:
+
+    run_folder = get_run_folder(run_name=run_name)
+    all_transformers = (i.stem for i in (run_folder / "transformers").iterdir())
+
+    iterable = transformers_to_load if transformers_to_load else all_transformers
+
+    label_transformers = {}
+    for transformer_name in iterable:
+        target_transformer_path = label_setup.get_transformer_path(
+            run_path=run_folder, transformer_name=transformer_name
+        )
+        target_transformer_object = joblib.load(filename=target_transformer_path)
+        label_transformers[transformer_name] = target_transformer_object
+
+    return label_transformers
