@@ -64,6 +64,27 @@ np.random.seed(0)
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
+def main():
+    predict_cl_args = get_predict_cl_args()
+
+    run_folder = Path(predict_cl_args.model_path).parents[1]
+    train_config = _load_serialized_train_config(run_folder=run_folder)
+
+    predict_config = get_default_predict_config(
+        loaded_train_config=train_config,
+        predict_cl_args=predict_cl_args,
+    )
+
+    predict(predict_config=predict_config, predict_cl_args=predict_cl_args)
+
+    if predict_cl_args.get_acts:
+        _compute_predict_activations(
+            train_config=train_config,
+            predict_config=predict_config,
+            predict_cl_args=predict_cl_args,
+        )
+
+
 def predict(
     predict_config: "PredictConfig",
     predict_cl_args: Namespace,
@@ -816,21 +837,4 @@ def _get_predict_activation_outfolder_target(
 
 if __name__ == "__main__":
 
-    predict_cl_args_ = get_predict_cl_args()
-
-    run_folder_ = Path(predict_cl_args_.model_path).parents[1]
-    train_config_ = _load_serialized_train_config(run_folder=run_folder_)
-
-    predict_config_ = get_default_predict_config(
-        loaded_train_config=train_config_,
-        predict_cl_args=predict_cl_args_,
-    )
-
-    predict(predict_config=predict_config_, predict_cl_args=predict_cl_args_)
-
-    if predict_cl_args_.get_acts:
-        _compute_predict_activations(
-            train_config=train_config_,
-            predict_config=predict_config_,
-            predict_cl_args=predict_cl_args_,
-        )
+    main()
