@@ -56,6 +56,7 @@ from snp_pred.train import (
 from snp_pred.train_utils.evaluation import PerformancePlotConfig
 from snp_pred.train_utils.metrics import al_metric_record_dict, calculate_batch_metrics
 from snp_pred.train_utils.utils import get_run_folder
+from snp_pred.train_utils.utils import load_transformers
 
 torch.manual_seed(0)
 np.random.seed(0)
@@ -329,7 +330,7 @@ def get_labels_for_predict(
     if not all_columns:
         raise ValueError(f"No columns specified in {tabular_file_info}.")
 
-    transformers = _load_transformers(
+    transformers = load_transformers(
         run_name=run_name,
         transformers_to_load=all_columns,
     )
@@ -605,26 +606,6 @@ def _set_up_default_test_dataset(
     test_dataset = datasets.DiskDataset(**test_dataset_kwargs)
 
     return test_dataset
-
-
-def _load_transformers(
-    run_name: str, transformers_to_load: Union[Sequence[str], None]
-) -> al_label_transformers:
-
-    run_folder = get_run_folder(run_name=run_name)
-    all_transformers = (i.stem for i in (run_folder / "transformers").iterdir())
-
-    iterable = transformers_to_load if transformers_to_load else all_transformers
-
-    label_transformers = {}
-    for transformer_name in iterable:
-        target_transformer_path = label_setup.get_transformer_path(
-            run_path=run_folder, transformer_name=transformer_name
-        )
-        target_transformer_object = joblib.load(filename=target_transformer_path)
-        label_transformers[transformer_name] = target_transformer_object
-
-    return label_transformers
 
 
 def _save_predictions(

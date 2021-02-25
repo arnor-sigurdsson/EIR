@@ -293,6 +293,7 @@ def get_shap_activation_producer(
 class SampleActivation:
     sample_info: "Batch"
     sample_activations: Dict[str, torch.Tensor]
+    raw_tabular_inputs: Dict
 
 
 def accumulate_all_activations(
@@ -301,7 +302,7 @@ def accumulate_all_activations(
 
     all_activations = []
 
-    for batch in data_producer:
+    for batch, raw_tabular_inputs in data_producer:
         sample_target_labels = batch.target_labels
 
         sample_all_modalities_activations = act_func(
@@ -312,7 +313,9 @@ def accumulate_all_activations(
             continue
 
         cur_sample_activation_info = SampleActivation(
-            sample_info=batch, sample_activations=sample_all_modalities_activations
+            sample_info=batch,
+            sample_activations=sample_all_modalities_activations,
+            raw_tabular_inputs=raw_tabular_inputs,
         )
         all_activations.append(cur_sample_activation_info)
 
@@ -427,7 +430,11 @@ def _get_interpretation_data_producer(
             inputs=inputs_detached, target_labels=batch.target_labels, ids=batch.ids
         )
 
-        yield batch_interpretation
+        raw_tabular_inputs = {
+            k: v for k, v in loader_batch[0].items() if k.startswith("tabular_")
+        }
+
+        yield batch_interpretation, raw_tabular_inputs
 
 
 def _detach_all_inputs(tensor_inputs: Dict[str, torch.Tensor]):

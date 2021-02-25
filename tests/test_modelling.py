@@ -257,6 +257,7 @@ def _check_test_performance_results(
                 "kernel_width": 8,
                 "channel_exp_base": 2,
                 "layers": [1],
+                "n_epochs": 6,
                 "target_cat_columns": ["Origin"],
                 "target_con_columns": ["Height", "ExtraTarget"],
             }
