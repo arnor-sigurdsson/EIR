@@ -268,6 +268,12 @@ def chunked_label_df_parse_wrapper(
     raise an error if there is any mismatch.
 
     If this starts to lead to memory issues, we can try using pandas union_categoricals.
+
+    Note that we continue in the case that we have empty dfs after filtering for IDs.
+    This is to avoid errors when applying column operations to empty dfs, as that case
+    might not be considered in the column operation functions. The case for supporting
+    that in column operations might be some manual creation of a df assuming that it
+    can be empty, but I think its a very rare use case, so not supported for now.
     """
 
     column_ops = {}
@@ -297,11 +303,17 @@ def chunked_label_df_parse_wrapper(
             df_labels=chunk, ids_to_keep=ids_to_keep
         )
 
+        if len(df_labels_filtered) == 0:
+            continue
+
         df_labels_parsed = _apply_column_operations_to_df(
             df=df_labels_filtered,
             operations_dict=column_ops,
             label_columns=label_columns,
         )
+
+        if len(df_labels_parsed) == 0:
+            continue
 
         df_column_filtered = _drop_not_needed_label_columns(
             df=df_labels_parsed, needed_label_columns=supplied_columns
@@ -618,6 +630,14 @@ def _apply_column_operations_to_df(
     Same logic for 'post', we might have operations that should only be applied
     after all other stand-alone operations have been applied.
 
+    Note that we have the return condition there for empty dataframes currently. This
+    is because currently we do not enforce on the applied operations that they should
+    always work with empty dataframes, and in e.g. cases where we are applying row-based
+    filtering operations on chunks, it can happens that an empty chunk ensues. In that
+    case, we will pass an empty df to operation functions that expect an actual df,
+    which in many cases will cause them to raise an error. To avoid this, we immediately
+    return the empty df if encountered.
+
     :param df: Dataframe to perform processing on.
     :param operations_dict: A dictionary of column names, where each value is a list
     of tuples, where each tuple is a callable as the first element and the callable's
@@ -627,6 +647,9 @@ def _apply_column_operations_to_df(
     """
 
     for operation_name, operation_sequences in operations_dict.items():
+
+        if len(df) == 0:
+            return df
 
         if _should_apply_op_sequence(
             operation_name=operation_name,
@@ -640,6 +663,9 @@ def _apply_column_operations_to_df(
                 operation_name=operation_name,
                 label_columns=label_columns,
             )
+
+    if len(df) == 0:
+        return df
 
     if "post" in operations_dict.keys():
         post_operations = operations_dict.get("post")
