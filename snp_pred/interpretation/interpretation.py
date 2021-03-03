@@ -312,14 +312,36 @@ def accumulate_all_activations(
         if sample_all_modalities_activations is None:
             continue
 
+        batch_on_cpu = _convert_all_batch_tensors_to_cpu(batch=batch)
         cur_sample_activation_info = SampleActivation(
-            sample_info=batch,
+            sample_info=batch_on_cpu,
             sample_activations=sample_all_modalities_activations,
             raw_tabular_inputs=raw_tabular_inputs,
         )
         all_activations.append(cur_sample_activation_info)
 
     return all_activations
+
+
+def _convert_all_batch_tensors_to_cpu(batch: Batch) -> Batch:
+    """
+    We need this to avoid blowing up GPU memory when gathering all the activations and
+    raw inputs, as the inputs are tensors which can be on the GPU.
+
+    If needed later maybe we can use some fancy recursion here, but this works for now.
+    """
+    new_batch_kwargs = {}
+
+    new_inputs = {k: v.cpu() for k, v in batch.inputs.items()}
+    new_target_labels = {k: v.cpu() for k, v in batch.target_labels.items()}
+
+    new_batch_kwargs["inputs"] = new_inputs
+    new_batch_kwargs["target_labels"] = new_target_labels
+    new_batch_kwargs["ids"] = batch.ids
+
+    new_batch = Batch(**new_batch_kwargs)
+
+    return new_batch
 
 
 def _prepare_eval_activation_outfolder(
