@@ -783,7 +783,12 @@ def _overload_train_config_for_predict_activations(
 ) -> Namespace:
     train_config_copy = copy(train_config)
 
-    train_config_copy.model = predict_config
+    train_config_copy.model = predict_config.model
+
+    train_config_copy.cl_args, _ = _converge_train_and_predict_cl_args(
+        train_cl_args=train_config.cl_args, predict_cl_args=predict_cl_args
+    )
+
     train_config_copy.cl_args.act_classes = predict_cl_args.act_classes
     train_config_copy.cl_args.max_acts_per_class = predict_cl_args.max_acts_per_class
 
