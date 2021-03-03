@@ -4,7 +4,6 @@ from collections import defaultdict
 from textwrap import wrap
 import warnings
 
-
 import torch
 import shap
 import matplotlib.pyplot as plt
@@ -41,14 +40,12 @@ def analyze_tabular_input_activations(
         embedding_module=tabular_model,
     )
 
-    parsed_activations = parse_tabular_activations(
+    parsed_activations = parse_tabular_activations_for_feature_importance(
         activation_tensor_slices=activation_tensor_slices,
         all_activations=all_activations,
         input_name=input_name,
     )
-
     df_activations = get_tabular_activation_df(parsed_activations=parsed_activations)
-
     plot_tabular_activations(
         df_activations=df_activations, activation_outfolder=activation_outfolder
     )
@@ -59,7 +56,6 @@ def analyze_tabular_input_activations(
         target_column=target_column_name,
         column_type=target_column_type,
     )
-
     for class_name, class_activations in all_activations_class_stratified.items():
 
         cur_class_outfolder = activation_outfolder / class_name
@@ -184,11 +180,15 @@ def get_cat_to_con_cutoff_from_slices(
     return cutoff
 
 
-def parse_tabular_activations(
+def parse_tabular_activations_for_feature_importance(
     activation_tensor_slices: Dict,
     all_activations: Sequence["SampleActivation"],
     input_name: str,
 ) -> Dict[str, List[float]]:
+    """
+    Note we need to use abs here to get the absolute feature importance, before
+    we sum so different signs don't cancel each other out.
+    """
     column_activations = {column: [] for column in activation_tensor_slices.keys()}
 
     for sample_activation in all_activations:
@@ -196,13 +196,13 @@ def parse_tabular_activations(
 
         for column in activation_tensor_slices.keys():
             cur_slice = activation_tensor_slices[column]
-            cur_column_activations = sample_acts[cur_slice].sum()
+            cur_column_activations = np.abs(sample_acts[cur_slice]).sum()
             column_activations[column].append(cur_column_activations)
 
     finalized_activations = {}
 
     for column, aggregated_activations in column_activations.items():
-        mean_activation = np.abs(np.array(column_activations[column]).mean())
+        mean_activation = np.array(column_activations[column]).mean()
         finalized_activations[column] = [mean_activation]
 
     return finalized_activations
@@ -359,6 +359,8 @@ def plot_tabular_categorical_feature(
             ind=feature_name_to_plot,
             shap_values=shap_values,
             features=features,
+            interaction_index=None,
+            color="black",
         )
 
     fig = plt.gcf()
