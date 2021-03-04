@@ -1,3 +1,4 @@
+from functools import reduce
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -140,13 +141,9 @@ def plot_snp_manhattan_plots(
 
     for col in activations_columns:
         label_name = col.split("_activations")[0]
-        fig, ax = plt.subplots(figsize=(12, 6))
-        ax.scatter(
-            x=df_snp_grads["BP_COORD"],
-            y=df_snp_grads[col],
-            label=label_name,
-            color="black",
-            marker=".",
+
+        ax, fig = _get_manhattan_axis_and_figure(
+            df=df_snp_grads, chr_column_name="CHR_CODE", activation_column_name=col
         )
 
         y_ticks = ax.get_yticks()
@@ -154,17 +151,140 @@ def plot_snp_manhattan_plots(
         y_max = df_snp_grads[col].max() + y_axis_tick_spacing
         ax.set_ylim(ymin=0.0, ymax=y_max)
 
-        ax.set_xlabel("BP Coordinate")
+        ax.set_xlabel("Chromosome")
         ax.set_ylabel("Activation")
 
-        plt.title(f"Manhattan Plot{title_extra}")
-        plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+        ax.set_title(f"{label_name}{title_extra}")
         plt.tight_layout()
 
         out_path = outfolder / f"manhattan/{label_name}_manhattan.png"
         ensure_path_exists(path=out_path)
         plt.savefig(out_path, bbox_inches="tight")
         plt.close("all")
+
+
+def _get_manhattan_axis_and_figure(
+    df: pd.DataFrame,
+    chr_column_name: str,
+    activation_column_name: str,
+    color=None,
+    figure_size=(12, 6),
+    ar=90,
+    gwas_sign_line=False,
+    gwasp=5e-08,
+    dotsize=8,
+    valpha=1,
+    axxlabel=None,
+    axylabel=None,
+    axlabelfontsize=9,
+    axlabelfontname="Arial",
+):
+    """Adapted from https://github.com/reneshbedre/bioinfokit#manhatten-plot."""
+
+    _x, _y = "Chromosome", r"Activation"
+    rand_colors = (
+        "#a7414a",
+        "#282726",
+        "#6a8a82",
+        "#a37c27",
+        "#563838",
+        "#0584f2",
+        "#f28a30",
+        "#f05837",
+        "#6465a5",
+        "#00743f",
+        "#be9063",
+        "#de8cf0",
+        "#888c46",
+        "#c0334d",
+        "#270101",
+        "#8d2f23",
+        "#ee6c81",
+        "#65734b",
+        "#14325c",
+        "#704307",
+        "#b5b3be",
+        "#f67280",
+        "#ffd082",
+        "#ffd800",
+        "#ad62aa",
+        "#21bf73",
+        "#a0855b",
+        "#5edfff",
+        "#08ffc8",
+        "#ca3e47",
+        "#c9753d",
+        "#6c5ce7",
+        "#a997df",
+        "#513b56",
+        "#590925",
+        "#007fff",
+        "#bf1363",
+        "#f39237",
+        "#0a3200",
+        "#8c271e",
+    )
+
+    df["tpval"] = df[activation_column_name]
+
+    # if the column contains numeric strings
+    df = df.loc[pd.to_numeric(df[chr_column_name], errors="coerce").sort_values().index]
+
+    df["ind"] = range(len(df))
+
+    if color is not None and len(color) == 2:
+        color_1 = int(df[chr_column_name].nunique() / 2) * [color[0]]
+        color_2 = int(df[chr_column_name].nunique() / 2) * [color[1]]
+        if df[chr_column_name].nunique() % 2 == 0:
+            color_list = list(reduce(lambda x, y: x + y, zip(color_1, color_2)))
+        elif df[chr_column_name].nunique() % 2 == 1:
+            color_list = list(reduce(lambda x, y: x + y, zip(color_1, color_2)))
+            color_list.append(color[0])
+    elif color is not None and len(color) == df[chr_column_name].nunique():
+        color_list = color
+    elif color is None:
+        # select colors randomly from the list based in number of chr
+        color_list = rand_colors[: df[chr_column_name].nunique()]
+    else:
+        raise ValueError("Error in color argument.")
+
+    xlabels = []
+    xticks = []
+    fig, ax = plt.subplots(figsize=figure_size)
+    i = 0
+    for label, df1 in df.groupby(chr_column_name):
+        df1.plot(
+            kind="scatter",
+            x="ind",
+            y="tpval",
+            color=color_list[i],
+            s=dotsize,
+            alpha=valpha,
+            ax=ax,
+        )
+        df1_max_ind = df1["ind"].iloc[-1]
+        df1_min_ind = df1["ind"].iloc[0]
+        xlabels.append(label)
+        xticks.append((df1_max_ind - (df1_max_ind - df1_min_ind) / 2))
+        i += 1
+
+    # add GWAS significant line
+    if gwas_sign_line is True:
+        ax.axhline(y=-np.log10(gwasp), linestyle="--", color="#7d7d7d", linewidth=1)
+
+    ax.margins(x=0)
+    ax.margins(y=0)
+    ax.set_xticks(xticks)
+    ax.set_xticklabels(xlabels, rotation=ar)
+
+    if axxlabel:
+        _x = axxlabel
+    if axylabel:
+        _y = axylabel
+    ax.set_xlabel(_x, fontsize=axlabelfontsize, fontname=axlabelfontname)
+    ax.set_ylabel(_y, fontsize=axlabelfontsize, fontname=axlabelfontname)
+
+    return ax, fig
 
 
 def plot_snp_manhattan_plots_plotly(
