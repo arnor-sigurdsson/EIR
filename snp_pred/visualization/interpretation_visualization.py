@@ -182,7 +182,7 @@ def _get_manhattan_axis_and_figure(
     """Adapted from https://github.com/reneshbedre/bioinfokit#manhatten-plot."""
 
     _x, _y = "Chromosome", r"Activation"
-    rand_colors = (
+    colors = (
         "#a7414a",
         "#282726",
         "#6a8a82",
@@ -227,9 +227,6 @@ def _get_manhattan_axis_and_figure(
 
     df["tpval"] = df[activation_column_name]
 
-    # if the column contains numeric strings
-    df = df.loc[pd.to_numeric(df[chr_column_name], errors="coerce").sort_values().index]
-
     df["ind"] = range(len(df))
 
     if color is not None and len(color) == 2:
@@ -244,7 +241,7 @@ def _get_manhattan_axis_and_figure(
         color_list = color
     elif color is None:
         # select colors randomly from the list based in number of chr
-        color_list = rand_colors[: df[chr_column_name].nunique()]
+        color_list = colors[: df[chr_column_name].nunique()]
     else:
         raise ValueError("Error in color argument.")
 
