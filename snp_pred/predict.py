@@ -120,6 +120,10 @@ def predict(
             target_column_type=target_column_type, target_preds=target_preds
         )
 
+        target_labels = None
+        if all_labels:
+            target_labels = all_labels[target_column_name].cpu().numpy()
+
         cur_target_transformer = predict_config.target_transformers[target_column_name]
         classes = _get_target_classnames(
             transformer=cur_target_transformer, target_column=target_column_name
@@ -128,10 +132,15 @@ def predict(
         output_folder = Path(predict_cl_args.output_folder, target_column_name)
         ensure_path_exists(path=output_folder, is_folder=True)
 
+        merged_predictions = _merge_ids_predictions_and_labels(
+            ids=all_ids,
+            predictions=predictions,
+            labels=target_labels,
+            prediction_classes=classes,
+        )
+
         _save_predictions(
-            preds=predictions,
-            test_dataset=predict_config.test_dataset,
-            classes=classes,
+            df_predictions=merged_predictions,
             outfolder=output_folder,
         )
 
@@ -150,6 +159,28 @@ def predict(
             )
 
             vf.gen_eval_graphs(plot_config=plot_config)
+
+
+def _merge_ids_predictions_and_labels(
+    ids: Sequence[str],
+    predictions: np.ndarray,
+    labels: np.ndarray,
+    prediction_classes: Union[Sequence[str], None] = None,
+    label_column_name: str = "True Label",
+) -> pd.DataFrame:
+    df = pd.DataFrame()
+
+    df["ID"] = ids
+    df = df.set_index("ID")
+
+    df[label_column_name] = labels
+
+    if prediction_classes is None:
+        prediction_classes = [f"Score Class {i}" for i in range(predictions.shape[1])]
+
+    df[prediction_classes] = predictions
+
+    return df
 
 
 def serialize_prediction_metrics(
@@ -628,14 +659,8 @@ def _set_up_default_test_dataset(
     return test_dataset
 
 
-def _save_predictions(
-    preds: np.ndarray, test_dataset: al_datasets, classes: List[str], outfolder: Path
-) -> None:
-    test_ids = [i.sample_id for i in test_dataset.samples]
-    df_preds = pd.DataFrame(data=preds, index=test_ids, columns=classes)
-    df_preds.index.name = "ID"
-
-    df_preds.to_csv(outfolder / "predictions.csv")
+def _save_predictions(df_predictions: pd.DataFrame, outfolder: Path) -> None:
+    df_predictions.to_csv(outfolder / "predictions.csv")
 
 
 def get_predict_cl_args() -> argparse.Namespace:

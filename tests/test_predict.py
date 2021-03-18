@@ -289,7 +289,7 @@ def test_predict(keep_outputs, prep_modelling_test_configs):
     target_classes = sorted(config.target_transformers[target_column].classes_)
 
     # check that columns in predictions.csv are in correct sorted order
-    assert (target_classes == df_test.columns).all()
+    assert set(target_classes).issubset(set(df_test.columns))
 
     for cls in target_classes:
         class_indices = [i for i in df_test.index if i.endswith(cls)]
