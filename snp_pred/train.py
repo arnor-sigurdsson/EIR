@@ -519,6 +519,7 @@ def get_dataloaders(
         num_workers=num_workers,
         pin_memory=False,
         drop_last=True,
+        worker_init_fn=worker_init_fn,
     )
 
     valid_dloader = DataLoader(
@@ -528,9 +529,14 @@ def get_dataloaders(
         num_workers=num_workers,
         pin_memory=False,
         drop_last=True,
+        worker_init_fn=worker_init_fn,
     )
 
     return train_dloader, valid_dloader
+
+
+def worker_init_fn(worker_id):
+    np.random.seed(np.random.get_state()[1][0] + worker_id)
 
 
 class GetAttrDelegatedDataParallel(nn.DataParallel):
