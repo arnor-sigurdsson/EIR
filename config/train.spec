@@ -20,6 +20,7 @@ block_cipher = None
 a = Analysis(['../snp_pred/train.py'],
              binaries=[],
              datas=[],
+             pathex=[],
              hiddenimports=[
                  'sklearn.utils._cython_blas',
                  'pkg_resources.py2_warn',
