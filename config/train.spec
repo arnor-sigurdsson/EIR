@@ -17,7 +17,7 @@ options = [('W ignore', None, 'OPTION')]
 
 block_cipher = None
 
-a = Analysis(['../snp_pred/train.py'],
+a = Analysis(['../eir/train.py'],
              binaries=[],
              datas=[],
              pathex=[],

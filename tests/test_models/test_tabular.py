@@ -2,7 +2,7 @@ import pytest
 import torch
 from torch import nn
 
-from snp_pred.models.tabular import tabular as tab
+from eir.models.tabular import tabular as tab
 
 
 @pytest.fixture

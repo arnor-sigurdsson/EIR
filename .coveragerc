@@ -1,4 +1,4 @@
 [run]
 omit = 
-    snp_pred/visualization/*
-    snp_pred/configuration.py
+    eir/visualization/*
+    eir/configuration.py

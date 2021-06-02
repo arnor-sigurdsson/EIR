@@ -1,8 +1,8 @@
 import pytest
 
-from snp_pred.models import layers
-from snp_pred.models.omics import models_cnn
-from snp_pred.train import DataDimensions
+from eir.models import layers
+from eir.models.omics import models_cnn
+from eir.train import DataDimensions
 
 
 def test_make_conv_layers():

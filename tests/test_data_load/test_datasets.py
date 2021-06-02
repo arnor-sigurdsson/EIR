@@ -6,9 +6,9 @@ import numpy as np
 import pytest
 import torch
 
-from snp_pred import train
-from snp_pred.data_load import datasets
-from snp_pred.data_load.datasets import al_datasets
+from eir import train
+from eir.data_load import datasets
+from eir.data_load.datasets import al_datasets
 
 
 @pytest.mark.parametrize(

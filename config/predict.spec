@@ -17,7 +17,7 @@ options = [('W ignore', None, 'OPTION')]
 
 block_cipher = None
 
-a = Analysis(['../snp_pred/predict.py'],
+a = Analysis(['../eir/predict.py'],
              binaries=[],
              datas=[],
              pathex=[],

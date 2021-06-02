@@ -1,15 +1,13 @@
 import numpy as np
 import pytest
 
-import snp_pred.interpretation.interpret_omics
+import eir.interpretation.interpret_omics
 
 
 def test_rescale_gradients():
     input_array = np.array([[0, 0, 1], [0, 0, 2], [0, 0, 4]])
 
-    rescaled_array = snp_pred.interpretation.interpret_omics.rescale_gradients(
-        input_array
-    )
+    rescaled_array = eir.interpretation.interpret_omics.rescale_gradients(input_array)
 
     assert (
         rescaled_array == np.array([[0, 0, 0.25], [0, 0, 0.50], [0, 0, 1.00]])
@@ -34,10 +32,8 @@ def acc_grads_inp():
 
 
 def test_get_top_gradients(acc_grads_inp):
-    top_snps_per_class = (
-        snp_pred.interpretation.interpret_omics.get_snp_cols_w_top_grads(
-            acc_grads_inp, 3
-        )
+    top_snps_per_class = eir.interpretation.interpret_omics.get_snp_cols_w_top_grads(
+        acc_grads_inp, 3
     )
     assert top_snps_per_class["Asia"]["top_n_idxs"] == [0, 2, 4]
     asia_grads = top_snps_per_class["Asia"]["top_n_grads"]
@@ -68,7 +64,7 @@ def test_read_snp_df(tmp_path):
     file_ = tmp_path / "data_final.snp"
     file_.write_text(snp_file_str)
 
-    snp_df = snp_pred.interpretation.interpret_omics.read_snp_df(file_)
+    snp_df = eir.interpretation.interpret_omics.read_snp_df(file_)
     snp_arr = snp_df["VAR_ID"].array
     assert len(snp_arr) == 10
     assert snp_arr[0] == "rs3094315"
@@ -76,14 +72,12 @@ def test_read_snp_df(tmp_path):
 
 
 def test_gather_and_rescale_snps(acc_grads_inp):
-    top_gradients_dict = (
-        snp_pred.interpretation.interpret_omics.get_snp_cols_w_top_grads(
-            acc_grads_inp, 3
-        )
+    top_gradients_dict = eir.interpretation.interpret_omics.get_snp_cols_w_top_grads(
+        acc_grads_inp, 3
     )
     classes = ["Asia", "Europe"]
 
-    top_snps_dict = snp_pred.interpretation.interpret_omics.gather_and_rescale_snps(
+    top_snps_dict = eir.interpretation.interpret_omics.gather_and_rescale_snps(
         acc_grads_inp, top_gradients_dict, classes
     )
 

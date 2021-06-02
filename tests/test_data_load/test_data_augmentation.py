@@ -10,7 +10,7 @@ from hypothesis.strategies import lists, integers, floats
 from torch import nn
 from torch.nn import functional as F
 
-from snp_pred.data_load import data_augmentation
+from eir.data_load import data_augmentation
 from tests.conftest import _set_up_base_test_array
 
 
@@ -113,7 +113,7 @@ def test_block_cutmix_omics_input(patched_indices: List[int]) -> None:
     batch_indices_for_mixing = torch.LongTensor([1, 0])
 
     with patch(
-        "snp_pred.data_load.data_augmentation.get_block_cutmix_indices",
+        "eir.data_load.data_augmentation.get_block_cutmix_indices",
         return_value=patched_indices,
         autospec=True,
     ):
@@ -190,7 +190,7 @@ def test_uniform_cutmix_omics_input(patched_indices: List[int]):
     # value, it's quite likely that the arrays can be the same in that once place
     patched_indices_tensor = torch.tensor(patched_indices + list(range(10))).unique()
     with patch(
-        "snp_pred.data_load.data_augmentation.get_uniform_cutmix_indices",
+        "eir.data_load.data_augmentation.get_uniform_cutmix_indices",
         return_value=patched_indices_tensor,
         autospec=True,
     ):
@@ -358,7 +358,7 @@ def test_make_random_snps_missing_some():
     test_array = torch.zeros((1, 4, 1000), dtype=torch.bool)
     test_array[:, 0, :] = True
 
-    patch_target = "snp_pred.data_load.data_augmentation.np.random.choice"
+    patch_target = "eir.data_load.data_augmentation.np.random.choice"
     with patch(patch_target, autospec=True) as mock_target:
         mock_return = np.array([1, 2, 3, 4, 5])
         mock_target.return_value = mock_return

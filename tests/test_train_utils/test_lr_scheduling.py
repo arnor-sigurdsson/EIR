@@ -12,9 +12,9 @@ from ignite.engine import Engine, State
 from torch.optim import Adam, SGD
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
-from snp_pred.train_utils import lr_scheduling
-from snp_pred.train_utils.lr_scheduling import get_optimizer_lr
-from snp_pred.train_utils.train_handlers import HandlerConfig
+from eir.train_utils import lr_scheduling
+from eir.train_utils.lr_scheduling import get_optimizer_lr
+from eir.train_utils.train_handlers import HandlerConfig
 
 
 @pytest.fixture()
@@ -307,7 +307,7 @@ def test_step_reduce_on_plateau_scheduler(
 
         # NOTE: A bit hacky, but lr_scheduling is getting it's dataframe by calling
         # a function in metrics.py, that's why we need to mock that
-        patch_target = "snp_pred.train_utils.metrics.pd.Series.iloc"
+        patch_target = "eir.train_utils.metrics.pd.Series.iloc"
         with patch(target=patch_target, autospec=True) as m:
 
             # What we really are mocking is the __getitem__ called last in

@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "snp_pred"
+name = "eir"
 version = "0.1.0"
 description = ""
 authors = ["Arnor Sigurdsson"]
@@ -47,8 +47,8 @@ pyinstaller = "^4.0"
 hypothesis = "^5.37.3"
 
 [tool.poetry.scripts]
-snptrain = "snp_pred.train:main"
-snppredict = "snp_pred.predict:main"
+eirtrain = "eir.train:main"
+eirpredict = "eir.predict:main"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

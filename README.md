@@ -1,4 +1,4 @@
-SNP-PRED
+EIR
 ==============================
 
- Supervised modelling on SNP data. 
+Supervised modelling on genotype and tabular data.

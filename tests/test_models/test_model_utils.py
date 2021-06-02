@@ -4,8 +4,8 @@ import pytest
 import torch
 from torch import nn
 
-from snp_pred.models import model_training_utils
-from snp_pred.models.omics import models_cnn
+from eir.models import model_training_utils
+from eir.models.omics import models_cnn
 
 
 @pytest.fixture

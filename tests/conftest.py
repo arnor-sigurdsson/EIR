@@ -16,15 +16,15 @@ from torch import cuda
 from torch import nn
 from torch.utils.data import DataLoader
 
-from snp_pred import train
-from snp_pred.data_load import datasets
-from snp_pred.train import (
+from eir import train
+from eir.data_load import datasets
+from eir.train import (
     Config,
     get_model_from_cl_args,
     set_up_num_outputs_per_target,
 )
-from snp_pred.train_utils import optimizers, metrics
-from snp_pred.train_utils.utils import (
+from eir.train_utils import optimizers, metrics
+from eir.train_utils.utils import (
     configure_root_logger,
     get_run_folder,
 )

@@ -1,4 +1,4 @@
-from snp_pred.train_utils import train_handlers
+from eir.train_utils import train_handlers
 
 
 def test_unflatten_engine_metrics_dict():
