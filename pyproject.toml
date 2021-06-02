@@ -46,6 +46,10 @@ gpustat = "^0.6.0"
 pyinstaller = "^4.0"
 hypothesis = "^5.37.3"
 
+[tool.poetry.scripts]
+snptrain = "snp_pred.train:main"
+snppredict = "snp_pred.predict:main"
+
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"

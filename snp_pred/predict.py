@@ -64,7 +64,12 @@ np.random.seed(0)
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
-def main(predict_cl_args: Namespace):
+def main():
+    predict_cl_args_ = get_predict_cl_args()
+    run_predict(predict_cl_args=predict_cl_args_)
+
+
+def run_predict(predict_cl_args: Namespace):
 
     run_folder = Path(predict_cl_args.model_path).parents[1]
     train_config = _load_serialized_train_config(run_folder=run_folder)
@@ -865,7 +870,4 @@ def _get_predict_activation_outfolder_target(
 
 
 if __name__ == "__main__":
-
-    predict_cl_args_ = get_predict_cl_args()
-
-    main(predict_cl_args=predict_cl_args_)
+    main()

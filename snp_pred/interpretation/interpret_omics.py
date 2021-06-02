@@ -47,6 +47,7 @@ def analyze_omics_input_activations(
         accumulated_grads=acc_acts, abs_grads=abs_grads
     )
 
+    # TODO: Add support for multiple SNP files
     snp_df = read_snp_df(snp_file_path=Path(cl_args.snp_file))
 
     classes = sorted(list(top_gradients_dict.keys()))

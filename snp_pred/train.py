@@ -112,7 +112,17 @@ np.random.seed(0)
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
-def main(cl_args: argparse.Namespace, config: "Config") -> None:
+def main():
+    default_cl_args = get_default_cl_args()
+    utils.configure_root_logger(run_name=default_cl_args.run_name)
+
+    default_hooks = get_default_hooks(cl_args_=default_cl_args)
+    default_config = get_default_config(cl_args=default_cl_args, hooks=default_hooks)
+
+    run_experiment(cl_args=default_cl_args, config=default_config)
+
+
+def run_experiment(cl_args: argparse.Namespace, config: "Config") -> None:
 
     _log_model(model=config.model, l1_weight=cl_args.l1)
 
@@ -1120,11 +1130,4 @@ def hook_default_aggregate_losses(state: Dict, *args, **kwargs) -> Dict:
 
 
 if __name__ == "__main__":
-
-    default_cl_args = get_default_cl_args()
-    utils.configure_root_logger(run_name=default_cl_args.run_name)
-
-    default_hooks = get_default_hooks(cl_args_=default_cl_args)
-    default_config = get_default_config(cl_args=default_cl_args, hooks=default_hooks)
-
-    main(cl_args=default_cl_args, config=default_config)
+    main()
