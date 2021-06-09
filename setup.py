@@ -1,16 +1,6 @@
-from setuptools import find_packages, setup
+#!/usr/bin/env python
 
+import setuptools
 
-setup(
-    name="eir",
-    packages=find_packages(),
-    version="0.1.0",
-    description="Supervised modelling of human origins data.",
-    author="Arnor Ingi Sigurdsson",
-    license="MIT",
-    entry_points={
-        "console_scripts": [
-            "snptrain = snptrain.eir.train.main",
-        ],
-    },
-)
+if __name__ == "__main__":
+    setuptools.setup()
