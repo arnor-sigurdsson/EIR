@@ -5,8 +5,8 @@ import pytest
 import torch
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 
-from snp_pred import train
-from snp_pred.train_utils import metrics
+from eir import train
+from eir.train_utils import metrics
 
 
 def test_calculate_batch_metrics():

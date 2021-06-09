@@ -8,9 +8,9 @@ import pandas as pd
 import pytest
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 
-from snp_pred.data_load import label_setup
-from snp_pred.data_load.common_ops import ColumnOperation
-from snp_pred.data_load.label_setup import merge_target_columns
+from eir.data_load import label_setup
+from eir.data_load.common_ops import ColumnOperation
+from eir.data_load.label_setup import merge_target_columns
 
 
 def get_split_labels(
@@ -769,7 +769,7 @@ def test_apply_column_operations_to_df_applied_2(
     assert df_labels_parsed["OriginExtraColumnsAll"].unique().item() == "Iceland"
 
 
-@patch("snp_pred.data_load.label_setup.logger.debug", autospec=True)
+@patch("eir.data_load.label_setup.logger.debug", autospec=True)
 @pytest.mark.parametrize("create_test_data", [{"task_type": "binary"}], indirect=True)
 def test_parse_label_df_not_applied(
     m_logger, create_test_data, create_test_column_ops, test_column_operations
@@ -1177,7 +1177,7 @@ def test_fill_continuous_nans(get_test_nan_df):
 
 
 def get_joblib_patch_target():
-    return "snp_pred.data_load.label_setup.joblib"
+    return "eir.data_load.label_setup.joblib"
 
 
 @patch(get_joblib_patch_target(), autospec=True)

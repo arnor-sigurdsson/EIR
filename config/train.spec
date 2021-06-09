@@ -6,9 +6,9 @@ import sys
 sys.setrecursionlimit(5000)
 
 # work-around for https://github.com/pyinstaller/pyinstaller/issues/4064
-import distutils
-if hasattr(distutils, 'distutils_path') and distutils.distutils_path.endswith('__init__.py'):
-    distutils.distutils_path = os.path.dirname(distutils.distutils_path)
+# import distutils
+# if hasattr(distutils, 'distutils_path') and distutils.distutils_path.endswith('__init__.py'):
+#     distutils.distutils_path = os.path.dirname(distutils.distutils_path)
 
 # See: https://stackoverflow.com/questions/57517371/matplotlibdeprecationwarning-with-pyinstaller-exe 
 # for mpl DeprecationWarning showing up after compiling
@@ -17,14 +17,16 @@ options = [('W ignore', None, 'OPTION')]
 
 block_cipher = None
 
-a = Analysis(['../human_origins_supervised/train.py'],
+a = Analysis(['../eir/train.py'],
              binaries=[],
              datas=[],
+             pathex=[],
              hiddenimports=[
                  'sklearn.utils._cython_blas',
                  'pkg_resources.py2_warn',
                  'sklearn.neighbors._typedefs',
                  'sklearn.neighbors._quad_tree',
+                 'sklearn.utils._weight_vector',
                  'sklearn.neighbors',
                  'sklearn.tree._utils',
                  'sklearn.tree',

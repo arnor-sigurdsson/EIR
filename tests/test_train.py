@@ -7,15 +7,15 @@ from torch.optim import SGD
 from torch.optim.adamw import AdamW
 from torch.utils.data import WeightedRandomSampler, SequentialSampler, RandomSampler
 
-from snp_pred import train
-from snp_pred.data_load import label_setup
-from snp_pred.models.fusion import FusionModel
-from snp_pred.models.omics.models_cnn import CNNModel
-from snp_pred.models.omics.models_mlp import MLPModel
-from snp_pred.train_utils import optimizers
+from eir import train
+from eir.data_load import label_setup
+from eir.models.fusion import FusionModel
+from eir.models.omics.models_cnn import CNNModel
+from eir.models.omics.models_mlp import MLPModel
+from eir.train_utils import optimizers
 
 
-@patch("snp_pred.train.utils.get_run_folder", autospec=True)
+@patch("eir.train.utils.get_run_folder", autospec=True)
 def test_prepare_run_folder_pass(patched_get_run_folder, tmp_path):
 
     # patch since we don't want to create run folders while testing
@@ -25,7 +25,7 @@ def test_prepare_run_folder_pass(patched_get_run_folder, tmp_path):
     assert (tmp_path / "test_folder").exists()
 
 
-@patch("snp_pred.train.utils.get_run_folder", autospec=True)
+@patch("eir.train.utils.get_run_folder", autospec=True)
 def test_prepare_run_folder_fail(patched_get_run_folder, tmp_path):
 
     patched_path = tmp_path / "test_folder"
@@ -85,7 +85,7 @@ def test_get_dataloaders(create_test_cl_args, create_test_data, create_test_data
 
 
 def _modify_bs_for_multi_gpu():
-    patch_target = "snp_pred.train.torch.cuda.device_count"
+    patch_target = "eir.train.torch.cuda.device_count"
     with patch(patch_target, autospec=True) as m:
         m.return_value = 2
 

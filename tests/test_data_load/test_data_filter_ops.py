@@ -1,7 +1,7 @@
 import pandas as pd
 import torch
 
-from snp_pred.data_load import common_ops
+from eir.data_load import common_ops
 
 
 def test_filter_ids_from_array_and_id_lists():

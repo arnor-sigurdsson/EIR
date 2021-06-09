@@ -7,9 +7,9 @@ import pytest
 from hypothesis import given
 from hypothesis.strategies import lists, integers
 
-from snp_pred.data_load import data_loading_funcs
-from snp_pred.data_load.datasets import Sample
-from snp_pred.train import get_dataloaders
+from eir.data_load import data_loading_funcs
+from eir.data_load.datasets import Sample
+from eir.train import get_dataloaders
 
 
 @pytest.mark.parametrize(

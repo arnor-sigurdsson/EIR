@@ -8,11 +8,11 @@ import pytest
 import torch
 from sklearn.preprocessing import LabelEncoder
 
-from snp_pred import predict
-from snp_pred import train
-from snp_pred.data_load.label_setup import TabularFileInfo
-from snp_pred.models.omics.models_cnn import CNNModel
-from snp_pred.models.omics.omics_models import get_omics_model_init_kwargs
+from eir import predict
+from eir import train
+from eir.data_load.label_setup import TabularFileInfo
+from eir.models.omics.models_cnn import CNNModel
+from eir.models.omics.omics_models import get_omics_model_init_kwargs
 from tests.conftest import cleanup
 from tests.test_data_load.test_datasets import check_dataset
 

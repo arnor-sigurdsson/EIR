@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder
 
-from snp_pred.train_utils import evaluation
+from eir.train_utils import evaluation
 
 
 def test_get_most_wrong_preds():
@@ -31,7 +31,7 @@ def test_get_most_wrong_preds():
 
     # patch so we get back the probs above after softmax
     with patch(
-        "snp_pred.train_utils.evaluation.softmax",
+        "eir.train_utils.evaluation.softmax",
         side_effect=dummy_function,
         autospec=True,
     ):

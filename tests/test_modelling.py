@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from snp_pred import train
+from eir import train
 from tests.conftest import cleanup, ModelTestConfig
 
 
