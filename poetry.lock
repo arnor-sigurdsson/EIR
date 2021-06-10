@@ -2056,7 +2056,7 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "3f89b75b314a981327a09829e02b6747c61e01b781ae8ec66bbb2c6fda47a830"
+content-hash = "d792bb36e1604f89eaadc5ceafa7ed87ecb51653b949841eb3eb1a4add83bfab"
 
 [metadata.files]
 absl-py = [
