@@ -27,6 +27,7 @@ adabelief-pytorch = "^0.2.0"
 dill = "^0.3.3"
 hypothesis = "^6.14.0"
 aislib = {git = "ssh://git@github.com/arnor-sigurdsson/aislib.git", rev = "v0.1.3-alpha"}
+colorama = "^0.4.4"
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.1.1"
