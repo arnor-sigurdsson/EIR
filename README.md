@@ -11,3 +11,5 @@
 ---
 
 Supervised modelling on genotype and tabular data.
+
+**WARNING:** This project is in alpha phase. Expect backwards incompatiable changes and API changes.
