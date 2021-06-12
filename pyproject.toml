@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "eir"
-version = "0.1.0"
+version = "0.1.0-alpha"
 description = ""
 authors = ["Arnor Sigurdsson"]
 
@@ -26,7 +26,7 @@ torch-optimizer = "^0.1.0"
 adabelief-pytorch = "^0.2.0"
 dill = "^0.3.3"
 hypothesis = "^6.14.0"
-aislib = {git = "ssh://git@github.com/arnor-sigurdsson/aislib.git", rev = "v0.1.3-alpha"}
+aislib = "0.1.4a0"
 colorama = "^0.4.4"
 
 [tool.poetry.dev-dependencies]

@@ -24,31 +24,24 @@ torch = ">=0.4.0"
 
 [[package]]
 name = "aislib"
-version = "0.1.0"
+version = "0.1.4a0"
 description = ""
 category = "main"
 optional = false
-python-versions = "^3.8"
-develop = false
+python-versions = ">=3.8,<4.0"
 
 [package.dependencies]
-matplotlib = "^3.3.3"
-numpy = "^1.19.4"
-pandas = "^1.2.0"
-pandas-plink = "^2.2.4"
-py = "^1.10.0"
-scikit-learn = "^0.24.0"
-seaborn = "^0.11.1"
-sympy = "^1.7.1"
-torch = "^1.8.1"
-torchvision = "^0.9.1"
-tqdm = "^4.55.0"
-
-[package.source]
-type = "git"
-url = "ssh://git@github.com/arnor-sigurdsson/aislib.git"
-reference = "v0.1.3-alpha"
-resolved_reference = "21a681108cedd3191a9a1f59c9b4cf90ebf0f723"
+matplotlib = ">=3.3.3,<4.0.0"
+numpy = ">=1.19.4,<2.0.0"
+pandas = ">=1.2.0,<2.0.0"
+pandas-plink = ">=2.2.4,<3.0.0"
+py = ">=1.10.0,<2.0.0"
+scikit-learn = ">=0.24.0,<0.25.0"
+seaborn = ">=0.11.1,<0.12.0"
+sympy = ">=1.7.1,<2.0.0"
+torch = ">=1.8.1,<2.0.0"
+torchvision = ">=0.9.1,<0.10.0"
+tqdm = ">=4.55.0,<5.0.0"
 
 [[package]]
 name = "altgraph"
@@ -2056,7 +2049,7 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "d792bb36e1604f89eaadc5ceafa7ed87ecb51653b949841eb3eb1a4add83bfab"
+content-hash = "a5804468273957beae2081f86a2f24937d1442509a5f18c7475535caa672a3b3"
 
 [metadata.files]
 absl-py = [
@@ -2067,7 +2060,10 @@ adabelief-pytorch = [
     {file = "adabelief_pytorch-0.2.1-py3-none-any.whl", hash = "sha256:8db479a32afd211e033908db552397201af478d600d958ca0ca28c9b78d3cb62"},
     {file = "adabelief_pytorch-0.2.1.tar.gz", hash = "sha256:25c803ca0f14ccfabe47040077bb0e87e28401ecc26e14b06b661165b035354f"},
 ]
-aislib = []
+aislib = [
+    {file = "aislib-0.1.4a0-py3-none-any.whl", hash = "sha256:6c62cbca0130e059b6c4ff501edb6136667700ab14f92094c8a048ce375f8cc8"},
+    {file = "aislib-0.1.4a0.tar.gz", hash = "sha256:75dfe00bccf8b311a0077cc6abe52df9e0dcc3550944cc3ef45b938b2f4c02cf"},
+]
 altgraph = [
     {file = "altgraph-0.17-py2.py3-none-any.whl", hash = "sha256:c623e5f3408ca61d4016f23a681b9adb100802ca3e3da5e718915a9e4052cebe"},
     {file = "altgraph-0.17.tar.gz", hash = "sha256:1f05a47122542f97028caf78775a095fbe6a2699b5089de8477eb583167d69aa"},
