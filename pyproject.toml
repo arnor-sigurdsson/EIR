@@ -1,8 +1,12 @@
 [tool.poetry]
-name = "eir"
-version = "0.1.0-alpha"
+name = "eir-dl"
+version = "0.1.1-alpha"
 description = ""
+license = "AGPLv3"
 authors = ["Arnor Sigurdsson"]
+packages = [
+    { include="eir", from="." },
+]
 
 [tool.poetry.dependencies]
 python = "^3.8"
