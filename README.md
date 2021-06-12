@@ -68,3 +68,6 @@ eirtrain \
 --get_acts
 ```
 
+> **_TIP:_**  For a full set of options and a short explanation of each, run `eirtrain --help`.
+
+This will generate a folder called `runs/test_mlp` in the current directory containing the results of the training.
