@@ -19,6 +19,17 @@ from typing import (
     Callable,
 )
 
+import warnings
+
+# Filter warnings from shap
+# TODO: Possibly catch some of these these and log them?
+warnings.filterwarnings("ignore", "could not be loaded!")
+warnings.filterwarnings(
+    "ignore",
+    "Using a non-full backward hook when the forward contains multiple autograd Nodes "
+    "is deprecated and will be removed in future versions.",
+)
+
 import numpy as np
 import torch
 from aislib.misc_utils import get_logger, ensure_path_exists

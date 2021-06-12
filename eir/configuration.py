@@ -440,13 +440,14 @@ def get_train_argument_parser() -> configargparse.ArgumentParser:
     parser_.add_argument(
         "--debug",
         action="store_true",
-        help="Whether to run in debug mode (w. breakpoint).",
+        help="Whether to run in debug mode.",
     )
 
     parser_.add_argument(
         "--no_pbar",
         action="store_true",
-        help="Whether to run in debug mode (w. breakpoint).",
+        help="Whether to not use progress bars. Useful when stdout/stderr is written "
+             "to files."
     )
 
     parser_.add_argument(
