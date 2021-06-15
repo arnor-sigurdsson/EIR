@@ -67,7 +67,7 @@ eirtrain \
 
 > **_TIP:_**  For a full set of options and a short explanation of each, run `eirtrain --help`.
 
-This will generate a folder called `runs/test_mlp` in the current directory containing the results of the training. The folder has roughly the following structure (some files/folders are omitted here):
+This will generate a folder called `runs/gln` in the current directory containing the results of the training. The folder has roughly the following structure (some files/folders are omitted here):
 
 ```bash
 ├── cl_args.json
