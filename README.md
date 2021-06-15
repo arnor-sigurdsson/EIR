@@ -38,7 +38,7 @@ processed_sample_data
 ```
 > **_NOTE:_**  Currently the label file ID columns must be called "ID" (uppercase).
 
-To train a GLN model on this data, which has 6 ancestry target classes, computing SNP activations during training, we can run the following command:
+For this quick demo, we are going to use the data above to train a GLN model to predict ancestry, of which there are 6 classes (Asia, Eastern Asia, Europe, Latin America and the Caribbean, Middle East and Sub-Saharan Africa). To train the model, computing SNP activations during training, we can run the following command:
 
 ```bash
 eirtrain \
