@@ -169,7 +169,7 @@ def get_train_argument_parser() -> configargparse.ArgumentParser:
         "--model_type",
         type=str,
         default="cnn",
-        choices=["cnn", "mlp", "mlp-split", "mlp-fully-split", "linear"],
+        choices=["cnn", "mlp", "mlp-split", "genome-local-net", "linear"],
         help="Model type for omics model.",
     )
 

@@ -252,7 +252,7 @@ def _check_test_performance_results(
         },
         {  # Case 4: Using the fully-split model
             "custom_cl_args": {
-                "model_type": "mlp-fully-split",
+                "model_type": "genome-local-net",
                 "lr": 1e-3,
                 "kernel_width": 8,
                 "channel_exp_base": 2,
@@ -276,7 +276,7 @@ def _check_test_performance_results(
         },
         {  # Case 6: Fully split with mixup
             "custom_cl_args": {
-                "model_type": "mlp-fully-split",
+                "model_type": "genome-local-net",
                 "lr": 1e-3,
                 "kernel_width": 8,
                 "channel_exp_base": 2,

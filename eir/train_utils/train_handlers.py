@@ -98,7 +98,7 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
     if ca.lr_schedule != "same":
         lr_scheduler = set_up_lr_scheduler(handler_config=handler_config)
         attach_lr_scheduler(engine=trainer, lr_scheduler=lr_scheduler, config=config)
-    elif ca.lr_schedule == "same" and ca.warmup_steps is not None:
+    elif ca.lr_schedule == "same" and ca.warmup_steps:
         raise NotImplementedError("Warmup not yet implemented for 'same' LR schedule.")
 
     if handler_config.run_name:
