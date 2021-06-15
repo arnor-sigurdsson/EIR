@@ -8,7 +8,10 @@
   
   <a href="https://www.biorxiv.org/content/10.1101/2021.06.11.447883v1" alt="bioRxiv">
         <img src="https://img.shields.io/badge/Paper-bioRxiv-B5232F.svg" /></a>
-   
+  
+  <a href="https://www.python.org/downloads/" alt="Python">
+        <img src="https://img.shields.io/badge/python-3.8-blue.svg" /></a>
+     
 </p>
 
 ---
