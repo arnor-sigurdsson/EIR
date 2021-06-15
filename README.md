@@ -23,7 +23,7 @@ Supervised modelling on genotype and tabular data.
 
 ## Quickstart
 
-Download [sample data](https://drive.google.com/file/d/17vzG8AXVD684HqTD6RNtKjrK8tzHWeGx/view?usp=sharing) (or process your own `.bed`, `.bim`, `.fam` files with e.g. [plink_pipelines](https://github.com/arnor-sigurdsson/plink_pipelines)).
+Download [sample data](https://drive.google.com/file/d/17vzG8AXVD684HqTD6RNtKjrK8tzHWeGx/view?usp=sharing) (or process your own `.bed`, `.bim`, `.fam` files with e.g. [plink_pipelines](https://github.com/arnor-sigurdsson/plink_pipelines)). The sample data we are using here is for predicting ancestry in the public [Human Origins](https://www.nature.com/articles/nature13673) dataset, but the same approach can just as well be used for e.g. disease predictions in other cohorts (for example the [UK Biobank](https://www.nature.com/articles/s41586-018-0579-z)).
 
 Examining the sample data, we can see the following structure:
 
