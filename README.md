@@ -8,6 +8,9 @@
   
   <a href="https://www.biorxiv.org/content/10.1101/2021.06.11.447883v1" alt="bioRxiv">
         <img src="https://img.shields.io/badge/Paper-bioRxiv-B5232F.svg" /></a>
+  
+  <a href="https://scholar.googleusercontent.com/scholar.bib?q=info:AYWFpHU2hdcJ:scholar.google.com/&output=citation&scisdr=CgWviBdzEKz7g01vtC8:AAGBfm0AAAAAYMhprC_cXv0j_tfi9mhWawWoPWYz_FtI&scisig=AAGBfm0AAAAAYMhprN5_tS1wztmoee1XOzEwU1xmFaZN&scisf=4&ct=citation&cd=-1&hl=en" alt="Cite">
+      <img src="https://img.shields.io/badge/Cite-BibTex-blue.svg" /></a>
    
 </p>
 
@@ -71,3 +74,14 @@ eirtrain \
 > **_TIP:_**  For a full set of options and a short explanation of each, run `eirtrain --help`.
 
 This will generate a folder called `runs/test_mlp` in the current directory containing the results of the training.
+
+## Citation
+
+```
+@article{sigurdsson2021deep,
+  title={Deep integrative models for large-scale human genomics},
+  author={Sigurdsson, Arnor Ingi and Westergaard, David and Winther, Ole and Lund, Ole and Brunak, S{\o}ren and Vilhjalmsson, Bjarni J and Rasmussen, Simon},
+  journal={bioRxiv},
+  year={2021},
+  publisher={Cold Spring Harbor Laboratory}
+}
