@@ -250,7 +250,7 @@ def _check_test_performance_results(
                 "target_con_columns": ["Height", "ExtraTarget"],
             }
         },
-        {  # Case 4: Using the fully-split model
+        {  # Case 4: Using GLN
             "custom_cl_args": {
                 "model_type": "genome-local-net",
                 "lr": 1e-3,
@@ -274,7 +274,7 @@ def _check_test_performance_results(
                 "target_con_columns": ["Height", "ExtraTarget"],
             }
         },
-        {  # Case 6: Fully split with mixup
+        {  # Case 6: GLN with mixing
             "custom_cl_args": {
                 "model_type": "genome-local-net",
                 "lr": 1e-3,
@@ -283,7 +283,7 @@ def _check_test_performance_results(
                 "mixing_type": "cutmix-uniform",
                 "layers": [1],
                 "mixing_alpha": 1.0,
-                "n_epochs": 10,
+                "n_epochs": 12,
                 "target_cat_columns": ["Origin"],
                 "run_name": "test-mixing",
                 "target_con_columns": ["Height", "ExtraTarget"],
