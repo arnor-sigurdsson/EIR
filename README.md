@@ -113,7 +113,7 @@ This will generate a folder called `test_set_predictions` under in the `--output
 
 ### Applying to other datasets
 
-Hopefully this small demo was useful! To apply to your own data, you will have to process it (see: plink_pipelines](https://github.com/arnor-sigurdsson/plink_pipelines)) and change the following flags: `--omics_sources <path/to/your/processed/arrays> --snp_file <path/to/your/bim/file> --label_file <path/to/your/labels/csv/file> --target_cat_columns <name_of_target_column_in_label_file>`
+Hopefully this small demo was useful! To apply to your own data, you will have to process it (see: [plink_pipelines](https://github.com/arnor-sigurdsson/plink_pipelines)) and change the following flags: `--omics_sources <path/to/your/processed/arrays> --snp_file <path/to/your/bim/file> --label_file <path/to/your/labels/csv/file> --target_cat_columns <name_of_target_column_in_label_file>`
 
 ## Citation
 
