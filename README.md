@@ -56,16 +56,17 @@ eirtrain \
 --label_file processed_sample_data/human_origins_labels.csv  \
 --target_cat_columns Origin  \
 --model_type genome-local-net \
---fc_task_dim 32 \
---fc_do 0.5 \
---rb_do 0.5 \
---na_augment_perc 0.4 \
---na_augment_prob 1.0 \
+--fc_task_dim 32 `#Number of hidden nodes in fully-connected layers` \
+--fc_do 0.5 `#Last layer dropout` \
+--rb_do 0.5 `#Residual blocks dropout` \
+--na_augment_perc 0.4 `#Input NA dropout` \
+--na_augment_prob 1.0 `#Probability of applying input NA dropout` \
 --layers 2 \
 --run_name gln \
---channel_exp_base 1 \
---kernel_width 8 \
---memory_dataset
+--channel_exp_base 1 `#Use 2**1 weight sets in locally-connected layers` \
+--kernel_width 8 `#Locally connected with, 8 / 2 = 2 SNPs` \
+--get_acts \
+--max_acts_per_class 200 `#Limit number of samples used for activation computations` \
 ```
 
 > **_TIP:_**  For a full set of options and a short explanation of each, run `eirtrain --help`.
@@ -109,6 +110,10 @@ eirpredict --model_path runs/gln/saved_models/<chosen_model>  --output_folder ru
 This will generate a folder called `test_set_predictions` under in the `--output_folder` directory.
 
 > **_TIP:_** We might want to predict on samples where we do not have any labels, in that case just omit the `--evaluate` and `--label_file` flags.
+
+### Applying to other datasets
+
+Hopefully this small demo was useful! To apply to your own data, you will have to process it (see: plink_pipelines](https://github.com/arnor-sigurdsson/plink_pipelines)) and change the following flags: `--omics_sources <path/to/your/processed/arrays> --snp_file <path/to/your/bim/file> --label_file <path/to/your/labels/csv/file> --target_cat_columns <name_of_target_column_in_label_file>`
 
 ## Citation
 
