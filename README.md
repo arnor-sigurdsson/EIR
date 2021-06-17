@@ -14,6 +14,10 @@
   
    <a href="https://pypi.org/project/eir-dl/" alt="Python">
         <img src="https://img.shields.io/pypi/v/eir-dl.svg" /></a>
+  
+  <a href="https://codecov.io/gh/arnor-sigurdsson/EIR" alt="Coverage">
+        <img src="https://codecov.io/gh/arnor-sigurdsson/EIR/branch/master/graph/badge.svg" /></a>
+  
        
 </p>
 
