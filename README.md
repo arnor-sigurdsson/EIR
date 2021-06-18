@@ -18,6 +18,9 @@
   <a href="https://codecov.io/gh/arnor-sigurdsson/EIR" alt="Coverage">
         <img src="https://codecov.io/gh/arnor-sigurdsson/EIR/branch/master/graph/badge.svg" /></a>
   
+  <a href='https://eir.readthedocs.io/en/latest/?badge=latest'>
+        <img src='https://readthedocs.org/projects/eir/badge/?version=latest' alt='Documentation Status' /></a>
+  
        
 </p>
 
