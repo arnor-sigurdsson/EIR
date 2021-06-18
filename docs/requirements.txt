@@ -1,1 +1,2 @@
 sphinx==4.0.2
+sphinx-copybutton==0.3.3
