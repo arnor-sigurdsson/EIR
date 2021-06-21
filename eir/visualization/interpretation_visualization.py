@@ -9,7 +9,6 @@ import pandas as pd
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
-import plotly.graph_objects as go
 
 from aislib.misc_utils import get_logger, ensure_path_exists
 
@@ -282,46 +281,3 @@ def _get_manhattan_axis_and_figure(
     ax.set_ylabel(_y, fontsize=axlabelfontsize, fontname=axlabelfontname)
 
     return ax, fig
-
-
-def plot_snp_manhattan_plots_plotly(
-    df_snp_grads: pd.DataFrame,
-    outfolder: Path,
-    quantile: float = 0.95,
-    title_extra: str = "",
-):
-    """
-    We have the percentile here to avoid creating html files that are massive in size.
-    """
-    activations_columns = [
-        i for i in df_snp_grads.columns if i.endswith("_activations")
-    ]
-
-    df_snp_grads = df_snp_grads.sort_values(by=["CHR_CODE", "BP_COORD"])
-
-    fig = go.Figure()
-
-    for col in activations_columns:
-        label_name = col.split("_activations")[0]
-        quantile_cutoff = df_snp_grads[col].quantile(quantile)
-        df_snp_grads_cut = df_snp_grads[df_snp_grads[col] >= quantile_cutoff]
-
-        fig.add_trace(
-            go.Scatter(
-                x=df_snp_grads_cut["BP_COORD"],
-                y=df_snp_grads_cut[col],
-                name=label_name,
-                mode="markers",
-                text=df_snp_grads_cut["VAR_ID"],
-            )
-        )
-
-    fig.update_layout(
-        title=f"Manhattan Plot (top {quantile}%){title_extra}",
-        xaxis_title="BP Coordinate",
-        yaxis_title="Activation",
-    )
-
-    out_path = outfolder / "manhattan/manhattan_interactive.html"
-    ensure_path_exists(path=out_path)
-    fig.write_html(str(out_path))

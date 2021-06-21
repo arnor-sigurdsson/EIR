@@ -80,11 +80,6 @@ def analyze_omics_input_activations(
         outfolder=activation_outfolder,
         title_extra=f" - {target_column_name}",
     )
-    av.plot_snp_manhattan_plots_plotly(
-        df_snp_grads=df_snp_grads,
-        outfolder=activation_outfolder,
-        title_extra=f" - {target_column_name}",
-    )
 
 
 def read_snp_df(

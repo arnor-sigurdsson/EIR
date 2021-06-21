@@ -2,3 +2,4 @@
 omit = 
     eir/visualization/*
     eir/configuration.py
+    eir/build_module.py

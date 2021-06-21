@@ -53,6 +53,7 @@ ipython = "^7.24.1"
 Sphinx = "^4.0.2"
 sphinx-rtd-theme = "^0.5.2"
 sphinx-copybutton = "^0.3.3"
+tomlkit = "^0.7.2"
 
 [tool.poetry.scripts]
 eirtrain = "eir.train:main"

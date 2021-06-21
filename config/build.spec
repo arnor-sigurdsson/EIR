@@ -5,19 +5,11 @@ import os
 import sys
 sys.setrecursionlimit(5000)
 
-# work-around for https://github.com/pyinstaller/pyinstaller/issues/4064
-# import distutils
-# if distutils.distutils_path.endswith('__init__.py'):
-#     distutils.distutils_path = os.path.dirname(distutils.distutils_path)
-
-# See: https://stackoverflow.com/questions/57517371/matplotlibdeprecationwarning-with-pyinstaller-exe 
-# for mpl DeprecationWarning showing up after compiling
-
 options = [('W ignore', None, 'OPTION')]
 
 block_cipher = None
 
-a = Analysis(['../eir/predict.py'],
+a = Analysis(['../eir/build_module.py'],
              binaries=[],
              datas=[],
              pathex=[],
@@ -30,7 +22,8 @@ a = Analysis(['../eir/predict.py'],
                  'sklearn.neighbors',
                  'sklearn.tree._utils',
                  'sklearn.tree',
-                 ],
+                 'ray.async_compat',
+             ],
              hookspath=[],
              runtime_hooks=[],
              excludes=[],
@@ -47,7 +40,7 @@ exe = EXE(pyz,
           a.zipfiles,
           a.datas,
           [],
-          name='predict',
+          name='eir',
           debug=False,
           bootloader_ignore_signals=False,
           strip=False,
