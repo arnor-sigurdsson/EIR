@@ -292,7 +292,7 @@ six = "*"
 
 [[package]]
 name = "dask"
-version = "2021.6.0"
+version = "2021.6.1"
 description = "Parallel PyData with Task Scheduling"
 category = "main"
 optional = false
@@ -309,10 +309,10 @@ toolz = ">=0.8.2"
 
 [package.extras]
 array = ["numpy (>=1.16)"]
-complete = ["bokeh (>=1.0.0,!=2.0.0)", "distributed (==2021.06.0)", "numpy (>=1.16)", "pandas (>=0.25.0)"]
+complete = ["bokeh (>=1.0.0,!=2.0.0)", "distributed (==2021.06.1)", "numpy (>=1.16)", "pandas (>=0.25.0)"]
 dataframe = ["numpy (>=1.16)", "pandas (>=0.25.0)"]
 diagnostics = ["bokeh (>=1.0.0,!=2.0.0)"]
-distributed = ["distributed (==2021.06.0)"]
+distributed = ["distributed (==2021.06.1)"]
 test = ["pytest", "pytest-rerunfailures", "pytest-xdist"]
 
 [[package]]
@@ -1986,6 +1986,14 @@ optional = false
 python-versions = ">=2.6, !=3.0.*, !=3.1.*, !=3.2.*"
 
 [[package]]
+name = "tomlkit"
+version = "0.7.2"
+description = "Style preserving TOML library"
+category = "dev"
+optional = false
+python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
+
+[[package]]
 name = "toolz"
 version = "0.11.1"
 description = "List processing tools and functional utilities"
@@ -2222,7 +2230,7 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "2570e286a52be049e4f34f80fc07173666fbca9793349d7a878a0ec7216ca237"
+content-hash = "9adbab0365284c815b6908e321e75670540a0539658ee5096aaac87656f7df4d"
 
 [metadata.files]
 absl-py = [
@@ -2452,8 +2460,8 @@ cycler = [
     {file = "cycler-0.10.0.tar.gz", hash = "sha256:cd7b2d1018258d7247a71425e9f26463dfb444d411c39569972f4ce586b0c9d8"},
 ]
 dask = [
-    {file = "dask-2021.6.0-py3-none-any.whl", hash = "sha256:ac4ec1e622bc220a057ad424ec5303f8ad96a70d672ccdb4ad60bf56d00fa1b7"},
-    {file = "dask-2021.6.0.tar.gz", hash = "sha256:234f62f8e9e5fd60cd669de16ad29b2c7bdad76c3a2ff0ac1eb854e80106f5af"},
+    {file = "dask-2021.6.1-py3-none-any.whl", hash = "sha256:a14096602565661605ede0f15c5478a930fcc8b52b8a77a17b1fcae8c23a30ae"},
+    {file = "dask-2021.6.1.tar.gz", hash = "sha256:8fd0949fbd273181784b635f21713aea0784ef01a805104931fa0cd6ae233ba8"},
 ]
 decorator = [
     {file = "decorator-5.0.9-py3-none-any.whl", hash = "sha256:6e5c199c16f7a9f0e3a61a4a54b3d27e7dad0dbdde92b944426cb20914376323"},
@@ -3524,6 +3532,10 @@ threadpoolctl = [
 toml = [
     {file = "toml-0.10.2-py2.py3-none-any.whl", hash = "sha256:806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b"},
     {file = "toml-0.10.2.tar.gz", hash = "sha256:b3bda1d108d5dd99f4a20d24d9c348e91c4db7ab1b749200bded2f839ccbe68f"},
+]
+tomlkit = [
+    {file = "tomlkit-0.7.2-py2.py3-none-any.whl", hash = "sha256:173ad840fa5d2aac140528ca1933c29791b79a374a0861a80347f42ec9328117"},
+    {file = "tomlkit-0.7.2.tar.gz", hash = "sha256:d7a454f319a7e9bd2e249f239168729327e4dd2d27b17dc68be264ad1ce36754"},
 ]
 toolz = [
     {file = "toolz-0.11.1-py3-none-any.whl", hash = "sha256:1bc473acbf1a1db4e72a1ce587be347450e8f08324908b8a266b486f408f04d5"},

@@ -16,10 +16,17 @@ repos:
         name: Run tests
         entry: tox
         language: system
-        types: [python]
-        stages: [push]
+        types: [ python ]
+        stages: [ push ]
+
       - id: update-reqs
         name: Update requirements.txt
         entry: ./misc/update_reqs.sh
         language: system
-        stages: [manual]
+        stages: [ push ]
+
+      - id: check-versions
+        name: Check project versions
+        entry: python ./misc/check_versions.py
+        language: system
+        stages: [ commit ]
