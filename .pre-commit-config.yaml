@@ -23,7 +23,7 @@ repos:
         name: Update requirements.txt
         entry: ./misc/update_reqs.sh
         language: system
-        stages: [ push ]
+        stages: [ commit ]
 
       - id: check-versions
         name: Check project versions
