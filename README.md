@@ -10,7 +10,7 @@
         <img src="https://img.shields.io/badge/Paper-bioRxiv-B5232F.svg" /></a>
   
   <a href="https://www.python.org/downloads/" alt="Python">
-        <img src="https://img.shields.io/badge/python-3.8+-blue.svg" /></a>
+        <img src="https://img.shields.io/badge/python-3.8|3.9-blue.svg" /></a>
   
    <a href="https://pypi.org/project/eir-dl/" alt="Python">
         <img src="https://img.shields.io/pypi/v/eir-dl.svg" /></a>
@@ -38,9 +38,10 @@ There are also [binaries](https://github.com/arnor-sigurdsson/EIR/releases) avai
 
 ## Usage
 
-- See the [quickstart](https://eir.readthedocs.io/en/latest/quickstart.html) for a quick demo on how to use the framework.
+- See the [Quickstart](https://eir.readthedocs.io/en/latest/quickstart.html) for a quick demo on how to use the framework.
+- If using the pre-built binaries, check out the [Using Binaries](https://eir.readthedocs.io/en/latest/binaries_guide.html) short tutorial.
 
-Please refer to the [documentation](https://eir.readthedocs.io/en/latest/index.html) for more examples and information.
+Please refer to the [Documentation](https://eir.readthedocs.io/en/latest/index.html) for more examples and information.
 
 ## Citation
 
