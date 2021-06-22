@@ -1,5 +1,5 @@
 EIR
-==============================
+===
 
 ``EIR`` is a framework for training linear and
 deep learning models on genotype and tabular data.
@@ -35,5 +35,6 @@ To get started, please, read :doc:`quickstart`
    :maxdepth: 2
 
    quickstart
+   binaries_guide
    license
 
