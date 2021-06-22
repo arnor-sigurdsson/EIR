@@ -22,7 +22,7 @@ chardet==4.0.0; python_version >= "2.7" and python_full_version < "3.0.0" or pyt
 click==8.0.1; python_version >= "3.6" and python_full_version >= "3.6.2"
 cloudpickle==1.6.0; python_version >= "3.8" and python_version < "4.0"
 colorama==0.4.4; (python_version >= "2.7" and python_full_version < "3.0.0") or (python_full_version >= "3.5.0")
-configargparse==1.4.1; (python_version >= "2.7" and python_full_version < "3.0.0") or (python_full_version >= "3.5.0")
+configargparse==1.5; (python_version >= "2.7" and python_full_version < "3.0.0") or (python_full_version >= "3.5.0")
 coverage==5.5; (python_version >= "2.7" and python_full_version < "3.0.0") or (python_full_version >= "3.5.0" and python_version < "4")
 cycler==0.10.0; python_version >= "3.7"
 dask==2021.6.1; python_version >= "3.8" and python_version < "4.0"
@@ -38,10 +38,10 @@ flake8==3.9.2; (python_version >= "2.7" and python_full_version < "3.0.0") or (p
 fsspec==2021.6.0; python_version >= "3.8" and python_version < "4.0"
 future==0.18.2; sys_platform == "win32" and python_version >= "3.6" and python_full_version >= "3.6.0"
 google-auth-oauthlib==0.4.4; python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.2.0" and python_version >= "3.6"
-google-auth==1.31.0; python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.6.0" and python_version >= "3.6"
+google-auth==1.32.0; python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.6.0" and python_version >= "3.6"
 gpustat==0.6.0
 greenlet==1.1.0; python_version >= "2.7" and python_full_version < "3.0.0" or python_full_version >= "3.5.0"
-grpcio==1.38.0; python_version >= "2.7" and python_full_version < "3.0.0" or python_full_version >= "3.2.0"
+grpcio==1.38.1; python_version >= "2.7" and python_full_version < "3.0.0" or python_full_version >= "3.2.0"
 hypothesis==6.14.0; python_version >= "3.6"
 identify==2.2.10; python_full_version >= "3.6.1"
 idna==2.10; python_version >= "2.7" and python_full_version < "3.0.0" or python_full_version >= "3.5.0"
@@ -62,7 +62,7 @@ jupyter==1.0.0
 jupyterlab-pygments==0.1.2; python_version >= "3.6"
 jupyterlab-widgets==1.0.0; python_version >= "3.6"
 kiwisolver==1.3.1; python_version >= "3.7"
-llvmlite==0.34.0; python_version >= "3.6"
+llvmlite==0.36.0; python_version >= "3.6" and python_version < "3.10"
 locket==0.2.1; python_version >= "3.8" and python_full_version < "3.0.0" and python_version < "4.0" or python_version >= "3.8" and python_version < "4.0" and python_full_version >= "3.4.0"
 macholib==1.14; sys_platform == "darwin" and python_version >= "3.6"
 markdown==3.3.4; python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.2.0" and python_version >= "3.6"
@@ -80,12 +80,12 @@ nbformat==5.1.3; python_full_version >= "3.6.1" and python_version >= "3.6"
 nest-asyncio==1.5.1; python_full_version >= "3.6.1" and python_version >= "3.6"
 nodeenv==1.6.0; python_full_version >= "3.6.1"
 notebook==6.4.0; python_version >= "3.6"
-numba==0.51.2; python_version >= "3.6"
+numba==0.53.1; python_version >= "3.6" and python_version < "3.10"
 numpy==1.20.3; python_version >= "3.7"
 nvidia-ml-py3==7.352.0
 oauthlib==3.1.1; python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.4.0" and python_version >= "3.6"
 packaging==20.9; python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.5.0" and python_version >= "3.6"
-pandas-plink==2.2.4; python_version >= "3.8" and python_version < "4.0"
+pandas-plink==2.2.8; python_version >= "3.8" and python_version < "4.0"
 pandas==1.2.4; python_full_version >= "3.7.1"
 pandocfilters==1.4.3; python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.4.0" and python_version >= "3.6"
 parso==0.8.2; python_version >= "3.7"
@@ -99,7 +99,7 @@ plotly==4.14.3
 pluggy==0.13.1; python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.5.0" and python_version >= "3.6"
 pre-commit==2.13.0; python_full_version >= "3.6.1"
 prometheus-client==0.11.0; python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.4.0" and python_version >= "3.6"
-prompt-toolkit==3.0.18; python_full_version >= "3.6.1" and python_version >= "3.7"
+prompt-toolkit==3.0.19; python_full_version >= "3.6.1" and python_version >= "3.7"
 protobuf==3.17.3; python_version >= "2.7" and python_full_version < "3.0.0" or python_full_version >= "3.2.0"
 psutil==5.8.0; python_version >= "2.6" and python_full_version < "3.0.0" or python_full_version >= "3.4.0"
 ptyprocess==0.7.0; sys_platform != "win32" and python_version >= "3.7" and os_name != "nt"
@@ -135,9 +135,9 @@ requests==2.25.1; python_version >= "3.6" and python_full_version < "3.0.0" or p
 retrying==1.3.3
 rsa==4.7.2; python_version >= "3.5" and python_version < "4" and (python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.6.0" and python_version >= "3.6")
 scikit-learn==0.24.2; python_version >= "3.6"
-scipy==1.6.1; python_version >= "3.8" and python_version < "4.0"
+scipy==1.7.0; python_version >= "3.8" and python_version < "3.10"
 seaborn==0.11.1; python_version >= "3.6"
-send2trash==1.5.0; python_version >= "3.6"
+send2trash==1.7.1; python_version >= "3.6"
 shap==0.39.0
 six==1.16.0; python_full_version >= "3.7.1" and python_version >= "3.7" and (python_version >= "2.7" and python_full_version < "3.0.0" or python_full_version >= "3.3.0") and (python_version >= "2.7" and python_full_version < "3.0.0" or python_full_version >= "3.6.0") and (python_version >= "2.7" and python_full_version < "3.0.0" or python_full_version >= "3.5.0") and (python_version >= "2.7" and python_full_version < "3.0.0" or python_full_version >= "3.4.0") and (python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.5.0" and python_version >= "3.6") and (python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.3.0" and python_version >= "3.6") and (python_version >= "3.5" and python_full_version < "3.0.0" or python_full_version >= "3.3.0" and python_version >= "3.5")
 slicer==0.0.7; python_version >= "3.6"
