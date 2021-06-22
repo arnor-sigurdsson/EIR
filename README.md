@@ -34,6 +34,8 @@ Supervised modelling on genotype and tabular data.
 
 `pip install eir-dl`
 
+There are also [binaries](https://github.com/arnor-sigurdsson/EIR/releases) available for download.
+
 ## Usage
 
 - See the [quickstart](https://eir.readthedocs.io/en/latest/quickstart.html) for a quick demo on how to use the framework.
