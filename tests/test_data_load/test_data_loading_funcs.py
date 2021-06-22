@@ -4,7 +4,7 @@ from typing import List
 
 import numpy as np
 import pytest
-from hypothesis import given
+from hypothesis import given, settings
 from hypothesis.strategies import lists, integers
 
 from eir.data_load import data_loading_funcs
@@ -132,6 +132,7 @@ def _gather_dataloader_target_label_distributions(
         elements=integers(min_value=0, max_value=9), min_size=10, max_size=1000
     ).map(lambda x: x + list(range(10)))
 )
+@settings(deadline=500)
 def test_gather_column_sampling_weights(test_labels):
     """
     We have the .map here to ensure that all possible values exist at least once.
@@ -179,6 +180,7 @@ def _check_label_weights_and_counts(test_labels, label_weight_dict):
         elements=integers(min_value=0, max_value=9), min_size=10, max_size=1000
     ).map(lambda x: x + list(range(10)))
 )
+@settings(deadline=500)
 def test_get_column_sample_weights(test_labels):
     """
     We do the `map` to make sure that the list contains at least one copy of all
@@ -199,6 +201,7 @@ def test_get_column_sample_weights(test_labels):
         elements=integers(min_value=0, max_value=9), min_size=10, max_size=1000
     ).map(lambda x: x + list(range(10)))
 )
+@settings(deadline=500)
 def test_aggregate_column_sampling_weights_auto(test_labels):
     """
     Note: This test currently works with the assumption that the labels are equally
