@@ -11,7 +11,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-18.04, macos-10.15]
         python-version: [3.8, 3.9]
     steps:
       - uses: actions/checkout@v2
@@ -28,7 +28,7 @@ jobs:
   createrelease:
     name: Create Release
     needs: test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     steps:
       - name: Create Release
         id: create_release
@@ -56,18 +56,20 @@ jobs:
       matrix:
         include:
 
-          - os: ubuntu-latest
+          - os: ubuntu-18.04
             TARGET: linux
             CMD_BUILD: |
               poetry run pyinstaller --onefile config/build.spec
+              ./dist/eir --version
               zip -j ./dist/eir_linux.zip ./dist/eir
             OUT_FILE_NAME: eir_linux.zip
             ASSET_MIME: application/zip
 
-          - os: macos-latest
+          - os: macos-10.15
             TARGET: macos
             CMD_BUILD: |
               poetry run pyinstaller --onefile config/build.spec
+              ./dist/eir --version
               zip -j ./dist/eir_macos.zip ./dist/eir
             OUT_FILE_NAME: eir_macos.zip
             ASSET_MIME: application/zip
@@ -117,7 +119,7 @@ jobs:
   upload:
     name: Upload to PyPI
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
