@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "eir-dl"
-version = "0.1.9-alpha"
+version = "0.1.10-alpha"
 description = ""
 license = "AGPLv3"
 authors = ["Arnor Sigurdsson"]
