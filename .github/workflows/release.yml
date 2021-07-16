@@ -159,6 +159,17 @@ jobs:
             OUT_FILE_NAME: eir-${{ needs.createrelease.outputs.versionoutput }}_CentOS-8.zip
             ASSET_MIME: application/zip
 
+          - name: CentOS 7
+            os: ubuntu-20.04
+            container: centos:7
+            TARGET: CentOS 7
+            CMD_BUILD: |
+              poetry run pyinstaller --onefile config/build.spec
+              ./dist/eir --version
+              zip -j ./dist/eir-${{ needs.createrelease.outputs.versionoutput }}_CentOS-7.zip ./dist/eir
+            OUT_FILE_NAME: eir-${{ needs.createrelease.outputs.versionoutput }}_CentOS-7.zip
+            ASSET_MIME: application/zip
+
     steps:
       - name: Set up Node
         run: |
