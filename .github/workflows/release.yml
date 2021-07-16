@@ -11,7 +11,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-18.04, macos-10.15]
+        os: [ubuntu-20.04, macos-10.15]
         python-version: [3.8, 3.9]
     steps:
       - uses: actions/checkout@v2
@@ -28,7 +28,7 @@ jobs:
   createrelease:
     name: Create Release
     needs: test
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
       - name: Create Release
         id: create_release
@@ -56,13 +56,13 @@ jobs:
       matrix:
         include:
 
-          - os: ubuntu-18.04
-            TARGET: linux
+          - os: ubuntu-20.04
+            TARGET: ubuntu
             CMD_BUILD: |
               poetry run pyinstaller --onefile config/build.spec
               ./dist/eir --version
-              zip -j ./dist/eir_linux.zip ./dist/eir
-            OUT_FILE_NAME: eir_linux.zip
+              zip -j ./dist/eir_ubuntu_20_${{ steps.get_tag_version.outputs.VERSION }}.zip ./dist/eir
+            OUT_FILE_NAME: eir_ubuntu_20_${{ steps.get_tag_version.outputs.VERSION }}.zip
             ASSET_MIME: application/zip
 
           - os: macos-10.15
@@ -70,35 +70,46 @@ jobs:
             CMD_BUILD: |
               poetry run pyinstaller --onefile config/build.spec
               ./dist/eir --version
-              zip -j ./dist/eir_macos.zip ./dist/eir
-            OUT_FILE_NAME: eir_macos.zip
+              zip -j ./dist/eir_macos_${{ steps.get_tag_version.outputs.VERSION }}.zip ./dist/eir
+            OUT_FILE_NAME: eir_macos_${{ steps.get_tag_version.outputs.VERSION }}.zip
             ASSET_MIME: application/zip
 
           - os: windows-latest
             TARGET: windows
             CMD_BUILD: |
               poetry run pyinstaller --onefile config/build.spec
-              Compress-Archive ./dist/eir.exe ./dist/eir_windows.zip
-            OUT_FILE_NAME: eir_windows.zip
+              Compress-Archive ./dist/eir.exe ./dist/eir_windows_${{ steps.get_tag_version.outputs.VERSION }}.zip
+            OUT_FILE_NAME: eir_windows_${{ steps.get_tag_version.outputs.VERSION }}.zip
             ASSET_MIME: application/vnd.microsoft.portable-executable
+
     steps:
-      - uses: actions/checkout@v1
+      - name: Checkout repository
+        uses: actions/checkout@v1
+
       - name: Set up Python 3.8
         uses: actions/setup-python@v2
         with:
           python-version: 3.8
+
+      - name: Get the tag version
+        id: get_tag_version
+        run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install --upgrade setuptools
           pip install poetry==1.1.6
           poetry install
+
       - name: Build with pyinstaller for ${{matrix.TARGET}}
         run: ${{matrix.CMD_BUILD}}
+
       - name: Load Release URL File from release job
         uses: actions/download-artifact@v1
         with:
           name: release_url
+
       - name: Get Release File Name & Upload URL
         id: get_release_info
         shell: bash
@@ -116,10 +127,72 @@ jobs:
           asset_name: ${{ matrix.OUT_FILE_NAME}}
           asset_content_type: ${{ matrix.ASSET_MIME}}
 
+  # Currently we are repeating a lot of code from the steps above, but afaik GH actions
+  # does currently not have a strong support for composable actions, and mixing
+  # matrix configurations with / without containers seems to produce errors
+  # See: https://github.community/t/run-matrix-job-on-macos-and-on-ubuntu-in-container/16359/8
+  # and https://github.com/actions/runner/issues/646
+  build-containers:
+    name: Build packages with containers
+    needs: createrelease
+    runs-on: ${{ matrix.os }}
+    container:
+      image: ${{ matrix.container }}
+    strategy:
+      matrix:
+        include:
+
+          - name: CentOS 8
+            os: ubuntu-20.04
+            container: centos:8
+            TARGET: CentOS 8
+            CMD_BUILD: |
+              poetry run pyinstaller --onefile config/build.spec
+              ./dist/eir --version
+              zip -j ./dist/eir_CentOS_8_${{ steps.get_tag_version.outputs.VERSION }}.zip ./dist/eir
+            OUT_FILE_NAME: eir_CentOS_8_${{ steps.get_tag_version.outputs.VERSION }}.zip
+            ASSET_MIME: application/zip
+
+    steps:
+      - name: Set up Node
+        run: |
+              dnf update -y
+              curl -sL https://rpm.nodesource.com/setup_14.x | bash -
+              dnf install -y nodejs
+
+      - name: Checkout repository
+        uses: actions/checkout@v1
+
+      - name: Set up Python 3.8
+        run: dnf install -y python3.8 python38-devel
+
+      - name: Set up system dependencies
+        run: dnf install -y gcc gcc-c++ zip unzip
+
+      - name: Get the tag version
+        id: get_tag_version
+        run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
+
+      - name: Install dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install --upgrade setuptools
+          pip install poetry==1.1.6
+          poetry env use 3.8
+          poetry install
+
+      - name: Build with pyinstaller for ${{matrix.TARGET}}
+        run: ${{matrix.CMD_BUILD}}
+
+      - name: Load Release URL File from release job
+        uses: actions/download-artifact@v1
+        with:
+          name: release_url
+
   upload:
     name: Upload to PyPI
     needs: build
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
