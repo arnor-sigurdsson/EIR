@@ -29,6 +29,8 @@ jobs:
     name: Create Release
     needs: test
     runs-on: ubuntu-20.04
+    outputs:
+      versionoutput: ${{ steps.getversiontag.outputs.VERSION }}
     steps:
       - name: Create Release
         id: create_release
@@ -40,13 +42,20 @@ jobs:
           release_name: Release ${{ github.ref }}
           draft: false
           prerelease: true
+
       - name: Output Release URL File
         run: echo "${{ steps.create_release.outputs.upload_url }}" > release_url.txt
+
       - name: Save Release URL File for publish
         uses: actions/upload-artifact@v1
         with:
           name: release_url
           path: release_url.txt
+
+      - name: Get the tag version
+        id: getversiontag
+        run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
+
 
   build:
     name: Build packages
@@ -61,8 +70,8 @@ jobs:
             CMD_BUILD: |
               poetry run pyinstaller --onefile config/build.spec
               ./dist/eir --version
-              zip -j ./dist/eir_ubuntu_20_${{ steps.get_tag_version.outputs.VERSION }}.zip ./dist/eir
-            OUT_FILE_NAME: eir_ubuntu_20_${{ steps.get_tag_version.outputs.VERSION }}.zip
+              zip -j ./dist/eir_ubuntu_20_${{ needs.createrelease.outputs.versionoutput }}.zip ./dist/eir
+            OUT_FILE_NAME: eir_ubuntu_20_${{ needs.createrelease.outputs.versionoutput }}.zip
             ASSET_MIME: application/zip
 
           - os: macos-10.15
@@ -70,16 +79,16 @@ jobs:
             CMD_BUILD: |
               poetry run pyinstaller --onefile config/build.spec
               ./dist/eir --version
-              zip -j ./dist/eir_macos_${{ steps.get_tag_version.outputs.VERSION }}.zip ./dist/eir
-            OUT_FILE_NAME: eir_macos_${{ steps.get_tag_version.outputs.VERSION }}.zip
+              zip -j ./dist/eir_macos_${{ needs.createrelease.outputs.versionoutput }}.zip ./dist/eir
+            OUT_FILE_NAME: eir_macos_${{ needs.createrelease.outputs.versionoutput }}.zip
             ASSET_MIME: application/zip
 
-          - os: windows-latest
+          - os: windows-2019
             TARGET: windows
             CMD_BUILD: |
               poetry run pyinstaller --onefile config/build.spec
-              Compress-Archive ./dist/eir.exe ./dist/eir_windows_${{ steps.get_tag_version.outputs.VERSION }}.zip
-            OUT_FILE_NAME: eir_windows_${{ steps.get_tag_version.outputs.VERSION }}.zip
+              Compress-Archive ./dist/eir.exe ./dist/eir_windows_${{ needs.createrelease.outputs.versionoutput }}.zip
+            OUT_FILE_NAME: eir_windows_${{ needs.createrelease.outputs.versionoutput }}.zip
             ASSET_MIME: application/vnd.microsoft.portable-executable
 
     steps:
@@ -90,10 +99,6 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: 3.8
-
-      - name: Get the tag version
-        id: get_tag_version
-        run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
 
       - name: Install dependencies
         run: |
@@ -149,8 +154,8 @@ jobs:
             CMD_BUILD: |
               poetry run pyinstaller --onefile config/build.spec
               ./dist/eir --version
-              zip -j ./dist/eir_CentOS_8_${{ steps.get_tag_version.outputs.VERSION }}.zip ./dist/eir
-            OUT_FILE_NAME: eir_CentOS_8_${{ steps.get_tag_version.outputs.VERSION }}.zip
+              zip -j ./dist/eir_CentOS_8_${{ needs.createrelease.outputs.versionoutput }}.zip ./dist/eir
+            OUT_FILE_NAME: eir_CentOS_8_${{ needs.createrelease.outputs.versionoutput }}.zip
             ASSET_MIME: application/zip
 
     steps:
@@ -168,10 +173,6 @@ jobs:
 
       - name: Set up system dependencies
         run: dnf install -y gcc gcc-c++ zip unzip
-
-      - name: Get the tag version
-        id: get_tag_version
-        run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
 
       - name: Install dependencies
         run: |
