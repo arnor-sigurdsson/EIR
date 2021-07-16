@@ -173,18 +173,18 @@ jobs:
     steps:
       - name: Set up Node
         run: |
-              dnf update -y
+              yum update -y
               curl -sL https://rpm.nodesource.com/setup_14.x | bash -
-              dnf install -y nodejs
+              yum install -y nodejs
 
       - name: Checkout repository
         uses: actions/checkout@v1
 
       - name: Set up Python 3.8
-        run: dnf install -y python3.8 python38-devel
+        run: yum install -y python3.8 python38-devel
 
       - name: Set up system dependencies
-        run: dnf install -y gcc gcc-c++ zip unzip
+        run: yum install -y gcc gcc-c++ zip unzip
 
       - name: Install dependencies
         run: |
