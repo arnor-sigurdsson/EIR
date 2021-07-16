@@ -192,7 +192,7 @@ jobs:
 
   upload:
     name: Upload to PyPI
-    needs: build
+    needs: [build, build-containers]
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
