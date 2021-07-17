@@ -171,24 +171,35 @@ jobs:
             ASSET_MIME: application/zip
 
     steps:
-      - name: Set up Node
+      - name: Set up package managers
         run: |
               yum update -y
+              yum install -y epel-release
+              dnf update -y
               curl -sL https://rpm.nodesource.com/setup_14.x | bash -
-              yum install -y nodejs
+              dnf install -y nodejs
 
       - name: Checkout repository
         uses: actions/checkout@v1
 
-      - name: Set up Python 3.8
-        run: yum install -y python3.8 python38-devel
-
       - name: Set up system dependencies
-        run: yum install -y gcc gcc-c++ zip unzip
+        run: dnf groupinstall -y "Development Tools"
+
+      - name: Set up Python 3.8
+        run: |
+          dnf install -y gcc zlib-devel bzip2 bzip2-devel readline-devel sqlite sqlite-devel openssl-devel tk-devel libffi-devel xz-devel
+          dnf install -y wget
+          wget https://www.python.org/ftp/python/3.8.11/Python-3.8.11.tgz
+          tar xzf Python-3.8.11.tgz
+          cd Python-3.8.11
+          ./configure --enable-optimizations --enable-shared LDFLAGS="-Wl,-rpath /usr/local/lib"
+          make altinstall
+          cd ..
 
       - name: Install dependencies
         run: |
-          python3 -m pip install --upgrade pip
+          python3.8 --version
+          python3.8 -m pip install --upgrade pip
           pip install --upgrade setuptools
           pip install poetry==1.1.6
           poetry env use 3.8
