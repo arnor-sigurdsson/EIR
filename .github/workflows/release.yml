@@ -175,9 +175,8 @@ jobs:
         run: |
               yum update -y
               yum install -y epel-release
+              yum install -y dnf
               dnf update -y
-              curl -sL https://rpm.nodesource.com/setup_14.x | bash -
-              dnf install -y nodejs
 
       - name: Checkout repository
         uses: actions/checkout@v1
