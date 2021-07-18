@@ -25,33 +25,13 @@ jobs:
           pip install poetry==1.1.6
           tox -e py
 
-  createrelease:
-    name: Create Release
+  getrelease:
+    name: Get release
     needs: test
     runs-on: ubuntu-20.04
     outputs:
       versionoutput: ${{ steps.getversiontag.outputs.VERSION }}
     steps:
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          draft: false
-          prerelease: true
-
-      - name: Output Release URL File
-        run: echo "${{ steps.create_release.outputs.upload_url }}" > release_url.txt
-
-      - name: Save Release URL File for publish
-        uses: actions/upload-artifact@v1
-        with:
-          name: release_url
-          path: release_url.txt
-
       - name: Get the tag version
         id: getversiontag
         run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
@@ -59,7 +39,7 @@ jobs:
 
   build:
     name: Build packages
-    needs: createrelease
+    needs: getrelease
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -70,8 +50,8 @@ jobs:
             CMD_BUILD: |
               poetry run pyinstaller --onefile config/build.spec
               ./dist/eir --version
-              zip -j ./dist/eir-${{ needs.createrelease.outputs.versionoutput }}_ubuntu-20.zip ./dist/eir
-            OUT_FILE_NAME: eir-${{ needs.createrelease.outputs.versionoutput }}_ubuntu-20.zip
+              zip -j ./dist/eir-${{ needs.getrelease.outputs.versionoutput }}_ubuntu-20.zip ./dist/eir
+            OUT_FILE_NAME: eir-${{ needs.getrelease.outputs.versionoutput }}_ubuntu-20.zip
             ASSET_MIME: application/zip
 
           - os: macos-10.15
@@ -79,21 +59,21 @@ jobs:
             CMD_BUILD: |
               poetry run pyinstaller --onefile config/build.spec
               ./dist/eir --version
-              zip -j ./dist/eir-${{ needs.createrelease.outputs.versionoutput }}_macos.zip ./dist/eir
-            OUT_FILE_NAME: eir-${{ needs.createrelease.outputs.versionoutput }}_macos.zip
+              zip -j ./dist/eir-${{ needs.getrelease.outputs.versionoutput }}_macos.zip ./dist/eir
+            OUT_FILE_NAME: eir-${{ needs.getrelease.outputs.versionoutput }}_macos.zip
             ASSET_MIME: application/zip
 
           - os: windows-2019
             TARGET: windows
             CMD_BUILD: |
               poetry run pyinstaller --onefile config/build.spec
-              Compress-Archive ./dist/eir.exe ./dist/eir-${{ needs.createrelease.outputs.versionoutput }}_windows.zip
-            OUT_FILE_NAME: eir-${{ needs.createrelease.outputs.versionoutput }}_windows.zip
+              Compress-Archive ./dist/eir.exe ./dist/eir-${{ needs.getrelease.outputs.versionoutput }}_windows.zip
+            OUT_FILE_NAME: eir-${{ needs.getrelease.outputs.versionoutput }}_windows.zip
             ASSET_MIME: application/vnd.microsoft.portable-executable
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v1
+        uses: actions/checkout@v2
 
       - name: Set up Python 3.8
         uses: actions/setup-python@v2
@@ -110,28 +90,15 @@ jobs:
       - name: Build with pyinstaller for ${{matrix.TARGET}}
         run: ${{matrix.CMD_BUILD}}
 
-      - name: Load Release URL File from release job
-        uses: actions/download-artifact@v1
-        with:
-          name: release_url
 
-      - name: Get Release File Name & Upload URL
-        id: get_release_info
-        shell: bash
-        run: |
-          value=`cat release_url/release_url.txt`
-          echo ::set-output name=upload_url::$value
-
-      - name: Upload Release Asset
-        id: upload-release-asset
-        uses: actions/upload-release-asset@v1
+      - name: Release
+        id: release
+        uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.get_release_info.outputs.upload_url }}
-          asset_path: ./dist/${{ matrix.OUT_FILE_NAME}}
-          asset_name: ${{ matrix.OUT_FILE_NAME}}
-          asset_content_type: ${{ matrix.ASSET_MIME}}
+          files: ./dist/${{ matrix.OUT_FILE_NAME}}
+          prerelease: true
 
   # Currently we are repeating a lot of code from the steps above, but afaik GH actions
   # does currently not have a strong support for composable actions, and mixing
@@ -140,7 +107,7 @@ jobs:
   # and https://github.com/actions/runner/issues/646
   build-containers:
     name: Build packages with containers
-    needs: createrelease
+    needs: getrelease
     runs-on: ${{ matrix.os }}
     container:
       image: ${{ matrix.container }}
@@ -155,8 +122,8 @@ jobs:
             CMD_BUILD: |
               poetry run pyinstaller --onefile config/build.spec
               ./dist/eir --version
-              zip -j ./dist/eir-${{ needs.createrelease.outputs.versionoutput }}_CentOS-8.zip ./dist/eir
-            OUT_FILE_NAME: eir-${{ needs.createrelease.outputs.versionoutput }}_CentOS-8.zip
+              zip -j ./dist/eir-${{ needs.getrelease.outputs.versionoutput }}_CentOS-8.zip ./dist/eir
+            OUT_FILE_NAME: eir-${{ needs.getrelease.outputs.versionoutput }}_CentOS-8.zip
             ASSET_MIME: application/zip
 
           - name: CentOS 7
@@ -166,8 +133,8 @@ jobs:
             CMD_BUILD: |
               poetry run pyinstaller --onefile config/build.spec
               ./dist/eir --version
-              zip -j ./dist/eir-${{ needs.createrelease.outputs.versionoutput }}_CentOS-7.zip ./dist/eir
-            OUT_FILE_NAME: eir-${{ needs.createrelease.outputs.versionoutput }}_CentOS-7.zip
+              zip -j ./dist/eir-${{ needs.getrelease.outputs.versionoutput }}_CentOS-7.zip ./dist/eir
+            OUT_FILE_NAME: eir-${{ needs.getrelease.outputs.versionoutput }}_CentOS-7.zip
             ASSET_MIME: application/zip
 
     steps:
@@ -179,7 +146,7 @@ jobs:
               dnf update -y
 
       - name: Checkout repository
-        uses: actions/checkout@v1
+        uses: actions/checkout@v2
 
       - name: Set up system dependencies
         run: dnf groupinstall -y "Development Tools"
@@ -207,28 +174,14 @@ jobs:
       - name: Build with pyinstaller for ${{matrix.TARGET}}
         run: ${{matrix.CMD_BUILD}}
 
-      - name: Load Release URL File from release job
-        uses: actions/download-artifact@v1
-        with:
-          name: release_url
-
-      - name: Get Release File Name & Upload URL
-        id: get_release_info
-        shell: bash
-        run: |
-          value=`cat release_url/release_url.txt`
-          echo ::set-output name=upload_url::$value
-
-      - name: Upload Release Asset
-        id: upload-release-asset
-        uses: actions/upload-release-asset@v1
+      - name: Release
+        id: release
+        uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.get_release_info.outputs.upload_url }}
-          asset_path: ./dist/${{ matrix.OUT_FILE_NAME}}
-          asset_name: ${{ matrix.OUT_FILE_NAME}}
-          asset_content_type: ${{ matrix.ASSET_MIME}}
+          files: ./dist/${{ matrix.OUT_FILE_NAME}}
+          prerelease: true
 
   upload:
     name: Upload to PyPI
