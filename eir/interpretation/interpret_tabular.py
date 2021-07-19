@@ -192,7 +192,7 @@ def parse_tabular_activations_for_feature_importance(
     column_activations = {column: [] for column in activation_tensor_slices.keys()}
 
     for sample_activation in all_activations:
-        sample_acts = sample_activation.sample_activations[input_name].squeeze()
+        sample_acts = sample_activation.sample_activations[input_name]
 
         for column in activation_tensor_slices.keys():
             cur_slice = activation_tensor_slices[column]
@@ -248,10 +248,12 @@ def _gather_continuous_inputs(
 
     for sample in all_activations:
         cur_full_input = sample.sample_info.inputs[input_name]
-        cur_con_input_part = cur_full_input.squeeze()[cat_to_con_cutoff:]
+        assert len(cur_full_input.shape) == 2
+
+        cur_con_input_part = cur_full_input[:, cat_to_con_cutoff:]
         con_inputs.append(cur_con_input_part)
 
-    con_inputs_array = np.array([np.array(i.cpu()) for i in con_inputs])
+    con_inputs_array = np.vstack([np.array(i.cpu()) for i in con_inputs])
     df = pd.DataFrame(con_inputs_array, columns=con_names)
 
     return df
@@ -262,23 +264,19 @@ def _gather_continuous_shap_values(
     cat_to_con_cutoff: int,
     input_name: str,
 ) -> np.ndarray:
-    """
-    We need to expand_dims in the case where we only have one input value, otherwise
-    shap will not accept a vector.
-    """
+
     con_acts = []
 
     for sample in all_activations:
         cur_full_input = sample.sample_activations[input_name]
-        cur_con_input_part = cur_full_input.squeeze()[cat_to_con_cutoff:]
+        assert len(cur_full_input.shape) == 2
+
+        cur_con_input_part = cur_full_input[:, cat_to_con_cutoff:]
         con_acts.append(cur_con_input_part)
 
-    array_squeezed = np.array(con_acts).squeeze()
+    array_np = np.vstack(con_acts)
 
-    if len(array_squeezed.shape) == 1:
-        return np.expand_dims(array_squeezed, 1)
-
-    return array_squeezed
+    return array_np
 
 
 def _gather_categorical_shap_values(
@@ -294,16 +292,18 @@ def _gather_categorical_shap_values(
 
     for sample in all_activations:
         cur_full_input = sample.sample_activations[input_name]
-        cur_cat_input_part = cur_full_input.squeeze()[cur_slice]
+        assert len(cur_full_input.shape) == 2
+
+        cur_cat_input_part = cur_full_input[cur_slice]
         cur_cat_summed_act = np.sum(np.array(cur_cat_input_part))
         cat_acts.append(cur_cat_summed_act)
 
-    array_squeezed = np.array(cat_acts).squeeze()
+    array_np = np.vstack(cat_acts)
 
-    if len(array_squeezed.shape) == 1:
-        return np.expand_dims(array_squeezed, 1)
+    if len(array_np.shape) == 1:
+        return np.expand_dims(array_np, 1)
 
-    return array_squeezed
+    return array_np
 
 
 def _gather_categorical_inputs(
@@ -316,7 +316,7 @@ def _gather_categorical_inputs(
     for sample in all_activations:
 
         cur_raw_cat_input = sample.raw_tabular_inputs[input_name][cat_name]
-        cur_cat_input_part = cur_raw_cat_input.squeeze()
+        cur_cat_input_part = cur_raw_cat_input
         cat_inputs.append(cur_cat_input_part)
 
     cat_inputs_array = np.array([np.array(i.cpu()) for i in cat_inputs])
