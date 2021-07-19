@@ -13,7 +13,7 @@ in this case we will use MacOS
 
 .. code-block:: console
 
-    $ wget https://github.com/arnor-sigurdsson/EIR/releases/download/0.1.8-alpha/eir_macos.zip
+    $ wget https://github.com/arnor-sigurdsson/EIR/releases/download/0.1.12-alpha/eir-0.1.12-alpha_macos.zip
     $ unzip eir_macos.zip
 
 We can check the version of
@@ -23,7 +23,7 @@ like so
 .. code-block:: console
 
     $ ./eir --version
-    0.1.8-alpha
+    0.1.12-alpha
 
 .. note::
 
