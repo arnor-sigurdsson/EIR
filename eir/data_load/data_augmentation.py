@@ -116,7 +116,8 @@ def get_mixing_info(
 
 def _sample_lambda(mixing_alpha: float) -> float:
     if mixing_alpha > 0:
-        lambda_ = torch.distributions.beta.Beta(mixing_alpha, mixing_alpha)
+        beta_object = torch.distributions.beta.Beta(mixing_alpha, mixing_alpha)
+        lambda_ = beta_object.sample().item()
     else:
         lambda_ = 1.0
 

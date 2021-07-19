@@ -137,13 +137,6 @@ def run_experiment(cl_args: argparse.Namespace, config: "Config") -> None:
 
 @dataclass(frozen=True)
 class Config:
-    """
-    The idea of this class is to keep track of objects that need to be used
-    in multiple contexts in different parts of the code (e.g. the train
-    dataloader is used to load samples during training, but also as background
-    for SHAP activation calculations).
-    """
-
     cl_args: argparse.Namespace
     data_dimensions: Dict[str, "DataDimensions"]
     train_loader: torch.utils.data.DataLoader
