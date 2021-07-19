@@ -1,15 +1,19 @@
 [tool.poetry]
-name = "eir"
-version = "0.1.0"
+name = "eir-dl"
+version = "0.1.12-alpha"
 description = ""
+license = "AGPLv3"
 authors = ["Arnor Sigurdsson"]
+packages = [
+    { include="eir", from="." },
+]
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = ">= 3.8,< 3.10"
 pandas = "^1.2.0"
 numpy = "^1.19.2"
-torch = "^1.8.1"
-torchvision = "^0.9.1"
+torch = "1.9.0"
+torchvision = "0.10.0"
 py = "^1.9.0"
 matplotlib = "^3.3.2"
 pytorch-ignite = "^0.4.2"
@@ -26,7 +30,7 @@ torch-optimizer = "^0.1.0"
 adabelief-pytorch = "^0.2.0"
 dill = "^0.3.3"
 hypothesis = "^6.14.0"
-aislib = {git = "ssh://git@github.com/arnor-sigurdsson/aislib.git", rev = "v0.1.3-alpha"}
+aislib = "0.1.5a0"
 colorama = "^0.4.4"
 
 [tool.poetry.dev-dependencies]
@@ -45,6 +49,11 @@ pre-commit = "^2.7.1"
 gpustat = "^0.6.0"
 pyinstaller = "^4.0"
 black = "^21.5b2"
+ipython = "^7.24.1"
+Sphinx = "^4.0.2"
+sphinx-rtd-theme = "^0.5.2"
+sphinx-copybutton = "^0.3.3"
+tomlkit = "^0.7.2"
 
 [tool.poetry.scripts]
 eirtrain = "eir.train:main"

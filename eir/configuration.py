@@ -28,21 +28,22 @@ def get_train_argument_parser() -> configargparse.ArgumentParser:
         "--config_file",
         is_config_file=True,
         required=False,
-        help="path to .yaml config file if using one",
+        help="path to .yaml config file if using one.",
     )
 
     parser_.add_argument(
-        "--n_epochs", type=int, default=5, help="number of epochs of training"
+        "--n_epochs", type=int, default=5, help="Number of epochs of training."
     )
     parser_.add_argument(
-        "--batch_size", type=int, default=64, help="size of the batches"
+        "--batch_size", type=int, default=64, help="Size of the batches."
     )
 
     parser_.add_argument(
         "--dataloader_workers",
         type=int,
         default=8,
-        help="Number of workers for training and validation dataloaders.",
+        help="Number of workers for multi-process training and validation data "
+        "loading.",
     )
     parser_.add_argument(
         "--lr", type=float, default=1e-3, help="Base learning rate for optimizer."
@@ -62,8 +63,8 @@ def get_train_argument_parser() -> configargparse.ArgumentParser:
         type=str,
         default="same",
         choices=["cycle", "plateau", "same", "cosine"],
-        help="Whether to use cyclical or reduce on plateau learning rate schedule. "
-        "Otherwise keeps same learning rate.",
+        help="Whether to use cyclical, cosine or reduce on plateau learning rate "
+        "schedule. Otherwise keeps same learning rate.",
     )
 
     parser_.add_argument(
@@ -79,7 +80,7 @@ def get_train_argument_parser() -> configargparse.ArgumentParser:
         "--lr_plateau_factor",
         type=float,
         default=0.1,
-        help="Factor to reduce LR when runnig with plateau schedule.",
+        help="Factor to reduce LR when running with plateau schedule.",
     )
 
     parser_.add_argument(
@@ -121,14 +122,14 @@ def get_train_argument_parser() -> configargparse.ArgumentParser:
         "--b1",
         type=float,
         default=0.9,
-        help="adam: decay of first order momentum of gradient",
+        help="Decay of first order momentum of gradient for relevant optimizers.",
     )
 
     parser_.add_argument(
         "--b2",
         type=float,
         default=0.999,
-        help="adam: decay of second order momentum of gradient",
+        help="Decay of second order momentum of gradient for relevant optimizers.",
     )
     parser_.add_argument("--wd", type=float, default=0.00, help="Weight decay.")
 
@@ -140,36 +141,39 @@ def get_train_argument_parser() -> configargparse.ArgumentParser:
         "--fc_repr_dim",
         type=int,
         default=512,
-        help="dimensionality of first fc layer in the network, this is the last shared"
+        help="Dimensionality of first fc layer in the network, this is the last shared"
         "when running multi task training, first fc layer after convolutions when"
-        "running cnn model, and first fc layer when running mlp",
+        "running cnn model, and first fc layer when running mlp.",
     )
 
     parser_.add_argument(
         "--fc_task_dim",
         type=int,
         default=128,
-        help="dimensionality of (a) specific task branches in multi task setting, (b)"
+        help="Dimensionality of (a) specific task branches in multi task setting, (b)"
         "successive fc layers in cnn model after the first fc after the "
-        "convolutions and (c) successive fc layers in mlp after first fc layer",
+        "convolutions and (c) successive fc layers in mlp after first fc layer.",
     )
 
     parser_.add_argument(
-        "--mg_num_experts", type=int, default=8, help="Number of experts to use."
+        "--mg_num_experts",
+        type=int,
+        default=8,
+        help="Number of experts to use when using the MGMoE fusion model.",
     )
 
     parser_.add_argument(
         "--split_mlp_num_splits",
         type=int,
         default=50,
-        help="Number of splits in split MLP layer.",
+        help="Number of splits in split MLP layer. Warning: Will be deprecated.",
     )
 
     parser_.add_argument(
         "--model_type",
         type=str,
         default="cnn",
-        choices=["cnn", "mlp", "mlp-split", "mlp-fully-split", "linear"],
+        choices=["cnn", "mlp", "mlp-split", "genome-local-net", "linear"],
         help="Model type for omics model.",
     )
 
@@ -185,21 +189,22 @@ def get_train_argument_parser() -> configargparse.ArgumentParser:
         "--kernel_width",
         type=int,
         default=12,
-        help="base width of the conv kernels used.",
+        help="Base width of the convolutional / locally-connected kernels used.",
     )
 
     parser_.add_argument(
         "--down_stride",
         type=int,
         default=4,
-        help="down stride to use common over the network.",
+        help="Down stride to use common over the network when using CNN models.",
     )
 
     parser_.add_argument(
         "--dilation_factor",
         type=int,
         default=1,
-        help="factor to dilate convolutions by in each successive block",
+        help="Factor to dilate convolutions by in each successive block when using CNN "
+        "models.",
     )
 
     parser_.add_argument(
@@ -220,14 +225,16 @@ def get_train_argument_parser() -> configargparse.ArgumentParser:
         "--first_channel_expansion",
         type=int,
         default=1,
-        help="factor by which to expand the first stride in the network",
+        help="Factor by which to expand the first stride in the network. "
+        "Used for CNN and locally-connected models.",
     )
 
     parser_.add_argument(
         "--channel_exp_base",
         type=int,
         default=5,
-        help="Exponential base for channels in first layer (i.e. default is 2**5)",
+        help="Exponential base for channels in first layer (i.e. default is 2**5). "
+        "Used for CNN and locally-connected models.",
     )
 
     # TODO: Better help message.
@@ -252,7 +259,7 @@ def get_train_argument_parser() -> configargparse.ArgumentParser:
     parser_.add_argument(
         "--sa",
         action="store_true",
-        help="Whether to add self attention to the network.",
+        help="Whether to add self attention to the network, only applies to CNN.",
     )
 
     parser_.add_argument(
@@ -285,7 +292,8 @@ def get_train_argument_parser() -> configargparse.ArgumentParser:
         type=str,
         default=None,
         nargs="*",
-        help="Target column to apply weighted sampling on.",
+        help="Target column to apply weighted sampling on. Only applies to categorical "
+        "columns. Passing in 'all' here will use an average of all the target columns.",
     )
 
     parser_.add_argument(
@@ -347,8 +355,7 @@ def get_train_argument_parser() -> configargparse.ArgumentParser:
         type=str,
         nargs="+",
         default=[],
-        help="What columns of categorical variables to add to fully connected layer at "
-        "end of model.",
+        help="What categorical columns from --label_file to include as input.",
     )
 
     parser_.add_argument(
@@ -356,49 +363,48 @@ def get_train_argument_parser() -> configargparse.ArgumentParser:
         type=str,
         nargs="+",
         default=[],
-        help="What columns of continuous variables to add to fully connected layer at "
-        "end of model.",
+        help="What continuous columns from --label_file to include as input.",
     )
 
     parser_.add_argument(
         "--snp_file",
         type=str,
         default="infer",
-        help="File to load SNPs from (.snp format).",
+        help="File to load SNPs from (.bim format).",
     )
 
     parser_.add_argument(
         "--memory_dataset",
         action="store_true",
-        help="Whether to load all sample into memory during " "training.",
+        help="Whether to load all sample into memory during training.",
     )
 
     parser_.add_argument(
         "--sample_interval",
         type=int,
         default=None,
-        help="Epoch interval to sample generated seqs.",
+        help="Iteration interval to perform validation.",
     )
 
     parser_.add_argument(
         "--checkpoint_interval",
         type=int,
         default=None,
-        help="Iteration to checkpoint model.",
+        help="Iteration interval to checkpoint model.",
     )
 
     parser_.add_argument(
         "--n_saved_models",
         type=int,
         default=None,
-        help="Iteration to checkpoint model.",
+        help="Number of top N models to saved during training.",
     )
 
     parser_.add_argument(
         "--run_name",
         required=True,
         type=str,
-        help="Name of the current run, specifying will save " "run info and models.",
+        help="Name of the current run.",
     )
 
     parser_.add_argument(
@@ -408,11 +414,13 @@ def get_train_argument_parser() -> configargparse.ArgumentParser:
     parser_.add_argument(
         "--multi_gpu",
         action="store_true",
-        help="Whether to run the training on " "multiple GPUs for the current node.",
+        help="Whether to run the training on multiple GPUs for the current node.",
     )
 
     parser_.add_argument(
-        "--get_acts", action="store_true", help="Whether to generate activation maps."
+        "--get_acts",
+        action="store_true",
+        help="Whether to compute activations w.r.t. inputs.",
     )
 
     parser_.add_argument(
@@ -434,19 +442,23 @@ def get_train_argument_parser() -> configargparse.ArgumentParser:
         "--act_every_sample_factor",
         type=int,
         default=1,
-        help="Number of rows to load at a time from label file before processing.",
+        help="Controls whether the activations are computed at every sample interval "
+        "(=1), every other sample interval (=2), etc. Useful when computing the "
+        "activations takes a long time and we don't want to do it every time we "
+        "evaluate.",
     )
 
     parser_.add_argument(
         "--debug",
         action="store_true",
-        help="Whether to run in debug mode (w. breakpoint).",
+        help="Whether to run in debug mode.",
     )
 
     parser_.add_argument(
         "--no_pbar",
         action="store_true",
-        help="Whether to run in debug mode (w. breakpoint).",
+        help="Whether to not use progress bars. Useful when stdout/stderr is written "
+        "to files.",
     )
 
     parser_.add_argument(

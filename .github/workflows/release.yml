@@ -1,0 +1,198 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '*.*.*'
+
+jobs:
+
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-20.04, macos-10.15]
+        python-version: [3.8, 3.9]
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python ${{ matrix.python-version }} on ${{ matrix.os }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Run tests with Python ${{ matrix.python-version }} on ${{ matrix.os }}
+        run: |
+          pip install tox==3.20.1
+          pip install poetry==1.1.6
+          tox -e py
+
+  getrelease:
+    name: Get release
+    needs: test
+    runs-on: ubuntu-20.04
+    outputs:
+      versionoutput: ${{ steps.getversiontag.outputs.VERSION }}
+    steps:
+      - name: Get the tag version
+        id: getversiontag
+        run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
+
+
+  build:
+    name: Build packages
+    needs: getrelease
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+
+          - os: ubuntu-20.04
+            TARGET: ubuntu
+            CMD_BUILD: |
+              poetry run pyinstaller --onefile config/build.spec
+              ./dist/eir --version
+              zip -j ./dist/eir-${{ needs.getrelease.outputs.versionoutput }}_ubuntu-20.zip ./dist/eir
+            OUT_FILE_NAME: eir-${{ needs.getrelease.outputs.versionoutput }}_ubuntu-20.zip
+            ASSET_MIME: application/zip
+
+          - os: macos-10.15
+            TARGET: macos
+            CMD_BUILD: |
+              poetry run pyinstaller --onefile config/build.spec
+              ./dist/eir --version
+              zip -j ./dist/eir-${{ needs.getrelease.outputs.versionoutput }}_macos.zip ./dist/eir
+            OUT_FILE_NAME: eir-${{ needs.getrelease.outputs.versionoutput }}_macos.zip
+            ASSET_MIME: application/zip
+
+          - os: windows-2019
+            TARGET: windows
+            CMD_BUILD: |
+              poetry run pyinstaller --onefile config/build.spec
+              Compress-Archive ./dist/eir.exe ./dist/eir-${{ needs.getrelease.outputs.versionoutput }}_windows.zip
+            OUT_FILE_NAME: eir-${{ needs.getrelease.outputs.versionoutput }}_windows.zip
+            ASSET_MIME: application/vnd.microsoft.portable-executable
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install --upgrade setuptools
+          pip install poetry==1.1.6
+          poetry install
+
+      - name: Build with pyinstaller for ${{matrix.TARGET}}
+        run: ${{matrix.CMD_BUILD}}
+
+
+      - name: Release
+        id: release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          files: ./dist/${{ matrix.OUT_FILE_NAME}}
+          prerelease: true
+
+  # Currently we are repeating a lot of code from the steps above, but afaik GH actions
+  # does currently not have a strong support for composable actions, and mixing
+  # matrix configurations with / without containers seems to produce errors
+  # See: https://github.community/t/run-matrix-job-on-macos-and-on-ubuntu-in-container/16359/8
+  # and https://github.com/actions/runner/issues/646
+  build-containers:
+    name: Build packages with containers
+    needs: getrelease
+    runs-on: ${{ matrix.os }}
+    container:
+      image: ${{ matrix.container }}
+    strategy:
+      matrix:
+        include:
+
+          - name: CentOS 8
+            os: ubuntu-20.04
+            container: centos:8
+            TARGET: CentOS 8
+            CMD_BUILD: |
+              poetry run pyinstaller --onefile config/build.spec
+              ./dist/eir --version
+              zip -j ./dist/eir-${{ needs.getrelease.outputs.versionoutput }}_CentOS-8.zip ./dist/eir
+            OUT_FILE_NAME: eir-${{ needs.getrelease.outputs.versionoutput }}_CentOS-8.zip
+            ASSET_MIME: application/zip
+
+          - name: CentOS 7
+            os: ubuntu-20.04
+            container: centos:7
+            TARGET: CentOS 7
+            CMD_BUILD: |
+              poetry run pyinstaller --onefile config/build.spec
+              ./dist/eir --version
+              zip -j ./dist/eir-${{ needs.getrelease.outputs.versionoutput }}_CentOS-7.zip ./dist/eir
+            OUT_FILE_NAME: eir-${{ needs.getrelease.outputs.versionoutput }}_CentOS-7.zip
+            ASSET_MIME: application/zip
+
+    steps:
+      - name: Set up package managers
+        run: |
+              yum update -y
+              yum install -y epel-release
+              yum install -y dnf
+              dnf update -y
+
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up system dependencies
+        run: dnf groupinstall -y "Development Tools"
+
+      - name: Set up Python 3.8
+        run: |
+          dnf install -y gcc zlib-devel bzip2 bzip2-devel readline-devel sqlite sqlite-devel openssl-devel tk-devel libffi-devel xz-devel
+          dnf install -y wget
+          wget https://www.python.org/ftp/python/3.8.11/Python-3.8.11.tgz
+          tar xzf Python-3.8.11.tgz
+          cd Python-3.8.11
+          ./configure --enable-optimizations --enable-shared LDFLAGS="-Wl,-rpath /usr/local/lib"
+          make altinstall
+          cd ..
+
+      - name: Install dependencies
+        run: |
+          python3.8 --version
+          python3.8 -m pip install --upgrade pip
+          pip install --upgrade setuptools
+          pip install poetry==1.1.6
+          poetry env use 3.8
+          poetry install
+
+      - name: Build with pyinstaller for ${{matrix.TARGET}}
+        run: ${{matrix.CMD_BUILD}}
+
+      - name: Release
+        id: release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          files: ./dist/${{ matrix.OUT_FILE_NAME}}
+          prerelease: true
+
+  upload:
+    name: Upload to PyPI
+    needs: [build, build-containers]
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.8'
+          architecture: x64
+      - run: pip install poetry==1.1.6
+      - run: poetry build
+      - run: poetry publish --username=__token__ --password=${{ secrets.PYPI_TOKEN }}

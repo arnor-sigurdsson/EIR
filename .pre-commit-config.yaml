@@ -1,5 +1,5 @@
 default_language_version:
-  python: python3.7
+  python: python3
 repos:
   - repo: https://github.com/ambv/black
     rev: 20.8b1
@@ -16,10 +16,17 @@ repos:
         name: Run tests
         entry: tox
         language: system
-        types: [python]
-        stages: [push]
+        types: [ python ]
+        stages: [ push ]
+
       - id: update-reqs
         name: Update requirements.txt
         entry: ./misc/update_reqs.sh
         language: system
-        stages: [manual]
+        stages: [ commit ]
+
+      - id: check-versions
+        name: Check project versions
+        entry: python ./misc/check_versions.py
+        language: system
+        stages: [ commit ]

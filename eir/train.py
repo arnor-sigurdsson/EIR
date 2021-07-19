@@ -126,9 +126,6 @@ def run_experiment(cl_args: argparse.Namespace, config: "Config") -> None:
 
     _log_model(model=config.model, l1_weight=cl_args.l1)
 
-    if cl_args.debug:
-        breakpoint()
-
     run_folder = utils.get_run_folder(run_name=cl_args.run_name)
     keys_to_serialize = get_default_config_keys_to_serialize()
     serialize_config(

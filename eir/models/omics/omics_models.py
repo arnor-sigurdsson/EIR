@@ -36,7 +36,7 @@ def _get_model_mapping() -> Dict[str, al_models_classes]:
         "cnn": CNNModel,
         "mlp": MLPModel,
         "mlp-split": SplitMLPModel,
-        "mlp-fully-split": FullySplitMLPModel,
+        "genome-local-net": FullySplitMLPModel,
     }
 
     return mapping
@@ -57,7 +57,7 @@ def _get_dataclass_mapping() -> Dict[str, Type[Dataclass]]:
         "cnn": CNNModelConfig,
         "mlp": MLPModelConfig,
         "mlp-split": SplitMLPModelConfig,
-        "mlp-fully-split": FullySplitMLPModelConfig,
+        "genome-local-net": FullySplitMLPModelConfig,
     }
 
     return mapping

@@ -5,7 +5,7 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 import torch
-from hypothesis import given
+from hypothesis import given, settings
 from hypothesis.strategies import lists, integers, floats
 from torch import nn
 from torch.nn import functional as F
@@ -39,6 +39,7 @@ def test_mixup_omics_data():
 
 
 @given(test_batch_size=integers(min_value=8, max_value=128))
+@settings(deadline=500)
 def test_get_random_batch_indices_to_mix(test_batch_size):
     random_indices = data_augmentation.get_random_batch_indices_to_mix(
         batch_size=test_batch_size
@@ -55,6 +56,7 @@ def test_get_random_batch_indices_to_mix(test_batch_size):
     input_height=integers(min_value=1, max_value=10),
     lambda_=floats(min_value=0.0, max_value=1.0),
 )
+@settings(deadline=500)
 def test_mixup_tensor(input_length: int, input_height: int, lambda_: float) -> None:
 
     tensor_1_one_hot_indices = torch.randint(0, input_height, (input_length,))
@@ -95,6 +97,7 @@ def test_mixup_tensor(input_length: int, input_height: int, lambda_: float) -> N
         unique=True,
     ).map(lambda x: sorted(x))
 )
+@settings(deadline=500)
 def test_block_cutmix_omics_input(patched_indices: List[int]) -> None:
     """
     We need it to be sorted here to avoid indexing with e.g. [521:3]
@@ -149,6 +152,7 @@ def test_block_cutmix_omics_input(patched_indices: List[int]) -> None:
     input_length=integers(min_value=10, max_value=int(1e4)),
     lambda_=floats(min_value=0.0, max_value=1.0),
 )
+@settings(deadline=500)
 def test_get_block_cutmix_indices(input_length: int, lambda_: float):
     random_index_start, random_index_end = data_augmentation.get_block_cutmix_indices(
         input_length=input_length, lambda_=lambda_
@@ -166,6 +170,7 @@ def test_get_block_cutmix_indices(input_length: int, lambda_: float):
         elements=integers(min_value=0, max_value=999), min_size=10, max_size=1000
     )
 )
+@settings(deadline=500)
 def test_uniform_cutmix_omics_input(patched_indices: List[int]):
     """
     Here we explicitly cut from 1 --> 0 and vice versa.
@@ -219,6 +224,7 @@ def test_uniform_cutmix_omics_input(patched_indices: List[int]):
     lambda_=floats(min_value=0.0, max_value=1.0),
     input_length=integers(min_value=100, max_value=int(1e4)),
 )
+@settings(deadline=500)
 def test_get_uniform_cutmix_indices(lambda_, input_length):
     test_random_indices = data_augmentation.get_uniform_cutmix_indices(
         input_length=input_length, lambda_=lambda_
@@ -235,6 +241,7 @@ def test_get_uniform_cutmix_indices(lambda_, input_length):
         elements=integers(min_value=0, max_value=9), min_size=10, max_size=1000
     ).map(lambda x: torch.tensor(x))
 )
+@settings(deadline=500)
 def test_mixup_all_targets(test_targets):
     target_columns = {
         "con": ["test_target_1", "test_target_2"],
@@ -258,6 +265,7 @@ def test_mixup_all_targets(test_targets):
         elements=integers(min_value=0, max_value=9), min_size=10, max_size=1000
     ).map(lambda x: torch.tensor(x))
 )
+@settings(deadline=500)
 def test_mixup_targets(test_targets):
     random_indices = torch.randperm(len(test_targets))
     targets_permuted = data_augmentation.mixup_targets(
