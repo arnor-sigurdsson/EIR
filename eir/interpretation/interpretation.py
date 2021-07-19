@@ -302,7 +302,7 @@ def get_shap_activation_producer(
 @dataclass
 class SampleActivation:
     sample_info: "Batch"
-    sample_activations: Dict[str, torch.Tensor]
+    sample_activations: Dict[str, np.ndarray]
     raw_tabular_inputs: Dict
 
 
@@ -380,7 +380,7 @@ def get_shap_sample_acts_deep_correct_only(
     inputs: al_model_inputs,
     sample_label: torch.Tensor,
     column_type: str,
-):
+) -> Union[np.ndarray, None]:
     """
     Note: We only get the grads for a correct prediction.
 
