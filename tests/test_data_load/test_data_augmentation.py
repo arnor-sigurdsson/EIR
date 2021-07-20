@@ -366,9 +366,9 @@ def test_make_random_snps_missing_some():
     test_array = torch.zeros((1, 4, 1000), dtype=torch.bool)
     test_array[:, 0, :] = True
 
-    patch_target = "eir.data_load.data_augmentation.np.random.choice"
+    patch_target = "eir.data_load.data_augmentation.torch.randperm"
     with patch(patch_target, autospec=True) as mock_target:
-        mock_return = np.array([1, 2, 3, 4, 5])
+        mock_return = torch.tensor(np.array([1, 2, 3, 4, 5]))
         mock_target.return_value = mock_return
 
         array = data_augmentation.make_random_omics_columns_missing(test_array)

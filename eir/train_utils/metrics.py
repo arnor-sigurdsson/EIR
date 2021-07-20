@@ -179,7 +179,9 @@ def calc_roc_auc_ovr(
     else:
         outputs = outputs[:, 1]
 
-    roc_auc = roc_auc_score(y_true=labels, y_score=outputs, average=average)
+    roc_auc = roc_auc_score(
+        y_true=labels, y_score=outputs, average=average, multi_class="ovo"
+    )
     return roc_auc
 
 

@@ -116,7 +116,8 @@ def get_mixing_info(
 
 def _sample_lambda(mixing_alpha: float) -> float:
     if mixing_alpha > 0:
-        lambda_ = np.random.beta(mixing_alpha, mixing_alpha)
+        beta_object = torch.distributions.beta.Beta(mixing_alpha, mixing_alpha)
+        lambda_ = beta_object.sample().item()
     else:
         lambda_ = 1.0
 
@@ -340,9 +341,8 @@ def make_random_omics_columns_missing(
         return omics_array
 
     n_snps = omics_array.shape[2]
-    n_to_drop = (int(n_snps * percentage),)
-    random_to_drop = np.random.choice(n_snps, n_to_drop, replace=False)
-    random_to_drop = torch.tensor(random_to_drop, dtype=torch.long)
+    n_to_drop = int(n_snps * percentage)
+    random_to_drop = torch.randperm(n_snps)[:n_to_drop].to(dtype=torch.long)
 
     missing_arr = torch.tensor([False, False, False, True], dtype=torch.bool).reshape(
         -1, 1
