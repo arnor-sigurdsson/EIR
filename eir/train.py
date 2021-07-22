@@ -1,4 +1,3 @@
-import argparse
 import sys
 from dataclasses import dataclass, fields
 from functools import partial
@@ -21,6 +20,7 @@ from typing import (
 
 import dill
 import numpy as np
+import pandas as pd
 import torch
 from aislib.misc_utils import ensure_path_exists
 from aislib.misc_utils import get_logger
@@ -31,7 +31,12 @@ from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader, WeightedRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
-from eir.configuration import get_default_cl_args
+from eir.config import schemas
+from eir.config.config import (
+    get_configs,
+    Configs,
+    get_all_targets,
+)
 from eir.data_load import data_utils
 from eir.data_load import datasets
 from eir.data_load.data_augmentation import hook_mix_loss, get_mix_data_hook
@@ -41,7 +46,6 @@ from eir.data_load.label_setup import (
     al_target_columns,
     al_label_transformers,
     al_all_column_ops,
-    get_array_path_iterator,
     set_up_train_and_valid_tabular_data,
     gather_ids_from_tabular_file,
     split_ids,
@@ -52,11 +56,10 @@ from eir.data_load.label_setup import (
 from eir.models import fusion, fusion_mgmoe
 from eir.models import model_training_utils
 from eir.models.model_training_utils import run_lr_find
-from eir.models.models_linear import LinearModel, LinearModelConfig
 from eir.models.omics.omics_models import (
     get_model_class,
     get_omics_model_init_kwargs,
-    match_namespace_to_dataclass,
+    al_omics_model_configs,
 )
 from eir.models.tabular.tabular import (
     get_tabular_inputs,
@@ -105,6 +108,7 @@ al_dataloader_getitem_batch = Tuple[
     List[str],
 ]
 al_num_outputs_per_target = Dict[str, int]
+al_input_objects = Dict[str, Union["OmicsInputInfo", "TabularInputInfo"]]
 
 torch.manual_seed(0)
 np.random.seed(0)
@@ -113,36 +117,40 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
 def main():
-    default_cl_args = get_default_cl_args()
-    utils.configure_root_logger(run_name=default_cl_args.run_name)
+    configs = get_configs()
 
-    default_hooks = get_default_hooks(cl_args_=default_cl_args)
-    default_config = get_default_config(cl_args=default_cl_args, hooks=default_hooks)
+    utils.configure_root_logger(run_name=configs.global_config.run_name)
 
-    run_experiment(cl_args=default_cl_args, config=default_config)
+    default_hooks = get_default_hooks(configs=configs)
+    default_config = get_default_config(configs=configs, hooks=default_hooks)
+
+    run_experiment(experiment=default_config)
 
 
-def run_experiment(cl_args: argparse.Namespace, config: "Config") -> None:
+def run_experiment(experiment: "Experiment") -> None:
 
-    _log_model(model=config.model, l1_weight=cl_args.l1)
+    _log_model(model=experiment.model, l1_weight=0.0)
 
-    run_folder = utils.get_run_folder(run_name=cl_args.run_name)
+    gc = experiment.configs.global_config
+
+    run_folder = utils.get_run_folder(run_name=gc.run_name)
     keys_to_serialize = get_default_config_keys_to_serialize()
     serialize_config(
-        config=config, run_folder=run_folder, keys_to_serialize=keys_to_serialize
+        experiment=experiment,
+        run_folder=run_folder,
+        keys_to_serialize=keys_to_serialize,
     )
 
-    train(config=config)
+    train(experiment=experiment)
 
 
 @dataclass(frozen=True)
-class Config:
-    cl_args: argparse.Namespace
-    data_dimensions: Dict[str, "DataDimensions"]
+class Experiment:
+    configs: Configs
+    inputs: al_input_objects
     train_loader: torch.utils.data.DataLoader
     valid_loader: torch.utils.data.DataLoader
     valid_dataset: torch.utils.data.Dataset
-    labels_dict: Dict
     target_transformers: al_label_transformers
     target_columns: al_target_columns
     num_outputs_per_target: al_num_outputs_per_target
@@ -156,12 +164,16 @@ class Config:
 
 
 def serialize_config(
-    config: "Config", run_folder: Path, keys_to_serialize: Union[Iterable[str], None]
+    experiment: "Experiment",
+    run_folder: Path,
+    keys_to_serialize: Union[Iterable[str], None],
 ) -> None:
     serialization_path = get_train_config_serialization_path(run_folder=run_folder)
     ensure_path_exists(path=serialization_path)
 
-    filtered_config = filter_config_by_keys(config=config, keys=keys_to_serialize)
+    filtered_config = filter_config_by_keys(
+        experiment=experiment, keys=keys_to_serialize
+    )
     serialize_namespace(namespace=filtered_config, output_path=serialization_path)
 
 
@@ -173,8 +185,7 @@ def get_train_config_serialization_path(run_folder: Path) -> Path:
 
 def get_default_config_keys_to_serialize() -> Iterable[str]:
     return (
-        "cl_args",
-        "data_dimensions",
+        "configs",
         "num_outputs_per_target",
         "target_transformers",
         "target_columns",
@@ -184,15 +195,15 @@ def get_default_config_keys_to_serialize() -> Iterable[str]:
 
 
 def filter_config_by_keys(
-    config: "Config", keys: Union[None, Iterable[str]] = None
+    experiment: "Experiment", keys: Union[None, Iterable[str]] = None
 ) -> SimpleNamespace:
     filtered = {}
 
-    config_fields = (f.name for f in fields(config))
+    config_fields = (f.name for f in fields(experiment))
     iterable = keys if keys is not None else config_fields
 
     for k in iterable:
-        filtered[k] = getattr(config, k)
+        filtered[k] = getattr(experiment, k)
 
     namespace = SimpleNamespace(**filtered)
 
@@ -204,39 +215,196 @@ def serialize_namespace(namespace: SimpleNamespace, output_path: Path) -> None:
         dill.dump(namespace, outfile)
 
 
-def get_default_config(
-    cl_args: argparse.Namespace, hooks: Union["Hooks", None] = None
-) -> "Config":
-    run_folder = _prepare_run_folder(run_name=cl_args.run_name)
+def set_up_target_labels_wrapper(
+    tabular_infos: Sequence[TabularFileInfo],
+    custom_label_ops: al_all_column_ops,
+    train_ids: Sequence[str],
+    valid_ids: Sequence[str],
+):
+    """
+    TODO:   Log if some were dropped on merge.
+    TODO:   Decide if we want to keep this merging here, or have a key reference to
+            target_name or something like that?
+    """
 
-    target_labels, tabular_input_labels = get_target_and_tabular_input_labels(
-        cl_args=cl_args,
-        custom_label_parsing_operations=hooks.custom_column_label_parsing_ops,
+    df_labels_train = pd.DataFrame(index=train_ids)
+    df_labels_valid = pd.DataFrame(index=valid_ids)
+    label_transformers = {}
+
+    for tabular_info in tabular_infos:
+        cur_labels = set_up_train_and_valid_tabular_data(
+            tabular_info=tabular_info,
+            custom_label_ops=custom_label_ops,
+            train_ids=train_ids,
+            valid_ids=valid_ids,
+        )
+
+        df_train_cur = pd.DataFrame.from_dict(cur_labels.train_labels, orient="index")
+        df_valid_cur = pd.DataFrame.from_dict(cur_labels.valid_labels, orient="index")
+
+        df_labels_train = pd.merge(
+            df_labels_train, df_train_cur, left_index=True, right_index=True
+        )
+        df_labels_valid = pd.merge(
+            df_labels_valid, df_valid_cur, left_index=True, right_index=True
+        )
+
+        cur_transformers = cur_labels.label_transformers
+        label_transformers = {**label_transformers, **cur_transformers}
+
+    train_labels_dict = df_labels_train.to_dict("index")
+    valid_labels_dict = df_labels_valid.to_dict("index")
+
+    labels_data_object = Labels(
+        train_labels=train_labels_dict,
+        valid_labels=valid_labels_dict,
+        label_transformers=label_transformers,
+    )
+
+    return labels_data_object
+
+
+def set_up_inputs(
+    inputs_configs: schemas.al_input_configs,
+    train_ids: Sequence[str],
+    valid_ids: Sequence[str],
+    hooks: Union["Hooks", None],
+) -> al_input_objects:
+    all_inputs = {}
+
+    for input_config in inputs_configs:
+        cur_input_data_config = input_config.input_info
+        setup_func = get_input_setup_function(
+            input_type=cur_input_data_config.input_type
+        )
+        logger.info(
+            "Setting up %s inputs '%s' from %s.",
+            cur_input_data_config.input_type,
+            cur_input_data_config.input_name,
+            cur_input_data_config.input_source,
+        )
+        set_up_input = setup_func(
+            input_config=input_config,
+            train_ids=train_ids,
+            valid_ids=valid_ids,
+            hooks=hooks,
+        )
+        cur_name = (
+            f"{cur_input_data_config.input_type}_{cur_input_data_config.input_name}"
+        )
+        all_inputs[cur_name] = set_up_input
+
+    return all_inputs
+
+
+def get_input_setup_function(input_type) -> Callable:
+    mapping = get_input_setup_function_map()
+
+    return mapping[input_type]
+
+
+def get_input_setup_function_map() -> Dict[str, Callable]:
+    setup_mapping = {"omics": set_up_omics_input, "tabular": set_up_tabular_input}
+
+    return setup_mapping
+
+
+@dataclass
+class TabularInputInfo:
+    labels: Labels
+    input_config: schemas.InputConfig
+
+
+def set_up_tabular_input(
+    input_config: schemas.InputConfig,
+    train_ids: Sequence[str],
+    valid_ids: Sequence[str],
+    hooks: "Hooks",
+) -> TabularInputInfo:
+    tabular_inputs_info = get_tabular_inputs_label_data(
+        input_source=input_config.input_info.input_source,
+        tabular_data_type_config=input_config.input_type_info,
+    )
+
+    tabular_labels = set_up_train_and_valid_tabular_data(
+        tabular_info=tabular_inputs_info,
+        custom_label_ops=hooks.custom_column_label_parsing_ops,
+        train_ids=train_ids,
+        valid_ids=valid_ids,
+    )
+
+    tabular_inputs_info = TabularInputInfo(
+        labels=tabular_labels, input_config=input_config
+    )
+
+    return tabular_inputs_info
+
+
+@dataclass
+class OmicsInputInfo:
+    input_config: schemas.InputConfig
+
+
+def set_up_omics_input(
+    input_config: schemas.InputConfig, *args, **kwargs
+) -> OmicsInputInfo:
+
+    omics_input_info = OmicsInputInfo(input_config=input_config)
+
+    return omics_input_info
+
+
+def get_default_config(
+    configs: Configs, hooks: Union["Hooks", None] = None
+) -> "Experiment":
+    run_folder = _prepare_run_folder(run_name=configs.global_config.run_name)
+
+    all_array_ids = gather_all_array_target_ids(target_configs=configs.target_configs)
+    train_ids, valid_ids = split_ids(
+        ids=all_array_ids, valid_size=configs.global_config.valid_size
+    )
+
+    logger.info("Setting up target labels.")
+    target_labels_info = get_tabular_target_label_data(
+        target_configs=configs.target_configs
+    )
+    target_labels = set_up_target_labels_wrapper(
+        tabular_infos=target_labels_info,
+        custom_label_ops=hooks.custom_column_label_parsing_ops,
+        train_ids=train_ids,
+        valid_ids=valid_ids,
     )
     save_transformer_set(
         transformers=target_labels.label_transformers, run_folder=run_folder
     )
-    save_transformer_set(
-        transformers=tabular_input_labels.label_transformers, run_folder=run_folder
+
+    inputs = set_up_inputs(
+        inputs_configs=configs.input_configs,
+        train_ids=train_ids,
+        valid_ids=valid_ids,
+        hooks=hooks,
     )
 
-    data_dimensions = _gather_all_omics_data_dimensions(
-        omics_sources=cl_args.omics_sources, omics_names=cl_args.omics_names
-    )
+    for input_name, input_ in inputs.items():
+        if input_name.startswith("tabular_"):
+            save_transformer_set(
+                transformers=input_.labels.label_transformers, run_folder=run_folder
+            )
 
     train_dataset, valid_dataset = datasets.set_up_datasets_from_cl_args(
-        cl_args=cl_args,
-        data_dimensions=data_dimensions,
+        configs=configs,
         target_labels=target_labels,
-        tabular_inputs_labels=tabular_input_labels,
+        inputs=inputs,
     )
 
     batch_size = _modify_bs_for_multi_gpu(
-        multi_gpu=cl_args.multi_gpu, batch_size=cl_args.batch_size
+        multi_gpu=configs.global_config.multi_gpu,
+        batch_size=configs.global_config.batch_size,
     )
 
     train_sampler = get_train_sampler(
-        columns_to_sample=cl_args.weighted_sampling_column, train_dataset=train_dataset
+        columns_to_sample=configs.global_config.weighted_sampling_column,
+        train_dataset=train_dataset,
     )
 
     train_dloader, valid_dloader = get_dataloaders(
@@ -244,22 +412,22 @@ def get_default_config(
         train_sampler=train_sampler,
         valid_dataset=valid_dataset,
         batch_size=batch_size,
-        num_workers=cl_args.dataloader_workers,
+        num_workers=configs.global_config.dataloader_workers,
     )
 
     num_outputs_per_target = set_up_num_outputs_per_target(
         target_transformers=target_labels.label_transformers
     )
 
-    model = get_model_from_cl_args(
-        cl_args=cl_args,
-        omics_data_dimensions=data_dimensions,
+    model = get_model(
+        inputs=inputs,
+        global_config=configs.global_config,
+        predictor_config=configs.predictor_config,
         num_outputs_per_target=num_outputs_per_target,
-        tabular_label_transformers=tabular_input_labels.label_transformers,
     )
 
     criterions = _get_criterions(
-        target_columns=train_dataset.target_columns, model_type=cl_args.model_type
+        target_columns=train_dataset.target_columns,
     )
 
     writer = get_summary_writer(run_folder=run_folder)
@@ -268,17 +436,18 @@ def get_default_config(
         criterions=criterions,
     )
 
-    optimizer = get_optimizer(model=model, loss_callable=loss_func, cl_args=cl_args)
+    optimizer = get_optimizer(
+        model=model, loss_callable=loss_func, global_config=configs.global_config
+    )
 
     metrics = get_default_metrics(target_transformers=target_labels.label_transformers)
 
-    config = Config(
-        cl_args=cl_args,
-        data_dimensions=data_dimensions,
+    config = Experiment(
+        configs=configs,
+        inputs=inputs,
         train_loader=train_dloader,
         valid_loader=valid_dloader,
         valid_dataset=valid_dataset,
-        labels_dict=train_dataset.target_labels_dict,
         target_transformers=target_labels.label_transformers,
         num_outputs_per_target=num_outputs_per_target,
         target_columns=train_dataset.target_columns,
@@ -294,115 +463,50 @@ def get_default_config(
     return config
 
 
-def get_target_and_tabular_input_labels(
-    cl_args: argparse.Namespace, custom_label_parsing_operations: al_all_column_ops
-) -> Tuple[Labels, Labels]:
-    """
-    TODO: Set up support for multiple tabular files.
-    """
-    all_array_ids = gather_ids_from_tabular_file(file_path=cl_args.label_file)
-    train_ids, valid_ids = split_ids(ids=all_array_ids, valid_size=cl_args.valid_size)
+def gather_all_array_target_ids(
+    target_configs: Sequence[schemas.TargetConfig],
+) -> Tuple[str, ...]:
+    all_ids = set()
+    for config in target_configs:
+        cur_label_file = Path(config.label_file)
+        cur_ids = gather_ids_from_tabular_file(file_path=cur_label_file)
+        all_ids.update(cur_ids)
 
-    logger.info("Setting up target labels.")
-    target_labels_info = get_tabular_target_label_data(cl_args=cl_args)
-    target_labels = set_up_train_and_valid_tabular_data(
-        tabular_info=target_labels_info,
-        custom_label_ops=custom_label_parsing_operations,
-        train_ids=train_ids,
-        valid_ids=valid_ids,
-    )
+    return tuple(all_ids)
 
-    tabular_inputs_info = get_tabular_inputs_label_data(cl_args=cl_args)
 
-    n_cat_tabular = len(tabular_inputs_info.cat_columns)
-    n_con_tabular = len(tabular_inputs_info.con_columns)
-    if n_cat_tabular + n_con_tabular > 0:
-        logger.info("Setting up tabular inputs.")
-        tabular_inputs = set_up_train_and_valid_tabular_data(
-            tabular_info=tabular_inputs_info,
-            custom_label_ops=custom_label_parsing_operations,
-            train_ids=train_ids,
-            valid_ids=valid_ids,
+def get_tabular_target_label_data(
+    target_configs: Iterable[schemas.TargetConfig],
+) -> Sequence[TabularFileInfo]:
+
+    tabular_infos = []
+
+    for target_config in target_configs:
+
+        tabular_info = TabularFileInfo(
+            file_path=Path(target_config.label_file),
+            con_columns=target_config.target_con_columns,
+            cat_columns=target_config.target_cat_columns,
+            parsing_chunk_size=target_config.label_parsing_chunk_size,
         )
-    else:
-        tabular_inputs = Labels(train_labels={}, valid_labels={}, label_transformers={})
+        tabular_infos.append(tabular_info)
 
-    return target_labels, tabular_inputs
+    return tabular_infos
 
 
-def get_tabular_target_label_data(cl_args: argparse.Namespace) -> TabularFileInfo:
+def get_tabular_inputs_label_data(
+    input_source: str,
+    tabular_data_type_config: schemas.TabularInputDataConfig,
+) -> TabularFileInfo:
 
     table_info = TabularFileInfo(
-        file_path=cl_args.label_file,
-        con_columns=cl_args.target_con_columns,
-        cat_columns=cl_args.target_cat_columns,
-        parsing_chunk_size=cl_args.label_parsing_chunk_size,
+        file_path=Path(input_source),
+        con_columns=tabular_data_type_config.extra_con_columns,
+        cat_columns=tabular_data_type_config.extra_cat_columns,
+        parsing_chunk_size=tabular_data_type_config.label_parsing_chunk_size,
     )
 
     return table_info
-
-
-def get_tabular_inputs_label_data(cl_args: argparse.Namespace) -> TabularFileInfo:
-
-    table_info = TabularFileInfo(
-        file_path=cl_args.label_file,
-        con_columns=cl_args.extra_con_columns,
-        cat_columns=cl_args.extra_cat_columns,
-        parsing_chunk_size=cl_args.label_parsing_chunk_size,
-    )
-
-    return table_info
-
-
-def _gather_all_omics_data_dimensions(
-    omics_sources: Sequence[str], omics_names: Sequence[str]
-) -> Dict[str, "DataDimensions"]:
-
-    data_dimensions = {}
-
-    if not omics_sources and not omics_names:
-        return data_dimensions
-
-    assert len(omics_sources) == len(omics_names)
-
-    for source, name in zip(omics_sources, omics_names):
-        cur_dimension = _get_data_dimension_from_data_source(data_source=Path(source))
-        data_dimensions[name] = cur_dimension
-
-    return data_dimensions
-
-
-@dataclass
-class DataDimensions:
-    channels: int
-    height: int
-    width: int
-
-    def num_elements(self):
-        return self.channels * self.height * self.width
-
-
-def _get_data_dimension_from_data_source(
-    data_source: Path,
-) -> DataDimensions:
-    """
-    TODO: Make more dynamic / robust. Also weird to say "width" for a 1D vector.
-    """
-
-    iterator = get_array_path_iterator(data_source=data_source)
-    path = next(iterator)
-    shape = np.load(file=path).shape
-
-    if len(shape) == 1:
-        channels, height, width = 1, 1, shape[0]
-    elif len(shape) == 2:
-        channels, height, width = 1, shape[0], shape[1]
-    elif len(shape) == 3:
-        channels, height, width = shape
-    else:
-        raise ValueError("Currently max 3 dimensional inputs supported")
-
-    return DataDimensions(channels=channels, height=height, width=width)
 
 
 def set_up_num_outputs_per_target(
@@ -541,107 +645,63 @@ class GetAttrDelegatedDataParallel(nn.DataParallel):
             return getattr(self.module, name)
 
 
-def get_model_from_cl_args(
-    cl_args: argparse.Namespace,
-    omics_data_dimensions: Dict[str, DataDimensions],
+def get_model(
+    inputs: al_input_objects,
+    predictor_config: schemas.PredictorConfig,
+    global_config: schemas.GlobalConfig,
     num_outputs_per_target: al_num_outputs_per_target,
-    tabular_label_transformers: al_label_transformers,
 ) -> Union[nn.Module, nn.DataParallel]:
-    """
-    Note:   If we have a linear model, we just return that because that takes care of
-            fusing tabular and genotype data by itself.
-
-    Note:   This function currently assumes 1 omics source, and one tabular source.
-            If we wanted to expand it, we would have to pass in nested configurations
-            for each data source (i.e. model), instead of just cl_args. Also we would
-            need to have nested data_dimensions, linking to models.
-    """
-
-    if cl_args.model_type == "linear":
-        assert len(omics_data_dimensions) == 1
-
-        linear_model = _get_linear_model(
-            target_cat_columns=cl_args.target_cat_columns,
-            target_con_columns=cl_args.target_con_columns,
-            data_dimensions=omics_data_dimensions,
-            device=cl_args.device,
-        )
-        return linear_model
 
     fusion_class = get_fusion_class_from_cl_args(
-        fusion_model_type=cl_args.fusion_model_type
+        fusion_model_type=global_config.fusion_model_type
     )
     fusion_kwargs = get_fusion_kwargs_from_cl_args(
-        cl_args=cl_args,
-        omics_data_dimensions=omics_data_dimensions,
+        global_config=global_config,
+        predictor_config=predictor_config,
+        inputs=inputs,
         num_outputs_per_target=num_outputs_per_target,
-        tabular_label_transformers=tabular_label_transformers,
     )
     fusion_model = fusion_class(**fusion_kwargs)
-    fusion_model = fusion_model.to(device=cl_args.device)
+    fusion_model = fusion_model.to(device=global_config.device)
 
-    if cl_args.multi_gpu:
+    if global_config.multi_gpu:
         fusion_model = GetAttrDelegatedDataParallel(module=fusion_model)
 
     return fusion_model
 
 
-def _get_linear_model(
-    target_cat_columns: Sequence[str],
-    target_con_columns: Sequence[str],
-    data_dimensions: Dict[str, DataDimensions],
-    device: str,
-) -> LinearModel:
-    """
-    TODO: Update / fix when we make a more general linear model. Currently it only
-          supports one omics input and tabular data.
-    """
-
-    assert len(data_dimensions) == 1
-
-    single_input_name = list(data_dimensions.keys())[0]
-    single_input_data_dimension = list(data_dimensions.values())[0]
-
-    model_config = LinearModelConfig(
-        input_name=single_input_name,
-        data_dimensions=single_input_data_dimension,
-        target_cat_columns=target_cat_columns,
-        target_con_columns=target_con_columns,
-    )
-
-    model = LinearModel(model_config=model_config)
-    model = model.to(device=device)
-
-    return model
-
-
-def get_modules_to_fuse_from_cl_args(
-    cl_args: argparse.Namespace,
-    omics_data_dimensions: Dict[str, DataDimensions],
-    tabular_label_transformers: al_label_transformers,
-):
+def get_modules_to_fuse_from_inputs(inputs: al_input_objects, device: str):
     models = nn.ModuleDict()
 
-    for name, dimensions in omics_data_dimensions.items():
-        cur_omics_model = get_omics_model_from_cl_args(
-            cl_args=cl_args, data_dimensions=dimensions
-        )
+    for input_name, inputs_object in inputs.items():
 
-        models[name] = cur_omics_model
+        if input_name.startswith("omics_"):
+            cur_omics_model = get_omics_model_from_model_config(
+                model_type=inputs_object.input_config.input_type_info.model_type,
+                model_config=inputs_object.input_config.model_config,
+                device=device,
+            )
 
-    if cl_args.extra_con_columns or cl_args.extra_cat_columns:
-        unique_tabular_values = get_unique_values_from_transformers(
-            transformers=tabular_label_transformers,
-            keys_to_use=cl_args.extra_cat_columns,
-        )
+            models[input_name] = cur_omics_model
 
-        tabular_model = get_tabular_model(
-            cat_columns=cl_args.extra_cat_columns,
-            con_columns=cl_args.extra_con_columns,
-            device=cl_args.device,
-            unique_label_values=unique_tabular_values,
-        )
-        models["tabular_cl_args"] = tabular_model
+        elif input_name.startswith("tabular_"):
+
+            transformers = inputs_object.labels.label_transformers
+            cat_columns = inputs_object.input_config.input_type_info.extra_cat_columns
+            con_columns = inputs_object.input_config.input_type_info.extra_con_columns
+
+            unique_tabular_values = get_unique_values_from_transformers(
+                transformers=transformers,
+                keys_to_use=cat_columns,
+            )
+
+            tabular_model = get_tabular_model(
+                cat_columns=cat_columns,
+                con_columns=con_columns,
+                device=device,
+                unique_label_values=unique_tabular_values,
+            )
+            models[input_name] = tabular_model
 
     return models
 
@@ -662,20 +722,21 @@ def get_tabular_model(
     return tabular_model
 
 
-def get_omics_model_from_cl_args(
-    cl_args: argparse.Namespace, data_dimensions: DataDimensions
+def get_omics_model_from_model_config(
+    model_config: al_omics_model_configs, model_type: str, device: str
 ):
 
-    omics_model_class = get_model_class(model_type=cl_args.model_type)
+    omics_model_class = get_model_class(model_type=model_type)
     model_init_kwargs = get_omics_model_init_kwargs(
-        model_type=cl_args.model_type, cl_args=cl_args, data_dimensions=data_dimensions
+        model_type=model_type,
+        model_config=model_config,
     )
     omics_model = omics_model_class(**model_init_kwargs)
 
-    if cl_args.model_type == "cnn":
+    if model_type == "cnn":
         assert omics_model.data_size_after_conv >= 8
 
-    omics_model = omics_model.to(device=cl_args.device)
+    omics_model = omics_model.to(device=device)
 
     return omics_model
 
@@ -691,61 +752,27 @@ def get_fusion_class_from_cl_args(
 
 
 def get_fusion_kwargs_from_cl_args(
-    cl_args: argparse.Namespace,
-    omics_data_dimensions: Dict[str, DataDimensions],
+    global_config: schemas.GlobalConfig,
+    predictor_config: schemas.PredictorConfig,
+    inputs: al_input_objects,
     num_outputs_per_target: al_num_outputs_per_target,
-    tabular_label_transformers: al_label_transformers,
 ) -> Dict[str, Any]:
 
     kwargs = {}
-    modules_to_fuse = get_modules_to_fuse_from_cl_args(
-        cl_args=cl_args,
-        omics_data_dimensions=omics_data_dimensions,
-        tabular_label_transformers=tabular_label_transformers,
+    modules_to_fuse = get_modules_to_fuse_from_inputs(
+        inputs=inputs, device=global_config.device
     )
     kwargs["modules_to_fuse"] = modules_to_fuse
-
     kwargs["num_outputs_per_target"] = num_outputs_per_target
-
-    model_dataclass_config_class = fusion.FusionModelConfig
-    if cl_args.fusion_model_type == "mgmoe":
-        model_dataclass_config_class = fusion_mgmoe.MGMoEModelConfig
-    model_dataclass_config_kwargs = match_namespace_to_dataclass(
-        namespace=cl_args, data_class=model_dataclass_config_class
-    )
-    model_config = model_dataclass_config_class(**model_dataclass_config_kwargs)
-
-    kwargs["model_config"] = model_config
+    kwargs["model_config"] = predictor_config.model_config
 
     return kwargs
 
 
-def _check_linear_model_columns(cl_args: argparse.Namespace) -> None:
-    num_label_cols = len(cl_args.target_cat_columns + cl_args.target_con_columns)
-    if num_label_cols != 1:
-        raise NotImplementedError(
-            "Linear model only supports one target column currently."
-        )
-
-    num_extra_cols = len(cl_args.extra_cat_columns + cl_args.extra_con_columns)
-    if num_extra_cols != 0:
-        raise NotImplementedError(
-            "Extra columns not supported for linear model currently."
-        )
-
-
-def _get_criterions(
-    target_columns: al_target_columns, model_type: str
-) -> al_criterions:
+def _get_criterions(target_columns: al_target_columns) -> al_criterions:
     criterions_dict = {}
 
     def get_criterion(column_type_):
-
-        if model_type == "linear":
-            if column_type_ == "cat":
-                return _calc_bce
-            else:
-                return partial(_calc_mse, mse_loss_func=nn.MSELoss(reduction="mean"))
 
         if column_type_ == "con":
             return partial(_calc_mse, mse_loss_func=nn.MSELoss())
@@ -761,13 +788,6 @@ def _get_criterions(
         criterions_dict[column_name] = criterion
 
     return criterions_dict
-
-
-def _calc_bce(input, target):
-    # note we use input and not e.g. input_ here because torch uses name "input"
-    # in loss functions for compatibility
-    bce_loss_func = nn.BCELoss()
-    return bce_loss_func(input[:, 1], target.to(dtype=torch.float))
 
 
 def _calc_mse(input, target, mse_loss_func: nn.MSELoss):
@@ -806,10 +826,10 @@ def _log_model(model: nn.Module, l1_weight: float) -> None:
     )
 
 
-def train(config: Config) -> None:
-    c = config
-    cl_args = config.cl_args
-    step_hooks = c.hooks.step_func_hooks
+def train(experiment: Experiment) -> None:
+    e = experiment
+    gc = experiment.configs.global_config
+    step_hooks = e.hooks.step_func_hooks
 
     def step(
         engine: Engine,
@@ -818,13 +838,13 @@ def train(config: Config) -> None:
         """
         The output here goes to trainer.output.
         """
-        c.model.train()
-        c.optimizer.zero_grad()
+        e.model.train()
+        e.optimizer.zero_grad()
 
         base_prepare_inputs_stage = step_hooks.base_prepare_batch
         state = call_hooks_stage_iterable(
             hook_iterable=base_prepare_inputs_stage,
-            common_kwargs={"config": config, "loader_batch": loader_batch},
+            common_kwargs={"experiment": experiment, "loader_batch": loader_batch},
             state=None,
         )
         base_batch = state["batch"]
@@ -832,7 +852,7 @@ def train(config: Config) -> None:
         post_prepare_inputs_stage = step_hooks.post_prepare_batch
         state = call_hooks_stage_iterable(
             hook_iterable=post_prepare_inputs_stage,
-            common_kwargs={"config": config, "loader_batch": base_batch},
+            common_kwargs={"experiment": experiment, "loader_batch": base_batch},
             state=state,
         )
         batch = state["batch"]
@@ -840,28 +860,28 @@ def train(config: Config) -> None:
         model_forward_loss_stage = step_hooks.model_forward
         state = call_hooks_stage_iterable(
             hook_iterable=model_forward_loss_stage,
-            common_kwargs={"config": config, "batch": batch},
+            common_kwargs={"experiment": experiment, "batch": batch},
             state=state,
         )
 
         loss_stage = step_hooks.loss
         state = call_hooks_stage_iterable(
             hook_iterable=loss_stage,
-            common_kwargs={"config": config, "batch": batch},
+            common_kwargs={"experiment": experiment, "batch": batch},
             state=state,
         )
 
         optimizer_backward_stage = step_hooks.optimizer_backward
         state = call_hooks_stage_iterable(
             hook_iterable=optimizer_backward_stage,
-            common_kwargs={"config": config, "batch": batch},
+            common_kwargs={"experiment": experiment, "batch": batch},
             state=state,
         )
 
         metrics_stage = step_hooks.metrics
         state = call_hooks_stage_iterable(
             hook_iterable=metrics_stage,
-            common_kwargs={"config": config, "batch": batch},
+            common_kwargs={"experiment": experiment, "batch": batch},
             state=state,
         )
 
@@ -869,24 +889,24 @@ def train(config: Config) -> None:
 
     trainer = Engine(process_function=step)
 
-    if cl_args.find_lr:
+    if gc.find_lr:
         logger.info("Running LR find and exiting.")
         run_lr_find(
             trainer_engine=trainer,
-            train_dataloader=c.train_loader,
-            model=c.model,
-            optimizer=c.optimizer,
-            output_folder=utils.get_run_folder(run_name=cl_args.run_name),
+            train_dataloader=e.train_loader,
+            model=e.model,
+            optimizer=e.optimizer,
+            output_folder=utils.get_run_folder(run_name=gc.run_name),
         )
         sys.exit(0)
 
-    trainer = configure_trainer(trainer=trainer, config=config)
+    trainer = configure_trainer(trainer=trainer, experiment=experiment)
 
-    trainer.run(data=c.train_loader, max_epochs=cl_args.n_epochs)
+    trainer.run(data=e.train_loader, max_epochs=gc.n_epochs)
 
 
-def get_default_hooks(cl_args_: argparse.Namespace):
-    step_func_hooks = _get_default_step_function_hooks(cl_args=cl_args_)
+def get_default_hooks(configs: Configs):
+    step_func_hooks = _get_default_step_function_hooks(configs=configs)
     hooks_object = Hooks(step_func_hooks=step_func_hooks)
 
     return hooks_object
@@ -901,13 +921,13 @@ class Hooks:
     custom_handler_attachers: Union[None, al_handler_attachers] = None
 
 
-def _get_default_step_function_hooks(cl_args: argparse.Namespace):
+def _get_default_step_function_hooks(configs: Configs):
     """
     TODO: Add validation, inspect that outputs have correct names.
     TODO: Refactor, split into smaller functions e.g. for L1, mixing and uncertainty.
     """
 
-    init_kwargs = _get_default_step_function_hooks_init_kwargs(cl_args=cl_args)
+    init_kwargs = _get_default_step_function_hooks_init_kwargs(configs=configs)
 
     step_func_hooks = StepFunctionHookStages(**init_kwargs)
 
@@ -915,7 +935,7 @@ def _get_default_step_function_hooks(cl_args: argparse.Namespace):
 
 
 def _get_default_step_function_hooks_init_kwargs(
-    cl_args: argparse.Namespace,
+    configs: Configs,
 ) -> Dict[str, Sequence[Callable]]:
 
     init_kwargs = {
@@ -927,31 +947,32 @@ def _get_default_step_function_hooks_init_kwargs(
         "metrics": [hook_default_compute_metrics],
     }
 
-    if cl_args.mixing_type is not None:
+    if configs.global_config.mixing_type is not None:
         logger.debug(
             "Setting up hooks for mixing with %s with α=%.2g.",
-            cl_args.mixing_type,
-            cl_args.mixing_alpha,
+            configs.global_config.mixing_type,
+            configs.global_config.mixing_alpha,
         )
-        mix_hook = get_mix_data_hook(mixing_type=cl_args.mixing_type)
+        mix_hook = get_mix_data_hook(mixing_type=configs.global_config.mixing_type)
 
         init_kwargs["post_prepare_batch"].append(mix_hook)
         init_kwargs["loss"][0] = hook_mix_loss
 
-    if len(cl_args.target_con_columns + cl_args.target_cat_columns) > 1:
+    all_targets = get_all_targets(targets_configs=configs.target_configs)
+    if len(all_targets) > 1:
         logger.debug(
             "Setting up hook for uncertainty weighted loss for multi task modelling."
         )
         uncertainty_hook = get_uncertainty_loss_hook(
-            target_cat_columns=cl_args.target_cat_columns,
-            target_con_columns=cl_args.target_con_columns,
-            device=cl_args.device,
+            target_cat_columns=all_targets.cat_targets,
+            target_con_columns=all_targets.con_targets,
+            device=configs.global_config.device,
         )
         init_kwargs["loss"].append(uncertainty_hook)
 
     init_kwargs["loss"].append(hook_default_aggregate_losses)
 
-    if cl_args.l1:
+    if any(getattr(input_config, "l1", None) for input_config in configs.input_configs):
         init_kwargs["loss"].append(hook_add_l1_loss)
 
     return init_kwargs
@@ -972,7 +993,7 @@ class StepFunctionHookStages:
 
 
 def hook_default_prepare_batch(
-    config: "Config",
+    experiment: "Experiment",
     loader_batch: al_dataloader_getitem_batch,
     *args,
     **kwargs,
@@ -980,9 +1001,10 @@ def hook_default_prepare_batch(
 
     batch = prepare_base_batch_default(
         loader_batch=loader_batch,
-        cl_args=config.cl_args,
-        target_columns=config.target_columns,
-        model=config.model,
+        input_objects=experiment.inputs,
+        target_columns=experiment.target_columns,
+        model=experiment.model,
+        device=experiment.configs.global_config.device,
     )
 
     state_updates = {"batch": batch}
@@ -992,19 +1014,20 @@ def hook_default_prepare_batch(
 
 def prepare_base_batch_default(
     loader_batch: al_dataloader_getitem_batch,
-    cl_args: argparse.Namespace,
+    input_objects: al_input_objects,
     target_columns: al_target_columns,
     model: fusion.FusionModel,
+    device: str,
 ):
 
     inputs, target_labels, train_ids = loader_batch
 
     inputs_prepared = {}
-    for input_name in inputs:
+    for input_name, input_object in input_objects.items():
 
         if input_name.startswith("omics_"):
             cur_omics = inputs[input_name]
-            cur_omics = cur_omics.to(device=cl_args.device)
+            cur_omics = cur_omics.to(device=device)
             cur_omics = cur_omics.to(dtype=torch.float32)
 
             inputs_prepared[input_name] = cur_omics
@@ -1013,14 +1036,17 @@ def prepare_base_batch_default(
 
             tabular_source_input: Dict[str, torch.Tensor] = inputs[input_name]
             for name, tensor in tabular_source_input.items():
-                tabular_source_input[name] = tensor.to(device=cl_args.device)
+                tabular_source_input[name] = tensor.to(device=device)
 
+            tabular_input_type_info = input_object.input_config.input_type_info
+            cat_columns = tabular_input_type_info.extra_cat_columns
+            con_columns = tabular_input_type_info.extra_con_columns
             tabular = get_tabular_inputs(
-                extra_cat_columns=cl_args.extra_cat_columns,
-                extra_con_columns=cl_args.extra_con_columns,
+                extra_cat_columns=cat_columns,
+                extra_con_columns=con_columns,
                 tabular_model=model.modules_to_fuse[input_name],
                 tabular_input=tabular_source_input,
-                device=cl_args.device,
+                device=device,
             )
             inputs_prepared[input_name] = tabular
         else:
@@ -1029,7 +1055,7 @@ def prepare_base_batch_default(
     if target_labels:
         target_labels = model_training_utils.parse_target_labels(
             target_columns=target_columns,
-            device=cl_args.device,
+            device=device,
             labels=target_labels,
         )
 
@@ -1043,11 +1069,11 @@ def prepare_base_batch_default(
 
 
 def hook_default_model_forward(
-    config: "Config", batch: "Batch", *args, **kwargs
+    experiment: "Experiment", batch: "Batch", *args, **kwargs
 ) -> Dict:
 
     inputs = batch.inputs
-    train_outputs = config.model(inputs=inputs)
+    train_outputs = experiment.model(inputs=inputs)
 
     state_updates = {"model_outputs": train_outputs}
 
@@ -1055,42 +1081,42 @@ def hook_default_model_forward(
 
 
 def hook_default_optimizer_backward(
-    config: "Config", state: Dict, *args, **kwargs
+    experiment: "Experiment", state: Dict, *args, **kwargs
 ) -> Dict:
 
     optimizer_backward_kwargs = get_optimizer_backward_kwargs(
-        optimizer_name=config.cl_args.optimizer
+        optimizer_name=experiment.configs.global_config.optimizer
     )
 
     state["loss"].backward(**optimizer_backward_kwargs)
-    config.optimizer.step()
+    experiment.optimizer.step()
 
     return {}
 
 
 def hook_default_compute_metrics(
-    config: "Config", batch: "Batch", state: Dict, *args, **kwargs
+    experiment: "Experiment", batch: "Batch", state: Dict, *args, **kwargs
 ):
 
     train_batch_metrics = calculate_batch_metrics(
-        target_columns=config.target_columns,
+        target_columns=experiment.target_columns,
         outputs=state["model_outputs"],
         labels=batch.target_labels,
         mode="train",
-        metric_record_dict=config.metrics,
+        metric_record_dict=experiment.metrics,
     )
 
     train_batch_metrics_w_loss = add_loss_to_metrics(
-        target_columns=config.target_columns,
+        target_columns=experiment.target_columns,
         losses=state["per_target_train_losses"],
         metric_dict=train_batch_metrics,
     )
 
     train_batch_metrics_with_averages = add_multi_task_average_metrics(
         batch_metrics_dict=train_batch_metrics_w_loss,
-        target_columns=config.target_columns,
+        target_columns=experiment.target_columns,
         loss=state["loss"].item(),
-        performance_average_functions=config.metrics["averaging_functions"],
+        performance_average_functions=experiment.metrics["averaging_functions"],
     )
 
     state_updates = {"metrics": train_batch_metrics_with_averages}
@@ -1099,10 +1125,10 @@ def hook_default_compute_metrics(
 
 
 def hook_default_per_target_loss(
-    config: "Config", batch: "Batch", state: Dict, *args, **kwargs
+    experiment: "Experiment", batch: "Batch", state: Dict, *args, **kwargs
 ) -> Dict:
 
-    per_target_train_losses = config.loss_function(
+    per_target_train_losses = experiment.loss_function(
         inputs=state["model_outputs"], targets=batch.target_labels
     )
 

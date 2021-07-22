@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, Sequence, TYPE_CHECKING
 
 import torch
@@ -22,16 +22,18 @@ if TYPE_CHECKING:
     from eir.train import al_num_outputs_per_target
 
 
+# TODO: Is this needed when we have the predictor config? Why not inherit from that?
+#       Have here perhaps only fusion specific settings
 @dataclass
 class MGMoEModelConfig:
-    layers: Sequence[int]
-    fc_task_dim: int
+    layers: Sequence[int] = field(default_factory=lambda: [2])
+    fc_task_dim: int = 64
 
-    split_mlp_num_splits: int
-    mg_num_experts: int
+    split_mlp_num_splits: int = 64
+    mg_num_experts: int = 8
 
-    rb_do: float
-    fc_do: float
+    rb_do: float = 0.00
+    fc_do: float = 0.00
 
 
 class MGMoEModel(nn.Module):

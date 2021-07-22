@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Union, Dict
 from typing import Set, overload, TYPE_CHECKING, Sequence, Iterable, Any
@@ -17,6 +18,11 @@ if TYPE_CHECKING:
 # Aliases
 al_unique_embed_vals = Dict[str, Set[str]]
 al_emb_lookup_dict = Dict[str, Dict[str, Dict[int, int]]]
+
+
+@dataclass
+class TabularModelConfig:
+    l1: float = 0.00
 
 
 class TabularModel(nn.Module):

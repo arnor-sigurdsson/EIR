@@ -3,9 +3,9 @@ import sys
 from contextlib import contextmanager
 from typing import Callable
 
-from eir.train import main as main_train
-from eir.predict import main as main_predict
 from eir import __version__
+from eir.predict import main as main_predict
+from eir.train import main as main_train
 
 
 @contextmanager

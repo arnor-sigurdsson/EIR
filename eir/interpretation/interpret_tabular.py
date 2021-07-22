@@ -1,23 +1,23 @@
-from pathlib import Path
-from typing import Dict, Sequence, TYPE_CHECKING, List
-from collections import defaultdict
-from textwrap import wrap
 import warnings
+from collections import defaultdict
+from pathlib import Path
+from textwrap import wrap
+from typing import Dict, Sequence, TYPE_CHECKING, List
 
-import torch
-import shap
 import matplotlib.pyplot as plt
-from matplotlib import MatplotlibDeprecationWarning
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import shap
+import torch
 from aislib.misc_utils import get_logger, ensure_path_exists
+from matplotlib import MatplotlibDeprecationWarning
 
 from eir.interpretation.interpret_omics import _get_target_class_name
 from eir.train_utils.utils import load_transformers
 
 if TYPE_CHECKING:
-    from eir.train import Config
+    from eir.train import Experiment
     from eir.data_load.label_setup import al_label_transformers_object
     from eir.interpretation.interpretation import SampleActivation
 
@@ -25,18 +25,23 @@ logger = get_logger(__name__)
 
 
 def analyze_tabular_input_activations(
-    config: "Config",
+    experiment: "Experiment",
     input_name: str,
     target_column_name: str,
     target_column_type: str,
     activation_outfolder: Path,
     all_activations: Sequence["SampleActivation"],
 ):
+    exp = experiment
 
-    tabular_model = config.model.modules_to_fuse[input_name]
+    tabular_type_info_config = exp.inputs[input_name].input_config.input_type_info
+    cat_columns = tabular_type_info_config.extra_cat_columns
+    con_columns = tabular_type_info_config.extra_con_columns
+
+    tabular_model = experiment.model.modules_to_fuse[input_name]
     activation_tensor_slices = set_up_tabular_tensor_slices(
-        cat_input_columns=config.cl_args.extra_cat_columns,
-        con_input_columns=config.cl_args.extra_con_columns,
+        cat_input_columns=cat_columns,
+        con_input_columns=con_columns,
         embedding_module=tabular_model,
     )
 
@@ -52,7 +57,7 @@ def analyze_tabular_input_activations(
 
     all_activations_class_stratified = stratify_activations_by_target_classes(
         all_activations=all_activations,
-        target_transformer=config.target_transformers[target_column_name],
+        target_transformer=experiment.target_transformers[target_column_name],
         target_column=target_column_name,
         column_type=target_column_type,
     )
@@ -61,11 +66,11 @@ def analyze_tabular_input_activations(
         cur_class_outfolder = activation_outfolder / class_name
         ensure_path_exists(path=cur_class_outfolder, is_folder=True)
 
-        if config.cl_args.extra_con_columns:
+        if con_columns:
 
             cat_to_con_cutoff = get_cat_to_con_cutoff_from_slices(
                 slices=activation_tensor_slices,
-                cat_input_columns=config.cl_args.extra_cat_columns,
+                cat_input_columns=cat_columns,
             )
             continuous_shap = _gather_continuous_shap_values(
                 all_activations=class_activations,
@@ -75,7 +80,7 @@ def analyze_tabular_input_activations(
             continuous_inputs = _gather_continuous_inputs(
                 all_activations=class_activations,
                 cat_to_con_cutoff=cat_to_con_cutoff,
-                con_names=config.cl_args.extra_con_columns,
+                con_names=con_columns,
                 input_name=input_name,
             )
             plot_tabular_beeswarm(
@@ -85,7 +90,7 @@ def analyze_tabular_input_activations(
                 class_name=class_name,
             )
 
-        for cat_column in config.cl_args.extra_cat_columns:
+        for cat_column in cat_columns:
 
             categorical_shap = _gather_categorical_shap_values(
                 all_activations=class_activations,
@@ -98,7 +103,8 @@ def analyze_tabular_input_activations(
                 input_name=input_name,
             )
             cat_column_transformers = load_transformers(
-                run_name=config.cl_args.run_name, transformers_to_load=[cat_column]
+                run_name=experiment.configs.global_config.run_name,
+                transformers_to_load=[cat_column],
             )
 
             categorical_inputs_mapped = map_categorical_labels_to_names(

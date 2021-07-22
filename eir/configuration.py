@@ -27,8 +27,8 @@ def get_train_argument_parser() -> configargparse.ArgumentParser:
     parser_.add_argument(
         "--config_file",
         is_config_file=True,
-        required=False,
-        help="path to .yaml config file if using one.",
+        required=True,
+        help="path to .yaml config file.",
     )
 
     parser_.add_argument(
@@ -343,6 +343,7 @@ def get_train_argument_parser() -> configargparse.ArgumentParser:
         default=[],
         help="Continuous target columns in label file.",
     )
+
     parser_.add_argument(
         "--target_cat_columns",
         nargs="*",

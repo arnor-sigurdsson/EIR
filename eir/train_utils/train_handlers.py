@@ -1,12 +1,13 @@
 import atexit
-import json
 from argparse import Namespace
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 from typing import List, Callable, Union, Tuple, TYPE_CHECKING, Dict, overload
 
+import aislib.misc_utils
 import pandas as pd
+import yaml
 from aislib.misc_utils import get_logger
 from ignite.contrib.handlers import ProgressBar
 from ignite.engine import Events, Engine, events
@@ -37,8 +38,9 @@ from eir.train_utils.utils import get_run_folder, validate_handler_dependencies
 from eir.visualization import visualization_funcs as vf
 
 if TYPE_CHECKING:
-    from eir.train import Config
+    from eir.train import Experiment
     from eir.train_utils.metrics import al_step_metric_dict
+    from eir.config.config import Configs
 
 # Aliases
 al_handler_and_event = Tuple[Callable[[Engine, "HandlerConfig"], None], Events]
@@ -50,25 +52,25 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 
 @dataclass
 class HandlerConfig:
-    config: "Config"
+    experiment: "Experiment"
     run_folder: Path
     run_name: str
     monitoring_metrics: List[Tuple[str, str]]
 
 
-def configure_trainer(trainer: Engine, config: "Config") -> Engine:
+def configure_trainer(trainer: Engine, experiment: "Experiment") -> Engine:
 
-    ca = config.cl_args
-    run_folder = get_run_folder(run_name=ca.run_name)
+    gc = experiment.configs.global_config
+    run_folder = get_run_folder(run_name=gc.run_name)
 
     monitoring_metrics = _get_monitoring_metrics(
-        target_columns=config.target_columns, metric_record_dict=config.metrics
+        target_columns=experiment.target_columns, metric_record_dict=experiment.metrics
     )
 
     handler_config = HandlerConfig(
-        config=config,
+        experiment=experiment,
         run_folder=run_folder,
-        run_name=ca.run_name,
+        run_name=gc.run_name,
         monitoring_metrics=monitoring_metrics,
     )
 
@@ -76,7 +78,7 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
         engine=trainer, monitoring_metrics=monitoring_metrics
     )
 
-    if not ca.no_pbar:
+    if not gc.no_pbar:
         pbar = ProgressBar()
         pbar.attach(engine=trainer, metric_names=["loss-average"])
         trainer.add_event_handler(
@@ -89,16 +91,18 @@ def configure_trainer(trainer: Engine, config: "Config") -> Engine:
         trainer=trainer, handler_config=handler_config
     )
 
-    if ca.early_stopping_patience:
+    if gc.early_stopping_patience:
         trainer = _attach_early_stopping_handler(
             trainer=trainer, handler_config=handler_config
         )
 
     # TODO: Implement warmup for same LR scheduling
-    if ca.lr_schedule != "same":
+    if gc.lr_schedule != "same":
         lr_scheduler = set_up_lr_scheduler(handler_config=handler_config)
-        attach_lr_scheduler(engine=trainer, lr_scheduler=lr_scheduler, config=config)
-    elif ca.lr_schedule == "same" and ca.warmup_steps:
+        attach_lr_scheduler(
+            engine=trainer, lr_scheduler=lr_scheduler, experiment=experiment
+        )
+    elif gc.lr_schedule == "same" and gc.warmup_steps:
         raise NotImplementedError("Warmup not yet implemented for 'same' LR schedule.")
 
     if handler_config.run_name:
@@ -114,24 +118,24 @@ def _attach_sample_interval_handlers(
     handler_config: "HandlerConfig",
 ) -> Engine:
 
-    config = handler_config.config
-    cl_args = config.cl_args
+    exp = handler_config.experiment
+    gc = exp.configs.global_config
 
     validation_handler_and_event = _get_validation_handler_and_event(
-        sample_interval_base=cl_args.sample_interval,
-        iter_per_epoch=len(config.train_loader),
-        n_epochs=cl_args.n_epochs,
-        early_stopping_patience=cl_args.early_stopping_patience,
+        sample_interval_base=gc.sample_interval,
+        iter_per_epoch=len(exp.train_loader),
+        n_epochs=gc.n_epochs,
+        early_stopping_patience=gc.early_stopping_patience,
     )
     all_handler_events = [validation_handler_and_event]
 
-    if cl_args.get_acts:
+    if gc.get_acts:
         activation_handler_and_event = _get_activation_handler_and_event(
-            iter_per_epoch=len(config.train_loader),
-            n_epochs=cl_args.n_epochs,
-            sample_interval_base=cl_args.sample_interval,
-            act_every_sample_factor=cl_args.act_every_sample_factor,
-            early_stopping_patience=cl_args.early_stopping_patience,
+            iter_per_epoch=len(exp.train_loader),
+            n_epochs=gc.n_epochs,
+            sample_interval_base=gc.sample_interval,
+            act_every_sample_factor=gc.act_every_sample_factor,
+            early_stopping_patience=gc.early_stopping_patience,
         )
         all_handler_events.append(activation_handler_and_event)
 
@@ -255,17 +259,17 @@ def _get_monitoring_metrics(
     [validation_handler],
 )
 def _attach_early_stopping_handler(trainer: Engine, handler_config: "HandlerConfig"):
-    cl_args = handler_config.config.cl_args
+    gc = handler_config.experiment.configs.global_config
 
     early_stopping_handler = _get_early_stopping_handler(
         trainer=trainer,
         handler_config=handler_config,
-        patience_steps=cl_args.early_stopping_patience,
+        patience_steps=gc.early_stopping_patience,
     )
 
     early_stopping_event_kwargs = _get_early_stopping_event_kwargs(
-        early_stopping_iteration_buffer=cl_args.early_stopping_buffer,
-        sample_interval=cl_args.sample_interval,
+        early_stopping_iteration_buffer=gc.early_stopping_buffer,
+        sample_interval=gc.sample_interval,
     )
 
     trainer.add_event_handler(
@@ -400,20 +404,20 @@ def _log_stats_to_pbar(engine: Engine, pbar: ProgressBar) -> None:
 
 
 def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
-    c = handler_config.config
-    cl_args = handler_config.config.cl_args
+    exp = handler_config.experiment
+    gc = handler_config.experiment.configs.global_config
 
-    _save_config(run_folder=handler_config.run_folder, cl_args=cl_args)
+    _save_config(run_folder=handler_config.run_folder, configs=exp.configs)
 
-    if cl_args.checkpoint_interval is not None:
+    if gc.checkpoint_interval is not None:
         trainer = _add_checkpoint_handler_wrapper(
             trainer=trainer,
             run_folder=handler_config.run_folder,
-            run_name=Path(cl_args.run_name),
-            n_to_save=cl_args.n_saved_models,
-            checkpoint_interval=cl_args.checkpoint_interval,
-            sample_interval=cl_args.sample_interval,
-            model=c.model,
+            run_name=Path(gc.run_name),
+            n_to_save=gc.n_saved_models,
+            checkpoint_interval=gc.checkpoint_interval,
+            sample_interval=gc.sample_interval,
+            model=exp.model,
         )
 
     trainer.add_event_handler(
@@ -422,12 +426,12 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
         handler_config=handler_config,
     )
 
-    for plot_event in _get_plot_events(sample_interval=cl_args.sample_interval):
+    for plot_event in _get_plot_events(sample_interval=gc.sample_interval):
 
         if plot_event == Events.COMPLETED and not _do_run_completed_handler(
-            iter_per_epoch=len(c.train_loader),
-            n_epochs=cl_args.n_epochs,
-            sample_interval=cl_args.sample_interval,
+            iter_per_epoch=len(exp.train_loader),
+            n_epochs=gc.n_epochs,
+            sample_interval=gc.sample_interval,
         ):
             continue
 
@@ -435,7 +439,7 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
             trainer=trainer, plot_event=plot_event, handler_config=handler_config
         )
 
-    if c.hooks.custom_handler_attachers is not None:
+    if exp.hooks.custom_handler_attachers is not None:
         custom_handlers = _get_custom_handlers(handler_config=handler_config)
         trainer = _attach_custom_handlers(
             trainer=trainer,
@@ -446,18 +450,27 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
     log_tb_hparams_on_exit_func = partial(
         add_hparams_to_tensorboard,
         h_params=H_PARAMS,
-        config=handler_config.config,
-        writer=handler_config.config.writer,
+        experiment=handler_config.experiment,
+        writer=handler_config.experiment.writer,
     )
     atexit.register(log_tb_hparams_on_exit_func)
 
     return trainer
 
 
-def _save_config(run_folder: Path, cl_args: Namespace):
-    with open(str(run_folder / "cl_args.json"), "w") as config_file:
-        config_dict = vars(cl_args)
-        json.dump(config_dict, config_file, sort_keys=True, indent=4)
+def _save_config(run_folder: Path, configs: "Configs"):
+
+    for config_name, config_object in configs.__dict__.items():
+        cur_outpath = Path(run_folder / "configs" / config_name).with_suffix(".yaml")
+        aislib.misc_utils.ensure_path_exists(path=cur_outpath)
+
+        if isinstance(config_object, list):
+            config_object = [
+                i.__dict__ for i in config_object if not isinstance(i, dict)
+            ]
+
+        with open(str(cur_outpath), "w") as yamlfile:
+            yaml.dump(data=config_object, stream=yamlfile)
 
 
 def _add_checkpoint_handler_wrapper(
@@ -522,7 +535,7 @@ def _get_checkpoint_handler(
         return engine.state.iteration
 
     checkpoint_handler = ModelCheckpoint(
-        dirname=Path(run_folder, "saved_models"),
+        dirname=str(Path(run_folder, "saved_models")),
         filename_prefix=run_name.name,
         create_dir=True,
         score_name=score_name,
@@ -623,13 +636,13 @@ def _attach_plot_progress_handler(
 
 
 def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> None:
-    cl_args = handler_config.config.cl_args
+    ca = handler_config.experiment.configs.global_config
 
     # if no val data is available yet
-    if engine.state.iteration < cl_args.sample_interval:
+    if engine.state.iteration < ca.sample_interval:
         return
 
-    run_folder = get_run_folder(cl_args.run_name)
+    run_folder = get_run_folder(ca.run_name)
 
     for results_dir in (run_folder / "results").iterdir():
         target_column = results_dir.name
@@ -643,7 +656,7 @@ def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> Non
             valid_history_df=valid_history_df,
             output_folder=results_dir,
             title_extra=target_column,
-            plot_skip_steps=cl_args.plot_skip_steps,
+            plot_skip_steps=ca.plot_skip_steps,
         )
 
     train_avg_history_df, valid_avg_history_df = get_metrics_dataframes(
@@ -655,16 +668,16 @@ def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> Non
         valid_history_df=valid_avg_history_df,
         output_folder=run_folder,
         title_extra="Multi Task Average",
-        plot_skip_steps=cl_args.plot_skip_steps,
+        plot_skip_steps=ca.plot_skip_steps,
     )
 
     with open(Path(handler_config.run_folder, "model_info.txt"), "w") as mfile:
-        mfile.write(str(handler_config.config.model))
+        mfile.write(str(handler_config.experiment.model))
 
 
 def _get_custom_handlers(handler_config: "HandlerConfig"):
 
-    custom_handlers = handler_config.config.hooks.custom_handler_attachers
+    custom_handlers = handler_config.experiment.hooks.custom_handler_attachers
 
     return custom_handlers
 
@@ -682,7 +695,7 @@ def _attach_custom_handlers(
 
 
 def add_hparams_to_tensorboard(
-    h_params: List[str], config: "Config", writer: SummaryWriter
+    h_params: List[str], experiment: "Experiment", writer: SummaryWriter
 ) -> None:
 
     logger.debug(
@@ -690,11 +703,13 @@ def add_hparams_to_tensorboard(
         "to tensorboard."
     )
 
-    c = config
-    run_folder = get_run_folder(run_name=c.cl_args.run_name)
+    exp = experiment
+    gc = exp.configs.global_config
+
+    run_folder = get_run_folder(run_name=gc.run_name)
 
     metrics_files = get_metrics_files(
-        target_columns=c.target_columns,
+        target_columns=exp.target_columns,
         run_folder=run_folder,
         train_or_val_target_prefix="validation_",
     )
@@ -710,7 +725,7 @@ def add_hparams_to_tensorboard(
         )
         return
 
-    h_param_dict = _generate_h_param_dict(cl_args=c.cl_args, h_params=h_params)
+    h_param_dict = _generate_h_param_dict(global_config=gc, h_params=h_params)
 
     min_loss = average_loss_df["loss-average"].min()
     max_perf = average_loss_df["perf-average"].max()
@@ -722,13 +737,16 @@ def add_hparams_to_tensorboard(
 
 
 def _generate_h_param_dict(
-    cl_args: Namespace, h_params: List[str]
+    global_config: Namespace, h_params: List[str]
 ) -> Dict[str, Union[str, float, int]]:
 
     h_param_dict = {}
 
     for param_name in h_params:
-        param_value = getattr(cl_args, param_name)
+        if not hasattr(global_config, param_name):
+            continue
+
+        param_value = getattr(global_config, param_name)
 
         if isinstance(param_value, (tuple, list)):
             param_value = "_".join([str(p) for p in param_value])

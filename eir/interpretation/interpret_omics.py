@@ -12,7 +12,7 @@ from sklearn.preprocessing import StandardScaler, LabelEncoder
 from eir.visualization import interpretation_visualization as av
 
 if TYPE_CHECKING:
-    from eir.train import Config
+    from eir.train import Experiment
     from eir.interpretation.interpretation import SampleActivation
 
 al_gradients_dict = Dict[str, List[np.ndarray]]
@@ -24,18 +24,17 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
 def analyze_omics_input_activations(
-    config: "Config",
+    experiment: "Experiment",
     input_name: str,
     target_column_name: str,
     target_column_type: str,
     activation_outfolder: Path,
     all_activations: Sequence["SampleActivation"],
 ) -> None:
-    c = config
-    cl_args = config.cl_args
+    exp = experiment
 
     acc_acts, acc_acts_masked = parse_single_omics_activations(
-        config=c,
+        experiment=exp,
         omics_input_name=input_name,
         target_column=target_column_name,
         column_type=target_column_type,
@@ -47,8 +46,9 @@ def analyze_omics_input_activations(
         accumulated_grads=acc_acts, abs_grads=abs_grads
     )
 
-    # TODO: Add support for multiple SNP files
-    snp_df = read_snp_df(snp_file_path=Path(cl_args.snp_file))
+    omics_data_type_config = exp.inputs[input_name].input_config.input_type_info
+    cur_snp_path = Path(omics_data_type_config.snp_file)
+    snp_df = read_snp_df(snp_file_path=cur_snp_path)
 
     classes = sorted(list(top_gradients_dict.keys()))
     scaled_grads = gather_and_rescale_snps(
@@ -149,14 +149,14 @@ def _save_snp_gradients(
 
 
 def parse_single_omics_activations(
-    config: "Config",
+    experiment: "Experiment",
     omics_input_name: str,
     target_column: str,
     column_type: str,
     activations: Sequence["SampleActivation"],
 ) -> Tuple[Dict, Dict]:
 
-    c = config
+    c = experiment
     target_transformer = c.target_transformers[target_column]
 
     acc_acts = defaultdict(list)

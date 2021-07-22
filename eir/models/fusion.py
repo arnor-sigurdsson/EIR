@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, Callable, Sequence, List, TYPE_CHECKING
 
 import torch
@@ -30,14 +30,16 @@ def default_fuse_features(features: Sequence[torch.Tensor]) -> torch.Tensor:
     return torch.cat(tuple(features), dim=1)
 
 
+# TODO: Is this needed when we have the predictor config? Why not inherit from that?
+#       Have here perhaps only fusion specific settings?
 @dataclass
 class FusionModelConfig:
-    layers: List[int]
+    layers: List[int] = field(default_factory=lambda x: [2, 2])
 
-    fc_task_dim: int
+    fc_task_dim: int = 32
 
-    rb_do: float
-    fc_do: float
+    rb_do: float = 0.00
+    fc_do: float = 0.00
 
 
 class FusionModel(nn.Module):

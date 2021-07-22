@@ -11,33 +11,33 @@ from torch import nn
 from eir.models.layers import FirstCNNBlock, SelfAttention, CNNResidualBlock
 
 if TYPE_CHECKING:
-    from eir.train import DataDimensions
+    from eir.config.config import DataDimensions
 
 logger = get_logger(__name__)
 
 
 @dataclass
 class CNNModelConfig:
-
-    layers: Union[None, List[int]]
-
-    fc_repr_dim: int
-
-    down_stride: int
-    first_stride_expansion: int
-
-    channel_exp_base: int
-    first_channel_expansion: int
-
-    kernel_width: int
-    first_kernel_expansion: int
-    dilation_factor: int
-
     data_dimensions: "DataDimensions"
 
-    rb_do: float
+    layers: Union[None, List[int]] = None
+
+    fc_repr_dim: int = 32
+
+    down_stride: int = 4
+    first_stride_expansion: int = 1
+
+    channel_exp_base: int = 2
+    first_channel_expansion: int = 1
+
+    kernel_width: int = 12
+    first_kernel_expansion: int = 1
+    dilation_factor: int = 1
+
+    rb_do: float = 0.00
 
     sa: bool = False
+    l1: float = 0.00
 
 
 class CNNModel(nn.Module):

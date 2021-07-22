@@ -5,13 +5,13 @@ import torch
 from torch import nn
 
 if TYPE_CHECKING:
-    from eir.train import DataDimensions
+    from eir.config.config import DataDimensions
 
 
 @dataclass
 class MLPModelConfig:
-    fc_repr_dim: int
     data_dimensions: "DataDimensions"
+    fc_repr_dim: int = 32
 
 
 class MLPModel(nn.Module):

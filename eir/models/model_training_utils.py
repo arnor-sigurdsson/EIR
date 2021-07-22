@@ -36,7 +36,7 @@ from eir.train_utils.utils import (
 if TYPE_CHECKING:
     # noinspection PyUnresolvedReferences
     from eir.train import (  # noqa: F401
-        Config,
+        Experiment,
         al_training_labels_batch,
         al_training_labels_target,
         al_training_labels_extra,

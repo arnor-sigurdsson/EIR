@@ -1,6 +1,7 @@
 import copy
 import os
 import sys
+import warnings
 from argparse import Namespace
 from collections import defaultdict
 from contextlib import contextmanager
@@ -18,8 +19,6 @@ from typing import (
     Protocol,
     Callable,
 )
-
-import warnings
 
 # Filter warnings from shap
 # TODO: Possibly catch some of these these and log them?
@@ -53,7 +52,7 @@ from eir.train_utils.utils import (
 
 if TYPE_CHECKING:
     from eir.train_utils.train_handlers import HandlerConfig
-    from eir.train import Config
+    from eir.train import Experiment
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -110,27 +109,28 @@ def activation_analysis_handler(
     engine: Engine, handler_config: "HandlerConfig"
 ) -> None:
 
-    c = handler_config.config
+    exp = handler_config.experiment
+    gc = exp.configs.global_config
     iteration = engine.state.iteration
 
     activation_outfolder_callable = partial(
         _prepare_eval_activation_outfolder,
-        run_name=c.cl_args.run_name,
+        run_name=gc.run_name,
         iteration=iteration,
     )
 
     activation_analysis_wrapper(
-        model=c.model,
-        train_config=c,
+        model=exp.model,
+        experiment=exp,
         outfolder_target_callable=activation_outfolder_callable,
-        dataset_to_interpret=c.valid_dataset,
-        background_loader=c.train_loader,
+        dataset_to_interpret=exp.valid_dataset,
+        background_loader=exp.train_loader,
     )
 
 
 def activation_analysis_wrapper(
     model: nn.Module,
-    train_config: Union["Config", Namespace],
+    experiment: Union["Experiment", Namespace],
     outfolder_target_callable: Callable,
     dataset_to_interpret: al_datasets,
     background_loader: torch.utils.data.DataLoader,
@@ -142,20 +142,20 @@ def activation_analysis_wrapper(
     TODO: Refactor this function further.
     """
 
-    c = train_config
-    cl_args = train_config.cl_args
+    exp = experiment
+    gc = experiment.configs.global_config
 
     model_copy = copy.deepcopy(model)
-    target_columns_gen = get_target_columns_generator(target_columns=c.target_columns)
+    target_columns_gen = get_target_columns_generator(target_columns=exp.target_columns)
 
     for column_type, column_name in target_columns_gen:
 
         no_explainer_background_samples = get_no_background_samples_for_shap_objects(
-            batch_size=cl_args.batch_size
+            batch_size=gc.batch_size
         )
 
         explainer, hook_handle = get_shap_object(
-            config=c,
+            experiment=exp,
             model=model_copy,
             column_name=column_name,
             background_loader=background_loader,
@@ -167,7 +167,7 @@ def activation_analysis_wrapper(
         act_producer = get_shap_activation_producer(
             explainer=explainer,
             column_type=column_type,
-            act_samples_per_class_limit=cl_args.max_acts_per_class,
+            act_samples_per_class_limit=gc.max_acts_per_class,
         )
 
         act_func = partial(
@@ -177,7 +177,7 @@ def activation_analysis_wrapper(
         )
 
         data_producer = _get_interpretation_data_producer(
-            config=c,
+            experiment=exp,
             column_name=column_name,
             column_type=column_type,
             dataset=dataset_to_interpret,
@@ -198,7 +198,7 @@ def activation_analysis_wrapper(
             if input_name.startswith("omics_"):
 
                 analyze_omics_input_activations(
-                    config=c,
+                    experiment=exp,
                     input_name=input_name,
                     target_column_name=column_name,
                     target_column_type=column_type,
@@ -208,7 +208,7 @@ def activation_analysis_wrapper(
 
             elif input_name.startswith("tabular_"):
                 analyze_tabular_input_activations(
-                    config=c,
+                    experiment=exp,
                     input_name=input_name,
                     target_column_name=column_name,
                     target_column_type=column_type,
@@ -225,15 +225,15 @@ def get_no_background_samples_for_shap_objects(batch_size: int):
 
 
 def get_shap_object(
-    config: "Config",
+    experiment: "Experiment",
     model: nn.Module,
     column_name: str,
     background_loader: DataLoader,
     n_background_samples: int = 64,
 ):
     background, *_ = gather_dloader_samples(
-        batch_prep_hook=config.hooks.step_func_hooks.base_prepare_batch,
-        batch_prep_hook_kwargs={"config": config},
+        batch_prep_hook=experiment.hooks.step_func_hooks.base_prepare_batch,
+        batch_prep_hook_kwargs={"experiment": experiment},
         data_loader=background_loader,
         n_samples=n_background_samples,
     )
@@ -426,23 +426,24 @@ def get_shap_sample_acts_deep_all_classes(
 
 
 def _get_interpretation_data_producer(
-    config: "Config",
+    experiment: "Experiment",
     column_name: str,
     column_type: str,
     dataset: al_datasets,
 ) -> Generator["Batch", None, None]:
 
-    target_transformer = config.target_transformers[column_name]
+    target_transformer = experiment.target_transformers[column_name]
+    gc = experiment.configs.global_config
 
     target_classes_numerical = _get_numerical_target_classes(
         target_transformer=target_transformer,
         column_type=column_type,
-        act_classes=config.cl_args.act_classes,
+        act_classes=gc.act_classes,
     )
 
     activations_data_loader = _get_activations_dataloader(
         dataset=dataset,
-        max_acts_per_class=config.cl_args.max_acts_per_class,
+        max_acts_per_class=gc.max_acts_per_class,
         target_column=column_name,
         column_type=column_type,
         target_classes_numerical=target_classes_numerical,
@@ -450,8 +451,8 @@ def _get_interpretation_data_producer(
 
     for loader_batch in activations_data_loader:
         state = call_hooks_stage_iterable(
-            hook_iterable=config.hooks.step_func_hooks.base_prepare_batch,
-            common_kwargs={"config": config, "loader_batch": loader_batch},
+            hook_iterable=experiment.hooks.step_func_hooks.base_prepare_batch,
+            common_kwargs={"experiment": experiment, "loader_batch": loader_batch},
             state=None,
         )
 

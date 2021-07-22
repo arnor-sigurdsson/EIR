@@ -19,6 +19,7 @@ from torch import nn
 from torch.utils.data import DataLoader
 
 import eir.visualization.visualization_funcs as vf
+from eir.config.config import DataDimensions
 from eir.configuration import append_data_source_prefixes
 from eir.data_load import datasets, label_setup
 from eir.data_load.data_utils import get_target_columns_generator
@@ -51,7 +52,6 @@ from eir.train import (
     get_fusion_class_from_cl_args,
     get_fusion_kwargs_from_cl_args,
     al_num_outputs_per_target,
-    DataDimensions,
 )
 from eir.train_utils.evaluation import PerformancePlotConfig
 from eir.train_utils.metrics import al_metric_record_dict, calculate_batch_metrics
@@ -428,7 +428,7 @@ def _hook_default_predict_prepare_batch(
 ):
     batch = prepare_base_batch_default(
         loader_batch=loader_batch,
-        cl_args=predict_config.train_cl_args_overloaded,
+        global_config=predict_config.train_cl_args_overloaded,
         target_columns=predict_config.target_columns,
         model=predict_config.model,
     )
@@ -801,7 +801,7 @@ def _compute_predict_activations(
 
     activation_analysis_wrapper(
         model=predict_config.model,
-        train_config=overloaded_train_config,
+        experiment=overloaded_train_config,
         outfolder_target_callable=activation_outfolder_callable,
         dataset_to_interpret=predict_config.test_dataset,
         background_loader=background_dataloader,

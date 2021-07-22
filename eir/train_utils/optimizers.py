@@ -20,16 +20,16 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
 def get_optimizer(
-    model: nn.Module, loss_callable: Callable, cl_args: argparse.Namespace
+    model: nn.Module, loss_callable: Callable, global_config: argparse.Namespace
 ) -> Optimizer:
 
     all_params = _get_all_params_to_optimize(
-        model=model, weight_decay=cl_args.wd, loss_callable=loss_callable
+        model=model, weight_decay=global_config.wd, loss_callable=loss_callable
     )
 
-    optimizer_class = _get_optimizer_class(optimizer_name=cl_args.optimizer)
+    optimizer_class = _get_optimizer_class(optimizer_name=global_config.optimizer)
     optimizer_args = _get_constructor_arguments(
-        params=all_params, cl_args=cl_args, optimizer_class=optimizer_class
+        params=all_params, cl_args=global_config, optimizer_class=optimizer_class
     )
     optimizer = optimizer_class(**optimizer_args)
 

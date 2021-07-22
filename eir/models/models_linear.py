@@ -6,7 +6,7 @@ from aislib.misc_utils import get_logger
 from torch import nn
 
 if TYPE_CHECKING:
-    from eir.train import DataDimensions
+    from eir.config.config import DataDimensions
 
 logger = get_logger(__name__)
 

@@ -2,7 +2,7 @@ from collections import OrderedDict
 from copy import copy
 from dataclasses import dataclass
 from functools import partial
-from typing import List, Callable, Sequence, TYPE_CHECKING
+from typing import List, Callable, Sequence, TYPE_CHECKING, Union
 
 import torch
 from aislib.misc_utils import get_logger
@@ -12,21 +12,22 @@ from torch import nn
 from eir.models.layers import SplitLinear, SplitMLPResidualBlock
 
 if TYPE_CHECKING:
-    from eir.train import DataDimensions
+    from eir.config.config import DataDimensions
 
 logger = get_logger(__name__)
 
 
 @dataclass
-class SplitMLPModelConfig:
+class SimpleLCLModelConfig:
 
-    fc_repr_dim: int
-    split_mlp_num_splits: int
     data_dimensions: "DataDimensions"
+    fc_repr_dim: int = 12
+    split_mlp_num_splits: int = 64
+    l1: float = 0.00
 
 
-class SplitMLPModel(nn.Module):
-    def __init__(self, model_config: SplitMLPModelConfig):
+class SimpleLCLModel(nn.Module):
+    def __init__(self, model_config: SimpleLCLModelConfig):
         super().__init__()
 
         self.model_config = model_config
@@ -65,27 +66,28 @@ class SplitMLPModel(nn.Module):
 
 
 @dataclass
-class FullySplitMLPModelConfig:
-    layers: List[int]
-
-    kernel_width: int
-    first_kernel_expansion: int
-
-    channel_exp_base: int
-    first_channel_expansion: int
-
-    fc_repr_dim: int
-    split_mlp_num_splits: int
-
+class LCLModelConfig:
     data_dimensions: "DataDimensions"
 
-    rb_do: float
+    layers: Union[None, List[int]] = None
+
+    kernel_width: Union[None, int] = 12
+    first_kernel_expansion: int = 1
+
+    channel_exp_base: int = 2
+    first_channel_expansion: int = 1
+
+    fc_repr_dim: int = 32
+    split_mlp_num_splits: Union[None, int] = None
+
+    rb_do: float = 0.00
+    l1: float = 0.00
 
     cutoff: int = 1024
 
 
-class FullySplitMLPModel(nn.Module):
-    def __init__(self, model_config: FullySplitMLPModelConfig):
+class LCLModel(nn.Module):
+    def __init__(self, model_config: LCLModelConfig):
         super().__init__()
 
         self.model_config = model_config
@@ -105,7 +107,7 @@ class FullySplitMLPModel(nn.Module):
             bias=False,
         )
 
-        split_parameter_spec = SplitParameterSpec(
+        split_parameter_spec = LCParameterSpec(
             in_features=self.fc_0.out_features,
             kernel_width=self.model_config.kernel_width,
             channel_exp_base=self.model_config.channel_exp_base,
@@ -186,7 +188,7 @@ def get_split_extractor_spec(
 
 
 @dataclass
-class SplitParameterSpec:
+class LCParameterSpec:
     in_features: int
     kernel_width: int
     channel_exp_base: int
@@ -195,7 +197,7 @@ class SplitParameterSpec:
 
 
 def _get_split_blocks(
-    split_parameter_spec: SplitParameterSpec,
+    split_parameter_spec: LCParameterSpec,
     block_layer_spec: Sequence[int],
 ) -> nn.Sequential:
     factory = _get_split_block_factory(block_layer_spec=block_layer_spec)
@@ -207,7 +209,7 @@ def _get_split_blocks(
 
 def _get_split_block_factory(
     block_layer_spec: Sequence[int],
-) -> Callable[[SplitParameterSpec], nn.Sequential]:
+) -> Callable[[LCParameterSpec], nn.Sequential]:
     if len(block_layer_spec) == 1:
         return generate_split_resblocks_auto
 
@@ -219,7 +221,7 @@ def _get_split_block_factory(
 
 
 def _generate_split_blocks_from_spec(
-    split_parameter_spec: SplitParameterSpec,
+    split_parameter_spec: LCParameterSpec,
     block_layer_spec: List[int],
 ) -> nn.Sequential:
 
@@ -259,7 +261,7 @@ def _generate_split_blocks_from_spec(
     return nn.Sequential(*block_modules)
 
 
-def generate_split_resblocks_auto(split_parameter_spec: SplitParameterSpec):
+def generate_split_resblocks_auto(split_parameter_spec: LCParameterSpec):
     """
     TODO:   Create some over-engineered abstraction for this and
             `_generate_split_blocks_from_spec` if feeling bored.

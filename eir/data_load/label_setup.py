@@ -20,7 +20,7 @@ al_all_column_ops = Union[None, Dict[str, Tuple[ColumnOperation, ...]]]
 al_train_val_dfs = Tuple[pd.DataFrame, pd.DataFrame]
 
 # e.g. 'Asia' or '5' for categorical or 1.511 for continuous
-al_label_values_raw = Union[str, float]
+al_label_values_raw = Union[float, int]
 al_sample_labels_raw = Dict[str, al_label_values_raw]
 al_label_dict = Dict[str, al_sample_labels_raw]
 al_target_columns = Dict[str, List[str]]
