@@ -19,7 +19,6 @@ def test_make_conv_layers():
         kernel_width=5,
         layers=None,
         fc_repr_dim=512,
-        data_dimensions=DataDimensions(channels=1, height=4, width=int(8e5)),
         down_stride=4,
         rb_do=0.1,
         first_kernel_expansion=1,
@@ -29,8 +28,11 @@ def test_make_conv_layers():
         channel_exp_base=5,
         sa=True,
     )
+    test_data_dimensions = DataDimensions(channels=1, height=4, width=int(8e5))
     conv_layers = models_cnn._make_conv_layers(
-        residual_blocks=conv_layer_list, cnn_model_configuration=test_model_config
+        residual_blocks=conv_layer_list,
+        cnn_model_configuration=test_model_config,
+        data_dimensions=test_data_dimensions,
     )
 
     # account for first block, add +2 instead if using SA
@@ -64,18 +66,34 @@ def test_get_cur_dilation(test_input, expected):
     "create_test_data", [{"task_type": "multi_task"}], indirect=True
 )
 @pytest.mark.parametrize(
-    "create_test_config",
+    "create_test_config_init_base",
     [
-        {  # Case 1: Check that we add and use extra inputs.
-            "custom_cl_args": {
-                "model_type": "cnn",
-                "target_cat_columns": ["Origin"],
-                "extra_con_columns": ["ExtraTarget"],
-                "extra_cat_columns": ["OriginExtraCol"],
-                "target_con_columns": ["Height"],
-                "run_name": "extra_inputs",
-            }
-        }
+        # Case 0: Check that we add and use extra inputs.
+        {
+            "injections": {
+                "global_configs": {
+                    "run_name": "extra_inputs",
+                },
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "input_type_info": {"model_type": "cnn"},
+                    },
+                    {
+                        "input_info": {"input_name": "test_tabular"},
+                        "input_type_info": {
+                            "model_type": "tabular",
+                            "extra_cat_columns": ["OriginExtraCol"],
+                            "extra_con_columns": ["ExtraTarget"],
+                        },
+                    },
+                ],
+                "target_configs": {
+                    "target_cat_columns": ["Origin"],
+                    "target_con_columns": ["Height"],
+                },
+            },
+        },
     ],
     indirect=True,
 )
@@ -83,7 +101,7 @@ def test_cnn_model(
     parse_test_cl_args, create_test_data, create_test_config, create_test_model
 ):
     fusion_model = create_test_model
-    cnn_model = fusion_model.modules_to_fuse["omics_test"]
+    cnn_model = fusion_model.modules_to_fuse["omics_test_genotype"]
 
     assert isinstance(cnn_model.conv[0], models_cnn.FirstCNNBlock)
     assert True
