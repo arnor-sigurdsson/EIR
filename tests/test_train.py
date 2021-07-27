@@ -1,4 +1,3 @@
-from argparse import Namespace
 from unittest.mock import patch
 
 import pytest
@@ -8,8 +7,8 @@ from torch.optim.adamw import AdamW
 from torch.utils.data import WeightedRandomSampler, SequentialSampler, RandomSampler
 
 import eir.data_load.data_utils
-import eir.setup.config
 import eir.models.omics.omics_models
+import eir.setup.config
 import eir.setup.input_setup
 import eir.train
 from eir import train
@@ -17,6 +16,8 @@ from eir.data_load import label_setup
 from eir.models.fusion import FusionModel
 from eir.models.omics.models_cnn import CNNModel
 from eir.models.omics.models_mlp import MLPModel
+from eir.setup.config import Configs
+from eir.setup.schemas import GlobalConfig
 from eir.train_utils import optimizers
 
 
@@ -45,44 +46,84 @@ def test_prepare_run_folder_fail(patched_get_run_folder, tmp_path):
 
 
 @pytest.mark.parametrize("create_test_data", [{"task_type": "multi"}], indirect=True)
-def test_get_train_sampler(test_config_base, create_test_data, create_test_datasets):
-    cl_args = test_config_base
+@pytest.mark.parametrize(
+    "create_test_config_init_base",
+    [
+        # Case 1: Linear
+        {
+            "injections": {
+                "global_configs": {"lr": 1e-03},
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "input_type_info": {"model_type": "mlp"},
+                    },
+                ],
+            },
+        },
+    ],
+    indirect=True,
+)
+def test_get_train_sampler(create_test_data, create_test_datasets, create_test_config):
+
+    test_config = create_test_config
+    gc = test_config.global_config
+
     train_dataset, *_ = create_test_datasets
-    cl_args.weighted_sampling_columns = ["Origin"]
+    gc.weighted_sampling_columns = ["Origin"]
 
     test_sampler = eir.data_load.data_utils.get_train_sampler(
-        columns_to_sample=cl_args.weighted_sampling_columns, train_dataset=train_dataset
+        columns_to_sample=gc.weighted_sampling_columns, train_dataset=train_dataset
     )
     assert isinstance(test_sampler, WeightedRandomSampler)
 
-    cl_args.weighted_sampling_columns = None
+    gc.weighted_sampling_columns = None
     test_sampler = eir.data_load.data_utils.get_train_sampler(
-        columns_to_sample=cl_args.weighted_sampling_columns, train_dataset=train_dataset
+        columns_to_sample=gc.weighted_sampling_columns, train_dataset=train_dataset
     )
     assert test_sampler is None
 
 
 @pytest.mark.parametrize("create_test_data", [{"task_type": "multi"}], indirect=True)
+@pytest.mark.parametrize(
+    "create_test_config_init_base",
+    [
+        # Case 1: Linear
+        {
+            "injections": {
+                "global_configs": {"lr": 1e-03},
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "input_type_info": {"model_type": "mlp"},
+                    },
+                ],
+            },
+        },
+    ],
+    indirect=True,
+)
 def test_get_dataloaders(create_test_config, create_test_data, create_test_datasets):
-    cl_args = create_test_config
-    cl_args.weighted_sampling_columns = ["Origin"]
+    test_config = create_test_config
+    gc = test_config.global_config
+    gc.weighted_sampling_columns = ["Origin"]
 
     train_dataset, valid_dataset = create_test_datasets
     train_sampler = eir.data_load.data_utils.get_train_sampler(
-        columns_to_sample=cl_args.weighted_sampling_columns, train_dataset=train_dataset
+        columns_to_sample=gc.weighted_sampling_columns, train_dataset=train_dataset
     )
 
     train_dataloader, valid_dataloader = train.get_dataloaders(
-        train_dataset, train_sampler, valid_dataset, cl_args.batch_size
+        train_dataset, train_sampler, valid_dataset, gc.batch_size
     )
 
-    assert train_dataloader.batch_size == cl_args.batch_size
-    assert valid_dataloader.batch_size == cl_args.batch_size
+    assert train_dataloader.batch_size == gc.batch_size
+    assert valid_dataloader.batch_size == gc.batch_size
     assert isinstance(train_dataloader.sampler, WeightedRandomSampler)
     assert isinstance(valid_dataloader.sampler, SequentialSampler)
 
     train_dataloader, valid_dataloader = train.get_dataloaders(
-        train_dataset, None, valid_dataset, cl_args.batch_size
+        train_dataset, None, valid_dataset, gc.batch_size
     )
 
     assert isinstance(train_dataloader.sampler, RandomSampler)
@@ -98,7 +139,7 @@ def _modify_bs_for_multi_gpu():
         assert train._modify_bs_for_multi_gpu(False, 32) == 64
 
 
-def test_get_optimizer(test_config_base):
+def test_get_optimizer():
     class FakeModel(nn.Module):
         def __init__(self):
             super().__init__()
@@ -110,124 +151,111 @@ def test_get_optimizer(test_config_base):
 
     model = FakeModel()
 
-    test_config_base.optimizer = "adamw"
+    gc_adamw = GlobalConfig(run_name="test", optimizer="adamw")
+
     adamw_optimizer = optimizers.get_optimizer(
-        model=model, loss_callable=lambda x: x, global_config=test_config_base
+        model=model, loss_callable=lambda x: x, global_config=gc_adamw
     )
     assert isinstance(adamw_optimizer, AdamW)
 
-    test_config_base.optimizer = "sgdm"
+    gc_sgdm = GlobalConfig(run_name="test", optimizer="sgdm")
     sgdm_optimizer = optimizers.get_optimizer(
-        model=model, loss_callable=lambda x: x, global_config=test_config_base
+        model=model, loss_callable=lambda x: x, global_config=gc_sgdm
     )
     assert isinstance(sgdm_optimizer, SGD)
     assert sgdm_optimizer.param_groups[0]["momentum"] == 0.9
 
 
-def test_get_model(test_config_base):
+@pytest.mark.parametrize("create_test_data", [{"task_type": "multi"}], indirect=True)
+@pytest.mark.parametrize(
+    "create_test_config_init_base",
+    [
+        {
+            "injections": {
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "input_type_info": {"model_type": "cnn"},
+                    },
+                ],
+                "target_configs": {
+                    "target_cat_columns": ["Origin"],
+                    "target_con_columns": ["Height"],
+                },
+            }
+        },
+        {
+            "injections": {
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "input_type_info": {"model_type": "mlp"},
+                    },
+                ],
+                "target_configs": {
+                    "target_cat_columns": ["Origin"],
+                    "target_con_columns": ["Height"],
+                },
+            }
+        },
+    ],
+    indirect=True,
+)
+def test_get_model(create_test_config: Configs, create_test_labels):
+    test_config = create_test_config
+    gc = create_test_config.global_config
+    target_labels = create_test_labels
 
-    # TODO: Refactor checking of fc_3 into separate test.
-
-    test_config_base.model_type = "cnn"
-    num_outputs_per_target_dict = {"Origin": 10, "Height": 1}
-
-    data_dimensions = {
-        "omics_test": eir.setup.input_setup.DataDimensions(
-            channels=1, height=4, width=1000
-        )
-    }
-
-    cnn_fusion_model = train.get_model(
-        global_config=test_config_base,
-        omics_data_dimensions=data_dimensions,
-        num_outputs_per_target=num_outputs_per_target_dict,
-        tabular_label_transformers=None,
+    num_outputs_per_class = train.set_up_num_outputs_per_target(
+        target_transformers=target_labels.label_transformers
     )
 
-    assert isinstance(cnn_fusion_model, FusionModel)
-    assert cnn_fusion_model.multi_task_branches["Origin"][-1][-1].out_features == 10
-    assert cnn_fusion_model.multi_task_branches["Height"][-1][-1].out_features == 1
-    assert isinstance(cnn_fusion_model.modules_to_fuse["omics_test"], CNNModel)
-
-    test_config_base.model_type = "mlp"
-    mlp_fusion_model = train.get_model(
-        global_config=test_config_base,
-        omics_data_dimensions=data_dimensions,
-        num_outputs_per_target=num_outputs_per_target_dict,
-        tabular_label_transformers=None,
+    inputs_as_dict = eir.setup.input_setup.set_up_inputs(
+        inputs_configs=create_test_config.input_configs,
+        train_ids=tuple(create_test_labels.train_labels.keys()),
+        valid_ids=tuple(create_test_labels.valid_labels.keys()),
+        hooks=None,
     )
-    assert isinstance(mlp_fusion_model.modules_to_fuse["omics_test"], MLPModel)
+
+    model = train.get_model(
+        inputs_as_dict=inputs_as_dict,
+        global_config=gc,
+        predictor_config=create_test_config.predictor_config,
+        num_outputs_per_target=num_outputs_per_class,
+    )
+
+    assert len(test_config.input_configs) == 1
+    omics_model_type = test_config.input_configs[0].input_type_info.model_type
+    _check_model(model_type=omics_model_type, model=model)
 
 
-def test_get_criterions_nonlinear():
+def _check_model(model_type: str, model: nn.Module):
+
+    if model_type == "cnn":
+        assert isinstance(model, FusionModel)
+        assert model.multi_task_branches["Origin"][-1][-1].out_features == 3
+        assert model.multi_task_branches["Height"][-1][-1].out_features == 1
+        assert isinstance(model.modules_to_fuse["omics_test_genotype"], CNNModel)
+
+    elif model_type == "mlp":
+        assert isinstance(model.modules_to_fuse["omics_test_genotype"], MLPModel)
+
+
+def test_get_criterions():
 
     test_target_columns_dict = {
         "con": ["Height", "BMI"],
         "cat": ["Origin", "HairColor"],
     }
 
-    test_criterions = train._get_criterions(test_target_columns_dict, model_type="cnn")
+    test_criterions = train._get_criterions(
+        test_target_columns_dict,
+    )
     for column_name in test_target_columns_dict["con"]:
         assert test_criterions[column_name].func is train._calc_mse
 
     for column_name in test_target_columns_dict["cat"]:
         assert isinstance(test_criterions[column_name], nn.CrossEntropyLoss)
-
-
-def test_get_criterions_linear_pass():
-
-    test_target_columns_dict_con = {"con": ["Height"], "cat": []}
-
-    test_criterions_con = train._get_criterions(
-        test_target_columns_dict_con, model_type="linear"
-    )
-
-    assert len(test_criterions_con) == 1
-    for column_name in test_target_columns_dict_con["con"]:
-        assert test_criterions_con[column_name].func is train._calc_mse
-
-    test_target_columns_dict_cat = {"con": [], "cat": ["Origin"]}
-
-    test_criterions_cat = train._get_criterions(
-        test_target_columns_dict_cat, model_type="linear"
-    )
-    assert len(test_criterions_cat) == 1
-    for column_name in test_target_columns_dict_cat["cat"]:
-        assert test_criterions_cat[column_name] is train._calc_bce
-
-
-def test_check_linear_model_columns_pass():
-    extra = {"extra_cat_columns": [], "extra_con_columns": []}
-    test_input_cat = Namespace(
-        target_cat_columns=["Origin"], target_con_columns=[], **extra
-    )
-    train._check_linear_model_columns(cl_args=test_input_cat)
-
-    test_input_con = Namespace(
-        target_con_columns=["Height"], target_cat_columns=[], **extra
-    )
-    train._check_linear_model_columns(cl_args=test_input_con)
-
-
-def test_check_linear_model_columns_fail():
-    extra = {"extra_cat_columns": [], "extra_con_columns": []}
-    test_input_cat = Namespace(
-        target_cat_columns=["Origin", "Height"], target_con_columns=[], **extra
-    )
-    with pytest.raises(NotImplementedError):
-        train._check_linear_model_columns(cl_args=test_input_cat)
-
-    test_input_con = Namespace(
-        target_con_columns=["Height", "BMI"], target_cat_columns=[], **extra
-    )
-    with pytest.raises(NotImplementedError):
-        train._check_linear_model_columns(cl_args=test_input_con)
-
-    test_input_mixed = Namespace(
-        target_con_columns=["Height", "BMI"], target_cat_columns=["Height"], **extra
-    )
-    with pytest.raises(NotImplementedError):
-        train._check_linear_model_columns(cl_args=test_input_mixed)
 
 
 def test_set_up_num_classes(get_transformer_test_data):
