@@ -220,7 +220,7 @@ def serialize_namespace(namespace: SimpleNamespace, output_path: Path) -> None:
 
 
 def set_up_target_labels_wrapper(
-    tabular_infos: Sequence[TabularFileInfo],
+    tabular_file_infos: Sequence[TabularFileInfo],
     custom_label_ops: al_all_column_ops,
     train_ids: Sequence[str],
     valid_ids: Sequence[str],
@@ -235,9 +235,9 @@ def set_up_target_labels_wrapper(
     df_labels_valid = pd.DataFrame(index=valid_ids)
     label_transformers = {}
 
-    for tabular_info in tabular_infos:
+    for tabular_info in tabular_file_infos:
         cur_labels = set_up_train_and_valid_tabular_data(
-            tabular_info=tabular_info,
+            tabular_file_info=tabular_info,
             custom_label_ops=custom_label_ops,
             train_ids=train_ids,
             valid_ids=valid_ids,
@@ -279,13 +279,13 @@ def get_default_experiment(
     )
 
     logger.info("Setting up target labels.")
-    target_labels_info = get_tabular_target_label_data(
+    target_labels_info = get_tabular_target_file_infos(
         target_configs=configs.target_configs
     )
 
     custom_ops = hooks.custom_column_label_parsing_ops if hooks else None
     target_labels = set_up_target_labels_wrapper(
-        tabular_infos=target_labels_info,
+        tabular_file_infos=target_labels_info,
         custom_label_ops=custom_ops,
         train_ids=train_ids,
         valid_ids=valid_ids,
@@ -386,7 +386,7 @@ def gather_all_array_target_ids(
     return tuple(all_ids)
 
 
-def get_tabular_target_label_data(
+def get_tabular_target_file_infos(
     target_configs: Iterable[schemas.TargetConfig],
 ) -> Sequence[TabularFileInfo]:
 

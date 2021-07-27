@@ -85,24 +85,24 @@ def set_up_tabular_input(
     valid_ids: Sequence[str],
     hooks: Union["Hooks", None],
 ) -> TabularInputInfo:
-    tabular_inputs_info = get_tabular_inputs_label_data(
+    tabular_file_info = get_tabular_input_file_info(
         input_source=input_config.input_info.input_source,
         tabular_data_type_config=input_config.input_type_info,
     )
 
     custom_ops = hooks.custom_column_label_parsing_ops if hooks else None
     tabular_labels = set_up_train_and_valid_tabular_data(
-        tabular_info=tabular_inputs_info,
+        tabular_file_info=tabular_file_info,
         custom_label_ops=custom_ops,
         train_ids=train_ids,
         valid_ids=valid_ids,
     )
 
-    tabular_inputs_info = TabularInputInfo(
+    tabular_input_info = TabularInputInfo(
         labels=tabular_labels, input_config=input_config
     )
 
-    return tabular_inputs_info
+    return tabular_input_info
 
 
 @dataclass
@@ -125,7 +125,7 @@ def set_up_omics_input(
     return omics_input_info
 
 
-def get_tabular_inputs_label_data(
+def get_tabular_input_file_info(
     input_source: str,
     tabular_data_type_config: schemas.TabularInputDataConfig,
 ) -> TabularFileInfo:

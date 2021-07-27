@@ -540,7 +540,7 @@ def recursive_dict_replace(dict_, dict_to_inject):
 
 
 @pytest.fixture()
-def get_test_data_dimensions(create_test_config, create_test_data):
+def get_test_data_dimensions(create_test_config: config.Configs, create_test_data):
 
     test_config = create_test_config
 
@@ -555,7 +555,9 @@ def get_test_data_dimensions(create_test_config, create_test_data):
 
 
 @pytest.fixture()
-def create_test_model(create_test_config, create_test_labels) -> nn.Module:
+def create_test_model(
+    create_test_config: config.Configs, create_test_labels
+) -> nn.Module:
     gc = create_test_config.global_config
     target_labels = create_test_labels
 
@@ -593,7 +595,9 @@ def cleanup(run_path):
 
 
 @pytest.fixture()
-def create_test_labels(create_test_data, create_test_config) -> train.Labels:
+def create_test_labels(
+    create_test_data, create_test_config: config.Configs
+) -> train.Labels:
 
     c = create_test_config
     gc = c.global_config
@@ -609,11 +613,11 @@ def create_test_labels(create_test_data, create_test_config) -> train.Labels:
     all_array_ids = train.gather_all_array_target_ids(target_configs=c.target_configs)
     train_ids, valid_ids = train.split_ids(ids=all_array_ids, valid_size=gc.valid_size)
 
-    target_labels_info = train.get_tabular_target_label_data(
+    target_labels_info = train.get_tabular_target_file_infos(
         target_configs=c.target_configs
     )
     target_labels = train.set_up_target_labels_wrapper(
-        tabular_infos=target_labels_info,
+        tabular_file_infos=target_labels_info,
         custom_label_ops=None,
         train_ids=train_ids,
         valid_ids=valid_ids,
@@ -630,7 +634,7 @@ def create_test_labels(create_test_data, create_test_config) -> train.Labels:
 def create_test_datasets(
     create_test_data,
     create_test_labels,
-    create_test_config,
+    create_test_config: config.Configs,
 ):
 
     configs = create_test_config
@@ -653,7 +657,7 @@ def create_test_datasets(
 
 
 @pytest.fixture()
-def create_test_dloaders(create_test_config, create_test_datasets):
+def create_test_dloaders(create_test_config: config.Configs, create_test_datasets):
     c = create_test_config
     gc = c.global_config
     train_dataset, valid_dataset = create_test_datasets
@@ -701,7 +705,7 @@ class ModelTestConfig:
 def prep_modelling_test_configs(
     create_test_data,
     create_test_labels,
-    create_test_config,
+    create_test_config: config.Configs,
     create_test_dloaders,
     create_test_model,
     create_test_datasets,

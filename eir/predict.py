@@ -46,12 +46,12 @@ from eir.train import (
     get_train_config_serialization_path,
     prepare_base_batch_default,
     Hooks,
-    get_tabular_target_label_data,
+    get_tabular_target_file_infos,
     get_fusion_class,
     get_fusion_kwargs_from_cl_args,
     al_num_outputs_per_target,
 )
-from eir.setup.input_setup import get_tabular_inputs_label_data, DataDimensions
+from eir.setup.input_setup import get_tabular_input_file_info, DataDimensions
 from eir.train_utils.evaluation import PerformancePlotConfig
 from eir.train_utils.metrics import al_metric_record_dict, calculate_batch_metrics
 from eir.train_utils.utils import get_run_folder
@@ -347,7 +347,7 @@ def get_target_and_extra_labels_for_predict(
             update the parameters slightly.
     """
 
-    target_info = get_tabular_target_label_data(cl_args=train_cl_args_overloaded)
+    target_info = get_tabular_target_file_infos(cl_args=train_cl_args_overloaded)
 
     target_labels = get_labels_for_predict(
         run_name=train_cl_args_overloaded.run_name,
@@ -356,7 +356,7 @@ def get_target_and_extra_labels_for_predict(
         ids=ids,
     )
 
-    tabular_input_info = get_tabular_inputs_label_data(cl_args=train_cl_args_overloaded)
+    tabular_input_info = get_tabular_input_file_info(cl_args=train_cl_args_overloaded)
 
     if tabular_input_info.con_columns or tabular_input_info.cat_columns:
         tabular_input_labels = get_labels_for_predict(

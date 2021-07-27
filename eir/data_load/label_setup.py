@@ -45,7 +45,7 @@ class TabularFileInfo:
 
 
 def set_up_train_and_valid_tabular_data(
-    tabular_info: TabularFileInfo,
+    tabular_file_info: TabularFileInfo,
     custom_label_ops: al_all_column_ops,
     train_ids: Sequence[str],
     valid_ids: Sequence[str],
@@ -55,15 +55,15 @@ def set_up_train_and_valid_tabular_data(
     set for regression) on the labels.
     """
 
-    if len(tabular_info.con_columns) + len(tabular_info.cat_columns) < 1:
-        raise ValueError(f"No label columns specified in {tabular_info}.")
+    if len(tabular_file_info.con_columns) + len(tabular_file_info.cat_columns) < 1:
+        raise ValueError(f"No label columns specified in {tabular_file_info}.")
 
     parse_wrapper = get_label_parsing_wrapper(
-        label_parsing_chunk_size=tabular_info.parsing_chunk_size
+        label_parsing_chunk_size=tabular_file_info.parsing_chunk_size
     )
     ids_to_keep = list(train_ids) + list(valid_ids)
     df_labels = parse_wrapper(
-        label_file_tabular_info=tabular_info,
+        label_file_tabular_info=tabular_file_info,
         ids_to_keep=ids_to_keep,
         custom_label_ops=custom_label_ops,
     )
@@ -73,7 +73,7 @@ def set_up_train_and_valid_tabular_data(
     )
 
     df_labels_train, df_labels_valid, label_transformers = _process_train_and_label_dfs(
-        tabular_info=tabular_info,
+        tabular_info=tabular_file_info,
         df_labels_train=df_labels_train,
         df_labels_valid=df_labels_valid,
     )
