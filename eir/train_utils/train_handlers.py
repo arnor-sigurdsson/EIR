@@ -1,5 +1,4 @@
 import atexit
-from argparse import Namespace
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
@@ -19,6 +18,7 @@ from torch.utils.tensorboard import SummaryWriter
 from eir.data_load.data_utils import get_target_columns_generator
 from eir.data_load.label_setup import al_target_columns
 from eir.interpretation.interpretation import activation_analysis_handler
+from eir.setup.schemas import GlobalConfig
 from eir.train_utils import H_PARAMS
 from eir.train_utils.evaluation import validation_handler
 from eir.train_utils.lr_scheduling import (
@@ -737,7 +737,7 @@ def add_hparams_to_tensorboard(
 
 
 def _generate_h_param_dict(
-    global_config: Namespace, h_params: List[str]
+    global_config: GlobalConfig, h_params: List[str]
 ) -> Dict[str, Union[str, float, int]]:
 
     h_param_dict = {}

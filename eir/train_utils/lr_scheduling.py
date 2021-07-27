@@ -1,4 +1,3 @@
-from argparse import Namespace
 from math import isclose
 from pathlib import Path
 from typing import Tuple, Union, Dict, TYPE_CHECKING, overload
@@ -15,6 +14,7 @@ from matplotlib import pyplot as plt
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim.optimizer import Optimizer
 
+from eir.setup.schemas import GlobalConfig
 from eir.train_utils.evaluation import validation_handler
 from eir.train_utils.metrics import (
     read_metrics_history_file,
@@ -58,7 +58,7 @@ def attach_lr_scheduler(
             update_optimizer_lr(lr=gc.lr_lb, optimizer=experiment.optimizer)
 
         step_scheduler_params = _get_reduce_lr_on_plateau_step_params(
-            cl_args=gc, optimizer=experiment.optimizer
+            global_config=gc, optimizer=experiment.optimizer
         )
         engine.add_event_handler(
             event_name=Events.ITERATION_COMPLETED,
@@ -71,24 +71,24 @@ def attach_lr_scheduler(
 
 
 def _get_reduce_lr_on_plateau_step_params(
-    cl_args: Namespace, optimizer: Optimizer
+    global_config: GlobalConfig, optimizer: Optimizer
 ) -> Dict:
 
-    run_folder = get_run_folder(run_name=cl_args.run_name)
+    run_folder = get_run_folder(run_name=global_config.run_name)
     validation_history_fpath = get_average_history_filepath(
         run_folder=run_folder, train_or_val_target_prefix="validation_"
     )
 
     warmup_steps = _get_warmup_steps_from_cla(
-        warmup_steps_arg=cl_args.warmup_steps, optimizer=optimizer
+        warmup_steps_arg=global_config.warmup_steps, optimizer=optimizer
     )
 
     params = {
         "validation_history_fpath": validation_history_fpath,
         "optimizer": optimizer,
-        "sample_interval": cl_args.sample_interval,
-        "lr_upper_bound": cl_args.lr,
-        "lr_lower_bound": cl_args.lr_lb,
+        "sample_interval": global_config.sample_interval,
+        "lr_upper_bound": global_config.lr,
+        "lr_lower_bound": global_config.lr_lb,
         "warmup_steps": warmup_steps,
     }
 

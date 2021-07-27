@@ -1,3 +1,5 @@
+import pytest
+
 from eir.train_utils import train_handlers
 
 
@@ -25,14 +27,34 @@ def test_unflatten_engine_metrics_dict():
     assert test_output["Height"]["Height_rmse"] == 0.11
 
 
-def test_generate_h_param_dict(test_config_base):
-    test_config_base.layers = [2, 2, 4]
-    test_h_params = ["lr", "na_augment_perc", "channel_exp_base", "layers"]
+@pytest.mark.parametrize("create_test_data", [{"task_type": "binary"}], indirect=True)
+@pytest.mark.parametrize(
+    "create_test_config_init_base",
+    [
+        {
+            "injections": {
+                "global_configs": {"lr_schedule": "plateau", "lr": 1e-03},
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "input_type_info": {"model_type": "identity"},
+                    },
+                ],
+            }
+        }
+    ],
+    indirect=True,
+)
+def test_generate_h_param_dict(create_test_config):
+
+    test_configs = create_test_config
+    gc = test_configs.global_config
+
+    test_h_params = [
+        "lr",
+    ]
     test_h_dict = train_handlers._generate_h_param_dict(
-        global_config=test_config_base, h_params=test_h_params
+        global_config=gc, h_params=test_h_params
     )
 
-    assert test_h_dict["lr"] == test_config_base.lr
-    assert test_h_dict["na_augment_perc"] == test_config_base.na_augment_perc
-    assert test_h_dict["channel_exp_base"] == test_config_base.channel_exp_base
-    assert test_h_dict["layers"] == "2_2_4"
+    assert test_h_dict["lr"] == gc.lr
