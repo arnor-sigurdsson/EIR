@@ -16,7 +16,7 @@ from eir.train import get_dataloaders
     "create_test_data", [{"task_type": "multi_task"}], indirect=True
 )
 @pytest.mark.parametrize(
-    "create_test_cl_args",
+    "create_test_config",
     [
         {
             "custom_cl_args": {
@@ -31,9 +31,9 @@ from eir.train import get_dataloaders
     indirect=True,
 )
 def test_get_weighted_random_sampler(
-    create_test_cl_args, create_test_data, create_test_datasets
+    create_test_config, create_test_data, create_test_datasets
 ):
-    cl_args = create_test_cl_args
+    cl_args = create_test_config
     target_columns = cl_args.target_cat_columns
     train_dataset, valid_dataset = create_test_datasets
 

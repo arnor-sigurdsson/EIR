@@ -22,14 +22,11 @@ if TYPE_CHECKING:
     from eir.train import al_num_outputs_per_target
 
 
-# TODO: Is this needed when we have the predictor config? Why not inherit from that?
-#       Have here perhaps only fusion specific settings
 @dataclass
 class MGMoEModelConfig:
-    layers: Sequence[int] = field(default_factory=lambda: [2])
+    layers: Sequence[int] = field(default_factory=lambda: [1, 1])
     fc_task_dim: int = 64
 
-    split_mlp_num_splits: int = 64
     mg_num_experts: int = 8
 
     rb_do: float = 0.00
@@ -51,7 +48,6 @@ class MGMoEModel(nn.Module):
         self.modules_to_fuse = modules_to_fuse
         self.fusion_callable = fusion_callable
 
-        self.num_chunks = self.model_config.split_mlp_num_splits
         self.num_experts = self.model_config.mg_num_experts
 
         cur_dim = sum(i.num_out_features for i in self.modules_to_fuse.values())

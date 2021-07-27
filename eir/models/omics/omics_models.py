@@ -1,6 +1,6 @@
 import argparse
 from dataclasses import _DataclassParams
-from typing import Union, Type, Dict, Any, Protocol
+from typing import Union, Type, Dict, Any, Protocol, TYPE_CHECKING
 
 from eir.models.omics.models_cnn import CNNModel, CNNModelConfig
 from eir.models.omics.models_locally_connected import (
@@ -9,25 +9,28 @@ from eir.models.omics.models_locally_connected import (
     LCLModel,
     LCLModelConfig,
 )
-from eir.models.omics.models_mlp import MLPModel
-from eir.models.omics.models_mlp import MLPModelConfig
+from eir.models.omics.models_mlp import MLPModel, MLPModelConfig
+from eir.models.omics.models_identity import IdentityModel, IdentityModelConfig
+
+if TYPE_CHECKING:
+    from eir.setup.input_setup import DataDimensions
 
 al_models_classes = Union[
     Type["CNNModel"],
     Type["MLPModel"],
     Type["SimpleLCLModel"],
     Type["LCLModel"],
+    Type["IdentityModel"],
 ]
 
-al_models = Union[
-    "CNNModel",
-    "MLPModel",
-    "SimpleLCLModel",
-    "LCLModel",
-]
+al_models = Union["CNNModel", "MLPModel", "SimpleLCLModel", "LCLModel", "IdentityModel"]
 
 al_omics_model_configs = Union[
-    CNNModelConfig, MLPModelConfig, SimpleLCLModelConfig, LCLModelConfig
+    CNNModelConfig,
+    MLPModelConfig,
+    SimpleLCLModelConfig,
+    LCLModelConfig,
+    IdentityModelConfig,
 ]
 
 
@@ -37,6 +40,7 @@ def get_omics_model_mapping() -> Dict[str, al_models_classes]:
         "mlp": MLPModel,
         "mlp-split": SimpleLCLModel,
         "genome-local-net": LCLModel,
+        "identity": IdentityModel,
     }
 
     return mapping
@@ -58,6 +62,7 @@ def get_omics_config_dataclass_mapping() -> Dict[str, Type[Dataclass]]:
         "mlp": MLPModelConfig,
         "mlp-split": SimpleLCLModelConfig,
         "genome-local-net": LCLModelConfig,
+        "identity": IdentityModelConfig,
     }
 
     return mapping
@@ -71,6 +76,7 @@ def get_model_config_dataclass(model_type: str) -> Type[Dataclass]:
 def get_omics_model_init_kwargs(
     model_type: str,
     model_config: al_omics_model_configs,
+    data_dimensions: "DataDimensions",
 ) -> Dict[str, Any]:
     """
     See: https://github.com/python/mypy/issues/5374 for type hint issue.
@@ -86,6 +92,7 @@ def get_omics_model_init_kwargs(
     dataclass_instance = model_config_dataclass(**model_config.__dict__)
 
     kwargs["model_config"] = dataclass_instance
+    kwargs["data_dimensions"] = data_dimensions
 
     return kwargs
 

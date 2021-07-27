@@ -28,7 +28,7 @@ def get_train_argument_parser() -> configargparse.ArgumentParser:
         "--config_file",
         is_config_file=True,
         required=True,
-        help="path to .yaml config file.",
+        help="path to .yaml setup file.",
     )
 
     parser_.add_argument(

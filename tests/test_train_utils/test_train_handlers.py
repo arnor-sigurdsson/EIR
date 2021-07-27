@@ -25,14 +25,14 @@ def test_unflatten_engine_metrics_dict():
     assert test_output["Height"]["Height_rmse"] == 0.11
 
 
-def test_generate_h_param_dict(args_config):
-    args_config.layers = [2, 2, 4]
+def test_generate_h_param_dict(test_config_base):
+    test_config_base.layers = [2, 2, 4]
     test_h_params = ["lr", "na_augment_perc", "channel_exp_base", "layers"]
     test_h_dict = train_handlers._generate_h_param_dict(
-        cl_args=args_config, h_params=test_h_params
+        global_config=test_config_base, h_params=test_h_params
     )
 
-    assert test_h_dict["lr"] == args_config.lr
-    assert test_h_dict["na_augment_perc"] == args_config.na_augment_perc
-    assert test_h_dict["channel_exp_base"] == args_config.channel_exp_base
+    assert test_h_dict["lr"] == test_config_base.lr
+    assert test_h_dict["na_augment_perc"] == test_config_base.na_augment_perc
+    assert test_h_dict["channel_exp_base"] == test_config_base.channel_exp_base
     assert test_h_dict["layers"] == "2_2_4"

@@ -1,26 +1,30 @@
 import csv
 import warnings
-from argparse import Namespace
+from copy import copy
 from dataclasses import dataclass
 from pathlib import Path
 from random import shuffle
 from shutil import rmtree
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Sequence, Mapping, Union, Literal
 
 import numpy as np
 import pandas as pd
 import pytest
 from _pytest.fixtures import SubRequest
 from aislib.misc_utils import ensure_path_exists
-from torch import cuda
 from torch import nn
 from torch.utils.data import DataLoader
 
+import eir.models.omics.omics_models
+import eir.setup.input_setup
+from eir.setup.input_setup import serialize_all_input_transformers
+import eir.train
 from eir import train
+from eir.setup import schemas, config
 from eir.data_load import datasets
 from eir.train import (
-    Config,
-    get_model_from_cl_args,
+    Experiment,
+    get_model,
     set_up_num_outputs_per_target,
 )
 from eir.train_utils import optimizers, metrics
@@ -63,82 +67,178 @@ def parse_test_cl_args(request):
     return parsed_args
 
 
+@dataclass
+class TestConfigInits:
+    global_configs: Sequence[dict]
+    input_configs: Sequence[dict]
+    predictor_configs: Sequence[dict]
+    target_configs: Sequence[dict]
+
+
 @pytest.fixture
-def args_config() -> Namespace:
-    """
-    TODO: Get from configuration.py, and then modify?
-    """
-    test_cl_args = Namespace(
-        **{
-            "act_classes": None,
-            "act_every_sample_factor": 0,
-            "b1": 0.9,
-            "b2": 0.999,
-            "batch_size": 32,
-            "channel_exp_base": 5,
-            "checkpoint_interval": None,
-            "extra_con_columns": [],
-            "custom_lib": None,
-            "omics_sources": "REPLACE_ME",
-            "omics_names": "REPLACE_ME",
-            "debug": False,
-            "device": "cuda:0" if cuda.is_available() else "cpu",
-            "dilation_factor": 1,
-            "dataloader_workers": 1,
-            "down_stride": 4,
-            "extra_cat_columns": [],
-            "early_stopping_patience": None,
-            "early_stopping_buffer": None,
-            "fc_repr_dim": 64,
-            "fc_task_dim": 32,
-            "fc_do": 0.0,
-            "find_lr": False,
-            "first_kernel_expansion": 1,
-            "first_stride_expansion": 1,
-            "first_channel_expansion": 1,
-            "fusion_model_type": "default",
-            "get_acts": True,
-            "gpu_num": "0",
-            "kernel_width": 12,
-            "label_file": "REPLACE_ME",
-            "label_parsing_chunk_size": None,
-            "l1": 1e-03,
-            "lr": 1e-02,
-            "lr_lb": 1e-5,
-            "lr_schedule": "plateau",
-            "max_acts_per_class": None,
-            "memory_dataset": True,
-            "mixing_type": None,
-            "mixing_alpha": 0.0,
-            "mg_num_experts": 3,
-            "model_type": "cnn",
-            "multi_gpu": False,
-            "n_cpu": 8,
-            "n_epochs": 5,
-            "n_saved_models": None,
-            "na_augment_perc": 0.05,
-            "na_augment_prob": 0.20,
-            "no_pbar": False,
-            "optimizer": "adam",
-            "lr_plateau_patience": 5,
-            "lr_plateau_factor": 0.1,
-            "plot_skip_steps": 50,
-            "rb_do": 0.25,
-            "layers": [1, 1],
-            "run_name": "test_run",
-            "sa": False,
-            "sample_interval": 200,
-            "split_mlp_num_splits": 16,
-            "target_cat_columns": ["Origin"],
-            "target_con_columns": [],
-            "valid_size": 0.05,
-            "warmup_steps": 100,
-            "wd": 1e-03,
-            "weighted_sampling_column": None,
-        }
+def create_test_config_init_base(
+    request, create_test_data
+) -> Tuple[TestConfigInits, "TestDataConfig"]:
+
+    injections = {}
+    if hasattr(request, "param"):
+        assert "injections" in request.param.keys()
+        injections = request.param["injections"]
+
+        injections_keys = set(injections.keys())
+        expected_keys = set(TestConfigInits.__dataclass_fields__.keys())
+        assert injections_keys.issubset(expected_keys)
+
+    test_global_init = get_test_base_global_init()
+    test_global_init = general_sequence_inject(
+        sequence=test_global_init, inject_dict=injections.get("global_configs", {})
     )
 
-    return test_cl_args
+    test_input_init = get_test_inputs_inits(
+        test_path=create_test_data.scoped_tmp_path,
+        input_config_dicts=injections.get("input_configs", {}),
+    )
+
+    model_type = injections.get("predictor_configs", {}).get("model_type", "nn")
+    test_predictor_init = get_test_base_predictor_init(model_type=model_type)
+
+    test_predictor_init = general_sequence_inject(
+        sequence=test_predictor_init,
+        inject_dict=injections.get("predictor_configs", {}),
+    )
+
+    test_target_inits = get_test_base_target_inits(test_data_config=create_test_data)
+    test_target_inits = general_sequence_inject(
+        sequence=test_target_inits,
+        inject_dict=injections.get("target_configs", {}),
+    )
+
+    test_config = TestConfigInits(
+        global_configs=test_global_init,
+        input_configs=test_input_init,
+        predictor_configs=test_predictor_init,
+        target_configs=test_target_inits,
+    )
+
+    return test_config, create_test_data
+
+
+def general_sequence_inject(
+    sequence: Sequence[dict], inject_dict: dict
+) -> Sequence[dict]:
+
+    injected = []
+
+    for dict_ in sequence:
+        dict_injected = recursive_dict_replace(dict_=dict_, dict_to_inject=inject_dict)
+        injected.append(dict_injected)
+
+    return injected
+
+
+def get_test_base_global_init() -> Sequence[dict]:
+    global_inits = [
+        {
+            "run_name": "test_run",
+            "plot_skip_steps": 0,
+            "get_acts": True,
+            "act_every_sample_factor": 0,
+            "warmup_steps": 100,
+            "lr": 1e-02,
+            "lr_lb": 1e-03,
+            "batch_size": 32,
+            "valid_size": 0.05,
+            "wd": 1e-03,
+        }
+    ]
+    return global_inits
+
+
+def get_test_inputs_inits(
+    test_path: Path, input_config_dicts: Sequence[dict]
+) -> Sequence[dict]:
+
+    inits = []
+
+    base_func_map = get_input_test_init_base_func_map()
+    for init_dict in input_config_dicts:
+        cur_name = init_dict["input_info"]["input_name"]
+        cur_base_func = base_func_map.get(cur_name)
+        cur_init_base = cur_base_func(test_path=test_path)
+
+        cur_init_injected = recursive_dict_replace(
+            dict_=cur_init_base, dict_to_inject=init_dict
+        )
+        inits.append(cur_init_injected)
+
+    return inits
+
+
+def get_input_test_init_base_func_map():
+    mapping = {
+        "test_genotype": get_test_omics_input_init,
+        "test_tabular": get_test_tabular_input_init,
+    }
+
+    return mapping
+
+
+def get_test_omics_input_init(
+    test_path: Path,
+) -> dict:
+
+    input_init_kwargs = {
+        "input_info": {
+            "input_source": str(test_path / "test_arrays"),
+            "input_name": "test_genotype",
+            "input_type": "omics",
+        },
+        "input_type_info": {
+            "model_type": "genome-local-net",
+            "na_augment_perc": 0.05,
+            "na_augment_prob": 0.20,
+            "snp_file": str(test_path / "test_snps.bim"),
+        },
+        "model_config": {},
+    }
+
+    return input_init_kwargs
+
+
+def get_test_tabular_input_init(
+    test_path: Path,
+) -> dict:
+
+    input_init_kwargs = {
+        "input_info": {
+            "input_source": str(test_path / "labels.csv"),
+            "input_name": "test_tabular",
+            "input_type": "tabular",
+        },
+        "input_type_info": {"model_type": "tabular"},
+        "model_config": {},
+    }
+
+    return input_init_kwargs
+
+
+def get_test_base_predictor_init(model_type: Literal["nn", "linear"]) -> Sequence[dict]:
+    if model_type == "linear":
+        return [{}]
+    return [{"model_config": {"rb_do": 0.25, "fc_do": 0.25}}]
+
+
+def get_test_base_target_inits(test_data_config: "TestDataConfig") -> Sequence[dict]:
+    test_path = test_data_config.scoped_tmp_path
+
+    test_target_init_kwargs = {
+        "label_file": str(test_path / "labels.csv"),
+        "target_cat_columns": ["Origin"],
+    }
+
+    test_target_init_kwargs_sequence = [test_target_init_kwargs]
+
+    return test_target_init_kwargs_sequence
 
 
 @pytest.fixture(scope="module")
@@ -207,7 +307,7 @@ def _create_test_data_config(
     if task_type != "binary":
         target_classes["Africa"] = 2
 
-    config = TestDataConfig(
+    test_data_config = TestDataConfig(
         request_params=request_params,
         task_type=task_type,
         scoped_tmp_path=scoped_tmp_path,
@@ -216,7 +316,7 @@ def _create_test_data_config(
         n_snps=parsed_test_cl_args["n_snps"],
     )
 
-    return config
+    return test_data_config
 
 
 def _set_up_label_file_writing(path: Path, fieldnames: List[str]):
@@ -349,66 +449,143 @@ def split_test_array_folder(test_folder: Path) -> None:
 
 
 @pytest.fixture()
-def create_test_cl_args(request, args_config, create_test_data) -> Namespace:
-    c = create_test_data
-    test_path = c.scoped_tmp_path
+def create_test_config(
+    create_test_config_init_base,
+) -> config.Configs:
 
-    args_config.omics_sources = [str(test_path / "test_arrays")]
-    args_config.omics_names = ["omics_test"]
-    args_config.snp_file = str(test_path / "test_snps.bim")
-    args_config.model_task = c.task_type
-    args_config.label_file = str(test_path / "labels.csv")
+    test_init, test_data_config = copy(create_test_config_init_base)
 
-    # If tests need to have their own config different from the base defined above,
-    # only supporting custom_cl_args hardcoded for now
-    if hasattr(request, "param"):
-        assert "custom_cl_args" in request.param.keys()
-        custom_cl_args = request.param["custom_cl_args"]
-        for k, v in custom_cl_args.items():
-            setattr(args_config, k, v)
+    test_global_config = config.get_global_config(
+        global_configs=test_init.global_configs
+    )
+    test_input_configs = config.get_input_configs(input_configs=test_init.input_configs)
+    test_predictor_configs = config.load_predictor_config(
+        predictor_configs=test_init.predictor_configs
+    )
+    test_target_configs = config.load_configs_general(
+        config_dict_iterable=test_init.target_configs, cls=schemas.TargetConfig
+    )
+
+    test_configs = config.Configs(
+        global_config=test_global_config,
+        input_configs=test_input_configs,
+        predictor_config=test_predictor_configs,
+        target_configs=test_target_configs,
+    )
 
     # This is done after in case tests modify run_name
-    args_config.run_name += (
-        "_" + args_config.model_type + "_" + c.request_params["task_type"]
+    run_name = (
+        test_configs.global_config.run_name
+        + "_"
+        + "_".join(i.input_type_info.model_type for i in test_configs.input_configs)
+        + "_"
+        + test_data_config.request_params["task_type"]
     )
+    test_configs.global_config.run_name = run_name
 
-    configure_root_logger(run_name=args_config.run_name)
+    configure_root_logger(run_name=run_name)
 
-    return args_config
+    return test_configs
+
+
+def modify_test_configs(
+    configs: TestConfigInits, modifications: Union[Sequence[dict], dict]
+) -> TestConfigInits:
+    if isinstance(modifications, Mapping):
+        assert set(modifications.keys()).issubset(set(configs.__dict__.keys()))
+
+    configs_copy = copy(configs)
+
+    for key, inner_modifications in modifications.items():
+        # E.g. List of GlobalConfig objects
+        cur_inner_configs = getattr(configs_copy, key)
+        assert isinstance(cur_inner_configs, Sequence)
+
+        for idx, inner_config_object in enumerate(cur_inner_configs):
+            assert isinstance(inner_config_object, Mapping)
+
+            if isinstance(modifications, Mapping):
+                current_inner_mod = inner_modifications
+            else:
+                current_inner_mod = inner_modifications[idx]
+
+            recursive_dict_replace(
+                dict_=inner_config_object, dict_to_inject=current_inner_mod
+            )
+
+    return configs_copy
+
+
+def recursive_dict_replace(dict_, dict_to_inject):
+    """
+    This is a for rudimentary dictionary injection / replacement. We only replace /
+    inject when have a non-mappable object (e.g. primitives like str / int).
+
+    An alternative would be checking if the new and old values are of type Mapping,
+    then merging them as dicts?
+    """
+    for cur_key, cur_value in dict_to_inject.items():
+
+        if cur_key not in dict_:
+            dict_[cur_key] = {}
+
+        old_dict_value = dict_.get(cur_key)
+        if isinstance(cur_value, Mapping):
+            assert isinstance(old_dict_value, Mapping)
+            recursive_dict_replace(old_dict_value, cur_value)
+        else:
+            dict_[cur_key] = cur_value
+
+    return dict_
 
 
 @pytest.fixture()
-def create_test_data_dimensions(create_test_cl_args, create_test_data):
+def get_test_data_dimensions(create_test_config, create_test_data):
 
-    cl_args = create_test_cl_args
+    test_config = create_test_config
 
-    data_dimensions = train._gather_all_omics_data_dimensions(
-        omics_sources=cl_args.omics_sources, omics_names=cl_args.omics_names
-    )
-
-    return data_dimensions
+    for input_config in test_config.input_configs:
+        if input_config.input_info.input_type == "omics":
+            cur_source = input_config.input_info.input_source
+            cur_dimensions = eir.setup.input_setup.get_data_dimension_from_data_source(
+                data_source=Path(cur_source)
+            )
+            cur_name = input_config.input_info.input_name
+            yield cur_name, cur_dimensions
 
 
 @pytest.fixture()
-def create_test_model(
-    create_test_cl_args, create_test_labels, create_test_data_dimensions
-) -> nn.Module:
-    cl_args = create_test_cl_args
-    target_labels, tabular_input_labels = create_test_labels
-    data_dimensions = create_test_data_dimensions
+def create_test_model(create_test_config, create_test_labels) -> nn.Module:
+    gc = create_test_config.global_config
+    target_labels = create_test_labels
 
     num_outputs_per_class = set_up_num_outputs_per_target(
         target_transformers=target_labels.label_transformers
     )
 
-    model = get_model_from_cl_args(
-        cl_args=cl_args,
-        omics_data_dimensions=data_dimensions,
+    inputs_as_dict = eir.setup.input_setup.set_up_inputs(
+        inputs_configs=create_test_config.input_configs,
+        train_ids=tuple(create_test_labels.train_labels.keys()),
+        valid_ids=tuple(create_test_labels.valid_labels.keys()),
+        hooks=None,
+    )
+
+    model = get_model(
+        inputs_as_dict=inputs_as_dict,
+        global_config=gc,
+        predictor_config=create_test_config.predictor_config,
         num_outputs_per_target=num_outputs_per_class,
-        tabular_label_transformers=tabular_input_labels.label_transformers,
     )
 
     return model
+
+
+def set_up_inputs_as_dict(input_configs: Sequence[schemas.InputConfig]):
+    input_name_config_iter = eir.setup.input_setup.get_input_name_config_iterator(
+        input_configs=input_configs
+    )
+    inputs_as_dict = {k: v for k, v in input_name_config_iter}
+    return inputs_as_dict
 
 
 def cleanup(run_path):
@@ -416,11 +593,12 @@ def cleanup(run_path):
 
 
 @pytest.fixture()
-def create_test_labels(create_test_data, create_test_cl_args):
+def create_test_labels(create_test_data, create_test_config) -> train.Labels:
 
-    cl_args = create_test_cl_args
+    c = create_test_config
+    gc = c.global_config
 
-    run_folder = get_run_folder(run_name=cl_args.run_name)
+    run_folder = get_run_folder(run_name=gc.run_name)
 
     # TODO: Use better logic here, to do the cleanup. Should not be in this fixture.
     if run_folder.exists():
@@ -428,59 +606,71 @@ def create_test_labels(create_test_data, create_test_cl_args):
 
     ensure_path_exists(run_folder, is_folder=True)
 
-    target_labels, tabular_input_labels = train.get_target_and_tabular_input_labels(
-        cl_args=cl_args, custom_label_parsing_operations=None
+    all_array_ids = train.gather_all_array_target_ids(target_configs=c.target_configs)
+    train_ids, valid_ids = train.split_ids(ids=all_array_ids, valid_size=gc.valid_size)
+
+    target_labels_info = train.get_tabular_target_label_data(
+        target_configs=c.target_configs
     )
+    target_labels = train.set_up_target_labels_wrapper(
+        tabular_infos=target_labels_info,
+        custom_label_ops=None,
+        train_ids=train_ids,
+        valid_ids=valid_ids,
+    )
+
     train.save_transformer_set(
         transformers=target_labels.label_transformers, run_folder=run_folder
     )
-    train.save_transformer_set(
-        transformers=tabular_input_labels.label_transformers, run_folder=run_folder
-    )
 
-    return target_labels, tabular_input_labels
+    return target_labels
 
 
 @pytest.fixture()
 def create_test_datasets(
     create_test_data,
     create_test_labels,
-    create_test_cl_args,
-    create_test_data_dimensions,
+    create_test_config,
 ):
 
-    cl_args = create_test_cl_args
-    target_labels, tabular_input_labels = create_test_labels
-    data_dimensions = create_test_data_dimensions
+    configs = create_test_config
+    target_labels = create_test_labels
 
-    train_dataset, valid_dataset = datasets.set_up_datasets_from_cl_args(
-        cl_args=cl_args,
-        data_dimensions=data_dimensions,
+    inputs = eir.setup.input_setup.set_up_inputs(
+        inputs_configs=configs.input_configs,
+        train_ids=tuple(target_labels.train_labels.keys()),
+        valid_ids=tuple(target_labels.valid_labels.keys()),
+        hooks=None,
+    )
+
+    train_dataset, valid_dataset = datasets.set_up_datasets_from_configs(
+        configs=configs,
         target_labels=target_labels,
-        tabular_inputs_labels=tabular_input_labels,
+        inputs_as_dict=inputs,
     )
 
     return train_dataset, valid_dataset
 
 
 @pytest.fixture()
-def create_test_dloaders(create_test_cl_args, create_test_datasets):
-    cl_args = create_test_cl_args
+def create_test_dloaders(create_test_config, create_test_datasets):
+    c = create_test_config
+    gc = c.global_config
     train_dataset, valid_dataset = create_test_datasets
 
     train_dloader = DataLoader(
-        train_dataset, batch_size=cl_args.batch_size, shuffle=True, drop_last=True
+        train_dataset, batch_size=gc.batch_size, shuffle=True, drop_last=True
     )
 
     valid_dloader = DataLoader(
-        valid_dataset, batch_size=cl_args.batch_size, shuffle=False, drop_last=True
+        valid_dataset, batch_size=gc.batch_size, shuffle=False, drop_last=True
     )
 
     return train_dloader, valid_dloader, train_dataset, valid_dataset
 
 
 def create_test_optimizer(
-    cl_args: Namespace,
+    global_config: schemas.GlobalConfig,
     model: nn.Module,
     criterions,
 ):
@@ -492,7 +682,7 @@ def create_test_optimizer(
     loss_module = train._get_loss_callable(criterions=criterions)
 
     optimizer = optimizers.get_optimizer(
-        model=model, loss_callable=loss_module, cl_args=cl_args
+        model=model, loss_callable=loss_module, global_config=global_config
     )
 
     return optimizer, loss_module
@@ -511,20 +701,20 @@ class ModelTestConfig:
 def prep_modelling_test_configs(
     create_test_data,
     create_test_labels,
-    create_test_cl_args,
+    create_test_config,
     create_test_dloaders,
     create_test_model,
     create_test_datasets,
-    create_test_data_dimensions,
-) -> Tuple[Config, ModelTestConfig]:
+    get_test_data_dimensions,
+) -> Tuple[Experiment, ModelTestConfig]:
     """
     Note that the fixtures used in this fixture get indirectly parametrized by
     test_classification and test_regression.
     """
-    cl_args = create_test_cl_args
+    c = create_test_config
+    gc = c.global_config
     train_loader, valid_loader, train_dataset, valid_dataset = create_test_dloaders
-    target_labels, tabular_inputs_labels = create_test_labels
-    data_dimensions = create_test_data_dimensions
+    target_labels = create_test_labels
 
     model = create_test_model
 
@@ -532,56 +722,64 @@ def prep_modelling_test_configs(
         target_transformers=target_labels.label_transformers
     )
 
-    criterions = train._get_criterions(
-        target_columns=train_dataset.target_columns, model_type=cl_args.model_type
-    )
+    criterions = train._get_criterions(target_columns=train_dataset.target_columns)
     test_metrics = metrics.get_default_metrics(
         target_transformers=target_labels.label_transformers,
     )
     test_metrics = _patch_metrics(metrics_=test_metrics)
 
     optimizer, loss_module = create_test_optimizer(
-        cl_args=cl_args,
+        global_config=gc,
         model=model,
         criterions=criterions,
     )
 
     train_dataset, valid_dataset = create_test_datasets
 
-    train._log_model(model=model, l1_weight=cl_args.l1)
+    train._log_model(model=model)
 
-    hooks = train.get_default_hooks(cl_args_=cl_args)
-    config = Config(
-        cl_args=cl_args,
+    inputs = eir.setup.input_setup.set_up_inputs(
+        inputs_configs=c.input_configs,
+        train_ids=tuple(target_labels.train_labels.keys()),
+        valid_ids=tuple(target_labels.valid_labels.keys()),
+        hooks=None,
+    )
+    serialize_all_input_transformers(
+        inputs_dict=inputs, run_folder=get_run_folder(gc.run_name)
+    )
+
+    hooks = train.get_default_hooks(configs=c)
+    experiment = Experiment(
+        configs=c,
+        inputs=inputs,
         train_loader=train_loader,
         valid_loader=valid_loader,
         valid_dataset=valid_dataset,
-        data_dimensions=data_dimensions,
         model=model,
         optimizer=optimizer,
         criterions=criterions,
         loss_function=loss_module,
         metrics=test_metrics,
-        labels_dict=target_labels.train_labels,
         target_transformers=target_labels.label_transformers,
         num_outputs_per_target=num_outputs_per_target,
         target_columns=train_dataset.target_columns,
-        writer=train.get_summary_writer(run_folder=Path("runs", cl_args.run_name)),
+        writer=train.get_summary_writer(run_folder=Path("runs", gc.run_name)),
         hooks=hooks,
     )
 
     keys_to_serialize = train.get_default_config_keys_to_serialize()
     train.serialize_config(
-        config=config,
-        run_folder=get_run_folder(cl_args.run_name),
+        experiment=experiment,
+        run_folder=get_run_folder(gc.run_name),
         keys_to_serialize=keys_to_serialize,
     )
 
+    targets = config.get_all_targets(targets_configs=c.target_configs)
     test_config = _get_cur_modelling_test_config(
-        train_loader=train_loader, cl_args=cl_args
+        train_loader=train_loader, global_config=gc, targets=targets
     )
 
-    return config, test_config
+    return experiment, test_config
 
 
 def _patch_metrics(metrics_):
@@ -598,23 +796,26 @@ def _patch_metrics(metrics_):
 
 
 def _get_cur_modelling_test_config(
-    train_loader: DataLoader, cl_args: Namespace
+    train_loader: DataLoader,
+    global_config: schemas.GlobalConfig,
+    targets: config.Targets,
 ) -> ModelTestConfig:
 
-    last_iter = len(train_loader) * cl_args.n_epochs
-    run_path = Path(f"runs/{cl_args.run_name}/")
+    last_iter = len(train_loader) * global_config.n_epochs
+    run_path = Path(f"runs/{global_config.run_name}/")
 
-    target_columns = cl_args.target_cat_columns + cl_args.target_con_columns
     last_sample_folders = _get_all_last_sample_folders(
-        target_columns=target_columns, run_path=run_path, iteration=last_iter
+        target_columns=targets.all_targets, run_path=run_path, iteration=last_iter
     )
 
     gen = last_sample_folders.items
     activations_path = {
-        k: folder / "activations/omics_test/top_acts.npy" for k, folder in gen()
+        k: folder / "activations/omics_test_genotype/top_acts.npy"
+        for k, folder in gen()
     }
     masked_activations_path = {
-        k: folder / "activations/omics_test/top_acts_masked.npy" for k, folder in gen()
+        k: folder / "activations/omics_test_genotype/top_acts_masked.npy"
+        for k, folder in gen()
     }
 
     test_config = ModelTestConfig(

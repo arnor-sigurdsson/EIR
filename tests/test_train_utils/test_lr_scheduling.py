@@ -48,8 +48,10 @@ def create_dummy_test_optimizer(request):
     raise ValueError()
 
 
-def test_get_reduce_lr_on_plateu_step_params(args_config, create_dummy_test_optimizer):
-    cl_args = args_config
+def test_get_reduce_lr_on_plateu_step_params(
+    test_config_base, create_dummy_test_optimizer
+):
+    cl_args = test_config_base
     optimizer = create_dummy_test_optimizer
 
     params = lr_scheduling._get_reduce_lr_on_plateau_step_params(
@@ -81,13 +83,13 @@ def get_dummy_handler_config(prep_modelling_test_configs) -> HandlerConfig:
 
 @pytest.mark.parametrize("create_test_data", [{"task_type": "binary"}], indirect=True)
 @pytest.mark.parametrize(
-    "create_test_cl_args",
+    "create_test_config",
     [{"custom_cl_args": {"lr_schedule": "plateau", "lr": 1e-3}}],
     indirect=True,
 )
 def test_set_up_lr_scheduler_plateau(get_dummy_handler_config):
     handler_config = get_dummy_handler_config
-    c = handler_config.config
+    c = handler_config.experiment
     cl_args = c.cl_args
 
     lr_scheduler = lr_scheduling.set_up_lr_scheduler(handler_config=handler_config)
@@ -101,7 +103,7 @@ def test_set_up_lr_scheduler_plateau(get_dummy_handler_config):
 
 @pytest.mark.parametrize("create_test_data", [{"task_type": "binary"}], indirect=True)
 @pytest.mark.parametrize(
-    "create_test_cl_args",
+    "create_test_config",
     [
         {"custom_cl_args": {"lr_schedule": "cycle", "lr": 1e-3}},
         {"custom_cl_args": {"lr_schedule": "cosine", "lr": 1e-3}},
@@ -110,7 +112,7 @@ def test_set_up_lr_scheduler_plateau(get_dummy_handler_config):
 )
 def test_set_up_lr_scheduler_cycle(get_dummy_handler_config):
     handler_config = get_dummy_handler_config
-    c = handler_config.config
+    c = handler_config.experiment
     cl_args = c.cl_args
 
     lr_scheduler = lr_scheduling.set_up_lr_scheduler(handler_config=handler_config)

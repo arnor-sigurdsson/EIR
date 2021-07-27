@@ -8,7 +8,6 @@ from typing import (
     Tuple,
     List,
     Dict,
-    overload,
     TYPE_CHECKING,
     Callable,
     Iterable,
@@ -31,17 +30,17 @@ from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader, WeightedRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
-from eir.config import schemas
-from eir.config.config import (
+from eir.setup import schemas
+from eir.setup.config import (
     get_configs,
     Configs,
     get_all_targets,
 )
+from eir.setup.input_setup import DataDimensions, serialize_all_input_transformers
 from eir.data_load import data_utils
 from eir.data_load import datasets
 from eir.data_load.data_augmentation import hook_mix_loss, get_mix_data_hook
-from eir.data_load.data_loading_funcs import get_weighted_random_sampler
-from eir.data_load.data_utils import Batch
+from eir.data_load.data_utils import Batch, get_train_sampler
 from eir.data_load.label_setup import (
     al_target_columns,
     al_label_transformers,
@@ -53,7 +52,7 @@ from eir.data_load.label_setup import (
     save_transformer_set,
     Labels,
 )
-from eir.models import fusion, fusion_mgmoe
+from eir.models import fusion, fusion_mgmoe, fusion_linear
 from eir.models import model_training_utils
 from eir.models.model_training_utils import run_lr_find
 from eir.models.omics.omics_models import (
@@ -63,9 +62,10 @@ from eir.models.omics.omics_models import (
 )
 from eir.models.tabular.tabular import (
     get_tabular_inputs,
-    TabularModel,
+    SimpleTabularModel,
     get_unique_values_from_transformers,
 )
+from eir.setup.input_setup import al_input_objects, set_up_inputs
 from eir.train_utils import utils
 from eir.train_utils.metrics import (
     calculate_batch_metrics,
@@ -108,7 +108,6 @@ al_dataloader_getitem_batch = Tuple[
     List[str],
 ]
 al_num_outputs_per_target = Dict[str, int]
-al_input_objects = Dict[str, Union["OmicsInputInfo", "TabularInputInfo"]]
 
 torch.manual_seed(0)
 np.random.seed(0)
@@ -122,14 +121,14 @@ def main():
     utils.configure_root_logger(run_name=configs.global_config.run_name)
 
     default_hooks = get_default_hooks(configs=configs)
-    default_config = get_default_config(configs=configs, hooks=default_hooks)
+    default_config = get_default_experiment(configs=configs, hooks=default_hooks)
 
     run_experiment(experiment=default_config)
 
 
 def run_experiment(experiment: "Experiment") -> None:
 
-    _log_model(model=experiment.model, l1_weight=0.0)
+    _log_model(model=experiment.model)
 
     gc = experiment.configs.global_config
 
@@ -154,7 +153,12 @@ class Experiment:
     target_transformers: al_label_transformers
     target_columns: al_target_columns
     num_outputs_per_target: al_num_outputs_per_target
-    model: Union[fusion.FusionModel, nn.DataParallel]
+    model: Union[
+        fusion.FusionModel,
+        fusion_mgmoe.MGMoEModel,
+        fusion_linear.LinearFusionModel,
+        nn.DataParallel,
+    ]
     optimizer: Optimizer
     criterions: al_criterions
     loss_function: Callable
@@ -220,7 +224,7 @@ def set_up_target_labels_wrapper(
     custom_label_ops: al_all_column_ops,
     train_ids: Sequence[str],
     valid_ids: Sequence[str],
-):
+) -> Labels:
     """
     TODO:   Log if some were dropped on merge.
     TODO:   Decide if we want to keep this merging here, or have a key reference to
@@ -264,97 +268,7 @@ def set_up_target_labels_wrapper(
     return labels_data_object
 
 
-def set_up_inputs(
-    inputs_configs: schemas.al_input_configs,
-    train_ids: Sequence[str],
-    valid_ids: Sequence[str],
-    hooks: Union["Hooks", None],
-) -> al_input_objects:
-    all_inputs = {}
-
-    for input_config in inputs_configs:
-        cur_input_data_config = input_config.input_info
-        setup_func = get_input_setup_function(
-            input_type=cur_input_data_config.input_type
-        )
-        logger.info(
-            "Setting up %s inputs '%s' from %s.",
-            cur_input_data_config.input_type,
-            cur_input_data_config.input_name,
-            cur_input_data_config.input_source,
-        )
-        set_up_input = setup_func(
-            input_config=input_config,
-            train_ids=train_ids,
-            valid_ids=valid_ids,
-            hooks=hooks,
-        )
-        cur_name = (
-            f"{cur_input_data_config.input_type}_{cur_input_data_config.input_name}"
-        )
-        all_inputs[cur_name] = set_up_input
-
-    return all_inputs
-
-
-def get_input_setup_function(input_type) -> Callable:
-    mapping = get_input_setup_function_map()
-
-    return mapping[input_type]
-
-
-def get_input_setup_function_map() -> Dict[str, Callable]:
-    setup_mapping = {"omics": set_up_omics_input, "tabular": set_up_tabular_input}
-
-    return setup_mapping
-
-
-@dataclass
-class TabularInputInfo:
-    labels: Labels
-    input_config: schemas.InputConfig
-
-
-def set_up_tabular_input(
-    input_config: schemas.InputConfig,
-    train_ids: Sequence[str],
-    valid_ids: Sequence[str],
-    hooks: "Hooks",
-) -> TabularInputInfo:
-    tabular_inputs_info = get_tabular_inputs_label_data(
-        input_source=input_config.input_info.input_source,
-        tabular_data_type_config=input_config.input_type_info,
-    )
-
-    tabular_labels = set_up_train_and_valid_tabular_data(
-        tabular_info=tabular_inputs_info,
-        custom_label_ops=hooks.custom_column_label_parsing_ops,
-        train_ids=train_ids,
-        valid_ids=valid_ids,
-    )
-
-    tabular_inputs_info = TabularInputInfo(
-        labels=tabular_labels, input_config=input_config
-    )
-
-    return tabular_inputs_info
-
-
-@dataclass
-class OmicsInputInfo:
-    input_config: schemas.InputConfig
-
-
-def set_up_omics_input(
-    input_config: schemas.InputConfig, *args, **kwargs
-) -> OmicsInputInfo:
-
-    omics_input_info = OmicsInputInfo(input_config=input_config)
-
-    return omics_input_info
-
-
-def get_default_config(
+def get_default_experiment(
     configs: Configs, hooks: Union["Hooks", None] = None
 ) -> "Experiment":
     run_folder = _prepare_run_folder(run_name=configs.global_config.run_name)
@@ -368,9 +282,11 @@ def get_default_config(
     target_labels_info = get_tabular_target_label_data(
         target_configs=configs.target_configs
     )
+
+    custom_ops = hooks.custom_column_label_parsing_ops if hooks else None
     target_labels = set_up_target_labels_wrapper(
         tabular_infos=target_labels_info,
-        custom_label_ops=hooks.custom_column_label_parsing_ops,
+        custom_label_ops=custom_ops,
         train_ids=train_ids,
         valid_ids=valid_ids,
     )
@@ -384,17 +300,12 @@ def get_default_config(
         valid_ids=valid_ids,
         hooks=hooks,
     )
+    serialize_all_input_transformers(inputs_dict=inputs, run_folder=run_folder)
 
-    for input_name, input_ in inputs.items():
-        if input_name.startswith("tabular_"):
-            save_transformer_set(
-                transformers=input_.labels.label_transformers, run_folder=run_folder
-            )
-
-    train_dataset, valid_dataset = datasets.set_up_datasets_from_cl_args(
+    train_dataset, valid_dataset = datasets.set_up_datasets_from_configs(
         configs=configs,
         target_labels=target_labels,
-        inputs=inputs,
+        inputs_as_dict=inputs,
     )
 
     batch_size = _modify_bs_for_multi_gpu(
@@ -420,7 +331,7 @@ def get_default_config(
     )
 
     model = get_model(
-        inputs=inputs,
+        inputs_as_dict=inputs,
         global_config=configs.global_config,
         predictor_config=configs.predictor_config,
         num_outputs_per_target=num_outputs_per_target,
@@ -494,21 +405,6 @@ def get_tabular_target_label_data(
     return tabular_infos
 
 
-def get_tabular_inputs_label_data(
-    input_source: str,
-    tabular_data_type_config: schemas.TabularInputDataConfig,
-) -> TabularFileInfo:
-
-    table_info = TabularFileInfo(
-        file_path=Path(input_source),
-        con_columns=tabular_data_type_config.extra_con_columns,
-        cat_columns=tabular_data_type_config.extra_cat_columns,
-        parsing_chunk_size=tabular_data_type_config.label_parsing_chunk_size,
-    )
-
-    return table_info
-
-
 def set_up_num_outputs_per_target(
     target_transformers: al_label_transformers,
 ) -> al_num_outputs_per_target:
@@ -561,52 +457,6 @@ def _modify_bs_for_multi_gpu(multi_gpu: bool, batch_size: int) -> int:
     return batch_size
 
 
-@overload
-def get_train_sampler(
-    columns_to_sample: None, train_dataset: datasets.DatasetBase
-) -> None:
-    ...
-
-
-@overload
-def get_train_sampler(
-    columns_to_sample: List[str], train_dataset: datasets.DatasetBase
-) -> WeightedRandomSampler:
-    ...
-
-
-def get_train_sampler(columns_to_sample, train_dataset):
-    """
-    TODO:   Refactor, remove dependency on train_dataset and use instead
-            Iterable[Samples], and target_columns directly.
-    """
-    if columns_to_sample is None:
-        return None
-
-    loaded_target_columns = (
-        train_dataset.target_columns["con"] + train_dataset.target_columns["cat"]
-    )
-
-    is_sample_column_loaded = set(columns_to_sample).issubset(
-        set(loaded_target_columns)
-    )
-    is_sample_all_cols = columns_to_sample == ["all"]
-
-    if not is_sample_column_loaded and not is_sample_all_cols:
-        raise ValueError(
-            "Weighted sampling from non-loaded columns not supported yet "
-            f"(could not find {columns_to_sample})."
-        )
-
-    if is_sample_all_cols:
-        columns_to_sample = train_dataset.target_columns["cat"]
-
-    train_sampler = get_weighted_random_sampler(
-        samples=train_dataset.samples, target_columns=columns_to_sample
-    )
-    return train_sampler
-
-
 def get_dataloaders(
     train_dataset: datasets.DatasetBase,
     train_sampler: Union[None, WeightedRandomSampler],
@@ -646,19 +496,17 @@ class GetAttrDelegatedDataParallel(nn.DataParallel):
 
 
 def get_model(
-    inputs: al_input_objects,
+    inputs_as_dict: al_input_objects,
     predictor_config: schemas.PredictorConfig,
     global_config: schemas.GlobalConfig,
     num_outputs_per_target: al_num_outputs_per_target,
 ) -> Union[nn.Module, nn.DataParallel]:
 
-    fusion_class = get_fusion_class_from_cl_args(
-        fusion_model_type=global_config.fusion_model_type
-    )
+    fusion_class = get_fusion_class(fusion_model_type=predictor_config.model_type)
     fusion_kwargs = get_fusion_kwargs_from_cl_args(
         global_config=global_config,
         predictor_config=predictor_config,
-        inputs=inputs,
+        inputs=inputs_as_dict,
         num_outputs_per_target=num_outputs_per_target,
     )
     fusion_model = fusion_class(**fusion_kwargs)
@@ -679,6 +527,7 @@ def get_modules_to_fuse_from_inputs(inputs: al_input_objects, device: str):
             cur_omics_model = get_omics_model_from_model_config(
                 model_type=inputs_object.input_config.input_type_info.model_type,
                 model_config=inputs_object.input_config.model_config,
+                data_dimensions=inputs_object.data_dimensions,
                 device=device,
             )
 
@@ -711,8 +560,8 @@ def get_tabular_model(
     con_columns: Sequence[str],
     device: str,
     unique_label_values: Dict[str, Set[str]],
-) -> TabularModel:
-    tabular_model = TabularModel(
+) -> SimpleTabularModel:
+    tabular_model = SimpleTabularModel(
         cat_columns=cat_columns,
         con_columns=con_columns,
         unique_label_values=unique_label_values,
@@ -723,13 +572,17 @@ def get_tabular_model(
 
 
 def get_omics_model_from_model_config(
-    model_config: al_omics_model_configs, model_type: str, device: str
+    model_config: al_omics_model_configs,
+    data_dimensions: DataDimensions,
+    model_type: str,
+    device: str,
 ):
 
     omics_model_class = get_model_class(model_type=model_type)
     model_init_kwargs = get_omics_model_init_kwargs(
         model_type=model_type,
         model_config=model_config,
+        data_dimensions=data_dimensions,
     )
     omics_model = omics_model_class(**model_init_kwargs)
 
@@ -741,13 +594,15 @@ def get_omics_model_from_model_config(
     return omics_model
 
 
-def get_fusion_class_from_cl_args(
+def get_fusion_class(
     fusion_model_type: str,
 ) -> Type[nn.Module]:
     if fusion_model_type == "mgmoe":
         return fusion_mgmoe.MGMoEModel
     elif fusion_model_type == "default":
         return fusion.FusionModel
+    elif fusion_model_type == "linear":
+        return fusion_linear.LinearFusionModel
     raise ValueError(f"Unrecognized fusion model type: {fusion_model_type}.")
 
 
@@ -807,19 +662,21 @@ def get_summary_writer(run_folder: Path) -> SummaryWriter:
     return writer
 
 
-def _log_model(model: nn.Module, l1_weight: float) -> None:
+def _log_model(model: nn.Module) -> None:
     """
     TODO: Add summary of parameters
     TODO: Add verbosity option
     """
     no_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
-    if l1_weight:
-        logger.debug(
-            "Penalizing weights of shape %s with L1 loss with weight %f.",
-            model.l1_penalized_weights.shape,
-            l1_weight,
-        )
+    for module in model.named_modules():
+        pass
+        # if l1_weight:
+        #     logger.debug(
+        #         "Penalizing weights of shape %s with L1 loss with weight %f.",
+        #         model.l1_penalized_weights.shape,
+        #         l1_weight,
+        #     )
 
     logger.info(
         "Starting training with a %s parameter model.", format(no_params, ",.0f")
@@ -972,10 +829,26 @@ def _get_default_step_function_hooks_init_kwargs(
 
     init_kwargs["loss"].append(hook_default_aggregate_losses)
 
-    if any(getattr(input_config, "l1", None) for input_config in configs.input_configs):
-        init_kwargs["loss"].append(hook_add_l1_loss)
+    init_kwargs = add_l1_loss_hook_if_applicable(
+        step_function_hooks_init_kwargs=init_kwargs, configs=configs
+    )
 
     return init_kwargs
+
+
+def add_l1_loss_hook_if_applicable(
+    step_function_hooks_init_kwargs: Dict[str, Sequence[Callable]],
+    configs: Configs,
+) -> Dict[str, Sequence[Callable]]:
+    input_l1 = any(
+        getattr(input_config, "l1", None) for input_config in configs.input_configs
+    )
+    preds_l1 = getattr(configs.predictor_config.model_config, "l1", None)
+    if input_l1 or preds_l1:
+        logger.info("Adding L1 loss hook.")
+        step_function_hooks_init_kwargs["loss"].append(hook_add_l1_loss)
+
+    return step_function_hooks_init_kwargs
 
 
 @dataclass

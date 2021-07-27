@@ -2,20 +2,18 @@ import argparse
 from argparse import Namespace
 from copy import copy
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Sequence, Iterable, Dict, List, Union, Type, Any, Callable, overload
 
 import configargparse
-import numpy as np
 import torch
 import yaml
 from aislib.misc_utils import get_logger
 
 import eir.models.tabular.tabular
-from eir.config import schemas
-from eir.data_load.label_setup import get_array_path_iterator
+from eir.setup import schemas
 from eir.models.fusion import FusionModelConfig
 from eir.models.fusion_mgmoe import MGMoEModelConfig
+from eir.models.fusion_linear import LinearFusionModelConfig
 from eir.models.omics.omics_models import get_omics_config_dataclass_mapping
 
 al_input_types = Union[schemas.OmicsInputDataConfig, schemas.TabularInputDataConfig]
@@ -70,13 +68,18 @@ def generate_aggregated_config(cl_args: argparse.Namespace) -> Configs:
     per target.
     """
 
-    global_config = get_global_config(global_configs=cl_args.global_configs)
-    input_configs = get_input_configs(input_configs=cl_args.input_configs)
-    predictor_config = load_predictor_config(
-        predictor_configs=cl_args.predictor_configs
-    )
+    global_config_iter = get_yaml_to_dict_iterator(configs=cl_args.global_configs)
+    global_config = get_global_config(global_configs=global_config_iter)
+
+    inputs_config_iter = get_yaml_to_dict_iterator(configs=cl_args.input_configs)
+    input_configs = get_input_configs(input_configs=inputs_config_iter)
+
+    predictor_config_iter = get_yaml_to_dict_iterator(configs=cl_args.predictor_configs)
+    predictor_config = load_predictor_config(predictor_configs=predictor_config_iter)
+
+    target_config_iter = get_yaml_to_dict_iterator(configs=cl_args.target_configs)
     target_configs = load_configs_general(
-        config_path_iterable=cl_args.target_configs, cls=schemas.TargetConfig
+        config_dict_iterable=target_config_iter, cls=schemas.TargetConfig
     )
 
     aggregated_configs = Configs(
@@ -89,10 +92,9 @@ def generate_aggregated_config(cl_args: argparse.Namespace) -> Configs:
     return aggregated_configs
 
 
-def get_global_config(global_configs: Iterable[str]) -> schemas.GlobalConfig:
+def get_global_config(global_configs: Iterable[dict]) -> schemas.GlobalConfig:
 
-    all_dict_configs = (load_yaml_config(config_path=f) for f in global_configs)
-    combined_config = combine_dicts(dicts=all_dict_configs)
+    combined_config = combine_dicts(dicts=global_configs)
 
     combined_config_namespace = Namespace(**combined_config)
 
@@ -123,14 +125,13 @@ def modify_global_config(global_config: schemas.GlobalConfig) -> schemas.GlobalC
 
 
 def get_input_configs(
-    input_configs: Iterable[str],
+    input_configs: Iterable[dict],
 ) -> Sequence[schemas.InputConfig]:
 
     config_objects = []
 
-    for config_path in input_configs:
-        config_as_dict = load_yaml_config(config_path=config_path)
-        config_object = init_input_config(yaml_config_as_dict=config_as_dict)
+    for config_dict in input_configs:
+        config_object = init_input_config(yaml_config_as_dict=config_dict)
         config_objects.append(config_object)
 
     return config_objects
@@ -148,7 +149,7 @@ def init_input_config(yaml_config_as_dict: Dict[str, Any]) -> schemas.InputConfi
     model_config = set_up_model_config(
         input_info_object=input_info_object,
         input_type_info_object=input_type_info_object,
-        model_init_kwargs_base=cfg["model_config"],
+        model_init_kwargs_base=cfg.get("model_config", {}),
     )
 
     input_config = schemas.InputConfig(
@@ -214,23 +215,23 @@ def get_model_config_setup_hook(input_type):
 
 
 def get_model_config_setup_hook_map():
-    mapping = {"omics": set_up_omics_config_object}
+    mapping = {
+        "omics": set_up_omics_config_object_init_kwargs,
+        "tabular": set_up_tabular_config_object_init_kwargs,
+    }
 
     return mapping
 
 
-def set_up_omics_config_object(
-    init_kwargs: dict, input_info_object: schemas.InputDataConfig, *args, **kwargs
+def set_up_omics_config_object_init_kwargs(init_kwargs: dict, *args, **kwargs) -> dict:
+
+    return init_kwargs
+
+
+def set_up_tabular_config_object_init_kwargs(
+    init_kwargs: dict, *args, **kwargs
 ) -> dict:
-
-    init_kwargs_copy = copy(init_kwargs)
-
-    dimension = _get_data_dimension_from_data_source(
-        data_source=Path(input_info_object.input_source)
-    )
-    init_kwargs_copy["data_dimensions"] = dimension
-
-    return init_kwargs_copy
+    return init_kwargs
 
 
 def get_model_config_map() -> Dict[str, Type]:
@@ -240,15 +241,19 @@ def get_model_config_map() -> Dict[str, Type]:
     return mapping
 
 
-def load_predictor_config(predictor_configs: Iterable[str]) -> schemas.PredictorConfig:
-    all_dict_configs = (load_yaml_config(config_path=f) for f in predictor_configs)
-    combined_config = combine_dicts(dicts=all_dict_configs)
+def load_predictor_config(predictor_configs: Iterable[dict]) -> schemas.PredictorConfig:
+    combined_config = combine_dicts(dicts=predictor_configs)
+
+    combined_config.setdefault("model_type", "default")
+    combined_config.setdefault("model_config", {})
 
     fusion_model_type = combined_config["model_type"]
 
     model_dataclass_config_class = FusionModelConfig
     if fusion_model_type == "mgmoe":
         model_dataclass_config_class = MGMoEModelConfig
+    elif fusion_model_type == "linear":
+        model_dataclass_config_class = LinearFusionModelConfig
 
     fusion_config_kwargs = combined_config["model_config"]
     fusion_config = model_dataclass_config_class(**fusion_config_kwargs)
@@ -260,12 +265,11 @@ def load_predictor_config(predictor_configs: Iterable[str]) -> schemas.Predictor
     return predictor_config
 
 
-def load_configs_general(config_path_iterable: Iterable[str], cls: Type):
+def load_configs_general(config_dict_iterable: Iterable[dict], cls: Type):
     config_objects = []
 
-    for config_path in config_path_iterable:
-        config_as_dict = load_yaml_config(config_path=config_path)
-        config_object = cls(**config_as_dict)
+    for config_dict in config_dict_iterable:
+        config_object = cls(**config_dict)
         config_objects.append(config_object)
 
     return config_objects
@@ -316,41 +320,13 @@ def combine_dicts(dicts: Iterable[dict]) -> dict:
     return combined_dict
 
 
+def get_yaml_to_dict_iterator(configs: Iterable[str]):
+    for yaml_config in configs:
+        yield load_yaml_config(config_path=yaml_config)
+
+
 def load_yaml_config(config_path: str) -> Dict[str, Any]:
     with open(config_path, "r") as yaml_file:
         config_as_dict = yaml.load(stream=yaml_file, Loader=yaml.FullLoader)
 
     return config_as_dict
-
-
-@dataclass
-class DataDimensions:
-    channels: int
-    height: int
-    width: int
-
-    def num_elements(self):
-        return self.channels * self.height * self.width
-
-
-def _get_data_dimension_from_data_source(
-    data_source: Path,
-) -> DataDimensions:
-    """
-    TODO: Make more dynamic / robust. Also weird to say "width" for a 1D vector.
-    """
-
-    iterator = get_array_path_iterator(data_source=data_source)
-    path = next(iterator)
-    shape = np.load(file=path).shape
-
-    if len(shape) == 1:
-        channels, height, width = 1, 1, shape[0]
-    elif len(shape) == 2:
-        channels, height, width = 1, shape[0], shape[1]
-    elif len(shape) == 3:
-        channels, height, width = shape
-    else:
-        raise ValueError("Currently max 3 dimensional inputs supported")
-
-    return DataDimensions(channels=channels, height=height, width=width)

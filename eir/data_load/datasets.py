@@ -22,7 +22,7 @@ from aislib.misc_utils import get_logger
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
-from eir.config import config
+from eir.setup import config
 from eir.data_load.data_augmentation import make_random_omics_columns_missing
 from eir.data_load.label_setup import (
     al_label_dict,
@@ -33,7 +33,7 @@ from eir.data_load.label_setup import (
 from eir.data_load.label_setup import merge_target_columns
 
 if TYPE_CHECKING:
-    from eir.train import al_input_objects
+    from eir.setup.input_setup import al_input_objects
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -50,10 +50,10 @@ al_inputs = Union[Dict[str, torch.Tensor], Dict[str, Any]]
 al_getitem_return = Tuple[Dict[str, torch.Tensor], al_sample_label_dict_target, str]
 
 
-def set_up_datasets_from_cl_args(
+def set_up_datasets_from_configs(
     configs: config.Configs,
     target_labels: Labels,
-    inputs: "al_input_objects",
+    inputs_as_dict: "al_input_objects",
 ) -> Tuple[al_datasets, al_datasets]:
 
     dataset_class = (
@@ -64,13 +64,13 @@ def set_up_datasets_from_cl_args(
     train_kwargs = construct_default_dataset_kwargs_from_cl_args(
         target_labels_dict=target_labels.train_labels,
         targets=targets,
-        inputs=inputs,
+        inputs=inputs_as_dict,
     )
 
     valid_kwargs = construct_default_dataset_kwargs_from_cl_args(
         target_labels_dict=target_labels.valid_labels,
         targets=targets,
-        inputs=inputs,
+        inputs=inputs_as_dict,
     )
 
     train_dataset = dataset_class(**train_kwargs)
@@ -593,7 +593,7 @@ def impute_missing_modalities(
             dtype = dtypes[input_name]
 
             if input_name.startswith("omics_"):
-                dimensions = input_object.input_config.model_config.data_dimensions
+                dimensions = input_object.data_dimensions
                 shape = dimensions.channels, dimensions.height, dimensions.width
 
                 imputed_tensor = impute_single_missing_modality(

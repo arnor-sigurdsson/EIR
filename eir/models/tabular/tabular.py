@@ -25,7 +25,7 @@ class TabularModelConfig:
     l1: float = 0.00
 
 
-class TabularModel(nn.Module):
+class SimpleTabularModel(nn.Module):
     def __init__(
         self,
         cat_columns: Sequence[str],
@@ -37,9 +37,13 @@ class TabularModel(nn.Module):
         Note: It would be more natural maybe to do the lookup here
         (using self.embeddings_dict), but then we also have to do all tensor
         preparation (e.g. mixing) here. Perhaps for now better to do it outside in
-        prepartion hook. However, this way also keeps a common interface between all
+        preparation hook. However, this way also keeps a common interface between all
         current models, where they are taking a tensor as input (otherwise, we would
         be taking a dict here).
+
+        Note: Currently the only thing this model does is looking up the trainable
+        embeddings. Other types of tabular models can be added later, with their own
+        layers.
         """
 
         super().__init__()
@@ -56,12 +60,10 @@ class TabularModel(nn.Module):
         emb_total_dim = con_total_dim = 0
         if self.embeddings_dict:
             emb_total_dim = attach_embeddings(self, self.embeddings_dict)
-        if con_columns:
+        if self.con_columns:
             con_total_dim = len(self.con_columns)
 
         self.input_dim = emb_total_dim + con_total_dim
-        if emb_total_dim or con_total_dim:
-            self.fc_extra = nn.Linear(self.input_dim, self.input_dim, bias=False)
 
     @property
     def num_out_features(self) -> int:
@@ -69,13 +71,10 @@ class TabularModel(nn.Module):
 
     @property
     def l1_penalized_weights(self) -> torch.Tensor:
-        return self.fc_extra.weight
+        return torch.cat([i for i in self.parameters()])
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
-
-        out = self.fc_extra(input)
-
-        return out
+        return input
 
 
 def set_up_embedding_dict(
@@ -113,7 +112,7 @@ def calc_embedding_dimension(n_categories: int) -> int:
 def get_tabular_inputs(
     extra_cat_columns: Sequence[str],
     extra_con_columns: Sequence[str],
-    tabular_model: TabularModel,
+    tabular_model: SimpleTabularModel,
     tabular_input: "al_training_labels_extra",
     device: str,
 ) -> Union[torch.Tensor, None]:
@@ -152,7 +151,7 @@ def get_tabular_inputs(
 def get_embeddings_from_labels(
     categorical_columns: Sequence[str],
     labels: Dict[str, Sequence[torch.Tensor]],
-    model: TabularModel,
+    model: SimpleTabularModel,
 ) -> torch.Tensor:
 
     """
@@ -182,7 +181,7 @@ def get_embeddings_from_labels(
 
 
 def lookup_embeddings(
-    model: TabularModel,
+    model: SimpleTabularModel,
     embedding_col: str,
     labels: Sequence[torch.Tensor],
 ) -> torch.Tensor:

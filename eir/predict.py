@@ -19,7 +19,6 @@ from torch import nn
 from torch.utils.data import DataLoader
 
 import eir.visualization.visualization_funcs as vf
-from eir.config.config import DataDimensions
 from eir.configuration import append_data_source_prefixes
 from eir.data_load import datasets, label_setup
 from eir.data_load.data_utils import get_target_columns_generator
@@ -48,11 +47,11 @@ from eir.train import (
     prepare_base_batch_default,
     Hooks,
     get_tabular_target_label_data,
-    get_tabular_inputs_label_data,
-    get_fusion_class_from_cl_args,
+    get_fusion_class,
     get_fusion_kwargs_from_cl_args,
     al_num_outputs_per_target,
 )
+from eir.setup.input_setup import get_tabular_inputs_label_data, DataDimensions
 from eir.train_utils.evaluation import PerformancePlotConfig
 from eir.train_utils.metrics import al_metric_record_dict, calculate_batch_metrics
 from eir.train_utils.utils import get_run_folder
@@ -471,7 +470,7 @@ def _get_fusion_model_class_and_kwargs_from_cl_args(
     omics_data_dimensions: Dict[str, DataDimensions],
 ) -> Tuple[Type[nn.Module], Dict[str, Any]]:
 
-    fusion_model_class = get_fusion_class_from_cl_args(
+    fusion_model_class = get_fusion_class(
         fusion_model_type=train_cl_args.fusion_model_type
     )
 

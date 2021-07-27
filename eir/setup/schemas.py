@@ -9,12 +9,14 @@ from eir.models.omics.omics_models import (
     CNNModel,
     LCLModel,
     SimpleLCLModel,
+    IdentityModel,
     CNNModelConfig,
     LCLModelConfig,
     MLPModelConfig,
     SimpleLCLModelConfig,
+    IdentityModelConfig,
 )
-from eir.models.tabular.tabular import TabularModel, TabularModelConfig
+from eir.models.tabular.tabular import SimpleTabularModel, TabularModelConfig
 
 al_input_configs = Sequence["InputConfig"]
 
@@ -28,6 +30,7 @@ al_model_configs = [
     Type[SimpleLCLModelConfig],
     Type[LCLModelConfig],
     Type[TabularModelConfig],
+    Type[IdentityModelConfig],
 ]
 
 al_models_classes = Union[
@@ -35,7 +38,8 @@ al_models_classes = Union[
     Type[MLPModel],
     Type[LCLModel],
     Type[SimpleLCLModel],
-    Type[TabularModel],
+    Type[SimpleTabularModel],
+    Type[IdentityModel],
 ]
 
 
@@ -62,7 +66,6 @@ class GlobalConfig:
     b1: float = 0.9
     b2: float = 0.99
     wd: float = 1e-04
-    fusion_model_type: Literal["default", "mgmoe"] = "default"
     memory_dataset: bool = False
     sample_interval: int = 200
     checkpoint_interval: Union[None, int] = None

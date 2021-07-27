@@ -15,22 +15,22 @@ from eir.data_load.datasets import al_datasets
     "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
 )
 def test_set_up_datasets(
-    create_test_cl_args,
+    create_test_config,
     create_test_data,
     parse_test_cl_args,
-    create_test_data_dimensions,
+    get_test_data_dimensions,
 ):
     c = create_test_data
     n_classes = len(c.target_classes)
-    data_dimensions = create_test_data_dimensions
+    data_dimensions = get_test_data_dimensions
 
-    cl_args = create_test_cl_args
+    cl_args = create_test_config
 
     target_labels, tabular_input_labels = train.get_target_and_tabular_input_labels(
-        cl_args=cl_args, custom_label_parsing_operations=None
+        configs=cl_args, custom_label_parsing_operations=None
     )
-    train_dataset, valid_dataset = datasets.set_up_datasets_from_cl_args(
-        cl_args=cl_args,
+    train_dataset, valid_dataset = datasets.set_up_datasets_from_configs(
+        configs=cl_args,
         data_dimensions=data_dimensions,
         target_labels=target_labels,
         tabular_inputs_labels=tabular_input_labels,
@@ -63,17 +63,17 @@ def _set_up_bad_label_file_for_testing(label_file: Path):
 
 @pytest.mark.parametrize("create_test_data", [{"task_type": "binary"}], indirect=True)
 def test_construct_dataset_init_params_from_cl_args(
-    args_config, create_test_data, create_test_labels, create_test_data_dimensions
+    test_config_base, create_test_data, create_test_labels, get_test_data_dimensions
 ):
 
     target_labels, tabular_input_labels = create_test_labels
-    data_dimensions = create_test_data_dimensions
+    data_dimensions = get_test_data_dimensions
 
-    args_config.target_con_columns = ["Height"]
-    args_config.extra_con_columns = ["BMI"]
+    test_config_base.target_con_columns = ["Height"]
+    test_config_base.extra_con_columns = ["BMI"]
 
     constructed_args = datasets.construct_default_dataset_kwargs_from_cl_args(
-        cl_args=args_config,
+        cl_args=test_config_base,
         target_labels_dict=target_labels.train_labels,
         data_dimensions=data_dimensions,
         tabular_labels_dict=tabular_input_labels.train_labels,
@@ -85,11 +85,12 @@ def test_construct_dataset_init_params_from_cl_args(
     assert "omics_test" in constructed_args["data_sources"]
 
     constructed_omics_sources_set = set(constructed_args["data_sources"].values())
-    passed_in_omics_sources = set(args_config.omics_sources)
+    passed_in_omics_sources = set(test_config_base.omics_sources)
     assert constructed_omics_sources_set == passed_in_omics_sources
 
     assert (
-        constructed_args["data_sources"]["omics_test"] == args_config.omics_sources[0]
+        constructed_args["data_sources"]["omics_test"]
+        == test_config_base.omics_sources[0]
     )
     assert "tabular_cl_args" not in constructed_args["data_sources"]
 
@@ -102,26 +103,26 @@ def test_construct_dataset_init_params_from_cl_args(
 )
 @pytest.mark.parametrize("dataset_type", ["memory", "disk"])
 @pytest.mark.parametrize(
-    "create_test_cl_args",
+    "create_test_config",
     [{"custom_cl_args": {"na_augment_perc": 0.05}}],
     indirect=True,
 )
 def test_datasets(
     dataset_type: str,
     create_test_data: pytest.fixture,
-    create_test_cl_args: pytest.fixture,
+    create_test_config,
     parse_test_cl_args,
-    create_test_data_dimensions,
+    get_test_data_dimensions,
 ):
     """
     We set `na_augment_perc` here to 0.0 as a safety guard against it having be set
-    in the defined args config. This is because the `check_dataset` currently assumes
+    in the defined args setup. This is because the `check_dataset` currently assumes
     no SNPs have been dropped out.
     """
     c = create_test_data
-    cl_args = create_test_cl_args
+    cl_args = create_test_config
     classes_tested = sorted(list(c.target_classes.keys()))
-    data_dimensions = create_test_data_dimensions
+    data_dimensions = get_test_data_dimensions
 
     if dataset_type == "disk":
         cl_args.memory_dataset = False
@@ -132,10 +133,10 @@ def test_datasets(
     valid_no_sample = int(len(classes_tested) * c.n_per_class * cl_args.valid_size)
 
     target_labels, tabular_input_labels = train.get_target_and_tabular_input_labels(
-        cl_args=cl_args, custom_label_parsing_operations=None
+        configs=cl_args, custom_label_parsing_operations=None
     )
-    train_dataset, valid_dataset = datasets.set_up_datasets_from_cl_args(
-        cl_args=cl_args,
+    train_dataset, valid_dataset = datasets.set_up_datasets_from_configs(
+        configs=cl_args,
         data_dimensions=data_dimensions,
         target_labels=target_labels,
         tabular_inputs_labels=tabular_input_labels,

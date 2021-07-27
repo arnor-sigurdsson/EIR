@@ -2,7 +2,7 @@ import pytest
 
 from eir.models import layers
 from eir.models.omics import models_cnn
-from eir.train import DataDimensions
+from eir.setup.input_setup import DataDimensions
 
 
 def test_make_conv_layers():
@@ -64,7 +64,7 @@ def test_get_cur_dilation(test_input, expected):
     "create_test_data", [{"task_type": "multi_task"}], indirect=True
 )
 @pytest.mark.parametrize(
-    "create_test_cl_args",
+    "create_test_config",
     [
         {  # Case 1: Check that we add and use extra inputs.
             "custom_cl_args": {
@@ -80,7 +80,7 @@ def test_get_cur_dilation(test_input, expected):
     indirect=True,
 )
 def test_cnn_model(
-    parse_test_cl_args, create_test_data, create_test_cl_args, create_test_model
+    parse_test_cl_args, create_test_data, create_test_config, create_test_model
 ):
     fusion_model = create_test_model
     cnn_model = fusion_model.modules_to_fuse["omics_test"]

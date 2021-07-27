@@ -8,6 +8,10 @@ import pytest
 import torch
 from sklearn.preprocessing import LabelEncoder
 
+import eir.setup.config
+import eir.models.omics.omics_models
+import eir.setup.input_setup
+import eir.train
 from eir import predict
 from eir import train
 from eir.data_load.label_setup import TabularFileInfo
@@ -17,18 +21,20 @@ from tests.conftest import cleanup
 from tests.test_data_load.test_datasets import check_dataset
 
 
-def test_load_model(args_config, tmp_path):
+def test_load_model(test_config_base, tmp_path):
     """
     We need `create_test_data` here because the create_test_model fixture depends on it
     down the line, and we need to pass in params for the subrequest in the
     `create_test_data` fixture definition.
     """
 
-    cl_args = args_config
+    cl_args = test_config_base
 
-    data_dimension = train.DataDimensions(channels=1, height=4, width=1000)
+    data_dimension = eir.setup.input_setup.DataDimensions(
+        channels=1, height=4, width=1000
+    )
     cnn_init_kwargs = get_omics_model_init_kwargs(
-        model_type="cnn", cl_args=cl_args, data_dimensions=data_dimension
+        model_type="cnn", model_config=cl_args, data_dimensions=data_dimension
     )
     model = CNNModel(**cnn_init_kwargs)
     model = model.to(device=cl_args.device)
@@ -118,7 +124,7 @@ def test_remove_keys_from_namespace(
 
 @pytest.mark.parametrize("create_test_data", [{"task_type": "multi"}], indirect=True)
 @pytest.mark.parametrize(
-    "create_test_cl_args",
+    "create_test_config",
     [
         {
             "custom_cl_args": {
@@ -131,13 +137,13 @@ def test_remove_keys_from_namespace(
     indirect=True,
 )
 def test_load_labels_for_predict(
-    create_test_data, create_test_datasets, create_test_cl_args, keep_outputs
+    create_test_data, create_test_datasets, create_test_config, keep_outputs
 ):
     """
     Note here we are treating the generated test data (i.e. by tests, not test-set-data)
     as the testing-set.
     """
-    cl_args = create_test_cl_args
+    cl_args = create_test_config
 
     run_path = Path(f"runs/{cl_args.run_name}/")
 
@@ -167,7 +173,7 @@ def test_load_labels_for_predict(
 
 @pytest.mark.parametrize("create_test_data", [{"task_type": "multi"}], indirect=True)
 @pytest.mark.parametrize(
-    "create_test_cl_args",
+    "create_test_config",
     [
         {"custom_cl_args": {"memory_dataset": True}},
         {"custom_cl_args": {"memory_dataset": False}},
@@ -175,12 +181,12 @@ def test_load_labels_for_predict(
     indirect=True,
 )
 def test_set_up_test_dataset(
-    create_test_data, create_test_cl_args, create_test_data_dimensions
+    create_test_data, create_test_config, get_test_data_dimensions
 ):
     test_data_config = create_test_data
     c = test_data_config
-    cl_args = create_test_cl_args
-    data_dimensions = create_test_data_dimensions
+    cl_args = create_test_config
+    data_dimensions = get_test_data_dimensions
     classes_tested = sorted(list(c.target_classes.keys()))
 
     test_ids = predict.gather_ids_from_tabular_file(file_path=Path(cl_args.label_file))
@@ -190,7 +196,7 @@ def test_set_up_test_dataset(
         tabular_info=tabular_info, ids_to_keep=test_ids
     )
 
-    target_column = create_test_cl_args.target_cat_columns[0]
+    target_column = create_test_config.target_cat_columns[0]
     mock_encoder = LabelEncoder().fit(["Asia", "Europe", "Africa"])
     transformers = {target_column: mock_encoder}
 
@@ -229,7 +235,7 @@ def grab_latest_model_path(saved_models_folder: Path):
     "create_test_data", [{"task_type": "multi", "split_to_test": True}], indirect=True
 )
 @pytest.mark.parametrize(
-    "create_test_cl_args",
+    "create_test_config",
     [
         {
             "custom_cl_args": {

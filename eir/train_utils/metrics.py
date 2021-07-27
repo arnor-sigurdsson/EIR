@@ -160,7 +160,7 @@ def calc_mcc(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
     return mcc
 
 
-def calc_roc_auc_ovr(
+def calc_roc_auc_ovo(
     outputs: np.ndarray, labels: np.ndarray, average: str = "macro", *args, **kwargs
 ) -> float:
     """
@@ -185,7 +185,7 @@ def calc_roc_auc_ovr(
     return roc_auc
 
 
-def calc_average_precision_ovr(
+def calc_average_precision(
     outputs: np.ndarray, labels: np.ndarray, average: str = "macro", *args, **kwargs
 ) -> float:
 
@@ -357,15 +357,32 @@ def hook_add_l1_loss(
     *args,
     **kwargs,
 ) -> Dict:
+    """
+    TODO: To the validation outside of the actual hook.
+    TODO: Use a combined iterator here for the fusion module and modules_to_fuse.
+    TODO: Convert all fusion modules to have their own L1 penalized weights.
+    """
     model_configs = experiment.inputs
 
     l1_loss = torch.tensor(0.0)
     for input_name, input_module in experiment.model.modules_to_fuse.items():
-        current_l1 = getattr(
-            model_configs[input_name].tabular_data_type_config, "l1", 0.0
-        )
-        cur_l1_loss = get_model_l1_loss(model=input_module, l1_weight=current_l1)
-        l1_loss += cur_l1_loss
+
+        current_l1 = getattr(model_configs[input_name], "l1", 0.0)
+        l1_weights = getattr(input_module, "l1_penalized_weights", None)
+        if current_l1 and not l1_weights:
+            raise AttributeError(
+                f"Module {input_module} for input name {input_name} does not have"
+                f"l1_penalized_weights attribute."
+            )
+
+        if l1_weights:
+            cur_l1_loss = get_model_l1_loss(model=input_module, l1_weight=current_l1)
+            l1_loss += cur_l1_loss
+
+    if hasattr(experiment.model, "l1_penalized_weights"):
+        fusion_l1 = experiment.model.model_config.l1
+        fusion_l1_loss = get_model_l1_loss(model=experiment.model, l1_weight=fusion_l1)
+        l1_loss += fusion_l1_loss
 
     updated_loss = state[loss_key] + l1_loss
 
@@ -541,10 +558,10 @@ def get_default_metrics(
     )
 
     roc_auc_macro = MetricRecord(
-        name="roc-auc-macro", function=calc_roc_auc_ovr, only_val=True
+        name="roc-auc-macro", function=calc_roc_auc_ovo, only_val=True
     )
     ap_macro = MetricRecord(
-        name="ap-macro", function=calc_average_precision_ovr, only_val=True
+        name="ap-macro", function=calc_average_precision, only_val=True
     )
     r2 = MetricRecord(name="r2", function=calc_r2, only_val=True)
     pcc = MetricRecord(name="pcc", function=calc_pcc, only_val=True)

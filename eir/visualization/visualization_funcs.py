@@ -248,7 +248,7 @@ def generate_binary_roc_curve(
 ):
     y_true_bin = label_binarize(y_true, classes=[0, 1])
     fpr, tpr, _ = roc_curve(y_true_bin, y_outp[:, 1])
-    roc_auc = metrics.calc_roc_auc_ovr(outputs=y_outp, labels=y_true)
+    roc_auc = metrics.calc_roc_auc_ovo(outputs=y_outp, labels=y_true)
 
     plt.plot(fpr, tpr, lw=2, label=f"(area = {roc_auc:0.4g})")
 
@@ -275,9 +275,7 @@ def generate_binary_pr_curve(
 ):
     y_true_bin = label_binarize(y_true, classes=[0, 1])
     precision, recall, _ = precision_recall_curve(y_true_bin, y_outp[:, 1])
-    average_precision = metrics.calc_average_precision_ovr(
-        outputs=y_outp, labels=y_true
-    )
+    average_precision = metrics.calc_average_precision(outputs=y_outp, labels=y_true)
 
     plt.step(
         recall,
@@ -310,7 +308,7 @@ def generate_binary_prediction_distribution(
 ):
     y_true_bin = label_binarize(y_true, classes=[0, 1])
     fpr, tpr, _ = roc_curve(y_true_bin, y_outp[:, 1])
-    roc_auc = metrics.calc_roc_auc_ovr(outputs=y_outp, labels=y_true)
+    roc_auc = metrics.calc_roc_auc_ovo(outputs=y_outp, labels=y_true)
 
     classes = transformer.classes_
     fig, ax = plt.subplots()
@@ -377,10 +375,10 @@ def generate_multi_class_roc_curve(
 
     fpr["macro"] = all_fpr
     tpr["macro"] = mean_tpr
-    roc_auc_macro = metrics.calc_roc_auc_ovr(
+    roc_auc_macro = metrics.calc_roc_auc_ovo(
         outputs=y_outp, labels=y_true, average="macro"
     )
-    roc_auc_micro = metrics.calc_roc_auc_ovr(
+    roc_auc_micro = metrics.calc_roc_auc_ovo(
         outputs=y_outp, labels=y_true, average="micro"
     )
 
@@ -457,7 +455,7 @@ def generate_multi_class_pr_curve(
     precision["micro"], recall["micro"], _ = precision_recall_curve(
         y_true_bin.ravel(), y_outp.ravel()
     )
-    average_precision_micro = metrics.calc_average_precision_ovr(
+    average_precision_micro = metrics.calc_average_precision(
         outputs=y_outp, labels=y_true, average="micro"
     )
 

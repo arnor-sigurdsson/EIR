@@ -7,6 +7,11 @@ from torch.optim import SGD
 from torch.optim.adamw import AdamW
 from torch.utils.data import WeightedRandomSampler, SequentialSampler, RandomSampler
 
+import eir.data_load.data_utils
+import eir.setup.config
+import eir.models.omics.omics_models
+import eir.setup.input_setup
+import eir.train
 from eir import train
 from eir.data_load import label_setup
 from eir.models.fusion import FusionModel
@@ -40,30 +45,30 @@ def test_prepare_run_folder_fail(patched_get_run_folder, tmp_path):
 
 
 @pytest.mark.parametrize("create_test_data", [{"task_type": "multi"}], indirect=True)
-def test_get_train_sampler(args_config, create_test_data, create_test_datasets):
-    cl_args = args_config
+def test_get_train_sampler(test_config_base, create_test_data, create_test_datasets):
+    cl_args = test_config_base
     train_dataset, *_ = create_test_datasets
     cl_args.weighted_sampling_columns = ["Origin"]
 
-    test_sampler = train.get_train_sampler(
+    test_sampler = eir.data_load.data_utils.get_train_sampler(
         columns_to_sample=cl_args.weighted_sampling_columns, train_dataset=train_dataset
     )
     assert isinstance(test_sampler, WeightedRandomSampler)
 
     cl_args.weighted_sampling_columns = None
-    test_sampler = train.get_train_sampler(
+    test_sampler = eir.data_load.data_utils.get_train_sampler(
         columns_to_sample=cl_args.weighted_sampling_columns, train_dataset=train_dataset
     )
     assert test_sampler is None
 
 
 @pytest.mark.parametrize("create_test_data", [{"task_type": "multi"}], indirect=True)
-def test_get_dataloaders(create_test_cl_args, create_test_data, create_test_datasets):
-    cl_args = create_test_cl_args
+def test_get_dataloaders(create_test_config, create_test_data, create_test_datasets):
+    cl_args = create_test_config
     cl_args.weighted_sampling_columns = ["Origin"]
 
     train_dataset, valid_dataset = create_test_datasets
-    train_sampler = train.get_train_sampler(
+    train_sampler = eir.data_load.data_utils.get_train_sampler(
         columns_to_sample=cl_args.weighted_sampling_columns, train_dataset=train_dataset
     )
 
@@ -93,7 +98,7 @@ def _modify_bs_for_multi_gpu():
         assert train._modify_bs_for_multi_gpu(False, 32) == 64
 
 
-def test_get_optimizer(args_config):
+def test_get_optimizer(test_config_base):
     class FakeModel(nn.Module):
         def __init__(self):
             super().__init__()
@@ -105,33 +110,35 @@ def test_get_optimizer(args_config):
 
     model = FakeModel()
 
-    args_config.optimizer = "adamw"
+    test_config_base.optimizer = "adamw"
     adamw_optimizer = optimizers.get_optimizer(
-        model=model, loss_callable=lambda x: x, cl_args=args_config
+        model=model, loss_callable=lambda x: x, global_config=test_config_base
     )
     assert isinstance(adamw_optimizer, AdamW)
 
-    args_config.optimizer = "sgdm"
+    test_config_base.optimizer = "sgdm"
     sgdm_optimizer = optimizers.get_optimizer(
-        model=model, loss_callable=lambda x: x, cl_args=args_config
+        model=model, loss_callable=lambda x: x, global_config=test_config_base
     )
     assert isinstance(sgdm_optimizer, SGD)
     assert sgdm_optimizer.param_groups[0]["momentum"] == 0.9
 
 
-def test_get_model(args_config):
+def test_get_model(test_config_base):
 
     # TODO: Refactor checking of fc_3 into separate test.
 
-    args_config.model_type = "cnn"
+    test_config_base.model_type = "cnn"
     num_outputs_per_target_dict = {"Origin": 10, "Height": 1}
 
     data_dimensions = {
-        "omics_test": train.DataDimensions(channels=1, height=4, width=1000)
+        "omics_test": eir.setup.input_setup.DataDimensions(
+            channels=1, height=4, width=1000
+        )
     }
 
-    cnn_fusion_model = train.get_model_from_cl_args(
-        cl_args=args_config,
+    cnn_fusion_model = train.get_model(
+        global_config=test_config_base,
         omics_data_dimensions=data_dimensions,
         num_outputs_per_target=num_outputs_per_target_dict,
         tabular_label_transformers=None,
@@ -142,9 +149,9 @@ def test_get_model(args_config):
     assert cnn_fusion_model.multi_task_branches["Height"][-1][-1].out_features == 1
     assert isinstance(cnn_fusion_model.modules_to_fuse["omics_test"], CNNModel)
 
-    args_config.model_type = "mlp"
-    mlp_fusion_model = train.get_model_from_cl_args(
-        cl_args=args_config,
+    test_config_base.model_type = "mlp"
+    mlp_fusion_model = train.get_model(
+        global_config=test_config_base,
         omics_data_dimensions=data_dimensions,
         num_outputs_per_target=num_outputs_per_target_dict,
         tabular_label_transformers=None,

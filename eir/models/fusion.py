@@ -30,11 +30,9 @@ def default_fuse_features(features: Sequence[torch.Tensor]) -> torch.Tensor:
     return torch.cat(tuple(features), dim=1)
 
 
-# TODO: Is this needed when we have the predictor config? Why not inherit from that?
-#       Have here perhaps only fusion specific settings?
 @dataclass
 class FusionModelConfig:
-    layers: List[int] = field(default_factory=lambda x: [2, 2])
+    layers: List[int] = field(default_factory=lambda: [2])
 
     fc_task_dim: int = 32
 
@@ -69,7 +67,7 @@ class FusionModel(nn.Module):
         cur_dim = sum(i.num_out_features for i in self.modules_to_fuse.values())
 
         multi_task_branches = create_multi_task_blocks_with_first_adaptor_block(
-            num_blocks=self.model_config.layers[-1],
+            num_blocks=self.model_config.layers[0],
             branch_names=task_names,
             block_constructor=MLPResidualBlock,
             block_constructor_kwargs=task_resblocks_kwargs,

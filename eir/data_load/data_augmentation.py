@@ -11,7 +11,7 @@ from eir.data_load.data_utils import Batch
 from eir.data_load.label_setup import al_target_columns
 
 if TYPE_CHECKING:
-    from train import al_training_labels_target, al_criterions, Config
+    from eir.train import al_training_labels_target, al_criterions, Experiment
 
 al_target_values = Union[torch.LongTensor, torch.Tensor]
 al_int_tensors = Union[
@@ -42,16 +42,18 @@ def get_mix_data_hook(mixing_type: str):
 
 
 def hook_default_mix_data(
-    config: "Config", state: Dict, mixing_func: Callable, *args, **kwargs
+    experiment: "Experiment", state: Dict, mixing_func: Callable, *args, **kwargs
 ) -> Dict:
+
+    gc = experiment.configs.global_config
 
     batch = state["batch"]
 
     mixing_info = get_mixing_info(
-        mixing_alpha=config.cl_args.mixing_alpha,
-        batch_size=config.cl_args.batch_size,
+        mixing_alpha=gc.mixing_alpha,
+        batch_size=gc.batch_size,
         target_labels=batch.target_labels,
-        target_columns=config.target_columns,
+        target_columns=experiment.target_columns,
     )
 
     mixed_inputs = {}
@@ -124,11 +126,11 @@ def _sample_lambda(mixing_alpha: float) -> float:
     return lambda_
 
 
-def hook_mix_loss(config: "Config", state: Dict, *args, **kwargs) -> Dict:
+def hook_mix_loss(experiment: "Experiment", state: Dict, *args, **kwargs) -> Dict:
 
     mixed_losses = calc_all_mixed_losses(
-        target_columns=config.target_columns,
-        criterions=config.criterions,
+        target_columns=experiment.target_columns,
+        criterions=experiment.criterions,
         outputs=state["model_outputs"],
         mixed_object=state["mixing_info"],
     )

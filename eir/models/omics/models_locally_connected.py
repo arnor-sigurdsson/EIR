@@ -12,7 +12,7 @@ from torch import nn
 from eir.models.layers import SplitLinear, SplitMLPResidualBlock
 
 if TYPE_CHECKING:
-    from eir.config.config import DataDimensions
+    from eir.setup.input_setup import DataDimensions
 
 logger = get_logger(__name__)
 
@@ -20,17 +20,19 @@ logger = get_logger(__name__)
 @dataclass
 class SimpleLCLModelConfig:
 
-    data_dimensions: "DataDimensions"
     fc_repr_dim: int = 12
     split_mlp_num_splits: int = 64
     l1: float = 0.00
 
 
 class SimpleLCLModel(nn.Module):
-    def __init__(self, model_config: SimpleLCLModelConfig):
+    def __init__(
+        self, model_config: SimpleLCLModelConfig, data_dimensions: "DataDimensions"
+    ):
         super().__init__()
 
         self.model_config = model_config
+        self.data_dimensions = data_dimensions
 
         num_chunks = self.model_config.split_mlp_num_splits
         self.fc_0 = SplitLinear(
@@ -44,7 +46,7 @@ class SimpleLCLModel(nn.Module):
 
     @property
     def fc_1_in_features(self) -> int:
-        return self.model_config.data_dimensions.num_elements()
+        return self.data_dimensions.num_elements()
 
     @property
     def l1_penalized_weights(self) -> torch.Tensor:
@@ -67,7 +69,6 @@ class SimpleLCLModel(nn.Module):
 
 @dataclass
 class LCLModelConfig:
-    data_dimensions: "DataDimensions"
 
     layers: Union[None, List[int]] = None
 
@@ -77,7 +78,6 @@ class LCLModelConfig:
     channel_exp_base: int = 2
     first_channel_expansion: int = 1
 
-    fc_repr_dim: int = 32
     split_mlp_num_splits: Union[None, int] = None
 
     rb_do: float = 0.00
@@ -87,10 +87,11 @@ class LCLModelConfig:
 
 
 class LCLModel(nn.Module):
-    def __init__(self, model_config: LCLModelConfig):
+    def __init__(self, model_config: LCLModelConfig, data_dimensions: "DataDimensions"):
         super().__init__()
 
         self.model_config = model_config
+        self.data_dimensions = data_dimensions
 
         fc_0_split_size = calc_value_after_expansion(
             base=self.model_config.kernel_width,
@@ -123,7 +124,7 @@ class LCLModel(nn.Module):
 
     @property
     def fc_1_in_features(self) -> int:
-        return self.model_config.data_dimensions.num_elements()
+        return self.data_dimensions.num_elements()
 
     @property
     def l1_penalized_weights(self) -> torch.Tensor:
@@ -198,7 +199,7 @@ class LCParameterSpec:
 
 def _get_split_blocks(
     split_parameter_spec: LCParameterSpec,
-    block_layer_spec: Sequence[int],
+    block_layer_spec: Union[None, Sequence[int]],
 ) -> nn.Sequential:
     factory = _get_split_block_factory(block_layer_spec=block_layer_spec)
 
@@ -210,7 +211,7 @@ def _get_split_blocks(
 def _get_split_block_factory(
     block_layer_spec: Sequence[int],
 ) -> Callable[[LCParameterSpec], nn.Sequential]:
-    if len(block_layer_spec) == 1:
+    if not block_layer_spec:
         return generate_split_resblocks_auto
 
     auto_factory = partial(

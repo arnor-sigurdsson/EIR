@@ -40,7 +40,7 @@ from eir.visualization import visualization_funcs as vf
 if TYPE_CHECKING:
     from eir.train import Experiment
     from eir.train_utils.metrics import al_step_metric_dict
-    from eir.config.config import Configs
+    from eir.setup.config import Configs
 
 # Aliases
 al_handler_and_event = Tuple[Callable[[Engine, "HandlerConfig"], None], Events]

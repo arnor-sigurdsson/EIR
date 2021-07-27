@@ -11,14 +11,13 @@ from torch import nn
 from eir.models.layers import FirstCNNBlock, SelfAttention, CNNResidualBlock
 
 if TYPE_CHECKING:
-    from eir.config.config import DataDimensions
+    from eir.setup.input_setup import DataDimensions
 
 logger = get_logger(__name__)
 
 
 @dataclass
 class CNNModelConfig:
-    data_dimensions: "DataDimensions"
 
     layers: Union[None, List[int]] = None
 
@@ -41,15 +40,22 @@ class CNNModelConfig:
 
 
 class CNNModel(nn.Module):
-    def __init__(self, model_config: CNNModelConfig):
+    def __init__(self, model_config: CNNModelConfig, data_dimensions: "DataDimensions"):
         # TODO: Make work for heights, this means modifying stuff in layers.py
         super().__init__()
 
         self.model_config = model_config
-        self.conv = nn.Sequential(*_make_conv_layers(self.resblocks, self.model_config))
+        self.data_dimensions = data_dimensions
+        self.conv = nn.Sequential(
+            *_make_conv_layers(
+                residual_blocks=self.resblocks,
+                cnn_model_configuration=self.model_config,
+                data_dimensions=self.data_dimensions,
+            )
+        )
 
         self.data_size_after_conv = pytorch_utils.calc_size_after_conv_sequence(
-            self.model_config.data_dimensions.width, self.conv
+            self.data_dimensions.width, self.conv
         )
         self.no_out_channels = self.conv[-1].out_channels
 
@@ -92,7 +98,7 @@ class CNNModel(nn.Module):
     def resblocks(self) -> List[int]:
         if not self.model_config.layers:
             residual_blocks = find_no_cnn_resblocks_needed(
-                self.model_config.data_dimensions.width,
+                self.data_dimensions.width,
                 self.model_config.down_stride,
                 self.model_config.first_stride_expansion,
             )
@@ -115,7 +121,9 @@ class CNNModel(nn.Module):
 
 
 def _make_conv_layers(
-    residual_blocks: List[int], cnn_model_configuration: CNNModelConfig
+    residual_blocks: List[int],
+    cnn_model_configuration: CNNModelConfig,
+    data_dimensions: "DataDimensions",
 ) -> List[nn.Module]:
     """
     Used to set up the convolutional layers for the model. Based on the passed in
@@ -141,7 +149,7 @@ def _make_conv_layers(
     first_conv_stride = down_stride_w * mc.first_stride_expansion
 
     first_kernel, first_pad = pytorch_utils.calc_conv_params_needed(
-        input_width=mc.data_dimensions.width,
+        input_width=data_dimensions.width,
         kernel_size=first_conv_kernel,
         stride=first_conv_stride,
         dilation=1,
@@ -149,9 +157,9 @@ def _make_conv_layers(
 
     conv_blocks = [
         FirstCNNBlock(
-            in_channels=cnn_model_configuration.data_dimensions.channels,
+            in_channels=data_dimensions.channels,
             out_channels=first_conv_channels,
-            conv_1_kernel_h=cnn_model_configuration.data_dimensions.height,
+            conv_1_kernel_h=data_dimensions.height,
             conv_1_kernel_w=first_kernel,
             conv_1_padding=first_pad,
             down_stride_w=first_conv_stride,
@@ -168,6 +176,7 @@ def _make_conv_layers(
                 layer_arch_idx=layer_arch_idx,
                 down_stride=down_stride_w,
                 cnn_config=cnn_model_configuration,
+                data_dimensions=data_dimensions,
             )
 
             if mc.sa and cur_width < 1024 and not sa_added:
@@ -185,12 +194,13 @@ def _get_conv_resblock(
     layer_arch_idx: int,
     down_stride: int,
     cnn_config: CNNModelConfig,
+    data_dimensions: "DataDimensions",
 ) -> Tuple[CNNResidualBlock, int]:
     mc = cnn_config
 
     cur_conv = nn.Sequential(*conv_blocks)
     cur_width = pytorch_utils.calc_size_after_conv_sequence(
-        input_width=mc.data_dimensions.width, conv_sequence=cur_conv
+        input_width=data_dimensions.width, conv_sequence=cur_conv
     )
 
     cur_kern, cur_padd = pytorch_utils.calc_conv_params_needed(

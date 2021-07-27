@@ -133,7 +133,7 @@ def create_test_column_ops():
 
 
 @pytest.mark.parametrize(
-    "create_test_cl_args",
+    "create_test_config",
     [
         {
             "custom_cl_args": {
@@ -152,10 +152,10 @@ def create_test_column_ops():
     "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
 )
 def test_set_up_train_and_valid_tabular_data(
-    parse_test_cl_args, create_test_data, create_test_cl_args
+    parse_test_cl_args, create_test_data, create_test_config
 ):
     c = create_test_data
-    cl_args = create_test_cl_args
+    cl_args = create_test_config
     n_classes = len(c.target_classes)
 
     target_labels = get_split_labels(
@@ -294,7 +294,7 @@ def test_transform_all_labels_in_sample_with_extra_con(
 
 
 @pytest.mark.parametrize(
-    "create_test_cl_args",
+    "create_test_config",
     [
         {
             "custom_cl_args": {
@@ -311,10 +311,10 @@ def test_transform_all_labels_in_sample_with_extra_con(
 )
 @pytest.mark.parametrize("create_test_data", [{"task_type": "binary"}], indirect=True)
 def test_label_df_parse_wrapper(
-    parse_test_cl_args, create_test_data, create_test_cl_args
+    parse_test_cl_args, create_test_data, create_test_config
 ):
     c = create_test_data
-    cl_args = create_test_cl_args
+    cl_args = create_test_config
     test_target_column = cl_args.target_cat_columns[0]  # Origin
 
     target_label_info = get_tabular_label_data(cl_args=cl_args, label_filter=["target"])
@@ -447,14 +447,18 @@ def test_get_array_path_iterator_fail(create_test_data):
     ],
 )
 def test_get_all_label_columns_and_dtypes(
-    test_input_args, expected, args_config, create_test_column_ops
+    test_input_args, expected, test_config_base, create_test_column_ops
 ):
 
     for key, columns in test_input_args.items():
-        setattr(args_config, key, columns)
+        setattr(test_config_base, key, columns)
 
-    cat_columns = args_config.target_cat_columns + args_config.extra_cat_columns
-    con_columns = args_config.target_con_columns + args_config.extra_con_columns
+    cat_columns = (
+        test_config_base.target_cat_columns + test_config_base.extra_cat_columns
+    )
+    con_columns = (
+        test_config_base.target_con_columns + test_config_base.extra_con_columns
+    )
 
     columns, dtypes = label_setup._get_all_label_columns_and_dtypes(
         cat_columns=cat_columns,
@@ -501,10 +505,10 @@ def test_get_all_label_columns_and_dtypes(
     ],
 )
 def test_get_label_columns_from_cl_args(
-    test_input_args, expected, args_config, create_test_column_ops
+    test_input_args, expected, test_config_base, create_test_column_ops
 ):
     for key, columns in test_input_args.items():
-        setattr(args_config, key, columns)
+        setattr(test_config_base, key, columns)
 
 
 @pytest.mark.parametrize(
@@ -949,8 +953,8 @@ def test_check_parsed_label_df_fail(
 @pytest.mark.parametrize(
     "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
 )
-def test_split_df_by_ids(create_test_data, create_test_cl_args):
-    cl_args = create_test_cl_args
+def test_split_df_by_ids(create_test_data, create_test_config):
+    cl_args = create_test_config
 
     target_label_info = get_tabular_label_data(
         cl_args=cl_args, label_filter=["target", "extra"]
@@ -983,8 +987,8 @@ def test_split_df_by_ids(create_test_data, create_test_cl_args):
 @pytest.mark.parametrize(
     "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
 )
-def test_split_ids(create_test_data, create_test_cl_args):
-    cl_args = create_test_cl_args
+def test_split_ids(create_test_data, create_test_config):
+    cl_args = create_test_config
 
     target_label_info = get_tabular_label_data(
         cl_args=cl_args, label_filter=["target", "extra"]

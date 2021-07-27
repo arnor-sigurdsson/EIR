@@ -6,21 +6,60 @@ import pandas as pd
 import pytest
 
 from eir import train
+from eir.setup.config import get_all_targets, Configs
 from tests.conftest import cleanup, ModelTestConfig
 
 
 @pytest.mark.parametrize(
-    "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
-)
-@pytest.mark.parametrize(
-    "create_test_cl_args",
+    "create_test_data",
     [
-        {"custom_cl_args": {"model_type": "mlp", "lr": 1e-03}},
-        {"custom_cl_args": {"model_type": "cnn", "lr": 1e-03, "fc_do": 0.25}},
+        {"task_type": "binary"},
+        {"task_type": "multi"},
     ],
     indirect=True,
 )
-def test_classification_nonlinear(keep_outputs, prep_modelling_test_configs):
+@pytest.mark.parametrize(
+    "create_test_config_init_base",
+    [
+        # Case 1: MLP
+        {
+            "injections": {
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "input_type_info": {"model_type": "mlp"},
+                    }
+                ],
+            },
+        },
+        # Case 2: CNN
+        {
+            "injections": {
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "input_type_info": {"model_type": "cnn"},
+                        "model_config": {"rb_do": 0.25},
+                    }
+                ],
+            },
+        },
+        # Case 3: Linear
+        {
+            "injections": {
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "input_type_info": {"model_type": "identity"},
+                    },
+                ],
+                "predictor_configs": {"model_type": "linear"},
+            },
+        },
+    ],
+    indirect=True,
+)
+def test_classification(keep_outputs, prep_modelling_test_configs):
     """
     NOTE:
         We probably cannot check directly if the gradients for a given SNP
@@ -37,11 +76,11 @@ def test_classification_nonlinear(keep_outputs, prep_modelling_test_configs):
         The indirect parametrization passes the arguments over to the fixtures used
         in _prep_modelling_test_config.
     """
-    config, test_config = prep_modelling_test_configs
+    experiment, test_config = prep_modelling_test_configs
 
-    train.train(config)
+    train.train(experiment)
 
-    target_column = config.cl_args.target_cat_columns[0]
+    target_column = experiment.configs.target_configs[0].target_cat_columns[0]
 
     _check_test_performance_results(
         run_path=test_config.run_path,
@@ -56,39 +95,6 @@ def test_classification_nonlinear(keep_outputs, prep_modelling_test_configs):
         target_column=target_column,
         top_row_grads_dict=top_row_grads_dict,
         at_least_n=8,
-    )
-
-    if not keep_outputs:
-        cleanup(test_config.run_path)
-
-
-@pytest.mark.parametrize("create_test_data", [{"task_type": "binary"}], indirect=True)
-@pytest.mark.parametrize(
-    "create_test_cl_args", [{"custom_cl_args": {"model_type": "linear"}}], indirect=True
-)
-def test_classification_linear(keep_outputs, prep_modelling_test_configs):
-    """
-    Largely duplicated from `test_classification_nonlinear` as currently linear model
-    only support regression or binary classification.
-    """
-    config, test_config = prep_modelling_test_configs
-
-    train.train(config)
-
-    target_column = config.cl_args.target_cat_columns[0]
-
-    _check_test_performance_results(
-        run_path=test_config.run_path,
-        target_column=target_column,
-        metric="mcc",
-        thresholds=(0.8, 0.8),
-    )
-
-    top_row_grads_dict = {"Asia": [0] * 10, "Europe": [1] * 10, "Africa": [2] * 10}
-    _check_snps_wrapper(
-        test_config=test_config,
-        target_column=target_column,
-        top_row_grads_dict=top_row_grads_dict,
     )
 
     if not keep_outputs:
@@ -119,53 +125,94 @@ def _check_snps_wrapper(
     "create_test_data", [{"task_type": "regression"}], indirect=True
 )
 @pytest.mark.parametrize(
-    "create_test_cl_args",
+    "create_test_config_init_base",
     [
+        # Case 1: Linear
         {
-            "custom_cl_args": {
-                "model_type": "linear",
-                "lr": 1e-03,
-                "target_cat_columns": [],
-                "target_con_columns": ["Height"],
-            }
+            "injections": {
+                "global_configs": {"lr": 1e-03},
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "input_type_info": {"model_type": "identity"},
+                    },
+                ],
+                "predictor_configs": {
+                    "model_type": "linear",
+                    "model_config": {"l1": 5e-03},
+                },
+                "target_configs": {
+                    "target_cat_columns": [],
+                    "target_con_columns": ["Height"],
+                },
+            },
         },
+        # Case 2: CNN
         {
-            "custom_cl_args": {
-                "model_type": "cnn",
-                "target_cat_columns": [],
-                "target_con_columns": ["Height"],
-            }
+            "injections": {
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "input_type_info": {"model_type": "cnn"},
+                        "model_config": {"channel_exp_base": 5, "rb_do": 0.2},
+                    },
+                ],
+                "target_configs": {
+                    "target_cat_columns": [],
+                    "target_con_columns": ["Height"],
+                },
+            },
         },
+        # Case 3: MLP
         {
-            "custom_cl_args": {
-                "model_type": "mlp",
-                "target_cat_columns": [],
-                "target_con_columns": ["Height"],
-            }
+            "injections": {
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "input_type_info": {"model_type": "mlp"},
+                    },
+                ],
+                "target_configs": {
+                    "target_cat_columns": [],
+                    "target_con_columns": ["Height"],
+                },
+            },
         },
+        # Case 4: CNN Cycle
         {
-            "custom_cl_args": {
-                "model_type": "cnn",
-                "target_cat_columns": [],
-                "target_con_columns": ["Height"],
-                "n_epochs": 10,
-                "lr_schedule": "cycle",
-                "run_name": "test_cycle",
-            }
+            "injections": {
+                "global_configs": {
+                    "lr_schedule": "cycle",
+                    "run_name": "test_lr-cycle",
+                },
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "input_type_info": {"model_type": "cnn"},
+                    },
+                ],
+                "target_configs": {
+                    "target_cat_columns": [],
+                    "target_con_columns": ["Height"],
+                },
+            },
         },
     ],
     indirect=True,
 )
 def test_regression(keep_outputs, prep_modelling_test_configs):
-    config, test_config = prep_modelling_test_configs
+    experiment, test_config = prep_modelling_test_configs
 
-    train.train(config)
+    train.train(experiment)
 
-    target_column = config.cl_args.target_con_columns[0]
+    target_column = experiment.configs.target_configs[0].target_con_columns[0]
+    model_type = (
+        experiment.configs.input_configs[0].input_type_info.model_type == "linear"
+    )
 
     # linear regression performs slightly worse, but we don't want to lower expectations
     # other models
-    thresholds = (0.70, 0.70) if config.cl_args.model_type == "linear" else (0.8, 0.8)
+    thresholds = (0.70, 0.70) if model_type == "linear" else (0.8, 0.8)
     _check_test_performance_results(
         run_path=test_config.run_path,
         target_column=target_column,
@@ -210,100 +257,182 @@ def _check_test_performance_results(
     "create_test_data", [{"task_type": "multi_task"}], indirect=True
 )
 @pytest.mark.parametrize(
-    "create_test_cl_args",
+    "create_test_config_init_base",
     [
-        {  # Case 0: Check that we add and use extra inputs.
-            "custom_cl_args": {
-                "model_type": "cnn",
-                "target_cat_columns": ["Origin"],
-                "extra_con_columns": ["ExtraTarget"],
-                "extra_cat_columns": ["OriginExtraCol"],
-                "target_con_columns": ["Height"],
-                "run_name": "extra_inputs",
-            }
+        # Case 0: Check that we add and use extra inputs.
+        {
+            "injections": {
+                "global_configs": {
+                    "run_name": "extra_inputs",
+                },
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "input_type_info": {"model_type": "cnn"},
+                    },
+                    {
+                        "input_info": {"input_name": "test_tabular"},
+                        "input_type_info": {
+                            "model_type": "tabular",
+                            "extra_cat_columns": ["OriginExtraCol"],
+                            "extra_con_columns": ["ExtraTarget"],
+                        },
+                    },
+                ],
+                "target_configs": {
+                    "target_cat_columns": ["Origin"],
+                    "target_con_columns": ["Height"],
+                },
+            },
         },
-        {  # Case 1: Normal multi task with CNN
-            "custom_cl_args": {
-                "model_type": "cnn",
-                "target_cat_columns": ["Origin"],
-                "target_con_columns": ["Height", "ExtraTarget"],
-            }
+        # Case 1: Normal multi task with CNN
+        {
+            "injections": {
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "input_type_info": {"model_type": "cnn"},
+                        "model_config": {"channel_exp_base": 4},
+                    },
+                ],
+                "target_configs": {
+                    "target_cat_columns": ["Origin"],
+                    "target_con_columns": ["Height", "ExtraTarget"],
+                },
+            },
         },
-        {  # Case 2: Normal multi task with MLP, note we have to reduce the LR for
-            # stability and add L1 for regularization
-            "custom_cl_args": {
-                "model_type": "mlp",
-                "l1": 1e-3,
-                "lr": 1e-3,
-                "target_cat_columns": ["Origin"],
-                "target_con_columns": ["Height", "ExtraTarget"],
-            }
+        # Case 2:  Normal multi task with MLP, note we have to reduce the LR for
+        # stability and add L1 for regularization
+        {
+            "injections": {
+                "global_configs": {"lr": 1e-03},
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "input_type_info": {"model_type": "mlp"},
+                        "model_config": {"l1": 1e-03},
+                    },
+                ],
+                "target_configs": {
+                    "target_cat_columns": ["Origin"],
+                    "target_con_columns": ["Height", "ExtraTarget"],
+                },
+            },
         },
-        {  # Case 3: Using the split model
-            "custom_cl_args": {
-                "model_type": "mlp-split",
-                "l1": 1e-3,
-                "lr": 1e-3,
-                "fc_repr_dim": 8,
-                "split_mlp_num_splits": 64,
-                "target_cat_columns": ["Origin"],
-                "target_con_columns": ["Height", "ExtraTarget"],
-            }
+        # Case 3: Using the Simple LCL model
+        {
+            "injections": {
+                "global_configs": {"lr": 1e-03},
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "input_type_info": {"model_type": "mlp-split"},
+                        "model_config": {"fc_repr_dim": 8, "split_mlp_num_splits": 64},
+                    },
+                ],
+                "target_configs": {
+                    "target_cat_columns": ["Origin"],
+                    "target_con_columns": ["Height", "ExtraTarget"],
+                },
+            },
         },
-        {  # Case 4: Using GLN
-            "custom_cl_args": {
-                "model_type": "genome-local-net",
-                "lr": 1e-3,
-                "kernel_width": 8,
-                "channel_exp_base": 2,
-                "layers": [1],
-                "n_epochs": 6,
-                "target_cat_columns": ["Origin"],
-                "target_con_columns": ["Height", "ExtraTarget"],
-            }
+        # Case 4: Using the GLN
+        {
+            "injections": {
+                "global_configs": {
+                    "lr": 1e-03,
+                },
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "input_type_info": {"model_type": "genome-local-net"},
+                        "model_config": {
+                            "kernel_width": 8,
+                            "channel_exp_base": 2,
+                            "l1": 1e-04,
+                            "rb_do": 0.20,
+                        },
+                    },
+                ],
+                "target_configs": {
+                    "target_cat_columns": ["Origin"],
+                    "target_con_columns": ["Height", "ExtraTarget"],
+                },
+            },
         },
-        {  # Case 5: MGMOE
-            "custom_cl_args": {
-                "fusion_model_type": "mgmoe",
-                "model_type": "mlp-split",
-                "lr": 1e-3,
-                "fc_repr_dim": 8,
-                "split_mlp_num_splits": 64,
-                "run_name": "test_mgmoe_fusion",
-                "target_cat_columns": ["Origin"],
-                "target_con_columns": ["Height", "ExtraTarget"],
-            }
+        # Case 5: Using the MGMoE fusion
+        {
+            "injections": {
+                "global_configs": {
+                    "run_name": "mgmoe",
+                    "lr": 1e-03,
+                },
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "input_type_info": {"model_type": "genome-local-net"},
+                        "model_config": {
+                            "kernel_width": 8,
+                            "channel_exp_base": 2,
+                            "l1": 1e-03,
+                        },
+                    },
+                ],
+                "predictor_configs": {
+                    "model_type": "mgmoe",
+                    "model_config": {"mg_num_experts": 2},
+                },
+                "target_configs": {
+                    "target_cat_columns": ["Origin"],
+                    "target_con_columns": ["Height", "ExtraTarget"],
+                },
+            },
         },
-        {  # Case 6: GLN with mixing
-            "custom_cl_args": {
-                "model_type": "genome-local-net",
-                "lr": 1e-3,
-                "kernel_width": 8,
-                "channel_exp_base": 2,
-                "mixing_type": "cutmix-uniform",
-                "layers": [1],
-                "mixing_alpha": 1.0,
-                "n_epochs": 12,
-                "target_cat_columns": ["Origin"],
-                "run_name": "test-mixing",
-                "target_con_columns": ["Height", "ExtraTarget"],
-            }
+        # Case 6: Using the GLN with mixing
+        {
+            "injections": {
+                "global_configs": {
+                    "run_name": "mixing_multi",
+                    "lr": 1e-03,
+                    "mixing_alpha": 1.0,
+                    "mixing_type": "cutmix-uniform",
+                },
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "input_type_info": {"model_type": "genome-local-net"},
+                        "model_config": {
+                            "kernel_width": 8,
+                            "channel_exp_base": 2,
+                        },
+                    },
+                ],
+                "predictor_configs": {"model_type": "mgmoe"},
+                "target_configs": {
+                    "target_cat_columns": ["Origin"],
+                    "target_con_columns": ["Height", "ExtraTarget"],
+                },
+            },
         },
     ],
     indirect=True,
 )
-def test_multi_task(keep_outputs, prep_modelling_test_configs):
-    config, test_config = prep_modelling_test_configs
-    cl_args = config.cl_args
+def test_multi_task(
+    keep_outputs: bool,
+    prep_modelling_test_configs: Tuple[train.Experiment, ModelTestConfig],
+):
+    experiment, test_config = prep_modelling_test_configs
+    gc = experiment.configs.global_config
 
-    train.train(config)
+    train.train(experiment)
 
-    extra_columns = cl_args.extra_con_columns + cl_args.extra_cat_columns
-    for cat_column in config.cl_args.target_cat_columns:
+    targets = get_all_targets(targets_configs=experiment.configs.target_configs)
+    extra_columns = get_all_tabular_input_columns(configs=experiment.configs)
+    for cat_column in targets.cat_targets:
         threshold, at_least_n = _get_multi_task_test_args(
             extra_columns=extra_columns,
             target_copy="OriginExtraCol",
-            mixing=cl_args.mixing_type,
+            mixing=gc.mixing_type,
         )
 
         _check_test_performance_results(
@@ -321,11 +450,11 @@ def test_multi_task(keep_outputs, prep_modelling_test_configs):
             at_least_n=at_least_n,
         )
 
-    for con_column in config.cl_args.target_con_columns:
+    for con_column in targets.con_targets:
         threshold, at_least_n = _get_multi_task_test_args(
             extra_columns=extra_columns,
             target_copy="ExtraTarget",
-            mixing=cl_args.mixing_type,
+            mixing=gc.mixing_type,
         )
 
         _check_test_performance_results(
@@ -346,6 +475,16 @@ def test_multi_task(keep_outputs, prep_modelling_test_configs):
 
     if not keep_outputs:
         cleanup(test_config.run_path)
+
+
+def get_all_tabular_input_columns(configs: Configs):
+    extra_columns = []
+    for input_config in configs.input_configs:
+        if input_config.input_info.input_type == "tabular":
+            extra_columns += input_config.input_type_info.extra_con_columns
+            extra_columns += input_config.input_type_info.extra_cat_columns
+
+    return extra_columns
 
 
 def _get_multi_task_test_args(
