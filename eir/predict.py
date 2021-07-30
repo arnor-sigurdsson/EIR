@@ -749,7 +749,6 @@ def get_named_pred_dict_iterators(
                 value = ()
             cur_gen = config.get_yaml_to_dict_iterator(configs=value)
             dict_of_generators[key] = tuple(cur_gen)
-
     return dict_of_generators
 
 
@@ -912,22 +911,6 @@ def recursive_dict_replace(dict_, dict_to_inject):
             dict_[cur_key] = cur_value
 
     return dict_
-
-
-def _remove_keys_from_namespace(
-    namespace: Namespace, keys_to_remove: Iterable[str]
-) -> Namespace:
-    new_namespace_kwargs = {}
-
-    keys_to_remove_set = set(keys_to_remove)
-
-    for key_name, key_value in namespace.__dict__.items():
-        if key_name not in keys_to_remove_set:
-            new_namespace_kwargs[key_name] = key_value
-
-    filtered_namespace = Namespace(**new_namespace_kwargs)
-
-    return filtered_namespace
 
 
 def _load_labels_for_predict(

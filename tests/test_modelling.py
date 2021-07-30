@@ -292,7 +292,11 @@ def _check_test_performance_results(
                     {
                         "input_info": {"input_name": "test_genotype"},
                         "input_type_info": {"model_type": "cnn"},
-                        "model_config": {"channel_exp_base": 4},
+                        "model_config": {
+                            "channel_exp_base": 5,
+                            "rb_do": 0.15,
+                            "fc_repr_dim": 64,
+                        },
                     },
                 ],
                 "target_configs": {
