@@ -1,6 +1,6 @@
 from math import isclose
-from unittest.mock import patch
 from typing import Tuple, TYPE_CHECKING
+from unittest.mock import patch
 
 import pytest
 import torch

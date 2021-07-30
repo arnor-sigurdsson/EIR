@@ -10,10 +10,9 @@ from aislib.misc_utils import ensure_path_exists
 from sklearn.preprocessing import LabelEncoder
 from torch import nn
 
-from eir.data_load.label_setup import al_label_dict
-
 if TYPE_CHECKING:
     from eir.train import al_training_labels_extra
+    from eir.data_load.label_setup import al_label_dict
 
 # Aliases
 al_unique_embed_vals = Dict[str, Set[str]]
@@ -196,7 +195,7 @@ def lookup_embeddings(
 
 
 def get_unique_embed_values(
-    labels_dict: al_label_dict, embedding_cols: Sequence[str]
+    labels_dict: "al_label_dict", embedding_cols: Sequence[str]
 ) -> al_unique_embed_vals:
     unique_embeddings_dict = OrderedDict((i, set()) for i in sorted(embedding_cols))
 
@@ -225,14 +224,14 @@ def get_extra_continuous_inputs_from_labels(
 
 @overload
 def set_up_and_save_embeddings_dict(
-    embedding_columns: None, labels_dict: al_label_dict, run_folder: Path
+    embedding_columns: None, labels_dict: "al_label_dict", run_folder: Path
 ) -> None:
     ...
 
 
 @overload
 def set_up_and_save_embeddings_dict(
-    embedding_columns: List[str], labels_dict: al_label_dict, run_folder: Path
+    embedding_columns: List[str], labels_dict: "al_label_dict", run_folder: Path
 ) -> al_emb_lookup_dict:
     ...
 
@@ -254,7 +253,7 @@ def set_up_and_save_embeddings_dict(embedding_columns, labels_dict, run_folder):
 
 
 def get_embedding_dict(
-    labels_dict: al_label_dict, embedding_cols: List[str]
+    labels_dict: "al_label_dict", embedding_cols: List[str]
 ) -> al_emb_lookup_dict:
     """
     Simple wrapper function to call other embedding functions to create embedding

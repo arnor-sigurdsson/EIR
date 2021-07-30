@@ -131,7 +131,7 @@ def test_set_up_train_and_valid_tabular_data(
     dc = create_test_data
     n_classes = len(dc.target_classes)
 
-    all_array_ids = train.gather_all_array_target_ids(
+    all_array_ids = train.gather_all_ids_from_target_configs(
         target_configs=test_configs.target_configs
     )
     train_ids, valid_ids = train.split_ids(ids=all_array_ids, valid_size=gc.valid_size)

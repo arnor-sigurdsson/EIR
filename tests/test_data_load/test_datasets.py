@@ -7,9 +7,9 @@ import pytest
 import torch
 
 from eir import train
-from eir.setup.config import get_all_targets, Configs
 from eir.data_load import datasets
 from eir.data_load.datasets import al_datasets
+from eir.setup.config import get_all_targets, Configs
 
 if TYPE_CHECKING:
     from ..conftest import TestDataConfig
@@ -45,7 +45,7 @@ def test_set_up_datasets(
 
     test_configs = create_test_config
 
-    all_array_ids = train.gather_all_array_target_ids(
+    all_array_ids = train.gather_all_ids_from_target_configs(
         target_configs=test_configs.target_configs
     )
     train_ids, valid_ids = train.split_ids(
@@ -63,7 +63,7 @@ def test_set_up_datasets(
         valid_ids=valid_ids,
     )
 
-    inputs = train.set_up_inputs(
+    inputs = train.set_up_inputs_for_training(
         inputs_configs=test_configs.input_configs,
         train_ids=train_ids,
         valid_ids=valid_ids,
@@ -142,7 +142,7 @@ def test_construct_dataset_init_params_from_cl_args(
 
     test_configs = create_test_config
 
-    all_array_ids = train.gather_all_array_target_ids(
+    all_array_ids = train.gather_all_ids_from_target_configs(
         target_configs=test_configs.target_configs
     )
     train_ids, valid_ids = train.split_ids(
@@ -160,7 +160,7 @@ def test_construct_dataset_init_params_from_cl_args(
         valid_ids=valid_ids,
     )
 
-    inputs = train.set_up_inputs(
+    inputs = train.set_up_inputs_for_training(
         inputs_configs=test_configs.input_configs,
         train_ids=train_ids,
         valid_ids=valid_ids,
@@ -172,9 +172,10 @@ def test_construct_dataset_init_params_from_cl_args(
         target_labels_dict=target_labels.train_labels,
         targets=targets,
         inputs=inputs,
+        test_mode=False,
     )
 
-    assert len(constructed_args) == 3
+    assert len(constructed_args) == 4
     assert len(constructed_args.get("inputs")) == 2
 
     gotten_input_names = set(constructed_args.get("inputs").keys())
@@ -235,7 +236,7 @@ def test_datasets(
     train_no_samples = int(len(classes_tested) * c.n_per_class * (1 - gc.valid_size))
     valid_no_sample = int(len(classes_tested) * c.n_per_class * gc.valid_size)
 
-    all_array_ids = train.gather_all_array_target_ids(
+    all_array_ids = train.gather_all_ids_from_target_configs(
         target_configs=test_configs.target_configs
     )
     train_ids, valid_ids = train.split_ids(
@@ -253,7 +254,7 @@ def test_datasets(
         valid_ids=valid_ids,
     )
 
-    inputs = train.set_up_inputs(
+    inputs = train.set_up_inputs_for_training(
         inputs_configs=test_configs.input_configs,
         train_ids=train_ids,
         valid_ids=valid_ids,
@@ -308,13 +309,27 @@ def check_dataset(
     assert test_id == dataset.samples[0].sample_id
 
 
-def test_prepare_genotype_array():
+def test_prepare_genotype_array_train_mode():
     test_array = torch.zeros((1, 4, 100), dtype=torch.bool)
 
     prepared_array = datasets.prepare_one_hot_omics_data(
         genotype_array=test_array,
         na_augment_perc=1.0,
         na_augment_prob=1.0,
+        test_mode=False,
     )
 
     assert (prepared_array[:, -1, :] == 1).all()
+
+
+def test_prepare_genotype_array_test_mode():
+    test_array = torch.zeros((1, 4, 100), dtype=torch.bool)
+
+    prepared_array_train = datasets.prepare_one_hot_omics_data(
+        genotype_array=test_array,
+        na_augment_perc=1.0,
+        na_augment_prob=1.0,
+        test_mode=True,
+    )
+
+    assert prepared_array_train.sum().item() == 0

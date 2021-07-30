@@ -13,8 +13,8 @@ from torch.optim.adamw import AdamW
 from torch.optim.optimizer import Optimizer
 from torch_optimizer import get as get_custom_opt
 
-from eir.setup.schemas import GlobalConfig
 from eir.models.model_training_utils import add_wd_to_model_params
+from eir.setup.schemas import GlobalConfig
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 

@@ -22,7 +22,6 @@ from aislib.misc_utils import get_logger
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
-from eir.setup import config
 from eir.data_load.data_augmentation import make_random_omics_columns_missing
 from eir.data_load.label_setup import (
     al_label_dict,
@@ -31,9 +30,10 @@ from eir.data_load.label_setup import (
     Labels,
 )
 from eir.data_load.label_setup import merge_target_columns
+from eir.setup import config
 
 if TYPE_CHECKING:
-    from eir.setup.input_setup import al_input_objects
+    from eir.setup.input_setup import al_input_objects_as_dict
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -53,7 +53,7 @@ al_getitem_return = Tuple[Dict[str, torch.Tensor], al_sample_label_dict_target, 
 def set_up_datasets_from_configs(
     configs: config.Configs,
     target_labels: Labels,
-    inputs_as_dict: "al_input_objects",
+    inputs_as_dict: "al_input_objects_as_dict",
 ) -> Tuple[al_datasets, al_datasets]:
 
     dataset_class = (
@@ -65,12 +65,14 @@ def set_up_datasets_from_configs(
         target_labels_dict=target_labels.train_labels,
         targets=targets,
         inputs=inputs_as_dict,
+        test_mode=False,
     )
 
     valid_kwargs = construct_default_dataset_kwargs_from_cl_args(
         target_labels_dict=target_labels.valid_labels,
         targets=targets,
         inputs=inputs_as_dict,
+        test_mode=True,
     )
 
     train_dataset = dataset_class(**train_kwargs)
@@ -86,7 +88,8 @@ def set_up_datasets_from_configs(
 def construct_default_dataset_kwargs_from_cl_args(
     target_labels_dict: Union[None, al_label_dict],
     targets: config.Targets,
-    inputs: "al_input_objects",
+    inputs: "al_input_objects_as_dict",
+    test_mode: bool,
 ) -> Dict[str, Any]:
 
     target_columns = merge_target_columns(
@@ -98,6 +101,7 @@ def construct_default_dataset_kwargs_from_cl_args(
         "target_columns": target_columns,
         "inputs": inputs,
         "target_labels_dict": target_labels_dict,
+        "test_mode": test_mode,
     }
 
     return dataset_kwargs
@@ -141,8 +145,9 @@ class Sample:
 class DatasetBase(Dataset):
     def __init__(
         self,
-        inputs: "al_input_objects",
+        inputs: "al_input_objects_as_dict",
         target_columns: al_target_columns,
+        test_mode: bool,
         target_labels_dict: al_label_dict = None,
     ):
         super().__init__()
@@ -150,6 +155,7 @@ class DatasetBase(Dataset):
         self.samples: Union[List[Sample], None] = None
 
         self.inputs = inputs
+        self.test_mode = test_mode
         self.target_columns = target_columns
         self.target_labels_dict = target_labels_dict if target_labels_dict else {}
 
@@ -164,6 +170,9 @@ class DatasetBase(Dataset):
         available for. This is quite likely if we have e.g. pre-split data into
         train/val and test folders.
         """
+
+        mode_str = "evaluation/test" if self.test_mode else "train"
+        logger.debug("Setting up dataset in %s mode.", mode_str)
 
         def _default_factory() -> Sample:
             return Sample(sample_id="", inputs={}, target_labels={})
@@ -192,13 +201,8 @@ class DatasetBase(Dataset):
                 )
 
             elif input_type == "tabular":
-                # TODO: Make this logic not-so-hacky with tabular dict below, more
-                #       explicit what is passed in here.
                 samples = _add_tabular_data_to_samples(
-                    tabular_dict={
-                        **source_data.labels.train_labels,
-                        **source_data.labels.valid_labels,
-                    },
+                    tabular_dict=source_data.labels.all_labels,
                     samples=samples,
                     ids_to_keep=ids_to_keep,
                     source_name=source_name,
@@ -423,7 +427,7 @@ class MemoryDataset(DatasetBase):
 
         inputs_prepared = copy(sample.inputs)
         inputs_prepared = prepare_inputs_memory(
-            inputs_values=inputs_prepared, inputs_objects=self.inputs
+            inputs=inputs_prepared, inputs_objects=self.inputs, test_mode=self.test_mode
         )
 
         inputs_final = impute_missing_modalities_wrapper(
@@ -439,7 +443,7 @@ class MemoryDataset(DatasetBase):
         return len(self.samples)
 
 
-def _get_default_impute_fill_values(inputs_objects: "al_input_objects"):
+def _get_default_impute_fill_values(inputs_objects: "al_input_objects_as_dict"):
     fill_values = {}
     for input_name, input_object in inputs_objects.items():
         if input_name.startswith("omics_"):
@@ -450,7 +454,7 @@ def _get_default_impute_fill_values(inputs_objects: "al_input_objects"):
     return fill_values
 
 
-def _get_default_impute_dtypes(inputs_objects: "al_input_objects"):
+def _get_default_impute_dtypes(inputs_objects: "al_input_objects_as_dict"):
     dtypes = {}
     for input_name, input_object in inputs_objects.items():
         if input_name.startswith("omics_"):
@@ -465,10 +469,11 @@ def prepare_one_hot_omics_data(
     genotype_array: torch.Tensor,
     na_augment_perc: float,
     na_augment_prob: float,
+    test_mode: bool,
 ) -> torch.BoolTensor:
     array_bool = genotype_array.to(dtype=torch.bool)
 
-    if na_augment_perc > 0 and na_augment_prob > 0:
+    if not test_mode and na_augment_perc > 0 and na_augment_prob > 0:
         array_bool = make_random_omics_columns_missing(
             omics_array=array_bool,
             percentage=na_augment_perc,
@@ -494,7 +499,7 @@ class DiskDataset(DatasetBase):
 
         inputs_prepared = copy(sample.inputs)
         inputs_prepared = prepare_inputs_disk(
-            inputs=inputs_prepared, inputs_objects=self.inputs
+            inputs=inputs_prepared, inputs_objects=self.inputs, test_mode=self.test_mode
         )
 
         inputs_final = impute_missing_modalities_wrapper(
@@ -510,7 +515,7 @@ class DiskDataset(DatasetBase):
 
 
 def prepare_inputs_disk(
-    inputs: Dict[str, Any], inputs_objects: "al_input_objects"
+    inputs: Dict[str, Any], inputs_objects: "al_input_objects_as_dict", test_mode: bool
 ) -> Dict[str, torch.Tensor]:
     prepared_inputs = {}
     for name, data in inputs.items():
@@ -528,6 +533,7 @@ def prepare_inputs_disk(
                 genotype_array=array_raw,
                 na_augment_perc=na_augment_perc,
                 na_augment_prob=na_augment_prob,
+                test_mode=test_mode,
             )
             prepared_inputs[name] = array_prepared
 
@@ -538,35 +544,36 @@ def prepare_inputs_disk(
 
 
 def prepare_inputs_memory(
-    inputs_values: Dict[str, Any], inputs_objects: "al_input_objects"
+    inputs: Dict[str, Any], inputs_objects: "al_input_objects_as_dict", test_mode: bool
 ) -> Dict[str, torch.Tensor]:
     prepared_inputs = {}
 
-    for name, data in inputs_values.items():
+    for name, data in inputs.items():
+
+        input_type_info = inputs_objects[name].input_config.input_type_info
 
         if name.startswith("omics_"):
             array_raw = data
-            na_augment_perc = inputs_objects[
-                name
-            ].tabular_data_type_config.na_augment_perc
-            na_augment_prob = inputs_objects[
-                name
-            ].tabular_data_type_config.na_augment_prob
+
+            na_augment_perc = input_type_info.na_augment_perc
+            na_augment_prob = input_type_info.na_augment_prob
+
             array_prepared = prepare_one_hot_omics_data(
                 genotype_array=array_raw,
                 na_augment_perc=na_augment_perc,
                 na_augment_prob=na_augment_prob,
+                test_mode=test_mode,
             )
             prepared_inputs[name] = array_prepared
 
         else:
-            prepared_inputs[name] = inputs_values[name]
+            prepared_inputs[name] = inputs[name]
 
     return prepared_inputs
 
 
 def impute_missing_modalities_wrapper(
-    inputs_values: Dict[str, Any], inputs_objects: "al_input_objects"
+    inputs_values: Dict[str, Any], inputs_objects: "al_input_objects_as_dict"
 ):
     impute_dtypes = _get_default_impute_dtypes(inputs_objects=inputs_objects)
     impute_fill_values = _get_default_impute_fill_values(inputs_objects=inputs_objects)
@@ -582,7 +589,7 @@ def impute_missing_modalities_wrapper(
 
 def impute_missing_modalities(
     inputs_values: Dict[str, Any],
-    inputs_objects: "al_input_objects",
+    inputs_objects: "al_input_objects_as_dict",
     fill_values: Dict[str, Any],
     dtypes: Dict[str, Any],
 ) -> Dict[str, torch.Tensor]:

@@ -12,6 +12,7 @@ from sklearn.preprocessing import StandardScaler, LabelEncoder
 from tqdm import tqdm
 
 from eir.data_load.common_ops import ColumnOperation
+from eir.setup.schemas import InputConfig
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -34,6 +35,10 @@ class Labels:
     train_labels: al_label_dict
     valid_labels: al_label_dict
     label_transformers: al_label_transformers
+
+    @property
+    def all_labels(self):
+        return {**self.train_labels, **self.valid_labels}
 
 
 @dataclass
@@ -396,6 +401,32 @@ def ensure_categorical_columns_and_format(df: pd.DataFrame) -> pd.DataFrame:
             df_copy[column] = df_copy[column].cat.rename_categories(mapping)
 
     return df_copy
+
+
+def gather_all_ids_from_all_inputs(
+    input_configs: Sequence[InputConfig],
+) -> Tuple[str, ...]:
+    ids = set()
+    for input_config in input_configs:
+
+        cur_source = Path(input_config.input_info.input_source)
+        cur_type = input_config.input_info.input_type
+        if cur_type == "omics":
+            cur_ids = gather_ids_from_data_source(data_source=cur_source)
+
+        elif cur_type == "tabular":
+            cur_ids = gather_ids_from_tabular_file(
+                file_path=Path(input_config.input_info.input_source)
+            )
+        else:
+            raise NotImplementedError(
+                f"ID gather not implemented for type {cur_type} (source: {cur_source})"
+            )
+
+        cur_ids_set = set(cur_ids)
+        ids.update(cur_ids_set)
+
+    return tuple(ids)
 
 
 def gather_ids_from_data_source(data_source: Path, validate: bool = True):

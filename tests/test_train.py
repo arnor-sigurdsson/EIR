@@ -210,7 +210,7 @@ def test_get_model(create_test_config: Configs, create_test_labels):
         target_transformers=target_labels.label_transformers
     )
 
-    inputs_as_dict = eir.setup.input_setup.set_up_inputs(
+    inputs_as_dict = eir.setup.input_setup.set_up_inputs_for_training(
         inputs_configs=create_test_config.input_configs,
         train_ids=tuple(create_test_labels.train_labels.keys()),
         valid_ids=tuple(create_test_labels.valid_labels.keys()),

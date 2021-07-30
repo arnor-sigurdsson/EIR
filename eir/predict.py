@@ -1,12 +1,24 @@
-import argparse
 import json
 from argparse import Namespace
-from copy import copy
+from copy import copy, deepcopy
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 from random import sample
-from typing import Union, List, Dict, Sequence, Callable, Iterable, Tuple, Type, Any
+from typing import (
+    Union,
+    List,
+    Dict,
+    Sequence,
+    Callable,
+    Iterable,
+    Tuple,
+    Type,
+    Any,
+    Mapping,
+    Generator,
+    Literal,
+)
 
 import dill
 import joblib
@@ -19,7 +31,6 @@ from torch import nn
 from torch.utils.data import DataLoader
 
 import eir.visualization.visualization_funcs as vf
-from eir.configuration import append_data_source_prefixes
 from eir.data_load import datasets, label_setup
 from eir.data_load.data_utils import get_target_columns_generator
 from eir.data_load.datasets import (
@@ -31,7 +42,6 @@ from eir.data_load.label_setup import (
     al_target_columns,
     al_label_transformers,
     al_all_column_ops,
-    gather_ids_from_tabular_file,
     transform_label_df,
     TabularFileInfo,
 )
@@ -39,23 +49,42 @@ from eir.interpretation.interpretation import (
     activation_analysis_wrapper,
     get_no_background_samples_for_shap_objects,
 )
+from eir.models import al_fusion_models
 from eir.models.model_training_utils import gather_pred_outputs_from_dloader
-from eir.models.models_linear import LinearModel, LinearModelConfig
 from eir.models.tabular.tabular import al_emb_lookup_dict
+from eir.setup import config
+from eir.setup import input_setup
+from eir.setup import schemas
+from eir.setup.config import Configs, get_all_targets, get_main_parser
+from eir.setup.input_setup import (
+    al_input_objects_as_dict,
+    OmicsInputInfo,
+    get_input_name_config_iterator,
+)
 from eir.train import (
-    get_train_config_serialization_path,
+    get_train_experiment_serialization_path,
     prepare_base_batch_default,
     Hooks,
     get_tabular_target_file_infos,
     get_fusion_class,
     get_fusion_kwargs_from_cl_args,
     al_num_outputs_per_target,
+    get_default_experiment_keys_to_serialize,
+    gather_all_ids_from_target_configs,
 )
-from eir.setup.input_setup import get_tabular_input_file_info, DataDimensions
 from eir.train_utils.evaluation import PerformancePlotConfig
-from eir.train_utils.metrics import al_metric_record_dict, calculate_batch_metrics
-from eir.train_utils.utils import get_run_folder
-from eir.train_utils.utils import load_transformers
+from eir.train_utils.metrics import (
+    al_metric_record_dict,
+    calculate_batch_metrics,
+    al_step_metric_dict,
+)
+from eir.train_utils.train_handlers import object_to_primitives
+from eir.train_utils.utils import get_run_folder, load_transformers
+
+al_named_dict_configs = Dict[
+    Literal["global_configs", "predictor_configs", "input_configs", "target_configs"],
+    Iterable[Dict],
+]
 
 torch.manual_seed(0)
 np.random.seed(0)
@@ -63,29 +92,61 @@ np.random.seed(0)
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
+@dataclass()
+class PredictSpecificCLArgs:
+    model_path: str
+    evaluate: bool
+    output_folder: str
+
+
 def main():
-    predict_cl_args_ = get_predict_cl_args()
-    run_predict(predict_cl_args=predict_cl_args_)
+    main_parser = get_main_parser()
+
+    main_parser.add_argument(
+        "--model_path",
+        type=str,
+        required=True,
+        help="Path to model to use for predictions.",
+    )
+
+    main_parser.add_argument("--evaluate", dest="evaluate", action="store_true")
+
+    main_parser.add_argument(
+        "--output_folder", type=str, help="Where to save prediction results."
+    )
+
+    predict_cl_args = main_parser.parse_args()
+
+    run_predict(predict_cl_args=predict_cl_args)
 
 
 def run_predict(predict_cl_args: Namespace):
 
-    run_folder = Path(predict_cl_args.model_path).parents[1]
-    train_config = _load_serialized_train_config(run_folder=run_folder)
+    run_folder = get_run_folder_from_model_path(model_path=predict_cl_args.model_path)
+    loaded_train_experiment = _load_serialized_train_experiment(run_folder=run_folder)
 
     predict_config = get_default_predict_config(
-        loaded_train_config=train_config,
+        loaded_train_experiment=loaded_train_experiment,
         predict_cl_args=predict_cl_args,
     )
 
     predict(predict_config=predict_config, predict_cl_args=predict_cl_args)
 
-    if predict_cl_args.get_acts:
+    if predict_config.train_configs_overloaded.global_config.get_acts:
         _compute_predict_activations(
-            train_config=train_config,
+            loaded_train_experiment=loaded_train_experiment,
             predict_config=predict_config,
-            predict_cl_args=predict_cl_args,
         )
+
+
+def get_run_folder_from_model_path(model_path: str) -> Path:
+    model_path_object = Path(model_path)
+    assert model_path_object.exists()
+
+    run_folder = model_path_object.parents[1]
+    assert run_folder.exists()
+
+    return run_folder
 
 
 def predict(
@@ -187,9 +248,7 @@ def _merge_ids_predictions_and_labels(
     return df
 
 
-def serialize_prediction_metrics(
-    output_folder: Path, metrics: Dict[str, Dict[str, np.ndarray]]
-):
+def serialize_prediction_metrics(output_folder: Path, metrics: al_step_metric_dict):
     with open(str(output_folder / "calculated_metrics.json"), "w") as outfile:
         parsed = _convert_dict_values_to_python_objects(object_=metrics)
         json.dump(obj=parsed, fp=outfile)
@@ -211,12 +270,14 @@ def _convert_dict_values_to_python_objects(object_):
 
 @dataclass
 class PredictConfig:
-    train_cl_args_overloaded: Namespace
+    train_configs_overloaded: Configs
+    inputs: al_input_objects_as_dict
+    predict_specific_cl_args: PredictSpecificCLArgs
     test_dataset: datasets.DiskDataset
     target_columns: al_target_columns
     target_transformers: al_label_transformers
     test_dataloader: DataLoader
-    model: nn.Module
+    model: al_fusion_models
     hooks: "PredictHooks"
     metrics: al_metric_record_dict
 
@@ -239,171 +300,277 @@ class PredictHookStages:
 
 
 @dataclass
+class PredictTabularInputInfo:
+    labels: "PredictLabels"
+    input_config: schemas.InputConfig
+
+
+@dataclass
 class PredictLabels:
     label_dict: al_label_dict
-    transformers: al_label_transformers
+    label_transformers: al_label_transformers
+
+    @property
+    def all_labels(self):
+        return self.label_dict
 
 
 def get_default_predict_config(
-    loaded_train_config: Namespace,
+    loaded_train_experiment: "LoadedTrainExperiment",
     predict_cl_args: Namespace,
 ) -> PredictConfig:
 
-    train_cl_args_overloaded, predict_cl_args = _converge_train_and_predict_cl_args(
-        train_cl_args=loaded_train_config.cl_args, predict_cl_args=predict_cl_args
+    configs_overloaded_for_predict = _converge_train_and_predict_configs(
+        train_configs=loaded_train_experiment.configs, predict_cl_args=predict_cl_args
     )
 
-    default_train_hooks = loaded_train_config.hooks
+    default_train_hooks = loaded_train_experiment.hooks
 
-    target_labels, tabular_input_labels = None, None
     if predict_cl_args.evaluate:
-        test_ids = gather_ids_from_tabular_file(
-            file_path=train_cl_args_overloaded.label_file
+        test_ids = gather_all_ids_from_target_configs(
+            target_configs=configs_overloaded_for_predict.target_configs
         )
 
         label_ops = default_train_hooks.custom_column_label_parsing_ops
-        target_labels, tabular_input_labels = get_target_and_extra_labels_for_predict(
-            train_cl_args_overloaded=train_cl_args_overloaded,
+        target_labels = get_target_labels_for_testing(
+            configs_overloaded_for_predict=configs_overloaded_for_predict,
             custom_column_label_parsing_ops=label_ops,
             ids=test_ids,
         )
+    else:
+        test_ids = label_setup.gather_all_ids_from_all_inputs(
+            input_configs=configs_overloaded_for_predict.input_configs
+        )
+        target_labels = None
+
+    test_inputs = set_up_inputs_for_testing(
+        inputs_configs=configs_overloaded_for_predict.input_configs,
+        ids=test_ids,
+        hooks=default_train_hooks.custom_column_label_parsing_ops,
+        run_name=loaded_train_experiment.configs.global_config.run_name,
+    )
 
     test_dataset = _set_up_default_test_dataset(
-        cl_args=train_cl_args_overloaded,
-        data_dimensions=loaded_train_config.data_dimensions,
+        configs=configs_overloaded_for_predict,
         target_labels_dict=target_labels.label_dict,
-        tabular_inputs_labels_dict=tabular_input_labels.label_dict,
+        inputs_as_dict=test_inputs,
     )
 
     test_dataloader = DataLoader(
         dataset=test_dataset,
-        batch_size=train_cl_args_overloaded.batch_size,
+        batch_size=configs_overloaded_for_predict.global_config.batch_size,
         shuffle=False,
-        num_workers=train_cl_args_overloaded.dataloader_workers,
+        num_workers=configs_overloaded_for_predict.global_config.dataloader_workers,
     )
 
-    if train_cl_args_overloaded.model_type == "linear":
-        model_class = LinearModel
-        model_config = LinearModelConfig(
-            input_name=list(loaded_train_config.data_dimensions.keys())[0],
-            target_cat_columns=train_cl_args_overloaded.target_cat_columns,
-            target_con_columns=train_cl_args_overloaded.target_con_columns,
-            data_dimensions=list(loaded_train_config.data_dimensions.values())[0],
-        )
-        model_init_kwargs = {"model_config": model_config}
-        model = _load_model(
-            model_path=Path(predict_cl_args.model_path),
-            model_class=model_class,
-            model_init_kwargs=model_init_kwargs,
-            device=train_cl_args_overloaded.device,
-        )
+    func = _get_fusion_model_class_and_kwargs_from_cl_args
+    fusion_model_class, fusion_model_kwargs = func(
+        global_config=configs_overloaded_for_predict.global_config,
+        predictor_config=configs_overloaded_for_predict.predictor_config,
+        num_outputs_per_target=loaded_train_experiment.num_outputs_per_target,
+        input_objects=test_inputs,
+    )
 
-    else:
-        func = _get_fusion_model_class_and_kwargs_from_cl_args
-        fusion_model_class, fusion_model_kwargs = func(
-            train_cl_args=train_cl_args_overloaded,
-            num_outputs_per_target=loaded_train_config.num_outputs_per_target,
-            tabular_input_transformers=tabular_input_labels.transformers,
-            omics_data_dimensions=loaded_train_config.data_dimensions,
-        )
-
-        model = _load_model(
-            model_path=Path(predict_cl_args.model_path),
-            model_class=fusion_model_class,
-            model_init_kwargs=fusion_model_kwargs,
-            device=train_cl_args_overloaded.device,
-        )
+    model = _load_model(
+        model_path=Path(predict_cl_args.model_path),
+        model_class=fusion_model_class,
+        model_init_kwargs=fusion_model_kwargs,
+        device=configs_overloaded_for_predict.global_config.device,
+    )
     assert not model.training
+
+    predict_specific_cl_args = extract_predict_specific_cl_args(
+        all_predict_cl_args=predict_cl_args
+    )
 
     default_predict_hooks = _get_default_predict_hooks(train_hooks=default_train_hooks)
     test_config = PredictConfig(
-        train_cl_args_overloaded=train_cl_args_overloaded,
+        train_configs_overloaded=configs_overloaded_for_predict,
+        inputs=test_inputs,
+        predict_specific_cl_args=predict_specific_cl_args,
         test_dataset=test_dataset,
-        target_columns=loaded_train_config.target_columns,
-        target_transformers=loaded_train_config.target_transformers,
+        target_columns=loaded_train_experiment.target_columns,
+        target_transformers=loaded_train_experiment.target_transformers,
         test_dataloader=test_dataloader,
         model=model,
         hooks=default_predict_hooks,
-        metrics=loaded_train_config.metrics,
+        metrics=loaded_train_experiment.metrics,
     )
     return test_config
 
 
-def _load_serialized_train_config(run_folder: Path) -> Namespace:
-    train_config_path = get_train_config_serialization_path(run_folder=run_folder)
+@dataclass
+class LoadedTrainExperiment:
+    configs: Configs
+    hooks: Union["Hooks", None]
+    metrics: "al_metric_record_dict"
+    num_outputs_per_target: al_num_outputs_per_target
+    target_columns: al_target_columns
+    target_transformers: al_label_transformers
+
+
+@dataclass
+class LoadedTrainExperimentMixedWithPredict(LoadedTrainExperiment):
+    model: nn.Module
+    inputs: al_input_objects_as_dict
+
+
+def _load_serialized_train_experiment(run_folder: Path) -> LoadedTrainExperiment:
+    train_config_path = get_train_experiment_serialization_path(run_folder=run_folder)
     with open(train_config_path, "rb") as infile:
         train_config = dill.load(file=infile)
 
-    return train_config
+    expected_keys = get_default_experiment_keys_to_serialize()
+    train_config_as_dict = train_config.__dict__
+    assert set(train_config_as_dict.keys()) == set(expected_keys)
+
+    loaded_experiment = LoadedTrainExperiment(**train_config_as_dict)
+
+    return loaded_experiment
 
 
-def get_target_and_extra_labels_for_predict(
-    train_cl_args_overloaded: Namespace,
+def get_target_labels_for_testing(
+    configs_overloaded_for_predict: Configs,
     custom_column_label_parsing_ops: al_all_column_ops,
     ids: Sequence[str],
-) -> Tuple[PredictLabels, PredictLabels]:
+) -> PredictLabels:
     """
     NOTE:   This can be extended to more tabular data, including other files, if we
             update the parameters slightly.
     """
 
-    target_info = get_tabular_target_file_infos(cl_args=train_cl_args_overloaded)
+    target_infos = get_tabular_target_file_infos(
+        target_configs=configs_overloaded_for_predict.target_configs
+    )
 
     target_labels = get_labels_for_predict(
-        run_name=train_cl_args_overloaded.run_name,
-        tabular_file_info=target_info,
+        run_name=configs_overloaded_for_predict.global_config.run_name,
+        tabular_file_infos=target_infos,
         custom_column_label_parsing_ops=custom_column_label_parsing_ops,
         ids=ids,
     )
 
-    tabular_input_info = get_tabular_input_file_info(cl_args=train_cl_args_overloaded)
+    return target_labels
 
-    if tabular_input_info.con_columns or tabular_input_info.cat_columns:
-        tabular_input_labels = get_labels_for_predict(
-            run_name=train_cl_args_overloaded.run_name,
-            tabular_file_info=tabular_input_info,
-            custom_column_label_parsing_ops=custom_column_label_parsing_ops,
-            ids=ids,
-        )
-    else:
-        tabular_input_labels = PredictLabels(label_dict={}, transformers={})
 
-    return target_labels, tabular_input_labels
+def setup_tabular_input_for_testing(
+    input_config: schemas.InputConfig,
+    ids: Sequence[str],
+    hooks: Union["Hooks", None],
+    run_name: str,
+) -> PredictTabularInputInfo:
+
+    tabular_file_info = input_setup.get_tabular_input_file_info(
+        input_source=input_config.input_info.input_source,
+        tabular_data_type_config=input_config.input_type_info,
+    )
+    tabular_file_info_seq = [tabular_file_info]
+
+    custom_ops = hooks.custom_column_label_parsing_ops if hooks else None
+    predict_labels = get_labels_for_predict(
+        run_name=run_name,
+        tabular_file_infos=tabular_file_info_seq,
+        custom_column_label_parsing_ops=custom_ops,
+        ids=ids,
+    )
+
+    predict_input_info = PredictTabularInputInfo(
+        labels=predict_labels, input_config=input_config
+    )
+
+    return predict_input_info
 
 
 def get_labels_for_predict(
     run_name: str,
-    tabular_file_info: TabularFileInfo,
+    tabular_file_infos: Sequence[TabularFileInfo],
     custom_column_label_parsing_ops: al_all_column_ops,
     ids: Sequence[str],
 ) -> PredictLabels:
 
-    all_columns = list(tabular_file_info.cat_columns) + list(
-        tabular_file_info.con_columns
+    df_labels_test = pd.DataFrame(index=ids)
+    label_transformers = {}
+    con_columns, cat_columns = [], []
+
+    for tabular_info in tabular_file_infos:
+
+        all_columns = list(tabular_info.cat_columns) + list(tabular_info.con_columns)
+        if not all_columns:
+            raise ValueError(f"No columns specified in {tabular_file_infos}.")
+
+        cur_transformers = load_transformers(
+            run_name=run_name,
+            transformers_to_load=all_columns,
+        )
+        label_transformers = {**label_transformers, **cur_transformers}
+
+        df_cur_labels = _load_labels_for_predict(
+            tabular_info=tabular_info,
+            ids_to_keep=ids,
+            custom_label_ops=custom_column_label_parsing_ops,
+        )
+        df_labels_test = pd.merge(
+            df_labels_test, df_cur_labels, left_index=True, right_index=True
+        )
+
+    labels_dict = parse_labels_for_predict(
+        con_targets=con_columns,
+        cat_targets=cat_columns,
+        df_labels_test=df_labels_test,
+        label_transformers=label_transformers,
     )
 
-    if not all_columns:
-        raise ValueError(f"No columns specified in {tabular_file_info}.")
-
-    transformers = load_transformers(
-        run_name=run_name,
-        transformers_to_load=all_columns,
+    labels = PredictLabels(
+        label_dict=labels_dict, label_transformers=label_transformers
     )
-
-    df_labels = _load_labels_for_predict(
-        tabular_info=tabular_file_info,
-        ids_to_keep=ids,
-        custom_label_ops=custom_column_label_parsing_ops,
-    )
-    labels_dict = parse_labels_for_testing(
-        tabular_info=tabular_file_info,
-        df_labels_test=df_labels,
-        label_transformers=transformers,
-    )
-
-    labels = PredictLabels(label_dict=labels_dict, transformers=transformers)
 
     return labels
+
+
+def set_up_inputs_for_testing(
+    inputs_configs: schemas.al_input_configs,
+    ids: Sequence[str],
+    hooks: Union["Hooks", None],
+    run_name: str,
+) -> Dict[str, Union[PredictTabularInputInfo, OmicsInputInfo]]:
+    all_inputs = {}
+
+    name_config_iter = get_input_name_config_iterator(input_configs=inputs_configs)
+    for name, input_config in name_config_iter:
+        cur_input_data_config = input_config.input_info
+        setup_func = get_input_setup_function_for_predict(
+            input_type=cur_input_data_config.input_type
+        )
+        logger.info(
+            "Setting up %s inputs '%s' from %s.",
+            cur_input_data_config.input_type,
+            cur_input_data_config.input_name,
+            cur_input_data_config.input_source,
+        )
+        set_up_input = setup_func(
+            input_config=input_config,
+            ids=ids,
+            run_name=run_name,
+            hooks=hooks,
+        )
+        all_inputs[name] = set_up_input
+
+    return all_inputs
+
+
+def get_input_setup_function_for_predict(input_type) -> Callable:
+    mapping = get_input_setup_function_map_for_predict()
+
+    return mapping[input_type]
+
+
+def get_input_setup_function_map_for_predict() -> Dict[str, Callable]:
+    setup_mapping = {
+        "omics": input_setup.set_up_omics_input,
+        "tabular": setup_tabular_input_for_testing,
+    }
+
+    return setup_mapping
 
 
 def _get_default_predict_hooks(train_hooks: "Hooks") -> PredictHooks:
@@ -427,14 +594,30 @@ def _hook_default_predict_prepare_batch(
 ):
     batch = prepare_base_batch_default(
         loader_batch=loader_batch,
-        global_config=predict_config.train_cl_args_overloaded,
+        input_objects=predict_config.inputs,
         target_columns=predict_config.target_columns,
         model=predict_config.model,
+        device=predict_config.train_configs_overloaded.global_config.device,
     )
 
     state_updates = {"batch": batch}
 
     return state_updates
+
+
+def extract_predict_specific_cl_args(
+    all_predict_cl_args: Namespace,
+) -> PredictSpecificCLArgs:
+    predict_module_specific_keys = PredictSpecificCLArgs.__dataclass_fields__.keys()
+
+    dataclass_kwargs = {
+        k: v
+        for k, v in all_predict_cl_args.__dict__.items()
+        if k in predict_module_specific_keys
+    }
+    predict_specific_cl_args_object = PredictSpecificCLArgs(**dataclass_kwargs)
+
+    return predict_specific_cl_args_object
 
 
 def _parse_predictions(
@@ -464,21 +647,19 @@ def _load_cl_args_config(cl_args_config_path: Path) -> Namespace:
 
 
 def _get_fusion_model_class_and_kwargs_from_cl_args(
-    train_cl_args: Namespace,
+    global_config: schemas.GlobalConfig,
+    predictor_config: schemas.PredictorConfig,
     num_outputs_per_target: al_num_outputs_per_target,
-    tabular_input_transformers: al_label_transformers,
-    omics_data_dimensions: Dict[str, DataDimensions],
+    input_objects: al_input_objects_as_dict,
 ) -> Tuple[Type[nn.Module], Dict[str, Any]]:
 
-    fusion_model_class = get_fusion_class(
-        fusion_model_type=train_cl_args.fusion_model_type
-    )
+    fusion_model_class = get_fusion_class(fusion_model_type=predictor_config.model_type)
 
     fusion_model_kwargs = get_fusion_kwargs_from_cl_args(
-        cl_args=train_cl_args,
-        omics_data_dimensions=omics_data_dimensions,
+        global_config=global_config,
+        predictor_config=predictor_config,
         num_outputs_per_target=num_outputs_per_target,
-        tabular_label_transformers=tabular_input_transformers,
+        inputs=input_objects,
     )
 
     return fusion_model_class, fusion_model_kwargs
@@ -489,7 +670,7 @@ def _load_model(
     model_class: Type[nn.Module],
     model_init_kwargs: Dict,
     device: str,
-) -> torch.nn.Module:
+) -> Union[al_fusion_models, nn.Module]:
 
     model = model_class(**model_init_kwargs)
 
@@ -528,41 +709,209 @@ def _load_saved_embeddings_dict(
     return embeddings_dict
 
 
-def _converge_train_and_predict_cl_args(
-    train_cl_args: Namespace, predict_cl_args: Namespace
-) -> Tuple[Namespace, Namespace]:
+def _converge_train_and_predict_configs(
+    train_configs: Configs, predict_cl_args: Namespace
+) -> Configs:
 
-    train_cl_args_copy = copy(train_cl_args)
+    train_configs_copy = deepcopy(train_configs)
 
-    train_cl_args_overloaded = _overload_train_cl_args_for_predict(
-        train_cl_args=train_cl_args_copy, predict_cl_args=predict_cl_args
-    )
-    train_cl_args_overloaded_prefix_renamed = append_data_source_prefixes(
-        cl_args=train_cl_args_overloaded
+    named_dict_iterators = get_named_pred_dict_iterators(
+        predict_cl_args=predict_cl_args
     )
 
-    train_keys = train_cl_args_overloaded_prefix_renamed.__dict__.keys()
-    predict_cl_args_filtered = _remove_keys_from_namespace(
-        namespace=predict_cl_args, keys_to_remove=train_keys
+    matched_dict_iterator = get_train_predict_matched_config_generator(
+        train_configs=train_configs_copy, named_dict_iterators=named_dict_iterators
     )
 
-    return train_cl_args_overloaded_prefix_renamed, predict_cl_args_filtered
+    predict_configs_overloaded = overload_train_configs_for_predict(
+        matched_dict_iterator=matched_dict_iterator
+    )
+
+    return predict_configs_overloaded
 
 
-def _overload_train_cl_args_for_predict(
-    train_cl_args: Namespace, predict_cl_args: Namespace
-) -> Namespace:
+def get_named_pred_dict_iterators(
+    predict_cl_args: Namespace,
+) -> al_named_dict_configs:
+    target_keys = {
+        "global_configs",
+        "predictor_configs",
+        "input_configs",
+        "target_configs",
+    }
 
-    train_overloaded = copy(train_cl_args)
-    train_keys = set(train_overloaded.__dict__.keys())
+    dict_of_generators = {}
+    for key, value in predict_cl_args.__dict__.items():
 
-    predict_arg_iter = predict_cl_args.__dict__.items()
-    for predict_argument_name, predict_argument_value in predict_arg_iter:
+        if key in target_keys:
 
-        if predict_argument_name in train_keys:
-            train_overloaded.__setattr__(predict_argument_name, predict_argument_value)
+            if not value:
+                value = ()
+            cur_gen = config.get_yaml_to_dict_iterator(configs=value)
+            dict_of_generators[key] = tuple(cur_gen)
 
-    return train_overloaded
+    return dict_of_generators
+
+
+def get_train_predict_matched_config_generator(
+    train_configs: Configs,
+    named_dict_iterators: al_named_dict_configs,
+) -> Generator[Tuple[str, Dict, Dict], None, None]:
+    train_keys = set(train_configs.__dict__.keys())
+
+    single_configs = {
+        "global_configs": "global_config",
+        "predictor_configs": "predictor_config",
+    }
+
+    sequence_configs = {"input_configs", "target_configs"}
+
+    for predict_argument_name, predict_dict_iter in named_dict_iterators.items():
+        name_in_configs_object = single_configs.get(
+            predict_argument_name, predict_argument_name
+        )
+        assert name_in_configs_object in train_keys
+
+        if predict_dict_iter is None:
+            predict_dict_iter = []
+
+        # If not a sequence we can yield directly
+        if predict_argument_name in single_configs.keys():
+            train_config = getattr(train_configs, name_in_configs_object)
+            train_config_as_dict = object_to_primitives(obj=train_config)
+
+            predict_config_as_dict = config.combine_dicts(dicts=predict_dict_iter)
+
+            yield (
+                name_in_configs_object,
+                train_config_as_dict,
+                predict_config_as_dict,
+            )
+
+        # Otherwise we have to match the respective ones with each other
+        elif predict_argument_name in sequence_configs:
+            train_config_sequence = getattr(train_configs, name_in_configs_object)
+
+            for cur_config in train_config_sequence:
+                matching_func = get_config_sequence_matching_func(
+                    name=name_in_configs_object
+                )
+                pred_dict_match_from_iter = matching_func(
+                    train_config=cur_config, pred_dict_iterator=predict_dict_iter
+                )
+
+                cur_train_config_as_dict = object_to_primitives(obj=cur_config)
+
+                yield (
+                    name_in_configs_object,
+                    cur_train_config_as_dict,
+                    pred_dict_match_from_iter,
+                )
+
+
+def get_config_sequence_matching_func(
+    name: Literal["input_configs", "target_configs"]
+) -> Callable:
+    assert name in ("input_configs", "target_configs")
+
+    def _input_configs(
+        train_config: schemas.InputConfig, pred_dict_iterator: Iterable[Dict]
+    ):
+        matches = []
+
+        train_input_info = train_config.input_info
+        for pred_config_dict in pred_dict_iterator:
+            pred_input_info = pred_config_dict["input_info"]
+            cond_1 = pred_input_info["input_name"] == train_input_info.input_name
+            cond_2 = pred_input_info["input_type"] = train_input_info.input_type
+
+            if all((cond_1, cond_2)):
+                matches.append(pred_config_dict)
+
+        assert len(matches) == 1
+        return matches[0]
+
+    def _target_configs(
+        train_config: schemas.TargetConfig, pred_dict_iterator: Iterable[Dict]
+    ):
+        matches = []
+
+        train_cat_columns = train_config.target_cat_columns
+        train_con_columns = train_config.target_con_columns
+
+        for pred_config_dict in pred_dict_iterator:
+            pred_cat_cols = pred_config_dict.get("target_cat_columns", [])
+            pred_con_cols = pred_config_dict.get("target_con_columns", [])
+
+            cond_1 = train_cat_columns == pred_cat_cols
+            cond_2 = train_con_columns == pred_con_cols
+
+            if all((cond_1, cond_2)):
+                matches.append(pred_config_dict)
+
+        assert len(matches) == 1
+        return matches[0]
+
+    if name == "input_configs":
+        return _input_configs
+    return _target_configs
+
+
+def overload_train_configs_for_predict(
+    matched_dict_iterator: Generator[Tuple[str, Dict, Dict], None, None],
+) -> Configs:
+
+    main_overloaded_kwargs = {}
+
+    for name, train_config_dict, predict_config_dict_to_inject in matched_dict_iterator:
+        overloaded_dict = recursive_dict_replace(
+            dict_=train_config_dict, dict_to_inject=predict_config_dict_to_inject
+        )
+        if name in ("global_config", "predictor_config"):
+            main_overloaded_kwargs[name] = overloaded_dict
+        elif name in ("input_configs", "target_configs"):
+            main_overloaded_kwargs.setdefault(name, [])
+            main_overloaded_kwargs.get(name).append(overloaded_dict)
+
+    global_config_overloaded = config.get_global_config(
+        global_configs=[main_overloaded_kwargs.get("global_config")]
+    )
+    input_configs_overloaded = config.get_input_configs(
+        input_configs=main_overloaded_kwargs.get("input_configs")
+    )
+    predictor_config_overloaded = config.load_predictor_config(
+        predictor_configs=[main_overloaded_kwargs.get("predictor_config")]
+    )
+    target_configs_overloaded = config.load_configs_general(
+        config_dict_iterable=main_overloaded_kwargs.get("target_configs"),
+        cls=schemas.TargetConfig,
+    )
+
+    train_configs_overloaded = config.Configs(
+        global_config=global_config_overloaded,
+        input_configs=input_configs_overloaded,
+        predictor_config=predictor_config_overloaded,
+        target_configs=target_configs_overloaded,
+    )
+
+    return train_configs_overloaded
+
+
+def recursive_dict_replace(dict_, dict_to_inject):
+
+    for cur_key, cur_value in dict_to_inject.items():
+
+        if cur_key not in dict_:
+            dict_[cur_key] = {}
+
+        old_dict_value = dict_.get(cur_key)
+        if isinstance(cur_value, Mapping):
+            assert isinstance(old_dict_value, Mapping)
+            recursive_dict_replace(old_dict_value, cur_value)
+        else:
+            dict_[cur_key] = cur_value
+
+    return dict_
 
 
 def _remove_keys_from_namespace(
@@ -599,21 +948,20 @@ def _load_labels_for_predict(
     return df_labels_test
 
 
-def parse_labels_for_testing(
-    tabular_info: TabularFileInfo,
+def parse_labels_for_predict(
+    con_targets: Sequence[str],
+    cat_targets: Sequence[str],
     df_labels_test: pd.DataFrame,
     label_transformers: al_label_transformers,
 ) -> al_label_dict:
 
-    con_transformers = {
-        k: v for k, v in label_transformers.items() if k in tabular_info.con_columns
-    }
+    con_transformers = {k: v for k, v in label_transformers.items() if k in con_targets}
     train_con_column_means = _prep_missing_con_dict(con_transformers=con_transformers)
 
     df_labels_test = label_setup.handle_missing_label_values_in_df(
         df=df_labels_test,
-        cat_label_columns=tabular_info.cat_columns,
-        con_label_columns=tabular_info.con_columns,
+        cat_label_columns=cat_targets,
+        con_label_columns=con_targets,
         con_manual_values=train_con_column_means,
         name="test_df",
     )
@@ -637,25 +985,17 @@ def _prep_missing_con_dict(con_transformers: al_label_transformers) -> Dict[str,
 
 
 def _set_up_default_test_dataset(
-    cl_args: Namespace,
-    data_dimensions: Dict[str, "DataDimensions"],
+    configs: Configs,
     target_labels_dict: Union[None, al_label_dict],
-    tabular_inputs_labels_dict: Union[None, al_label_dict],
+    inputs_as_dict: al_input_objects_as_dict,
 ) -> al_datasets:
-    """
-    :param cl_args: Training CL arguments with the data_source
-    replaced with testing one.
-    :param target_labels_dict: None if we are predicting on unknown data,
-    otherwise a dictionary of labels (if evaluating on test set).
-    :return: Dataset instance to be used for loading test samples.
-    """
 
+    targets = get_all_targets(targets_configs=configs.target_configs)
     test_dataset_kwargs = datasets.construct_default_dataset_kwargs_from_cl_args(
-        cl_args=cl_args,
         target_labels_dict=target_labels_dict,
-        data_dimensions=data_dimensions,
-        tabular_labels_dict=tabular_inputs_labels_dict,
-        na_augment=False,
+        targets=targets,
+        inputs=inputs_as_dict,
+        test_mode=True,
     )
 
     test_dataset = datasets.DiskDataset(**test_dataset_kwargs)
@@ -664,189 +1004,89 @@ def _set_up_default_test_dataset(
 
 
 def _save_predictions(df_predictions: pd.DataFrame, outfolder: Path) -> None:
-    df_predictions.to_csv(outfolder / "predictions.csv")
-
-
-def get_predict_cl_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--model_path",
-        type=str,
-        required=True,
-        help="Path to model to use for predictions.",
-    )
-
-    parser.add_argument(
-        "--batch_size", type=int, default=64, help="size of the batches"
-    )
-
-    parser.add_argument(
-        "--label_file", type=str, help="Which file to load labels from."
-    )
-
-    parser.add_argument(
-        "--omics_sources",
-        type=str,
-        nargs="*",
-        help="Which one-hot omics sources to load samples from for predicting. Can "
-        "either be (a) a folder in which files will be gathered from the folder "
-        "recursively or (b) a simple text file with each line having a path for "
-        "a sample array",
-    )
-
-    parser.add_argument(
-        "--omics_names",
-        type=str,
-        nargs="*",
-        help="Names for the omics sources passed in the --omics_sources argument.",
-    )
-
-    parser.add_argument("--evaluate", dest="evaluate", action="store_true")
-    parser.set_defaults(evaluate=False)
-
-    parser.add_argument(
-        "--output_folder", type=str, help="Where to save prediction results."
-    )
-
-    parser.add_argument(
-        "--device",
-        type=str,
-        default="cpu",
-        choices=["gpu", "cpu"],
-        help="Which device (CPU or GPU) to run" "the inference on.",
-    )
-
-    parser.add_argument(
-        "--gpu_num",
-        type=str,
-        default="0",
-        help="Which GPU to run (according to CUDA) if running with flat "
-        "'--device gpu'.",
-    )
-
-    parser.add_argument(
-        "--dataloader_workers",
-        type=int,
-        default=0,
-        help="Number of workers for dataloader.",
-    )
-
-    parser.add_argument(
-        "--get_acts", action="store_true", help="Whether to generate activation maps."
-    )
-
-    parser.add_argument(
-        "--act_classes",
-        default=None,
-        nargs="+",
-        help="Classes to use for activation maps.",
-    )
-
-    parser.add_argument(
-        "--max_acts_per_class",
-        default=None,
-        type=int,
-        help="Maximum number of samples per class to gather for activation analysis. "
-        "Good to use when modelling on imbalanced data.",
-    )
-
-    cl_args = parser.parse_args()
-
-    device = _parse_predict_device_cl_argument(cl_args=cl_args)
-    cl_args.device = device
-
-    return cl_args
-
-
-def _parse_predict_device_cl_argument(cl_args: argparse.Namespace) -> str:
-    if cl_args.device == "gpu":
-        device = "cuda:" + cl_args.gpu_num if torch.cuda.is_available() else "cpu"
-        if cl_args.device == "cpu":
-            logger.warning(
-                "Device CL input was 'gpu' with gpu_num '%s', "
-                "but number of available GPUs is %d. Reverting to CPU for "
-                "now.",
-                cl_args.gpu_num,
-                torch.cuda.device_count(),
-            )
-    else:
-        device = "cpu"
-
-    return device
+    df_predictions.to_csv(path_or_buf=str(outfolder / "predictions.csv"))
 
 
 def _compute_predict_activations(
-    train_config: Namespace, predict_config: PredictConfig, predict_cl_args: Namespace
+    loaded_train_experiment: "LoadedTrainExperiment",
+    predict_config: PredictConfig,
 ) -> None:
 
-    overloaded_train_config = _overload_train_config_for_predict_activations(
-        train_config=train_config,
+    gc = predict_config.train_configs_overloaded.global_config
+
+    overloaded_train_experiment = _overload_train_experiment_for_predict_activations(
+        train_config=loaded_train_experiment,
         predict_config=predict_config,
-        predict_cl_args=predict_cl_args,
     )
 
     background_dataloader = _get_background_dataloader(
-        batch_size=predict_cl_args.batch_size,
-        dataloader_workers=predict_cl_args.dataloader_workers,
-        cl_args=train_config.cl_args,
-        data_dimensions=train_config.data_dimensions,
-        label_parsing_ops=train_config.hooks.custom_column_label_parsing_ops,
+        batch_size=gc.batch_size,
+        dataloader_workers=gc.dataloader_workers,
+        configs_overloaded_for_predict=predict_config.train_configs_overloaded,
+        inputs_as_dict=predict_config.inputs,
+        label_parsing_ops=loaded_train_experiment.hooks.custom_column_label_parsing_ops,
     )
 
     activation_outfolder_callable = partial(
         _get_predict_activation_outfolder_target,
-        predict_outfolder=Path(predict_cl_args.output_folder),
+        predict_outfolder=Path(predict_config.predict_specific_cl_args.output_folder),
     )
 
     activation_analysis_wrapper(
         model=predict_config.model,
-        experiment=overloaded_train_config,
+        experiment=overloaded_train_experiment,
         outfolder_target_callable=activation_outfolder_callable,
         dataset_to_interpret=predict_config.test_dataset,
         background_loader=background_dataloader,
     )
 
 
-def _overload_train_config_for_predict_activations(
-    train_config: Namespace, predict_config: PredictConfig, predict_cl_args: Namespace
-) -> Namespace:
-    train_config_copy = copy(train_config)
+def _overload_train_experiment_for_predict_activations(
+    train_config: LoadedTrainExperiment,
+    predict_config: PredictConfig,
+) -> LoadedTrainExperimentMixedWithPredict:
+    """
+    TODO:   Possibly set inputs=None as a field in LoadedTrainExperiment that then gets
+            filled with test_inputs. When we do not need the weird monkey-patching here
+            of the batch_prep_hooks, as the LoadedTrainExperiment will have the
+            inputs attribute.
+    """
+    train_experiment_copy = copy(train_config)
 
-    train_config_copy.model = predict_config.model
+    mixed_experiment_kwargs = train_experiment_copy.__dict__
+    mixed_experiment_kwargs["model"] = predict_config.model
+    mixed_experiment_kwargs["configs"] = predict_config.train_configs_overloaded
+    mixed_experiment_kwargs["inputs"] = predict_config.inputs
 
-    train_config_copy.cl_args, _ = _converge_train_and_predict_cl_args(
-        train_cl_args=train_config.cl_args, predict_cl_args=predict_cl_args
-    )
+    mixed_experiment = LoadedTrainExperimentMixedWithPredict(**mixed_experiment_kwargs)
 
-    train_config_copy.cl_args.act_classes = predict_cl_args.act_classes
-    train_config_copy.cl_args.max_acts_per_class = predict_cl_args.max_acts_per_class
-
-    return train_config_copy
+    return mixed_experiment
 
 
 def _get_background_dataloader(
     batch_size: int,
     dataloader_workers: int,
-    cl_args: Namespace,
-    data_dimensions,
-    label_parsing_ops,
+    configs_overloaded_for_predict: Configs,
+    inputs_as_dict: al_input_objects_as_dict,
+    label_parsing_ops: Union["Hooks", None],
 ):
     background_size = get_no_background_samples_for_shap_objects(batch_size=batch_size)
 
-    train_ids = gather_ids_from_tabular_file(file_path=cl_args.label_file)
+    train_ids = label_setup.gather_all_ids_from_all_inputs(
+        input_configs=configs_overloaded_for_predict.input_configs
+    )
     train_ids_sampled = sample(population=train_ids, k=background_size)
 
-    target_labels, tabular_input_labels = get_target_and_extra_labels_for_predict(
-        train_cl_args_overloaded=cl_args,
+    target_labels = get_target_labels_for_testing(
+        configs_overloaded_for_predict=configs_overloaded_for_predict,
         custom_column_label_parsing_ops=label_parsing_ops,
         ids=train_ids_sampled,
     )
 
     background_dataset = _set_up_default_test_dataset(
-        cl_args=cl_args,
-        data_dimensions=data_dimensions,
+        configs=configs_overloaded_for_predict,
         target_labels_dict=target_labels.label_dict,
-        tabular_inputs_labels_dict=tabular_input_labels.label_dict,
+        inputs_as_dict=inputs_as_dict,
     )
 
     background_loader = DataLoader(

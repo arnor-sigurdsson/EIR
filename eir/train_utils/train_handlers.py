@@ -1,4 +1,5 @@
 import atexit
+import json
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
@@ -407,7 +408,7 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
     exp = handler_config.experiment
     gc = handler_config.experiment.configs.global_config
 
-    _save_config(run_folder=handler_config.run_folder, configs=exp.configs)
+    _save_yaml_configs(run_folder=handler_config.run_folder, configs=exp.configs)
 
     if gc.checkpoint_interval is not None:
         trainer = _add_checkpoint_handler_wrapper(
@@ -458,19 +459,20 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
     return trainer
 
 
-def _save_config(run_folder: Path, configs: "Configs"):
+def _save_yaml_configs(run_folder: Path, configs: "Configs"):
 
     for config_name, config_object in configs.__dict__.items():
         cur_outpath = Path(run_folder / "configs" / config_name).with_suffix(".yaml")
         aislib.misc_utils.ensure_path_exists(path=cur_outpath)
 
-        if isinstance(config_object, list):
-            config_object = [
-                i.__dict__ for i in config_object if not isinstance(i, dict)
-            ]
+        config_object_as_primitives = object_to_primitives(obj=config_object)
 
         with open(str(cur_outpath), "w") as yamlfile:
-            yaml.dump(data=config_object, stream=yamlfile)
+            yaml.dump(data=config_object_as_primitives, stream=yamlfile)
+
+
+def object_to_primitives(obj):
+    return json.loads(json.dumps(obj, default=lambda o: o.__dict__))
 
 
 def _add_checkpoint_handler_wrapper(

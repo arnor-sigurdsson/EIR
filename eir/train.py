@@ -30,13 +30,6 @@ from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader, WeightedRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
-from eir.setup import schemas
-from eir.setup.config import (
-    get_configs,
-    Configs,
-    get_all_targets,
-)
-from eir.setup.input_setup import DataDimensions, serialize_all_input_transformers
 from eir.data_load import data_utils
 from eir.data_load import datasets
 from eir.data_load.data_augmentation import hook_mix_loss, get_mix_data_hook
@@ -52,7 +45,7 @@ from eir.data_load.label_setup import (
     save_transformer_set,
     Labels,
 )
-from eir.models import fusion, fusion_mgmoe, fusion_linear
+from eir.models import fusion, fusion_mgmoe, fusion_linear, al_fusion_models
 from eir.models import model_training_utils
 from eir.models.model_training_utils import run_lr_find
 from eir.models.omics.omics_models import (
@@ -65,7 +58,14 @@ from eir.models.tabular.tabular import (
     SimpleTabularModel,
     get_unique_values_from_transformers,
 )
-from eir.setup.input_setup import al_input_objects, set_up_inputs
+from eir.setup import schemas
+from eir.setup.config import (
+    get_configs,
+    Configs,
+    get_all_targets,
+)
+from eir.setup.input_setup import DataDimensions, serialize_all_input_transformers
+from eir.setup.input_setup import al_input_objects_as_dict, set_up_inputs_for_training
 from eir.train_utils import utils
 from eir.train_utils.metrics import (
     calculate_batch_metrics,
@@ -133,8 +133,8 @@ def run_experiment(experiment: "Experiment") -> None:
     gc = experiment.configs.global_config
 
     run_folder = utils.get_run_folder(run_name=gc.run_name)
-    keys_to_serialize = get_default_config_keys_to_serialize()
-    serialize_config(
+    keys_to_serialize = get_default_experiment_keys_to_serialize()
+    serialize_experiment(
         experiment=experiment,
         run_folder=run_folder,
         keys_to_serialize=keys_to_serialize,
@@ -146,19 +146,14 @@ def run_experiment(experiment: "Experiment") -> None:
 @dataclass(frozen=True)
 class Experiment:
     configs: Configs
-    inputs: al_input_objects
+    inputs: al_input_objects_as_dict
     train_loader: torch.utils.data.DataLoader
     valid_loader: torch.utils.data.DataLoader
     valid_dataset: torch.utils.data.Dataset
     target_transformers: al_label_transformers
     target_columns: al_target_columns
     num_outputs_per_target: al_num_outputs_per_target
-    model: Union[
-        fusion.FusionModel,
-        fusion_mgmoe.MGMoEModel,
-        fusion_linear.LinearFusionModel,
-        nn.DataParallel,
-    ]
+    model: al_fusion_models
     optimizer: Optimizer
     criterions: al_criterions
     loss_function: Callable
@@ -167,27 +162,27 @@ class Experiment:
     hooks: Union["Hooks", None]
 
 
-def serialize_config(
+def serialize_experiment(
     experiment: "Experiment",
     run_folder: Path,
     keys_to_serialize: Union[Iterable[str], None],
 ) -> None:
-    serialization_path = get_train_config_serialization_path(run_folder=run_folder)
+    serialization_path = get_train_experiment_serialization_path(run_folder=run_folder)
     ensure_path_exists(path=serialization_path)
 
-    filtered_config = filter_config_by_keys(
+    filtered_experiment = filter_experiment_by_keys(
         experiment=experiment, keys=keys_to_serialize
     )
-    serialize_namespace(namespace=filtered_config, output_path=serialization_path)
+    serialize_namespace(namespace=filtered_experiment, output_path=serialization_path)
 
 
-def get_train_config_serialization_path(run_folder: Path) -> Path:
-    train_config_path = run_folder / "serializations" / "filtered_config.dill"
+def get_train_experiment_serialization_path(run_folder: Path) -> Path:
+    train_experiment_path = run_folder / "serializations" / "filtered_experiment.dill"
 
-    return train_config_path
+    return train_experiment_path
 
 
-def get_default_config_keys_to_serialize() -> Iterable[str]:
+def get_default_experiment_keys_to_serialize() -> Iterable[str]:
     return (
         "configs",
         "num_outputs_per_target",
@@ -198,7 +193,7 @@ def get_default_config_keys_to_serialize() -> Iterable[str]:
     )
 
 
-def filter_config_by_keys(
+def filter_experiment_by_keys(
     experiment: "Experiment", keys: Union[None, Iterable[str]] = None
 ) -> SimpleNamespace:
     filtered = {}
@@ -273,7 +268,9 @@ def get_default_experiment(
 ) -> "Experiment":
     run_folder = _prepare_run_folder(run_name=configs.global_config.run_name)
 
-    all_array_ids = gather_all_array_target_ids(target_configs=configs.target_configs)
+    all_array_ids = gather_all_ids_from_target_configs(
+        target_configs=configs.target_configs
+    )
     train_ids, valid_ids = split_ids(
         ids=all_array_ids, valid_size=configs.global_config.valid_size
     )
@@ -294,7 +291,7 @@ def get_default_experiment(
         transformers=target_labels.label_transformers, run_folder=run_folder
     )
 
-    inputs = set_up_inputs(
+    inputs = set_up_inputs_for_training(
         inputs_configs=configs.input_configs,
         train_ids=train_ids,
         valid_ids=valid_ids,
@@ -374,7 +371,7 @@ def get_default_experiment(
     return config
 
 
-def gather_all_array_target_ids(
+def gather_all_ids_from_target_configs(
     target_configs: Sequence[schemas.TargetConfig],
 ) -> Tuple[str, ...]:
     all_ids = set()
@@ -496,7 +493,7 @@ class GetAttrDelegatedDataParallel(nn.DataParallel):
 
 
 def get_model(
-    inputs_as_dict: al_input_objects,
+    inputs_as_dict: al_input_objects_as_dict,
     predictor_config: schemas.PredictorConfig,
     global_config: schemas.GlobalConfig,
     num_outputs_per_target: al_num_outputs_per_target,
@@ -518,7 +515,7 @@ def get_model(
     return fusion_model
 
 
-def get_modules_to_fuse_from_inputs(inputs: al_input_objects, device: str):
+def get_modules_to_fuse_from_inputs(inputs: al_input_objects_as_dict, device: str):
     models = nn.ModuleDict()
 
     for input_name, inputs_object in inputs.items():
@@ -609,7 +606,7 @@ def get_fusion_class(
 def get_fusion_kwargs_from_cl_args(
     global_config: schemas.GlobalConfig,
     predictor_config: schemas.PredictorConfig,
-    inputs: al_input_objects,
+    inputs: al_input_objects_as_dict,
     num_outputs_per_target: al_num_outputs_per_target,
 ) -> Dict[str, Any]:
 
@@ -887,7 +884,7 @@ def hook_default_prepare_batch(
 
 def prepare_base_batch_default(
     loader_batch: al_dataloader_getitem_batch,
-    input_objects: al_input_objects,
+    input_objects: al_input_objects_as_dict,
     target_columns: al_target_columns,
     model: fusion.FusionModel,
     device: str,

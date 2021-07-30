@@ -1,8 +1,20 @@
 import argparse
+import types
 from argparse import Namespace
 from copy import copy
 from dataclasses import dataclass
-from typing import Sequence, Iterable, Dict, List, Union, Type, Any, Callable, overload
+from typing import (
+    Sequence,
+    Iterable,
+    Dict,
+    List,
+    Union,
+    Type,
+    Any,
+    Callable,
+    overload,
+    Generator,
+)
 
 import configargparse
 import torch
@@ -10,11 +22,11 @@ import yaml
 from aislib.misc_utils import get_logger
 
 import eir.models.tabular.tabular
-from eir.setup import schemas
 from eir.models.fusion import FusionModelConfig
-from eir.models.fusion_mgmoe import MGMoEModelConfig
 from eir.models.fusion_linear import LinearFusionModelConfig
+from eir.models.fusion_mgmoe import MGMoEModelConfig
 from eir.models.omics.omics_models import get_omics_config_dataclass_mapping
+from eir.setup import schemas
 
 al_input_types = Union[schemas.OmicsInputDataConfig, schemas.TabularInputDataConfig]
 
@@ -29,6 +41,14 @@ def get_configs():
 
 
 def get_main_cl_args() -> argparse.Namespace:
+
+    parser_ = get_main_parser()
+    cl_args = parser_.parse_args()
+
+    return cl_args
+
+
+def get_main_parser() -> configargparse.ArgumentParser:
     parser_ = configargparse.ArgumentParser(
         config_file_parser_class=configargparse.YAMLConfigFileParser
     )
@@ -40,16 +60,14 @@ def get_main_cl_args() -> argparse.Namespace:
     parser_.add_argument("--input_configs", type=str, nargs="+", required=True, help="")
 
     parser_.add_argument(
-        "--predictor_configs", type=str, nargs="+", required=True, help=""
+        "--predictor_configs", type=str, nargs="*", required=False, help=""
     )
 
     parser_.add_argument(
         "--target_configs", type=str, nargs="+", required=True, help=""
     )
 
-    cl_args = parser_.parse_args()
-
-    return cl_args
+    return parser_
 
 
 @dataclass
@@ -61,7 +79,9 @@ class Configs:
     target_configs: Sequence[schemas.TargetConfig]
 
 
-def generate_aggregated_config(cl_args: argparse.Namespace) -> Configs:
+def generate_aggregated_config(
+    cl_args: Union[argparse.Namespace, types.SimpleNamespace]
+) -> Configs:
     """
     We manually assume and use only first element of predictor configs, as for now we
     will only support one configuration. Later we can use different predictor settings
@@ -320,7 +340,7 @@ def combine_dicts(dicts: Iterable[dict]) -> dict:
     return combined_dict
 
 
-def get_yaml_to_dict_iterator(configs: Iterable[str]):
+def get_yaml_to_dict_iterator(configs: Iterable[str]) -> Generator[Dict, None, None]:
     for yaml_config in configs:
         yield load_yaml_config(config_path=yaml_config)
 

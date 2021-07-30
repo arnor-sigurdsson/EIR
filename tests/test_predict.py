@@ -8,8 +8,8 @@ import pytest
 import torch
 from sklearn.preprocessing import LabelEncoder
 
-import eir.setup.config
 import eir.models.omics.omics_models
+import eir.setup.config
 import eir.setup.input_setup
 import eir.train
 from eir import predict
@@ -17,6 +17,7 @@ from eir import train
 from eir.data_load.label_setup import TabularFileInfo
 from eir.models.omics.models_cnn import CNNModel
 from eir.models.omics.omics_models import get_omics_model_init_kwargs
+from eir.setup import config
 from tests.conftest import cleanup
 from tests.test_data_load.test_datasets import check_dataset
 
@@ -63,7 +64,18 @@ def test_load_model(test_config_base, tmp_path):
 
 
 @pytest.mark.parametrize(
-    "train_cl_args, predict_cl_args, expected_train_after, expected_predict_after",
+    "train_configs, predict_cl_args, expected_train_after, expected_predict_after",
+    [
+        (
+            Namespace(key1=1, key2=2),
+            Namespace(key2="should_be_present_in_train", key3="unique_to_test"),
+            Namespace(key1=1, key2="should_be_present_in_train"),
+            Namespace(key3="unique_to_test"),
+        )
+    ],
+)
+@pytest.mark.parametrize(
+    "train_configs, predict_cl_args, expected_train_after, expected_predict_after",
     [
         (
             Namespace(key1=1, key2=2),
@@ -74,13 +86,13 @@ def test_load_model(test_config_base, tmp_path):
     ],
 )
 def test_converge_train_and_predict_cl_args(
-    train_cl_args: Namespace,
+    train_configs: config.Configs,
     predict_cl_args: Namespace,
-    expected_train_after: Namespace,
+    expected_train_after: config.Configs,
     expected_predict_after: Namespace,
 ) -> None:
-    train_converged, predict_converged = predict._converge_train_and_predict_cl_args(
-        train_cl_args=train_cl_args, predict_cl_args=predict_cl_args
+    train_converged, predict_converged = predict._converge_train_and_predict_configs(
+        train_configs=train_configs, predict_cl_args=predict_cl_args
     )
 
     assert train_converged == expected_train_after
@@ -100,8 +112,8 @@ def test_converge_train_and_predict_cl_args(
 def test_overload_train_cl_args_for_predict(
     train_cl_args: Namespace, predict_cl_args: Namespace, expected_train_after_overload
 ) -> None:
-    train_after_overload = predict._overload_train_cl_args_for_predict(
-        train_cl_args=train_cl_args, predict_cl_args=predict_cl_args
+    train_after_overload = predict.overload_train_configs_for_predict(
+        train_configs=train_cl_args, predict_cl_args=predict_cl_args
     )
     assert train_after_overload == expected_train_after_overload
 
@@ -200,7 +212,7 @@ def test_set_up_test_dataset(
     mock_encoder = LabelEncoder().fit(["Asia", "Europe", "Africa"])
     transformers = {target_column: mock_encoder}
 
-    df_test_dict = predict.parse_labels_for_testing(
+    df_test_dict = predict.parse_labels_for_predict(
         tabular_info=tabular_info,
         df_labels_test=df_test,
         label_transformers=transformers,
@@ -272,18 +284,18 @@ def test_predict(keep_outputs, prep_modelling_test_configs):
         max_acts_per_class=None,
     )
 
-    train_config = predict._load_serialized_train_config(
+    train_config = predict._load_serialized_train_experiment(
         run_folder=test_config.run_path
     )
 
     predict_config = predict.get_default_predict_config(
-        loaded_train_config=train_config, predict_cl_args=predict_cl_args
+        loaded_train_experiment=train_config, predict_cl_args=predict_cl_args
     )
 
     predict.predict(predict_cl_args=predict_cl_args, predict_config=predict_config)
 
     predict._compute_predict_activations(
-        train_config=train_config,
+        loaded_train_experiment=train_config,
         predict_config=predict_config,
         predict_cl_args=predict_cl_args,
     )

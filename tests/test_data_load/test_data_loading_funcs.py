@@ -9,8 +9,8 @@ from hypothesis.strategies import lists, integers
 
 from eir.data_load import data_loading_funcs
 from eir.data_load.datasets import Sample
-from eir.train import get_dataloaders
 from eir.setup.config import get_all_targets
+from eir.train import get_dataloaders
 
 
 @pytest.mark.parametrize(

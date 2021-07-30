@@ -2,8 +2,8 @@ from dataclasses import dataclass, field
 from typing import Union, Literal, List, Optional, Sequence, Type
 
 from eir.models.fusion import FusionModelConfig
-from eir.models.models_linear import LinearModelConfig
 from eir.models.fusion_mgmoe import MGMoEModelConfig
+from eir.models.models_linear import LinearModelConfig
 from eir.models.omics.omics_models import (
     MLPModel,
     CNNModel,

@@ -17,11 +17,11 @@ from torch.utils.data import DataLoader
 
 import eir.models.omics.omics_models
 import eir.setup.input_setup
-from eir.setup.input_setup import serialize_all_input_transformers
 import eir.train
 from eir import train
-from eir.setup import schemas, config
 from eir.data_load import datasets
+from eir.setup import schemas, config
+from eir.setup.input_setup import serialize_all_input_transformers
 from eir.train import (
     Experiment,
     get_model,
@@ -565,7 +565,7 @@ def create_test_model(
         target_transformers=target_labels.label_transformers
     )
 
-    inputs_as_dict = eir.setup.input_setup.set_up_inputs(
+    inputs_as_dict = eir.setup.input_setup.set_up_inputs_for_training(
         inputs_configs=create_test_config.input_configs,
         train_ids=tuple(create_test_labels.train_labels.keys()),
         valid_ids=tuple(create_test_labels.valid_labels.keys()),
@@ -610,7 +610,9 @@ def create_test_labels(
 
     ensure_path_exists(run_folder, is_folder=True)
 
-    all_array_ids = train.gather_all_array_target_ids(target_configs=c.target_configs)
+    all_array_ids = train.gather_all_ids_from_target_configs(
+        target_configs=c.target_configs
+    )
     train_ids, valid_ids = train.split_ids(ids=all_array_ids, valid_size=gc.valid_size)
 
     target_labels_info = train.get_tabular_target_file_infos(
@@ -640,7 +642,7 @@ def create_test_datasets(
     configs = create_test_config
     target_labels = create_test_labels
 
-    inputs = eir.setup.input_setup.set_up_inputs(
+    inputs = eir.setup.input_setup.set_up_inputs_for_training(
         inputs_configs=configs.input_configs,
         train_ids=tuple(target_labels.train_labels.keys()),
         valid_ids=tuple(target_labels.valid_labels.keys()),
@@ -742,7 +744,7 @@ def prep_modelling_test_configs(
 
     train._log_model(model=model)
 
-    inputs = eir.setup.input_setup.set_up_inputs(
+    inputs = eir.setup.input_setup.set_up_inputs_for_training(
         inputs_configs=c.input_configs,
         train_ids=tuple(target_labels.train_labels.keys()),
         valid_ids=tuple(target_labels.valid_labels.keys()),
@@ -771,8 +773,8 @@ def prep_modelling_test_configs(
         hooks=hooks,
     )
 
-    keys_to_serialize = train.get_default_config_keys_to_serialize()
-    train.serialize_config(
+    keys_to_serialize = train.get_default_experiment_keys_to_serialize()
+    train.serialize_experiment(
         experiment=experiment,
         run_folder=get_run_folder(gc.run_name),
         keys_to_serialize=keys_to_serialize,

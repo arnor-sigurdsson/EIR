@@ -4,6 +4,7 @@ from typing import Dict, Union, Sequence, Callable, TYPE_CHECKING
 
 import numpy as np
 from aislib.misc_utils import get_logger
+
 from eir.data_load.label_setup import (
     Labels,
     set_up_train_and_valid_tabular_data,
@@ -18,15 +19,15 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-al_input_objects = Dict[str, Union["OmicsInputInfo", "TabularInputInfo"]]
+al_input_objects_as_dict = Dict[str, Union["OmicsInputInfo", "TabularInputInfo"]]
 
 
-def set_up_inputs(
+def set_up_inputs_for_training(
     inputs_configs: schemas.al_input_configs,
     train_ids: Sequence[str],
     valid_ids: Sequence[str],
     hooks: Union["Hooks", None],
-) -> al_input_objects:
+) -> al_input_objects_as_dict:
     all_inputs = {}
 
     name_config_iter = get_input_name_config_iterator(input_configs=inputs_configs)
@@ -68,7 +69,10 @@ def get_input_setup_function(input_type) -> Callable:
 
 
 def get_input_setup_function_map() -> Dict[str, Callable]:
-    setup_mapping = {"omics": set_up_omics_input, "tabular": set_up_tabular_input}
+    setup_mapping = {
+        "omics": set_up_omics_input,
+        "tabular": set_up_tabular_input_for_training,
+    }
 
     return setup_mapping
 
@@ -79,7 +83,7 @@ class TabularInputInfo:
     input_config: schemas.InputConfig
 
 
-def set_up_tabular_input(
+def set_up_tabular_input_for_training(
     input_config: schemas.InputConfig,
     train_ids: Sequence[str],
     valid_ids: Sequence[str],
@@ -173,7 +177,9 @@ def get_data_dimension_from_data_source(
     return DataDimensions(channels=channels, height=height, width=width)
 
 
-def serialize_all_input_transformers(inputs_dict: al_input_objects, run_folder: Path):
+def serialize_all_input_transformers(
+    inputs_dict: al_input_objects_as_dict, run_folder: Path
+):
     for input_name, input_ in inputs_dict.items():
         if input_name.startswith("tabular_"):
             save_transformer_set(

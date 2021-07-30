@@ -2,7 +2,6 @@ import copy
 import os
 import sys
 import warnings
-from argparse import Namespace
 from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -53,6 +52,7 @@ from eir.train_utils.utils import (
 if TYPE_CHECKING:
     from eir.train_utils.train_handlers import HandlerConfig
     from eir.train import Experiment
+    from eir.predict import LoadedTrainExperiment
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -130,7 +130,7 @@ def activation_analysis_handler(
 
 def activation_analysis_wrapper(
     model: nn.Module,
-    experiment: Union["Experiment", Namespace],
+    experiment: Union["Experiment", "LoadedTrainExperiment"],
     outfolder_target_callable: Callable,
     dataset_to_interpret: al_datasets,
     background_loader: torch.utils.data.DataLoader,
