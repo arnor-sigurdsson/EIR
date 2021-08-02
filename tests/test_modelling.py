@@ -47,13 +47,17 @@ from tests.conftest import cleanup, ModelTestConfig
         # Case 3: Linear
         {
             "injections": {
+                "global_configs": {"lr": 1e-03},
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
                         "input_type_info": {"model_type": "identity"},
                     },
                 ],
-                "predictor_configs": {"model_type": "linear"},
+                "predictor_configs": {
+                    "model_type": "linear",
+                    "model_config": {"l1": 1e-03},
+                },
             },
         },
     ],
@@ -299,6 +303,9 @@ def _check_test_performance_results(
                         },
                     },
                 ],
+                "predictor_configs": {
+                    "model_config": {"fc_task_dim": 64, "rb_do": 0.10, "fc_do": 0.10},
+                },
                 "target_configs": {
                     "target_cat_columns": ["Origin"],
                     "target_con_columns": ["Height", "ExtraTarget"],
@@ -317,6 +324,9 @@ def _check_test_performance_results(
                         "model_config": {"l1": 1e-03},
                     },
                 ],
+                "predictor_configs": {
+                    "model_config": {"fc_task_dim": 64, "rb_do": 0.10, "fc_do": 0.10},
+                },
                 "target_configs": {
                     "target_cat_columns": ["Origin"],
                     "target_con_columns": ["Height", "ExtraTarget"],

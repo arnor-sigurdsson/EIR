@@ -45,7 +45,6 @@ from eir.data_load.label_setup import (
 )
 from eir.interpretation.interpretation import (
     activation_analysis_wrapper,
-    get_no_background_samples_for_shap_objects,
 )
 from eir.models import al_fusion_models
 from eir.models.model_training_utils import gather_pred_outputs_from_dloader
@@ -1022,12 +1021,14 @@ def _get_background_dataloader(
     inputs_as_dict: al_input_objects_as_dict,
     label_parsing_ops: Union["Hooks", None],
 ):
-    background_size = get_no_background_samples_for_shap_objects(batch_size=batch_size)
 
     train_ids = label_setup.gather_all_ids_from_all_inputs(
         input_configs=configs_overloaded_for_predict.input_configs
     )
-    train_ids_sampled = sample(population=train_ids, k=background_size)
+    train_ids_sampled = sample(
+        population=train_ids,
+        k=configs_overloaded_for_predict.global_config.act_background_samples,
+    )
 
     target_labels = get_target_labels_for_testing(
         configs_overloaded_for_predict=configs_overloaded_for_predict,

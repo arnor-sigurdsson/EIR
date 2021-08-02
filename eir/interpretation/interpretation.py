@@ -150,16 +150,12 @@ def activation_analysis_wrapper(
 
     for column_type, column_name in target_columns_gen:
 
-        no_explainer_background_samples = get_no_background_samples_for_shap_objects(
-            batch_size=gc.batch_size
-        )
-
         explainer, hook_handle = get_shap_object(
             experiment=exp,
             model=model_copy,
             column_name=column_name,
             background_loader=background_loader,
-            n_background_samples=no_explainer_background_samples,
+            n_background_samples=gc.act_background_samples,
         )
 
         input_names = explainer.explainer.model.input_names
@@ -217,11 +213,6 @@ def activation_analysis_wrapper(
                 )
 
         hook_handle.remove()
-
-
-def get_no_background_samples_for_shap_objects(batch_size: int):
-    no_explainer_background_samples = batch_size
-    return no_explainer_background_samples
 
 
 def get_shap_object(
