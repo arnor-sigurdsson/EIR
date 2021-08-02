@@ -1,4 +1,3 @@
-from argparse import Namespace
 from collections import defaultdict
 from copy import copy
 from dataclasses import dataclass
@@ -105,21 +104,6 @@ def construct_default_dataset_kwargs_from_cl_args(
     }
 
     return dataset_kwargs
-
-
-def gather_all_data_sources(
-    cl_args: Namespace, tabular_labels_dict: Union[Labels, None]
-) -> Dict[str, str]:
-    all_sources = {}
-
-    if cl_args.omics_sources and cl_args.omics_names:
-        for source_on_disk, name in zip(cl_args.omics_sources, cl_args.omics_names):
-            all_sources[name] = source_on_disk
-
-    if tabular_labels_dict:
-        all_sources["tabular_cl_args"] = tabular_labels_dict
-
-    return all_sources
 
 
 def _check_valid_and_train_datasets(
@@ -236,6 +220,12 @@ class DatasetBase(Dataset):
             if self.target_labels_dict:
                 if not s.target_labels:
                     no_target_labels.append(s)
+
+        if not self.samples:
+            raise ValueError(
+                f"Expected to have at least one sample, but got {self.samples} instead."
+                f" Possibly there is a mismatch between input IDs and target IDs."
+            )
 
         if no_ids:
             raise ValueError(

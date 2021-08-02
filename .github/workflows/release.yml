@@ -22,7 +22,7 @@ jobs:
       - name: Run tests with Python ${{ matrix.python-version }} on ${{ matrix.os }}
         run: |
           pip install tox==3.20.1
-          pip install poetry==1.1.6
+          pip install poetry==1.1.7
           tox -e py
 
   getrelease:
@@ -84,7 +84,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install --upgrade setuptools
-          pip install poetry==1.1.6
+          pip install poetry==1.1.7
           poetry install
 
       - name: Build with pyinstaller for ${{matrix.TARGET}}
@@ -167,7 +167,7 @@ jobs:
           python3.8 --version
           python3.8 -m pip install --upgrade pip
           pip install --upgrade setuptools
-          pip install poetry==1.1.6
+          pip install poetry==1.1.7
           poetry env use 3.8
           poetry install
 
@@ -193,6 +193,6 @@ jobs:
         with:
           python-version: '3.8'
           architecture: x64
-      - run: pip install poetry==1.1.6
+      - run: pip install poetry==1.1.7
       - run: poetry build
       - run: poetry publish --username=__token__ --password=${{ secrets.PYPI_TOKEN }}

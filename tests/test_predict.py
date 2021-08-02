@@ -484,6 +484,14 @@ def grab_best_model_path(saved_models_folder: Path):
                         "input_info": {"input_name": "test_genotype"},
                         "input_type_info": {"model_type": "genome-local-net"},
                     },
+                    {
+                        "input_info": {"input_name": "test_tabular"},
+                        "input_type_info": {
+                            "model_type": "tabular",
+                            "extra_cat_columns": [],
+                            "extra_con_columns": ["ExtraTarget"],
+                        },
+                    },
                 ],
             },
         },

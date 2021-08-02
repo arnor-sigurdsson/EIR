@@ -33,6 +33,8 @@ from eir.train_utils.utils import (
     get_run_folder,
 )
 
+al_prep_modelling_test_configs = Tuple[Experiment, "ModelTestConfig"]
+
 np.random.seed(0)
 
 

@@ -3,7 +3,6 @@ from typing import Union, Literal, List, Optional, Sequence, Type
 
 from eir.models.fusion import FusionModelConfig
 from eir.models.fusion_mgmoe import MGMoEModelConfig
-from eir.models.models_linear import LinearModelConfig
 from eir.models.omics.omics_models import (
     MLPModel,
     CNNModel,
@@ -24,7 +23,6 @@ al_input_configs = Sequence["InputConfig"]
 al_model_configs = [
     Type[FusionModelConfig],
     Type[MGMoEModelConfig],
-    Type[LinearModelConfig],
     Type[CNNModelConfig],
     Type[MLPModelConfig],
     Type[SimpleLCLModelConfig],
@@ -125,8 +123,3 @@ class TargetConfig:
     label_parsing_chunk_size: Union[None, int] = None
     target_cat_columns: Sequence[str] = field(default_factory=list)
     target_con_columns: Sequence[str] = field(default_factory=list)
-
-
-@dataclass
-class LinearModelConfig:
-    l1: int = 0.0

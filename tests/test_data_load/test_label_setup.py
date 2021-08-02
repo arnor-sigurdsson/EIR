@@ -99,6 +99,7 @@ def create_test_column_ops():
                         },
                     },
                 ],
+                "target_configs": {"label_parsing_chunk_size": 50},
             },
         },
         {
@@ -117,6 +118,7 @@ def create_test_column_ops():
                         },
                     },
                 ],
+                "target_configs": {"label_parsing_chunk_size": None},
             },
         },
     ],
@@ -297,6 +299,7 @@ def test_transform_all_labels_in_sample_with_extra_con(
                         },
                     },
                 ],
+                "target_configs": {"label_parsing_chunk_size": 50},
             },
         },
         {
@@ -315,6 +318,7 @@ def test_transform_all_labels_in_sample_with_extra_con(
                         },
                     },
                 ],
+                "target_configs": {"label_parsing_chunk_size": None},
             },
         },
     ],

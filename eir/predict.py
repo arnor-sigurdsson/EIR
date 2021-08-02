@@ -7,7 +7,6 @@ from pathlib import Path
 from random import sample
 from typing import (
     Union,
-    List,
     Dict,
     Sequence,
     Callable,
@@ -21,7 +20,6 @@ from typing import (
 )
 
 import dill
-import joblib
 import numpy as np
 import pandas as pd
 import torch
@@ -51,7 +49,6 @@ from eir.interpretation.interpretation import (
 )
 from eir.models import al_fusion_models
 from eir.models.model_training_utils import gather_pred_outputs_from_dloader
-from eir.models.tabular.tabular import al_emb_lookup_dict
 from eir.setup import config
 from eir.setup import input_setup
 from eir.setup import schemas
@@ -79,7 +76,7 @@ from eir.train_utils.metrics import (
     al_step_metric_dict,
 )
 from eir.train_utils.train_handlers import object_to_primitives
-from eir.train_utils.utils import get_run_folder, load_transformers
+from eir.train_utils.utils import load_transformers
 
 al_named_dict_configs = Dict[
     Literal["global_configs", "predictor_configs", "input_configs", "target_configs"],
@@ -181,16 +178,14 @@ def predict(
     for target_column_type, target_column_name in target_columns_gen:
 
         target_preds = all_preds[target_column_name]
-        predictions = _parse_predictions(
-            target_column_type=target_column_type, target_preds=target_preds
-        )
+        predictions = _parse_predictions(target_preds=target_preds)
 
         target_labels = None
         if all_labels:
             target_labels = all_labels[target_column_name].cpu().numpy()
 
         cur_target_transformer = predict_config.target_transformers[target_column_name]
-        classes = _get_target_classnames(
+        classes = _get_target_class_names(
             transformer=cur_target_transformer, target_column=target_column_name
         )
 
@@ -620,30 +615,18 @@ def extract_predict_specific_cl_args(
     return predict_specific_cl_args_object
 
 
-def _parse_predictions(
-    target_column_type: str, target_preds: torch.Tensor
-) -> np.ndarray:
-    if target_column_type == "cat":
-        predictions = target_preds.cpu().numpy()
-    else:
-        predictions = target_preds.cpu().numpy()
+def _parse_predictions(target_preds: torch.Tensor) -> np.ndarray:
 
+    predictions = target_preds.cpu().numpy()
     return predictions
 
 
-def _get_target_classnames(
+def _get_target_class_names(
     transformer: al_label_transformers_object, target_column: str
 ):
     if isinstance(transformer, LabelEncoder):
         return transformer.classes_
     return [target_column]
-
-
-def _load_cl_args_config(cl_args_config_path: Path) -> Namespace:
-    with open(str(cl_args_config_path), "r") as infile:
-        loaded_cl_args = json.load(infile)
-
-    return Namespace(**loaded_cl_args)
 
 
 def _get_fusion_model_class_and_kwargs_from_cl_args(
@@ -693,20 +676,6 @@ def _load_model_weights(
     model = model.to(device=device_for_load)
 
     return model
-
-
-def _load_saved_embeddings_dict(
-    embed_columns: Union[None, List[str]], run_name: str
-) -> Union[None, al_emb_lookup_dict]:
-    embeddings_dict = None
-
-    run_folder = get_run_folder(run_name)
-
-    if embed_columns:
-        model_embeddings_path = run_folder / "extra_inputs" / "embeddings.save"
-        embeddings_dict = joblib.load(model_embeddings_path)
-
-    return embeddings_dict
 
 
 def _converge_train_and_predict_configs(

@@ -3,7 +3,7 @@ import json
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
-from typing import List, Callable, Union, Tuple, TYPE_CHECKING, Dict, overload
+from typing import List, Callable, Union, Tuple, TYPE_CHECKING, Dict, overload, Literal
 
 import aislib.misc_utils
 import pandas as pd
@@ -44,7 +44,9 @@ if TYPE_CHECKING:
     from eir.setup.config import Configs
 
 # Aliases
-al_handler_and_event = Tuple[Callable[[Engine, "HandlerConfig"], None], Events]
+al_handler_and_event = Tuple[
+    Callable[[Engine, "HandlerConfig"], None], Union[Events, Tuple[Events, Events]]
+]
 al_sample_interval_handlers = Tuple[al_handler_and_event, ...]
 
 
@@ -178,7 +180,7 @@ def _get_activation_handler_and_event(
     n_epochs: int,
     sample_interval_base: int,
     act_every_sample_factor: int,
-    early_stopping_patience,
+    early_stopping_patience: int,
 ) -> al_handler_and_event:
 
     activation_handler_callable = activation_analysis_handler
@@ -268,7 +270,7 @@ def _attach_early_stopping_handler(trainer: Engine, handler_config: "HandlerConf
         patience_steps=gc.early_stopping_patience,
     )
 
-    early_stopping_event_kwargs = _get_early_stopping_event_kwargs(
+    early_stopping_event_kwargs = _get_early_stopping_event_filter_kwargs(
         early_stopping_iteration_buffer=gc.early_stopping_buffer,
         sample_interval=gc.sample_interval,
     )
@@ -304,20 +306,22 @@ def _get_early_stopping_handler(
 
 
 @overload
-def _get_early_stopping_event_kwargs(
+def _get_early_stopping_event_filter_kwargs(
     early_stopping_iteration_buffer: None, sample_interval: int
-) -> Dict[str, int]:
+) -> Dict[Literal["every"], int]:
     ...
 
 
 @overload
-def _get_early_stopping_event_kwargs(
+def _get_early_stopping_event_filter_kwargs(
     early_stopping_iteration_buffer: int, sample_interval: int
-) -> Dict[str, Callable[[Engine, int], bool]]:
+) -> Dict[Literal["event_filter"], Callable[[Engine, int], bool]]:
     ...
 
 
-def _get_early_stopping_event_kwargs(early_stopping_iteration_buffer, sample_interval):
+def _get_early_stopping_event_filter_kwargs(
+    early_stopping_iteration_buffer, sample_interval
+):
 
     if early_stopping_iteration_buffer is None:
         return {"every": sample_interval}
@@ -733,8 +737,11 @@ def add_hparams_to_tensorboard(
     max_perf = average_loss_df["perf-average"].max()
 
     writer.add_hparams(
-        h_param_dict,
-        {"validation_loss-overall_min": min_loss, "best_overall_performance": max_perf},
+        hparam_dict=h_param_dict,
+        metric_dict={
+            "validation_loss-overall_min": min_loss,
+            "best_overall_performance": max_perf,
+        },
     )
 
 

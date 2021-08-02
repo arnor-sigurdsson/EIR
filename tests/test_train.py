@@ -64,6 +64,52 @@ def test_prepare_run_folder_fail(patched_get_run_folder, tmp_path):
     ],
     indirect=True,
 )
+def test_get_default_experiment(create_test_config):
+    test_configs = create_test_config
+
+    default_experiment = train.get_default_experiment(configs=test_configs, hooks=None)
+    assert default_experiment.configs == test_configs
+
+    assert default_experiment.hooks is None
+
+    assert len(default_experiment.criterions) == 1
+    assert isinstance(default_experiment.criterions["Origin"], nn.CrossEntropyLoss)
+
+    assert len(default_experiment.inputs) == 1
+    assert set(default_experiment.inputs.keys()) == {"omics_test_genotype"}
+
+    assert default_experiment.target_columns == {"cat": ["Origin"], "con": []}
+
+
+def test_modify_bs_for_multi_gpu():
+    no_gpu = train._modify_bs_for_multi_gpu(multi_gpu=False, batch_size=64)
+    assert no_gpu == 64
+
+    with patch("eir.train.torch.cuda.device_count", autospec=True) as mocked:
+        mocked.return_value = 4
+        gpu = train._modify_bs_for_multi_gpu(multi_gpu=True, batch_size=64)
+        assert gpu == 64 * 4
+
+
+@pytest.mark.parametrize("create_test_data", [{"task_type": "multi"}], indirect=True)
+@pytest.mark.parametrize(
+    "create_test_config_init_base",
+    [
+        # Case 1: Linear
+        {
+            "injections": {
+                "global_configs": {"lr": 1e-03},
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "input_type_info": {"model_type": "mlp"},
+                    },
+                ],
+            },
+        },
+    ],
+    indirect=True,
+)
 def test_get_train_sampler(create_test_data, create_test_datasets, create_test_config):
 
     test_config = create_test_config

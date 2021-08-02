@@ -418,6 +418,32 @@ def _check_test_performance_results(
                 },
             },
         },
+        # Case 7: Using the GLN with limited activations
+        {
+            "injections": {
+                "global_configs": {
+                    "run_name": "limited_activations",
+                    "lr": 1e-03,
+                    "max_acts_per_class": 100,
+                },
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "input_type_info": {"model_type": "genome-local-net"},
+                        "model_config": {
+                            "kernel_width": 8,
+                            "channel_exp_base": 2,
+                            "l1": 1e-04,
+                            "rb_do": 0.20,
+                        },
+                    },
+                ],
+                "target_configs": {
+                    "target_cat_columns": ["Origin"],
+                    "target_con_columns": ["Height", "ExtraTarget"],
+                },
+            },
+        },
     ],
     indirect=True,
 )
