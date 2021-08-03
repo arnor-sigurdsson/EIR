@@ -368,6 +368,13 @@ def _check_test_performance_results(
                         },
                     },
                 ],
+                "predictor_configs": {
+                    "model_config": {
+                        "fc_task_dim": 64,
+                        "fc_do": 0.20,
+                        "rb_do": 0.20,
+                    },
+                },
                 "target_configs": {
                     "target_cat_columns": ["Origin"],
                     "target_con_columns": ["Height", "ExtraTarget"],
