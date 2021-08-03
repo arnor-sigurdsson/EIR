@@ -1,5 +1,4 @@
 import atexit
-import json
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
@@ -26,6 +25,7 @@ from eir.train_utils.lr_scheduling import (
     set_up_lr_scheduler,
     attach_lr_scheduler,
 )
+from eir.setup.config import object_to_primitives
 from eir.train_utils.metrics import (
     get_metrics_dataframes,
     persist_metrics,
@@ -473,10 +473,6 @@ def _save_yaml_configs(run_folder: Path, configs: "Configs"):
 
         with open(str(cur_outpath), "w") as yamlfile:
             yaml.dump(data=config_object_as_primitives, stream=yamlfile)
-
-
-def object_to_primitives(obj):
-    return json.loads(json.dumps(obj, default=lambda o: o.__dict__))
 
 
 def _add_checkpoint_handler_wrapper(

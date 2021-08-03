@@ -21,6 +21,7 @@ import eir.train
 from eir import train
 from eir.data_load import datasets
 from eir.setup import schemas, config
+from eir.setup.config import recursive_dict_replace
 from eir.setup.input_setup import serialize_all_input_transformers
 from eir.train import (
     Experiment,
@@ -517,29 +518,6 @@ def modify_test_configs(
             )
 
     return configs_copy
-
-
-def recursive_dict_replace(dict_, dict_to_inject):
-    """
-    This is a for rudimentary dictionary injection / replacement. We only replace /
-    inject when have a non-mappable object (e.g. primitives like str / int).
-
-    An alternative would be checking if the new and old values are of type Mapping,
-    then merging them as dicts?
-    """
-    for cur_key, cur_value in dict_to_inject.items():
-
-        if cur_key not in dict_:
-            dict_[cur_key] = {}
-
-        old_dict_value = dict_.get(cur_key)
-        if isinstance(cur_value, Mapping):
-            assert isinstance(old_dict_value, Mapping)
-            recursive_dict_replace(old_dict_value, cur_value)
-        else:
-            dict_[cur_key] = cur_value
-
-    return dict_
 
 
 @pytest.fixture()

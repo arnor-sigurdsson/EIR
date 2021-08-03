@@ -1,5 +1,11 @@
 import argparse
+from pathlib import Path
 import types
+import ast
+from collections import defaultdict
+import json
+import operator
+from functools import reduce
 from argparse import Namespace
 from copy import copy
 from dataclasses import dataclass
@@ -9,11 +15,13 @@ from typing import (
     Dict,
     List,
     Union,
+    Tuple,
     Type,
     Any,
     Callable,
     overload,
     Generator,
+    Mapping,
 )
 
 import configargparse
@@ -34,18 +42,18 @@ logger = get_logger(name=__name__)
 
 
 def get_configs():
-    main_cl_args = get_main_cl_args()
-    configs = generate_aggregated_config(cl_args=main_cl_args)
-
+    main_cl_args, extra_cl_args = get_main_cl_args()
+    configs = generate_aggregated_config(
+        cl_args=main_cl_args, extra_cl_args_overload=extra_cl_args
+    )
     return configs
 
 
-def get_main_cl_args() -> argparse.Namespace:
-
+def get_main_cl_args() -> Tuple[argparse.Namespace, List[str]]:
     parser_ = get_main_parser()
-    cl_args = parser_.parse_args()
+    cl_args, extra_cl_args = parser_.parse_known_args()
 
-    return cl_args
+    return cl_args, extra_cl_args
 
 
 def get_main_parser() -> configargparse.ArgumentParser:
@@ -72,7 +80,6 @@ def get_main_parser() -> configargparse.ArgumentParser:
 
 @dataclass
 class Configs:
-
     global_config: schemas.GlobalConfig
     input_configs: Sequence[schemas.InputConfig]
     predictor_config: schemas.PredictorConfig
@@ -80,7 +87,8 @@ class Configs:
 
 
 def generate_aggregated_config(
-    cl_args: Union[argparse.Namespace, types.SimpleNamespace]
+    cl_args: Union[argparse.Namespace, types.SimpleNamespace],
+    extra_cl_args_overload: Union[List[str], None] = None,
 ) -> Configs:
     """
     We manually assume and use only first element of predictor configs, as for now we
@@ -88,16 +96,26 @@ def generate_aggregated_config(
     per target.
     """
 
-    global_config_iter = get_yaml_to_dict_iterator(configs=cl_args.global_configs)
+    global_config_iter = get_yaml_iterator_with_injections(
+        yaml_config_files=cl_args.global_configs, extra_cl_args=extra_cl_args_overload
+    )
     global_config = get_global_config(global_configs=global_config_iter)
 
-    inputs_config_iter = get_yaml_to_dict_iterator(configs=cl_args.input_configs)
+    inputs_config_iter = get_yaml_iterator_with_injections(
+        yaml_config_files=cl_args.input_configs,
+        extra_cl_args=extra_cl_args_overload,
+    )
     input_configs = get_input_configs(input_configs=inputs_config_iter)
 
-    predictor_config_iter = get_yaml_to_dict_iterator(configs=cl_args.predictor_configs)
+    predictor_config_iter = get_yaml_iterator_with_injections(
+        yaml_config_files=cl_args.predictor_configs,
+        extra_cl_args=extra_cl_args_overload,
+    )
     predictor_config = load_predictor_config(predictor_configs=predictor_config_iter)
 
-    target_config_iter = get_yaml_to_dict_iterator(configs=cl_args.target_configs)
+    target_config_iter = get_yaml_iterator_with_injections(
+        yaml_config_files=cl_args.target_configs, extra_cl_args=extra_cl_args_overload
+    )
     target_configs = load_configs_general(
         config_dict_iterable=target_config_iter, cls=schemas.TargetConfig
     )
@@ -113,7 +131,6 @@ def generate_aggregated_config(
 
 
 def get_global_config(global_configs: Iterable[dict]) -> schemas.GlobalConfig:
-
     combined_config = combine_dicts(dicts=global_configs)
 
     combined_config_namespace = Namespace(**combined_config)
@@ -126,7 +143,6 @@ def get_global_config(global_configs: Iterable[dict]) -> schemas.GlobalConfig:
 
 
 def modify_global_config(global_config: schemas.GlobalConfig) -> schemas.GlobalConfig:
-
     gc_copy = copy(global_config)
 
     if gc_copy.valid_size > 1.0:
@@ -147,7 +163,6 @@ def modify_global_config(global_config: schemas.GlobalConfig) -> schemas.GlobalC
 def get_input_configs(
     input_configs: Iterable[dict],
 ) -> Sequence[schemas.InputConfig]:
-
     config_objects = []
 
     for config_dict in input_configs:
@@ -244,7 +259,6 @@ def get_model_config_setup_hook_map():
 
 
 def set_up_omics_config_object_init_kwargs(init_kwargs: dict, *args, **kwargs) -> dict:
-
     return init_kwargs
 
 
@@ -340,8 +354,56 @@ def combine_dicts(dicts: Iterable[dict]) -> dict:
     return combined_dict
 
 
-def get_yaml_to_dict_iterator(configs: Iterable[str]) -> Generator[Dict, None, None]:
-    for yaml_config in configs:
+def get_yaml_iterator_with_injections(
+    yaml_config_files: Iterable[str], extra_cl_args: List[str]
+) -> Generator[Dict, None, None]:
+    if not extra_cl_args:
+        yield from get_yaml_to_dict_iterator(yaml_config_files=yaml_config_files)
+
+    for yaml_config_file in yaml_config_files:
+        loaded_yaml = load_yaml_config(config_path=yaml_config_file)
+
+        yaml_file_path_object = Path(yaml_config_file)
+        for extra_arg in extra_cl_args:
+            extra_arg_parsed = extra_arg.lstrip("--")
+            target_file, str_to_inject = extra_arg_parsed.split(".", 1)
+
+            if target_file == yaml_file_path_object.stem:
+                dict_to_inject = convert_cl_str_to_dict(str_=str_to_inject)
+
+                logger.debug("Injecting %s into %s", dict_to_inject, loaded_yaml)
+                loaded_yaml = recursive_dict_replace(
+                    dict_=loaded_yaml, dict_to_inject=dict_to_inject
+                )
+
+        yield loaded_yaml
+
+
+def convert_cl_str_to_dict(str_: str) -> dict:
+    def _infinite_dict():
+        return defaultdict(_infinite_dict)
+
+    infinite_dict = _infinite_dict()
+
+    keys, final_value = str_.split("=", 1)
+    keys_split = keys.split(".")
+
+    try:
+        final_value_parsed = ast.literal_eval(final_value)
+    except ValueError:
+        final_value_parsed = final_value
+
+    inner_most_dict = reduce(operator.getitem, keys_split[:-1], infinite_dict)
+    inner_most_dict[keys_split[-1]] = final_value_parsed
+
+    dict_primitive = object_to_primitives(obj=infinite_dict)
+    return dict_primitive
+
+
+def get_yaml_to_dict_iterator(
+    yaml_config_files: Iterable[str],
+) -> Generator[Dict, None, None]:
+    for yaml_config in yaml_config_files:
         yield load_yaml_config(config_path=yaml_config)
 
 
@@ -350,3 +412,23 @@ def load_yaml_config(config_path: str) -> Dict[str, Any]:
         config_as_dict = yaml.load(stream=yaml_file, Loader=yaml.FullLoader)
 
     return config_as_dict
+
+
+def recursive_dict_replace(dict_: dict, dict_to_inject: dict) -> dict:
+    for cur_key, cur_value in dict_to_inject.items():
+
+        if cur_key not in dict_:
+            dict_[cur_key] = {}
+
+        old_dict_value = dict_.get(cur_key)
+        if isinstance(cur_value, Mapping):
+            assert isinstance(old_dict_value, Mapping)
+            recursive_dict_replace(old_dict_value, cur_value)
+        else:
+            dict_[cur_key] = cur_value
+
+    return dict_
+
+
+def object_to_primitives(obj):
+    return json.loads(json.dumps(obj, default=lambda o: o.__dict__))

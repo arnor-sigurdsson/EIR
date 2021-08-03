@@ -20,7 +20,7 @@ from eir.models.omics.models_cnn import CNNModel
 from eir.models.omics.omics_models import get_omics_model_init_kwargs
 from eir.setup import config
 from eir.setup import schemas
-from eir.train_utils.train_handlers import object_to_primitives
+from eir.setup.config import object_to_primitives
 from tests.conftest import cleanup, TestDataConfig, ModelTestConfig
 from tests.test_data_load.test_datasets import check_dataset
 
@@ -231,7 +231,7 @@ def _overload_test_yaml_object_for_predict(
     if cur_key == "input_configs":
         for idx, input_dict in enumerate(obj_as_primitives):
             if do_inject_test_values:
-                input_dict = predict.recursive_dict_replace(
+                input_dict = eir.setup.config.recursive_dict_replace(
                     dict_=input_dict,
                     dict_to_inject={
                         "input_info": {

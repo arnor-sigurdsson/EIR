@@ -14,7 +14,6 @@ from typing import (
     Tuple,
     Type,
     Any,
-    Mapping,
     Generator,
     Literal,
 )
@@ -51,7 +50,13 @@ from eir.models.model_training_utils import gather_pred_outputs_from_dloader
 from eir.setup import config
 from eir.setup import input_setup
 from eir.setup import schemas
-from eir.setup.config import Configs, get_all_targets, get_main_parser
+from eir.setup.config import (
+    Configs,
+    get_all_targets,
+    get_main_parser,
+    recursive_dict_replace,
+    object_to_primitives,
+)
 from eir.setup.input_setup import (
     al_input_objects_as_dict,
     OmicsInputInfo,
@@ -74,7 +79,6 @@ from eir.train_utils.metrics import (
     calculate_batch_metrics,
     al_step_metric_dict,
 )
-from eir.train_utils.train_handlers import object_to_primitives
 from eir.train_utils.utils import load_transformers
 
 al_named_dict_configs = Dict[
@@ -715,7 +719,7 @@ def get_named_pred_dict_iterators(
 
             if not value:
                 value = ()
-            cur_gen = config.get_yaml_to_dict_iterator(configs=value)
+            cur_gen = config.get_yaml_to_dict_iterator(yaml_config_files=value)
             dict_of_generators[key] = tuple(cur_gen)
     return dict_of_generators
 
@@ -862,23 +866,6 @@ def overload_train_configs_for_predict(
     )
 
     return train_configs_overloaded
-
-
-def recursive_dict_replace(dict_, dict_to_inject):
-
-    for cur_key, cur_value in dict_to_inject.items():
-
-        if cur_key not in dict_:
-            dict_[cur_key] = {}
-
-        old_dict_value = dict_.get(cur_key)
-        if isinstance(cur_value, Mapping):
-            assert isinstance(old_dict_value, Mapping)
-            recursive_dict_replace(old_dict_value, cur_value)
-        else:
-            dict_[cur_key] = cur_value
-
-    return dict_
 
 
 def _load_labels_for_predict(
