@@ -220,7 +220,7 @@ def get_shap_object(
     model: nn.Module,
     column_name: str,
     background_loader: DataLoader,
-    n_background_samples: int = 64,
+    n_background_samples: int,
 ):
     background, *_ = gather_dloader_samples(
         batch_prep_hook=experiment.hooks.step_func_hooks.base_prepare_batch,
