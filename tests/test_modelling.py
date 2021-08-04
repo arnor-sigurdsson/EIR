@@ -596,7 +596,12 @@ def _check_identified_snps(
 
         if check_types:
             expected_top_rows = top_row_grads_dict[cls]
-            _check_snp_types(cls, top_grads_dict, expected_top_rows, at_least_n)
+            _check_snp_types(
+                cls_name=cls,
+                top_grads_msk=top_grads_dict,
+                expected_idxs=expected_top_rows,
+                at_least_n=at_least_n,
+            )
 
 
 def _check_snp_types(cls_name: str, top_grads_msk, expected_idxs, at_least_n: int):

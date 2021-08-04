@@ -2,6 +2,7 @@ import argparse
 from pathlib import Path
 import types
 import ast
+import sys
 from collections import defaultdict
 import json
 import operator
@@ -53,6 +54,8 @@ def get_main_cl_args() -> Tuple[argparse.Namespace, List[str]]:
     parser_ = get_main_parser()
     cl_args, extra_cl_args = parser_.parse_known_args()
 
+    cl_args = add_preset_to_cl_args(cl_args=cl_args)
+
     return cl_args, extra_cl_args
 
 
@@ -61,21 +64,130 @@ def get_main_parser() -> configargparse.ArgumentParser:
         config_file_parser_class=configargparse.YAMLConfigFileParser
     )
 
+    config_nargs = "*" if "--preset" in sys.argv else "+"
+    config_required = False if "--preset" in sys.argv else True
+
     parser_.add_argument(
-        "--global_configs", nargs="+", type=str, required=True, help=""
+        "--preset",
+        type=str,
+        choices=["gln"],
+        default=None,
+        help="Whether and which preset to use that is built into the framework.",
     )
 
-    parser_.add_argument("--input_configs", type=str, nargs="+", required=True, help="")
-
     parser_.add_argument(
-        "--predictor_configs", type=str, nargs="*", required=False, help=""
+        "--global_configs",
+        nargs=config_nargs,
+        type=str,
+        required=config_required,
+        help="Global .yaml configurations for the experiment.",
     )
 
     parser_.add_argument(
-        "--target_configs", type=str, nargs="+", required=True, help=""
+        "--input_configs",
+        type=str,
+        nargs=config_nargs,
+        required=config_required,
+        help="Input feature extraction .yaml configurations. "
+        "Each configuration represents one input.",
+    )
+
+    parser_.add_argument(
+        "--predictor_configs",
+        type=str,
+        nargs="*",
+        required=False,
+        help="Predictor .yaml configurations.",
+    )
+
+    parser_.add_argument(
+        "--target_configs",
+        type=str,
+        nargs=config_nargs,
+        required=config_required,
+        help="Target .yaml configurations.",
     )
 
     return parser_
+
+
+def add_preset_to_cl_args(cl_args: Namespace):
+
+    if not cl_args.preset:
+        return cl_args
+
+    preset_map = _get_preset_map()
+    preset_dir = preset_map.get(cl_args.preset)
+    preset_dct = load_preset(preset_directory=preset_dir)
+
+    cl_args_copy = copy(cl_args)
+    for key, value in preset_dct.items():
+        setattr(cl_args_copy, key, value)
+
+    return cl_args_copy
+
+
+def load_preset(preset_directory: Path) -> Dict[str, List[str]]:
+    expected_keys = {
+        "global_configs",
+        "input_configs",
+        "target_configs",
+        "predictor_configs",
+    }
+
+    preset_yamls = {}
+    overload_names = []
+    for d in preset_directory.iterdir():
+        assert d.stem in expected_keys
+        files_in_dir = list(str(i) for i in d.iterdir())
+        preset_yamls[d.stem] = files_in_dir
+        overload_names += [i.stem for i in d.iterdir()]
+
+    logger.info("Preset keys for overloading are: %s", overload_names)
+
+    log_str = (
+        f"Following keys will have to be overloaded when using "
+        f"'{preset_directory.stem}' preset:"
+    )
+    log_targets = []
+    for key, files in preset_yamls.items():
+        for file in files:
+            overload_name = Path(file).stem
+            cur_yaml = load_yaml_config(config_path=file)
+
+            for match, *_ in _recursive_search(dict_=cur_yaml, target="MUST_FILL"):
+                match_str = ".".join(match)
+                log_targets.append(f"{overload_name}.{match_str}")
+
+    logger.info(f"{log_str} {log_targets}")
+    return preset_yamls
+
+
+def _get_preset_map() -> Dict[str, Path]:
+    preset_map = {}
+
+    preset_root = Path("config/experiment_presets")
+
+    for directory in preset_root.iterdir():
+        preset_map[directory.stem] = directory
+
+    return preset_map
+
+
+def _recursive_search(
+    dict_: Mapping, target: Any, path=None
+) -> Generator[Tuple[str, Any], None, None]:
+    if not path:
+        path = []
+
+    for key, value in dict_.items():
+        local_path = copy(path)
+        local_path.append(key)
+        if isinstance(value, Mapping):
+            yield from _recursive_search(dict_=value, target=target, path=local_path)
+        else:
+            if value == target:
+                yield local_path, value
 
 
 @dataclass
@@ -390,7 +502,7 @@ def convert_cl_str_to_dict(str_: str) -> dict:
 
     try:
         final_value_parsed = ast.literal_eval(final_value)
-    except ValueError:
+    except (ValueError, SyntaxError):
         final_value_parsed = final_value
 
     inner_most_dict = reduce(operator.getitem, keys_split[:-1], infinite_dict)

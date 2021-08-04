@@ -215,7 +215,7 @@ def _get_split_block_factory(
         return generate_split_resblocks_auto
 
     auto_factory = partial(
-        _generate_split_blocks_from_spec, block_layer_spec=block_layer_spec[:-1]
+        _generate_split_blocks_from_spec, block_layer_spec=block_layer_spec
     )
 
     return auto_factory
