@@ -56,7 +56,7 @@ def test_prepare_run_folder_fail(patched_get_run_folder, tmp_path):
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "mlp"},
+                        "input_type_info": {"model_type": "linear"},
                     },
                 ],
             },
@@ -102,7 +102,7 @@ def test_modify_bs_for_multi_gpu():
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "mlp"},
+                        "input_type_info": {"model_type": "linear"},
                     },
                 ],
             },
@@ -141,7 +141,7 @@ def test_get_train_sampler(create_test_data, create_test_datasets, create_test_c
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "mlp"},
+                        "input_type_info": {"model_type": "linear"},
                     },
                 ],
             },
@@ -235,7 +235,7 @@ def test_get_optimizer():
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "mlp"},
+                        "input_type_info": {"model_type": "linear"},
                     },
                 ],
                 "target_configs": {
@@ -283,7 +283,7 @@ def _check_model(model_type: str, model: nn.Module):
         assert model.multi_task_branches["Height"][-1][-1].out_features == 1
         assert isinstance(model.modules_to_fuse["omics_test_genotype"], CNNModel)
 
-    elif model_type == "mlp":
+    elif model_type == "linear":
         assert isinstance(model.modules_to_fuse["omics_test_genotype"], LinearModel)
 
 

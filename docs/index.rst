@@ -35,6 +35,7 @@ To get started, please, read :doc:`quickstart`
     :maxdepth: 2
 
     quickstart
+    tutorials/tutorial_index
     binaries_guide
     api_reference
     license

@@ -1,0 +1,10 @@
+input_info:
+  input_source: processed_sample_data/arrays/
+  input_name: genotype
+  input_type: omics
+
+input_type_info:
+  model_type: identity
+  na_augment_perc: 0.4
+  na_augment_prob: 1.0
+  snp_file: processed_sample_data/data_final_gen.bim

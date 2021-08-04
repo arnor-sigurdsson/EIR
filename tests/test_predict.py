@@ -143,7 +143,7 @@ def test_get_named_pred_dict_iterators(tmp_path: Path) -> None:
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "mlp"},
+                        "input_type_info": {"model_type": "linear"},
                     }
                 ],
             },
@@ -259,7 +259,7 @@ def _overload_test_yaml_object_for_predict(
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "mlp"},
+                        "input_type_info": {"model_type": "linear"},
                     }
                 ],
             },
@@ -308,7 +308,7 @@ def test_overload_train_configs_for_predict(
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "mlp"},
+                        "input_type_info": {"model_type": "linear"},
                     },
                     {
                         "input_info": {"input_name": "test_tabular"},
@@ -379,7 +379,7 @@ def test_load_labels_for_predict(
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "mlp"},
+                        "input_type_info": {"model_type": "linear"},
                     },
                 ],
             },
@@ -390,7 +390,7 @@ def test_load_labels_for_predict(
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "mlp"},
+                        "input_type_info": {"model_type": "linear"},
                     },
                 ],
             },

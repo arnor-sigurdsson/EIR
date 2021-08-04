@@ -21,9 +21,7 @@ class IdentityModelConfig:
     """
 
     flatten: bool = True
-    flatten_shape: Literal[
-        "c",
-    ] = "c"
+    flatten_shape: Literal["c", "fortran"] = "c"
 
 
 class IdentityModel(nn.Module):

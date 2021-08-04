@@ -39,7 +39,7 @@ al_omics_model_configs = Union[
 def get_omics_model_mapping() -> Dict[str, al_models_classes]:
     mapping = {
         "cnn": CNNModel,
-        "mlp": LinearModel,
+        "linear": LinearModel,
         "mlp-split": SimpleLCLModel,
         "genome-local-net": LCLModel,
         "identity": IdentityModel,
@@ -61,7 +61,7 @@ class Dataclass(Protocol):
 def get_omics_config_dataclass_mapping() -> Dict[str, Type[Dataclass]]:
     mapping = {
         "cnn": CNNModelConfig,
-        "mlp": LinearModelConfig,
+        "linear": LinearModelConfig,
         "mlp-split": SimpleLCLModelConfig,
         "genome-local-net": LCLModelConfig,
         "identity": IdentityModelConfig,

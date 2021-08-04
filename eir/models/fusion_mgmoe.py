@@ -27,9 +27,9 @@ class MGMoEModelConfig:
     """
     :param layers:
         A sequence of two int values controlling the number of residual MLP blocks in
-        the network. The first item (i.e. `layers[0]`) refers to the number of blocks
-        in the expert branches. The second item (i.e. `layers[1]`) refers to the number
-        of blocks in the predictor branches.
+        the network. The first item (i.e. ``layers[0]``) refers to the number of blocks
+        in the expert branches. The second item (i.e. ``layers[1]``) refers to the
+        number of blocks in the predictor branches.
 
     :param fc_task_dim:
        Number of hidden nodes in all residual blocks (both expert and predictor) of

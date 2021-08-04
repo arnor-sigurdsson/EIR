@@ -24,7 +24,7 @@ class CNNModelConfig:
     stride.
 
     :param layers:
-        Controls the number of layers in the model. If set to `None`, the model will
+        Controls the number of layers in the model. If set to ``None``, the model will
         automatically set up the number of layers until a certain width (stride * 8)
         is met. Future work includes adding a parameter to control the target width.
 
@@ -37,20 +37,20 @@ class CNNModelConfig:
 
     :param first_stride_expansion:
         Factor to extend the first layer stride. This value can both be positive or
-        negative. For example in the case of `down_stride=12`, setting
-        `first_stride_expansion=2` means that the first layer will have a stride of 24,
-        whereas other layers will have a stride of 12. When using a negative value,
+        negative. For example in the case of ``down_stride=12``, setting
+        ``first_stride_expansion=2`` means that the first layer will have a stride of
+        24, whereas other layers will have a stride of 12. When using a negative value,
         divides the first stride by the value instead of multiplying.
 
     :param channel_exp_base:
         Which power of 2 to use in order to set the number of channels in the network.
-        For example, setting `channel_exp_base=3` means that 2**3=8 channels will be
+        For example, setting ``channel_exp_base=3`` means that 2**3=8 channels will be
         used.
 
     :param first_channel_expansion:
         Factor to extend the first layer channels. This value can both be positive or
-        negative. For example in the case of `channel_exp_base=3` (i.e. 8 channels),
-        setting `first_channel_expansion=2` means that the first layer will have 16
+        negative. For example in the case of ``channel_exp_base=3`` (i.e. 8 channels),
+        setting ``first_channel_expansion=2`` means that the first layer will have 16
         channels, whereas other layers will have a channel of 8 as base.
         When using a negative value, divides the first channel by the value instead
         of multiplying.
@@ -63,9 +63,9 @@ class CNNModelConfig:
 
     :param first_kernel_expansion:
         Factor to extend the first kernel. This value can both be positive or negative.
-        For example in the case of `kernel_width=12`, setting
-        `first_kernel_expansion=2` means that the first kernel will have a width of 24,
-        whereas other kernels will have a width of 12. When using a negative value,
+        For example in the case of ``kernel_width=12``, setting
+        ``first_kernel_expansion=2`` means that the first kernel will have a width of
+        24, whereas other kernels will have a width of 12. When using a negative value,
         divides the first kernel by the value instead of multiplying.
 
     :param dilation_factor:
@@ -201,7 +201,7 @@ def _make_conv_layers(
     that channel dimension.
     :param cnn_model_configuration: Experiment hyperparameters / configuration needed
     for the convolution setup.
-    :return: A list of `nn.Module` objects to be passed to `nn.Sequential`.
+    :return: A list of ``nn.Module`` objects to be passed to ``nn.Sequential``.
     """
     mc = cnn_model_configuration
 

@@ -97,6 +97,7 @@ def get_main_parser() -> configargparse.ArgumentParser:
         type=str,
         nargs="*",
         required=False,
+        default=[],
         help="Predictor .yaml configurations.",
     )
 
@@ -322,8 +323,11 @@ def get_inputs_schema_map() -> Dict[
 def set_up_model_config(
     input_info_object: schemas.InputDataConfig,
     input_type_info_object: al_input_types,
-    model_init_kwargs_base: dict,
+    model_init_kwargs_base: Union[None, dict],
 ):
+    if not model_init_kwargs_base:
+        model_init_kwargs_base = {}
+
     init_kwargs = copy(model_init_kwargs_base)
 
     cur_setup_hook = get_model_config_setup_hook(
@@ -471,6 +475,7 @@ def get_yaml_iterator_with_injections(
 ) -> Generator[Dict, None, None]:
     if not extra_cl_args:
         yield from get_yaml_to_dict_iterator(yaml_config_files=yaml_config_files)
+        return
 
     for yaml_config_file in yaml_config_files:
         loaded_yaml = load_yaml_config(config_path=yaml_config_file)

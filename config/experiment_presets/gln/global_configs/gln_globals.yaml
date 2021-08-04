@@ -1,5 +1,6 @@
 run_name: gln_run
 n_epochs: 20
+lr: 0.001
 sample_interval: 300
 checkpoint_interval: 300
 n_saved_models: 3

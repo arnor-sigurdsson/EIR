@@ -29,7 +29,7 @@ if TYPE_CHECKING:
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "mlp"},
+                        "input_type_info": {"model_type": "linear"},
                     }
                 ],
             },
@@ -142,7 +142,7 @@ def _set_up_bad_label_file_for_testing(label_file: Path) -> None:
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "mlp"},
+                        "input_type_info": {"model_type": "linear"},
                     }
                 ],
             },
@@ -296,7 +296,7 @@ def _corrupt_arrays_for_testing(
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "mlp"},
+                        "input_type_info": {"model_type": "linear"},
                     },
                     {
                         "input_info": {"input_name": "test_tabular"},
@@ -384,7 +384,7 @@ def test_construct_dataset_init_params_from_cl_args(
                     {
                         "input_info": {"input_name": "test_genotype"},
                         "input_type_info": {
-                            "model_type": "mlp",
+                            "model_type": "linear",
                             "na_augment_perc": 0.05,
                         },
                     }

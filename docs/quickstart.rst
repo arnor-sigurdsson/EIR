@@ -1,3 +1,5 @@
+.. _quickstart:
+
 Quickstart
 ==========
 
@@ -47,9 +49,11 @@ we can run the following command:
 .. tip::
 
     While concise,
-    the command above indeed obscures a lot of the configuration
-    happening behind the scenes.
-    For a full set of options and a short explanation of each, run ``eirtrain --help``.
+    the command above indeed obscures a lot of the configuration and functionality
+    happening behind the scenes. See the :ref:`01-basic-tutorial` for a more thorough example.
+    Additionally, the full set of configurations used for the ``gln`` preset
+    are available in the ``config/`` directory in the
+    `project repository <https://github.com/arnor-sigurdsson/EIR>`_.
 
 
 This will generate a folder called ``runs/gln``
@@ -83,34 +87,7 @@ The folder has roughly the following structure
     ├── training_curve_LOSS-AVERAGE.png
     ├── training_curve_PERF-AVERAGE.png
 
-
-Predicting on external samples
-------------------------------
-
-To predict on unseen samples,
-we can use the ``eirpredict``, for example like so:
-
-.. code-block:: console
-
-    eirpredict --model_path runs/gln/saved_models/<chosen_model>  --output_folder runs --device cpu --label_file <path/to/test_labels.csv>  --omics_sources <path/to/test_arrays> --omics_names genotype --evaluate
-
-This will generate a folder called ``test_set_predictions``
-under in the ``--output_folder`` directory.
-
-.. tip::
-
-   We might want to predict on samples where we do not have any labels,
-   in that case just omit the ``--evaluate`` and ``--label_file`` flags.
-
-Applying to other datasets
---------------------------
-
-Hopefully this small demo was useful!
-To apply to your own data,
-you will have to process it (see: `plink pipelines`_)
-and change the following flags:
-
-.. code-block:: console
-
-    --omics_sources <path/to/your/processed/arrays> --snp_file <path/to/your/bim/file> --label_file <path/to/your/labels/csv/file> --target_cat_columns <name_of_target_column_in_label_file>
-
+Hopefully this small demo was useful! For a more thorough tutorial
+(e.g. showing how you can predict on external samples,
+tips on applying the framework to your own data),
+head to :ref:`01-basic-tutorial`.

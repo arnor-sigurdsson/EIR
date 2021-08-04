@@ -27,7 +27,7 @@ from tests.conftest import cleanup, ModelTestConfig
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "mlp"},
+                        "input_type_info": {"model_type": "linear"},
                     }
                 ],
             },
@@ -173,7 +173,7 @@ def _check_snps_wrapper(
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "mlp"},
+                        "input_type_info": {"model_type": "linear"},
                     },
                 ],
                 "target_configs": {
@@ -320,7 +320,7 @@ def _check_test_performance_results(
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "mlp"},
+                        "input_type_info": {"model_type": "linear"},
                         "model_config": {"l1": 1e-03},
                     },
                 ],

@@ -22,7 +22,7 @@ from eir.models.tabular.tabular import SimpleTabularModel, TabularModelConfig
 al_input_configs = Sequence["InputConfig"]
 
 
-al_model_configs = [
+al_model_configs = Union[
     Type[FusionModelConfig],
     Type[MGMoEModelConfig],
     Type[CNNModelConfig],
@@ -266,11 +266,11 @@ class InputDataConfig:
 class OmicsInputDataConfig:
     """
     :param snp_file:
-        Path to the relevant `.bim` file, used for activation analysis.
+        Path to the relevant ``.bim`` file, used for activation analysis.
 
     :param na_augment_perc:
         Percentage of the input (i.e. percentage of SNPs) to augment by setting the
-        SNPs to 'missing' (i.e. `[0, 0, 0, 1]` in one-hot encoding).
+        SNPs to 'missing' (i.e. ``[0, 0, 0, 1]`` in one-hot encoding).
 
     :param na_augment_prob:
         Probability of applying NA augmentation to a given sample.
@@ -285,7 +285,9 @@ class OmicsInputDataConfig:
     snp_file: Optional[str] = None
     na_augment_perc: float = 0.0
     na_augment_prob: float = 0.0
-    model_type: Literal["cnn", "mlp", "mlp-split", "genome-local-net", "linear"] = "gln"
+    model_type: Literal[
+        "cnn", "linear", "mlp-split", "genome-local-net", "linear"
+    ] = "gln"
     omics_format: Literal["one-hot"] = "one-hot"
 
 
@@ -296,15 +298,15 @@ class TabularInputDataConfig:
         Type of tabular model to use. Currently only one type ("tabular") is supported.
 
     :param extra_cat_columns:
-        Which columns to use as a categorical inputs from the `input_source` specified
-        in the `input_info` field of the relevant `.yaml`.
+        Which columns to use as a categorical inputs from the ``input_source`` specified
+        in the ``input_info`` field of the relevant ``.yaml``.
 
     :param extra_con_columns:
-        Which columns to use as a continuous inputs from the `input_source` specified
-        in the `input_info` field of the relevant `.yaml`.
+        Which columns to use as a continuous inputs from the ``input_source`` specified
+        in the ``input_info`` field of the relevant ``.yaml``.
 
     :param label_parsing_chunk_size:
-        Number of rows to process at time when loading in the `input_source`. Useful
+        Number of rows to process at time when loading in the ``input_source``. Useful
         when RAM is limited.
     """
 
@@ -318,17 +320,17 @@ class TabularInputDataConfig:
 class TargetConfig:
     """
     :param label_file:
-        Label `.csv` file to load targets from.
+        Label ``.csv`` file to load targets from.
 
     :param label_parsing_chunk_size:
-        Number of rows to process at time when loading in the `input_source`. Useful
+        Number of rows to process at time when loading in the ``input_source``. Useful
         when RAM is limited.
 
     :param target_cat_columns:
-        Which columns from `label_file` to use as categorical targets.
+        Which columns from ``label_file`` to use as categorical targets.
 
     :param target_con_columns:
-        Which columns from `label_file` to use as continuous targets.
+        Which columns from ``label_file`` to use as continuous targets.
     """
 
     label_file: str
