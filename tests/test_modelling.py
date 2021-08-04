@@ -415,7 +415,7 @@ def _check_test_performance_results(
                 "global_configs": {
                     "run_name": "mixing_multi",
                     "lr": 1e-03,
-                    "mixing_alpha": 1.0,
+                    "mixing_alpha": 0.5,
                     "mixing_type": "cutmix-uniform",
                 },
                 "input_configs": [

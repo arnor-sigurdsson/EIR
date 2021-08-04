@@ -119,13 +119,21 @@ def activation_analysis_handler(
         iteration=iteration,
     )
 
+    background_loader = get_background_loader(experiment=exp)
+
     activation_analysis_wrapper(
         model=exp.model,
         experiment=exp,
         outfolder_target_callable=activation_outfolder_callable,
         dataset_to_interpret=exp.valid_dataset,
-        background_loader=exp.train_loader,
+        background_loader=background_loader,
     )
+
+
+def get_background_loader(experiment: "Experiment") -> torch.utils.data.DataLoader:
+    background_loader = copy.deepcopy(experiment.train_loader)
+
+    return background_loader
 
 
 def activation_analysis_wrapper(

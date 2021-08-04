@@ -350,7 +350,7 @@ def get_default_experiment(
 
     metrics = get_default_metrics(target_transformers=target_labels.label_transformers)
 
-    config = Experiment(
+    experiment = Experiment(
         configs=configs,
         inputs=inputs,
         train_loader=train_dloader,
@@ -368,7 +368,7 @@ def get_default_experiment(
         hooks=hooks,
     )
 
-    return config
+    return experiment
 
 
 def gather_all_ids_from_target_configs(

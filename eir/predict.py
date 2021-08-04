@@ -957,7 +957,7 @@ def _compute_predict_activations(
         predict_config=predict_config,
     )
 
-    background_dataloader = _get_background_dataloader(
+    background_dataloader = _get_predict_background_loader(
         batch_size=gc.batch_size,
         dataloader_workers=gc.dataloader_workers,
         configs_overloaded_for_predict=predict_config.train_configs_overloaded,
@@ -1001,7 +1001,7 @@ def _overload_train_experiment_for_predict_activations(
     return mixed_experiment
 
 
-def _get_background_dataloader(
+def _get_predict_background_loader(
     batch_size: int,
     dataloader_workers: int,
     configs_overloaded_for_predict: Configs,
