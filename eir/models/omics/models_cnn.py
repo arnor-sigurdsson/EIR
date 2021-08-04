@@ -18,6 +18,69 @@ logger = get_logger(__name__)
 
 @dataclass
 class CNNModelConfig:
+    """
+    Note that when using the automatic network setup, channels will get increased as
+    the input gets propagated through the network while the width gets reduced due to
+    stride.
+
+    :param layers:
+        Controls the number of layers in the model. If set to `None`, the model will
+        automatically set up the number of layers until a certain width (stride * 8)
+        is met. Future work includes adding a parameter to control the target width.
+
+    :param fc_repr_dim:
+        Output dimension of the last FC layer in the network which accepts the outputs
+        from the convolutional layer.
+
+    :param down_stride:
+        Down stride of the convolutional layers.
+
+    :param first_stride_expansion:
+        Factor to extend the first layer stride. This value can both be positive or
+        negative. For example in the case of `down_stride=12`, setting
+        `first_stride_expansion=2` means that the first layer will have a stride of 24,
+        whereas other layers will have a stride of 12. When using a negative value,
+        divides the first stride by the value instead of multiplying.
+
+    :param channel_exp_base:
+        Which power of 2 to use in order to set the number of channels in the network.
+        For example, setting `channel_exp_base=3` means that 2**3=8 channels will be
+        used.
+
+    :param first_channel_expansion:
+        Factor to extend the first layer channels. This value can both be positive or
+        negative. For example in the case of `channel_exp_base=3` (i.e. 8 channels),
+        setting `first_channel_expansion=2` means that the first layer will have 16
+        channels, whereas other layers will have a channel of 8 as base.
+        When using a negative value, divides the first channel by the value instead
+        of multiplying.
+
+    :param kernel_width:
+        Base kernel width of the convolutions. Differently from the LCL model
+        configurations, this number refers to the actual columns in the unflattened
+        input. So assuming an omics input, setting kernel_width=2 means 2 SNPs covered
+        at a time.
+
+    :param first_kernel_expansion:
+        Factor to extend the first kernel. This value can both be positive or negative.
+        For example in the case of `kernel_width=12`, setting
+        `first_kernel_expansion=2` means that the first kernel will have a width of 24,
+        whereas other kernels will have a width of 12. When using a negative value,
+        divides the first kernel by the value instead of multiplying.
+
+    :param dilation_factor:
+        Base dilation factor of the convolutions in the network.
+
+    :param rb_do:
+        Dropout in the convolutional residual blocks.
+
+    :param sa:
+        Whether to add a self-attention layer to the network after a width of 1024
+        has been reached.
+
+    :param l1:
+        L1 regularization to apply to the first layer.
+    """
 
     layers: Union[None, List[int]] = None
 

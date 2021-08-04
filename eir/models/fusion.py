@@ -32,6 +32,20 @@ def default_fuse_features(features: Sequence[torch.Tensor]) -> torch.Tensor:
 
 @dataclass
 class FusionModelConfig:
+    """
+    :param layers:
+        Number of residual MLP layers to use in for each output predictor after fusing.
+
+    :param fc_task_dim:
+        Number of hidden nodes in each MLP residual block.
+
+    :param rb_do:
+        Dropout in each MLP residual block.
+
+    :param fc_do:
+        Dropout before last FC layer.
+    """
+
     layers: List[int] = field(default_factory=lambda: [2])
 
     fc_task_dim: int = 32

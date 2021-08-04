@@ -19,6 +19,19 @@ logger = get_logger(__name__)
 
 @dataclass
 class SimpleLCLModelConfig:
+    """
+    :param fc_repr_dim:
+        Controls the number of output sets in the first and only split layer. Analogous
+        to channels in CNNs.
+    :param split_mlp_num_splits:
+        Controls the number of splits applied to the input. E.g. with a input with of
+        800, using `split_mlp_num_splits=100` will result in a kernel width of 8,
+        meaning 8 elements in the flattened input. If using a SNP inputs with a one-hot
+        encoding of 4 possible values, this will result in 8/2 = 2 SNPs per locally
+        connected area.
+    :param l1: float = 0.00
+        L1 regularization applied to the first and only locally connected layer.
+    """
 
     fc_repr_dim: int = 12
     split_mlp_num_splits: int = 64
@@ -69,6 +82,56 @@ class SimpleLCLModel(nn.Module):
 
 @dataclass
 class LCLModelConfig:
+    """
+    Note that when using the automatic network setup, kernel widths will get expanded
+    to ensure that the feature representations become smaller as they are propagated
+    through the network.
+
+    :param layers:
+        Controls the number of layers in the model. If set to `None`, the model will
+        automatically set up the number of layers according to the `cutoff` paramter
+        value.
+
+    :param kernel_width:
+        With of the locally connected kernels. Note that this refers to the flattened
+        input, meaning that if we have a one-hot encoding of 4 values (e.g. SNPs), 12
+        refers to 12/4 = 3 SNPs per locally connected window. Can be set to `None` if
+        the `split_mlp_num_splits` paramter is set, which means that the kernel width
+        will be set automatically according to
+
+    :param first_kernel_expansion:
+        Factor to extend the first kernel. This value can both be positive or negative.
+        For example in the case of `kernel_width=12`, setting
+        `first_kernel_expansion=2` means that the first kernel will have a width of 24,
+        whereas other kernels will have a width of 12. When using a negative value,
+        divides the first kernel by the value instead of multiplying.
+
+    :param channel_exp_base:
+        Which power of 2 to use in order to set the number of channels/weight sets in
+        the network. For example, setting `channel_exp_base=3` means that 2**3=8
+        weight sets will be used.
+
+    :param first_channel_expansion:
+        Whether to expand / shrink the number of channels in the first layer as compared
+        to other layers in the network. Works analogously to the
+        `first_kernel_expansion` parameter.
+
+    :param split_mlp_num_splits:
+        Controls the number of splits applied to the input. E.g. with a input width of
+        800, using `split_mlp_num_splits=100` will result in a kernel width of 8,
+        meaning 8 elements in the flattened input. If using a SNP inputs with a one-hot
+        encoding of 4 possible values, this will result in 8/2 = 2 SNPs per locally
+        connected area.
+
+    :param rb_do:
+        Dropout in the residual blocks.
+
+    :param l1:
+        L1 regularization applied to the first layer in the network.
+
+    :param cutoff:
+        Feature dimension cutoff where the automatic network setup stops adding layers.
+    """
 
     layers: Union[None, List[int]] = None
 

@@ -15,7 +15,7 @@ from eir import train
 from eir.data_load import label_setup
 from eir.models.fusion import FusionModel
 from eir.models.omics.models_cnn import CNNModel
-from eir.models.omics.models_mlp import MLPModel
+from eir.models.omics.models_linear import LinearModel
 from eir.setup.config import Configs
 from eir.setup.schemas import GlobalConfig
 from eir.train_utils import optimizers
@@ -284,7 +284,7 @@ def _check_model(model_type: str, model: nn.Module):
         assert isinstance(model.modules_to_fuse["omics_test_genotype"], CNNModel)
 
     elif model_type == "mlp":
-        assert isinstance(model.modules_to_fuse["omics_test_genotype"], MLPModel)
+        assert isinstance(model.modules_to_fuse["omics_test_genotype"], LinearModel)
 
 
 def test_get_criterions():

@@ -10,24 +10,26 @@ from eir.models.omics.models_locally_connected import (
     LCLModel,
     LCLModelConfig,
 )
-from eir.models.omics.models_mlp import MLPModel, MLPModelConfig
+from eir.models.omics.models_linear import LinearModel, LinearModelConfig
 
 if TYPE_CHECKING:
     from eir.setup.input_setup import DataDimensions
 
 al_models_classes = Union[
     Type["CNNModel"],
-    Type["MLPModel"],
+    Type["LinearModel"],
     Type["SimpleLCLModel"],
     Type["LCLModel"],
     Type["IdentityModel"],
 ]
 
-al_models = Union["CNNModel", "MLPModel", "SimpleLCLModel", "LCLModel", "IdentityModel"]
+al_models = Union[
+    "CNNModel", "LinearModel", "SimpleLCLModel", "LCLModel", "IdentityModel"
+]
 
 al_omics_model_configs = Union[
     CNNModelConfig,
-    MLPModelConfig,
+    LinearModelConfig,
     SimpleLCLModelConfig,
     LCLModelConfig,
     IdentityModelConfig,
@@ -37,7 +39,7 @@ al_omics_model_configs = Union[
 def get_omics_model_mapping() -> Dict[str, al_models_classes]:
     mapping = {
         "cnn": CNNModel,
-        "mlp": MLPModel,
+        "mlp": LinearModel,
         "mlp-split": SimpleLCLModel,
         "genome-local-net": LCLModel,
         "identity": IdentityModel,
@@ -59,7 +61,7 @@ class Dataclass(Protocol):
 def get_omics_config_dataclass_mapping() -> Dict[str, Type[Dataclass]]:
     mapping = {
         "cnn": CNNModelConfig,
-        "mlp": MLPModelConfig,
+        "mlp": LinearModelConfig,
         "mlp-split": SimpleLCLModelConfig,
         "genome-local-net": LCLModelConfig,
         "identity": IdentityModelConfig,

@@ -3,15 +3,16 @@ from typing import Union, Literal, List, Optional, Sequence, Type
 
 from eir.models.fusion import FusionModelConfig
 from eir.models.fusion_mgmoe import MGMoEModelConfig
+from eir.models.fusion_linear import LinearFusionModelConfig
 from eir.models.omics.omics_models import (
-    MLPModel,
+    LinearModel,
     CNNModel,
     LCLModel,
     SimpleLCLModel,
     IdentityModel,
     CNNModelConfig,
     LCLModelConfig,
-    MLPModelConfig,
+    LinearModelConfig,
     SimpleLCLModelConfig,
     IdentityModelConfig,
     Dataclass,
@@ -25,7 +26,7 @@ al_model_configs = [
     Type[FusionModelConfig],
     Type[MGMoEModelConfig],
     Type[CNNModelConfig],
-    Type[MLPModelConfig],
+    Type[LinearModelConfig],
     Type[SimpleLCLModelConfig],
     Type[LCLModelConfig],
     Type[TabularModelConfig],
@@ -35,7 +36,7 @@ al_model_configs = [
 
 al_models_classes = Union[
     Type[CNNModel],
-    Type[MLPModel],
+    Type[LinearModel],
     Type[LCLModel],
     Type[SimpleLCLModel],
     Type[SimpleTabularModel],
@@ -50,89 +51,123 @@ class GlobalConfig:
 
     :param run_name:
         What to name the experiment and output folder where results are saved.
+
     :param n_epochs:
         Number of epochs for training.
+
     :param batch_size:
         Size of batches during training.
+
     :param valid_size:
         Size if the validaton set, if float then uses a percentage. If int,
         then raw counts.
+
     :param dataloader_workers:
         Number of workers for multi-process training and validation data loading.
+
     :param device:
         Device to run the training on (i.e. GPU / CPU).
+
     :param gpu_num:
         Which GPU to run (according to CUDA order).
+
     :param weighted_sampling_column:
         Target column to apply weighted sampling on. Only applies to categorical
         columns. Passing in 'all' here will use an average of all the target columns.
+
     :param lr:
         Base learning rate for optimizer.
+
     :param lr_lb:
         Lower bound for learning rate when using LR scheduling
+
     :param find_lr:
         Whether to perform a range test of different learning rates, with
         the lower limit being what is passed in for the --lr flag.
         Produces a plot and exits with status 0 before training if this flag
         is active.
+
     :param lr_schedule:
         Whether to use cyclical, cosine or reduce on plateau learning rate
         schedule. Otherwise keeps same learning rate
+
     :param lr_plateau_patience:
         Number of validation performance steps without improvement over
         best performance before reducing LR (only relevant when --lr_schedule is
         'plateau'.
+
     :param lr_plateau_factor:
         Factor to reduce LR when running with plateau schedule.
+
     :param early_stopping_patience:
         Number of validation performance steps without improvement over
         best performance before terminating run.
+
     :param early_stopping_buffer:
         Number of iterations to run before activation early stopping checks,
         useful if networks take a while to 'kick into gear'.
+
     :param warmup_steps:
         How many steps to use in warmup. If not set, will automatically compute the
         number of steps if using an adaptive optimizer, otherwise use 2000.
+
     :param optimizer:
         What optimizer to use.
+
     :param b1:
         Decay of first order momentum of gradient for relevant optimizers.
+
     :param b2:
         Decay of second order momentum of gradient for relevant optimizers.
+
     :param wd:
         Weight decay.
+
     :param memory_dataset:
         Whether to load all sample into memory during training.
+
     :param sample_interval:
         Iteration interval to perform validation and possibly activation analysis if
         set.
+
     :param checkpoint_interval:
         Iteration interval to checkpoint (i.e. save) model.
+
     :param n_saved_models:
         Number of top N models to saved during training.
+
     :param multi_gpu:
         Whether to run the training on multiple GPUs for the current node.
+
     :param get_acts:
         Whether to compute activations w.r.t. inputs.
+
     :param max_acts_per_class:
         Maximum number of samples per class to gather for activation analysis.
         Good to use when modelling on imbalanced data.
+
     :param act_every_sample_factor:
         Controls whether the activations are computed at every sample interval
         (=1), every other sample interval (=2), etc. Useful when computing the
         activations takes a long time and we don't want to do it every time we
         evaluate.
+
     :param act_background_samples:
         Number of samples to use for the background in activation computations.
+
     :param debug:
         Whether to run in debug mode.
+
     :param no_pbar:
         Whether to not use progress bars. Useful when stdout/stderr is written
         to files.
+
     :param mixing_alpha:
         Alpha parameter used for mixing (higher means more mixing).
+
     :param mixing_type:
         Type of mixing to apply when using mixup and similar approaches.
+
     :param plot_skip_steps:
         How many iterations to skip in in plots.
     """
@@ -179,19 +214,29 @@ class GlobalConfig:
 class PredictorConfig:
     """
     :param model_type:
+        Which type of fusion model to use.
+
     :param model_config:
+        Predictor model configuration.
     """
 
-    model_type: str
-    model_config: Union[FusionModelConfig, MGMoEModelConfig]
+    model_type: Literal["default", "linear", "mgmoe"]
+    model_config: Union[FusionModelConfig, LinearFusionModelConfig, MGMoEModelConfig]
 
 
 @dataclass
 class InputConfig:
     """
     :param input_info:
+        Information about the input source, name and type.
+
     :param input_type_info:
+       Information specific to the input type, e.g. some augmentations are only relevant
+       for omics input. Another example is the type of model to apply to the input.
+
     :param model_config:
+        Configuration for the chosen model (i.e. feature extractor) for this input.
+
     """
 
     input_info: "InputDataConfig"
@@ -201,13 +246,42 @@ class InputConfig:
 
 @dataclass
 class InputDataConfig:
+    """
+    :param input_source:
+        Where on the filesystem to locate the input.
+
+    :param input_name:
+        Name to identify the input.
+
+    :param input_type:
+        Type of the input.
+    """
+
     input_source: str
     input_name: str
-    input_type: str
+    input_type: Literal["omics", "tabular"]
 
 
 @dataclass
 class OmicsInputDataConfig:
+    """
+    :param snp_file:
+        Path to the relevant `.bim` file, used for activation analysis.
+
+    :param na_augment_perc:
+        Percentage of the input (i.e. percentage of SNPs) to augment by setting the
+        SNPs to 'missing' (i.e. `[0, 0, 0, 1]` in one-hot encoding).
+
+    :param na_augment_prob:
+        Probability of applying NA augmentation to a given sample.
+
+    :param model_type:
+        Type of omics feature extractor to use.
+
+    :param omics_format:
+        Currently unsupported (i.e. does nothing), which format the omics data is in.
+    """
+
     snp_file: Optional[str] = None
     na_augment_perc: float = 0.0
     na_augment_prob: float = 0.0
@@ -217,6 +291,23 @@ class OmicsInputDataConfig:
 
 @dataclass
 class TabularInputDataConfig:
+    """
+    :param model_type:
+        Type of tabular model to use. Currently only one type ("tabular") is supported.
+
+    :param extra_cat_columns:
+        Which columns to use as a categorical inputs from the `input_source` specified
+        in the `input_info` field of the relevant `.yaml`.
+
+    :param extra_con_columns:
+        Which columns to use as a continuous inputs from the `input_source` specified
+        in the `input_info` field of the relevant `.yaml`.
+
+    :param label_parsing_chunk_size:
+        Number of rows to process at time when loading in the `input_source`. Useful
+        when RAM is limited.
+    """
+
     model_type: Literal["tabular"] = "tabular"
     extra_cat_columns: Sequence[str] = field(default_factory=list)
     extra_con_columns: Sequence[str] = field(default_factory=list)
@@ -225,6 +316,21 @@ class TabularInputDataConfig:
 
 @dataclass
 class TargetConfig:
+    """
+    :param label_file:
+        Label `.csv` file to load targets from.
+
+    :param label_parsing_chunk_size:
+        Number of rows to process at time when loading in the `input_source`. Useful
+        when RAM is limited.
+
+    :param target_cat_columns:
+        Which columns from `label_file` to use as categorical targets.
+
+    :param target_con_columns:
+        Which columns from `label_file` to use as continuous targets.
+    """
+
     label_file: str
     label_parsing_chunk_size: Union[None, int] = None
     target_cat_columns: Sequence[str] = field(default_factory=list)

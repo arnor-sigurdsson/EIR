@@ -9,13 +9,22 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class MLPModelConfig:
+class LinearModelConfig:
+    """
+    :param fc_repr_dim:
+        Number of output nodes in the first and only hidden layer.
+    :param l1:
+        L1 regularisation to apply to the first layer.
+    """
+
     fc_repr_dim: int = 32
     l1: float = 0.0
 
 
-class MLPModel(nn.Module):
-    def __init__(self, model_config: MLPModelConfig, data_dimensions: "DataDimensions"):
+class LinearModel(nn.Module):
+    def __init__(
+        self, model_config: LinearModelConfig, data_dimensions: "DataDimensions"
+    ):
         super().__init__()
 
         self.model_config = model_config

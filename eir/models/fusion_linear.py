@@ -16,6 +16,11 @@ if TYPE_CHECKING:
 
 @dataclasses.dataclass
 class LinearFusionModelConfig:
+    """
+    :param l1:
+        L1 regularisation to apply to the first and only layer in the model.
+    """
+
     l1: float = 0.0
 
 

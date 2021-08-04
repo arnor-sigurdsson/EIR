@@ -21,6 +21,11 @@ al_emb_lookup_dict = Dict[str, Dict[str, Dict[int, int]]]
 
 @dataclass
 class TabularModelConfig:
+    """
+    :param l1:
+        L1 regularization applied to the embeddings for categorical tabular inputs.
+    """
+
     l1: float = 0.00
 
 

@@ -41,7 +41,7 @@ from eir.interpretation.interpret_omics import analyze_omics_input_activations
 from eir.interpretation.interpret_tabular import analyze_tabular_input_activations
 from eir.models.model_training_utils import gather_dloader_samples
 from eir.models.omics.models_cnn import CNNModel
-from eir.models.omics.models_mlp import MLPModel
+from eir.models.omics.models_linear import LinearModel
 from eir.train_utils.evaluation import validation_handler
 from eir.train_utils.utils import (
     prep_sample_outfolder,
@@ -358,7 +358,7 @@ def _prepare_eval_activation_outfolder(
 
 
 def _grab_single_target_from_model_output_hook(
-    self: Union[CNNModel, MLPModel],
+    self: Union[CNNModel, LinearModel],
     input_: torch.Tensor,
     output: Dict[str, torch.Tensor],
     output_target_column: str,

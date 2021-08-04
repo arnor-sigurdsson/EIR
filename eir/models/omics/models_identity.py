@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Callable, TYPE_CHECKING
+from typing import Callable, TYPE_CHECKING, Literal
 
 import torch
 from torch import nn
@@ -12,8 +12,18 @@ if TYPE_CHECKING:
 
 @dataclass
 class IdentityModelConfig:
+    """
+    :param flatten:
+        Whether to flatten the input.
+
+    :param flatten_shape:
+        What column-row order to flatten the input in.
+    """
+
     flatten: bool = True
-    flatten_shape: str = "c"
+    flatten_shape: Literal[
+        "c",
+    ] = "c"
 
 
 class IdentityModel(nn.Module):
@@ -49,7 +59,7 @@ class IdentityModel(nn.Module):
 
 
 def get_identity_reshape_func(
-    flatten: bool, flatten_shape: str
+    flatten: bool, flatten_shape: Literal["c", "fortran"]
 ) -> Callable[[torch.Tensor], torch.Tensor]:
     if not flatten:
         return lambda x: x
