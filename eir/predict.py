@@ -79,15 +79,14 @@ from eir.train_utils.metrics import (
     calculate_batch_metrics,
     al_step_metric_dict,
 )
-from eir.train_utils.utils import load_transformers
+from eir.train_utils.utils import load_transformers, seed_everything
 
 al_named_dict_configs = Dict[
     Literal["global_configs", "predictor_configs", "input_configs", "target_configs"],
     Iterable[Dict],
 ]
 
-torch.manual_seed(0)
-np.random.seed(0)
+seed_everything()
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 

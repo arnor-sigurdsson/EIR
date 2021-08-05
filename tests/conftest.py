@@ -9,7 +9,6 @@ from typing import List, Tuple, Dict, Sequence, Mapping, Union, Literal
 
 import numpy as np
 import pandas as pd
-import torch
 import pytest
 from _pytest.fixtures import SubRequest
 from aislib.misc_utils import ensure_path_exists
@@ -30,15 +29,11 @@ from eir.train import (
     set_up_num_outputs_per_target,
 )
 from eir.train_utils import optimizers, metrics
-from eir.train_utils.utils import (
-    configure_root_logger,
-    get_run_folder,
-)
+from eir.train_utils.utils import configure_root_logger, get_run_folder, seed_everything
 
 al_prep_modelling_test_configs = Tuple[Experiment, "ModelTestConfig"]
 
-torch.manual_seed(0)
-np.random.seed(0)
+seed_everything()
 
 
 def pytest_addoption(parser):
@@ -148,7 +143,7 @@ def get_test_base_global_init() -> Sequence[dict]:
             "plot_skip_steps": 0,
             "get_acts": True,
             "act_every_sample_factor": 0,
-            "act_background_samples": 256,
+            "act_background_samples": 512,
             "n_epochs": 5,
             "warmup_steps": 100,
             "lr": 1e-02,

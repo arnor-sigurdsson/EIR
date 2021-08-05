@@ -1,4 +1,5 @@
 import logging
+import random
 from functools import wraps
 from pathlib import Path
 from typing import (
@@ -14,6 +15,8 @@ from typing import (
 )
 
 import joblib
+import numpy as np
+import torch
 from aislib.misc_utils import get_logger, ensure_path_exists
 from ignite.engine import Engine
 
@@ -149,3 +152,12 @@ def load_transformers(
         label_transformers[transformer_name] = target_transformer_object
 
     return label_transformers
+
+
+def seed_everything(seed: int = 0) -> None:
+
+    logger.debug("Global random seed set to %d", seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)

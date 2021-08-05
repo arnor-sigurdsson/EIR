@@ -39,7 +39,10 @@ from tests.conftest import cleanup, ModelTestConfig
                     {
                         "input_info": {"input_name": "test_genotype"},
                         "input_type_info": {"model_type": "cnn"},
-                        "model_config": {"rb_do": 0.25},
+                        "model_config": {
+                            "rb_do": 0.25,
+                            "channel_exp_base": 3,
+                        },
                     }
                 ],
             },

@@ -18,7 +18,6 @@ from typing import (
 )
 
 import dill
-import numpy as np
 import pandas as pd
 import torch
 from aislib.misc_utils import ensure_path_exists
@@ -109,9 +108,7 @@ al_dataloader_getitem_batch = Tuple[
 ]
 al_num_outputs_per_target = Dict[str, int]
 
-torch.manual_seed(0)
-np.random.seed(0)
-
+utils.seed_everything()
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
