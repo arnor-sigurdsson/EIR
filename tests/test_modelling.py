@@ -553,10 +553,10 @@ def _get_multi_task_test_args(
     if an_extra_col_is_correlated_with_target:
         thresholds, at_least_n = (0.9, 0.9), 0
     else:
-        thresholds, at_least_n = (0.8, 0.8), 8
+        thresholds, at_least_n = (0.8, 0.8), 7
 
     if mixing is not None:
-        thresholds, at_least_n = (0.0, 0.8), 8
+        thresholds, at_least_n = (0.0, 0.8), 7
 
     return thresholds, at_least_n
 
