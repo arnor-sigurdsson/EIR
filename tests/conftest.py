@@ -144,7 +144,7 @@ def get_test_base_global_init() -> Sequence[dict]:
             "get_acts": True,
             "act_every_sample_factor": 0,
             "act_background_samples": 512,
-            "n_epochs": 5,
+            "n_epochs": 6,
             "warmup_steps": 100,
             "lr": 1e-02,
             "lr_lb": 1e-03,

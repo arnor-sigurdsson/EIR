@@ -835,7 +835,8 @@ def add_l1_loss_hook_if_applicable(
     configs: Configs,
 ) -> Dict[str, Sequence[Callable]]:
     input_l1 = any(
-        getattr(input_config, "l1", None) for input_config in configs.input_configs
+        getattr(input_config.model_config, "l1", None)
+        for input_config in configs.input_configs
     )
     preds_l1 = getattr(configs.predictor_config.model_config, "l1", None)
     if input_l1 or preds_l1:

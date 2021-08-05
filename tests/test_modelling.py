@@ -28,6 +28,7 @@ from tests.conftest import cleanup, ModelTestConfig
                     {
                         "input_info": {"input_name": "test_genotype"},
                         "input_type_info": {"model_type": "linear"},
+                        "model_config": {"l1": 1e-03},
                     }
                 ],
             },
@@ -42,6 +43,7 @@ from tests.conftest import cleanup, ModelTestConfig
                         "model_config": {
                             "rb_do": 0.25,
                             "channel_exp_base": 3,
+                            "l1": 1e-03,
                         },
                     }
                 ],
@@ -161,7 +163,7 @@ def _check_snps_wrapper(
                     {
                         "input_info": {"input_name": "test_genotype"},
                         "input_type_info": {"model_type": "cnn"},
-                        "model_config": {"channel_exp_base": 5, "rb_do": 0.2},
+                        "model_config": {"l1": 1e-03},
                     },
                 ],
                 "target_configs": {
@@ -177,6 +179,7 @@ def _check_snps_wrapper(
                     {
                         "input_info": {"input_name": "test_genotype"},
                         "input_type_info": {"model_type": "linear"},
+                        "model_config": {"l1": 1e-03},
                     },
                 ],
                 "target_configs": {
@@ -196,6 +199,7 @@ def _check_snps_wrapper(
                     {
                         "input_info": {"input_name": "test_genotype"},
                         "input_type_info": {"model_type": "cnn"},
+                        "model_config": {"l1": 1e-03},
                     },
                 ],
                 "target_configs": {
@@ -276,6 +280,7 @@ def _check_test_performance_results(
                     {
                         "input_info": {"input_name": "test_genotype"},
                         "input_type_info": {"model_type": "cnn"},
+                        "model_config": {"l1": 1e-03},
                     },
                     {
                         "input_info": {"input_name": "test_tabular"},
@@ -303,6 +308,7 @@ def _check_test_performance_results(
                             "channel_exp_base": 5,
                             "rb_do": 0.15,
                             "fc_repr_dim": 64,
+                            "l1": 1e-03,
                         },
                     },
                 ],
@@ -344,7 +350,11 @@ def _check_test_performance_results(
                     {
                         "input_info": {"input_name": "test_genotype"},
                         "input_type_info": {"model_type": "mlp-split"},
-                        "model_config": {"fc_repr_dim": 8, "split_mlp_num_splits": 64},
+                        "model_config": {
+                            "fc_repr_dim": 8,
+                            "split_mlp_num_splits": 64,
+                            "l1": 1e-03,
+                        },
                     },
                 ],
                 "target_configs": {
@@ -366,7 +376,7 @@ def _check_test_performance_results(
                         "model_config": {
                             "kernel_width": 8,
                             "channel_exp_base": 2,
-                            "l1": 1e-04,
+                            "l1": 1e-03,
                             "rb_do": 0.20,
                         },
                     },
@@ -428,10 +438,10 @@ def _check_test_performance_results(
                         "model_config": {
                             "kernel_width": 8,
                             "channel_exp_base": 2,
+                            "l1": 1e-03,
                         },
                     },
                 ],
-                "predictor_configs": {"model_type": "mgmoe"},
                 "target_configs": {
                     "target_cat_columns": ["Origin"],
                     "target_con_columns": ["Height", "ExtraTarget"],
@@ -453,7 +463,7 @@ def _check_test_performance_results(
                         "model_config": {
                             "kernel_width": 8,
                             "channel_exp_base": 2,
-                            "l1": 1e-04,
+                            "l1": 1e-03,
                             "rb_do": 0.20,
                         },
                     },
