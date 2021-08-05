@@ -41,7 +41,7 @@ def pytest_addoption(parser):
     parser.addoption(
         "--num_samples_per_class",
         type=int,
-        default=2000,
+        default=1000,
         help="Number of samples per class.",
     )
     parser.addoption(
@@ -143,8 +143,8 @@ def get_test_base_global_init() -> Sequence[dict]:
             "plot_skip_steps": 0,
             "get_acts": True,
             "act_every_sample_factor": 0,
-            "act_background_samples": 512,
-            "n_epochs": 5,
+            "act_background_samples": 256,
+            "n_epochs": 10,
             "warmup_steps": 100,
             "lr": 1e-02,
             "lr_lb": 1e-03,
@@ -198,7 +198,7 @@ def get_test_omics_input_init(
         "input_type_info": {
             "model_type": "genome-local-net",
             "na_augment_perc": 0.10,
-            "na_augment_prob": 0.50,
+            "na_augment_prob": 0.10,
             "snp_file": str(test_path / "test_snps.bim"),
         },
         "model_config": {},
