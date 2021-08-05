@@ -13,7 +13,7 @@ jobs:
     - name: Run tests
       run: |
         pip install tox==3.20.1
-        pip install poetry==1.1.6
+        pip install poetry==1.1.7
         tox -e py38
     - name: Generate report
       uses: codecov/codecov-action@v1

@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Union, Dict
 from typing import Set, overload, TYPE_CHECKING, Sequence, Iterable, Any
@@ -9,17 +10,26 @@ from aislib.misc_utils import ensure_path_exists
 from sklearn.preprocessing import LabelEncoder
 from torch import nn
 
-from eir.data_load.label_setup import al_label_dict
-
 if TYPE_CHECKING:
     from eir.train import al_training_labels_extra
+    from eir.data_load.label_setup import al_label_dict
 
 # Aliases
 al_unique_embed_vals = Dict[str, Set[str]]
 al_emb_lookup_dict = Dict[str, Dict[str, Dict[int, int]]]
 
 
-class TabularModel(nn.Module):
+@dataclass
+class TabularModelConfig:
+    """
+    :param l1:
+        L1 regularization applied to the embeddings for categorical tabular inputs.
+    """
+
+    l1: float = 0.00
+
+
+class SimpleTabularModel(nn.Module):
     def __init__(
         self,
         cat_columns: Sequence[str],
@@ -31,9 +41,13 @@ class TabularModel(nn.Module):
         Note: It would be more natural maybe to do the lookup here
         (using self.embeddings_dict), but then we also have to do all tensor
         preparation (e.g. mixing) here. Perhaps for now better to do it outside in
-        prepartion hook. However, this way also keeps a common interface between all
+        preparation hook. However, this way also keeps a common interface between all
         current models, where they are taking a tensor as input (otherwise, we would
         be taking a dict here).
+
+        Note: Currently the only thing this model does is looking up the trainable
+        embeddings. Other types of tabular models can be added later, with their own
+        layers.
         """
 
         super().__init__()
@@ -50,12 +64,10 @@ class TabularModel(nn.Module):
         emb_total_dim = con_total_dim = 0
         if self.embeddings_dict:
             emb_total_dim = attach_embeddings(self, self.embeddings_dict)
-        if con_columns:
+        if self.con_columns:
             con_total_dim = len(self.con_columns)
 
         self.input_dim = emb_total_dim + con_total_dim
-        if emb_total_dim or con_total_dim:
-            self.fc_extra = nn.Linear(self.input_dim, self.input_dim, bias=False)
 
     @property
     def num_out_features(self) -> int:
@@ -63,13 +75,10 @@ class TabularModel(nn.Module):
 
     @property
     def l1_penalized_weights(self) -> torch.Tensor:
-        return self.fc_extra.weight
+        return torch.cat([i for i in self.parameters()])
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
-
-        out = self.fc_extra(input)
-
-        return out
+        return input
 
 
 def set_up_embedding_dict(
@@ -107,7 +116,7 @@ def calc_embedding_dimension(n_categories: int) -> int:
 def get_tabular_inputs(
     extra_cat_columns: Sequence[str],
     extra_con_columns: Sequence[str],
-    tabular_model: TabularModel,
+    tabular_model: SimpleTabularModel,
     tabular_input: "al_training_labels_extra",
     device: str,
 ) -> Union[torch.Tensor, None]:
@@ -146,7 +155,7 @@ def get_tabular_inputs(
 def get_embeddings_from_labels(
     categorical_columns: Sequence[str],
     labels: Dict[str, Sequence[torch.Tensor]],
-    model: TabularModel,
+    model: SimpleTabularModel,
 ) -> torch.Tensor:
 
     """
@@ -176,7 +185,7 @@ def get_embeddings_from_labels(
 
 
 def lookup_embeddings(
-    model: TabularModel,
+    model: SimpleTabularModel,
     embedding_col: str,
     labels: Sequence[torch.Tensor],
 ) -> torch.Tensor:
@@ -191,7 +200,7 @@ def lookup_embeddings(
 
 
 def get_unique_embed_values(
-    labels_dict: al_label_dict, embedding_cols: Sequence[str]
+    labels_dict: "al_label_dict", embedding_cols: Sequence[str]
 ) -> al_unique_embed_vals:
     unique_embeddings_dict = OrderedDict((i, set()) for i in sorted(embedding_cols))
 
@@ -220,14 +229,14 @@ def get_extra_continuous_inputs_from_labels(
 
 @overload
 def set_up_and_save_embeddings_dict(
-    embedding_columns: None, labels_dict: al_label_dict, run_folder: Path
+    embedding_columns: None, labels_dict: "al_label_dict", run_folder: Path
 ) -> None:
     ...
 
 
 @overload
 def set_up_and_save_embeddings_dict(
-    embedding_columns: List[str], labels_dict: al_label_dict, run_folder: Path
+    embedding_columns: List[str], labels_dict: "al_label_dict", run_folder: Path
 ) -> al_emb_lookup_dict:
     ...
 
@@ -249,7 +258,7 @@ def set_up_and_save_embeddings_dict(embedding_columns, labels_dict, run_folder):
 
 
 def get_embedding_dict(
-    labels_dict: al_label_dict, embedding_cols: List[str]
+    labels_dict: "al_label_dict", embedding_cols: List[str]
 ) -> al_emb_lookup_dict:
     """
     Simple wrapper function to call other embedding functions to create embedding

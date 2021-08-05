@@ -23,7 +23,7 @@ Installation
 
 .. code-block:: console
 
-   $ pip install eir-dl
+    $ pip install eir-dl
 
 
 Documentation
@@ -32,9 +32,10 @@ Documentation
 To get started, please, read :doc:`quickstart`
 
 .. toctree::
-   :maxdepth: 2
+    :maxdepth: 2
 
-   quickstart
-   binaries_guide
-   license
-
+    quickstart
+    tutorials/tutorial_index
+    binaries_guide
+    api_reference
+    license

@@ -1,4 +1,3 @@
-from argparse import Namespace
 from collections import defaultdict
 from copy import copy
 from dataclasses import dataclass
@@ -9,7 +8,6 @@ from typing import (
     Union,
     Tuple,
     Callable,
-    Iterable,
     Sequence,
     Generator,
     DefaultDict,
@@ -31,9 +29,10 @@ from eir.data_load.label_setup import (
     Labels,
 )
 from eir.data_load.label_setup import merge_target_columns
+from eir.setup import config
 
 if TYPE_CHECKING:
-    from eir.train import DataDimensions
+    from eir.setup.input_setup import al_input_objects_as_dict
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -50,29 +49,29 @@ al_inputs = Union[Dict[str, torch.Tensor], Dict[str, Any]]
 al_getitem_return = Tuple[Dict[str, torch.Tensor], al_sample_label_dict_target, str]
 
 
-def set_up_datasets_from_cl_args(
-    cl_args: Namespace,
+def set_up_datasets_from_configs(
+    configs: config.Configs,
     target_labels: Labels,
-    data_dimensions: Dict[str, "DataDimensions"],
-    tabular_inputs_labels: Union[Labels, None] = None,
+    inputs_as_dict: "al_input_objects_as_dict",
 ) -> Tuple[al_datasets, al_datasets]:
 
-    dataset_class = MemoryDataset if cl_args.memory_dataset else DiskDataset
+    dataset_class = (
+        MemoryDataset if configs.global_config.memory_dataset else DiskDataset
+    )
 
+    targets = config.get_all_targets(targets_configs=configs.target_configs)
     train_kwargs = construct_default_dataset_kwargs_from_cl_args(
-        cl_args=cl_args,
         target_labels_dict=target_labels.train_labels,
-        data_dimensions=data_dimensions,
-        tabular_labels_dict=tabular_inputs_labels.train_labels,
-        na_augment=True,
+        targets=targets,
+        inputs=inputs_as_dict,
+        test_mode=False,
     )
 
     valid_kwargs = construct_default_dataset_kwargs_from_cl_args(
-        cl_args=cl_args,
         target_labels_dict=target_labels.valid_labels,
-        data_dimensions=data_dimensions,
-        tabular_labels_dict=tabular_inputs_labels.valid_labels,
-        na_augment=False,
+        targets=targets,
+        inputs=inputs_as_dict,
+        test_mode=True,
     )
 
     train_dataset = dataset_class(**train_kwargs)
@@ -86,51 +85,25 @@ def set_up_datasets_from_cl_args(
 
 
 def construct_default_dataset_kwargs_from_cl_args(
-    cl_args: Namespace,
     target_labels_dict: Union[None, al_label_dict],
-    data_dimensions: Dict[str, "DataDimensions"],
-    tabular_labels_dict: Union[None, al_label_dict],
-    na_augment: bool,
+    targets: config.Targets,
+    inputs: "al_input_objects_as_dict",
+    test_mode: bool,
 ) -> Dict[str, Any]:
 
     target_columns = merge_target_columns(
-        target_con_columns=cl_args.target_con_columns,
-        target_cat_columns=cl_args.target_cat_columns,
-    )
-
-    data_sources = gather_all_data_sources(
-        cl_args=cl_args, tabular_labels_dict=tabular_labels_dict
+        target_con_columns=targets.con_targets,
+        target_cat_columns=targets.cat_targets,
     )
 
     dataset_kwargs = {
         "target_columns": target_columns,
-        "data_sources": data_sources,
-        "data_dimensions": data_dimensions,
+        "inputs": inputs,
         "target_labels_dict": target_labels_dict,
+        "test_mode": test_mode,
     }
 
-    if na_augment:
-        dataset_kwargs["na_augment"] = (
-            cl_args.na_augment_perc,
-            cl_args.na_augment_prob,
-        )
-
     return dataset_kwargs
-
-
-def gather_all_data_sources(
-    cl_args: Namespace, tabular_labels_dict: Union[Labels, None]
-) -> Dict[str, str]:
-    all_sources = {}
-
-    if cl_args.omics_sources and cl_args.omics_names:
-        for source_on_disk, name in zip(cl_args.omics_sources, cl_args.omics_names):
-            all_sources[name] = source_on_disk
-
-    if tabular_labels_dict:
-        all_sources["tabular_cl_args"] = tabular_labels_dict
-
-    return all_sources
 
 
 def _check_valid_and_train_datasets(
@@ -156,23 +129,19 @@ class Sample:
 class DatasetBase(Dataset):
     def __init__(
         self,
-        data_sources: Dict[str, Any],
-        data_dimensions: Dict,
+        inputs: "al_input_objects_as_dict",
         target_columns: al_target_columns,
+        test_mode: bool,
         target_labels_dict: al_label_dict = None,
-        na_augment: Tuple[float] = (0.0, 0.0),
     ):
         super().__init__()
 
-        self.data_sources = data_sources
-        self.data_dimensions = data_dimensions
-
         self.samples: Union[List[Sample], None] = None
 
+        self.inputs = inputs
+        self.test_mode = test_mode
         self.target_columns = target_columns
         self.target_labels_dict = target_labels_dict if target_labels_dict else {}
-
-        self.na_augment = na_augment
 
     def init_label_attributes(self):
         if not self.target_columns:
@@ -186,6 +155,9 @@ class DatasetBase(Dataset):
         train/val and test folders.
         """
 
+        mode_str = "evaluation/test" if self.test_mode else "train"
+        logger.debug("Setting up dataset in %s mode.", mode_str)
+
         def _default_factory() -> Sample:
             return Sample(sample_id="", inputs={}, target_labels={})
 
@@ -198,21 +170,23 @@ class DatasetBase(Dataset):
             )
             ids_to_keep = self.target_labels_dict.keys()
 
-        for source_name, source_data in self.data_sources.items():
+        for source_name, source_data in self.inputs.items():
 
-            if source_name.startswith("omics_"):
+            input_type = source_data.input_config.input_info.input_type
+            input_source = source_data.input_config.input_info.input_source
+            if input_type == "omics":
 
                 samples = _add_file_data_to_samples(
-                    source_data=source_data,
+                    source_data=input_source,
                     samples=samples,
                     ids_to_keep=ids_to_keep,
                     file_loading_hook=omics_hook,
                     source_name=source_name,
                 )
 
-            elif source_name.startswith("tabular_"):
+            elif input_type == "tabular":
                 samples = _add_tabular_data_to_samples(
-                    tabular_dict=source_data,
+                    tabular_dict=source_data.labels.all_labels,
                     samples=samples,
                     ids_to_keep=ids_to_keep,
                     source_name=source_name,
@@ -246,6 +220,12 @@ class DatasetBase(Dataset):
             if self.target_labels_dict:
                 if not s.target_labels:
                     no_target_labels.append(s)
+
+        if not self.samples:
+            raise ValueError(
+                f"Expected to have at least one sample, but got {self.samples} instead."
+                f" Possibly there is a mismatch between input IDs and target IDs."
+            )
 
         if no_ids:
             raise ValueError(
@@ -309,14 +289,17 @@ def _add_tabular_data_to_samples(
     ids_to_keep: Union[None, Sequence[str]],
     source_name: str = "Tabular Data",
 ) -> DefaultDict[str, Sample]:
+    def _get_tabular_iterator():
+        for sample_id_, tabular_inputs_ in tabular_dict.items():
+            if sample_id_ not in ids_to_keep:
+                continue
+            yield sample_id_, tabular_inputs_
 
-    tabular_iterator = tqdm(tabular_dict.items(), desc=source_name)
+    tabular_iterator = tqdm(
+        _get_tabular_iterator(), desc=source_name, total=len(ids_to_keep)
+    )
 
     for sample_id, tabular_inputs in tabular_iterator:
-
-        if sample_id not in ids_to_keep:
-            continue
-
         samples = _add_id_to_samples(samples=samples, sample_id=sample_id)
 
         samples[sample_id].inputs[source_name] = tabular_inputs
@@ -434,13 +417,11 @@ class MemoryDataset(DatasetBase):
 
         inputs_prepared = copy(sample.inputs)
         inputs_prepared = prepare_inputs_memory(
-            inputs=inputs_prepared,
-            na_augment_perc=self.na_augment[0],
-            na_augment_prob=self.na_augment[1],
+            inputs=inputs_prepared, inputs_objects=self.inputs, test_mode=self.test_mode
         )
 
         inputs_final = impute_missing_modalities_wrapper(
-            inputs=inputs_prepared, data_dimensions=self.data_dimensions
+            inputs_values=inputs_prepared, inputs_objects=self.inputs
         )
 
         target_labels = sample.target_labels
@@ -452,24 +433,24 @@ class MemoryDataset(DatasetBase):
         return len(self.samples)
 
 
-def _get_default_impute_fill_values(data_sources: Iterable[str]):
+def _get_default_impute_fill_values(inputs_objects: "al_input_objects_as_dict"):
     fill_values = {}
-    for source in data_sources:
-        if source.startswith("omics_"):
-            fill_values[source] = False
+    for input_name, input_object in inputs_objects.items():
+        if input_name.startswith("omics_"):
+            fill_values[input_name] = False
         else:
-            fill_values[source] = -1
+            fill_values[input_name] = -1
 
     return fill_values
 
 
-def _get_default_impute_dtypes(data_sources: Iterable[str]):
+def _get_default_impute_dtypes(inputs_objects: "al_input_objects_as_dict"):
     dtypes = {}
-    for source in data_sources:
-        if source.startswith("omics_"):
-            dtypes[source] = torch.bool
+    for input_name, input_object in inputs_objects.items():
+        if input_name.startswith("omics_"):
+            dtypes[input_name] = torch.bool
         else:
-            dtypes[source] = torch.float
+            dtypes[input_name] = torch.float
 
     return dtypes
 
@@ -478,10 +459,11 @@ def prepare_one_hot_omics_data(
     genotype_array: torch.Tensor,
     na_augment_perc: float,
     na_augment_prob: float,
+    test_mode: bool,
 ) -> torch.BoolTensor:
     array_bool = genotype_array.to(dtype=torch.bool)
 
-    if na_augment_perc > 0 and na_augment_prob > 0:
+    if not test_mode and na_augment_perc > 0 and na_augment_prob > 0:
         array_bool = make_random_omics_columns_missing(
             omics_array=array_bool,
             percentage=na_augment_perc,
@@ -507,18 +489,15 @@ class DiskDataset(DatasetBase):
 
         inputs_prepared = copy(sample.inputs)
         inputs_prepared = prepare_inputs_disk(
-            inputs=inputs_prepared,
-            na_augment_perc=self.na_augment[0],
-            na_augment_prob=self.na_augment[1],
+            inputs=inputs_prepared, inputs_objects=self.inputs, test_mode=self.test_mode
         )
 
         inputs_final = impute_missing_modalities_wrapper(
-            inputs=inputs_prepared, data_dimensions=self.data_dimensions
+            inputs_values=inputs_prepared, inputs_objects=self.inputs
         )
 
         target_labels = sample.target_labels
         sample_id = sample.sample_id
-
         return inputs_final, target_labels, sample_id
 
     def __len__(self):
@@ -526,17 +505,25 @@ class DiskDataset(DatasetBase):
 
 
 def prepare_inputs_disk(
-    inputs: Dict[str, Any], na_augment_perc: float, na_augment_prob: float
+    inputs: Dict[str, Any], inputs_objects: "al_input_objects_as_dict", test_mode: bool
 ) -> Dict[str, torch.Tensor]:
     prepared_inputs = {}
     for name, data in inputs.items():
 
+        input_type_info = inputs_objects[name].input_config.input_type_info
+
         if name.startswith("omics_"):
+
             array_raw = _load_one_hot_array(path=data)
+
+            na_augment_perc = input_type_info.na_augment_perc
+            na_augment_prob = input_type_info.na_augment_prob
+
             array_prepared = prepare_one_hot_omics_data(
                 genotype_array=array_raw,
                 na_augment_perc=na_augment_perc,
                 na_augment_prob=na_augment_prob,
+                test_mode=test_mode,
             )
             prepared_inputs[name] = array_prepared
 
@@ -547,17 +534,25 @@ def prepare_inputs_disk(
 
 
 def prepare_inputs_memory(
-    inputs: Dict[str, Any], na_augment_perc: float, na_augment_prob: float
+    inputs: Dict[str, Any], inputs_objects: "al_input_objects_as_dict", test_mode: bool
 ) -> Dict[str, torch.Tensor]:
     prepared_inputs = {}
+
     for name, data in inputs.items():
+
+        input_type_info = inputs_objects[name].input_config.input_type_info
 
         if name.startswith("omics_"):
             array_raw = data
+
+            na_augment_perc = input_type_info.na_augment_perc
+            na_augment_prob = input_type_info.na_augment_prob
+
             array_prepared = prepare_one_hot_omics_data(
                 genotype_array=array_raw,
                 na_augment_perc=na_augment_perc,
                 na_augment_prob=na_augment_prob,
+                test_mode=test_mode,
             )
             prepared_inputs[name] = array_prepared
 
@@ -568,15 +563,13 @@ def prepare_inputs_memory(
 
 
 def impute_missing_modalities_wrapper(
-    inputs: Dict[str, Any], data_dimensions: Dict[str, "DataDimensions"]
+    inputs_values: Dict[str, Any], inputs_objects: "al_input_objects_as_dict"
 ):
-    impute_dtypes = _get_default_impute_dtypes(data_sources=data_dimensions.keys())
-    impute_fill_values = _get_default_impute_fill_values(
-        data_sources=data_dimensions.keys()
-    )
+    impute_dtypes = _get_default_impute_dtypes(inputs_objects=inputs_objects)
+    impute_fill_values = _get_default_impute_fill_values(inputs_objects=inputs_objects)
     inputs_imputed = impute_missing_modalities(
-        inputs=inputs,
-        data_dimensions=data_dimensions,
+        inputs_values=inputs_values,
+        inputs_objects=inputs_objects,
         fill_values=impute_fill_values,
         dtypes=impute_dtypes,
     )
@@ -585,25 +578,27 @@ def impute_missing_modalities_wrapper(
 
 
 def impute_missing_modalities(
-    inputs: Dict[str, Any],
-    data_dimensions: Dict[str, "DataDimensions"],
+    inputs_values: Dict[str, Any],
+    inputs_objects: "al_input_objects_as_dict",
     fill_values: Dict[str, Any],
     dtypes: Dict[str, Any],
 ) -> Dict[str, torch.Tensor]:
 
-    for name, dimensions in data_dimensions.items():
-        if name not in inputs:
-            fill_value = fill_values[name]
-            dtype = dtypes[name]
-            shape = dimensions.channels, dimensions.height, dimensions.width
+    for input_name, input_object in inputs_objects.items():
+        if input_name not in inputs_values:
+            fill_value = fill_values[input_name]
+            dtype = dtypes[input_name]
 
-            imputed_tensor = impute_single_missing_modality(
-                shape=shape, fill_value=fill_value, dtype=dtype
-            )
+            if input_name.startswith("omics_"):
+                dimensions = input_object.data_dimensions
+                shape = dimensions.channels, dimensions.height, dimensions.width
 
-            inputs[name] = imputed_tensor
+                imputed_tensor = impute_single_missing_modality(
+                    shape=shape, fill_value=fill_value, dtype=dtype
+                )
+                inputs_values[input_name] = imputed_tensor
 
-    return inputs
+    return inputs_values
 
 
 def impute_single_missing_modality(shape: Tuple[int, ...], fill_value: Any, dtype: Any):

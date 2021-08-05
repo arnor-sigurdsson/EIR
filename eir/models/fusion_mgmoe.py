@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, Sequence, TYPE_CHECKING
 
 import torch
@@ -24,14 +24,34 @@ if TYPE_CHECKING:
 
 @dataclass
 class MGMoEModelConfig:
-    layers: Sequence[int]
-    fc_task_dim: int
+    """
+    :param layers:
+        A sequence of two int values controlling the number of residual MLP blocks in
+        the network. The first item (i.e. ``layers[0]``) refers to the number of blocks
+        in the expert branches. The second item (i.e. ``layers[1]``) refers to the
+        number of blocks in the predictor branches.
 
-    split_mlp_num_splits: int
-    mg_num_experts: int
+    :param fc_task_dim:
+       Number of hidden nodes in all residual blocks (both expert and predictor) of
+       the network.
 
-    rb_do: float
-    fc_do: float
+    :param mg_num_experts:
+        Number of multi gate experts to use.
+
+    :param rb_do:
+        Dropout in all MLP residual blocks (both expert and predictor).
+
+    :param fc_do:
+        Dropout before the last FC layer.
+    """
+
+    layers: Sequence[int] = field(default_factory=lambda: [1, 1])
+    fc_task_dim: int = 64
+
+    mg_num_experts: int = 8
+
+    rb_do: float = 0.00
+    fc_do: float = 0.00
 
 
 class MGMoEModel(nn.Module):
@@ -49,7 +69,6 @@ class MGMoEModel(nn.Module):
         self.modules_to_fuse = modules_to_fuse
         self.fusion_callable = fusion_callable
 
-        self.num_chunks = self.model_config.split_mlp_num_splits
         self.num_experts = self.model_config.mg_num_experts
 
         cur_dim = sum(i.num_out_features for i in self.modules_to_fuse.values())

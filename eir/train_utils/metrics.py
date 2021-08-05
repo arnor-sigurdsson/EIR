@@ -1,6 +1,6 @@
 import csv
-from copy import copy
 import warnings
+from copy import copy
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
@@ -27,7 +27,7 @@ from eir.data_load.data_utils import get_target_columns_generator
 from eir.data_load.label_setup import al_label_transformers
 
 if TYPE_CHECKING:
-    from eir.train import al_criterions, Config  # noqa: F401
+    from eir.train import al_criterions, Experiment  # noqa: F401
     from eir.models.omics.omics_models import al_models  # noqa: F401
     from eir.train_utils.train_handlers import HandlerConfig
     from eir.data_load.label_setup import (  # noqa: F401
@@ -160,7 +160,7 @@ def calc_mcc(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
     return mcc
 
 
-def calc_roc_auc_ovr(
+def calc_roc_auc_ovo(
     outputs: np.ndarray, labels: np.ndarray, average: str = "macro", *args, **kwargs
 ) -> float:
     """
@@ -185,7 +185,7 @@ def calc_roc_auc_ovr(
     return roc_auc
 
 
-def calc_average_precision_ovr(
+def calc_average_precision(
     outputs: np.ndarray, labels: np.ndarray, average: str = "macro", *args, **kwargs
 ) -> float:
 
@@ -351,13 +351,38 @@ class UncertaintyMultiTaskLoss(nn.Module):
 
 
 def hook_add_l1_loss(
-    config: "Config",
+    experiment: "Experiment",
     state: Dict,
     loss_key: str = "loss",
     *args,
     **kwargs,
 ) -> Dict:
-    l1_loss = get_model_l1_loss(model=config.model, l1_weight=config.cl_args.l1)
+    """
+    TODO: To the validation outside of the actual hook.
+    TODO: Use a combined iterator here for the fusion module and modules_to_fuse.
+    TODO: Convert all fusion modules to have their own L1 penalized weights.
+    """
+    model_configs = experiment.inputs
+
+    l1_loss = torch.tensor(0.0)
+    for input_name, input_module in experiment.model.modules_to_fuse.items():
+
+        current_l1 = getattr(model_configs[input_name], "l1", 0.0)
+        l1_weights = getattr(input_module, "l1_penalized_weights", None)
+        if current_l1 and not l1_weights:
+            raise AttributeError(
+                f"Module {input_module} for input name {input_name} does not have"
+                f"l1_penalized_weights attribute."
+            )
+
+        if l1_weights:
+            cur_l1_loss = get_model_l1_loss(model=input_module, l1_weight=current_l1)
+            l1_loss += cur_l1_loss
+
+    if hasattr(experiment.model, "l1_penalized_weights"):
+        fusion_l1 = experiment.model.model_config.l1
+        fusion_l1_loss = get_model_l1_loss(model=experiment.model, l1_weight=fusion_l1)
+        l1_loss += fusion_l1_loss
 
     updated_loss = state[loss_key] + l1_loss
 
@@ -366,7 +391,7 @@ def hook_add_l1_loss(
     return state_updates
 
 
-def get_model_l1_loss(model: "al_models", l1_weight: float) -> torch.Tensor:
+def get_model_l1_loss(model: nn.Module, l1_weight: float) -> torch.Tensor:
     l1_loss = calc_l1_loss(
         weight_tensor=model.l1_penalized_weights, l1_weight=l1_weight
     )
@@ -397,11 +422,11 @@ def persist_metrics(
 ):
 
     hc = handler_config
-    c = handler_config.config
-    cl_args = c.cl_args
+    exp = handler_config.experiment
+    gc = exp.configs.global_config
 
     metrics_files = get_metrics_files(
-        target_columns=c.target_columns,
+        target_columns=exp.target_columns,
         run_folder=hc.run_folder,
         train_or_val_target_prefix=f"{prefixes['metrics']}",
     )
@@ -416,8 +441,8 @@ def persist_metrics(
             name=f"{prefixes['writer']}/{metrics_name}",
             metric_dict=cur_metric_dict,
             iteration=iteration,
-            writer=c.writer,
-            plot_skip_steps=cl_args.plot_skip_steps,
+            writer=exp.writer,
+            plot_skip_steps=gc.plot_skip_steps,
         )
 
         _append_metrics_to_file(
@@ -533,10 +558,10 @@ def get_default_metrics(
     )
 
     roc_auc_macro = MetricRecord(
-        name="roc-auc-macro", function=calc_roc_auc_ovr, only_val=True
+        name="roc-auc-macro", function=calc_roc_auc_ovo, only_val=True
     )
     ap_macro = MetricRecord(
-        name="ap-macro", function=calc_average_precision_ovr, only_val=True
+        name="ap-macro", function=calc_average_precision, only_val=True
     )
     r2 = MetricRecord(name="r2", function=calc_r2, only_val=True)
     pcc = MetricRecord(name="pcc", function=calc_pcc, only_val=True)

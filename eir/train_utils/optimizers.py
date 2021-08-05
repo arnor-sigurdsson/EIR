@@ -1,4 +1,3 @@
-import argparse
 import reprlib
 from collections import defaultdict
 from functools import partial
@@ -15,21 +14,22 @@ from torch.optim.optimizer import Optimizer
 from torch_optimizer import get as get_custom_opt
 
 from eir.models.model_training_utils import add_wd_to_model_params
+from eir.setup.schemas import GlobalConfig
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
 def get_optimizer(
-    model: nn.Module, loss_callable: Callable, cl_args: argparse.Namespace
+    model: nn.Module, loss_callable: Callable, global_config: GlobalConfig
 ) -> Optimizer:
 
     all_params = _get_all_params_to_optimize(
-        model=model, weight_decay=cl_args.wd, loss_callable=loss_callable
+        model=model, weight_decay=global_config.wd, loss_callable=loss_callable
     )
 
-    optimizer_class = _get_optimizer_class(optimizer_name=cl_args.optimizer)
+    optimizer_class = _get_optimizer_class(optimizer_name=global_config.optimizer)
     optimizer_args = _get_constructor_arguments(
-        params=all_params, cl_args=cl_args, optimizer_class=optimizer_class
+        params=all_params, global_config=global_config, optimizer_class=optimizer_class
     )
     optimizer = optimizer_class(**optimizer_args)
 
@@ -96,10 +96,14 @@ def get_base_optimizers_dict() -> Dict[str, Type[Optimizer]]:
 
 
 def _get_constructor_arguments(
-    params: List, cl_args: argparse.Namespace, optimizer_class: Type[Optimizer]
+    params: List, global_config: GlobalConfig, optimizer_class: Type[Optimizer]
 ):
-    base = {"params": params, "lr": cl_args.lr, "weight_decay": cl_args.wd}
-    all_extras = {"betas": (cl_args.b1, cl_args.b2), "momentum": 0.9, "amsgrad": False}
+    base = {"params": params, "lr": global_config.lr, "weight_decay": global_config.wd}
+    all_extras = {
+        "betas": (global_config.b1, global_config.b2),
+        "momentum": 0.9,
+        "amsgrad": False,
+    }
     accepted_args = signature(optimizer_class).parameters.keys()
     common_extras = {k: v for k, v in all_extras.items() if k in accepted_args}
     return {**base, **common_extras}

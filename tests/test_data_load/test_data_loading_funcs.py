@@ -9,6 +9,7 @@ from hypothesis.strategies import lists, integers
 
 from eir.data_load import data_loading_funcs
 from eir.data_load.datasets import Sample
+from eir.setup.config import get_all_targets
 from eir.train import get_dataloaders
 
 
@@ -16,30 +17,45 @@ from eir.train import get_dataloaders
     "create_test_data", [{"task_type": "multi_task"}], indirect=True
 )
 @pytest.mark.parametrize(
-    "create_test_cl_args",
+    "create_test_config_init_base",
     [
         {
-            "custom_cl_args": {
-                "model_type": "cnn",
-                "target_cat_columns": ["Origin", "OriginExtraCol"],
-                "extra_con_columns": ["ExtraTarget"],
-                "target_con_columns": ["Height"],
-                "run_name": "extra_inputs",
-            }
-        }
+            "injections": {
+                "global_configs": {
+                    "run_name": "extra_inputs",
+                },
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "input_type_info": {"model_type": "cnn"},
+                    },
+                    {
+                        "input_info": {"input_name": "test_tabular"},
+                        "input_type_info": {
+                            "model_type": "tabular",
+                            "extra_con_columns": ["ExtraTarget"],
+                        },
+                    },
+                ],
+                "target_configs": {
+                    "target_cat_columns": ["Origin", "OriginExtraCol"],
+                    "target_con_columns": ["Height"],
+                },
+            },
+        },
     ],
     indirect=True,
 )
 def test_get_weighted_random_sampler(
-    create_test_cl_args, create_test_data, create_test_datasets
+    create_test_config, create_test_data, create_test_datasets
 ):
-    cl_args = create_test_cl_args
-    target_columns = cl_args.target_cat_columns
+    test_config = create_test_config
+    targets_object = get_all_targets(targets_configs=test_config.target_configs)
     train_dataset, valid_dataset = create_test_datasets
 
     patched_train_dataset = patch_dataset_to_be_unbalanced(dataset=train_dataset)
     random_sampler = data_loading_funcs.get_weighted_random_sampler(
-        samples=patched_train_dataset.samples, target_columns=target_columns
+        samples=patched_train_dataset.samples, target_columns=targets_object.cat_targets
     )
 
     assert random_sampler.replacement

@@ -1,6 +1,4 @@
-from argparse import Namespace
 from pathlib import Path
-from typing import Sequence
 from unittest.mock import patch
 
 import numpy as np
@@ -8,64 +6,11 @@ import pandas as pd
 import pytest
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 
+from eir import train
 from eir.data_load import label_setup
 from eir.data_load.common_ops import ColumnOperation
 from eir.data_load.label_setup import merge_target_columns
-
-
-def get_split_labels(
-    cl_args: Namespace,
-    custom_label_parsing_operations: label_setup.al_all_column_ops,
-    label_filter: Sequence[str],
-) -> label_setup.Labels:
-
-    assert "target" in label_filter or "extra" in label_filter
-
-    test_omics_input_folder = Path(cl_args.omics_sources[0])
-    all_array_ids = label_setup.gather_ids_from_data_source(
-        data_source=test_omics_input_folder
-    )
-    train_ids, valid_ids = label_setup.split_ids(
-        ids=all_array_ids, valid_size=cl_args.valid_size
-    )
-
-    target_labels_info = get_tabular_label_data(
-        cl_args=cl_args, label_filter=label_filter
-    )
-    all_labels = label_setup.set_up_train_and_valid_tabular_data(
-        tabular_info=target_labels_info,
-        custom_label_ops=custom_label_parsing_operations,
-        train_ids=train_ids,
-        valid_ids=valid_ids,
-    )
-
-    return all_labels
-
-
-def get_tabular_label_data(
-    cl_args: Namespace, label_filter: Sequence[str]
-) -> label_setup.TabularFileInfo:
-
-    assert "target" in label_filter or "extra" in label_filter
-
-    con_columns = []
-    cat_columns = []
-
-    if "target" in label_filter:
-        con_columns += cl_args.target_con_columns
-        cat_columns += cl_args.target_cat_columns
-    if "extra" in label_filter:
-        con_columns += cl_args.extra_con_columns
-        cat_columns += cl_args.extra_cat_columns
-
-    table_info = label_setup.TabularFileInfo(
-        file_path=cl_args.label_file,
-        con_columns=con_columns,
-        cat_columns=cat_columns,
-        parsing_chunk_size=cl_args.label_parsing_chunk_size,
-    )
-
-    return table_info
+from eir.setup.config import Configs
 
 
 @pytest.fixture()
@@ -133,38 +78,80 @@ def create_test_column_ops():
 
 
 @pytest.mark.parametrize(
-    "create_test_cl_args",
+    "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
+)
+@pytest.mark.parametrize(
+    "create_test_config_init_base",
     [
         {
-            "custom_cl_args": {
-                "label_parsing_chunk_size": None,
-            }
+            "injections": {
+                "global_configs": {
+                    "run_name": "tabular_only",
+                },
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_tabular"},
+                        "input_type_info": {
+                            "model_type": "tabular",
+                            "label_parsing_chunk_size": 50,
+                            "extra_cat_columns": [],
+                            "extra_con_columns": ["ExtraTarget"],
+                        },
+                    },
+                ],
+                "target_configs": {"label_parsing_chunk_size": 50},
+            },
         },
         {
-            "custom_cl_args": {
-                "label_parsing_chunk_size": 50,
-            }
+            "injections": {
+                "global_configs": {
+                    "run_name": "tabular_only",
+                },
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_tabular"},
+                        "input_type_info": {
+                            "model_type": "tabular",
+                            "label_parsing_chunk_size": None,
+                            "extra_cat_columns": [],
+                            "extra_con_columns": ["ExtraTarget"],
+                        },
+                    },
+                ],
+                "target_configs": {"label_parsing_chunk_size": None},
+            },
         },
     ],
     indirect=True,
 )
-@pytest.mark.parametrize(
-    "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
-)
 def test_set_up_train_and_valid_tabular_data(
-    parse_test_cl_args, create_test_data, create_test_cl_args
+    parse_test_cl_args, create_test_data, create_test_config
 ):
-    c = create_test_data
-    cl_args = create_test_cl_args
-    n_classes = len(c.target_classes)
+    test_configs = create_test_config
+    gc = test_configs.global_config
 
-    target_labels = get_split_labels(
-        cl_args=cl_args, custom_label_parsing_operations=None, label_filter=["target"]
+    dc = create_test_data
+    n_classes = len(dc.target_classes)
+
+    all_array_ids = train.gather_all_ids_from_target_configs(
+        target_configs=test_configs.target_configs
     )
+    train_ids, valid_ids = train.split_ids(ids=all_array_ids, valid_size=gc.valid_size)
+
+    target_file_infos = train.get_tabular_target_file_infos(
+        target_configs=test_configs.target_configs
+    )
+    target_labels = train.set_up_target_labels_wrapper(
+        tabular_file_infos=target_file_infos,
+        custom_label_ops=None,
+        train_ids=train_ids,
+        valid_ids=valid_ids,
+    )
+
     train_labels_dict = target_labels.train_labels
     valid_labels_dict = target_labels.valid_labels
 
-    assert len(train_labels_dict) + len(valid_labels_dict) == n_classes * c.n_per_class
+    assert len(train_labels_dict) + len(valid_labels_dict) == n_classes * dc.n_per_class
     assert len(train_labels_dict) > len(valid_labels_dict)
 
     train_ids_set = set(train_labels_dict.keys())
@@ -294,41 +281,76 @@ def test_transform_all_labels_in_sample_with_extra_con(
 
 
 @pytest.mark.parametrize(
-    "create_test_cl_args",
+    "create_test_config_init_base",
     [
         {
-            "custom_cl_args": {
-                "label_parsing_chunk_size": None,
-            }
+            "injections": {
+                "global_configs": {
+                    "run_name": "tabular_only",
+                },
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_tabular"},
+                        "input_type_info": {
+                            "model_type": "tabular",
+                            "label_parsing_chunk_size": 50,
+                            "extra_cat_columns": [],
+                            "extra_con_columns": ["ExtraTarget"],
+                        },
+                    },
+                ],
+                "target_configs": {"label_parsing_chunk_size": 50},
+            },
         },
         {
-            "custom_cl_args": {
-                "label_parsing_chunk_size": 50,
-            }
+            "injections": {
+                "global_configs": {
+                    "run_name": "tabular_only",
+                },
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_tabular"},
+                        "input_type_info": {
+                            "model_type": "tabular",
+                            "label_parsing_chunk_size": None,
+                            "extra_cat_columns": [],
+                            "extra_con_columns": ["ExtraTarget"],
+                        },
+                    },
+                ],
+                "target_configs": {"label_parsing_chunk_size": None},
+            },
         },
     ],
     indirect=True,
 )
 @pytest.mark.parametrize("create_test_data", [{"task_type": "binary"}], indirect=True)
 def test_label_df_parse_wrapper(
-    parse_test_cl_args, create_test_data, create_test_cl_args
+    parse_test_cl_args, create_test_data, create_test_config: Configs
 ):
-    c = create_test_data
-    cl_args = create_test_cl_args
-    test_target_column = cl_args.target_cat_columns[0]  # Origin
+    dc = create_test_data
+    test_configs = create_test_config
 
-    target_label_info = get_tabular_label_data(cl_args=cl_args, label_filter=["target"])
+    assert len(test_configs.target_configs) == 1
+    main_target_info = test_configs.target_configs[0]
+
+    test_target_column = main_target_info.target_cat_columns[0]  # ["Origin"]
+
+    target_file_infos = train.get_tabular_target_file_infos(
+        target_configs=test_configs.target_configs
+    )
+    assert len(target_file_infos) == 1
 
     parse_wrapper = label_setup.get_label_parsing_wrapper(
-        label_parsing_chunk_size=cl_args.label_parsing_chunk_size
+        label_parsing_chunk_size=main_target_info.label_parsing_chunk_size
     )
     df_labels = parse_wrapper(
-        label_file_tabular_info=target_label_info,
+        label_file_tabular_info=target_file_infos[0],
         ids_to_keep=None,
     )
 
     # since we're only testing binary case here
-    n_total = c.n_per_class * 2
+    n_total = dc.n_per_class * 2
 
     assert df_labels.shape == (n_total, 1)
     assert set(df_labels[test_target_column].unique()) == {"Asia", "Europe"}
@@ -447,14 +469,16 @@ def test_get_array_path_iterator_fail(create_test_data):
     ],
 )
 def test_get_all_label_columns_and_dtypes(
-    test_input_args, expected, args_config, create_test_column_ops
+    test_input_args, expected, create_test_column_ops
 ):
 
-    for key, columns in test_input_args.items():
-        setattr(args_config, key, columns)
-
-    cat_columns = args_config.target_cat_columns + args_config.extra_cat_columns
-    con_columns = args_config.target_con_columns + args_config.extra_con_columns
+    cat_columns = []
+    con_columns = []
+    for key, value in test_input_args.items():
+        if "_cat_" in key:
+            cat_columns += value
+        elif "_con_" in key:
+            con_columns += value
 
     columns, dtypes = label_setup._get_all_label_columns_and_dtypes(
         cat_columns=cat_columns,
@@ -467,44 +491,6 @@ def test_get_all_label_columns_and_dtypes(
         assert isinstance(dtypes[column], pd.CategoricalDtype)
     for column in con_columns:
         assert dtypes[column] == float
-
-
-@pytest.mark.parametrize(
-    "test_input_args,expected",
-    [
-        ({"target_cat_columns": ["Origin"]}, ["Origin"]),
-        (
-            {"target_cat_columns": ["Origin", "OriginExtraColumnsAll"]},
-            ["Origin", "OriginExtraColumnsAll"],
-        ),
-        (
-            {
-                "target_cat_columns": ["Origin"],
-                "extra_con_columns": ["OriginExtraColumnsPartial1"],
-            },
-            ["Origin", "OriginExtraColumnsPartial1"],
-        ),
-        (
-            {
-                "target_con_columns": ["Origin"],
-                "target_cat_columns": ["OriginExtraColumnsAll"],
-                "extra_con_columns": ["OriginExtraColumnsPartial1"],
-                "extra_cat_columns": ["OriginExtraColumnsPartial2"],
-            },
-            [
-                "Origin",
-                "OriginExtraColumnsAll",
-                "OriginExtraColumnsPartial1",
-                "OriginExtraColumnsPartial2",
-            ],
-        ),
-    ],
-)
-def test_get_label_columns_from_cl_args(
-    test_input_args, expected, args_config, create_test_column_ops
-):
-    for key, columns in test_input_args.items():
-        setattr(args_config, key, columns)
 
 
 @pytest.mark.parametrize(
@@ -949,15 +935,18 @@ def test_check_parsed_label_df_fail(
 @pytest.mark.parametrize(
     "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
 )
-def test_split_df_by_ids(create_test_data, create_test_cl_args):
-    cl_args = create_test_cl_args
+def test_split_df_by_ids(create_test_data, create_test_config):
+    test_configs = create_test_config
 
-    target_label_info = get_tabular_label_data(
-        cl_args=cl_args, label_filter=["target", "extra"]
+    target_file_infos = train.get_tabular_target_file_infos(
+        target_configs=test_configs.target_configs
     )
+    assert len(target_file_infos) == 1
+
+    main_target_file_info = target_file_infos[0]
 
     df_labels = label_setup.label_df_parse_wrapper(
-        label_file_tabular_info=target_label_info,
+        label_file_tabular_info=main_target_file_info,
         ids_to_keep=None,
     )
 
@@ -983,15 +972,18 @@ def test_split_df_by_ids(create_test_data, create_test_cl_args):
 @pytest.mark.parametrize(
     "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
 )
-def test_split_ids(create_test_data, create_test_cl_args):
-    cl_args = create_test_cl_args
+def test_split_ids(create_test_data, create_test_config):
+    test_configs = create_test_config
 
-    target_label_info = get_tabular_label_data(
-        cl_args=cl_args, label_filter=["target", "extra"]
+    target_file_infos = train.get_tabular_target_file_infos(
+        target_configs=test_configs.target_configs
     )
+    assert len(target_file_infos) == 1
+
+    main_target_file_info = target_file_infos[0]
 
     df_labels = label_setup.label_df_parse_wrapper(
-        label_file_tabular_info=target_label_info,
+        label_file_tabular_info=main_target_file_info,
         ids_to_keep=None,
     )
 
@@ -1037,33 +1029,22 @@ def get_test_nan_df():
 
 
 @pytest.fixture
-def get_test_nan_args():
-    cl_args = Namespace(
-        **{
-            "label_file": "fake_file",
-            "label_parsing_chunk_size": None,
-            "target_cat_columns": ["A"],
-            "extra_cat_columns": ["B"],
-            "target_con_columns": ["C"],
-            "extra_con_columns": ["D"],
-        }
+def get_test_nan_tabular_file_info():
+    label_info = label_setup.TabularFileInfo(
+        file_path=Path("fake_file"), cat_columns=["A", "B"], con_columns=["C", "D"]
     )
 
-    return cl_args
+    return label_info
 
 
-def test_process_train_and_label_dfs(get_test_nan_df, get_test_nan_args):
+def test_process_train_and_label_dfs(get_test_nan_df, get_test_nan_tabular_file_info):
     """
     NOTE:   Here we have the situation where we have NA in valid, but not in train. This
             means that we have to make sure we have manually added the 'NA' to train.
     """
 
     test_df = get_test_nan_df
-    cl_args = get_test_nan_args
-
-    label_info = get_tabular_label_data(
-        cl_args=cl_args, label_filter=["target", "extra"]
-    )
+    label_info = get_test_nan_tabular_file_info
 
     train_df = test_df.copy()
     valid_df = test_df.copy()
@@ -1117,13 +1098,11 @@ def test_process_train_and_label_dfs(get_test_nan_df, get_test_nan_args):
     assert (train_df_filled["D"] == valid_df_filled["D"]).all()
 
 
-def test_handle_missing_label_values_in_df(get_test_nan_df, get_test_nan_args):
+def test_handle_missing_label_values_in_df(
+    get_test_nan_df, get_test_nan_tabular_file_info
+):
     test_df = get_test_nan_df
-    cl_args = get_test_nan_args
-
-    label_info = get_tabular_label_data(
-        cl_args=cl_args, label_filter=["target", "extra"]
-    )
+    label_info = get_test_nan_tabular_file_info
 
     test_df_filled = label_setup.handle_missing_label_values_in_df(
         df=test_df,

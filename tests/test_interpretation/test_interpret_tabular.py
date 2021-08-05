@@ -6,9 +6,8 @@ from hypothesis import given, settings
 from hypothesis.strategies import integers, lists, floats
 
 from eir.data_load.data_utils import Batch
-from eir.interpretation.interpretation import SampleActivation
-
 from eir.interpretation import interpret_tabular as it
+from eir.interpretation.interpretation import SampleActivation
 
 
 def generate_test_activation_sequence(

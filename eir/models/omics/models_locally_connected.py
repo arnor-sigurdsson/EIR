@@ -2,7 +2,7 @@ from collections import OrderedDict
 from copy import copy
 from dataclasses import dataclass
 from functools import partial
-from typing import List, Callable, Sequence, TYPE_CHECKING
+from typing import List, Callable, Sequence, TYPE_CHECKING, Union
 
 import torch
 from aislib.misc_utils import get_logger
@@ -12,24 +12,40 @@ from torch import nn
 from eir.models.layers import SplitLinear, SplitMLPResidualBlock
 
 if TYPE_CHECKING:
-    from eir.train import DataDimensions
+    from eir.setup.input_setup import DataDimensions
 
 logger = get_logger(__name__)
 
 
 @dataclass
-class SplitMLPModelConfig:
+class SimpleLCLModelConfig:
+    """
+    :param fc_repr_dim:
+        Controls the number of output sets in the first and only split layer. Analogous
+        to channels in CNNs.
+    :param split_mlp_num_splits:
+        Controls the number of splits applied to the input. E.g. with a input with of
+        800, using ``split_mlp_num_splits=100`` will result in a kernel width of 8,
+        meaning 8 elements in the flattened input. If using a SNP inputs with a one-hot
+        encoding of 4 possible values, this will result in 8/2 = 2 SNPs per locally
+        connected area.
+    :param l1:
+        L1 regularization applied to the first and only locally connected layer.
+    """
 
-    fc_repr_dim: int
-    split_mlp_num_splits: int
-    data_dimensions: "DataDimensions"
+    fc_repr_dim: int = 12
+    split_mlp_num_splits: int = 64
+    l1: float = 0.00
 
 
-class SplitMLPModel(nn.Module):
-    def __init__(self, model_config: SplitMLPModelConfig):
+class SimpleLCLModel(nn.Module):
+    def __init__(
+        self, model_config: SimpleLCLModelConfig, data_dimensions: "DataDimensions"
+    ):
         super().__init__()
 
         self.model_config = model_config
+        self.data_dimensions = data_dimensions
 
         num_chunks = self.model_config.split_mlp_num_splits
         self.fc_0 = SplitLinear(
@@ -43,7 +59,7 @@ class SplitMLPModel(nn.Module):
 
     @property
     def fc_1_in_features(self) -> int:
-        return self.model_config.data_dimensions.num_elements()
+        return self.data_dimensions.num_elements()
 
     @property
     def l1_penalized_weights(self) -> torch.Tensor:
@@ -65,30 +81,80 @@ class SplitMLPModel(nn.Module):
 
 
 @dataclass
-class FullySplitMLPModelConfig:
-    layers: List[int]
+class LCLModelConfig:
+    """
+    Note that when using the automatic network setup, kernel widths will get expanded
+    to ensure that the feature representations become smaller as they are propagated
+    through the network.
 
-    kernel_width: int
-    first_kernel_expansion: int
+    :param layers:
+        Controls the number of layers in the model. If set to ``None``, the model will
+        automatically set up the number of layers according to the ``cutoff`` paramter
+        value.
 
-    channel_exp_base: int
-    first_channel_expansion: int
+    :param kernel_width:
+        With of the locally connected kernels. Note that this refers to the flattened
+        input, meaning that if we have a one-hot encoding of 4 values (e.g. SNPs), 12
+        refers to 12/4 = 3 SNPs per locally connected window. Can be set to ``None`` if
+        the ``split_mlp_num_splits`` paramter is set, which means that the kernel width
+        will be set automatically according to
 
-    fc_repr_dim: int
-    split_mlp_num_splits: int
+    :param first_kernel_expansion:
+        Factor to extend the first kernel. This value can both be positive or negative.
+        For example in the case of ``kernel_width=12``, setting
+        ``first_kernel_expansion=2`` means that the first kernel will have a width of
+        24, whereas other kernels will have a width of 12. When using a negative value,
+        divides the first kernel by the value instead of multiplying.
 
-    data_dimensions: "DataDimensions"
+    :param channel_exp_base:
+        Which power of 2 to use in order to set the number of channels/weight sets in
+        the network. For example, setting ``channel_exp_base=3`` means that 2**3=8
+        weight sets will be used.
 
-    rb_do: float
+    :param first_channel_expansion:
+        Whether to expand / shrink the number of channels in the first layer as compared
+        to other layers in the network. Works analogously to the
+        ``first_kernel_expansion`` parameter.
+
+    :param split_mlp_num_splits:
+        Controls the number of splits applied to the input. E.g. with a input width of
+        800, using ``split_mlp_num_splits=100`` will result in a kernel width of 8,
+        meaning 8 elements in the flattened input. If using a SNP inputs with a one-hot
+        encoding of 4 possible values, this will result in 8/2 = 2 SNPs per locally
+        connected area.
+
+    :param rb_do:
+        Dropout in the residual blocks.
+
+    :param l1:
+        L1 regularization applied to the first layer in the network.
+
+    :param cutoff:
+        Feature dimension cutoff where the automatic network setup stops adding layers.
+    """
+
+    layers: Union[None, List[int]] = None
+
+    kernel_width: Union[None, int] = 12
+    first_kernel_expansion: int = 1
+
+    channel_exp_base: int = 2
+    first_channel_expansion: int = 1
+
+    split_mlp_num_splits: Union[None, int] = None
+
+    rb_do: float = 0.00
+    l1: float = 0.00
 
     cutoff: int = 1024
 
 
-class FullySplitMLPModel(nn.Module):
-    def __init__(self, model_config: FullySplitMLPModelConfig):
+class LCLModel(nn.Module):
+    def __init__(self, model_config: LCLModelConfig, data_dimensions: "DataDimensions"):
         super().__init__()
 
         self.model_config = model_config
+        self.data_dimensions = data_dimensions
 
         fc_0_split_size = calc_value_after_expansion(
             base=self.model_config.kernel_width,
@@ -105,7 +171,7 @@ class FullySplitMLPModel(nn.Module):
             bias=False,
         )
 
-        split_parameter_spec = SplitParameterSpec(
+        split_parameter_spec = LCParameterSpec(
             in_features=self.fc_0.out_features,
             kernel_width=self.model_config.kernel_width,
             channel_exp_base=self.model_config.channel_exp_base,
@@ -121,7 +187,7 @@ class FullySplitMLPModel(nn.Module):
 
     @property
     def fc_1_in_features(self) -> int:
-        return self.model_config.data_dimensions.num_elements()
+        return self.data_dimensions.num_elements()
 
     @property
     def l1_penalized_weights(self) -> torch.Tensor:
@@ -186,7 +252,7 @@ def get_split_extractor_spec(
 
 
 @dataclass
-class SplitParameterSpec:
+class LCParameterSpec:
     in_features: int
     kernel_width: int
     channel_exp_base: int
@@ -195,8 +261,8 @@ class SplitParameterSpec:
 
 
 def _get_split_blocks(
-    split_parameter_spec: SplitParameterSpec,
-    block_layer_spec: Sequence[int],
+    split_parameter_spec: LCParameterSpec,
+    block_layer_spec: Union[None, Sequence[int]],
 ) -> nn.Sequential:
     factory = _get_split_block_factory(block_layer_spec=block_layer_spec)
 
@@ -207,19 +273,19 @@ def _get_split_blocks(
 
 def _get_split_block_factory(
     block_layer_spec: Sequence[int],
-) -> Callable[[SplitParameterSpec], nn.Sequential]:
-    if len(block_layer_spec) == 1:
+) -> Callable[[LCParameterSpec], nn.Sequential]:
+    if not block_layer_spec:
         return generate_split_resblocks_auto
 
     auto_factory = partial(
-        _generate_split_blocks_from_spec, block_layer_spec=block_layer_spec[:-1]
+        _generate_split_blocks_from_spec, block_layer_spec=block_layer_spec
     )
 
     return auto_factory
 
 
 def _generate_split_blocks_from_spec(
-    split_parameter_spec: SplitParameterSpec,
+    split_parameter_spec: LCParameterSpec,
     block_layer_spec: List[int],
 ) -> nn.Sequential:
 
@@ -259,10 +325,10 @@ def _generate_split_blocks_from_spec(
     return nn.Sequential(*block_modules)
 
 
-def generate_split_resblocks_auto(split_parameter_spec: SplitParameterSpec):
+def generate_split_resblocks_auto(split_parameter_spec: LCParameterSpec):
     """
     TODO:   Create some over-engineered abstraction for this and
-            `_generate_split_blocks_from_spec` if feeling bored.
+            ``_generate_split_blocks_from_spec`` if feeling bored.
     """
 
     s = split_parameter_spec

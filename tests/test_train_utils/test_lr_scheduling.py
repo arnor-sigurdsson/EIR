@@ -1,4 +1,5 @@
 from math import isclose
+from typing import Tuple, TYPE_CHECKING
 from unittest.mock import patch
 
 import pytest
@@ -15,6 +16,10 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from eir.train_utils import lr_scheduling
 from eir.train_utils.lr_scheduling import get_optimizer_lr
 from eir.train_utils.train_handlers import HandlerConfig
+
+if TYPE_CHECKING:
+    from eir.train import Experiment
+    from ..conftest import ModelTestConfig
 
 
 @pytest.fixture()
@@ -48,31 +53,55 @@ def create_dummy_test_optimizer(request):
     raise ValueError()
 
 
-def test_get_reduce_lr_on_plateu_step_params(args_config, create_dummy_test_optimizer):
-    cl_args = args_config
+@pytest.mark.parametrize("create_test_data", [{"task_type": "binary"}], indirect=True)
+@pytest.mark.parametrize(
+    "create_test_config_init_base",
+    [
+        {
+            "injections": {
+                "global_configs": {"lr_schedule": "plateau", "lr": 1e-03},
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "input_type_info": {"model_type": "identity"},
+                    },
+                ],
+            }
+        }
+    ],
+    indirect=True,
+)
+def test_get_reduce_lr_on_plateu_step_params(
+    create_test_config, create_dummy_test_optimizer
+):
+    test_config = create_test_config
+    gc = test_config.global_config
     optimizer = create_dummy_test_optimizer
 
     params = lr_scheduling._get_reduce_lr_on_plateau_step_params(
-        cl_args=cl_args, optimizer=optimizer
+        global_config=gc, optimizer=optimizer
     )
 
-    assert params["lr_upper_bound"] == cl_args.lr
-    assert params["lr_lower_bound"] == cl_args.lr_lb
-    assert params["sample_interval"] == cl_args.sample_interval
-    assert params["warmup_steps"] == cl_args.warmup_steps
+    assert params["lr_upper_bound"] == gc.lr
+    assert params["lr_lower_bound"] == gc.lr_lb
+    assert params["sample_interval"] == gc.sample_interval
+    assert params["warmup_steps"] == gc.warmup_steps
     assert params["optimizer"] == optimizer
     assert params["validation_history_fpath"].name == "validation_average_history.log"
 
 
 @pytest.fixture()
-def get_dummy_handler_config(prep_modelling_test_configs) -> HandlerConfig:
-    config, test_config = prep_modelling_test_configs
-    cl_args = config.cl_args
+def get_dummy_handler_config(
+    prep_modelling_test_configs: Tuple["Experiment", "ModelTestConfig"]
+) -> HandlerConfig:
+    experiment, test_config = prep_modelling_test_configs
+    configs = experiment.configs
+    global_config = configs.global_config
 
     handler_config = HandlerConfig(
-        config=config,
+        experiment=experiment,
         run_folder=test_config.run_path,
-        run_name=cl_args.run_name,
+        run_name=global_config.run_name,
         monitoring_metrics=[("tmp_var", "tmp_var")],
     )
 
@@ -81,50 +110,84 @@ def get_dummy_handler_config(prep_modelling_test_configs) -> HandlerConfig:
 
 @pytest.mark.parametrize("create_test_data", [{"task_type": "binary"}], indirect=True)
 @pytest.mark.parametrize(
-    "create_test_cl_args",
-    [{"custom_cl_args": {"lr_schedule": "plateau", "lr": 1e-3}}],
+    "create_test_config_init_base",
+    [
+        {
+            "injections": {
+                "global_configs": {"lr_schedule": "plateau", "lr": 1e-03},
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "input_type_info": {"model_type": "identity"},
+                    },
+                ],
+            }
+        }
+    ],
     indirect=True,
 )
 def test_set_up_lr_scheduler_plateau(get_dummy_handler_config):
     handler_config = get_dummy_handler_config
-    c = handler_config.config
-    cl_args = c.cl_args
+    exp = handler_config.experiment
+    gc = exp.configs.global_config
 
     lr_scheduler = lr_scheduling.set_up_lr_scheduler(handler_config=handler_config)
     assert isinstance(lr_scheduler, ReduceLROnPlateau)
 
     # Note: Check comment in lr_scheduling.set_up_lr_scheduler for why -1
-    expected_patience = cl_args.lr_plateau_patience - 1
+    expected_patience = gc.lr_plateau_patience - 1
     assert lr_scheduler.patience == expected_patience
-    assert lr_scheduler.optimizer == c.optimizer
+    assert lr_scheduler.optimizer == exp.optimizer
 
 
 @pytest.mark.parametrize("create_test_data", [{"task_type": "binary"}], indirect=True)
 @pytest.mark.parametrize(
-    "create_test_cl_args",
+    "create_test_config_init_base",
     [
-        {"custom_cl_args": {"lr_schedule": "cycle", "lr": 1e-3}},
-        {"custom_cl_args": {"lr_schedule": "cosine", "lr": 1e-3}},
+        # Case 1: Cycle
+        {
+            "injections": {
+                "global_configs": {"lr_schedule": "cycle", "lr": 1e-03},
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "input_type_info": {"model_type": "identity"},
+                    },
+                ],
+            }
+        },
+        # Case 2: Cosine
+        {
+            "injections": {
+                "global_configs": {"lr_schedule": "cosine", "lr": 1e-03},
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "input_type_info": {"model_type": "identity"},
+                    },
+                ],
+            }
+        },
     ],
     indirect=True,
 )
 def test_set_up_lr_scheduler_cycle(get_dummy_handler_config):
     handler_config = get_dummy_handler_config
-    c = handler_config.config
-    cl_args = c.cl_args
+    exp = handler_config.experiment
+    gc = exp.configs.global_config
 
     lr_scheduler = lr_scheduling.set_up_lr_scheduler(handler_config=handler_config)
 
     _check_warmup_concat_scheduler(
-        lr_scheduler=lr_scheduler, warmup_steps=cl_args.warmup_steps
+        lr_scheduler=lr_scheduler, warmup_steps=gc.warmup_steps
     )
 
     _check_cosine_scheduler(
         cosine_scheduler=lr_scheduler.schedulers[1],
-        lr_schedule=cl_args.lr_schedule,
-        cycle_iter_size=len(c.train_loader),
-        n_epochs=cl_args.n_epochs,
-        warmup_steps=cl_args.warmup_steps,
+        lr_schedule=gc.lr_schedule,
+        cycle_iter_size=len(exp.train_loader),
+        n_epochs=gc.n_epochs,
+        warmup_steps=gc.warmup_steps,
     )
 
 

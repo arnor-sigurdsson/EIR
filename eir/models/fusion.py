@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, Callable, Sequence, List, TYPE_CHECKING
 
 import torch
@@ -32,12 +32,26 @@ def default_fuse_features(features: Sequence[torch.Tensor]) -> torch.Tensor:
 
 @dataclass
 class FusionModelConfig:
-    layers: List[int]
+    """
+    :param layers:
+        Number of residual MLP layers to use in for each output predictor after fusing.
 
-    fc_task_dim: int
+    :param fc_task_dim:
+        Number of hidden nodes in each MLP residual block.
 
-    rb_do: float
-    fc_do: float
+    :param rb_do:
+        Dropout in each MLP residual block.
+
+    :param fc_do:
+        Dropout before last FC layer.
+    """
+
+    layers: List[int] = field(default_factory=lambda: [2])
+
+    fc_task_dim: int = 32
+
+    rb_do: float = 0.00
+    fc_do: float = 0.00
 
 
 class FusionModel(nn.Module):
@@ -67,7 +81,7 @@ class FusionModel(nn.Module):
         cur_dim = sum(i.num_out_features for i in self.modules_to_fuse.values())
 
         multi_task_branches = create_multi_task_blocks_with_first_adaptor_block(
-            num_blocks=self.model_config.layers[-1],
+            num_blocks=self.model_config.layers[0],
             branch_names=task_names,
             block_constructor=MLPResidualBlock,
             block_constructor_kwargs=task_resblocks_kwargs,

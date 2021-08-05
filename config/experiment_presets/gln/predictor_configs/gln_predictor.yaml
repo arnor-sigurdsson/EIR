@@ -1,0 +1,7 @@
+model_type: default
+model_config:
+  layers:
+    - 2
+  fc_do: 0.5
+  rb_do: 0.5
+  fc_task_dim: 64

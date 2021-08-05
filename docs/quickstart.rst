@@ -1,3 +1,5 @@
+.. _quickstart:
+
 Quickstart
 ==========
 
@@ -38,33 +40,20 @@ we can run the following command:
 .. code-block:: bash
 
     eirtrain \
-    --n_epochs 20 \
-    --dataloader_workers 0 \
-    --omics_sources processed_sample_data/arrays/ \
-    --omics_names genotype \
-    --sample_interval 100 \
-    --checkpoint_interval 100 \
-    --n_saved_models 1 \
-    --snp_file processed_sample_data/data_final_gen.bim  \
-    --label_file processed_sample_data/human_origins_labels.csv  \
-    --target_cat_columns Origin  \
-    --model_type genome-local-net \
-    --fc_task_dim 32 `#Number of hidden nodes in fully-connected layers` \
-    --fc_do 0.5 `#Last layer dropout` \
-    --rb_do 0.5 `#Residual blocks dropout` \
-    --na_augment_perc 0.4 `#Input NA dropout` \
-    --na_augment_prob 1.0 `#Probability of applying input NA dropout` \
-    --layers 2 \
-    --run_name gln \
-    --channel_exp_base 1 `#Use 2**1 weight sets in locally-connected layers` \
-    --kernel_width 8 `#Locally connected with, 8 / 2 = 2 SNPs` \
-    --get_acts \
-    --max_acts_per_class 200 `#Limit number of samples used for activation computations` \
+    --preset gln --gln_targets.label_file="processed_sample_data/human_origins_labels.csv" \
+    --gln_targets.target_cat_columns="['Origin',]" \
+    --gln_input.input_info.input_source="processed_sample_data/arrays/" \
+    --gln_input.input_type_info.snp_file="processed_sample_data/data_final_gen.bim"
 
 
 .. tip::
 
-    For a full set of options and a short explanation of each, run ``eirtrain --help``.
+    While concise,
+    the command above indeed obscures a lot of the configuration and functionality
+    happening behind the scenes. See the :ref:`01-basic-tutorial` for a more thorough example.
+    Additionally, the full set of configurations used for the ``gln`` preset
+    are available in the ``config/`` directory in the
+    `project repository <https://github.com/arnor-sigurdsson/EIR>`_.
 
 
 This will generate a folder called ``runs/gln``
@@ -98,34 +87,7 @@ The folder has roughly the following structure
     ├── training_curve_LOSS-AVERAGE.png
     ├── training_curve_PERF-AVERAGE.png
 
-
-Predicting on external samples
-------------------------------
-
-To predict on unseen samples,
-we can use the ``eirpredict``, for example like so:
-
-.. code-block:: console
-
-    eirpredict --model_path runs/gln/saved_models/<chosen_model>  --output_folder runs --device cpu --label_file <path/to/test_labels.csv>  --omics_sources <path/to/test_arrays> --omics_names genotype --evaluate
-
-This will generate a folder called ``test_set_predictions``
-under in the ``--output_folder`` directory.
-
-.. tip::
-
-   We might want to predict on samples where we do not have any labels,
-   in that case just omit the ``--evaluate`` and ``--label_file`` flags.
-
-Applying to other datasets
---------------------------
-
-Hopefully this small demo was useful!
-To apply to your own data,
-you will have to process it (see: `plink pipelines`_)
-and change the following flags:
-
-.. code-block:: console
-
-    --omics_sources <path/to/your/processed/arrays> --snp_file <path/to/your/bim/file> --label_file <path/to/your/labels/csv/file> --target_cat_columns <name_of_target_column_in_label_file>
-
+Hopefully this small demo was useful! For a more thorough tutorial
+(e.g. showing how you can predict on external samples,
+tips on applying the framework to your own data),
+head to :ref:`01-basic-tutorial`.

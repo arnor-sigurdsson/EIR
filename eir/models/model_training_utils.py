@@ -25,10 +25,6 @@ from torch.utils.data import DataLoader
 
 from eir.data_load.data_utils import get_target_columns_generator
 from eir.data_load.label_setup import al_target_columns
-from eir.train_utils.metrics import (
-    calculate_prediction_losses,
-    aggregate_losses,
-)
 from eir.train_utils.utils import (
     call_hooks_stage_iterable,
 )
@@ -36,7 +32,7 @@ from eir.train_utils.utils import (
 if TYPE_CHECKING:
     # noinspection PyUnresolvedReferences
     from eir.train import (  # noqa: F401
-        Config,
+        Experiment,
         al_training_labels_batch,
         al_training_labels_target,
         al_training_labels_extra,
@@ -428,12 +424,3 @@ def plot_lr_find_results(
     )
 
     fig.write_html(str(outfolder / "lr_search.html"))
-
-
-def _calculate_losses_and_average(criterions, outputs, labels) -> torch.Tensor:
-    all_losses = calculate_prediction_losses(
-        criterions=criterions, targets=labels, inputs=outputs
-    )
-    average_loss = aggregate_losses(all_losses)
-
-    return average_loss

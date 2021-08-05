@@ -19,7 +19,7 @@ from eir.visualization import visualization_funcs as vf
 
 if TYPE_CHECKING:
     from eir.train_utils.train_handlers import HandlerConfig
-    from eir.train import Config
+    from eir.train import Experiment
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -33,51 +33,51 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
 
     TODO: Streamline with hooks.
     """
-    c = handler_config.config
-    cl_args = c.cl_args
+    exp = handler_config.experiment
+    gc = exp.configs.global_config
     iteration = engine.state.iteration
 
-    c.model.eval()
+    exp.model.eval()
     gather_preds = model_training_utils.gather_pred_outputs_from_dloader
 
     val_outputs_total, val_target_labels, val_ids_total = gather_preds(
-        data_loader=c.valid_loader,
-        batch_prep_hook=c.hooks.step_func_hooks.base_prepare_batch,
-        batch_prep_hook_kwargs={"config": c},
-        model=c.model,
+        data_loader=exp.valid_loader,
+        batch_prep_hook=exp.hooks.step_func_hooks.base_prepare_batch,
+        batch_prep_hook_kwargs={"experiment": exp},
+        model=exp.model,
         with_labels=True,
     )
-    c.model.train()
+    exp.model.train()
 
     val_target_labels = model_training_utils.parse_target_labels(
-        target_columns=c.target_columns, device=cl_args.device, labels=val_target_labels
+        target_columns=exp.target_columns, device=gc.device, labels=val_target_labels
     )
 
-    val_losses = c.loss_function(inputs=val_outputs_total, targets=val_target_labels)
+    val_losses = exp.loss_function(inputs=val_outputs_total, targets=val_target_labels)
     val_loss_avg = metrics.aggregate_losses(losses_dict=val_losses)
 
     eval_metrics_dict = metrics.calculate_batch_metrics(
-        target_columns=c.target_columns,
+        target_columns=exp.target_columns,
         outputs=val_outputs_total,
         labels=val_target_labels,
         mode="val",
-        metric_record_dict=c.metrics,
+        metric_record_dict=exp.metrics,
     )
 
     eval_metrics_dict_w_loss = metrics.add_loss_to_metrics(
-        target_columns=c.target_columns,
+        target_columns=exp.target_columns,
         losses=val_losses,
         metric_dict=eval_metrics_dict,
     )
 
     eval_metrics_dict_w_avgs = metrics.add_multi_task_average_metrics(
         batch_metrics_dict=eval_metrics_dict_w_loss,
-        target_columns=c.target_columns,
+        target_columns=exp.target_columns,
         loss=val_loss_avg.item(),
-        performance_average_functions=c.metrics["averaging_functions"],
+        performance_average_functions=exp.metrics["averaging_functions"],
     )
 
-    write_eval_header = True if iteration == cl_args.sample_interval else False
+    write_eval_header = True if iteration == gc.sample_interval else False
     metrics.persist_metrics(
         handler_config=handler_config,
         metrics_dict=eval_metrics_dict_w_avgs,
@@ -91,7 +91,7 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
         val_labels=val_target_labels,
         val_ids=val_ids_total,
         iteration=iteration,
-        config=handler_config.config,
+        experiment=handler_config.experiment,
     )
 
 
@@ -100,15 +100,15 @@ def save_evaluation_results_wrapper(
     val_labels: Dict[str, torch.Tensor],
     val_ids: List[str],
     iteration: int,
-    config: "Config",
+    experiment: "Experiment",
 ):
 
-    target_columns_gen = get_target_columns_generator(config.target_columns)
-    transformers = config.target_transformers
+    target_columns_gen = get_target_columns_generator(experiment.target_columns)
+    transformers = experiment.target_transformers
 
     for column_type, column_name in target_columns_gen:
         cur_sample_outfolder = utils.prep_sample_outfolder(
-            run_name=config.cl_args.run_name,
+            run_name=experiment.configs.global_config.run_name,
             column_name=column_name,
             iteration=iteration,
         )
