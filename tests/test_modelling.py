@@ -431,7 +431,6 @@ def _check_test_performance_results(
                         },
                     },
                 ],
-                "predictor_configs": {"model_type": "mgmoe"},
                 "target_configs": {
                     "target_cat_columns": ["Origin"],
                     "target_con_columns": ["Height", "ExtraTarget"],

@@ -147,7 +147,7 @@ def get_test_base_global_init() -> Sequence[dict]:
             "n_epochs": 10,
             "warmup_steps": 100,
             "lr": 1e-02,
-            "lr_lb": 1e-03,
+            "lr_lb": 1e-05,
             "batch_size": 32,
             "valid_size": 0.05,
             "wd": 1e-03,
