@@ -144,7 +144,7 @@ def get_test_base_global_init() -> Sequence[dict]:
             "get_acts": True,
             "act_every_sample_factor": 0,
             "act_background_samples": 256,
-            "n_epochs": 10,
+            "n_epochs": 12,
             "warmup_steps": 100,
             "lr": 1e-02,
             "lr_lb": 1e-05,
@@ -480,6 +480,8 @@ def create_test_config(
         test_configs.global_config.run_name
         + "_"
         + "_".join(i.input_type_info.model_type for i in test_configs.input_configs)
+        + "_"
+        + f"{test_configs.predictor_config.model_type}"
         + "_"
         + test_data_config.request_params["task_type"]
     )

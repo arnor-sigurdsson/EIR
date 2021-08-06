@@ -414,7 +414,7 @@ def _check_test_performance_results(
                 ],
                 "predictor_configs": {
                     "model_type": "mgmoe",
-                    "model_config": {"mg_num_experts": 2},
+                    "model_config": {"mg_num_experts": 3},
                 },
                 "target_configs": {
                     "target_cat_columns": ["Origin"],

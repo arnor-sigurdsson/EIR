@@ -46,7 +46,7 @@ def get_calculate_batch_metrics_data_test_kwargs():
     }
 
     labels = {
-        "Origin": torch.tensor([0, 1, 2]).unsqueeze(1),
+        "Origin": torch.tensor([0, 1, 2]),
         "BMI": torch.tensor([1.0, 2.0, 3.0]).unsqueeze(1),
         "Height": torch.tensor([-1.0, -2.0, -3.0]).unsqueeze(1),
     }
