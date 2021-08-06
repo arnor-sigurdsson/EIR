@@ -7,7 +7,7 @@ import pytest
 
 from eir import train
 from eir.setup.config import get_all_targets, Configs
-from tests.conftest import cleanup, ModelTestConfig
+from tests.conftest import ModelTestConfig
 
 
 @pytest.mark.parametrize(
@@ -68,7 +68,7 @@ from tests.conftest import cleanup, ModelTestConfig
     ],
     indirect=True,
 )
-def test_classification(keep_outputs, prep_modelling_test_configs):
+def test_classification(prep_modelling_test_configs):
     """
     NOTE:
         We probably cannot check directly if the gradients for a given SNP
@@ -105,9 +105,6 @@ def test_classification(keep_outputs, prep_modelling_test_configs):
         top_row_grads_dict=top_row_grads_dict,
         at_least_n=8,
     )
-
-    if not keep_outputs:
-        cleanup(test_config.run_path)
 
 
 def _check_snps_wrapper(
@@ -211,7 +208,7 @@ def _check_snps_wrapper(
     ],
     indirect=True,
 )
-def test_regression(keep_outputs, prep_modelling_test_configs):
+def test_regression(prep_modelling_test_configs):
     experiment, test_config = prep_modelling_test_configs
 
     train.train(experiment)
@@ -239,9 +236,6 @@ def test_regression(keep_outputs, prep_modelling_test_configs):
         top_row_grads_dict=top_row_grads_dict,
         at_least_n=8,
     )
-
-    if not keep_outputs:
-        cleanup(test_config.run_path)
 
 
 def _check_test_performance_results(
@@ -442,6 +436,13 @@ def _check_test_performance_results(
                         },
                     },
                 ],
+                "predictor_configs": {
+                    "model_config": {
+                        "fc_task_dim": 64,
+                        "fc_do": 0.10,
+                        "rb_do": 0.10,
+                    },
+                },
                 "target_configs": {
                     "target_cat_columns": ["Origin"],
                     "target_con_columns": ["Height", "ExtraTarget"],
@@ -468,6 +469,13 @@ def _check_test_performance_results(
                         },
                     },
                 ],
+                "predictor_configs": {
+                    "model_config": {
+                        "fc_task_dim": 64,
+                        "fc_do": 0.20,
+                        "rb_do": 0.20,
+                    },
+                },
                 "target_configs": {
                     "target_cat_columns": ["Origin"],
                     "target_con_columns": ["Height", "ExtraTarget"],
@@ -478,7 +486,6 @@ def _check_test_performance_results(
     indirect=True,
 )
 def test_multi_task(
-    keep_outputs: bool,
     prep_modelling_test_configs: Tuple[train.Experiment, ModelTestConfig],
 ):
     experiment, test_config = prep_modelling_test_configs
@@ -532,9 +539,6 @@ def test_multi_task(
             top_row_grads_dict=top_row_grads_dict,
             at_least_n=at_least_n,
         )
-
-    if not keep_outputs:
-        cleanup(test_config.run_path)
 
 
 def get_all_tabular_input_columns(configs: Configs):

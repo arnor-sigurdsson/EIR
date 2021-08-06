@@ -52,7 +52,10 @@ def test_prepare_run_folder_fail(patched_get_run_folder, tmp_path):
         # Case 1: Linear
         {
             "injections": {
-                "global_configs": {"lr": 1e-03},
+                "global_configs": {
+                    "lr": 1e-03,
+                    "run_name": "test_get_default_experiment",
+                },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
