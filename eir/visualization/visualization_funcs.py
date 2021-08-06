@@ -378,19 +378,8 @@ def generate_multi_class_roc_curve(
     roc_auc_macro = metrics.calc_roc_auc_ovo(
         outputs=y_outp, labels=y_true, average="macro"
     )
-    roc_auc_micro = metrics.calc_roc_auc_ovo(
-        outputs=y_outp, labels=y_true, average="micro"
-    )
 
     plt.figure(figsize=(12, 8))
-    plt.plot(
-        fpr["micro"],
-        tpr["micro"],
-        label=f"micro-average ROC curve (area = {roc_auc_micro:0.4g})",
-        color="deeppink",
-        linestyle=":",
-        linewidth=4,
-    )
 
     plt.plot(
         fpr["macro"],

@@ -8,6 +8,7 @@ from typing import Dict, TYPE_CHECKING, List, Tuple, Callable, Union
 
 import numpy as np
 import pandas as pd
+from scipy.special import softmax
 import torch
 from aislib.misc_utils import ensure_path_exists, get_logger
 from scipy.stats import pearsonr
@@ -175,7 +176,7 @@ def calc_roc_auc_ovo(
     assert average in ["micro", "macro"]
 
     if outputs.shape[1] > 2:
-        labels = label_binarize(y=labels, classes=sorted(np.unique(labels)))
+        outputs = softmax(x=outputs, axis=1)
     else:
         outputs = outputs[:, 1]
 
