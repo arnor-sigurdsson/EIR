@@ -21,7 +21,7 @@ from eir.models.omics.omics_models import get_omics_model_init_kwargs
 from eir.setup import config
 from eir.setup import schemas
 from eir.setup.config import object_to_primitives
-from tests.conftest import cleanup, TestDataConfig, ModelTestConfig
+from tests.conftest import TestDataConfig, ModelTestConfig
 from tests.test_data_load.test_datasets import check_dataset
 
 al_config_instances = Union[
@@ -331,15 +331,12 @@ def test_overload_train_configs_for_predict(
 def test_load_labels_for_predict(
     create_test_data: TestDataConfig,
     create_test_config: config.Configs,
-    keep_outputs: bool,
 ):
     """
     Note here we are treating the generated test data (i.e. by tests, not test-set-data)
     as the testing-set.
     """
     test_configs = create_test_config
-
-    run_path = Path(f"runs/{test_configs.global_config.run_name}/")
 
     test_ids = predict.gather_all_ids_from_target_configs(
         target_configs=test_configs.target_configs
@@ -364,9 +361,6 @@ def test_load_labels_for_predict(
     assert len(target_tabular_info.cat_columns) == 1
     cat_target_column = target_tabular_info.cat_columns[0]
     assert set(df_test[cat_target_column]) == {"Asia", "Africa", "Europe"}
-
-    if not keep_outputs:
-        cleanup(run_path)
 
 
 @pytest.mark.parametrize("create_test_data", [{"task_type": "multi"}], indirect=True)
@@ -499,7 +493,6 @@ def grab_best_model_path(saved_models_folder: Path):
     indirect=True,
 )
 def test_predict(
-    keep_outputs: bool,
     prep_modelling_test_configs: Tuple[train.Experiment, ModelTestConfig],
     tmp_path: Path,
 ):
@@ -565,5 +558,3 @@ def test_predict(
     assert preds_accuracy > 0.95
 
     assert (tmp_path / "Origin/activations").exists()
-    if not keep_outputs:
-        cleanup(model_test_config.run_path)

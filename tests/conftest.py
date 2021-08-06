@@ -41,7 +41,7 @@ def pytest_addoption(parser):
     parser.addoption(
         "--num_samples_per_class",
         type=int,
-        default=2000,
+        default=1000,
         help="Number of samples per class.",
     )
     parser.addoption(
@@ -143,11 +143,11 @@ def get_test_base_global_init() -> Sequence[dict]:
             "plot_skip_steps": 0,
             "get_acts": True,
             "act_every_sample_factor": 0,
-            "act_background_samples": 512,
-            "n_epochs": 6,
+            "act_background_samples": 256,
+            "n_epochs": 12,
             "warmup_steps": 100,
             "lr": 1e-02,
-            "lr_lb": 1e-03,
+            "lr_lb": 1e-05,
             "batch_size": 32,
             "valid_size": 0.05,
             "wd": 1e-03,
@@ -198,7 +198,7 @@ def get_test_omics_input_init(
         "input_type_info": {
             "model_type": "genome-local-net",
             "na_augment_perc": 0.10,
-            "na_augment_prob": 0.50,
+            "na_augment_prob": 0.10,
             "snp_file": str(test_path / "test_snps.bim"),
         },
         "model_config": {},
@@ -452,7 +452,7 @@ def split_test_array_folder(test_folder: Path) -> None:
 
 @pytest.fixture()
 def create_test_config(
-    create_test_config_init_base,
+    create_test_config_init_base, keep_outputs: bool
 ) -> config.Configs:
 
     test_init, test_data_config = copy(create_test_config_init_base)
@@ -460,6 +460,7 @@ def create_test_config(
     test_global_config = config.get_global_config(
         global_configs=test_init.global_configs
     )
+
     test_input_configs = config.get_input_configs(input_configs=test_init.input_configs)
     test_predictor_configs = config.load_predictor_config(
         predictor_configs=test_init.predictor_configs
@@ -481,13 +482,26 @@ def create_test_config(
         + "_"
         + "_".join(i.input_type_info.model_type for i in test_configs.input_configs)
         + "_"
+        + f"{test_configs.predictor_config.model_type}"
+        + "_"
         + test_data_config.request_params["task_type"]
     )
     test_configs.global_config.run_name = run_name
 
+    run_folder = get_run_folder(run_name=run_name)
+
+    # If another test had side-effect leftovers, TODO: Enforce unique names
+    if run_folder.exists():
+        cleanup(run_path=run_folder)
+
+    ensure_path_exists(path=run_folder, is_folder=True)
+
     configure_root_logger(run_name=run_name)
 
-    return test_configs
+    yield test_configs
+
+    if not keep_outputs:
+        cleanup(run_path=run_folder)
 
 
 def modify_test_configs(
@@ -569,8 +583,8 @@ def set_up_inputs_as_dict(input_configs: Sequence[schemas.InputConfig]):
     return inputs_as_dict
 
 
-def cleanup(run_path):
-    rmtree(run_path)
+def cleanup(run_path: Union[Path, str]) -> None:
+    rmtree(path=run_path)
 
 
 @pytest.fixture()
@@ -582,12 +596,6 @@ def create_test_labels(
     gc = c.global_config
 
     run_folder = get_run_folder(run_name=gc.run_name)
-
-    # TODO: Use better logic here, to do the cleanup. Should not be in this fixture.
-    if run_folder.exists():
-        cleanup(run_folder)
-
-    ensure_path_exists(run_folder, is_folder=True)
 
     all_array_ids = train.gather_all_ids_from_target_configs(
         target_configs=c.target_configs
