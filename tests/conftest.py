@@ -775,16 +775,19 @@ def prep_modelling_test_configs(
     return experiment, test_config
 
 
-def _patch_metrics(metrics_):
+def _patch_metrics(
+    metrics_: metrics.al_metric_record_dict,
+) -> metrics.al_metric_record_dict:
     warnings.warn(
         "This function will soon be deprecated as conftest will need to "
         "create its own metrics when train.py default metrics will be "
         "minimal.",
         category=DeprecationWarning,
     )
-    for type_ in ("cat", "con"):
+    for type_ in ("con",):
         for metric_record in metrics_[type_]:
-            metric_record.only_val = False
+            if metric_record.name == "r2":
+                metric_record.only_val = False
     return metrics_
 
 

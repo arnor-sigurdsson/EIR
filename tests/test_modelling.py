@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Union, Tuple, Dict, List
+from typing import Union, Tuple, Dict, List, Sequence
 
 import numpy as np
 import pandas as pd
@@ -112,6 +112,7 @@ def _check_snps_wrapper(
     target_column: str,
     top_row_grads_dict: Dict[str, List[int]],
     at_least_n: Union[str, int] = "all",
+    check_types_skip_cls_names: Sequence[str] = tuple(),
 ):
     expected_top_indxs = list(range(50, 1000, 100))
 
@@ -124,6 +125,7 @@ def _check_snps_wrapper(
             top_row_grads_dict=top_row_grads_dict,
             check_types=check_types,
             at_least_n=at_least_n,
+            check_types_skip_cls_names=check_types_skip_cls_names,
         )
 
 
@@ -580,6 +582,7 @@ def _check_identified_snps(
     expected_top_indxs: List[int],
     top_row_grads_dict: Dict[str, List[int]],
     check_types: bool,
+    check_types_skip_cls_names: Sequence[str] = tuple(),
     at_least_n: Union[str, int] = "all",
 ):
     """
@@ -598,6 +601,7 @@ def _check_identified_snps(
     :param at_least_n: At least how many SNPs must be identified to pass the test.
     :return:
     """
+
     top_grads_array = np.load(str(arrpath), allow_pickle=True)
 
     # get dict from array
@@ -611,7 +615,7 @@ def _check_identified_snps(
         else:
             assert len(set(actual_top).intersection(set(expected_top))) >= at_least_n
 
-        if check_types:
+        if check_types and cls not in check_types_skip_cls_names:
             expected_top_rows = top_row_grads_dict[cls]
             _check_snp_types(
                 cls_name=cls,
