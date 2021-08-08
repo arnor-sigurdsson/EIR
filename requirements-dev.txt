@@ -4,7 +4,7 @@ aislib==0.1.5a0; python_version >= "3.8" and python_version < "4.0"
 alabaster==0.7.12; python_version >= "3.6"
 altgraph==0.17; sys_platform == "darwin" and python_version >= "3.6"
 appdirs==1.4.4; python_full_version >= "3.6.2"
-appnope==0.1.2; platform_system == "Darwin" and python_version >= "3.7" and sys_platform == "darwin"
+appnope==0.1.2; sys_platform == "darwin" and python_version >= "3.7" and platform_system == "Darwin"
 argon2-cffi==20.1.0; python_version >= "3.6"
 async-generator==1.10; python_full_version >= "3.6.1" and python_version >= "3.7"
 atomicwrites==1.4.0; python_version >= "3.6" and python_full_version < "3.0.0" and sys_platform == "win32" and (python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.5.0" and python_version >= "3.6") or sys_platform == "win32" and python_version >= "3.6" and python_full_version >= "3.4.0" and (python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.5.0" and python_version >= "3.6")

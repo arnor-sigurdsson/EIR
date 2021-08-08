@@ -167,7 +167,8 @@ def load_preset(preset_directory: Path) -> Dict[str, List[str]]:
 def _get_preset_map() -> Dict[str, Path]:
     preset_map = {}
 
-    preset_root = Path("config/experiment_presets")
+    eir_abspath = Path(__file__).parents[1]
+    preset_root = eir_abspath / "config/experiment_presets"
 
     for directory in preset_root.iterdir():
         preset_map[directory.stem] = directory

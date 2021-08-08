@@ -7,6 +7,7 @@ authors = ["Arnor Sigurdsson"]
 packages = [
     { include="eir", from="." },
 ]
+include = ["config/experiment_presets/*"]
 
 [tool.poetry.dependencies]
 python = ">= 3.8,< 3.10"
@@ -32,6 +33,7 @@ dill = "^0.3.3"
 hypothesis = "^6.14.0"
 aislib = "0.1.5a0"
 colorama = "^0.4.4"
+ipython = "^7.26.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.1.1"
@@ -49,11 +51,11 @@ pre-commit = "^2.7.1"
 gpustat = "^0.6.0"
 pyinstaller = "^4.0"
 black = "^21.5b2"
-ipython = "^7.24.1"
 Sphinx = "^4.0.2"
 sphinx-rtd-theme = "^0.5.2"
 sphinx-copybutton = "^0.3.3"
 tomlkit = "^0.7.2"
+
 
 [tool.poetry.scripts]
 eirtrain = "eir.train:main"
