@@ -1,13 +1,12 @@
 [tool.poetry]
 name = "eir-dl"
-version = "0.1.14-alpha"
+version = "0.1.15-alpha"
 description = ""
 license = "AGPLv3"
 authors = ["Arnor Sigurdsson"]
 packages = [
     { include="eir", from="." },
 ]
-include = ["config/experiment_presets/*"]
 
 [tool.poetry.dependencies]
 python = ">= 3.8,< 3.10"

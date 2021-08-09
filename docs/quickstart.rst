@@ -45,10 +45,6 @@ we can run the following command:
     --gln_input.input_info.input_source="processed_sample_data/arrays/" \
     --gln_input.input_type_info.snp_file="processed_sample_data/data_final_gen.bim"
 
-.. warning::
-    For now the ``--preset`` option only works when the framework is installed with
-    Python (i.e. not with pre-built binaries).
-
 .. tip::
 
     While concise,

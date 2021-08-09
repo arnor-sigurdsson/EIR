@@ -1,15 +1,18 @@
 import argparse
-from pathlib import Path
-import types
 import ast
-import sys
-from collections import defaultdict
+import atexit
 import json
 import operator
-from functools import reduce
+import shutil
+import sys
+import tempfile
+import types
 from argparse import Namespace
+from collections import defaultdict
 from copy import copy
 from dataclasses import dataclass
+from functools import partial, reduce
+from pathlib import Path
 from typing import (
     Sequence,
     Iterable,
@@ -36,6 +39,7 @@ from eir.models.fusion_linear import LinearFusionModelConfig
 from eir.models.fusion_mgmoe import MGMoEModelConfig
 from eir.models.omics.omics_models import get_omics_config_dataclass_mapping
 from eir.setup import schemas
+from eir.setup.presets import gln
 
 al_input_types = Union[schemas.OmicsInputDataConfig, schemas.TabularInputDataConfig]
 
@@ -118,17 +122,19 @@ def add_preset_to_cl_args(cl_args: Namespace):
         return cl_args
 
     preset_map = _get_preset_map()
-    preset_dir = preset_map.get(cl_args.preset)
-    preset_dct = load_preset(preset_directory=preset_dir)
+    preset_dict = preset_map.get(cl_args.preset)
+    preset_dir_dict = prepare_preset_tmp_dir(
+        preset_dict=preset_dict, preset_name=cl_args.preset
+    )
 
     cl_args_copy = copy(cl_args)
-    for key, value in preset_dct.items():
+    for key, value in preset_dir_dict.items():
         setattr(cl_args_copy, key, value)
 
     return cl_args_copy
 
 
-def load_preset(preset_directory: Path) -> Dict[str, List[str]]:
+def prepare_preset_tmp_dir(preset_dict: Dict, preset_name: str) -> Dict[str, List[str]]:
     expected_keys = {
         "global_configs",
         "input_configs",
@@ -136,42 +142,49 @@ def load_preset(preset_directory: Path) -> Dict[str, List[str]]:
         "predictor_configs",
     }
 
-    preset_yamls = {}
+    def _cleanup(tmp_dir: Path):
+        if tmp_dir.exists():
+            shutil.rmtree(path=tmp_dir)
+
+    temp_dir = tempfile.mkdtemp()
+    temp_dir_path_object = Path(str(temp_dir))
+
+    remove_func = partial(_cleanup, tmp_dir=temp_dir_path_object)
+    atexit.register(remove_func)
+
     overload_names = []
-    for d in preset_directory.iterdir():
-        assert d.stem in expected_keys
-        files_in_dir = list(str(i) for i in d.iterdir())
-        preset_yamls[d.stem] = files_in_dir
-        overload_names += [i.stem for i in d.iterdir()]
+    preset_yaml_files = {}
+    log_targets = []
+
+    for main_key, inner_dicts in preset_dict.items():
+        assert main_key in expected_keys
+        preset_yaml_files[main_key] = []
+
+        for inner_key, inner_dict in inner_dicts.items():
+            overload_names.append(inner_key)
+
+            for match, *_ in _recursive_search(dict_=inner_dict, target="MUST_FILL"):
+                match_str = ".".join(match)
+                log_targets.append(f"{inner_key}.{match_str}")
+
+            tmp_yaml_outpath = temp_dir_path_object / f"{inner_key}.yaml"
+            with open(tmp_yaml_outpath, "w") as out_yaml:
+                yaml.dump(data=inner_dict, stream=out_yaml)
+            preset_yaml_files[main_key].append(tmp_yaml_outpath)
 
     logger.info("Preset keys for overloading are: %s", overload_names)
 
     log_str = (
         f"Following keys will have to be overloaded when using "
-        f"'{preset_directory.stem}' preset:"
+        f"'{[preset_name]}' preset:"
     )
-    log_targets = []
-    for key, files in preset_yamls.items():
-        for file in files:
-            overload_name = Path(file).stem
-            cur_yaml = load_yaml_config(config_path=file)
-
-            for match, *_ in _recursive_search(dict_=cur_yaml, target="MUST_FILL"):
-                match_str = ".".join(match)
-                log_targets.append(f"{overload_name}.{match_str}")
 
     logger.info(f"{log_str} {log_targets}")
-    return preset_yamls
+    return preset_yaml_files
 
 
-def _get_preset_map() -> Dict[str, Path]:
-    preset_map = {}
-
-    eir_abspath = Path(__file__).parents[1]
-    preset_root = eir_abspath / "config/experiment_presets"
-
-    for directory in preset_root.iterdir():
-        preset_map[directory.stem] = directory
+def _get_preset_map() -> Dict[str, Dict]:
+    preset_map = {"gln": gln.PRESET}
 
     return preset_map
 
