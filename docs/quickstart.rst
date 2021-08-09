@@ -45,12 +45,16 @@ we can run the following command:
     --gln_input.input_info.input_source="processed_sample_data/arrays/" \
     --gln_input.input_type_info.snp_file="processed_sample_data/data_final_gen.bim"
 
+.. warning::
+    For now the ``--preset`` option only works when the framework is installed with
+    Python (i.e. not with pre-built binaries).
 
 .. tip::
 
     While concise,
     the command above indeed obscures a lot of the configuration and functionality
-    happening behind the scenes. See the :ref:`01-basic-tutorial` for a more thorough example.
+    happening behind the scenes. See the :ref:`01-basic-tutorial`
+    for a more thorough example.
     Additionally, the full set of configurations used for the ``gln`` preset
     are available in the ``config/`` directory in the
     `project repository <https://github.com/arnor-sigurdsson/EIR>`_.
