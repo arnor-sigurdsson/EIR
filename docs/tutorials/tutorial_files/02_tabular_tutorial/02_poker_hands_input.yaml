@@ -1,0 +1,18 @@
+input_info:
+  input_source: poker_hands_data/poker_hands_train.csv
+  input_name: poker_hands
+  input_type: tabular
+
+input_type_info:
+  model_type: tabular
+  extra_cat_columns:
+          - S1
+          - C1
+          - S2
+          - C2
+          - S3
+          - C3
+          - S4
+          - C4
+          - S5
+          - C5

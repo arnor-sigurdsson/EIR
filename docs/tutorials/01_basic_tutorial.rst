@@ -58,33 +58,19 @@ While the **global** configuration has a lot of options,
 the only one we really need to fill in now is ``run_name``,
 so we have the following ``tutorial_01_globals.yaml`` file:
 
-.. code-block:: yaml
 
-    run_name: tutorial_01_run
+.. literalinclude:: tutorial_files/01_basic_tutorial/tutorial_01_globals.yaml
+    :language: yaml
+    :caption:
+
 
 We also need to tell the framework where to load **inputs** from,
 and some information about the input, for that we use an input ``.yaml`` configuration
 called ``tutorial_01_inputs.yaml``:
 
-.. code-block:: yaml
-
-    input_info:
-      input_source: processed_sample_data/arrays/
-      input_name: genotype
-      input_type: omics
-
-    input_type_info:
-      model_type: genome-local-net
-      na_augment_perc: 0.4
-      na_augment_prob: 1.0
-      snp_file: processed_sample_data/data_final_gen.bim
-
-    model_config:
-      rb_do: 0.25
-      channel_exp_base: 2
-      layers:
-        - 2
-      kernel_width: 8
+.. literalinclude:: tutorial_files/01_basic_tutorial/tutorial_01_input.yaml
+    :language: yaml
+    :caption:
 
 Above we can see that the input needs 3 fields: ``input_info``, ``input_type_info`` and
 ``model_config``.
@@ -99,10 +85,10 @@ do, head over to the :ref:`api-reference` reference.
 Finally, we need to specify what **targets** to predict during training. For that we
 will use the ``tutorial_01_targets.yaml`` file with the following content:
 
-.. code-block:: yaml
+.. literalinclude:: tutorial_files/01_basic_tutorial/tutorial_01_targets.yaml
+    :language: yaml
+    :caption:
 
-    label_file: processed_sample_data/human_origins_labels.csv
-    target_cat_columns: Origin
 
 With all this, we should have our project directory looking something like this:
 
@@ -214,30 +200,19 @@ Training a linear model
 """""""""""""""""""""""
 
 We can also try training a linear model with L1 regularisation (LASSO),
-for that we can use the following input configuration (``tutorial_01b_input_identity``):
+for that we can use the following input configuration:
 
-.. code-block:: yaml
-
-    input_info:
-      input_source: processed_sample_data/arrays/
-      input_name: genotype
-      input_type: omics
-
-    input_type_info:
-      model_type: identity
-      na_augment_perc: 0.4
-      na_augment_prob: 1.0
-      snp_file: processed_sample_data/data_final_gen.bim
+.. literalinclude:: tutorial_files/01_basic_tutorial/tutorial_01b_input_identity.yaml
+    :language: yaml
+    :caption:
 
 This model type will flatten the omics input and propagate it to the predictor. For our
-linear model, we therefore use a linear predictor with L1 regularisation
-(``tutorial_01b_predictor_linear``).
+linear model, we therefore use a linear predictor with L1 regularisation.
 
-.. code-block:: yaml
+.. literalinclude:: tutorial_files/01_basic_tutorial/tutorial_01b_predictor_linear.yaml
+    :language: yaml
+    :caption:
 
-    model_type: linear
-    model_config:
-      l1: 0.001
 
 Now, we can train the model with the following command:
 

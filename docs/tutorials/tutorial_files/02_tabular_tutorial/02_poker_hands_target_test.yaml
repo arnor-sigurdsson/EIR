@@ -1,0 +1,3 @@
+label_file: poker_hands_data/poker_hands_test.csv
+target_cat_columns:
+  - CLASS
