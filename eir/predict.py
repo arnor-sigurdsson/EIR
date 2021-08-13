@@ -347,9 +347,10 @@ def get_default_predict_config(
         run_name=loaded_train_experiment.configs.global_config.run_name,
     )
 
+    label_dict = target_labels.label_dict if target_labels else {}
     test_dataset = _set_up_default_test_dataset(
         configs=configs_overloaded_for_predict,
-        target_labels_dict=target_labels.label_dict,
+        target_labels_dict=label_dict,
         inputs_as_dict=test_inputs,
     )
 

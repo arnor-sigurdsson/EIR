@@ -468,26 +468,30 @@ def check_dataset(
     exp_no_sample: int,
     classes_tested: List[str],
     target_transformers,
+    check_targets: bool = True,
     target_column="Origin",
 ) -> None:
 
     assert len(dataset) == exp_no_sample
 
-    transformed_values_in_dataset = set(
-        i.target_labels[target_column] for i in dataset.samples
-    )
-    expected_transformed_values = set(range(len(classes_tested)))
-    assert transformed_values_in_dataset == expected_transformed_values
-
-    tt_it = target_transformers[target_column].inverse_transform
-
-    assert (tt_it(range(len(classes_tested))) == classes_tested).all()
-
     test_inputs, target_labels, test_id = dataset[0]
-    test_genotype = test_inputs["omics_test_genotype"]
 
+    if check_targets:
+        transformed_values_in_dataset = set(
+            i.target_labels[target_column] for i in dataset.samples
+        )
+        expected_transformed_values = set(range(len(classes_tested)))
+        assert transformed_values_in_dataset == expected_transformed_values
+
+        tt_it = target_transformers[target_column].inverse_transform
+
+        assert (tt_it(range(len(classes_tested))) == classes_tested).all()
+
+        assert target_labels[target_column] in expected_transformed_values
+
+    test_genotype = test_inputs["omics_test_genotype"]
     assert (test_genotype.sum(1) == 1).all()
-    assert target_labels[target_column] in expected_transformed_values
+
     assert test_id == dataset.samples[0].sample_id
 
 
