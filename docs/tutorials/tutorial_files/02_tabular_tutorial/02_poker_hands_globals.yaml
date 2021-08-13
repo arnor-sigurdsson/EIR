@@ -1,0 +1,6 @@
+run_name: poker_hands_run
+valid_size: 0.33
+n_saved_models: 1
+checkpoint_interval: 1000
+sample_interval: 1000
+n_epochs: 100
