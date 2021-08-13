@@ -392,9 +392,11 @@ def test_load_labels_for_predict(
     ],
     indirect=True,
 )
+@pytest.mark.parametrize("with_target_labels", [True, False])
 def test_set_up_test_dataset(
     create_test_data: TestDataConfig,
     create_test_config: config.Configs,
+    with_target_labels: bool,
 ):
     test_data_config = create_test_data
     test_configs = create_test_config
@@ -418,12 +420,14 @@ def test_set_up_test_dataset(
     mock_encoder = LabelEncoder().fit(["Asia", "Europe", "Africa"])
     transformers = {target_column: mock_encoder}
 
-    test_target_labels = predict.parse_labels_for_predict(
-        con_targets=target_tabular_info.con_columns,
-        cat_targets=target_tabular_info.cat_columns,
-        df_labels_test=df_test,
-        label_transformers=transformers,
-    )
+    test_target_labels = None
+    if with_target_labels:
+        test_target_labels = predict.parse_labels_for_predict(
+            con_targets=target_tabular_info.con_columns,
+            cat_targets=target_tabular_info.cat_columns,
+            df_labels_test=df_test,
+            label_transformers=transformers,
+        )
 
     test_inputs = predict.set_up_inputs_for_testing(
         inputs_configs=test_configs.input_configs,
@@ -447,6 +451,7 @@ def test_set_up_test_dataset(
         classes_tested=classes_tested,
         target_transformers=transformers,
         target_column=target_column,
+        check_targets=with_target_labels,
     )
 
 

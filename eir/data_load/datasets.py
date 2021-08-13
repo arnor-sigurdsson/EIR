@@ -192,12 +192,19 @@ class DatasetBase(Dataset):
                     source_name=source_name,
                 )
 
+        num_samples_raw = len(samples)
         if self.target_labels_dict:
-            num_samples_raw = len(samples)
             samples = list(i for i in samples.values() if i.inputs and i.target_labels)
             num_missing = num_samples_raw - len(samples)
             logger.debug(
                 "Filtered out %d samples that had no inputs or no target labels.",
+                num_missing,
+            )
+        else:
+            samples = list(i for i in samples.values() if i.inputs)
+            num_missing = num_samples_raw - len(samples)
+            logger.debug(
+                "Filtered out %d samples that had no inputs.",
                 num_missing,
             )
 
@@ -291,12 +298,16 @@ def _add_tabular_data_to_samples(
 ) -> DefaultDict[str, Sample]:
     def _get_tabular_iterator():
         for sample_id_, tabular_inputs_ in tabular_dict.items():
-            if sample_id_ not in ids_to_keep:
+            if ids_to_keep and sample_id_ not in ids_to_keep:
                 continue
             yield sample_id_, tabular_inputs_
 
+    if ids_to_keep is None:
+        ids_to_keep = []
+
+    known_length = None if not ids_to_keep else len(ids_to_keep)
     tabular_iterator = tqdm(
-        _get_tabular_iterator(), desc=source_name, total=len(ids_to_keep)
+        _get_tabular_iterator(), desc=source_name, total=known_length
     )
 
     for sample_id, tabular_inputs in tabular_iterator:
