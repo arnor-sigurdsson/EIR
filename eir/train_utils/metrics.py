@@ -585,6 +585,14 @@ def get_default_metrics(
 def get_default_performance_averaging_functions(
     cat_metric_name: str, con_metric_name: str
 ) -> al_averaging_functions_dict:
+
+    logger.info(
+        "Default performance averaging functions across tasks set to %s for "
+        "categorical targets and %s for continuous targets.",
+        cat_metric_name.upper(),
+        con_metric_name.upper(),
+    )
+
     def _calc_cat_averaging_value(
         metric_dict: "al_step_metric_dict", column_name: str, metric_name: str
     ) -> float:

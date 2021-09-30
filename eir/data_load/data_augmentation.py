@@ -77,6 +77,14 @@ def hook_default_mix_data(
             )
             mixed_inputs[input_name] = mixed_tabular_input_tensor
 
+        elif input_name.startswith("sequence_"):
+            mixed_sequence_embeddings = mixup_tensor(
+                tensor=input_data,
+                lambda_=mixing_info.lambda_,
+                random_batch_indices_to_mix=mixing_info.permuted_indexes,
+            )
+            mixed_inputs[input_name] = mixed_sequence_embeddings
+
     batch_mixed = Batch(
         inputs=mixed_inputs,
         target_labels=batch.target_labels,

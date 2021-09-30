@@ -1,9 +1,22 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Union, Sequence, Callable, TYPE_CHECKING
+from typing import (
+    Dict,
+    Union,
+    Generator,
+    Sequence,
+    Callable,
+    Tuple,
+    TYPE_CHECKING,
+    Iterator,
+    List,
+)
 
 import numpy as np
 from aislib.misc_utils import get_logger
+from torchtext.vocab import build_vocab_from_iterator, Vocab
+from torchtext.data.utils import get_tokenizer as get_pytorch_tokenizer
+from tqdm import tqdm
 
 from eir.data_load.label_setup import (
     Labels,
@@ -19,7 +32,9 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-al_input_objects_as_dict = Dict[str, Union["OmicsInputInfo", "TabularInputInfo"]]
+al_input_objects_as_dict = Dict[
+    str, Union["OmicsInputInfo", "TabularInputInfo", "SequenceInputInfo"]
+]
 
 
 def set_up_inputs_for_training(
@@ -72,9 +87,252 @@ def get_input_setup_function_map() -> Dict[str, Callable]:
     setup_mapping = {
         "omics": set_up_omics_input,
         "tabular": set_up_tabular_input_for_training,
+        "sequence": set_up_sequence_input_for_training,
     }
 
     return setup_mapping
+
+
+@dataclass
+class SequenceInputInfo:
+    input_config: schemas.InputConfig
+    vocab: Vocab
+    tokenizer: Callable
+    computed_max_length: int
+
+
+def set_up_sequence_input_for_training(
+    input_config: schemas.InputConfig, *args, **kwargs
+):
+
+    vocab, gathered_stats, tokenizer = get_vocab_wrapper(input_config=input_config)
+
+    gathered_stats = possibly_gather_all_stats_from_input(
+        prev_gathered_stats=gathered_stats,
+        input_source=input_config.input_info.input_source,
+        vocab_file=input_config.input_type_info.vocab_file,
+        split_on=input_config.input_type_info.split_on,
+        max_length=input_config.input_type_info.max_length,
+    )
+
+    computed_max_length = get_max_length(
+        max_length_config_value=input_config.input_type_info.max_length,
+        gathered_stats=gathered_stats,
+    )
+    sequence_input_info = SequenceInputInfo(
+        input_config=input_config,
+        vocab=vocab,
+        computed_max_length=computed_max_length,
+        tokenizer=tokenizer,
+    )
+
+    return sequence_input_info
+
+
+@dataclass
+class GatheredSequenceStats:
+    total_count: int = 0
+    total_files: int = 0
+    max_length: int = 0
+
+
+def get_vocab_wrapper(
+    input_config: schemas.InputConfig,
+) -> Tuple[Vocab, GatheredSequenceStats, Callable]:
+    gathered_stats = GatheredSequenceStats()
+
+    vocab_file = input_config.input_type_info.vocab_file
+    vocab_iter = get_vocab_iterator(
+        input_source=input_config.input_info.input_source,
+        split_on=input_config.input_type_info.split_on,
+        gathered_stats=gathered_stats,
+        vocab_file=input_config.input_type_info.vocab_file,
+    )
+    tokenizer = get_tokenizer(
+        tokenizer_name=input_config.input_type_info.tokenizer,
+        tokenizer_language=input_config.input_type_info.tokenizer_language,
+    )
+    tokenized_vocab_iter = get_tokenized_vocab_iterator(
+        vocab_iterator=vocab_iter, tokenizer=tokenizer
+    )
+
+    min_freq = input_config.input_type_info.min_freq
+    if vocab_file:
+        logger.info(
+            "Minimum word/token frequency will be set to 0 as vocabulary is loaded "
+            "from file %s.",
+            vocab_file,
+        )
+        min_freq = 1
+
+    vocab = build_vocab_from_iterator(
+        iterator=tokenized_vocab_iter,
+        specials=["<unk>"],
+        min_freq=min_freq,
+    )
+    vocab.set_default_index(vocab["<unk>"])
+
+    return vocab, gathered_stats, tokenizer
+
+
+def get_tokenizer(
+    tokenizer_name: Union[str, None], tokenizer_language: Union[str, None]
+) -> Callable[[Sequence[str]], Sequence[str]]:
+
+    if not tokenizer_name:
+        return lambda x: x
+
+    tokenizer = get_pytorch_tokenizer(
+        tokenizer=tokenizer_name, language=tokenizer_language
+    )
+
+    def _join_and_tokenize(raw_input: Sequence[str]) -> Sequence[str]:
+        input_joined = " ".join(raw_input)
+        return tokenizer(input_joined)
+
+    return _join_and_tokenize
+
+
+def get_tokenized_vocab_iterator(
+    vocab_iterator: Iterator[Sequence[str]],
+    tokenizer: Callable[[Sequence[str]], Sequence[str]],
+) -> Generator[List[str], None, None]:
+    for list_of_words in vocab_iterator:
+        yield tokenizer(list_of_words)
+
+
+def get_vocab_iterator(
+    input_source: str,
+    split_on: str,
+    gathered_stats: "GatheredSequenceStats",
+    vocab_file: Union[str, None] = None,
+) -> Generator[Sequence[str], None, None]:
+
+    if vocab_file is None:
+        logger.info(
+            "Vocabulary will be collected from input source %s, "
+            "splitting tokens on %s.",
+            input_source,
+            split_on,
+        )
+        vocab_iter = yield_tokens_from_source(
+            data_source=input_source,
+            split_on=split_on,
+            gathered_stats=gathered_stats,
+        )
+    else:
+        logger.info(
+            "Vocabulary for %s will be collected from vocabulary file %s.",
+            input_source,
+            vocab_file,
+        )
+        vocab_iter = yield_tokens_from_file(
+            file_path=vocab_file, split_on=" ", gathered_stats=gathered_stats
+        )
+
+    return vocab_iter
+
+
+def yield_tokens_from_source(
+    data_source: str, split_on: str, gathered_stats: GatheredSequenceStats
+):
+    iterator = tqdm(Path(data_source).iterdir(), desc="Vocabulary Setup")
+
+    for file in iterator:
+        yield from yield_tokens_from_file(
+            file_path=str(file), split_on=split_on, gathered_stats=gathered_stats
+        )
+    return gathered_stats
+
+
+def yield_tokens_from_file(
+    file_path: str, split_on: str, gathered_stats: GatheredSequenceStats
+):
+    gathered_stats.total_files += 1
+
+    split_func = _get_split_func(split_on=split_on)
+
+    with open(file_path, "r") as f:
+        for line in f:
+            cur_line = split_func(line.strip())
+
+            cur_length = len(cur_line)
+            gathered_stats.total_count += len(cur_line)
+
+            if cur_length > gathered_stats.max_length:
+                gathered_stats.max_length = cur_length
+
+            yield cur_line
+
+
+def _get_split_func(split_on: str) -> Callable[[str], List[str]]:
+    if split_on == "":
+        return lambda x: list(x)
+    return lambda x: x.split(split_on)
+
+
+class ReturnSavingGenerator:
+    def __init__(self, gen):
+        self.gen = gen
+
+    def __iter__(self):
+        self.caught_return_value = yield from self.gen
+
+
+def possibly_gather_all_stats_from_input(
+    prev_gathered_stats: GatheredSequenceStats,
+    input_source: str,
+    vocab_file: str,
+    split_on: str,
+    max_length: schemas.al_max_sequence_length,
+) -> GatheredSequenceStats:
+    """
+    Note that we use all(...) there to exhaust the generator object, so that the
+    stats get accumulated in the GatheredSequenceStats().
+    """
+    gathered_stats = prev_gathered_stats
+
+    if vocab_file and max_length in {"average", "max"}:
+        logger.info(
+            "Doing a full pass over input data despite vocabulary file %s being "
+            "present, as dynamic max length '%s' was requested.",
+            vocab_file,
+            max_length,
+        )
+        vocab_iter = yield_tokens_from_source(
+            data_source=input_source,
+            split_on=split_on,
+            gathered_stats=GatheredSequenceStats(),
+        )
+        value_keeping_gen = ReturnSavingGenerator(gen=vocab_iter)
+        all(value_keeping_gen)
+        gathered_stats = value_keeping_gen.caught_return_value
+
+    return gathered_stats
+
+
+def get_max_length(
+    max_length_config_value: schemas.al_max_sequence_length,
+    gathered_stats: GatheredSequenceStats,
+):
+    if isinstance(max_length_config_value, int):
+        return max_length_config_value
+
+    if max_length_config_value == "max":
+        logger.info(
+            "Using inferred max length found in sequence data source as %d",
+            gathered_stats.max_length,
+        )
+        return gathered_stats.max_length
+    elif max_length_config_value == "average":
+        average_length = gathered_stats.total_count // gathered_stats.total_files
+        logger.info(
+            "Using inferred average length found in sequence data source as %d",
+            average_length,
+        )
+        return average_length
+
+    raise ValueError("Unknown max length config value %s.", max_length_config_value)
 
 
 @dataclass
@@ -109,6 +367,21 @@ def set_up_tabular_input_for_training(
     return tabular_input_info
 
 
+def get_tabular_input_file_info(
+    input_source: str,
+    tabular_data_type_config: schemas.TabularInputDataConfig,
+) -> TabularFileInfo:
+
+    table_info = TabularFileInfo(
+        file_path=Path(input_source),
+        con_columns=tabular_data_type_config.extra_con_columns,
+        cat_columns=tabular_data_type_config.extra_cat_columns,
+        parsing_chunk_size=tabular_data_type_config.label_parsing_chunk_size,
+    )
+
+    return table_info
+
+
 @dataclass
 class OmicsInputInfo:
     input_config: schemas.InputConfig
@@ -127,21 +400,6 @@ def set_up_omics_input(
     )
 
     return omics_input_info
-
-
-def get_tabular_input_file_info(
-    input_source: str,
-    tabular_data_type_config: schemas.TabularInputDataConfig,
-) -> TabularFileInfo:
-
-    table_info = TabularFileInfo(
-        file_path=Path(input_source),
-        con_columns=tabular_data_type_config.extra_con_columns,
-        cat_columns=tabular_data_type_config.extra_cat_columns,
-        parsing_chunk_size=tabular_data_type_config.label_parsing_chunk_size,
-    )
-
-    return table_info
 
 
 @dataclass

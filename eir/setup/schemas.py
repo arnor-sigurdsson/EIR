@@ -43,6 +43,8 @@ al_models_classes = Union[
     Type[IdentityModel],
 ]
 
+al_max_sequence_length = Union[int, Literal["max", "average"]]
+
 
 @dataclass
 class GlobalConfig:
@@ -237,11 +239,17 @@ class InputConfig:
     :param model_config:
         Configuration for the chosen model (i.e. feature extractor) for this input.
 
+    :param interpretation_config:
+        Configuration for interpretation analysis when applicable.
+
     """
 
     input_info: "InputDataConfig"
-    input_type_info: Union["OmicsInputDataConfig", "TabularInputDataConfig"]
+    input_type_info: Union[
+        "OmicsInputDataConfig", "TabularInputDataConfig", "SequenceInputDataConfig"
+    ]
     model_config: al_model_configs
+    interpretation_config: Union[None, "SequenceInterpretationConfig"] = None
 
 
 @dataclass
@@ -259,7 +267,7 @@ class InputDataConfig:
 
     input_source: str
     input_name: str
-    input_type: Literal["omics", "tabular"]
+    input_type: Literal["omics", "tabular", "sequence"]
 
 
 @dataclass
@@ -314,6 +322,42 @@ class TabularInputDataConfig:
     extra_cat_columns: Sequence[str] = field(default_factory=list)
     extra_con_columns: Sequence[str] = field(default_factory=list)
     label_parsing_chunk_size: Union[None, int] = None
+
+
+@dataclass
+class SequenceInputDataConfig:
+    """
+    :param model_type:
+        Type of sequence model to use. Currently only one type ("default") is supported.
+
+    """
+
+    model_type: Literal["default"] = "default"
+    vocab_file: Union[None, str] = None
+    max_length: al_max_sequence_length = "average"
+    sampling_strategy_if_longer: Literal["from_start", "uniform"] = "uniform"
+    min_freq: int = 10
+    split_on: str = " "
+    tokenizer: Literal[None] = None
+    tokenizer_language: Union[str, None] = None
+
+
+@dataclass
+class SequenceInterpretationConfig:
+    """
+    :param interpretation_sampling_strategy:
+        pass
+
+    :param num_samples_to_interpret:
+        pass
+
+    :param manual_samples_to_interpret:
+        pass
+    """
+
+    interpretation_sampling_strategy: Literal["first_n", "random_sample"] = "first_n"
+    num_samples_to_interpret: int = 10
+    manual_samples_to_interpret: Union[Sequence[str], None] = None
 
 
 @dataclass

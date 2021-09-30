@@ -13,13 +13,14 @@ import torch
 from aislib.misc_utils import get_logger, ensure_path_exists
 from matplotlib import MatplotlibDeprecationWarning
 
-from eir.interpretation.interpret_omics import _get_target_class_name
 from eir.train_utils.utils import load_transformers
+from eir.interpretation.interpretation_utils import get_target_class_name
 
 if TYPE_CHECKING:
     from eir.train import Experiment
     from eir.data_load.label_setup import al_label_transformers_object
     from eir.interpretation.interpretation import SampleActivation
+
 
 logger = get_logger(__name__)
 
@@ -162,7 +163,7 @@ def stratify_activations_by_target_classes(
     all_activations_class_stratified = defaultdict(list)
 
     for sample in all_activations:
-        cur_label_name = _get_target_class_name(
+        cur_label_name = get_target_class_name(
             sample_label=sample.sample_info.target_labels[target_column],
             target_transformer=target_transformer,
             column_type=column_type,
@@ -198,7 +199,7 @@ def parse_tabular_activations_for_feature_importance(
     column_activations = {column: [] for column in activation_tensor_slices.keys()}
 
     for sample_activation in all_activations:
-        sample_acts = sample_activation.sample_activations[input_name]
+        sample_acts = sample_activation.sample_activations[input_name].squeeze()
 
         for column in activation_tensor_slices.keys():
             cur_slice = activation_tensor_slices[column]
@@ -226,17 +227,20 @@ def get_tabular_activation_df(
 
 
 def plot_tabular_activations(
-    df_activations: pd.DataFrame, activation_outfolder: Path
+    df_activations: pd.DataFrame, activation_outfolder: Path, top_n: int = 20
 ) -> None:
 
+    df_activations_sorted = df_activations.sort_values(by="Shap_Value", ascending=False)
+    df_activations_filtered = df_activations_sorted.head(top_n)
+
     sns_plot = sns.barplot(
-        x=df_activations["Shap_Value"],
-        y=df_activations.index,
+        x=df_activations_filtered["Shap_Value"],
+        y=df_activations_filtered.index,
         palette="Blues_d",
     )
     plt.tight_layout()
     sns_figure = sns_plot.get_figure()
-    sns_figure.set_size_inches(10, 0.5 * len(df_activations))
+    sns_figure.set_size_inches(10, 0.5 * top_n)
     sns_figure.savefig(
         str(activation_outfolder / "feature_importance.png"), bbox_inches="tight"
     )
@@ -300,7 +304,7 @@ def _gather_categorical_shap_values(
         cur_full_input = sample.sample_activations[input_name]
         assert len(cur_full_input.shape) == 2
 
-        cur_cat_input_part = cur_full_input[cur_slice]
+        cur_cat_input_part = cur_full_input.squeeze()[cur_slice]
         cur_cat_summed_act = np.sum(np.array(cur_cat_input_part))
         cat_acts.append(cur_cat_summed_act)
 
@@ -321,7 +325,7 @@ def _gather_categorical_inputs(
 
     for sample in all_activations:
 
-        cur_raw_cat_input = sample.raw_tabular_inputs[input_name][cat_name]
+        cur_raw_cat_input = sample.raw_inputs[input_name][cat_name]
         cur_cat_input_part = cur_raw_cat_input
         cat_inputs.append(cur_cat_input_part)
 

@@ -52,6 +52,10 @@ from eir.models.omics.omics_models import (
     get_omics_model_init_kwargs,
     al_omics_model_configs,
 )
+from eir.models.sequence.transformer_basic import (
+    BasicTransformerModelConfig,
+    TransformerModel,
+)
 from eir.models.tabular.tabular import (
     get_tabular_inputs,
     SimpleTabularModel,
@@ -546,7 +550,33 @@ def get_modules_to_fuse_from_inputs(inputs: al_input_objects_as_dict, device: st
             )
             models[input_name] = tabular_model
 
+        elif input_name.startswith("sequence_"):
+            sequence_model = get_sequence_model(
+                model_type=inputs_object.input_config.input_type_info.model_type,
+                model_config=inputs_object.input_config.model_config,
+                num_tokens=len(inputs_object.vocab),
+                max_length=inputs_object.computed_max_length,
+                device=device,
+            )
+            models[input_name] = sequence_model
+
     return models
+
+
+def get_sequence_model(
+    model_type: str,
+    model_config: BasicTransformerModelConfig,
+    num_tokens: int,
+    max_length: int,
+    device: str,
+):
+    sequence_model = TransformerModel(
+        model_config=model_config,
+        num_tokens=num_tokens,
+        max_length=max_length,
+    ).to(device=device)
+
+    return sequence_model
 
 
 def get_tabular_model(
@@ -917,6 +947,14 @@ def prepare_base_batch_default(
                 device=device,
             )
             inputs_prepared[input_name] = tabular
+
+        elif input_name.startswith("sequence_"):
+            cur_seq = inputs[input_name]
+            cur_seq = cur_seq.to(device=device)
+            cur_module = model.modules_to_fuse[input_name]
+            cur_embedding = cur_module.embed_tokens(input=cur_seq)
+            inputs_prepared[input_name] = cur_embedding
+
         else:
             raise ValueError(f"Unrecognized input type {input_name}.")
 

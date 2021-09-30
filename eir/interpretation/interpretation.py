@@ -34,11 +34,13 @@ from ignite.engine import Engine
 from shap import DeepExplainer
 from torch import nn
 from torch.utils.data import DataLoader, Subset
+from torch.utils.hooks import RemovableHandle
 
 from eir.data_load.data_utils import get_target_columns_generator, Batch
 from eir.data_load.datasets import al_datasets
 from eir.interpretation.interpret_omics import analyze_omics_input_activations
 from eir.interpretation.interpret_tabular import analyze_tabular_input_activations
+from eir.interpretation.interpret_sequence import analyze_sequence_input_activations
 from eir.models.model_training_utils import gather_dloader_samples
 from eir.models.omics.models_cnn import CNNModel
 from eir.models.omics.models_linear import LinearModel
@@ -198,26 +200,25 @@ def activation_analysis_wrapper(
             activation_outfolder = outfolder_target_callable(
                 column_name=column_name, input_name=input_name
             )
+            common_kwargs = {
+                "experiment": experiment,
+                "input_name": input_name,
+                "target_column_name": column_name,
+                "target_column_type": column_type,
+                "all_activations": all_activations,
+                "activation_outfolder": activation_outfolder,
+            }
 
             if input_name.startswith("omics_"):
-
-                analyze_omics_input_activations(
-                    experiment=exp,
-                    input_name=input_name,
-                    target_column_name=column_name,
-                    target_column_type=column_type,
-                    all_activations=all_activations,
-                    activation_outfolder=activation_outfolder,
-                )
+                analyze_omics_input_activations(**common_kwargs)
 
             elif input_name.startswith("tabular_"):
-                analyze_tabular_input_activations(
-                    experiment=exp,
-                    input_name=input_name,
-                    target_column_name=column_name,
-                    target_column_type=column_type,
-                    all_activations=all_activations,
-                    activation_outfolder=activation_outfolder,
+                analyze_tabular_input_activations(**common_kwargs)
+
+            elif input_name.startswith("sequence_"):
+                analyze_sequence_input_activations(
+                    **common_kwargs,
+                    expected_target_classes_shap_values=explainer.expected_value
                 )
 
         hook_handle.remove()
@@ -229,7 +230,7 @@ def get_shap_object(
     column_name: str,
     background_loader: DataLoader,
     n_background_samples: int,
-):
+) -> Tuple[DeepExplainer, RemovableHandle]:
     background, *_ = gather_dloader_samples(
         batch_prep_hook=experiment.hooks.step_func_hooks.base_prepare_batch,
         batch_prep_hook_kwargs={"experiment": experiment},
@@ -302,7 +303,7 @@ def get_shap_activation_producer(
 class SampleActivation:
     sample_info: "Batch"
     sample_activations: Dict[str, np.ndarray]
-    raw_tabular_inputs: Dict
+    raw_inputs: Dict
 
 
 def accumulate_all_activations(
@@ -311,7 +312,7 @@ def accumulate_all_activations(
 
     all_activations = []
 
-    for batch, raw_tabular_inputs in data_producer:
+    for batch, raw_inputs in data_producer:
         sample_target_labels = batch.target_labels
 
         sample_all_modalities_activations = act_func(
@@ -325,7 +326,7 @@ def accumulate_all_activations(
         cur_sample_activation_info = SampleActivation(
             sample_info=batch_on_cpu,
             sample_activations=sample_all_modalities_activations,
-            raw_tabular_inputs=raw_tabular_inputs,
+            raw_inputs=raw_inputs,
         )
         all_activations.append(cur_sample_activation_info)
 
@@ -462,11 +463,9 @@ def _get_interpretation_data_producer(
             inputs=inputs_detached, target_labels=batch.target_labels, ids=batch.ids
         )
 
-        raw_tabular_inputs = {
-            k: v for k, v in loader_batch[0].items() if k.startswith("tabular_")
-        }
+        raw_inputs = {k: v for k, v in loader_batch[0].items()}
 
-        yield batch_interpretation, raw_tabular_inputs
+        yield batch_interpretation, raw_inputs
 
 
 def _detach_all_inputs(tensor_inputs: Dict[str, torch.Tensor]):

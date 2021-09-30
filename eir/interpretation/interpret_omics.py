@@ -5,15 +5,14 @@ from typing import Dict, List, Tuple, Callable, Union, TYPE_CHECKING, Sequence
 
 import numpy as np
 import pandas as pd
-import torch
 from aislib.misc_utils import get_logger
-from sklearn.preprocessing import StandardScaler, LabelEncoder
 
 from eir.visualization import interpretation_visualization as av
 
 if TYPE_CHECKING:
     from eir.train import Experiment
     from eir.interpretation.interpretation import SampleActivation
+    from eir.interpretation.interpretation_utils import get_target_class_name
 
 al_gradients_dict = Dict[str, List[np.ndarray]]
 al_top_gradients_dict = Dict[str, Dict[str, np.ndarray]]
@@ -156,8 +155,8 @@ def parse_single_omics_activations(
     activations: Sequence["SampleActivation"],
 ) -> Tuple[Dict, Dict]:
 
-    c = experiment
-    target_transformer = c.target_transformers[target_column]
+    exp = experiment
+    target_transformer = exp.target_transformers[target_column]
 
     acc_acts = defaultdict(list)
     acc_acts_masked = defaultdict(list)
@@ -172,7 +171,7 @@ def parse_single_omics_activations(
         inputs_omics = sample_inputs[omics_input_name]
         single_sample_copy = deepcopy(inputs_omics).cpu().numpy().squeeze()
 
-        cur_label_name = _get_target_class_name(
+        cur_label_name = get_target_class_name(
             sample_label=sample_target_labels[target_column],
             target_transformer=target_transformer,
             column_type=column_type,
@@ -185,21 +184,6 @@ def parse_single_omics_activations(
         acc_acts_masked[cur_label_name].append(single_acts_masked.squeeze())
 
     return acc_acts, acc_acts_masked
-
-
-def _get_target_class_name(
-    sample_label: torch.Tensor,
-    target_transformer: Union[StandardScaler, LabelEncoder],
-    column_type: str,
-    target_column_name: str,
-):
-    if column_type == "con":
-        return target_column_name
-
-    tt_it = target_transformer.inverse_transform
-    cur_trn_label = tt_it([sample_label.item()])[0]
-
-    return cur_trn_label
 
 
 def rescale_gradients(gradients: np.ndarray) -> np.ndarray:
