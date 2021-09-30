@@ -308,7 +308,7 @@ def get_default_experiment(
     )
 
     train_sampler = get_train_sampler(
-        columns_to_sample=configs.global_config.weighted_sampling_column,
+        columns_to_sample=configs.global_config.weighted_sampling_columns,
         train_dataset=train_dataset,
     )
 

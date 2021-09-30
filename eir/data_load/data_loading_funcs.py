@@ -1,4 +1,5 @@
 from collections import Counter
+from statistics import mean
 from typing import TYPE_CHECKING, List, Tuple, Union, Dict, Iterable
 
 import torch
@@ -45,7 +46,11 @@ def get_weighted_random_sampler(samples: Iterable["Sample"], target_columns: Lis
         all_target_columns_weights_and_counts=all_column_weights
     )
 
-    logger.debug("Num samples per epoch: %d", num_sample_per_epoch)
+    logger.debug(
+        "Num samples per epoch according to average target class counts in %s: %d",
+        target_columns,
+        num_sample_per_epoch,
+    )
     sampler = WeightedRandomSampler(
         weights=samples_weighted, num_samples=num_sample_per_epoch, replacement=True
     )
@@ -107,8 +112,8 @@ def _aggregate_column_sampling_weights(
     We sum up the normalized weights for each target column to create the final sampling
     weights.
 
-    As for the samples per epoch, we want to take the sum of the class with the fewest
-    counts over all target columns to sample on.
+    As for the samples per epoch, we take the average of the class counts per target,
+    then sum those up.
     """
 
     all_weights = torch.stack(
@@ -117,8 +122,11 @@ def _aggregate_column_sampling_weights(
     )
     all_weights_summed = all_weights.sum(dim=1)
 
-    samples_per_epoch = sum(
-        min(i["label_counts"]) for i in all_target_columns_weights_and_counts.values()
+    samples_per_epoch = int(
+        mean(
+            mean(i["label_counts"])
+            for i in all_target_columns_weights_and_counts.values()
+        )
     )
     samples_per_epoch = min(len(all_weights_summed), samples_per_epoch)
 
