@@ -514,7 +514,7 @@ def generate_confusion_matrix(
     annot_font_size = int(tick_label_font_size * 1.5)
     annot_kwargs = {"fontsize": annot_font_size}
     fmt = "d" if not normalize else ".2g"
-    sns.heatmap(data=df_cm, annot=True, fmt=fmt, annot_kws=annot_kwargs)
+    sns.heatmap(data=df_cm, annot=True, fmt=fmt, annot_kws=annot_kwargs, cmap=cmap)
 
     label_fontsize = annot_font_size
     ax.set_title(title_extra, fontsize=label_fontsize)

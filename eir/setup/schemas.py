@@ -2,8 +2,8 @@ from dataclasses import dataclass, field
 from typing import Union, Literal, List, Optional, Sequence, Type
 
 from eir.models.fusion import FusionModelConfig
-from eir.models.fusion_mgmoe import MGMoEModelConfig
 from eir.models.fusion_linear import LinearFusionModelConfig
+from eir.models.fusion_mgmoe import MGMoEModelConfig
 from eir.models.omics.omics_models import (
     LinearModel,
     CNNModel,
@@ -332,7 +332,7 @@ class SequenceInputDataConfig:
 
     """
 
-    model_type: Literal["default"] = "default"
+    model_type: Literal["default"] = "sequence-default"
     vocab_file: Union[None, str] = None
     max_length: al_max_sequence_length = "average"
     sampling_strategy_if_longer: Literal["from_start", "uniform"] = "uniform"
@@ -346,13 +346,20 @@ class SequenceInputDataConfig:
 class SequenceInterpretationConfig:
     """
     :param interpretation_sampling_strategy:
-        pass
+        How to sample sequences for activation analysis. `first_n` always grabs the
+        same first n values from the beginning of the dataset to interpret, while
+        `random_sample` will sample uniformly from the whole dataset without
+        replacement.
 
     :param num_samples_to_interpret:
-        pass
+        How many samples to interpret.
 
     :param manual_samples_to_interpret:
-        pass
+        IDs of samples to always interpret, irrespective of
+        `interpretation_sampling_strategy` and `num_samples_to_interpret`. A caveat
+        here is that they must be present in the dataset that is being interpreted
+        (e.g. validation / test dataset), meaning that adding IDs here that happen to
+        be in the training dataset will not work.
     """
 
     interpretation_sampling_strategy: Literal["first_n", "random_sample"] = "first_n"

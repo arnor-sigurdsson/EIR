@@ -10,6 +10,7 @@ from typing import (
     Tuple,
     Callable,
     Sequence,
+    Iterable,
     Generator,
     Mapping,
     DefaultDict,
@@ -44,12 +45,7 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 # Type Aliases
 al_datasets = Union["MemoryDataset", "DiskDataset"]
 # embeddings --> remain str, cat targets --> int, con extra/target --> float
-al_sample_labels_transformed_all = Dict[str, Union[int, str, float]]
 al_sample_label_dict_target = Dict[str, Union[int, float]]
-al_sample_label_dict_extra = Dict[str, Union[str, float]]
-al_all_labels = Dict[
-    str, Union[al_sample_label_dict_target, al_sample_label_dict_extra]
-]
 al_inputs = Union[Dict[str, torch.Tensor], Dict[str, Any]]
 al_getitem_return = Tuple[Dict[str, torch.Tensor], al_sample_label_dict_target, str]
 
@@ -417,7 +413,7 @@ def get_file_sample_id_iterator(
 
 
 def _get_sample_id_data_iterator(
-    base_iterator, id_callable: Callable
+    base_iterator: Iterable[str], id_callable: Callable
 ) -> Generator[Tuple[Any, str], None, None]:
     for item in base_iterator:
         sample_id = id_callable(item)
@@ -707,6 +703,9 @@ def impute_missing_modalities(
     fill_values: Dict[str, Any],
     dtypes: Dict[str, Any],
 ) -> Dict[str, torch.Tensor]:
+    """
+    TODO: Implement support for imputing missing tabular modality.
+    """
 
     for input_name, input_object in inputs_objects.items():
         if input_name not in inputs_values:
@@ -729,6 +728,11 @@ def impute_missing_modalities(
                     shape=shape, fill_value=fill_value, dtype=dtype
                 )
                 inputs_values[input_name] = imputed_tensor
+
+            elif input_name.startswith("tabular_"):
+                raise NotImplementedError(
+                    "Imputing missing tabular values not yet supported."
+                )
 
     return inputs_values
 

@@ -1,7 +1,7 @@
 import csv
 from copy import deepcopy
 from pathlib import Path
-from typing import List, TYPE_CHECKING, Dict, Union
+from typing import List, TYPE_CHECKING, Dict, Union, Any
 from uuid import uuid4
 
 import numpy as np
@@ -19,7 +19,18 @@ if TYPE_CHECKING:
 
 
 @pytest.mark.parametrize(
-    "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
+    "create_test_data",
+    [
+        {
+            "task_type": "binary",
+            "manual_test_data_creator": lambda: "test_dataset_binary",
+        },
+        {
+            "task_type": "multi",
+            "manual_test_data_creator": lambda: "test_dataset_multi",
+        },
+    ],
+    indirect=True,
 )
 @pytest.mark.parametrize(
     "create_test_config_init_base",
@@ -172,7 +183,9 @@ def _set_up_bad_label_file_for_testing(label_file: Path) -> None:
     ],
 )
 @pytest.mark.parametrize(
-    "create_test_data", [{"task_type": "binary"}], indirect=True, scope="function"
+    "create_test_data",
+    [{"task_type": "binary", "manual_test_data_creator": uuid4}],
+    indirect=True,
 )
 def test_set_up_datasets_fails(
     dataset_fail_config: Dict,
@@ -495,14 +508,6 @@ def check_dataset(
     assert test_id == dataset.samples[0].sample_id
 
 
-def test_prepare_inputs_disk():
-    pass
-
-
-def test_prepare_inputs_memory():
-    pass
-
-
 def test_prepare_genotype_array_train_mode():
     test_array = torch.zeros((1, 4, 100), dtype=torch.bool)
 
@@ -527,3 +532,197 @@ def test_prepare_genotype_array_test_mode():
     )
 
     assert prepared_array_train.sum().item() == 0
+
+
+@pytest.mark.parametrize(
+    "create_test_data",
+    [
+        {
+            "task_type": "binary",
+        },
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize(
+    "create_test_config_init_base",
+    [
+        {
+            "injections": {
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "input_type_info": {"model_type": "linear"},
+                    }
+                ],
+            },
+        }
+    ],
+    indirect=True,
+)
+def test_get_file_sample_id_iterator(
+    create_test_config: Configs,
+    create_test_data: "TestDataConfig",
+    parse_test_cl_args: Dict[str, Any],
+):
+    test_experiment_config = create_test_config
+    test_data_config = create_test_data
+
+    input_configs = test_experiment_config.input_configs
+    assert len(input_configs) == 1
+
+    input_data_source = input_configs[0].input_info.input_source
+
+    iterator = datasets.get_file_sample_id_iterator(
+        data_source=input_data_source, ids_to_keep=None
+    )
+    all_ids = [i for i in iterator]
+
+    assert len(all_ids) == test_data_config.n_per_class * len(
+        test_data_config.target_classes
+    )
+
+    iterator_empty = datasets.get_file_sample_id_iterator(
+        data_source=input_data_source, ids_to_keep=["does_not_exists"]
+    )
+    all_ids = [i for i in iterator_empty]
+    assert len(all_ids) == 0
+
+
+def test_process_tensor_to_length():
+    test_tensor = torch.arange(0, 100)
+
+    test_tensor_simple_trunc = datasets.process_tensor_to_length(
+        tensor=test_tensor, max_length=50, sampling_strategy_if_longer="from_start"
+    )
+    assert len(test_tensor_simple_trunc) == 50
+    assert (test_tensor_simple_trunc == test_tensor[:50]).all()
+
+    test_tensor_unif_trunc = datasets.process_tensor_to_length(
+        tensor=test_tensor, max_length=50, sampling_strategy_if_longer="uniform"
+    )
+    assert len(test_tensor_unif_trunc) == 50
+    assert len(test_tensor_unif_trunc) == len(set(test_tensor_unif_trunc))
+
+    test_tensor_padded = datasets.process_tensor_to_length(
+        tensor=test_tensor, max_length=128, sampling_strategy_if_longer="uniform"
+    )
+    assert len(test_tensor_padded) == 128
+
+
+def test_sample_sequence_uniform():
+    test_tensor = torch.arange(0, 100)
+
+    sampled_tensor = datasets._sample_sequence_uniform(
+        tensor=test_tensor, tensor_length=len(test_tensor), max_length=50
+    )
+    assert len(sampled_tensor) == 50
+    assert len(sampled_tensor) == len(set(sampled_tensor))
+
+
+@pytest.mark.parametrize(
+    "create_test_data",
+    [
+        {"task_type": "binary", "modalities": ["omics", "sequence"]},
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize(
+    "create_test_config_init_base",
+    [
+        {
+            "injections": {
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "input_type_info": {"model_type": "cnn"},
+                        "model_config": {"l1": 1e-03},
+                    },
+                    {
+                        "input_info": {"input_name": "test_sequence"},
+                    },
+                    {
+                        "input_info": {"input_name": "test_tabular"},
+                        "input_type_info": {
+                            "model_type": "tabular",
+                            "extra_cat_columns": ["OriginExtraCol"],
+                            "extra_con_columns": ["ExtraTarget"],
+                        },
+                    },
+                ],
+            },
+        }
+    ],
+    indirect=True,
+)
+def test_impute_missing_modalities(
+    create_test_config: Configs,
+    create_test_data: "TestDataConfig",
+    parse_test_cl_args: Dict[str, Any],
+):
+    test_experiment_config = create_test_config
+    test_data_config = create_test_data
+
+    all_array_ids = train.gather_all_ids_from_target_configs(
+        target_configs=test_experiment_config.target_configs
+    )
+    train_ids, valid_ids = train.split_ids(
+        ids=all_array_ids, valid_size=test_experiment_config.global_config.valid_size
+    )
+
+    input_objects = train.set_up_inputs_for_training(
+        inputs_configs=test_experiment_config.input_configs,
+        train_ids=train_ids,
+        valid_ids=valid_ids,
+        hooks=None,
+    )
+    impute_dtypes = datasets._get_default_impute_dtypes(inputs_objects=input_objects)
+    impute_fill_values = datasets._get_default_impute_fill_values(
+        inputs_objects=input_objects
+    )
+
+    test_inputs_all_avail = {k: torch.empty(10) for k in input_objects.keys()}
+
+    no_fill = datasets.impute_missing_modalities(
+        inputs_values=test_inputs_all_avail,
+        inputs_objects=input_objects,
+        fill_values=impute_fill_values,
+        dtypes=impute_dtypes,
+    )
+    assert no_fill == test_inputs_all_avail
+
+    with pytest.raises(NotImplementedError):
+        test_inputs_missing_tabular = {
+            k: v for k, v in test_inputs_all_avail.items() if "tabular" not in k
+        }
+        _ = datasets.impute_missing_modalities(
+            inputs_values=test_inputs_missing_tabular,
+            inputs_objects=input_objects,
+            fill_values=impute_fill_values,
+            dtypes=impute_dtypes,
+        )
+
+    test_inputs_missing_omics = {
+        k: v for k, v in test_inputs_all_avail.items() if "omics" not in k
+    }
+    with_imputed_omics = datasets.impute_missing_modalities(
+        inputs_values=test_inputs_missing_omics,
+        inputs_objects=input_objects,
+        fill_values=impute_fill_values,
+        dtypes=impute_dtypes,
+    )
+    assert len(with_imputed_omics) == 3
+    assert (
+        with_imputed_omics["omics_test_genotype"].numel() == test_data_config.n_snps * 4
+    )
+
+
+def test_impute_single_missing_modality():
+    imputed_test_tensor = datasets.impute_single_missing_modality(
+        shape=(10, 10), fill_value=0, dtype=torch.float
+    )
+    assert imputed_test_tensor.numel() == 100
+    assert len(imputed_test_tensor.shape) == 2
+    assert imputed_test_tensor.shape[0] == 10
+    assert imputed_test_tensor.shape[1] == 10
+
+    assert (imputed_test_tensor == 0.0).all()

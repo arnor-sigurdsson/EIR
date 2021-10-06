@@ -1,17 +1,24 @@
 import io
 import random
+from collections import defaultdict
 from copy import copy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Sequence, Literal, Generator, Tuple
+from typing import TYPE_CHECKING, Sequence, Literal, Generator, Tuple, Dict
 
 import numpy as np
+import pandas as pd
 import shap
 import torch
+from aislib.misc_utils import ensure_path_exists
 from shap._explanation import Explanation
 from torchtext.vocab import Vocab
 
-from eir.interpretation.interpretation_utils import get_target_class_name
+from eir.interpretation.interpretation_utils import (
+    get_target_class_name,
+    stratify_activations_by_target_classes,
+    plot_activations_bar,
+)
 from eir.setup import schemas
 
 if TYPE_CHECKING:
@@ -38,6 +45,7 @@ def analyze_sequence_input_activations(
     samples_to_act_analyze_gen = get_sequence_sample_activations_to_analyse_generator(
         interpretation_config=interpretation_config, all_activations=all_activations
     )
+    vocab = exp.inputs[input_name].vocab
 
     for sample_activation in samples_to_act_analyze_gen:
 
@@ -54,8 +62,9 @@ def analyze_sequence_input_activations(
             sample_activation_object=sample_activation,
             cur_label_name=cur_label_name,
             target_column_name=target_column_name,
+            target_column_type=target_column_type,
             input_name=input_name,
-            vocab=exp.inputs[input_name].vocab,
+            vocab=vocab,
             expected_target_classes_shap_values=expected_target_classes_shap_values,
         )
 
@@ -78,9 +87,36 @@ def analyze_sequence_input_activations(
 
         outpath = (
             activation_outfolder
+            / "single_samples"
             / f"sequence_{sample_activation.sample_info.ids[0]}_{cur_label_name}.html"
         )
+        ensure_path_exists(path=outpath)
         save_html(out_path=outpath, html_string=html_string)
+
+    acts_stratified_by_target = stratify_activations_by_target_classes(
+        all_activations=all_activations,
+        target_transformer=target_transformer,
+        target_column=target_column_name,
+        column_type=target_column_type,
+    )
+
+    for class_name, target_activations in acts_stratified_by_target.items():
+        token_importances = get_sequence_token_importance(
+            activations=target_activations, vocab=vocab, input_name=input_name
+        )
+        df_token_importances = get_sequence_feature_importance_df(
+            token_importances=token_importances
+        )
+        target_outfolder = activation_outfolder / f"{class_name}"
+        ensure_path_exists(path=target_outfolder, is_folder=True)
+        plot_activations_bar(
+            df_activations=df_token_importances,
+            outpath=target_outfolder / f"feature_importance_{class_name}.pdf",
+            title=f"{target_column_name} – {class_name}",
+        )
+        df_token_importances.to_csv(
+            path_or_buf=target_outfolder / f"feature_importance_{class_name}.csv"
+        )
 
 
 def get_sequence_sample_activations_to_analyse_generator(
@@ -120,6 +156,7 @@ def extract_sample_info_for_sequence_activation(
     sample_activation_object: "SampleActivation",
     cur_label_name: str,
     target_column_name: str,
+    target_column_type: str,
     input_name: str,
     vocab: Vocab,
     expected_target_classes_shap_values: Sequence[float],
@@ -130,11 +167,12 @@ def extract_sample_info_for_sequence_activation(
     sample_tokens = sample_activation_object.raw_inputs[input_name]
     raw_inputs = extract_raw_inputs_from_tokens(tokens=sample_tokens, vocab=vocab)
 
-    sample_target_labels = sample_activation_object.sample_info.target_labels
-    cur_base_values_index = sample_target_labels[target_column_name].item()
-    cur_sample_expected_value = expected_target_classes_shap_values[
-        cur_base_values_index
-    ]
+    cur_sample_expected_value = _parse_out_sequence_expected_value(
+        sample_target_labels=sample_activation_object.sample_info.target_labels,
+        target_column_name=target_column_name,
+        target_column_type=target_column_type,
+        expected_values=expected_target_classes_shap_values,
+    )
 
     extracted_sequence_info = SequenceActivationSampleInfo(
         sequence_shap_values=shap_values,
@@ -149,6 +187,23 @@ def extract_sample_info_for_sequence_activation(
 def extract_raw_inputs_from_tokens(tokens: torch.Tensor, vocab) -> Sequence[str]:
     raw_inputs = vocab.lookup_tokens(tokens.squeeze().tolist())
     return raw_inputs
+
+
+def _parse_out_sequence_expected_value(
+    sample_target_labels: Dict[str, torch.Tensor],
+    target_column_name: str,
+    expected_values: Sequence[float],
+    target_column_type: str,
+) -> float:
+
+    if target_column_type == "con":
+        assert len(expected_values) == 1
+        return expected_values[0]
+
+    cur_base_values_index = sample_target_labels[target_column_name].item()
+    cur_sample_expected_value = expected_values[cur_base_values_index]
+
+    return cur_sample_expected_value
 
 
 def get_sequence_index_to_truncate_unknown(
@@ -235,3 +290,44 @@ def get_label_transformer_mapping(
     mapping = dict(zip(*values))
 
     return mapping
+
+
+def get_sequence_token_importance(
+    activations: Sequence["SampleActivation"], vocab: Vocab, input_name: str
+) -> Dict[str, float]:
+
+    token_importances = defaultdict(lambda: 0.0)
+    token_counts = defaultdict(lambda: 0)
+
+    for act in activations:
+        orig_seq_input = extract_raw_inputs_from_tokens(
+            tokens=act.raw_inputs[input_name], vocab=vocab
+        )
+        seq_shap_values = act.sample_activations[input_name]
+        seq_shap_values_abs = seq_shap_values.squeeze()
+        assert len(seq_shap_values_abs.shape) == 2
+
+        seq_shap_values_sum = seq_shap_values_abs.sum(1).squeeze()
+        assert len(seq_shap_values_sum) == len(orig_seq_input)
+
+        for token, shap_value in zip(orig_seq_input, seq_shap_values_sum):
+            token_importances[token] += shap_value
+            token_counts[token] += 1
+
+    n_samples = len(activations)
+    for token, total_shap_value in token_importances.items():
+        token_importances[token] = total_shap_value / (token_counts[token] * n_samples)
+
+    return token_importances
+
+
+def get_sequence_feature_importance_df(
+    token_importances: Dict[str, float]
+) -> pd.DataFrame:
+    df = pd.DataFrame.from_dict(
+        token_importances, columns=["Shap_Value"], orient="index"
+    )
+
+    df.index.name = "Token"
+
+    return df

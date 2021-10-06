@@ -374,7 +374,7 @@ def test_ensure_categorical_columns_are_str(get_test_nan_df):
 def test_gather_ids_from_data_source(create_test_data):
     c = create_test_data
 
-    test_path = c.scoped_tmp_path / "test_arrays"
+    test_path = c.scoped_tmp_path / "omics"
     expected_num_samples = c.n_per_class * len(c.target_classes)
 
     test_ids = label_setup.gather_ids_from_data_source(data_source=test_path)
@@ -389,7 +389,7 @@ def test_gather_ids_from_data_source(create_test_data):
 def test_get_array_path_iterator_file(create_test_data):
     c = create_test_data
 
-    test_path = c.scoped_tmp_path / "test_arrays"
+    test_path = c.scoped_tmp_path / "omics"
     test_label_file_path = c.scoped_tmp_path / "test_paths.txt"
 
     with open(test_label_file_path, "w") as test_label_file:
@@ -408,7 +408,7 @@ def test_get_array_path_iterator_file(create_test_data):
 def test_get_array_path_iterator_folder(create_test_data):
     c = create_test_data
 
-    test_path = c.scoped_tmp_path / "test_arrays"
+    test_path = c.scoped_tmp_path / "omics"
 
     expected_num_samples = c.n_per_class * len(c.target_classes)
     folder_iterator = label_setup.get_array_path_iterator(data_source=test_path)
@@ -526,7 +526,7 @@ def test_get_extra_columns(test_input, expected, create_test_column_ops):
 def test_load_label_df_one_target_no_extra_col(parse_test_cl_args, create_test_data):
     c = create_test_data
 
-    label_fpath = c.scoped_tmp_path / "labels.csv"
+    label_fpath = c.scoped_tmp_path / "labels_train.csv"
     n_classes = len(c.target_classes)
 
     label_columns = ["Origin"]
@@ -545,7 +545,7 @@ def test_load_label_df_one_target_no_extra_col(parse_test_cl_args, create_test_d
 def test_load_label_df_one_target_one_extra_col(parse_test_cl_args, create_test_data):
     c = create_test_data
 
-    label_fpath = c.scoped_tmp_path / "labels.csv"
+    label_fpath = c.scoped_tmp_path / "labels_train.csv"
 
     label_columns = ["Origin", "OriginExtraCol"]
 
@@ -565,7 +565,7 @@ def test_load_label_df_one_target_one_extra_col(parse_test_cl_args, create_test_
 def test_load_label_df_missing_col_fail(parse_test_cl_args, create_test_data):
     c = create_test_data
 
-    label_fpath = c.scoped_tmp_path / "labels.csv"
+    label_fpath = c.scoped_tmp_path / "labels_train.csv"
 
     label_columns = ["Origin", "NonExistentColumn"]
 
@@ -583,7 +583,7 @@ def test_load_label_df_missing_col_pass(
 ):
     c = create_test_data
 
-    label_fpath = c.scoped_tmp_path / "labels.csv"
+    label_fpath = c.scoped_tmp_path / "labels_train.csv"
 
     label_columns = ["Origin", "NonExistentColumn"]
 
@@ -601,7 +601,7 @@ def test_load_label_df_missing_col_pass(
 def test_load_label_extra_target_extra_col(parse_test_cl_args, create_test_data):
     c = create_test_data
 
-    label_fpath = c.scoped_tmp_path / "labels.csv"
+    label_fpath = c.scoped_tmp_path / "labels_train.csv"
 
     label_columns = ["Origin", "OriginExtraCol", "Height", "ExtraTarget"]
     df_label_multi_target = label_setup._load_label_df(
@@ -639,7 +639,7 @@ def test_get_currently_available_columns_pass(
 ):
     c = create_test_data
 
-    label_fpath = c.scoped_tmp_path / "labels.csv"
+    label_fpath = c.scoped_tmp_path / "labels_train.csv"
     label_columns = ["Origin", "NotExisting1", "NotExisting2"]
 
     available_columns = label_setup._get_currently_available_columns(
@@ -657,7 +657,7 @@ def test_get_currently_available_columns_pass(
 def test_get_currently_available_columns_fail(parse_test_cl_args, create_test_data):
     c = create_test_data
 
-    label_fpath = c.scoped_tmp_path / "labels.csv"
+    label_fpath = c.scoped_tmp_path / "labels_train.csv"
     label_columns = ["Origin", "NotExisting1", "NotExisting2"]
 
     with pytest.raises(ValueError):
@@ -671,7 +671,7 @@ def test_get_currently_available_columns_fail(parse_test_cl_args, create_test_da
 @pytest.mark.parametrize("create_test_data", [{"task_type": "binary"}], indirect=True)
 def test_filter_ids_from_label_df(create_test_data):
     c = create_test_data
-    label_fpath = c.scoped_tmp_path / "labels.csv"
+    label_fpath = c.scoped_tmp_path / "labels_train.csv"
 
     label_columns = ["Origin"]
     df_labels = label_setup._load_label_df(
@@ -704,7 +704,7 @@ def test_apply_column_operations_to_df_applied_1(
     create_test_column_ops.
     """
     c = create_test_data
-    label_fpath = c.scoped_tmp_path / "labels.csv"
+    label_fpath = c.scoped_tmp_path / "labels_train.csv"
 
     test_column_ops = create_test_column_ops
 
@@ -732,7 +732,7 @@ def test_apply_column_operations_to_df_applied_2(
     """
 
     c = create_test_data
-    label_fpath = c.scoped_tmp_path / "labels.csv"
+    label_fpath = c.scoped_tmp_path / "labels_train.csv"
 
     test_column_ops = create_test_column_ops
 
@@ -789,7 +789,7 @@ def test_parse_label_df_not_applied(
         assert len(calls) == 2
 
     c = create_test_data
-    label_fpath = c.scoped_tmp_path / "labels.csv"
+    label_fpath = c.scoped_tmp_path / "labels_train.csv"
 
     test_column_ops = create_test_column_ops
 
@@ -865,7 +865,7 @@ def test_apply_column_operations_to_df_always_applied(
     """
 
     c = create_test_data
-    label_fpath = c.scoped_tmp_path / "labels.csv"
+    label_fpath = c.scoped_tmp_path / "labels_train.csv"
 
     test_column_ops = create_test_always_applied_column_ops
 
@@ -892,7 +892,7 @@ def test_apply_column_operations_to_df_always_applied(
 )
 def test_check_parsed_label_df_pass(parse_test_cl_args, create_test_data):
     c = create_test_data
-    label_fpath = c.scoped_tmp_path / "labels.csv"
+    label_fpath = c.scoped_tmp_path / "labels_train.csv"
 
     label_columns = ["Origin", "ExtraTarget"]
 
@@ -916,7 +916,7 @@ def test_check_parsed_label_df_fail(
     parse_test_cl_args, create_test_data, test_column_operations
 ):
     c = create_test_data
-    label_fpath = c.scoped_tmp_path / "labels.csv"
+    label_fpath = c.scoped_tmp_path / "labels_train.csv"
 
     label_columns = ["Origin", "ExtraTarget", "NotExisting"]
 

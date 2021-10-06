@@ -155,7 +155,9 @@ def test_get_train_predict_matched_config_generator(create_test_config, tmp_path
     test_configs = create_test_config
 
     test_predict_cl_args = _setup_test_namespace_for_matched_config_test(
-        test_configs=test_configs, predict_cl_args_save_path=tmp_path
+        test_configs=test_configs,
+        predict_cl_args_save_path=tmp_path,
+        do_inject_test_values=True,
     )
 
     named_test_iterators = predict.get_named_pred_dict_iterators(
@@ -184,6 +186,7 @@ def _setup_test_namespace_for_matched_config_test(
     test_configs: config.Configs,
     predict_cl_args_save_path: Path,
     do_inject_test_values: bool = True,
+    monkeypatch_train_to_test_paths: bool = False,
 ) -> Namespace:
     keys = ("global_configs", "input_configs", "predictor_configs", "target_configs")
     name_to_attr_map = {
@@ -213,6 +216,12 @@ def _setup_test_namespace_for_matched_config_test(
                 ".yaml"
             )
             ensure_path_exists(path=cur_outpath)
+
+            if monkeypatch_train_to_test_paths:
+                obj_primitive_to_dump = _recursive_dict_str_value_replace(
+                    dict_=obj_primitive_to_dump, old="train", new="test"
+                )
+
             with open(cur_outpath, "w") as out_yaml:
                 yaml.dump(data=obj_primitive_to_dump, stream=out_yaml)
 
@@ -221,6 +230,17 @@ def _setup_test_namespace_for_matched_config_test(
     test_predict_cl_args = Namespace(**paths)
 
     return test_predict_cl_args
+
+
+def _recursive_dict_str_value_replace(dict_: dict, old: str, new: str):
+    for key, value in dict_.items():
+        if isinstance(value, dict):
+            _recursive_dict_str_value_replace(dict_=value, old=old, new=new)
+        elif isinstance(value, str):
+            if old in value:
+                dict_[key] = value.replace(old, new)
+
+    return dict_
 
 
 def _overload_test_yaml_object_for_predict(
@@ -274,7 +294,9 @@ def test_overload_train_configs_for_predict(
     test_configs = create_test_config
 
     test_predict_cl_args = _setup_test_namespace_for_matched_config_test(
-        test_configs=test_configs, predict_cl_args_save_path=tmp_path
+        test_configs=test_configs,
+        predict_cl_args_save_path=tmp_path,
+        do_inject_test_values=True,
     )
 
     named_test_iterators = predict.get_named_pred_dict_iterators(
@@ -463,7 +485,15 @@ def grab_best_model_path(saved_models_folder: Path):
 
 
 @pytest.mark.parametrize(
-    "create_test_data", [{"task_type": "multi", "split_to_test": True}], indirect=True
+    "create_test_data",
+    [
+        {
+            "task_type": "multi",
+            "split_to_test": True,
+            "manual_test_data_creator": lambda: "test_predict",
+        }
+    ],
+    indirect=True,
 )
 @pytest.mark.parametrize(
     "create_test_config_init_base",
@@ -510,6 +540,7 @@ def test_predict(
         test_configs=train_configs_for_testing,
         predict_cl_args_save_path=tmp_path,
         do_inject_test_values=False,
+        monkeypatch_train_to_test_paths=True,
     )
 
     extra_test_predict_kwargs = {

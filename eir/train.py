@@ -463,6 +463,13 @@ def get_dataloaders(
     num_workers: int = 0,
 ) -> Tuple:
 
+    check_dataset_and_batch_size_compatiblity(
+        dataset=train_dataset, batch_size=batch_size, name="Training"
+    )
+
+    check_dataset_and_batch_size_compatiblity(
+        dataset=valid_dataset, batch_size=batch_size, name="Validation"
+    )
     train_dloader = DataLoader(
         dataset=train_dataset,
         batch_size=batch_size,
@@ -483,6 +490,17 @@ def get_dataloaders(
     )
 
     return train_dloader, valid_dloader
+
+
+def check_dataset_and_batch_size_compatiblity(
+    dataset: datasets.DatasetBase, batch_size: int, name: str = ""
+):
+    if len(dataset) < batch_size:
+        raise ValueError(
+            f"{name} dataset size ({len(dataset)}) can not be smaller than "
+            f"batch size ({batch_size}). A fix can be increasing {name.lower()} sample "
+            f"size or reducing the batch size."
+        )
 
 
 class GetAttrDelegatedDataParallel(nn.DataParallel):
@@ -588,7 +606,7 @@ def get_tabular_model(
     tabular_model = SimpleTabularModel(
         cat_columns=cat_columns,
         con_columns=con_columns,
-        unique_label_values=unique_label_values,
+        unique_label_values_per_column=unique_label_values,
         device=device,
     )
 

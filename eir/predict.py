@@ -72,6 +72,7 @@ from eir.train import (
     al_num_outputs_per_target,
     get_default_experiment_keys_to_serialize,
     gather_all_ids_from_target_configs,
+    check_dataset_and_batch_size_compatiblity,
 )
 from eir.train_utils.evaluation import PerformancePlotConfig
 from eir.train_utils.metrics import (
@@ -354,6 +355,11 @@ def get_default_predict_config(
         inputs_as_dict=test_inputs,
     )
 
+    check_dataset_and_batch_size_compatiblity(
+        dataset=test_dataset,
+        batch_size=configs_overloaded_for_predict.global_config.batch_size,
+        name="Test",
+    )
     test_dataloader = DataLoader(
         dataset=test_dataset,
         batch_size=configs_overloaded_for_predict.global_config.batch_size,
@@ -959,6 +965,7 @@ def _compute_predict_activations(
 
     background_dataloader = _get_predict_background_loader(
         batch_size=gc.batch_size,
+        train_input_configs=loaded_train_experiment.configs.input_configs,
         dataloader_workers=gc.dataloader_workers,
         configs_overloaded_for_predict=predict_config.train_configs_overloaded,
         inputs_as_dict=predict_config.inputs,
@@ -1004,13 +1011,14 @@ def _overload_train_experiment_for_predict_activations(
 def _get_predict_background_loader(
     batch_size: int,
     dataloader_workers: int,
+    train_input_configs: Sequence[schemas.InputConfig],
     configs_overloaded_for_predict: Configs,
     inputs_as_dict: al_input_objects_as_dict,
     label_parsing_ops: Union["Hooks", None],
 ):
 
     train_ids = label_setup.gather_all_ids_from_all_inputs(
-        input_configs=configs_overloaded_for_predict.input_configs
+        input_configs=train_input_configs
     )
     train_ids_sampled = sample(
         population=train_ids,
@@ -1029,6 +1037,11 @@ def _get_predict_background_loader(
         inputs_as_dict=inputs_as_dict,
     )
 
+    check_dataset_and_batch_size_compatiblity(
+        dataset=background_dataset,
+        batch_size=batch_size,
+        name="Test activation background",
+    )
     background_loader = DataLoader(
         dataset=background_dataset,
         batch_size=batch_size,

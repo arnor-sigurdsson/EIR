@@ -8,9 +8,9 @@ from typing import Dict, TYPE_CHECKING, List, Tuple, Callable, Union
 
 import numpy as np
 import pandas as pd
-from scipy.special import softmax
 import torch
 from aislib.misc_utils import ensure_path_exists, get_logger
+from scipy.special import softmax
 from scipy.stats import pearsonr
 from sklearn.metrics import (
     matthews_corrcoef,

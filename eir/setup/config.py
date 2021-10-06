@@ -121,7 +121,7 @@ def get_main_parser() -> configargparse.ArgumentParser:
     return parser_
 
 
-def add_preset_to_cl_args(cl_args: Namespace):
+def add_preset_to_cl_args(cl_args: Namespace) -> Namespace:
 
     if not cl_args.preset:
         return cl_args

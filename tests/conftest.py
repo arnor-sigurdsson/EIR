@@ -1,15 +1,24 @@
-import csv
+import json
 import warnings
 from copy import copy
 from dataclasses import dataclass
 from pathlib import Path
-from random import shuffle
 from shutil import rmtree
-from typing import List, Tuple, Dict, Sequence, Mapping, Union, Literal
+from typing import (
+    List,
+    Tuple,
+    Dict,
+    Sequence,
+    Mapping,
+    Union,
+    Literal,
+    Iterable,
+    Any,
+)
 
-import numpy as np
 import pandas as pd
 import pytest
+import torch.utils.data
 from _pytest.fixtures import SubRequest
 from aislib.misc_utils import ensure_path_exists
 from torch import nn
@@ -30,6 +39,15 @@ from eir.train import (
 )
 from eir.train_utils import optimizers, metrics
 from eir.train_utils.utils import configure_root_logger, get_run_folder, seed_everything
+from tests.test_modelling.setup_modelling_test_data.setup_omics_test_data import (
+    create_test_omics_data_and_labels,
+)
+from tests.test_modelling.setup_modelling_test_data.setup_sequence_test_data import (
+    create_test_sequence_data,
+)
+from tests.test_modelling.setup_modelling_test_data.setup_test_data_utils import (
+    set_up_test_data_root_outpath,
+)
 
 al_prep_modelling_test_configs = Tuple[Experiment, "ModelTestConfig"]
 
@@ -58,7 +76,7 @@ def pytest_generate_tests(metafunc):
 
 
 @pytest.fixture(scope="session")
-def parse_test_cl_args(request):
+def parse_test_cl_args(request) -> Dict[str, Any]:
     n_per_class = request.config.getoption("--num_samples_per_class")
     num_snps = request.config.getoption("--num_snps")
 
@@ -97,6 +115,7 @@ def create_test_config_init_base(
     test_input_init = get_test_inputs_inits(
         test_path=create_test_data.scoped_tmp_path,
         input_config_dicts=injections.get("input_configs", {}),
+        split_to_test=create_test_data.request_params.get("split_to_test", False),
     )
 
     model_type = injections.get("predictor_configs", {}).get("model_type", "nn")
@@ -107,7 +126,10 @@ def create_test_config_init_base(
         inject_dict=injections.get("predictor_configs", {}),
     )
 
-    test_target_inits = get_test_base_target_inits(test_data_config=create_test_data)
+    test_target_inits = get_test_base_target_inits(
+        test_data_config=create_test_data,
+        split_to_test=create_test_data.request_params.get("split_to_test", False),
+    )
     test_target_inits = general_sequence_inject(
         sequence=test_target_inits,
         inject_dict=injections.get("target_configs", {}),
@@ -157,7 +179,7 @@ def get_test_base_global_init() -> Sequence[dict]:
 
 
 def get_test_inputs_inits(
-    test_path: Path, input_config_dicts: Sequence[dict]
+    test_path: Path, input_config_dicts: Sequence[dict], split_to_test: bool
 ) -> Sequence[dict]:
 
     inits = []
@@ -166,7 +188,7 @@ def get_test_inputs_inits(
     for init_dict in input_config_dicts:
         cur_name = init_dict["input_info"]["input_name"]
         cur_base_func = base_func_map.get(cur_name)
-        cur_init_base = cur_base_func(test_path=test_path)
+        cur_init_base = cur_base_func(test_path=test_path, split_to_test=split_to_test)
 
         cur_init_injected = recursive_dict_replace(
             dict_=cur_init_base, dict_to_inject=init_dict
@@ -180,18 +202,21 @@ def get_input_test_init_base_func_map():
     mapping = {
         "test_genotype": get_test_omics_input_init,
         "test_tabular": get_test_tabular_input_init,
+        "test_sequence": get_test_sequence_input_init,
     }
 
     return mapping
 
 
-def get_test_omics_input_init(
-    test_path: Path,
-) -> dict:
+def get_test_omics_input_init(test_path: Path, split_to_test: bool) -> dict:
+
+    input_source = test_path / "omics"
+    if split_to_test:
+        input_source = input_source / "train_set"
 
     input_init_kwargs = {
         "input_info": {
-            "input_source": str(test_path / "test_arrays"),
+            "input_source": str(input_source),
             "input_name": "test_genotype",
             "input_type": "omics",
         },
@@ -207,18 +232,48 @@ def get_test_omics_input_init(
     return input_init_kwargs
 
 
-def get_test_tabular_input_init(
-    test_path: Path,
-) -> dict:
+def get_test_tabular_input_init(test_path: Path, split_to_test: bool) -> dict:
+
+    input_source = test_path / "labels_train.csv"
+    if split_to_test:
+        input_source = test_path / "labels_train.csv"
 
     input_init_kwargs = {
         "input_info": {
-            "input_source": str(test_path / "labels.csv"),
+            "input_source": str(input_source),
             "input_name": "test_tabular",
             "input_type": "tabular",
         },
         "input_type_info": {"model_type": "tabular"},
         "model_config": {},
+    }
+
+    return input_init_kwargs
+
+
+def get_test_sequence_input_init(test_path: Path, split_to_test: bool) -> dict:
+
+    input_source = test_path / "sequence"
+    if split_to_test:
+        input_source = input_source / "train_set"
+
+    input_init_kwargs = {
+        "input_info": {
+            "input_source": str(input_source),
+            "input_name": "test_sequence",
+            "input_type": "sequence",
+        },
+        "input_type_info": {
+            "max_length": "max",
+            "tokenizer_language": "en",
+            "model_type": "sequence-default",
+        },
+        "model_config": {
+            "num_heads": 2,
+            "num_layers": 1,
+            "dropout": 0.25,
+            "embedding_dim": 8,
+        },
     }
 
     return input_init_kwargs
@@ -230,11 +285,17 @@ def get_test_base_predictor_init(model_type: Literal["nn", "linear"]) -> Sequenc
     return [{"model_config": {"rb_do": 0.25, "fc_do": 0.25}}]
 
 
-def get_test_base_target_inits(test_data_config: "TestDataConfig") -> Sequence[dict]:
+def get_test_base_target_inits(
+    test_data_config: "TestDataConfig", split_to_test: bool
+) -> Sequence[dict]:
     test_path = test_data_config.scoped_tmp_path
 
+    label_file = test_path / "labels_train.csv"
+    if split_to_test:
+        label_file = test_path / "labels_train.csv"
+
     test_target_init_kwargs = {
-        "label_file": str(test_path / "labels.csv"),
+        "label_file": str(label_file),
         "target_cat_columns": ["Origin"],
     }
 
@@ -243,48 +304,33 @@ def get_test_base_target_inits(test_data_config: "TestDataConfig") -> Sequence[d
     return test_target_init_kwargs_sequence
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def create_test_data(request, tmp_path_factory, parse_test_cl_args) -> "TestDataConfig":
-    c = _create_test_data_config(request, tmp_path_factory, parse_test_cl_args)
-
-    fieldnames = ["ID", "Origin", "Height", "OriginExtraCol", "ExtraTarget"]
-
-    label_file_handle, label_file_writer = _set_up_label_file_writing(
-        path=c.scoped_tmp_path, fieldnames=fieldnames
+    test_data_config = _create_test_data_config(
+        create_test_data_fixture_request=request,
+        tmp_path_factory=tmp_path_factory,
+        parsed_test_cl_args=parse_test_cl_args,
     )
 
-    array_outfolder = _set_up_test_data_array_outpath(c.scoped_tmp_path)
+    base_outfolder = set_up_test_data_root_outpath(
+        base_folder=test_data_config.scoped_tmp_path
+    )
 
-    for cls, snp_row_idx in c.target_classes.items():
-        for sample_idx in range(c.n_per_class):
+    omics_path = base_outfolder / "omics"
+    if "omics" in test_data_config.modalities and not omics_path.exists():
+        create_test_omics_data_and_labels(
+            test_data_config=test_data_config,
+            array_outfolder=omics_path,
+        )
 
-            sample_outpath = array_outfolder / f"{sample_idx}_{cls}"
+    sequence_path = base_outfolder / "sequence"
+    if "sequence" in test_data_config.modalities and not sequence_path.exists():
+        create_test_sequence_data(
+            test_data_config=test_data_config,
+            sequence_outfolder=sequence_path,
+        )
 
-            num_active_snps_in_sample = _save_test_array_to_disk(
-                test_data_config=c,
-                active_snp_row_idx=snp_row_idx,
-                sample_outpath=sample_outpath,
-            )
-
-            label_line_base = _set_up_label_line_dict(
-                sample_name=sample_outpath.name, fieldnames=fieldnames
-            )
-
-            label_line_dict = _get_current_test_label_values(
-                values_dict=label_line_base,
-                num_active_snps=num_active_snps_in_sample,
-                cur_class=cls,
-            )
-            label_file_writer.writerow(label_line_dict)
-
-    label_file_handle.close()
-
-    write_test_data_snp_file(c.scoped_tmp_path, c.n_snps)
-
-    if c.request_params.get("split_to_test", False):
-        split_test_array_folder(c.scoped_tmp_path)
-
-    return c
+    return test_data_config
 
 
 @dataclass
@@ -295,15 +341,28 @@ class TestDataConfig:
     target_classes: Dict[str, int]
     n_per_class: int
     n_snps: int
+    modalities: Sequence[Union[Literal["omics"], Literal["sequence"]]] = ("omics",)
 
 
 def _create_test_data_config(
     create_test_data_fixture_request: SubRequest, tmp_path_factory, parsed_test_cl_args
-):
+) -> TestDataConfig:
 
     request_params = create_test_data_fixture_request.param
     task_type = request_params["task_type"]
-    scoped_tmp_path = tmp_path_factory.mktemp(task_type)
+
+    if request_params.get("manual_test_data_creator", None):
+        manual_name_creator_callable = request_params["manual_test_data_creator"]
+        basename = str(manual_name_creator_callable())
+    else:
+        basename = "test_data_" + str(
+            _hash_dict(dict_to_hash={**request_params, **parsed_test_cl_args})
+        )
+
+    scoped_tmp_path = tmp_path_factory.getbasetemp().joinpath(basename)
+
+    if not scoped_tmp_path.exists():
+        scoped_tmp_path.mkdir(mode=0o700)
 
     target_classes = {"Asia": 0, "Europe": 1}
     if task_type != "binary":
@@ -316,138 +375,15 @@ def _create_test_data_config(
         target_classes=target_classes,
         n_per_class=parsed_test_cl_args["n_per_class"],
         n_snps=parsed_test_cl_args["n_snps"],
+        modalities=request_params.get("modalities", ("omics",)),
     )
 
     return test_data_config
 
 
-def _set_up_label_file_writing(path: Path, fieldnames: List[str]):
-    label_file = str(path / "labels.csv")
-
-    label_file_handle = open(str(label_file), "w")
-
-    writer = csv.DictWriter(f=label_file_handle, fieldnames=fieldnames, delimiter=",")
-    writer.writeheader()
-
-    return label_file_handle, writer
-
-
-def _set_up_label_line_dict(sample_name: str, fieldnames: List[str]):
-    label_line_dict = {k: None for k in fieldnames}
-    assert "ID" in label_line_dict.keys()
-    label_line_dict["ID"] = sample_name
-    return label_line_dict
-
-
-def _get_current_test_label_values(values_dict, num_active_snps: List, cur_class: str):
-    class_base_heights = {"Asia": 120, "Europe": 140, "Africa": 160}
-    cur_base_height = class_base_heights[cur_class]
-
-    added_height = 5 * len(num_active_snps)
-    noise = np.random.randn()
-
-    height_value = cur_base_height + added_height + noise
-    values_dict["Height"] = height_value
-    values_dict["ExtraTarget"] = height_value - 50
-
-    values_dict["Origin"] = cur_class
-    values_dict["OriginExtraCol"] = cur_class
-
-    return values_dict
-
-
-def _save_test_array_to_disk(
-    test_data_config: TestDataConfig, active_snp_row_idx, sample_outpath: Path
-):
-    c = test_data_config
-
-    base_array, snp_idxs_candidates = _set_up_base_test_array(c.n_snps)
-
-    cur_test_array, snps_this_sample = _create_test_array(
-        base_array=base_array,
-        snp_idxs_candidates=snp_idxs_candidates,
-        snp_row_idx=active_snp_row_idx,
-    )
-
-    np.save(str(sample_outpath), cur_test_array)
-
-    return snps_this_sample
-
-
-def _set_up_base_test_array(n_snps: int) -> Tuple[np.ndarray, np.ndarray]:
-    # create random one hot array
-    base_array = np.eye(4)[np.random.choice(4, n_snps)].T
-    # set up 10 candidates
-    step_size = n_snps // 10
-    snp_idxs_candidates = np.array(range(50, n_snps, step_size))
-
-    return base_array, snp_idxs_candidates
-
-
-def _create_test_array(
-    base_array: np.ndarray,
-    snp_idxs_candidates: np.ndarray,
-    snp_row_idx: int,
-) -> Tuple[np.ndarray, List[int]]:
-    # make samples have missing for chosen, otherwise might have alleles chosen
-    # below by random, without having the phenotype
-    base_array[:, snp_idxs_candidates] = 0
-    base_array[3, snp_idxs_candidates] = 1
-
-    lower_bound, upper_bound = 4, 11  # between 4 and 10 snps
-
-    np.random.shuffle(snp_idxs_candidates)
-    num_snps_this_sample = np.random.randint(lower_bound, upper_bound)
-    snp_idxs = sorted(snp_idxs_candidates[:num_snps_this_sample])
-
-    base_array[:, snp_idxs] = 0
-    base_array[snp_row_idx, snp_idxs] = 1
-
-    base_array = base_array.astype(np.uint8)
-    return base_array, snp_idxs
-
-
-def _set_up_test_data_array_outpath(base_folder: Path) -> Path:
-    array_folder = base_folder / "test_arrays"
-    if not array_folder.exists():
-        array_folder.mkdir()
-
-    return array_folder
-
-
-def write_test_data_snp_file(base_folder: Path, n_snps: int) -> None:
-    """
-    BIM specs:
-        0. Chromosome code
-        1. Variant ID
-        2. Position in centi-morgans
-        3. Base-pair coordinate (1-based)
-        4. ALT allele cod
-        5. REF allele code
-    """
-    snp_file = base_folder / "test_snps.bim"
-    base_snp_string_list = ["1", "REPLACE_W_IDX", "0.1", "REPLACE_W_IDX", "A", "T"]
-
-    with open(str(snp_file), "w") as snpfile:
-        for snp_idx in range(n_snps):
-            cur_snp_list = base_snp_string_list[:]
-            cur_snp_list[1] = str(snp_idx)
-            cur_snp_list[3] = str(snp_idx)
-
-            cur_snp_string = "\t".join(cur_snp_list)
-            snpfile.write(cur_snp_string + "\n")
-
-
-def split_test_array_folder(test_folder: Path) -> None:
-    test_array_test_set_folder = test_folder / "test_arrays_test_set"
-    test_array_test_set_folder.mkdir()
-
-    all_arrays = [i for i in (test_folder / "test_arrays").iterdir()]
-    shuffle(all_arrays)
-
-    test_arrays_test_set = all_arrays[:200]
-    for array_file in test_arrays_test_set:
-        array_file.replace(test_array_test_set_folder / array_file.name)
+def _hash_dict(dict_to_hash: dict) -> int:
+    dict_hash = hash(json.dumps(dict_to_hash, sort_keys=True))
+    return dict_hash
 
 
 @pytest.fixture()
@@ -533,21 +469,6 @@ def modify_test_configs(
 
 
 @pytest.fixture()
-def get_test_data_dimensions(create_test_config: config.Configs, create_test_data):
-
-    test_config = create_test_config
-
-    for input_config in test_config.input_configs:
-        if input_config.input_info.input_type == "omics":
-            cur_source = input_config.input_info.input_source
-            cur_dimensions = eir.setup.input_setup.get_data_dimension_from_data_source(
-                data_source=Path(cur_source)
-            )
-            cur_name = input_config.input_info.input_name
-            yield cur_name, cur_dimensions
-
-
-@pytest.fixture()
 def create_test_model(
     create_test_config: config.Configs, create_test_labels
 ) -> nn.Module:
@@ -624,7 +545,7 @@ def create_test_datasets(
     create_test_data,
     create_test_labels,
     create_test_config: config.Configs,
-):
+) -> Tuple[torch.utils.data.Dataset, torch.utils.data.Dataset]:
 
     configs = create_test_config
     target_labels = create_test_labels
@@ -686,8 +607,7 @@ class ModelTestConfig:
     iteration: int
     run_path: Path
     last_sample_folders: Dict[str, Path]
-    activations_path: Dict[str, Path]
-    masked_activations_path: Dict[str, Path]
+    activations_paths: Dict[str, Dict[str, Path]]
 
 
 @pytest.fixture()
@@ -698,7 +618,6 @@ def prep_modelling_test_configs(
     create_test_dloaders,
     create_test_model,
     create_test_datasets,
-    get_test_data_dimensions,
 ) -> Tuple[Experiment, ModelTestConfig]:
     """
     Note that the fixtures used in this fixture get indirectly parametrized by
@@ -769,7 +688,10 @@ def prep_modelling_test_configs(
 
     targets = config.get_all_targets(targets_configs=c.target_configs)
     test_config = _get_cur_modelling_test_config(
-        train_loader=train_loader, global_config=gc, targets=targets
+        train_loader=train_loader,
+        global_config=gc,
+        targets=targets,
+        input_names=inputs.keys(),
     )
 
     return experiment, test_config
@@ -795,6 +717,7 @@ def _get_cur_modelling_test_config(
     train_loader: DataLoader,
     global_config: schemas.GlobalConfig,
     targets: config.Targets,
+    input_names: Iterable[str],
 ) -> ModelTestConfig:
 
     last_iter = len(train_loader) * global_config.n_epochs
@@ -804,25 +727,34 @@ def _get_cur_modelling_test_config(
         target_columns=targets.all_targets, run_path=run_path, iteration=last_iter
     )
 
-    gen = last_sample_folders.items
-    activations_path = {
-        k: folder / "activations/omics_test_genotype/top_acts.npy"
-        for k, folder in gen()
-    }
-    masked_activations_path = {
-        k: folder / "activations/omics_test_genotype/top_acts_masked.npy"
-        for k, folder in gen()
-    }
+    all_activation_paths = _get_all_activation_paths(
+        last_sample_folder_per_target=last_sample_folders, input_names=input_names
+    )
 
     test_config = ModelTestConfig(
         iteration=last_iter,
         run_path=run_path,
         last_sample_folders=last_sample_folders,
-        activations_path=activations_path,
-        masked_activations_path=masked_activations_path,
+        activations_paths=all_activation_paths,
     )
 
     return test_config
+
+
+def _get_all_activation_paths(
+    last_sample_folder_per_target: Dict[str, Path], input_names: Iterable[str]
+) -> Dict[str, Dict[str, Path]]:
+
+    all_activation_paths = {}
+
+    for target_name, last_sample_folder in last_sample_folder_per_target.items():
+        all_activation_paths[target_name] = {}
+        for input_name in input_names:
+            all_activation_paths[target_name][input_name] = (
+                last_sample_folder / "activations" / input_name
+            )
+
+    return all_activation_paths
 
 
 def _get_all_last_sample_folders(

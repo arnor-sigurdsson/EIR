@@ -13,6 +13,7 @@ from typing import (
     TYPE_CHECKING,
     Sequence,
     Iterable,
+    Any,
     Tuple,
     Generator,
     Protocol,
@@ -38,8 +39,14 @@ from torch.utils.hooks import RemovableHandle
 
 from eir.data_load.data_utils import get_target_columns_generator, Batch
 from eir.data_load.datasets import al_datasets
-from eir.interpretation.interpret_omics import analyze_omics_input_activations
-from eir.interpretation.interpret_tabular import analyze_tabular_input_activations
+from eir.interpretation.interpret_omics import (
+    analyze_omics_input_activations,
+    get_omics_consumer,
+    ParsedOmicsActivations,
+)
+from eir.interpretation.interpret_tabular import (
+    analyze_tabular_input_activations,
+)
 from eir.interpretation.interpret_sequence import analyze_sequence_input_activations
 from eir.models.model_training_utils import gather_dloader_samples
 from eir.models.omics.models_cnn import CNNModel
@@ -55,6 +62,7 @@ if TYPE_CHECKING:
     from eir.train_utils.train_handlers import HandlerConfig
     from eir.train import Experiment
     from eir.predict import LoadedTrainExperiment
+    from eir.data_load.label_setup import al_label_transformers_object
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -158,54 +166,63 @@ def activation_analysis_wrapper(
     model_copy = copy.deepcopy(model)
     target_columns_gen = get_target_columns_generator(target_columns=exp.target_columns)
 
-    for column_type, column_name in target_columns_gen:
+    for target_column_type, target_column_name in target_columns_gen:
 
         explainer, hook_handle = get_shap_object(
             experiment=exp,
             model=model_copy,
-            column_name=column_name,
+            column_name=target_column_name,
             background_loader=background_loader,
             n_background_samples=gc.act_background_samples,
         )
 
         input_names = explainer.explainer.model.input_names
 
-        act_producer = get_shap_activation_producer(
+        act_callable = get_shap_activation_callable(
             explainer=explainer,
-            column_type=column_type,
+            column_type=target_column_type,
             act_samples_per_class_limit=gc.max_acts_per_class,
         )
 
         act_func = partial(
             get_activation,
-            activation_producer=act_producer,
+            activation_callable=act_callable,
             input_names=input_names,
         )
 
         data_producer = _get_interpretation_data_producer(
             experiment=exp,
-            column_name=column_name,
-            column_type=column_type,
+            column_name=target_column_name,
+            column_type=target_column_type,
             dataset=dataset_to_interpret,
         )
 
-        all_activations = accumulate_all_activations(
+        act_producer = get_sample_activation_producer(
             data_producer=data_producer,
             act_func=act_func,
-            target_column_name=column_name,
+            target_column_name=target_column_name,
+        )
+        act_consumers = get_activation_consumers(
+            input_names=input_names,
+            target_transformer=exp.target_transformers[target_column_name],
+            target_column=target_column_name,
+            column_type=target_column_type,
+        )
+        all_activations = process_activations_for_all_modalities(
+            activation_producer=act_producer, activation_consumers=act_consumers
         )
 
         for input_name in input_names:
 
             activation_outfolder = outfolder_target_callable(
-                column_name=column_name, input_name=input_name
+                column_name=target_column_name, input_name=input_name
             )
             common_kwargs = {
                 "experiment": experiment,
                 "input_name": input_name,
-                "target_column_name": column_name,
-                "target_column_type": column_type,
-                "all_activations": all_activations,
+                "target_column_name": target_column_name,
+                "target_column_type": target_column_type,
+                "all_activations": all_activations[input_name],
                 "activation_outfolder": activation_outfolder,
             }
 
@@ -218,7 +235,7 @@ def activation_analysis_wrapper(
             elif input_name.startswith("sequence_"):
                 analyze_sequence_input_activations(
                     **common_kwargs,
-                    expected_target_classes_shap_values=explainer.expected_value
+                    expected_target_classes_shap_values=explainer.expected_value,
                 )
 
         hook_handle.remove()
@@ -263,14 +280,14 @@ class ActivationCallable(Protocol):
 
 
 def get_activation(
-    activation_producer: ActivationCallable,
+    activation_callable: ActivationCallable,
     inputs: Sequence[torch.Tensor],
     input_names: Sequence[torch.Tensor],
     *args,
     **kwargs
 ) -> Union[Dict[str, torch.Tensor], None]:
 
-    input_activations = activation_producer(inputs=inputs, *args, **kwargs)
+    input_activations = activation_callable(inputs=inputs, *args, **kwargs)
 
     if input_activations is None:
         return None
@@ -280,11 +297,13 @@ def get_activation(
     return name_matched_activation
 
 
-def get_shap_activation_producer(
+def get_shap_activation_callable(
     explainer: DeepExplainer,
     column_type: str,
     act_samples_per_class_limit: Union[int, None],
-):
+) -> Callable[
+    [DeepExplainer, al_model_inputs, torch.Tensor, str], Union[None, np.ndarray]
+]:
     assert column_type in ("cat", "con")
     act_sample_func = get_shap_sample_acts_deep_correct_only
 
@@ -331,6 +350,125 @@ def accumulate_all_activations(
         all_activations.append(cur_sample_activation_info)
 
     return all_activations
+
+
+def get_activation_consumers(
+    input_names: Sequence[str],
+    target_transformer: "al_label_transformers_object",
+    target_column: str,
+    column_type: str,
+) -> Dict[str, Callable[[Union["SampleActivation", None]], Any]]:
+    consumers_dict = {}
+
+    for name in input_names:
+        consumers_dict[name] = _get_consumer_from_input_name(
+            input_name=name,
+            target_transformer=target_transformer,
+            target_column=target_column,
+            column_type=column_type,
+        )
+
+    return consumers_dict
+
+
+def _get_consumer_from_input_name(
+    target_transformer: "al_label_transformers_object",
+    input_name: str,
+    target_column: str,
+    column_type: str,
+) -> Callable[
+    [Union["SampleActivation", None]],
+    Union[Sequence["SampleActivation"], ParsedOmicsActivations],
+]:
+    if input_name.startswith("sequence_") or input_name.startswith("tabular_"):
+        return get_basic_sequence_consumer()
+    elif input_name.startswith("omics_"):
+        return get_omics_consumer(
+            target_transformer=target_transformer,
+            input_name=input_name,
+            target_column=target_column,
+            column_type=column_type,
+        )
+
+
+def get_sample_activation_producer(
+    data_producer: Iterable["Batch"], act_func: Callable, target_column_name: str
+):
+    for batch, raw_inputs in data_producer:
+        sample_target_labels = batch.target_labels
+
+        sample_all_modalities_activations = act_func(
+            inputs=batch.inputs, sample_label=sample_target_labels[target_column_name]
+        )
+
+        if sample_all_modalities_activations is None:
+            continue
+
+        batch_on_cpu = _convert_all_batch_tensors_to_cpu(batch=batch)
+        cur_sample_activation_info = SampleActivation(
+            sample_info=batch_on_cpu,
+            sample_activations=sample_all_modalities_activations,
+            raw_inputs=raw_inputs,
+        )
+        yield cur_sample_activation_info
+
+
+def get_basic_sequence_consumer() -> Callable[
+    [Union["SampleActivation", None]], Sequence["SampleActivation"]
+]:
+
+    results = []
+
+    def _consumer(
+        activation: Union["SampleActivation", None]
+    ) -> Sequence["SampleActivation"]:
+
+        if activation is None:
+            return results
+
+        results.append(activation)
+
+    return _consumer
+
+
+def process_activations_for_all_modalities(
+    activation_producer: Generator["SampleActivation", None, None],
+    activation_consumers: Dict[str, Callable],
+) -> Dict[str, Union[Sequence["SampleActivation"]]]:
+    processed_activations_all_modalities = {}
+
+    for sample_activation in activation_producer:
+        for consumer_name, consumer in activation_consumers.items():
+            parsed_act = _parse_out_non_target_modality_activations(
+                sample_activation=sample_activation, modality_key=consumer_name
+            )
+            consumer(parsed_act)
+
+    for consumer_name, consumer in activation_consumers.items():
+        processed_activations_all_modalities[consumer_name] = consumer(None)
+
+    return processed_activations_all_modalities
+
+
+def _parse_out_non_target_modality_activations(
+    sample_activation: SampleActivation, modality_key: str
+) -> SampleActivation:
+    parsed_act = {modality_key: sample_activation.sample_activations[modality_key]}
+    parsed_inp = {modality_key: sample_activation.raw_inputs[modality_key]}
+
+    batch = sample_activation.sample_info
+
+    parsed_batch_inputs = {modality_key: batch.inputs[modality_key]}
+
+    new_batch = Batch(
+        inputs=parsed_batch_inputs, target_labels=batch.target_labels, ids=batch.ids
+    )
+
+    parsed_activation = SampleActivation(
+        sample_info=new_batch, sample_activations=parsed_act, raw_inputs=parsed_inp
+    )
+
+    return parsed_activation
 
 
 def _convert_all_batch_tensors_to_cpu(batch: Batch) -> Batch:
@@ -411,7 +549,7 @@ def get_shap_sample_acts_deep_all_classes(
     inputs: al_model_inputs,
     sample_label: torch.Tensor,
     column_type: str,
-):
+) -> np.ndarray:
     with suppress_stdout():
         explained_input_order = explainer.explainer.model.input_names
         list_inputs = [inputs[n] for n in explained_input_order]

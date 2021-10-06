@@ -1,4 +1,5 @@
 import logging
+import os
 import random
 from functools import wraps
 from pathlib import Path
@@ -156,7 +157,13 @@ def load_transformers(
 
 def seed_everything(seed: int = 0) -> None:
 
-    logger.debug("Global random seed set to %d", seed)
+    os_seed = os.environ.get("EIR_SEED", None)
+    if os_seed:
+        seed = os_seed
+
+    extra_log = " grabbed from environment variable 'EIR_SEED '" if os_seed else " "
+    logger.debug("Global random seed%sset to %d", extra_log, seed)
+
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)

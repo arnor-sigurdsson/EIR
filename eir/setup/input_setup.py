@@ -10,12 +10,13 @@ from typing import (
     TYPE_CHECKING,
     Iterator,
     List,
+    Literal,
 )
 
 import numpy as np
 from aislib.misc_utils import get_logger
-from torchtext.vocab import build_vocab_from_iterator, Vocab
 from torchtext.data.utils import get_tokenizer as get_pytorch_tokenizer
+from torchtext.vocab import build_vocab_from_iterator, Vocab
 from tqdm import tqdm
 
 from eir.data_load.label_setup import (
@@ -35,6 +36,17 @@ logger = get_logger(__name__)
 al_input_objects_as_dict = Dict[
     str, Union["OmicsInputInfo", "TabularInputInfo", "SequenceInputInfo"]
 ]
+al_tokenizer_choices = (
+    Union[
+        Literal["basic_english"],
+        Literal["spacy"],
+        Literal["moses"],
+        Literal["toktok"],
+        Literal["revtok"],
+        Literal["subword"],
+        None,
+    ],
+)
 
 
 def set_up_inputs_for_training(
@@ -176,12 +188,19 @@ def get_vocab_wrapper(
 
 
 def get_tokenizer(
-    tokenizer_name: Union[str, None], tokenizer_language: Union[str, None]
+    tokenizer_name: al_tokenizer_choices,
+    tokenizer_language: Union[str, None],
 ) -> Callable[[Sequence[str]], Sequence[str]]:
 
     if not tokenizer_name:
         return lambda x: x
 
+    _validate_tokenizer_args(
+        tokenizer_name=tokenizer_name, tokenizer_language=tokenizer_language
+    )
+    logger.debug(
+        "Using tokenizer '%s' with language '%s'.", tokenizer_name, tokenizer_language
+    )
     tokenizer = get_pytorch_tokenizer(
         tokenizer=tokenizer_name, language=tokenizer_language
     )
@@ -191,6 +210,24 @@ def get_tokenizer(
         return tokenizer(input_joined)
 
     return _join_and_tokenize
+
+
+def _validate_tokenizer_args(
+    tokenizer_name: al_tokenizer_choices, tokenizer_language: Union[str, None]
+):
+    tokenizer_language_passed = tokenizer_language is not None
+    tokenizer_does_not_support_language = tokenizer_name not in (
+        "spacy",
+        "basic_english",
+    )
+
+    if tokenizer_language_passed and tokenizer_does_not_support_language:
+        raise ValueError(
+            "Tokenizer '%s' does not support setting a language (got '%s'). "
+            "Please leave it as None.",
+            tokenizer_name,
+            tokenizer_language,
+        )
 
 
 def get_tokenized_vocab_iterator(
@@ -211,7 +248,7 @@ def get_vocab_iterator(
     if vocab_file is None:
         logger.info(
             "Vocabulary will be collected from input source %s, "
-            "splitting tokens on %s.",
+            "splitting tokens on '%s'.",
             input_source,
             split_on,
         )

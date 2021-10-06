@@ -42,7 +42,7 @@ def generate_test_sample_activation(
     mocked_sample_act = SampleActivation(
         sample_info=mock_batch,
         sample_activations=mock_sample_activations,
-        raw_tabular_inputs=mock_raw_tabular_inputs,
+        raw_inputs=mock_raw_tabular_inputs,
     )
 
     return mocked_sample_act
