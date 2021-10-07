@@ -105,7 +105,7 @@ def test_classification(prep_modelling_test_configs):
         test_config=test_config,
         target_column=target_column,
         top_row_grads_dict=top_row_grads_dict,
-        at_least_n=8,
+        at_least_n=5,
     )
 
 
@@ -255,7 +255,7 @@ def test_regression(prep_modelling_test_configs):
         test_config=test_config,
         target_column=target_column,
         top_row_grads_dict=top_row_grads_dict,
-        at_least_n=8,
+        at_least_n=5,
     )
 
 
@@ -568,10 +568,10 @@ def _get_multi_task_test_args(
     if an_extra_col_is_correlated_with_target:
         thresholds, at_least_n = (0.9, 0.9), 0
     else:
-        thresholds, at_least_n = (0.8, 0.8), 7
+        thresholds, at_least_n = (0.8, 0.8), 5
 
     if mixing is not None:
-        thresholds, at_least_n = (0.0, 0.8), 7
+        thresholds, at_least_n = (0.0, 0.8), 5
 
     return thresholds, at_least_n
 

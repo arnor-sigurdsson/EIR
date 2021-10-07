@@ -67,7 +67,11 @@ from eir.setup.config import (
     Configs,
     get_all_targets,
 )
-from eir.setup.input_setup import DataDimensions, serialize_all_input_transformers
+from eir.setup.input_setup import (
+    DataDimensions,
+    serialize_all_input_transformers,
+    serialize_all_sequence_inputs,
+)
 from eir.setup.input_setup import al_input_objects_as_dict, set_up_inputs_for_training
 from eir.train_utils import utils
 from eir.train_utils.metrics import (
@@ -299,6 +303,7 @@ def get_default_experiment(
         hooks=hooks,
     )
     serialize_all_input_transformers(inputs_dict=inputs, run_folder=run_folder)
+    serialize_all_sequence_inputs(inputs_dict=inputs, run_folder=run_folder)
 
     train_dataset, valid_dataset = datasets.set_up_datasets_from_configs(
         configs=configs,
@@ -499,7 +504,10 @@ def check_dataset_and_batch_size_compatiblity(
         raise ValueError(
             f"{name} dataset size ({len(dataset)}) can not be smaller than "
             f"batch size ({batch_size}). A fix can be increasing {name.lower()} sample "
-            f"size or reducing the batch size."
+            f"size or reducing the batch size. If predicting on few unknown samples,"
+            f"a solution can be setting the batch size to 1 in the global configuration"
+            f"passed to the prediction module. Future work includes making this "
+            f"easier to work with."
         )
 
 

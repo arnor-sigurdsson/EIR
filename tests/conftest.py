@@ -31,7 +31,10 @@ from eir import train
 from eir.data_load import datasets
 from eir.setup import schemas, config
 from eir.setup.config import recursive_dict_replace
-from eir.setup.input_setup import serialize_all_input_transformers
+from eir.setup.input_setup import (
+    serialize_all_input_transformers,
+    serialize_all_sequence_inputs,
+)
 from eir.train import (
     Experiment,
     get_model,
@@ -656,9 +659,9 @@ def prep_modelling_test_configs(
         valid_ids=tuple(target_labels.valid_labels.keys()),
         hooks=None,
     )
-    serialize_all_input_transformers(
-        inputs_dict=inputs, run_folder=get_run_folder(gc.run_name)
-    )
+    run_folder = get_run_folder(run_name=gc.run_name)
+    serialize_all_input_transformers(inputs_dict=inputs, run_folder=run_folder)
+    serialize_all_sequence_inputs(inputs_dict=inputs, run_folder=run_folder)
 
     hooks = train.get_default_hooks(configs=c)
     experiment = Experiment(

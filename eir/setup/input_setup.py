@@ -13,8 +13,9 @@ from typing import (
     Literal,
 )
 
+import dill
 import numpy as np
-from aislib.misc_utils import get_logger
+from aislib.misc_utils import get_logger, ensure_path_exists
 from torchtext.data.utils import get_tokenizer as get_pytorch_tokenizer
 from torchtext.vocab import build_vocab_from_iterator, Vocab
 from tqdm import tqdm
@@ -480,3 +481,28 @@ def serialize_all_input_transformers(
             save_transformer_set(
                 transformers=input_.labels.label_transformers, run_folder=run_folder
             )
+
+
+def serialize_all_sequence_inputs(
+    inputs_dict: al_input_objects_as_dict, run_folder: Path
+):
+    for input_name, input_ in inputs_dict.items():
+        if input_name.startswith("sequence_"):
+            outpath = get_sequence_input_serialization_path(
+                run_folder=run_folder, sequence_input_name=input_name
+            )
+            ensure_path_exists(path=outpath, is_folder=False)
+            with open(outpath, "wb") as outfile:
+                dill.dump(obj=input_, file=outfile)
+
+
+def get_sequence_input_serialization_path(
+    run_folder: Path, sequence_input_name: str
+) -> Path:
+    path = (
+        run_folder
+        / "serializations"
+        / f"sequence_input_serializations/{sequence_input_name}.dill"
+    )
+
+    return path

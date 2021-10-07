@@ -451,14 +451,14 @@ def test_set_up_test_dataset(
             label_transformers=transformers,
         )
 
-    test_inputs = predict.set_up_inputs_for_testing(
-        inputs_configs=test_configs.input_configs,
+    test_inputs = predict.set_up_inputs(
+        test_inputs_configs=test_configs.input_configs,
         ids=test_ids,
         hooks=None,
         run_name=test_configs.global_config.run_name,
     )
 
-    test_dataset = predict._set_up_default_test_dataset(
+    test_dataset = predict._set_up_default_dataset(
         configs=test_configs,
         target_labels_dict=test_target_labels,
         inputs_as_dict=test_inputs,
@@ -485,11 +485,18 @@ def grab_best_model_path(saved_models_folder: Path):
 
 
 @pytest.mark.parametrize(
+    argnames="act_background_source", argvalues=["train", "predict"]
+)
+@pytest.mark.parametrize(
     "create_test_data",
     [
         {
             "task_type": "multi",
             "split_to_test": True,
+            "modalities": (
+                "omics",
+                "sequence",
+            ),
             "manual_test_data_creator": lambda: "test_predict",
         }
     ],
@@ -514,6 +521,9 @@ def grab_best_model_path(saved_models_folder: Path):
                         "input_type_info": {"model_type": "genome-local-net"},
                     },
                     {
+                        "input_info": {"input_name": "test_sequence"},
+                    },
+                    {
                         "input_info": {"input_name": "test_tabular"},
                         "input_type_info": {
                             "model_type": "tabular",
@@ -528,6 +538,7 @@ def grab_best_model_path(saved_models_folder: Path):
     indirect=True,
 )
 def test_predict(
+    act_background_source: str,
     prep_modelling_test_configs: Tuple[train.Experiment, ModelTestConfig],
     tmp_path: Path,
 ):
@@ -547,6 +558,7 @@ def test_predict(
         "model_path": grab_best_model_path(model_test_config.run_path / "saved_models"),
         "evaluate": True,
         "output_folder": tmp_path,
+        "act_background_source": act_background_source,
     }
     all_predict_kwargs = {
         **test_predict_cl_args_files_only.__dict__,
@@ -591,6 +603,6 @@ def test_predict(
     true_labels = df_test["True Label"]
 
     preds_accuracy = (preds == true_labels).sum() / len(true_labels)
-    assert preds_accuracy > 0.95
+    assert preds_accuracy > 0.7
 
     assert (tmp_path / "Origin/activations").exists()
