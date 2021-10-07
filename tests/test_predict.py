@@ -509,9 +509,9 @@ def grab_best_model_path(saved_models_folder: Path):
             "injections": {
                 "global_configs": {
                     "run_name": "test_run_predict",
-                    "n_epochs": 4,
-                    "checkpoint_interval": 50,
-                    "sample_interval": 50,
+                    "n_epochs": 12,
+                    "checkpoint_interval": 200,
+                    "sample_interval": 200,
                     "get_acts": False,
                     "batch_size": 64,
                 },

@@ -52,20 +52,23 @@ def plot_activations_bar(
 ) -> None:
 
     df_activations_sorted = df_activations.sort_values(by="Shap_Value", ascending=False)
-    df_activations_filtered = df_activations_sorted.head(top_n)
+    df_activations_filtered = df_activations_sorted.head(n=top_n)
+    df_activations_renamed = df_activations_filtered.rename(
+        mapper={"Shap_Value": "Importance"}, axis=1
+    )
 
     ax: plt.Axes = sns.barplot(
-        x=df_activations_filtered["Shap_Value"],
-        y=df_activations_filtered.index,
+        x=df_activations_renamed["Importance"],
+        y=df_activations_renamed.index,
         palette="Blues_d",
     )
     plt.tight_layout()
-    sns_figure = ax.get_figure()
+    sns_figure: plt.Figure = ax.get_figure()
 
     if title:
         ax.set_title(title)
 
     sns_figure.set_size_inches(10, 0.5 * top_n)
-    sns_figure.savefig(outpath, bbox_inches="tight")
+    sns_figure.savefig(fname=outpath, bbox_inches="tight")
 
     plt.close("all")

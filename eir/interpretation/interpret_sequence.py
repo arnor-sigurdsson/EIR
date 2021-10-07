@@ -132,7 +132,7 @@ def get_sequence_sample_activations_to_analyse_generator(
     elif strategy == "random_sample":
         base = random.sample(all_activations, n_samples)
     else:
-        raise ValueError()
+        raise ValueError(f"Unrecognized option for sequence sampling: {strategy}.")
 
     manual_samples = interpretation_config.manual_samples_to_interpret
     if manual_samples:

@@ -1732,7 +1732,7 @@ slicer = "0.0.7"
 tqdm = ">4.25.0"
 
 [package.extras]
-all = ["sphinx", "opencv-python", "ipython", "pytest", "numpydoc", "lime", "nbsphinx", "sentencepiece", "pyod", "sphinx-rtd-theme", "torch", "transformers", "pyspark", "pytest-cov", "pytest-mpl", "xgboost", "matplotlib", "lightgbm", "catboost"]
+all = ["sphinx-rtd-theme", "sentencepiece", "catboost", "torch", "numpydoc", "sphinx", "ipython", "pyspark", "pytest-mpl", "lime", "lightgbm", "transformers", "pyod", "nbsphinx", "pytest", "matplotlib", "pytest-cov", "xgboost", "opencv-python"]
 docs = ["matplotlib", "ipython", "numpydoc", "sphinx-rtd-theme", "sphinx", "nbsphinx"]
 others = ["lime"]
 plots = ["matplotlib", "ipython"]

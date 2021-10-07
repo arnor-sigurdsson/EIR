@@ -331,8 +331,8 @@ def generate_binary_prediction_distribution(
         bbox=props,
     )
     ax.set_ylabel("Frequency")
-    ax.set_xlabel(f"PGS of class {classes[1]}")
-    ax.set_title(title_extra + " PGS")
+    ax.set_xlabel(f"Score of class {classes[1]}")
+    ax.set_title(title_extra + " Score Distribution")
 
     plt.tight_layout()
     plt.savefig(outfolder / "positive_prediction_distribution.png", dpi=200)
@@ -491,7 +491,7 @@ def generate_confusion_matrix(
     outfolder: Path,
     normalize: Literal["true", "pred", "all", None] = None,
     title_extra: str = "",
-    cmap: plt = plt.cm.Blues,
+    cmap: matplotlib.colors.Colormap = sns.color_palette("rocket", as_cmap=True),
 ):
     if not title_extra:
         if normalize:
