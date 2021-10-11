@@ -73,9 +73,9 @@ def test_get_weighted_random_sampler(
         dataloader=train_dataloader, target_col="Origin"
     )
     are_close = _check_if_all_numbers_close(
-        list_of_numbers=list(label_counts.values()), abs_tol=100
+        list_of_numbers=list(label_counts.values()), abs_tol=200
     )
-    assert are_close
+    assert are_close, label_counts.values()
 
     # Assert failure when we don't use weighted random sampler
     train_dataloader, valid_dataloader = get_dataloaders(
@@ -92,7 +92,7 @@ def test_get_weighted_random_sampler(
     are_close_imb = _check_if_all_numbers_close(
         list_of_numbers=list(label_counts_imbalanced.values()), abs_tol=100
     )
-    assert not are_close_imb
+    assert not are_close_imb, label_counts_imbalanced.values()
 
 
 def _check_if_all_numbers_close(list_of_numbers, abs_tol):

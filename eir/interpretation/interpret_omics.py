@@ -428,7 +428,7 @@ def save_masked_grads(
         top_gradients_dict=top_grads_msk_inputs,
         snp_df=snp_df,
         output_folder=sample_outfolder,
-        fname="top_snps_masked.png",
+        fname="top_snps_masked.pdf",
     )
 
     np.save(str(sample_outfolder / "top_acts_masked.npy"), top_grads_msk_inputs)
