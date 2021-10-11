@@ -155,7 +155,9 @@ def test_get_train_predict_matched_config_generator(create_test_config, tmp_path
     test_configs = create_test_config
 
     test_predict_cl_args = _setup_test_namespace_for_matched_config_test(
-        test_configs=test_configs, predict_cl_args_save_path=tmp_path
+        test_configs=test_configs,
+        predict_cl_args_save_path=tmp_path,
+        do_inject_test_values=True,
     )
 
     named_test_iterators = predict.get_named_pred_dict_iterators(
@@ -184,6 +186,7 @@ def _setup_test_namespace_for_matched_config_test(
     test_configs: config.Configs,
     predict_cl_args_save_path: Path,
     do_inject_test_values: bool = True,
+    monkeypatch_train_to_test_paths: bool = False,
 ) -> Namespace:
     keys = ("global_configs", "input_configs", "predictor_configs", "target_configs")
     name_to_attr_map = {
@@ -213,6 +216,12 @@ def _setup_test_namespace_for_matched_config_test(
                 ".yaml"
             )
             ensure_path_exists(path=cur_outpath)
+
+            if monkeypatch_train_to_test_paths:
+                obj_primitive_to_dump = _recursive_dict_str_value_replace(
+                    dict_=obj_primitive_to_dump, old="train", new="test"
+                )
+
             with open(cur_outpath, "w") as out_yaml:
                 yaml.dump(data=obj_primitive_to_dump, stream=out_yaml)
 
@@ -221,6 +230,17 @@ def _setup_test_namespace_for_matched_config_test(
     test_predict_cl_args = Namespace(**paths)
 
     return test_predict_cl_args
+
+
+def _recursive_dict_str_value_replace(dict_: dict, old: str, new: str):
+    for key, value in dict_.items():
+        if isinstance(value, dict):
+            _recursive_dict_str_value_replace(dict_=value, old=old, new=new)
+        elif isinstance(value, str):
+            if old in value:
+                dict_[key] = value.replace(old, new)
+
+    return dict_
 
 
 def _overload_test_yaml_object_for_predict(
@@ -274,7 +294,9 @@ def test_overload_train_configs_for_predict(
     test_configs = create_test_config
 
     test_predict_cl_args = _setup_test_namespace_for_matched_config_test(
-        test_configs=test_configs, predict_cl_args_save_path=tmp_path
+        test_configs=test_configs,
+        predict_cl_args_save_path=tmp_path,
+        do_inject_test_values=True,
     )
 
     named_test_iterators = predict.get_named_pred_dict_iterators(
@@ -429,14 +451,14 @@ def test_set_up_test_dataset(
             label_transformers=transformers,
         )
 
-    test_inputs = predict.set_up_inputs_for_testing(
-        inputs_configs=test_configs.input_configs,
+    test_inputs = predict.set_up_inputs(
+        test_inputs_configs=test_configs.input_configs,
         ids=test_ids,
         hooks=None,
         run_name=test_configs.global_config.run_name,
     )
 
-    test_dataset = predict._set_up_default_test_dataset(
+    test_dataset = predict._set_up_default_dataset(
         configs=test_configs,
         target_labels_dict=test_target_labels,
         inputs_as_dict=test_inputs,
@@ -463,7 +485,22 @@ def grab_best_model_path(saved_models_folder: Path):
 
 
 @pytest.mark.parametrize(
-    "create_test_data", [{"task_type": "multi", "split_to_test": True}], indirect=True
+    argnames="act_background_source", argvalues=["train", "predict"]
+)
+@pytest.mark.parametrize(
+    "create_test_data",
+    [
+        {
+            "task_type": "multi",
+            "split_to_test": True,
+            "modalities": (
+                "omics",
+                "sequence",
+            ),
+            "manual_test_data_creator": lambda: "test_predict",
+        }
+    ],
+    indirect=True,
 )
 @pytest.mark.parametrize(
     "create_test_config_init_base",
@@ -472,9 +509,9 @@ def grab_best_model_path(saved_models_folder: Path):
             "injections": {
                 "global_configs": {
                     "run_name": "test_run_predict",
-                    "n_epochs": 4,
-                    "checkpoint_interval": 50,
-                    "sample_interval": 50,
+                    "n_epochs": 12,
+                    "checkpoint_interval": 200,
+                    "sample_interval": 200,
                     "get_acts": False,
                     "batch_size": 64,
                 },
@@ -482,6 +519,9 @@ def grab_best_model_path(saved_models_folder: Path):
                     {
                         "input_info": {"input_name": "test_genotype"},
                         "input_type_info": {"model_type": "genome-local-net"},
+                    },
+                    {
+                        "input_info": {"input_name": "test_sequence"},
                     },
                     {
                         "input_info": {"input_name": "test_tabular"},
@@ -498,6 +538,7 @@ def grab_best_model_path(saved_models_folder: Path):
     indirect=True,
 )
 def test_predict(
+    act_background_source: str,
     prep_modelling_test_configs: Tuple[train.Experiment, ModelTestConfig],
     tmp_path: Path,
 ):
@@ -510,12 +551,14 @@ def test_predict(
         test_configs=train_configs_for_testing,
         predict_cl_args_save_path=tmp_path,
         do_inject_test_values=False,
+        monkeypatch_train_to_test_paths=True,
     )
 
     extra_test_predict_kwargs = {
         "model_path": grab_best_model_path(model_test_config.run_path / "saved_models"),
         "evaluate": True,
         "output_folder": tmp_path,
+        "act_background_source": act_background_source,
     }
     all_predict_kwargs = {
         **test_predict_cl_args_files_only.__dict__,
@@ -560,6 +603,6 @@ def test_predict(
     true_labels = df_test["True Label"]
 
     preds_accuracy = (preds == true_labels).sum() / len(true_labels)
-    assert preds_accuracy > 0.95
+    assert preds_accuracy > 0.7
 
     assert (tmp_path / "Origin/activations").exists()

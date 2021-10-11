@@ -1,5 +1,4 @@
 import warnings
-from collections import defaultdict
 from pathlib import Path
 from textwrap import wrap
 from typing import Dict, Sequence, TYPE_CHECKING, List
@@ -7,19 +6,21 @@ from typing import Dict, Sequence, TYPE_CHECKING, List
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import seaborn as sns
 import shap
 import torch
 from aislib.misc_utils import get_logger, ensure_path_exists
 from matplotlib import MatplotlibDeprecationWarning
 
-from eir.interpretation.interpret_omics import _get_target_class_name
+from eir.interpretation.interpretation_utils import (
+    stratify_activations_by_target_classes,
+    plot_activations_bar,
+)
 from eir.train_utils.utils import load_transformers
 
 if TYPE_CHECKING:
     from eir.train import Experiment
-    from eir.data_load.label_setup import al_label_transformers_object
     from eir.interpretation.interpretation import SampleActivation
+
 
 logger = get_logger(__name__)
 
@@ -51,8 +52,9 @@ def analyze_tabular_input_activations(
         input_name=input_name,
     )
     df_activations = get_tabular_activation_df(parsed_activations=parsed_activations)
-    plot_tabular_activations(
-        df_activations=df_activations, activation_outfolder=activation_outfolder
+    plot_activations_bar(
+        df_activations=df_activations,
+        outpath=activation_outfolder / "feature_importance.pdf",
     )
 
     all_activations_class_stratified = stratify_activations_by_target_classes(
@@ -153,26 +155,6 @@ def set_up_tabular_tensor_slices(
     return slices
 
 
-def stratify_activations_by_target_classes(
-    all_activations: Sequence["SampleActivation"],
-    target_transformer: "al_label_transformers_object",
-    target_column: str,
-    column_type: str,
-) -> Dict[str, Sequence["SampleActivation"]]:
-    all_activations_class_stratified = defaultdict(list)
-
-    for sample in all_activations:
-        cur_label_name = _get_target_class_name(
-            sample_label=sample.sample_info.target_labels[target_column],
-            target_transformer=target_transformer,
-            column_type=column_type,
-            target_column_name=target_column,
-        )
-        all_activations_class_stratified[cur_label_name].append(sample)
-
-    return all_activations_class_stratified
-
-
 def get_cat_to_con_cutoff_from_slices(
     slices: Dict[str, slice], cat_input_columns: Sequence[str]
 ) -> int:
@@ -198,7 +180,7 @@ def parse_tabular_activations_for_feature_importance(
     column_activations = {column: [] for column in activation_tensor_slices.keys()}
 
     for sample_activation in all_activations:
-        sample_acts = sample_activation.sample_activations[input_name]
+        sample_acts = sample_activation.sample_activations[input_name].squeeze(0)
 
         for column in activation_tensor_slices.keys():
             cur_slice = activation_tensor_slices[column]
@@ -223,25 +205,6 @@ def get_tabular_activation_df(
     df_activations = df_activations.sort_values(by="Shap_Value", ascending=False)
 
     return df_activations
-
-
-def plot_tabular_activations(
-    df_activations: pd.DataFrame, activation_outfolder: Path
-) -> None:
-
-    sns_plot = sns.barplot(
-        x=df_activations["Shap_Value"],
-        y=df_activations.index,
-        palette="Blues_d",
-    )
-    plt.tight_layout()
-    sns_figure = sns_plot.get_figure()
-    sns_figure.set_size_inches(10, 0.5 * len(df_activations))
-    sns_figure.savefig(
-        str(activation_outfolder / "feature_importance.png"), bbox_inches="tight"
-    )
-
-    plt.close("all")
 
 
 def _gather_continuous_inputs(
@@ -276,6 +239,7 @@ def _gather_continuous_shap_values(
     for sample in all_activations:
         cur_full_input = sample.sample_activations[input_name]
         assert len(cur_full_input.shape) == 2
+        assert cur_full_input.shape[0] == 1
 
         cur_con_input_part = cur_full_input[:, cat_to_con_cutoff:]
         con_acts.append(cur_con_input_part)
@@ -299,8 +263,11 @@ def _gather_categorical_shap_values(
     for sample in all_activations:
         cur_full_input = sample.sample_activations[input_name]
         assert len(cur_full_input.shape) == 2
+        assert cur_full_input.shape[0] == 1
 
-        cur_cat_input_part = cur_full_input[cur_slice]
+        cur_input_squeezed = cur_full_input.squeeze(0)
+
+        cur_cat_input_part = cur_input_squeezed[cur_slice]
         cur_cat_summed_act = np.sum(np.array(cur_cat_input_part))
         cat_acts.append(cur_cat_summed_act)
 
@@ -321,7 +288,7 @@ def _gather_categorical_inputs(
 
     for sample in all_activations:
 
-        cur_raw_cat_input = sample.raw_tabular_inputs[input_name][cat_name]
+        cur_raw_cat_input = sample.raw_inputs[input_name][cat_name]
         cur_cat_input_part = cur_raw_cat_input
         cat_inputs.append(cur_cat_input_part)
 

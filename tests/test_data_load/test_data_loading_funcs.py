@@ -1,5 +1,6 @@
 from collections import Counter
 from math import isclose
+from statistics import mean
 from typing import List
 
 import numpy as np
@@ -241,7 +242,8 @@ def test_aggregate_column_sampling_weights_auto(test_labels):
     expected_weights = origin_weights * len(target_columns)
 
     origin_counts = test_all_label_weights_and_counts["Origin"]["label_counts"]
-    expected_samples_per_epoch = min(origin_counts) * len(target_columns)
+    hair_counts = test_all_label_weights_and_counts["HairColor"]["label_counts"]
+    expected_samples_per_epoch = int(mean([mean(origin_counts), mean(hair_counts)]))
 
     assert (test_weights == expected_weights).all()
     assert test_samples_per_epoch == expected_samples_per_epoch

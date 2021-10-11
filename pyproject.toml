@@ -20,7 +20,6 @@ pytorch-ignite = "^0.4.2"
 tqdm = "^4.55.0"
 sympy = "^1.6.2"
 scikit-learn = "^0.24.0"
-shap = "^0.39.0"
 seaborn = "^0.11.1"
 joblib = "^0.17.0"
 tensorboard = "^2.3.0"
@@ -33,6 +32,8 @@ hypothesis = "^6.14.0"
 aislib = "0.1.5a0"
 colorama = "^0.4.4"
 ipython = "^7.26.0"
+torchtext = "^0.10.0"
+shap = {git = "https://github.com/slundberg/shap.git", rev = "9d7de4d"}
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.1.1"

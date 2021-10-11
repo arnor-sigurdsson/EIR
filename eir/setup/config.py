@@ -38,10 +38,15 @@ from eir.models.fusion import FusionModelConfig
 from eir.models.fusion_linear import LinearFusionModelConfig
 from eir.models.fusion_mgmoe import MGMoEModelConfig
 from eir.models.omics.omics_models import get_omics_config_dataclass_mapping
+from eir.models.sequence.transformer_basic import BasicTransformerModelConfig
 from eir.setup import schemas
 from eir.setup.presets import gln
 
-al_input_types = Union[schemas.OmicsInputDataConfig, schemas.TabularInputDataConfig]
+al_input_types = Union[
+    schemas.OmicsInputDataConfig,
+    schemas.TabularInputDataConfig,
+    schemas.SequenceInputDataConfig,
+]
 
 logger = get_logger(name=__name__)
 
@@ -116,7 +121,7 @@ def get_main_parser() -> configargparse.ArgumentParser:
     return parser_
 
 
-def add_preset_to_cl_args(cl_args: Namespace):
+def add_preset_to_cl_args(cl_args: Namespace) -> Namespace:
 
     if not cl_args.preset:
         return cl_args
@@ -305,7 +310,7 @@ def init_input_config(yaml_config_as_dict: Dict[str, Any]) -> schemas.InputConfi
     input_info_object = schemas.InputDataConfig(**cfg["input_info"])
 
     input_schema_map = get_inputs_schema_map()
-    input_type_info_class = input_schema_map.get(input_info_object.input_type)
+    input_type_info_class = input_schema_map[input_info_object.input_type]
     input_type_info_object = input_type_info_class(**cfg["input_type_info"])
 
     model_config = set_up_model_config(
@@ -314,21 +319,33 @@ def init_input_config(yaml_config_as_dict: Dict[str, Any]) -> schemas.InputConfi
         model_init_kwargs_base=cfg.get("model_config", {}),
     )
 
+    interpretation_config = set_up_interpretation_config(
+        input_type=input_info_object.input_type,
+        interpretation_config_dict=cfg.get("interpretation_config", None),
+    )
+
     input_config = schemas.InputConfig(
         input_info=input_info_object,
         input_type_info=input_type_info_object,
         model_config=model_config,
+        interpretation_config=interpretation_config,
     )
 
     return input_config
 
 
 def get_inputs_schema_map() -> Dict[
-    str, Union[Type[schemas.OmicsInputDataConfig], Type[schemas.TabularInputDataConfig]]
+    str,
+    Union[
+        Type[schemas.OmicsInputDataConfig],
+        Type[schemas.TabularInputDataConfig],
+        Type[schemas.SequenceInputDataConfig],
+    ],
 ]:
     mapping = {
         "omics": schemas.OmicsInputDataConfig,
         "tabular": schemas.TabularInputDataConfig,
+        "sequence": schemas.SequenceInputDataConfig,
     }
 
     return mapping
@@ -355,7 +372,8 @@ def set_up_model_config(
         )
 
     model_config_map = get_model_config_map()
-    model_config_class = model_config_map.get(input_type_info_object.model_type)
+    model_config_class = model_config_map[input_type_info_object.model_type]
+
     model_config = model_config_class(**init_kwargs)
 
     return model_config
@@ -381,18 +399,15 @@ def get_model_config_setup_hook(input_type):
 
 def get_model_config_setup_hook_map():
     mapping = {
-        "omics": set_up_omics_config_object_init_kwargs,
-        "tabular": set_up_tabular_config_object_init_kwargs,
+        "omics": set_up_config_object_init_kwargs_identity,
+        "tabular": set_up_config_object_init_kwargs_identity,
+        "sequence": set_up_config_object_init_kwargs_identity,
     }
 
     return mapping
 
 
-def set_up_omics_config_object_init_kwargs(init_kwargs: dict, *args, **kwargs) -> dict:
-    return init_kwargs
-
-
-def set_up_tabular_config_object_init_kwargs(
+def set_up_config_object_init_kwargs_identity(
     init_kwargs: dict, *args, **kwargs
 ) -> dict:
     return init_kwargs
@@ -400,7 +415,43 @@ def set_up_tabular_config_object_init_kwargs(
 
 def get_model_config_map() -> Dict[str, Type]:
     mapping = get_omics_config_dataclass_mapping()
-    mapping = {**mapping, **{"tabular": eir.models.tabular.tabular.TabularModelConfig}}
+    mapping = {
+        **mapping,
+        **{
+            "tabular": eir.models.tabular.tabular.TabularModelConfig,
+            "sequence-default": BasicTransformerModelConfig,
+        },
+    }
+
+    return mapping
+
+
+def set_up_interpretation_config(
+    input_type: str, interpretation_config_dict: Union[None, Dict[str, Any]]
+) -> Union[None, schemas.SequenceInterpretationConfig]:
+
+    config_class = get_interpretation_config_class(input_type=input_type)
+    if config_class is None:
+        return None
+
+    if interpretation_config_dict is None:
+        interpretation_config_dict = {}
+
+    config_object = config_class(**interpretation_config_dict)
+
+    return config_object
+
+
+def get_interpretation_config_class(input_type: str):
+    mapping = get_interpretation_config_schema_map()
+
+    return mapping.get(input_type, None)
+
+
+def get_interpretation_config_schema_map():
+    mapping = {
+        "sequence": schemas.SequenceInterpretationConfig,
+    }
 
     return mapping
 

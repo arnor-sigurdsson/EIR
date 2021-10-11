@@ -16,8 +16,16 @@ Model Configurations
 The documentation below details what the parameters passed to the respective models
 (trough the `model_config` field in the `\-\-input_configs` `.yaml` files).
 
-Fusion Modules
-^^^^^^^^^^^^^^
+Fusion and Predictor Modules
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Note that the settings here currently only
+refer to the predictor branches.
+Future work includes
+adding more configurations
+to the fusion operations themselves,
+and having therefore separate configurations
+for those and the predictor branches.
 
 .. autoclass:: eir.models.fusion_linear.LinearFusionModelConfig
 
@@ -42,3 +50,8 @@ Tabular Feature Extractors
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. autoclass:: eir.models.tabular.tabular.TabularModelConfig
+
+Sequence Feature Extractors
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. autoclass:: eir.models.sequence.transformer_basic.BasicTransformerModelConfig

@@ -2,8 +2,8 @@ from dataclasses import dataclass, field
 from typing import Union, Literal, List, Optional, Sequence, Type
 
 from eir.models.fusion import FusionModelConfig
-from eir.models.fusion_mgmoe import MGMoEModelConfig
 from eir.models.fusion_linear import LinearFusionModelConfig
+from eir.models.fusion_mgmoe import MGMoEModelConfig
 from eir.models.omics.omics_models import (
     LinearModel,
     CNNModel,
@@ -43,6 +43,20 @@ al_models_classes = Union[
     Type[IdentityModel],
 ]
 
+al_tokenizer_choices = (
+    Union[
+        Literal["basic_english"],
+        Literal["spacy"],
+        Literal["moses"],
+        Literal["toktok"],
+        Literal["revtok"],
+        Literal["subword"],
+        None,
+    ],
+)
+
+al_max_sequence_length = Union[int, Literal["max", "average"]]
+
 
 @dataclass
 class GlobalConfig:
@@ -71,7 +85,7 @@ class GlobalConfig:
     :param gpu_num:
         Which GPU to run (according to CUDA order).
 
-    :param weighted_sampling_column:
+    :param weighted_sampling_columns:
         Target column to apply weighted sampling on. Only applies to categorical
         columns. Passing in 'all' here will use an average of all the target columns.
 
@@ -179,7 +193,7 @@ class GlobalConfig:
     dataloader_workers: int = 0
     device: str = "cpu"
     gpu_num: str = "0"
-    weighted_sampling_column: Union[None, str] = None
+    weighted_sampling_columns: Union[None, Sequence[str]] = None
     lr: float = 1e-03
     lr_lb: float = 0.0
     find_lr: bool = False
@@ -237,11 +251,17 @@ class InputConfig:
     :param model_config:
         Configuration for the chosen model (i.e. feature extractor) for this input.
 
+    :param interpretation_config:
+        Configuration for interpretation analysis when applicable.
+
     """
 
     input_info: "InputDataConfig"
-    input_type_info: Union["OmicsInputDataConfig", "TabularInputDataConfig"]
+    input_type_info: Union[
+        "OmicsInputDataConfig", "TabularInputDataConfig", "SequenceInputDataConfig"
+    ]
     model_config: al_model_configs
+    interpretation_config: Union[None, "SequenceInterpretationConfig"] = None
 
 
 @dataclass
@@ -259,7 +279,7 @@ class InputDataConfig:
 
     input_source: str
     input_name: str
-    input_type: Literal["omics", "tabular"]
+    input_type: Literal["omics", "tabular", "sequence"]
 
 
 @dataclass
@@ -314,6 +334,88 @@ class TabularInputDataConfig:
     extra_cat_columns: Sequence[str] = field(default_factory=list)
     extra_con_columns: Sequence[str] = field(default_factory=list)
     label_parsing_chunk_size: Union[None, int] = None
+
+
+@dataclass
+class SequenceInputDataConfig:
+    """
+    :param model_type:
+        Type of sequence model to use. Currently only one type ("sequence-default") is
+        supported, which is a vanilla transformer model.
+
+    :param vocab_file:
+        An optional text file containing pre-defined vocabulary to use
+        for the training. If this is not passed in, the framework will automatically
+        build the vocabulary from the training data. Passing in a vocabulary file is
+        therefore useful if (a) you want to manually specify / limit the vocabulary used
+        and/or (b) you want to save time by pre-computing the vocabulary.
+
+    :param max_length:
+        Maximum length to truncate/pad sequences to. This can be an integer or the
+        values 'max' or 'average'. The 'max' keyword will use the maximum sequence
+        length found in the training data, while the 'average' will use the average
+        length across all training samples.
+
+    :param sampling_strategy_if_longer:
+        Controls how sequences are truncated if they are longer than the specified
+        ``max_length`` parameter. Using 'from_start' will always truncate from the
+        beginning of the sequence, ensuring the the samples will always be the same
+        during training. Setting this parameter to ``uniform`` will uniformly sample
+        a slice of a given sample sequence during training. Note that for consistency,
+        the validation/test set samples always use the ``from_start`` setting when
+        truncating.
+
+    :param min_freq:
+        Minimum number of times a token must appear in the total training data to be
+        included in the vocabulary. Note that this setting will not do anything if
+        passing in ``vocab_file``.
+
+
+    :param split_on:
+        Which token to split the sequence on to generate separate tokens for the
+        vocabulary.
+
+    :param tokenizer:
+        Which tokenizer to use. Relevant if modelling on language, but not as much when
+        doing it on other arbitrary sequences.
+
+    :param tokenizer_language:
+        Which language rules the tokenizer should apply when tokenizing the raw data.
+    """
+
+    model_type: Literal["sequence-default"] = "sequence-default"
+    vocab_file: Union[None, str] = None
+    max_length: al_max_sequence_length = "average"
+    sampling_strategy_if_longer: Literal["from_start", "uniform"] = "uniform"
+    min_freq: int = 10
+    split_on: str = " "
+    tokenizer: al_tokenizer_choices = None
+    tokenizer_language: Union[str, None] = None
+
+
+@dataclass
+class SequenceInterpretationConfig:
+    """
+    :param interpretation_sampling_strategy:
+        How to sample sequences for activation analysis. `first_n` always grabs the
+        same first n values from the beginning of the dataset to interpret, while
+        `random_sample` will sample uniformly from the whole dataset without
+        replacement.
+
+    :param num_samples_to_interpret:
+        How many samples to interpret.
+
+    :param manual_samples_to_interpret:
+        IDs of samples to always interpret, irrespective of
+        `interpretation_sampling_strategy` and `num_samples_to_interpret`. A caveat
+        here is that they must be present in the dataset that is being interpreted
+        (e.g. validation / test dataset), meaning that adding IDs here that happen to
+        be in the training dataset will not work.
+    """
+
+    interpretation_sampling_strategy: Literal["first_n", "random_sample"] = "first_n"
+    num_samples_to_interpret: int = 10
+    manual_samples_to_interpret: Union[Sequence[str], None] = None
 
 
 @dataclass

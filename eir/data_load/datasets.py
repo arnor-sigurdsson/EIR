@@ -1,6 +1,7 @@
 from collections import defaultdict
 from copy import copy
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 from typing import (
     List,
@@ -9,15 +10,19 @@ from typing import (
     Tuple,
     Callable,
     Sequence,
+    Iterable,
     Generator,
+    Mapping,
     DefaultDict,
     Any,
+    Literal,
     TYPE_CHECKING,
 )
 
 import numpy as np
 import torch
 from aislib.misc_utils import get_logger
+from torch.nn.functional import pad
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
@@ -30,21 +35,17 @@ from eir.data_load.label_setup import (
 )
 from eir.data_load.label_setup import merge_target_columns
 from eir.setup import config
+from eir.setup.input_setup import _get_split_func
 
 if TYPE_CHECKING:
-    from eir.setup.input_setup import al_input_objects_as_dict
+    from eir.setup.input_setup import al_input_objects_as_dict, SequenceInputInfo
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 # Type Aliases
 al_datasets = Union["MemoryDataset", "DiskDataset"]
 # embeddings --> remain str, cat targets --> int, con extra/target --> float
-al_sample_labels_transformed_all = Dict[str, Union[int, str, float]]
 al_sample_label_dict_target = Dict[str, Union[int, float]]
-al_sample_label_dict_extra = Dict[str, Union[str, float]]
-al_all_labels = Dict[
-    str, Union[al_sample_label_dict_target, al_sample_label_dict_extra]
-]
 al_inputs = Union[Dict[str, torch.Tensor], Dict[str, Any]]
 al_getitem_return = Tuple[Dict[str, torch.Tensor], al_sample_label_dict_target, str]
 
@@ -147,21 +148,36 @@ class DatasetBase(Dataset):
         if not self.target_columns:
             raise ValueError("Please specify label column name.")
 
-    def set_up_samples(self, omics_hook: Callable = lambda x: x) -> List[Sample]:
+    def set_up_samples(
+        self, file_loading_hooks: Mapping[str, Callable] = None
+    ) -> List[Sample]:
         """
         We do an extra filtering step at the end to account for the situation where
         we have a target label file with more samples than there are any inputs
         available for. This is quite likely if we have e.g. pre-split data into
         train/val and test folders.
+
+        Note that there is a slight weirdness in how we handle the file loading hooks
+        for omics and sequence data. Omics is currently treated as being quite simple,
+        where we always just load a file straight from the disk. However, with sequence
+        data, we might do different things depending on the source, e.g. split on
+        different tokens. That's why we use the `source_name` there to grab file loading
+        hooks, instead of just a general 'sequence' key.
         """
 
         mode_str = "evaluation/test" if self.test_mode else "train"
         logger.debug("Setting up dataset in %s mode.", mode_str)
 
-        def _default_factory() -> Sample:
+        def _identity(sample_data: Any) -> Any:
+            return sample_data
+
+        if file_loading_hooks is None:
+            file_loading_hooks = defaultdict(lambda: _identity)
+
+        def _default_sample_factory() -> Sample:
             return Sample(sample_id="", inputs={}, target_labels={})
 
-        samples = defaultdict(_default_factory)
+        samples = defaultdict(_default_sample_factory)
 
         ids_to_keep = None
         if self.target_labels_dict:
@@ -180,7 +196,7 @@ class DatasetBase(Dataset):
                     source_data=input_source,
                     samples=samples,
                     ids_to_keep=ids_to_keep,
-                    file_loading_hook=omics_hook,
+                    file_loading_hook=file_loading_hooks[input_type],
                     source_name=source_name,
                 )
 
@@ -189,6 +205,15 @@ class DatasetBase(Dataset):
                     tabular_dict=source_data.labels.all_labels,
                     samples=samples,
                     ids_to_keep=ids_to_keep,
+                    source_name=source_name,
+                )
+
+            elif input_type == "sequence":
+                samples = _add_file_data_to_samples(
+                    source_data=input_source,
+                    samples=samples,
+                    ids_to_keep=ids_to_keep,
+                    file_loading_hook=file_loading_hooks[source_name],
                     source_name=source_name,
                 )
 
@@ -277,9 +302,9 @@ def _add_file_data_to_samples(
     file_data_iterator = get_file_sample_id_iterator_basic(
         data_source=source_data, ids_to_keep=ids_to_keep
     )
-    omics_file_iterator_tqdm = tqdm(file_data_iterator, desc=source_name)
+    file_iterator_tqdm = tqdm(file_data_iterator, desc=source_name)
 
-    for sample_id, file in omics_file_iterator_tqdm:
+    for sample_id, file in file_iterator_tqdm:
 
         sample_data = file_loading_hook(file)
 
@@ -388,7 +413,7 @@ def get_file_sample_id_iterator(
 
 
 def _get_sample_id_data_iterator(
-    base_iterator, id_callable: Callable
+    base_iterator: Iterable[str], id_callable: Callable
 ) -> Generator[Tuple[Any, str], None, None]:
     for item in base_iterator:
         sample_id = id_callable(item)
@@ -408,20 +433,26 @@ class MemoryDataset(DatasetBase):
         if self.target_labels_dict:
             self.init_label_attributes()
 
-        self.samples = self.set_up_samples(omics_hook=self._mem_sample_loader)
+        file_loading_hooks = self._get_file_loading_hooks()
+        self.samples = self.set_up_samples(file_loading_hooks=file_loading_hooks)
         self.check_samples()
 
-    @staticmethod
-    def _mem_sample_loader(sample_fpath: Union[str, Path]) -> torch.ByteTensor:
-        """
-        A small hook to actually load the arrays into `self.samples` instead of just
-        pointing to filenames.
-        """
-        array = np.load(sample_fpath)
+    def _get_file_loading_hooks(
+        self,
+    ) -> Mapping[str, Callable[..., torch.Tensor]]:
+        mapping = {
+            "omics": _load_one_hot_array,
+        }
 
-        array = array.astype(np.uint8)
-        tensor = torch.from_numpy(array).unsqueeze(0)
-        return tensor
+        for source_name, source_data in self.inputs.items():
+            input_type = source_data.input_config.input_info.input_type
+            if input_type == "sequence":
+                mapping[source_name] = partial(
+                    load_sequence_from_disk,
+                    split_on=source_data.input_config.input_type_info.split_on,
+                )
+
+        return mapping
 
     def __getitem__(self, index: int) -> al_getitem_return:
         sample = self.samples[index]
@@ -450,7 +481,7 @@ def _get_default_impute_fill_values(inputs_objects: "al_input_objects_as_dict"):
         if input_name.startswith("omics_"):
             fill_values[input_name] = False
         else:
-            fill_values[input_name] = -1
+            fill_values[input_name] = 0
 
     return fill_values
 
@@ -460,6 +491,8 @@ def _get_default_impute_dtypes(inputs_objects: "al_input_objects_as_dict"):
     for input_name, input_object in inputs_objects.items():
         if input_name.startswith("omics_"):
             dtypes[input_name] = torch.bool
+        elif input_name.startswith("sequence"):
+            dtypes[input_name] = torch.long
         else:
             dtypes[input_name] = torch.float
 
@@ -526,22 +559,93 @@ def prepare_inputs_disk(
         if name.startswith("omics_"):
 
             array_raw = _load_one_hot_array(path=data)
-
-            na_augment_perc = input_type_info.na_augment_perc
-            na_augment_prob = input_type_info.na_augment_prob
-
             array_prepared = prepare_one_hot_omics_data(
                 genotype_array=array_raw,
-                na_augment_perc=na_augment_perc,
-                na_augment_prob=na_augment_prob,
+                na_augment_perc=input_type_info.na_augment_perc,
+                na_augment_prob=input_type_info.na_augment_prob,
                 test_mode=test_mode,
             )
             prepared_inputs[name] = array_prepared
+
+        elif name.startswith("sequence_"):
+
+            sequence_raw = load_sequence_from_disk(
+                sequence_file_path=data,
+                split_on=input_type_info.split_on,
+            )
+            prepared_sequence_inputs = prepare_sequence_data(
+                sequence_input_object=inputs_objects[name],
+                cur_file_content=sequence_raw,
+                test_mode=test_mode,
+            )
+            prepared_inputs[name] = prepared_sequence_inputs
 
         else:
             prepared_inputs[name] = inputs[name]
 
     return prepared_inputs
+
+
+def prepare_sequence_data(
+    sequence_input_object: "SequenceInputInfo", cur_file_content: Any, test_mode: bool
+) -> torch.Tensor:
+
+    sio = sequence_input_object
+
+    cur_vocab = sio.vocab
+    cur_tokens_tokenized = sequence_input_object.tokenizer(cur_file_content)
+    cur_tokens = torch.LongTensor(cur_vocab(cur_tokens_tokenized))
+
+    sampling_strat = sio.input_config.input_type_info.sampling_strategy_if_longer
+    if test_mode:
+        sampling_strat = "from_start"
+
+    cur_tokens_padded = process_tensor_to_length(
+        tensor=cur_tokens,
+        max_length=sio.computed_max_length,
+        sampling_strategy_if_longer=sampling_strat,
+    )
+
+    return cur_tokens_padded
+
+
+def process_tensor_to_length(
+    tensor: torch.Tensor,
+    max_length: int,
+    sampling_strategy_if_longer: Literal["from_start", "uniform"],
+) -> torch.Tensor:
+    tensor_length = len(tensor)
+
+    if tensor_length > max_length:
+
+        if sampling_strategy_if_longer == "from_start":
+            truncated_tensor = tensor[:max_length]
+            return truncated_tensor
+
+        if sampling_strategy_if_longer == "uniform":
+            uniformly_sampled_tensor = _sample_sequence_uniform(
+                tensor=tensor, tensor_length=tensor_length, max_length=max_length
+            )
+            return uniformly_sampled_tensor
+
+    right_padding = max_length - tensor_length
+    padded_tensor = pad(input=tensor, pad=[0, right_padding])
+
+    return padded_tensor
+
+
+def _sample_sequence_uniform(
+    tensor: torch.Tensor, tensor_length: int, max_length: int
+) -> torch.Tensor:
+    random_index_start = torch.randperm(max(1, tensor_length - max_length))[0]
+    random_index_end = random_index_start + max_length
+    return tensor[random_index_start:random_index_end]
+
+
+def load_sequence_from_disk(sequence_file_path: Path, split_on: str) -> List[str]:
+    split_func = _get_split_func(split_on=split_on)
+    with open(sequence_file_path, "r") as infile:
+        return split_func(infile.read().strip())
 
 
 def prepare_inputs_memory(
@@ -554,18 +658,23 @@ def prepare_inputs_memory(
         input_type_info = inputs_objects[name].input_config.input_type_info
 
         if name.startswith("omics_"):
-            array_raw = data
-
-            na_augment_perc = input_type_info.na_augment_perc
-            na_augment_prob = input_type_info.na_augment_prob
-
+            array_raw_in_memory = data
             array_prepared = prepare_one_hot_omics_data(
-                genotype_array=array_raw,
-                na_augment_perc=na_augment_perc,
-                na_augment_prob=na_augment_prob,
+                genotype_array=array_raw_in_memory,
+                na_augment_perc=input_type_info.na_augment_perc,
+                na_augment_prob=input_type_info.na_augment_prob,
                 test_mode=test_mode,
             )
             prepared_inputs[name] = array_prepared
+
+        elif name.startswith("sequence_"):
+            sequence_raw_in_memory = data
+            prepared_sequence_inputs = prepare_sequence_data(
+                sequence_input_object=inputs_objects[name],
+                cur_file_content=sequence_raw_in_memory,
+                test_mode=test_mode,
+            )
+            prepared_inputs[name] = prepared_sequence_inputs
 
         else:
             prepared_inputs[name] = inputs[name]
@@ -594,6 +703,9 @@ def impute_missing_modalities(
     fill_values: Dict[str, Any],
     dtypes: Dict[str, Any],
 ) -> Dict[str, torch.Tensor]:
+    """
+    TODO: Implement support for imputing missing tabular modality.
+    """
 
     for input_name, input_object in inputs_objects.items():
         if input_name not in inputs_values:
@@ -608,6 +720,19 @@ def impute_missing_modalities(
                     shape=shape, fill_value=fill_value, dtype=dtype
                 )
                 inputs_values[input_name] = imputed_tensor
+
+            elif input_name.startswith("sequence_"):
+                max_length = input_object.computed_max_length
+                shape = (max_length,)
+                imputed_tensor = impute_single_missing_modality(
+                    shape=shape, fill_value=fill_value, dtype=dtype
+                )
+                inputs_values[input_name] = imputed_tensor
+
+            elif input_name.startswith("tabular_"):
+                raise NotImplementedError(
+                    "Imputing missing tabular values not yet supported."
+                )
 
     return inputs_values
 

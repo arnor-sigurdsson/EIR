@@ -60,7 +60,9 @@ from eir.setup.config import (
 from eir.setup.input_setup import (
     al_input_objects_as_dict,
     OmicsInputInfo,
+    SequenceInputInfo,
     get_input_name_config_iterator,
+    get_sequence_input_serialization_path,
 )
 from eir.train import (
     get_train_experiment_serialization_path,
@@ -72,6 +74,7 @@ from eir.train import (
     al_num_outputs_per_target,
     get_default_experiment_keys_to_serialize,
     gather_all_ids_from_target_configs,
+    check_dataset_and_batch_size_compatiblity,
 )
 from eir.train_utils.evaluation import PerformancePlotConfig
 from eir.train_utils.metrics import (
@@ -79,7 +82,7 @@ from eir.train_utils.metrics import (
     calculate_batch_metrics,
     al_step_metric_dict,
 )
-from eir.train_utils.utils import load_transformers, seed_everything
+from eir.train_utils.utils import load_transformers, seed_everything, get_run_folder
 
 al_named_dict_configs = Dict[
     Literal["global_configs", "predictor_configs", "input_configs", "target_configs"],
@@ -96,6 +99,7 @@ class PredictSpecificCLArgs:
     model_path: str
     evaluate: bool
     output_folder: str
+    act_background_source: Union[Literal["train"], Literal["predict"]]
 
 
 def main():
@@ -111,7 +115,19 @@ def main():
     main_parser.add_argument("--evaluate", dest="evaluate", action="store_true")
 
     main_parser.add_argument(
-        "--output_folder", type=str, help="Where to save prediction results."
+        "--output_folder",
+        type=str,
+        help="Where to save prediction results.",
+        required=True,
+    )
+
+    main_parser.add_argument(
+        "--act_background_source",
+        type=str,
+        help="For activation analysis, whether to load backgrounds from the data used "
+        "for training or to use the current data passed to the predict module.",
+        choices=["train", "predict"],
+        default="train",
     )
 
     predict_cl_args = main_parser.parse_args()
@@ -340,20 +356,25 @@ def get_default_predict_config(
         )
         target_labels = None
 
-    test_inputs = set_up_inputs_for_testing(
-        inputs_configs=configs_overloaded_for_predict.input_configs,
+    test_inputs = set_up_inputs(
+        test_inputs_configs=configs_overloaded_for_predict.input_configs,
         ids=test_ids,
         hooks=default_train_hooks.custom_column_label_parsing_ops,
         run_name=loaded_train_experiment.configs.global_config.run_name,
     )
 
     label_dict = target_labels.label_dict if target_labels else {}
-    test_dataset = _set_up_default_test_dataset(
+    test_dataset = _set_up_default_dataset(
         configs=configs_overloaded_for_predict,
         target_labels_dict=label_dict,
         inputs_as_dict=test_inputs,
     )
 
+    check_dataset_and_batch_size_compatiblity(
+        dataset=test_dataset,
+        batch_size=configs_overloaded_for_predict.global_config.batch_size,
+        name="Test",
+    )
     test_dataloader = DataLoader(
         dataset=test_dataset,
         batch_size=configs_overloaded_for_predict.global_config.batch_size,
@@ -525,15 +546,48 @@ def get_labels_for_predict(
     return labels
 
 
-def set_up_inputs_for_testing(
-    inputs_configs: schemas.al_input_configs,
+def set_up_sequence_input_for_testing(
+    input_config: schemas.InputConfig,
+    run_name: str,
+    *args,
+    **kwargs,
+) -> SequenceInputInfo:
+    input_name = input_config.input_info.input_name
+    input_name_with_prefix = f"sequence_{input_name}"
+
+    run_folder = get_run_folder(run_name=run_name)
+
+    serialized_sequence_input_config_path = get_sequence_input_serialization_path(
+        run_folder=run_folder, sequence_input_name=input_name_with_prefix
+    )
+    assert serialized_sequence_input_config_path.exists()
+    with open(serialized_sequence_input_config_path, "rb") as infile:
+        serialized_train_sequence_input_object: SequenceInputInfo = dill.load(
+            file=infile
+        )
+
+    assert isinstance(serialized_train_sequence_input_object, SequenceInputInfo)
+
+    train_sequence_input_info_kwargs = serialized_train_sequence_input_object.__dict__
+    assert "input_config" in train_sequence_input_info_kwargs.keys()
+
+    test_sequence_input_info_kwargs = copy(train_sequence_input_info_kwargs)
+    test_sequence_input_info_kwargs["input_config"] = input_config
+
+    test_sequence_input_object = SequenceInputInfo(**test_sequence_input_info_kwargs)
+
+    return test_sequence_input_object
+
+
+def set_up_inputs(
+    test_inputs_configs: schemas.al_input_configs,
     ids: Sequence[str],
     hooks: Union["Hooks", None],
     run_name: str,
 ) -> Dict[str, Union[PredictTabularInputInfo, OmicsInputInfo]]:
     all_inputs = {}
 
-    name_config_iter = get_input_name_config_iterator(input_configs=inputs_configs)
+    name_config_iter = get_input_name_config_iterator(input_configs=test_inputs_configs)
     for name, input_config in name_config_iter:
         cur_input_data_config = input_config.input_info
         setup_func = get_input_setup_function_for_predict(
@@ -566,6 +620,7 @@ def get_input_setup_function_map_for_predict() -> Dict[str, Callable]:
     setup_mapping = {
         "omics": input_setup.set_up_omics_input,
         "tabular": setup_tabular_input_for_testing,
+        "sequence": set_up_sequence_input_for_testing,
     }
 
     return setup_mapping
@@ -922,7 +977,7 @@ def _prep_missing_con_dict(con_transformers: al_label_transformers) -> Dict[str,
     return train_means
 
 
-def _set_up_default_test_dataset(
+def _set_up_default_dataset(
     configs: Configs,
     target_labels_dict: Union[None, al_label_dict],
     inputs_as_dict: al_input_objects_as_dict,
@@ -952,17 +1007,22 @@ def _compute_predict_activations(
 
     gc = predict_config.train_configs_overloaded.global_config
 
+    background_source = predict_config.predict_specific_cl_args.act_background_source
+    background_source_config = get_background_source_config(
+        background_source_in_predict_cl_args=background_source,
+        train_configs=loaded_train_experiment.configs,
+        predict_configs=predict_config.train_configs_overloaded,
+    )
+    background_dataloader = _get_predict_background_loader(
+        batch_size=gc.batch_size,
+        configs=background_source_config,
+        dataloader_workers=gc.dataloader_workers,
+        label_parsing_ops=loaded_train_experiment.hooks.custom_column_label_parsing_ops,
+    )
+
     overloaded_train_experiment = _overload_train_experiment_for_predict_activations(
         train_config=loaded_train_experiment,
         predict_config=predict_config,
-    )
-
-    background_dataloader = _get_predict_background_loader(
-        batch_size=gc.batch_size,
-        dataloader_workers=gc.dataloader_workers,
-        configs_overloaded_for_predict=predict_config.train_configs_overloaded,
-        inputs_as_dict=predict_config.inputs,
-        label_parsing_ops=loaded_train_experiment.hooks.custom_column_label_parsing_ops,
     )
 
     activation_outfolder_callable = partial(
@@ -977,6 +1037,33 @@ def _compute_predict_activations(
         dataset_to_interpret=predict_config.test_dataset,
         background_loader=background_dataloader,
     )
+
+
+def get_background_source_config(
+    background_source_in_predict_cl_args: Literal["train", "predict"],
+    train_configs: Configs,
+    predict_configs: Configs,
+) -> Configs:
+    """
+    TODO:   In the case of predict, make sure background and samples analysed are
+            separated.
+    """
+    if background_source_in_predict_cl_args == "predict":
+        logger.info(
+            "Background for activation analysis will be loaded from sources "
+            "passed to predict.py."
+        )
+        return predict_configs
+
+    elif background_source_in_predict_cl_args == "train":
+        logger.info(
+            "Background for activation analysis will be loaded from sources "
+            "previously used for training run with name '%s'.",
+            train_configs.global_config.run_name,
+        )
+        return train_configs
+
+    raise ValueError()
 
 
 def _overload_train_experiment_for_predict_activations(
@@ -1004,31 +1091,47 @@ def _overload_train_experiment_for_predict_activations(
 def _get_predict_background_loader(
     batch_size: int,
     dataloader_workers: int,
-    configs_overloaded_for_predict: Configs,
-    inputs_as_dict: al_input_objects_as_dict,
+    configs: Configs,
     label_parsing_ops: Union["Hooks", None],
 ):
+    """
+    TODO: Add option to choose whether to reuse train data as background,
+          to use the data passed to the predict.py module, or possibly just
+          an option to serialize the explainer from a training run and reuse
+          that if passed as an option here.
+    """
 
-    train_ids = label_setup.gather_all_ids_from_all_inputs(
-        input_configs=configs_overloaded_for_predict.input_configs
+    background_ids_pool = label_setup.gather_all_ids_from_all_inputs(
+        input_configs=configs.input_configs
     )
-    train_ids_sampled = sample(
-        population=train_ids,
-        k=configs_overloaded_for_predict.global_config.act_background_samples,
+    background_ids_sampled = sample(
+        population=background_ids_pool,
+        k=configs.global_config.act_background_samples,
     )
 
     target_labels = get_target_labels_for_testing(
-        configs_overloaded_for_predict=configs_overloaded_for_predict,
+        configs_overloaded_for_predict=configs,
         custom_column_label_parsing_ops=label_parsing_ops,
-        ids=train_ids_sampled,
+        ids=background_ids_sampled,
     )
 
-    background_dataset = _set_up_default_test_dataset(
-        configs=configs_overloaded_for_predict,
+    background_inputs_as_dict = set_up_inputs(
+        test_inputs_configs=configs.input_configs,
+        ids=background_ids_sampled,
+        hooks=label_parsing_ops,
+        run_name=configs.global_config.run_name,
+    )
+    background_dataset = _set_up_default_dataset(
+        configs=configs,
         target_labels_dict=target_labels.label_dict,
-        inputs_as_dict=inputs_as_dict,
+        inputs_as_dict=background_inputs_as_dict,
     )
 
+    check_dataset_and_batch_size_compatiblity(
+        dataset=background_dataset,
+        batch_size=batch_size,
+        name="Test activation background",
+    )
     background_loader = DataLoader(
         dataset=background_dataset,
         batch_size=batch_size,

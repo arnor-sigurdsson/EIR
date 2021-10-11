@@ -22,7 +22,7 @@ of the framework
 (see :ref:`01-basic-tutorial`).
 
 To download the data for for this tutorial,
-`use this link <https://drive.google.com/file/d/1Lw2Qlf0qGosie4VpFPIgfN6CSGZGnJix/view>`_
+`use this link. <https://drive.google.com/file/d/1Lw2Qlf0qGosie4VpFPIgfN6CSGZGnJix/view>`_
 
 Having a quick look at the data,
 we can see it consists of 10 categorical inputs columns

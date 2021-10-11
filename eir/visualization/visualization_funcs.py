@@ -1,6 +1,6 @@
 from pathlib import Path
 from textwrap import wrap
-from typing import List, Callable, Union, Tuple, TYPE_CHECKING, Dict
+from typing import List, Callable, Union, Tuple, TYPE_CHECKING, Dict, Literal
 
 import matplotlib
 import numpy as np
@@ -19,6 +19,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from matplotlib.ticker import MaxNLocator
+import seaborn as sns
 
 from aislib.misc_utils import get_logger
 
@@ -330,8 +331,8 @@ def generate_binary_prediction_distribution(
         bbox=props,
     )
     ax.set_ylabel("Frequency")
-    ax.set_xlabel(f"PGS of class {classes[1]}")
-    ax.set_title(title_extra + " PGS")
+    ax.set_xlabel(f"Score of class {classes[1]}")
+    ax.set_title(title_extra + " Score Distribution")
 
     plt.tight_layout()
     plt.savefig(outfolder / "positive_prediction_distribution.png", dpi=200)
@@ -488,9 +489,9 @@ def generate_confusion_matrix(
     y_outp: np.ndarray,
     classes: List[str],
     outfolder: Path,
-    normalize: bool = False,
+    normalize: Literal["true", "pred", "all", None] = None,
     title_extra: str = "",
-    cmap: plt = plt.cm.Blues,
+    cmap: matplotlib.colors.Colormap = sns.color_palette("rocket", as_cmap=True),
 ):
     if not title_extra:
         if normalize:
@@ -498,57 +499,45 @@ def generate_confusion_matrix(
         else:
             title_extra = "Confusion matrix, without normalization"
 
-    conf_mat = confusion_matrix(y_true, y_outp)
+    conf_mat = confusion_matrix(y_true=y_true, y_pred=y_outp, normalize=normalize)
 
-    # Only use the labels that appear in the data
     classes = classes[unique_labels(y_true, y_outp)]
     classes_wrapped = ["\n".join(wrap(c, 20)) for c in classes]
-    if normalize:
-        conf_mat = conf_mat.astype("float") / conf_mat.sum(axis=1)[:, np.newaxis]
 
-    fig, ax = plt.subplots()
-    im = ax.imshow(conf_mat, interpolation="nearest", cmap=cmap)
-    ax.figure.colorbar(im, ax=ax)
+    df_cm = pd.DataFrame(conf_mat, index=classes_wrapped, columns=classes_wrapped)
 
-    # We want to show all ticks...
-    ax.set(
-        xticks=np.arange(conf_mat.shape[1]),
-        yticks=np.arange(conf_mat.shape[0]),
-        # ... and label them with the respective list entries
-        xticklabels=classes_wrapped,
-        yticklabels=classes_wrapped,
-        title=title_extra,
-        ylabel="True label",
-        xlabel="Predicted label",
-    )
+    width = len(classes) * 1.25
+    height = len(classes) * 1.00
+    fig, ax = plt.subplots(figsize=(width, height))
 
-    # Rotate the tick labels and set their alignment.
+    tick_label_font_size = min(len(classes) * 2, 14)
+    annot_font_size = int(tick_label_font_size * 1.5)
+    annot_kwargs = {"fontsize": annot_font_size}
+    fmt = "d" if not normalize else ".2g"
+    sns.heatmap(data=df_cm, annot=True, fmt=fmt, annot_kws=annot_kwargs, cmap=cmap)
+
+    label_fontsize = annot_font_size
+    ax.set_title(title_extra, fontsize=label_fontsize)
+    ax.set_ylabel("True Label", fontsize=label_fontsize)
+    ax.set_xlabel("Predicted Label", fontsize=label_fontsize)
+
+    color_bar = ax.collections[0].colorbar
+    color_bar.ax.tick_params(labelsize=label_fontsize)
+
     plt.setp(
         ax.get_xticklabels(),
         rotation=45,
         ha="right",
         rotation_mode="anchor",
-        fontsize=8,
+        fontsize=tick_label_font_size,
     )
 
-    plt.setp(ax.get_yticklabels(), fontsize=8)
+    plt.setp(ax.get_yticklabels(), fontsize=tick_label_font_size)
 
-    # Loop over data dimensions and create text annotations.
-    fmt = ".2f" if normalize else "d"
-    thresh = conf_mat.max() / 2.0
-    for i in range(conf_mat.shape[0]):
-        for j in range(conf_mat.shape[1]):
-            ax.text(
-                j,
-                i,
-                format(conf_mat[i, j], fmt),
-                ha="center",
-                va="center",
-                color="white" if conf_mat[i, j] > thresh else "black",
-            )
+    fig = plt.gcf()
 
     fig.tight_layout()
-    plt.savefig(outfolder / "confusion_matrix.png", dpi=200)
+    plt.savefig(outfolder / "confusion_matrix.pdf")
     plt.close("all")
 
 

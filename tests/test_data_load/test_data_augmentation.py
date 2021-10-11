@@ -11,7 +11,9 @@ from torch import nn
 from torch.nn import functional as F
 
 from eir.data_load import data_augmentation
-from tests.conftest import _set_up_base_test_array
+from tests.test_modelling.setup_modelling_test_data.setup_omics_test_data import (
+    _set_up_base_test_array,
+)
 
 
 def test_get_mix_data_hook():

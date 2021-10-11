@@ -34,7 +34,7 @@ class SimpleTabularModel(nn.Module):
         self,
         cat_columns: Sequence[str],
         con_columns: Sequence[str],
-        unique_label_values: Dict[str, Set[str]],
+        unique_label_values_per_column: Dict[str, Set[str]],
         device: str,
     ):
         """
@@ -54,11 +54,11 @@ class SimpleTabularModel(nn.Module):
 
         self.cat_columns = cat_columns
         self.con_columns = con_columns
-        self.unique_label_values = unique_label_values
+        self.unique_label_values = unique_label_values_per_column
         self.device = device
 
         self.embeddings_dict = set_up_embedding_dict(
-            unique_label_values=unique_label_values
+            unique_label_values=unique_label_values_per_column
         )
 
         emb_total_dim = con_total_dim = 0

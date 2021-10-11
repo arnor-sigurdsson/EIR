@@ -52,6 +52,10 @@ from eir.models.omics.omics_models import (
     get_omics_model_init_kwargs,
     al_omics_model_configs,
 )
+from eir.models.sequence.transformer_basic import (
+    BasicTransformerModelConfig,
+    TransformerModel,
+)
 from eir.models.tabular.tabular import (
     get_tabular_inputs,
     SimpleTabularModel,
@@ -63,7 +67,11 @@ from eir.setup.config import (
     Configs,
     get_all_targets,
 )
-from eir.setup.input_setup import DataDimensions, serialize_all_input_transformers
+from eir.setup.input_setup import (
+    DataDimensions,
+    serialize_all_input_transformers,
+    serialize_all_sequence_inputs,
+)
 from eir.setup.input_setup import al_input_objects_as_dict, set_up_inputs_for_training
 from eir.train_utils import utils
 from eir.train_utils.metrics import (
@@ -295,6 +303,7 @@ def get_default_experiment(
         hooks=hooks,
     )
     serialize_all_input_transformers(inputs_dict=inputs, run_folder=run_folder)
+    serialize_all_sequence_inputs(inputs_dict=inputs, run_folder=run_folder)
 
     train_dataset, valid_dataset = datasets.set_up_datasets_from_configs(
         configs=configs,
@@ -308,7 +317,7 @@ def get_default_experiment(
     )
 
     train_sampler = get_train_sampler(
-        columns_to_sample=configs.global_config.weighted_sampling_column,
+        columns_to_sample=configs.global_config.weighted_sampling_columns,
         train_dataset=train_dataset,
     )
 
@@ -459,6 +468,13 @@ def get_dataloaders(
     num_workers: int = 0,
 ) -> Tuple:
 
+    check_dataset_and_batch_size_compatiblity(
+        dataset=train_dataset, batch_size=batch_size, name="Training"
+    )
+
+    check_dataset_and_batch_size_compatiblity(
+        dataset=valid_dataset, batch_size=batch_size, name="Validation"
+    )
     train_dloader = DataLoader(
         dataset=train_dataset,
         batch_size=batch_size,
@@ -479,6 +495,20 @@ def get_dataloaders(
     )
 
     return train_dloader, valid_dloader
+
+
+def check_dataset_and_batch_size_compatiblity(
+    dataset: datasets.DatasetBase, batch_size: int, name: str = ""
+):
+    if len(dataset) < batch_size:
+        raise ValueError(
+            f"{name} dataset size ({len(dataset)}) can not be smaller than "
+            f"batch size ({batch_size}). A fix can be increasing {name.lower()} sample "
+            f"size or reducing the batch size. If predicting on few unknown samples,"
+            f"a solution can be setting the batch size to 1 in the global configuration"
+            f"passed to the prediction module. Future work includes making this "
+            f"easier to work with."
+        )
 
 
 class GetAttrDelegatedDataParallel(nn.DataParallel):
@@ -546,7 +576,33 @@ def get_modules_to_fuse_from_inputs(inputs: al_input_objects_as_dict, device: st
             )
             models[input_name] = tabular_model
 
+        elif input_name.startswith("sequence_"):
+            sequence_model = get_sequence_model(
+                model_type=inputs_object.input_config.input_type_info.model_type,
+                model_config=inputs_object.input_config.model_config,
+                num_tokens=len(inputs_object.vocab),
+                max_length=inputs_object.computed_max_length,
+                device=device,
+            )
+            models[input_name] = sequence_model
+
     return models
+
+
+def get_sequence_model(
+    model_type: str,
+    model_config: BasicTransformerModelConfig,
+    num_tokens: int,
+    max_length: int,
+    device: str,
+):
+    sequence_model = TransformerModel(
+        model_config=model_config,
+        num_tokens=num_tokens,
+        max_length=max_length,
+    ).to(device=device)
+
+    return sequence_model
 
 
 def get_tabular_model(
@@ -558,7 +614,7 @@ def get_tabular_model(
     tabular_model = SimpleTabularModel(
         cat_columns=cat_columns,
         con_columns=con_columns,
-        unique_label_values=unique_label_values,
+        unique_label_values_per_column=unique_label_values,
         device=device,
     )
 
@@ -917,6 +973,14 @@ def prepare_base_batch_default(
                 device=device,
             )
             inputs_prepared[input_name] = tabular
+
+        elif input_name.startswith("sequence_"):
+            cur_seq = inputs[input_name]
+            cur_seq = cur_seq.to(device=device)
+            cur_module = model.modules_to_fuse[input_name]
+            cur_embedding = cur_module.embed_tokens(input=cur_seq)
+            inputs_prepared[input_name] = cur_embedding
+
         else:
             raise ValueError(f"Unrecognized input type {input_name}.")
 

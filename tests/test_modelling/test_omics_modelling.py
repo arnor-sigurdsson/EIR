@@ -1,13 +1,15 @@
 from pathlib import Path
-from typing import Union, Tuple, Dict, List, Sequence
+from typing import Union, Tuple, Dict, List, Sequence, TYPE_CHECKING
 
 import numpy as np
-import pandas as pd
 import pytest
 
 from eir import train
 from eir.setup.config import get_all_targets, Configs
-from tests.conftest import ModelTestConfig
+from tests.test_modelling.test_modelling_utils import check_test_performance_results
+
+if TYPE_CHECKING:
+    from tests.conftest import ModelTestConfig
 
 
 @pytest.mark.parametrize(
@@ -87,11 +89,11 @@ def test_classification(prep_modelling_test_configs):
     """
     experiment, test_config = prep_modelling_test_configs
 
-    train.train(experiment)
+    train.train(experiment=experiment)
 
     target_column = experiment.configs.target_configs[0].target_cat_columns[0]
 
-    _check_test_performance_results(
+    check_test_performance_results(
         run_path=test_config.run_path,
         target_column=target_column,
         metric="mcc",
@@ -103,12 +105,12 @@ def test_classification(prep_modelling_test_configs):
         test_config=test_config,
         target_column=target_column,
         top_row_grads_dict=top_row_grads_dict,
-        at_least_n=8,
+        at_least_n=5,
     )
 
 
 def _check_snps_wrapper(
-    test_config: ModelTestConfig,
+    test_config: "ModelTestConfig",
     target_column: str,
     top_row_grads_dict: Dict[str, List[int]],
     at_least_n: Union[str, int] = "all",
@@ -116,17 +118,34 @@ def _check_snps_wrapper(
 ):
     expected_top_indxs = list(range(50, 1000, 100))
 
-    for paths in [test_config.activations_path, test_config.masked_activations_path]:
-        check_types = True if paths == test_config.masked_activations_path else False
-        cur_path = paths[target_column]
+    cur_target_act_paths = test_config.activations_paths[target_column]
+    omics_acts_generator = _get_snp_activations_generator(
+        cur_target_act_paths=cur_target_act_paths
+    )
+
+    for acts_array_path, is_masked in omics_acts_generator:
+
+        check_types = True if is_masked else False
         _check_identified_snps(
-            arrpath=cur_path,
+            arrpath=acts_array_path,
             expected_top_indxs=expected_top_indxs,
             top_row_grads_dict=top_row_grads_dict,
             check_types=check_types,
             at_least_n=at_least_n,
             check_types_skip_cls_names=check_types_skip_cls_names,
         )
+
+
+def _get_snp_activations_generator(cur_target_act_paths: Dict[str, Path]):
+    for name, cur_path in cur_target_act_paths.items():
+        if name.startswith("omics_"):
+            top_acts_npy = cur_path / "top_acts.npy"
+            assert top_acts_npy.exists()
+            yield top_acts_npy, False
+
+            top_acts_masked_npy = cur_path / "top_acts_masked.npy"
+            assert top_acts_masked_npy.exists()
+            yield top_acts_masked_npy, True
 
 
 @pytest.mark.parametrize(
@@ -223,7 +242,7 @@ def test_regression(prep_modelling_test_configs):
     # linear regression performs slightly worse, but we don't want to lower expectations
     # other models
     thresholds = (0.70, 0.70) if model_type == "linear" else (0.8, 0.8)
-    _check_test_performance_results(
+    check_test_performance_results(
         run_path=test_config.run_path,
         target_column=target_column,
         metric="r2",
@@ -236,28 +255,8 @@ def test_regression(prep_modelling_test_configs):
         test_config=test_config,
         target_column=target_column,
         top_row_grads_dict=top_row_grads_dict,
-        at_least_n=8,
+        at_least_n=5,
     )
-
-
-def _check_test_performance_results(
-    run_path: Path, target_column: str, metric: str, thresholds: Tuple[float, float]
-):
-    target_column_results_folder = run_path / "results" / target_column
-    train_history_path = (
-        target_column_results_folder / f"train_{target_column}_history.log"
-    )
-    valid_history_path = (
-        target_column_results_folder / f"validation_{target_column}_history.log"
-    )
-
-    threshold_train, threshold_valid = thresholds
-
-    df_train = pd.read_csv(train_history_path)
-    assert df_train.loc[:, f"{target_column}_{metric}"].max() > threshold_train
-
-    df_valid = pd.read_csv(valid_history_path)
-    assert df_valid.loc[:, f"{target_column}_{metric}"].max() > threshold_valid
 
 
 @pytest.mark.parametrize(
@@ -488,12 +487,12 @@ def _check_test_performance_results(
     indirect=True,
 )
 def test_multi_task(
-    prep_modelling_test_configs: Tuple[train.Experiment, ModelTestConfig],
+    prep_modelling_test_configs: Tuple[train.Experiment, "ModelTestConfig"],
 ):
     experiment, test_config = prep_modelling_test_configs
     gc = experiment.configs.global_config
 
-    train.train(experiment)
+    train.train(experiment=experiment)
 
     targets = get_all_targets(targets_configs=experiment.configs.target_configs)
     extra_columns = get_all_tabular_input_columns(configs=experiment.configs)
@@ -504,7 +503,7 @@ def test_multi_task(
             mixing=gc.mixing_type,
         )
 
-        _check_test_performance_results(
+        check_test_performance_results(
             run_path=test_config.run_path,
             target_column=cat_column,
             metric="mcc",
@@ -526,7 +525,7 @@ def test_multi_task(
             mixing=gc.mixing_type,
         )
 
-        _check_test_performance_results(
+        check_test_performance_results(
             run_path=test_config.run_path,
             target_column=con_column,
             metric="r2",
@@ -569,10 +568,10 @@ def _get_multi_task_test_args(
     if an_extra_col_is_correlated_with_target:
         thresholds, at_least_n = (0.9, 0.9), 0
     else:
-        thresholds, at_least_n = (0.8, 0.8), 7
+        thresholds, at_least_n = (0.8, 0.8), 5
 
     if mixing is not None:
-        thresholds, at_least_n = (0.0, 0.8), 7
+        thresholds, at_least_n = (0.0, 0.8), 5
 
     return thresholds, at_least_n
 

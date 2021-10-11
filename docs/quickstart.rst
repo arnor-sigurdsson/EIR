@@ -51,10 +51,6 @@ we can run the following command:
     the command above indeed obscures a lot of the configuration and functionality
     happening behind the scenes. See the :ref:`01-basic-tutorial`
     for a more thorough example.
-    Additionally, the full set of configurations used for the ``gln`` preset
-    are available in the ``config/`` directory in the
-    `project repository <https://github.com/arnor-sigurdsson/EIR>`_.
-
 
 This will generate a folder called ``runs/gln``
 in the current directory containing the results of the training.
