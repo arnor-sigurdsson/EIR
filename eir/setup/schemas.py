@@ -43,6 +43,18 @@ al_models_classes = Union[
     Type[IdentityModel],
 ]
 
+al_tokenizer_choices = (
+    Union[
+        Literal["basic_english"],
+        Literal["spacy"],
+        Literal["moses"],
+        Literal["toktok"],
+        Literal["revtok"],
+        Literal["subword"],
+        None,
+    ],
+)
+
 al_max_sequence_length = Union[int, Literal["max", "average"]]
 
 
@@ -328,17 +340,56 @@ class TabularInputDataConfig:
 class SequenceInputDataConfig:
     """
     :param model_type:
-        Type of sequence model to use. Currently only one type ("default") is supported.
+        Type of sequence model to use. Currently only one type ("sequence-default") is
+        supported, which is a vanilla transformer model.
 
+    :param vocab_file:
+        An optional text file containing pre-defined vocabulary to use
+        for the training. If this is not passed in, the framework will automatically
+        build the vocabulary from the training data. Passing in a vocabulary file is
+        therefore useful if (a) you want to manually specify / limit the vocabulary used
+        and/or (b) you want to save time by pre-computing the vocabulary.
+
+    :param max_length:
+        Maximum length to truncate/pad sequences to. This can be an integer or the
+        values 'max' or 'average'. The 'max' keyword will use the maximum sequence
+        length found in the training data, while the 'average' will use the average
+        length across all training samples.
+
+    :param sampling_strategy_if_longer:
+        Controls how sequences are truncated if they are longer than the specified
+        ``max_length`` parameter. Using 'from_start' will always truncate from the
+        beginning of the sequence, ensuring the the samples will always be the same
+        during training. Setting this parameter to ``uniform`` will uniformly sample
+        a slice of a given sample sequence during training. Note that for consistency,
+        the validation/test set samples always use the ``from_start`` setting when
+        truncating.
+
+    :param min_freq:
+        Minimum number of times a token must appear in the total training data to be
+        included in the vocabulary. Note that this setting will not do anything if
+        passing in ``vocab_file``.
+
+
+    :param split_on:
+        Which token to split the sequence on to generate separate tokens for the
+        vocabulary.
+
+    :param tokenizer:
+        Which tokenizer to use. Relevant if modelling on language, but not as much when
+        doing it on other arbitrary sequences.
+
+    :param tokenizer_language:
+        Which language rules the tokenizer should apply when tokenizing the raw data.
     """
 
-    model_type: Literal["default"] = "sequence-default"
+    model_type: Literal["sequence-default"] = "sequence-default"
     vocab_file: Union[None, str] = None
     max_length: al_max_sequence_length = "average"
     sampling_strategy_if_longer: Literal["from_start", "uniform"] = "uniform"
     min_freq: int = 10
     split_on: str = " "
-    tokenizer: Literal[None] = None
+    tokenizer: al_tokenizer_choices = None
     tokenizer_language: Union[str, None] = None
 
 

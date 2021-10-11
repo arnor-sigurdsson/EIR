@@ -10,7 +10,6 @@ from typing import (
     TYPE_CHECKING,
     Iterator,
     List,
-    Literal,
 )
 
 import dill
@@ -28,6 +27,7 @@ from eir.data_load.label_setup import (
     save_transformer_set,
 )
 from eir.setup import schemas
+from eir.setup.schemas import al_tokenizer_choices
 
 if TYPE_CHECKING:
     from eir.train import Hooks
@@ -37,17 +37,6 @@ logger = get_logger(__name__)
 al_input_objects_as_dict = Dict[
     str, Union["OmicsInputInfo", "TabularInputInfo", "SequenceInputInfo"]
 ]
-al_tokenizer_choices = (
-    Union[
-        Literal["basic_english"],
-        Literal["spacy"],
-        Literal["moses"],
-        Literal["toktok"],
-        Literal["revtok"],
-        Literal["subword"],
-        None,
-    ],
-)
 
 
 def set_up_inputs_for_training(

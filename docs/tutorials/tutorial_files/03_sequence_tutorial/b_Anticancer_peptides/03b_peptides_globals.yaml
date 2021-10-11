@@ -1,0 +1,14 @@
+run_name: anti_breast_cancer_peptides
+valid_size: 0.25
+n_saved_models: 1
+checkpoint_interval: 200
+sample_interval: 200
+n_epochs: 500
+memory_dataset: True
+batch_size: 32
+early_stopping_buffer: 2000
+get_acts: True
+act_every_sample_factor: 3
+max_acts_per_class: 100
+weighted_sampling_columns:
+  - all

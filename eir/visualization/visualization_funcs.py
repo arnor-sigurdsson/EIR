@@ -521,6 +521,9 @@ def generate_confusion_matrix(
     ax.set_ylabel("True Label", fontsize=label_fontsize)
     ax.set_xlabel("Predicted Label", fontsize=label_fontsize)
 
+    color_bar = ax.collections[0].colorbar
+    color_bar.ax.tick_params(labelsize=label_fontsize)
+
     plt.setp(
         ax.get_xticklabels(),
         rotation=45,

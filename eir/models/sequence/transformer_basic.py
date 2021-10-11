@@ -12,10 +12,26 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 
 @dataclass
 class BasicTransformerModelConfig:
+    """
+    :param embedding_dim:
+        Which dimension to use for the embeddings. If ``None``, will autoamtically set
+        this value based on the number of tokens and attention heads.
+
+    :param num_heads:
+        The number of heads in the multi-head attention models
+
+    :param num_layers:
+        The number of encoder blocks in the transformer model.
+
+    :param dropout:
+        Common dropout value to use in (a) the positional encoding and (b) the encoder
+        layers.
+    """
+
     embedding_dim: Union[int, None] = None
     num_heads: int = 8
     num_layers: int = 2
-    dropout: float = 0.5
+    dropout: float = 0.10
 
 
 class TransformerModel(nn.Module):
