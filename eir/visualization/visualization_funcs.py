@@ -235,7 +235,7 @@ def generate_regression_prediction_plot(
     ax.set(title=title_extra)
 
     plt.tight_layout()
-    plt.savefig(outfolder / "regression_predictions.png", dpi=200)
+    plt.savefig(outfolder / "regression_predictions.pdf")
     plt.close("all")
 
 
@@ -262,7 +262,7 @@ def generate_binary_roc_curve(
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5), prop={"size": 8})
 
     plt.tight_layout()
-    plt.savefig(outfolder / "bin_roc_curve.png", dpi=200)
+    plt.savefig(outfolder / "bin_roc_curve.pdf")
     plt.close("all")
 
 
@@ -294,7 +294,7 @@ def generate_binary_pr_curve(
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5), prop={"size": 8})
 
     plt.tight_layout()
-    plt.savefig(outfolder / "bin_pr_curve.png", dpi=200)
+    plt.savefig(outfolder / "bin_pr_curve.pdf")
     plt.close("all")
 
 
@@ -335,7 +335,7 @@ def generate_binary_prediction_distribution(
     ax.set_title(title_extra + " Score Distribution")
 
     plt.tight_layout()
-    plt.savefig(outfolder / "positive_prediction_distribution.png", dpi=200)
+    plt.savefig(outfolder / "positive_prediction_distribution.pdf")
     plt.close("all")
 
 
@@ -412,7 +412,7 @@ def generate_multi_class_roc_curve(
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
 
     plt.tight_layout()
-    plt.savefig(outfolder / "mc_roc_curve.png", dpi=200)
+    plt.savefig(outfolder / "mc_roc_curve.pdf")
     plt.close("all")
 
 
@@ -480,7 +480,7 @@ def generate_multi_class_pr_curve(
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
 
     plt.tight_layout()
-    plt.savefig(outfolder / "mc_pr_curve.png", dpi=200)
+    plt.savefig(outfolder / "mc_pr_curve.pdf")
     plt.close("all")
 
 
@@ -571,7 +571,5 @@ def generate_all_training_curves(
             )
 
         fname_identifier = _parse_metrics_colname(column_name=valid_series.name)
-        figure_object.savefig(
-            output_folder / f"training_curve_{fname_identifier}.png", dpi=200
-        )
+        figure_object.savefig(output_folder / f"training_curve_{fname_identifier}.pdf")
         plt.close("all")

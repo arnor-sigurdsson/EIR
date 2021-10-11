@@ -343,7 +343,7 @@ def plot_tabular_categorical_feature(
 
     plt.tight_layout()
 
-    fig_name = f"cat_features_{feature_name_to_plot}_{class_name}.png"
+    fig_name = f"cat_features_{feature_name_to_plot}_{class_name}.pdf"
     output_path = str(activation_outfolder / fig_name)
 
     try:
@@ -384,7 +384,7 @@ def plot_tabular_beeswarm(
 
     plt.tight_layout()
     fig.savefig(
-        str(activation_outfolder / f"con_features_beeswarm_{class_name}.png"),
+        str(activation_outfolder / f"con_features_beeswarm_{class_name}.pdf"),
         bbox_inches="tight",
     )
 

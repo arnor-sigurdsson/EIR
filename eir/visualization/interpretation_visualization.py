@@ -69,7 +69,7 @@ def plot_top_gradients(
     top_gradients_dict: "al_top_gradients_dict",
     snp_df: pd.DataFrame,
     output_folder: Path,
-    fname: str = "top_snps.png",
+    fname: str = "top_snps.pdf",
     custom_ylabel: str = None,
 ):
     n_cls = len(top_gradients_dict.keys())

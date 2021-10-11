@@ -264,7 +264,7 @@ def _plot_lr_schedule(
     plt.xlabel("Iteration")
     plt.ylabel("Learning Rate")
 
-    plt.savefig(output_folder / "lr_schedule.png")
+    plt.savefig(output_folder / "lr_schedule.pdf")
     plt.close("all")
 
 
