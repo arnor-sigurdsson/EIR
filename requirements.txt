@@ -1,14 +1,14 @@
 absl-py==0.14.1; python_version >= "3.6"
 adabelief-pytorch==0.2.1; python_version >= "3.6"
-aislib==0.1.5a0; python_version >= "3.8" and python_version < "4.0"
+aislib==0.1.6a0; python_version >= "3.8" and python_version < "4.0"
 appnope==0.1.2; sys_platform == "darwin" and python_version >= "3.7"
 atomicwrites==1.4.0; python_version >= "3.8" and python_full_version < "3.0.0" and sys_platform == "win32" and python_version < "4.0" or sys_platform == "win32" and python_version >= "3.8" and python_full_version >= "3.4.0" and python_version < "4.0"
 attrs==21.2.0; python_version >= "3.8" and python_full_version < "3.0.0" and python_version < "4.0" or python_full_version >= "3.5.0" and python_version >= "3.8" and python_version < "4.0"
 backcall==0.2.0; python_version >= "3.7"
 cachetools==4.2.4; python_version >= "3.5" and python_version < "4.0" and (python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.6.0" and python_version >= "3.6")
-certifi==2021.5.30; python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.6.0" and python_version >= "3.6"
+certifi==2021.10.8; python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.6.0" and python_version >= "3.6"
 cffi==1.14.6; python_version >= "3.8" and python_version < "4.0" and platform_python_implementation == "PyPy"
-charset-normalizer==2.0.6; python_full_version >= "3.6.0" and python_version >= "3.6"
+charset-normalizer==2.0.7; python_full_version >= "3.6.0" and python_version >= "3.6"
 cloudpickle==2.0.0; python_version >= "3.8" and python_version < "4.0"
 colorama==0.4.4; (python_version >= "2.7" and python_full_version < "3.0.0") or (python_full_version >= "3.5.0")
 configargparse==1.5.3; (python_version >= "2.7" and python_full_version < "3.0.0") or (python_full_version >= "3.5.0")
@@ -21,7 +21,7 @@ fsspec==2021.10.0; python_version >= "3.8" and python_version < "4.0"
 google-auth-oauthlib==0.4.6; python_version >= "3.6"
 google-auth==1.35.0; python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.6.0" and python_version >= "3.6"
 grpcio==1.41.0; python_version >= "3.6"
-hypothesis==6.23.1; python_version >= "3.6"
+hypothesis==6.23.2; python_version >= "3.6"
 idna==3.2; python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.6.0" and python_version >= "3.6"
 iniconfig==1.1.1; python_version >= "3.8" and python_version < "4.0"
 ipython==7.28.0; python_version >= "3.7"
@@ -73,7 +73,7 @@ shap @ git+https://github.com/slundberg/shap.git@9d7de4d
 six==1.16.0; python_full_version >= "3.7.1" and python_version >= "3.7" and (python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.3.0" and python_version >= "3.6") and (python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.6.0" and python_version >= "3.6") and (python_version >= "2.7" and python_full_version < "3.0.0" or python_full_version >= "3.3.0")
 slicer==0.0.7; python_version >= "3.6"
 sortedcontainers==2.4.0; python_version >= "3.6"
-sympy==1.8; python_version >= "3.6"
+sympy==1.9; python_version >= "3.6"
 tabulate==0.8.9; python_version >= "3.6"
 tensorboard-data-server==0.6.1; python_version >= "3.6"
 tensorboard-plugin-wit==1.8.0; python_version >= "3.6"
@@ -82,9 +82,9 @@ threadpoolctl==3.0.0; python_version >= "3.8" and python_version < "4.0"
 toml==0.10.2; python_version >= "3.8" and python_full_version < "3.0.0" and python_version < "4.0" or python_full_version >= "3.3.0" and python_version >= "3.8" and python_version < "4.0"
 toolz==0.11.1; python_version >= "3.8" and python_version < "4.0"
 torch-optimizer==0.1.0; python_full_version >= "3.6.0"
-torch==1.9.0; python_full_version >= "3.6.2"
-torchtext==0.10.0; python_version >= "3.5"
-torchvision==0.10.0
+torch==1.9.1; python_full_version >= "3.6.2"
+torchtext==0.10.1; python_version >= "3.5"
+torchvision==0.10.1
 tqdm==4.62.3; (python_version >= "2.7" and python_full_version < "3.0.0") or (python_full_version >= "3.4.0")
 traitlets==5.1.0; python_version >= "3.7"
 typing-extensions==3.10.0.2; python_full_version >= "3.6.2"

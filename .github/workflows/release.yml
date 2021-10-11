@@ -54,15 +54,6 @@ jobs:
             OUT_FILE_NAME: eir-${{ needs.getrelease.outputs.versionoutput }}_ubuntu-20.zip
             ASSET_MIME: application/zip
 
-          - os: macos-10.15
-            TARGET: macos
-            CMD_BUILD: |
-              poetry run pyinstaller --onefile config/build.spec
-              ./dist/eir --version
-              zip -j ./dist/eir-${{ needs.getrelease.outputs.versionoutput }}_macos.zip ./dist/eir
-            OUT_FILE_NAME: eir-${{ needs.getrelease.outputs.versionoutput }}_macos.zip
-            ASSET_MIME: application/zip
-
           - os: windows-2019
             TARGET: windows
             CMD_BUILD: |

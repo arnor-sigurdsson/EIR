@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "eir-dl"
-version = "0.1.15-alpha"
+version = "0.1.16-alpha"
 description = ""
 license = "AGPLv3"
 authors = ["Arnor Sigurdsson"]
@@ -12,8 +12,8 @@ packages = [
 python = ">= 3.8,< 3.10"
 pandas = "^1.2.0"
 numpy = "^1.19.2"
-torch = "1.9.0"
-torchvision = "0.10.0"
+torch = "^1.9.1"
+torchvision = "^0.10.1"
 py = "^1.9.0"
 matplotlib = "^3.3.2"
 pytorch-ignite = "^0.4.2"
@@ -29,10 +29,10 @@ torch-optimizer = "^0.1.0"
 adabelief-pytorch = "^0.2.0"
 dill = "^0.3.3"
 hypothesis = "^6.14.0"
-aislib = "0.1.5a0"
+aislib = "^0.1.6-alpha.0"
 colorama = "^0.4.4"
 ipython = "^7.26.0"
-torchtext = "^0.10.0"
+torchtext = "^0.10.1"
 shap = {git = "https://github.com/slundberg/shap.git", rev = "9d7de4d"}
 
 [tool.poetry.dev-dependencies]
