@@ -33,7 +33,7 @@ aislib = "^0.1.6-alpha.0"
 colorama = "^0.4.4"
 ipython = "^7.26.0"
 torchtext = "^0.10.1"
-shap = {git = "https://github.com/slundberg/shap.git", rev = "9d7de4d"}
+shap = "^0.39.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.1.1"
