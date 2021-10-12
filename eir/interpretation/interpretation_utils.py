@@ -54,11 +54,11 @@ def plot_activations_bar(
     df_activations_sorted = df_activations.sort_values(by="Shap_Value", ascending=False)
     df_activations_filtered = df_activations_sorted.head(n=top_n)
     df_activations_renamed = df_activations_filtered.rename(
-        mapper={"Shap_Value": "Importance"}, axis=1
+        mapper={"Shap_Value": "Influence"}, axis=1
     )
 
     ax: plt.Axes = sns.barplot(
-        x=df_activations_renamed["Importance"],
+        x=df_activations_renamed["Influence"],
         y=df_activations_renamed.index,
         palette="Blues_d",
     )

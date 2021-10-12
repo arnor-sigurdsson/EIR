@@ -20,6 +20,7 @@ from eir.interpretation.interpretation_utils import (
     plot_activations_bar,
 )
 from eir.setup import schemas
+from eir.visualization.sequence_visualization_forward_port import text
 
 if TYPE_CHECKING:
     from eir.train import Experiment
@@ -83,7 +84,7 @@ def analyze_sequence_input_activations(
             base_values=extracted_sample_info.expected_shap_value,
         )
 
-        html_string = shap.plots.text(explanation, display=False)
+        html_string = text(shap_values=explanation, display=False)
 
         outpath = (
             activation_outfolder
@@ -111,11 +112,11 @@ def analyze_sequence_input_activations(
         ensure_path_exists(path=target_outfolder, is_folder=True)
         plot_activations_bar(
             df_activations=df_token_importances,
-            outpath=target_outfolder / f"feature_importance_{class_name}.pdf",
+            outpath=target_outfolder / f"token_influence_{class_name}.pdf",
             title=f"{target_column_name} – {class_name}",
         )
         df_token_importances.to_csv(
-            path_or_buf=target_outfolder / f"feature_importance_{class_name}.csv"
+            path_or_buf=target_outfolder / f"token_influence_{class_name}.csv"
         )
 
 
