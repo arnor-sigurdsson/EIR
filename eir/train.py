@@ -719,15 +719,6 @@ def _log_model(model: nn.Module) -> None:
     """
     no_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
-    for module in model.named_modules():
-        pass
-        # if l1_weight:
-        #     logger.debug(
-        #         "Penalizing weights of shape %s with L1 loss with weight %f.",
-        #         model.l1_penalized_weights.shape,
-        #         l1_weight,
-        #     )
-
     logger.info(
         "Starting training with a %s parameter model.", format(no_params, ",.0f")
     )
