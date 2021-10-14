@@ -75,7 +75,7 @@ class SimpleTabularModel(nn.Module):
 
     @property
     def l1_penalized_weights(self) -> torch.Tensor:
-        return torch.cat([i for i in self.parameters()])
+        return torch.cat([torch.flatten(i) for i in self.parameters()])
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
         return input
