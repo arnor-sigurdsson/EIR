@@ -1,6 +1,6 @@
 import math
 from dataclasses import dataclass
-from typing import Union
+from typing import Union, Literal, Type
 
 import torch
 from aislib.misc_utils import get_logger
@@ -26,12 +26,17 @@ class BasicTransformerModelConfig:
     :param dropout:
         Common dropout value to use in (a) the positional encoding and (b) the encoder
         layers.
+
+    :param position:
+        Whether to use positional encodings or embeddings for representing token
+        positions.
     """
 
     embedding_dim: Union[int, None] = None
     num_heads: int = 8
     num_layers: int = 2
     dropout: float = 0.10
+    position: Literal["encode", "embed"] = "encode"
 
 
 class TransformerModel(nn.Module):
@@ -62,8 +67,13 @@ class TransformerModel(nn.Module):
             )
             self.embedding_dim = auto_emb_dim
 
-        self.pos_encoder = PositionalEncoding(
-            embedding_dim=self.embedding_dim, dropout=model_config.dropout
+        pos_repr_class = get_positional_representation_class(
+            position_model_config=self.model_config.position
+        )
+        self.pos_representation = pos_repr_class(
+            embedding_dim=self.embedding_dim,
+            dropout=model_config.dropout,
+            max_len=self.max_length,
         )
         encoder_layers = TransformerEncoderLayer(
             d_model=self.embedding_dim,
@@ -94,7 +104,7 @@ class TransformerModel(nn.Module):
     def forward(self, input: Tensor) -> Tensor:
 
         out = input * math.sqrt(self.embedding_dim)
-        out = self.pos_encoder(out)
+        out = self.pos_representation(out)
         out = self.transformer_encoder(out)
         return out.flatten(1)
 
@@ -104,6 +114,20 @@ def next_power_of_2(x: int) -> int:
         return 1
 
     return 2 ** math.ceil(math.log2(x))
+
+
+def get_positional_representation_class(
+    position_model_config: Literal["encode", "embed"]
+) -> Union[Type["PositionalEncoding"], Type["PositionalEmbedding"]]:
+    if position_model_config == "encode":
+        return PositionalEncoding
+    elif position_model_config == "embed":
+        return PositionalEmbedding
+    raise ValueError(
+        "Unknown value for positional representation. "
+        "Expected 'encode' or 'embed' but got '%s'.",
+        position_model_config,
+    )
 
 
 class PositionalEncoding(nn.Module):
@@ -124,4 +148,20 @@ class PositionalEncoding(nn.Module):
 
     def forward(self, x: Tensor) -> Tensor:
         x = x + self.pe[: x.size(0)]
+        return self.dropout(x)
+
+
+class PositionalEmbedding(nn.Module):
+    def __init__(
+        self, embedding_dim: int, dropout: float = 0.1, max_len: int = 5000
+    ) -> None:
+        super().__init__()
+        self.dropout = nn.Dropout(p=dropout)
+
+        self.embedding = torch.nn.Parameter(
+            data=torch.randn(1, max_len, embedding_dim), requires_grad=True
+        )
+
+    def forward(self, x: Tensor) -> Tensor:
+        x = x + self.embedding[: x.size(0)]
         return self.dropout(x)
