@@ -48,6 +48,7 @@ if TYPE_CHECKING:
                             "extra_cat_columns": ["OriginExtraCol"],
                             "extra_con_columns": ["ExtraTarget"],
                         },
+                        "model_config": {"l1": 1e-03},
                     },
                 ],
                 "predictor_configs": {

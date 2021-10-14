@@ -9,6 +9,7 @@ from typing import Dict, TYPE_CHECKING, List, Tuple, Callable, Union
 import numpy as np
 import pandas as pd
 import torch
+from torch.linalg import vector_norm
 from aislib.misc_utils import ensure_path_exists, get_logger
 from scipy.special import softmax
 from scipy.stats import pearsonr
@@ -359,13 +360,13 @@ def hook_add_l1_loss(
     **kwargs,
 ) -> Dict:
     """
-    TODO: To the validation outside of the actual hook.
+    TODO: Do the validation outside of the actual hook.
     TODO: Use a combined iterator here for the fusion module and modules_to_fuse.
     TODO: Convert all fusion modules to have their own L1 penalized weights.
     """
     model_configs = experiment.inputs
 
-    l1_loss = torch.tensor(0.0)
+    l1_loss = torch.tensor(0.0, device=experiment.configs.global_config.device)
     for input_name, input_module in experiment.model.modules_to_fuse.items():
 
         cur_model_config = model_configs[input_name].input_config.model_config
@@ -378,7 +379,7 @@ def hook_add_l1_loss(
                 f"l1_penalized_weights attribute."
             )
 
-        if has_l1_weights is not None and current_l1:
+        if has_l1_weights and current_l1:
             cur_l1_loss = get_model_l1_loss(model=input_module, l1_weight=current_l1)
             l1_loss += cur_l1_loss
 
@@ -404,7 +405,7 @@ def get_model_l1_loss(model: nn.Module, l1_weight: float) -> torch.Tensor:
 
 
 def calc_l1_loss(weight_tensor: torch.Tensor, l1_weight: float):
-    l1_loss = torch.norm(weight_tensor, p=1) * l1_weight
+    l1_loss = vector_norm(weight_tensor, ord=1, dim=None) * l1_weight
     return l1_loss
 
 
