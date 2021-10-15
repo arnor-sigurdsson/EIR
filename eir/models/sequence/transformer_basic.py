@@ -73,13 +73,14 @@ class TransformerModel(nn.Module):
         self.pos_representation = pos_repr_class(
             embedding_dim=self.embedding_dim,
             dropout=model_config.dropout,
-            max_len=self.max_length,
+            max_length=self.max_length,
         )
         encoder_layers = TransformerEncoderLayer(
             d_model=self.embedding_dim,
             nhead=model_config.num_heads,
             dim_feedforward=self.max_length,
             dropout=model_config.dropout,
+            batch_first=True,
         )
         self.transformer_encoder = TransformerEncoder(
             encoder_layer=encoder_layers, num_layers=model_config.num_layers
@@ -132,36 +133,46 @@ def get_positional_representation_class(
 
 class PositionalEncoding(nn.Module):
     def __init__(
-        self, embedding_dim: int, dropout: float = 0.1, max_len: int = 5000
+        self,
+        embedding_dim: int,
+        max_length: int,
+        dropout: float = 0.1,
     ) -> None:
+
         super().__init__()
         self.dropout = nn.Dropout(p=dropout)
+        self.max_length = max_length
 
-        position = torch.arange(max_len).unsqueeze(1)
+        position = torch.arange(max_length).unsqueeze(1)
         div_term = torch.exp(
             torch.arange(0, embedding_dim, 2) * (-math.log(10000.0) / embedding_dim)
         )
-        pe = torch.zeros(max_len, 1, embedding_dim)
-        pe[:, 0, 0::2] = torch.sin(position * div_term)
-        pe[:, 0, 1::2] = torch.cos(position * div_term)
+        pe = torch.zeros(1, max_length, embedding_dim)
+        pe[0, :, 0::2] = torch.sin(position * div_term)
+        pe[0, :, 1::2] = torch.cos(position * div_term)
         self.register_buffer("pe", pe)
 
     def forward(self, x: Tensor) -> Tensor:
-        x = x + self.pe[: x.size(0)]
+        x = x + self.pe[:, : self.max_length, :]
         return self.dropout(x)
 
 
 class PositionalEmbedding(nn.Module):
     def __init__(
-        self, embedding_dim: int, dropout: float = 0.1, max_len: int = 5000
+        self,
+        embedding_dim: int,
+        max_length: int,
+        dropout: float = 0.1,
     ) -> None:
+
         super().__init__()
         self.dropout = nn.Dropout(p=dropout)
+        self.max_length = max_length
 
         self.embedding = torch.nn.Parameter(
-            data=torch.randn(1, max_len, embedding_dim), requires_grad=True
+            data=torch.randn(1, max_length, embedding_dim), requires_grad=True
         )
 
     def forward(self, x: Tensor) -> Tensor:
-        x = x + self.embedding[: x.size(0)]
+        x = x + self.embedding[:, : self.max_length, :]
         return self.dropout(x)
