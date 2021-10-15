@@ -139,8 +139,11 @@ def analyze_omics_input_activations(
     df_snp_grads = _save_snp_gradients(
         accumulated_grads=acc_acts, outfolder=activation_outfolder, snp_df=snp_df
     )
+    df_snp_grads_with_abs = _add_absolute_summed_snp_gradients_to_df(
+        df_snp_grads=df_snp_grads
+    )
     av.plot_snp_manhattan_plots(
-        df_snp_grads=df_snp_grads,
+        df_snp_grads=df_snp_grads_with_abs,
         outfolder=activation_outfolder,
         title_extra=f" - {target_column_name}",
     )
@@ -210,6 +213,31 @@ def _save_snp_gradients(
 
     df_output.to_csv(path_or_buf=outfolder / "snp_activations.csv")
     return df_output
+
+
+def _add_absolute_summed_snp_gradients_to_df(
+    df_snp_grads: pd.DataFrame,
+) -> pd.DataFrame:
+
+    df_snp_grads_copy = df_snp_grads.copy()
+
+    activations_columns = [
+        i for i in df_snp_grads_copy.columns if i.endswith("_activations")
+    ]
+    if "Aggregated_activations" in activations_columns:
+        raise ValueError(
+            "Cannot compute aggregated activations as reserved column name "
+            "'Aggregated' already present as target (all activation columns: %s). "
+            "Please rename the column 'Aggregated' to something else "
+            "in the relevant target file.",
+            activations_columns,
+        )
+
+    df_snp_grads_copy["Aggregated_activations"] = (
+        df_snp_grads_copy[activations_columns].abs().sum(axis=1)
+    )
+
+    return df_snp_grads_copy
 
 
 def parse_single_omics_activations(

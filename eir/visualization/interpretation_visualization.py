@@ -132,22 +132,25 @@ def plot_top_gradients(
 def plot_snp_manhattan_plots(
     df_snp_grads: pd.DataFrame, outfolder: Path, title_extra: str = ""
 ):
+
+    df_snp_grads_copy = df_snp_grads.copy()
+
     activations_columns = [
-        i for i in df_snp_grads.columns if i.endswith("_activations")
+        i for i in df_snp_grads_copy.columns if i.endswith("_activations")
     ]
 
-    df_snp_grads = df_snp_grads.sort_values(by=["CHR_CODE", "BP_COORD"])
+    df_snp_grads_copy = df_snp_grads_copy.sort_values(by=["CHR_CODE", "BP_COORD"])
 
     for col in activations_columns:
         label_name = col.split("_activations")[0]
 
         ax, fig = _get_manhattan_axis_and_figure(
-            df=df_snp_grads, chr_column_name="CHR_CODE", activation_column_name=col
+            df=df_snp_grads_copy, chr_column_name="CHR_CODE", activation_column_name=col
         )
 
         y_ticks = ax.get_yticks()
         y_axis_tick_spacing = y_ticks[1] - y_ticks[0]
-        y_max = df_snp_grads[col].max() + y_axis_tick_spacing
+        y_max = df_snp_grads_copy[col].max() + y_axis_tick_spacing
         ax.set_ylim(ymin=0.0, ymax=y_max)
 
         ax.set_xlabel("Chromosome")

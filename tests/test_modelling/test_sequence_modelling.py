@@ -25,7 +25,7 @@ seed_everything(seed=0)
 @pytest.mark.parametrize(
     "create_test_config_init_base",
     [
-        # Case 1: Classification
+        # Case 1: Classification - Positional Encoding
         {
             "injections": {
                 "global_configs": {
@@ -36,11 +36,28 @@ seed_everything(seed=0)
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_sequence"},
+                        "model_config": {"position": "encode"},
                     }
                 ],
             },
         },
-        # Case 2: Regression
+        # Case 2: Classification - Positional Embedding
+        {
+            "injections": {
+                "global_configs": {
+                    "run_name": "test_classification",
+                    "n_epochs": 12,
+                    "memory_dataset": True,
+                },
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_sequence"},
+                        "model_config": {"position": "embed"},
+                    }
+                ],
+            },
+        },
+        # Case 3: Regression
         {
             "injections": {
                 "global_configs": {
@@ -59,7 +76,7 @@ seed_everything(seed=0)
                 },
             },
         },
-        # Case 3: Multi Task
+        # Case 4: Multi Task
         {
             "injections": {
                 "global_configs": {
@@ -78,7 +95,7 @@ seed_everything(seed=0)
                 },
             },
         },
-        # Case 4: Multi Task with Mixing
+        # Case 5: Multi Task with Mixing
         {
             "injections": {
                 "global_configs": {
