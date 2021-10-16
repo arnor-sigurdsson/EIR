@@ -38,7 +38,9 @@ from eir.models.fusion import FusionModelConfig
 from eir.models.fusion_linear import LinearFusionModelConfig
 from eir.models.fusion_mgmoe import MGMoEModelConfig
 from eir.models.omics.omics_models import get_omics_config_dataclass_mapping
-from eir.models.sequence.transformer_basic import BasicTransformerModelConfig
+from eir.models.sequence.transformer_basic import (
+    BasicTransformerFeatureExtractorModelConfig,
+)
 from eir.setup import schemas
 from eir.setup.presets import gln
 
@@ -419,7 +421,7 @@ def get_model_config_map() -> Dict[str, Type]:
         **mapping,
         **{
             "tabular": eir.models.tabular.tabular.TabularModelConfig,
-            "sequence-default": BasicTransformerModelConfig,
+            "sequence-default": BasicTransformerFeatureExtractorModelConfig,
         },
     }
 

@@ -36,12 +36,12 @@ seed_everything(seed=0)
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_sequence"},
-                        "model_config": {"position": "encode"},
+                        "input_type_info": {"position": "encode"},
                     }
                 ],
             },
         },
-        # Case 2: Classification - Positional Embedding
+        # Case 2: Classification - Positional Embedding and Windowed
         {
             "injections": {
                 "global_configs": {
@@ -52,7 +52,7 @@ seed_everything(seed=0)
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_sequence"},
-                        "model_config": {"position": "embed"},
+                        "input_type_info": {"window_size": 16, "position": "embed"},
                     }
                 ],
             },
