@@ -270,12 +270,12 @@ def get_test_sequence_input_init(test_path: Path, split_to_test: bool) -> dict:
             "max_length": "max",
             "tokenizer_language": "en",
             "model_type": "sequence-default",
+            "embedding_dim": 8,
         },
         "model_config": {
             "num_heads": 2,
             "num_layers": 1,
             "dropout": 0.25,
-            "embedding_dim": 8,
         },
     }
 

@@ -18,20 +18,24 @@ from eir.models.omics.omics_models import (
     Dataclass,
 )
 from eir.models.tabular.tabular import SimpleTabularModel, TabularModelConfig
+from eir.models.sequence.transformer_basic import (
+    BasicTransformerFeatureExtractorModelConfig,
+)
 
 al_input_configs = Sequence["InputConfig"]
 
 
 al_model_configs = Union[
-    Type[FusionModelConfig],
-    Type[MGMoEModelConfig],
-    Type[CNNModelConfig],
-    Type[LinearModelConfig],
-    Type[SimpleLCLModelConfig],
-    Type[LCLModelConfig],
-    Type[TabularModelConfig],
-    Type[IdentityModelConfig],
-    Type[Dataclass],
+    FusionModelConfig,
+    MGMoEModelConfig,
+    CNNModelConfig,
+    LinearModelConfig,
+    SimpleLCLModelConfig,
+    LCLModelConfig,
+    TabularModelConfig,
+    IdentityModelConfig,
+    BasicTransformerFeatureExtractorModelConfig,
+    Dataclass,
 ]
 
 al_models_classes = Union[
@@ -370,7 +374,6 @@ class SequenceInputDataConfig:
         included in the vocabulary. Note that this setting will not do anything if
         passing in ``vocab_file``.
 
-
     :param split_on:
         Which token to split the sequence on to generate separate tokens for the
         vocabulary.
@@ -381,6 +384,16 @@ class SequenceInputDataConfig:
 
     :param tokenizer_language:
         Which language rules the tokenizer should apply when tokenizing the raw data.
+
+    :param embedding_dim:
+        Which dimension to use for the embeddings. If ``None``, will autoamtically set
+        this value based on the number of tokens and attention heads.
+
+    :param window_size:
+        If set to more than 0, will apply a sliding window of feature
+        extraction over the input, meaning the model (e.g. transformer) will only
+        see a part of the input at a time. Can be Useful to avoid the O(n²)
+        complexity of transformers, as it becomes n_windows * O(window_size²) instead.
     """
 
     model_type: Literal["sequence-default"] = "sequence-default"
@@ -391,6 +404,10 @@ class SequenceInputDataConfig:
     split_on: str = " "
     tokenizer: al_tokenizer_choices = None
     tokenizer_language: Union[str, None] = None
+    position: Literal["encode", "embed"] = "encode"
+    position_dropout: float = 0.1
+    embedding_dim: int = None
+    window_size: int = 0
 
 
 @dataclass

@@ -53,8 +53,11 @@ from eir.models.omics.omics_models import (
     al_omics_model_configs,
 )
 from eir.models.sequence.transformer_basic import (
-    BasicTransformerModelConfig,
-    TransformerModel,
+    BasicTransformerFeatureExtractorModelConfig,
+    TransformerFeatureExtractor,
+    TransformerWrapperModel,
+    TransformerWrapperModelConfig,
+    get_embedding_dim_for_sequence_model,
 )
 from eir.models.tabular.tabular import (
     get_tabular_inputs,
@@ -546,10 +549,11 @@ def get_modules_to_fuse_from_inputs(inputs: al_input_objects_as_dict, device: st
     models = nn.ModuleDict()
 
     for input_name, inputs_object in inputs.items():
+        input_type_info = inputs_object.input_config.input_type_info
 
         if input_name.startswith("omics_"):
             cur_omics_model = get_omics_model_from_model_config(
-                model_type=inputs_object.input_config.input_type_info.model_type,
+                model_type=input_type_info.model_type,
                 model_config=inputs_object.input_config.model_config,
                 data_dimensions=inputs_object.data_dimensions,
                 device=device,
@@ -560,8 +564,8 @@ def get_modules_to_fuse_from_inputs(inputs: al_input_objects_as_dict, device: st
         elif input_name.startswith("tabular_"):
 
             transformers = inputs_object.labels.label_transformers
-            cat_columns = inputs_object.input_config.input_type_info.extra_cat_columns
-            con_columns = inputs_object.input_config.input_type_info.extra_con_columns
+            cat_columns = input_type_info.extra_cat_columns
+            con_columns = input_type_info.extra_con_columns
 
             unique_tabular_values = get_unique_values_from_transformers(
                 transformers=transformers,
@@ -577,11 +581,21 @@ def get_modules_to_fuse_from_inputs(inputs: al_input_objects_as_dict, device: st
             models[input_name] = tabular_model
 
         elif input_name.startswith("sequence_"):
+
+            input_type_info = inputs_object.input_config.input_type_info
+            sequence_wrapper_model_config = TransformerWrapperModelConfig(
+                position=input_type_info.position,
+                position_dropout=input_type_info.position_dropout,
+                window_size=input_type_info.window_size,
+            )
+
             sequence_model = get_sequence_model(
-                model_type=inputs_object.input_config.input_type_info.model_type,
+                model_type=input_type_info.model_type,
                 model_config=inputs_object.input_config.model_config,
+                wrapper_model_config=sequence_wrapper_model_config,
                 num_tokens=len(inputs_object.vocab),
                 max_length=inputs_object.computed_max_length,
+                embedding_dim=input_type_info.embedding_dim,
                 device=device,
             )
             models[input_name] = sequence_model
@@ -591,13 +605,39 @@ def get_modules_to_fuse_from_inputs(inputs: al_input_objects_as_dict, device: st
 
 def get_sequence_model(
     model_type: str,
-    model_config: BasicTransformerModelConfig,
+    model_config: BasicTransformerFeatureExtractorModelConfig,
+    wrapper_model_config: TransformerWrapperModelConfig,
     num_tokens: int,
     max_length: int,
+    embedding_dim: int,
     device: str,
 ):
-    sequence_model = TransformerModel(
+
+    feature_extractor_max_length = max_length
+    if wrapper_model_config.window_size:
+        logger.info(
+            "Using sliding model for sequence input as window size was set to %d.",
+            wrapper_model_config.window_size,
+        )
+        feature_extractor_max_length = wrapper_model_config.window_size
+
+    embedding_dim = get_embedding_dim_for_sequence_model(
+        embedding_dim=embedding_dim,
+        num_tokens=num_tokens,
+        num_heads=model_config.num_heads,
+    )
+
+    feature_extractor = TransformerFeatureExtractor(
         model_config=model_config,
+        num_tokens=num_tokens,
+        max_length=feature_extractor_max_length,
+        embedding_dim=embedding_dim,
+    )
+
+    sequence_model = TransformerWrapperModel(
+        feature_extractor=feature_extractor,
+        model_config=wrapper_model_config,
+        embedding_dim=embedding_dim,
         num_tokens=num_tokens,
         max_length=max_length,
     ).to(device=device)
