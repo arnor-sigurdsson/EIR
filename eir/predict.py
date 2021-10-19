@@ -359,7 +359,7 @@ def get_default_predict_config(
     test_inputs = set_up_inputs(
         test_inputs_configs=configs_overloaded_for_predict.input_configs,
         ids=test_ids,
-        hooks=default_train_hooks.custom_column_label_parsing_ops,
+        hooks=default_train_hooks,
         run_name=loaded_train_experiment.configs.global_config.run_name,
     )
 
@@ -854,7 +854,7 @@ def get_config_sequence_matching_func(
             if all((cond_1, cond_2)):
                 matches.append(pred_config_dict)
 
-        assert len(matches) == 1
+        assert len(matches) == 1, matches
         return matches[0]
 
     def _target_configs(
@@ -875,7 +875,7 @@ def get_config_sequence_matching_func(
             if all((cond_1, cond_2)):
                 matches.append(pred_config_dict)
 
-        assert len(matches) == 1
+        assert len(matches) == 1, matches
         return matches[0]
 
     if name == "input_configs":
