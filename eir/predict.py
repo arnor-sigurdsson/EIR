@@ -509,13 +509,17 @@ def get_labels_for_predict(
 
     df_labels_test = pd.DataFrame(index=ids)
     label_transformers = {}
-    con_columns, cat_columns = [], []
+    con_columns = []
+    cat_columns = []
 
     for tabular_info in tabular_file_infos:
 
         all_columns = list(tabular_info.cat_columns) + list(tabular_info.con_columns)
         if not all_columns:
             raise ValueError(f"No columns specified in {tabular_file_infos}.")
+
+        con_columns += tabular_info.con_columns
+        cat_columns += tabular_info.cat_columns
 
         cur_transformers = load_transformers(
             run_name=run_name,
@@ -1017,7 +1021,7 @@ def _compute_predict_activations(
         batch_size=gc.batch_size,
         configs=background_source_config,
         dataloader_workers=gc.dataloader_workers,
-        label_parsing_ops=loaded_train_experiment.hooks.custom_column_label_parsing_ops,
+        loaded_hooks=loaded_train_experiment.hooks,
     )
 
     overloaded_train_experiment = _overload_train_experiment_for_predict_activations(
@@ -1092,7 +1096,7 @@ def _get_predict_background_loader(
     batch_size: int,
     dataloader_workers: int,
     configs: Configs,
-    label_parsing_ops: Union["Hooks", None],
+    loaded_hooks: Union["Hooks", None],
 ):
     """
     TODO: Add option to choose whether to reuse train data as background,
@@ -1111,14 +1115,14 @@ def _get_predict_background_loader(
 
     target_labels = get_target_labels_for_testing(
         configs_overloaded_for_predict=configs,
-        custom_column_label_parsing_ops=label_parsing_ops,
+        custom_column_label_parsing_ops=loaded_hooks.custom_column_label_parsing_ops,
         ids=background_ids_sampled,
     )
 
     background_inputs_as_dict = set_up_inputs(
         test_inputs_configs=configs.input_configs,
         ids=background_ids_sampled,
-        hooks=label_parsing_ops,
+        hooks=loaded_hooks,
         run_name=configs.global_config.run_name,
     )
     background_dataset = _set_up_default_dataset(
