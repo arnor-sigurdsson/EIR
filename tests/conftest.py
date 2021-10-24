@@ -37,9 +37,9 @@ from eir.setup.input_setup import (
 )
 from eir.train import (
     Experiment,
-    get_model,
     set_up_num_outputs_per_target,
 )
+from eir.models.model_setup import get_model
 from eir.train_utils import optimizers, metrics
 from eir.train_utils.utils import configure_root_logger, get_run_folder, seed_everything
 from tests.test_modelling.setup_modelling_test_data.setup_omics_test_data import (

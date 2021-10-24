@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
+from collections import OrderedDict
 from typing import (
     Dict,
     Union,
@@ -17,7 +18,14 @@ import numpy as np
 from aislib.misc_utils import get_logger, ensure_path_exists
 from torchtext.data.utils import get_tokenizer as get_pytorch_tokenizer
 from torchtext.vocab import build_vocab_from_iterator, Vocab
+from torchtext.vocab import vocab as pytorch_vocab_builder
 from tqdm import tqdm
+from transformers import AutoTokenizer, PreTrainedTokenizer
+from transformers.tokenization_utils_base import (
+    TextInput,
+    PreTokenizedInput,
+    EncodedInput,
+)
 
 from eir.data_load.label_setup import (
     Labels,
@@ -36,6 +44,15 @@ logger = get_logger(__name__)
 
 al_input_objects_as_dict = Dict[
     str, Union["OmicsInputInfo", "TabularInputInfo", "SequenceInputInfo"]
+]
+al_hf_tokenizer_inputs = Union[TextInput, PreTokenizedInput, EncodedInput]
+al_sequence_input_objects_basic = Tuple[
+    Vocab, "GatheredSequenceStats", Callable[[Sequence[str]], List[int]]
+]
+al_sequence_input_objects_hf = Tuple[
+    Vocab,
+    "GatheredSequenceStats",
+    Callable[[al_hf_tokenizer_inputs], Sequence[int]],
 ]
 
 
@@ -99,7 +116,7 @@ def get_input_setup_function_map() -> Dict[str, Callable]:
 class SequenceInputInfo:
     input_config: schemas.InputConfig
     vocab: Vocab
-    tokenizer: Callable
+    encode_func: Callable[[Sequence[str]], List[int]]
     computed_max_length: int
 
 
@@ -107,7 +124,12 @@ def set_up_sequence_input_for_training(
     input_config: schemas.InputConfig, *args, **kwargs
 ):
 
-    vocab, gathered_stats, tokenizer = get_vocab_wrapper(input_config=input_config)
+    sequence_input_object_func = _get_sequence_input_object_func(
+        pretrained=input_config.input_type_info.pretrained_model
+    )
+    vocab, gathered_stats, encode_callable = sequence_input_object_func(
+        input_config=input_config
+    )
 
     gathered_stats = possibly_gather_all_stats_from_input(
         prev_gathered_stats=gathered_stats,
@@ -125,10 +147,22 @@ def set_up_sequence_input_for_training(
         input_config=input_config,
         vocab=vocab,
         computed_max_length=computed_max_length,
-        tokenizer=tokenizer,
+        encode_func=encode_callable,
     )
 
     return sequence_input_info
+
+
+def _get_sequence_input_object_func(
+    pretrained: bool,
+) -> Callable[
+    [schemas.InputConfig],
+    Union[al_sequence_input_objects_basic, al_sequence_input_objects_hf],
+]:
+    if pretrained:
+        return get_sequence_input_objects_from_pretrained
+    else:
+        return get_sequence_input_objects_from_input
 
 
 @dataclass
@@ -138,9 +172,9 @@ class GatheredSequenceStats:
     max_length: int = 0
 
 
-def get_vocab_wrapper(
+def get_sequence_input_objects_from_input(
     input_config: schemas.InputConfig,
-) -> Tuple[Vocab, GatheredSequenceStats, Callable]:
+) -> al_sequence_input_objects_basic:
     gathered_stats = GatheredSequenceStats()
 
     vocab_file = input_config.input_type_info.vocab_file
@@ -150,7 +184,7 @@ def get_vocab_wrapper(
         gathered_stats=gathered_stats,
         vocab_file=input_config.input_type_info.vocab_file,
     )
-    tokenizer = get_tokenizer(
+    tokenizer = get_basic_tokenizer(
         tokenizer_name=input_config.input_type_info.tokenizer,
         tokenizer_language=input_config.input_type_info.tokenizer_language,
     )
@@ -174,10 +208,53 @@ def get_vocab_wrapper(
     )
     vocab.set_default_index(vocab["<unk>"])
 
-    return vocab, gathered_stats, tokenizer
+    encode_func = get_pytorch_tokenizer_encode_func(
+        pytorch_tokenizer=tokenizer, pytorch_vocab=vocab
+    )
+
+    return vocab, gathered_stats, encode_func
 
 
-def get_tokenizer(
+def get_sequence_input_objects_from_pretrained(
+    input_config: schemas.InputConfig,
+) -> al_sequence_input_objects_hf:
+    vocab_file = input_config.input_type_info.vocab_file
+    if vocab_file:
+        raise ValueError(
+            "Using a vocabulary file not supported when using pre-trained models "
+            "their training vocabulary will be used."
+        )
+
+    gathered_stats = GatheredSequenceStats()
+    hf_model_name = input_config.input_type_info.model_type
+    hf_tokenizer = _get_hf_tokenizer(hf_model_name=hf_model_name)
+
+    def _passthrough_hf_encode(raw_input_split: al_hf_tokenizer_inputs) -> List[int]:
+        return hf_tokenizer.encode(text=raw_input_split, is_split_into_words=True)
+
+    vocab = _sync_hf_and_pytorch_vocab(hf_tokenizer=hf_tokenizer)
+
+    return vocab, gathered_stats, _passthrough_hf_encode
+
+
+def _sync_hf_and_pytorch_vocab(hf_tokenizer: PreTrainedTokenizer) -> Vocab:
+    hf_tokenizer_vocab = hf_tokenizer.get_vocab()
+    hf_tokenizer_vocab_sorted = OrderedDict(
+        {k: v for k, v in sorted(hf_tokenizer_vocab.items(), key=lambda item: item[1])}
+    )
+    vocab = pytorch_vocab_builder(ordered_dict=hf_tokenizer_vocab_sorted, min_freq=0)
+
+    return vocab
+
+
+def _get_hf_tokenizer(hf_model_name: str) -> PreTrainedTokenizer:
+    hf_tokenizer = AutoTokenizer.from_pretrained(
+        pretrained_model_name_or_path=hf_model_name
+    )
+    return hf_tokenizer
+
+
+def get_basic_tokenizer(
     tokenizer_name: al_tokenizer_choices,
     tokenizer_language: Union[str, None],
 ) -> Callable[[Sequence[str]], Sequence[str]]:
@@ -195,11 +272,27 @@ def get_tokenizer(
         tokenizer=tokenizer_name, language=tokenizer_language
     )
 
-    def _join_and_tokenize(raw_input: Sequence[str]) -> Sequence[str]:
-        input_joined = " ".join(raw_input)
+    def _join_and_tokenize(raw_input_split: Sequence[str]) -> Sequence[str]:
+        input_joined = " ".join(raw_input_split)
         return tokenizer(input_joined)
 
     return _join_and_tokenize
+
+
+def get_pytorch_tokenizer_encode_func(
+    pytorch_tokenizer: Callable[[Sequence[str]], Sequence[str]],
+    pytorch_vocab: Vocab,
+) -> Callable[[Sequence[str]], List[int]]:
+    """
+    TODO: Possibly deprecate using torchtext and just switch completely to HF.
+    """
+
+    def _encode_func(raw_input_split: Sequence[str]) -> List[int]:
+        input_tokenized = pytorch_tokenizer(raw_input_split)
+        input_as_ids = pytorch_vocab(input_tokenized)
+        return input_as_ids
+
+    return _encode_func
 
 
 def _validate_tokenizer_args(

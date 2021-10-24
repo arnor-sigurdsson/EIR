@@ -34,6 +34,8 @@ colorama = "^0.4.4"
 ipython = "^7.26.0"
 torchtext = "^0.10.1"
 shap = "^0.39.0"
+transformers = "^4.11.3"
+sentencepiece = "^0.1.96"
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.1.1"

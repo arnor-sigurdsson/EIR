@@ -69,13 +69,12 @@ from eir.train import (
     prepare_base_batch_default,
     Hooks,
     get_tabular_target_file_infos,
-    get_fusion_class,
-    get_fusion_kwargs_from_cl_args,
     al_num_outputs_per_target,
     get_default_experiment_keys_to_serialize,
     gather_all_ids_from_target_configs,
     check_dataset_and_batch_size_compatiblity,
 )
+from eir.models.model_setup import get_fusion_class, get_fusion_kwargs_from_cl_args
 from eir.train_utils.evaluation import PerformancePlotConfig
 from eir.train_utils.metrics import (
     al_metric_record_dict,
@@ -731,11 +730,10 @@ def _load_model(
 def _load_model_weights(
     model: nn.Module, model_state_dict_path: Path, device: str
 ) -> nn.Module:
-    device_for_load = torch.device(device)
     model.load_state_dict(
-        state_dict=torch.load(model_state_dict_path, map_location=device_for_load)
+        state_dict=torch.load(model_state_dict_path, map_location=device)
     )
-    model = model.to(device=device_for_load)
+    model = model.to(device=device)
 
     return model
 

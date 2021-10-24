@@ -1,13 +1,15 @@
+import inspect
 import math
 from dataclasses import dataclass
-from typing import Union, Literal, Type, Callable, Tuple, Dict
 from functools import partial
+from typing import Union, Literal, Type, Callable, Tuple, Dict, Sequence
 
 import torch
 from aislib.misc_utils import get_logger
 from torch import nn, Tensor
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
 from torch.nn.functional import pad
+from transformers import PreTrainedModel, PretrainedConfig
 
 from eir.models.layers import _find_split_padding_needed
 
@@ -17,10 +19,6 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 @dataclass
 class TransformerWrapperModelConfig:
     """
-    :param embedding_dim:
-        Which dimension to use for the embeddings. If ``None``, will autoamtically set
-        this value based on the number of tokens and attention heads.
-
     :param position:
         Whether to use positional encodings or embeddings for representing token
         positions.
@@ -43,11 +41,15 @@ class TransformerWrapperModelConfig:
 class TransformerWrapperModel(nn.Module):
     def __init__(
         self,
-        feature_extractor: "TransformerFeatureExtractor",
+        feature_extractor: Union["TransformerFeatureExtractor", nn.Module],
         model_config: TransformerWrapperModelConfig,
         embedding_dim: int,
         num_tokens: int,
         max_length: int,
+        external_feature_extractor: bool,
+        device: str,
+        embeddings: nn.Embedding = None,
+        pre_computed_num_out_features: Union[None, int] = None,
     ) -> None:
 
         super().__init__()
@@ -55,22 +57,29 @@ class TransformerWrapperModel(nn.Module):
         self.embedding_dim = embedding_dim
         self.num_tokens = num_tokens
         self.max_length = max_length
+        self.external_feature_extractor = external_feature_extractor
+        self.pre_computed_num_out_features = pre_computed_num_out_features
 
         pos_repr_class = get_positional_representation_class(
             position_model_config=self.model_config.position
         )
         self.pos_representation = pos_repr_class(
             embedding_dim=self.embedding_dim,
-            dropout=model_config.position_dropout,
+            dropout=self.model_config.position_dropout,
             max_length=self.max_length,
         )
-        self.embedding = nn.Embedding(
-            num_embeddings=self.num_tokens, embedding_dim=self.embedding_dim
-        )
+
+        if embeddings:
+            self.embedding = embeddings
+        else:
+            self.embedding = nn.Embedding(
+                num_embeddings=self.num_tokens, embedding_dim=self.embedding_dim
+            )
 
         self.feature_extractor = feature_extractor
 
-        self.init_weights()
+        if not embeddings:
+            self.init_embedding_weights()
 
         (
             self.dynamic_extras,
@@ -78,18 +87,25 @@ class TransformerWrapperModel(nn.Module):
         ) = _get_transformer_wrapper_feature_extractor(
             feature_extractor=self.feature_extractor,
             window_size=self.model_config.window_size,
-            max_length=max_length,
+            max_length=self.max_length,
+            embedding_dim=self.embedding_dim,
+            device=device,
+            external_feature_extractor=self.external_feature_extractor,
         )
 
     @property
     def num_out_features(self) -> int:
+
+        if self.pre_computed_num_out_features:
+            return self.pre_computed_num_out_features
+
         padding = self.dynamic_extras.get("padding", 0)
         return (self.max_length + padding) * self.embedding_dim
 
     def embed_tokens(self, input: torch.Tensor) -> torch.Tensor:
         return self.embedding(input)
 
-    def init_weights(self) -> None:
+    def init_embedding_weights(self) -> None:
         init_range = 0.1
         self.embedding.weight.data.uniform_(-init_range, init_range)
 
@@ -120,15 +136,26 @@ def get_embedding_dim_for_sequence_model(
 
 
 def _get_transformer_wrapper_feature_extractor(
-    feature_extractor: "TransformerFeatureExtractor",
+    feature_extractor: Union["TransformerFeatureExtractor", nn.Module],
+    external_feature_extractor: bool,
     window_size: int,
+    embedding_dim: int,
     max_length: int,
+    device: str,
 ) -> Tuple[Dict, Callable[[torch.Tensor], torch.Tensor]]:
 
     dynamic_extras = {}
+
+    feature_extractor_forward = _get_feature_extractor_forward(
+        is_hf_model=external_feature_extractor,
+        feature_extractor=feature_extractor,
+        input_length=window_size if window_size else max_length,
+        embedding_size=embedding_dim,
+        device=device,
+    )
     if not window_size:
         extractor = partial(
-            _simple_transformer_forward, feature_extractor=feature_extractor
+            feature_extractor_forward, feature_extractor=feature_extractor
         )
     else:
         num_chunks = int(math.ceil(max_length / window_size))
@@ -150,6 +177,7 @@ def _get_transformer_wrapper_feature_extractor(
         extractor = partial(
             _conv_transfomer_forward,
             feature_extractor=feature_extractor,
+            feature_extractor_forward_callable=feature_extractor_forward,
             max_length=max_length,
             window_size=window_size,
             padding=padding,
@@ -158,15 +186,87 @@ def _get_transformer_wrapper_feature_extractor(
     return dynamic_extras, extractor
 
 
+def _get_feature_extractor_forward(
+    is_hf_model: bool,
+    feature_extractor: Union[nn.Module, PreTrainedModel],
+    input_length: int,
+    embedding_size: int,
+    device: str,
+) -> Callable[
+    [torch.Tensor, Union["TransformerFeatureExtractor", nn.Module]], torch.Tensor
+]:
+    if is_hf_model:
+        return get_hf_transformer_forward(
+            feature_extractor_=feature_extractor,
+            input_length=input_length,
+            embedding_dim=embedding_size,
+            device=device,
+        )
+    return _simple_transformer_forward
+
+
 def _simple_transformer_forward(
     input: torch.Tensor, feature_extractor: "TransformerFeatureExtractor"
 ) -> torch.Tensor:
-    return feature_extractor(input=input)
+    return feature_extractor(input=input).flatten(1)
+
+
+def get_hf_transformer_forward(
+    feature_extractor_: PreTrainedModel,
+    input_length: int,
+    embedding_dim: int,
+    device: str,
+):
+
+    forward_argnames = inspect.getfullargspec(feature_extractor_.forward)[0]
+
+    bound_kwargs = _build_transformer_forward_kwargs(
+        forward_argnames=forward_argnames,
+        config=feature_extractor_.config,
+        input_length=input_length,
+        embedding_dim=embedding_dim,
+        device=device,
+    )
+
+    def _hf_transformer_forward(
+        input: torch.Tensor,
+        feature_extractor: nn.Module,
+        key: str = "last_hidden_state",
+    ) -> torch.Tensor:
+        hf_transformer_out = feature_extractor(inputs_embeds=input, **bound_kwargs)
+        tensor_out = getattr(hf_transformer_out, key)
+        final_out = tensor_out.flatten(1)
+        return final_out
+
+    return _hf_transformer_forward
+
+
+def _build_transformer_forward_kwargs(
+    forward_argnames: Sequence[str],
+    config: PretrainedConfig,
+    input_length: int,
+    embedding_dim: int,
+    device: str,
+) -> Dict:
+    """
+    TODO: Deprecate.
+    """
+    kwargs = {}
+
+    if "attention_mask" in forward_argnames:
+        kwargs["attention_mask"] = torch.ones(1, input_length, device=device)
+    if "decoder_inputs_embeds" in forward_argnames:
+        kwargs["decoder_inputs_embeds"] = torch.randn(1, input_length, embedding_dim)
+
+    return kwargs
 
 
 def _conv_transfomer_forward(
     input: torch.Tensor,
     feature_extractor: "TransformerFeatureExtractor",
+    feature_extractor_forward_callable: Callable[
+        [torch.Tensor, Callable], torch.Tensor
+    ],
     max_length: int,
     window_size: int,
     padding: int,
@@ -180,7 +280,7 @@ def _conv_transfomer_forward(
         upper_index = lower_index + window_size
 
         cur_input = out[:, lower_index:upper_index, :]
-        cur_out = feature_extractor(input=cur_input).flatten(1)
+        cur_out = feature_extractor_forward_callable(cur_input, feature_extractor)
 
         if aggregated_out is None:
             aggregated_out = cur_out
@@ -241,7 +341,7 @@ class TransformerFeatureExtractor(nn.Module):
 
     def forward(self, input: Tensor) -> Tensor:
         out = self.transformer_encoder(input)
-        return out.flatten(1)
+        return out
 
 
 def next_power_of_2(x: int) -> int:

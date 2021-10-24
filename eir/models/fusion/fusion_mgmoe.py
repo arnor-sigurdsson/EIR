@@ -6,7 +6,7 @@ import torch
 from aislib.pytorch_modules import Swish
 from torch import nn
 
-from eir.models.fusion import default_fuse_features, al_features
+from eir.models.fusion.fusion_default import default_fuse_features, al_features
 from eir.models.layers import MLPResidualBlock
 from eir.models.models_base import (
     construct_multi_branches,
@@ -159,7 +159,7 @@ class MGMoEModel(nn.Module):
 
     @staticmethod
     def get_final_act_spec(in_features: int, dropout_p: float):
-        # TODO: Refactor, duplicated from fusion.py
+        # TODO: Refactor, duplicated from fusion_default.py
 
         spec = OrderedDict(
             {
