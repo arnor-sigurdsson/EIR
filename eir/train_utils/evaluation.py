@@ -262,8 +262,12 @@ def scale_and_save_regression_preds(
     transformer: StandardScaler,
     outfolder: Path,
 ) -> None:
-    val_labels = transformer.inverse_transform(val_labels).squeeze()
-    val_outputs = transformer.inverse_transform(val_outputs).squeeze()
+
+    val_labels_2d = val_labels.reshape(-1, 1)
+    val_outputs_2d = val_outputs.reshape(-1, 1)
+
+    val_labels = transformer.inverse_transform(val_labels_2d).squeeze()
+    val_outputs = transformer.inverse_transform(val_outputs_2d).squeeze()
 
     data = np.array([val_ids, val_labels, val_outputs]).T
     df = pd.DataFrame(data=data, columns=["ID", "Actual", "Predicted"])

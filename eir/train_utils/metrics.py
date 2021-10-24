@@ -231,8 +231,8 @@ def calc_r2(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
 
 
 def calc_rmse(
-    outputs: torch.Tensor,
-    labels: torch.Tensor,
+    outputs: np.ndarray,
+    labels: np.ndarray,
     target_transformers: Dict[str, StandardScaler],
     column_name: str,
     *args,
@@ -240,8 +240,11 @@ def calc_rmse(
 ) -> float:
     cur_target_transformer = target_transformers[column_name]
 
-    labels = cur_target_transformer.inverse_transform(labels).squeeze()
-    preds = cur_target_transformer.inverse_transform(outputs).squeeze()
+    labels_2d = labels.reshape(-1, 1)
+    outputs_2d = outputs.reshape(-1, 1)
+
+    labels = cur_target_transformer.inverse_transform(labels_2d).squeeze()
+    preds = cur_target_transformer.inverse_transform(outputs_2d).squeeze()
 
     rmse = np.sqrt(mean_squared_error(y_true=labels, y_pred=preds))
     return rmse
