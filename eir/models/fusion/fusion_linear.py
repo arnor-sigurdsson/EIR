@@ -4,7 +4,7 @@ from typing import Dict, TYPE_CHECKING
 import torch
 from torch import nn
 
-from eir.models.fusion import default_fuse_features, al_features
+from eir.models.fusion.fusion_default import default_fuse_features, al_features
 from eir.models.models_base import (
     get_final_layer,
     calculate_module_dict_outputs,

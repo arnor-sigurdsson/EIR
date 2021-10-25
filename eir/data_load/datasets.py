@@ -569,13 +569,13 @@ def prepare_inputs_disk(
 
         elif name.startswith("sequence_"):
 
-            sequence_raw = load_sequence_from_disk(
+            sequence_split = load_sequence_from_disk(
                 sequence_file_path=data,
                 split_on=input_type_info.split_on,
             )
             prepared_sequence_inputs = prepare_sequence_data(
                 sequence_input_object=inputs_objects[name],
-                cur_file_content=sequence_raw,
+                cur_file_content_split=sequence_split,
                 test_mode=test_mode,
             )
             prepared_inputs[name] = prepared_sequence_inputs
@@ -587,21 +587,22 @@ def prepare_inputs_disk(
 
 
 def prepare_sequence_data(
-    sequence_input_object: "SequenceInputInfo", cur_file_content: Any, test_mode: bool
+    sequence_input_object: "SequenceInputInfo",
+    cur_file_content_split: List[str],
+    test_mode: bool,
 ) -> torch.Tensor:
 
     sio = sequence_input_object
 
-    cur_vocab = sio.vocab
-    cur_tokens_tokenized = sequence_input_object.tokenizer(cur_file_content)
-    cur_tokens = torch.LongTensor(cur_vocab(cur_tokens_tokenized))
+    cur_tokens_tokenized = sequence_input_object.encode_func(cur_file_content_split)
+    cur_tokens_as_tensor = torch.LongTensor(cur_tokens_tokenized)
 
     sampling_strat = sio.input_config.input_type_info.sampling_strategy_if_longer
     if test_mode:
         sampling_strat = "from_start"
 
     cur_tokens_padded = process_tensor_to_length(
-        tensor=cur_tokens,
+        tensor=cur_tokens_as_tensor,
         max_length=sio.computed_max_length,
         sampling_strategy_if_longer=sampling_strat,
     )
@@ -671,7 +672,7 @@ def prepare_inputs_memory(
             sequence_raw_in_memory = data
             prepared_sequence_inputs = prepare_sequence_data(
                 sequence_input_object=inputs_objects[name],
-                cur_file_content=sequence_raw_in_memory,
+                cur_file_content_split=sequence_raw_in_memory,
                 test_mode=test_mode,
             )
             prepared_inputs[name] = prepared_sequence_inputs

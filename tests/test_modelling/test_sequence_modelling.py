@@ -1,10 +1,17 @@
 from pathlib import Path
+from copy import copy
 from typing import Iterable, Sequence, Tuple, Union
 
 import pandas as pd
 import pytest
+from transformers.models.auto.modeling_auto import MODEL_MAPPING_NAMES
 
 from eir import train
+from eir.models.model_setup import (
+    _get_hf_sequence_feature_extractor_objects,
+    _get_manual_out_features_for_external_feature_extractor,
+    _get_unsupported_hf_models,
+)
 from eir.setup.config import get_all_targets
 from eir.train_utils.utils import seed_everything
 from tests.test_modelling.setup_modelling_test_data.setup_sequence_test_data import (
@@ -108,6 +115,39 @@ seed_everything(seed=0)
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_sequence"},
+                    }
+                ],
+                "target_configs": {
+                    "target_cat_columns": ["Origin"],
+                    "target_con_columns": ["Height", "ExtraTarget"],
+                },
+            },
+        },
+        # Case 6: External model: Albert
+        {
+            "injections": {
+                "global_configs": {
+                    "n_epochs": 12,
+                    "memory_dataset": True,
+                    "run_name": "test_albert",
+                    "mixing_alpha": 0.5,
+                    "mixing_type": "mixup",
+                },
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_sequence"},
+                        "input_type_info": {
+                            "model_type": "albert",
+                            "window_size": 16,
+                            "position": "embed",
+                        },
+                        "model_config": {
+                            "num_hidden_layers": 2,
+                            "num_attention_heads": 4,
+                            "embedding_size": 12,
+                            "hidden_size": 16,
+                            "intermediate_size": 32,
+                        },
                     }
                 ],
                 "target_configs": {
@@ -237,3 +277,79 @@ def _check_sequence_activations(
     if fail_fast:
         assert success, matching
     return success
+
+
+def _get_all_hf_model_names() -> Sequence[str]:
+    all_models = sorted(list(MODEL_MAPPING_NAMES.keys()))
+    unsupported = _get_unsupported_hf_models()
+    unsupported_names = unsupported.keys()
+    return [i for i in all_models if i not in unsupported_names]
+
+
+@pytest.mark.parametrize(
+    "model_name",
+    _get_all_hf_model_names(),
+)
+def test_external_nlp_feature_extractor_forward(model_name: str):
+
+    model_config = _get_common_model_config_overload()
+    model_config_parsed = _parse_model_specific_config_values(
+        model_config=model_config, model_name=model_name
+    )
+
+    feature_extractor_objects = _get_hf_sequence_feature_extractor_objects(
+        model_name=model_name,
+        model_config=model_config_parsed,
+        feature_extractor_max_length=64,
+        num_chunks=1,
+    )
+    _get_manual_out_features_for_external_feature_extractor(
+        input_length=64,
+        embedding_dim=feature_extractor_objects.embedding_dim,
+        num_chunks=1,
+        feature_extractor=feature_extractor_objects.feature_extractor,
+    )
+
+
+def _get_common_model_config_overload() -> dict:
+    n_heads = 4
+    n_layers = 2
+    embedding_dim = 16
+
+    config = {
+        "num_hidden_layers": n_layers,
+        "encoder_layers": n_layers,
+        "num_encoder_layers": n_layers,
+        "decoder_layers": n_layers,
+        "num_decoder_layers": n_layers,
+        "block_sizes": [2],
+        "attention_head_size": 4,
+        "embedding_size": embedding_dim,
+        "d_embed": embedding_dim,
+        "hidden_size": 16,
+        "num_attention_heads": n_heads,
+        "encoder_attention_heads": n_heads,
+        "decoder_attention_heads": n_heads,
+        "num_heads": n_heads,
+        "intermediate_size": 32,
+        "d_model": 16,
+        "pad_token_id": 0,
+        "attention_window": 16,
+        "axial_pos_embds_dim": (4, 12),
+        "axial_pos_shape": (8, 8),
+    }
+
+    assert config["hidden_size"] % n_heads == 0
+
+    return config
+
+
+def _parse_model_specific_config_values(model_config: dict, model_name: str) -> dict:
+    mc = copy(model_config)
+
+    if model_name == "prophetnet":
+        mc.pop("num_hidden_layers")
+    elif model_name == "xlm-prophetnet":
+        mc.pop("num_hidden_layers")
+
+    return mc

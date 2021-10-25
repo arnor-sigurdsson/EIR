@@ -13,8 +13,6 @@ from typing import (
     Iterable,
     Sequence,
     Any,
-    Set,
-    Type,
 )
 
 import dill
@@ -44,25 +42,12 @@ from eir.data_load.label_setup import (
     save_transformer_set,
     Labels,
 )
-from eir.models import fusion, fusion_mgmoe, fusion_linear, al_fusion_models
+from eir.models import al_fusion_models, FusionModel
 from eir.models import model_training_utils
+from eir.models.model_setup import get_model
 from eir.models.model_training_utils import run_lr_find
-from eir.models.omics.omics_models import (
-    get_model_class,
-    get_omics_model_init_kwargs,
-    al_omics_model_configs,
-)
-from eir.models.sequence.transformer_basic import (
-    BasicTransformerFeatureExtractorModelConfig,
-    TransformerFeatureExtractor,
-    TransformerWrapperModel,
-    TransformerWrapperModelConfig,
-    get_embedding_dim_for_sequence_model,
-)
 from eir.models.tabular.tabular import (
     get_tabular_inputs,
-    SimpleTabularModel,
-    get_unique_values_from_transformers,
 )
 from eir.setup import schemas
 from eir.setup.config import (
@@ -71,7 +56,6 @@ from eir.setup.config import (
     get_all_targets,
 )
 from eir.setup.input_setup import (
-    DataDimensions,
     serialize_all_input_transformers,
     serialize_all_sequence_inputs,
 )
@@ -507,211 +491,11 @@ def check_dataset_and_batch_size_compatiblity(
         raise ValueError(
             f"{name} dataset size ({len(dataset)}) can not be smaller than "
             f"batch size ({batch_size}). A fix can be increasing {name.lower()} sample "
-            f"size or reducing the batch size. If predicting on few unknown samples,"
+            f"size or reducing the batch size. If predicting on few unknown samples, "
             f"a solution can be setting the batch size to 1 in the global configuration"
-            f"passed to the prediction module. Future work includes making this "
+            f" passed to the prediction module. Future work includes making this "
             f"easier to work with."
         )
-
-
-class GetAttrDelegatedDataParallel(nn.DataParallel):
-    def __getattr__(self, name):
-        try:
-            return super().__getattr__(name)
-        except AttributeError:
-            return getattr(self.module, name)
-
-
-def get_model(
-    inputs_as_dict: al_input_objects_as_dict,
-    predictor_config: schemas.PredictorConfig,
-    global_config: schemas.GlobalConfig,
-    num_outputs_per_target: al_num_outputs_per_target,
-) -> Union[nn.Module, nn.DataParallel]:
-
-    fusion_class = get_fusion_class(fusion_model_type=predictor_config.model_type)
-    fusion_kwargs = get_fusion_kwargs_from_cl_args(
-        global_config=global_config,
-        predictor_config=predictor_config,
-        inputs=inputs_as_dict,
-        num_outputs_per_target=num_outputs_per_target,
-    )
-    fusion_model = fusion_class(**fusion_kwargs)
-    fusion_model = fusion_model.to(device=global_config.device)
-
-    if global_config.multi_gpu:
-        fusion_model = GetAttrDelegatedDataParallel(module=fusion_model)
-
-    return fusion_model
-
-
-def get_modules_to_fuse_from_inputs(inputs: al_input_objects_as_dict, device: str):
-    models = nn.ModuleDict()
-
-    for input_name, inputs_object in inputs.items():
-        input_type_info = inputs_object.input_config.input_type_info
-
-        if input_name.startswith("omics_"):
-            cur_omics_model = get_omics_model_from_model_config(
-                model_type=input_type_info.model_type,
-                model_config=inputs_object.input_config.model_config,
-                data_dimensions=inputs_object.data_dimensions,
-                device=device,
-            )
-
-            models[input_name] = cur_omics_model
-
-        elif input_name.startswith("tabular_"):
-
-            transformers = inputs_object.labels.label_transformers
-            cat_columns = input_type_info.extra_cat_columns
-            con_columns = input_type_info.extra_con_columns
-
-            unique_tabular_values = get_unique_values_from_transformers(
-                transformers=transformers,
-                keys_to_use=cat_columns,
-            )
-
-            tabular_model = get_tabular_model(
-                cat_columns=cat_columns,
-                con_columns=con_columns,
-                device=device,
-                unique_label_values=unique_tabular_values,
-            )
-            models[input_name] = tabular_model
-
-        elif input_name.startswith("sequence_"):
-
-            input_type_info = inputs_object.input_config.input_type_info
-            sequence_wrapper_model_config = TransformerWrapperModelConfig(
-                position=input_type_info.position,
-                position_dropout=input_type_info.position_dropout,
-                window_size=input_type_info.window_size,
-            )
-
-            sequence_model = get_sequence_model(
-                model_type=input_type_info.model_type,
-                model_config=inputs_object.input_config.model_config,
-                wrapper_model_config=sequence_wrapper_model_config,
-                num_tokens=len(inputs_object.vocab),
-                max_length=inputs_object.computed_max_length,
-                embedding_dim=input_type_info.embedding_dim,
-                device=device,
-            )
-            models[input_name] = sequence_model
-
-    return models
-
-
-def get_sequence_model(
-    model_type: str,
-    model_config: BasicTransformerFeatureExtractorModelConfig,
-    wrapper_model_config: TransformerWrapperModelConfig,
-    num_tokens: int,
-    max_length: int,
-    embedding_dim: int,
-    device: str,
-):
-
-    feature_extractor_max_length = max_length
-    if wrapper_model_config.window_size:
-        logger.info(
-            "Using sliding model for sequence input as window size was set to %d.",
-            wrapper_model_config.window_size,
-        )
-        feature_extractor_max_length = wrapper_model_config.window_size
-
-    embedding_dim = get_embedding_dim_for_sequence_model(
-        embedding_dim=embedding_dim,
-        num_tokens=num_tokens,
-        num_heads=model_config.num_heads,
-    )
-
-    feature_extractor = TransformerFeatureExtractor(
-        model_config=model_config,
-        num_tokens=num_tokens,
-        max_length=feature_extractor_max_length,
-        embedding_dim=embedding_dim,
-    )
-
-    sequence_model = TransformerWrapperModel(
-        feature_extractor=feature_extractor,
-        model_config=wrapper_model_config,
-        embedding_dim=embedding_dim,
-        num_tokens=num_tokens,
-        max_length=max_length,
-    ).to(device=device)
-
-    return sequence_model
-
-
-def get_tabular_model(
-    cat_columns: Sequence[str],
-    con_columns: Sequence[str],
-    device: str,
-    unique_label_values: Dict[str, Set[str]],
-) -> SimpleTabularModel:
-    tabular_model = SimpleTabularModel(
-        cat_columns=cat_columns,
-        con_columns=con_columns,
-        unique_label_values_per_column=unique_label_values,
-        device=device,
-    )
-
-    return tabular_model
-
-
-def get_omics_model_from_model_config(
-    model_config: al_omics_model_configs,
-    data_dimensions: DataDimensions,
-    model_type: str,
-    device: str,
-):
-
-    omics_model_class = get_model_class(model_type=model_type)
-    model_init_kwargs = get_omics_model_init_kwargs(
-        model_type=model_type,
-        model_config=model_config,
-        data_dimensions=data_dimensions,
-    )
-    omics_model = omics_model_class(**model_init_kwargs)
-
-    if model_type == "cnn":
-        assert omics_model.data_size_after_conv >= 8
-
-    omics_model = omics_model.to(device=device)
-
-    return omics_model
-
-
-def get_fusion_class(
-    fusion_model_type: str,
-) -> Type[nn.Module]:
-    if fusion_model_type == "mgmoe":
-        return fusion_mgmoe.MGMoEModel
-    elif fusion_model_type == "default":
-        return fusion.FusionModel
-    elif fusion_model_type == "linear":
-        return fusion_linear.LinearFusionModel
-    raise ValueError(f"Unrecognized fusion model type: {fusion_model_type}.")
-
-
-def get_fusion_kwargs_from_cl_args(
-    global_config: schemas.GlobalConfig,
-    predictor_config: schemas.PredictorConfig,
-    inputs: al_input_objects_as_dict,
-    num_outputs_per_target: al_num_outputs_per_target,
-) -> Dict[str, Any]:
-
-    kwargs = {}
-    modules_to_fuse = get_modules_to_fuse_from_inputs(
-        inputs=inputs, device=global_config.device
-    )
-    kwargs["modules_to_fuse"] = modules_to_fuse
-    kwargs["num_outputs_per_target"] = num_outputs_per_target
-    kwargs["model_config"] = predictor_config.model_config
-
-    return kwargs
 
 
 def _get_criterions(target_columns: al_target_columns) -> al_criterions:
@@ -757,10 +541,13 @@ def _log_model(model: nn.Module) -> None:
     TODO: Add summary of parameters
     TODO: Add verbosity option
     """
-    no_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    no_params = sum(p.numel() for p in model.parameters())
+    no_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
     logger.info(
-        "Starting training with a %s parameter model.", format(no_params, ",.0f")
+        "Starting training with a %s parameter model. " "Num trainable parameters: %s.",
+        format(no_params, ",.0f"),
+        format(no_trainable_params, ",.0f"),
     )
 
 
@@ -971,7 +758,7 @@ def prepare_base_batch_default(
     loader_batch: al_dataloader_getitem_batch,
     input_objects: al_input_objects_as_dict,
     target_columns: al_target_columns,
-    model: fusion.FusionModel,
+    model: FusionModel,
     device: str,
 ):
 

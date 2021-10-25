@@ -7,13 +7,14 @@ from torch.optim.adamw import AdamW
 from torch.utils.data import WeightedRandomSampler, SequentialSampler, RandomSampler
 
 import eir.data_load.data_utils
+import eir.models.model_setup
 import eir.models.omics.omics_models
 import eir.setup.config
 import eir.setup.input_setup
 import eir.train
 from eir import train
 from eir.data_load import label_setup
-from eir.models.fusion import FusionModel
+from eir.models.fusion.fusion_default import FusionModel
 from eir.models.omics.models_cnn import CNNModel
 from eir.models.omics.models_linear import LinearModel
 from eir.setup.config import Configs
@@ -266,7 +267,7 @@ def test_get_model(create_test_config: Configs, create_test_labels):
         hooks=None,
     )
 
-    model = train.get_model(
+    model = eir.models.model_setup.get_model(
         inputs_as_dict=inputs_as_dict,
         global_config=gc,
         predictor_config=create_test_config.predictor_config,

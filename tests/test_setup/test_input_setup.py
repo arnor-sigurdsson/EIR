@@ -104,15 +104,17 @@ def test_get_tokenizer():
 
     test_input = "the lazy dog JUMPED over:: the red fox or whatever".split()
 
-    identity_tokenizer = input_setup.get_tokenizer(
+    identity_tokenizer = input_setup.get_basic_tokenizer(
         tokenizer_name=None, tokenizer_language=None
     )
     assert identity_tokenizer(test_input) == test_input
 
     with pytest.raises(ValueError):
-        input_setup.get_tokenizer(tokenizer_name="revtok", tokenizer_language="is")
+        input_setup.get_basic_tokenizer(
+            tokenizer_name="revtok", tokenizer_language="is"
+        )
 
-    basic_english_tokenizer = input_setup.get_tokenizer(
+    basic_english_tokenizer = input_setup.get_basic_tokenizer(
         tokenizer_name="basic_english", tokenizer_language="en"
     )
 
@@ -127,7 +129,7 @@ def test_get_tokenized_vocab_iterator():
     def _test_iterator():
         yield "the lazy dog JUMPED over:: the red fox or whatever".split()
 
-    basic_english_tokenizer = input_setup.get_tokenizer(
+    basic_english_tokenizer = input_setup.get_basic_tokenizer(
         tokenizer_name="basic_english", tokenizer_language="en"
     )
 

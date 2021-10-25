@@ -76,6 +76,8 @@ def set_up_train_and_valid_tabular_data(
     df_labels_train, df_labels_valid = _split_df_by_ids(
         df=df_labels, train_ids=train_ids, valid_ids=valid_ids
     )
+    _pre_check_label_df(df=df_labels_train, name="Training DataFrame")
+    _pre_check_label_df(df=df_labels_valid, name="Validation DataFrame")
 
     df_labels_train, df_labels_valid, label_transformers = _process_train_and_label_dfs(
         tabular_info=tabular_file_info,
@@ -102,24 +104,23 @@ def _get_fit_label_transformers(
     label_transformers = {}
 
     for column_type in label_columns:
-        target_columns_of_cur_type = label_columns[column_type]
+        label_columns_for_cur_type = label_columns[column_type]
 
-        if target_columns_of_cur_type:
+        if label_columns_for_cur_type:
             logger.debug(
                 "Fitting transformers on %s label columns %s",
                 column_type,
-                target_columns_of_cur_type,
+                label_columns_for_cur_type,
             )
 
-        for cur_target_column in target_columns_of_cur_type:
-            cur_series = df_labels[cur_target_column]
+        for label_column in label_columns_for_cur_type:
+            cur_series = df_labels[label_column]
 
-            cur_target_transformer = _get_transformer(column_type=column_type)
+            cur_transformer = _get_transformer(column_type=column_type)
             cur_target_transformer_fit = _fit_transformer_on_label_column(
-                column_series=cur_series, transformer=cur_target_transformer
+                column_series=cur_series, transformer=cur_transformer
             )
-
-            label_transformers[cur_target_column] = cur_target_transformer_fit
+            label_transformers[label_column] = cur_target_transformer_fit
 
     return label_transformers
 
@@ -572,8 +573,23 @@ def _load_label_df(
     )
 
     df_labels = df_labels.set_index("ID")
+    _pre_check_label_df(df=df_labels, name=str(label_fpath))
 
     return df_labels
+
+
+def _pre_check_label_df(df: pd.DataFrame, name: str) -> None:
+    for column in df.columns:
+        if df[column].isnull().all():
+            raise ValueError(
+                f"All values are NULL in column '{column}' from {name}. "
+                f"This can either be due to all values in the column actually "
+                f"being NULL, or an unfavorable split happened during train/validation"
+                f" splitting, causing all values in the training split for the column "
+                f"to be NULL. For now this will raise an error, but might be handled "
+                f"in the future."
+                f" In any case, please remove '{column}' as an input/target for now.",
+            )
 
 
 def _ensure_id_str_dtype(dtypes: Union[Dict[str, Any], None]) -> Dict[str, Any]:

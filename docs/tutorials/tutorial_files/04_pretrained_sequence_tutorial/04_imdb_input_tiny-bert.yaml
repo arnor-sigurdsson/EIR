@@ -1,0 +1,13 @@
+input_info:
+  input_source: IMDB/IMDB_Reviews/
+  input_name: imdb_reviews_tiny_bert
+  input_type: sequence
+
+input_type_info:
+        model_type: "prajjwal1/bert-tiny" 
+        pretrained_model: true
+        freeze_pretrained_model: false
+        sampling_strategy_if_longer: "uniform"
+        max_length: 512
+        split_on: " "
+        min_freq: 10

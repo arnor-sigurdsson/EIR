@@ -1,9 +1,9 @@
 from dataclasses import dataclass, field
 from typing import Union, Literal, List, Optional, Sequence, Type
 
-from eir.models.fusion import FusionModelConfig
-from eir.models.fusion_linear import LinearFusionModelConfig
-from eir.models.fusion_mgmoe import MGMoEModelConfig
+from eir.models.fusion.fusion_default import FusionModelConfig
+from eir.models.fusion.fusion_linear import LinearFusionModelConfig
+from eir.models.fusion.fusion_mgmoe import MGMoEModelConfig
 from eir.models.omics.omics_models import (
     LinearModel,
     CNNModel,
@@ -347,6 +347,10 @@ class SequenceInputDataConfig:
         Type of sequence model to use. Currently only one type ("sequence-default") is
         supported, which is a vanilla transformer model.
 
+    :param pretrained_model:
+        Specify whether the model type is assumed to be pretrained and from the
+        Hugging Face model hub.
+
     :param vocab_file:
         An optional text file containing pre-defined vocabulary to use
         for the training. If this is not passed in, the framework will automatically
@@ -396,7 +400,9 @@ class SequenceInputDataConfig:
         complexity of transformers, as it becomes n_windows * O(window_size²) instead.
     """
 
-    model_type: Literal["sequence-default"] = "sequence-default"
+    model_type: Union[Literal["sequence-default"], str] = "sequence-default"
+    pretrained_model: bool = False
+    freeze_pretrained_model: bool = False
     vocab_file: Union[None, str] = None
     max_length: al_max_sequence_length = "average"
     sampling_strategy_if_longer: Literal["from_start", "uniform"] = "uniform"

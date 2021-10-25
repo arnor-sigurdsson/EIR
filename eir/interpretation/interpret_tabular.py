@@ -386,6 +386,7 @@ def plot_tabular_beeswarm(
     fig.savefig(
         str(activation_outfolder / f"con_features_beeswarm_{class_name}.pdf"),
         bbox_inches="tight",
+        dpi=300,
     )
 
     plt.close("all")

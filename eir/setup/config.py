@@ -34,9 +34,9 @@ import yaml
 from aislib.misc_utils import get_logger
 
 import eir.models.tabular.tabular
-from eir.models.fusion import FusionModelConfig
-from eir.models.fusion_linear import LinearFusionModelConfig
-from eir.models.fusion_mgmoe import MGMoEModelConfig
+from eir.models.fusion.fusion_default import FusionModelConfig
+from eir.models.fusion.fusion_linear import LinearFusionModelConfig
+from eir.models.fusion.fusion_mgmoe import MGMoEModelConfig
 from eir.models.omics.omics_models import get_omics_config_dataclass_mapping
 from eir.models.sequence.transformer_basic import (
     BasicTransformerFeatureExtractorModelConfig,
@@ -358,6 +358,17 @@ def set_up_model_config(
     input_type_info_object: al_input_types,
     model_init_kwargs_base: Union[None, dict],
 ):
+
+    if getattr(input_type_info_object, "pretrained_model", None):
+        return None
+
+    is_sequence = getattr(input_info_object, "input_type") == "sequence"
+    is_unknown_sequence_model = (
+        getattr(input_type_info_object, "model_type") != "sequence-default"
+    )
+    if is_sequence and is_unknown_sequence_model:
+        return model_init_kwargs_base
+
     if not model_init_kwargs_base:
         model_init_kwargs_base = {}
 

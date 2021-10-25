@@ -1,0 +1,5 @@
+model_type: default
+model_config:
+        rb_do: 0.2
+        fc_do: 0.2
+        fc_task_dim: 128

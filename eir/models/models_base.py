@@ -7,12 +7,16 @@ from typing import (
     Callable,
     Iterable,
     Any,
+    Union,
     TYPE_CHECKING,
 )
 
 import torch
 from aislib.misc_utils import get_logger
 from torch import nn
+from transformers import PreTrainedModel
+
+from eir.models.sequence.transformer_basic import get_hf_transformer_forward
 
 if TYPE_CHECKING:
     from eir.train import al_num_outputs_per_target
@@ -184,3 +188,34 @@ def calculate_module_dict_outputs(
         final_out[target_column] = linear_layer(input_)
 
     return final_out
+
+
+def get_output_dimensions_for_input(
+    module: Union[PreTrainedModel, nn.Module],
+    input_shape: Tuple[int, ...],
+    hf_model: bool = False,
+) -> torch.LongTensor:
+
+    module_copy = deepcopy(module).to(device="cpu")
+
+    with torch.no_grad():
+        test_input = torch.randn(*input_shape)
+
+        if hf_model:
+            hf_forward = get_hf_transformer_forward(
+                feature_extractor_=module_copy,
+                input_length=input_shape[1],
+                embedding_dim=input_shape[2],
+                device="cpu",
+            )
+            test_output = hf_forward(input=test_input, feature_extractor=module_copy)
+        else:
+            test_output = module_copy(test_input)
+
+        output_shape = test_output.shape
+        logger.info(
+            "Inferred output shape of %s from model %s.",
+            output_shape,
+            type(module).__name__,
+        )
+        return output_shape
