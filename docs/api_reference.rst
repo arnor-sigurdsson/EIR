@@ -27,11 +27,11 @@ to the fusion operations themselves,
 and having therefore separate configurations
 for those and the predictor branches.
 
-.. autoclass:: eir.models.fusion_linear.LinearFusionModelConfig
+.. autoclass:: eir.models.fusion.fusion_default.FusionModelConfig
 
-.. autoclass:: eir.models.fusion.FusionModelConfig
+.. autoclass:: eir.models.fusion.fusion_mgmoe.MGMoEModelConfig
 
-.. autoclass:: eir.models.fusion_mgmoe.MGMoEModelConfig
+.. autoclass:: eir.models.fusion.fusion_linear.LinearFusionModelConfig
 
 Omics Feature Extractors
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -54,4 +54,4 @@ Tabular Feature Extractors
 Sequence Feature Extractors
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. autoclass:: eir.models.sequence.transformer_basic.BasicTransformerModelConfig
+.. autoclass:: eir.models.sequence.transformer_basic.BasicTransformerFeatureExtractorModelConfig
