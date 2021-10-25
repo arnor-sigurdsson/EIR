@@ -54,6 +54,7 @@ def set_up_train_and_valid_tabular_data(
     custom_label_ops: al_all_column_ops,
     train_ids: Sequence[str],
     valid_ids: Sequence[str],
+    include_missing: bool = False,
 ) -> Labels:
     """
     Splits and does split based processing (e.g. scaling validation set with training
@@ -83,6 +84,7 @@ def set_up_train_and_valid_tabular_data(
         tabular_info=tabular_file_info,
         df_labels_train=df_labels_train,
         df_labels_valid=df_labels_valid,
+        include_missing=include_missing,
     )
 
     train_labels_dict = df_labels_train.to_dict("index")
@@ -872,6 +874,7 @@ def _process_train_and_label_dfs(
     tabular_info: TabularFileInfo,
     df_labels_train: pd.DataFrame,
     df_labels_valid: pd.DataFrame,
+    include_missing: bool = False,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, al_label_transformers]:
     """
     NOTE: Possibly, we will run into problem here in the future in the scenario that
@@ -892,6 +895,7 @@ def _process_train_and_label_dfs(
         con_label_columns=tabular_info.con_columns,
         con_manual_values=train_con_means,
         name="train df",
+        include_missing=include_missing,
     )
 
     df_labels_valid_no_nan = handle_missing_label_values_in_df(
@@ -900,6 +904,7 @@ def _process_train_and_label_dfs(
         con_label_columns=tabular_info.con_columns,
         con_manual_values=train_con_means,
         name="valid df",
+        include_missing=include_missing,
     )
 
     label_columns = {
@@ -932,10 +937,14 @@ def handle_missing_label_values_in_df(
     con_label_columns: Sequence[str],
     con_manual_values: Union[Dict[str, float], None] = None,
     name: str = "df",
+    include_missing: bool = False,
 ) -> pd.DataFrame:
 
     df_filled_cat = _fill_categorical_nans(
-        df=df, column_names=cat_label_columns, name=name
+        df=df,
+        column_names=cat_label_columns,
+        name=name,
+        include_missing=include_missing,
     )
 
     df_filled_final = _fill_continuous_nans(
@@ -951,6 +960,7 @@ def handle_missing_label_values_in_df(
 def _fill_categorical_nans(
     df: pd.DataFrame,
     column_names: Sequence[str],
+    include_missing: bool,
     name: str = "df",
 ) -> pd.DataFrame:
     """
@@ -968,7 +978,7 @@ def _fill_categorical_nans(
     for column in column_names:
 
         na_found = df[column].isna().sum() != 0
-        if na_found:
+        if na_found or include_missing:
             df[column] = df[column].cat.add_categories("NA").fillna("NA")
 
     return df

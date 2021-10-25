@@ -36,6 +36,7 @@ from eir.data_load.label_setup import (
 )
 from eir.setup import schemas
 from eir.setup.schemas import al_tokenizer_choices
+from eir.models.tabular.tabular import get_unique_values_from_transformers
 
 if TYPE_CHECKING:
     from eir.train import Hooks
@@ -459,6 +460,7 @@ def get_max_length(
 class TabularInputInfo:
     labels: Labels
     input_config: schemas.InputConfig
+    total_num_features: int
 
 
 def set_up_tabular_input_for_training(
@@ -478,10 +480,18 @@ def set_up_tabular_input_for_training(
         custom_label_ops=custom_ops,
         train_ids=train_ids,
         valid_ids=valid_ids,
+        include_missing=True,
     )
 
+    total_num_features = get_tabular_num_features(
+        label_transformers=tabular_labels.label_transformers,
+        cat_columns=input_config.input_type_info.extra_cat_columns,
+        con_columns=input_config.input_type_info.extra_con_columns,
+    )
     tabular_input_info = TabularInputInfo(
-        labels=tabular_labels, input_config=input_config
+        labels=tabular_labels,
+        input_config=input_config,
+        total_num_features=total_num_features,
     )
 
     return tabular_input_info
@@ -500,6 +510,21 @@ def get_tabular_input_file_info(
     )
 
     return table_info
+
+
+def get_tabular_num_features(
+    label_transformers: Dict, cat_columns: Sequence[str], con_columns: Sequence[str]
+) -> int:
+    unique_cat_values = get_unique_values_from_transformers(
+        transformers=label_transformers,
+        keys_to_use=cat_columns,
+    )
+    cat_num_features = sum(
+        len(unique_values) for unique_values in unique_cat_values.values()
+    )
+    total_num_features = cat_num_features + len(con_columns)
+
+    return total_num_features
 
 
 @dataclass

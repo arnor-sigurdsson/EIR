@@ -38,7 +38,11 @@ from eir.setup import config
 from eir.setup.input_setup import _get_split_func
 
 if TYPE_CHECKING:
-    from eir.setup.input_setup import al_input_objects_as_dict, SequenceInputInfo
+    from eir.setup.input_setup import (
+        al_input_objects_as_dict,
+        SequenceInputInfo,
+        TabularInputInfo,
+    )
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -480,10 +484,30 @@ def _get_default_impute_fill_values(inputs_objects: "al_input_objects_as_dict"):
     for input_name, input_object in inputs_objects.items():
         if input_name.startswith("omics_"):
             fill_values[input_name] = False
+        elif input_name.startswith("tabular_"):
+            fill_values[input_name] = _build_tabular_fill_value(
+                input_object=input_object
+            )
         else:
             fill_values[input_name] = 0
 
     return fill_values
+
+
+def _build_tabular_fill_value(input_object: "TabularInputInfo"):
+    fill_value = {}
+    transformers = input_object.labels.label_transformers
+
+    cat_columns = input_object.input_config.input_type_info.extra_cat_columns
+    for cat_column in cat_columns:
+        cur_label_encoder = transformers[cat_column]
+        fill_value[cat_column] = cur_label_encoder.transform(["NA"]).item()
+
+    con_columns = input_object.input_config.input_type_info.extra_con_columns
+    for con_column in con_columns:
+        fill_value[con_column] = 0.0
+
+    return fill_value
 
 
 def _get_default_impute_dtypes(inputs_objects: "al_input_objects_as_dict"):
@@ -704,9 +728,6 @@ def impute_missing_modalities(
     fill_values: Dict[str, Any],
     dtypes: Dict[str, Any],
 ) -> Dict[str, torch.Tensor]:
-    """
-    TODO: Implement support for imputing missing tabular modality.
-    """
 
     for input_name, input_object in inputs_objects.items():
         if input_name not in inputs_values:
@@ -731,14 +752,14 @@ def impute_missing_modalities(
                 inputs_values[input_name] = imputed_tensor
 
             elif input_name.startswith("tabular_"):
-                raise NotImplementedError(
-                    "Imputing missing tabular values not yet supported."
-                )
+                inputs_values[input_name] = fill_value
 
     return inputs_values
 
 
-def impute_single_missing_modality(shape: Tuple[int, ...], fill_value: Any, dtype: Any):
+def impute_single_missing_modality(
+    shape: Tuple[int, ...], fill_value: Any, dtype: Any
+) -> torch.Tensor:
     imputed_tensor = torch.empty(shape, dtype=dtype).fill_(fill_value)
     return imputed_tensor
 

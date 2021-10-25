@@ -7,7 +7,7 @@ from typing import Set, overload, TYPE_CHECKING, Sequence, Iterable, Any
 import joblib
 import torch
 from aislib.misc_utils import ensure_path_exists
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import LabelEncoder, StandardScaler
 from torch import nn
 
 if TYPE_CHECKING:
@@ -61,7 +61,9 @@ class SimpleTabularModel(nn.Module):
             unique_label_values=unique_label_values_per_column
         )
 
-        emb_total_dim = con_total_dim = 0
+        emb_total_dim = 0
+        con_total_dim = 0
+
         if self.embeddings_dict:
             emb_total_dim = attach_embeddings(self, self.embeddings_dict)
         if self.con_columns:
@@ -273,7 +275,7 @@ def get_embedding_dict(
 
 
 def get_unique_values_from_transformers(
-    transformers: Dict[str, LabelEncoder],
+    transformers: Dict[str, Union[LabelEncoder, StandardScaler]],
     keys_to_use: Union[str, Iterable[str]],
 ) -> Dict[str, Any]:
 
