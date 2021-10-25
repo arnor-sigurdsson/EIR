@@ -260,7 +260,7 @@ def _get_pretrained_hf_sequence_feature_extractor_objects(
 
     pretrained_model = _get_hf_pretrained_model(model_name=model_name)
     pretrained_model_embeddings = pretrained_model.get_input_embeddings()
-    feature_extractor = pretrained_model.encoder
+    feature_extractor = pretrained_model
 
     if frozen:
         logger.info("Freezing weights and embeddings of model '%s'.", model_name)
@@ -279,7 +279,7 @@ def _get_pretrained_hf_sequence_feature_extractor_objects(
         feature_extractor=feature_extractor,
     )
     objects_for_wrapper = SequenceModelObjectsForWrapperModel(
-        feature_extractor=pretrained_model.encoder,
+        feature_extractor=pretrained_model,
         embeddings=pretrained_model_embeddings,
         embedding_dim=pretrained_embedding_dim,
         external=True,
