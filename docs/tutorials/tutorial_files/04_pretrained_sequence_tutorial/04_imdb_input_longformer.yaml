@@ -1,0 +1,23 @@
+input_info:
+  input_source: IMDB/IMDB_Reviews/
+  input_name: imdb_reviews_longformer
+  input_type: sequence
+
+input_type_info:
+        model_type: longformer
+        pretrained_model: false
+        sampling_strategy_if_longer: "uniform"
+        max_length: 512
+        split_on: " "
+        min_freq: 10
+        tokenizer: "basic_english"
+        tokenizer_language: "en"
+
+model_config:
+        num_hidden_layers: 2
+        hidden_size: 12
+        num_attention_heads: 2
+        intermediate_size: 32
+        attention_window: 64
+        max_position_embeddings: 1024
+
