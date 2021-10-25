@@ -1117,10 +1117,13 @@ def test_handle_missing_label_values_in_df(
     assert (test_df_filled["D"] == test_df["D"]).all()
 
 
-def test_fill_categorical_nans(get_test_nan_df):
+@pytest.mark.parametrize("include_missing", [False, True])
+def test_fill_categorical_nans(
+    include_missing: bool, get_test_nan_df: pd.DataFrame
+) -> None:
     test_df = get_test_nan_df
     test_df_filled = label_setup._fill_categorical_nans(
-        df=test_df, column_names=["A", "B"]
+        df=test_df, column_names=["A", "B"], include_missing=include_missing
     )
 
     assert set(test_df_filled["A"].unique()) == {"NA", 3}

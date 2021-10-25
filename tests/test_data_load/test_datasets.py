@@ -690,16 +690,22 @@ def test_impute_missing_modalities(
     )
     assert no_fill == test_inputs_all_avail
 
-    with pytest.raises(NotImplementedError):
-        test_inputs_missing_tabular = {
-            k: v for k, v in test_inputs_all_avail.items() if "tabular" not in k
-        }
-        _ = datasets.impute_missing_modalities(
-            inputs_values=test_inputs_missing_tabular,
-            inputs_objects=input_objects,
-            fill_values=impute_fill_values,
-            dtypes=impute_dtypes,
-        )
+    test_inputs_missing_tabular = {
+        k: v for k, v in test_inputs_all_avail.items() if "tabular" not in k
+    }
+    filled_tabular = datasets.impute_missing_modalities(
+        inputs_values=test_inputs_missing_tabular,
+        inputs_objects=input_objects,
+        fill_values=impute_fill_values,
+        dtypes=impute_dtypes,
+    )
+
+    transformers = input_objects["tabular_test_tabular"].labels.label_transformers
+    origin_extra_label_encoder = transformers["OriginExtraCol"]
+    na_transformer_index = origin_extra_label_encoder.transform(["NA"]).item()
+    filled_na_value = filled_tabular["tabular_test_tabular"]["OriginExtraCol"]
+    assert na_transformer_index == filled_na_value
+    assert filled_tabular["tabular_test_tabular"]["ExtraTarget"] == 0.0
 
     test_inputs_missing_omics = {
         k: v for k, v in test_inputs_all_avail.items() if "omics" not in k
