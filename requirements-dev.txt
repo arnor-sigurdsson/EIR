@@ -3,7 +3,7 @@ adabelief-pytorch==0.2.1; python_version >= "3.6"
 aislib==0.1.7a0; python_version >= "3.8" and python_version < "4.0"
 alabaster==0.7.12; python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.4.0" and python_version >= "3.6"
 altgraph==0.17.2; sys_platform == "darwin" and python_version >= "3.6"
-appnope==0.1.2; platform_system == "Darwin" and python_version >= "3.7" and sys_platform == "darwin"
+appnope==0.1.2; sys_platform == "darwin" and python_version >= "3.7" and platform_system == "Darwin"
 argon2-cffi==21.1.0; python_version >= "3.6"
 atomicwrites==1.4.0; python_version >= "3.6" and python_full_version < "3.0.0" and sys_platform == "win32" or sys_platform == "win32" and python_version >= "3.6" and python_full_version >= "3.4.0"
 attrs==21.2.0; python_version >= "3.7" and python_full_version < "3.0.0" or python_full_version >= "3.5.0" and python_version >= "3.7"
@@ -115,7 +115,7 @@ pygments==2.10.0; python_version >= "3.7" and python_full_version < "3.0.0" or p
 pyinstaller-hooks-contrib==2021.3; python_version >= "3.6"
 pyinstaller==4.5.1; python_version >= "3.6"
 pynvim==0.4.3
-pyparsing==3.0.0; python_version >= "3.7"
+pyparsing==3.0.1; python_version >= "3.7"
 pyrsistent==0.18.0; python_version >= "3.7"
 pytest-cov==3.0.0; python_version >= "3.6"
 pytest-testmon==1.2.2; python_version >= "3.6"
@@ -144,7 +144,7 @@ sentencepiece==0.1.96
 shap==0.40.0
 six==1.16.0; python_full_version >= "3.7.1" and python_version >= "3.6" and (python_version >= "3.7" and python_full_version < "3.0.0" or python_full_version >= "3.3.0" and python_version >= "3.7") and (python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.3.0" and python_version >= "3.6") and (python_version >= "2.7" and python_full_version < "3.0.0" or python_full_version >= "3.5.0") and (python_version >= "2.7" and python_full_version < "3.0.0" or python_full_version >= "3.4.0")
 slicer==0.0.7; python_version >= "3.6"
-snakeviz==2.1.0
+snakeviz==2.1.1
 snowballstemmer==2.1.0; python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.4.0" and python_version >= "3.6"
 sortedcontainers==2.4.0; python_version >= "3.6"
 sphinx-copybutton==0.4.0; python_version >= "3.6"
@@ -167,7 +167,7 @@ testpath==0.5.0; python_version >= "3.7"
 threadpoolctl==3.0.0; python_version >= "3.8" and python_version < "4.0"
 tokenizers==0.10.3; python_full_version >= "3.6.0"
 toml==0.10.2; python_full_version >= "3.6.1" and python_version >= "3.6" and (python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.3.0" and python_version >= "3.6")
-tomli==1.2.1; python_version >= "3.6" and python_full_version >= "3.6.2"
+tomli==1.2.2; python_version >= "3.6" and python_full_version >= "3.6.2"
 tomlkit==0.7.2; (python_version >= "2.7" and python_full_version < "3.0.0") or (python_full_version >= "3.5.0")
 toolz==0.11.1; python_version >= "3.8" and python_version < "4.0"
 torch-optimizer==0.1.0; python_full_version >= "3.6.0"
