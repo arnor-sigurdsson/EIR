@@ -89,7 +89,7 @@ As before, we do our training with the following command:
 
 Checking the accuracy, we see:
 
-.. image:: tutorial_files/04_pretrained_sequence_tutorial/figures/04a_basic_transformer_training_curve_ACC.pdf
+.. image:: tutorial_files/04_pretrained_sequence_tutorial/figures/04a_basic_transformer_training_curve_ACC.png
 
 A little better than what
 we saw in the :ref:`03-sequence-tutorial`,
@@ -132,7 +132,7 @@ To train, we just swap out the input configuration from the command above:
 
 Training this model gave the following training curve:
 
-.. image:: tutorial_files/04_pretrained_sequence_tutorial/figures/04b_windowed_transformer_training_curve_ACC.pdf
+.. image:: tutorial_files/04_pretrained_sequence_tutorial/figures/04b_windowed_transformer_training_curve_ACC.png
 
 Indeed, increasing the sequence length does seem to help,
 and using a window size of 64 seems to work fairly well.
@@ -187,7 +187,7 @@ We train with the following command:
 
 And get the following training curve:
 
-.. image:: tutorial_files/04_pretrained_sequence_tutorial/figures/04c_longformer_training_curve_ACC.pdf
+.. image:: tutorial_files/04_pretrained_sequence_tutorial/figures/04c_longformer_training_curve_ACC.png
 
 Indeed, we see an incremental improvement
 on the validation set
@@ -246,7 +246,7 @@ so here it helps to have a powerful computer. We run this as always with:
 
 The training curve looks like so:
 
-.. image:: tutorial_files/04_pretrained_sequence_tutorial/figures/04d_pretrained_tiny-bert_training_curve_ACC.pdf
+.. image:: tutorial_files/04_pretrained_sequence_tutorial/figures/04d_pretrained_tiny-bert_training_curve_ACC.png
 
 Indeed, it does seem to help a bit to use a pretrained model.
 Also notice how quickly it reached it top validation performance compared to the
@@ -289,7 +289,7 @@ I was a bit lazy when I was running this
 and did not run it to completion,
 however the performance looked like this before I stopped it:
 
-.. image:: tutorial_files/04_pretrained_sequence_tutorial/figures/04e_combined_model_training_curve_ACC.pdf
+.. image:: tutorial_files/04_pretrained_sequence_tutorial/figures/04e_combined_model_training_curve_ACC.png
 
 So in this case, we do not see a
 huge improvement when combining our models.
