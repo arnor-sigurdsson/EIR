@@ -162,9 +162,9 @@ let's have a look at
 the words that had the biggest influence
 towards a Positive and Negative sentiment.
 
-.. image:: tutorial_files/03_sequence_tutorial/a_IMDB/figures/tutorial_03a_feature_importance_Positive.pdf
+.. image:: tutorial_files/03_sequence_tutorial/a_IMDB/figures/tutorial_03a_feature_importance_Positive.png
 
-.. image:: tutorial_files/03_sequence_tutorial/a_IMDB/figures/tutorial_03a_feature_importance_Negative.pdf
+.. image:: tutorial_files/03_sequence_tutorial/a_IMDB/figures/tutorial_03a_feature_importance_Negative.png
 
 So fortunately,
 it seems indeed that our model learned some relevant things!
@@ -273,7 +273,7 @@ As the data is imbalanced, we will look at the MCC training curve:
 
 Checking the confusion matrix at iteration 1200, we see:
 
-.. image:: tutorial_files/03_sequence_tutorial/b_Anticancer_peptides/figures/tutorial_03b_confusion_matrix.pdf
+.. image:: tutorial_files/03_sequence_tutorial/b_Anticancer_peptides/figures/tutorial_03b_confusion_matrix.png
     :width: 800
 
 Looking at the training curve,
@@ -302,7 +302,7 @@ Here we have the training curve for this run:
 Now that's more like it! As before, let's have a look at the activations. In this case
 we will check activations towards the moderately active class:
 
-.. image:: tutorial_files/03_sequence_tutorial/b_Anticancer_peptides/figures/tutorial_03b_feature_importance_mod._active_mixing.pdf
+.. image:: tutorial_files/03_sequence_tutorial/b_Anticancer_peptides/figures/tutorial_03b_feature_importance_mod._active_mixing.png
 
 It seems that the Lysine (K) amino acid influences the model towards a
 moderately active prediction, while Glutamic acid (E) does the opposite.
