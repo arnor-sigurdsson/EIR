@@ -35,6 +35,7 @@ a = Analysis(
         "sklearn.neighbors._typedefs",
         "sklearn.neighbors._quad_tree",
         "sklearn.utils._weight_vector",
+        "sklearn.neighbors._partition_nodes",
         "sklearn.neighbors",
         "sklearn.tree._utils",
         "sklearn.tree",
