@@ -29,6 +29,7 @@ import eir.setup.input_setup
 import eir.train
 from eir import train
 from eir.data_load import datasets
+from eir.models.model_setup import get_model
 from eir.setup import schemas, config
 from eir.setup.config import recursive_dict_replace
 from eir.setup.input_setup import (
@@ -39,7 +40,6 @@ from eir.train import (
     Experiment,
     set_up_num_outputs_per_target,
 )
-from eir.models.model_setup import get_model
 from eir.train_utils import optimizers, metrics
 from eir.train_utils.utils import configure_root_logger, get_run_folder, seed_everything
 from tests.test_modelling.setup_modelling_test_data.setup_omics_test_data import (
@@ -206,6 +206,7 @@ def get_input_test_init_base_func_map():
         "test_genotype": get_test_omics_input_init,
         "test_tabular": get_test_tabular_input_init,
         "test_sequence": get_test_sequence_input_init,
+        "test_bytes": get_test_bytes_input_init,
     }
 
     return mapping
@@ -277,6 +278,29 @@ def get_test_sequence_input_init(test_path: Path, split_to_test: bool) -> dict:
             "num_layers": 1,
             "dropout": 0.25,
         },
+    }
+
+    return input_init_kwargs
+
+
+def get_test_bytes_input_init(test_path: Path, split_to_test: bool) -> Dict:
+    input_source = test_path / "sequence"
+    if split_to_test:
+        input_source = input_source / "train_set"
+
+    input_init_kwargs = {
+        "input_info": {
+            "input_source": str(input_source),
+            "input_name": "test_sequence",
+            "input_type": "bytes",
+        },
+        "input_type_info": {
+            "max_length": 128,
+            "model_type": "sequence-default",
+            "embedding_dim": 32,
+            "window_size": 64,
+        },
+        "model_config": {},
     }
 
     return input_init_kwargs

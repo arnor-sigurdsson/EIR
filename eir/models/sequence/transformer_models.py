@@ -10,6 +10,7 @@ from torch import nn, Tensor
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
 from torch.nn.functional import pad
 from transformers import PreTrainedModel, PretrainedConfig
+from perceiver_pytorch import PerceiverIO
 
 from eir.models.layers import _find_split_padding_needed
 
@@ -208,7 +209,7 @@ def _get_feature_extractor_forward(
 def _simple_transformer_forward(
     input: torch.Tensor, feature_extractor: "TransformerFeatureExtractor"
 ) -> torch.Tensor:
-    return feature_extractor(input=input).flatten(1)
+    return feature_extractor(input).flatten(1)
 
 
 def get_hf_transformer_forward(
@@ -299,6 +300,9 @@ class BasicTransformerFeatureExtractorModelConfig:
     :param num_layers:
         The number of encoder blocks in the transformer model.
 
+    :param dim_feedforward:
+        The dimension of the feedforward network model
+
     :param dropout:
          Dropout value to use in the encoder layers.
 
@@ -306,6 +310,7 @@ class BasicTransformerFeatureExtractorModelConfig:
 
     num_heads: int = 8
     num_layers: int = 2
+    dim_feedforward: int = 256
     dropout: float = 0.10
 
 
@@ -327,7 +332,7 @@ class TransformerFeatureExtractor(nn.Module):
         encoder_layers = TransformerEncoderLayer(
             d_model=self.embedding_dim,
             nhead=model_config.num_heads,
-            dim_feedforward=max_length,
+            dim_feedforward=model_config.dim_feedforward,
             dropout=model_config.dropout,
             batch_first=True,
         )
@@ -349,6 +354,50 @@ def next_power_of_2(x: int) -> int:
         return 1
 
     return 2 ** math.ceil(math.log2(x))
+
+
+@dataclass
+class PerceiverIOModelConfig:
+    """ """
+
+    depth: int = 2
+    dim: int = 16
+    queries_dim: int = 32
+    logits_dim: Union[int, None] = None
+    num_latents: int = 32
+    latent_dim: int = 128
+    cross_heads: int = 1
+    latent_heads: int = 8
+    cross_dim_head: int = 64
+    latent_dim_head: int = 64
+    weight_tie_layers: bool = False
+    decoder_ff: bool = False
+
+
+class PerceiverIOFeatureExtractor(nn.Module):
+    def __init__(
+        self,
+        model_config: PerceiverIOModelConfig,
+        max_length: int,
+    ) -> None:
+        super().__init__()
+
+        self.model_config = model_config
+        self.max_length = max_length
+
+        self.perceiver = PerceiverIO(**model_config.__dict__)
+
+    @property
+    def num_out_features(self) -> int:
+        mc = self.model_config
+        if mc.logits_dim:
+            return mc.logits_dim * self.max_length
+
+        return mc.latent_dim * mc.num_latents
+
+    def forward(self, input: Tensor) -> Tensor:
+        out = self.perceiver(data=input)
+        return out
 
 
 def get_positional_representation_class(

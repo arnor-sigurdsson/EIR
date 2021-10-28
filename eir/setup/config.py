@@ -38,8 +38,9 @@ from eir.models.fusion.fusion_default import FusionModelConfig
 from eir.models.fusion.fusion_linear import LinearFusionModelConfig
 from eir.models.fusion.fusion_mgmoe import MGMoEModelConfig
 from eir.models.omics.omics_models import get_omics_config_dataclass_mapping
-from eir.models.sequence.transformer_basic import (
+from eir.models.sequence.transformer_models import (
     BasicTransformerFeatureExtractorModelConfig,
+    PerceiverIOModelConfig,
 )
 from eir.setup import schemas
 from eir.setup.presets import gln
@@ -48,6 +49,7 @@ al_input_types = Union[
     schemas.OmicsInputDataConfig,
     schemas.TabularInputDataConfig,
     schemas.SequenceInputDataConfig,
+    schemas.ByteInputDataConfig,
 ]
 
 logger = get_logger(name=__name__)
@@ -342,12 +344,14 @@ def get_inputs_schema_map() -> Dict[
         Type[schemas.OmicsInputDataConfig],
         Type[schemas.TabularInputDataConfig],
         Type[schemas.SequenceInputDataConfig],
+        Type[schemas.ByteInputDataConfig],
     ],
 ]:
     mapping = {
         "omics": schemas.OmicsInputDataConfig,
         "tabular": schemas.TabularInputDataConfig,
         "sequence": schemas.SequenceInputDataConfig,
+        "bytes": schemas.ByteInputDataConfig,
     }
 
     return mapping
@@ -362,9 +366,10 @@ def set_up_model_config(
     if getattr(input_type_info_object, "pretrained_model", None):
         return None
 
-    is_sequence = getattr(input_info_object, "input_type") == "sequence"
-    is_unknown_sequence_model = (
-        getattr(input_type_info_object, "model_type") != "sequence-default"
+    is_sequence = getattr(input_info_object, "input_type") in ("sequence", "bytes")
+    is_unknown_sequence_model = getattr(input_type_info_object, "model_type") not in (
+        "sequence-default",
+        "perceiver",
     )
     if is_sequence and is_unknown_sequence_model:
         return model_init_kwargs_base
@@ -415,6 +420,7 @@ def get_model_config_setup_hook_map():
         "omics": set_up_config_object_init_kwargs_identity,
         "tabular": set_up_config_object_init_kwargs_identity,
         "sequence": set_up_config_object_init_kwargs_identity,
+        "bytes": set_up_config_object_init_kwargs_identity,
     }
 
     return mapping
@@ -433,6 +439,7 @@ def get_model_config_map() -> Dict[str, Type]:
         **{
             "tabular": eir.models.tabular.tabular.TabularModelConfig,
             "sequence-default": BasicTransformerFeatureExtractorModelConfig,
+            "perceiver": PerceiverIOModelConfig,
         },
     }
 

@@ -42,6 +42,9 @@ if TYPE_CHECKING:
                         "input_info": {"input_name": "test_sequence"},
                     },
                     {
+                        "input_info": {"input_name": "test_bytes"},
+                    },
+                    {
                         "input_info": {"input_name": "test_tabular"},
                         "input_type_info": {
                             "model_type": "tabular",

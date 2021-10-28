@@ -44,6 +44,7 @@ from eir.interpretation.interpret_omics import (
     get_omics_consumer,
     ParsedOmicsActivations,
 )
+from eir.setup.schemas import InputConfig
 from eir.interpretation.interpret_tabular import (
     analyze_tabular_input_activations,
 )
@@ -123,6 +124,19 @@ def activation_analysis_handler(
     gc = exp.configs.global_config
     iteration = engine.state.iteration
 
+    types, should_run = check_if_should_run_analysis(
+        input_configs=exp.configs.input_configs
+    )
+    if not should_run:
+        logger.warning(
+            "Got get_acts: %s but none of the input types in %s currently "
+            "support activation analysis. "
+            "Activation analysis will be skipped. ",
+            gc.get_acts,
+            types,
+        )
+        return
+
     activation_outfolder_callable = partial(
         _prepare_eval_activation_outfolder,
         run_name=gc.run_name,
@@ -138,6 +152,16 @@ def activation_analysis_handler(
         dataset_to_interpret=exp.valid_dataset,
         background_loader=background_loader,
     )
+
+
+def check_if_should_run_analysis(
+    input_configs: Sequence[InputConfig],
+) -> Tuple[set, bool]:
+    all_types = {i.input_info.input_type for i in input_configs}
+
+    if all_types == {"bytes"}:
+        return all_types, False
+    return all_types, True
 
 
 def get_background_loader(experiment: "Experiment") -> torch.utils.data.DataLoader:
@@ -208,11 +232,14 @@ def activation_analysis_wrapper(
             target_column=target_column_name,
             column_type=target_column_type,
         )
+
         all_activations = process_activations_for_all_modalities(
             activation_producer=act_producer, activation_consumers=act_consumers
         )
 
         for input_name in input_names:
+            if input_name.startswith("bytes_"):
+                continue
 
             activation_outfolder = outfolder_target_callable(
                 column_name=target_column_name, input_name=input_name
@@ -361,12 +388,14 @@ def get_activation_consumers(
     consumers_dict = {}
 
     for name in input_names:
-        consumers_dict[name] = _get_consumer_from_input_name(
+        consumer = _get_consumer_from_input_name(
             input_name=name,
             target_transformer=target_transformer,
             target_column=target_column,
             column_type=column_type,
         )
+        if consumer is not None:
+            consumers_dict[name] = consumer
 
     return consumers_dict
 

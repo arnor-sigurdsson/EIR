@@ -42,6 +42,7 @@ if TYPE_CHECKING:
         al_input_objects_as_dict,
         SequenceInputInfo,
         TabularInputInfo,
+        BytesInputInfo,
     )
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
@@ -212,7 +213,7 @@ class DatasetBase(Dataset):
                     source_name=source_name,
                 )
 
-            elif input_type == "sequence":
+            elif input_type in ("sequence", "bytes"):
                 samples = _add_file_data_to_samples(
                     source_data=input_source,
                     samples=samples,
@@ -455,6 +456,11 @@ class MemoryDataset(DatasetBase):
                     load_sequence_from_disk,
                     split_on=source_data.input_config.input_type_info.split_on,
                 )
+            elif input_type == "bytes":
+                mapping[source_name] = partial(
+                    load_bytes_from_disk,
+                    dtype=source_data.input_config.input_type_info.byte_encoding,
+                )
 
         return mapping
 
@@ -515,7 +521,7 @@ def _get_default_impute_dtypes(inputs_objects: "al_input_objects_as_dict"):
     for input_name, input_object in inputs_objects.items():
         if input_name.startswith("omics_"):
             dtypes[input_name] = torch.bool
-        elif input_name.startswith("sequence"):
+        elif input_name.startswith("sequence_") or input_name.startswith("bytes_"):
             dtypes[input_name] = torch.long
         else:
             dtypes[input_name] = torch.float
@@ -604,10 +610,43 @@ def prepare_inputs_disk(
             )
             prepared_inputs[name] = prepared_sequence_inputs
 
+        elif name.startswith("bytes_"):
+
+            bytes_data = load_bytes_from_disk(
+                file_path=data,
+                dtype=input_type_info.byte_encoding,
+            )
+            prepared_bytes_input = prepare_bytes_data(
+                bytes_input_object=inputs_objects[name],
+                bytes_data=bytes_data,
+                test_mode=test_mode,
+            )
+
+            prepared_inputs[name] = prepared_bytes_input
+
         else:
             prepared_inputs[name] = inputs[name]
 
     return prepared_inputs
+
+
+def prepare_bytes_data(
+    bytes_input_object: "BytesInputInfo", bytes_data: np.ndarray, test_mode: bool
+) -> torch.Tensor:
+    bio = bytes_input_object
+
+    sampling_strat = bio.input_config.input_type_info.sampling_strategy_if_longer
+    if test_mode:
+        sampling_strat = "from_start"
+
+    bytes_tensor = torch.LongTensor(bytes_data)
+    cur_bytes_padded = process_tensor_to_length(
+        tensor=bytes_tensor,
+        max_length=bio.input_config.input_type_info.max_length,
+        sampling_strategy_if_longer=sampling_strat,
+    )
+
+    return cur_bytes_padded
 
 
 def prepare_sequence_data(
@@ -667,6 +706,11 @@ def _sample_sequence_uniform(
     return tensor[random_index_start:random_index_end]
 
 
+def load_bytes_from_disk(file_path: Path, dtype: str) -> np.ndarray:
+    data = np.fromfile(file=file_path, dtype=dtype)
+    return data
+
+
 def load_sequence_from_disk(sequence_file_path: Path, split_on: str) -> List[str]:
     split_func = _get_split_func(split_on=split_on)
     with open(sequence_file_path, "r") as infile:
@@ -700,6 +744,16 @@ def prepare_inputs_memory(
                 test_mode=test_mode,
             )
             prepared_inputs[name] = prepared_sequence_inputs
+
+        elif name.startswith("bytes_"):
+            bytes_raw_in_memory = data
+            prepared_bytes_input = prepare_bytes_data(
+                bytes_input_object=inputs_objects[name],
+                bytes_data=bytes_raw_in_memory,
+                test_mode=test_mode,
+            )
+
+            prepared_inputs[name] = prepared_bytes_input
 
         else:
             prepared_inputs[name] = inputs[name]
@@ -745,6 +799,14 @@ def impute_missing_modalities(
 
             elif input_name.startswith("sequence_"):
                 max_length = input_object.computed_max_length
+                shape = (max_length,)
+                imputed_tensor = impute_single_missing_modality(
+                    shape=shape, fill_value=fill_value, dtype=dtype
+                )
+                inputs_values[input_name] = imputed_tensor
+
+            elif input_name.startswith("bytes_"):
+                max_length = input_object.input_config.input_type_info.max_length
                 shape = (max_length,)
                 imputed_tensor = impute_single_missing_modality(
                     shape=shape, fill_value=fill_value, dtype=dtype
