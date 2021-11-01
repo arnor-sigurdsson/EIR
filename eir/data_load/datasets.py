@@ -244,7 +244,7 @@ class DatasetBase(Dataset):
         return samples
 
     def __getitem__(self, index: int):
-        raise NotImplementedError
+        raise NotImplementedError()
 
     def check_samples(self):
 
@@ -845,8 +845,13 @@ def impute_missing_modalities(
                 inputs_values[input_name] = imputed_tensor
 
             elif input_name.startswith("image"):
-                dimensions = input_object.shape
-                raise NotImplementedError()
+                size = input_object.input_config.input_type_info.size
+                num_channels = input_object.num_channels
+                shape = (num_channels, *size)
+                imputed_tensor = impute_single_missing_modality(
+                    shape=shape, fill_value=fill_value, dtype=dtype
+                )
+                inputs_values[input_name] = imputed_tensor
 
             elif input_name.startswith("tabular_"):
                 inputs_values[input_name] = fill_value
