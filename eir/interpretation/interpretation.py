@@ -49,6 +49,7 @@ from eir.interpretation.interpret_tabular import (
     analyze_tabular_input_activations,
 )
 from eir.interpretation.interpret_sequence import analyze_sequence_input_activations
+from eir.interpretation.interpret_image import analyze_image_input_activations
 from eir.models.model_training_utils import gather_dloader_samples
 from eir.models.omics.models_cnn import CNNModel
 from eir.models.omics.models_linear import LinearModel
@@ -264,6 +265,8 @@ def activation_analysis_wrapper(
                     **common_kwargs,
                     expected_target_classes_shap_values=explainer.expected_value,
                 )
+            elif input_name.startswith("image_"):
+                analyze_image_input_activations(**common_kwargs)
 
         hook_handle.remove()
 
@@ -409,7 +412,11 @@ def _get_consumer_from_input_name(
     [Union["SampleActivation", None]],
     Union[Sequence["SampleActivation"], ParsedOmicsActivations],
 ]:
-    if input_name.startswith("sequence_") or input_name.startswith("tabular_"):
+    if (
+        input_name.startswith("sequence_")
+        or input_name.startswith("tabular_")
+        or input_name.startswith("image_")
+    ):
         return get_basic_sequence_consumer()
     elif input_name.startswith("omics_"):
         return get_omics_consumer(

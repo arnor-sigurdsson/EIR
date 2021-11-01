@@ -8,9 +8,7 @@ from tests.test_modelling.setup_modelling_test_data.setup_test_data_utils import
     set_up_label_line_dict,
     get_current_test_label_values,
     set_up_test_data_root_outpath,
-    split_test_array_folder,
-    get_ids_from_paths,
-    split_label_file,
+    common_split_test_data_wrapper,
 )
 
 if TYPE_CHECKING:
@@ -57,14 +55,7 @@ def create_test_omics_data_and_labels(
     write_test_data_snp_file(base_folder=c.scoped_tmp_path, n_snps=c.n_snps)
 
     if c.request_params.get("split_to_test", False):
-        train_arrays, test_arrays = split_test_array_folder(c.scoped_tmp_path / "omics")
-        train_ids = get_ids_from_paths(paths=train_arrays)
-        test_ids = get_ids_from_paths(paths=test_arrays)
-        split_label_file(
-            label_file_path=c.scoped_tmp_path / "labels_train.csv",
-            train_ids=train_ids,
-            test_ids=test_ids,
-        )
+        common_split_test_data_wrapper(test_folder=c.scoped_tmp_path, name="omics")
 
 
 def _create_and_save_test_array_omics(

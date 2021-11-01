@@ -46,6 +46,7 @@ from eir.interpretation.interpretation import (
     activation_analysis_wrapper,
 )
 from eir.models import al_fusion_models
+from eir.models.model_setup import get_fusion_class, get_fusion_kwargs_from_cl_args
 from eir.models.model_training_utils import gather_pred_outputs_from_dloader
 from eir.setup import config
 from eir.setup import input_setup
@@ -59,9 +60,9 @@ from eir.setup.config import (
 )
 from eir.setup.input_setup import (
     al_input_objects_as_dict,
-    OmicsInputInfo,
     SequenceInputInfo,
     BytesInputInfo,
+    ImageInputInfo,
     get_input_name_config_iterator,
     get_input_serialization_path,
 )
@@ -75,7 +76,6 @@ from eir.train import (
     gather_all_ids_from_target_configs,
     check_dataset_and_batch_size_compatiblity,
 )
-from eir.models.model_setup import get_fusion_class, get_fusion_kwargs_from_cl_args
 from eir.train_utils.evaluation import PerformancePlotConfig
 from eir.train_utils.metrics import (
     al_metric_record_dict,
@@ -88,6 +88,17 @@ al_named_dict_configs = Dict[
     Literal["global_configs", "predictor_configs", "input_configs", "target_configs"],
     Iterable[Dict],
 ]
+al_serializable_input_objects = Union[
+    SequenceInputInfo,
+    ImageInputInfo,
+    BytesInputInfo,
+]
+al_serializable_input_classes = Union[
+    Type[SequenceInputInfo],
+    Type[ImageInputInfo],
+    Type[BytesInputInfo],
+]
+
 
 seed_everything()
 
@@ -550,69 +561,42 @@ def get_labels_for_predict(
     return labels
 
 
-def set_up_sequence_input_for_testing(
+def load_serialized_input_for_testing(
     input_config: schemas.InputConfig,
     run_name: str,
+    input_class: al_serializable_input_classes,
     *args,
     **kwargs,
-) -> SequenceInputInfo:
+):
     input_name = input_config.input_info.input_name
-    input_name_with_prefix = f"sequence_{input_name}"
+    input_type = input_config.input_info.input_type
+    input_name_with_prefix = f"{input_type}_{input_name}"
 
     run_folder = get_run_folder(run_name=run_name)
 
-    serialized_sequence_input_config_path = get_input_serialization_path(
+    serialized_input_config_path = get_input_serialization_path(
         run_folder=run_folder,
         sequence_input_name=input_name_with_prefix,
-        input_type="sequence",
+        input_type=input_type,
     )
-    assert serialized_sequence_input_config_path.exists()
-    with open(serialized_sequence_input_config_path, "rb") as infile:
-        serialized_train_sequence_input_object: SequenceInputInfo = dill.load(
+
+    assert serialized_input_config_path.exists()
+    with open(serialized_input_config_path, "rb") as infile:
+        serialized_input_config_object: al_serializable_input_objects = dill.load(
             file=infile
         )
 
-    assert isinstance(serialized_train_sequence_input_object, SequenceInputInfo)
+    assert isinstance(serialized_input_config_object, input_class)
 
-    train_sequence_input_info_kwargs = serialized_train_sequence_input_object.__dict__
-    assert "input_config" in train_sequence_input_info_kwargs.keys()
+    train_input_info_kwargs = serialized_input_config_object.__dict__
+    assert "input_config" in train_input_info_kwargs.keys()
 
-    test_sequence_input_info_kwargs = copy(train_sequence_input_info_kwargs)
-    test_sequence_input_info_kwargs["input_config"] = input_config
+    test_input_info_kwargs = copy(train_input_info_kwargs)
+    test_input_info_kwargs["input_config"] = input_config
 
-    test_sequence_input_object = SequenceInputInfo(**test_sequence_input_info_kwargs)
+    test_input_object = input_class(**test_input_info_kwargs)
 
-    return test_sequence_input_object
-
-
-def set_up_bytes_input_for_testing(
-    input_config: schemas.InputConfig, run_name: str
-) -> BytesInputInfo:
-    input_name = input_config.input_info.input_name
-    input_name_with_prefix = f"bytes_{input_name}"
-
-    run_folder = get_run_folder(run_name=run_name)
-
-    serialized_bytes_input_config_path = get_input_serialization_path(
-        run_folder=run_folder,
-        sequence_input_name=input_name_with_prefix,
-        input_type="bytes",
-    )
-    assert serialized_bytes_input_config_path.exists()
-    with open(serialized_bytes_input_config_path, "rb") as infile:
-        serialized_bytes_input_config_object: BytesInputInfo = dill.load(file=infile)
-
-    assert isinstance(serialized_bytes_input_config_object, BytesInputInfo)
-
-    train_sequence_input_info_kwargs = serialized_bytes_input_config_object.__dict__
-    assert "input_config" in train_sequence_input_info_kwargs.keys()
-
-    test_sequence_input_info_kwargs = copy(train_sequence_input_info_kwargs)
-    test_sequence_input_info_kwargs["input_config"] = input_config
-
-    test_sequence_input_object = BytesInputInfo(**test_sequence_input_info_kwargs)
-
-    return test_sequence_input_object
+    return test_input_object
 
 
 def set_up_inputs(
@@ -620,7 +604,7 @@ def set_up_inputs(
     ids: Sequence[str],
     hooks: Union["Hooks", None],
     run_name: str,
-) -> Dict[str, Union[PredictTabularInputInfo, OmicsInputInfo]]:
+) -> al_input_objects_as_dict:
     all_inputs = {}
 
     name_config_iter = get_input_name_config_iterator(input_configs=test_inputs_configs)
@@ -656,8 +640,11 @@ def get_input_setup_function_map_for_predict() -> Dict[str, Callable]:
     setup_mapping = {
         "omics": input_setup.set_up_omics_input,
         "tabular": setup_tabular_input_for_testing,
-        "sequence": set_up_sequence_input_for_testing,
-        "bytes": set_up_bytes_input_for_testing,
+        "sequence": partial(
+            load_serialized_input_for_testing, input_class=SequenceInputInfo
+        ),
+        "bytes": partial(load_serialized_input_for_testing, input_class=BytesInputInfo),
+        "image": partial(load_serialized_input_for_testing, input_class=ImageInputInfo),
     }
 
     return setup_mapping

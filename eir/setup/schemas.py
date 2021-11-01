@@ -4,6 +4,8 @@ from typing import Union, Literal, List, Optional, Sequence, Type
 from eir.models.fusion.fusion_default import FusionModelConfig
 from eir.models.fusion.fusion_linear import LinearFusionModelConfig
 from eir.models.fusion.fusion_mgmoe import MGMoEModelConfig
+from eir.models.image.image_models import ImageModelConfig
+from eir.models.image.image_models import get_all_timm_model_names
 from eir.models.omics.omics_models import (
     LinearModel,
     CNNModel,
@@ -17,12 +19,23 @@ from eir.models.omics.omics_models import (
     IdentityModelConfig,
     Dataclass,
 )
-from eir.models.tabular.tabular import SimpleTabularModel, TabularModelConfig
 from eir.models.sequence.transformer_models import (
     BasicTransformerFeatureExtractorModelConfig,
+    get_all_hf_model_names,
 )
+from eir.models.tabular.tabular import SimpleTabularModel, TabularModelConfig
+from eir.setup.setup_utils import get_all_optimizer_names
 
 al_input_configs = Sequence["InputConfig"]
+al_sequence_models = tuple(
+    Literal[i] for i in ["sequence-default"] + list(get_all_hf_model_names())
+)
+al_bytes_models = tuple(
+    Literal[i]
+    for i in ["sequence-default", "perceiver"] + list(get_all_hf_model_names())
+)
+al_image_models = tuple(Literal[i] for i in get_all_timm_model_names())
+al_optimizers = tuple(Literal[i] for i in get_all_optimizer_names())
 
 
 al_model_configs = Union[
@@ -35,6 +48,7 @@ al_model_configs = Union[
     TabularModelConfig,
     IdentityModelConfig,
     BasicTransformerFeatureExtractorModelConfig,
+    ImageModelConfig,
     Dataclass,
 ]
 
@@ -207,7 +221,7 @@ class GlobalConfig:
     early_stopping_patience: int = 10
     early_stopping_buffer: Union[None, int] = None
     warmup_steps: Union[Literal["auto"], int] = "auto"
-    optimizer: str = "adam"
+    optimizer: al_optimizers = "adam"
     b1: float = 0.9
     b2: float = 0.999
     wd: float = 1e-04
@@ -226,20 +240,6 @@ class GlobalConfig:
     mixing_alpha: float = 0.0
     mixing_type: Union[None, Literal["mixup", "cutmix-block", "cutmix-uniform"]] = None
     plot_skip_steps: int = 200
-
-
-@dataclass
-class PredictorConfig:
-    """
-    :param model_type:
-        Which type of fusion model to use.
-
-    :param model_config:
-        Predictor model configuration.
-    """
-
-    model_type: Literal["default", "linear", "mgmoe"]
-    model_config: Union[FusionModelConfig, LinearFusionModelConfig, MGMoEModelConfig]
 
 
 @dataclass
@@ -266,9 +266,10 @@ class InputConfig:
         "TabularInputDataConfig",
         "SequenceInputDataConfig",
         "ByteInputDataConfig",
+        "ImageInputDataConfig",
     ]
     model_config: al_model_configs
-    interpretation_config: Union[None, "SequenceInterpretationConfig"] = None
+    interpretation_config: Union[None, "BasicInterpretationConfig"] = None
 
 
 @dataclass
@@ -286,7 +287,7 @@ class InputDataConfig:
 
     input_source: str
     input_name: str
-    input_type: Literal["omics", "tabular", "sequence", "bytes"]
+    input_type: Literal["omics", "tabular", "sequence", "image", "bytes"]
 
 
 @dataclass
@@ -353,6 +354,9 @@ class SequenceInputDataConfig:
         Specify whether the model type is assumed to be pretrained and from the
         Hugging Face model hub.
 
+    :param freeze_pretrained_model:
+        Whether to freeze the pretrained model weights.
+
     :param vocab_file:
         An optional text file containing pre-defined vocabulary to use
         for the training. If this is not passed in, the framework will automatically
@@ -408,7 +412,7 @@ class SequenceInputDataConfig:
         complexity of transformers, as it becomes O(window_size² * n_windows) instead.
     """
 
-    model_type: Union[Literal["sequence-default"], str] = "sequence-default"
+    model_type: al_sequence_models = "sequence-default"
     pretrained_model: bool = False
     freeze_pretrained_model: bool = False
     vocab_file: Union[None, str] = None
@@ -425,7 +429,7 @@ class SequenceInputDataConfig:
 
 
 @dataclass
-class SequenceInterpretationConfig:
+class BasicInterpretationConfig:
     """
     :param interpretation_sampling_strategy:
         How to sample sequences for activation analysis. `first_n` always grabs the
@@ -489,7 +493,7 @@ class ByteInputDataConfig:
         complexity of transformers, as it becomes O(window_size² * n_windows) instead.
     """
 
-    model_type: Union[Literal["sequence-default"], str] = "sequence-default"
+    model_type: al_bytes_models = "sequence-default"
     max_length: al_max_sequence_length = "average"
     byte_encoding: Literal["uint8"] = "uint8"
     sampling_strategy_if_longer: Literal["from_start", "uniform"] = "uniform"
@@ -497,6 +501,70 @@ class ByteInputDataConfig:
     position_dropout: float = 0.1
     embedding_dim: int = None
     window_size: int = 0
+
+
+@dataclass
+class ImageInputDataConfig:
+    """
+    :param model_type:
+        Which type of image model to use.
+
+    :param pretrained_model:
+        Specify whether the model type is assumed to be pretrained and from the
+        Pytorch Image Models repository.
+
+    :param freeze_pretrained_model:
+        Whether to freeze the pretrained model weights.
+
+    :param auto_augment:
+        Setting this to True will use TrivialAugment Wide augmentation.
+
+    :param size:
+        Target size of the images for training.  If size is a sequence like
+        (h, w), output size will be matched to this. If size is an int,
+        smaller edge of the image will be matched to this number.
+
+    :param mean_normalization_values:
+        Average channel values to normalize images with. This can be a sequence matching
+        the number of channels, or None. If None and using a pretrained model, the
+        values used for the model pretraining will be used. If None and training from
+        scratch, will iterate over training data and compute the running average
+        per channel.
+
+    :param stds_normalization_values:
+        Standard deviation channel values to normalize images with. This can be a
+        sequence mathing the number of channels, or None. If None and using a
+        pretrained model, the values used for the model pretraining will be used.
+        If None and training from scratch, will iterate over training data and compute
+        the running average per channel.
+
+    :param num_channels:
+        Number of channels in the images. If None, will try to infer the number of
+        channels from a random image in the training data.
+    """
+
+    model_type: al_image_models
+    pretrained_model: bool = False
+    freeze_pretrained_model: bool = False
+    auto_augment: bool = True
+    size: Sequence[int] = (64,)
+    mean_normalization_values: Union[None, Sequence[float]] = None
+    stds_normalization_values: Union[None, Sequence[float]] = None
+    num_channels: int = None
+
+
+@dataclass
+class PredictorConfig:
+    """
+    :param model_type:
+        Which type of fusion model to use.
+
+    :param model_config:
+        Predictor model configuration.
+    """
+
+    model_type: Literal["default", "linear", "mgmoe"]
+    model_config: Union[FusionModelConfig, LinearFusionModelConfig, MGMoEModelConfig]
 
 
 @dataclass

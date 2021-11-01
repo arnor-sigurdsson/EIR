@@ -1,14 +1,14 @@
 import csv
 from pathlib import Path
 from random import shuffle
-from typing import List, Tuple, Sequence, Iterable
+from typing import List, Tuple, Sequence, Iterable, Union
 
 import numpy as np
 import pandas as pd
 
 
 def set_up_label_file_writing(path: Path, fieldnames: List[str]):
-    label_file = str(path / "labels_train.csv")
+    label_file = str(path / "labels.csv")
 
     label_file_handle = open(str(label_file), "w")
 
@@ -51,7 +51,39 @@ def set_up_test_data_root_outpath(base_folder: Path) -> Path:
     return base_folder
 
 
-def split_test_array_folder(test_folder: Path) -> Tuple[Sequence[Path], Sequence[Path]]:
+def common_split_test_data_wrapper(test_folder: Path, name: str):
+    train_ids = None
+    test_ids = None
+    train_labels_path = test_folder / "labels_train.csv"
+    test_labels_path = test_folder / "labels_test.csv"
+
+    if test_labels_path.exists() or train_labels_path.exists():
+        assert train_labels_path.exists()
+        assert test_labels_path.exists()
+
+        train_ids = list(pd.read_csv(train_labels_path)["ID"].values)
+        test_ids = list(pd.read_csv(test_labels_path)["ID"].values)
+
+    data_folder = test_folder / name
+    train_arrays, test_arrays = split_test_array_folder(
+        test_folder=data_folder, train_ids=train_ids, test_ids=test_ids
+    )
+    train_ids = get_ids_from_paths(paths=train_arrays)
+    test_ids = get_ids_from_paths(paths=test_arrays)
+
+    if not test_labels_path.exists():
+        split_label_file(
+            label_file_path=test_folder / "labels.csv",
+            train_ids=train_ids,
+            test_ids=test_ids,
+        )
+
+
+def split_test_array_folder(
+    test_folder: Path,
+    train_ids: Union[Sequence[str], None] = None,
+    test_ids: Union[Sequence[str], None] = None,
+) -> Tuple[Sequence[Path], Sequence[Path]]:
 
     all_arrays = [i for i in test_folder.iterdir()]
     shuffle(all_arrays)
@@ -61,11 +93,18 @@ def split_test_array_folder(test_folder: Path) -> Tuple[Sequence[Path], Sequence
     test_array_test_set_folder = test_folder / "test_set"
     test_array_test_set_folder.mkdir()
 
-    test_arrays_test_set = all_arrays[:200]
+    if test_ids:
+        test_arrays_test_set = [i for i in all_arrays if i.stem in test_ids]
+    else:
+        test_arrays_test_set = all_arrays[:200]
     for array_file in test_arrays_test_set:
         array_file.replace(test_array_test_set_folder / array_file.name)
 
-    train_arrays_test_set = all_arrays[200:]
+    if train_ids:
+        train_arrays_test_set = [i for i in all_arrays if i.stem in train_ids]
+    else:
+        train_arrays_test_set = all_arrays[200:]
+
     for array_file in train_arrays_test_set:
         array_file.replace(train_array_test_set_folder / array_file.name)
 

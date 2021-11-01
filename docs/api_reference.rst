@@ -4,34 +4,48 @@ API
 ===
 
 
-Experiment Configuration
-------------------------
+Global Configurations
+---------------------
 
-.. automodule:: eir.setup.schemas
-    :members:
+.. autoclass:: eir.setup.schemas.GlobalConfig
 
-Model Configurations
+Input Configurations
 --------------------
+
+.. autoclass:: eir.setup.schemas.InputConfig
+
+Input Data Configuration
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. autoclass:: eir.setup.schemas.InputDataConfig
+
+Input Type Configurations
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. autoclass:: eir.setup.schemas.OmicsInputDataConfig
+
+.. autoclass:: eir.setup.schemas.TabularInputDataConfig
+
+.. autoclass:: eir.setup.schemas.SequenceInputDataConfig
+
+.. autoclass:: eir.setup.schemas.ByteInputDataConfig
+
+.. autoclass:: eir.setup.schemas.ImageInputDataConfig
+
+Interpretation Configurations
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Parameters to have basic control over how interpretation is done. Currently only
+supported for sequence and image data.
+
+.. autoclass:: eir.setup.schemas.BasicInterpretationConfig
+
+Feature Extractor Configurations
+--------------------------------
 
 The documentation below details what the parameters passed to the respective models
 (trough the `model_config` field in the `\-\-input_configs` `.yaml` files).
 
-Fusion and Predictor Modules
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Note that the settings here currently only
-refer to the predictor branches.
-Future work includes
-adding more configurations
-to the fusion operations themselves,
-and having therefore separate configurations
-for those and the predictor branches.
-
-.. autoclass:: eir.models.fusion.fusion_default.FusionModelConfig
-
-.. autoclass:: eir.models.fusion.fusion_mgmoe.MGMoEModelConfig
-
-.. autoclass:: eir.models.fusion.fusion_linear.LinearFusionModelConfig
 
 Omics Feature Extractors
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -54,4 +68,31 @@ Tabular Feature Extractors
 Sequence Feature Extractors
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. autoclass:: eir.models.sequence.transformer_basic.BasicTransformerFeatureExtractorModelConfig
+.. autoclass:: eir.models.sequence.transformer_models.BasicTransformerFeatureExtractorModelConfig
+
+Predictor Configurations
+------------------------
+
+Note that the settings here currently only
+refer to the predictor branches.
+Future work includes
+adding more configurations
+to the fusion operations themselves,
+and having therefore separate configurations
+for those and the predictor branches.
+
+.. autoclass:: eir.setup.schemas.PredictorConfig
+
+Predictor Modules
+^^^^^^^^^^^^^^^^^
+
+.. autoclass:: eir.models.fusion.fusion_default.FusionModelConfig
+
+.. autoclass:: eir.models.fusion.fusion_mgmoe.MGMoEModelConfig
+
+.. autoclass:: eir.models.fusion.fusion_linear.LinearFusionModelConfig
+
+Target Configurations
+---------------------
+
+.. autoclass:: eir.setup.schemas.TargetConfig

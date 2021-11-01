@@ -1,11 +1,14 @@
+import random
 from collections import defaultdict
 from pathlib import Path
-from typing import TYPE_CHECKING, Sequence, Dict
+from typing import TYPE_CHECKING, Sequence, Dict, Generator
 
 import pandas as pd
 import seaborn as sns
 import torch
 from matplotlib import pyplot as plt
+
+from eir.setup import schemas
 
 if TYPE_CHECKING:
     from eir.data_load.label_setup import al_label_transformers_object
@@ -72,3 +75,28 @@ def plot_activations_bar(
     sns_figure.savefig(fname=outpath, bbox_inches="tight")
 
     plt.close("all")
+
+
+def get_basic_sample_activations_to_analyse_generator(
+    interpretation_config: schemas.BasicInterpretationConfig,
+    all_activations: Sequence["SampleActivation"],
+) -> Generator["SampleActivation", None, None]:
+
+    strategy = interpretation_config.interpretation_sampling_strategy
+    n_samples = interpretation_config.num_samples_to_interpret
+
+    if strategy == "first_n":
+        base = all_activations[:n_samples]
+    elif strategy == "random_sample":
+        base = random.sample(all_activations, n_samples)
+    else:
+        raise ValueError(f"Unrecognized option for sequence sampling: {strategy}.")
+
+    manual_samples = interpretation_config.manual_samples_to_interpret
+    if manual_samples:
+        for activation in all_activations:
+            if activation.sample_info.ids in manual_samples:
+                base.append(activation)
+
+    for item in base:
+        yield item

@@ -6,11 +6,12 @@ from typing import Union, Literal, Type, Callable, Tuple, Dict, Sequence
 
 import torch
 from aislib.misc_utils import get_logger
+from perceiver_pytorch import PerceiverIO
 from torch import nn, Tensor
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
 from torch.nn.functional import pad
 from transformers import PreTrainedModel, PretrainedConfig
-from perceiver_pytorch import PerceiverIO
+from transformers.models.auto.modeling_auto import MODEL_MAPPING_NAMES
 
 from eir.models.layers import _find_split_padding_needed
 
@@ -459,3 +460,40 @@ class PositionalEmbedding(nn.Module):
     def forward(self, x: Tensor) -> Tensor:
         x = x + self.embedding[:, : self.max_length, :]
         return self.dropout(x)
+
+
+def get_all_hf_model_names() -> Sequence[str]:
+    all_models = sorted(list(MODEL_MAPPING_NAMES.keys()))
+    unsupported = get_unsupported_hf_models()
+    unsupported_names = unsupported.keys()
+    return [i for i in all_models if i not in unsupported_names]
+
+
+def get_unsupported_hf_models() -> dict:
+    unsupported = {
+        "beit": "Not strictly sequence model.",
+        "canine": "Cannot do straightforward look up of embeddings.",
+        "clip": "Not strictly sequence model.",
+        "convbert": "HF error.",
+        "deit": "Not strictly sequence model.",
+        "detr": "Not strictly sequence model.",
+        "dpr": "Not strictly sequence model.",
+        "fsmt": "Not strictly sequence model.",
+        "funnel": "HF error.",
+        "hubert": "Cannot do straightforward look up of embeddings.",
+        "layoutlmv2": "LayoutLMv2Model requires the detectron2 library.",
+        "lxmert": "Not strictly sequence model.",
+        "mt5": "Not implemented in EIR for feature extraction yet.",
+        "retribert": "Cannot do straightforward look up of embeddings.",
+        "segformer": "Not strictly sequence model.",
+        "sew": "Not strictly sequence model.",
+        "sew-d": "Not strictly sequence model.",
+        "speech_to_text": "Not strictly sequence model.",
+        "tapas": "TapasModel requires the torch-scatter library.",
+        "unispeech": "Not strictly sequence model.",
+        "unispeech-sat": "Not strictly sequence model.",
+        "vit": "Not strictly sequence model.",
+        "wav2vec2": "Not strictly sequence model.",
+    }
+
+    return unsupported

@@ -68,22 +68,13 @@ def hook_default_mix_data(
             )
             mixed_inputs[input_name] = mixed_omics
 
-        elif input_name.startswith("tabular_"):
-
-            mixed_tabular_input_tensor = mixup_tensor(
+        else:
+            mixed_input_tensor = mixup_tensor(
                 tensor=input_data,
                 lambda_=mixing_info.lambda_,
                 random_batch_indices_to_mix=mixing_info.permuted_indexes,
             )
-            mixed_inputs[input_name] = mixed_tabular_input_tensor
-
-        elif input_name.startswith("sequence_") or input_name.startswith("bytes_"):
-            mixed_sequence_embeddings = mixup_tensor(
-                tensor=input_data,
-                lambda_=mixing_info.lambda_,
-                random_batch_indices_to_mix=mixing_info.permuted_indexes,
-            )
-            mixed_inputs[input_name] = mixed_sequence_embeddings
+            mixed_inputs[input_name] = mixed_input_tensor
 
     batch_mixed = Batch(
         inputs=mixed_inputs,

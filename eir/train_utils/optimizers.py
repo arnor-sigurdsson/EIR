@@ -2,7 +2,7 @@ import reprlib
 from collections import defaultdict
 from functools import partial
 from inspect import signature
-from typing import Callable, List, Type, Dict
+from typing import Callable, List, Type, Dict, TYPE_CHECKING
 
 from adabelief_pytorch import AdaBelief
 from aislib.misc_utils import get_logger
@@ -14,13 +14,16 @@ from torch.optim.optimizer import Optimizer
 from torch_optimizer import get as get_custom_opt
 
 from eir.models.model_training_utils import add_wd_to_model_params
-from eir.setup.schemas import GlobalConfig
+from eir.setup.setup_utils import get_base_optimizer_names
+
+if TYPE_CHECKING:
+    from eir.setup.schemas import GlobalConfig
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
 def get_optimizer(
-    model: nn.Module, loss_callable: Callable, global_config: GlobalConfig
+    model: nn.Module, loss_callable: Callable, global_config: "GlobalConfig"
 ) -> Optimizer:
 
     all_params = _get_all_params_to_optimize(
@@ -92,11 +95,12 @@ def get_base_optimizers_dict() -> Dict[str, Type[Optimizer]]:
         "adabelief": AdaBelief,
         "adabeliefw": partial(AdaBelief, weight_decouple=True),
     }
+    assert set(base_optimizers) == get_base_optimizer_names()
     return base_optimizers
 
 
 def _get_constructor_arguments(
-    params: List, global_config: GlobalConfig, optimizer_class: Type[Optimizer]
+    params: List, global_config: "GlobalConfig", optimizer_class: Type[Optimizer]
 ):
     base = {"params": params, "lr": global_config.lr, "weight_decay": global_config.wd}
     all_extras = {

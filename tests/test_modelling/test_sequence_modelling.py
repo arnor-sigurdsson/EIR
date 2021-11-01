@@ -1,17 +1,16 @@
-from pathlib import Path
 from copy import copy
+from pathlib import Path
 from typing import Iterable, Sequence, Tuple, Union
 
 import pandas as pd
 import pytest
-from transformers.models.auto.modeling_auto import MODEL_MAPPING_NAMES
 
 from eir import train
 from eir.models.model_setup import (
     _get_hf_sequence_feature_extractor_objects,
     _get_manual_out_features_for_external_feature_extractor,
-    _get_unsupported_hf_models,
 )
+from eir.models.sequence.transformer_models import get_all_hf_model_names
 from eir.setup.config import get_all_targets
 from eir.train_utils.utils import seed_everything
 from tests.test_modelling.setup_modelling_test_data.setup_sequence_test_data import (
@@ -279,16 +278,9 @@ def _check_sequence_activations(
     return success
 
 
-def _get_all_hf_model_names() -> Sequence[str]:
-    all_models = sorted(list(MODEL_MAPPING_NAMES.keys()))
-    unsupported = _get_unsupported_hf_models()
-    unsupported_names = unsupported.keys()
-    return [i for i in all_models if i not in unsupported_names]
-
-
 @pytest.mark.parametrize(
     "model_name",
-    _get_all_hf_model_names(),
+    get_all_hf_model_names(),
 )
 def test_external_nlp_feature_extractor_forward(model_name: str):
 

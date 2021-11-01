@@ -265,7 +265,7 @@ def add_wd_to_model_params(
     Note: Since we are adding the weight decay manually here, the optimizer does not
     touch the parameter group weight decay at initialization.
     """
-    _check_named_modules(model)
+    _check_named_modules(model=model)
 
     params = []
     for name, param in model.named_parameters():
@@ -290,8 +290,8 @@ def _check_named_modules(model: nn.Module):
     """
 
     for name, module in model.named_modules():
-        if "act_" in name:
-            assert isinstance(module, (Swish, nn.PReLU))
+        if name.startswith("act_"):
+            assert isinstance(module, (Swish, nn.PReLU)), (name, module)
 
         if isinstance(module, (Swish, nn.PReLU)):
             assert "act_" in name, name

@@ -34,7 +34,7 @@ from eir.setup import schemas, config
 from eir.setup.config import recursive_dict_replace
 from eir.setup.input_setup import (
     serialize_all_input_transformers,
-    serialize_all_sequence_inputs,
+    serialize_chosen_input_objects,
 )
 from eir.train import (
     Experiment,
@@ -42,6 +42,9 @@ from eir.train import (
 )
 from eir.train_utils import optimizers, metrics
 from eir.train_utils.utils import configure_root_logger, get_run_folder, seed_everything
+from tests.test_modelling.setup_modelling_test_data.setup_image_test_data import (
+    create_test_image_data,
+)
 from tests.test_modelling.setup_modelling_test_data.setup_omics_test_data import (
     create_test_omics_data_and_labels,
 )
@@ -190,7 +193,12 @@ def get_test_inputs_inits(
     base_func_map = get_input_test_init_base_func_map()
     for init_dict in input_config_dicts:
         cur_name = init_dict["input_info"]["input_name"]
-        cur_base_func = base_func_map.get(cur_name)
+
+        cur_base_func_keys = [i for i in base_func_map.keys() if cur_name.startswith(i)]
+        assert len(cur_base_func_keys) == 1
+        cur_base_func_key = cur_base_func_keys[0]
+
+        cur_base_func = base_func_map.get(cur_base_func_key)
         cur_init_base = cur_base_func(test_path=test_path, split_to_test=split_to_test)
 
         cur_init_injected = recursive_dict_replace(
@@ -207,6 +215,7 @@ def get_input_test_init_base_func_map():
         "test_tabular": get_test_tabular_input_init,
         "test_sequence": get_test_sequence_input_init,
         "test_bytes": get_test_bytes_input_init,
+        "test_image": get_test_image_input_init,
     }
 
     return mapping
@@ -238,7 +247,7 @@ def get_test_omics_input_init(test_path: Path, split_to_test: bool) -> dict:
 
 def get_test_tabular_input_init(test_path: Path, split_to_test: bool) -> dict:
 
-    input_source = test_path / "labels_train.csv"
+    input_source = test_path / "labels.csv"
     if split_to_test:
         input_source = test_path / "labels_train.csv"
 
@@ -306,6 +315,34 @@ def get_test_bytes_input_init(test_path: Path, split_to_test: bool) -> Dict:
     return input_init_kwargs
 
 
+def get_test_image_input_init(test_path: Path, split_to_test: bool) -> Dict:
+    input_source = test_path / "image"
+    if split_to_test:
+        input_source = input_source / "train_set"
+
+    input_init_kwargs = {
+        "input_info": {
+            "input_source": str(input_source),
+            "input_name": "test_image",
+            "input_type": "image",
+        },
+        "input_type_info": {
+            "model_type": "ResNet",
+            "pretrained_model": False,
+            "freeze_pretrained_model": False,
+            "auto_augment": False,
+            "size": (16,),
+        },
+        "model_config": {
+            "num_output_features": 128,
+            "layers": [1, 1, 1, 1],
+            "block": "BasicBlock",
+        },
+    }
+
+    return input_init_kwargs
+
+
 def get_test_base_predictor_init(model_type: Literal["nn", "linear"]) -> Sequence[dict]:
     if model_type == "linear":
         return [{}]
@@ -317,7 +354,7 @@ def get_test_base_target_inits(
 ) -> Sequence[dict]:
     test_path = test_data_config.scoped_tmp_path
 
-    label_file = test_path / "labels_train.csv"
+    label_file = test_path / "labels.csv"
     if split_to_test:
         label_file = test_path / "labels_train.csv"
 
@@ -355,6 +392,13 @@ def create_test_data(request, tmp_path_factory, parse_test_cl_args) -> "TestData
         create_test_sequence_data(
             test_data_config=test_data_config,
             sequence_outfolder=sequence_path,
+        )
+
+    image_path = base_outfolder / "image"
+    if "image" in test_data_config.modalities and not image_path.exists():
+        create_test_image_data(
+            test_data_config=test_data_config,
+            image_output_folder=image_path,
         )
 
     return test_data_config
@@ -685,7 +729,7 @@ def prep_modelling_test_configs(
     )
     run_folder = get_run_folder(run_name=gc.run_name)
     serialize_all_input_transformers(inputs_dict=inputs, run_folder=run_folder)
-    serialize_all_sequence_inputs(inputs_dict=inputs, run_folder=run_folder)
+    serialize_chosen_input_objects(inputs_dict=inputs, run_folder=run_folder)
 
     hooks = train.get_default_hooks(configs=c)
     experiment = Experiment(
