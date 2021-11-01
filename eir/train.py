@@ -672,13 +672,12 @@ def _get_default_step_function_hooks_init_kwargs(
         "metrics": [hook_default_compute_metrics],
     }
 
-    if configs.global_config.mixing_type is not None:
+    if configs.global_config.mixing_alpha:
         logger.debug(
-            "Setting up hooks for mixing with %s with α=%.2g.",
-            configs.global_config.mixing_type,
+            "Setting up hooks for mixing with with α=%.2g.",
             configs.global_config.mixing_alpha,
         )
-        mix_hook = get_mix_data_hook(mixing_type=configs.global_config.mixing_type)
+        mix_hook = get_mix_data_hook(input_configs=configs.input_configs)
 
         init_kwargs["post_prepare_batch"].append(mix_hook)
         init_kwargs["loss"][0] = hook_mix_loss

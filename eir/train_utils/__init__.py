@@ -15,7 +15,6 @@ H_PARAMS = [
     "lr",
     "split_mlp_num_splits",
     "mg_num_experts",
-    "mixing_type",
     "mixing_alpha",
     "lr_schedule",
     "model_type",

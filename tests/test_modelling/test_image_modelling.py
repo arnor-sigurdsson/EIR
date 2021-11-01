@@ -1,4 +1,4 @@
-from typing import Tuple, Union
+from typing import Tuple
 
 import pytest
 
@@ -29,7 +29,6 @@ seed_everything(seed=0)
                     "memory_dataset": True,
                     "get_acts": True,
                     "act_background_samples": 8,
-                    "mixing_type": "mixup",
                     "mixing_alpha": 1.0,
                 },
                 "input_configs": [
@@ -48,7 +47,6 @@ seed_everything(seed=0)
                     "memory_dataset": True,
                     "get_acts": True,
                     "act_background_samples": 8,
-                    "mixing_type": "mixup",
                     "mixing_alpha": 1.0,
                 },
                 "input_configs": [
@@ -56,7 +54,10 @@ seed_everything(seed=0)
                         "input_info": {
                             "input_name": "test_image",
                         },
-                        "input_type_info": {"model_type": "resnet18"},
+                        "input_type_info": {
+                            "model_type": "resnet18",
+                            "mixing_subtype": "cutmix",
+                        },
                     }
                 ],
             },
@@ -72,7 +73,7 @@ def test_sequence_modelling(prep_modelling_test_configs):
     targets = get_all_targets(targets_configs=experiment.configs.target_configs)
 
     thresholds = get_image_test_args(
-        mixing=experiment.configs.global_config.mixing_type
+        mixing=experiment.configs.global_config.mixing_alpha
     )
     for cat_target_column in targets.cat_targets:
 
@@ -93,10 +94,10 @@ def test_sequence_modelling(prep_modelling_test_configs):
         )
 
 
-def get_image_test_args(mixing: Union[None, str]) -> Tuple[float, float]:
+def get_image_test_args(mixing: float) -> Tuple[float, float]:
 
     thresholds = (0.7, 0.6)
-    if mixing is not None:
+    if mixing:
         thresholds = (0.0, 0.6)
 
     return thresholds

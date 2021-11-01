@@ -1,6 +1,6 @@
 from copy import copy
 from pathlib import Path
-from typing import Iterable, Sequence, Tuple, Union
+from typing import Iterable, Sequence, Tuple
 
 import pandas as pd
 import pytest
@@ -109,7 +109,6 @@ seed_everything(seed=0)
                     "memory_dataset": True,
                     "run_name": "test_multi_task_with_mixing",
                     "mixing_alpha": 0.5,
-                    "mixing_type": "mixup",
                 },
                 "input_configs": [
                     {
@@ -130,7 +129,6 @@ seed_everything(seed=0)
                     "memory_dataset": True,
                     "run_name": "test_albert",
                     "mixing_alpha": 0.5,
-                    "mixing_type": "mixup",
                 },
                 "input_configs": [
                     {
@@ -166,7 +164,7 @@ def test_sequence_modelling(prep_modelling_test_configs):
     targets = get_all_targets(targets_configs=experiment.configs.target_configs)
 
     thresholds = get_sequence_test_args(
-        mixing=experiment.configs.global_config.mixing_type
+        mixing=experiment.configs.global_config.mixing_alpha
     )
     for cat_target_column in targets.cat_targets:
         target_transformer = experiment.target_transformers[cat_target_column]
@@ -206,10 +204,10 @@ def test_sequence_modelling(prep_modelling_test_configs):
             )
 
 
-def get_sequence_test_args(mixing: Union[None, str]) -> Tuple[float, float]:
+def get_sequence_test_args(mixing: float) -> Tuple[float, float]:
 
     thresholds = (0.8, 0.7)
-    if mixing is not None:
+    if mixing:
         thresholds = (0.0, 0.7)
 
     return thresholds

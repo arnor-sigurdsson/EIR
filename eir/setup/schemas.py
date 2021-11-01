@@ -197,9 +197,6 @@ class GlobalConfig:
     :param mixing_alpha:
         Alpha parameter used for mixing (higher means more mixing).
 
-    :param mixing_type:
-        Type of mixing to apply when using mixup and similar approaches.
-
     :param plot_skip_steps:
         How many iterations to skip in in plots.
     """
@@ -238,7 +235,6 @@ class GlobalConfig:
     debug: bool = False
     no_pbar: bool = False
     mixing_alpha: float = 0.0
-    mixing_type: Union[None, Literal["mixup", "cutmix-block", "cutmix-uniform"]] = None
     plot_skip_steps: int = 200
 
 
@@ -308,6 +304,8 @@ class OmicsInputDataConfig:
 
     :param omics_format:
         Currently unsupported (i.e. does nothing), which format the omics data is in.
+
+    :param mixing_subtype:
     """
 
     snp_file: Optional[str] = None
@@ -317,6 +315,7 @@ class OmicsInputDataConfig:
         "cnn", "linear", "mlp-split", "genome-local-net", "linear"
     ] = "gln"
     omics_format: Literal["one-hot"] = "one-hot"
+    mixing_subtype: Union[Literal["mixup", "cutmix-block", "cutmix-uniform"]] = "mixup"
 
 
 @dataclass
@@ -336,12 +335,15 @@ class TabularInputDataConfig:
     :param label_parsing_chunk_size:
         Number of rows to process at time when loading in the ``input_source``. Useful
         when RAM is limited.
+
+    :param mixing_subtype:
     """
 
     model_type: Literal["tabular"] = "tabular"
     extra_cat_columns: Sequence[str] = field(default_factory=list)
     extra_con_columns: Sequence[str] = field(default_factory=list)
     label_parsing_chunk_size: Union[None, int] = None
+    mixing_subtype: Literal["mixup"] = "mixup"
 
 
 @dataclass
@@ -410,6 +412,8 @@ class SequenceInputDataConfig:
         extraction over the input, meaning the model (e.g. transformer) will only
         see a part of the input at a time. Can be Useful to avoid the O(n²)
         complexity of transformers, as it becomes O(window_size² * n_windows) instead.
+
+    :param mixing_subtype:
     """
 
     model_type: al_sequence_models = "sequence-default"
@@ -426,6 +430,7 @@ class SequenceInputDataConfig:
     position_dropout: float = 0.1
     embedding_dim: int = None
     window_size: int = 0
+    mixing_subtype: Literal["mixup"] = "mixup"
 
 
 @dataclass
@@ -491,6 +496,8 @@ class ByteInputDataConfig:
         extraction over the input, meaning the model (e.g. transformer) will only
         see a part of the input at a time. Can be Useful to avoid the O(n²)
         complexity of transformers, as it becomes O(window_size² * n_windows) instead.
+
+    :param mixing_subtype:
     """
 
     model_type: al_bytes_models = "sequence-default"
@@ -501,6 +508,7 @@ class ByteInputDataConfig:
     position_dropout: float = 0.1
     embedding_dim: int = None
     window_size: int = 0
+    mixing_subtype: Literal["mixup"] = "mixup"
 
 
 @dataclass
@@ -541,6 +549,8 @@ class ImageInputDataConfig:
     :param num_channels:
         Number of channels in the images. If None, will try to infer the number of
         channels from a random image in the training data.
+
+    :param mixing_subtype:
     """
 
     model_type: al_image_models
@@ -551,6 +561,7 @@ class ImageInputDataConfig:
     mean_normalization_values: Union[None, Sequence[float]] = None
     stds_normalization_values: Union[None, Sequence[float]] = None
     num_channels: int = None
+    mixing_subtype: Union[Literal["mixup"], Literal["cutmix"]] = "mixup"
 
 
 @dataclass

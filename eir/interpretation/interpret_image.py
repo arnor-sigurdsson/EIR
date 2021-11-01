@@ -73,6 +73,7 @@ def analyze_image_input_activations(
         )
         ensure_path_exists(path=outpath)
         cur_figure.savefig(outpath, dpi=300)
+        plt.close("all")
 
 
 def unnormalize(
