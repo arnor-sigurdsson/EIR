@@ -77,7 +77,7 @@ def hook_default_mix_data(
             )
             mixed_inputs[input_name] = mixed_tabular_input_tensor
 
-        elif input_name.startswith("sequence_"):
+        elif input_name.startswith("sequence_") or input_name.startswith("bytes_"):
             mixed_sequence_embeddings = mixup_tensor(
                 tensor=input_data,
                 lambda_=mixing_info.lambda_,

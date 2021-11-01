@@ -18,7 +18,7 @@ from eir.models.omics.omics_models import (
     Dataclass,
 )
 from eir.models.tabular.tabular import SimpleTabularModel, TabularModelConfig
-from eir.models.sequence.transformer_basic import (
+from eir.models.sequence.transformer_models import (
     BasicTransformerFeatureExtractorModelConfig,
 )
 
@@ -262,7 +262,10 @@ class InputConfig:
 
     input_info: "InputDataConfig"
     input_type_info: Union[
-        "OmicsInputDataConfig", "TabularInputDataConfig", "SequenceInputDataConfig"
+        "OmicsInputDataConfig",
+        "TabularInputDataConfig",
+        "SequenceInputDataConfig",
+        "ByteInputDataConfig",
     ]
     model_config: al_model_configs
     interpretation_config: Union[None, "SequenceInterpretationConfig"] = None
@@ -283,7 +286,7 @@ class InputDataConfig:
 
     input_source: str
     input_name: str
-    input_type: Literal["omics", "tabular", "sequence"]
+    input_type: Literal["omics", "tabular", "sequence", "bytes"]
 
 
 @dataclass
@@ -344,8 +347,7 @@ class TabularInputDataConfig:
 class SequenceInputDataConfig:
     """
     :param model_type:
-        Type of sequence model to use. Currently only one type ("sequence-default") is
-        supported, which is a vanilla transformer model.
+        Type of sequence model to use.
 
     :param pretrained_model:
         Specify whether the model type is assumed to be pretrained and from the
@@ -389,15 +391,21 @@ class SequenceInputDataConfig:
     :param tokenizer_language:
         Which language rules the tokenizer should apply when tokenizing the raw data.
 
+    :param position:
+        Whether to encode the token position or use learnable position embeddings.
+
+    :param position_dropoput:
+        Dropout for the positional encoding / embedding.
+
     :param embedding_dim:
-        Which dimension to use for the embeddings. If ``None``, will autoamtically set
+        Which dimension to use for the embeddings. If ``None``, will automatically set
         this value based on the number of tokens and attention heads.
 
     :param window_size:
         If set to more than 0, will apply a sliding window of feature
         extraction over the input, meaning the model (e.g. transformer) will only
         see a part of the input at a time. Can be Useful to avoid the O(n²)
-        complexity of transformers, as it becomes n_windows * O(window_size²) instead.
+        complexity of transformers, as it becomes O(window_size² * n_windows) instead.
     """
 
     model_type: Union[Literal["sequence-default"], str] = "sequence-default"
@@ -439,6 +447,56 @@ class SequenceInterpretationConfig:
     interpretation_sampling_strategy: Literal["first_n", "random_sample"] = "first_n"
     num_samples_to_interpret: int = 10
     manual_samples_to_interpret: Union[Sequence[str], None] = None
+
+
+@dataclass
+class ByteInputDataConfig:
+    """
+    :param model_type:
+        Type of sequence model to use on the raw bytes.
+
+    :param byte_encoding:
+        Which byte encoding to use when reading the binary data, currently only
+        support uint8.
+
+    :param max_length:
+        Maximum length to truncate/pad sequences to. While in sequence models this
+        generally refers to words, here we are referring to number of bytes.
+
+    :param sampling_strategy_if_longer:
+        Controls how sequences are truncated if they are longer than the specified
+        ``max_length`` parameter. Using 'from_start' will always truncate from the
+        beginning of the byte sequence, ensuring the the samples will always be the same
+        during training. Setting this parameter to ``uniform`` will uniformly sample
+        a slice of a given sample sequence during training. Note that for consistency,
+        the validation/test set samples always use the ``from_start`` setting when
+        truncating.
+
+    :param position:
+        Whether to encode the token position or use learnable position embeddings.
+
+    :param position_dropoput:
+        Dropout for the positional encoding / embedding.
+
+    :param embedding_dim:
+        Which dimension to use for the embeddings. If ``None``, will automatically set
+        this value based on the number of tokens and attention heads.
+
+    :param window_size:
+        If set to more than 0, will apply a sliding window of feature
+        extraction over the input, meaning the model (e.g. transformer) will only
+        see a part of the input at a time. Can be Useful to avoid the O(n²)
+        complexity of transformers, as it becomes O(window_size² * n_windows) instead.
+    """
+
+    model_type: Union[Literal["sequence-default"], str] = "sequence-default"
+    max_length: al_max_sequence_length = "average"
+    byte_encoding: Literal["uint8"] = "uint8"
+    sampling_strategy_if_longer: Literal["from_start", "uniform"] = "uniform"
+    position: Literal["encode", "embed"] = "encode"
+    position_dropout: float = 0.1
+    embedding_dim: int = None
+    window_size: int = 0
 
 
 @dataclass

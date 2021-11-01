@@ -16,7 +16,7 @@ from aislib.misc_utils import get_logger
 from torch import nn
 from transformers import PreTrainedModel
 
-from eir.models.sequence.transformer_basic import get_hf_transformer_forward
+from eir.models.sequence.transformer_models import get_hf_transformer_forward
 
 if TYPE_CHECKING:
     from eir.train import al_num_outputs_per_target

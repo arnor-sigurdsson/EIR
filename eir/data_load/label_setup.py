@@ -414,7 +414,7 @@ def gather_all_ids_from_all_inputs(
 
         cur_source = Path(input_config.input_info.input_source)
         cur_type = input_config.input_info.input_type
-        if cur_type in ["omics", "sequence"]:
+        if cur_type in ["omics", "sequence", "bytes"]:
             cur_ids = gather_ids_from_data_source(data_source=cur_source)
 
         elif cur_type == "tabular":

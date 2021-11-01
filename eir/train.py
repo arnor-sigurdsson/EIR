@@ -792,7 +792,7 @@ def prepare_base_batch_default(
             )
             inputs_prepared[input_name] = tabular
 
-        elif input_name.startswith("sequence_"):
+        elif input_name.startswith("sequence_") or input_name.startswith("bytes_"):
             cur_seq = inputs[input_name]
             cur_seq = cur_seq.to(device=device)
             cur_module = model.modules_to_fuse[input_name]

@@ -386,6 +386,14 @@ optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 
 [[package]]
+name = "einops"
+version = "0.3.2"
+description = "A new flavour of deep learning operations"
+category = "main"
+optional = false
+python-versions = "*"
+
+[[package]]
 name = "entrypoints"
 version = "0.3"
 description = "Discover and load entry points from installed packages."
@@ -1219,6 +1227,18 @@ python-versions = ">=3.6.0"
 
 [package.dependencies]
 future = "*"
+
+[[package]]
+name = "perceiver-pytorch"
+version = "0.7.5"
+description = "Perceiver - Pytorch"
+category = "main"
+optional = false
+python-versions = "*"
+
+[package.dependencies]
+einops = ">=0.3"
+torch = ">=1.6"
 
 [[package]]
 name = "pexpect"
@@ -2415,7 +2435,7 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "1.1"
 python-versions = ">= 3.8,< 3.10"
-content-hash = "48980c44a846f90946929fa787d3e483480d003421ffce835a3cdaa85f671fa5"
+content-hash = "4055b383d1def8e4da7efaa43190c60144ff85b0cdd87e34855cd704243c9689"
 
 [metadata.files]
 absl-py = [
@@ -2661,6 +2681,10 @@ distlib = [
 docutils = [
     {file = "docutils-0.17.1-py2.py3-none-any.whl", hash = "sha256:cf316c8370a737a022b72b56874f6602acf974a37a9fba42ec2876387549fc61"},
     {file = "docutils-0.17.1.tar.gz", hash = "sha256:686577d2e4c32380bb50cbb22f575ed742d58168cee37e99117a854bcd88f125"},
+]
+einops = [
+    {file = "einops-0.3.2-py3-none-any.whl", hash = "sha256:285f3c75620897acb8b5580170c88121f010c77ce130bc7b9f220179009dafe0"},
+    {file = "einops-0.3.2.tar.gz", hash = "sha256:5200e413539f0377f4177ef00dc019968f4177c49b1db3e836c7883df2a5fe2e"},
 ]
 entrypoints = [
     {file = "entrypoints-0.3-py2.py3-none-any.whl", hash = "sha256:589f874b313739ad35be6e0cd7efde2a4e9b6fea91edcc34e58ecbb8dbe56d19"},
@@ -3258,6 +3282,10 @@ pathspec = [
 ]
 pefile = [
     {file = "pefile-2021.9.3.tar.gz", hash = "sha256:344a49e40a94e10849f0fe34dddc80f773a12b40675bf2f7be4b8be578bdd94a"},
+]
+perceiver-pytorch = [
+    {file = "perceiver-pytorch-0.7.5.tar.gz", hash = "sha256:14d13956573cfcbf347beb179a9cbe81adb39cc686fbd96200317aa5913a90b4"},
+    {file = "perceiver_pytorch-0.7.5-py3-none-any.whl", hash = "sha256:e9940300dd7c4c2e4c29fb7837e25c71aa2466d38470b1c9de3e4bb37b01653e"},
 ]
 pexpect = [
     {file = "pexpect-4.8.0-py2.py3-none-any.whl", hash = "sha256:0b48a55dcb3c05f3329815901ea4fc1537514d6ba867a152b581d69ae3710937"},

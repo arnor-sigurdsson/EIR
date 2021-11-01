@@ -17,12 +17,14 @@ from eir.models.omics.omics_models import (
     get_model_class,
     get_omics_model_init_kwargs,
 )
-from eir.models.sequence.transformer_basic import (
+from eir.models.sequence.transformer_models import (
     TransformerWrapperModelConfig,
     BasicTransformerFeatureExtractorModelConfig,
     TransformerWrapperModel,
     get_embedding_dim_for_sequence_model,
     TransformerFeatureExtractor,
+    PerceiverIOModelConfig,
+    PerceiverIOFeatureExtractor,
 )
 from eir.models.tabular.tabular import (
     get_unique_values_from_transformers,
@@ -127,6 +129,29 @@ def get_modules_to_fuse_from_inputs(
             )
             models[input_name] = sequence_model
 
+        elif input_name.startswith("bytes_"):
+
+            input_type_info = inputs_object.input_config.input_type_info
+            sequence_wrapper_model_config = TransformerWrapperModelConfig(
+                position=input_type_info.position,
+                position_dropout=input_type_info.position_dropout,
+                window_size=input_type_info.window_size,
+            )
+
+            num_tokens = len(inputs_object.vocab)
+            sequence_model = get_sequence_model(
+                model_type=input_type_info.model_type,
+                pretrained=False,
+                pretrained_frozen=False,
+                model_config=inputs_object.input_config.model_config,
+                wrapper_model_config=sequence_wrapper_model_config,
+                num_tokens=num_tokens,
+                max_length=inputs_object.computed_max_length,
+                embedding_dim=input_type_info.embedding_dim,
+                device=device,
+            )
+            models[input_name] = sequence_model
+
     return models
 
 
@@ -141,7 +166,9 @@ class SequenceModelConfigurationPrimitives:
 
 @dataclass
 class SequenceModelObjectsForWrapperModel:
-    feature_extractor: nn.Module
+    feature_extractor: Union[
+        TransformerFeatureExtractor, PerceiverIOFeatureExtractor, nn.Module
+    ]
     embeddings: Union[None, nn.Module]
     embedding_dim: int
     external: bool
@@ -200,18 +227,27 @@ def _get_sequence_feature_extractor_objects_for_wrapper_model(
     model_type: str,
     pretrained: bool,
     pretrained_frozen: bool,
-    model_config: Union[BasicTransformerFeatureExtractorModelConfig, Dict],
+    model_config: Union[
+        BasicTransformerFeatureExtractorModelConfig, PerceiverIOModelConfig, Dict
+    ],
     num_tokens: int,
     embedding_dim: int,
     feature_extractor_max_length: int,
     num_chunks: int,
 ) -> SequenceModelObjectsForWrapperModel:
+
     if model_type == "sequence-default":
         objects_for_wrapper = _get_basic_sequence_feature_extractor_objects(
             model_config=model_config,
             num_tokens=num_tokens,
             feature_extractor_max_length=feature_extractor_max_length,
             embedding_dim=embedding_dim,
+        )
+    elif model_type == "perceiver":
+        objects_for_wrapper = _get_perceiver_sequence_feature_extractor_objects(
+            model_config=model_config,
+            max_length=feature_extractor_max_length,
+            num_chunks=num_chunks,
         )
     elif pretrained:
         objects_for_wrapper = _get_pretrained_hf_sequence_feature_extractor_objects(
@@ -385,6 +421,30 @@ def _get_basic_sequence_feature_extractor_objects(
         embedding_dim=parsed_embedding_dim,
         external=False,
         known_out_features=None,
+    )
+
+    return objects_for_wrapper
+
+
+def _get_perceiver_sequence_feature_extractor_objects(
+    model_config: PerceiverIOModelConfig,
+    max_length: int,
+    num_chunks: int,
+):
+
+    feature_extractor = PerceiverIOFeatureExtractor(
+        model_config=model_config,
+        max_length=max_length,
+    )
+
+    known_out_features = feature_extractor.num_out_features * num_chunks
+
+    objects_for_wrapper = SequenceModelObjectsForWrapperModel(
+        feature_extractor=feature_extractor,
+        embeddings=None,
+        embedding_dim=model_config.dim,
+        external=False,
+        known_out_features=known_out_features,
     )
 
     return objects_for_wrapper
