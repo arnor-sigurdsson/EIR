@@ -192,6 +192,11 @@ def get_image_model(
             in_chans=input_channels,
         ).to(device=device)
     else:
+
+        if "num_output_features" not in model_config:
+            n_output_feats = wrapper_model_config.num_output_features
+            model_config["num_output_features"] = n_output_feats
+
         feature_extractor = _meta_get_image_model_from_scratch(
             model_type=model_type, model_config=model_config
         ).to(device=device)

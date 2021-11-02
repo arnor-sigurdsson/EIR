@@ -79,10 +79,19 @@ def analyze_image_input_activations(
 def unnormalize(
     normalized_img: np.ndarray, normalization_stats: "ImageNormalizationStats"
 ):
+    """
+    Clip because sometimes we get values like 1.0000001 which will cause shap.image
+    to do =/ 255, resulting in a black image.
+    """
     means = torch.Tensor(normalization_stats.channel_means)
     stds = torch.Tensor(normalization_stats.channel_stds)
     unnorm = Normalize(
         mean=(-means / stds).tolist(),
         std=(1.0 / stds).tolist(),
     )
-    return unnorm(torch.Tensor(normalized_img)).cpu().numpy()
+
+    img_as_tensor = torch.Tensor(normalized_img)
+    img_unnormalized = unnorm(img_as_tensor).cpu().numpy()
+    img_final = img_unnormalized.clip(None, 1.0)
+
+    return img_final

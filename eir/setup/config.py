@@ -7,6 +7,7 @@ import shutil
 import sys
 import tempfile
 import types
+from collections import Counter
 from argparse import Namespace
 from collections import defaultdict
 from copy import copy
@@ -305,7 +306,21 @@ def get_input_configs(
         config_object = init_input_config(yaml_config_as_dict=config_dict)
         config_objects.append(config_object)
 
+    _check_input_config_names(input_configs=config_objects)
     return config_objects
+
+
+def _check_input_config_names(input_configs: Iterable[schemas.InputConfig]) -> None:
+    names = []
+    for config in input_configs:
+        names.append(config.input_info.input_name)
+
+    if len(set(names)) != len(names):
+        counts = Counter(names)
+        raise ValueError(
+            f"Found duplicates of input names in input configs: {counts}. "
+            f"Please make sure each input source has a unique input_name."
+        )
 
 
 def init_input_config(yaml_config_as_dict: Dict[str, Any]) -> schemas.InputConfig:
