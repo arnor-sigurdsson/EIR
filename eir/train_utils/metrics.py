@@ -428,6 +428,7 @@ def persist_metrics(
     iteration: int,
     write_header: bool,
     prefixes: Dict[str, str],
+    writer_funcs: Union[None, Dict[str, Callable]] = None,
 ):
 
     hc = handler_config
@@ -454,7 +455,11 @@ def persist_metrics(
             plot_skip_steps=gc.plot_skip_steps,
         )
 
-        _append_metrics_to_file(
+        cur_func = get_buffered_metrics_writer(buffer_interval=1)
+        if writer_funcs:
+            cur_func = writer_funcs[metrics_name]
+
+        cur_func(
             filepath=metrics_history_file,
             metrics=cur_metric_dict,
             iteration=iteration,
@@ -517,22 +522,41 @@ def _add_metrics_to_writer(
             )
 
 
-def _append_metrics_to_file(
-    filepath: Path, metrics: Dict[str, float], iteration: int, write_header=False
-):
-    """
-    TODO:   Have cached file handles here instead of reopening the file at every
-            iteration.
-    """
-    with open(str(filepath), "a") as logfile:
-        fieldnames = ["iteration"] + sorted(metrics.keys())
-        writer = csv.DictWriter(logfile, fieldnames=fieldnames)
+def get_buffered_metrics_writer(buffer_interval: int):
+    buffer = []
 
-        if write_header:
-            writer.writeheader()
+    def append_metrics_to_file(
+        filepath: Path, metrics: Dict[str, float], iteration: int, write_header=False
+    ):
+
+        nonlocal buffer
 
         dict_to_write = {**{"iteration": iteration}, **metrics}
-        writer.writerow(dict_to_write)
+
+        if write_header:
+            with open(str(filepath), "a") as logfile:
+                fieldnames = ["iteration"] + sorted(metrics.keys())
+                writer = csv.DictWriter(logfile, fieldnames=fieldnames)
+
+                if write_header:
+                    writer.writeheader()
+
+        if iteration % buffer_interval == 0:
+
+            with open(str(filepath), "a") as logfile:
+                fieldnames = ["iteration"] + sorted(metrics.keys())
+                writer = csv.DictWriter(logfile, fieldnames=fieldnames)
+
+                source = buffer if buffer_interval != 1 else [dict_to_write]
+                for row in source:
+                    writer.writerow(row)
+
+            buffer = []
+
+        else:
+            buffer.append(dict_to_write)
+
+    return append_metrics_to_file
 
 
 def read_metrics_history_file(file_path: Path) -> pd.DataFrame:
