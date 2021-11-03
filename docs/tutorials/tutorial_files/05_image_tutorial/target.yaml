@@ -1,0 +1,3 @@
+label_file: hot_dog_not_hot_dog/labels.csv
+target_cat_columns:
+  - CLASS
