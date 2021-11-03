@@ -496,6 +496,7 @@ def grab_best_model_path(saved_models_folder: Path):
             "modalities": (
                 "omics",
                 "sequence",
+                "image",
             ),
             "manual_test_data_creator": lambda: "test_predict",
         }
@@ -512,6 +513,7 @@ def grab_best_model_path(saved_models_folder: Path):
                     "n_epochs": 12,
                     "checkpoint_interval": 200,
                     "sample_interval": 200,
+                    "act_background_samples": 128,
                     "get_acts": False,
                     "batch_size": 64,
                 },
@@ -522,6 +524,27 @@ def grab_best_model_path(saved_models_folder: Path):
                     },
                     {
                         "input_info": {"input_name": "test_sequence"},
+                    },
+                    {
+                        "input_info": {"input_name": "test_sequence_albert"},
+                        "input_type_info": {
+                            "model_type": "albert",
+                            "window_size": 16,
+                            "position": "embed",
+                        },
+                        "model_config": {
+                            "num_hidden_layers": 2,
+                            "num_attention_heads": 4,
+                            "embedding_size": 12,
+                            "hidden_size": 16,
+                            "intermediate_size": 32,
+                        },
+                    },
+                    {
+                        "input_info": {"input_name": "test_bytes"},
+                    },
+                    {
+                        "input_info": {"input_name": "test_image"},
                     },
                     {
                         "input_info": {"input_name": "test_tabular"},

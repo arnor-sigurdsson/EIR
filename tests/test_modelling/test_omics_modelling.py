@@ -424,12 +424,14 @@ def test_regression(prep_modelling_test_configs):
                     "run_name": "mixing_multi",
                     "lr": 1e-03,
                     "mixing_alpha": 0.5,
-                    "mixing_type": "cutmix-uniform",
                 },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "genome-local-net"},
+                        "input_type_info": {
+                            "model_type": "genome-local-net",
+                            "mixing_subtype": "cutmix-uniform",
+                        },
                         "model_config": {
                             "kernel_width": 8,
                             "channel_exp_base": 2,
@@ -500,7 +502,7 @@ def test_multi_task(
         threshold, at_least_n = _get_multi_task_test_args(
             extra_columns=extra_columns,
             target_copy="OriginExtraCol",
-            mixing=gc.mixing_type,
+            mixing=gc.mixing_alpha,
         )
 
         check_test_performance_results(
@@ -522,7 +524,7 @@ def test_multi_task(
         threshold, at_least_n = _get_multi_task_test_args(
             extra_columns=extra_columns,
             target_copy="ExtraTarget",
-            mixing=gc.mixing_type,
+            mixing=gc.mixing_alpha,
         )
 
         check_test_performance_results(
@@ -553,7 +555,7 @@ def get_all_tabular_input_columns(configs: Configs):
 
 
 def _get_multi_task_test_args(
-    extra_columns: List[str], target_copy: str, mixing: Union[None, str]
+    extra_columns: List[str], target_copy: str, mixing: float
 ) -> Tuple[Tuple[float, float], int]:
     """
     We use 0 for at_least_n in the case we have correlated input columns because
@@ -570,7 +572,7 @@ def _get_multi_task_test_args(
     else:
         thresholds, at_least_n = (0.8, 0.8), 5
 
-    if mixing is not None:
+    if mixing:
         thresholds, at_least_n = (0.0, 0.8), 5
 
     return thresholds, at_least_n

@@ -18,6 +18,7 @@ if TYPE_CHECKING:
             "modalities": (
                 "omics",
                 "sequence",
+                "image",
             ),
             "manual_test_data_creator": lambda: "test_multi_modal_multi_task",
         }
@@ -31,6 +32,8 @@ if TYPE_CHECKING:
             "injections": {
                 "global_configs": {
                     "run_name": "multi_task_multi_modal",
+                    "n_epochs": 6,
+                    "act_background_samples": 8,
                 },
                 "input_configs": [
                     {
@@ -43,6 +46,9 @@ if TYPE_CHECKING:
                     },
                     {
                         "input_info": {"input_name": "test_bytes"},
+                    },
+                    {
+                        "input_info": {"input_name": "test_image"},
                     },
                     {
                         "input_info": {"input_name": "test_tabular"},

@@ -179,7 +179,7 @@ class CNNResidualBlockBase(nn.Module):
         self.se_block = SEBlock(channels=out_channels, reduction=16)
 
     def forward(self, x: torch.Tensor):
-        raise NotImplementedError
+        raise NotImplementedError()
 
 
 class FirstCNNBlock(CNNResidualBlockBase):

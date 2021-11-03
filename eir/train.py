@@ -55,11 +55,11 @@ from eir.setup.config import (
     Configs,
     get_all_targets,
 )
+from eir.setup.input_setup import al_input_objects_as_dict, set_up_inputs_for_training
 from eir.setup.input_setup import (
     serialize_all_input_transformers,
-    serialize_all_sequence_inputs,
+    serialize_chosen_input_objects,
 )
-from eir.setup.input_setup import al_input_objects_as_dict, set_up_inputs_for_training
 from eir.train_utils import utils
 from eir.train_utils.metrics import (
     calculate_batch_metrics,
@@ -290,7 +290,7 @@ def get_default_experiment(
         hooks=hooks,
     )
     serialize_all_input_transformers(inputs_dict=inputs, run_folder=run_folder)
-    serialize_all_sequence_inputs(inputs_dict=inputs, run_folder=run_folder)
+    serialize_chosen_input_objects(inputs_dict=inputs, run_folder=run_folder)
 
     train_dataset, valid_dataset = datasets.set_up_datasets_from_configs(
         configs=configs,
@@ -672,13 +672,12 @@ def _get_default_step_function_hooks_init_kwargs(
         "metrics": [hook_default_compute_metrics],
     }
 
-    if configs.global_config.mixing_type is not None:
+    if configs.global_config.mixing_alpha:
         logger.debug(
-            "Setting up hooks for mixing with %s with α=%.2g.",
-            configs.global_config.mixing_type,
+            "Setting up hooks for mixing with with α=%.2g.",
             configs.global_config.mixing_alpha,
         )
-        mix_hook = get_mix_data_hook(mixing_type=configs.global_config.mixing_type)
+        mix_hook = get_mix_data_hook(input_configs=configs.input_configs)
 
         init_kwargs["post_prepare_batch"].append(mix_hook)
         init_kwargs["loss"][0] = hook_mix_loss
@@ -767,12 +766,12 @@ def prepare_base_batch_default(
     inputs_prepared = {}
     for input_name, input_object in input_objects.items():
 
-        if input_name.startswith("omics_"):
-            cur_omics = inputs[input_name]
-            cur_omics = cur_omics.to(device=device)
-            cur_omics = cur_omics.to(dtype=torch.float32)
+        if input_name.startswith("omics_") or input_name.startswith("image_"):
+            cur_tensor = inputs[input_name]
+            cur_tensor = cur_tensor.to(device=device)
+            cur_tensor = cur_tensor.to(dtype=torch.float32)
 
-            inputs_prepared[input_name] = cur_omics
+            inputs_prepared[input_name] = cur_tensor
 
         elif input_name.startswith("tabular_"):
 

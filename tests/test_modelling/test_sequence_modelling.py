@@ -1,17 +1,16 @@
-from pathlib import Path
 from copy import copy
-from typing import Iterable, Sequence, Tuple, Union
+from pathlib import Path
+from typing import Iterable, Sequence, Tuple
 
 import pandas as pd
 import pytest
-from transformers.models.auto.modeling_auto import MODEL_MAPPING_NAMES
 
 from eir import train
 from eir.models.model_setup import (
     _get_hf_sequence_feature_extractor_objects,
     _get_manual_out_features_for_external_feature_extractor,
-    _get_unsupported_hf_models,
 )
+from eir.models.sequence.transformer_models import get_all_hf_model_names
 from eir.setup.config import get_all_targets
 from eir.train_utils.utils import seed_everything
 from tests.test_modelling.setup_modelling_test_data.setup_sequence_test_data import (
@@ -110,7 +109,6 @@ seed_everything(seed=0)
                     "memory_dataset": True,
                     "run_name": "test_multi_task_with_mixing",
                     "mixing_alpha": 0.5,
-                    "mixing_type": "mixup",
                 },
                 "input_configs": [
                     {
@@ -131,7 +129,6 @@ seed_everything(seed=0)
                     "memory_dataset": True,
                     "run_name": "test_albert",
                     "mixing_alpha": 0.5,
-                    "mixing_type": "mixup",
                 },
                 "input_configs": [
                     {
@@ -167,7 +164,7 @@ def test_sequence_modelling(prep_modelling_test_configs):
     targets = get_all_targets(targets_configs=experiment.configs.target_configs)
 
     thresholds = get_sequence_test_args(
-        mixing=experiment.configs.global_config.mixing_type
+        mixing=experiment.configs.global_config.mixing_alpha
     )
     for cat_target_column in targets.cat_targets:
         target_transformer = experiment.target_transformers[cat_target_column]
@@ -207,10 +204,10 @@ def test_sequence_modelling(prep_modelling_test_configs):
             )
 
 
-def get_sequence_test_args(mixing: Union[None, str]) -> Tuple[float, float]:
+def get_sequence_test_args(mixing: float) -> Tuple[float, float]:
 
     thresholds = (0.8, 0.7)
-    if mixing is not None:
+    if mixing:
         thresholds = (0.0, 0.7)
 
     return thresholds
@@ -279,16 +276,9 @@ def _check_sequence_activations(
     return success
 
 
-def _get_all_hf_model_names() -> Sequence[str]:
-    all_models = sorted(list(MODEL_MAPPING_NAMES.keys()))
-    unsupported = _get_unsupported_hf_models()
-    unsupported_names = unsupported.keys()
-    return [i for i in all_models if i not in unsupported_names]
-
-
 @pytest.mark.parametrize(
     "model_name",
-    _get_all_hf_model_names(),
+    get_all_hf_model_names(),
 )
 def test_external_nlp_feature_extractor_forward(model_name: str):
 

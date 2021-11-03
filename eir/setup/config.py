@@ -7,6 +7,7 @@ import shutil
 import sys
 import tempfile
 import types
+from collections import Counter
 from argparse import Namespace
 from collections import defaultdict
 from copy import copy
@@ -305,7 +306,21 @@ def get_input_configs(
         config_object = init_input_config(yaml_config_as_dict=config_dict)
         config_objects.append(config_object)
 
+    _check_input_config_names(input_configs=config_objects)
     return config_objects
+
+
+def _check_input_config_names(input_configs: Iterable[schemas.InputConfig]) -> None:
+    names = []
+    for config in input_configs:
+        names.append(config.input_info.input_name)
+
+    if len(set(names)) != len(names):
+        counts = Counter(names)
+        raise ValueError(
+            f"Found duplicates of input names in input configs: {counts}. "
+            f"Please make sure each input source has a unique input_name."
+        )
 
 
 def init_input_config(yaml_config_as_dict: Dict[str, Any]) -> schemas.InputConfig:
@@ -352,6 +367,7 @@ def get_inputs_schema_map() -> Dict[
         "tabular": schemas.TabularInputDataConfig,
         "sequence": schemas.SequenceInputDataConfig,
         "bytes": schemas.ByteInputDataConfig,
+        "image": schemas.ImageInputDataConfig,
     }
 
     return mapping
@@ -364,14 +380,18 @@ def set_up_model_config(
 ):
 
     if getattr(input_type_info_object, "pretrained_model", None):
-        return None
+        return {}
 
-    is_sequence = getattr(input_info_object, "input_type") in ("sequence", "bytes")
+    is_possibly_external = getattr(input_info_object, "input_type") in (
+        "sequence",
+        "bytes",
+        "image",
+    )
     is_unknown_sequence_model = getattr(input_type_info_object, "model_type") not in (
         "sequence-default",
         "perceiver",
     )
-    if is_sequence and is_unknown_sequence_model:
+    if is_possibly_external and is_unknown_sequence_model:
         return model_init_kwargs_base
 
     if not model_init_kwargs_base:
@@ -421,6 +441,7 @@ def get_model_config_setup_hook_map():
         "tabular": set_up_config_object_init_kwargs_identity,
         "sequence": set_up_config_object_init_kwargs_identity,
         "bytes": set_up_config_object_init_kwargs_identity,
+        "image": set_up_config_object_init_kwargs_identity,
     }
 
     return mapping
@@ -448,7 +469,7 @@ def get_model_config_map() -> Dict[str, Type]:
 
 def set_up_interpretation_config(
     input_type: str, interpretation_config_dict: Union[None, Dict[str, Any]]
-) -> Union[None, schemas.SequenceInterpretationConfig]:
+) -> Union[None, schemas.BasicInterpretationConfig]:
 
     config_class = get_interpretation_config_class(input_type=input_type)
     if config_class is None:
@@ -470,7 +491,8 @@ def get_interpretation_config_class(input_type: str):
 
 def get_interpretation_config_schema_map():
     mapping = {
-        "sequence": schemas.SequenceInterpretationConfig,
+        "sequence": schemas.BasicInterpretationConfig,
+        "image": schemas.BasicInterpretationConfig,
     }
 
     return mapping

@@ -1,10 +1,9 @@
 import io
-import random
 from collections import defaultdict
 from copy import copy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Sequence, Literal, Generator, Tuple, Dict
+from typing import TYPE_CHECKING, Sequence, Literal, Tuple, Dict
 
 import numpy as np
 import pandas as pd
@@ -18,8 +17,8 @@ from eir.interpretation.interpretation_utils import (
     get_target_class_name,
     stratify_activations_by_target_classes,
     plot_activations_bar,
+    get_basic_sample_activations_to_analyse_generator,
 )
-from eir.setup import schemas
 from eir.visualization.sequence_visualization_forward_port import text
 
 if TYPE_CHECKING:
@@ -43,7 +42,7 @@ def analyze_sequence_input_activations(
     input_object = exp.inputs[input_name]
     interpretation_config = input_object.input_config.interpretation_config
 
-    samples_to_act_analyze_gen = get_sequence_sample_activations_to_analyse_generator(
+    samples_to_act_analyze_gen = get_basic_sample_activations_to_analyse_generator(
         interpretation_config=interpretation_config, all_activations=all_activations
     )
     vocab = exp.inputs[input_name].vocab
@@ -118,31 +117,6 @@ def analyze_sequence_input_activations(
         df_token_importances.to_csv(
             path_or_buf=target_outfolder / f"token_influence_{class_name}.csv"
         )
-
-
-def get_sequence_sample_activations_to_analyse_generator(
-    interpretation_config: schemas.SequenceInterpretationConfig,
-    all_activations: Sequence["SampleActivation"],
-) -> Generator["SampleActivation", None, None]:
-
-    strategy = interpretation_config.interpretation_sampling_strategy
-    n_samples = interpretation_config.num_samples_to_interpret
-
-    if strategy == "first_n":
-        base = all_activations[:n_samples]
-    elif strategy == "random_sample":
-        base = random.sample(all_activations, n_samples)
-    else:
-        raise ValueError(f"Unrecognized option for sequence sampling: {strategy}.")
-
-    manual_samples = interpretation_config.manual_samples_to_interpret
-    if manual_samples:
-        for activation in all_activations:
-            if activation.sample_info.ids in manual_samples:
-                base.append(activation)
-
-    for item in base:
-        yield item
 
 
 @dataclass

@@ -1,0 +1,18 @@
+input_info:
+  input_source: data/IMDB_Bytes/IMDB_Reviews/
+  input_name: imdb_reviews_bytes_base_transformer
+  input_type: bytes
+
+input_type_info:
+        model_type: sequence-default
+        sampling_strategy_if_longer: "uniform"
+        max_length: 1024
+        window_size: 128
+        embedding_dim: 64
+        position: "embed"
+
+model_config:
+        num_layers: 8
+        num_heads: 4
+        dim_feedforward: 512
+

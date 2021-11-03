@@ -1,17 +1,19 @@
 from copy import copy
 from dataclasses import dataclass
 from functools import partial
-from typing import TYPE_CHECKING, Union, Dict, Callable, Sequence, Tuple
+from typing import TYPE_CHECKING, Union, Dict, Callable, Sequence, Tuple, Iterable
 
 import numpy as np
 import torch
 from torch import nn
+from timm.data.mixup import rand_bbox
 
 from eir.data_load.data_utils import Batch
 from eir.data_load.label_setup import al_target_columns
 
 if TYPE_CHECKING:
     from eir.train import al_training_labels_target, al_criterions, Experiment
+    from eir.setup.schemas import InputConfig
 
 al_target_values = Union[torch.LongTensor, torch.Tensor]
 al_int_tensors = Union[
@@ -32,17 +34,73 @@ class MixingObject:
     permuted_indexes: al_int_tensors
 
 
-def get_mix_data_hook(mixing_type: str):
-    mixing_func_mapping = _get_mixing_function_map()
-    mixing_func = mixing_func_mapping.get(mixing_type)
+def get_mix_data_hook(input_configs: Iterable["InputConfig"]):
+    mixing_func_mapping = _get_mixing_func_map()
 
-    bound_hook = partial(hook_default_mix_data, mixing_func=mixing_func)
+    input_mixing_func_map = {}
+
+    for config in input_configs:
+
+        cur_input_type_config = config.input_type_info
+        cur_mixing_type = getattr(cur_input_type_config, "mixing_subtype", "mixup")
+
+        cur_input_type = config.input_info.input_type
+        cur_mixing_callable = mixing_func_mapping[cur_input_type][cur_mixing_type]
+
+        cur_input_name = config.input_info.input_name
+        cur_input_name_with_prefix = f"{cur_input_type}_{cur_input_name}"
+
+        input_mixing_func_map[cur_input_name_with_prefix] = cur_mixing_callable
+
+    bound_hook = partial(
+        hook_default_mix_data,
+        mixing_funcs=input_mixing_func_map,
+    )
 
     return bound_hook
 
 
+def _get_mixing_func_map() -> Dict[str, Dict[str, Callable]]:
+    mapping = {
+        "omics": {
+            "cutmix-uniform": uniform_cutmix_omics_input,
+            "cutmix-block": block_cutmix_omics_input,
+            "mixup": mixup_tensor,
+        },
+        "tabular": {"mixup": mixup_tensor},
+        "sequence": {"mixup": mixup_tensor},
+        "bytes": {"mixup": mixup_tensor},
+        "image": {"mixup": mixup_tensor, "cutmix": cutmix_image},
+    }
+
+    return mapping
+
+
+def cutmix_image(
+    tensor: torch.Tensor,
+    lambda_: float,
+    random_batch_indices_to_mix: Sequence[al_int_tensors],
+):
+
+    image_shape = tensor[0].shape
+    y_bottom, y_top, x_bottom, x_top = rand_bbox(img_shape=image_shape, lam=lambda_)
+
+    target_to_cut = tensor[random_batch_indices_to_mix, :]
+    cut_part = target_to_cut[..., y_bottom:y_top, x_bottom:x_top]
+
+    # Caution: input_ will be modified as well since no .clone() below here
+    cutmixed_x = tensor
+    cutmixed_x[..., y_bottom:y_top, x_bottom:x_top] = cut_part
+
+    return cutmixed_x
+
+
 def hook_default_mix_data(
-    experiment: "Experiment", state: Dict, mixing_func: Callable, *args, **kwargs
+    experiment: "Experiment",
+    state: Dict,
+    mixing_funcs: Dict[str, Callable],
+    *args,
+    **kwargs,
 ) -> Dict:
 
     gc = experiment.configs.global_config
@@ -59,31 +117,14 @@ def hook_default_mix_data(
     mixed_inputs = {}
 
     for input_name, input_data in batch.inputs.items():
-        if input_name.startswith("omics_"):
 
-            mixed_omics = mixup_omics_data(
-                inputs=input_data,
-                mixing_func=mixing_func,
-                mixing_info=mixing_info,
-            )
-            mixed_inputs[input_name] = mixed_omics
-
-        elif input_name.startswith("tabular_"):
-
-            mixed_tabular_input_tensor = mixup_tensor(
-                tensor=input_data,
-                lambda_=mixing_info.lambda_,
-                random_batch_indices_to_mix=mixing_info.permuted_indexes,
-            )
-            mixed_inputs[input_name] = mixed_tabular_input_tensor
-
-        elif input_name.startswith("sequence_") or input_name.startswith("bytes_"):
-            mixed_sequence_embeddings = mixup_tensor(
-                tensor=input_data,
-                lambda_=mixing_info.lambda_,
-                random_batch_indices_to_mix=mixing_info.permuted_indexes,
-            )
-            mixed_inputs[input_name] = mixed_sequence_embeddings
+        cur_mixing_func = mixing_funcs.get(input_name)
+        mixed_input_batch = cur_mixing_func(
+            tensor=input_data,
+            lambda_=mixing_info.lambda_,
+            random_batch_indices_to_mix=mixing_info.permuted_indexes,
+        )
+        mixed_inputs[input_name] = mixed_input_batch
 
     batch_mixed = Batch(
         inputs=mixed_inputs,
@@ -148,64 +189,8 @@ def hook_mix_loss(experiment: "Experiment", state: Dict, *args, **kwargs) -> Dic
     return state_updates
 
 
-def _get_mixing_function_map():
-    mapping = {
-        "cutmix-uniform": uniform_cutmix_omics_input,
-        "cutmix-block": block_cutmix_omics_input,
-        "mixup": mixup_input,
-    }
-    return mapping
-
-
-def mixup_omics_data(
-    inputs: torch.Tensor,
-    mixing_func: Callable[[torch.Tensor, float, torch.Tensor], torch.Tensor],
-    mixing_info: MixingObject,
-) -> torch.Tensor:
-    """
-    NOTE: **This function will modify the inputs in-place**
-
-    The original inputs (inputs) will be lost when calling this function, unless
-    they have been explicitly copied and stored in another variable before this call.
-
-    This is because we do not want to clone the input tensor in this (or any functions
-    called within this) function as it might mean a large memory overhead if the inputs
-    are large.
-
-    An exception is when we use the "vanilla" MixUp, as that calculates a new tensor
-    instead of cut-pasting inside an already existing tensor.
-    """
-    assert inputs.dim() == 4, "Should be called with 4 dimensions."
-
-    mixed_inputs = mixing_func(
-        input_batch=inputs,
-        lambda_=mixing_info.lambda_,
-        random_batch_indices_to_mix=mixing_info.permuted_indexes,
-    )
-
-    return mixed_inputs
-
-
 def get_random_batch_indices_to_mix(batch_size: int) -> al_int_tensors:
     return torch.randperm(batch_size).to(dtype=torch.long)
-
-
-def mixup_input(
-    input_batch: torch.Tensor,
-    lambda_: float,
-    random_batch_indices_to_mix: al_int_tensors,
-) -> torch.Tensor:
-    """
-    This function is to delegate arguments from mixup_snp_data to a general mixup
-    function that is does not necessarily have an 'input_batch' argument.
-    """
-    mixed_input = mixup_tensor(
-        tensor=input_batch,
-        lambda_=lambda_,
-        random_batch_indices_to_mix=random_batch_indices_to_mix,
-    )
-
-    return mixed_input
 
 
 def mixup_tensor(
@@ -221,17 +206,17 @@ def mixup_tensor(
 
 
 def block_cutmix_omics_input(
-    input_batch: torch.Tensor, lambda_: float, random_batch_indices_to_mix: torch.Tensor
+    tensor: torch.Tensor, lambda_: float, random_batch_indices_to_mix: torch.Tensor
 ) -> torch.Tensor:
 
     cut_start, cut_end = get_block_cutmix_indices(
-        input_length=input_batch.shape[-1], lambda_=lambda_
+        input_length=tensor.shape[-1], lambda_=lambda_
     )
-    target_to_cut = input_batch[random_batch_indices_to_mix, :]
+    target_to_cut = tensor[random_batch_indices_to_mix, :]
     cut_part = target_to_cut[..., cut_start:cut_end]
 
     # Caution: input_ will be modified as well since no .clone() below here
-    cutmixed_x = input_batch
+    cutmixed_x = tensor
     cutmixed_x[..., cut_start:cut_end] = cut_part
 
     return cutmixed_x
@@ -246,20 +231,20 @@ def get_block_cutmix_indices(input_length: int, lambda_: float) -> Tuple[int, in
 
 
 def uniform_cutmix_omics_input(
-    input_batch: torch.Tensor,
+    tensor: torch.Tensor,
     lambda_: float,
     random_batch_indices_to_mix: torch.Tensor,
 ) -> torch.Tensor:
 
-    target_to_mix = input_batch[random_batch_indices_to_mix, :]
+    target_to_mix = tensor[random_batch_indices_to_mix, :]
 
     random_snp_indices_to_mix = get_uniform_cutmix_indices(
-        input_length=input_batch.shape[-1], lambda_=lambda_
+        input_length=tensor.shape[-1], lambda_=lambda_
     )
     cut_part = target_to_mix[..., random_snp_indices_to_mix]
 
     # Caution: input_ will be modified as well since no .clone() below here
-    cutmixed_x = input_batch
+    cutmixed_x = tensor
     cutmixed_x[..., random_snp_indices_to_mix] = cut_part
 
     return cutmixed_x

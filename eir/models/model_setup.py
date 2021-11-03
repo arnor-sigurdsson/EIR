@@ -1,7 +1,9 @@
 import math
+from copy import copy
 from dataclasses import dataclass
 from typing import Union, Dict, Any, Sequence, Set, Type, Tuple, TYPE_CHECKING
 
+import timm
 from aislib.misc_utils import get_logger
 from torch import nn
 from transformers import (
@@ -11,6 +13,7 @@ from transformers import (
 )
 
 from eir.models.fusion import fusion_linear, fusion_mgmoe, fusion_default
+from eir.models.image.image_models import ImageWrapperModel, ImageModelConfig
 from eir.models.models_base import get_output_dimensions_for_input
 from eir.models.omics.omics_models import (
     al_omics_model_configs,
@@ -25,6 +28,7 @@ from eir.models.sequence.transformer_models import (
     TransformerFeatureExtractor,
     PerceiverIOModelConfig,
     PerceiverIOFeatureExtractor,
+    get_unsupported_hf_models,
 )
 from eir.models.tabular.tabular import (
     get_unique_values_from_transformers,
@@ -152,7 +156,101 @@ def get_modules_to_fuse_from_inputs(
             )
             models[input_name] = sequence_model
 
+        elif input_name.startswith("image_"):
+            image_model = get_image_model(
+                model_type=input_type_info.model_type,
+                pretrained=input_type_info.pretrained_model,
+                frozen=input_type_info.freeze_pretrained_model,
+                model_config=inputs_object.input_config.model_config,
+                input_channels=inputs_object.num_channels,
+                device=device,
+            )
+            models[input_name] = image_model
+
     return models
+
+
+def get_image_model(
+    model_type: str,
+    pretrained: bool,
+    frozen: bool,
+    model_config: Dict,
+    input_channels: int,
+    device: str,
+) -> ImageWrapperModel:
+
+    wrapper_kwargs = {
+        k: v for k, v in model_config.items() if k == "num_output_features"
+    }
+    wrapper_model_config = ImageModelConfig(**wrapper_kwargs)
+
+    if model_type in timm.list_models():
+        feature_extractor = timm.create_model(
+            model_name=model_type,
+            pretrained=pretrained,
+            num_classes=wrapper_model_config.num_output_features,
+            in_chans=input_channels,
+        ).to(device=device)
+    else:
+
+        if "num_output_features" not in model_config:
+            n_output_feats = wrapper_model_config.num_output_features
+            model_config["num_output_features"] = n_output_feats
+
+        feature_extractor = _meta_get_image_model_from_scratch(
+            model_type=model_type, model_config=model_config
+        ).to(device=device)
+
+    model = ImageWrapperModel(
+        feature_extractor=feature_extractor, model_config=wrapper_model_config
+    )
+
+    if frozen:
+        for param in model.parameters():
+            param.requires_grad = False
+
+    return model
+
+
+def _meta_get_image_model_from_scratch(
+    model_type: str, model_config: Dict
+) -> nn.Module:
+    """
+    A kind of ridiculous way to initialize modules from scratch that are found in timm,
+    but could not find a better way at first glance given how timm is set up.
+    """
+
+    feature_extractor_model_config = copy(model_config)
+    if "num_output_features" in feature_extractor_model_config:
+        num_classes = feature_extractor_model_config.pop("num_output_features")
+        feature_extractor_model_config["num_classes"] = num_classes
+
+    logger.info(
+        "Model '%s' not found among pretrained/external image model names, assuming "
+        "module will be initialized from scratch using %s for initalization.",
+        model_type,
+        model_config,
+    )
+
+    feature_extractor_class = getattr(timm.models, model_type)
+    parent_module = getattr(
+        timm.models, feature_extractor_class.__module__.split(".")[-1]
+    )
+    found_modules = {
+        k: getattr(parent_module, v)
+        for k, v in feature_extractor_model_config.items()
+        if isinstance(v, str) and getattr(parent_module, v, None)
+    }
+    feature_extractor_model_config_with_meta = {
+        **feature_extractor_model_config,
+        **found_modules,
+    }
+
+    feature_extractor = feature_extractor_class(
+        **feature_extractor_model_config_with_meta
+    )
+
+    return feature_extractor
 
 
 @dataclass
@@ -517,7 +615,7 @@ def get_fusion_kwargs_from_cl_args(
 
 
 def _warn_abount_unsupported_hf_model(model_name: str) -> None:
-    unsupported_models = _get_unsupported_hf_models()
+    unsupported_models = get_unsupported_hf_models()
     if model_name in unsupported_models.keys():
         reason = unsupported_models[model_name]
         logger.warning(
@@ -527,28 +625,3 @@ def _warn_abount_unsupported_hf_model(model_name: str) -> None:
             model_name,
             reason,
         )
-
-
-def _get_unsupported_hf_models() -> dict:
-    unsupported = {
-        "beit": "Not strictly sequence model.",
-        "canine": "Cannot do straightforward look up of embeddings.",
-        "clip": "Not strictly sequence model.",
-        "convbert": "HF error.",
-        "deit": "Not strictly sequence model.",
-        "detr": "Not strictly sequence model.",
-        "dpr": "Not strictly sequence model.",
-        "fsmt": "Not strictly sequence model.",
-        "funnel": "HF error.",
-        "hubert": "Cannot do straightforward look up of embeddings.",
-        "layoutlmv2": "LayoutLMv2Model requires the detectron2 library.",
-        "lxmert": "Not strictly sequence model.",
-        "mt5": "Not implemented in EIR for feature extraction yet.",
-        "retribert": "Cannot do straightforward look up of embeddings.",
-        "speech_to_text": "Not strictly sequence model.",
-        "tapas": "TapasModel requires the torch-scatter library.",
-        "vit": "Not strictly sequence model.",
-        "wav2vec2": "Not strictly sequence model.",
-    }
-
-    return unsupported

@@ -1,0 +1,12 @@
+run_name: is_it_a_hot_dog
+valid_size: 0.10
+batch_size: 32
+n_saved_models: 1
+checkpoint_interval: 100
+sample_interval: 100
+n_epochs: 200
+memory_dataset: False
+max_acts_per_class: 10
+get_acts: True
+mixing_alpha: 0.5
+plot_skip_steps: 0

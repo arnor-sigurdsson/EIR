@@ -21,9 +21,11 @@ from typing import (
 
 import numpy as np
 import torch
+from PIL.Image import Image
 from aislib.misc_utils import get_logger
 from torch.nn.functional import pad
 from torch.utils.data import Dataset
+from torchvision.datasets.folder import default_loader
 from tqdm import tqdm
 
 from eir.data_load.data_augmentation import make_random_omics_columns_missing
@@ -43,6 +45,7 @@ if TYPE_CHECKING:
         SequenceInputInfo,
         TabularInputInfo,
         BytesInputInfo,
+        ImageInputInfo,
     )
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
@@ -195,7 +198,7 @@ class DatasetBase(Dataset):
 
             input_type = source_data.input_config.input_info.input_type
             input_source = source_data.input_config.input_info.input_source
-            if input_type == "omics":
+            if input_type == "omics" or input_type == "image":
 
                 samples = _add_file_data_to_samples(
                     source_data=input_source,
@@ -241,7 +244,7 @@ class DatasetBase(Dataset):
         return samples
 
     def __getitem__(self, index: int):
-        raise NotImplementedError
+        raise NotImplementedError()
 
     def check_samples(self):
 
@@ -445,9 +448,7 @@ class MemoryDataset(DatasetBase):
     def _get_file_loading_hooks(
         self,
     ) -> Mapping[str, Callable[..., torch.Tensor]]:
-        mapping = {
-            "omics": _load_one_hot_array,
-        }
+        mapping = {"omics": _load_one_hot_array, "image": default_loader}
 
         for source_name, source_data in self.inputs.items():
             input_type = source_data.input_config.input_info.input_type
@@ -624,10 +625,31 @@ def prepare_inputs_disk(
 
             prepared_inputs[name] = prepared_bytes_input
 
+        elif name.startswith("image_"):
+            image_data = default_loader(path=data)
+            prepared_image_data = prepare_image_data(
+                image_input_object=inputs_objects[name],
+                image_data=image_data,
+                test_mode=test_mode,
+            )
+            prepared_inputs[name] = prepared_image_data
+
         else:
             prepared_inputs[name] = inputs[name]
 
     return prepared_inputs
+
+
+def prepare_image_data(
+    image_input_object: "ImageInputInfo", image_data: Image, test_mode: bool
+) -> torch.Tensor:
+
+    if test_mode:
+        image_prepared = image_input_object.base_transforms(img=image_data)
+    else:
+        image_prepared = image_input_object.all_transforms(img=image_data)
+
+    return image_prepared
 
 
 def prepare_bytes_data(
@@ -755,6 +777,15 @@ def prepare_inputs_memory(
 
             prepared_inputs[name] = prepared_bytes_input
 
+        elif name.startswith("image_"):
+            image_raw_in_memory = data
+            prepared_image_data = prepare_image_data(
+                image_input_object=inputs_objects[name],
+                image_data=image_raw_in_memory,
+                test_mode=test_mode,
+            )
+            prepared_inputs[name] = prepared_image_data
+
         else:
             prepared_inputs[name] = inputs[name]
 
@@ -808,6 +839,15 @@ def impute_missing_modalities(
             elif input_name.startswith("bytes_"):
                 max_length = input_object.input_config.input_type_info.max_length
                 shape = (max_length,)
+                imputed_tensor = impute_single_missing_modality(
+                    shape=shape, fill_value=fill_value, dtype=dtype
+                )
+                inputs_values[input_name] = imputed_tensor
+
+            elif input_name.startswith("image"):
+                size = input_object.input_config.input_type_info.size
+                num_channels = input_object.num_channels
+                shape = (num_channels, *size)
                 imputed_tensor = impute_single_missing_modality(
                     shape=shape, fill_value=fill_value, dtype=dtype
                 )

@@ -134,7 +134,7 @@ def test_add_hparams_to_tensorboard(
 
     train(experiment=test_experiment)
 
-    expected = ["lr", "batch_size", "mixing_type"]
+    expected = ["lr", "batch_size"]
     random = ["random_1", "random_2"]
     test_hparam_keys = expected + random
 
@@ -147,7 +147,6 @@ def test_add_hparams_to_tensorboard(
     assert set(hparam_kwarg.keys()) == set(expected)
     assert hparam_kwarg["batch_size"] == global_config.batch_size
     assert hparam_kwarg["lr"] == global_config.lr
-    assert hparam_kwarg["mixing_type"] == "None"
 
     metric_dict_kwarg = patched_writer.add_hparams.call_args.kwargs["metric_dict"]
     assert metric_dict_kwarg["best_overall_performance"] > 0.8
@@ -177,7 +176,7 @@ def test_generate_hparam_dict(create_test_config: Configs):
 
     global_config = test_configs.global_config
 
-    expected = ["lr", "batch_size", "mixing_type"]
+    expected = ["lr", "batch_size"]
     random = ["random_1", "random_2"]
     test_hparam_keys = expected + random
 
@@ -185,6 +184,5 @@ def test_generate_hparam_dict(create_test_config: Configs):
         global_config=global_config, h_params=test_hparam_keys
     )
     assert set(hparam_dict.keys()) == set(expected)
-    assert hparam_dict.get("mixing_type") == "None"
     assert hparam_dict.get("batch_size") == global_config.batch_size
     assert hparam_dict.get("lr") == global_config.lr

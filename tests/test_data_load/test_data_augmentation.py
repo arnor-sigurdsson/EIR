@@ -123,7 +123,7 @@ def test_block_cutmix_omics_input(patched_indices: List[int]) -> None:
         autospec=True,
     ):
         block_cutmixed_test_arrays = data_augmentation.block_cutmix_omics_input(
-            input_batch=test_batch,
+            tensor=test_batch,
             lambda_=1.0,
             random_batch_indices_to_mix=batch_indices_for_mixing,
         )
@@ -202,7 +202,7 @@ def test_uniform_cutmix_omics_input(patched_indices: List[int]):
         autospec=True,
     ):
         uniform_cutmixed_test_arrays = data_augmentation.uniform_cutmix_omics_input(
-            input_batch=test_batch,
+            tensor=test_batch,
             lambda_=1.0,
             random_batch_indices_to_mix=batch_indices_for_mixing,
         )

@@ -1,6 +1,6 @@
-from dataclasses import dataclass
-from pathlib import Path
 from collections import OrderedDict
+from dataclasses import dataclass, fields
+from pathlib import Path
 from typing import (
     Dict,
     Union,
@@ -18,9 +18,14 @@ from typing import (
 import dill
 import numpy as np
 from aislib.misc_utils import get_logger, ensure_path_exists
+from timm.models.registry import _model_default_cfgs
 from torchtext.data.utils import get_tokenizer as get_pytorch_tokenizer
 from torchtext.vocab import build_vocab_from_iterator, Vocab
 from torchtext.vocab import vocab as pytorch_vocab_builder
+from torchvision import transforms
+from torchvision.datasets.folder import default_loader
+from torchvision.transforms import Compose
+from torchvision.transforms.functional import to_tensor
 from tqdm import tqdm
 from transformers import AutoTokenizer, PreTrainedTokenizer
 from transformers.tokenization_utils_base import (
@@ -36,9 +41,10 @@ from eir.data_load.label_setup import (
     get_array_path_iterator,
     save_transformer_set,
 )
+from eir.models.tabular.tabular import get_unique_values_from_transformers
 from eir.setup import schemas
 from eir.setup.schemas import al_tokenizer_choices
-from eir.models.tabular.tabular import get_unique_values_from_transformers
+from eir.setup.setup_utils import collect_stats
 
 if TYPE_CHECKING:
     from eir.train import Hooks
@@ -47,7 +53,13 @@ logger = get_logger(__name__)
 
 al_input_objects_as_dict = Dict[
     str,
-    Union["OmicsInputInfo", "TabularInputInfo", "SequenceInputInfo", "BytesInputInfo"],
+    Union[
+        "OmicsInputInfo",
+        "TabularInputInfo",
+        "SequenceInputInfo",
+        "BytesInputInfo",
+        "ImageInputInfo",
+    ],
 ]
 al_hf_tokenizer_inputs = Union[TextInput, PreTokenizedInput, EncodedInput]
 al_sequence_input_objects_basic = Tuple[
@@ -112,6 +124,7 @@ def get_input_setup_function_map() -> Dict[str, Callable]:
         "tabular": set_up_tabular_input_for_training,
         "sequence": set_up_sequence_input_for_training,
         "bytes": set_up_bytes_input_for_training,
+        "image": set_up_image_input_for_training,
     }
 
     return setup_mapping
@@ -161,6 +174,197 @@ def build_bytes_vocab(
 def _get_encoding_to_num_tokens_map() -> Dict[str, int]:
     mapping = {"uint8": 256}
     return mapping
+
+
+@dataclass
+class PretrainedImageModelInfo:
+    url: str
+    num_classes: int
+    input_size: Sequence[int]
+    pool_size: Sequence[int]
+    mean: Sequence[float]
+    std: Sequence[float]
+    first_conv: str
+    classifier: str
+
+
+def get_timm_configs() -> Dict[str, PretrainedImageModelInfo]:
+    default_configs = {}
+    field_names = {i.name for i in fields(PretrainedImageModelInfo)}
+    for name, dict_ in _model_default_cfgs.items():
+        common = {k: v for k, v in dict_.items() if k in field_names}
+        default_configs[name] = PretrainedImageModelInfo(**common)
+
+    return default_configs
+
+
+@dataclass
+class ImageInputInfo:
+    input_config: schemas.InputConfig
+    base_transforms: Compose
+    all_transforms: Compose
+    normalization_stats: "ImageNormalizationStats"
+    num_channels: int
+
+
+def set_up_image_input_for_training(
+    input_config: schemas.InputConfig, *args, **kwargs
+) -> ImageInputInfo:
+    input_type_info = input_config.input_type_info
+
+    num_channels = input_type_info.num_channels
+    if not num_channels:
+        num_channels = infer_num_channels(
+            data_source=input_config.input_info.input_source
+        )
+
+    normalization_stats = get_image_normalization_values(input_config=input_config)
+
+    base_transforms, all_transforms = get_image_transforms(
+        target_size=input_config.input_type_info.size,
+        normalization_stats=normalization_stats,
+        auto_augment=input_type_info.auto_augment,
+    )
+
+    image_input_info = ImageInputInfo(
+        input_config=input_config,
+        base_transforms=base_transforms,
+        all_transforms=all_transforms,
+        normalization_stats=normalization_stats,
+        num_channels=num_channels,
+    )
+
+    return image_input_info
+
+
+def infer_num_channels(data_source: str) -> int:
+    test_file = next(Path(data_source).iterdir())
+    test_image = default_loader(path=str(test_file))
+    test_image_array = np.array(test_image)
+
+    if test_image_array.ndim == 2:
+        num_channels = 1
+    else:
+        num_channels = test_image_array.shape[-1]
+
+    logger.info(
+        "Inferring number of channels from source %s (using file %s) as: %d",
+        data_source,
+        test_file.name,
+        num_channels,
+    )
+
+    return num_channels
+
+
+@dataclass
+class ImageNormalizationStats:
+    channel_means: Sequence[float]
+    channel_stds: Sequence[float]
+
+
+def get_image_normalization_values(
+    input_config: schemas.InputConfig,
+) -> ImageNormalizationStats:
+    input_type_info = input_config.input_type_info
+
+    pretrained_model_configs = get_timm_configs()
+
+    means = input_type_info.mean_normalization_values
+    stds = input_type_info.stds_normalization_values
+
+    if input_type_info.pretrained_model:
+        cur_config = pretrained_model_configs[input_type_info.model_type]
+
+        if not means:
+            logger.info(
+                "Using inferred image channel means (%s) from base on training "
+                "statistics from pretrained '%s' model.",
+                cur_config.mean,
+                input_type_info.model_type,
+            )
+            means = cur_config.mean
+        else:
+            logger.warning(
+                "Got manual values for channel means (%s) when using "
+                "pretrained model '%s'. Usually one would use the means "
+                "from the training data when '%s' was trained.",
+                means,
+                input_type_info.model_type,
+                input_type_info.model_type,
+            )
+        if not stds:
+            logger.info(
+                "Using inferred image channel standard deviations (%s) from base on "
+                "training statistics from pretrained '%s' model.",
+                cur_config.std,
+                input_type_info.model_type,
+            )
+            stds = cur_config.std
+        else:
+            logger.warning(
+                "Got manual values for channel standard deviations (%s) "
+                "when using pretrained model '%s'. Usually one would use "
+                "the means from the training data when '%s' was trained.",
+                stds,
+                input_type_info.model_type,
+                input_type_info.model_type,
+            )
+    else:
+        if not means or not stds:
+            input_source = input_config.input_info.input_source
+            logger.info(
+                "Not using a pretrained model and no mean and standard deviation "
+                "statistics passed in. Gathering running image means and standard "
+                "deviations from %s.",
+                input_source,
+            )
+            file_iterator = Path(input_source).rglob("*")
+            image_iterator = (default_loader(str(f)) for f in file_iterator)
+            tensor_iterator = (to_tensor(i) for i in image_iterator)
+
+            gathered_stats = collect_stats(tensor_iterable=tensor_iterator)
+            means = gathered_stats.mean
+            stds = gathered_stats.std
+            logger.info(
+                "Gathered the following means: %s and standard deviations: %s "
+                "from %s.",
+                means,
+                stds,
+                input_source,
+            )
+
+    stats = ImageNormalizationStats(channel_means=means, channel_stds=stds)
+
+    return stats
+
+
+def get_image_transforms(
+    target_size: Sequence[int],
+    normalization_stats: ImageNormalizationStats,
+    auto_augment: bool,
+) -> Tuple[Compose, Compose]:
+    random_transforms = transforms.TrivialAugmentWide()
+    target_resize = [int(i * 1.5) for i in target_size]
+
+    base = [
+        transforms.Resize(*target_resize),
+        transforms.CenterCrop(*target_size),
+        transforms.ToTensor(),
+        transforms.Normalize(
+            mean=normalization_stats.channel_means,
+            std=normalization_stats.channel_stds,
+        ),
+    ]
+
+    base_transforms = transforms.Compose(transforms=base)
+    if auto_augment:
+        logger.info("Image will be auto augmented with TrivialAugment during training.")
+        all_transforms = transforms.Compose(transforms=[random_transforms] + base)
+    else:
+        all_transforms = base_transforms
+
+    return base_transforms, all_transforms
 
 
 @dataclass
@@ -640,11 +844,13 @@ def serialize_all_input_transformers(
             )
 
 
-def serialize_all_sequence_inputs(
+def serialize_chosen_input_objects(
     inputs_dict: al_input_objects_as_dict, run_folder: Path
 ):
+    targets_to_serialize = {"sequence_", "bytes_", "image_"}
     for input_name, input_ in inputs_dict.items():
-        if input_name.startswith("sequence_") or input_name.startswith("bytes_"):
+        any_match = any(i for i in targets_to_serialize if input_name.startswith(i))
+        if any_match:
             input_type = input_name.split("_")[0]
             outpath = get_input_serialization_path(
                 run_folder=run_folder,
