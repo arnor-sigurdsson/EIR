@@ -17,10 +17,14 @@ from tests.test_modelling.setup_modelling_test_data.setup_sequence_test_data imp
     get_continent_keyword_map,
 )
 from tests.test_modelling.test_modelling_utils import check_test_performance_results
+from tests.conftest import should_skip_in_gha_macos
 
 seed_everything(seed=0)
 
 
+@pytest.mark.skipif(
+    condition=should_skip_in_gha_macos(), reason="In GHA and platform is Darwin."
+)
 @pytest.mark.parametrize(
     "create_test_data",
     [

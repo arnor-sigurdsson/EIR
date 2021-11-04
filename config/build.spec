@@ -1,6 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 import os
-from PyInstaller.utils.hooks import copy_metadata
+from PyInstaller.utils.hooks import copy_metadata, collect_data_files
 
 # https://stackoverflow.com/questions/38977929/pyinstaller-creating-exe-runtimeerror-maximum-recursion-depth-exceeded-while-ca
 import sys
@@ -23,6 +23,8 @@ for to_copy in (
     "tokenizers",
 ):
     datas += copy_metadata(to_copy)
+
+datas += collect_data_files("timm", include_py_files=True)
 
 a = Analysis(
     ["../eir/build_module.py"],
