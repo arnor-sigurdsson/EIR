@@ -7,11 +7,15 @@ import pytest
 from eir import train
 from eir.setup.config import get_all_targets, Configs
 from tests.test_modelling.test_modelling_utils import check_test_performance_results
+from tests.conftest import should_skip_in_gha_macos
 
 if TYPE_CHECKING:
     from tests.conftest import ModelTestConfig
 
 
+@pytest.mark.skipif(
+    condition=should_skip_in_gha_macos(), reason="In GHA and platform is Darwin."
+)
 @pytest.mark.parametrize(
     "create_test_data",
     [
@@ -148,6 +152,9 @@ def _get_snp_activations_generator(cur_target_act_paths: Dict[str, Path]):
             yield top_acts_masked_npy, True
 
 
+@pytest.mark.skipif(
+    condition=should_skip_in_gha_macos(), reason="In GHA and platform is Darwin."
+)
 @pytest.mark.parametrize(
     "create_test_data", [{"task_type": "regression"}], indirect=True
 )
@@ -259,6 +266,9 @@ def test_regression(prep_modelling_test_configs):
     )
 
 
+@pytest.mark.skipif(
+    condition=should_skip_in_gha_macos(), reason="In GHA and platform is Darwin."
+)
 @pytest.mark.parametrize(
     "create_test_data", [{"task_type": "multi_task"}], indirect=True
 )

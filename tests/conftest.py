@@ -81,6 +81,30 @@ def pytest_generate_tests(metafunc):
         metafunc.parametrize("keep_outputs", [option_value])
 
 
+def get_system_info() -> Tuple[bool, str]:
+    import os
+    import platform
+
+    in_gh_actions = os.environ.get("GITHUB_ACTIONS", False)
+    if in_gh_actions:
+        in_gh_actions = True
+
+    system = platform.system()
+
+    return in_gh_actions, system
+
+
+def should_skip_in_gha_macos():
+    """
+    We use this to skip some modelling tests as the GHA MacOS runner can be very slow.
+    """
+    in_gha, platform = get_system_info()
+    if in_gha and platform == "Darwin":
+        return True
+
+    return False
+
+
 @pytest.fixture(scope="session")
 def parse_test_cl_args(request) -> Dict[str, Any]:
     n_per_class = request.config.getoption("--num_samples_per_class")
