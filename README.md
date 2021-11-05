@@ -26,7 +26,7 @@
 
 ---
 
-Supervised modelling on genotype, tabular and sequence data.
+Supervised modelling on genotype, tabular, sequence, image and binary data.
 
 **WARNING:** This project is in alpha phase. Expect backwards incompatiable changes and API changes.
 
