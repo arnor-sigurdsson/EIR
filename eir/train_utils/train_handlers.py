@@ -2,7 +2,16 @@ import atexit
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
-from typing import List, Callable, Union, Tuple, TYPE_CHECKING, Dict, overload, Literal
+from typing import (
+    List,
+    Callable,
+    Union,
+    Tuple,
+    TYPE_CHECKING,
+    Dict,
+    overload,
+    Literal,
+)
 
 import aislib.misc_utils
 import pandas as pd
@@ -34,6 +43,7 @@ from eir.train_utils.metrics import (
     MetricRecord,
     read_metrics_history_file,
     get_average_history_filepath,
+    get_buffered_metrics_writer,
 )
 from eir.train_utils.utils import get_run_folder, validate_handler_dependencies
 from eir.visualization import visualization_funcs as vf
@@ -425,10 +435,16 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
             model=exp.model,
         )
 
+    metric_writing_funcs = _get_metric_writing_funcs(
+        sample_interval=gc.sample_interval,
+        target_columns=exp.target_columns,
+        run_folder=handler_config.run_folder,
+    )
     trainer.add_event_handler(
         event_name=Events.ITERATION_COMPLETED,
         handler=_write_training_metrics_handler,
         handler_config=handler_config,
+        writer_funcs=metric_writing_funcs,
     )
 
     for plot_event in _get_plot_events(sample_interval=gc.sample_interval):
@@ -526,6 +542,23 @@ def _add_checkpoint_handler_wrapper(
     return trainer
 
 
+def _get_metric_writing_funcs(
+    sample_interval: int, target_columns: Dict[str, List[str]], run_folder: Path
+) -> Dict[str, Callable]:
+    buffer_interval = sample_interval // 2
+    metrics_files = get_metrics_files(
+        target_columns=target_columns,
+        run_folder=run_folder,
+        train_or_val_target_prefix="train_",
+    )
+    writer_funcs = {
+        file_name: get_buffered_metrics_writer(buffer_interval=buffer_interval)
+        for file_name in metrics_files.keys()
+    }
+
+    return writer_funcs
+
+
 def _get_checkpoint_handler(
     run_folder: Path,
     run_name: Path,
@@ -568,7 +601,11 @@ def _attach_checkpoint_handler(
     return trainer
 
 
-def _write_training_metrics_handler(engine: Engine, handler_config: HandlerConfig):
+def _write_training_metrics_handler(
+    engine: Engine,
+    handler_config: HandlerConfig,
+    writer_funcs: Union[Dict[str, Callable], None] = None,
+):
     """
     Note that trainer.state.metrics contains the *running averages* we are interested
     in.
@@ -592,6 +629,7 @@ def _write_training_metrics_handler(engine: Engine, handler_config: HandlerConfi
         iteration=iteration,
         write_header=is_first_iteration,
         prefixes={"metrics": "train_", "writer": "train"},
+        writer_funcs=writer_funcs,
     )
 
 
