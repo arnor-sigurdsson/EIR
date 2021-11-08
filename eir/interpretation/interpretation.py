@@ -63,7 +63,7 @@ from eir.train_utils.utils import (
 if TYPE_CHECKING:
     from eir.train_utils.train_handlers import HandlerConfig
     from eir.train import Experiment
-    from eir.predict import LoadedTrainExperiment
+    from eir.experiment_io.experiment_io import LoadedTrainExperiment
     from eir.data_load.label_setup import al_label_transformers_object
 
 logger = get_logger(name=__name__, tqdm_compatible=True)

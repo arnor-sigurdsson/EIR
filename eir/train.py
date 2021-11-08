@@ -1,8 +1,7 @@
 import sys
-from dataclasses import dataclass, fields
+from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
-from types import SimpleNamespace
 from typing import (
     Union,
     Tuple,
@@ -15,7 +14,6 @@ from typing import (
     Any,
 )
 
-import dill
 import pandas as pd
 import torch
 from aislib.misc_utils import ensure_path_exists
@@ -42,6 +40,12 @@ from eir.data_load.label_setup import (
     save_transformer_set,
     Labels,
 )
+from eir.experiment_io.experiment_io import (
+    serialize_experiment,
+    get_default_experiment_keys_to_serialize,
+    serialize_all_input_transformers,
+    serialize_chosen_input_objects,
+)
 from eir.models import al_fusion_models, FusionModel
 from eir.models import model_training_utils
 from eir.models.model_setup import get_model
@@ -56,10 +60,6 @@ from eir.setup.config import (
     get_all_targets,
 )
 from eir.setup.input_setup import al_input_objects_as_dict, set_up_inputs_for_training
-from eir.setup.input_setup import (
-    serialize_all_input_transformers,
-    serialize_chosen_input_objects,
-)
 from eir.train_utils import utils
 from eir.train_utils.metrics import (
     calculate_batch_metrics,
@@ -113,9 +113,9 @@ def main():
     utils.configure_root_logger(run_name=configs.global_config.run_name)
 
     default_hooks = get_default_hooks(configs=configs)
-    default_config = get_default_experiment(configs=configs, hooks=default_hooks)
+    default_experiment = get_default_experiment(configs=configs, hooks=default_hooks)
 
-    run_experiment(experiment=default_config)
+    run_experiment(experiment=default_experiment)
 
 
 def run_experiment(experiment: "Experiment") -> None:
@@ -152,58 +152,6 @@ class Experiment:
     writer: SummaryWriter
     metrics: "al_metric_record_dict"
     hooks: Union["Hooks", None]
-
-
-def serialize_experiment(
-    experiment: "Experiment",
-    run_folder: Path,
-    keys_to_serialize: Union[Iterable[str], None],
-) -> None:
-    serialization_path = get_train_experiment_serialization_path(run_folder=run_folder)
-    ensure_path_exists(path=serialization_path)
-
-    filtered_experiment = filter_experiment_by_keys(
-        experiment=experiment, keys=keys_to_serialize
-    )
-    serialize_namespace(namespace=filtered_experiment, output_path=serialization_path)
-
-
-def get_train_experiment_serialization_path(run_folder: Path) -> Path:
-    train_experiment_path = run_folder / "serializations" / "filtered_experiment.dill"
-
-    return train_experiment_path
-
-
-def get_default_experiment_keys_to_serialize() -> Iterable[str]:
-    return (
-        "configs",
-        "num_outputs_per_target",
-        "target_transformers",
-        "target_columns",
-        "metrics",
-        "hooks",
-    )
-
-
-def filter_experiment_by_keys(
-    experiment: "Experiment", keys: Union[None, Iterable[str]] = None
-) -> SimpleNamespace:
-    filtered = {}
-
-    config_fields = (f.name for f in fields(experiment))
-    iterable = keys if keys is not None else config_fields
-
-    for k in iterable:
-        filtered[k] = getattr(experiment, k)
-
-    namespace = SimpleNamespace(**filtered)
-
-    return namespace
-
-
-def serialize_namespace(namespace: SimpleNamespace, output_path: Path) -> None:
-    with open(output_path, "wb") as outfile:
-        dill.dump(namespace, outfile)
 
 
 def set_up_target_labels_wrapper(
@@ -289,6 +237,7 @@ def get_default_experiment(
         valid_ids=valid_ids,
         hooks=hooks,
     )
+
     serialize_all_input_transformers(inputs_dict=inputs, run_folder=run_folder)
     serialize_chosen_input_objects(inputs_dict=inputs, run_folder=run_folder)
 

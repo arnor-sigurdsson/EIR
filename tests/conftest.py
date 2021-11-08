@@ -24,6 +24,7 @@ from aislib.misc_utils import ensure_path_exists
 from torch import nn
 from torch.utils.data import DataLoader
 
+import eir.experiment_io.experiment_io
 import eir.models.omics.omics_models
 import eir.setup.input_setup
 import eir.train
@@ -32,7 +33,7 @@ from eir.data_load import datasets
 from eir.models.model_setup import get_model
 from eir.setup import schemas, config
 from eir.setup.config import recursive_dict_replace
-from eir.setup.input_setup import (
+from eir.experiment_io.experiment_io import (
     serialize_all_input_transformers,
     serialize_chosen_input_objects,
 )
@@ -774,8 +775,10 @@ def prep_modelling_test_configs(
         hooks=hooks,
     )
 
-    keys_to_serialize = train.get_default_experiment_keys_to_serialize()
-    train.serialize_experiment(
+    keys_to_serialize = (
+        eir.experiment_io.experiment_io.get_default_experiment_keys_to_serialize()
+    )
+    eir.experiment_io.experiment_io.serialize_experiment(
         experiment=experiment,
         run_folder=get_run_folder(gc.run_name),
         keys_to_serialize=keys_to_serialize,

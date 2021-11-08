@@ -15,7 +15,7 @@ from eir.interpretation.interpretation_utils import (
     stratify_activations_by_target_classes,
     plot_activations_bar,
 )
-from eir.train_utils.utils import load_transformers
+from eir.experiment_io.experiment_io import load_transformers
 
 if TYPE_CHECKING:
     from eir.train import Experiment

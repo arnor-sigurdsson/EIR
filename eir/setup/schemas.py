@@ -265,6 +265,7 @@ class InputConfig:
         "ImageInputDataConfig",
     ]
     model_config: al_model_configs
+    pretrained_config: Union[None, "BasicPretrainedConfig"] = None
     interpretation_config: Union[None, "BasicInterpretationConfig"] = None
 
 
@@ -431,6 +432,25 @@ class SequenceInputDataConfig:
     embedding_dim: int = None
     window_size: int = 0
     mixing_subtype: Literal["mixup"] = "mixup"
+
+
+@dataclass
+class BasicPretrainedConfig:
+    """
+    :param model_path:
+        Path save model from an EIR training run to load. Note that currently this
+        only supports if it's in a folder from an EIR training run, as the current
+        prototype functionality uses that to e.g. find configuration from the
+        pretrained model run.
+
+    :param load_module_nmae:
+        Name of the module to extract and use in the respective input feature
+        extraction.
+
+    """
+
+    model_path: str
+    load_module_name: str
 
 
 @dataclass
