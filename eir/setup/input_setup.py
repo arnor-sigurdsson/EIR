@@ -68,11 +68,15 @@ al_input_objects_as_dict = Dict[
 ]
 al_hf_tokenizer_inputs = Union[TextInput, PreTokenizedInput, EncodedInput]
 al_sequence_input_objects_basic = Tuple[
-    Vocab, "GatheredSequenceStats", Callable[[Sequence[str]], List[int]]
+    Vocab,
+    "GatheredSequenceStats",
+    Callable[[Sequence[str]], Sequence[str]],
+    Callable[[Sequence[str]], List[int]],
 ]
 al_sequence_input_objects_hf = Tuple[
     Vocab,
     "GatheredSequenceStats",
+    PreTrainedTokenizer,
     Callable[[al_hf_tokenizer_inputs], Sequence[int]],
 ]
 
@@ -468,7 +472,7 @@ def set_up_sequence_input_for_training(
     sequence_input_object_func = _get_sequence_input_object_func(
         pretrained=input_config.input_type_info.pretrained_model
     )
-    vocab, gathered_stats, encode_callable = sequence_input_object_func(
+    vocab, gathered_stats, tokenizer, encode_callable = sequence_input_object_func(
         input_config=input_config
     )
 
@@ -489,6 +493,7 @@ def set_up_sequence_input_for_training(
         vocab=vocab,
         computed_max_length=computed_max_length,
         encode_func=encode_callable,
+        tokenizer=tokenizer,
     )
 
     return sequence_input_info
@@ -553,7 +558,7 @@ def get_sequence_input_objects_from_input(
         pytorch_tokenizer=tokenizer, pytorch_vocab=vocab
     )
 
-    return vocab, gathered_stats, encode_func
+    return vocab, gathered_stats, tokenizer, encode_func
 
 
 def get_sequence_input_objects_from_pretrained(
@@ -575,7 +580,7 @@ def get_sequence_input_objects_from_pretrained(
 
     vocab = _sync_hf_and_pytorch_vocab(hf_tokenizer=hf_tokenizer)
 
-    return vocab, gathered_stats, _passthrough_hf_encode
+    return vocab, gathered_stats, hf_tokenizer, _passthrough_hf_encode
 
 
 def _sync_hf_and_pytorch_vocab(hf_tokenizer: PreTrainedTokenizer) -> Vocab:
