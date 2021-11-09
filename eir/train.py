@@ -500,10 +500,8 @@ def _log_model(model: nn.Module) -> None:
     )
 
 
-def train(experiment: Experiment) -> None:
-    e = experiment
-    gc = experiment.configs.global_config
-    step_hooks = e.hooks.step_func_hooks
+def get_base_trainer(experiment: Experiment) -> Engine:
+    step_hooks = experiment.hooks.step_func_hooks
 
     def step(
         engine: Engine,
@@ -512,8 +510,8 @@ def train(experiment: Experiment) -> None:
         """
         The output here goes to trainer.output.
         """
-        e.model.train()
-        e.optimizer.zero_grad()
+        experiment.model.train()
+        experiment.optimizer.zero_grad()
 
         base_prepare_inputs_stage = step_hooks.base_prepare_batch
         state = call_hooks_stage_iterable(
@@ -563,20 +561,29 @@ def train(experiment: Experiment) -> None:
 
     trainer = Engine(process_function=step)
 
+    return trainer
+
+
+def train(experiment: Experiment) -> None:
+    exp = experiment
+    gc = experiment.configs.global_config
+
+    trainer = get_base_trainer(experiment=experiment)
+
     if gc.find_lr:
         logger.info("Running LR find and exiting.")
         run_lr_find(
             trainer_engine=trainer,
-            train_dataloader=e.train_loader,
-            model=e.model,
-            optimizer=e.optimizer,
+            train_dataloader=exp.train_loader,
+            model=exp.model,
+            optimizer=exp.optimizer,
             output_folder=utils.get_run_folder(run_name=gc.run_name),
         )
         sys.exit(0)
 
     trainer = configure_trainer(trainer=trainer, experiment=experiment)
 
-    trainer.run(data=e.train_loader, max_epochs=gc.n_epochs)
+    trainer.run(data=exp.train_loader, max_epochs=gc.n_epochs)
 
 
 def get_default_hooks(configs: Configs):

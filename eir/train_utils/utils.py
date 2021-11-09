@@ -89,8 +89,13 @@ def validate_handler_dependencies(handler_dependencies: Sequence[Callable]):
 
             for dep in handler_dependencies:
                 if not engine_object.has_event_handler(dep):
-                    raise MissingHandlerDependencyError(
+                    logger.warning(
                         f"Dependency '{dep.__name__}' missing from engine."
+                        f"If your are running EIR directly through the CLI, "
+                        f"this is likely a bug. If you are customizing"
+                        f"EIR (e.g. the validation handler), this can"
+                        f"be expected, please ignore this warning in "
+                        f"that case."
                     )
 
             func_output = func(*args, **kwargs)
