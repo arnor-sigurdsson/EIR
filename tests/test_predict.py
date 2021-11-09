@@ -10,6 +10,8 @@ import yaml
 from aislib.misc_utils import ensure_path_exists
 from sklearn.preprocessing import LabelEncoder
 
+import eir.experiment_io.experiment_io
+import eir.models.model_setup
 import eir.models.omics.omics_models
 import eir.setup.config
 import eir.setup.input_setup
@@ -82,11 +84,12 @@ def test_load_model(create_test_config: config.Configs, tmp_path: Path):
     model_path = tmp_path / "model.pt"
     torch.save(obj=model.state_dict(), f=model_path)
 
-    loaded_model = predict._load_model(
+    loaded_model = eir.models.model_setup.load_model(
         model_path=model_path,
         model_class=CNNModel,
         model_init_kwargs=cnn_init_kwargs,
         device=gc.device,
+        test_mode=True,
     )
     # make sure we're in eval model
     assert not loaded_model.training
@@ -589,8 +592,10 @@ def test_predict(
     }
     predict_cl_args = Namespace(**all_predict_kwargs)
 
-    train_configs_for_testing = predict._load_serialized_train_experiment(
-        run_folder=model_test_config.run_path
+    train_configs_for_testing = (
+        eir.experiment_io.experiment_io.load_serialized_train_experiment(
+            run_folder=model_test_config.run_path
+        )
     )
 
     predict_config = predict.get_default_predict_config(

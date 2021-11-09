@@ -34,6 +34,9 @@ seed_everything(seed=0)
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_image"},
+                        "input_type_info": {
+                            "size": [16],
+                        },
                     }
                 ],
             },
@@ -57,6 +60,7 @@ seed_everything(seed=0)
                         "input_type_info": {
                             "model_type": "resnet18",
                             "mixing_subtype": "cutmix",
+                            "size": [16, 16],
                         },
                     }
                 ],

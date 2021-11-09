@@ -338,6 +338,10 @@ def init_input_config(yaml_config_as_dict: Dict[str, Any]) -> schemas.InputConfi
         model_init_kwargs_base=cfg.get("model_config", {}),
     )
 
+    pretrained_config = set_up_pretrained_config(
+        pretrained_config_dict=cfg.get("pretrained_config", None)
+    )
+
     interpretation_config = set_up_interpretation_config(
         input_type=input_info_object.input_type,
         interpretation_config_dict=cfg.get("interpretation_config", None),
@@ -346,6 +350,7 @@ def init_input_config(yaml_config_as_dict: Dict[str, Any]) -> schemas.InputConfi
     input_config = schemas.InputConfig(
         input_info=input_info_object,
         input_type_info=input_type_info_object,
+        pretrained_config=pretrained_config,
         model_config=model_config,
         interpretation_config=interpretation_config,
     )
@@ -467,6 +472,26 @@ def get_model_config_map() -> Dict[str, Type]:
     return mapping
 
 
+def set_up_pretrained_config(
+    pretrained_config_dict: Union[None, Dict[str, Any]]
+) -> Union[None, schemas.BasicPretrainedConfig]:
+
+    if pretrained_config_dict is None:
+        return None
+
+    config_class = get_pretrained_config_class()
+    if config_class is None:
+        return None
+
+    config_object = config_class(**pretrained_config_dict)
+
+    return config_object
+
+
+def get_pretrained_config_class() -> Type[schemas.BasicPretrainedConfig]:
+    return schemas.BasicPretrainedConfig
+
+
 def set_up_interpretation_config(
     input_type: str, interpretation_config_dict: Union[None, Dict[str, Any]]
 ) -> Union[None, schemas.BasicInterpretationConfig]:
@@ -483,13 +508,17 @@ def set_up_interpretation_config(
     return config_object
 
 
-def get_interpretation_config_class(input_type: str):
+def get_interpretation_config_class(
+    input_type: str,
+) -> Union[None, schemas.BasicInterpretationConfig]:
     mapping = get_interpretation_config_schema_map()
 
     return mapping.get(input_type, None)
 
 
-def get_interpretation_config_schema_map():
+def get_interpretation_config_schema_map() -> Dict[
+    str, Type[schemas.BasicInterpretationConfig]
+]:
     mapping = {
         "sequence": schemas.BasicInterpretationConfig,
         "image": schemas.BasicInterpretationConfig,

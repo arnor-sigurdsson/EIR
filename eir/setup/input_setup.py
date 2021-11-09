@@ -1,5 +1,6 @@
 from collections import OrderedDict
 from dataclasses import dataclass, fields
+from functools import partial
 from pathlib import Path
 from typing import (
     Dict,
@@ -8,6 +9,7 @@ from typing import (
     Sequence,
     Callable,
     Literal,
+    Type,
     Hashable,
     Tuple,
     TYPE_CHECKING,
@@ -15,9 +17,8 @@ from typing import (
     List,
 )
 
-import dill
 import numpy as np
-from aislib.misc_utils import get_logger, ensure_path_exists
+from aislib.misc_utils import get_logger
 from timm.models.registry import _model_default_cfgs
 from torchtext.data.utils import get_tokenizer as get_pytorch_tokenizer
 from torchtext.vocab import build_vocab_from_iterator, Vocab
@@ -39,7 +40,11 @@ from eir.data_load.label_setup import (
     set_up_train_and_valid_tabular_data,
     TabularFileInfo,
     get_array_path_iterator,
-    save_transformer_set,
+)
+from eir.experiment_io.experiment_io import (
+    load_serialized_input_object,
+    load_transformers,
+    get_run_folder_from_model_path,
 )
 from eir.models.tabular.tabular import get_unique_values_from_transformers
 from eir.setup import schemas
@@ -63,12 +68,28 @@ al_input_objects_as_dict = Dict[
 ]
 al_hf_tokenizer_inputs = Union[TextInput, PreTokenizedInput, EncodedInput]
 al_sequence_input_objects_basic = Tuple[
-    Vocab, "GatheredSequenceStats", Callable[[Sequence[str]], List[int]]
+    Vocab,
+    "GatheredSequenceStats",
+    Callable[[Sequence[str]], Sequence[str]],
+    Callable[[Sequence[str]], List[int]],
 ]
 al_sequence_input_objects_hf = Tuple[
     Vocab,
     "GatheredSequenceStats",
+    PreTrainedTokenizer,
     Callable[[al_hf_tokenizer_inputs], Sequence[int]],
+]
+
+al_serializable_input_objects = Union[
+    "SequenceInputInfo",
+    "ImageInputInfo",
+    "BytesInputInfo",
+]
+
+al_serializable_input_classes = Union[
+    Type["SequenceInputInfo"],
+    Type["ImageInputInfo"],
+    Type["BytesInputInfo"],
 ]
 
 
@@ -83,15 +104,19 @@ def set_up_inputs_for_training(
     name_config_iter = get_input_name_config_iterator(input_configs=inputs_configs)
     for name, input_config in name_config_iter:
         cur_input_data_config = input_config.input_info
+
         setup_func = get_input_setup_function(
-            input_type=cur_input_data_config.input_type
+            input_type=cur_input_data_config.input_type,
+            pretrained_config=input_config.pretrained_config,
         )
+
         logger.info(
             "Setting up %s inputs '%s' from %s.",
             cur_input_data_config.input_type,
             cur_input_data_config.input_name,
             cur_input_data_config.input_source,
         )
+
         set_up_input = setup_func(
             input_config=input_config,
             train_ids=train_ids,
@@ -104,6 +129,9 @@ def set_up_inputs_for_training(
 
 
 def get_input_name_config_iterator(input_configs: schemas.al_input_configs):
+    """
+    TODO: Deprecate prefixing with input type.
+    """
     for input_config in input_configs:
         cur_input_data_config = input_config.input_info
         cur_name = (
@@ -112,10 +140,21 @@ def get_input_name_config_iterator(input_configs: schemas.al_input_configs):
         yield cur_name, input_config
 
 
-def get_input_setup_function(input_type) -> Callable:
-    mapping = get_input_setup_function_map()
+def get_input_setup_function(
+    input_type: str, pretrained_config: schemas.BasicPretrainedConfig
+) -> Callable:
+    from_scratch_mapping = get_input_setup_function_map()
 
-    return mapping[input_type]
+    if pretrained_config:
+        pretrained_run_folder = get_run_folder_from_model_path(
+            model_path=pretrained_config.model_path
+        )
+        from_pretrained_mapping = get_input_setup_from_pretrained_function_map(
+            run_folder=pretrained_run_folder
+        )
+        return from_pretrained_mapping[input_type]
+
+    return from_scratch_mapping[input_type]
 
 
 def get_input_setup_function_map() -> Dict[str, Callable]:
@@ -128,6 +167,56 @@ def get_input_setup_function_map() -> Dict[str, Callable]:
     }
 
     return setup_mapping
+
+
+def set_up_tabular_input_from_pretrained(
+    input_config: schemas.InputConfig,
+    train_ids: Sequence[str],
+    valid_ids: Sequence[str],
+    hooks: Union["Hooks", None],
+) -> "TabularInputInfo":
+
+    tabular_input_object = set_up_tabular_input_for_training(
+        input_config=input_config, train_ids=train_ids, valid_ids=valid_ids, hooks=hooks
+    )
+
+    pretrained_run_folder = get_run_folder_from_model_path(
+        model_path=input_config.pretrained_config.model_path
+    )
+
+    loaded_transformers = load_transformers(
+        run_folder=pretrained_run_folder, transformers_to_load=None
+    )
+
+    tabular_input_object.labels.label_transformers = loaded_transformers
+
+    return tabular_input_object
+
+
+def get_input_setup_from_pretrained_function_map(
+    run_folder: Path,
+) -> Dict[str, Callable]:
+    pretrained_setup_mapping = {
+        "omics": set_up_omics_input,
+        "tabular": set_up_tabular_input_from_pretrained,
+        "sequence": partial(
+            load_serialized_input_object,
+            input_class=SequenceInputInfo,
+            run_folder=run_folder,
+        ),
+        "bytes": partial(
+            load_serialized_input_object,
+            input_class=BytesInputInfo,
+            run_folder=run_folder,
+        ),
+        "image": partial(
+            load_serialized_input_object,
+            input_class=ImageInputInfo,
+            run_folder=run_folder,
+        ),
+    }
+
+    return pretrained_setup_mapping
 
 
 @dataclass
@@ -348,8 +437,8 @@ def get_image_transforms(
     target_resize = [int(i * 1.5) for i in target_size]
 
     base = [
-        transforms.Resize(*target_resize),
-        transforms.CenterCrop(*target_size),
+        transforms.Resize(size=target_resize),
+        transforms.CenterCrop(size=target_size),
         transforms.ToTensor(),
         transforms.Normalize(
             mean=normalization_stats.channel_means,
@@ -371,8 +460,9 @@ def get_image_transforms(
 class SequenceInputInfo:
     input_config: schemas.InputConfig
     vocab: Vocab
-    encode_func: Callable[[Sequence[str]], List[int]]
     computed_max_length: int
+    encode_func: Callable[[Sequence[str]], List[int]]
+    tokenizer: Union[Callable, None] = None
 
 
 def set_up_sequence_input_for_training(
@@ -382,7 +472,7 @@ def set_up_sequence_input_for_training(
     sequence_input_object_func = _get_sequence_input_object_func(
         pretrained=input_config.input_type_info.pretrained_model
     )
-    vocab, gathered_stats, encode_callable = sequence_input_object_func(
+    vocab, gathered_stats, tokenizer, encode_callable = sequence_input_object_func(
         input_config=input_config
     )
 
@@ -403,6 +493,7 @@ def set_up_sequence_input_for_training(
         vocab=vocab,
         computed_max_length=computed_max_length,
         encode_func=encode_callable,
+        tokenizer=tokenizer,
     )
 
     return sequence_input_info
@@ -467,7 +558,7 @@ def get_sequence_input_objects_from_input(
         pytorch_tokenizer=tokenizer, pytorch_vocab=vocab
     )
 
-    return vocab, gathered_stats, encode_func
+    return vocab, gathered_stats, tokenizer, encode_func
 
 
 def get_sequence_input_objects_from_pretrained(
@@ -489,7 +580,7 @@ def get_sequence_input_objects_from_pretrained(
 
     vocab = _sync_hf_and_pytorch_vocab(hf_tokenizer=hf_tokenizer)
 
-    return vocab, gathered_stats, _passthrough_hf_encode
+    return vocab, gathered_stats, hf_tokenizer, _passthrough_hf_encode
 
 
 def _sync_hf_and_pytorch_vocab(hf_tokenizer: PreTrainedTokenizer) -> Vocab:
@@ -832,43 +923,3 @@ def get_data_dimension_from_data_source(
         raise ValueError("Currently max 3 dimensional inputs supported")
 
     return DataDimensions(channels=channels, height=height, width=width)
-
-
-def serialize_all_input_transformers(
-    inputs_dict: al_input_objects_as_dict, run_folder: Path
-):
-    for input_name, input_ in inputs_dict.items():
-        if input_name.startswith("tabular_"):
-            save_transformer_set(
-                transformers=input_.labels.label_transformers, run_folder=run_folder
-            )
-
-
-def serialize_chosen_input_objects(
-    inputs_dict: al_input_objects_as_dict, run_folder: Path
-):
-    targets_to_serialize = {"sequence_", "bytes_", "image_"}
-    for input_name, input_ in inputs_dict.items():
-        any_match = any(i for i in targets_to_serialize if input_name.startswith(i))
-        if any_match:
-            input_type = input_name.split("_")[0]
-            outpath = get_input_serialization_path(
-                run_folder=run_folder,
-                input_type=input_type,
-                sequence_input_name=input_name,
-            )
-            ensure_path_exists(path=outpath, is_folder=False)
-            with open(outpath, "wb") as outfile:
-                dill.dump(obj=input_, file=outfile)
-
-
-def get_input_serialization_path(
-    run_folder: Path, input_type: str, sequence_input_name: str
-) -> Path:
-    path = (
-        run_folder
-        / "serializations"
-        / f"{input_type}_input_serializations/{sequence_input_name}.dill"
-    )
-
-    return path

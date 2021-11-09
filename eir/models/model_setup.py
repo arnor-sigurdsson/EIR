@@ -1,9 +1,11 @@
 import math
 from copy import copy
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Union, Dict, Any, Sequence, Set, Type, Tuple, TYPE_CHECKING
 
 import timm
+import torch
 from aislib.misc_utils import get_logger
 from torch import nn
 from transformers import (
@@ -12,6 +14,11 @@ from transformers import (
     AutoConfig,
 )
 
+from eir.experiment_io.experiment_io import (
+    get_run_folder_from_model_path,
+    load_serialized_train_experiment,
+)
+from eir.models import al_fusion_models
 from eir.models.fusion import fusion_linear, fusion_mgmoe, fusion_default
 from eir.models.image.image_models import ImageWrapperModel, ImageModelConfig
 from eir.models.models_base import get_output_dimensions_for_input
@@ -58,13 +65,18 @@ def get_model(
     num_outputs_per_target: "al_num_outputs_per_target",
 ) -> Union[nn.Module, nn.DataParallel]:
 
-    fusion_class = get_fusion_class(fusion_model_type=predictor_config.model_type)
-    fusion_kwargs = get_fusion_kwargs_from_cl_args(
+    fusion_class, fusion_kwargs = get_fusion_model_class_and_kwargs_from_configs(
         global_config=global_config,
         predictor_config=predictor_config,
-        inputs=inputs_as_dict,
         num_outputs_per_target=num_outputs_per_target,
+        input_objects=inputs_as_dict,
     )
+
+    modules_to_fuse = overload_fusion_model_feature_extractors_with_pretrained(
+        modules_to_fuse=fusion_kwargs["modules_to_fuse"], inputs_as_dict=inputs_as_dict
+    )
+    fusion_kwargs["modules_to_fuse"] = modules_to_fuse
+
     fusion_model = fusion_class(**fusion_kwargs)
     fusion_model = fusion_model.to(device=global_config.device)
 
@@ -596,7 +608,7 @@ def get_fusion_class(
     raise ValueError(f"Unrecognized fusion model type: {fusion_model_type}.")
 
 
-def get_fusion_kwargs_from_cl_args(
+def get_fusion_kwargs_from_configs(
     global_config: schemas.GlobalConfig,
     predictor_config: schemas.PredictorConfig,
     inputs: "al_input_objects_as_dict",
@@ -625,3 +637,108 @@ def _warn_abount_unsupported_hf_model(model_name: str) -> None:
             model_name,
             reason,
         )
+
+
+def overload_fusion_model_feature_extractors_with_pretrained(
+    modules_to_fuse: nn.ModuleDict, inputs_as_dict: "al_input_objects_as_dict"
+) -> nn.ModuleDict:
+    any_pretrained = any(
+        i.input_config.pretrained_config for i in inputs_as_dict.values()
+    )
+    if not any_pretrained:
+        return modules_to_fuse
+
+    for input_name, input_object in inputs_as_dict.items():
+        input_config = input_object.input_config
+
+        pretrained_config = input_config.pretrained_config
+        if not pretrained_config:
+            continue
+
+        load_model_path = Path(pretrained_config.model_path)
+        load_run_folder = get_run_folder_from_model_path(
+            model_path=str(load_model_path)
+        )
+        load_experiment = load_serialized_train_experiment(run_folder=load_run_folder)
+        load_configs = load_experiment.configs
+
+        func = get_fusion_model_class_and_kwargs_from_configs
+        fusion_model_class, fusion_model_kwargs = func(
+            global_config=load_configs.global_config,
+            predictor_config=load_configs.predictor_config,
+            num_outputs_per_target=load_experiment.num_outputs_per_target,
+            input_objects=inputs_as_dict,
+        )
+
+        loaded_fusion_model = load_model(
+            model_path=load_model_path,
+            model_class=fusion_model_class,
+            model_init_kwargs=fusion_model_kwargs,
+            device="cpu",
+            test_mode=False,
+        )
+        loaded_fusion_feature_extractors = loaded_fusion_model.modules_to_fuse
+
+        module_name_to_load = pretrained_config.load_module_name
+        module_to_overload = loaded_fusion_feature_extractors[module_name_to_load]
+
+        logger.info(
+            "Replacing '%s' in current model with '%s' from %s.",
+            input_name,
+            module_name_to_load,
+            load_model_path,
+        )
+
+        modules_to_fuse[input_name] = module_to_overload
+
+    return modules_to_fuse
+
+
+def get_fusion_model_class_and_kwargs_from_configs(
+    global_config: schemas.GlobalConfig,
+    predictor_config: schemas.PredictorConfig,
+    num_outputs_per_target: "al_num_outputs_per_target",
+    input_objects: "al_input_objects_as_dict",
+) -> Tuple[Type[nn.Module], Dict[str, Any]]:
+
+    fusion_model_class = get_fusion_class(fusion_model_type=predictor_config.model_type)
+
+    fusion_model_kwargs = get_fusion_kwargs_from_configs(
+        global_config=global_config,
+        predictor_config=predictor_config,
+        num_outputs_per_target=num_outputs_per_target,
+        inputs=input_objects,
+    )
+
+    return fusion_model_class, fusion_model_kwargs
+
+
+def load_model(
+    model_path: Path,
+    model_class: Type[nn.Module],
+    model_init_kwargs: Dict,
+    device: str,
+    test_mode: bool,
+) -> Union[al_fusion_models, nn.Module]:
+
+    model = model_class(**model_init_kwargs)
+
+    model = _load_model_weights(
+        model=model, model_state_dict_path=model_path, device=device
+    )
+
+    if test_mode:
+        model.eval()
+
+    return model
+
+
+def _load_model_weights(
+    model: nn.Module, model_state_dict_path: Path, device: str
+) -> nn.Module:
+    model.load_state_dict(
+        state_dict=torch.load(model_state_dict_path, map_location=device)
+    )
+    model = model.to(device=device)
+
+    return model

@@ -12,13 +12,10 @@ from typing import (
     Callable,
     Iterable,
     Tuple,
-    Type,
-    Any,
     Generator,
     Literal,
 )
 
-import dill
 import numpy as np
 import pandas as pd
 import torch
@@ -42,11 +39,21 @@ from eir.data_load.label_setup import (
     transform_label_df,
     TabularFileInfo,
 )
+from eir.experiment_io.experiment_io import (
+    get_run_folder_from_model_path,
+    LoadedTrainExperiment,
+    load_serialized_train_experiment,
+    load_serialized_input_object,
+    load_transformers,
+)
+from eir.models.model_setup import (
+    get_fusion_model_class_and_kwargs_from_configs,
+    load_model,
+)
 from eir.interpretation.interpretation import (
     activation_analysis_wrapper,
 )
 from eir.models import al_fusion_models
-from eir.models.model_setup import get_fusion_class, get_fusion_kwargs_from_cl_args
 from eir.models.model_training_utils import gather_pred_outputs_from_dloader
 from eir.setup import config
 from eir.setup import input_setup
@@ -64,15 +71,11 @@ from eir.setup.input_setup import (
     BytesInputInfo,
     ImageInputInfo,
     get_input_name_config_iterator,
-    get_input_serialization_path,
 )
 from eir.train import (
-    get_train_experiment_serialization_path,
     prepare_base_batch_default,
     Hooks,
     get_tabular_target_file_infos,
-    al_num_outputs_per_target,
-    get_default_experiment_keys_to_serialize,
     gather_all_ids_from_target_configs,
     check_dataset_and_batch_size_compatiblity,
 )
@@ -82,23 +85,12 @@ from eir.train_utils.metrics import (
     calculate_batch_metrics,
     al_step_metric_dict,
 )
-from eir.train_utils.utils import load_transformers, seed_everything, get_run_folder
+from eir.train_utils.utils import seed_everything
 
 al_named_dict_configs = Dict[
     Literal["global_configs", "predictor_configs", "input_configs", "target_configs"],
     Iterable[Dict],
 ]
-al_serializable_input_objects = Union[
-    SequenceInputInfo,
-    ImageInputInfo,
-    BytesInputInfo,
-]
-al_serializable_input_classes = Union[
-    Type[SequenceInputInfo],
-    Type[ImageInputInfo],
-    Type[BytesInputInfo],
-]
-
 
 seed_everything()
 
@@ -149,7 +141,7 @@ def main():
 def run_predict(predict_cl_args: Namespace):
 
     run_folder = get_run_folder_from_model_path(model_path=predict_cl_args.model_path)
-    loaded_train_experiment = _load_serialized_train_experiment(run_folder=run_folder)
+    loaded_train_experiment = load_serialized_train_experiment(run_folder=run_folder)
 
     predict_config = get_default_predict_config(
         loaded_train_experiment=loaded_train_experiment,
@@ -163,16 +155,6 @@ def run_predict(predict_cl_args: Namespace):
             loaded_train_experiment=loaded_train_experiment,
             predict_config=predict_config,
         )
-
-
-def get_run_folder_from_model_path(model_path: str) -> Path:
-    model_path_object = Path(model_path)
-    assert model_path_object.exists()
-
-    run_folder = model_path_object.parents[1]
-    assert run_folder.exists()
-
-    return run_folder
 
 
 def predict(
@@ -393,7 +375,7 @@ def get_default_predict_config(
         num_workers=configs_overloaded_for_predict.global_config.dataloader_workers,
     )
 
-    func = _get_fusion_model_class_and_kwargs_from_cl_args
+    func = get_fusion_model_class_and_kwargs_from_configs
     fusion_model_class, fusion_model_kwargs = func(
         global_config=configs_overloaded_for_predict.global_config,
         predictor_config=configs_overloaded_for_predict.predictor_config,
@@ -401,11 +383,12 @@ def get_default_predict_config(
         input_objects=test_inputs,
     )
 
-    model = _load_model(
+    model = load_model(
         model_path=Path(predict_cl_args.model_path),
         model_class=fusion_model_class,
         model_init_kwargs=fusion_model_kwargs,
         device=configs_overloaded_for_predict.global_config.device,
+        test_mode=True,
     )
     assert not model.training
 
@@ -430,33 +413,9 @@ def get_default_predict_config(
 
 
 @dataclass
-class LoadedTrainExperiment:
-    configs: Configs
-    hooks: Union["Hooks", None]
-    metrics: "al_metric_record_dict"
-    num_outputs_per_target: al_num_outputs_per_target
-    target_columns: al_target_columns
-    target_transformers: al_label_transformers
-
-
-@dataclass
 class LoadedTrainExperimentMixedWithPredict(LoadedTrainExperiment):
     model: nn.Module
     inputs: al_input_objects_as_dict
-
-
-def _load_serialized_train_experiment(run_folder: Path) -> LoadedTrainExperiment:
-    train_config_path = get_train_experiment_serialization_path(run_folder=run_folder)
-    with open(train_config_path, "rb") as infile:
-        train_config = dill.load(file=infile)
-
-    expected_keys = get_default_experiment_keys_to_serialize()
-    train_config_as_dict = train_config.__dict__
-    assert set(train_config_as_dict.keys()) == set(expected_keys)
-
-    loaded_experiment = LoadedTrainExperiment(**train_config_as_dict)
-
-    return loaded_experiment
 
 
 def get_target_labels_for_testing(
@@ -561,44 +520,6 @@ def get_labels_for_predict(
     return labels
 
 
-def load_serialized_input_for_testing(
-    input_config: schemas.InputConfig,
-    run_name: str,
-    input_class: al_serializable_input_classes,
-    *args,
-    **kwargs,
-):
-    input_name = input_config.input_info.input_name
-    input_type = input_config.input_info.input_type
-    input_name_with_prefix = f"{input_type}_{input_name}"
-
-    run_folder = get_run_folder(run_name=run_name)
-
-    serialized_input_config_path = get_input_serialization_path(
-        run_folder=run_folder,
-        sequence_input_name=input_name_with_prefix,
-        input_type=input_type,
-    )
-
-    assert serialized_input_config_path.exists()
-    with open(serialized_input_config_path, "rb") as infile:
-        serialized_input_config_object: al_serializable_input_objects = dill.load(
-            file=infile
-        )
-
-    assert isinstance(serialized_input_config_object, input_class)
-
-    train_input_info_kwargs = serialized_input_config_object.__dict__
-    assert "input_config" in train_input_info_kwargs.keys()
-
-    test_input_info_kwargs = copy(train_input_info_kwargs)
-    test_input_info_kwargs["input_config"] = input_config
-
-    test_input_object = input_class(**test_input_info_kwargs)
-
-    return test_input_object
-
-
 def set_up_inputs(
     test_inputs_configs: schemas.al_input_configs,
     ids: Sequence[str],
@@ -641,10 +562,10 @@ def get_input_setup_function_map_for_predict() -> Dict[str, Callable]:
         "omics": input_setup.set_up_omics_input,
         "tabular": setup_tabular_input_for_testing,
         "sequence": partial(
-            load_serialized_input_for_testing, input_class=SequenceInputInfo
+            load_serialized_input_object, input_class=SequenceInputInfo
         ),
-        "bytes": partial(load_serialized_input_for_testing, input_class=BytesInputInfo),
-        "image": partial(load_serialized_input_for_testing, input_class=ImageInputInfo),
+        "bytes": partial(load_serialized_input_object, input_class=BytesInputInfo),
+        "image": partial(load_serialized_input_object, input_class=ImageInputInfo),
     }
 
     return setup_mapping
@@ -709,54 +630,6 @@ def _get_target_class_names(
     if isinstance(transformer, LabelEncoder):
         return transformer.classes_
     return [target_column]
-
-
-def _get_fusion_model_class_and_kwargs_from_cl_args(
-    global_config: schemas.GlobalConfig,
-    predictor_config: schemas.PredictorConfig,
-    num_outputs_per_target: al_num_outputs_per_target,
-    input_objects: al_input_objects_as_dict,
-) -> Tuple[Type[nn.Module], Dict[str, Any]]:
-
-    fusion_model_class = get_fusion_class(fusion_model_type=predictor_config.model_type)
-
-    fusion_model_kwargs = get_fusion_kwargs_from_cl_args(
-        global_config=global_config,
-        predictor_config=predictor_config,
-        num_outputs_per_target=num_outputs_per_target,
-        inputs=input_objects,
-    )
-
-    return fusion_model_class, fusion_model_kwargs
-
-
-def _load_model(
-    model_path: Path,
-    model_class: Type[nn.Module],
-    model_init_kwargs: Dict,
-    device: str,
-) -> Union[al_fusion_models, nn.Module]:
-
-    model = model_class(**model_init_kwargs)
-
-    model = _load_model_weights(
-        model=model, model_state_dict_path=model_path, device=device
-    )
-
-    model.eval()
-
-    return model
-
-
-def _load_model_weights(
-    model: nn.Module, model_state_dict_path: Path, device: str
-) -> nn.Module:
-    model.load_state_dict(
-        state_dict=torch.load(model_state_dict_path, map_location=device)
-    )
-    model = model.to(device=device)
-
-    return model
 
 
 def _converge_train_and_predict_configs(
