@@ -433,8 +433,8 @@ def get_image_transforms(
     target_resize = [int(i * 1.5) for i in target_size]
 
     base = [
-        transforms.Resize(*target_resize),
-        transforms.CenterCrop(*target_size),
+        transforms.Resize(size=target_resize),
+        transforms.CenterCrop(size=target_size),
         transforms.ToTensor(),
         transforms.Normalize(
             mean=normalization_stats.channel_means,

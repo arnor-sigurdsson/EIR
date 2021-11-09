@@ -846,6 +846,9 @@ def impute_missing_modalities(
 
             elif input_name.startswith("image"):
                 size = input_object.input_config.input_type_info.size
+                if len(size) == 1:
+                    size = [size, size]
+
                 num_channels = input_object.num_channels
                 shape = (num_channels, *size)
                 imputed_tensor = impute_single_missing_modality(
