@@ -44,7 +44,7 @@ def get_extra_labels_from_ids(
 
 
 def get_run_folder(run_name: str) -> Path:
-    return Path("runs", run_name)
+    return Path(run_name)
 
 
 def prep_sample_outfolder(run_name: str, column_name: str, iteration: int) -> Path:

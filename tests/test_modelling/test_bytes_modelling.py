@@ -28,6 +28,7 @@ seed_everything(seed=0)
                     "n_epochs": 12,
                     "memory_dataset": True,
                     "mixing_alpha": 1.0,
+                    "act_background_samples": 8,
                 },
                 "input_configs": [
                     {

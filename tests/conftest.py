@@ -192,7 +192,7 @@ def general_sequence_inject(
 def get_test_base_global_init() -> Sequence[dict]:
     global_inits = [
         {
-            "run_name": "test_run",
+            "run_name": "runs/test_run",
             "plot_skip_steps": 0,
             "get_acts": True,
             "act_every_sample_factor": 0,
@@ -518,6 +518,10 @@ def create_test_config(
         + "_"
         + test_data_config.request_params["task_type"]
     )
+
+    if not run_name.startswith("runs/"):
+        run_name = "runs/" + run_name
+
     test_configs.global_config.run_name = run_name
 
     run_folder = get_run_folder(run_name=run_name)
@@ -771,7 +775,7 @@ def prep_modelling_test_configs(
         target_transformers=target_labels.label_transformers,
         num_outputs_per_target=num_outputs_per_target,
         target_columns=train_dataset.target_columns,
-        writer=train.get_summary_writer(run_folder=Path("runs", gc.run_name)),
+        writer=train.get_summary_writer(run_folder=Path(gc.run_name)),
         hooks=hooks,
     )
 
@@ -819,7 +823,7 @@ def _get_cur_modelling_test_config(
 ) -> ModelTestConfig:
 
     last_iter = len(train_loader) * global_config.n_epochs
-    run_path = Path(f"runs/{global_config.run_name}/")
+    run_path = Path(f"{global_config.run_name}/")
 
     last_sample_folders = _get_all_last_sample_folders(
         target_columns=targets.all_targets, run_path=run_path, iteration=last_iter

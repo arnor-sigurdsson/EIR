@@ -143,7 +143,7 @@ def _get_experiment_overloaded_for_pretrained(
         pretrained_configs.global_config.run_name + "_with_pretrained"
     )
 
-    run_path = Path(f"runs/{pretrained_configs.global_config.run_name}/")
+    run_path = Path(f"{pretrained_configs.global_config.run_name}/")
     if run_path.exists():
         cleanup(run_path=run_path)
 
