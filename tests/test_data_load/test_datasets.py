@@ -372,13 +372,10 @@ def test_construct_dataset_init_params_from_cl_args(
     assert len(constructed_args.get("inputs")) == 2
 
     gotten_input_names = set(constructed_args.get("inputs").keys())
-    expected_input_names = {"omics_test_genotype", "tabular_test_tabular"}
+    expected_input_names = {"test_genotype", "test_tabular"}
     assert gotten_input_names == expected_input_names
 
-    assert (
-        inputs["omics_test_genotype"]
-        == constructed_args["inputs"]["omics_test_genotype"]
-    )
+    assert inputs["test_genotype"] == constructed_args["inputs"]["test_genotype"]
 
     expected_target_cols = {"con": ["Height"], "cat": ["Origin"]}
     assert constructed_args["target_columns"] == expected_target_cols
@@ -504,7 +501,7 @@ def check_dataset(
 
         assert target_labels[target_column] in expected_transformed_values
 
-    test_genotype = test_inputs["omics_test_genotype"]
+    test_genotype = test_inputs["test_genotype"]
     assert (test_genotype.sum(1) == 1).all()
 
     assert test_id == dataset.samples[0].sample_id
@@ -704,15 +701,15 @@ def test_impute_missing_modalities(
         dtypes=impute_dtypes,
     )
 
-    transformers = input_objects["tabular_test_tabular"].labels.label_transformers
+    transformers = input_objects["test_tabular"].labels.label_transformers
     origin_extra_label_encoder = transformers["OriginExtraCol"]
     na_transformer_index = origin_extra_label_encoder.transform(["NA"]).item()
-    filled_na_value = filled_tabular["tabular_test_tabular"]["OriginExtraCol"]
+    filled_na_value = filled_tabular["test_tabular"]["OriginExtraCol"]
     assert na_transformer_index == filled_na_value
-    assert filled_tabular["tabular_test_tabular"]["ExtraTarget"] == 0.0
+    assert filled_tabular["test_tabular"]["ExtraTarget"] == 0.0
 
     test_inputs_missing_omics = {
-        k: v for k, v in test_inputs_all_avail.items() if "omics" not in k
+        k: v for k, v in test_inputs_all_avail.items() if k != "test_genotype"
     }
     with_imputed_omics = datasets.impute_missing_modalities(
         inputs_values=test_inputs_missing_omics,
@@ -721,9 +718,7 @@ def test_impute_missing_modalities(
         dtypes=impute_dtypes,
     )
     assert len(with_imputed_omics) == 3
-    assert (
-        with_imputed_omics["omics_test_genotype"].numel() == test_data_config.n_snps * 4
-    )
+    assert with_imputed_omics["test_genotype"].numel() == test_data_config.n_snps * 4
 
 
 def test_impute_single_missing_modality():

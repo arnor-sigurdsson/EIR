@@ -98,8 +98,8 @@ def test_get_input_name_config_iterator(create_test_config: "Configs"):
         input_configs=test_configs.input_configs
     )
     for name, config in named_input_configs_iterator:
-        input_type = config.input_info.input_type
-        assert name.startswith(input_type + "_")
+        name_from_config = config.input_info.input_name
+        assert name == name_from_config
 
 
 def test_get_tokenizer():

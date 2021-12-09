@@ -92,10 +92,11 @@ def get_modules_to_fuse_from_inputs(
     models = nn.ModuleDict()
 
     for input_name, inputs_object in inputs_as_dict.items():
+        input_type = inputs_object.input_config.input_info.input_type
         input_type_info = inputs_object.input_config.input_type_info
         model_config = inputs_object.input_config.model_config
 
-        if input_name.startswith("omics_"):
+        if input_type == "omics":
             cur_omics_model = get_omics_model_from_model_config(
                 model_type=model_config.model_type,
                 model_init_config=model_config.model_init_config,
@@ -104,7 +105,7 @@ def get_modules_to_fuse_from_inputs(
 
             models[input_name] = cur_omics_model
 
-        elif input_name.startswith("tabular_"):
+        elif input_type == "tabular":
 
             transformers = inputs_object.labels.label_transformers
             cat_columns = input_type_info.extra_cat_columns
@@ -123,7 +124,7 @@ def get_modules_to_fuse_from_inputs(
             )
             models[input_name] = tabular_model
 
-        elif input_name.startswith("sequence_"):
+        elif input_type == "sequence":
 
             num_tokens = len(inputs_object.vocab)
             sequence_model = get_sequence_model(
@@ -135,7 +136,7 @@ def get_modules_to_fuse_from_inputs(
             )
             models[input_name] = sequence_model
 
-        elif input_name.startswith("bytes_"):
+        elif input_type == "bytes":
 
             num_tokens = len(inputs_object.vocab)
             sequence_model = get_sequence_model(
@@ -147,7 +148,7 @@ def get_modules_to_fuse_from_inputs(
             )
             models[input_name] = sequence_model
 
-        elif input_name.startswith("image_"):
+        elif input_type == "image":
             image_model = get_image_model(
                 model_config=model_config,
                 input_channels=inputs_object.num_channels,

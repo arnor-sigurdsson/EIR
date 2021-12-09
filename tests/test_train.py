@@ -80,7 +80,7 @@ def test_get_default_experiment(create_test_config):
     assert isinstance(default_experiment.criterions["Origin"], nn.CrossEntropyLoss)
 
     assert len(default_experiment.inputs) == 1
-    assert set(default_experiment.inputs.keys()) == {"omics_test_genotype"}
+    assert set(default_experiment.inputs.keys()) == {"test_genotype"}
 
     assert default_experiment.target_columns == {"cat": ["Origin"], "con": []}
 
@@ -285,10 +285,10 @@ def _check_model(model_type: str, model: nn.Module):
         assert isinstance(model, FusionModel)
         assert model.multi_task_branches["Origin"][-1][-1].out_features == 3
         assert model.multi_task_branches["Height"][-1][-1].out_features == 1
-        assert isinstance(model.modules_to_fuse["omics_test_genotype"], CNNModel)
+        assert isinstance(model.modules_to_fuse["test_genotype"], CNNModel)
 
     elif model_type == "linear":
-        assert isinstance(model.modules_to_fuse["omics_test_genotype"], LinearModel)
+        assert isinstance(model.modules_to_fuse["test_genotype"], LinearModel)
 
 
 def test_get_criterions():

@@ -489,9 +489,11 @@ class MemoryDataset(DatasetBase):
 def _get_default_impute_fill_values(inputs_objects: "al_input_objects_as_dict"):
     fill_values = {}
     for input_name, input_object in inputs_objects.items():
-        if input_name.startswith("omics_"):
+        input_type = input_object.input_config.input_info.input_type
+
+        if input_type == "omics":
             fill_values[input_name] = False
-        elif input_name.startswith("tabular_"):
+        elif input_type == "tabular":
             fill_values[input_name] = _build_tabular_fill_value(
                 input_object=input_object
             )
@@ -520,9 +522,10 @@ def _build_tabular_fill_value(input_object: "TabularInputInfo"):
 def _get_default_impute_dtypes(inputs_objects: "al_input_objects_as_dict"):
     dtypes = {}
     for input_name, input_object in inputs_objects.items():
-        if input_name.startswith("omics_"):
+        input_type = input_object.input_config.input_info.input_type
+        if input_type == "omics":
             dtypes[input_name] = torch.bool
-        elif input_name.startswith("sequence_") or input_name.startswith("bytes_"):
+        elif input_type in ("sequence", "bytes"):
             dtypes[input_name] = torch.long
         else:
             dtypes[input_name] = torch.float
@@ -585,9 +588,12 @@ def prepare_inputs_disk(
     prepared_inputs = {}
     for name, data in inputs.items():
 
-        input_type_info = inputs_objects[name].input_config.input_type_info
+        input_object = inputs_objects[name]
 
-        if name.startswith("omics_"):
+        input_type_info = input_object.input_config.input_type_info
+        input_type = input_object.input_config.input_info.input_type
+
+        if input_type == "omics":
 
             array_raw = _load_one_hot_array(path=data)
             array_prepared = prepare_one_hot_omics_data(
@@ -598,7 +604,7 @@ def prepare_inputs_disk(
             )
             prepared_inputs[name] = array_prepared
 
-        elif name.startswith("sequence_"):
+        elif input_type == "sequence":
 
             sequence_split = load_sequence_from_disk(
                 sequence_file_path=data,
@@ -611,7 +617,7 @@ def prepare_inputs_disk(
             )
             prepared_inputs[name] = prepared_sequence_inputs
 
-        elif name.startswith("bytes_"):
+        elif input_type == "bytes":
 
             bytes_data = load_bytes_from_disk(
                 file_path=data,
@@ -625,7 +631,7 @@ def prepare_inputs_disk(
 
             prepared_inputs[name] = prepared_bytes_input
 
-        elif name.startswith("image_"):
+        elif input_type == "image":
             image_data = default_loader(path=data)
             prepared_image_data = prepare_image_data(
                 image_input_object=inputs_objects[name],
@@ -746,9 +752,12 @@ def prepare_inputs_memory(
 
     for name, data in inputs.items():
 
-        input_type_info = inputs_objects[name].input_config.input_type_info
+        input_object = inputs_objects[name]
 
-        if name.startswith("omics_"):
+        input_type_info = input_object.input_config.input_type_info
+        input_type = input_object.input_config.input_info.input_type
+
+        if input_type == "omics":
             array_raw_in_memory = data
             array_prepared = prepare_one_hot_omics_data(
                 genotype_array=array_raw_in_memory,
@@ -758,7 +767,7 @@ def prepare_inputs_memory(
             )
             prepared_inputs[name] = array_prepared
 
-        elif name.startswith("sequence_"):
+        elif input_type == "sequence":
             sequence_raw_in_memory = data
             prepared_sequence_inputs = prepare_sequence_data(
                 sequence_input_object=inputs_objects[name],
@@ -767,7 +776,7 @@ def prepare_inputs_memory(
             )
             prepared_inputs[name] = prepared_sequence_inputs
 
-        elif name.startswith("bytes_"):
+        elif input_type == "bytes":
             bytes_raw_in_memory = data
             prepared_bytes_input = prepare_bytes_data(
                 bytes_input_object=inputs_objects[name],
@@ -777,7 +786,7 @@ def prepare_inputs_memory(
 
             prepared_inputs[name] = prepared_bytes_input
 
-        elif name.startswith("image_"):
+        elif input_type == "image":
             image_raw_in_memory = data
             prepared_image_data = prepare_image_data(
                 image_input_object=inputs_objects[name],
@@ -815,11 +824,13 @@ def impute_missing_modalities(
 ) -> Dict[str, torch.Tensor]:
 
     for input_name, input_object in inputs_objects.items():
+        input_type = input_object.input_config.input_info.input_type
+
         if input_name not in inputs_values:
             fill_value = fill_values[input_name]
             dtype = dtypes[input_name]
 
-            if input_name.startswith("omics_"):
+            if input_type == "omics":
                 dimensions = input_object.data_dimensions
                 shape = dimensions.channels, dimensions.height, dimensions.width
 
@@ -828,7 +839,7 @@ def impute_missing_modalities(
                 )
                 inputs_values[input_name] = imputed_tensor
 
-            elif input_name.startswith("sequence_"):
+            elif input_type == "sequence":
                 max_length = input_object.computed_max_length
                 shape = (max_length,)
                 imputed_tensor = impute_single_missing_modality(
@@ -836,7 +847,7 @@ def impute_missing_modalities(
                 )
                 inputs_values[input_name] = imputed_tensor
 
-            elif input_name.startswith("bytes_"):
+            elif input_type == "bytes":
                 max_length = input_object.input_config.input_type_info.max_length
                 shape = (max_length,)
                 imputed_tensor = impute_single_missing_modality(
@@ -844,7 +855,7 @@ def impute_missing_modalities(
                 )
                 inputs_values[input_name] = imputed_tensor
 
-            elif input_name.startswith("image"):
+            elif input_type == "image":
                 size = input_object.input_config.input_type_info.size
                 if len(size) == 1:
                     size = [size, size]
@@ -856,7 +867,7 @@ def impute_missing_modalities(
                 )
                 inputs_values[input_name] = imputed_tensor
 
-            elif input_name.startswith("tabular_"):
+            elif input_type == "tabular":
                 inputs_values[input_name] = fill_value
 
     return inputs_values

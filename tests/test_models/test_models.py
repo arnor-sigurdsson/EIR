@@ -101,7 +101,7 @@ def test_cnn_model(
     parse_test_cl_args, create_test_data, create_test_config, create_test_model
 ):
     fusion_model = create_test_model
-    cnn_model = fusion_model.modules_to_fuse["omics_test_genotype"]
+    cnn_model = fusion_model.modules_to_fuse["test_genotype"]
 
     assert isinstance(cnn_model.conv[0], models_cnn.FirstCNNBlock)
     assert True

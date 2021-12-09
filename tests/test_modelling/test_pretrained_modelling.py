@@ -128,12 +128,10 @@ def _get_experiment_overloaded_for_pretrained(
 
     input_configs_with_pretrained = []
     for cur_input_config in input_configs:
-        cur_type = cur_input_config.input_info.input_type
         cur_name = cur_input_config.input_info.input_name
-        cur_name_with_prefix = f"{cur_type}_{cur_name}"
 
         cur_pretrained_config = BasicPretrainedConfig(
-            model_path=str(saved_model_path), load_module_name=cur_name_with_prefix
+            model_path=str(saved_model_path), load_module_name=cur_name
         )
         cur_input_config.pretrained_config = cur_pretrained_config
         input_configs_with_pretrained.append(cur_input_config)

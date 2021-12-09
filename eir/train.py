@@ -721,15 +721,16 @@ def prepare_base_batch_default(
 
     inputs_prepared = {}
     for input_name, input_object in input_objects.items():
+        input_type = input_object.input_config.input_info.input_type
 
-        if input_name.startswith("omics_") or input_name.startswith("image_"):
+        if input_type in ("omics", "image"):
             cur_tensor = inputs[input_name]
             cur_tensor = cur_tensor.to(device=device)
             cur_tensor = cur_tensor.to(dtype=torch.float32)
 
             inputs_prepared[input_name] = cur_tensor
 
-        elif input_name.startswith("tabular_"):
+        elif input_type == "tabular":
 
             tabular_source_input: Dict[str, torch.Tensor] = inputs[input_name]
             for name, tensor in tabular_source_input.items():
@@ -747,7 +748,7 @@ def prepare_base_batch_default(
             )
             inputs_prepared[input_name] = tabular
 
-        elif input_name.startswith("sequence_") or input_name.startswith("bytes_"):
+        elif input_type in ("sequence", "bytes"):
             cur_seq = inputs[input_name]
             cur_seq = cur_seq.to(device=device)
             cur_module = model.modules_to_fuse[input_name]

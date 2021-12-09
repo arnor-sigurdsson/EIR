@@ -132,15 +132,14 @@ def load_serialized_input_object(
 
     input_name = input_config.input_info.input_name
     input_type = input_config.input_info.input_type
-    input_name_with_prefix = f"{input_type}_{input_name}"
 
     serialized_input_config_path = get_input_serialization_path(
         run_folder=run_folder,
-        sequence_input_name=input_name_with_prefix,
+        input_name=input_name,
         input_type=input_type,
     )
 
-    assert serialized_input_config_path.exists()
+    assert serialized_input_config_path.exists(), serialized_input_config_path
     with open(serialized_input_config_path, "rb") as infile:
         serialized_input_config_object: "al_serializable_input_objects" = dill.load(
             file=infile
@@ -163,7 +162,8 @@ def serialize_all_input_transformers(
     inputs_dict: "al_input_objects_as_dict", run_folder: Path
 ):
     for input_name, input_ in inputs_dict.items():
-        if input_name.startswith("tabular_"):
+        input_type = input_.input_config.input_info.input_type
+        if input_type == "tabular":
             save_transformer_set(
                 transformers=input_.labels.label_transformers, run_folder=run_folder
             )
@@ -172,15 +172,17 @@ def serialize_all_input_transformers(
 def serialize_chosen_input_objects(
     inputs_dict: "al_input_objects_as_dict", run_folder: Path
 ):
-    targets_to_serialize = {"sequence_", "bytes_", "image_"}
+    targets_to_serialize = {"sequence", "bytes", "image"}
     for input_name, input_ in inputs_dict.items():
-        any_match = any(i for i in targets_to_serialize if input_name.startswith(i))
+        input_type = input_.input_config.input_info.input_type
+
+        any_match = any(i for i in targets_to_serialize if input_type == i)
+
         if any_match:
-            input_type = input_name.split("_")[0]
             outpath = get_input_serialization_path(
                 run_folder=run_folder,
                 input_type=input_type,
-                sequence_input_name=input_name,
+                input_name=input_name,
             )
             ensure_path_exists(path=outpath, is_folder=False)
             with open(outpath, "wb") as outfile:
@@ -188,12 +190,12 @@ def serialize_chosen_input_objects(
 
 
 def get_input_serialization_path(
-    run_folder: Path, input_type: str, sequence_input_name: str
+    run_folder: Path, input_type: str, input_name: str
 ) -> Path:
     path = (
         run_folder
         / "serializations"
-        / f"{input_type}_input_serializations/{sequence_input_name}.dill"
+        / f"{input_type}_input_serializations/{input_name}.dill"
     )
 
     return path

@@ -129,14 +129,10 @@ def set_up_inputs_for_training(
 
 
 def get_input_name_config_iterator(input_configs: schemas.al_input_configs):
-    """
-    TODO: Deprecate prefixing with input type.
-    """
+
     for input_config in input_configs:
         cur_input_data_config = input_config.input_info
-        cur_name = (
-            f"{cur_input_data_config.input_type}_{cur_input_data_config.input_name}"
-        )
+        cur_name = cur_input_data_config.input_name
         yield cur_name, input_config
 
 
