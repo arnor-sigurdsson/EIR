@@ -58,10 +58,10 @@ seed_everything(seed=0)
                             "input_name": "test_image",
                         },
                         "input_type_info": {
-                            "model_type": "resnet18",
                             "mixing_subtype": "cutmix",
                             "size": [16, 16],
                         },
+                        "model_config": {"model_type": "resnet18"},
                     }
                 ],
             },

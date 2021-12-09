@@ -362,15 +362,17 @@ def get_image_normalization_values(
     means = input_type_info.mean_normalization_values
     stds = input_type_info.stds_normalization_values
 
-    if input_type_info.pretrained_model:
-        cur_config = pretrained_model_configs[input_type_info.model_type]
+    model_config = input_config.model_config
+
+    if model_config.pretrained_model:
+        cur_config = pretrained_model_configs[model_config.model_type]
 
         if not means:
             logger.info(
                 "Using inferred image channel means (%s) from base on training "
                 "statistics from pretrained '%s' model.",
                 cur_config.mean,
-                input_type_info.model_type,
+                model_config.model_type,
             )
             means = cur_config.mean
         else:
@@ -379,15 +381,15 @@ def get_image_normalization_values(
                 "pretrained model '%s'. Usually one would use the means "
                 "from the training data when '%s' was trained.",
                 means,
-                input_type_info.model_type,
-                input_type_info.model_type,
+                model_config.model_type,
+                model_config.model_type,
             )
         if not stds:
             logger.info(
                 "Using inferred image channel standard deviations (%s) from base on "
                 "training statistics from pretrained '%s' model.",
                 cur_config.std,
-                input_type_info.model_type,
+                model_config.model_type,
             )
             stds = cur_config.std
         else:
@@ -396,8 +398,8 @@ def get_image_normalization_values(
                 "when using pretrained model '%s'. Usually one would use "
                 "the means from the training data when '%s' was trained.",
                 stds,
-                input_type_info.model_type,
-                input_type_info.model_type,
+                model_config.model_type,
+                model_config.model_type,
             )
     else:
         if not means or not stds:
@@ -470,7 +472,7 @@ def set_up_sequence_input_for_training(
 ):
 
     sequence_input_object_func = _get_sequence_input_object_func(
-        pretrained=input_config.input_type_info.pretrained_model
+        pretrained=input_config.model_config.pretrained_model
     )
     vocab, gathered_stats, tokenizer, encode_callable = sequence_input_object_func(
         input_config=input_config
@@ -572,7 +574,7 @@ def get_sequence_input_objects_from_pretrained(
         )
 
     gathered_stats = GatheredSequenceStats()
-    hf_model_name = input_config.input_type_info.model_type
+    hf_model_name = input_config.model_config.model_type
     hf_tokenizer = _get_hf_tokenizer(hf_model_name=hf_model_name)
 
     def _passthrough_hf_encode(raw_input_split: al_hf_tokenizer_inputs) -> List[int]:

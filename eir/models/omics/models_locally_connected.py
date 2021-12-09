@@ -212,7 +212,7 @@ class LCLModel(nn.Module):
 def flatten_h_w_fortran(x: torch.Tensor) -> torch.Tensor:
     """
     This is needed when e.g. flattening one-hot inputs that are ordered in a columns
-    wise fasion (meaning that each column is a one-hot feature),
+    wise fashion (meaning that each column is a one-hot feature),
     and we want to make sure the first part of the flattened tensor is the first column,
     i.e. first one-hot element.
     """

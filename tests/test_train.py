@@ -60,7 +60,7 @@ def test_prepare_run_folder_fail(patched_get_run_folder, tmp_path):
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "linear"},
+                        "model_config": {"model_type": "linear"},
                     },
                 ],
             },
@@ -106,7 +106,7 @@ def test_modify_bs_for_multi_gpu():
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "linear"},
+                        "model_config": {"model_type": "linear"},
                     },
                 ],
             },
@@ -145,7 +145,7 @@ def test_get_train_sampler(create_test_data, create_test_datasets, create_test_c
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "linear"},
+                        "model_config": {"model_type": "linear"},
                     },
                 ],
             },
@@ -225,7 +225,7 @@ def test_get_optimizer():
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "cnn"},
+                        "model_config": {"model_type": "cnn"},
                     },
                 ],
                 "target_configs": {
@@ -239,7 +239,7 @@ def test_get_optimizer():
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "linear"},
+                        "model_config": {"model_type": "linear"},
                     },
                 ],
                 "target_configs": {
@@ -275,7 +275,7 @@ def test_get_model(create_test_config: Configs, create_test_labels):
     )
 
     assert len(test_config.input_configs) == 1
-    omics_model_type = test_config.input_configs[0].input_type_info.model_type
+    omics_model_type = test_config.input_configs[0].model_config.model_type
     _check_model(model_type=omics_model_type, model=model)
 
 

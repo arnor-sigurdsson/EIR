@@ -40,7 +40,7 @@ if TYPE_CHECKING:
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "linear"},
+                        "model_config": {"model_type": "linear"},
                     }
                 ],
             },
@@ -153,7 +153,7 @@ def _set_up_bad_label_file_for_testing(label_file: Path) -> None:
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "linear"},
+                        "model_config": {"model_type": "linear"},
                     }
                 ],
             },
@@ -309,15 +309,15 @@ def _corrupt_arrays_for_testing(
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "linear"},
+                        "model_config": {"model_type": "linear"},
                     },
                     {
                         "input_info": {"input_name": "test_tabular"},
                         "input_type_info": {
-                            "model_type": "tabular",
                             "extra_cat_columns": [],
                             "extra_con_columns": ["ExtraTarget"],
                         },
+                        "model_config": {"model_type": "tabular"},
                     },
                 ],
                 "target_configs": {
@@ -397,8 +397,10 @@ def test_construct_dataset_init_params_from_cl_args(
                     {
                         "input_info": {"input_name": "test_genotype"},
                         "input_type_info": {
-                            "model_type": "linear",
                             "na_augment_perc": 0.05,
+                        },
+                        "model_config": {
+                            "model_type": "linear",
                         },
                     }
                 ],
@@ -551,7 +553,7 @@ def test_prepare_genotype_array_test_mode():
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "linear"},
+                        "model_config": {"model_type": "linear"},
                     }
                 ],
             },
@@ -634,8 +636,10 @@ def test_sample_sequence_uniform():
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "cnn"},
-                        "model_config": {"l1": 1e-03},
+                        "model_config": {
+                            "model_type": "cnn",
+                            "model_init_config": {"l1": 1e-03},
+                        },
                     },
                     {
                         "input_info": {"input_name": "test_sequence"},
@@ -643,10 +647,10 @@ def test_sample_sequence_uniform():
                     {
                         "input_info": {"input_name": "test_tabular"},
                         "input_type_info": {
-                            "model_type": "tabular",
                             "extra_cat_columns": ["OriginExtraCol"],
                             "extra_con_columns": ["ExtraTarget"],
                         },
+                        "model_config": {"model_type": "tabular"},
                     },
                 ],
             },

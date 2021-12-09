@@ -77,15 +77,15 @@ def test_get_cur_dilation(test_input, expected):
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "cnn"},
+                        "model_config": {"model_type": "cnn"},
                     },
                     {
                         "input_info": {"input_name": "test_tabular"},
                         "input_type_info": {
-                            "model_type": "tabular",
                             "extra_cat_columns": ["OriginExtraCol"],
                             "extra_con_columns": ["ExtraTarget"],
                         },
+                        "model_config": {"model_type": "tabular"},
                     },
                 ],
                 "target_configs": {

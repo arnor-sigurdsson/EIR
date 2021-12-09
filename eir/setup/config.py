@@ -34,15 +34,21 @@ import torch
 import yaml
 from aislib.misc_utils import get_logger
 
-import eir.models.tabular.tabular
 from eir.models.fusion.fusion_default import FusionModelConfig
 from eir.models.fusion.fusion_linear import LinearFusionModelConfig
 from eir.models.fusion.fusion_mgmoe import MGMoEModelConfig
-from eir.models.omics.omics_models import get_omics_config_dataclass_mapping
+
+from eir.models.tabular.tabular import TabularModelConfig, SimpleTabularModelConfig
+from eir.models.omics.omics_models import (
+    get_omics_config_dataclass_mapping,
+    OmicsModelConfig,
+)
 from eir.models.sequence.transformer_models import (
     BasicTransformerFeatureExtractorModelConfig,
     PerceiverIOModelConfig,
+    SequenceModelConfig,
 )
+from eir.models.image.image_models import ImageModelConfig
 from eir.setup import schemas
 from eir.setup.presets import gln
 
@@ -382,65 +388,138 @@ def set_up_model_config(
     input_info_object: schemas.InputDataConfig,
     input_type_info_object: al_input_types,
     model_init_kwargs_base: Union[None, dict],
-):
+) -> schemas.al_model_configs:
+
+    input_type = input_info_object.input_type
+
+    model_config_class = get_model_config_class(input_type=input_type)
+
+    model_type = model_init_kwargs_base.get("model_type", None)
+    if not model_type:
+        try:
+            model_type = getattr(model_config_class, "model_type")
+        except AttributeError:
+            raise AttributeError(
+                "Not model type specified in model config and could not find default "
+                "value for '%s'.",
+                input_type,
+            )
+
+        logger.info(
+            "Model type not specified in model configuration, "
+            "attempting to grab default value."
+        )
+
+    model_type_config = set_up_model_init_config(
+        input_info_object=input_info_object,
+        input_type_info_object=input_type_info_object,
+        model_init_kwargs_base=model_init_kwargs_base.get("model_init_config", {}),
+        model_type=model_type,
+    )
+
+    common_kwargs = {"model_type": model_type, "model_init_config": model_type_config}
+    other_specific_kwargs = {
+        k: v for k, v in model_init_kwargs_base.items() if k not in common_kwargs
+    }
+    model_config_kwargs = {**common_kwargs, **other_specific_kwargs}
+    model_config = model_config_class(**model_config_kwargs)
+
+    return model_config
+
+
+def get_model_config_class(input_type: str) -> schemas.al_model_configs_classes:
+    model_config_setup_map = get_model_config_init_class_map()
+
+    return model_config_setup_map.get(input_type)
+
+
+def get_model_config_init_class_map() -> Dict[str, schemas.al_model_configs_classes]:
+    mapping = {
+        "tabular": TabularModelConfig,
+        "omics": OmicsModelConfig,
+        "sequence": SequenceModelConfig,
+        "bytes": SequenceModelConfig,
+        "image": ImageModelConfig,
+    }
+
+    return mapping
+
+
+def set_up_model_init_config(
+    input_info_object: schemas.InputDataConfig,
+    input_type_info_object: al_input_types,
+    model_init_kwargs_base: Union[None, dict],
+    model_type: str,
+) -> Dict:
 
     if getattr(input_type_info_object, "pretrained_model", None):
         return {}
 
-    is_possibly_external = getattr(input_info_object, "input_type") in (
-        "sequence",
-        "bytes",
-        "image",
+    not_from_eir = get_is_not_eir_model_condition(
+        input_info_object=input_info_object,
+        model_type=model_type,
     )
-    is_unknown_sequence_model = getattr(input_type_info_object, "model_type") not in (
-        "sequence-default",
-        "perceiver",
-    )
-    if is_possibly_external and is_unknown_sequence_model:
+    if not_from_eir:
         return model_init_kwargs_base
 
     if not model_init_kwargs_base:
         model_init_kwargs_base = {}
 
-    init_kwargs = copy(model_init_kwargs_base)
+    model_init_kwargs = copy(model_init_kwargs_base)
 
-    cur_setup_hook = get_model_config_setup_hook(
+    model_config_type_setup_hook = get_model_config_type_setup_hook(
         input_type=input_info_object.input_type
     )
-    if cur_setup_hook:
-        init_kwargs = cur_setup_hook(
-            init_kwargs=init_kwargs,
+    if model_config_type_setup_hook:
+        model_init_kwargs = model_config_type_setup_hook(
+            init_kwargs=model_init_kwargs,
             input_info_object=input_info_object,
             input_type_info_object=input_type_info_object,
         )
 
-    model_config_map = get_model_config_map()
-    model_config_class = model_config_map[input_type_info_object.model_type]
+    model_config_map = get_model_config_type_init_callable_map()
+    model_config_callable = model_config_map[model_type]
 
-    model_config = model_config_class(**init_kwargs)
+    model_config = model_config_callable(**model_init_kwargs)
 
     return model_config
 
 
+def get_is_not_eir_model_condition(
+    input_info_object: schemas.InputDataConfig, model_type: str
+) -> bool:
+    is_possibly_external = getattr(input_info_object, "input_type") in (
+        "sequence",
+        "bytes",
+        "image",
+    )
+    is_unknown_sequence_model = model_type not in (
+        "sequence-default",
+        "perceiver",
+    )
+    not_from_eir = is_possibly_external and is_unknown_sequence_model
+    return not_from_eir
+
+
 @overload
-def get_model_config_setup_hook(
+def get_model_config_type_setup_hook(
     input_type: str,
 ) -> Callable[[dict, schemas.InputDataConfig, al_input_types], dict]:
     ...
 
 
 @overload
-def get_model_config_setup_hook(input_type: None) -> None:
+def get_model_config_type_setup_hook(input_type: None) -> None:
     ...
 
 
-def get_model_config_setup_hook(input_type):
-    model_config_setup_map = get_model_config_setup_hook_map()
+def get_model_config_type_setup_hook(input_type):
+    model_config_setup_map = get_model_config_type_setup_hook_map()
 
     return model_config_setup_map.get(input_type, None)
 
 
-def get_model_config_setup_hook_map():
+def get_model_config_type_setup_hook_map():
     mapping = {
         "omics": set_up_config_object_init_kwargs_identity,
         "tabular": set_up_config_object_init_kwargs_identity,
@@ -458,12 +537,12 @@ def set_up_config_object_init_kwargs_identity(
     return init_kwargs
 
 
-def get_model_config_map() -> Dict[str, Type]:
+def get_model_config_type_init_callable_map() -> Dict[str, Type]:
     mapping = get_omics_config_dataclass_mapping()
     mapping = {
         **mapping,
         **{
-            "tabular": eir.models.tabular.tabular.TabularModelConfig,
+            "tabular": SimpleTabularModelConfig,
             "sequence-default": BasicTransformerFeatureExtractorModelConfig,
             "perceiver": PerceiverIOModelConfig,
         },

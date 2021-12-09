@@ -30,7 +30,7 @@ from eir.data_load.label_setup import al_label_transformers
 
 if TYPE_CHECKING:
     from eir.train import al_criterions, Experiment  # noqa: F401
-    from eir.models.omics.omics_models import al_models  # noqa: F401
+    from eir.models.omics.omics_models import al_omics_models  # noqa: F401
     from eir.train_utils.train_handlers import HandlerConfig
     from eir.data_load.label_setup import (  # noqa: F401
         al_target_columns,

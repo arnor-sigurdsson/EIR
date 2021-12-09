@@ -259,12 +259,11 @@ def get_test_omics_input_init(test_path: Path, split_to_test: bool) -> dict:
             "input_type": "omics",
         },
         "input_type_info": {
-            "model_type": "genome-local-net",
             "na_augment_perc": 0.10,
             "na_augment_prob": 0.10,
             "snp_file": str(test_path / "test_snps.bim"),
         },
-        "model_config": {},
+        "model_config": {"model_type": "genome-local-net"},
     }
 
     return input_init_kwargs
@@ -282,8 +281,8 @@ def get_test_tabular_input_init(test_path: Path, split_to_test: bool) -> dict:
             "input_name": "test_tabular",
             "input_type": "tabular",
         },
-        "input_type_info": {"model_type": "tabular"},
-        "model_config": {},
+        "input_type_info": {},
+        "model_config": {"model_type": "tabular"},
     }
 
     return input_init_kwargs
@@ -304,13 +303,15 @@ def get_test_sequence_input_init(test_path: Path, split_to_test: bool) -> dict:
         "input_type_info": {
             "max_length": "max",
             "tokenizer_language": "en",
-            "model_type": "sequence-default",
-            "embedding_dim": 8,
         },
         "model_config": {
-            "num_heads": 2,
-            "num_layers": 1,
-            "dropout": 0.25,
+            "model_type": "sequence-default",
+            "embedding_dim": 8,
+            "model_init_config": {
+                "num_heads": 2,
+                "num_layers": 1,
+                "dropout": 0.25,
+            },
         },
     }
 
@@ -330,11 +331,12 @@ def get_test_bytes_input_init(test_path: Path, split_to_test: bool) -> Dict:
         },
         "input_type_info": {
             "max_length": 128,
+        },
+        "model_config": {
             "model_type": "sequence-default",
-            "embedding_dim": 32,
+            "embedding_dim": 8,
             "window_size": 64,
         },
-        "model_config": {},
     }
 
     return input_init_kwargs
@@ -352,16 +354,18 @@ def get_test_image_input_init(test_path: Path, split_to_test: bool) -> Dict:
             "input_type": "image",
         },
         "input_type_info": {
-            "model_type": "ResNet",
-            "pretrained_model": False,
-            "freeze_pretrained_model": False,
             "auto_augment": False,
             "size": (16,),
         },
         "model_config": {
+            "model_type": "ResNet",
+            "pretrained_model": False,
             "num_output_features": 128,
-            "layers": [1, 1, 1, 1],
-            "block": "BasicBlock",
+            "freeze_pretrained_model": False,
+            "model_init_config": {
+                "layers": [1, 1, 1, 1],
+                "block": "BasicBlock",
+            },
         },
     }
 
@@ -512,7 +516,7 @@ def create_test_config(
     run_name = (
         test_configs.global_config.run_name
         + "_"
-        + "_".join(i.input_type_info.model_type for i in test_configs.input_configs)
+        + "_".join(i.model_config.model_type for i in test_configs.input_configs)
         + "_"
         + f"{test_configs.predictor_config.model_type}"
         + "_"

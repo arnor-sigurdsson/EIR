@@ -33,15 +33,15 @@ seed_everything(seed=0)
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_bytes"},
-                        "input_type_info": {
-                            "model_type": "sequence-default",
-                            "window_size": 64,
-                            "position": "embed",
-                        },
                         "model_config": {
-                            "num_heads": 2,
-                            "num_layers": 2,
-                            "dropout": 0.10,
+                            "position": "embed",
+                            "window_size": 64,
+                            "model_type": "sequence-default",
+                            "model_init_config": {
+                                "num_heads": 2,
+                                "num_layers": 2,
+                                "dropout": 0.10,
+                            },
                         },
                     }
                 ],
@@ -59,12 +59,12 @@ seed_everything(seed=0)
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_bytes"},
-                        "input_type_info": {
-                            "model_type": "perceiver",
+                        "model_config": {
                             "window_size": 64,
                             "position": "embed",
+                            "model_type": "perceiver",
+                            "model_init_config": {"depth": 1, "dim": 32},
                         },
-                        "model_config": {"depth": 1, "dim": 32},
                     }
                 ],
                 "predictor_configs": {"model_config": {"fc_task_dim": 32}},

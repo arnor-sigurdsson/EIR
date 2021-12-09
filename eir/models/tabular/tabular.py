@@ -1,7 +1,7 @@
 from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Union, Dict
+from typing import List, Union, Dict, Literal
 from typing import Set, overload, TYPE_CHECKING, Sequence, Iterable, Any
 
 import joblib
@@ -21,6 +21,21 @@ al_emb_lookup_dict = Dict[str, Dict[str, Dict[int, int]]]
 
 @dataclass
 class TabularModelConfig:
+
+    """
+    :param model_type:
+         Which type of image model to use.
+
+    :param model_init_config:
+          Configuration / arguments used to initialise model.
+    """
+
+    model_init_config: "SimpleTabularModelConfig"
+    model_type: Literal["tabular"] = "tabular"
+
+
+@dataclass
+class SimpleTabularModelConfig:
     """
     :param l1:
         L1 regularization applied to the embeddings for categorical tabular inputs.
@@ -77,6 +92,9 @@ class SimpleTabularModel(nn.Module):
 
     @property
     def l1_penalized_weights(self) -> torch.Tensor:
+        if not self.cat_columns:
+            return torch.empty(0)
+
         return torch.cat([torch.flatten(i) for i in self.parameters()])
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:

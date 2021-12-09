@@ -380,7 +380,7 @@ def get_default_predict_config(
         global_config=configs_overloaded_for_predict.global_config,
         predictor_config=configs_overloaded_for_predict.predictor_config,
         num_outputs_per_target=loaded_train_experiment.num_outputs_per_target,
-        input_objects=test_inputs,
+        inputs_as_dicts=test_inputs,
     )
 
     model = load_model(

@@ -46,7 +46,7 @@ seed_everything(seed=0)
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_sequence"},
-                        "input_type_info": {"position": "encode"},
+                        "model_config": {"position": "encode"},
                     }
                 ],
             },
@@ -62,7 +62,7 @@ seed_everything(seed=0)
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_sequence"},
-                        "input_type_info": {"window_size": 16, "position": "embed"},
+                        "model_config": {"window_size": 16, "position": "embed"},
                     }
                 ],
             },
@@ -137,19 +137,19 @@ seed_everything(seed=0)
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_sequence"},
-                        "input_type_info": {
-                            "model_type": "albert",
-                            "window_size": 16,
-                            "position": "embed",
-                        },
                         "model_config": {
-                            "num_hidden_layers": 2,
-                            "num_attention_heads": 4,
-                            "embedding_size": 12,
-                            "hidden_size": 16,
-                            "intermediate_size": 32,
+                            "position": "embed",
+                            "window_size": 16,
+                            "model_type": "albert",
+                            "model_init_config": {
+                                "num_hidden_layers": 2,
+                                "num_attention_heads": 4,
+                                "embedding_size": 12,
+                                "hidden_size": 16,
+                                "intermediate_size": 32,
+                            },
                         },
-                    }
+                    },
                 ],
                 "target_configs": {
                     "target_cat_columns": ["Origin"],

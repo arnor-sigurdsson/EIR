@@ -7,6 +7,7 @@ from eir.models.fusion.fusion_mgmoe import MGMoEModelConfig
 from eir.models.image.image_models import ImageModelConfig
 from eir.models.image.image_models import get_all_timm_model_names
 from eir.models.omics.omics_models import (
+    OmicsModelConfig,
     LinearModel,
     CNNModel,
     LCLModel,
@@ -21,9 +22,14 @@ from eir.models.omics.omics_models import (
 )
 from eir.models.sequence.transformer_models import (
     BasicTransformerFeatureExtractorModelConfig,
+    SequenceModelConfig,
     get_all_hf_model_names,
 )
-from eir.models.tabular.tabular import SimpleTabularModel, TabularModelConfig
+from eir.models.tabular.tabular import (
+    SimpleTabularModel,
+    TabularModelConfig,
+    SimpleTabularModelConfig,
+)
 from eir.setup.setup_utils import get_all_optimizer_names
 
 al_input_configs = Sequence["InputConfig"]
@@ -37,15 +43,25 @@ al_bytes_models = tuple(
 al_image_models = tuple(Literal[i] for i in get_all_timm_model_names())
 al_optimizers = tuple(Literal[i] for i in get_all_optimizer_names())
 
-
 al_model_configs = Union[
+    OmicsModelConfig, TabularModelConfig, ImageModelConfig, SequenceModelConfig
+]
+
+al_model_configs_classes = Union[
+    Type[OmicsModelConfig],
+    Type[TabularModelConfig],
+    Type[ImageModelConfig],
+    Type[SequenceModelConfig],
+]
+
+al_model_type_configs = Union[
     FusionModelConfig,
     MGMoEModelConfig,
     CNNModelConfig,
     LinearModelConfig,
     SimpleLCLModelConfig,
     LCLModelConfig,
-    TabularModelConfig,
+    SimpleTabularModelConfig,
     IdentityModelConfig,
     BasicTransformerFeatureExtractorModelConfig,
     ImageModelConfig,
@@ -251,6 +267,9 @@ class InputConfig:
     :param model_config:
         Configuration for the chosen model (i.e. feature extractor) for this input.
 
+    :param pretrained_config:
+        Configuration for using leveraging pretraining from a previous experiment.
+
     :param interpretation_config:
         Configuration for interpretation analysis when applicable.
 
@@ -300,21 +319,17 @@ class OmicsInputDataConfig:
     :param na_augment_prob:
         Probability of applying NA augmentation to a given sample.
 
-    :param model_type:
-        Type of omics feature extractor to use.
-
     :param omics_format:
         Currently unsupported (i.e. does nothing), which format the omics data is in.
 
     :param mixing_subtype:
+        Which type of mixing to use on the omics data given that ``mixing_alpha`` is
+        set >0.0 in the global configuration.
     """
 
     snp_file: Optional[str] = None
     na_augment_perc: float = 0.0
     na_augment_prob: float = 0.0
-    model_type: Literal[
-        "cnn", "linear", "mlp-split", "genome-local-net", "linear"
-    ] = "gln"
     omics_format: Literal["one-hot"] = "one-hot"
     mixing_subtype: Union[Literal["mixup", "cutmix-block", "cutmix-uniform"]] = "mixup"
 
@@ -322,9 +337,6 @@ class OmicsInputDataConfig:
 @dataclass
 class TabularInputDataConfig:
     """
-    :param model_type:
-        Type of tabular model to use. Currently only one type ("tabular") is supported.
-
     :param extra_cat_columns:
         Which columns to use as a categorical inputs from the ``input_source`` specified
         in the ``input_info`` field of the relevant ``.yaml``.
@@ -338,9 +350,10 @@ class TabularInputDataConfig:
         when RAM is limited.
 
     :param mixing_subtype:
+        Which type of mixing to use on the tabular data given that ``mixing_alpha`` is
+        set >0.0 in the global configuration.
     """
 
-    model_type: Literal["tabular"] = "tabular"
     extra_cat_columns: Sequence[str] = field(default_factory=list)
     extra_con_columns: Sequence[str] = field(default_factory=list)
     label_parsing_chunk_size: Union[None, int] = None
@@ -350,16 +363,6 @@ class TabularInputDataConfig:
 @dataclass
 class SequenceInputDataConfig:
     """
-    :param model_type:
-        Type of sequence model to use.
-
-    :param pretrained_model:
-        Specify whether the model type is assumed to be pretrained and from the
-        Hugging Face model hub.
-
-    :param freeze_pretrained_model:
-        Whether to freeze the pretrained model weights.
-
     :param vocab_file:
         An optional text file containing pre-defined vocabulary to use
         for the training. If this is not passed in, the framework will automatically
@@ -398,28 +401,11 @@ class SequenceInputDataConfig:
     :param tokenizer_language:
         Which language rules the tokenizer should apply when tokenizing the raw data.
 
-    :param position:
-        Whether to encode the token position or use learnable position embeddings.
-
-    :param position_dropoput:
-        Dropout for the positional encoding / embedding.
-
-    :param embedding_dim:
-        Which dimension to use for the embeddings. If ``None``, will automatically set
-        this value based on the number of tokens and attention heads.
-
-    :param window_size:
-        If set to more than 0, will apply a sliding window of feature
-        extraction over the input, meaning the model (e.g. transformer) will only
-        see a part of the input at a time. Can be Useful to avoid the O(n²)
-        complexity of transformers, as it becomes O(window_size² * n_windows) instead.
-
     :param mixing_subtype:
+        Which type of mixing to use on the sequence data given that ``mixing_alpha`` is
+        set >0.0 in the global configuration.
     """
 
-    model_type: al_sequence_models = "sequence-default"
-    pretrained_model: bool = False
-    freeze_pretrained_model: bool = False
     vocab_file: Union[None, str] = None
     max_length: al_max_sequence_length = "average"
     sampling_strategy_if_longer: Literal["from_start", "uniform"] = "uniform"
@@ -427,10 +413,6 @@ class SequenceInputDataConfig:
     split_on: str = " "
     tokenizer: al_tokenizer_choices = None
     tokenizer_language: Union[str, None] = None
-    position: Literal["encode", "embed"] = "encode"
-    position_dropout: float = 0.1
-    embedding_dim: int = None
-    window_size: int = 0
     mixing_subtype: Literal["mixup"] = "mixup"
 
 
@@ -446,7 +428,6 @@ class BasicPretrainedConfig:
     :param load_module_nmae:
         Name of the module to extract and use in the respective input feature
         extraction.
-
     """
 
     model_path: str
@@ -481,9 +462,6 @@ class BasicInterpretationConfig:
 @dataclass
 class ByteInputDataConfig:
     """
-    :param model_type:
-        Type of sequence model to use on the raw bytes.
-
     :param byte_encoding:
         Which byte encoding to use when reading the binary data, currently only
         support uint8.
@@ -501,49 +479,20 @@ class ByteInputDataConfig:
         the validation/test set samples always use the ``from_start`` setting when
         truncating.
 
-    :param position:
-        Whether to encode the token position or use learnable position embeddings.
-
-    :param position_dropoput:
-        Dropout for the positional encoding / embedding.
-
-    :param embedding_dim:
-        Which dimension to use for the embeddings. If ``None``, will automatically set
-        this value based on the number of tokens and attention heads.
-
-    :param window_size:
-        If set to more than 0, will apply a sliding window of feature
-        extraction over the input, meaning the model (e.g. transformer) will only
-        see a part of the input at a time. Can be Useful to avoid the O(n²)
-        complexity of transformers, as it becomes O(window_size² * n_windows) instead.
-
     :param mixing_subtype:
+        Which type of mixing to use on the bytes data given that ``mixing_alpha`` is
+        set >0.0 in the global configuration.
     """
 
-    model_type: al_bytes_models = "sequence-default"
     max_length: al_max_sequence_length = "average"
     byte_encoding: Literal["uint8"] = "uint8"
     sampling_strategy_if_longer: Literal["from_start", "uniform"] = "uniform"
-    position: Literal["encode", "embed"] = "encode"
-    position_dropout: float = 0.1
-    embedding_dim: int = None
-    window_size: int = 0
     mixing_subtype: Literal["mixup"] = "mixup"
 
 
 @dataclass
 class ImageInputDataConfig:
     """
-    :param model_type:
-        Which type of image model to use.
-
-    :param pretrained_model:
-        Specify whether the model type is assumed to be pretrained and from the
-        Pytorch Image Models repository.
-
-    :param freeze_pretrained_model:
-        Whether to freeze the pretrained model weights.
-
     :param auto_augment:
         Setting this to True will use TrivialAugment Wide augmentation.
 
@@ -571,11 +520,10 @@ class ImageInputDataConfig:
         channels from a random image in the training data.
 
     :param mixing_subtype:
+        Which type of mixing to use on the image data given that ``mixing_alpha`` is
+        set >0.0 in the global configuration.
     """
 
-    model_type: al_image_models
-    pretrained_model: bool = False
-    freeze_pretrained_model: bool = False
     auto_augment: bool = True
     size: Sequence[int] = (64,)
     mean_normalization_values: Union[None, Sequence[float]] = None

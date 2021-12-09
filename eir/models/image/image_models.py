@@ -1,15 +1,44 @@
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Sequence, Dict, Any, TYPE_CHECKING
 
 from torch import nn
 from torch import Tensor
 
 import timm
 
+if TYPE_CHECKING:
+    from eir.setup.schemas import al_image_models
+
 
 @dataclass
 class ImageModelConfig:
+
+    """
+    :param model_type:
+         Which type of image model to use.
+
+    :param model_init_config:
+          Configuration / arguments used to initialise model.
+
+    :param num_output_features:
+          Number of output final output features from image feature extractor, which
+          get passed to fusion module.
+
+    :param pretrained_model:
+          Specify whether the model type is assumed to be pretrained and from the
+          Pytorch Image Models repository.
+
+    :param freeze_pretrained_model:
+          Whether to freeze the pretrained model weights.
+    """
+
+    model_type: "al_image_models"
+    model_init_config: Dict[str, Any]
+
     num_output_features: int = 256
+
+    pretrained_model: bool = False
+    freeze_pretrained_model: bool = False
 
 
 class ImageWrapperModel(nn.Module):
