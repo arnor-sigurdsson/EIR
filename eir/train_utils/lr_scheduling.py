@@ -74,7 +74,7 @@ def _get_reduce_lr_on_plateau_step_params(
     global_config: GlobalConfig, optimizer: Optimizer
 ) -> Dict:
 
-    run_folder = get_run_folder(run_name=global_config.run_name)
+    run_folder = get_run_folder(output_folder=global_config.output_folder)
     validation_history_fpath = get_average_history_filepath(
         run_folder=run_folder, train_or_val_target_prefix="validation_"
     )

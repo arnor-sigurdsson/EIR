@@ -328,7 +328,7 @@ def test_overload_train_configs_for_predict(
         {
             "injections": {
                 "global_configs": {
-                    "run_name": "extra_inputs",
+                    "output_folder": "extra_inputs",
                 },
                 "input_configs": [
                     {
@@ -458,7 +458,7 @@ def test_set_up_test_dataset(
         test_inputs_configs=test_configs.input_configs,
         ids=test_ids,
         hooks=None,
-        run_name=test_configs.global_config.run_name,
+        output_folder=test_configs.global_config.output_folder,
     )
 
     test_dataset = predict._set_up_default_dataset(
@@ -512,7 +512,7 @@ def grab_best_model_path(saved_models_folder: Path):
         {
             "injections": {
                 "global_configs": {
-                    "run_name": "test_run_predict",
+                    "output_folder": "test_run_predict",
                     "n_epochs": 12,
                     "checkpoint_interval": 200,
                     "sample_interval": 200,

@@ -101,7 +101,7 @@ def get_dummy_handler_config(
     handler_config = HandlerConfig(
         experiment=experiment,
         run_folder=test_config.run_path,
-        run_name=global_config.run_name,
+        output_folder=global_config.output_folder,
         monitoring_metrics=[("tmp_var", "tmp_var")],
     )
 

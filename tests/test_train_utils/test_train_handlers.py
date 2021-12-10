@@ -109,7 +109,7 @@ def test_get_early_stopping_event_kwargs():
         {
             "injections": {
                 "global_configs": {
-                    "run_name": "test_hparam_summary_writer",
+                    "output_folder": "test_hparam_summary_writer",
                     "lr": 1e-03,
                     "n_epochs": 2,
                     "sample_interval": 100,

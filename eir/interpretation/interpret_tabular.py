@@ -105,7 +105,7 @@ def analyze_tabular_input_activations(
                 input_name=input_name,
             )
             cat_column_transformers = load_transformers(
-                run_name=experiment.configs.global_config.run_name,
+                output_folder=experiment.configs.global_config.output_folder,
                 transformers_to_load=[cat_column],
             )
 

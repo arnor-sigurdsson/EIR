@@ -24,7 +24,7 @@ seed_everything(seed=0)
         {
             "injections": {
                 "global_configs": {
-                    "run_name": "test_classification_vanilla_transformer_bytes",
+                    "output_folder": "test_classification_vanilla_transformer_bytes",
                     "n_epochs": 12,
                     "memory_dataset": True,
                     "mixing_alpha": 1.0,
@@ -51,7 +51,7 @@ seed_everything(seed=0)
         {
             "injections": {
                 "global_configs": {
-                    "run_name": "test_classification_perceiver_bytes",
+                    "output_folder": "test_classification_perceiver_bytes",
                     "n_epochs": 12,
                     "memory_dataset": True,
                     "mixing_alpha": 1.0,

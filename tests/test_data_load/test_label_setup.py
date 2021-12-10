@@ -86,7 +86,7 @@ def create_test_column_ops():
         {
             "injections": {
                 "global_configs": {
-                    "run_name": "tabular_only",
+                    "output_folder": "tabular_only",
                 },
                 "input_configs": [
                     {
@@ -105,7 +105,7 @@ def create_test_column_ops():
         {
             "injections": {
                 "global_configs": {
-                    "run_name": "tabular_only",
+                    "output_folder": "tabular_only",
                 },
                 "input_configs": [
                     {
@@ -286,7 +286,7 @@ def test_transform_all_labels_in_sample_with_extra_con(
         {
             "injections": {
                 "global_configs": {
-                    "run_name": "tabular_only",
+                    "output_folder": "tabular_only",
                 },
                 "input_configs": [
                     {
@@ -305,7 +305,7 @@ def test_transform_all_labels_in_sample_with_extra_con(
         {
             "injections": {
                 "global_configs": {
-                    "run_name": "tabular_only",
+                    "output_folder": "tabular_only",
                 },
                 "input_configs": [
                     {

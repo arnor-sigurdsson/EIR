@@ -353,7 +353,7 @@ def get_default_predict_config(
         test_inputs_configs=configs_overloaded_for_predict.input_configs,
         ids=test_ids,
         hooks=default_train_hooks,
-        run_name=loaded_train_experiment.configs.global_config.run_name,
+        output_folder=loaded_train_experiment.configs.global_config.output_folder,
     )
 
     label_dict = target_labels.label_dict if target_labels else {}
@@ -433,7 +433,7 @@ def get_target_labels_for_testing(
     )
 
     target_labels = get_labels_for_predict(
-        run_name=configs_overloaded_for_predict.global_config.run_name,
+        output_folder=configs_overloaded_for_predict.global_config.output_folder,
         tabular_file_infos=target_infos,
         custom_column_label_parsing_ops=custom_column_label_parsing_ops,
         ids=ids,
@@ -446,7 +446,7 @@ def setup_tabular_input_for_testing(
     input_config: schemas.InputConfig,
     ids: Sequence[str],
     hooks: Union["Hooks", None],
-    run_name: str,
+    output_folder: str,
 ) -> PredictTabularInputInfo:
 
     tabular_file_info = input_setup.get_tabular_input_file_info(
@@ -457,7 +457,7 @@ def setup_tabular_input_for_testing(
 
     custom_ops = hooks.custom_column_label_parsing_ops if hooks else None
     predict_labels = get_labels_for_predict(
-        run_name=run_name,
+        output_folder=output_folder,
         tabular_file_infos=tabular_file_info_seq,
         custom_column_label_parsing_ops=custom_ops,
         ids=ids,
@@ -471,7 +471,7 @@ def setup_tabular_input_for_testing(
 
 
 def get_labels_for_predict(
-    run_name: str,
+    output_folder: str,
     tabular_file_infos: Sequence[TabularFileInfo],
     custom_column_label_parsing_ops: al_all_column_ops,
     ids: Sequence[str],
@@ -492,7 +492,7 @@ def get_labels_for_predict(
         cat_columns += tabular_info.cat_columns
 
         cur_transformers = load_transformers(
-            run_name=run_name,
+            output_folder=output_folder,
             transformers_to_load=all_columns,
         )
         label_transformers = {**label_transformers, **cur_transformers}
@@ -524,7 +524,7 @@ def set_up_inputs(
     test_inputs_configs: schemas.al_input_configs,
     ids: Sequence[str],
     hooks: Union["Hooks", None],
-    run_name: str,
+    output_folder: str,
 ) -> al_input_objects_as_dict:
     all_inputs = {}
 
@@ -543,7 +543,7 @@ def set_up_inputs(
         set_up_input = setup_func(
             input_config=input_config,
             ids=ids,
-            run_name=run_name,
+            output_folder=output_folder,
             hooks=hooks,
         )
         all_inputs[name] = set_up_input
@@ -956,7 +956,7 @@ def get_background_source_config(
         logger.info(
             "Background for activation analysis will be loaded from sources "
             "previously used for training run with name '%s'.",
-            train_configs.global_config.run_name,
+            train_configs.global_config.output_folder,
         )
         return train_configs
 
@@ -1017,7 +1017,7 @@ def _get_predict_background_loader(
         test_inputs_configs=configs.input_configs,
         ids=background_ids_sampled,
         hooks=loaded_hooks,
-        run_name=configs.global_config.run_name,
+        output_folder=configs.global_config.output_folder,
     )
     background_dataset = _set_up_default_dataset(
         configs=configs,

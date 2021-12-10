@@ -97,7 +97,7 @@ class GlobalConfig:
     """
     Global configurations that are common / relevant for the whole experiment to run.
 
-    :param run_name:
+    :param output_folder:
         What to name the experiment and output folder where results are saved.
 
     :param n_epochs:
@@ -217,7 +217,7 @@ class GlobalConfig:
         How many iterations to skip in in plots.
     """
 
-    run_name: str
+    output_folder: str
     n_epochs: int = 10
     batch_size: int = 64
     valid_size: Union[float, int] = 0.1

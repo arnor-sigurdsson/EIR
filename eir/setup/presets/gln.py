@@ -1,7 +1,7 @@
 PRESET = {
     "global_configs": {
         "gln_globals": {
-            "run_name": "gln_run",
+            "output_folder": "gln_run",
             "n_epochs": 20,
             "lr": 0.001,
             "sample_interval": 300,

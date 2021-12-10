@@ -110,7 +110,7 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 def main():
     configs = get_configs()
 
-    utils.configure_root_logger(run_name=configs.global_config.run_name)
+    utils.configure_root_logger(output_folder=configs.global_config.output_folder)
 
     default_hooks = get_default_hooks(configs=configs)
     default_experiment = get_default_experiment(configs=configs, hooks=default_hooks)
@@ -124,7 +124,7 @@ def run_experiment(experiment: "Experiment") -> None:
 
     gc = experiment.configs.global_config
 
-    run_folder = utils.get_run_folder(run_name=gc.run_name)
+    run_folder = utils.get_run_folder(output_folder=gc.output_folder)
     keys_to_serialize = get_default_experiment_keys_to_serialize()
     serialize_experiment(
         experiment=experiment,
@@ -206,7 +206,7 @@ def set_up_target_labels_wrapper(
 def get_default_experiment(
     configs: Configs, hooks: Union["Hooks", None] = None
 ) -> "Experiment":
-    run_folder = _prepare_run_folder(run_name=configs.global_config.run_name)
+    run_folder = _prepare_run_folder(output_folder=configs.global_config.output_folder)
 
     all_array_ids = gather_all_ids_from_target_configs(
         target_configs=configs.target_configs
@@ -368,8 +368,8 @@ def set_up_num_outputs_per_target(
     return num_outputs_per_target_dict
 
 
-def _prepare_run_folder(run_name: str) -> Path:
-    run_folder = utils.get_run_folder(run_name=run_name)
+def _prepare_run_folder(output_folder: str) -> Path:
+    run_folder = utils.get_run_folder(output_folder=output_folder)
     history_file = get_average_history_filepath(
         run_folder=run_folder, train_or_val_target_prefix="train_"
     )
@@ -577,7 +577,7 @@ def train(experiment: Experiment) -> None:
             train_dataloader=exp.train_loader,
             model=exp.model,
             optimizer=exp.optimizer,
-            output_folder=utils.get_run_folder(run_name=gc.run_name),
+            output_folder=utils.get_run_folder(output_folder=gc.output_folder),
         )
         sys.exit(0)
 

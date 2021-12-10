@@ -43,13 +43,13 @@ def get_extra_labels_from_ids(
     return extra_labels
 
 
-def get_run_folder(run_name: str) -> Path:
-    return Path(run_name)
+def get_run_folder(output_folder: str) -> Path:
+    return Path(output_folder)
 
 
-def prep_sample_outfolder(run_name: str, column_name: str, iteration: int) -> Path:
+def prep_sample_outfolder(output_folder: str, column_name: str, iteration: int) -> Path:
     sample_outfolder = (
-        get_run_folder(run_name=run_name)
+        get_run_folder(output_folder=output_folder)
         / "results"
         / column_name
         / "samples"
@@ -60,9 +60,9 @@ def prep_sample_outfolder(run_name: str, column_name: str, iteration: int) -> Pa
     return sample_outfolder
 
 
-def configure_root_logger(run_name: str):
+def configure_root_logger(output_folder: str):
 
-    logfile_path = get_run_folder(run_name=run_name) / "logging_history.log"
+    logfile_path = get_run_folder(output_folder=output_folder) / "logging_history.log"
 
     ensure_path_exists(logfile_path)
     file_handler = logging.FileHandler(str(logfile_path))

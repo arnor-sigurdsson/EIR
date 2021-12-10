@@ -24,7 +24,7 @@ seed_everything(seed=0)
         {
             "injections": {
                 "global_configs": {
-                    "run_name": "test_image_classification",
+                    "output_folder": "test_image_classification",
                     "n_epochs": 6,
                     "memory_dataset": True,
                     "get_acts": True,
@@ -45,7 +45,7 @@ seed_everything(seed=0)
         {
             "injections": {
                 "global_configs": {
-                    "run_name": "test_image_classification",
+                    "output_folder": "test_image_classification",
                     "n_epochs": 6,
                     "memory_dataset": True,
                     "get_acts": True,

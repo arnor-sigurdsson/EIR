@@ -140,7 +140,7 @@ def activation_analysis_handler(
 
     activation_outfolder_callable = partial(
         _prepare_eval_activation_outfolder,
-        run_name=gc.run_name,
+        output_folder=gc.output_folder,
         iteration=iteration,
     )
 
@@ -535,10 +535,15 @@ def _convert_all_batch_tensors_to_cpu(batch: Batch) -> Batch:
 
 
 def _prepare_eval_activation_outfolder(
-    run_name: str, input_name: str, column_name: str, iteration: int, *args, **kwargs
+    output_folder: str,
+    input_name: str,
+    column_name: str,
+    iteration: int,
+    *args,
+    **kwargs
 ):
     sample_outfolder = prep_sample_outfolder(
-        run_name=run_name, column_name=column_name, iteration=iteration
+        output_folder=output_folder, column_name=column_name, iteration=iteration
     )
     activation_outfolder = sample_outfolder / "activations" / input_name
     ensure_path_exists(path=activation_outfolder, is_folder=True)

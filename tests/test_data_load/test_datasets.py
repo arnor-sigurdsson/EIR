@@ -304,7 +304,7 @@ def _corrupt_arrays_for_testing(
         {
             "injections": {
                 "global_configs": {
-                    "run_name": "extra_inputs",
+                    "output_folder": "extra_inputs",
                 },
                 "input_configs": [
                     {

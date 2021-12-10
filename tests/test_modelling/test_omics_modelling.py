@@ -226,7 +226,7 @@ def _get_snp_activations_generator(cur_target_act_paths: Dict[str, Path]):
             "injections": {
                 "global_configs": {
                     "lr_schedule": "cycle",
-                    "run_name": "test_lr-cycle",
+                    "output_folder": "test_lr-cycle",
                 },
                 "input_configs": [
                     {
@@ -287,7 +287,7 @@ def test_regression(prep_modelling_test_configs):
         {
             "injections": {
                 "global_configs": {
-                    "run_name": "extra_inputs",
+                    "output_folder": "extra_inputs",
                 },
                 "input_configs": [
                     {
@@ -421,7 +421,7 @@ def test_regression(prep_modelling_test_configs):
         {
             "injections": {
                 "global_configs": {
-                    "run_name": "mgmoe",
+                    "output_folder": "mgmoe",
                     "lr": 1e-03,
                 },
                 "input_configs": [
@@ -451,7 +451,7 @@ def test_regression(prep_modelling_test_configs):
         {
             "injections": {
                 "global_configs": {
-                    "run_name": "mixing_multi",
+                    "output_folder": "mixing_multi",
                     "lr": 1e-03,
                     "mixing_alpha": 0.5,
                 },
@@ -488,7 +488,7 @@ def test_regression(prep_modelling_test_configs):
         {
             "injections": {
                 "global_configs": {
-                    "run_name": "limited_activations",
+                    "output_folder": "limited_activations",
                     "lr": 1e-03,
                     "max_acts_per_class": 100,
                 },

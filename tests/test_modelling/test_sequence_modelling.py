@@ -39,7 +39,7 @@ seed_everything(seed=0)
         {
             "injections": {
                 "global_configs": {
-                    "run_name": "test_classification",
+                    "output_folder": "test_classification",
                     "n_epochs": 12,
                     "memory_dataset": True,
                 },
@@ -55,7 +55,7 @@ seed_everything(seed=0)
         {
             "injections": {
                 "global_configs": {
-                    "run_name": "test_classification",
+                    "output_folder": "test_classification",
                     "n_epochs": 12,
                     "memory_dataset": True,
                 },
@@ -73,7 +73,7 @@ seed_everything(seed=0)
                 "global_configs": {
                     "n_epochs": 12,
                     "memory_dataset": True,
-                    "run_name": "test_regression",
+                    "output_folder": "test_regression",
                 },
                 "input_configs": [
                     {
@@ -92,7 +92,7 @@ seed_everything(seed=0)
                 "global_configs": {
                     "n_epochs": 12,
                     "memory_dataset": True,
-                    "run_name": "test_multi_task",
+                    "output_folder": "test_multi_task",
                 },
                 "input_configs": [
                     {
@@ -111,7 +111,7 @@ seed_everything(seed=0)
                 "global_configs": {
                     "n_epochs": 12,
                     "memory_dataset": True,
-                    "run_name": "test_multi_task_with_mixing",
+                    "output_folder": "test_multi_task_with_mixing",
                     "mixing_alpha": 0.5,
                 },
                 "input_configs": [
@@ -131,7 +131,7 @@ seed_everything(seed=0)
                 "global_configs": {
                     "n_epochs": 12,
                     "memory_dataset": True,
-                    "run_name": "test_albert",
+                    "output_folder": "test_albert",
                     "mixing_alpha": 0.5,
                 },
                 "input_configs": [

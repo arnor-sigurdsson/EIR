@@ -55,7 +55,7 @@ def test_prepare_run_folder_fail(patched_get_run_folder, tmp_path):
             "injections": {
                 "global_configs": {
                     "lr": 1e-03,
-                    "run_name": "test_get_default_experiment",
+                    "output_folder": "test_get_default_experiment",
                 },
                 "input_configs": [
                     {
@@ -201,14 +201,14 @@ def test_get_optimizer():
 
     model = FakeModel()
 
-    gc_adamw = GlobalConfig(run_name="test", optimizer="adamw")
+    gc_adamw = GlobalConfig(output_folder="test", optimizer="adamw")
 
     adamw_optimizer = optimizers.get_optimizer(
         model=model, loss_callable=lambda x: x, global_config=gc_adamw
     )
     assert isinstance(adamw_optimizer, AdamW)
 
-    gc_sgdm = GlobalConfig(run_name="test", optimizer="sgdm")
+    gc_sgdm = GlobalConfig(output_folder="test", optimizer="sgdm")
     sgdm_optimizer = optimizers.get_optimizer(
         model=model, loss_callable=lambda x: x, global_config=gc_sgdm
     )

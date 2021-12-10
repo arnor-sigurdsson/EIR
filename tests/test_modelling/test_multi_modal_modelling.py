@@ -31,7 +31,7 @@ if TYPE_CHECKING:
         {
             "injections": {
                 "global_configs": {
-                    "run_name": "multi_task_multi_modal",
+                    "output_folder": "multi_task_multi_modal",
                     "n_epochs": 6,
                     "act_background_samples": 8,
                 },

@@ -121,14 +121,14 @@ def load_serialized_input_object(
     input_config: schemas.InputConfig,
     input_class: "al_serializable_input_classes",
     *args,
-    run_name: Union[None, str] = None,
+    output_folder: Union[None, str] = None,
     run_folder: Union[None, Path] = None,
     **kwargs,
 ):
 
-    assert run_name or run_folder
+    assert output_folder or run_folder
     if not run_folder:
-        run_folder = get_run_folder(run_name=run_name)
+        run_folder = get_run_folder(output_folder=output_folder)
 
     input_name = input_config.input_info.input_name
     input_type = input_config.input_info.input_type
@@ -203,14 +203,14 @@ def get_input_serialization_path(
 
 def load_transformers(
     transformers_to_load: Union[Sequence[str], None],
-    run_name: Union[str, None] = None,
+    output_folder: Union[str, None] = None,
     run_folder: Union[None, Path] = None,
 ) -> al_label_transformers:
 
-    assert run_folder or run_name
+    assert run_folder or output_folder
 
     if not run_folder:
-        run_folder = get_run_folder(run_name=run_name)
+        run_folder = get_run_folder(output_folder=output_folder)
 
     all_transformers = (i.stem for i in (run_folder / "transformers").iterdir())
 

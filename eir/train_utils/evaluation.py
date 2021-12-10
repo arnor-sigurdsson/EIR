@@ -108,7 +108,7 @@ def save_evaluation_results_wrapper(
 
     for column_type, column_name in target_columns_gen:
         cur_sample_outfolder = utils.prep_sample_outfolder(
-            run_name=experiment.configs.global_config.run_name,
+            output_folder=experiment.configs.global_config.output_folder,
             column_name=column_name,
             iteration=iteration,
         )

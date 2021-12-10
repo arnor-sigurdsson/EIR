@@ -35,7 +35,7 @@ if TYPE_CHECKING:
         {
             "injections": {
                 "global_configs": {
-                    "run_name": "multi_task_multi_modal",
+                    "output_folder": "multi_task_multi_modal",
                     "n_epochs": 2,
                     "act_background_samples": 8,
                     "sample_interval": 50,
@@ -141,11 +141,11 @@ def _get_experiment_overloaded_for_pretrained(
     pretrained_configs.global_config.n_epochs = 6
     pretrained_configs.global_config.sample_interval = 200
     pretrained_configs.global_config.checkpoint_interval = 200
-    pretrained_configs.global_config.run_name = (
-        pretrained_configs.global_config.run_name + "_with_pretrained"
+    pretrained_configs.global_config.output_folder = (
+        pretrained_configs.global_config.output_folder + "_with_pretrained"
     )
 
-    run_path = Path(f"{pretrained_configs.global_config.run_name}/")
+    run_path = Path(f"{pretrained_configs.global_config.output_folder}/")
     if run_path.exists():
         cleanup(run_path=run_path)
 
