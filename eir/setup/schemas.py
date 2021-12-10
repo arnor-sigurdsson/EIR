@@ -337,11 +337,11 @@ class OmicsInputDataConfig:
 @dataclass
 class TabularInputDataConfig:
     """
-    :param extra_cat_columns:
+    :param input_cat_columns:
         Which columns to use as a categorical inputs from the ``input_source`` specified
         in the ``input_info`` field of the relevant ``.yaml``.
 
-    :param extra_con_columns:
+    :param input_con_columns:
         Which columns to use as a continuous inputs from the ``input_source`` specified
         in the ``input_info`` field of the relevant ``.yaml``.
 
@@ -354,8 +354,8 @@ class TabularInputDataConfig:
         set >0.0 in the global configuration.
     """
 
-    extra_cat_columns: Sequence[str] = field(default_factory=list)
-    extra_con_columns: Sequence[str] = field(default_factory=list)
+    input_cat_columns: Sequence[str] = field(default_factory=list)
+    input_con_columns: Sequence[str] = field(default_factory=list)
     label_parsing_chunk_size: Union[None, int] = None
     mixing_subtype: Literal["mixup"] = "mixup"
 

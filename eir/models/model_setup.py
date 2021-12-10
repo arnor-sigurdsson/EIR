@@ -108,8 +108,8 @@ def get_modules_to_fuse_from_inputs(
         elif input_type == "tabular":
 
             transformers = inputs_object.labels.label_transformers
-            cat_columns = input_type_info.extra_cat_columns
-            con_columns = input_type_info.extra_con_columns
+            cat_columns = input_type_info.input_cat_columns
+            con_columns = input_type_info.input_con_columns
 
             unique_tabular_values = get_unique_values_from_transformers(
                 transformers=transformers,

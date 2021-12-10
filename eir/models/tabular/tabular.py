@@ -134,8 +134,8 @@ def calc_embedding_dimension(n_categories: int) -> int:
 
 
 def get_tabular_inputs(
-    extra_cat_columns: Sequence[str],
-    extra_con_columns: Sequence[str],
+    input_cat_columns: Sequence[str],
+    input_con_columns: Sequence[str],
     tabular_model: SimpleTabularModel,
     tabular_input: "al_training_labels_extra",
     device: str,
@@ -144,25 +144,25 @@ def get_tabular_inputs(
     We want to have a wrapper function to gather all extra inputs needed by the model.
     """
     extra_embeddings = None
-    if extra_cat_columns:
+    if input_cat_columns:
 
         extra_embeddings = get_embeddings_from_labels(
-            categorical_columns=extra_cat_columns,
+            categorical_columns=input_cat_columns,
             labels=tabular_input,
             model=tabular_model,
         )
 
-        if not extra_con_columns:
+        if not input_con_columns:
             return extra_embeddings.to(device=device)
 
     extra_continuous = None
-    if extra_con_columns:
+    if input_con_columns:
 
         extra_continuous = get_extra_continuous_inputs_from_labels(
-            labels=tabular_input, continuous_columns=extra_con_columns
+            labels=tabular_input, continuous_columns=input_con_columns
         )
 
-        if not extra_cat_columns:
+        if not input_cat_columns:
             return extra_continuous.to(device=device)
 
     if extra_continuous is not None and extra_embeddings is not None:

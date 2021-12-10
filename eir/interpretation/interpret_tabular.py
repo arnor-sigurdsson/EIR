@@ -36,8 +36,8 @@ def analyze_tabular_input_activations(
     exp = experiment
 
     tabular_type_info_config = exp.inputs[input_name].input_config.input_type_info
-    cat_columns = tabular_type_info_config.extra_cat_columns
-    con_columns = tabular_type_info_config.extra_con_columns
+    cat_columns = tabular_type_info_config.input_cat_columns
+    con_columns = tabular_type_info_config.input_con_columns
 
     tabular_model = experiment.model.modules_to_fuse[input_name]
     activation_tensor_slices = set_up_tabular_tensor_slices(

@@ -338,8 +338,8 @@ def test_overload_train_configs_for_predict(
                     {
                         "input_info": {"input_name": "test_tabular"},
                         "input_type_info": {
-                            "extra_cat_columns": [],
-                            "extra_con_columns": ["ExtraTarget"],
+                            "input_cat_columns": [],
+                            "input_con_columns": ["ExtraTarget"],
                         },
                         "model_config": {"model_type": "tabular"},
                     },
@@ -552,8 +552,8 @@ def grab_best_model_path(saved_models_folder: Path):
                     {
                         "input_info": {"input_name": "test_tabular"},
                         "input_type_info": {
-                            "extra_cat_columns": [],
-                            "extra_con_columns": ["ExtraTarget"],
+                            "input_cat_columns": [],
+                            "input_con_columns": ["ExtraTarget"],
                         },
                         "model_config": {"model_type": "tabular"},
                     },

@@ -300,8 +300,8 @@ def test_regression(prep_modelling_test_configs):
                     {
                         "input_info": {"input_name": "test_tabular"},
                         "input_type_info": {
-                            "extra_cat_columns": ["OriginExtraCol"],
-                            "extra_con_columns": ["ExtraTarget"],
+                            "input_cat_columns": ["OriginExtraCol"],
+                            "input_con_columns": ["ExtraTarget"],
                         },
                         "model_config": {"model_type": "tabular"},
                     },
@@ -582,8 +582,8 @@ def get_all_tabular_input_columns(configs: Configs):
     extra_columns = []
     for input_config in configs.input_configs:
         if input_config.input_info.input_type == "tabular":
-            extra_columns += input_config.input_type_info.extra_con_columns
-            extra_columns += input_config.input_type_info.extra_cat_columns
+            extra_columns += input_config.input_type_info.input_con_columns
+            extra_columns += input_config.input_type_info.input_cat_columns
 
     return extra_columns
 

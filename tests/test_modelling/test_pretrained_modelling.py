@@ -62,8 +62,8 @@ if TYPE_CHECKING:
                     {
                         "input_info": {"input_name": "test_tabular"},
                         "input_type_info": {
-                            "extra_cat_columns": ["OriginExtraCol"],
-                            "extra_con_columns": ["ExtraTarget"],
+                            "input_cat_columns": ["OriginExtraCol"],
+                            "input_con_columns": ["ExtraTarget"],
                         },
                         "model_config": {
                             "model_type": "tabular",

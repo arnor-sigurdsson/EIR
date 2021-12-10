@@ -828,8 +828,8 @@ def set_up_tabular_input_for_training(
 
     total_num_features = get_tabular_num_features(
         label_transformers=tabular_labels.label_transformers,
-        cat_columns=input_config.input_type_info.extra_cat_columns,
-        con_columns=input_config.input_type_info.extra_con_columns,
+        cat_columns=input_config.input_type_info.input_cat_columns,
+        con_columns=input_config.input_type_info.input_con_columns,
     )
     tabular_input_info = TabularInputInfo(
         labels=tabular_labels,
@@ -847,8 +847,8 @@ def get_tabular_input_file_info(
 
     table_info = TabularFileInfo(
         file_path=Path(input_source),
-        con_columns=tabular_data_type_config.extra_con_columns,
-        cat_columns=tabular_data_type_config.extra_cat_columns,
+        con_columns=tabular_data_type_config.input_con_columns,
+        cat_columns=tabular_data_type_config.input_cat_columns,
         parsing_chunk_size=tabular_data_type_config.label_parsing_chunk_size,
     )
 

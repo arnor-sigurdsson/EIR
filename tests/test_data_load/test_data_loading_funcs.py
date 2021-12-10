@@ -33,7 +33,7 @@ from eir.train import get_dataloaders
                     {
                         "input_info": {"input_name": "test_tabular"},
                         "input_type_info": {
-                            "extra_con_columns": ["ExtraTarget"],
+                            "input_con_columns": ["ExtraTarget"],
                         },
                         "model_config": {"model_type": "tabular"},
                     },

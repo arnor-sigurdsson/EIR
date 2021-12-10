@@ -507,12 +507,12 @@ def _build_tabular_fill_value(input_object: "TabularInputInfo"):
     fill_value = {}
     transformers = input_object.labels.label_transformers
 
-    cat_columns = input_object.input_config.input_type_info.extra_cat_columns
+    cat_columns = input_object.input_config.input_type_info.input_cat_columns
     for cat_column in cat_columns:
         cur_label_encoder = transformers[cat_column]
         fill_value[cat_column] = cur_label_encoder.transform(["NA"]).item()
 
-    con_columns = input_object.input_config.input_type_info.extra_con_columns
+    con_columns = input_object.input_config.input_type_info.input_con_columns
     for con_column in con_columns:
         fill_value[con_column] = 0.0
 

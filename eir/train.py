@@ -737,11 +737,11 @@ def prepare_base_batch_default(
                 tabular_source_input[name] = tensor.to(device=device)
 
             tabular_input_type_info = input_object.input_config.input_type_info
-            cat_columns = tabular_input_type_info.extra_cat_columns
-            con_columns = tabular_input_type_info.extra_con_columns
+            cat_columns = tabular_input_type_info.input_cat_columns
+            con_columns = tabular_input_type_info.input_con_columns
             tabular = get_tabular_inputs(
-                extra_cat_columns=cat_columns,
-                extra_con_columns=con_columns,
+                input_cat_columns=cat_columns,
+                input_con_columns=con_columns,
                 tabular_model=model.modules_to_fuse[input_name],
                 tabular_input=tabular_source_input,
                 device=device,

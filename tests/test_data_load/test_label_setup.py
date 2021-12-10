@@ -93,8 +93,8 @@ def create_test_column_ops():
                         "input_info": {"input_name": "test_tabular"},
                         "input_type_info": {
                             "label_parsing_chunk_size": 50,
-                            "extra_cat_columns": [],
-                            "extra_con_columns": ["ExtraTarget"],
+                            "input_cat_columns": [],
+                            "input_con_columns": ["ExtraTarget"],
                         },
                         "model_config": {"model_type": "tabular"},
                     },
@@ -112,8 +112,8 @@ def create_test_column_ops():
                         "input_info": {"input_name": "test_tabular"},
                         "input_type_info": {
                             "label_parsing_chunk_size": None,
-                            "extra_cat_columns": [],
-                            "extra_con_columns": ["ExtraTarget"],
+                            "input_cat_columns": [],
+                            "input_con_columns": ["ExtraTarget"],
                         },
                         "model_config": {"model_type": "tabular"},
                     },
@@ -293,8 +293,8 @@ def test_transform_all_labels_in_sample_with_extra_con(
                         "input_info": {"input_name": "test_tabular"},
                         "input_type_info": {
                             "label_parsing_chunk_size": 50,
-                            "extra_cat_columns": [],
-                            "extra_con_columns": ["ExtraTarget"],
+                            "input_cat_columns": [],
+                            "input_con_columns": ["ExtraTarget"],
                         },
                         "model_config": {"model_type": "tabular"},
                     },
@@ -312,8 +312,8 @@ def test_transform_all_labels_in_sample_with_extra_con(
                         "input_info": {"input_name": "test_tabular"},
                         "input_type_info": {
                             "label_parsing_chunk_size": None,
-                            "extra_cat_columns": [],
-                            "extra_con_columns": ["ExtraTarget"],
+                            "input_cat_columns": [],
+                            "input_con_columns": ["ExtraTarget"],
                         },
                         "model_config": {"model_type": "tabular"},
                     },
@@ -445,7 +445,7 @@ def test_get_array_path_iterator_fail(create_test_data):
         (
             {
                 "target_cat_columns": ["Origin"],
-                "extra_con_columns": ["OriginExtraColumnsPartial1"],
+                "input_con_columns": ["OriginExtraColumnsPartial1"],
             },
             ["Origin", "OriginExtraColumnsPartial1", "ExtraCol1", "ExtraCol2"],
         ),
@@ -453,8 +453,8 @@ def test_get_array_path_iterator_fail(create_test_data):
             {
                 "target_con_columns": ["Origin"],
                 "target_cat_columns": ["OriginExtraColumnsAll"],
-                "extra_con_columns": ["OriginExtraColumnsPartial1"],
-                "extra_cat_columns": ["OriginExtraColumnsPartial2"],
+                "input_con_columns": ["OriginExtraColumnsPartial1"],
+                "input_cat_columns": ["OriginExtraColumnsPartial2"],
             },
             [
                 "Origin",
