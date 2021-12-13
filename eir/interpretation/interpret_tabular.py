@@ -36,8 +36,8 @@ def analyze_tabular_input_activations(
     exp = experiment
 
     tabular_type_info_config = exp.inputs[input_name].input_config.input_type_info
-    cat_columns = tabular_type_info_config.extra_cat_columns
-    con_columns = tabular_type_info_config.extra_con_columns
+    cat_columns = tabular_type_info_config.input_cat_columns
+    con_columns = tabular_type_info_config.input_con_columns
 
     tabular_model = experiment.model.modules_to_fuse[input_name]
     activation_tensor_slices = set_up_tabular_tensor_slices(
@@ -105,7 +105,7 @@ def analyze_tabular_input_activations(
                 input_name=input_name,
             )
             cat_column_transformers = load_transformers(
-                run_name=experiment.configs.global_config.run_name,
+                output_folder=experiment.configs.global_config.output_folder,
                 transformers_to_load=[cat_column],
             )
 

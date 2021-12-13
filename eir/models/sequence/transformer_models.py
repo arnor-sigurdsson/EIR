@@ -2,7 +2,7 @@ import inspect
 import math
 from dataclasses import dataclass
 from functools import partial
-from typing import Union, Literal, Type, Callable, Tuple, Dict, Sequence
+from typing import Union, Literal, Type, Callable, Tuple, Dict, Sequence, TYPE_CHECKING
 
 import torch
 from aislib.misc_utils import get_logger
@@ -15,36 +15,66 @@ from transformers.models.auto.modeling_auto import MODEL_MAPPING_NAMES
 
 from eir.models.layers import _find_split_padding_needed
 
+if TYPE_CHECKING:
+    from eir.setup.schemas import al_sequence_models
+
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
 @dataclass
-class TransformerWrapperModelConfig:
-    """
-    :param position:
-        Whether to use positional encodings or embeddings for representing token
-        positions.
+class SequenceModelConfig:
 
-    :param position_dropout:
-        Dropout to use in the positional encoding/embeddings.
+    """
+    :param model_init_config:
+          Configuration / arguments used to initialise model.
+
+    :param model_type:
+         Which type of image model to use.
+
+    :param embedding_dim:
+        Which dimension to use for the embeddings. If ``None``, will automatically set
+        this value based on the number of tokens and attention heads.
+
+    :param position:
+        Whether to encode the token position or use learnable position embeddings.
+
+    :param position_dropoput:
+        Dropout for the positional encoding / embedding.
 
     :param window_size:
         If set to more than 0, will apply a sliding window of feature
         extraction over the input, meaning the model (e.g. transformer) will only
         see a part of the input at a time. Can be Useful to avoid the O(n²)
-        complexity of transformers, as it becomes n_windows * O(window_size²) instead.
+        complexity of transformers, as it becomes O(window_size² * n_windows) instead.
+
+    :param pretrained_model:
+          Specify whether the model type is assumed to be pretrained and from the
+          Pytorch Image Models repository.
+
+    :param freeze_pretrained_model:
+          Whether to freeze the pretrained model weights.
+
     """
+
+    model_init_config: Union["BasicTransformerFeatureExtractorModelConfig", Dict]
+
+    model_type: "al_sequence_models" = "sequence-default"
+
+    embedding_dim: int = 8
 
     position: Literal["encode", "embed"] = "encode"
     position_dropout: float = 0.10
     window_size: int = 0
+
+    pretrained_model: bool = False
+    freeze_pretrained_model: bool = False
 
 
 class TransformerWrapperModel(nn.Module):
     def __init__(
         self,
         feature_extractor: Union["TransformerFeatureExtractor", nn.Module],
-        model_config: TransformerWrapperModelConfig,
+        model_config: SequenceModelConfig,
         embedding_dim: int,
         num_tokens: int,
         max_length: int,
@@ -306,7 +336,6 @@ class BasicTransformerFeatureExtractorModelConfig:
 
     :param dropout:
          Dropout value to use in the encoder layers.
-
     """
 
     num_heads: int = 8

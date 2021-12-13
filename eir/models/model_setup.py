@@ -28,7 +28,7 @@ from eir.models.omics.omics_models import (
     get_omics_model_init_kwargs,
 )
 from eir.models.sequence.transformer_models import (
-    TransformerWrapperModelConfig,
+    SequenceModelConfig,
     BasicTransformerFeatureExtractorModelConfig,
     TransformerWrapperModel,
     get_embedding_dim_for_sequence_model,
@@ -69,7 +69,7 @@ def get_model(
         global_config=global_config,
         predictor_config=predictor_config,
         num_outputs_per_target=num_outputs_per_target,
-        input_objects=inputs_as_dict,
+        inputs_as_dicts=inputs_as_dict,
     )
 
     modules_to_fuse = overload_fusion_model_feature_extractors_with_pretrained(
@@ -87,27 +87,29 @@ def get_model(
 
 
 def get_modules_to_fuse_from_inputs(
-    inputs: "al_input_objects_as_dict", device: str
+    inputs_as_dict: "al_input_objects_as_dict", device: str
 ) -> nn.ModuleDict:
     models = nn.ModuleDict()
 
-    for input_name, inputs_object in inputs.items():
+    for input_name, inputs_object in inputs_as_dict.items():
+        input_type = inputs_object.input_config.input_info.input_type
         input_type_info = inputs_object.input_config.input_type_info
+        model_config = inputs_object.input_config.model_config
 
-        if input_name.startswith("omics_"):
+        if input_type == "omics":
             cur_omics_model = get_omics_model_from_model_config(
-                model_type=input_type_info.model_type,
-                model_config=inputs_object.input_config.model_config,
+                model_type=model_config.model_type,
+                model_init_config=model_config.model_init_config,
                 data_dimensions=inputs_object.data_dimensions,
             )
 
             models[input_name] = cur_omics_model
 
-        elif input_name.startswith("tabular_"):
+        elif input_type == "tabular":
 
             transformers = inputs_object.labels.label_transformers
-            cat_columns = input_type_info.extra_cat_columns
-            con_columns = input_type_info.extra_con_columns
+            cat_columns = input_type_info.input_cat_columns
+            con_columns = input_type_info.input_con_columns
 
             unique_tabular_values = get_unique_values_from_transformers(
                 transformers=transformers,
@@ -122,58 +124,33 @@ def get_modules_to_fuse_from_inputs(
             )
             models[input_name] = tabular_model
 
-        elif input_name.startswith("sequence_"):
-
-            input_type_info = inputs_object.input_config.input_type_info
-            sequence_wrapper_model_config = TransformerWrapperModelConfig(
-                position=input_type_info.position,
-                position_dropout=input_type_info.position_dropout,
-                window_size=input_type_info.window_size,
-            )
+        elif input_type == "sequence":
 
             num_tokens = len(inputs_object.vocab)
             sequence_model = get_sequence_model(
-                model_type=input_type_info.model_type,
-                pretrained=input_type_info.pretrained_model,
-                pretrained_frozen=input_type_info.freeze_pretrained_model,
-                model_config=inputs_object.input_config.model_config,
-                wrapper_model_config=sequence_wrapper_model_config,
+                sequence_model_config=inputs_object.input_config.model_config,
                 num_tokens=num_tokens,
                 max_length=inputs_object.computed_max_length,
-                embedding_dim=input_type_info.embedding_dim,
+                embedding_dim=model_config.embedding_dim,
                 device=device,
             )
             models[input_name] = sequence_model
 
-        elif input_name.startswith("bytes_"):
-
-            input_type_info = inputs_object.input_config.input_type_info
-            sequence_wrapper_model_config = TransformerWrapperModelConfig(
-                position=input_type_info.position,
-                position_dropout=input_type_info.position_dropout,
-                window_size=input_type_info.window_size,
-            )
+        elif input_type == "bytes":
 
             num_tokens = len(inputs_object.vocab)
             sequence_model = get_sequence_model(
-                model_type=input_type_info.model_type,
-                pretrained=False,
-                pretrained_frozen=False,
-                model_config=inputs_object.input_config.model_config,
-                wrapper_model_config=sequence_wrapper_model_config,
+                sequence_model_config=inputs_object.input_config.model_config,
                 num_tokens=num_tokens,
                 max_length=inputs_object.computed_max_length,
-                embedding_dim=input_type_info.embedding_dim,
+                embedding_dim=model_config.embedding_dim,
                 device=device,
             )
             models[input_name] = sequence_model
 
-        elif input_name.startswith("image_"):
+        elif input_type == "image":
             image_model = get_image_model(
-                model_type=input_type_info.model_type,
-                pretrained=input_type_info.pretrained_model,
-                frozen=input_type_info.freeze_pretrained_model,
-                model_config=inputs_object.input_config.model_config,
+                model_config=model_config,
                 input_channels=inputs_object.num_channels,
                 device=device,
             )
@@ -183,41 +160,31 @@ def get_modules_to_fuse_from_inputs(
 
 
 def get_image_model(
-    model_type: str,
-    pretrained: bool,
-    frozen: bool,
-    model_config: Dict,
+    model_config: ImageModelConfig,
     input_channels: int,
     device: str,
 ) -> ImageWrapperModel:
 
-    wrapper_kwargs = {
-        k: v for k, v in model_config.items() if k == "num_output_features"
-    }
-    wrapper_model_config = ImageModelConfig(**wrapper_kwargs)
-
-    if model_type in timm.list_models():
+    if model_config.model_type in timm.list_models():
         feature_extractor = timm.create_model(
-            model_name=model_type,
-            pretrained=pretrained,
-            num_classes=wrapper_model_config.num_output_features,
+            model_name=model_config.model_type,
+            pretrained=model_config.pretrained_model,
+            num_classes=model_config.num_output_features,
             in_chans=input_channels,
         ).to(device=device)
+
     else:
-
-        if "num_output_features" not in model_config:
-            n_output_feats = wrapper_model_config.num_output_features
-            model_config["num_output_features"] = n_output_feats
-
         feature_extractor = _meta_get_image_model_from_scratch(
-            model_type=model_type, model_config=model_config
+            model_type=model_config.model_type,
+            model_init_config=model_config.model_init_config,
+            num_output_features=model_config.num_output_features,
         ).to(device=device)
 
     model = ImageWrapperModel(
-        feature_extractor=feature_extractor, model_config=wrapper_model_config
+        feature_extractor=feature_extractor, model_config=model_config
     )
 
-    if frozen:
+    if model_config.freeze_pretrained_model:
         for param in model.parameters():
             param.requires_grad = False
 
@@ -225,23 +192,22 @@ def get_image_model(
 
 
 def _meta_get_image_model_from_scratch(
-    model_type: str, model_config: Dict
+    model_type: str, model_init_config: Dict, num_output_features: Union[None, int]
 ) -> nn.Module:
     """
     A kind of ridiculous way to initialize modules from scratch that are found in timm,
     but could not find a better way at first glance given how timm is set up.
     """
 
-    feature_extractor_model_config = copy(model_config)
-    if "num_output_features" in feature_extractor_model_config:
-        num_classes = feature_extractor_model_config.pop("num_output_features")
-        feature_extractor_model_config["num_classes"] = num_classes
+    feature_extractor_model_config = copy(model_init_config)
+    if num_output_features:
+        feature_extractor_model_config["num_classes"] = num_output_features
 
     logger.info(
         "Model '%s' not found among pretrained/external image model names, assuming "
         "module will be initialized from scratch using %s for initalization.",
         model_type,
-        model_config,
+        model_init_config,
     )
 
     feature_extractor_class = getattr(timm.models, model_type)
@@ -286,11 +252,7 @@ class SequenceModelObjectsForWrapperModel:
 
 
 def get_sequence_model(
-    model_type: str,
-    pretrained: bool,
-    pretrained_frozen: bool,
-    model_config: Union[BasicTransformerFeatureExtractorModelConfig, Dict],
-    wrapper_model_config: TransformerWrapperModelConfig,
+    sequence_model_config: SequenceModelConfig,
     num_tokens: int,
     max_length: int,
     embedding_dim: int,
@@ -299,19 +261,19 @@ def get_sequence_model(
 
     feature_extractor_max_length = max_length
     num_chunks = 1
-    if wrapper_model_config.window_size:
+    if sequence_model_config.window_size:
         logger.info(
             "Using sliding model for sequence input as window size was set to %d.",
-            wrapper_model_config.window_size,
+            sequence_model_config.window_size,
         )
-        feature_extractor_max_length = wrapper_model_config.window_size
-        num_chunks = math.ceil(max_length / wrapper_model_config.window_size)
+        feature_extractor_max_length = sequence_model_config.window_size
+        num_chunks = math.ceil(max_length / sequence_model_config.window_size)
 
     objects_for_wrapper = _get_sequence_feature_extractor_objects_for_wrapper_model(
-        model_type=model_type,
-        pretrained=pretrained,
-        pretrained_frozen=pretrained_frozen,
-        model_config=model_config,
+        model_type=sequence_model_config.model_type,
+        pretrained=sequence_model_config.pretrained_model,
+        pretrained_frozen=sequence_model_config.freeze_pretrained_model,
+        model_config=sequence_model_config.model_init_config,
         num_tokens=num_tokens,
         embedding_dim=embedding_dim,
         feature_extractor_max_length=feature_extractor_max_length,
@@ -321,7 +283,7 @@ def get_sequence_model(
     sequence_model = TransformerWrapperModel(
         feature_extractor=objects_for_wrapper.feature_extractor,
         external_feature_extractor=objects_for_wrapper.external,
-        model_config=wrapper_model_config,
+        model_config=sequence_model_config,
         embedding_dim=objects_for_wrapper.embedding_dim,
         num_tokens=num_tokens,
         max_length=max_length,
@@ -577,7 +539,7 @@ def get_tabular_model(
 
 
 def get_omics_model_from_model_config(
-    model_config: al_omics_model_configs,
+    model_init_config: al_omics_model_configs,
     data_dimensions: "DataDimensions",
     model_type: str,
 ):
@@ -585,7 +547,7 @@ def get_omics_model_from_model_config(
     omics_model_class = get_model_class(model_type=model_type)
     model_init_kwargs = get_omics_model_init_kwargs(
         model_type=model_type,
-        model_config=model_config,
+        model_config=model_init_config,
         data_dimensions=data_dimensions,
     )
     omics_model = omics_model_class(**model_init_kwargs)
@@ -611,13 +573,13 @@ def get_fusion_class(
 def get_fusion_kwargs_from_configs(
     global_config: schemas.GlobalConfig,
     predictor_config: schemas.PredictorConfig,
-    inputs: "al_input_objects_as_dict",
+    inputs_as_dict: "al_input_objects_as_dict",
     num_outputs_per_target: "al_num_outputs_per_target",
 ) -> Dict[str, Any]:
 
     kwargs = {}
     modules_to_fuse = get_modules_to_fuse_from_inputs(
-        inputs=inputs, device=global_config.device
+        inputs_as_dict=inputs_as_dict, device=global_config.device
     )
     kwargs["modules_to_fuse"] = modules_to_fuse
     kwargs["num_outputs_per_target"] = num_outputs_per_target
@@ -667,7 +629,7 @@ def overload_fusion_model_feature_extractors_with_pretrained(
             global_config=load_configs.global_config,
             predictor_config=load_configs.predictor_config,
             num_outputs_per_target=load_experiment.num_outputs_per_target,
-            input_objects=inputs_as_dict,
+            inputs_as_dicts=inputs_as_dict,
         )
 
         loaded_fusion_model = load_model(
@@ -698,7 +660,7 @@ def get_fusion_model_class_and_kwargs_from_configs(
     global_config: schemas.GlobalConfig,
     predictor_config: schemas.PredictorConfig,
     num_outputs_per_target: "al_num_outputs_per_target",
-    input_objects: "al_input_objects_as_dict",
+    inputs_as_dicts: "al_input_objects_as_dict",
 ) -> Tuple[Type[nn.Module], Dict[str, Any]]:
 
     fusion_model_class = get_fusion_class(fusion_model_type=predictor_config.model_type)
@@ -707,7 +669,7 @@ def get_fusion_model_class_and_kwargs_from_configs(
         global_config=global_config,
         predictor_config=predictor_config,
         num_outputs_per_target=num_outputs_per_target,
-        inputs=input_objects,
+        inputs_as_dict=inputs_as_dicts,
     )
 
     return fusion_model_class, fusion_model_kwargs

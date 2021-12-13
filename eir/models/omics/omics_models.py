@@ -1,6 +1,6 @@
 import argparse
-from dataclasses import _DataclassParams
-from typing import Union, Type, Dict, Any, Protocol, TYPE_CHECKING
+from dataclasses import _DataclassParams, dataclass
+from typing import Union, Type, Dict, Any, Protocol, Literal, TYPE_CHECKING
 
 from eir.models.omics.models_cnn import CNNModel, CNNModelConfig
 from eir.models.omics.models_identity import IdentityModel, IdentityModelConfig
@@ -15,7 +15,7 @@ from eir.models.omics.models_locally_connected import (
 if TYPE_CHECKING:
     from eir.setup.input_setup import DataDimensions
 
-al_models_classes = Union[
+al_omics_model_classes = Union[
     Type["CNNModel"],
     Type["LinearModel"],
     Type["SimpleLCLModel"],
@@ -23,9 +23,18 @@ al_models_classes = Union[
     Type["IdentityModel"],
 ]
 
-al_models = Union[
+al_omics_models = Union[
     "CNNModel", "LinearModel", "SimpleLCLModel", "LCLModel", "IdentityModel"
 ]
+
+al_omics_model_types = Literal[
+    "cnn",
+    "linear",
+    "mlp-split",
+    "genome-local-net",
+    "linear",
+]
+
 
 al_omics_model_configs = Union[
     CNNModelConfig,
@@ -36,7 +45,22 @@ al_omics_model_configs = Union[
 ]
 
 
-def get_omics_model_mapping() -> Dict[str, al_models_classes]:
+@dataclass
+class OmicsModelConfig:
+
+    """
+    :param model_type:
+         Which type of image model to use.
+
+    :param model_init_config:
+          Configuration used to initialise model.
+    """
+
+    model_type: al_omics_model_types
+    model_init_config: al_omics_model_configs
+
+
+def get_omics_model_mapping() -> Dict[str, al_omics_model_classes]:
     mapping = {
         "cnn": CNNModel,
         "linear": LinearModel,
@@ -48,7 +72,7 @@ def get_omics_model_mapping() -> Dict[str, al_models_classes]:
     return mapping
 
 
-def get_model_class(model_type: str) -> al_models_classes:
+def get_model_class(model_type: str) -> al_omics_model_classes:
     mapping = get_omics_model_mapping()
     return mapping[model_type]
 

@@ -33,8 +33,10 @@ if TYPE_CHECKING:
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "linear"},
-                        "model_config": {"l1": 1e-03},
+                        "model_config": {
+                            "model_type": "linear",
+                            "model_init_config": {"l1": 1e-03},
+                        },
                     }
                 ],
             },
@@ -45,11 +47,13 @@ if TYPE_CHECKING:
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "cnn"},
                         "model_config": {
-                            "rb_do": 0.25,
-                            "channel_exp_base": 3,
-                            "l1": 1e-03,
+                            "model_type": "cnn",
+                            "model_init_config": {
+                                "rb_do": 0.25,
+                                "channel_exp_base": 3,
+                                "l1": 1e-03,
+                            },
                         },
                     }
                 ],
@@ -62,7 +66,7 @@ if TYPE_CHECKING:
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "identity"},
+                        "model_config": {"model_type": "identity"},
                     },
                 ],
                 "predictor_configs": {
@@ -168,7 +172,7 @@ def _get_snp_activations_generator(cur_target_act_paths: Dict[str, Path]):
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "identity"},
+                        "model_config": {"model_type": "identity"},
                     },
                 ],
                 "predictor_configs": {
@@ -187,8 +191,10 @@ def _get_snp_activations_generator(cur_target_act_paths: Dict[str, Path]):
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "cnn"},
-                        "model_config": {"l1": 1e-03},
+                        "model_config": {
+                            "model_type": "cnn",
+                            "model_init_config": {"l1": 1e-03},
+                        },
                     },
                 ],
                 "target_configs": {
@@ -203,8 +209,10 @@ def _get_snp_activations_generator(cur_target_act_paths: Dict[str, Path]):
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "linear"},
-                        "model_config": {"l1": 1e-03},
+                        "model_config": {
+                            "model_type": "linear",
+                            "model_init_config": {"l1": 1e-03},
+                        },
                     },
                 ],
                 "target_configs": {
@@ -218,13 +226,15 @@ def _get_snp_activations_generator(cur_target_act_paths: Dict[str, Path]):
             "injections": {
                 "global_configs": {
                     "lr_schedule": "cycle",
-                    "run_name": "test_lr-cycle",
+                    "output_folder": "test_lr-cycle",
                 },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "cnn"},
-                        "model_config": {"l1": 1e-03},
+                        "model_config": {
+                            "model_type": "cnn",
+                            "model_init_config": {"l1": 1e-03},
+                        },
                     },
                 ],
                 "target_configs": {
@@ -239,12 +249,10 @@ def _get_snp_activations_generator(cur_target_act_paths: Dict[str, Path]):
 def test_regression(prep_modelling_test_configs):
     experiment, test_config = prep_modelling_test_configs
 
-    train.train(experiment)
+    train.train(experiment=experiment)
 
     target_column = experiment.configs.target_configs[0].target_con_columns[0]
-    model_type = (
-        experiment.configs.input_configs[0].input_type_info.model_type == "linear"
-    )
+    model_type = experiment.configs.input_configs[0].model_config.model_type == "linear"
 
     # linear regression performs slightly worse, but we don't want to lower expectations
     # other models
@@ -279,21 +287,23 @@ def test_regression(prep_modelling_test_configs):
         {
             "injections": {
                 "global_configs": {
-                    "run_name": "extra_inputs",
+                    "output_folder": "extra_inputs",
                 },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "cnn"},
-                        "model_config": {"l1": 1e-03},
+                        "model_config": {
+                            "model_type": "cnn",
+                            "model_init_config": {"l1": 1e-03},
+                        },
                     },
                     {
                         "input_info": {"input_name": "test_tabular"},
                         "input_type_info": {
-                            "model_type": "tabular",
-                            "extra_cat_columns": ["OriginExtraCol"],
-                            "extra_con_columns": ["ExtraTarget"],
+                            "input_cat_columns": ["OriginExtraCol"],
+                            "input_con_columns": ["ExtraTarget"],
                         },
+                        "model_config": {"model_type": "tabular"},
                     },
                 ],
                 "target_configs": {
@@ -308,12 +318,14 @@ def test_regression(prep_modelling_test_configs):
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "cnn"},
                         "model_config": {
-                            "channel_exp_base": 5,
-                            "rb_do": 0.15,
-                            "fc_repr_dim": 64,
-                            "l1": 1e-03,
+                            "model_type": "cnn",
+                            "model_init_config": {
+                                "channel_exp_base": 5,
+                                "rb_do": 0.15,
+                                "fc_repr_dim": 64,
+                                "l1": 1e-03,
+                            },
                         },
                     },
                 ],
@@ -334,8 +346,10 @@ def test_regression(prep_modelling_test_configs):
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "linear"},
-                        "model_config": {"l1": 1e-03},
+                        "model_config": {
+                            "model_type": "linear",
+                            "model_init_config": {"l1": 1e-03},
+                        },
                     },
                 ],
                 "predictor_configs": {
@@ -354,11 +368,13 @@ def test_regression(prep_modelling_test_configs):
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "mlp-split"},
                         "model_config": {
-                            "fc_repr_dim": 8,
-                            "split_mlp_num_splits": 64,
-                            "l1": 1e-03,
+                            "model_type": "mlp-split",
+                            "model_init_config": {
+                                "fc_repr_dim": 8,
+                                "split_mlp_num_splits": 64,
+                                "l1": 1e-03,
+                            },
                         },
                     },
                 ],
@@ -377,12 +393,14 @@ def test_regression(prep_modelling_test_configs):
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "genome-local-net"},
                         "model_config": {
-                            "kernel_width": 8,
-                            "channel_exp_base": 2,
-                            "l1": 1e-03,
-                            "rb_do": 0.20,
+                            "model_type": "genome-local-net",
+                            "model_init_config": {
+                                "kernel_width": 8,
+                                "channel_exp_base": 2,
+                                "l1": 1e-03,
+                                "rb_do": 0.20,
+                            },
                         },
                     },
                 ],
@@ -403,17 +421,19 @@ def test_regression(prep_modelling_test_configs):
         {
             "injections": {
                 "global_configs": {
-                    "run_name": "mgmoe",
+                    "output_folder": "mgmoe",
                     "lr": 1e-03,
                 },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "genome-local-net"},
                         "model_config": {
-                            "kernel_width": 8,
-                            "channel_exp_base": 2,
-                            "l1": 1e-03,
+                            "model_type": "genome-local-net",
+                            "model_init_config": {
+                                "kernel_width": 8,
+                                "channel_exp_base": 2,
+                                "l1": 1e-03,
+                            },
                         },
                     },
                 ],
@@ -431,7 +451,7 @@ def test_regression(prep_modelling_test_configs):
         {
             "injections": {
                 "global_configs": {
-                    "run_name": "mixing_multi",
+                    "output_folder": "mixing_multi",
                     "lr": 1e-03,
                     "mixing_alpha": 0.5,
                 },
@@ -439,13 +459,15 @@ def test_regression(prep_modelling_test_configs):
                     {
                         "input_info": {"input_name": "test_genotype"},
                         "input_type_info": {
-                            "model_type": "genome-local-net",
                             "mixing_subtype": "cutmix-uniform",
                         },
                         "model_config": {
-                            "kernel_width": 8,
-                            "channel_exp_base": 2,
-                            "l1": 1e-03,
+                            "model_type": "genome-local-net",
+                            "model_init_config": {
+                                "kernel_width": 8,
+                                "channel_exp_base": 2,
+                                "l1": 1e-03,
+                            },
                         },
                     },
                 ],
@@ -466,19 +488,21 @@ def test_regression(prep_modelling_test_configs):
         {
             "injections": {
                 "global_configs": {
-                    "run_name": "limited_activations",
+                    "output_folder": "limited_activations",
                     "lr": 1e-03,
                     "max_acts_per_class": 100,
                 },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "genome-local-net"},
                         "model_config": {
-                            "kernel_width": 8,
-                            "channel_exp_base": 2,
-                            "l1": 1e-03,
-                            "rb_do": 0.20,
+                            "model_type": "genome-local-net",
+                            "model_init_config": {
+                                "kernel_width": 8,
+                                "channel_exp_base": 2,
+                                "l1": 1e-03,
+                                "rb_do": 0.20,
+                            },
                         },
                     },
                 ],
@@ -558,8 +582,8 @@ def get_all_tabular_input_columns(configs: Configs):
     extra_columns = []
     for input_config in configs.input_configs:
         if input_config.input_info.input_type == "tabular":
-            extra_columns += input_config.input_type_info.extra_con_columns
-            extra_columns += input_config.input_type_info.extra_cat_columns
+            extra_columns += input_config.input_type_info.input_con_columns
+            extra_columns += input_config.input_type_info.input_cat_columns
 
     return extra_columns
 

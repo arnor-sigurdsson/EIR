@@ -31,15 +31,17 @@ if TYPE_CHECKING:
         {
             "injections": {
                 "global_configs": {
-                    "run_name": "multi_task_multi_modal",
+                    "output_folder": "multi_task_multi_modal",
                     "n_epochs": 6,
                     "act_background_samples": 8,
                 },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "cnn"},
-                        "model_config": {"l1": 1e-03},
+                        "model_config": {
+                            "model_type": "cnn",
+                            "model_init_config": {"l1": 1e-03},
+                        },
                     },
                     {
                         "input_info": {"input_name": "test_sequence"},
@@ -53,11 +55,13 @@ if TYPE_CHECKING:
                     {
                         "input_info": {"input_name": "test_tabular"},
                         "input_type_info": {
-                            "model_type": "tabular",
-                            "extra_cat_columns": ["OriginExtraCol"],
-                            "extra_con_columns": ["ExtraTarget"],
+                            "input_cat_columns": ["OriginExtraCol"],
+                            "input_con_columns": ["ExtraTarget"],
                         },
-                        "model_config": {"l1": 1e-03},
+                        "model_config": {
+                            "model_type": "tabular",
+                            "model_init_config": {"l1": 1e-03},
+                        },
                     },
                 ],
                 "predictor_configs": {

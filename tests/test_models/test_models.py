@@ -72,20 +72,20 @@ def test_get_cur_dilation(test_input, expected):
         {
             "injections": {
                 "global_configs": {
-                    "run_name": "extra_inputs",
+                    "output_folder": "extra_inputs",
                 },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "cnn"},
+                        "model_config": {"model_type": "cnn"},
                     },
                     {
                         "input_info": {"input_name": "test_tabular"},
                         "input_type_info": {
-                            "model_type": "tabular",
-                            "extra_cat_columns": ["OriginExtraCol"],
-                            "extra_con_columns": ["ExtraTarget"],
+                            "input_cat_columns": ["OriginExtraCol"],
+                            "input_con_columns": ["ExtraTarget"],
                         },
+                        "model_config": {"model_type": "tabular"},
                     },
                 ],
                 "target_configs": {
@@ -101,7 +101,7 @@ def test_cnn_model(
     parse_test_cl_args, create_test_data, create_test_config, create_test_model
 ):
     fusion_model = create_test_model
-    cnn_model = fusion_model.modules_to_fuse["omics_test_genotype"]
+    cnn_model = fusion_model.modules_to_fuse["test_genotype"]
 
     assert isinstance(cnn_model.conv[0], models_cnn.FirstCNNBlock)
     assert True

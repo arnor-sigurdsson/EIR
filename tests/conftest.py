@@ -192,7 +192,7 @@ def general_sequence_inject(
 def get_test_base_global_init() -> Sequence[dict]:
     global_inits = [
         {
-            "run_name": "test_run",
+            "output_folder": "runs/test_run",
             "plot_skip_steps": 0,
             "get_acts": True,
             "act_every_sample_factor": 0,
@@ -259,12 +259,11 @@ def get_test_omics_input_init(test_path: Path, split_to_test: bool) -> dict:
             "input_type": "omics",
         },
         "input_type_info": {
-            "model_type": "genome-local-net",
             "na_augment_perc": 0.10,
             "na_augment_prob": 0.10,
             "snp_file": str(test_path / "test_snps.bim"),
         },
-        "model_config": {},
+        "model_config": {"model_type": "genome-local-net"},
     }
 
     return input_init_kwargs
@@ -282,8 +281,8 @@ def get_test_tabular_input_init(test_path: Path, split_to_test: bool) -> dict:
             "input_name": "test_tabular",
             "input_type": "tabular",
         },
-        "input_type_info": {"model_type": "tabular"},
-        "model_config": {},
+        "input_type_info": {},
+        "model_config": {"model_type": "tabular"},
     }
 
     return input_init_kwargs
@@ -304,13 +303,15 @@ def get_test_sequence_input_init(test_path: Path, split_to_test: bool) -> dict:
         "input_type_info": {
             "max_length": "max",
             "tokenizer_language": "en",
-            "model_type": "sequence-default",
-            "embedding_dim": 8,
         },
         "model_config": {
-            "num_heads": 2,
-            "num_layers": 1,
-            "dropout": 0.25,
+            "model_type": "sequence-default",
+            "embedding_dim": 8,
+            "model_init_config": {
+                "num_heads": 2,
+                "num_layers": 1,
+                "dropout": 0.25,
+            },
         },
     }
 
@@ -330,11 +331,12 @@ def get_test_bytes_input_init(test_path: Path, split_to_test: bool) -> Dict:
         },
         "input_type_info": {
             "max_length": 128,
+        },
+        "model_config": {
             "model_type": "sequence-default",
-            "embedding_dim": 32,
+            "embedding_dim": 8,
             "window_size": 64,
         },
-        "model_config": {},
     }
 
     return input_init_kwargs
@@ -352,16 +354,18 @@ def get_test_image_input_init(test_path: Path, split_to_test: bool) -> Dict:
             "input_type": "image",
         },
         "input_type_info": {
-            "model_type": "ResNet",
-            "pretrained_model": False,
-            "freeze_pretrained_model": False,
             "auto_augment": False,
             "size": (16,),
         },
         "model_config": {
+            "model_type": "ResNet",
+            "pretrained_model": False,
             "num_output_features": 128,
-            "layers": [1, 1, 1, 1],
-            "block": "BasicBlock",
+            "freeze_pretrained_model": False,
+            "model_init_config": {
+                "layers": [1, 1, 1, 1],
+                "block": "BasicBlock",
+            },
         },
     }
 
@@ -508,19 +512,23 @@ def create_test_config(
         target_configs=test_target_configs,
     )
 
-    # This is done after in case tests modify run_name
-    run_name = (
-        test_configs.global_config.run_name
+    # This is done after in case tests modify output_folder
+    output_folder = (
+        test_configs.global_config.output_folder
         + "_"
-        + "_".join(i.input_type_info.model_type for i in test_configs.input_configs)
+        + "_".join(i.model_config.model_type for i in test_configs.input_configs)
         + "_"
         + f"{test_configs.predictor_config.model_type}"
         + "_"
         + test_data_config.request_params["task_type"]
     )
-    test_configs.global_config.run_name = run_name
 
-    run_folder = get_run_folder(run_name=run_name)
+    if not output_folder.startswith("runs/"):
+        output_folder = "runs/" + output_folder
+
+    test_configs.global_config.output_folder = output_folder
+
+    run_folder = get_run_folder(output_folder=output_folder)
 
     # If another test had side-effect leftovers, TODO: Enforce unique names
     if run_folder.exists():
@@ -528,7 +536,7 @@ def create_test_config(
 
     ensure_path_exists(path=run_folder, is_folder=True)
 
-    configure_root_logger(run_name=run_name)
+    configure_root_logger(output_folder=output_folder)
 
     yield test_configs
 
@@ -612,7 +620,7 @@ def create_test_labels(
     c = create_test_config
     gc = c.global_config
 
-    run_folder = get_run_folder(run_name=gc.run_name)
+    run_folder = get_run_folder(output_folder=gc.output_folder)
 
     all_array_ids = train.gather_all_ids_from_target_configs(
         target_configs=c.target_configs
@@ -752,7 +760,7 @@ def prep_modelling_test_configs(
         valid_ids=tuple(target_labels.valid_labels.keys()),
         hooks=None,
     )
-    run_folder = get_run_folder(run_name=gc.run_name)
+    run_folder = get_run_folder(output_folder=gc.output_folder)
     serialize_all_input_transformers(inputs_dict=inputs, run_folder=run_folder)
     serialize_chosen_input_objects(inputs_dict=inputs, run_folder=run_folder)
 
@@ -771,7 +779,7 @@ def prep_modelling_test_configs(
         target_transformers=target_labels.label_transformers,
         num_outputs_per_target=num_outputs_per_target,
         target_columns=train_dataset.target_columns,
-        writer=train.get_summary_writer(run_folder=Path("runs", gc.run_name)),
+        writer=train.get_summary_writer(run_folder=Path(gc.output_folder)),
         hooks=hooks,
     )
 
@@ -780,7 +788,7 @@ def prep_modelling_test_configs(
     )
     eir.experiment_io.experiment_io.serialize_experiment(
         experiment=experiment,
-        run_folder=get_run_folder(gc.run_name),
+        run_folder=get_run_folder(gc.output_folder),
         keys_to_serialize=keys_to_serialize,
     )
 
@@ -819,7 +827,7 @@ def _get_cur_modelling_test_config(
 ) -> ModelTestConfig:
 
     last_iter = len(train_loader) * global_config.n_epochs
-    run_path = Path(f"runs/{global_config.run_name}/")
+    run_path = Path(f"{global_config.output_folder}/")
 
     last_sample_folders = _get_all_last_sample_folders(
         target_columns=targets.all_targets, run_path=run_path, iteration=last_iter

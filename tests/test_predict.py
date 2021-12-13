@@ -49,7 +49,7 @@ al_config_instances = Union[
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "cnn"},
+                        "model_config": {"model_type": "cnn"},
                     }
                 ],
             },
@@ -75,7 +75,7 @@ def test_load_model(create_test_config: config.Configs, tmp_path: Path):
     cnn_model_config = test_configs.input_configs[0].model_config
     cnn_init_kwargs = get_omics_model_init_kwargs(
         model_type="cnn",
-        model_config=cnn_model_config,
+        model_config=cnn_model_config.model_init_config,
         data_dimensions=data_dimension,
     )
     model = CNNModel(**cnn_init_kwargs)
@@ -146,7 +146,7 @@ def test_get_named_pred_dict_iterators(tmp_path: Path) -> None:
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "linear"},
+                        "model_config": {"model_type": "linear"},
                     }
                 ],
             },
@@ -282,7 +282,7 @@ def _overload_test_yaml_object_for_predict(
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "linear"},
+                        "model_config": {"model_type": "linear"},
                     }
                 ],
             },
@@ -328,20 +328,20 @@ def test_overload_train_configs_for_predict(
         {
             "injections": {
                 "global_configs": {
-                    "run_name": "extra_inputs",
+                    "output_folder": "extra_inputs",
                 },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "linear"},
+                        "model_config": {"model_type": "linear"},
                     },
                     {
                         "input_info": {"input_name": "test_tabular"},
                         "input_type_info": {
-                            "model_type": "tabular",
-                            "extra_cat_columns": [],
-                            "extra_con_columns": ["ExtraTarget"],
+                            "input_cat_columns": [],
+                            "input_con_columns": ["ExtraTarget"],
                         },
+                        "model_config": {"model_type": "tabular"},
                     },
                 ],
                 "target_configs": {
@@ -398,7 +398,7 @@ def test_load_labels_for_predict(
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "linear"},
+                        "model_config": {"model_type": "linear"},
                     },
                 ],
             },
@@ -409,7 +409,7 @@ def test_load_labels_for_predict(
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "linear"},
+                        "model_config": {"model_type": "linear"},
                     },
                 ],
             },
@@ -458,7 +458,7 @@ def test_set_up_test_dataset(
         test_inputs_configs=test_configs.input_configs,
         ids=test_ids,
         hooks=None,
-        run_name=test_configs.global_config.run_name,
+        output_folder=test_configs.global_config.output_folder,
     )
 
     test_dataset = predict._set_up_default_dataset(
@@ -512,7 +512,7 @@ def grab_best_model_path(saved_models_folder: Path):
         {
             "injections": {
                 "global_configs": {
-                    "run_name": "test_run_predict",
+                    "output_folder": "test_run_predict",
                     "n_epochs": 12,
                     "checkpoint_interval": 200,
                     "sample_interval": 200,
@@ -523,24 +523,24 @@ def grab_best_model_path(saved_models_folder: Path):
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "genome-local-net"},
+                        "model_config": {"model_type": "genome-local-net"},
                     },
                     {
                         "input_info": {"input_name": "test_sequence"},
                     },
                     {
                         "input_info": {"input_name": "test_sequence_albert"},
-                        "input_type_info": {
-                            "model_type": "albert",
+                        "model_config": {
                             "window_size": 16,
                             "position": "embed",
-                        },
-                        "model_config": {
-                            "num_hidden_layers": 2,
-                            "num_attention_heads": 4,
-                            "embedding_size": 12,
-                            "hidden_size": 16,
-                            "intermediate_size": 32,
+                            "model_type": "albert",
+                            "model_init_config": {
+                                "num_hidden_layers": 2,
+                                "num_attention_heads": 4,
+                                "embedding_size": 12,
+                                "hidden_size": 16,
+                                "intermediate_size": 32,
+                            },
                         },
                     },
                     {
@@ -552,10 +552,10 @@ def grab_best_model_path(saved_models_folder: Path):
                     {
                         "input_info": {"input_name": "test_tabular"},
                         "input_type_info": {
-                            "model_type": "tabular",
-                            "extra_cat_columns": [],
-                            "extra_con_columns": ["ExtraTarget"],
+                            "input_cat_columns": [],
+                            "input_con_columns": ["ExtraTarget"],
                         },
+                        "model_config": {"model_type": "tabular"},
                     },
                 ],
             },

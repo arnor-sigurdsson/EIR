@@ -23,19 +23,19 @@ from eir.train import get_dataloaders
         {
             "injections": {
                 "global_configs": {
-                    "run_name": "extra_inputs",
+                    "output_folder": "extra_inputs",
                 },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "cnn"},
+                        "model_type": {"model_type": "cnn"},
                     },
                     {
                         "input_info": {"input_name": "test_tabular"},
                         "input_type_info": {
-                            "model_type": "tabular",
-                            "extra_con_columns": ["ExtraTarget"],
+                            "input_con_columns": ["ExtraTarget"],
                         },
+                        "model_config": {"model_type": "tabular"},
                     },
                 ],
                 "target_configs": {

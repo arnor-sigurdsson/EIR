@@ -109,7 +109,7 @@ def test_get_early_stopping_event_kwargs():
         {
             "injections": {
                 "global_configs": {
-                    "run_name": "test_hparam_summary_writer",
+                    "output_folder": "test_hparam_summary_writer",
                     "lr": 1e-03,
                     "n_epochs": 2,
                     "sample_interval": 100,
@@ -117,7 +117,7 @@ def test_get_early_stopping_event_kwargs():
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "linear"},
+                        "model_config": {"model_type": "linear"},
                     },
                 ],
             },
@@ -163,7 +163,7 @@ def test_add_hparams_to_tensorboard(
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "linear"},
+                        "model_config": {"model_type": "linear"},
                     },
                 ],
             },

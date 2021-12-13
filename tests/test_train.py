@@ -55,12 +55,12 @@ def test_prepare_run_folder_fail(patched_get_run_folder, tmp_path):
             "injections": {
                 "global_configs": {
                     "lr": 1e-03,
-                    "run_name": "test_get_default_experiment",
+                    "output_folder": "test_get_default_experiment",
                 },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "linear"},
+                        "model_config": {"model_type": "linear"},
                     },
                 ],
             },
@@ -80,7 +80,7 @@ def test_get_default_experiment(create_test_config):
     assert isinstance(default_experiment.criterions["Origin"], nn.CrossEntropyLoss)
 
     assert len(default_experiment.inputs) == 1
-    assert set(default_experiment.inputs.keys()) == {"omics_test_genotype"}
+    assert set(default_experiment.inputs.keys()) == {"test_genotype"}
 
     assert default_experiment.target_columns == {"cat": ["Origin"], "con": []}
 
@@ -106,7 +106,7 @@ def test_modify_bs_for_multi_gpu():
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "linear"},
+                        "model_config": {"model_type": "linear"},
                     },
                 ],
             },
@@ -145,7 +145,7 @@ def test_get_train_sampler(create_test_data, create_test_datasets, create_test_c
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "linear"},
+                        "model_config": {"model_type": "linear"},
                     },
                 ],
             },
@@ -201,14 +201,14 @@ def test_get_optimizer():
 
     model = FakeModel()
 
-    gc_adamw = GlobalConfig(run_name="test", optimizer="adamw")
+    gc_adamw = GlobalConfig(output_folder="test", optimizer="adamw")
 
     adamw_optimizer = optimizers.get_optimizer(
         model=model, loss_callable=lambda x: x, global_config=gc_adamw
     )
     assert isinstance(adamw_optimizer, AdamW)
 
-    gc_sgdm = GlobalConfig(run_name="test", optimizer="sgdm")
+    gc_sgdm = GlobalConfig(output_folder="test", optimizer="sgdm")
     sgdm_optimizer = optimizers.get_optimizer(
         model=model, loss_callable=lambda x: x, global_config=gc_sgdm
     )
@@ -225,7 +225,7 @@ def test_get_optimizer():
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "cnn"},
+                        "model_config": {"model_type": "cnn"},
                     },
                 ],
                 "target_configs": {
@@ -239,7 +239,7 @@ def test_get_optimizer():
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "linear"},
+                        "model_config": {"model_type": "linear"},
                     },
                 ],
                 "target_configs": {
@@ -275,7 +275,7 @@ def test_get_model(create_test_config: Configs, create_test_labels):
     )
 
     assert len(test_config.input_configs) == 1
-    omics_model_type = test_config.input_configs[0].input_type_info.model_type
+    omics_model_type = test_config.input_configs[0].model_config.model_type
     _check_model(model_type=omics_model_type, model=model)
 
 
@@ -285,10 +285,10 @@ def _check_model(model_type: str, model: nn.Module):
         assert isinstance(model, FusionModel)
         assert model.multi_task_branches["Origin"][-1][-1].out_features == 3
         assert model.multi_task_branches["Height"][-1][-1].out_features == 1
-        assert isinstance(model.modules_to_fuse["omics_test_genotype"], CNNModel)
+        assert isinstance(model.modules_to_fuse["test_genotype"], CNNModel)
 
     elif model_type == "linear":
-        assert isinstance(model.modules_to_fuse["omics_test_genotype"], LinearModel)
+        assert isinstance(model.modules_to_fuse["test_genotype"], LinearModel)
 
 
 def test_get_criterions():

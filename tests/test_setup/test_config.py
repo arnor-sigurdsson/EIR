@@ -41,7 +41,7 @@ def test_generate_aggregated_config_basic():
     aggregated_config = config.generate_aggregated_config(
         cl_args=cl_args_with_preset_configs
     )
-    assert aggregated_config.global_config.run_name == "gln_run"
+    assert aggregated_config.global_config.output_folder == "gln_run"
 
     assert len(aggregated_config.input_configs) == 1
     assert aggregated_config.input_configs[0].input_info.input_source == "MUST_FILL"
@@ -58,7 +58,7 @@ def test_generate_aggregated_config_with_overload():
         cl_args=cl_args_with_preset_configs,
         extra_cl_args_overload=["--gln_input.input_info.input_source=test_value"],
     )
-    assert aggregated_config.global_config.run_name == "gln_run"
+    assert aggregated_config.global_config.output_folder == "gln_run"
     assert len(aggregated_config.input_configs) == 1
     assert aggregated_config.input_configs[0].input_info.input_source == "test_value"
 

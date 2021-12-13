@@ -39,14 +39,14 @@ seed_everything(seed=0)
         {
             "injections": {
                 "global_configs": {
-                    "run_name": "test_classification",
+                    "output_folder": "test_classification",
                     "n_epochs": 12,
                     "memory_dataset": True,
                 },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_sequence"},
-                        "input_type_info": {"position": "encode"},
+                        "model_config": {"position": "encode"},
                     }
                 ],
             },
@@ -55,14 +55,14 @@ seed_everything(seed=0)
         {
             "injections": {
                 "global_configs": {
-                    "run_name": "test_classification",
+                    "output_folder": "test_classification",
                     "n_epochs": 12,
                     "memory_dataset": True,
                 },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_sequence"},
-                        "input_type_info": {"window_size": 16, "position": "embed"},
+                        "model_config": {"window_size": 16, "position": "embed"},
                     }
                 ],
             },
@@ -73,7 +73,7 @@ seed_everything(seed=0)
                 "global_configs": {
                     "n_epochs": 12,
                     "memory_dataset": True,
-                    "run_name": "test_regression",
+                    "output_folder": "test_regression",
                 },
                 "input_configs": [
                     {
@@ -92,7 +92,7 @@ seed_everything(seed=0)
                 "global_configs": {
                     "n_epochs": 12,
                     "memory_dataset": True,
-                    "run_name": "test_multi_task",
+                    "output_folder": "test_multi_task",
                 },
                 "input_configs": [
                     {
@@ -111,7 +111,7 @@ seed_everything(seed=0)
                 "global_configs": {
                     "n_epochs": 12,
                     "memory_dataset": True,
-                    "run_name": "test_multi_task_with_mixing",
+                    "output_folder": "test_multi_task_with_mixing",
                     "mixing_alpha": 0.5,
                 },
                 "input_configs": [
@@ -131,25 +131,25 @@ seed_everything(seed=0)
                 "global_configs": {
                     "n_epochs": 12,
                     "memory_dataset": True,
-                    "run_name": "test_albert",
+                    "output_folder": "test_albert",
                     "mixing_alpha": 0.5,
                 },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_sequence"},
-                        "input_type_info": {
-                            "model_type": "albert",
-                            "window_size": 16,
-                            "position": "embed",
-                        },
                         "model_config": {
-                            "num_hidden_layers": 2,
-                            "num_attention_heads": 4,
-                            "embedding_size": 12,
-                            "hidden_size": 16,
-                            "intermediate_size": 32,
+                            "position": "embed",
+                            "window_size": 16,
+                            "model_type": "albert",
+                            "model_init_config": {
+                                "num_hidden_layers": 2,
+                                "num_attention_heads": 4,
+                                "embedding_size": 12,
+                                "hidden_size": 16,
+                                "intermediate_size": 32,
+                            },
                         },
-                    }
+                    },
                 ],
                 "target_configs": {
                     "target_cat_columns": ["Origin"],

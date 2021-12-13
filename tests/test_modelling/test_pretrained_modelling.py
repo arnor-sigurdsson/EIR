@@ -35,7 +35,7 @@ if TYPE_CHECKING:
         {
             "injections": {
                 "global_configs": {
-                    "run_name": "multi_task_multi_modal",
+                    "output_folder": "multi_task_multi_modal",
                     "n_epochs": 2,
                     "act_background_samples": 8,
                     "sample_interval": 50,
@@ -45,8 +45,10 @@ if TYPE_CHECKING:
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "cnn"},
-                        "model_config": {"l1": 1e-03},
+                        "model_config": {
+                            "model_type": "cnn",
+                            "model_init_config": {"l1": 1e-03},
+                        },
                     },
                     {
                         "input_info": {"input_name": "test_sequence"},
@@ -60,11 +62,13 @@ if TYPE_CHECKING:
                     {
                         "input_info": {"input_name": "test_tabular"},
                         "input_type_info": {
-                            "model_type": "tabular",
-                            "extra_cat_columns": ["OriginExtraCol"],
-                            "extra_con_columns": ["ExtraTarget"],
+                            "input_cat_columns": ["OriginExtraCol"],
+                            "input_con_columns": ["ExtraTarget"],
                         },
-                        "model_config": {"l1": 1e-03},
+                        "model_config": {
+                            "model_type": "tabular",
+                            "model_init_config": {"l1": 1e-03},
+                        },
                     },
                 ],
                 "predictor_configs": {
@@ -124,12 +128,10 @@ def _get_experiment_overloaded_for_pretrained(
 
     input_configs_with_pretrained = []
     for cur_input_config in input_configs:
-        cur_type = cur_input_config.input_info.input_type
         cur_name = cur_input_config.input_info.input_name
-        cur_name_with_prefix = f"{cur_type}_{cur_name}"
 
         cur_pretrained_config = BasicPretrainedConfig(
-            model_path=str(saved_model_path), load_module_name=cur_name_with_prefix
+            model_path=str(saved_model_path), load_module_name=cur_name
         )
         cur_input_config.pretrained_config = cur_pretrained_config
         input_configs_with_pretrained.append(cur_input_config)
@@ -139,11 +141,11 @@ def _get_experiment_overloaded_for_pretrained(
     pretrained_configs.global_config.n_epochs = 6
     pretrained_configs.global_config.sample_interval = 200
     pretrained_configs.global_config.checkpoint_interval = 200
-    pretrained_configs.global_config.run_name = (
-        pretrained_configs.global_config.run_name + "_with_pretrained"
+    pretrained_configs.global_config.output_folder = (
+        pretrained_configs.global_config.output_folder + "_with_pretrained"
     )
 
-    run_path = Path(f"runs/{pretrained_configs.global_config.run_name}/")
+    run_path = Path(f"{pretrained_configs.global_config.output_folder}/")
     if run_path.exists():
         cleanup(run_path=run_path)
 

@@ -67,14 +67,14 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 class HandlerConfig:
     experiment: "Experiment"
     run_folder: Path
-    run_name: str
+    output_folder: str
     monitoring_metrics: List[Tuple[str, str]]
 
 
 def configure_trainer(trainer: Engine, experiment: "Experiment") -> Engine:
 
     gc = experiment.configs.global_config
-    run_folder = get_run_folder(run_name=gc.run_name)
+    run_folder = get_run_folder(output_folder=gc.output_folder)
 
     monitoring_metrics = _get_monitoring_metrics(
         target_columns=experiment.target_columns, metric_record_dict=experiment.metrics
@@ -83,7 +83,7 @@ def configure_trainer(trainer: Engine, experiment: "Experiment") -> Engine:
     handler_config = HandlerConfig(
         experiment=experiment,
         run_folder=run_folder,
-        run_name=gc.run_name,
+        output_folder=gc.output_folder,
         monitoring_metrics=monitoring_metrics,
     )
 
@@ -118,7 +118,7 @@ def configure_trainer(trainer: Engine, experiment: "Experiment") -> Engine:
     elif gc.lr_schedule == "same" and gc.warmup_steps:
         raise NotImplementedError("Warmup not yet implemented for 'same' LR schedule.")
 
-    if handler_config.run_name:
+    if handler_config.output_folder:
         trainer = _attach_run_event_handlers(
             trainer=trainer, handler_config=handler_config
         )
@@ -428,7 +428,7 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
         trainer = _add_checkpoint_handler_wrapper(
             trainer=trainer,
             run_folder=handler_config.run_folder,
-            run_name=Path(gc.run_name),
+            output_folder=Path(gc.output_folder),
             n_to_save=gc.n_saved_models,
             checkpoint_interval=gc.checkpoint_interval,
             sample_interval=gc.sample_interval,
@@ -494,7 +494,7 @@ def _save_yaml_configs(run_folder: Path, configs: "Configs"):
 def _add_checkpoint_handler_wrapper(
     trainer: Engine,
     run_folder: Path,
-    run_name: Path,
+    output_folder: Path,
     n_to_save: Union[int, None],
     checkpoint_interval: int,
     sample_interval: int,
@@ -526,7 +526,7 @@ def _add_checkpoint_handler_wrapper(
 
     checkpoint_handler = _get_checkpoint_handler(
         run_folder=run_folder,
-        run_name=run_name,
+        output_folder=output_folder,
         n_to_save=n_to_save,
         score_function=checkpoint_score_function,
         score_name=score_name,
@@ -561,7 +561,7 @@ def _get_metric_writing_funcs(
 
 def _get_checkpoint_handler(
     run_folder: Path,
-    run_name: Path,
+    output_folder: Path,
     n_to_save: int,
     score_function: Callable = None,
     score_name: str = None,
@@ -571,7 +571,7 @@ def _get_checkpoint_handler(
 
     checkpoint_handler = ModelCheckpoint(
         dirname=str(Path(run_folder, "saved_models")),
-        filename_prefix=run_name.name,
+        filename_prefix=output_folder.name,
         create_dir=True,
         score_name=score_name,
         n_saved=n_to_save,
@@ -682,7 +682,7 @@ def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> Non
     if engine.state.iteration < ca.sample_interval:
         return
 
-    run_folder = get_run_folder(ca.run_name)
+    run_folder = get_run_folder(ca.output_folder)
 
     for results_dir in (run_folder / "results").iterdir():
         target_column = results_dir.name
@@ -746,7 +746,7 @@ def add_hparams_to_tensorboard(
     exp = experiment
     gc = exp.configs.global_config
 
-    run_folder = get_run_folder(run_name=gc.run_name)
+    run_folder = get_run_folder(output_folder=gc.output_folder)
 
     metrics_files = get_metrics_files(
         target_columns=exp.target_columns,

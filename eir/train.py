@@ -110,7 +110,7 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 def main():
     configs = get_configs()
 
-    utils.configure_root_logger(run_name=configs.global_config.run_name)
+    utils.configure_root_logger(output_folder=configs.global_config.output_folder)
 
     default_hooks = get_default_hooks(configs=configs)
     default_experiment = get_default_experiment(configs=configs, hooks=default_hooks)
@@ -124,7 +124,7 @@ def run_experiment(experiment: "Experiment") -> None:
 
     gc = experiment.configs.global_config
 
-    run_folder = utils.get_run_folder(run_name=gc.run_name)
+    run_folder = utils.get_run_folder(output_folder=gc.output_folder)
     keys_to_serialize = get_default_experiment_keys_to_serialize()
     serialize_experiment(
         experiment=experiment,
@@ -206,7 +206,7 @@ def set_up_target_labels_wrapper(
 def get_default_experiment(
     configs: Configs, hooks: Union["Hooks", None] = None
 ) -> "Experiment":
-    run_folder = _prepare_run_folder(run_name=configs.global_config.run_name)
+    run_folder = _prepare_run_folder(output_folder=configs.global_config.output_folder)
 
     all_array_ids = gather_all_ids_from_target_configs(
         target_configs=configs.target_configs
@@ -368,8 +368,8 @@ def set_up_num_outputs_per_target(
     return num_outputs_per_target_dict
 
 
-def _prepare_run_folder(run_name: str) -> Path:
-    run_folder = utils.get_run_folder(run_name=run_name)
+def _prepare_run_folder(output_folder: str) -> Path:
+    run_folder = utils.get_run_folder(output_folder=output_folder)
     history_file = get_average_history_filepath(
         run_folder=run_folder, train_or_val_target_prefix="train_"
     )
@@ -577,7 +577,7 @@ def train(experiment: Experiment) -> None:
             train_dataloader=exp.train_loader,
             model=exp.model,
             optimizer=exp.optimizer,
-            output_folder=utils.get_run_folder(run_name=gc.run_name),
+            output_folder=utils.get_run_folder(output_folder=gc.output_folder),
         )
         sys.exit(0)
 
@@ -664,7 +664,7 @@ def add_l1_loss_hook_if_applicable(
     configs: Configs,
 ) -> Dict[str, Sequence[Callable]]:
     input_l1 = any(
-        getattr(input_config.model_config, "l1", None)
+        getattr(input_config.model_config.model_init_config, "l1", None)
         for input_config in configs.input_configs
     )
     preds_l1 = getattr(configs.predictor_config.model_config, "l1", None)
@@ -721,33 +721,34 @@ def prepare_base_batch_default(
 
     inputs_prepared = {}
     for input_name, input_object in input_objects.items():
+        input_type = input_object.input_config.input_info.input_type
 
-        if input_name.startswith("omics_") or input_name.startswith("image_"):
+        if input_type in ("omics", "image"):
             cur_tensor = inputs[input_name]
             cur_tensor = cur_tensor.to(device=device)
             cur_tensor = cur_tensor.to(dtype=torch.float32)
 
             inputs_prepared[input_name] = cur_tensor
 
-        elif input_name.startswith("tabular_"):
+        elif input_type == "tabular":
 
             tabular_source_input: Dict[str, torch.Tensor] = inputs[input_name]
             for name, tensor in tabular_source_input.items():
                 tabular_source_input[name] = tensor.to(device=device)
 
             tabular_input_type_info = input_object.input_config.input_type_info
-            cat_columns = tabular_input_type_info.extra_cat_columns
-            con_columns = tabular_input_type_info.extra_con_columns
+            cat_columns = tabular_input_type_info.input_cat_columns
+            con_columns = tabular_input_type_info.input_con_columns
             tabular = get_tabular_inputs(
-                extra_cat_columns=cat_columns,
-                extra_con_columns=con_columns,
+                input_cat_columns=cat_columns,
+                input_con_columns=con_columns,
                 tabular_model=model.modules_to_fuse[input_name],
                 tabular_input=tabular_source_input,
                 device=device,
             )
             inputs_prepared[input_name] = tabular
 
-        elif input_name.startswith("sequence_") or input_name.startswith("bytes_"):
+        elif input_type in ("sequence", "bytes"):
             cur_seq = inputs[input_name]
             cur_seq = cur_seq.to(device=device)
             cur_module = model.modules_to_fuse[input_name]

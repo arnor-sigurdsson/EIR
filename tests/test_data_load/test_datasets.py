@@ -40,7 +40,7 @@ if TYPE_CHECKING:
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "linear"},
+                        "model_config": {"model_type": "linear"},
                     }
                 ],
             },
@@ -153,7 +153,7 @@ def _set_up_bad_label_file_for_testing(label_file: Path) -> None:
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "linear"},
+                        "model_config": {"model_type": "linear"},
                     }
                 ],
             },
@@ -304,20 +304,20 @@ def _corrupt_arrays_for_testing(
         {
             "injections": {
                 "global_configs": {
-                    "run_name": "extra_inputs",
+                    "output_folder": "extra_inputs",
                 },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "linear"},
+                        "model_config": {"model_type": "linear"},
                     },
                     {
                         "input_info": {"input_name": "test_tabular"},
                         "input_type_info": {
-                            "model_type": "tabular",
-                            "extra_cat_columns": [],
-                            "extra_con_columns": ["ExtraTarget"],
+                            "input_cat_columns": [],
+                            "input_con_columns": ["ExtraTarget"],
                         },
+                        "model_config": {"model_type": "tabular"},
                     },
                 ],
                 "target_configs": {
@@ -372,13 +372,10 @@ def test_construct_dataset_init_params_from_cl_args(
     assert len(constructed_args.get("inputs")) == 2
 
     gotten_input_names = set(constructed_args.get("inputs").keys())
-    expected_input_names = {"omics_test_genotype", "tabular_test_tabular"}
+    expected_input_names = {"test_genotype", "test_tabular"}
     assert gotten_input_names == expected_input_names
 
-    assert (
-        inputs["omics_test_genotype"]
-        == constructed_args["inputs"]["omics_test_genotype"]
-    )
+    assert inputs["test_genotype"] == constructed_args["inputs"]["test_genotype"]
 
     expected_target_cols = {"con": ["Height"], "cat": ["Origin"]}
     assert constructed_args["target_columns"] == expected_target_cols
@@ -397,8 +394,10 @@ def test_construct_dataset_init_params_from_cl_args(
                     {
                         "input_info": {"input_name": "test_genotype"},
                         "input_type_info": {
-                            "model_type": "linear",
                             "na_augment_perc": 0.05,
+                        },
+                        "model_config": {
+                            "model_type": "linear",
                         },
                     }
                 ],
@@ -502,7 +501,7 @@ def check_dataset(
 
         assert target_labels[target_column] in expected_transformed_values
 
-    test_genotype = test_inputs["omics_test_genotype"]
+    test_genotype = test_inputs["test_genotype"]
     assert (test_genotype.sum(1) == 1).all()
 
     assert test_id == dataset.samples[0].sample_id
@@ -551,7 +550,7 @@ def test_prepare_genotype_array_test_mode():
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "linear"},
+                        "model_config": {"model_type": "linear"},
                     }
                 ],
             },
@@ -634,8 +633,10 @@ def test_sample_sequence_uniform():
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "cnn"},
-                        "model_config": {"l1": 1e-03},
+                        "model_config": {
+                            "model_type": "cnn",
+                            "model_init_config": {"l1": 1e-03},
+                        },
                     },
                     {
                         "input_info": {"input_name": "test_sequence"},
@@ -643,10 +644,10 @@ def test_sample_sequence_uniform():
                     {
                         "input_info": {"input_name": "test_tabular"},
                         "input_type_info": {
-                            "model_type": "tabular",
-                            "extra_cat_columns": ["OriginExtraCol"],
-                            "extra_con_columns": ["ExtraTarget"],
+                            "input_cat_columns": ["OriginExtraCol"],
+                            "input_con_columns": ["ExtraTarget"],
                         },
+                        "model_config": {"model_type": "tabular"},
                     },
                 ],
             },
@@ -700,15 +701,15 @@ def test_impute_missing_modalities(
         dtypes=impute_dtypes,
     )
 
-    transformers = input_objects["tabular_test_tabular"].labels.label_transformers
+    transformers = input_objects["test_tabular"].labels.label_transformers
     origin_extra_label_encoder = transformers["OriginExtraCol"]
     na_transformer_index = origin_extra_label_encoder.transform(["NA"]).item()
-    filled_na_value = filled_tabular["tabular_test_tabular"]["OriginExtraCol"]
+    filled_na_value = filled_tabular["test_tabular"]["OriginExtraCol"]
     assert na_transformer_index == filled_na_value
-    assert filled_tabular["tabular_test_tabular"]["ExtraTarget"] == 0.0
+    assert filled_tabular["test_tabular"]["ExtraTarget"] == 0.0
 
     test_inputs_missing_omics = {
-        k: v for k, v in test_inputs_all_avail.items() if "omics" not in k
+        k: v for k, v in test_inputs_all_avail.items() if k != "test_genotype"
     }
     with_imputed_omics = datasets.impute_missing_modalities(
         inputs_values=test_inputs_missing_omics,
@@ -717,9 +718,7 @@ def test_impute_missing_modalities(
         dtypes=impute_dtypes,
     )
     assert len(with_imputed_omics) == 3
-    assert (
-        with_imputed_omics["omics_test_genotype"].numel() == test_data_config.n_snps * 4
-    )
+    assert with_imputed_omics["test_genotype"].numel() == test_data_config.n_snps * 4
 
 
 def test_impute_single_missing_modality():

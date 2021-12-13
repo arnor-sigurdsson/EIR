@@ -1,7 +1,7 @@
 PRESET = {
     "global_configs": {
         "gln_globals": {
-            "run_name": "gln_run",
+            "output_folder": "gln_run",
             "n_epochs": 20,
             "lr": 0.001,
             "sample_interval": 300,
@@ -21,16 +21,18 @@ PRESET = {
                 "input_type": "omics",
             },
             "input_type_info": {
-                "model_type": "genome-local-net",
                 "na_augment_perc": 0.4,
                 "na_augment_prob": 1.0,
                 "snp_file": "MUST_FILL",
             },
             "model_config": {
-                "rb_do": 0.5,
-                "channel_exp_base": 2,
-                "layers": [2],
-                "kernel_width": 8,
+                "model_type": "genome-local-net",
+                "model_init_config": {
+                    "rb_do": 0.5,
+                    "channel_exp_base": 2,
+                    "layers": [2],
+                    "kernel_width": 8,
+                },
             },
         }
     },

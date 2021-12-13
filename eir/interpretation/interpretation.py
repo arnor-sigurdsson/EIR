@@ -140,7 +140,7 @@ def activation_analysis_handler(
 
     activation_outfolder_callable = partial(
         _prepare_eval_activation_outfolder,
-        run_name=gc.run_name,
+        output_folder=gc.output_folder,
         iteration=iteration,
     )
 
@@ -201,14 +201,13 @@ def activation_analysis_wrapper(
             n_background_samples=gc.act_background_samples,
         )
 
-        input_names = explainer.explainer.model.input_names
-
         act_callable = get_shap_activation_callable(
             explainer=explainer,
             column_type=target_column_type,
             act_samples_per_class_limit=gc.max_acts_per_class,
         )
 
+        input_names = explainer.explainer.model.input_names
         act_func = partial(
             get_activation,
             activation_callable=act_callable,
@@ -227,8 +226,12 @@ def activation_analysis_wrapper(
             act_func=act_func,
             target_column_name=target_column_name,
         )
+
+        input_names_and_types = {
+            i: exp.inputs[i].input_config.input_info.input_type for i in input_names
+        }
         act_consumers = get_activation_consumers(
-            input_names=input_names,
+            input_names_and_types=input_names_and_types,
             target_transformer=exp.target_transformers[target_column_name],
             target_column=target_column_name,
             column_type=target_column_type,
@@ -239,7 +242,10 @@ def activation_analysis_wrapper(
         )
 
         for input_name in input_names:
-            if input_name.startswith("bytes_"):
+            input_object = exp.inputs[input_name]
+            input_type = input_object.input_config.input_info.input_type
+
+            if input_type == "bytes":
                 continue
 
             activation_outfolder = outfolder_target_callable(
@@ -254,18 +260,18 @@ def activation_analysis_wrapper(
                 "activation_outfolder": activation_outfolder,
             }
 
-            if input_name.startswith("omics_"):
+            if input_type == "omics":
                 analyze_omics_input_activations(**common_kwargs)
 
-            elif input_name.startswith("tabular_"):
+            elif input_type == "tabular":
                 analyze_tabular_input_activations(**common_kwargs)
 
-            elif input_name.startswith("sequence_"):
+            elif input_type == "sequence":
                 analyze_sequence_input_activations(
                     **common_kwargs,
                     expected_target_classes_shap_values=explainer.expected_value,
                 )
-            elif input_name.startswith("image_"):
+            elif input_type == "image":
                 analyze_image_input_activations(**common_kwargs)
 
         hook_handle.remove()
@@ -383,28 +389,30 @@ def accumulate_all_activations(
 
 
 def get_activation_consumers(
-    input_names: Sequence[str],
+    input_names_and_types: Dict[str, str],
     target_transformer: "al_label_transformers_object",
     target_column: str,
     column_type: str,
 ) -> Dict[str, Callable[[Union["SampleActivation", None]], Any]]:
     consumers_dict = {}
 
-    for name in input_names:
-        consumer = _get_consumer_from_input_name(
-            input_name=name,
+    for input_name, input_type in input_names_and_types.items():
+        consumer = _get_consumer_from_input_type(
+            input_type=input_type,
+            input_name=input_name,
             target_transformer=target_transformer,
             target_column=target_column,
             column_type=column_type,
         )
         if consumer is not None:
-            consumers_dict[name] = consumer
+            consumers_dict[input_name] = consumer
 
     return consumers_dict
 
 
-def _get_consumer_from_input_name(
+def _get_consumer_from_input_type(
     target_transformer: "al_label_transformers_object",
+    input_type: str,
     input_name: str,
     target_column: str,
     column_type: str,
@@ -412,13 +420,11 @@ def _get_consumer_from_input_name(
     [Union["SampleActivation", None]],
     Union[Sequence["SampleActivation"], ParsedOmicsActivations],
 ]:
-    if (
-        input_name.startswith("sequence_")
-        or input_name.startswith("tabular_")
-        or input_name.startswith("image_")
-    ):
+
+    if input_type in ("sequence", "tabular", "image"):
         return get_basic_sequence_consumer()
-    elif input_name.startswith("omics_"):
+
+    elif input_type == "omics":
         return get_omics_consumer(
             target_transformer=target_transformer,
             input_name=input_name,
@@ -529,10 +535,15 @@ def _convert_all_batch_tensors_to_cpu(batch: Batch) -> Batch:
 
 
 def _prepare_eval_activation_outfolder(
-    run_name: str, input_name: str, column_name: str, iteration: int, *args, **kwargs
+    output_folder: str,
+    input_name: str,
+    column_name: str,
+    iteration: int,
+    *args,
+    **kwargs
 ):
     sample_outfolder = prep_sample_outfolder(
-        run_name=run_name, column_name=column_name, iteration=iteration
+        output_folder=output_folder, column_name=column_name, iteration=iteration
     )
     activation_outfolder = sample_outfolder / "activations" / input_name
     ensure_path_exists(path=activation_outfolder, is_folder=True)

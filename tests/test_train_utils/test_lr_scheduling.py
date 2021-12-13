@@ -63,7 +63,7 @@ def create_dummy_test_optimizer(request):
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "identity"},
+                        "model_config": {"model_type": "identity"},
                     },
                 ],
             }
@@ -101,7 +101,7 @@ def get_dummy_handler_config(
     handler_config = HandlerConfig(
         experiment=experiment,
         run_folder=test_config.run_path,
-        run_name=global_config.run_name,
+        output_folder=global_config.output_folder,
         monitoring_metrics=[("tmp_var", "tmp_var")],
     )
 
@@ -118,7 +118,7 @@ def get_dummy_handler_config(
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "identity"},
+                        "model_config": {"model_type": "identity"},
                     },
                 ],
             }
@@ -151,7 +151,7 @@ def test_set_up_lr_scheduler_plateau(get_dummy_handler_config):
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "identity"},
+                        "model_config": {"model_type": "identity"},
                     },
                 ],
             }
@@ -163,7 +163,7 @@ def test_set_up_lr_scheduler_plateau(get_dummy_handler_config):
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"model_type": "identity"},
+                        "model_config": {"model_type": "identity"},
                     },
                 ],
             }

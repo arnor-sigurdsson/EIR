@@ -48,9 +48,8 @@ def get_mix_data_hook(input_configs: Iterable["InputConfig"]):
         cur_mixing_callable = mixing_func_mapping[cur_input_type][cur_mixing_type]
 
         cur_input_name = config.input_info.input_name
-        cur_input_name_with_prefix = f"{cur_input_type}_{cur_input_name}"
 
-        input_mixing_func_map[cur_input_name_with_prefix] = cur_mixing_callable
+        input_mixing_func_map[cur_input_name] = cur_mixing_callable
 
     bound_hook = partial(
         hook_default_mix_data,
