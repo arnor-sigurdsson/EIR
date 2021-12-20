@@ -492,7 +492,7 @@ def _get_basic_sequence_feature_extractor_objects(
         embeddings=None,
         embedding_dim=parsed_embedding_dim,
         external=False,
-        known_out_features=None,
+        known_out_features=0,
     )
 
     return objects_for_wrapper

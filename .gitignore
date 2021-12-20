@@ -80,6 +80,8 @@ data
 runs/
 config/custom_configs
 /*.png
+logs/
+*.pt
 
 # exclude custom modules
 *custom_*.py

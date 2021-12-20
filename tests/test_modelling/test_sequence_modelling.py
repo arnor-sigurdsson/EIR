@@ -13,11 +13,11 @@ from eir.models.model_setup import (
 from eir.models.sequence.transformer_models import get_all_hf_model_names
 from eir.setup.config import get_all_targets
 from eir.train_utils.utils import seed_everything
+from tests.conftest import should_skip_in_gha_macos
 from tests.test_modelling.setup_modelling_test_data.setup_sequence_test_data import (
     get_continent_keyword_map,
 )
 from tests.test_modelling.test_modelling_utils import check_test_performance_results
-from tests.conftest import should_skip_in_gha_macos
 
 seed_everything(seed=0)
 
@@ -312,6 +312,7 @@ def _get_common_model_config_overload() -> dict:
 
     config = {
         "num_hidden_layers": n_layers,
+        "attention_types": [[["global"], 1]],
         "encoder_layers": n_layers,
         "num_encoder_layers": n_layers,
         "decoder_layers": n_layers,

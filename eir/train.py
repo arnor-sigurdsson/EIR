@@ -46,7 +46,7 @@ from eir.experiment_io.experiment_io import (
     serialize_all_input_transformers,
     serialize_chosen_input_objects,
 )
-from eir.models import al_fusion_models, FusionModel
+from eir.models import al_fusion_models
 from eir.models import model_training_utils
 from eir.models.model_setup import get_model
 from eir.models.model_training_utils import run_lr_find
@@ -713,9 +713,9 @@ def prepare_base_batch_default(
     loader_batch: al_dataloader_getitem_batch,
     input_objects: al_input_objects_as_dict,
     target_columns: al_target_columns,
-    model: FusionModel,
+    model: nn.Module,
     device: str,
-):
+) -> Batch:
 
     inputs, target_labels, train_ids = loader_batch
 
@@ -742,7 +742,7 @@ def prepare_base_batch_default(
             tabular = get_tabular_inputs(
                 input_cat_columns=cat_columns,
                 input_con_columns=con_columns,
-                tabular_model=model.modules_to_fuse[input_name],
+                tabular_model=getattr(model.modules_to_fuse, input_name),
                 tabular_input=tabular_source_input,
                 device=device,
             )
@@ -751,10 +751,10 @@ def prepare_base_batch_default(
         elif input_type in ("sequence", "bytes"):
             cur_seq = inputs[input_name]
             cur_seq = cur_seq.to(device=device)
-            cur_module = model.modules_to_fuse[input_name]
-            cur_embedding = cur_module.embed_tokens(input=cur_seq)
+            cur_module = getattr(model.modules_to_fuse, input_name)
+            cur_module_embedding = cur_module.get_embedding()
+            cur_embedding = cur_module_embedding(input=cur_seq)
             inputs_prepared[input_name] = cur_embedding
-
         else:
             raise ValueError(f"Unrecognized input type {input_name}.")
 

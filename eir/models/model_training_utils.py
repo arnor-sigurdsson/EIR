@@ -424,3 +424,20 @@ def plot_lr_find_results(
     )
 
     fig.write_html(str(outfolder / "lr_search.html"))
+
+
+def trace_eir_model(
+    fusion_model: nn.Module, example_inputs: Dict[str, Any]
+) -> torch.jit.TracedModule:
+
+    fusion_model.eval()
+
+    for name, module in fusion_model.named_modules():
+        if hasattr(module, "script_submodules_for_tracing"):
+            module.script_submodules_for_tracing()
+
+    traced_fusion_model = torch.jit.trace(
+        func=fusion_model, example_inputs=example_inputs, strict=False
+    )
+
+    return traced_fusion_model

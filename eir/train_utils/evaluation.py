@@ -103,7 +103,9 @@ def save_evaluation_results_wrapper(
     experiment: "Experiment",
 ):
 
-    target_columns_gen = get_target_columns_generator(experiment.target_columns)
+    target_columns_gen = get_target_columns_generator(
+        target_columns=experiment.target_columns
+    )
     transformers = experiment.target_transformers
 
     for column_type, column_name in target_columns_gen:

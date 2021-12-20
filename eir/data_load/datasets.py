@@ -803,7 +803,7 @@ def prepare_inputs_memory(
 
 def impute_missing_modalities_wrapper(
     inputs_values: Dict[str, Any], inputs_objects: "al_input_objects_as_dict"
-):
+) -> Dict[str, torch.Tensor]:
     impute_dtypes = _get_default_impute_dtypes(inputs_objects=inputs_objects)
     impute_fill_values = _get_default_impute_fill_values(inputs_objects=inputs_objects)
     inputs_imputed = impute_missing_modalities(
@@ -858,7 +858,7 @@ def impute_missing_modalities(
             elif input_type == "image":
                 size = input_object.input_config.input_type_info.size
                 if len(size) == 1:
-                    size = [size, size]
+                    size = [size[0], size[0]]
 
                 num_channels = input_object.num_channels
                 shape = (num_channels, *size)

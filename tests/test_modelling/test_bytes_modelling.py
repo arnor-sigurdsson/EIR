@@ -47,29 +47,6 @@ seed_everything(seed=0)
                 ],
             },
         },
-        # Case 2: Classification - Perceiver
-        {
-            "injections": {
-                "global_configs": {
-                    "output_folder": "test_classification_perceiver_bytes",
-                    "n_epochs": 12,
-                    "memory_dataset": True,
-                    "mixing_alpha": 1.0,
-                },
-                "input_configs": [
-                    {
-                        "input_info": {"input_name": "test_bytes"},
-                        "model_config": {
-                            "window_size": 64,
-                            "position": "embed",
-                            "model_type": "perceiver",
-                            "model_init_config": {"depth": 1, "dim": 32},
-                        },
-                    }
-                ],
-                "predictor_configs": {"model_config": {"fc_task_dim": 32}},
-            },
-        },
     ],
     indirect=True,
 )

@@ -81,7 +81,7 @@ class TransformerWrapperModel(nn.Module):
         external_feature_extractor: bool,
         device: str,
         embeddings: nn.Embedding = None,
-        pre_computed_num_out_features: Union[None, int] = None,
+        pre_computed_num_out_features: int = 0,
     ) -> None:
 
         super().__init__()
@@ -134,8 +134,11 @@ class TransformerWrapperModel(nn.Module):
         padding = self.dynamic_extras.get("padding", 0)
         return (self.max_length + padding) * self.embedding_dim
 
-    def embed_tokens(self, input: torch.Tensor) -> torch.Tensor:
-        return self.embedding(input)
+    def get_embedding(self):
+        return self.embedding
+
+    def script_submodules_for_tracing(self):
+        self.embedding = torch.jit.script(self.embedding)
 
     def init_embedding_weights(self) -> None:
         init_range = 0.1
@@ -174,9 +177,9 @@ def _get_transformer_wrapper_feature_extractor(
     embedding_dim: int,
     max_length: int,
     device: str,
-) -> Tuple[Dict, Callable[[torch.Tensor], torch.Tensor]]:
+) -> Tuple[Dict[str, int], Callable[[torch.Tensor], torch.Tensor]]:
 
-    dynamic_extras = {}
+    dynamic_extras = {"padding": 0}
 
     feature_extractor_forward = _get_feature_extractor_forward(
         is_hf_model=external_feature_extractor,
@@ -504,6 +507,7 @@ def get_unsupported_hf_models() -> dict:
         "canine": "Cannot do straightforward look up of embeddings.",
         "clip": "Not strictly sequence model.",
         "convbert": "HF error.",
+        "gpt_neo": "Configuration troublesome w.r.t. attn layers matching num_layers.",
         "deit": "Not strictly sequence model.",
         "detr": "Not strictly sequence model.",
         "dpr": "Not strictly sequence model.",
