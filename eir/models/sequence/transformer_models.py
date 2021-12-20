@@ -523,9 +523,12 @@ def get_unsupported_hf_models() -> dict:
         "sew-d": "Not strictly sequence model.",
         "speech_to_text": "Not strictly sequence model.",
         "tapas": "TapasModel requires the torch-scatter library.",
+        "perceiver": "Not strictly sequence model.",
+        "qdqbert": "ImportError.",
         "unispeech": "Not strictly sequence model.",
         "unispeech-sat": "Not strictly sequence model.",
         "vit": "Not strictly sequence model.",
+        "vision-text-dual-encoder": "Not strictly sequence model.",
         "wav2vec2": "Not strictly sequence model.",
     }
 

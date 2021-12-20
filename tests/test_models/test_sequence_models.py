@@ -1,6 +1,7 @@
 from typing import Dict, Sequence
 
 import pytest
+import torch
 
 from eir.models.model_training_utils import trace_eir_model
 from eir.models.sequence.transformer_models import get_all_hf_model_names
@@ -83,4 +84,5 @@ def test_sequence_models(
     )
 
     model.eval()
-    _ = trace_eir_model(fusion_model=model, example_inputs=example_batch.inputs)
+    with torch.no_grad():
+        _ = trace_eir_model(fusion_model=model, example_inputs=example_batch.inputs)

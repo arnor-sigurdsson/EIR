@@ -26,10 +26,16 @@ def get_timm_models_to_test() -> List[str]:
     models = list(df["model"])
     models_pt = [i for i in models if not i.startswith("tf")]
     models_filtered = [i for i in models_pt if i in timm.list_models()]
-    models_filtered = [i for i in models_filtered if "levit" not in i]
-    models_filtered = [i for i in models_filtered if "convit" not in i]
 
-    return models_filtered
+    models_manual_filtered = []
+    not_allowed = {"levit", "convit"}
+    for model_name in models_filtered:
+        if any(i in model_name for i in not_allowed):
+            continue
+        else:
+            models_manual_filtered.append(model_name)
+
+    return models_manual_filtered
 
 
 def get_test_image_models_parametrization() -> Sequence[Dict]:
