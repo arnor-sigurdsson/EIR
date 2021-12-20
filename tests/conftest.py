@@ -97,6 +97,15 @@ def get_system_info() -> Tuple[bool, str]:
     return in_gh_actions, system
 
 
+def should_skip_in_gha():
+
+    in_gha, _ = get_system_info()
+    if in_gha:
+        return True
+
+    return False
+
+
 def should_skip_in_gha_macos():
     """
     We use this to skip some modelling tests as the GHA MacOS runner can be very slow.

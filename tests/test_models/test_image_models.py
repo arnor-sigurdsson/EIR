@@ -7,6 +7,7 @@ import torch
 from timm.models.registry import get_model_default_value
 
 from eir.models.model_training_utils import trace_eir_model
+from tests.conftest import should_skip_in_gha
 from tests.test_models.model_testing_utils import prepare_example_batch
 
 
@@ -87,6 +88,7 @@ def get_test_image_models_parametrization() -> Sequence[Dict]:
     return all_parametrizations
 
 
+@pytest.mark.skipif(condition=should_skip_in_gha(), reason="In GHA.")
 @pytest.mark.parametrize(
     "create_test_data",
     [

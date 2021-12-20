@@ -9,6 +9,7 @@ from tests.test_modelling.test_sequence_modelling import (
     _get_common_model_config_overload,
     _parse_model_specific_config_values,
 )
+from tests.conftest import should_skip_in_gha
 from tests.test_models.model_testing_utils import prepare_example_batch
 
 
@@ -58,6 +59,7 @@ def get_test_external_sequence_models_parametrization() -> Sequence[Dict]:
     return all_parametrizations
 
 
+@pytest.mark.skipif(condition=should_skip_in_gha(), reason="In GHA.")
 @pytest.mark.parametrize(
     "create_test_data",
     [
