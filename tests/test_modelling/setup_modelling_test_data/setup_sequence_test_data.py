@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 def create_test_sequence_data(
     test_data_config: "TestDataConfig", sequence_outfolder: Path
-):
+) -> Path:
 
     c = test_data_config
 
@@ -60,6 +60,8 @@ def create_test_sequence_data(
 
     if c.request_params.get("split_to_test", False):
         common_split_test_data_wrapper(test_folder=c.scoped_tmp_path, name="sequence")
+
+    return sequence_outfolder
 
 
 @dataclass

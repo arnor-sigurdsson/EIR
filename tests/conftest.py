@@ -1,4 +1,5 @@
 import json
+import random
 import warnings
 from copy import copy
 from dataclasses import dataclass
@@ -16,6 +17,7 @@ from typing import (
     Any,
 )
 
+import numpy as np
 import pandas as pd
 import pytest
 import torch.utils.data
@@ -30,13 +32,13 @@ import eir.setup.input_setup
 import eir.train
 from eir import train
 from eir.data_load import datasets
-from eir.models.model_setup import get_model
-from eir.setup import schemas, config
-from eir.setup.config import recursive_dict_replace
 from eir.experiment_io.experiment_io import (
     serialize_all_input_transformers,
     serialize_chosen_input_objects,
 )
+from eir.models.model_setup import get_model
+from eir.setup import schemas, config
+from eir.setup.config import recursive_dict_replace
 from eir.train import (
     Experiment,
     set_up_num_outputs_per_target,
@@ -93,6 +95,15 @@ def get_system_info() -> Tuple[bool, str]:
     system = platform.system()
 
     return in_gh_actions, system
+
+
+def should_skip_in_gha():
+
+    in_gha, _ = get_system_info()
+    if in_gha:
+        return True
+
+    return False
 
 
 def should_skip_in_gha_macos():
@@ -409,28 +420,58 @@ def create_test_data(request, tmp_path_factory, parse_test_cl_args) -> "TestData
         base_folder=test_data_config.scoped_tmp_path
     )
 
+    drop_random_samples = test_data_config.random_samples_dropped_from_modalities
+
     omics_path = base_outfolder / "omics"
     if "omics" in test_data_config.modalities and not omics_path.exists():
-        create_test_omics_data_and_labels(
+        omics_sample_path = create_test_omics_data_and_labels(
             test_data_config=test_data_config,
             array_outfolder=omics_path,
         )
 
+        if drop_random_samples:
+            _delete_random_files_from_folder(folder=omics_sample_path, n_to_drop=50)
+
     sequence_path = base_outfolder / "sequence"
     if "sequence" in test_data_config.modalities and not sequence_path.exists():
-        create_test_sequence_data(
+        sequence_sample_folder = create_test_sequence_data(
             test_data_config=test_data_config,
             sequence_outfolder=sequence_path,
         )
+        if drop_random_samples:
+            _delete_random_files_from_folder(
+                folder=sequence_sample_folder, n_to_drop=50
+            )
 
     image_path = base_outfolder / "image"
     if "image" in test_data_config.modalities and not image_path.exists():
-        create_test_image_data(
+        image_sample_folder = create_test_image_data(
             test_data_config=test_data_config,
             image_output_folder=image_path,
         )
+        if drop_random_samples:
+            _delete_random_files_from_folder(folder=image_sample_folder, n_to_drop=50)
+
+    if drop_random_samples:
+        label_file = test_data_config.scoped_tmp_path / "labels.csv"
+        _delete_random_rows_from_csv(csv_file=label_file, n_to_drop=50)
 
     return test_data_config
+
+
+def _delete_random_rows_from_csv(csv_file: Path, n_to_drop: int):
+    df = pd.read_csv(filepath_or_buffer=csv_file, index_col=0)
+    drop_indices = np.random.choice(df.index, n_to_drop, replace=False)
+    df_subset = df.drop(drop_indices)
+    df_subset.to_csv(path_or_buf=csv_file)
+
+
+def _delete_random_files_from_folder(folder: Path, n_to_drop: int):
+    all_files = tuple(folder.iterdir())
+    to_drop = random.sample(population=all_files, k=n_to_drop)
+
+    for f in to_drop:
+        f.unlink()
 
 
 @dataclass
@@ -442,6 +483,7 @@ class TestDataConfig:
     n_per_class: int
     n_snps: int
     modalities: Sequence[Union[Literal["omics"], Literal["sequence"]]] = ("omics",)
+    random_samples_dropped_from_modalities: bool = False
 
 
 def _create_test_data_config(
@@ -476,6 +518,9 @@ def _create_test_data_config(
         n_per_class=parsed_test_cl_args["n_per_class"],
         n_snps=parsed_test_cl_args["n_snps"],
         modalities=request_params.get("modalities", ("omics",)),
+        random_samples_dropped_from_modalities=request_params.get(
+            "random_samples_dropped_from_modalities", False
+        ),
     )
 
     return test_data_config

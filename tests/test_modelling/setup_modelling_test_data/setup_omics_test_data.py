@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 def create_test_omics_data_and_labels(
     test_data_config: "TestDataConfig", array_outfolder: Path
-):
+) -> Path:
 
     c = test_data_config
 
@@ -56,6 +56,8 @@ def create_test_omics_data_and_labels(
 
     if c.request_params.get("split_to_test", False):
         common_split_test_data_wrapper(test_folder=c.scoped_tmp_path, name="omics")
+
+    return array_outfolder
 
 
 def _create_and_save_test_array_omics(

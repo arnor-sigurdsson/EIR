@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 def create_test_image_data(
     test_data_config: "TestDataConfig", image_output_folder: Path
-):
+) -> Path:
 
     c = test_data_config
 
@@ -55,6 +55,8 @@ def create_test_image_data(
 
     if c.request_params.get("split_to_test", False):
         common_split_test_data_wrapper(test_folder=c.scoped_tmp_path, name="image")
+
+    return image_output_folder
 
 
 @dataclass

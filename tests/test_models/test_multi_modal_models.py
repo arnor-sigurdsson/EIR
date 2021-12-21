@@ -1,13 +1,9 @@
-from typing import Tuple, TYPE_CHECKING
-
 import pytest
+import torch
 
-from eir import train
-from eir.setup.config import get_all_targets
-from tests.test_modelling.test_modelling_utils import check_test_performance_results
+from eir.models.model_training_utils import trace_eir_model
 
-if TYPE_CHECKING:
-    from tests.conftest import ModelTestConfig
+from tests.test_models.model_testing_utils import prepare_example_batch
 
 
 @pytest.mark.parametrize(
@@ -82,27 +78,18 @@ if TYPE_CHECKING:
     indirect=True,
 )
 def test_multi_modal_multi_task(
-    prep_modelling_test_configs: Tuple[train.Experiment, "ModelTestConfig"],
+    parse_test_cl_args,
+    create_test_data,
+    create_test_config,
+    create_test_model,
+    create_test_labels,
 ):
-    experiment, test_config = prep_modelling_test_configs
+    model = create_test_model
 
-    train.train(experiment=experiment)
+    example_batch = prepare_example_batch(
+        configs=create_test_config, labels=create_test_labels, model=model
+    )
 
-    targets = get_all_targets(targets_configs=experiment.configs.target_configs)
-    for cat_column in targets.cat_targets:
-
-        check_test_performance_results(
-            run_path=test_config.run_path,
-            target_column=cat_column,
-            metric="mcc",
-            thresholds=(0.9, 0.9),
-        )
-
-    for con_column in targets.con_targets:
-
-        check_test_performance_results(
-            run_path=test_config.run_path,
-            target_column=con_column,
-            metric="r2",
-            thresholds=(0.9, 0.9),
-        )
+    model.eval()
+    with torch.no_grad():
+        _ = trace_eir_model(fusion_model=model, example_inputs=example_batch.inputs)

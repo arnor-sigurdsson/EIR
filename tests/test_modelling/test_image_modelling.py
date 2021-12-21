@@ -69,7 +69,7 @@ seed_everything(seed=0)
     ],
     indirect=True,
 )
-def test_sequence_modelling(prep_modelling_test_configs):
+def test_image_modelling(prep_modelling_test_configs):
     experiment, test_config = prep_modelling_test_configs
 
     train.train(experiment=experiment)

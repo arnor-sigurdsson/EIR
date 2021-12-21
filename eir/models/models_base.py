@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
-def merge_module_dicts(module_dicts: Tuple[nn.ModuleDict, ...]):
+def merge_module_dicts(module_dicts: Tuple[nn.ModuleDict, ...]) -> nn.ModuleDict:
     def _check_inputs():
         assert all(i.keys() == module_dicts[0].keys() for i in module_dicts)
 
