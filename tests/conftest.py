@@ -430,7 +430,7 @@ def create_test_data(request, tmp_path_factory, parse_test_cl_args) -> "TestData
         )
 
         if drop_random_samples:
-            _delete_random_files_from_folder(folder=omics_sample_path, n_to_drop=100)
+            _delete_random_files_from_folder(folder=omics_sample_path, n_to_drop=50)
 
     sequence_path = base_outfolder / "sequence"
     if "sequence" in test_data_config.modalities and not sequence_path.exists():
@@ -440,7 +440,7 @@ def create_test_data(request, tmp_path_factory, parse_test_cl_args) -> "TestData
         )
         if drop_random_samples:
             _delete_random_files_from_folder(
-                folder=sequence_sample_folder, n_to_drop=100
+                folder=sequence_sample_folder, n_to_drop=50
             )
 
     image_path = base_outfolder / "image"
@@ -450,11 +450,11 @@ def create_test_data(request, tmp_path_factory, parse_test_cl_args) -> "TestData
             image_output_folder=image_path,
         )
         if drop_random_samples:
-            _delete_random_files_from_folder(folder=image_sample_folder, n_to_drop=100)
+            _delete_random_files_from_folder(folder=image_sample_folder, n_to_drop=50)
 
     if drop_random_samples:
         label_file = test_data_config.scoped_tmp_path / "labels.csv"
-        _delete_random_rows_from_csv(csv_file=label_file, n_to_drop=100)
+        _delete_random_rows_from_csv(csv_file=label_file, n_to_drop=50)
 
     return test_data_config
 
