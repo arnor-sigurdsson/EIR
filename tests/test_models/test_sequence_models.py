@@ -13,6 +13,68 @@ from tests.conftest import should_skip_in_gha
 from tests.test_models.model_testing_utils import prepare_example_batch
 
 
+@pytest.mark.parametrize(
+    "create_test_data",
+    [
+        {"task_type": "multi", "modalities": ("sequence",)},
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize(
+    "create_test_config_init_base",
+    [
+        # Case 1: Classification - Positional Encoding
+        {
+            "injections": {
+                "global_configs": {
+                    "output_folder": "test_classification",
+                    "n_epochs": 12,
+                    "memory_dataset": True,
+                },
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_sequence"},
+                        "model_config": {"position": "encode"},
+                    }
+                ],
+            },
+        },
+        # Case 2: Classification - Positional Embedding and Windowed
+        {
+            "injections": {
+                "global_configs": {
+                    "output_folder": "test_classification",
+                    "n_epochs": 12,
+                    "memory_dataset": True,
+                },
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_sequence"},
+                        "model_config": {"window_size": 16, "position": "embed"},
+                    }
+                ],
+            },
+        },
+    ],
+    indirect=True,
+)
+def test_internal_sequence_models(
+    parse_test_cl_args,
+    create_test_data,
+    create_test_config,
+    create_test_model,
+    create_test_labels,
+):
+    model = create_test_model
+
+    example_batch = prepare_example_batch(
+        configs=create_test_config, labels=create_test_labels, model=model
+    )
+
+    model.eval()
+    _ = trace_eir_model(fusion_model=model, example_inputs=example_batch.inputs)
+
+
 def get_test_external_sequence_models_parametrization() -> Sequence[Dict]:
     """
     Some models seem to fail tracing or a bit troublesome to configure, skip for now.
@@ -72,7 +134,7 @@ def get_test_external_sequence_models_parametrization() -> Sequence[Dict]:
     get_test_external_sequence_models_parametrization(),
     indirect=True,
 )
-def test_sequence_models(
+def test_external_sequence_models(
     parse_test_cl_args,
     create_test_data,
     create_test_config,
