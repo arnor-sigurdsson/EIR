@@ -527,6 +527,7 @@ def get_unsupported_hf_models() -> dict:
         "vit": "Not strictly sequence model.",
         "vision-text-dual-encoder": "Not strictly sequence model.",
         "wav2vec2": "Not strictly sequence model.",
+        "wavlm": "NotImplementedError.",
     }
 
     return unsupported
