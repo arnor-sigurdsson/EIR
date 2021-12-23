@@ -752,7 +752,7 @@ def prepare_base_batch_default(
             cur_seq = inputs[input_name]
             cur_seq = cur_seq.to(device=device)
             cur_module = getattr(model.modules_to_fuse, input_name)
-            cur_module_embedding = cur_module.get_embedding()
+            cur_module_embedding = cur_module.embedding
             cur_embedding = cur_module_embedding(input=cur_seq)
             inputs_prepared[input_name] = cur_embedding
         else:

@@ -134,9 +134,6 @@ class TransformerWrapperModel(nn.Module):
         padding = self.dynamic_extras.get("padding", 0)
         return (self.max_length + padding) * self.embedding_dim
 
-    def get_embedding(self):
-        return self.embedding
-
     def script_submodules_for_tracing(self):
         self.embedding = torch.jit.script(self.embedding)
 

@@ -252,6 +252,7 @@ class GlobalConfig:
     no_pbar: bool = False
     mixing_alpha: float = 0.0
     plot_skip_steps: int = 200
+    pretrained_checkpoint: Union[None, str] = None
 
 
 @dataclass
