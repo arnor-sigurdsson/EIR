@@ -1277,7 +1277,7 @@ future = "*"
 
 [[package]]
 name = "perceiver-pytorch"
-version = "0.7.5"
+version = "0.8.1"
 description = "Perceiver - Pytorch"
 category = "main"
 optional = false
@@ -2511,7 +2511,7 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "1.1"
 python-versions = ">= 3.8,< 3.10"
-content-hash = "5f466b830f215c89998497ae08bd7c8a3bfd7f91f15ae705d70f7abff8028ef7"
+content-hash = "fdea65b0d1102e08d7e6ff69a6d15ec7d53629fe155659531613385af11a97b6"
 
 [metadata.files]
 absl-py = [
@@ -3403,8 +3403,8 @@ pefile = [
     {file = "pefile-2021.9.3.tar.gz", hash = "sha256:344a49e40a94e10849f0fe34dddc80f773a12b40675bf2f7be4b8be578bdd94a"},
 ]
 perceiver-pytorch = [
-    {file = "perceiver-pytorch-0.7.5.tar.gz", hash = "sha256:14d13956573cfcbf347beb179a9cbe81adb39cc686fbd96200317aa5913a90b4"},
-    {file = "perceiver_pytorch-0.7.5-py3-none-any.whl", hash = "sha256:e9940300dd7c4c2e4c29fb7837e25c71aa2466d38470b1c9de3e4bb37b01653e"},
+    {file = "perceiver-pytorch-0.8.1.tar.gz", hash = "sha256:ccc653e9927f6cf444b6f6eabdf53cf9a95877739f19246b4d3bb70a76086b86"},
+    {file = "perceiver_pytorch-0.8.1-py3-none-any.whl", hash = "sha256:91aaf0cc6ea22edb323bde7e1a90ed285c886131b13b56456414433ff74e039c"},
 ]
 pexpect = [
     {file = "pexpect-4.8.0-py2.py3-none-any.whl", hash = "sha256:0b48a55dcb3c05f3329815901ea4fc1537514d6ba867a152b581d69ae3710937"},
