@@ -72,6 +72,20 @@ def get_model(
         inputs_as_dicts=inputs_as_dict,
     )
 
+    if global_config.pretrained_checkpoint:
+        logger.info(
+            "Loading pretrained checkpoint from '%s'.",
+            global_config.pretrained_checkpoint,
+        )
+        loaded_fusion_model = load_model(
+            model_path=Path(global_config.pretrained_checkpoint),
+            model_class=fusion_class,
+            model_init_kwargs=fusion_kwargs,
+            device=global_config.device,
+            test_mode=False,
+        )
+        return loaded_fusion_model
+
     modules_to_fuse = overload_fusion_model_feature_extractors_with_pretrained(
         modules_to_fuse=fusion_kwargs["modules_to_fuse"], inputs_as_dict=inputs_as_dict
     )

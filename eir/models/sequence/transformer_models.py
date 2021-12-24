@@ -134,9 +134,6 @@ class TransformerWrapperModel(nn.Module):
         padding = self.dynamic_extras.get("padding", 0)
         return (self.max_length + padding) * self.embedding_dim
 
-    def get_embedding(self):
-        return self.embedding
-
     def script_submodules_for_tracing(self):
         self.embedding = torch.jit.script(self.embedding)
 
@@ -530,6 +527,7 @@ def get_unsupported_hf_models() -> dict:
         "vit": "Not strictly sequence model.",
         "vision-text-dual-encoder": "Not strictly sequence model.",
         "wav2vec2": "Not strictly sequence model.",
+        "wavlm": "NotImplementedError.",
     }
 
     return unsupported

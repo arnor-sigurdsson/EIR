@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import shap
 import torch
-from aislib.misc_utils import ensure_path_exists
+from aislib.misc_utils import ensure_path_exists, get_logger
 from shap._explanation import Explanation
 from torchtext.vocab import Vocab
 
@@ -24,6 +24,8 @@ from eir.visualization.sequence_visualization_forward_port import text
 if TYPE_CHECKING:
     from eir.train import Experiment
     from eir.interpretation.interpretation import SampleActivation
+
+logger = get_logger(name=__name__)
 
 
 def analyze_sequence_input_activations(
@@ -76,6 +78,14 @@ def analyze_sequence_input_activations(
             sequence_activation_sample_info=extracted_sample_info,
             truncate_start_idx=index_to_truncate,
         )
+
+        if not truncated_sample_info.raw_inputs:
+            logger.debug(
+                "Skipping sequence activation analysis of single sample %s as it is "
+                "empty after truncating unknowns.",
+                sample_activation.sample_info.ids[0],
+            )
+            continue
 
         explanation = Explanation(
             values=truncated_sample_info.sequence_shap_values,

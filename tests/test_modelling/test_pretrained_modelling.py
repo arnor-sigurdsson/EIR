@@ -97,7 +97,7 @@ def test_pre_training_and_loading(
     (
         pretrained_experiment,
         pretrained_test_config,
-    ) = _get_experiment_overloaded_for_pretrained(
+    ) = _get_experiment_overloaded_for_pretrained_extractor(
         experiment=experiment, test_config=test_config
     )
 
@@ -117,8 +117,26 @@ def test_pre_training_and_loading(
             thresholds=(0.9, 0.9),
         )
 
+    (
+        pretrained_checkpoint_experiment,
+        pretrained_checkpoint_test_config,
+    ) = _get_experiment_overloaded_for_pretrained_checkpoint(
+        experiment=experiment, test_config=test_config
+    )
 
-def _get_experiment_overloaded_for_pretrained(
+    train.train(experiment=pretrained_checkpoint_experiment)
+
+    for cat_column in targets.cat_targets:
+
+        check_test_performance_results(
+            run_path=pretrained_checkpoint_test_config.run_path,
+            target_column=cat_column,
+            metric="mcc",
+            thresholds=(0.9, 0.9),
+        )
+
+
+def _get_experiment_overloaded_for_pretrained_extractor(
     experiment: train.Experiment, test_config: "ModelTestConfig"
 ) -> Tuple[train.Experiment, "ModelTestConfig"]:
 
@@ -143,6 +161,43 @@ def _get_experiment_overloaded_for_pretrained(
     pretrained_configs.global_config.checkpoint_interval = 200
     pretrained_configs.global_config.output_folder = (
         pretrained_configs.global_config.output_folder + "_with_pretrained"
+    )
+
+    run_path = Path(f"{pretrained_configs.global_config.output_folder}/")
+    if run_path.exists():
+        cleanup(run_path=run_path)
+
+    default_hooks = train.get_default_hooks(configs=pretrained_configs)
+    pretrained_experiment = train.get_default_experiment(
+        configs=pretrained_configs, hooks=default_hooks
+    )
+
+    targets = get_all_targets(
+        targets_configs=pretrained_experiment.configs.target_configs
+    )
+    pretrained_test_config = _get_cur_modelling_test_config(
+        train_loader=pretrained_experiment.train_loader,
+        global_config=pretrained_configs.global_config,
+        targets=targets,
+        input_names=pretrained_experiment.inputs.keys(),
+    )
+
+    return pretrained_experiment, pretrained_test_config
+
+
+def _get_experiment_overloaded_for_pretrained_checkpoint(
+    experiment: train.Experiment, test_config: "ModelTestConfig"
+) -> Tuple[train.Experiment, "ModelTestConfig"]:
+
+    pretrained_configs = deepcopy(experiment.configs)
+    saved_model_path = next((test_config.run_path / "saved_models").iterdir())
+
+    pretrained_configs.global_config.n_epochs = 6
+    pretrained_configs.global_config.pretrained_checkpoint = str(saved_model_path)
+    pretrained_configs.global_config.sample_interval = 200
+    pretrained_configs.global_config.checkpoint_interval = 200
+    pretrained_configs.global_config.output_folder = (
+        pretrained_configs.global_config.output_folder + "_with_pretrained_checkpoint"
     )
 
     run_path = Path(f"{pretrained_configs.global_config.output_folder}/")
