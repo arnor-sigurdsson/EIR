@@ -223,11 +223,15 @@ class BytesInputInfo:
 
 
 def set_up_bytes_input_for_training(
-    input_config: schemas.InputConfig, add_specials: bool = False, *args, **kwargs
+    input_config: schemas.InputConfig, add_specials: bool = True, *args, **kwargs
 ) -> BytesInputInfo:
 
+    specials = tuple()
+    if add_specials:
+        specials = _get_default_specials()
+
     bytes_vocab = build_bytes_vocab(
-        byte_encoding=input_config.input_type_info.byte_encoding
+        byte_encoding=input_config.input_type_info.byte_encoding, specials=specials
     )
 
     bytes_input_info = BytesInputInfo(
@@ -547,7 +551,7 @@ def get_sequence_input_objects_from_input(
 
     vocab = build_vocab_from_iterator(
         iterator=tokenized_vocab_iter,
-        specials=["<unk>"],
+        specials=_get_default_specials(),
         min_freq=min_freq,
     )
     vocab.set_default_index(vocab["<unk>"])
@@ -557,6 +561,11 @@ def get_sequence_input_objects_from_input(
     )
 
     return vocab, gathered_stats, tokenizer, encode_func
+
+
+def _get_default_specials() -> List[str]:
+    default_specials = ["<bos>", "<unk>", "<mask>", "<pad>", "<eos>"]
+    return default_specials
 
 
 def get_sequence_input_objects_from_pretrained(

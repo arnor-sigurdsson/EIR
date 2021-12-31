@@ -238,7 +238,9 @@ def _get_feature_extractor_forward(
 
 
 def _simple_transformer_forward(
-    input: torch.Tensor, feature_extractor: "TransformerFeatureExtractor"
+    input: torch.Tensor,
+    feature_extractor: "TransformerFeatureExtractor",
+    pool: Union[Literal["avg"], Literal["max"], None] = None,
 ) -> torch.Tensor:
     return feature_extractor(input).flatten(1)
 
@@ -248,6 +250,7 @@ def get_hf_transformer_forward(
     input_length: int,
     embedding_dim: int,
     device: str,
+    pool: Union[Literal["avg"], Literal["max"], None] = None,
 ):
 
     forward_argnames = inspect.getfullargspec(feature_extractor_.forward)[0]
