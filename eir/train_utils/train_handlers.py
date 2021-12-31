@@ -54,9 +54,9 @@ if TYPE_CHECKING:
     from eir.setup.config import Configs
 
 # Aliases
-al_handler_and_event = Tuple[
-    Callable[[Engine, "HandlerConfig"], None], Union[Events, Tuple[Events, Events]]
-]
+al_handler = Callable[[Engine, "HandlerConfig"], None]
+al_event = Union[Events, Tuple[Events, Events]]
+al_handler_and_event = Tuple[al_handler, al_event]
 al_sample_interval_handlers = Tuple[al_handler_and_event, ...]
 
 
@@ -71,7 +71,11 @@ class HandlerConfig:
     monitoring_metrics: List[Tuple[str, str]]
 
 
-def configure_trainer(trainer: Engine, experiment: "Experiment") -> Engine:
+def configure_trainer(
+    trainer: Engine,
+    experiment: "Experiment",
+    validation_handler_callable: al_handler = validation_handler,
+) -> Engine:
 
     gc = experiment.configs.global_config
     run_folder = get_run_folder(output_folder=gc.output_folder)
@@ -101,7 +105,9 @@ def configure_trainer(trainer: Engine, experiment: "Experiment") -> Engine:
         )
 
     trainer = _attach_sample_interval_handlers(
-        trainer=trainer, handler_config=handler_config
+        trainer=trainer,
+        handler_config=handler_config,
+        validation_handler_callable=validation_handler_callable,
     )
 
     if gc.early_stopping_patience:
@@ -129,6 +135,7 @@ def configure_trainer(trainer: Engine, experiment: "Experiment") -> Engine:
 def _attach_sample_interval_handlers(
     trainer: Engine,
     handler_config: "HandlerConfig",
+    validation_handler_callable: Callable = validation_handler,
 ) -> Engine:
 
     exp = handler_config.experiment
@@ -139,6 +146,7 @@ def _attach_sample_interval_handlers(
         iter_per_epoch=len(exp.train_loader),
         n_epochs=gc.n_epochs,
         early_stopping_patience=gc.early_stopping_patience,
+        validation_handler_callable=validation_handler_callable,
     )
     all_handler_events = [validation_handler_and_event]
 
@@ -168,9 +176,9 @@ def _get_validation_handler_and_event(
     iter_per_epoch: int,
     n_epochs: int,
     early_stopping_patience: int,
+    validation_handler_callable: Callable,
 ) -> al_handler_and_event:
 
-    validation_handler_callable = validation_handler
     validation_event = Events.ITERATION_COMPLETED(every=sample_interval_base)
 
     do_run_when_training_complete = _do_run_completed_handler(
