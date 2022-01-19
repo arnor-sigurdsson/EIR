@@ -2,7 +2,16 @@ import inspect
 import math
 from dataclasses import dataclass
 from functools import partial
-from typing import Union, Literal, Type, Callable, Tuple, Dict, Sequence, TYPE_CHECKING
+from typing import (
+    Union,
+    Literal,
+    Type,
+    Tuple,
+    Dict,
+    Sequence,
+    TYPE_CHECKING,
+    Callable,
+)
 
 import torch
 from aislib.misc_utils import get_logger
@@ -47,6 +56,13 @@ class SequenceModelConfig:
         see a part of the input at a time. Can be Useful to avoid the O(n²)
         complexity of transformers, as it becomes O(window_size² * n_windows) instead.
 
+    :param pool:
+        Whether and how to pool (max / avg) the final feature maps before being
+        passed to the final fusion module / predictor. Meaning we pool over the
+        sequence (i.e. time) dimension, so the resulting dimensions is embedding_dim
+        instead of sequence_length * embedding_dim. If using windowed / conv
+        transformers, this becomes embedding_dim * number_of_chunks.
+
     :param pretrained_model:
           Specify whether the model type is assumed to be pretrained and from the
           Pytorch Image Models repository.
@@ -65,6 +81,7 @@ class SequenceModelConfig:
     position: Literal["encode", "embed"] = "encode"
     position_dropout: float = 0.10
     window_size: int = 0
+    pool: Union[Literal["avg"], Literal["max"], None] = None
 
     pretrained_model: bool = False
     freeze_pretrained_model: bool = False
@@ -121,6 +138,7 @@ class TransformerWrapperModel(nn.Module):
             window_size=self.model_config.window_size,
             max_length=self.max_length,
             embedding_dim=self.embedding_dim,
+            pool=self.model_config.pool,
             device=device,
             external_feature_extractor=self.external_feature_extractor,
         )
@@ -132,7 +150,17 @@ class TransformerWrapperModel(nn.Module):
             return self.pre_computed_num_out_features
 
         padding = self.dynamic_extras.get("padding", 0)
-        return (self.max_length + padding) * self.embedding_dim
+        length_with_padding = self.max_length + padding
+
+        if self.model_config.pool in ("avg", "max"):
+
+            num_chunks = 1
+            if self.model_config.window_size:
+                num_chunks = length_with_padding // self.model_config.window_size
+
+            return self.embedding_dim * num_chunks
+
+        return length_with_padding * self.embedding_dim
 
     def script_submodules_for_tracing(self):
         self.embedding = torch.jit.script(self.embedding)
@@ -174,6 +202,7 @@ def _get_transformer_wrapper_feature_extractor(
     embedding_dim: int,
     max_length: int,
     device: str,
+    pool: Union[Literal["avg"], Literal["max"], None] = None,
 ) -> Tuple[Dict[str, int], Callable[[torch.Tensor], torch.Tensor]]:
 
     dynamic_extras = {"padding": 0}
@@ -184,6 +213,7 @@ def _get_transformer_wrapper_feature_extractor(
         input_length=window_size if window_size else max_length,
         embedding_size=embedding_dim,
         device=device,
+        pool=pool,
     )
     if not window_size:
         extractor = partial(
@@ -224,6 +254,7 @@ def _get_feature_extractor_forward(
     input_length: int,
     embedding_size: int,
     device: str,
+    pool: Union[Literal["avg"], Literal["max"], None] = None,
 ) -> Callable[
     [torch.Tensor, Union["TransformerFeatureExtractor", nn.Module]], torch.Tensor
 ]:
@@ -233,16 +264,28 @@ def _get_feature_extractor_forward(
             input_length=input_length,
             embedding_dim=embedding_size,
             device=device,
+            pool=pool,
         )
-    return _simple_transformer_forward
+    return _get_simple_transformer_forward(pool=pool)
 
 
-def _simple_transformer_forward(
-    input: torch.Tensor,
-    feature_extractor: "TransformerFeatureExtractor",
+def _get_simple_transformer_forward(
     pool: Union[Literal["avg"], Literal["max"], None] = None,
-) -> torch.Tensor:
-    return feature_extractor(input).flatten(1)
+):
+    pooling_func = _get_sequence_pooling_func(pool=pool)
+
+    def _simple_transformer_forward(
+        input: torch.Tensor,
+        feature_extractor: "TransformerFeatureExtractor",
+    ) -> torch.Tensor:
+
+        tensor_out = feature_extractor(input)
+        tensor_pooled = pooling_func(input=tensor_out)
+        final_out = tensor_pooled.flatten(1)
+
+        return final_out
+
+    return _simple_transformer_forward
 
 
 def get_hf_transformer_forward(
@@ -263,6 +306,8 @@ def get_hf_transformer_forward(
         device=device,
     )
 
+    pooling_func = _get_sequence_pooling_func(pool=pool)
+
     def _hf_transformer_forward(
         input: torch.Tensor,
         feature_extractor: nn.Module,
@@ -270,10 +315,35 @@ def get_hf_transformer_forward(
     ) -> torch.Tensor:
         hf_transformer_out = feature_extractor(inputs_embeds=input, **bound_kwargs)
         tensor_out = getattr(hf_transformer_out, key)
-        final_out = tensor_out.flatten(1)
+        tensor_pooled = pooling_func(input=tensor_out)
+        final_out = tensor_pooled.flatten(1)
         return final_out
 
     return _hf_transformer_forward
+
+
+def _get_sequence_pooling_func(
+    pool: Union[Literal["avg"], Literal["max"], None]
+) -> Callable:
+    def _identity(input: torch.Tensor) -> torch.Tensor:
+        return input
+
+    def _max(input: torch.Tensor) -> torch.Tensor:
+        return input.max(dim=1)[0]
+
+    def _avg(input: torch.Tensor) -> torch.Tensor:
+        return input.mean(dim=1)
+
+    if pool is None:
+        return _identity
+
+    elif pool == "max":
+        return _max
+
+    elif pool == "avg":
+        return _avg
+
+    raise ValueError()
 
 
 def _build_transformer_forward_kwargs(
@@ -288,8 +358,6 @@ def _build_transformer_forward_kwargs(
     """
     kwargs = {}
 
-    if "attention_mask" in forward_argnames:
-        kwargs["attention_mask"] = torch.ones(1, input_length, device=device)
     if "decoder_inputs_embeds" in forward_argnames:
         kwargs["decoder_inputs_embeds"] = torch.randn(1, input_length, embedding_dim)
 

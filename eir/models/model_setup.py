@@ -2,7 +2,7 @@ import math
 from copy import copy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Union, Dict, Any, Sequence, Set, Type, Tuple, TYPE_CHECKING
+from typing import Union, Dict, Any, Sequence, Set, Type, Tuple, Literal, TYPE_CHECKING
 
 import timm
 import torch
@@ -292,6 +292,7 @@ def get_sequence_model(
         embedding_dim=embedding_dim,
         feature_extractor_max_length=feature_extractor_max_length,
         num_chunks=num_chunks,
+        pool=sequence_model_config.pool,
     )
 
     sequence_model = TransformerWrapperModel(
@@ -320,6 +321,7 @@ def _get_sequence_feature_extractor_objects_for_wrapper_model(
     embedding_dim: int,
     feature_extractor_max_length: int,
     num_chunks: int,
+    pool: Union[Literal["max"], Literal["avg"], None],
 ) -> SequenceModelObjectsForWrapperModel:
 
     if model_type == "sequence-default":
@@ -341,6 +343,8 @@ def _get_sequence_feature_extractor_objects_for_wrapper_model(
             frozen=pretrained_frozen,
             feature_extractor_max_length=feature_extractor_max_length,
             num_chunks=num_chunks,
+            num_tokens=num_tokens,
+            pool=pool,
         )
     else:
         objects_for_wrapper = _get_hf_sequence_feature_extractor_objects(
@@ -348,13 +352,18 @@ def _get_sequence_feature_extractor_objects_for_wrapper_model(
             model_config=model_config,
             feature_extractor_max_length=feature_extractor_max_length,
             num_chunks=num_chunks,
+            pool=pool,
         )
 
     return objects_for_wrapper
 
 
 def _get_manual_out_features_for_external_feature_extractor(
-    input_length: int, embedding_dim: int, num_chunks: int, feature_extractor: nn.Module
+    input_length: int,
+    embedding_dim: int,
+    num_chunks: int,
+    feature_extractor: nn.Module,
+    pool: Union[Literal["max"], Literal["avg"], None],
 ) -> int:
     input_shape = _get_sequence_input_dim(
         input_length=input_length,
@@ -364,6 +373,7 @@ def _get_manual_out_features_for_external_feature_extractor(
         module=feature_extractor,
         input_shape=input_shape,
         hf_model=True,
+        pool=pool,
     )
     manual_out_features = out_feature_shape.numel() * num_chunks
 
@@ -377,10 +387,16 @@ def _get_sequence_input_dim(
 
 
 def _get_pretrained_hf_sequence_feature_extractor_objects(
-    model_name: str, frozen: bool, feature_extractor_max_length: int, num_chunks: int
+    model_name: str,
+    num_tokens: int,
+    frozen: bool,
+    feature_extractor_max_length: int,
+    num_chunks: int,
+    pool: Union[Literal["max"], Literal["avg"], None],
 ) -> SequenceModelObjectsForWrapperModel:
 
     pretrained_model = _get_hf_pretrained_model(model_name=model_name)
+    pretrained_model.resize_token_embeddings(new_num_tokens=num_tokens)
     pretrained_model_embeddings = pretrained_model.get_input_embeddings()
     feature_extractor = pretrained_model
 
@@ -399,6 +415,7 @@ def _get_pretrained_hf_sequence_feature_extractor_objects(
         embedding_dim=pretrained_embedding_dim,
         num_chunks=num_chunks,
         feature_extractor=feature_extractor,
+        pool=pool,
     )
     objects_for_wrapper = SequenceModelObjectsForWrapperModel(
         feature_extractor=pretrained_model,
@@ -430,6 +447,7 @@ def _get_hf_sequence_feature_extractor_objects(
     model_config: Dict[str, Any],
     feature_extractor_max_length: int,
     num_chunks: int,
+    pool: Union[Literal["max"], Literal["avg"], None],
 ) -> SequenceModelObjectsForWrapperModel:
 
     feature_extractor = _get_hf_model(model_name=model_name, model_config=model_config)
@@ -443,6 +461,7 @@ def _get_hf_sequence_feature_extractor_objects(
         embedding_dim=pretrained_embedding_dim,
         num_chunks=num_chunks,
         feature_extractor=feature_extractor,
+        pool=pool,
     )
     objects_for_wrapper = SequenceModelObjectsForWrapperModel(
         feature_extractor=feature_extractor,

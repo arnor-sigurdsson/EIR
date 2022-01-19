@@ -2,6 +2,7 @@ from collections import OrderedDict
 from dataclasses import dataclass, fields
 from functools import partial
 from pathlib import Path
+from copy import deepcopy
 from typing import (
     Dict,
     Union,
@@ -563,6 +564,21 @@ def get_sequence_input_objects_from_input(
     return vocab, gathered_stats, tokenizer, encode_func
 
 
+def _get_default_specials_map() -> dict:
+    mapping = {
+        "bos_token": "<bos>",
+        "unk_token": "<unk>",
+        "mask_token": "<mask>",
+        "pad_token": "<pad>",
+        "eos_token": "<eos>",
+    }
+
+    default_specials = _get_default_specials()
+    assert set(mapping.values()) == set(default_specials)
+
+    return mapping
+
+
 def _get_default_specials() -> List[str]:
     default_specials = ["<bos>", "<unk>", "<mask>", "<pad>", "<eos>"]
     return default_specials
@@ -602,9 +618,28 @@ def _sync_hf_and_pytorch_vocab(hf_tokenizer: PreTrainedTokenizer) -> Vocab:
 
 def _get_hf_tokenizer(hf_model_name: str) -> PreTrainedTokenizer:
     hf_tokenizer = AutoTokenizer.from_pretrained(
-        pretrained_model_name_or_path=hf_model_name
+        pretrained_model_name_or_path=hf_model_name, add_prefix_space=True
     )
+
+    hf_tokenizer = _add_specials_to_hf_tokenizer(hf_tokenizer=hf_tokenizer)
     return hf_tokenizer
+
+
+def _add_specials_to_hf_tokenizer(
+    hf_tokenizer: PreTrainedTokenizer,
+) -> PreTrainedTokenizer:
+    hf_tokenizer_copy = deepcopy(hf_tokenizer)
+    name_special_token_map = _get_default_specials_map()
+
+    specials_tokens_to_add = {}
+    for special_token_name, special_token in name_special_token_map.items():
+        if special_token_name not in hf_tokenizer_copy.special_tokens_map:
+            specials_tokens_to_add[special_token_name] = special_token
+
+    hf_tokenizer_copy.add_special_tokens(specials_tokens_to_add)
+    logger.debug("Special tokens %s added to %s.", specials_tokens_to_add, hf_tokenizer)
+
+    return hf_tokenizer_copy
 
 
 def get_basic_tokenizer(
