@@ -2135,7 +2135,7 @@ python-versions = ">=3.6"
 
 [[package]]
 name = "timm"
-version = "0.4.12"
+version = "0.5.4"
 description = "(Unofficial) PyTorch Image Models"
 category = "main"
 optional = false
@@ -2499,7 +2499,7 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "1.1"
 python-versions = ">= 3.8,< 3.10"
-content-hash = "fdea65b0d1102e08d7e6ff69a6d15ec7d53629fe155659531613385af11a97b6"
+content-hash = "5a1d49f946c326b721781487e8791d625d9aafc72966dab31c7fe35bcbbe144b"
 
 [metadata.files]
 absl-py = [
@@ -4059,8 +4059,8 @@ threadpoolctl = [
     {file = "threadpoolctl-3.0.0.tar.gz", hash = "sha256:d03115321233d0be715f0d3a5ad1d6c065fe425ddc2d671ca8e45e9fd5d7a52a"},
 ]
 timm = [
-    {file = "timm-0.4.12-py3-none-any.whl", hash = "sha256:dba6b1702b7d24bf9f0f1c2fc394b4ee28f93cde5404f1dc732d63ccd00533b6"},
-    {file = "timm-0.4.12.tar.gz", hash = "sha256:b14be70dbd4528b5ca8657cf5bc2672c7918c3d9ebfbffe80f4785b54e884b1e"},
+    {file = "timm-0.5.4-py3-none-any.whl", hash = "sha256:0592c8fd2d46d0769c0b7e954b3dacea93769eee40dabb4bd7f2acb85243b588"},
+    {file = "timm-0.5.4.tar.gz", hash = "sha256:5d7b92e66a76c432009aba90d515ea7a882aae573415a7c5269e3617df901c1f"},
 ]
 tokenizers = [
     {file = "tokenizers-0.10.3-cp36-cp36m-macosx_10_11_x86_64.whl", hash = "sha256:4ab688daf4692a6c31dfe42f1f3a4a8c22050705eb69d58d3efde9d55f434586"},
