@@ -411,7 +411,7 @@ class BasicTransformerFeatureExtractorModelConfig:
 
     num_heads: int = 8
     num_layers: int = 2
-    dim_feedforward: int = 256
+    dim_feedforward: Union[int, Literal["auto"]] = "auto"
     dropout: float = 0.10
 
 
@@ -430,15 +430,20 @@ class TransformerFeatureExtractor(nn.Module):
         self.num_tokens = num_tokens
         self.max_length = max_length
 
-        encoder_layers = TransformerEncoderLayer(
+        dim_feed_forward = parse_dim_feedforward(
+            dim_feedforward=model_config.dim_feedforward,
+            embedding_dim=self.embedding_dim,
+        )
+
+        encoder_layer_base = TransformerEncoderLayer(
             d_model=self.embedding_dim,
             nhead=model_config.num_heads,
-            dim_feedforward=model_config.dim_feedforward,
+            dim_feedforward=dim_feed_forward,
             dropout=model_config.dropout,
             batch_first=True,
         )
         self.transformer_encoder = TransformerEncoder(
-            encoder_layer=encoder_layers, num_layers=model_config.num_layers
+            encoder_layer=encoder_layer_base, num_layers=model_config.num_layers
         )
 
     @property
@@ -455,6 +460,20 @@ def next_power_of_2(x: int) -> int:
         return 1
 
     return 2 ** math.ceil(math.log2(x))
+
+
+def parse_dim_feedforward(
+    dim_feedforward: Union[int, Literal["auto"]], embedding_dim: int
+) -> int:
+    if dim_feedforward == "auto":
+        dim_feedforward = embedding_dim * 4
+        logger.info(
+            "Setting dim_feedfoward to %d based on %d and 'auto' option.",
+            dim_feedforward,
+            embedding_dim,
+        )
+
+    return dim_feedforward
 
 
 @dataclass

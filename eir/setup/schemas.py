@@ -426,7 +426,7 @@ class BasicPretrainedConfig:
         prototype functionality uses that to e.g. find configuration from the
         pretrained model run.
 
-    :param load_module_nmae:
+    :param load_module_name:
         Name of the module to extract and use in the respective input feature
         extraction.
     """

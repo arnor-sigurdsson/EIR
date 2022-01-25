@@ -51,7 +51,8 @@ seed_everything(seed=0)
                 ],
             },
         },
-        # Case 2: Classification - Positional Embedding, Windowed and Avg Pooling
+        # Case 2: Classification - Positional Embedding, Windowed, Auto dff
+        # and Avg Pooling
         {
             "injections": {
                 "global_configs": {
@@ -66,6 +67,7 @@ seed_everything(seed=0)
                             "window_size": 16,
                             "position": "embed",
                             "pool": "avg",
+                            "model_init_config": {"dim_feedforward": "auto"},
                         },
                     }
                 ],
