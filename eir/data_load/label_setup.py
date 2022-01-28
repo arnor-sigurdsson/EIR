@@ -13,6 +13,7 @@ from tqdm import tqdm
 
 from eir.data_load.common_ops import ColumnOperation
 from eir.setup.schemas import InputConfig
+from eir.train_utils.utils import get_seed
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -860,9 +861,15 @@ def _split_df_by_ids(
 def split_ids(
     ids: Sequence[str], valid_size: Union[int, float]
 ) -> Tuple[Sequence[str], Sequence[str]]:
+    """
+    We sort here to ensure that we get the same splits every time.
+    """
 
+    seed, _ = get_seed()
+
+    ids_sorted = sorted(list(ids))
     train_ids, valid_ids = train_test_split(
-        list(ids), test_size=valid_size, random_state=0
+        ids_sorted, test_size=valid_size, random_state=seed
     )
 
     assert len(train_ids) + len(valid_ids) == len(ids)

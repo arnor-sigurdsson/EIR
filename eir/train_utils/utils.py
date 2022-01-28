@@ -142,14 +142,25 @@ def state_registered_hook_call(
 
 def seed_everything(seed: int = 0) -> None:
 
-    os_seed = os.environ.get("EIR_SEED", None)
-    if os_seed:
-        seed = os_seed
+    seed, from_os = get_seed(default_seed=seed)
 
-    extra_log = " grabbed from environment variable 'EIR_SEED '" if os_seed else " "
-    logger.debug("Global random seed%sset to %d", extra_log, seed)
+    extra_log = " grabbed from environment variable 'EIR_SEED '" if from_os else " "
+    logger.debug("Global random seed%sset to %d.", extra_log, seed)
 
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
+
+
+def get_seed(default_seed: int = 0) -> Tuple[int, bool]:
+    os_seed = os.environ.get("EIR_SEED", None)
+
+    if os_seed:
+        seed = int(os_seed)
+        from_os = True
+    else:
+        seed = default_seed
+        from_os = False
+
+    return seed, from_os
