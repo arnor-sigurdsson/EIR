@@ -211,8 +211,14 @@ def get_default_experiment(
     all_array_ids = gather_all_ids_from_target_configs(
         target_configs=configs.target_configs
     )
+    manual_valid_ids = _read_manual_ids_if_exist(
+        manual_valid_ids_file=configs.global_config.manual_valid_ids_file
+    )
+
     train_ids, valid_ids = split_ids(
-        ids=all_array_ids, valid_size=configs.global_config.valid_size
+        ids=all_array_ids,
+        valid_size=configs.global_config.valid_size,
+        manual_valid_ids=manual_valid_ids,
     )
 
     logger.info("Setting up target labels.")
@@ -323,6 +329,19 @@ def gather_all_ids_from_target_configs(
         all_ids.update(cur_ids)
 
     return tuple(all_ids)
+
+
+def _read_manual_ids_if_exist(
+    manual_valid_ids_file: Union[None, str]
+) -> Union[Sequence[str], None]:
+
+    if not manual_valid_ids_file:
+        return None
+
+    with open(manual_valid_ids_file, "r") as infile:
+        manual_ids = tuple(line.strip() for line in infile)
+
+    return manual_ids
 
 
 def get_tabular_target_file_infos(

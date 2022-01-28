@@ -859,20 +859,66 @@ def _split_df_by_ids(
 
 
 def split_ids(
-    ids: Sequence[str], valid_size: Union[int, float]
+    ids: Sequence[str],
+    valid_size: Union[int, float],
+    manual_valid_ids: Union[None, Sequence[str]] = None,
 ) -> Tuple[Sequence[str], Sequence[str]]:
     """
     We sort here to ensure that we get the same splits every time.
     """
 
-    seed, _ = get_seed()
+    if manual_valid_ids:
 
+        logger.info(
+            "Doing a manual split into validation set with %d IDs read from file.",
+            len(manual_valid_ids),
+        )
+        train_ids, valid_ids = _split_ids_manual(
+            ids=ids, manual_valid_ids=manual_valid_ids
+        )
+
+    else:
+        seed, _ = get_seed()
+        ids_sorted = sorted(list(ids))
+        train_ids, valid_ids = train_test_split(
+            ids_sorted, test_size=valid_size, random_state=seed
+        )
+
+    assert len(train_ids) + len(valid_ids) == len(ids)
+    assert set(train_ids).isdisjoint(set(valid_ids))
+
+    return train_ids, valid_ids
+
+
+def _split_ids_auto(
+    ids: Sequence[str], valid_size: Union[int, float]
+) -> Tuple[Sequence[str], Sequence[str]]:
+
+    seed, _ = get_seed()
     ids_sorted = sorted(list(ids))
+
     train_ids, valid_ids = train_test_split(
         ids_sorted, test_size=valid_size, random_state=seed
     )
 
-    assert len(train_ids) + len(valid_ids) == len(ids)
+    return train_ids, valid_ids
+
+
+def _split_ids_manual(
+    ids: Sequence[str], manual_valid_ids: Sequence[str]
+) -> Tuple[Sequence[str], Sequence[str]]:
+
+    not_found = tuple(i for i in manual_valid_ids if i not in ids)
+    if not_found:
+        raise ValueError(
+            f"Did not find {len(not_found)} manual validation IDs "
+            f"'{reprlib.repr(not_found)}' among those IDs. Possibly some validation"
+            f"IDs are not present, or this is a bug."
+        )
+
+    train_ids_set = set(ids) - set(manual_valid_ids)
+    train_ids = list(train_ids_set)
+    valid_ids = list(manual_valid_ids)
 
     return train_ids, valid_ids
 
