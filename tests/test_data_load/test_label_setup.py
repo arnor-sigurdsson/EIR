@@ -989,6 +989,7 @@ def test_split_ids(create_test_data, create_test_config):
 
     ids = tuple(df_labels.index)
 
+    # Automatic splitting
     for valid_fraction in (0.1, 0.5, 0.7):
 
         ids_train, ids_valid = label_setup.split_ids(ids=ids, valid_size=valid_fraction)
@@ -997,6 +998,14 @@ def test_split_ids(create_test_data, create_test_config):
 
         assert len(ids_train) == int(expected_train)
         assert len(ids_valid) == int(expected_valid)
+
+    # Manual splitting
+    manual_ids = ids[:10]
+
+    ids_train, ids_valid = label_setup.split_ids(
+        ids=ids, valid_size=valid_fraction, manual_valid_ids=manual_ids
+    )
+    assert set(ids_valid) == set(manual_ids)
 
 
 @pytest.fixture

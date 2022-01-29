@@ -35,7 +35,7 @@ seed_everything(seed=0)
 @pytest.mark.parametrize(
     "create_test_config_init_base",
     [
-        # Case 1: Classification - Positional Encoding
+        # Case 1: Classification - Positional Encoding and Max Pooling
         {
             "injections": {
                 "global_configs": {
@@ -46,12 +46,13 @@ seed_everything(seed=0)
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_sequence"},
-                        "model_config": {"position": "encode"},
+                        "model_config": {"position": "encode", "pool": "max"},
                     }
                 ],
             },
         },
-        # Case 2: Classification - Positional Embedding and Windowed
+        # Case 2: Classification - Positional Embedding, Windowed, Auto dff
+        # and Avg Pooling
         {
             "injections": {
                 "global_configs": {
@@ -62,7 +63,12 @@ seed_everything(seed=0)
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_sequence"},
-                        "model_config": {"window_size": 16, "position": "embed"},
+                        "model_config": {
+                            "window_size": 16,
+                            "position": "embed",
+                            "pool": "avg",
+                            "model_init_config": {"dim_feedforward": "auto"},
+                        },
                     }
                 ],
             },
@@ -296,12 +302,14 @@ def test_external_nlp_feature_extractor_forward(model_name: str):
         model_config=model_config_parsed,
         feature_extractor_max_length=64,
         num_chunks=1,
+        pool=None,
     )
     _get_manual_out_features_for_external_feature_extractor(
         input_length=64,
         embedding_dim=feature_extractor_objects.embedding_dim,
         num_chunks=1,
         feature_extractor=feature_extractor_objects.feature_extractor,
+        pool=None,
     )
 
 

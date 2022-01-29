@@ -192,7 +192,7 @@ def _parse_out_sequence_expected_value(
 
 
 def get_sequence_index_to_truncate_unknown(
-    raw_inputs: Sequence[str], padding_value: str = "<unk>"
+    raw_inputs: Sequence[str], padding_value: str = "<pad>"
 ) -> int:
     raw_inputs_reversed = raw_inputs[::-1]
     counter = 0

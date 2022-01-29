@@ -668,10 +668,13 @@ def prepare_bytes_data(
         sampling_strat = "from_start"
 
     bytes_tensor = torch.LongTensor(bytes_data)
+
+    padding_value = bio.vocab.get("<pad>", 0)
     cur_bytes_padded = process_tensor_to_length(
         tensor=bytes_tensor,
         max_length=bio.input_config.input_type_info.max_length,
         sampling_strategy_if_longer=sampling_strat,
+        padding_value=padding_value,
     )
 
     return cur_bytes_padded
@@ -692,10 +695,13 @@ def prepare_sequence_data(
     if test_mode:
         sampling_strat = "from_start"
 
+    padding_token = getattr(sio.tokenizer, "pad_token", "<pad>")
+    padding_value = sio.encode_func([padding_token])[0]
     cur_tokens_padded = process_tensor_to_length(
         tensor=cur_tokens_as_tensor,
         max_length=sio.computed_max_length,
         sampling_strategy_if_longer=sampling_strat,
+        padding_value=padding_value,
     )
 
     return cur_tokens_padded
@@ -705,6 +711,7 @@ def process_tensor_to_length(
     tensor: torch.Tensor,
     max_length: int,
     sampling_strategy_if_longer: Literal["from_start", "uniform"],
+    padding_value: int = 0,
 ) -> torch.Tensor:
     tensor_length = len(tensor)
 
@@ -721,7 +728,7 @@ def process_tensor_to_length(
             return uniformly_sampled_tensor
 
     right_padding = max_length - tensor_length
-    padded_tensor = pad(input=tensor, pad=[0, right_padding])
+    padded_tensor = pad(input=tensor, pad=[0, right_padding], value=padding_value)
 
     return padded_tensor
 

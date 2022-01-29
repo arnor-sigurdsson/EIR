@@ -543,6 +543,8 @@ def get_buffered_metrics_writer(buffer_interval: int):
 
         if iteration % buffer_interval == 0:
 
+            buffer.append(dict_to_write)
+
             with open(str(filepath), "a") as logfile:
                 fieldnames = ["iteration"] + sorted(metrics.keys())
                 writer = csv.DictWriter(logfile, fieldnames=fieldnames)

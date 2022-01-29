@@ -110,6 +110,10 @@ class GlobalConfig:
         Size if the validaton set, if float then uses a percentage. If int,
         then raw counts.
 
+    :param manual_valid_ids_file:
+        File with IDs of those samples to manually use as the validation set. Should
+        be one ID per line in the file.
+
     :param dataloader_workers:
         Number of workers for multi-process training and validation data loading.
 
@@ -221,6 +225,7 @@ class GlobalConfig:
     n_epochs: int = 10
     batch_size: int = 64
     valid_size: Union[float, int] = 0.1
+    manual_valid_ids_file: Union[str, None] = None
     dataloader_workers: int = 0
     device: str = "cpu"
     gpu_num: str = "0"
@@ -426,7 +431,7 @@ class BasicPretrainedConfig:
         prototype functionality uses that to e.g. find configuration from the
         pretrained model run.
 
-    :param load_module_nmae:
+    :param load_module_name:
         Name of the module to extract and use in the respective input feature
         extraction.
     """

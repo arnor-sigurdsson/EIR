@@ -8,6 +8,7 @@ from typing import (
     Iterable,
     Any,
     Union,
+    Literal,
     TYPE_CHECKING,
 )
 
@@ -193,6 +194,7 @@ def calculate_module_dict_outputs(
 def get_output_dimensions_for_input(
     module: Union[PreTrainedModel, nn.Module],
     input_shape: Tuple[int, ...],
+    pool: Union[Literal["max"], Literal["avg"], None],
     hf_model: bool = False,
 ) -> torch.LongTensor:
 
@@ -207,6 +209,7 @@ def get_output_dimensions_for_input(
                 input_length=input_shape[1],
                 embedding_dim=input_shape[2],
                 device="cpu",
+                pool=pool,
             )
             test_output = hf_forward(input=test_input, feature_extractor=module_copy)
         else:
