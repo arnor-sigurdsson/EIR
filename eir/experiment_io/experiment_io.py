@@ -123,8 +123,9 @@ def load_serialized_input_object(
     *args,
     output_folder: Union[None, str] = None,
     run_folder: Union[None, Path] = None,
+    custom_input_name: Union[str, None] = None,
     **kwargs,
-):
+) -> "al_serializable_input_objects":
 
     assert output_folder or run_folder
     if not run_folder:
@@ -132,6 +133,9 @@ def load_serialized_input_object(
 
     input_name = input_config.input_info.input_name
     input_type = input_config.input_info.input_type
+
+    if custom_input_name:
+        input_name = custom_input_name
 
     serialized_input_config_path = get_input_serialization_path(
         run_folder=run_folder,
@@ -150,12 +154,67 @@ def load_serialized_input_object(
     train_input_info_kwargs = serialized_input_config_object.__dict__
     assert "input_config" in train_input_info_kwargs.keys()
 
-    test_input_info_kwargs = copy(train_input_info_kwargs)
-    test_input_info_kwargs["input_config"] = input_config
+    loaded_input_info_kwargs = copy(train_input_info_kwargs)
 
-    test_input_object = input_class(**test_input_info_kwargs)
+    _check_current_and_loaded_input_config_compatibility(
+        current_input_config=input_config,
+        loaded_input_config=serialized_input_config_object.input_config,
+        serialized_input_config_path=serialized_input_config_path,
+    )
+    loaded_input_info_kwargs["input_config"] = input_config
 
-    return test_input_object
+    loaded_input_object = input_class(**loaded_input_info_kwargs)
+
+    return loaded_input_object
+
+
+def get_input_serialization_path(
+    run_folder: Path, input_type: str, input_name: str
+) -> Path:
+    path = (
+        run_folder
+        / "serializations"
+        / f"{input_type}_input_serializations/{input_name}.dill"
+    )
+
+    return path
+
+
+def _check_current_and_loaded_input_config_compatibility(
+    current_input_config: schemas.InputConfig,
+    loaded_input_config: schemas.InputConfig,
+    serialized_input_config_path: Path,
+) -> None:
+
+    fieldnames = current_input_config.__dict__.keys()
+    assert set(fieldnames) == set(loaded_input_config.__dict__.keys())
+
+    should_be_same = ("model_config",)
+
+    for key in should_be_same:
+
+        current_value = getattr(current_input_config, key)
+        loaded_value = getattr(loaded_input_config, key)
+
+        if current_value != loaded_value:
+
+            logger.warning(
+                "Expected '%s' to be the same in current input configuration '%s' and "
+                "loaded input configuration '%s' (loaded from '%s'). If you are loading"
+                " a pretrained EIR module, this can be expected if you are changing "
+                "parameters that are expected to be agnostic across runs (e.g. dropout)"
+                ", but in many cases this will cause (a) the model you are trying to "
+                "load and (b) the model you are setting up for the current experiment "
+                "to diverge, which will most likely lead to a RuntimeError. The "
+                "resolution is likely to ensure that the input configurations of "
+                "(a) and (b) are exactly the same when it comes to model "
+                "configurations, which should ensure that the model architectures "
+                "match.",
+                key,
+                current_value,
+                loaded_value,
+                serialized_input_config_path,
+            )
 
 
 def serialize_all_input_transformers(
@@ -187,18 +246,6 @@ def serialize_chosen_input_objects(
             ensure_path_exists(path=outpath, is_folder=False)
             with open(outpath, "wb") as outfile:
                 dill.dump(obj=input_, file=outfile)
-
-
-def get_input_serialization_path(
-    run_folder: Path, input_type: str, input_name: str
-) -> Path:
-    path = (
-        run_folder
-        / "serializations"
-        / f"{input_type}_input_serializations/{input_name}.dill"
-    )
-
-    return path
 
 
 def load_transformers(

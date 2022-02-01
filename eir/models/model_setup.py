@@ -1,5 +1,6 @@
 import math
 from copy import copy
+from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Union, Dict, Any, Sequence, Set, Type, Tuple, Literal, TYPE_CHECKING
@@ -637,12 +638,22 @@ def _warn_abount_unsupported_hf_model(model_name: str) -> None:
 def overload_fusion_model_feature_extractors_with_pretrained(
     modules_to_fuse: nn.ModuleDict, inputs_as_dict: "al_input_objects_as_dict"
 ) -> nn.ModuleDict:
+
+    """
+    Note that `inputs_as_dict` here have already been set up according to pretrained
+    configurations.
+    """
+
     any_pretrained = any(
         i.input_config.pretrained_config for i in inputs_as_dict.values()
     )
     if not any_pretrained:
         return modules_to_fuse
 
+    input_configs = tuple(i.input_config for i in inputs_as_dict.values())
+    replace_pattern = _build_all_replacements_tuples_for_loading_pretrained_module(
+        input_configs=input_configs
+    )
     for input_name, input_object in inputs_as_dict.items():
         input_config = input_object.input_config
 
@@ -665,17 +676,20 @@ def overload_fusion_model_feature_extractors_with_pretrained(
             inputs_as_dicts=inputs_as_dict,
         )
 
-        loaded_fusion_model = load_model(
+        loaded_and_renamed_fusion_model = load_model(
             model_path=load_model_path,
             model_class=fusion_model_class,
             model_init_kwargs=fusion_model_kwargs,
             device="cpu",
             test_mode=False,
+            state_dict_key_rename=replace_pattern,
         )
-        loaded_fusion_feature_extractors = loaded_fusion_model.modules_to_fuse
+        loaded_and_renamed_fusion_extractors = (
+            loaded_and_renamed_fusion_model.modules_to_fuse
+        )
 
         module_name_to_load = pretrained_config.load_module_name
-        module_to_overload = loaded_fusion_feature_extractors[module_name_to_load]
+        module_to_overload = loaded_and_renamed_fusion_extractors[input_name]
 
         logger.info(
             "Replacing '%s' in current model with '%s' from %s.",
@@ -708,18 +722,54 @@ def get_fusion_model_class_and_kwargs_from_configs(
     return fusion_model_class, fusion_model_kwargs
 
 
+def _build_all_replacements_tuples_for_loading_pretrained_module(
+    input_configs: Sequence[schemas.InputConfig],
+) -> Sequence[Tuple[str, str]]:
+
+    replacement_patterns = []
+    for input_config in input_configs:
+        if input_config.pretrained_config:
+            cur_replacement = _build_replace_tuple_when_loading_pretrained_module(
+                load_module_name=input_config.pretrained_config.load_module_name,
+                current_input_name=input_config.input_info.input_name,
+            )
+            if cur_replacement:
+                replacement_patterns.append(cur_replacement)
+
+    return replacement_patterns
+
+
+def _build_replace_tuple_when_loading_pretrained_module(
+    load_module_name: str, current_input_name: str
+) -> Union[None, Tuple[str, str]]:
+
+    if load_module_name == current_input_name:
+        return None
+
+    load_module_name_parsed = f"modules_to_fuse.{load_module_name}."
+    current_input_name_parsed = f"modules_to_fuse.{current_input_name}."
+
+    replace_pattern = (load_module_name_parsed, current_input_name_parsed)
+
+    return replace_pattern
+
+
 def load_model(
     model_path: Path,
     model_class: Type[nn.Module],
     model_init_kwargs: Dict,
     device: str,
     test_mode: bool,
+    state_dict_key_rename: Union[None, Sequence[Tuple[str, str]]] = None,
 ) -> Union[al_fusion_models, nn.Module]:
 
     model = model_class(**model_init_kwargs)
 
     model = _load_model_weights(
-        model=model, model_state_dict_path=model_path, device=device
+        model=model,
+        model_state_dict_path=model_path,
+        device=device,
+        state_dict_key_rename=state_dict_key_rename,
     )
 
     if test_mode:
@@ -729,11 +779,38 @@ def load_model(
 
 
 def _load_model_weights(
-    model: nn.Module, model_state_dict_path: Path, device: str
+    model: nn.Module,
+    model_state_dict_path: Path,
+    device: str,
+    state_dict_key_rename: Union[None, Sequence[Tuple[str, str]]] = None,
 ) -> nn.Module:
-    model.load_state_dict(
-        state_dict=torch.load(model_state_dict_path, map_location=device)
-    )
+    state_dict = torch.load(model_state_dict_path, map_location=device)
+
+    if state_dict_key_rename:
+        for replace_tuple in state_dict_key_rename:
+            logger.debug(
+                "Renaming '%s' in pretrained model to '%s' in current model.",
+                replace_tuple[0],
+                replace_tuple[1],
+            )
+            state_dict = _replace_dict_key_names(
+                dict_=state_dict, replace_pattern=replace_tuple
+            )
+
+    model.load_state_dict(state_dict=state_dict)
+
     model = model.to(device=device)
 
     return model
+
+
+def _replace_dict_key_names(
+    dict_: Dict[str, Any], replace_pattern: Tuple[str, str]
+) -> OrderedDict:
+    renamed_dict = OrderedDict()
+
+    for key, value in dict_.items():
+        new_key = key.replace(*replace_pattern)
+        renamed_dict[new_key] = value
+
+    return renamed_dict
