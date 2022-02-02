@@ -147,7 +147,8 @@ def get_input_setup_function(
             model_path=pretrained_config.model_path
         )
         from_pretrained_mapping = get_input_setup_from_pretrained_function_map(
-            run_folder=pretrained_run_folder
+            run_folder=pretrained_run_folder,
+            load_module_name=pretrained_config.load_module_name,
         )
         return from_pretrained_mapping[input_type]
 
@@ -191,7 +192,7 @@ def set_up_tabular_input_from_pretrained(
 
 
 def get_input_setup_from_pretrained_function_map(
-    run_folder: Path,
+    run_folder: Path, load_module_name: str
 ) -> Dict[str, Callable]:
     pretrained_setup_mapping = {
         "omics": set_up_omics_input,
@@ -200,16 +201,19 @@ def get_input_setup_from_pretrained_function_map(
             load_serialized_input_object,
             input_class=SequenceInputInfo,
             run_folder=run_folder,
+            custom_input_name=load_module_name,
         ),
         "bytes": partial(
             load_serialized_input_object,
             input_class=BytesInputInfo,
             run_folder=run_folder,
+            custom_input_name=load_module_name,
         ),
         "image": partial(
             load_serialized_input_object,
             input_class=ImageInputInfo,
             run_folder=run_folder,
+            custom_input_name=load_module_name,
         ),
     }
 

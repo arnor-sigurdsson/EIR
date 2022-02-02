@@ -36,6 +36,99 @@ if TYPE_CHECKING:
             "injections": {
                 "global_configs": {
                     "output_folder": "multi_task_multi_modal",
+                    "n_epochs": 1,
+                    "act_background_samples": 8,
+                    "sample_interval": 50,
+                    "checkpoint_interval": 50,
+                    "n_saved_models": 2,
+                },
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "model_config": {
+                            "model_type": "cnn",
+                            "model_init_config": {"l1": 1e-03},
+                        },
+                    },
+                    {
+                        "input_info": {"input_name": "test_sequence"},
+                    },
+                    {
+                        "input_info": {"input_name": "test_bytes"},
+                    },
+                    {
+                        "input_info": {"input_name": "test_image"},
+                    },
+                    {
+                        "input_info": {"input_name": "test_tabular"},
+                        "input_type_info": {
+                            "input_cat_columns": ["OriginExtraCol"],
+                            "input_con_columns": ["ExtraTarget"],
+                        },
+                        "model_config": {
+                            "model_type": "tabular",
+                            "model_init_config": {"l1": 1e-03},
+                        },
+                    },
+                ],
+                "predictor_configs": {
+                    "model_config": {
+                        "fc_task_dim": 64,
+                        "fc_do": 0.10,
+                        "rb_do": 0.10,
+                    },
+                },
+                "target_configs": {
+                    "target_cat_columns": ["Origin"],
+                    "target_con_columns": ["Height"],
+                },
+            },
+        }
+    ],
+    indirect=True,
+)
+def test_pre_trained_module_setup(
+    prep_modelling_test_configs: Tuple[train.Experiment, "ModelTestConfig"],
+):
+    experiment, test_config = prep_modelling_test_configs
+
+    train.train(experiment=experiment)
+
+    _get_experiment_overloaded_for_pretrained_extractor(
+        experiment=experiment, test_config=test_config, rename_pretrained_inputs=False
+    )
+
+    _get_experiment_overloaded_for_pretrained_extractor(
+        experiment=experiment, test_config=test_config, rename_pretrained_inputs=True
+    )
+
+    _get_experiment_overloaded_for_pretrained_checkpoint(
+        experiment=experiment, test_config=test_config
+    )
+
+
+@pytest.mark.parametrize(
+    "create_test_data",
+    [
+        {
+            "task_type": "multi_task",
+            "modalities": (
+                "omics",
+                "sequence",
+                "image",
+            ),
+            "manual_test_data_creator": lambda: "test_multi_modal_multi_task",
+        }
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize(
+    "create_test_config_init_base",
+    [
+        {
+            "injections": {
+                "global_configs": {
+                    "output_folder": "multi_task_multi_modal",
                     "n_epochs": 2,
                     "act_background_samples": 8,
                     "sample_interval": 50,
@@ -98,7 +191,7 @@ def test_pre_training_and_loading(
         pretrained_experiment,
         pretrained_test_config,
     ) = _get_experiment_overloaded_for_pretrained_extractor(
-        experiment=experiment, test_config=test_config
+        experiment=experiment, test_config=test_config, rename_pretrained_inputs=True
     )
 
     train.train(experiment=pretrained_experiment)
@@ -137,7 +230,9 @@ def test_pre_training_and_loading(
 
 
 def _get_experiment_overloaded_for_pretrained_extractor(
-    experiment: train.Experiment, test_config: "ModelTestConfig"
+    experiment: train.Experiment,
+    test_config: "ModelTestConfig",
+    rename_pretrained_inputs: bool,
 ) -> Tuple[train.Experiment, "ModelTestConfig"]:
 
     input_configs = deepcopy(experiment.configs.input_configs)
@@ -152,6 +247,11 @@ def _get_experiment_overloaded_for_pretrained_extractor(
             model_path=str(saved_model_path), load_module_name=cur_name
         )
         cur_input_config.pretrained_config = cur_pretrained_config
+
+        # Check that the names can differ
+        if rename_pretrained_inputs:
+            cur_input_config.input_info.input_name = cur_name + "_pretrained_module"
+
         input_configs_with_pretrained.append(cur_input_config)
 
     pretrained_configs.input_configs = input_configs_with_pretrained
