@@ -22,6 +22,7 @@ class AutoDocExperimentInfo:
     command: List[str]
     files_to_copy_mapping: Sequence[Tuple[str, str]]
     post_run_functions: Sequence[Tuple[Callable, Dict]] = ()
+    force_run_command: bool = False
 
 
 def make_tutorial_data(auto_doc_experiment_info: AutoDocExperimentInfo) -> None:
@@ -32,7 +33,9 @@ def make_tutorial_data(auto_doc_experiment_info: AutoDocExperimentInfo) -> None:
 
     set_up_conf_files(base_path=ade.base_path, conf_output_path=ade.conf_output_path)
 
-    run_folder = run_experiment_from_command(command=ade.command, overwrite=False)
+    run_folder = run_experiment_from_command(
+        command=ade.command, force_run=ade.force_run_command
+    )
 
     save_command_as_text(
         command=ade.command,
@@ -52,13 +55,13 @@ def make_tutorial_data(auto_doc_experiment_info: AutoDocExperimentInfo) -> None:
 def save_command_as_text(command: List[str], output_path: Path) -> None:
     ensure_path_exists(path=output_path)
 
-    command_as_str = command[0] + " \\ \n"
+    command_as_str = command[0] + " \\\n"
 
     cur_str = command[1]
 
     for part in command[2:]:
         if part.startswith("--"):
-            command_as_str += cur_str + " \\ \n"
+            command_as_str += cur_str + " \\\n"
             cur_str = part
         else:
             cur_str += " " + part
@@ -84,19 +87,21 @@ def find_and_copy_files(
 
                 output_destination = output_folder / target
                 copy2(path, output_destination)
-                images = convert_from_path(
-                    pdf_path=output_destination,
-                    fmt="png",
-                )
 
-                assert len(images) == 1
-                pil_image: Image = images[0]
+                if output_destination.suffix == ".pdf":
+                    files = convert_from_path(
+                        pdf_path=output_destination,
+                        fmt="png",
+                    )
 
-                pil_image.save(output_destination.with_suffix(".png"))
-                output_destination.unlink()
+                    assert len(files) == 1
+                    pil_image: Image = files[0]
+
+                    pil_image.save(output_destination.with_suffix(".png"))
+                    output_destination.unlink()
 
 
-def run_experiment_from_command(command: List[str], overwrite: bool = False):
+def run_experiment_from_command(command: List[str], force_run: bool = False):
 
     globals_file = next(i for i in command if "globals" in i)
     globals_dict = load_yaml_config(config_path=globals_file)
@@ -108,7 +113,7 @@ def run_experiment_from_command(command: List[str], overwrite: bool = False):
         output_folder_inject_string = output_folder_injected[0]
         run_folder = Path(output_folder_inject_string.split(".output_folder=")[-1])
 
-    if not overwrite and run_folder.exists():
+    if not force_run and run_folder.exists():
         return run_folder
 
     subprocess.run(args=command)

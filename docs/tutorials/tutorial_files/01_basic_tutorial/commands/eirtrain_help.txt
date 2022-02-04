@@ -1,4 +1,4 @@
-11:41:48 - DEBUG - eir.train_utils.utils - Global random seed set to 0.
+12:49:35 - DEBUG - eir.train_utils.utils - Global random seed set to 0.
 usage: eirtrain [-h] [--preset {gln}] --global_configs GLOBAL_CONFIGS
                 [GLOBAL_CONFIGS ...] --input_configs INPUT_CONFIGS
                 [INPUT_CONFIGS ...]

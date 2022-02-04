@@ -1,6 +1,6 @@
-run_name: poker_hands_run
-valid_size: 0.33
+output_folder: eir_tutorials/tutorial_runs/tutorial_02_run
+manual_valid_ids_file: eir_tutorials/02_tabular_tutorial/data/poker_hands_data/pre_split_valid_ids.txt
 n_saved_models: 1
 checkpoint_interval: 1000
 sample_interval: 1000
-n_epochs: 100
+n_epochs: 50
