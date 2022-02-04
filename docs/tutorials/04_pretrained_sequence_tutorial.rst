@@ -24,7 +24,7 @@ Note that this tutorial assumes that
 you are already familiar with
 the basic functionality
 of the framework
-(see :ref:`01-basic-tutorial`).
+(see :ref:`01-genotype-tutorial`).
 If you have not already,
 it can also be useful
 to go over the sequence tutorial

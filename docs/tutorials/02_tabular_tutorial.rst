@@ -1,7 +1,7 @@
 .. _02-tabular-tutorial:
 
-02 – Tabular Tutorial
-=====================
+02 – Tabular Tutorial: Nonlinear Poker Hands
+============================================
 
 A - Setup
 ^^^^^^^^^
@@ -19,7 +19,7 @@ Note that this tutorial assumes that
 you are already familiar with
 the basic functionality
 of the framework
-(see :ref:`01-basic-tutorial`).
+(see :ref:`01-genotype-tutorial`).
 
 To download the data for for this tutorial,
 `use this link. <https://drive.google.com/file/d/1Lw2Qlf0qGosie4VpFPIgfN6CSGZGnJix/view>`_

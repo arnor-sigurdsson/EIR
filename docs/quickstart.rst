@@ -49,7 +49,7 @@ we can run the following command:
 
     While concise,
     the command above indeed obscures a lot of the configuration and functionality
-    happening behind the scenes. See the :ref:`01-basic-tutorial`
+    happening behind the scenes. See the :ref:`01-genotype-tutorial`
     for a more thorough example.
 
 This will generate a folder called ``runs/gln``
@@ -86,4 +86,4 @@ The folder has roughly the following structure
 Hopefully this small demo was useful! For a more thorough tutorial
 (e.g. showing how you can predict on external samples,
 tips on applying the framework to your own data),
-head to :ref:`01-basic-tutorial`.
+head to :ref:`01-genotype-tutorial`.

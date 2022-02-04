@@ -1,7 +1,7 @@
-.. _01-basic-tutorial:
+.. _01-genotype-tutorial:
 
-01 – Basic Tutorial
-===================
+01 – Genotype Tutorial: Ancestry Prediction
+===========================================
 
 A - Setup
 ^^^^^^^^^
@@ -22,30 +22,20 @@ which as the following structure:
     ├── data_final_gen.bim          # Variant information file accompanying the genotype arrays
     └── human_origins_labels.csv    # Contains the target labels (what we want to predict from the genotype data)
 
-.. _processed sample data: https://drive.google.com/file/d/17vzG8AXVD684HqTD6RNtKjrK8tzHWeGx/view?usp=sharing
+.. _processed sample data: https://drive.google.com/file/d/1uzOR7-kZDHMsyhkzFdG9APYHVVf5fzMl
+
 
 In order to configure the experiment we want to run,
 we will use ``.yaml`` configurations.
 Running ``eirtrain --help``,
 we can see the configurations needed
 
-.. code-block:: console
+.. literalinclude:: tutorial_files/01_basic_tutorial/commands/eirtrain_help.txt
+    :language: console
+    :lines: 2-
 
-    usage: eirtrain [-h] [--preset {gln}] --global_configs GLOBAL_CONFIGS [GLOBAL_CONFIGS ...] --input_configs INPUT_CONFIGS [INPUT_CONFIGS ...] [--predictor_configs [PREDICTOR_CONFIGS [PREDICTOR_CONFIGS ...]]] --target_configs TARGET_CONFIGS [TARGET_CONFIGS ...]
-
-    optional arguments:
-      -h, --help            show this help message and exit
-      --preset {gln}        Whether and which preset to use that is built into the framework.
-      --global_configs GLOBAL_CONFIGS [GLOBAL_CONFIGS ...]
-                            Global .yaml configurations for the experiment.
-      --input_configs INPUT_CONFIGS [INPUT_CONFIGS ...]
-                            Input feature extraction .yaml configurations. Each configuration represents one input.
-      --predictor_configs [PREDICTOR_CONFIGS [PREDICTOR_CONFIGS ...]]
-                            Predictor .yaml configurations.
-      --target_configs TARGET_CONFIGS [TARGET_CONFIGS ...]
-                            Target .yaml configurations.
-
-In order to see what should be in these configuration files,
+In order to see more details about
+what should be in these configuration files,
 we can check the :ref:`api-reference` reference.
 
 .. note::
@@ -55,7 +45,7 @@ we can check the :ref:`api-reference` reference.
     in the `project repository <https://github.com/arnor-sigurdsson/EIR>`_
 
 While the **global** configuration has a lot of options,
-the only one we really need to fill in now is ``run_name``,
+the only one we really need to fill in now is ``output_folder``,
 so we have the following ``tutorial_01_globals.yaml`` file:
 
 
@@ -76,9 +66,11 @@ Above we can see that the input needs 3 fields: ``input_info``, ``input_type_inf
 ``model_config``.
 The ``input_info`` contains basic information about the input.
 The ``input_type_info`` contains information specific to the input type (in this case
-`omics`.
-Finally, the ``model_config`` contains configuration for the chosen model in
-``input_type_info`` (in this case the GLN model). For more information about the
+`omics`).
+Finally, the ``model_config`` contains configuration for
+the model that should be
+trained with the input data.
+For more information about the
 configurations, e.g. which parameters are relevant for the chosen models and what they
 do, head over to the :ref:`api-reference` reference.
 
@@ -92,16 +84,8 @@ will use the ``tutorial_01_targets.yaml`` file with the following content:
 
 With all this, we should have our project directory looking something like this:
 
-.. code-block:: console
-
-    ├── 01_basic_tutorial
-    │   ├── tutorial_01_globals.yaml
-    │   ├── tutorial_01_input.yaml
-    │   └── tutorial_01_targets.yaml
-    └── processed_sample_data
-        ├── arrays
-        ├── data_final_gen.bim
-        └── human_origins_labels.csv
+.. literalinclude:: tutorial_files/01_basic_tutorial/commands/tutorial_folder.txt
+    :language: console
 
 B - Training
 ^^^^^^^^^^^^
@@ -112,16 +96,14 @@ Training a GLN model
 Now that we have our configurations set up,
 training is simply passing them to the framework, like so:
 
-.. code-block:: console
+.. literalinclude:: tutorial_files/01_basic_tutorial/commands/GLN_1.txt
+    :language: console
 
-    eirtrain \
-    --global_configs 01_basic_tutorial/tutorial_01_globals.yaml \
-    --input_configs 01_basic_tutorial/tutorial_01_input.yaml \
-    --target_configs 01_basic_tutorial/tutorial_01_targets.yaml
-
-This will generate a folder in the current directory called ``runs``,
-and ``runs/tutorial_01_run`` (note that the inner run name comes from the value in
-``global_config`` we set before).
+This will generate a folder in the current directory called ``eir_tutorials``,
+and ``eir_tutorials/tutorial_runs/tutorial_01_run``
+(note that the inner run name comes from the value in
+``global_config`` we set before)
+will contain the results from our experiment.
 
 .. tip::
     You might try running the command above again after it partially/completely
@@ -130,33 +112,17 @@ and ``runs/tutorial_01_run`` (note that the inner run name comes from the value 
     another run, we will have to delete/rename the experiment, or change it in the
     configuration (see below).
 
-Examining the directory, we see the following structure:
+Examining the directory, we see the following structure
+(some files have been excluded here for brevity):
 
-.. code-block:: console
+.. literalinclude:: tutorial_files/01_basic_tutorial/commands/experiment_01_folder.txt
+    :language: console
 
-    ├── cl_args.json
-    ├── model_info.txt
-    ├── saved_models
-    ├── results
-    │   └── Origin  # Target column
-    │       ├── samples
-    │       │   ├── 200 # Validation results according to --sample_interval
-    │       │   │   ├── activations # Activations, computed if --get_acts flag is used
-    │       │   │   ├── confusion_matrix.png
-    │       │   │   ├── mc_pr_curve.png
-    │       │   │   ├── mc_roc_curve.png
-    │       │   │   └── wrong_preds.csv
-    │       │   ├── 400
-    │       │   │   ├── ...
-    │       │   ├── 600
-    │       │   │   ├── ...
-    │       ├── training_curve_ACC.png
-    │       ├── training_curve_AP-MACRO.png
-    │       ├── training_curve_LOSS.png
-    │       ├── training_curve_MCC.png
-    │       ├── training_curve_ROC-AUC-MACRO.png
-    ├── training_curve_LOSS-AVERAGE.png
-    ├── training_curve_PERF-AVERAGE.png
+In the results folder,
+the [200, 400, 600] folders
+contain our validation results
+according to our ``sample_interval`` configuration
+in the global config.
 
 We can examine how our model did with respect to accuracy (let's assume our targets are
 fairly balanced in this case) by checking the `training_curve_ACC.png` file:
@@ -172,22 +138,16 @@ we can look at the confusion matrix in one of the evaluation folders of
 In the training curve above,
 we can see that our model barely got going before the run finished!
 Let's try another experiment.
-We can change the ``run_name`` value in ``01_basic_tutorial/tutorial_01_globals.yaml``,
+We can change the ``output_folder`` value
+in ``01_basic_tutorial/tutorial_01_globals.yaml``,
 but the framework also supports rudimentary injection of values from the command line.
 Let's try that,
 setting a new run name,
 increasing the number of epochs and
 changing the learning rate:
 
-.. code-block:: console
-
-    eirtrain \
-    --global_configs 01_basic_tutorial/tutorial_01_globals.yaml \
-    --input_configs 01_basic_tutorial/tutorial_01_input.yaml \
-    --target_configs 01_basic_tutorial/tutorial_01_targets.yaml \
-    --tutorial_01_globals.run_name="my_custom_run_lr=0.002_epochs=20" \
-    --tutorial_01_globals.lr=0.002 \
-    --tutorial_01_globals.n_epochs=20
+.. literalinclude:: tutorial_files/01_basic_tutorial/commands/GLN_2.txt
+    :language: console
 
 .. note::
     The injected values are according to the configuration filenames.
@@ -214,21 +174,14 @@ linear model, we therefore use a linear predictor with L1 regularisation.
     :caption:
 
 
-Now, we can train the model with the following command:
+Now, we can train the linear model with the following command:
 
-.. code-block:: console
-
-    eirtrain \
-    --global_configs 01_basic_tutorial/tutorial_01_globals.yaml \
-    --input_configs 01_basic_tutorial/tutorial_01b_input_identity.yaml \
-    --predictor_configs 01_basic_tutorial/tutorial_01b_predictor_linear.yaml  \
-    --target_configs 01_basic_tutorial/tutorial_01_targets.yaml  \
-    --tutorial_01_globals.run_name="tutorial_01_run_linear" \
-    --tutorial_01_globals.n_epochs=20
+.. literalinclude:: tutorial_files/01_basic_tutorial/commands/LINEAR_1.txt
+    :language: console
 
 .. note::
     You might notice that we we did not set a predictor configuration before, that is
-    because it defaults to the default residual MLP predictor model if not specified.
+    because it defaults to a residual MLP predictor model if not specified.
 
 We can see that the linear model performs pretty well also. It does show a little more
 sign of overfitting as training performance is better than validation performance, so
@@ -243,30 +196,14 @@ To predict on external samples, we run ``eirpredict``.
 As we can see when running ``eirpredict --help``, it looks quite
 similar to ``eirtrain``:
 
-.. code-block:: console
+.. literalinclude:: tutorial_files/01_basic_tutorial/commands/eirpredict_help.txt
+    :language: console
+    :lines: 2-
 
-    usage: eirpredict [-h] [--preset {gln}] --global_configs GLOBAL_CONFIGS [GLOBAL_CONFIGS ...] --input_configs INPUT_CONFIGS [INPUT_CONFIGS ...] [--predictor_configs [PREDICTOR_CONFIGS [PREDICTOR_CONFIGS ...]]] --target_configs TARGET_CONFIGS [TARGET_CONFIGS ...]
-                      --model_path MODEL_PATH [--evaluate] [--output_folder OUTPUT_FOLDER]
-
-    optional arguments:
-      -h, --help            show this help message and exit
-      --preset {gln}        Whether and which preset to use that is built into the framework.
-      --global_configs GLOBAL_CONFIGS [GLOBAL_CONFIGS ...]
-                            Global .yaml configurations for the experiment.
-      --input_configs INPUT_CONFIGS [INPUT_CONFIGS ...]
-                            Input feature extraction .yaml configurations. Each configuration represents one input.
-      --predictor_configs [PREDICTOR_CONFIGS [PREDICTOR_CONFIGS ...]]
-                            Predictor .yaml configurations.
-      --target_configs TARGET_CONFIGS [TARGET_CONFIGS ...]
-                            Target .yaml configurations.
-      --model_path MODEL_PATH
-                            Path to model to use for predictions.
-      --evaluate
-      --output_folder OUTPUT_FOLDER
-                            Where to save prediction results.
 
 Generally we do not change much of the configs when predicting, with the exception of
-the input configs and perhaps the global config
+the input configs (and then mainly setting the ``input_source``,
+i.e. where to load our samples to predict on from) and perhaps the global config
 (e.g. we might not compute activations during training, but compute them on our test set
 by activating ``get_acts`` in the global config when predicting). Specific to
 ``eirpredict``, we have to choose a saved model (``--model_path``), whether we want to

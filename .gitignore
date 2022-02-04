@@ -78,6 +78,7 @@ target/
 # exclude data from source control by default
 data
 runs/
+eir_tutorials/
 config/custom_configs
 /*.png
 logs/

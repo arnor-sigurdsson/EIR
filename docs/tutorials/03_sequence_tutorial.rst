@@ -3,8 +3,8 @@
 .. role:: raw-html(raw)
     :format: html
 
-03 – Sequence Tutorial
-======================
+03 – Sequence Tutorial: Movie Reviews and Peptides
+==================================================
 
 In this tutorial,
 we will be training models
@@ -21,7 +21,7 @@ Note that this tutorial assumes that
 you are already familiar with
 the basic functionality
 of the framework
-(see :ref:`01-basic-tutorial`).
+(see :ref:`01-genotype-tutorial`).
 
 A - IMDB Reviews
 ----------------
