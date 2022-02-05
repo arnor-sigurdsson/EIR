@@ -1,10 +1,10 @@
-run_name: imdb_sentiment_bytes
+output_folder: eir_tutorials/tutorial_runs/tutorial_06_imdb_sentiment_binary
 valid_size: 0.10
 n_saved_models: 1
 device: "cuda:0" 
 checkpoint_interval: 1000
 sample_interval: 1000
 dataloader_workers: 8
-memory_dataset: false
+memory_dataset: true
 n_epochs: 50
 mixing_alpha: 0.5

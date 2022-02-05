@@ -20,7 +20,7 @@ We will be using the familiar IMDB reviews dataset,
 see `here <https://ai.stanford.edu/~ang/papers/acl11-WordVectorsSentimentAnalysis.pdf>`__
 for more information about the data.
 To download the data and configurations for this part of the tutorial,
-`use this link. <https://drive.google.com/file/d/1lYGVhynlhGSDHfLOnS7SqBVL_J3lvL64/view?usp=sharing>`__
+`use this link. <https://drive.google.com/file/d/1lYGVhynlhGSDHfLOnS7SqBVL_J3lvL64>`__
 
 A - Local Transformer
 ---------------------
