@@ -2,6 +2,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from shutil import copy2
+import re
 from typing import List, Sequence, Tuple, Callable, Dict
 
 from PIL.Image import Image
@@ -83,7 +84,7 @@ def find_and_copy_files(
 ):
     for path in run_folder.rglob("*"):
         for pattern, target in patterns:
-            if pattern in str(path):
+            if re.match(pattern=pattern, string=str(path)) or pattern in str(path):
 
                 output_destination = output_folder / target
                 copy2(path, output_destination)

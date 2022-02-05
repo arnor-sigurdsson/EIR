@@ -32,10 +32,10 @@ A1 - IMDB Setup
 For this first task,
 we will do a relatively classic NLP task,
 where we train a model to predict sentiment
-from IMDB reviews, see `here <https://ai.stanford.edu/~ang/papers/acl11-WordVectorsSentimentAnalysis.pdf>`_
+from IMDB reviews, see `here <https://ai.stanford.edu/~ang/papers/acl11-WordVectorsSentimentAnalysis.pdf>`__
 for more information about the data.
 To download the data and configurations for this part of the tutorial,
-`use this link. <https://drive.google.com/file/d/1lqWFbyMshZ57chUd1oTXxB6TSbw0-W0Z/view?usp=sharing>`_
+`use this link. <https://drive.google.com/file/d/1UcwSlJIpK4iQrokxRCuTrdEKubapADUm>`__
 
 Here we can see an example of one review from the dataset.
 
@@ -95,35 +95,18 @@ we will start by defining our configurations.
 
 Now with the configurations set up, our folder structure should look like this:
 
-.. code-block:: console
-
-    ├── IMDB_Reviews
-    │     ├── 0_3.txt
-    │     ├── 0_9.txt
-    │     ├── 10000_4.txt
-    │     ├── 10000_8.txt
-    │     ├── 10001_10.txt
-    │     ├── ...
-    ├── conf
-    │     ├── 03a_imdb_globals.yaml
-    │     ├── 03a_imdb_input.yaml
-    │     ├── 03a_imdb_predictor.yaml
-    │     └── 03a_imdb_target.yaml
-    ├── imdb.vocab
-    └── imdb_labels.csv
+.. literalinclude:: tutorial_files/03_sequence_tutorial/a_IMDB/commands/tutorial_folder.txt
+    :language: console
+    :caption:
 
 A2 - IMDB Training
 ^^^^^^^^^^^^^^^^^^
 
 As before, we can train a model using ``eirtrain``:
 
-.. code-block:: console
-
-    eirtrain \
-    --global_configs IMDB/conf/03a_imdb_globals.yaml \
-    --input_configs IMDB/conf/03a_imdb_input.yaml  \
-    --target_configs IMDB/conf/03a_imdb_target.yaml  \
-    --predictor_configs IMDB/conf/03a_imdb_predictor.yaml
+.. literalinclude:: tutorial_files/03_sequence_tutorial/a_IMDB/commands/SEQUENCE_IMDB_1.txt
+    :language: console
+    :caption:
 
 This took around 20 minutes to run on my laptop,
 so this is a good chance to take a nap
@@ -131,7 +114,7 @@ or do something else for a while!
 
 Looking at the accuracy, I got the following training/validation results:
 
-.. image:: tutorial_files/03_sequence_tutorial/a_IMDB/figures/tutorial_03a_training_curve_ACC.png
+.. image:: tutorial_files/03_sequence_tutorial/a_IMDB/figures/03a_imdb_training_curve_ACC_transformer_1.png
 
 Perhaps not great, but not too bad either!
 Especially since we are using a relatively short sequence length.
@@ -154,7 +137,7 @@ framework to compute and analyze
 how the inputs influence the model
 towards a certain output. In this case,
 the activations can be found in the
-``imdb_sentiment/results/Sentiment/samples/<every_1000_iterations>/activations``
+``imdb_sentiment/results/Sentiment/samples/<every_2000_iterations>/activations``
 folders.
 
 Firstly,
@@ -175,7 +158,7 @@ for 10 single samples,
 here is one such example, where we look at the activations towards a positive sentiment.
 
 .. raw:: html
-   :file: tutorial_files/03_sequence_tutorial/a_IMDB/figures/tutorial_03a_sequence_9016_10_Positive.html
+   :file: tutorial_files/03_sequence_tutorial/a_IMDB/figures/tutorial_03a_single_sample_example.html
 
 :raw-html:`<br />`
 
@@ -194,7 +177,7 @@ we will use the framework to predict anti breast cancer properties of
 peptides (a peptide is basically a short protein sequence).
 See `here <https://pubmed.ncbi.nlm.nih.gov/30953170/>`_
 for more information about the dataset. To download the data and configurations for this part of the tutorial,
-`use this link. <https://drive.google.com/file/d/1yzb_XFsAuWmNEErdjOKghvxzQVvwBaMd/view?usp=sharing>`_
+`use this link. <https://drive.google.com/file/d/1dXXw7RCINu1wgK-tZBp-GiKIHLMBI3nj>`_
 
 Again, let's take a quick look at one sample we are going to be modelling on:
 
@@ -231,8 +214,9 @@ as you will see momentarily.
 .. note::
 
     You might notice that we use a large validation set here.
-    This is the same situation as in :ref:`02-tabular-tutorial`,
-    to ensure that we have all classes present in the validation set.
+    This a similar situation as in :ref:`02-tabular-tutorial`, where we used a manual
+    validation set to ensure that we have all classes present in the validation set.
+    Here, we take the lazier approach and just make the validation set larger.
     Currently the framework does not handle having a mismatch in which classes are
     present in the training and validation sets.
 
@@ -257,55 +241,41 @@ we do not split on whitespace anymore, but rather on "".
 B1 - Anticancer Peptides Training
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+For the peptide data,
+the folder structure should look something like this:
+
+.. literalinclude:: tutorial_files/03_sequence_tutorial/b_Anticancer_peptides/commands/tutorial_folder.txt
+    :language: console
+
+
 As before, we run:
 
-.. code-block:: console
+.. literalinclude:: tutorial_files/03_sequence_tutorial/b_Anticancer_peptides/commands/SEQUENCE_PEPTIDES_1.txt
+    :language: console
 
-    eirtrain \
-    --global_configs Anticancer_Peptides/conf/03b_peptides_globals.yaml \
-    --input_configs Anticancer_Peptides/conf/03b_peptides_input.yaml \
-    --target_configs Anticancer_Peptides/conf/03b_peptides_target.yaml \
-    --predictor_configs Anticancer_Peptides/conf/03b_peptides_predictor.yaml
 
 As the data is imbalanced, we will look at the MCC training curve:
 
-.. image:: tutorial_files/03_sequence_tutorial/b_Anticancer_peptides/figures/tutorial_03b_training_curve_MCC.png
+.. image:: tutorial_files/03_sequence_tutorial/b_Anticancer_peptides/figures/03b_peptides_training_curve_MCC_transformer_1.png
 
-Checking the confusion matrix at iteration 1200, we see:
+Checking the confusion matrix at iteration 2000, we see:
 
-.. image:: tutorial_files/03_sequence_tutorial/b_Anticancer_peptides/figures/tutorial_03b_confusion_matrix.png
+.. image:: tutorial_files/03_sequence_tutorial/b_Anticancer_peptides/figures/03b_peptides_confusion_matrix_1.png
     :width: 800
 
 Looking at the training curve,
 we see that we are definitely overfitting quite a bit!
-Fortunately, there exists
-a really cool
-data augmentation technique called `mixup <https://arxiv.org/pdf/1710.09412.pdf>`_,
-which is included in the framework. Let's try another run, injecting the relevant
-parameters from the command line:
+We could probably squeeze out a better performance
+by playing with the hyperparameters a bit,
+but for now we will keep going!
 
-.. code-block:: console
-
-    eirtrain \
-    --global_configs Anticancer_Peptides/conf/03b_peptides_globals.yaml \
-    --input_configs Anticancer_Peptides/conf/03b_peptides_input.yaml \
-    --target_configs Anticancer_Peptides/conf/03b_peptides_target.yaml \
-    --predictor_configs Anticancer_Peptides/conf/03b_peptides_predictor.yaml \
-    --03b_peptides_globals.mixing_alpha=1.0 \
-    --03b_peptides_globals.mixing_type="mixup" \
-    --03b_peptides_globals.run_name="anti_breast_cancer_peptides_mixing"
-
-Here we have the training curve for this run:
-
-.. image:: tutorial_files/03_sequence_tutorial/b_Anticancer_peptides/figures/tutorial_03b_training_curve_MCC_mixing.png
-
-Now that's more like it! As before, let's have a look at the activations. In this case
+As before, let's have a look at the activations. In this case
 we will check activations towards the moderately active class:
 
-.. image:: tutorial_files/03_sequence_tutorial/b_Anticancer_peptides/figures/tutorial_03b_feature_importance_mod._active_mixing.png
+.. image:: tutorial_files/03_sequence_tutorial/b_Anticancer_peptides/figures/tutorial_03b_feature_importance_mod._active.png
 
-It seems that the Lysine (K) amino acid influences the model towards a
-moderately active prediction, while Glutamic acid (E) does the opposite.
+It seems that the Cysteine (C) amino acid influences the model towards a
+moderately active prediction, while Glutamine (Q) does the opposite.
 
 Looking at an example
 of single moderately active sample
@@ -314,13 +284,13 @@ towards a prediction of
 the moderately active class, we see:
 
 .. raw:: html
-   :file: tutorial_files/03_sequence_tutorial/b_Anticancer_peptides/figures/tutorial_03b_sequence_199_mod._active_mixing.html
+   :file: tutorial_files/03_sequence_tutorial/b_Anticancer_peptides/figures/tutorial_03b_single_sample_mod._active_example.html
 
 :raw-html:`<br />`
 
 
-As we saw in the token importance figure,
-K does indeed seem to have a positive influence towards the moderately active properties
+As we can see in the token importance figure,
+K and L indeed seem to have a positive influence towards the moderately active properties
 of the peptide. Interestingly (but perhaps not surprisingly),
 the effect seems to depend on the context.
 In some cases,
