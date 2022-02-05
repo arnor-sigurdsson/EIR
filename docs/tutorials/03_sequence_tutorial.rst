@@ -274,8 +274,11 @@ we will check activations towards the moderately active class:
 
 .. image:: tutorial_files/03_sequence_tutorial/b_Anticancer_peptides/figures/tutorial_03b_feature_importance_mod._active.png
 
-It seems that the Cysteine (C) amino acid influences the model towards a
-moderately active prediction, while Glutamine (Q) does the opposite.
+It seems that the
+Aspartic acid (D) and Leucine (L) amino acids
+influences the model towards a
+moderately active prediction,
+while Glutamine (Q) does the opposite.
 
 Looking at an example
 of single moderately active sample
@@ -290,11 +293,11 @@ the moderately active class, we see:
 
 
 As we can see in the token importance figure,
-K and L indeed seem to have a positive influence towards the moderately active properties
+L indeed seems to have a positive influence towards the moderately active properties
 of the peptide. Interestingly (but perhaps not surprisingly),
 the effect seems to depend on the context.
 In some cases,
-K seems to have a negative effect.
+L seems to have a negative effect.
 We will leave further analysis to the experts!
 
 .. warning::

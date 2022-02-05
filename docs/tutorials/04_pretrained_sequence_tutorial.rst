@@ -18,7 +18,7 @@ We will be using the IMDB reviews dataset,
 see `here <https://ai.stanford.edu/~ang/papers/acl11-WordVectorsSentimentAnalysis.pdf>`__
 for more information about the data.
 To download the data and configurations for this part of the tutorial,
-`use this link. <https://drive.google.com/file/d/1cS0Q_pU5qVLSNsDoQK3LX2dhku2ZN7mf/view?usp=sharing>`__
+`use this link. <https://drive.google.com/file/d/1u6bkIr9sECkU9z3Veutjn8cx6Mu3GP3Z>`__
 
 Note that this tutorial assumes that
 you are already familiar with

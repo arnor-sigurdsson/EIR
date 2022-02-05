@@ -6,12 +6,6 @@
 A - Setup
 ^^^^^^^^^
 
-While the :ref:`quickstart` shows
-how to quickly train a model,
-it obscures a lot of the
-configuration and functionality
-offered by the framework.
-
 For this tutorial we will be using the `processed sample data`_,
 which as the following structure:
 
