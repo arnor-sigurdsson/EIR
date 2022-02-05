@@ -25,7 +25,7 @@ def _parse_google_url(url_to_parse: str):
     return parsed_url
 
 
-def unzip_file(file: Path, overwrite: bool = True):
+def unzip_file(file: Path, overwrite: bool = False):
 
     with zipfile.ZipFile(file, "r") as zip_ref:
 

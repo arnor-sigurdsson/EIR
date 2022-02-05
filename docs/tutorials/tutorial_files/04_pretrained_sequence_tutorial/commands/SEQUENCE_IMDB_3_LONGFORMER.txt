@@ -1,0 +1,6 @@
+eirtrain \
+--global_configs eir_tutorials/04_pretrained_sequence_tutorial/conf/04_imdb_globals.yaml \
+--input_configs eir_tutorials/04_pretrained_sequence_tutorial/conf/04_imdb_input_longformer.yaml \
+--predictor_configs eir_tutorials/04_pretrained_sequence_tutorial/conf/04_imdb_predictor.yaml \
+--target_configs eir_tutorials/04_pretrained_sequence_tutorial/conf/04_imdb_target.yaml \
+--04_imdb_globals.output_folder=eir_tutorials/tutorial_runs/tutorial_04_imdb_run_longformer

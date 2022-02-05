@@ -15,10 +15,10 @@ NLP architectures, and
 pretrained NLP models with ``EIR``
 in order to predict sentiment from text.
 We will be using the IMDB reviews dataset,
-see `here <https://ai.stanford.edu/~ang/papers/acl11-WordVectorsSentimentAnalysis.pdf>`_
+see `here <https://ai.stanford.edu/~ang/papers/acl11-WordVectorsSentimentAnalysis.pdf>`__
 for more information about the data.
 To download the data and configurations for this part of the tutorial,
-`use this link. <https://drive.google.com/file/d/1cS0Q_pU5qVLSNsDoQK3LX2dhku2ZN7mf/view?usp=sharing>`_
+`use this link. <https://drive.google.com/file/d/1cS0Q_pU5qVLSNsDoQK3LX2dhku2ZN7mf/view?usp=sharing>`__
 
 Note that this tutorial assumes that
 you are already familiar with
@@ -64,6 +64,18 @@ As always, configurations first!
 .. literalinclude:: tutorial_files/04_pretrained_sequence_tutorial/04_imdb_globals.yaml
     :language: yaml
     :caption:
+
+.. note::
+
+    You might notice that we have a new configuration in our global config,
+    ``mixing_alpha``.
+    The parameter controls the level of
+    `Mixup, <https://arxiv.org/pdf/1710.09412.pdf>`__
+    a really cool data augmentation
+    which is included in the framework,
+    and is automatically applied to all input modalities
+    (genotype, tabular, sequence, images, binary data)
+    when set in the global configuration.
 
 .. literalinclude:: tutorial_files/04_pretrained_sequence_tutorial/04_imdb_input.yaml
     :language: yaml
