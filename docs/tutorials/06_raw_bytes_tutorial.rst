@@ -27,21 +27,8 @@ A - Local Transformer
 
 After downloading the data, the folder structure should look like this:
 
-.. code-block:: console
-
-    ├── IMDB_Reviews
-    │     ├── 0_3.txt
-    │     ├── 0_9.txt
-    │     ├── 10000_4.txt
-    │     ├── 10000_8.txt
-    │     ├── 10001_10.txt
-    │     ├── ...
-    ├── conf
-    │     ├── globals.yaml
-    │     ├── input.yaml
-    │     ├── target.yaml
-    │     ├── predictor.yaml
-    └── imdb_labels.csv
+.. literalinclude:: tutorial_files/06_raw_bytes_tutorial/commands/tutorial_folder.txt
+    :language: console
 
 We will use the
 built-in local transformer model
@@ -75,9 +62,17 @@ are here:
     try reducing the number of layers
     and the sequence length.
 
-When training, I got the following training curve:
+As usual, we can run the following command to train:
 
-.. image:: tutorial_files/06_raw_bytes_tutorial/figures/a_training_curve_ACC.png
+.. literalinclude:: tutorial_files/06_raw_bytes_tutorial/commands/SEQUENCE_BINARY_IMDB_1.txt
+    :language: console
+
+
+When training, I got the following training curves:
+
+.. image:: tutorial_files/06_raw_bytes_tutorial/figures/06_training_curve_ACC_transformer_1.png
+
+.. image:: tutorial_files/06_raw_bytes_tutorial/figures/06_training_curve_MCC_transformer_1.png
 
 Not so great, but not a complete failure either!
 When comparing with our

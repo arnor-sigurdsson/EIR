@@ -5,7 +5,7 @@ input_info:
 
 input_type_info:
         sampling_strategy_if_longer: "uniform"
-        max_length: 2048
+        max_length: 1024
 
 model_config:
         model_type: sequence-default
