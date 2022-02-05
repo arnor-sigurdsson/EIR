@@ -48,7 +48,7 @@ def get_05_hot_dog_run_1_resnet_info() -> AutoDocExperimentInfo:
 
     ade = AutoDocExperimentInfo(
         name="IMAGE_1_RESNET",
-        data_url="https://drive.google.com/file/d/1NXUPWGvi8WfY5L4EadHw09bQ0C8-6X1U",
+        data_url="https://drive.google.com/file/d/1g5slDIwtXcksjKlJ5anAiVCZGCM9AAHI",
         data_output_path=data_output_path,
         conf_output_path=Path(conf_output_path),
         base_path=Path(base_path),
@@ -94,7 +94,7 @@ def get_05_hot_dog_run_2_resnet_pretrained_info() -> AutoDocExperimentInfo:
 
     ade = AutoDocExperimentInfo(
         name="IMAGE_2_PRETRAINED_RESNET",
-        data_url="https://drive.google.com/file/d/1NXUPWGvi8WfY5L4EadHw09bQ0C8-6X1U",
+        data_url="https://drive.google.com/file/d/1g5slDIwtXcksjKlJ5anAiVCZGCM9AAHI",
         data_output_path=data_output_path,
         conf_output_path=Path(conf_output_path),
         base_path=Path(base_path),
@@ -145,7 +145,7 @@ def get_05_hot_dog_run_2_combined_pretrained_info() -> AutoDocExperimentInfo:
 
     ade = AutoDocExperimentInfo(
         name="IMAGE_3_PRETRAINED_EFFICIENTNET",
-        data_url="https://drive.google.com/file/d/1NXUPWGvi8WfY5L4EadHw09bQ0C8-6X1U",
+        data_url="https://drive.google.com/file/d/1g5slDIwtXcksjKlJ5anAiVCZGCM9AAHI",
         data_output_path=data_output_path,
         conf_output_path=Path(conf_output_path),
         base_path=Path(base_path),

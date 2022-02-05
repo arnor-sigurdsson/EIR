@@ -22,7 +22,7 @@ of the framework
 (see :ref:`01-genotype-tutorial`).
 
 To download the data for for this tutorial,
-`use this link. <https://drive.google.com/file/d/1Efnt8iurEM8fEBC-QHdtuoQdGp49dPPF>`_
+`use this link. <https://drive.google.com/file/d/1Ck1F_iYT3WdoAHjtPwR1peOqhwjmCqHl>`_
 
 Having a quick look at the data,
 we can see it consists of 10 categorical inputs columns
@@ -171,7 +171,7 @@ and they even use the Poker Hand dataset as well!
    * - Rule-based
      - 100.0
 
-So using our humble model before we saw an accuracy of 98.7%. Of course, since the
+So using our humble model before we saw an accuracy of 98.8%. Of course, since the
 dataset is highly imbalanced, it can be difficult to compare with the numbers in the
 table above. For example it can be that TabNet is performing very well on the rare
 classes, which will not have a large effect on the total test accuracy. However, our

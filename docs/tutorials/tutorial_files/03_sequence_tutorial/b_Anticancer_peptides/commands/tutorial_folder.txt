@@ -8,5 +8,4 @@ eir_tutorials/03_sequence_tutorial/
 └── data
     └── Anticancer_Peptides
         ├── breast_cancer_labels.csv
-        ├── breast_cancer_train
-        └── conf
+        └── breast_cancer_train

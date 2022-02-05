@@ -60,7 +60,7 @@ def get_03_imdb_run_1_transformer_info() -> AutoDocExperimentInfo:
 
     ade = AutoDocExperimentInfo(
         name="SEQUENCE_IMDB_1",
-        data_url="https://drive.google.com/file/d/1UcwSlJIpK4iQrokxRCuTrdEKubapADUm",
+        data_url="https://drive.google.com/file/d/1u6bkIr9sECkU9z3Veutjn8cx6Mu3GP3Z",
         data_output_path=data_output_path,
         conf_output_path=Path(conf_output_path),
         base_path=Path(base_path),
@@ -133,7 +133,7 @@ def get_03_peptides_run_1_transformer_info() -> AutoDocExperimentInfo:
 
     ade = AutoDocExperimentInfo(
         name="SEQUENCE_PEPTIDES_1",
-        data_url="https://drive.google.com/file/d/1dXXw7RCINu1wgK-tZBp-GiKIHLMBI3nj",
+        data_url="https://drive.google.com/file/d/12vHW1V8hhIuasih_gWPn7xHmZZTAd22Q",
         data_output_path=data_output_path,
         conf_output_path=Path(conf_output_path),
         base_path=Path(base_path),

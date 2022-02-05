@@ -35,7 +35,7 @@ where we train a model to predict sentiment
 from IMDB reviews, see `here <https://ai.stanford.edu/~ang/papers/acl11-WordVectorsSentimentAnalysis.pdf>`__
 for more information about the data.
 To download the data and configurations for this part of the tutorial,
-`use this link. <https://drive.google.com/file/d/1UcwSlJIpK4iQrokxRCuTrdEKubapADUm>`__
+`use this link. <https://drive.google.com/file/d/1u6bkIr9sECkU9z3Veutjn8cx6Mu3GP3Z>`__
 
 Here we can see an example of one review from the dataset.
 
@@ -177,7 +177,7 @@ we will use the framework to predict anti breast cancer properties of
 peptides (a peptide is basically a short protein sequence).
 See `here <https://pubmed.ncbi.nlm.nih.gov/30953170/>`_
 for more information about the dataset. To download the data and configurations for this part of the tutorial,
-`use this link. <https://drive.google.com/file/d/1dXXw7RCINu1wgK-tZBp-GiKIHLMBI3nj>`_
+`use this link. <https://drive.google.com/file/d/12vHW1V8hhIuasih_gWPn7xHmZZTAd22Q>`_
 
 Again, let's take a quick look at one sample we are going to be modelling on:
 

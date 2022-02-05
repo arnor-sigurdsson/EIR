@@ -18,7 +18,7 @@ a `hot dog or not <https://www.youtube.com/watch?v=vIci3C4JkL0>`__
 We will be using a subset of the Food-101 dataset,
 originally introduced `here <https://link.springer.com/chapter/10.1007%2F978-3-319-10599-4_29>`__
 To download the data and configurations for this part of the tutorial,
-`use this link. <https://drive.google.com/file/d/1NXUPWGvi8WfY5L4EadHw09bQ0C8-6X1U>`__
+`use this link. <https://drive.google.com/file/d/1g5slDIwtXcksjKlJ5anAiVCZGCM9AAHI>`__
 
 Note that this tutorial assumes that
 you are already familiar with

@@ -7,7 +7,7 @@ eir_tutorials/03_sequence_tutorial/
 │       └── 03a_imdb_target.yaml
 └── data
     └── IMDB
-        ├── IMDB_Reviews
         ├── conf
-        ├── imdb.vocab
-        └── imdb_labels.csv
+        ├── imdb_labels.csv
+        ├── IMDB_Reviews
+        └── imdb.vocab

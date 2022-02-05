@@ -87,7 +87,7 @@ def get_tutorial_01_run_1_gln_info() -> AutoDocExperimentInfo:
 
     ade = AutoDocExperimentInfo(
         name="GLN_1",
-        data_url="https://drive.google.com/file/d/1uzOR7-kZDHMsyhkzFdG9APYHVVf5fzMl",
+        data_url="https://drive.google.com/file/d/1MELauhv7zFwxM8nonnj3iu_SmS69MuNi",
         data_output_path=data_output_path,
         conf_output_path=Path(conf_output_path),
         base_path=Path(base_path),
@@ -131,7 +131,7 @@ def get_tutorial_01_run_2_gln_info() -> AutoDocExperimentInfo:
 
     ade = AutoDocExperimentInfo(
         name="GLN_2",
-        data_url="https://drive.google.com/file/d/1uzOR7-kZDHMsyhkzFdG9APYHVVf5fzMl",
+        data_url="https://drive.google.com/file/d/1MELauhv7zFwxM8nonnj3iu_SmS69MuNi",
         data_output_path=Path(
             "data/tutorial_data/01_basic_tutorial/processed_sample_data.zip"
         ),
@@ -171,7 +171,7 @@ def get_tutorial_01_run_3_linear_info() -> AutoDocExperimentInfo:
 
     ade = AutoDocExperimentInfo(
         name="LINEAR_1",
-        data_url="https://drive.google.com/file/d/1uzOR7-kZDHMsyhkzFdG9APYHVVf5fzMl",
+        data_url="https://drive.google.com/file/d/1MELauhv7zFwxM8nonnj3iu_SmS69MuNi",
         data_output_path=Path(
             "data/tutorial_data/01_basic_tutorial/processed_sample_data.zip"
         ),

@@ -22,7 +22,7 @@ which as the following structure:
     ├── data_final_gen.bim          # Variant information file accompanying the genotype arrays
     └── human_origins_labels.csv    # Contains the target labels (what we want to predict from the genotype data)
 
-.. _processed sample data: https://drive.google.com/file/d/1uzOR7-kZDHMsyhkzFdG9APYHVVf5fzMl
+.. _processed sample data: https://drive.google.com/file/d/1MELauhv7zFwxM8nonnj3iu_SmS69MuNi
 
 
 In order to configure the experiment we want to run,

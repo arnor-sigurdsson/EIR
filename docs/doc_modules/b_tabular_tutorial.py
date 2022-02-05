@@ -56,7 +56,7 @@ def get_02_poker_hands_run_1_tabular_info() -> AutoDocExperimentInfo:
 
     ade = AutoDocExperimentInfo(
         name="TABULAR_1",
-        data_url="https://drive.google.com/file/d/1Efnt8iurEM8fEBC-QHdtuoQdGp49dPPF",
+        data_url="https://drive.google.com/file/d/1Ck1F_iYT3WdoAHjtPwR1peOqhwjmCqHl",
         data_output_path=data_output_path,
         conf_output_path=Path(conf_output_path),
         base_path=Path(base_path),
@@ -89,7 +89,7 @@ def get_02_poker_hands_run_1_predict_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/02_poker_hands_target_test.yaml",
         "--model_path",
         "eir_tutorials/tutorial_runs/tutorial_02_run/saved_models"
-        "/tutorial_02_run_model_15000_perf-average=0.9791.pt",
+        "/tutorial_02_run_model_15000_perf-average=0.9815.pt",
         "--evaluate",
         "--output_folder",
         "eir_tutorials/tutorial_runs/tutorial_02_run",
@@ -108,7 +108,7 @@ def get_02_poker_hands_run_1_predict_info() -> AutoDocExperimentInfo:
 
     ade = AutoDocExperimentInfo(
         name="TABULAR_1_PREDICT",
-        data_url="https://drive.google.com/file/d/1Efnt8iurEM8fEBC-QHdtuoQdGp49dPPF",
+        data_url="https://drive.google.com/file/d/1Ck1F_iYT3WdoAHjtPwR1peOqhwjmCqHl",
         data_output_path=data_output_path,
         conf_output_path=Path(conf_output_path),
         base_path=Path(base_path),

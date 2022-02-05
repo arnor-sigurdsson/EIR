@@ -8,6 +8,5 @@ eir_tutorials/05_image_tutorial/
 │   └── target.yaml
 └── data
     └── hot_dog_not_hot_dog
-        ├── conf
         ├── food_images
         └── labels.csv
