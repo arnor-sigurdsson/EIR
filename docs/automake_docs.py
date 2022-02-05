@@ -5,6 +5,7 @@ from docs.doc_modules import (
     b_tabular_tutorial,
     c_sequence_tutorial,
     d_pretrained_models_tutorial,
+    e_image_tutorial,
 )
 from docs.doc_modules.experiments import make_tutorial_data
 
@@ -13,13 +14,15 @@ if __name__ == "__main__":
     b_experiments = b_tabular_tutorial.get_experiments()
     c_experiments = c_sequence_tutorial.get_experiments()
     d_experiments = d_pretrained_models_tutorial.get_experiments()
+    e_experiments = e_image_tutorial.get_experiments()
 
     experiment_iter = chain.from_iterable(
         [
             # a_experiments,
             # b_experiments,
             # c_experiments,
-            d_experiments
+            # d_experiments
+            e_experiments,
         ]
     )
     for experiment in experiment_iter:

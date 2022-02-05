@@ -1,3 +1,3 @@
-label_file: hot_dog_not_hot_dog/labels.csv
+label_file: eir_tutorials/05_image_tutorial/data/hot_dog_not_hot_dog/labels.csv
 target_cat_columns:
   - CLASS
