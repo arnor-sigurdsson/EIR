@@ -3,8 +3,8 @@
 .. role:: raw-html(raw)
     :format: html
 
-05 – Image Tutorial
-===================
+05 – Image Tutorial: Hot Dog or Not?
+====================================
 
 In this tutorial,
 we will be using ``EIR``
@@ -18,13 +18,13 @@ a `hot dog or not <https://www.youtube.com/watch?v=vIci3C4JkL0>`__
 We will be using a subset of the Food-101 dataset,
 originally introduced `here <https://link.springer.com/chapter/10.1007%2F978-3-319-10599-4_29>`__
 To download the data and configurations for this part of the tutorial,
-`use this link. <https://drive.google.com/file/d/1NXUPWGvi8WfY5L4EadHw09bQ0C8-6X1U/view?usp=sharing>`_
+`use this link. <https://drive.google.com/file/d/1g5slDIwtXcksjKlJ5anAiVCZGCM9AAHI>`__
 
 Note that this tutorial assumes that
 you are already familiar with
 the basic functionality
 of the framework
-(see :ref:`01-basic-tutorial`).
+(see :ref:`01-genotype-tutorial`).
 If you have not already,
 it can also be useful
 to go over the sequence tutorial
@@ -33,19 +33,8 @@ to go over the sequence tutorial
 A - Baseline
 ------------
 
-.. code-block:: console
-
-    ├── conf
-    │   ├── globals.yaml
-    │   ├── inputs_efficientnet_b0.yaml
-    │   ├── inputs_resnet18.yaml
-    │   ├── inputs.yaml
-    │   ├── predictor.yaml
-    │   └── target.yaml
-    ├── food_images
-    │   ├── 1000288.jpg
-    │   ├── ...
-    └── labels.csv
+.. literalinclude:: tutorial_files/05_image_tutorial/commands/tutorial_folder.txt
+    :language: console
 
 Looking at the data
 we are working with,
@@ -95,14 +84,8 @@ To the configuration!
 
 As usually, we do our training with the following command:
 
-.. code-block:: console
-
-    eirtrain \
-    --global_configs hot_dog_not_hot_dog/conf/globals.yaml \
-    --input_configs hot_dog_not_hot_dog/conf/inputs.yaml  \
-    --target_configs hot_dog_not_hot_dog/conf/target.yaml  \
-    --predictor_configs hot_dog_not_hot_dog/conf/predictor.yaml
-
+.. literalinclude:: tutorial_files/05_image_tutorial/commands/IMAGE_1_RESNET.txt
+    :language: console
 
 .. note::
     Training these deep image models
@@ -113,9 +96,9 @@ As usually, we do our training with the following command:
 
 Now for the results, we see the following:
 
-.. image:: tutorial_files/05_image_tutorial/figures/a_training_curve_ACC_basic_resnet.png
+.. image:: tutorial_files/05_image_tutorial/figures/05_image_training_curve_ACC_resnet_1.png
 
-That looks *ok*, but not great. Our validation performance is all over the place
+That looks *kind of* ok, but far from great. Our validation performance is all over the place
 (a contributing factor could be that our validation set here is very small),
 and we don't get a better performance than around 72%. Certainly not good enough
 for an actual app!
@@ -138,31 +121,29 @@ Now our input configuration looks like this:
 
 To train, we run:
 
-.. code-block:: console
+.. literalinclude:: tutorial_files/05_image_tutorial/commands/IMAGE_2_PRETRAINED_RESNET.txt
+    :language: console
 
-    eirtrain \
-    --global_configs hot_dog_not_hot_dog/conf/globals.yaml \
-    --input_configs hot_dog_not_hot_dog/conf/input_resnet18.yaml  \
-    --target_configs hot_dog_not_hot_dog/conf/target.yaml  \
-    --predictor_configs hot_dog_not_hot_dog/conf/predictor.yaml
 
 Looking at our performance, we see:
 
-.. image:: tutorial_files/05_image_tutorial/figures/b_training_curve_ACC_resnet18-pretrained.png
+.. image:: tutorial_files/05_image_tutorial/figures/05_image_training_curve_ACC_resnet_pretrained_1.png
 
-Definitely better, but still less than 90%!
+Definitely better!
 One factor here could be that
 we are training on different
 image sizes than
 the original model was trained on.
 In any case, let's have a look at what our models
-are focusing on (perhaps you already noticed
+are focusing on
+when deciding something is *not* a hot dog.
+(perhaps you already noticed
 we set the ``get_acts`` value to ``True``
 in the global configuration):
 
-.. image:: tutorial_files/05_image_tutorial/figures/c_hot_dog_activations.png
+.. image:: tutorial_files/05_image_tutorial/figures/pretrained_resnet_not_hot_dog_activations.png
 
-That is a hot dog alright, and our model seems to agree.
+That is not a hot dog alright, and our model seems to agree.
 
 C - Combining pretrained image models
 -------------------------------------
@@ -184,13 +165,9 @@ Training as usual,
 notice that we are now passing in both input configurations
 to the ``--input_configs`` flag.
 
-.. code-block:: console
+.. literalinclude:: tutorial_files/05_image_tutorial/commands/IMAGE_3_PRETRAINED_EFFICIENTNET.txt
+    :language: console
 
-    eirtrain \
-    --global_configs hot_dog_not_hot_dog/conf/globals.yaml \
-    --input_configs hot_dog_not_hot_dog/conf/input_resnet18.yaml hot_dog_not_hot_dog/conf/input_efficientnet_b0.yaml  \
-    --target_configs hot_dog_not_hot_dog/conf/target.yaml  \
-    --predictor_configs hot_dog_not_hot_dog/conf/predictor.yaml
 
 .. note::
     Here we are maybe
@@ -205,7 +182,7 @@ to the ``--input_configs`` flag.
 The training and validation curves I got look like so
 (I got a bit impatient and stopped the run early):
 
-.. image:: tutorial_files/05_image_tutorial/figures/d_training_curve_ACC_resnet-18-pretrained_efficientnet-b0-pretrained.png
+.. image:: tutorial_files/05_image_tutorial/figures/05_image_training_curve_ACC_combined_pretrained_1.png
 
 Definitely looks more stable,
 and better performance than before.
@@ -220,16 +197,18 @@ focus on for an example image.
 
 First the ResNet18 feature extractor:
 
-.. image:: tutorial_files/05_image_tutorial/figures/e_not_hot_dog_activations_resnet18.png
+.. image:: tutorial_files/05_image_tutorial/figures/pretrained_combined_resnet_not_hot_dog_activations.png
 
 And then the EfficientNet-B0 feature extractor:
 
-.. image:: tutorial_files/05_image_tutorial/figures/e_not_hot_dog_activations_efficientnet-b0.png
+.. image:: tutorial_files/05_image_tutorial/figures/pretrained_combined_efficientnet_not_hot_dog_activations.png
 
 While it's definitely more clear
 to the human eye in the ResNet18 case,
 both feature extractors seem to be focusing
-on the little ketchup bowl (and also the fries)
+on that piece of french fry
+(or is that perhaps an onion?
+I actually have no clue what food this is...)
 when deciding that this is indeed, not a hot dog.
 
 With that, we conclude this image tutorial. Thank you for reading!

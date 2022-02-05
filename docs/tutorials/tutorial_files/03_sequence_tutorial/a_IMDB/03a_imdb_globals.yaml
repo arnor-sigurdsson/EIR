@@ -1,4 +1,4 @@
-run_name: imdb_sentiment
+output_folder: eir_tutorials/tutorial_runs/tutorial_03_imdb_run
 valid_size: 0.10
 n_saved_models: 1
 checkpoint_interval: 500
@@ -7,4 +7,4 @@ memory_dataset: true
 n_epochs: 25
 get_acts: true
 max_acts_per_class: 100
-act_every_sample_factor: 2
+act_every_sample_factor: 4

@@ -1,17 +1,18 @@
 input_info:
-  input_source: hot_dog_not_hot_dog/food_images
+  input_source: eir_tutorials/05_image_tutorial/data/hot_dog_not_hot_dog/food_images
   input_name: hot_dog
   input_type: image
 
 input_type_info:
-  model_type: "ResNet"
   mixing_subtype: "cutmix"
   size:
     - 64
 
 model_config:
-  layers: [1, 1, 1, 1]
-  block: "BasicBlock"
+  model_type: "ResNet"
+  model_init_config:
+    layers: [1, 1, 1, 1]
+    block: "BasicBlock"
 
 
 

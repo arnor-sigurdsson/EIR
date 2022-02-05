@@ -1,4 +1,4 @@
-run_name: anti_breast_cancer_peptides
+output_folder: eir_tutorials/tutorial_runs/tutorial_03_anti_breast_cancer_peptides_run
 valid_size: 0.25
 n_saved_models: 1
 checkpoint_interval: 200

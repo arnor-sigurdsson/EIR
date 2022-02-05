@@ -20,28 +20,15 @@ We will be using the familiar IMDB reviews dataset,
 see `here <https://ai.stanford.edu/~ang/papers/acl11-WordVectorsSentimentAnalysis.pdf>`__
 for more information about the data.
 To download the data and configurations for this part of the tutorial,
-`use this link. <https://drive.google.com/file/d/1lYGVhynlhGSDHfLOnS7SqBVL_J3lvL64/view?usp=sharing>`__
+`use this link. <https://drive.google.com/file/d/1u6bkIr9sECkU9z3Veutjn8cx6Mu3GP3Z>`__
 
 A - Local Transformer
 ---------------------
 
 After downloading the data, the folder structure should look like this:
 
-.. code-block:: console
-
-    ├── IMDB_Reviews
-    │     ├── 0_3.txt
-    │     ├── 0_9.txt
-    │     ├── 10000_4.txt
-    │     ├── 10000_8.txt
-    │     ├── 10001_10.txt
-    │     ├── ...
-    ├── conf
-    │     ├── globals.yaml
-    │     ├── input.yaml
-    │     ├── target.yaml
-    │     ├── predictor.yaml
-    └── imdb_labels.csv
+.. literalinclude:: tutorial_files/06_raw_bytes_tutorial/commands/tutorial_folder.txt
+    :language: console
 
 We will use the
 built-in local transformer model
@@ -75,9 +62,17 @@ are here:
     try reducing the number of layers
     and the sequence length.
 
-When training, I got the following training curve:
+As usual, we can run the following command to train:
 
-.. image:: tutorial_files/06_raw_bytes_tutorial/figures/a_training_curve_ACC.png
+.. literalinclude:: tutorial_files/06_raw_bytes_tutorial/commands/SEQUENCE_BINARY_IMDB_1.txt
+    :language: console
+
+
+When training, I got the following training curves:
+
+.. image:: tutorial_files/06_raw_bytes_tutorial/figures/06_training_curve_ACC_transformer_1.png
+
+.. image:: tutorial_files/06_raw_bytes_tutorial/figures/06_training_curve_MCC_transformer_1.png
 
 Not so great, but not a complete failure either!
 When comparing with our

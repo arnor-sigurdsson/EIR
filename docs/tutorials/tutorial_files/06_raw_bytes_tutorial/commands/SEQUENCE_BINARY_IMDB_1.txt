@@ -1,0 +1,5 @@
+eirtrain \
+--global_configs eir_tutorials/06_raw_bytes_tutorial/conf/globals.yaml \
+--input_configs eir_tutorials/06_raw_bytes_tutorial/conf/input.yaml \
+--predictor_configs eir_tutorials/06_raw_bytes_tutorial/conf/predictor.yaml \
+--target_configs eir_tutorials/06_raw_bytes_tutorial/conf/target.yaml

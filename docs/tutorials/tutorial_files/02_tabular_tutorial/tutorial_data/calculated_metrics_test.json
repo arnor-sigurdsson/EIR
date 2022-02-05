@@ -1,8 +1,1 @@
-{
-    "CLASS": {
-        "CLASS_mcc": 0.9752453782757713,
-        "CLASS_acc": 0.985993985993986,
-        "CLASS_roc-auc-macro": 0.8920077761663737,
-        "CLASS_ap-macro": 0.5125193360565979,
-    }
-}
+{"CLASS": {"CLASS_mcc": 0.9794823382516709, "CLASS_acc": 0.9883869883869884, "CLASS_roc-auc-macro": 0.9082133747230979, "CLASS_ap-macro": 0.49877241208022066}}

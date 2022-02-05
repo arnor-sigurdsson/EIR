@@ -38,10 +38,9 @@ There are also [binaries](https://github.com/arnor-sigurdsson/EIR/releases) avai
 
 ## Usage
 
-- See the [Quickstart](https://eir.readthedocs.io/en/latest/quickstart.html) for a quick demo on how to use the framework.
-- If using the pre-built binaries, check out the [Using Binaries](https://eir.readthedocs.io/en/latest/binaries_guide.html) short tutorial.
+Please refer to the [Documentation](https://eir.readthedocs.io/en/latest/index.html) for examples and information.
 
-Please refer to the [Documentation](https://eir.readthedocs.io/en/latest/index.html) for more examples and information.
+If using the pre-built binaries, check out the [Using Binaries](https://eir.readthedocs.io/en/latest/binaries_guide.html) short tutorial.
 
 ## Citation
 

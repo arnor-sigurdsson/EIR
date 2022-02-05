@@ -1,11 +1,9 @@
 input_info:
-  input_source: IMDB/IMDB_Reviews/
+  input_source: eir_tutorials/04_pretrained_sequence_tutorial/data/IMDB/IMDB_Reviews
   input_name: imdb_reviews_longformer
   input_type: sequence
 
 input_type_info:
-        model_type: longformer
-        pretrained_model: false
         sampling_strategy_if_longer: "uniform"
         max_length: 512
         split_on: " "
@@ -14,10 +12,15 @@ input_type_info:
         tokenizer_language: "en"
 
 model_config:
-        num_hidden_layers: 2
-        hidden_size: 12
-        num_attention_heads: 2
-        intermediate_size: 32
-        attention_window: 64
-        max_position_embeddings: 1024
+      model_type: longformer
+      pretrained_model: false
+      position: embed
+      pool: avg
+      model_init_config:
+            num_hidden_layers: 2
+            hidden_size: 32
+            num_attention_heads: 2
+            intermediate_size: 32
+            attention_window: 64
+            max_position_embeddings: 1024
 

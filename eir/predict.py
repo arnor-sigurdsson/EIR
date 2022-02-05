@@ -46,14 +46,14 @@ from eir.experiment_io.experiment_io import (
     load_serialized_input_object,
     load_transformers,
 )
-from eir.models.model_setup import (
-    get_fusion_model_class_and_kwargs_from_configs,
-    load_model,
-)
 from eir.interpretation.interpretation import (
     activation_analysis_wrapper,
 )
 from eir.models import al_fusion_models
+from eir.models.model_setup import (
+    get_fusion_model_class_and_kwargs_from_configs,
+    load_model,
+)
 from eir.models.model_training_utils import gather_pred_outputs_from_dloader
 from eir.setup import config
 from eir.setup import input_setup
@@ -85,14 +85,12 @@ from eir.train_utils.metrics import (
     calculate_batch_metrics,
     al_step_metric_dict,
 )
-from eir.train_utils.utils import seed_everything
 
 al_named_dict_configs = Dict[
     Literal["global_configs", "predictor_configs", "input_configs", "target_configs"],
     Iterable[Dict],
 ]
 
-seed_everything()
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 

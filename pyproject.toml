@@ -59,6 +59,8 @@ Sphinx = "^4.0.2"
 sphinx-rtd-theme = "^1.0.0"
 sphinx-copybutton = "^0.4.0"
 tomlkit = "^0.7.2"
+gdown = "^4.2.1"
+pdf2image = "^1.16.0"
 
 
 [tool.poetry.scripts]

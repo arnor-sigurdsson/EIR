@@ -1,7 +1,7 @@
 .. _02-tabular-tutorial:
 
-02 – Tabular Tutorial
-=====================
+02 – Tabular Tutorial: Nonlinear Poker Hands
+============================================
 
 A - Setup
 ^^^^^^^^^
@@ -19,10 +19,10 @@ Note that this tutorial assumes that
 you are already familiar with
 the basic functionality
 of the framework
-(see :ref:`01-basic-tutorial`).
+(see :ref:`01-genotype-tutorial`).
 
 To download the data for for this tutorial,
-`use this link. <https://drive.google.com/file/d/1Lw2Qlf0qGosie4VpFPIgfN6CSGZGnJix/view>`_
+`use this link. <https://drive.google.com/file/d/1Ck1F_iYT3WdoAHjtPwR1peOqhwjmCqHl>`_
 
 Having a quick look at the data,
 we can see it consists of 10 categorical inputs columns
@@ -47,12 +47,12 @@ the global, input, target and predictor parts respectively:
 
 .. note::
 
-    You might notice that the validation size is quite large here. This is because
-    the data is quite imbalanced, so we use a rather large validation set to
+    You might notice the perhaps new ``manual_valid_ids_file`` argument
+    in the global configuration. This is because
+    the data is quite imbalanced, so we provide a pre-computed validation set to
     ensure that all classes are present in both the training and validation set.
-    This might be fixed later by adding an option for stratified splits.
-    Currently the framework does not handle having a mismatch in which classes are
-    present in the training and validation sets.
+    Be aware that currently the framework does not handle having a mismatch in which
+    classes are present in the training and validation sets.
 
 .. literalinclude:: tutorial_files/02_tabular_tutorial/02_poker_hands_input.yaml
     :language: yaml
@@ -70,16 +70,9 @@ So, after setting up,
 our folder structure should look
 something like this:
 
-.. code-block:: console
+.. literalinclude:: tutorial_files/02_tabular_tutorial/commands/tutorial_folder.txt
+    :language: console
 
-    ├── poker_hands_configs
-    │     ├── 02_poker_hands_globals.yaml
-    │     ├── 02_poker_hands_input.yaml
-    │     ├── 02_poker_hands_predictor.yaml
-    │     ├── 02_poker_hands_target.yaml
-    ├── poker_hands_data
-    │     ├── poker_hands_test.csv
-    │     └── poker_hands_train.csv
 
 B - Training
 ^^^^^^^^^^^^
@@ -91,29 +84,24 @@ to the framework
 (fully running this should take around 10 minutes,
 so now is a good time to stretch your legs or grab a cup of coffee!):
 
-.. code-block:: console
-
-    eirtrain \
-    --global_configs poker_hands_configs/02_poker_hands_globals.yaml \
-    --input_configs poker_hands_configs/02_poker_hands_input.yaml  \
-    --target_configs poker_hands_configs/02_poker_hands_target.yaml  \
-    --predictor_configs poker_hands_configs/02_poker_hands_predictor.yaml
+.. literalinclude:: tutorial_files/02_tabular_tutorial/commands/TABULAR_1.txt
+    :language: console
 
 We can examine how our model did with respect to accuracy
 by checking the `training_curve_ACC.png` file:
 
-.. image:: tutorial_files/02_tabular_tutorial/figures/tutorial_02_training_curve_ACC.png
+.. image:: tutorial_files/02_tabular_tutorial/figures/02_poker_hands_training_curve_ACC_tabular_1.png
 
 However,
 we do know that the data is very imbalanced,
 so a better idea might be checking the MCC:
 
-.. image:: tutorial_files/02_tabular_tutorial/figures/tutorial_02_training_curve_MCC.png
+.. image:: tutorial_files/02_tabular_tutorial/figures/02_poker_hands_training_curve_MCC_tabular_1.png
 
 Both look fairly good, but how are we really doing? Let's check the confusion matrix
-for our predictions at iteration 24000:
+for our predictions at iteration 15000:
 
-.. image:: tutorial_files/02_tabular_tutorial/figures/tutorial_02_confusion_matrix.png
+.. image:: tutorial_files/02_tabular_tutorial/figures/02_poker_hands_confusion_matrix_tabular_1.png
 
 So there it is – we are performing quite well for classes 0-3,
 but (perhaps as expected), we perform very poorly on the rare classes.
@@ -127,19 +115,12 @@ To test, we can run the following command
 (note that you will have to add the path to your saved model for the ``--model_path``
 parameter below).
 
-.. code-block:: console
+.. literalinclude:: tutorial_files/02_tabular_tutorial/commands/TABULAR_1_PREDICT.txt
+    :language: console
 
-    mkdir runs/eir_tutorial_prediction_output
-    eirpredict \
-    --global_configs poker_hands_configs/02_poker_hands_globals.yaml \
-    --input_configs poker_hands_configs/02_poker_hands_input_test.yaml \
-    --target_configs poker_hands_configs/02_poker_hands_target_test.yaml \
-    --model_path runs/poker_hands_run/saved_models/<your model> \
-    --evaluate \
-    --output_folder runs/eir_tutorial_prediction_output
 
-This will create the following files
-in the ``runs/eir_tutorial_prediction_output``
+This will create the following extra files
+in the ``eir_tutorials/tutorial_runs/tutorial_02_run``
 directory
 
 .. code-block:: console
@@ -190,16 +171,13 @@ and they even use the Poker Hand dataset as well!
    * - Rule-based
      - 100.0
 
-So using our humble model before we saw an accuracy of 98.6%. Of course, since the
+So using our humble model before we saw an accuracy of 98.8%. Of course, since the
 dataset is highly imbalanced, it can be difficult to compare with the numbers in the
 table above. For example it can be that TabNet is performing very well on the rare
 classes, which will not have a large effect on the total test accuracy. However, our
 performance is perhaps a nice baseline, especially since
-TabNet is a much more complex
-model,
-we used a very large validation set during our training,
-did not especially account for the target label imbalance and
-did not do extensive hyper-parameter tuning!
+TabNet is a much more complex model,
+and we did not do extensive hyper-parameter tuning!
 
 If you made it this far, I want to thank you for reading. I hope this tutorial was
 useful / interesting to you!

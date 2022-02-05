@@ -15,16 +15,16 @@ NLP architectures, and
 pretrained NLP models with ``EIR``
 in order to predict sentiment from text.
 We will be using the IMDB reviews dataset,
-see `here <https://ai.stanford.edu/~ang/papers/acl11-WordVectorsSentimentAnalysis.pdf>`_
+see `here <https://ai.stanford.edu/~ang/papers/acl11-WordVectorsSentimentAnalysis.pdf>`__
 for more information about the data.
 To download the data and configurations for this part of the tutorial,
-`use this link. <https://drive.google.com/file/d/1cS0Q_pU5qVLSNsDoQK3LX2dhku2ZN7mf/view?usp=sharing>`_
+`use this link. <https://drive.google.com/file/d/1u6bkIr9sECkU9z3Veutjn8cx6Mu3GP3Z>`__
 
 Note that this tutorial assumes that
 you are already familiar with
 the basic functionality
 of the framework
-(see :ref:`01-basic-tutorial`).
+(see :ref:`01-genotype-tutorial`).
 If you have not already,
 it can also be useful
 to go over the sequence tutorial
@@ -33,26 +33,18 @@ to go over the sequence tutorial
 A - Baseline
 ------------
 
-After downloading the data, the folder structure should look like this:
+After downloading the data,
+the folder structure should look something like this
+(note that at this point,
+the ``yaml`` configuration files
+are probably not present,
+but we will make them during this tutorial,
+alternatively you can download them
+from the project repository):
 
-.. code-block:: console
+.. literalinclude:: tutorial_files/04_pretrained_sequence_tutorial/commands/tutorial_folder.txt
+    :language: console
 
-    ├── IMDB_Reviews
-    │     ├── 0_3.txt
-    │     ├── 0_9.txt
-    │     ├── 10000_4.txt
-    │     ├── 10000_8.txt
-    │     ├── 10001_10.txt
-    │     ├── ...
-    ├── conf
-    │     ├── 04_imdb_globals.yaml
-    │     ├── 04_imdb_input.yaml
-    │     ├── 04_imdb_input_longformer.yaml
-    │     ├── 04_imdb_input_tiny-bert.yaml
-    │     ├── 04_imdb_input_windowed.yamlml
-    │     ├── 04_imdb_predictor.yaml
-    ├── imdb.vocab
-    └── imdb_labels.csv
 
 First we will use the
 built-in transformer model
@@ -64,6 +56,18 @@ As always, configurations first!
 .. literalinclude:: tutorial_files/04_pretrained_sequence_tutorial/04_imdb_globals.yaml
     :language: yaml
     :caption:
+
+.. note::
+
+    You might notice that we have a new configuration in our global config,
+    ``mixing_alpha``.
+    The parameter controls the level of
+    `Mixup, <https://arxiv.org/pdf/1710.09412.pdf>`__
+    a really cool data augmentation
+    which is included in the framework,
+    and is automatically applied to all input modalities
+    (genotype, tabular, sequence, images, binary data)
+    when set in the global configuration.
 
 .. literalinclude:: tutorial_files/04_pretrained_sequence_tutorial/04_imdb_input.yaml
     :language: yaml
@@ -79,17 +83,12 @@ As always, configurations first!
 
 As before, we do our training with the following command:
 
-.. code-block:: console
-
-    eirtrain \
-    --global_configs IMDB/conf/04_imdb_globals.yaml \
-    --input_configs IMDB/conf/04_imdb_input.yaml  \
-    --target_configs IMDB/conf/04_imdb_target.yaml  \
-    --predictor_configs IMDB/conf/04_imdb_predictor.yaml
+.. literalinclude:: tutorial_files/04_pretrained_sequence_tutorial/commands/SEQUENCE_IMDB_1_TRANSFORMER.txt
+    :language: console
 
 Checking the accuracy, we see:
 
-.. image:: tutorial_files/04_pretrained_sequence_tutorial/figures/04a_basic_transformer_training_curve_ACC.png
+.. image:: tutorial_files/04_pretrained_sequence_tutorial/figures/04_imdb_training_curve_ACC_transformer_1.png
 
 A little better than what
 we saw in the :ref:`03-sequence-tutorial`,
@@ -108,7 +107,7 @@ The main culprit is the quadratic
 increase w.r.t. input length.
 One relatively straightforward way to get around this
 is not looking at the full sequence at once,
-but rather in parts (kind of like a convolution!).
+but rather in parts (kind of like a convolution).
 This functionality is included by default
 and can be controlled with the ``window_size`` parameter
 of the ``input_type_info`` field when training sequence models.
@@ -122,17 +121,13 @@ increasing your maximum length to 512:
 
 To train, we just swap out the input configuration from the command above:
 
-.. code-block:: console
-
-    eirtrain \
-    --global_configs IMDB/conf/04_imdb_globals.yaml \
-    --input_configs IMDB/conf/04_imdb_input_windowed.yaml  \
-    --target_configs IMDB/conf/04_imdb_target.yaml  \
-    --predictor_configs IMDB/conf/04_imdb_predictor.yaml --04_imdb_globals.run_name="imdb_sentiment_windowed"
+.. literalinclude:: tutorial_files/04_pretrained_sequence_tutorial/commands/SEQUENCE_IMDB_2_LOCAL.txt
+    :language: yaml
+    :caption:
 
 Training this model gave the following training curve:
 
-.. image:: tutorial_files/04_pretrained_sequence_tutorial/figures/04b_windowed_transformer_training_curve_ACC.png
+.. image:: tutorial_files/04_pretrained_sequence_tutorial/figures/04_imdb_training_curve_ACC_local_transformer_1.png
 
 Indeed, increasing the sequence length does seem to help,
 and using a window size of 64 seems to work fairly well.
@@ -146,19 +141,19 @@ of transformers when it comes to input length.
 In fact, this is such a notorious
 problem that people have done a lot of work in finding
 cool architectures and methods to get around it.
-By taking advantage of the excellent work `Hugging Face <https://huggingface.co>`_
+By taking advantage of the excellent work `Hugging Face <https://huggingface.co>`__
 has done, we can use these established architectures
 within ``EIR``
 (big thanks to them by the way!).
 The architecture we will be using
-is called `Longformer <https://arxiv.org/abs/2004.05150>`_ ,
+is called `Longformer, <https://arxiv.org/abs/2004.05150>`__
 and as mentioned it tries to approximate full self-attention
 in order to scale linearly w.r.t input size.
 
 .. tip::
     Hugging Face has implemented a bunch of
     other pretrained models and architectures,
-    check `this link <https://huggingface.co/transformers/#supported-frameworks>`_
+    check `this link <https://huggingface.co/transformers/#supported-frameworks>`__
     for an exhaustive list.
 
 To use the Longformer model, we use the following configuration,
@@ -177,21 +172,20 @@ we are now passing in flags *specifically* to the LongFormer model:
 
 We train with the following command:
 
-.. code-block:: console
-
-    eirtrain \
-    --global_configs IMDB/conf/04_imdb_globals.yaml \
-    --input_configs IMDB/conf/04_imdb_input_longformer.yaml  \
-    --target_configs IMDB/conf/04_imdb_target.yaml  \
-    --predictor_configs IMDB/conf/04_imdb_predictor.yaml  --04_imdb_globals.run_name="imdb_sentiment_longformer"
+.. literalinclude:: tutorial_files/04_pretrained_sequence_tutorial/commands/SEQUENCE_IMDB_3_LONGFORMER.txt
+    :language: console
 
 And get the following training curve:
 
-.. image:: tutorial_files/04_pretrained_sequence_tutorial/figures/04c_longformer_training_curve_ACC.png
+.. image:: tutorial_files/04_pretrained_sequence_tutorial/figures/04_imdb_training_curve_ACC_longformer_1.png
 
-Indeed, we see an incremental improvement
+Indeed, we see an improvement
 on the validation set
-when using the the Longformer model.
+when using the the Longformer model
+compared to the first run.
+There does not seem to be
+a big difference
+compared to our local transformer run,
 Of course, we would have to evaluate on a
 test set to get the final performance,
 but this is looking pretty good!
@@ -208,7 +202,7 @@ taking advantage of the fact that
 they have already been trained on a bunch of data.
 
 In this case, we will use a
-little BERT model called `Tiny BERT <https://arxiv.org/abs/1908.08962>`_.
+little BERT model called `Tiny BERT <https://arxiv.org/abs/1908.08962>`__.
 The approach is almost the same
 as we saw above with the Longformer, here is the configuration:
 
@@ -233,23 +227,19 @@ of our model for our task.
 
 This model is quite a bit larger
 than the nones we have used so far
-(22 million parameters!),
-so here it helps to have a powerful computer. We run this as always with:
+so here it helps to have a powerful computer.
+We run this as always with:
 
-.. code-block:: console
 
-    eirtrain \
-    --global_configs IMDB/conf/04_imdb_globals.yaml \
-    --input_configs IMDB/conf/04_imdb_input_tiny-bert.yaml  \
-    --target_configs IMDB/conf/04_imdb_target.yaml  \
-    --predictor_configs IMDB/conf/04_imdb_predictor.yaml  --04_imdb_globals.run_name="imdb_sentiment_pretrained_tiny_bert"
+.. literalinclude:: tutorial_files/04_pretrained_sequence_tutorial/commands/SEQUENCE_IMDB_4_TINY_BERT.txt
+    :language: console
 
 The training curve looks like so:
 
-.. image:: tutorial_files/04_pretrained_sequence_tutorial/figures/04d_pretrained_tiny-bert_training_curve_ACC.png
+.. image:: tutorial_files/04_pretrained_sequence_tutorial/figures/04_imdb_training_curve_ACC_tiny_bert_1.png
 
-Indeed, it does seem to help a bit to use a pretrained model.
-Also notice how quickly it reached it top validation performance compared to the
+The pre-trained model performs quite similarly to our other long context models.
+However, notice how quickly it reached it top validation performance compared to the
 other models. Therefore, even though we are using a much bigger model than before,
 this kind of fine tuning can save us a lot of time!
 
@@ -274,22 +264,14 @@ but now we will be a bit cheeky and combined them into one big model.
 
 In this case,
 we will freeze the weights of the
-pretrained Tiny BERT part of our model,
-and also skip computing the activations to save us some time.
+pretrained Tiny BERT part of our model.
 
-.. code-block:: console
+.. literalinclude:: tutorial_files/04_pretrained_sequence_tutorial/commands/SEQUENCE_IMDB_5_COMBINED.txt
+    :language: console
 
-    eirtrain \
-    --global_configs IMDB/conf/04_imdb_globals.yaml \
-    --input_configs IMDB/conf/04_imdb_input_windowed.yaml IMDB/conf/04_imdb_input_longformer.yaml IMDB/conf/04_imdb_input_tiny-bert.yaml \
-    --target_configs IMDB/conf/04_imdb_target.yaml  \
-    --predictor_configs IMDB/conf/04_imdb_predictor.yaml --04_imdb_globals.run_name="imdb_sentiment_mega" --04_imdb_input_tiny-bert.input_type_info.freeze_pretrained_model=True --04_imdb_globals.get_acts=False
+And our performance:
 
-I was a bit lazy when I was running this
-and did not run it to completion,
-however the performance looked like this before I stopped it:
-
-.. image:: tutorial_files/04_pretrained_sequence_tutorial/figures/04e_combined_model_training_curve_ACC.png
+.. image:: tutorial_files/04_pretrained_sequence_tutorial/figures/04_imdb_training_curve_ACC_combined_1.png
 
 So in this case, we do not see a
 huge improvement when combining our models.
