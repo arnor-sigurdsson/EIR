@@ -176,7 +176,7 @@ jobs:
 
   upload:
     name: Upload to PyPI
-    needs: [build, build-containers]
+    needs: [build]
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
@@ -187,3 +187,4 @@ jobs:
       - run: pip install poetry==1.1.7
       - run: poetry build
       - run: poetry publish --username=__token__ --password=${{ secrets.PYPI_TOKEN }}
+
