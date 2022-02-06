@@ -6,8 +6,27 @@
 A - Setup
 ^^^^^^^^^
 
-For this tutorial we will be using the `processed sample data`_,
-which as the following structure:
+In this tutorial,
+we will be using
+`genotype data <https://en.wikipedia.org/wiki/Genotyping>`__
+to train deep learning
+and linear models
+for ancestry prediction.
+
+To start, please download `processed sample data`_
+(or process your own `.bed`, `.bim`, `.fam` files
+with e.g. `plink pipelines`_).
+The sample data we are using here for predicting ancestry
+is the public `Human Origins`_ dataset,
+but the same approach can just as well be used for
+e.g. disease predictions in other cohorts
+(for example the `UK Biobank`_).
+
+.. _processed sample data: https://drive.google.com/file/d/1MELauhv7zFwxM8nonnj3iu_SmS69MuNi
+.. _plink pipelines: https://github.com/arnor-sigurdsson/plink_pipelines
+.. _Human Origins: https://www.nature.com/articles/nature13673
+.. _UK Biobank: https://www.nature.com/articles/s41586-018-0579-z
+
 
 .. code-block:: console
 
@@ -15,8 +34,6 @@ which as the following structure:
     ├── arrays                      # Genotype data as NumPy arrays
     ├── data_final_gen.bim          # Variant information file accompanying the genotype arrays
     └── human_origins_labels.csv    # Contains the target labels (what we want to predict from the genotype data)
-
-.. _processed sample data: https://drive.google.com/file/d/1MELauhv7zFwxM8nonnj3iu_SmS69MuNi
 
 
 In order to configure the experiment we want to run,
@@ -237,5 +254,3 @@ the framework so you can apply it to your own data. For that, you will have to p
 it first (see: `plink pipelines`_). Then you will have to set the relevant paths for the
 inputs (e.g. ``input_source``, ``snp_file``) and targets
 (e.g. ``label_file``, ``target_cat_columns``).
-
-.. _plink pipelines: https://github.com/arnor-sigurdsson/plink_pipelines
