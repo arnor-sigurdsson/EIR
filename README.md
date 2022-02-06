@@ -40,8 +40,6 @@ There are also [binaries](https://github.com/arnor-sigurdsson/EIR/releases) avai
 
 Please refer to the [Documentation](https://eir.readthedocs.io/en/latest/index.html) for examples and information.
 
-If using the pre-built binaries, check out the [Using Binaries](https://eir.readthedocs.io/en/latest/binaries_guide.html) short tutorial.
-
 ## Citation
 
 If you use `EIR` in a scientific publication, we would appreciate if you could use the following citation:
