@@ -34,8 +34,6 @@ Supervised modelling on genotype, tabular, sequence, image and binary data.
 
 `pip install eir-dl`
 
-There are also [binaries](https://github.com/arnor-sigurdsson/EIR/releases) available for download.
-
 ## Usage
 
 Please refer to the [Documentation](https://eir.readthedocs.io/en/latest/index.html) for examples and information.

@@ -22,6 +22,5 @@ To get started, please, read :ref:`01-genotype-tutorial`.
     :maxdepth: 2
 
     tutorials/tutorial_index
-    binaries_guide
     api_reference
     license
