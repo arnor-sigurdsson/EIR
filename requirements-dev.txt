@@ -11,7 +11,7 @@ attrs==21.4.0; python_version >= "3.8" and python_full_version < "3.0.0" and pyt
 babel==2.9.1; python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.4.0" and python_version >= "3.6"
 backcall==0.2.0; python_version >= "3.7"
 beautifulsoup4==4.10.0; python_full_version > "3.0.0"
-black==21.12b0; python_full_version >= "3.6.2"
+black==22.1.0; python_full_version >= "3.6.2"
 bleach==4.1.0; python_version >= "3.7"
 blessings==1.7; python_version >= "2.7" and python_full_version < "3.0.0" or python_full_version >= "3.4.0"
 cachetools==5.0.0; python_version >= "3.7" and python_version < "4.0" and (python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.6.0" and python_version >= "3.6")
@@ -126,8 +126,7 @@ pyparsing==3.0.7; python_version >= "3.8" and python_version < "4.0" and python_
 pyrsistent==0.18.1; python_version >= "3.7"
 pysocks==1.7.1; python_full_version >= "3.6.0" and python_version >= "3.6" and (python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.6.0" and python_version >= "3.6") and (python_version >= "2.7" and python_full_version < "3.0.0" or python_full_version >= "3.6.0")
 pytest-cov==3.0.0; python_version >= "3.6"
-pytest-testmon==1.2.2; python_version >= "3.6"
-pytest==6.2.5; python_version >= "3.6"
+pytest==7.0.0; python_version >= "3.6"
 python-dateutil==2.8.2; python_full_version >= "3.6.1" and python_version >= "3.8" and python_version < "4.0"
 pytorch-ignite==0.4.8
 pytorch-ranger==0.1.1; python_version >= "3.5" and python_full_version >= "3.6.0"
@@ -176,8 +175,8 @@ testpath==0.5.0; python_version >= "3.7"
 threadpoolctl==3.1.0; python_version >= "3.8" and python_version < "4.0"
 timm==0.5.4; python_version >= "3.6"
 tokenizers==0.11.4; python_full_version >= "3.6.0"
-toml==0.10.2; python_full_version >= "3.6.1" and python_version >= "3.6" and (python_version >= "3.8" and python_full_version < "3.0.0" and python_version < "4.0" or python_version >= "3.8" and python_version < "4.0" and python_full_version >= "3.3.0")
-tomli==1.2.3; python_version >= "3.7" and python_full_version >= "3.6.2"
+toml==0.10.2; python_full_version >= "3.6.1"
+tomli==1.2.3; python_version >= "3.8" and python_full_version >= "3.6.2" and python_version < "4.0"
 tomlkit==0.7.2; (python_version >= "2.7" and python_full_version < "3.0.0") or (python_full_version >= "3.5.0")
 toolz==0.11.2; python_version >= "3.8" and python_version < "4.0"
 torch-optimizer==0.3.0; python_full_version >= "3.6.0"
@@ -189,7 +188,7 @@ tox==3.24.5; (python_version >= "2.7" and python_full_version < "3.0.0") or (pyt
 tqdm==4.62.3; (python_version >= "2.7" and python_full_version < "3.0.0") or (python_full_version >= "3.4.0")
 traitlets==5.1.1; python_full_version >= "3.7.0" and python_version >= "3.7"
 transformers==4.16.2; python_full_version >= "3.6.0"
-typing-extensions==4.0.1; python_version >= "3.8" and python_full_version >= "3.6.2" and python_version < "4.0"
+typing-extensions==4.0.1; python_version >= "3.8" and python_full_version >= "3.6.2" and python_version < "3.10"
 urllib3==1.26.8; python_full_version >= "3.6.0" and python_version < "4" and python_version >= "3.6" and (python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.6.0" and python_version >= "3.6") and (python_version >= "2.7" and python_full_version < "3.0.0" or python_full_version >= "3.6.0")
 virtualenv==20.13.1; python_full_version >= "3.6.1"
 visidata==2.8; python_version >= "3.6"

@@ -166,7 +166,7 @@ class LCLModel(nn.Module):
         )
         self.fc_0 = SplitLinear(
             in_features=self.fc_1_in_features,
-            out_feature_sets=2 ** fc_0_channel_exponent,
+            out_feature_sets=2**fc_0_channel_exponent,
             split_size=fc_0_split_size,
             bias=False,
         )
@@ -295,7 +295,7 @@ def _generate_split_blocks_from_spec(
     first_block = SplitMLPResidualBlock(
         in_features=s.in_features,
         split_size=s.kernel_width,
-        out_feature_sets=2 ** s.channel_exp_base,
+        out_feature_sets=2**s.channel_exp_base,
         dropout_p=s.dropout_p,
         full_preactivation=True,
     )
@@ -336,7 +336,7 @@ def generate_split_resblocks_auto(split_parameter_spec: LCParameterSpec):
     first_block = SplitMLPResidualBlock(
         in_features=s.in_features,
         split_size=s.kernel_width,
-        out_feature_sets=2 ** s.channel_exp_base,
+        out_feature_sets=2**s.channel_exp_base,
         dropout_p=s.dropout_p,
         full_preactivation=True,
     )

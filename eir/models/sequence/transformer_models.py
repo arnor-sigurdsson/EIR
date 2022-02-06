@@ -182,7 +182,7 @@ def get_embedding_dim_for_sequence_model(
 ) -> int:
 
     if embedding_dim is None:
-        auto_emb_dim = math.ceil((int(num_tokens ** 0.25) / num_heads)) * num_heads
+        auto_emb_dim = math.ceil((int(num_tokens**0.25) / num_heads)) * num_heads
         logger.info(
             "Setting up automatic embedding dimension of %d based on %d "
             "tokens and %d attention heads.",

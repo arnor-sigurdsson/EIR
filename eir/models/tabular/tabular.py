@@ -138,7 +138,7 @@ def attach_embeddings(model: nn.Module, embeddings_dict: al_emb_lookup_dict) -> 
 
 
 def calc_embedding_dimension(n_categories: int) -> int:
-    return min(600, round(1.6 * n_categories ** 0.56))
+    return min(600, round(1.6 * n_categories**0.56))
 
 
 def get_tabular_inputs(

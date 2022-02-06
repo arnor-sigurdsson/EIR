@@ -207,7 +207,7 @@ def _make_conv_layers(
 
     down_stride_w = mc.down_stride
 
-    first_conv_channels = 2 ** mc.channel_exp_base * mc.first_channel_expansion
+    first_conv_channels = 2**mc.channel_exp_base * mc.first_channel_expansion
     first_conv_kernel = mc.kernel_width * mc.first_kernel_expansion
     first_conv_stride = down_stride_w * mc.first_stride_expansion
 
@@ -305,7 +305,7 @@ def _get_cur_dilation(dilation_factor: int, width: int, block_number: int):
     Note that block_number refers to the number of residual blocks (not first block
     or self attention).
     """
-    dilation = dilation_factor ** block_number
+    dilation = dilation_factor**block_number
 
     while dilation >= width:
         dilation = dilation // dilation_factor

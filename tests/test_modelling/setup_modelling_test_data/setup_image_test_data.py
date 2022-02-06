@@ -80,7 +80,7 @@ def create_test_image(
         population=sample_range, k=num_active_in_sample_patch - min_active_patch_pixels
     )
 
-    patch_base = np.zeros(patch_size ** 2)
+    patch_base = np.zeros(patch_size**2)
     for index in active_patch_indices:
         patch_base[index] = 255
     patch_base = patch_base.reshape(patch_size, patch_size).astype(dtype=np.uint8)
