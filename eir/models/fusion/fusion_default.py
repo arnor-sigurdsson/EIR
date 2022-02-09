@@ -121,16 +121,6 @@ class FusionModel(nn.Module):
 
         return spec
 
-    @property
-    def l1_penalized_weights(self) -> torch.Tensor:
-        out = [torch.empty(0)]
-        for module in self.modules_to_fuse.values():
-            if hasattr(module, "l1_penalized_weights"):
-                weight_flat = torch.flatten(module.l1_penalized_weights)
-                out.append(weight_flat)
-
-        return torch.cat(out)
-
     def _init_weights(self):
         pass
 
