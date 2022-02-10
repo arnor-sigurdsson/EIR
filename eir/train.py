@@ -21,6 +21,7 @@ from aislib.misc_utils import get_logger
 from ignite.engine import Engine
 from sklearn.preprocessing import StandardScaler
 from torch import nn
+from torch.nn.utils import clip_grad_norm_
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader, WeightedRandomSampler
 from torch.utils.tensorboard import SummaryWriter
@@ -814,6 +815,13 @@ def hook_default_optimizer_backward(
     )
 
     state["loss"].backward(**optimizer_backward_kwargs)
+
+    gradient_clipping = experiment.configs.global_config.gradient_clipping
+    if gradient_clipping:
+        clip_grad_norm_(
+            parameters=experiment.model.parameters(),
+            max_norm=gradient_clipping,
+        )
     experiment.optimizer.step()
 
     return {}
