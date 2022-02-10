@@ -35,6 +35,7 @@ if TYPE_CHECKING:
                     "output_folder": "multi_task_multi_modal",
                     "n_epochs": 6,
                     "act_background_samples": 8,
+                    "gradient_clipping": 1.0,
                 },
                 "input_configs": [
                     {

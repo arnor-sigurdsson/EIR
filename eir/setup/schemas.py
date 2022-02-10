@@ -151,6 +151,9 @@ class GlobalConfig:
     :param lr_plateau_factor:
         Factor to reduce LR when running with plateau schedule.
 
+    :param gradient_clipping:
+        Max norm used for gradient clipping, with p=2.
+
     :param early_stopping_patience:
         Number of validation performance steps without improvement over
         best performance before terminating run.
@@ -236,6 +239,7 @@ class GlobalConfig:
     lr_schedule: Literal["cycle", "plateau", "same", "cosine"] = "plateau"
     lr_plateau_patience: int = 10
     lr_plateau_factor: float = 0.2
+    gradient_clipping: float = 0.0
     early_stopping_patience: int = 10
     early_stopping_buffer: Union[None, int] = None
     warmup_steps: Union[Literal["auto"], int] = "auto"
