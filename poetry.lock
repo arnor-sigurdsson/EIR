@@ -649,7 +649,7 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 
 [[package]]
 name = "importlib-metadata"
-version = "4.10.1"
+version = "4.11.0"
 description = "Read metadata from Python packages"
 category = "main"
 optional = false
@@ -1407,7 +1407,7 @@ twisted = ["twisted"]
 
 [[package]]
 name = "prompt-toolkit"
-version = "3.0.27"
+version = "3.0.28"
 description = "Library for building powerful interactive command lines in Python"
 category = "main"
 optional = false
@@ -1523,11 +1523,11 @@ hook_testing = ["pytest (>=2.7.3)", "execnet (>=1.5.0)", "psutil"]
 
 [[package]]
 name = "pyinstaller-hooks-contrib"
-version = "2022.0"
+version = "2022.1"
 description = "Community maintained hooks for PyInstaller"
 category = "dev"
 optional = false
-python-versions = "*"
+python-versions = ">=3.7"
 
 [[package]]
 name = "pynvim"
@@ -2997,8 +2997,8 @@ imagesize = [
     {file = "imagesize-1.3.0.tar.gz", hash = "sha256:cd1750d452385ca327479d45b64d9c7729ecf0b3969a58148298c77092261f9d"},
 ]
 importlib-metadata = [
-    {file = "importlib_metadata-4.10.1-py3-none-any.whl", hash = "sha256:899e2a40a8c4a1aec681feef45733de8a6c58f3f6a0dbed2eb6574b4387a77b6"},
-    {file = "importlib_metadata-4.10.1.tar.gz", hash = "sha256:951f0d8a5b7260e9db5e41d429285b5f451e928479f19d80818878527d36e95e"},
+    {file = "importlib_metadata-4.11.0-py3-none-any.whl", hash = "sha256:6affcdb3aec542dd98df8211e730bba6c5f2bec8288d47bacacde898f548c9ad"},
+    {file = "importlib_metadata-4.11.0.tar.gz", hash = "sha256:9e5e553bbba1843cb4a00823014b907616be46ee503d2b9ba001d214a8da218f"},
 ]
 importlib-resources = [
     {file = "importlib_resources-5.4.0-py3-none-any.whl", hash = "sha256:33a95faed5fc19b4bc16b29a6eeae248a3fe69dd55d4d229d2b480e23eeaad45"},
@@ -3519,8 +3519,8 @@ prometheus-client = [
     {file = "prometheus_client-0.13.1.tar.gz", hash = "sha256:ada41b891b79fca5638bd5cfe149efa86512eaa55987893becd2c6d8d0a5dfc5"},
 ]
 prompt-toolkit = [
-    {file = "prompt_toolkit-3.0.27-py3-none-any.whl", hash = "sha256:cb7dae7d2c59188c85a1d6c944fad19aded6a26bd9c8ae115a4e1c20eb90b713"},
-    {file = "prompt_toolkit-3.0.27.tar.gz", hash = "sha256:f2b6a8067a4fb959d3677d1ed764cc4e63e0f6f565b9a4fc7edc2b18bf80217b"},
+    {file = "prompt_toolkit-3.0.28-py3-none-any.whl", hash = "sha256:30129d870dcb0b3b6a53efdc9d0a83ea96162ffd28ffe077e94215b233dc670c"},
+    {file = "prompt_toolkit-3.0.28.tar.gz", hash = "sha256:9f1cd16b1e86c2968f2519d7fb31dd9d669916f515612c269d14e9ed52b51650"},
 ]
 protobuf = [
     {file = "protobuf-3.19.4-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:f51d5a9f137f7a2cec2d326a74b6e3fc79d635d69ffe1b036d39fc7d75430d37"},
@@ -3652,8 +3652,8 @@ pyinstaller = [
     {file = "pyinstaller-4.9.tar.gz", hash = "sha256:75a180a658871bc41f9cf94b6f90ffa54e98f5d6a7cdb02d7530f0360afe24f9"},
 ]
 pyinstaller-hooks-contrib = [
-    {file = "pyinstaller-hooks-contrib-2022.0.tar.gz", hash = "sha256:61b667f51b2525377fae30793f38fd9752a08032c72b209effabf707c840cc38"},
-    {file = "pyinstaller_hooks_contrib-2022.0-py2.py3-none-any.whl", hash = "sha256:29f0bd8fbb2ff6f2df60a0c147e5b5ad65ae5c1a982d90641a5f712de03fa161"},
+    {file = "pyinstaller-hooks-contrib-2022.1.tar.gz", hash = "sha256:f0a40fbe1842598a7066f785da5ac103ae2a86b4cebf478e530e1df57464814e"},
+    {file = "pyinstaller_hooks_contrib-2022.1-py2.py3-none-any.whl", hash = "sha256:37f0a16df336c69c8c7bf76105a6c4a53a270d648920fa21de654a6649e70404"},
 ]
 pynvim = [
     {file = "pynvim-0.4.3.tar.gz", hash = "sha256:3a795378bde5e8092fbeb3a1a99be9c613d2685542f1db0e5c6fd467eed56dff"},
