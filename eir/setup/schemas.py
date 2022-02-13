@@ -240,6 +240,7 @@ class GlobalConfig:
     lr_plateau_patience: int = 10
     lr_plateau_factor: float = 0.2
     gradient_clipping: float = 0.0
+    gradient_accumulation_steps: Union[None, int] = None
     early_stopping_patience: int = 10
     early_stopping_buffer: Union[None, int] = None
     warmup_steps: Union[Literal["auto"], int] = "auto"
