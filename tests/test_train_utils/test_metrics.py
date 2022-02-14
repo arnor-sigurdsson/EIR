@@ -204,3 +204,170 @@ def test_get_model_l1_loss(get_l1_test_model):
     l1_loss = metrics.get_model_l1_loss(model=test_model, l1_weight=1.0)
 
     assert l1_loss == 0.0
+
+
+@pytest.mark.parametrize(
+    "create_test_data",
+    [
+        {
+            "task_type": "binary",
+            "modalities": (
+                "omics",
+                "tabular",
+            ),
+        },
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize(
+    "create_test_config_init_base",
+    [
+        # Case 1: Omics Feature extractor: MLP
+        {
+            "injections": {
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "model_config": {
+                            "model_type": "linear",
+                            "model_init_config": {"l1": 1e-02},
+                        },
+                    }
+                ],
+            },
+        },
+        # Case 2: Omics Feature extractor: CNN
+        {
+            "injections": {
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "model_config": {
+                            "model_type": "cnn",
+                            "model_init_config": {
+                                "rb_do": 0.25,
+                                "channel_exp_base": 3,
+                                "l1": 1e-02,
+                            },
+                        },
+                    }
+                ],
+            },
+        },
+        # Case 3: Omics feature extractor: Simple LCL
+        {
+            "injections": {
+                "global_configs": {"lr": 1e-03},
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "model_config": {
+                            "model_type": "mlp-split",
+                            "model_init_config": {
+                                "fc_repr_dim": 8,
+                                "split_mlp_num_splits": 64,
+                                "l1": 1e-03,
+                            },
+                        },
+                    },
+                ],
+            },
+        },
+        # Case 4: Omics feature extractor: GLN
+        {
+            "injections": {
+                "global_configs": {
+                    "lr": 1e-03,
+                },
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "model_config": {
+                            "model_type": "genome-local-net",
+                            "model_init_config": {
+                                "kernel_width": 8,
+                                "channel_exp_base": 2,
+                                "l1": 1e-03,
+                                "rb_do": 0.20,
+                            },
+                        },
+                    },
+                ],
+            },
+        },
+        # Case 5: Omics feature extractor: Linear
+        {
+            "injections": {
+                "global_configs": {"lr": 1e-03},
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "model_config": {
+                            "model_type": "linear",
+                            "model_init_config": {"l1": 1e-02},
+                        },
+                    },
+                ],
+                "predictor_configs": {
+                    "model_type": "linear",
+                    "model_config": {"l1": 0.0},
+                },
+            },
+        },
+        # Case 6: Omics predictor: Linear
+        {
+            "injections": {
+                "global_configs": {"lr": 1e-03},
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "model_config": {
+                            "model_type": "identity",
+                        },
+                    },
+                ],
+                "predictor_configs": {
+                    "model_type": "linear",
+                    "model_config": {"l1": 1e-02},
+                },
+            },
+        },
+        # Case 7: Tabular feature extractor
+        {
+            "injections": {
+                "global_configs": {
+                    "output_folder": "extra_inputs",
+                },
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "model_config": {
+                            "model_type": "cnn",
+                            "model_init_config": {"l1": 0.0},
+                        },
+                    },
+                    {
+                        "input_info": {"input_name": "test_tabular"},
+                        "input_type_info": {
+                            "input_cat_columns": ["OriginExtraCol"],
+                            "input_con_columns": ["ExtraTarget"],
+                        },
+                        "model_config": {
+                            "model_type": "tabular",
+                            "model_init_config": {"l1": 1e-02},
+                        },
+                    },
+                ],
+            },
+        },
+    ],
+    indirect=True,
+)
+def test_hook_add_l1_loss(prep_modelling_test_configs):
+    experiment, *_ = prep_modelling_test_configs
+
+    test_state = {"loss": 0.0}
+    state_update = metrics.hook_add_l1_loss(experiment=experiment, state=test_state)
+
+    l1_loss = state_update["loss"]
+    assert l1_loss > 0.0
