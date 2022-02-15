@@ -489,7 +489,9 @@ def test_regression(prep_modelling_test_configs):
             "injections": {
                 "global_configs": {
                     "output_folder": "limited_activations",
-                    "lr": 1e-03,
+                    "lr": 1e-03 * 4,
+                    "batch_size": 16,
+                    "gradient_accumulation_steps": 4,
                     "max_acts_per_class": 100,
                 },
                 "input_configs": [

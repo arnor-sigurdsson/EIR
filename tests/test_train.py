@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 import pytest
 from torch import nn
@@ -321,3 +321,69 @@ def test_set_up_num_classes(get_transformer_test_data):
 
     assert num_classes["Height"] == 1
     assert num_classes["Origin"] == 3
+
+
+@pytest.mark.parametrize(
+    "create_test_data",
+    [
+        {
+            "task_type": "binary",
+            "modalities": ("omics",),
+        },
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize(
+    "create_test_config_init_base",
+    [
+        # Default optimizer setup
+        {
+            "injections": {
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "model_config": {
+                            "model_type": "linear",
+                        },
+                    }
+                ],
+            },
+        },
+        # With gradient accumulation
+        {
+            "injections": {
+                "global_configs": {"gradient_accumulation_steps": 4},
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "model_config": {
+                            "model_type": "linear",
+                        },
+                    }
+                ],
+            },
+        },
+    ],
+    indirect=True,
+)
+def test_hook_default_optimizer_backward(prep_modelling_test_configs):
+
+    experiment, *_ = prep_modelling_test_configs
+
+    experiment.__dict__["optimizer"] = MagicMock()
+
+    state = {"iteration": 1, "loss": MagicMock()}
+    num_test_steps = 12
+
+    for i in range(num_test_steps):
+        train.hook_default_optimizer_backward(experiment=experiment, state=state)
+        state["iteration"] += 1
+
+    grad_acc_steps = experiment.configs.global_config.gradient_accumulation_steps
+
+    if grad_acc_steps:
+        assert state["loss"].__truediv__.call_count == num_test_steps
+        assert experiment.optimizer.step.call_count == num_test_steps // grad_acc_steps
+    else:
+        assert state["loss"].backward.call_count == num_test_steps
+        assert experiment.optimizer.step.call_count == num_test_steps

@@ -676,13 +676,21 @@ def _get_default_step_function_hooks_init_kwargs(
         step_function_hooks_init_kwargs=init_kwargs, configs=configs
     )
 
+    grad_acc_steps = configs.global_config.gradient_accumulation_steps
+    if grad_acc_steps and grad_acc_steps > 1:
+        logger.debug(
+            "Adding gradient accumulation hook with steps=%d.",
+            configs.global_config.gradient_accumulation_steps,
+        )
+        init_kwargs["loss"].append(get_hook_iteration_counter())
+
     return init_kwargs
 
 
 def add_l1_loss_hook_if_applicable(
     step_function_hooks_init_kwargs: Dict[str, Sequence[Callable]],
     configs: Configs,
-) -> Dict[str, Sequence[Callable]]:
+) -> Dict[str, List[Callable]]:
     input_l1 = any(
         getattr(input_config.model_config.model_init_config, "l1", None)
         for input_config in configs.input_configs
@@ -814,7 +822,14 @@ def hook_default_optimizer_backward(
         optimizer_name=experiment.configs.global_config.optimizer
     )
 
-    state["loss"].backward(**optimizer_backward_kwargs)
+    grad_acc_steps = experiment.configs.global_config.gradient_accumulation_steps
+
+    if grad_acc_steps and grad_acc_steps > 1:
+        loss = state["loss"] / grad_acc_steps
+    else:
+        loss = state["loss"]
+
+    loss.backward(**optimizer_backward_kwargs)
 
     gradient_clipping = experiment.configs.global_config.gradient_clipping
     if gradient_clipping:
@@ -822,7 +837,14 @@ def hook_default_optimizer_backward(
             parameters=experiment.model.parameters(),
             max_norm=gradient_clipping,
         )
-    experiment.optimizer.step()
+
+    if grad_acc_steps and grad_acc_steps > 1:
+        cur_step = state["iteration"]
+        if cur_step % grad_acc_steps == 0:
+            experiment.optimizer.step()
+
+    else:
+        experiment.optimizer.step()
 
     return {}
 
@@ -874,6 +896,35 @@ def hook_default_aggregate_losses(state: Dict, *args, **kwargs) -> Dict:
 
     train_loss_avg = aggregate_losses(losses_dict=state["per_target_train_losses"])
     state_updates = {"loss": train_loss_avg}
+
+    return state_updates
+
+
+def get_hook_iteration_counter():
+    iteration_count = 0
+
+    def _counter_iterator(do_increment: bool = True, *args, **kwargs) -> Dict[str, int]:
+        nonlocal iteration_count
+        if do_increment:
+            iteration_count += 1
+
+        state_updates = {"iteration": iteration_count}
+        return state_updates
+
+    return _counter_iterator
+
+
+def hook_adjust_loss_for_gradient_accumulation(
+    experiment: "Experiment", state: Dict, *args, **kwargs
+) -> Dict:
+    gradient_accumulation_steps = (
+        experiment.configs.global_config.gradient_accumulation_steps
+    )
+
+    loss = state["loss"]
+    loss_adjusted = loss / gradient_accumulation_steps
+
+    state_updates = {"loss": loss_adjusted}
 
     return state_updates
 
