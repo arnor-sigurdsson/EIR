@@ -373,7 +373,9 @@ def hook_add_l1_loss(
     for input_name, input_module in experiment.model.modules_to_fuse.items():
 
         cur_model_config = model_configs[input_name].input_config.model_config
-        current_l1 = getattr(cur_model_config, "l1", None)
+        cur_model_init_config = cur_model_config.model_init_config
+
+        current_l1 = getattr(cur_model_init_config, "l1", None)
         has_l1_weights = hasattr(input_module, "l1_penalized_weights")
 
         if current_l1 and not has_l1_weights:
