@@ -676,13 +676,13 @@ def _get_default_step_function_hooks_init_kwargs(
         step_function_hooks_init_kwargs=init_kwargs, configs=configs
     )
 
-    if configs.global_config.gradient_accumulation_steps > 1:
+    grad_acc_steps = configs.global_config.gradient_accumulation_steps
+    if grad_acc_steps and grad_acc_steps > 1:
         logger.debug(
             "Adding gradient accumulation hook with steps=%d.",
             configs.global_config.gradient_accumulation_steps,
         )
         init_kwargs["loss"].append(get_hook_iteration_counter())
-        init_kwargs["loss"].append(hook_adjust_loss_for_gradient_accumulation)
 
     return init_kwargs
 
@@ -822,7 +822,14 @@ def hook_default_optimizer_backward(
         optimizer_name=experiment.configs.global_config.optimizer
     )
 
-    state["loss"].backward(**optimizer_backward_kwargs)
+    grad_acc_steps = experiment.configs.global_config.gradient_accumulation_steps
+
+    if grad_acc_steps and grad_acc_steps > 1:
+        loss = state["loss"] / grad_acc_steps
+    else:
+        loss = state["loss"]
+
+    loss.backward(**optimizer_backward_kwargs)
 
     gradient_clipping = experiment.configs.global_config.gradient_clipping
     if gradient_clipping:
@@ -831,10 +838,8 @@ def hook_default_optimizer_backward(
             max_norm=gradient_clipping,
         )
 
-    if experiment.configs.global_config.gradient_accumulation_steps > 1:
+    if grad_acc_steps and grad_acc_steps > 1:
         cur_step = state["iteration"]
-
-        grad_acc_steps = experiment.configs.global_config.gradient_accumulation_steps
         if cur_step % grad_acc_steps == 0:
             experiment.optimizer.step()
 
