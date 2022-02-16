@@ -22,6 +22,8 @@ but the same approach can just as well be used for
 e.g. disease predictions in other cohorts
 (for example the `UK Biobank`_).
 
+Examining the sample data, we can see the following structure:
+
 .. _processed sample data: https://drive.google.com/file/d/1MELauhv7zFwxM8nonnj3iu_SmS69MuNi
 .. _plink pipelines: https://github.com/arnor-sigurdsson/plink_pipelines
 .. _Human Origins: https://www.nature.com/articles/nature13673
@@ -35,17 +37,30 @@ e.g. disease predictions in other cohorts
     ├── data_final_gen.bim          # Variant information file accompanying the genotype arrays
     └── human_origins_labels.csv    # Contains the target labels (what we want to predict from the genotype data)
 
+.. important::
 
-In order to configure the experiment we want to run,
+    The label file ID column must be called "ID" (uppercase).
+
+For this tutorial,
+we are going to use the data above to models
+to predict ancestry, of which there are 6 classes
+(Asia, Eastern Asia, Europe, Latin America and the Caribbean, Middle East and Sub-Saharan Africa).
+Before diving into the model training,
+we first have to configure our experiments.
+
+To configure the experiments we want to run,
 we will use ``.yaml`` configurations.
 Running ``eirtrain --help``,
-we can see the configurations needed
+we can see the configurations needed:
 
 .. literalinclude:: tutorial_files/01_basic_tutorial/commands/eirtrain_help.txt
     :language: console
     :lines: 2-
 
-In order to see more details about
+Above we can see that
+there are four types of configurations we can use:
+*global*, *input*, *predictor* and *target*.
+To see more details about
 what should be in these configuration files,
 we can check the :ref:`api-reference` reference.
 
@@ -92,6 +107,13 @@ will use the ``tutorial_01_targets.yaml`` file with the following content:
     :language: yaml
     :caption:
 
+.. note::
+    You might notice that we have not written any predictor config so far.
+    The predictor configuration controls the final parts of our models that
+    lead to a prediction. While we indeed *can* configure these predictors,
+    we will leave use the defaults for now. The default predictor is a fully
+    connected neural network, but see below for an example of how we can change
+    that.
 
 With all this, we should have our project directory looking something like this:
 
