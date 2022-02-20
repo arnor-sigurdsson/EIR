@@ -123,6 +123,10 @@ class GlobalConfig:
     :param gpu_num:
         Which GPU to run (according to CUDA order).
 
+    :param amp:
+        Whether to use Automatic Mixed Precision. Currently only supported when
+        training on GPUs.
+
     :param weighted_sampling_columns:
         Target column to apply weighted sampling on. Only applies to categorical
         columns. Passing in 'all' here will use an average of all the target columns.
@@ -232,6 +236,7 @@ class GlobalConfig:
     dataloader_workers: int = 0
     device: str = "cpu"
     gpu_num: str = "0"
+    amp: bool = False
     weighted_sampling_columns: Union[None, Sequence[str]] = None
     lr: float = 1e-03
     lr_lb: float = 0.0
