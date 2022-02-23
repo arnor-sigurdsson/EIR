@@ -690,7 +690,7 @@ def _get_default_step_function_hooks_init_kwargs(
     if do_amp:
         logger.debug("Setting up AMP training.")
         optimizer_backward_hook_with_grad_scaler = [
-            get_hook_amp_grad_scaler()
+            get_hook_amp_grad_scaler(device=configs.global_config.device)
         ] + init_kwargs["optimizer_backward"]
         init_kwargs["optimizer_backward"] = optimizer_backward_hook_with_grad_scaler
 
