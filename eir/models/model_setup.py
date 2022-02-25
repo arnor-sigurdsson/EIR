@@ -1,6 +1,6 @@
 import math
-from copy import copy
 from collections import OrderedDict
+from copy import copy
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Union, Dict, Any, Sequence, Set, Type, Tuple, Literal, TYPE_CHECKING
@@ -8,13 +8,6 @@ from typing import Union, Dict, Any, Sequence, Set, Type, Tuple, Literal, TYPE_C
 import timm
 import torch
 from aislib.misc_utils import get_logger
-from torch import nn
-from transformers import (
-    PreTrainedModel,
-    AutoModel,
-    AutoConfig,
-)
-
 from eir.experiment_io.experiment_io import (
     get_run_folder_from_model_path,
     load_serialized_train_experiment,
@@ -41,8 +34,15 @@ from eir.models.sequence.transformer_models import (
 from eir.models.tabular.tabular import (
     get_unique_values_from_transformers,
     SimpleTabularModel,
+    SimpleTabularModelConfig,
 )
 from eir.setup import schemas
+from torch import nn
+from transformers import (
+    PreTrainedModel,
+    AutoModel,
+    AutoConfig,
+)
 
 if TYPE_CHECKING:
     from eir.setup.input_setup import al_input_objects_as_dict, DataDimensions
@@ -132,6 +132,7 @@ def get_modules_to_fuse_from_inputs(
             )
 
             tabular_model = get_tabular_model(
+                model_init_config=model_config.model_init_config,
                 cat_columns=cat_columns,
                 con_columns=con_columns,
                 device=device,
@@ -557,12 +558,15 @@ def _get_perceiver_sequence_feature_extractor_objects(
 
 
 def get_tabular_model(
+    model_init_config: SimpleTabularModelConfig,
     cat_columns: Sequence[str],
     con_columns: Sequence[str],
     device: str,
     unique_label_values: Dict[str, Set[str]],
 ) -> SimpleTabularModel:
+
     tabular_model = SimpleTabularModel(
+        model_init_config=model_init_config,
         cat_columns=cat_columns,
         con_columns=con_columns,
         unique_label_values_per_column=unique_label_values,
