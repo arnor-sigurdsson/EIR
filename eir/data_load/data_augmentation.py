@@ -330,7 +330,7 @@ def calc_mixed_loss(
 def make_random_omics_columns_missing(
     omics_array: torch.Tensor, percentage: float = 0.05, probability: float = 1.0
 ) -> torch.Tensor:
-    random_draw = np.random.uniform()
+    random_draw = torch.rand(1).item()
     if random_draw > probability:
         return omics_array
 
