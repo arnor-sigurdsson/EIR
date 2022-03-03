@@ -447,7 +447,7 @@ def get_dataloaders(
         shuffle=False,
         num_workers=num_workers,
         pin_memory=False,
-        drop_last=True,
+        drop_last=False,
     )
 
     return train_dloader, valid_dloader

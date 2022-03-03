@@ -726,7 +726,7 @@ def create_test_dloaders(create_test_config: config.Configs, create_test_dataset
     )
 
     valid_dloader = DataLoader(
-        valid_dataset, batch_size=gc.batch_size, shuffle=False, drop_last=True
+        valid_dataset, batch_size=gc.batch_size, shuffle=False, drop_last=False
     )
 
     return train_dloader, valid_dloader, train_dataset, valid_dataset
