@@ -16,6 +16,7 @@ from typing import (
     TYPE_CHECKING,
     Iterator,
     List,
+    Any,
 )
 
 import numpy as np
@@ -57,16 +58,14 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-al_input_objects_as_dict = Dict[
-    str,
-    Union[
-        "OmicsInputInfo",
-        "TabularInputInfo",
-        "SequenceInputInfo",
-        "BytesInputInfo",
-        "ImageInputInfo",
-    ],
+al_input_objects = Union[
+    "OmicsInputInfo",
+    "TabularInputInfo",
+    "SequenceInputInfo",
+    "BytesInputInfo",
+    "ImageInputInfo",
 ]
+al_input_objects_as_dict = Dict[str, al_input_objects]
 al_hf_tokenizer_inputs = Union[TextInput, PreTokenizedInput, EncodedInput]
 al_sequence_input_objects_basic = Tuple[
     Vocab,
@@ -94,23 +93,20 @@ al_serializable_input_classes = Union[
 ]
 
 
-def set_up_inputs_for_training(
+def set_up_inputs_general(
     inputs_configs: schemas.al_input_configs,
-    train_ids: Sequence[str],
-    valid_ids: Sequence[str],
     hooks: Union["Hooks", None],
+    setup_func_getter: Callable[[schemas.InputConfig], Callable[..., al_input_objects]],
+    setup_func_kwargs: Dict[str, Any],
 ) -> al_input_objects_as_dict:
     all_inputs = {}
 
     name_config_iter = get_input_name_config_iterator(input_configs=inputs_configs)
+
     for name, input_config in name_config_iter:
+        setup_func = setup_func_getter(input_config=input_config)
+
         cur_input_data_config = input_config.input_info
-
-        setup_func = get_input_setup_function(
-            input_type=cur_input_data_config.input_type,
-            pretrained_config=input_config.pretrained_config,
-        )
-
         logger.info(
             "Setting up %s inputs '%s' from %s.",
             cur_input_data_config.input_type,
@@ -119,12 +115,30 @@ def set_up_inputs_for_training(
         )
 
         set_up_input = setup_func(
-            input_config=input_config,
-            train_ids=train_ids,
-            valid_ids=valid_ids,
-            hooks=hooks,
+            input_config=input_config, hooks=hooks, **setup_func_kwargs
         )
         all_inputs[name] = set_up_input
+
+    return all_inputs
+
+
+def set_up_inputs_for_training(
+    inputs_configs: schemas.al_input_configs,
+    train_ids: Sequence[str],
+    valid_ids: Sequence[str],
+    hooks: Union["Hooks", None],
+) -> al_input_objects_as_dict:
+
+    train_input_setup_kwargs = {
+        "train_ids": train_ids,
+        "valid_ids": valid_ids,
+    }
+    all_inputs = set_up_inputs_general(
+        inputs_configs=inputs_configs,
+        hooks=hooks,
+        setup_func_getter=get_input_setup_function_for_train,
+        setup_func_kwargs=train_input_setup_kwargs,
+    )
 
     return all_inputs
 
@@ -137,9 +151,13 @@ def get_input_name_config_iterator(input_configs: schemas.al_input_configs):
         yield cur_name, input_config
 
 
-def get_input_setup_function(
-    input_type: str, pretrained_config: schemas.BasicPretrainedConfig
-) -> Callable:
+def get_input_setup_function_for_train(
+    input_config: schemas.InputConfig,
+) -> Callable[..., al_input_objects]:
+
+    input_type = input_config.input_info.input_type
+    pretrained_config = input_config.pretrained_config
+
     from_scratch_mapping = get_input_setup_function_map()
 
     if pretrained_config:
@@ -155,7 +173,7 @@ def get_input_setup_function(
     return from_scratch_mapping[input_type]
 
 
-def get_input_setup_function_map() -> Dict[str, Callable]:
+def get_input_setup_function_map() -> Dict[str, Callable[..., al_input_objects]]:
     setup_mapping = {
         "omics": set_up_omics_input,
         "tabular": set_up_tabular_input_for_training,
