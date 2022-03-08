@@ -70,7 +70,6 @@ from eir.setup.input_setup import (
     SequenceInputInfo,
     BytesInputInfo,
     ImageInputInfo,
-    get_input_name_config_iterator,
 )
 from eir.train import (
     prepare_base_batch_default,
@@ -347,7 +346,7 @@ def get_default_predict_config(
         )
         target_labels = None
 
-    test_inputs = set_up_inputs(
+    test_inputs = set_up_inputs_for_predict(
         test_inputs_configs=configs_overloaded_for_predict.input_configs,
         ids=test_ids,
         hooks=default_train_hooks,
@@ -518,44 +517,39 @@ def get_labels_for_predict(
     return labels
 
 
-def set_up_inputs(
+def set_up_inputs_for_predict(
     test_inputs_configs: schemas.al_input_configs,
     ids: Sequence[str],
     hooks: Union["Hooks", None],
     output_folder: str,
 ) -> al_input_objects_as_dict:
-    all_inputs = {}
 
-    name_config_iter = get_input_name_config_iterator(input_configs=test_inputs_configs)
-    for name, input_config in name_config_iter:
-        cur_input_data_config = input_config.input_info
-        setup_func = get_input_setup_function_for_predict(
-            input_type=cur_input_data_config.input_type
-        )
-        logger.info(
-            "Setting up %s inputs '%s' from %s.",
-            cur_input_data_config.input_type,
-            cur_input_data_config.input_name,
-            cur_input_data_config.input_source,
-        )
-        set_up_input = setup_func(
-            input_config=input_config,
-            ids=ids,
-            output_folder=output_folder,
-            hooks=hooks,
-        )
-        all_inputs[name] = set_up_input
+    train_input_setup_kwargs = {
+        "ids": ids,
+        "output_folder": output_folder,
+    }
+    all_inputs = input_setup.set_up_inputs_general(
+        inputs_configs=test_inputs_configs,
+        hooks=hooks,
+        setup_func_getter=get_input_setup_function_for_predict,
+        setup_func_kwargs=train_input_setup_kwargs,
+    )
 
     return all_inputs
 
 
-def get_input_setup_function_for_predict(input_type) -> Callable:
+def get_input_setup_function_for_predict(
+    input_config: schemas.InputConfig,
+) -> Callable[..., input_setup.al_input_objects]:
     mapping = get_input_setup_function_map_for_predict()
+    input_type = input_config.input_info.input_type
 
     return mapping[input_type]
 
 
-def get_input_setup_function_map_for_predict() -> Dict[str, Callable]:
+def get_input_setup_function_map_for_predict() -> Dict[
+    str, Callable[..., input_setup.al_input_objects]
+]:
     setup_mapping = {
         "omics": input_setup.set_up_omics_input,
         "tabular": setup_tabular_input_for_testing,
@@ -1011,7 +1005,7 @@ def _get_predict_background_loader(
         ids=background_ids_sampled,
     )
 
-    background_inputs_as_dict = set_up_inputs(
+    background_inputs_as_dict = set_up_inputs_for_predict(
         test_inputs_configs=configs.input_configs,
         ids=background_ids_sampled,
         hooks=loaded_hooks,

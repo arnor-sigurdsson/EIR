@@ -3,6 +3,8 @@ from collections import OrderedDict
 from copy import copy
 from dataclasses import dataclass
 from pathlib import Path
+import reprlib
+import typing
 from typing import Union, Dict, Any, Sequence, Set, Type, Tuple, Literal, TYPE_CHECKING
 
 import timm
@@ -644,8 +646,17 @@ def overload_fusion_model_feature_extractors_with_pretrained(
 ) -> nn.ModuleDict:
 
     """
-    Note that `inputs_as_dict` here have already been set up according to pretrained
-    configurations.
+    Note that `inputs_as_dict` here are coming from the current experiment, arguably
+    it would be more robust / better to have them loaded from the pretrained experiment,
+    but then we have to setup things from there such as hooks, valid_ids, train_ids,
+    etc.
+
+    For now we will enforce that the feature extractor architecture that is set-up
+    and then uses pre-trained weights from a previous experiment must match that of
+    the feature extractor that did the pre-training. Simply put, we must ensure
+    that all input setup parameters that have to do with architecture match exactly
+    between the (a) pretrained input config and (b) the input config loading the
+    pretrained model.
     """
 
     any_pretrained = any(
@@ -680,6 +691,7 @@ def overload_fusion_model_feature_extractors_with_pretrained(
             inputs_as_dicts=inputs_as_dict,
         )
 
+        pretrained_name = pretrained_config.load_module_name
         loaded_and_renamed_fusion_model = load_model(
             model_path=load_model_path,
             model_class=fusion_model_class,
@@ -687,6 +699,7 @@ def overload_fusion_model_feature_extractors_with_pretrained(
             device="cpu",
             test_mode=False,
             state_dict_key_rename=replace_pattern,
+            state_dict_keys_to_keep=(pretrained_name,),
         )
         loaded_and_renamed_fusion_extractors = (
             loaded_and_renamed_fusion_model.modules_to_fuse
@@ -764,6 +777,7 @@ def load_model(
     model_init_kwargs: Dict,
     device: str,
     test_mode: bool,
+    state_dict_keys_to_keep: Union[None, Sequence[str]] = None,
     state_dict_key_rename: Union[None, Sequence[Tuple[str, str]]] = None,
 ) -> Union[al_fusion_models, nn.Module]:
 
@@ -773,6 +787,7 @@ def load_model(
         model=model,
         model_state_dict_path=model_path,
         device=device,
+        state_dict_keys_to_keep=state_dict_keys_to_keep,
         state_dict_key_rename=state_dict_key_rename,
     )
 
@@ -786,9 +801,23 @@ def _load_model_weights(
     model: nn.Module,
     model_state_dict_path: Path,
     device: str,
+    state_dict_keys_to_keep: Union[None, Sequence[str]] = None,
     state_dict_key_rename: Union[None, Sequence[Tuple[str, str]]] = None,
 ) -> nn.Module:
     state_dict = torch.load(model_state_dict_path, map_location=device)
+
+    if state_dict_keys_to_keep:
+        no_keys_before = len(state_dict)
+        state_dict = _filter_state_dict_keys(
+            state_dict=state_dict, keys_to_keep=state_dict_keys_to_keep
+        )
+        logger.info(
+            "Extracting %d/%d modules for feature extractors: '%s' from %s.",
+            len(state_dict),
+            no_keys_before,
+            state_dict_keys_to_keep,
+            model_state_dict_path,
+        )
 
     if state_dict_key_rename:
         for replace_tuple in state_dict_key_rename:
@@ -801,7 +830,25 @@ def _load_model_weights(
                 dict_=state_dict, replace_pattern=replace_tuple
             )
 
-    model.load_state_dict(state_dict=state_dict)
+    incompatible_keys = model.load_state_dict(state_dict=state_dict, strict=False)
+
+    if incompatible_keys:
+        repr_object = reprlib.Repr()
+        repr_object.maxother = 256
+        repr_object.maxstring = 256
+        logger.info(
+            "Encountered incompatible modules when loading model from '%s'.\n"
+            "Missing keys: \n%s\n"
+            "Unexpected keys: \n%s\n"
+            "This is expected if you are loading select modules from a saved model, "
+            "which means you can ignore this message. If you are loading a pre-trained"
+            " model as-is, then this is most likely an error and something unexpected"
+            "has changed between the pre-training and setting up the current model"
+            "from the pre-trained one.",
+            model_state_dict_path,
+            repr_object.repr(incompatible_keys.missing_keys),
+            repr_object.repr(incompatible_keys.unexpected_keys),
+        )
 
     model = model.to(device=device)
 
@@ -818,3 +865,16 @@ def _replace_dict_key_names(
         renamed_dict[new_key] = value
 
     return renamed_dict
+
+
+def _filter_state_dict_keys(
+    state_dict: typing.OrderedDict[str, torch.nn.Parameter], keys_to_keep: Sequence[str]
+) -> typing.OrderedDict[str, torch.nn.Parameter]:
+
+    filtered_state_dict = OrderedDict()
+
+    for module_name, module_parameter in state_dict.items():
+        if any(key in module_name for key in keys_to_keep):
+            filtered_state_dict[module_name] = module_parameter
+
+    return filtered_state_dict

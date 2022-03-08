@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Tuple, TYPE_CHECKING
+from typing import Tuple, Sequence, TYPE_CHECKING
 from copy import deepcopy
 
 import pytest
@@ -105,6 +105,44 @@ def test_pre_trained_module_setup(
     _get_experiment_overloaded_for_pretrained_checkpoint(
         experiment=experiment, test_config=test_config
     )
+
+    experiment_overwritten = _add_new_feature_extractor_to_experiment(
+        experiment=experiment
+    )
+    _get_experiment_overloaded_for_pretrained_extractor(
+        experiment=experiment_overwritten,
+        test_config=test_config,
+        rename_pretrained_inputs=False,
+    )
+
+    _get_experiment_overloaded_for_pretrained_extractor(
+        experiment=experiment_overwritten,
+        test_config=test_config,
+        rename_pretrained_inputs=True,
+    )
+
+
+def _add_new_feature_extractor_to_experiment(
+    experiment: train.Experiment,
+) -> train.Experiment:
+    """
+    Used to check that we can do a partial loading of pretrained feature extractors.
+    """
+
+    experiment_attrs = experiment.__dict__
+    experiment_configs = deepcopy(experiment.configs)
+    first_config_modified = deepcopy(experiment_configs.input_configs[0])
+
+    extra_input_name = first_config_modified.input_info.input_name + "_copy"
+    first_config_modified.input_info.input_name = extra_input_name
+
+    inputs_configs = list(experiment_configs.input_configs)
+    inputs_configs_with_extra = inputs_configs + [first_config_modified]
+    experiment_attrs["configs"].input_configs = inputs_configs_with_extra
+
+    experiment_overwritten = train.Experiment(**experiment_attrs)
+
+    return experiment_overwritten
 
 
 @pytest.mark.parametrize(
@@ -233,6 +271,7 @@ def _get_experiment_overloaded_for_pretrained_extractor(
     experiment: train.Experiment,
     test_config: "ModelTestConfig",
     rename_pretrained_inputs: bool,
+    skip_pretrained_keys: Sequence[str] = tuple(),
 ) -> Tuple[train.Experiment, "ModelTestConfig"]:
 
     input_configs = deepcopy(experiment.configs.input_configs)
@@ -242,6 +281,9 @@ def _get_experiment_overloaded_for_pretrained_extractor(
     input_configs_with_pretrained = []
     for cur_input_config in input_configs:
         cur_name = cur_input_config.input_info.input_name
+
+        if cur_name in skip_pretrained_keys:
+            continue
 
         cur_pretrained_config = BasicPretrainedConfig(
             model_path=str(saved_model_path), load_module_name=cur_name

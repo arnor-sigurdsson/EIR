@@ -454,7 +454,7 @@ def test_set_up_test_dataset(
             label_transformers=transformers,
         )
 
-    test_inputs = predict.set_up_inputs(
+    test_inputs = predict.set_up_inputs_for_predict(
         test_inputs_configs=test_configs.input_configs,
         ids=test_ids,
         hooks=None,
