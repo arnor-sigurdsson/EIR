@@ -56,6 +56,7 @@ def analyze_tabular_input_activations(
         df_activations=df_activations,
         outpath=activation_outfolder / "feature_importance.pdf",
     )
+    df_activations.to_csv(activation_outfolder / "feature_importances.csv")
 
     all_activations_class_stratified = stratify_activations_by_target_classes(
         all_activations=all_activations,
@@ -92,6 +93,7 @@ def analyze_tabular_input_activations(
                 class_name=class_name,
             )
 
+        cat_act_dfs = []
         for cat_column in cat_columns:
 
             categorical_shap = _gather_categorical_shap_values(
@@ -122,6 +124,19 @@ def analyze_tabular_input_activations(
                 class_name=class_name,
                 activation_outfolder=cur_class_outfolder,
             )
+
+            df_cur_categorical_acts = _parse_categorical_shap_values_for_serialization(
+                categorical_inputs_mapped=categorical_inputs_mapped,
+                shap_values_for_input=categorical_shap,
+                column_name=cat_column,
+            )
+            cat_act_dfs.append(df_cur_categorical_acts)
+
+        _save_categorical_acts(
+            dfs_categorical_acts_for_class=cat_act_dfs,
+            class_name=class_name,
+            output_folder=cur_class_outfolder,
+        )
 
 
 def set_up_tabular_tensor_slices(
@@ -338,7 +353,7 @@ def plot_tabular_categorical_feature(
 
     fig = plt.gcf()
 
-    plt.title(feature_name_to_plot, fontsize=14)
+    plt.title(class_name, fontsize=14)
     plt.yticks(fontsize=10, wrap=True)
 
     plt.tight_layout()
@@ -356,6 +371,35 @@ def plot_tabular_categorical_feature(
         )
 
     plt.close("all")
+
+
+def _save_categorical_acts(
+    dfs_categorical_acts_for_class: Sequence[pd.DataFrame],
+    class_name: str,
+    output_folder: Path,
+) -> None:
+    df_cat_categorical_acts = pd.concat(dfs_categorical_acts_for_class)
+    df_cat_categorical_acts.index.name = "Input_Value"
+    csv_name = f"cat_features_{class_name}.csv"
+    output_path = str(output_folder / csv_name)
+    df_cat_categorical_acts.to_csv(path_or_buf=output_path)
+
+
+def _parse_categorical_shap_values_for_serialization(
+    categorical_inputs_mapped: pd.DataFrame,
+    shap_values_for_input: np.ndarray,
+    column_name: str,
+) -> pd.DataFrame:
+
+    categorical_inputs_copy = categorical_inputs_mapped.copy()
+
+    assert len(categorical_inputs_copy) == shap_values_for_input.shape[0]
+
+    categorical_inputs_copy["Shap_Value"] = shap_values_for_input
+    average_effects = categorical_inputs_copy.groupby(by=column_name).mean()
+    average_effects["Input_Name"] = average_effects.index.name
+
+    return average_effects
 
 
 def plot_tabular_beeswarm(
