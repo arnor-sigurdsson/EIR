@@ -378,6 +378,10 @@ def _save_categorical_acts(
     class_name: str,
     output_folder: Path,
 ) -> None:
+
+    if len(dfs_categorical_acts_for_class) == 0:
+        return None
+
     df_cat_categorical_acts = pd.concat(dfs_categorical_acts_for_class)
     df_cat_categorical_acts.index.name = "Input_Value"
     csv_name = f"cat_features_{class_name}.csv"
