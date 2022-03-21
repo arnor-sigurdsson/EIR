@@ -1,19 +1,21 @@
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from typing import Dict, Sequence, TYPE_CHECKING
+from typing import Literal, Union, Dict, Sequence, TYPE_CHECKING
 
 import torch
-from aislib.pytorch_modules import Swish
 from torch import nn
 
-from eir.models.fusion.fusion_default import default_fuse_features, al_features
+from eir.models.fusion.fusion_default import (
+    default_fuse_features,
+    al_features,
+    get_default_fusion_final_layers,
+)
 from eir.models.layers import MLPResidualBlock
 from eir.models.models_base import (
     construct_multi_branches,
     initialize_modules_from_spec,
     create_multi_task_blocks_with_first_adaptor_block,
     construct_blocks,
-    get_final_layer,
     merge_module_dicts,
     calculate_module_dict_outputs,
 )
@@ -43,6 +45,9 @@ class MGMoEModelConfig:
 
     :param fc_do:
         Dropout before the last FC layer.
+
+    :param stochastic_depth_p:
+        Probability of dropping input.
     """
 
     layers: Sequence[int] = field(default_factory=lambda: [1, 1])
@@ -52,6 +57,10 @@ class MGMoEModelConfig:
 
     rb_do: float = 0.00
     fc_do: float = 0.00
+
+    stochastic_depth_p: float = 0.00
+
+    final_layer_type: Union[Literal["linear"], Literal["mlp_residual"]] = "linear"
 
 
 class MGMoEModel(nn.Module):
@@ -90,6 +99,7 @@ class MGMoEModel(nn.Module):
             "out_features": self.model_config.fc_task_dim,
             "dropout_p": self.model_config.rb_do,
             "full_preactivation": False,
+            "stochastic_depth_p": self.model_config.stochastic_depth_p,
         }
         self.expert_branches = create_multi_task_blocks_with_first_adaptor_block(
             num_blocks=self.model_config.layers[0],
@@ -118,22 +128,16 @@ class MGMoEModel(nn.Module):
             },
         )
 
-        final_act_spec = self.get_final_act_spec(
-            in_features=self.model_config.fc_task_dim, dropout_p=self.model_config.fc_do
-        )
-        final_act = construct_multi_branches(
-            branch_names=self.task_names,
-            branch_factory=initialize_modules_from_spec,
-            branch_factory_kwargs={"spec": final_act_spec},
-        )
-
-        final_layer = get_final_layer(
-            in_features=self.model_config.fc_task_dim,
+        task_names = tuple(self.num_outputs_per_target.keys())
+        final_layers = get_default_fusion_final_layers(
+            fc_task_dim=self.model_config.fc_task_dim,
+            dropout_p=self.model_config.fc_do,
             num_outputs_per_target=self.num_outputs_per_target,
+            task_names=task_names,
+            final_layer_type=self.model_config.final_layer_type,
         )
-
         self.multi_task_branches = merge_module_dicts(
-            (multi_task_branches, final_act, final_layer)
+            (multi_task_branches, *final_layers)
         )
 
         self._init_weights()
@@ -152,20 +156,6 @@ class MGMoEModel(nn.Module):
                     },
                 ),
                 "gate_attention": (nn.Softmax, {"dim": 1}),
-            }
-        )
-
-        return spec
-
-    @staticmethod
-    def get_final_act_spec(in_features: int, dropout_p: float):
-        # TODO: Refactor, duplicated from fusion_default.py
-
-        spec = OrderedDict(
-            {
-                "norm_final": (nn.BatchNorm1d, {"num_features": in_features}),
-                "act_final": (Swish, {}),
-                "do_final": (nn.Dropout, {"p": dropout_p}),
             }
         )
 

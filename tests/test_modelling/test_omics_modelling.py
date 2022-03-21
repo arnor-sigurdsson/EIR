@@ -294,7 +294,10 @@ def test_regression(prep_modelling_test_configs):
                         "input_info": {"input_name": "test_genotype"},
                         "model_config": {
                             "model_type": "cnn",
-                            "model_init_config": {"l1": 1e-03},
+                            "model_init_config": {
+                                "l1": 1e-03,
+                                "stochastic_depth_p": 0.2,
+                            },
                         },
                     },
                     {
@@ -325,6 +328,7 @@ def test_regression(prep_modelling_test_configs):
                                 "rb_do": 0.15,
                                 "fc_repr_dim": 64,
                                 "l1": 1e-03,
+                                "stochastic_depth_p": 0.2,
                             },
                         },
                     },
@@ -335,6 +339,7 @@ def test_regression(prep_modelling_test_configs):
                         "rb_do": 0.10,
                         "fc_do": 0.10,
                         "final_layer_type": "mlp_residual",
+                        "stochastic_depth_p": 0.5,
                     },
                 },
                 "target_configs": {
@@ -445,7 +450,7 @@ def test_regression(prep_modelling_test_configs):
                 ],
                 "predictor_configs": {
                     "model_type": "mgmoe",
-                    "model_config": {"mg_num_experts": 3},
+                    "model_config": {"mg_num_experts": 3, "stochastic_depth_p": 0.5},
                 },
                 "target_configs": {
                     "target_cat_columns": ["Origin"],

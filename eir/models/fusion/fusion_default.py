@@ -45,6 +45,9 @@ class FusionModelConfig:
     :param fc_do:
         Dropout before final layer.
 
+    :param stochastic_depth_p:
+        Probability of dropping input.
+
     :param final_layer_type:
         Which type of final layer to use to construct prediction.
     """
@@ -55,6 +58,8 @@ class FusionModelConfig:
 
     rb_do: float = 0.00
     fc_do: float = 0.00
+
+    stochastic_depth_p: float = 0.00
 
     final_layer_type: Union[Literal["linear"], Literal["mlp_residual"]] = "linear"
 
@@ -80,6 +85,7 @@ class FusionModel(nn.Module):
             "in_features": self.model_config.fc_task_dim,
             "out_features": self.model_config.fc_task_dim,
             "dropout_p": self.model_config.rb_do,
+            "stochastic_depth_p": self.model_config.stochastic_depth_p,
             "full_preactivation": False,
         }
 
@@ -93,7 +99,7 @@ class FusionModel(nn.Module):
             first_layer_kwargs_overload={"in_features": cur_dim},
         )
 
-        final_layers = _get_default_fusion_final_layers(
+        final_layers = get_default_fusion_final_layers(
             fc_task_dim=self.model_config.fc_task_dim,
             dropout_p=self.model_config.fc_do,
             num_outputs_per_target=self.num_outputs_per_target,
@@ -138,7 +144,7 @@ def get_linear_final_act_spec(in_features: int, dropout_p: float):
     return spec
 
 
-def _get_default_fusion_final_layers(
+def get_default_fusion_final_layers(
     fc_task_dim: int,
     dropout_p: float,
     num_outputs_per_target: "al_num_outputs_per_target",
@@ -166,7 +172,10 @@ def _get_default_fusion_final_layers(
         final_layer_specific_kwargs = {}
 
     elif final_layer_type == "mlp_residual":
-        final_layer_specific_kwargs = {"dropout_p": dropout_p}
+        final_layer_specific_kwargs = {
+            "dropout_p": dropout_p,
+            "stochastic_depth_p": 0.0,
+        }
 
     else:
         raise ValueError("Unknown final layer type: '%s'.", final_layer_type)

@@ -6,6 +6,7 @@ from aislib.misc_utils import get_logger
 from aislib.pytorch_modules import Swish
 from torch import nn
 from torch.nn import Parameter
+from torchvision.ops.stochastic_depth import StochasticDepth
 
 logger = get_logger(__name__)
 
@@ -123,6 +124,7 @@ class CNNResidualBlockBase(nn.Module):
         conv_1_kernel_w: int = 12,
         conv_1_padding: int = 4,
         down_stride_w: int = 4,
+        stochastic_depth_p: float = 0.0,
     ):
         super().__init__()
 
@@ -134,6 +136,8 @@ class CNNResidualBlockBase(nn.Module):
         self.down_stride_w = down_stride_w
 
         self.down_stride_h = self.conv_1_kernel_h
+
+        self.stochastic_depth_p = stochastic_depth_p
 
         self.rb_do = nn.Dropout2d(rb_do)
         self.act_1 = Swish()
@@ -175,6 +179,8 @@ class CNNResidualBlockBase(nn.Module):
                 bias=False,
             )
         )
+
+        self.stochastic_depth = StochasticDepth(p=self.stochastic_depth_p, mode="batch")
 
         self.se_block = SEBlock(channels=out_channels, reduction=16)
 
@@ -226,6 +232,8 @@ class CNNResidualBlock(CNNResidualBlockBase):
 
         channel_recalibrations = self.se_block(out)
         out = out * channel_recalibrations
+
+        out = self.stochastic_depth(out)
 
         out = out + identity
 
@@ -353,6 +361,7 @@ class MLPResidualBlock(nn.Module):
         dropout_p: float = 0.0,
         full_preactivation: bool = False,
         zero_init_last_bn: bool = False,
+        stochastic_depth_p: float = 0.0,
     ):
         super().__init__()
 
@@ -361,6 +370,7 @@ class MLPResidualBlock(nn.Module):
         self.dropout_p = dropout_p
         self.full_preactivation = full_preactivation
         self.zero_init_last_bn = zero_init_last_bn
+        self.stochastic_depth_p = stochastic_depth_p
 
         self.bn_1 = nn.BatchNorm1d(num_features=in_features)
         self.act_1 = Swish()
@@ -382,6 +392,8 @@ class MLPResidualBlock(nn.Module):
                 in_features=in_features, out_features=out_features, bias=False
             )
 
+        self.stochastic_depth = StochasticDepth(p=self.stochastic_depth_p, mode="batch")
+
         if self.zero_init_last_bn:
             nn.init.zeros_(self.bn_2.weight)
 
@@ -399,6 +411,8 @@ class MLPResidualBlock(nn.Module):
         out = self.do(out)
         out = self.fc_2(out)
 
+        out = self.stochastic_depth(out)
+
         return out + identity
 
 
@@ -409,6 +423,7 @@ class SplitMLPResidualBlock(nn.Module):
         out_feature_sets: int,
         split_size: int,
         dropout_p: float = 0.0,
+        stochastic_depth_p: float = 0.0,
         full_preactivation: bool = False,
         zero_init_last_bn: bool = False,
         reduce_both: bool = True,
@@ -423,6 +438,7 @@ class SplitMLPResidualBlock(nn.Module):
         self.full_preactivation = full_preactivation
         self.zero_init_last_bn = zero_init_last_bn
         self.reduce_both = reduce_both
+        self.stochastic_depth_p = stochastic_depth_p
 
         self.bn_1 = nn.BatchNorm1d(num_features=in_features)
         self.act_1 = Swish()
@@ -456,6 +472,8 @@ class SplitMLPResidualBlock(nn.Module):
                 num_chunks=self.fc_2.out_features,
             )
 
+        self.stochastic_depth = StochasticDepth(p=stochastic_depth_p, mode="batch")
+
         self.out_features = self.fc_2.out_features
 
         if self.zero_init_last_bn:
@@ -474,6 +492,8 @@ class SplitMLPResidualBlock(nn.Module):
         out = self.act_2(out)
         out = self.do(out)
         out = self.fc_2(out)
+
+        out = self.stochastic_depth(out)
 
         return out + identity
 

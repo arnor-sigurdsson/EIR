@@ -8,6 +8,7 @@ from typing import (
     Callable,
     Iterable,
     Any,
+    Sequence,
     Union,
     Literal,
     TYPE_CHECKING,
@@ -49,7 +50,9 @@ def merge_module_dicts(module_dicts: Tuple[nn.ModuleDict, ...]) -> nn.ModuleDict
 
 
 def construct_blocks(
-    num_blocks: int, block_constructor: Callable, block_kwargs: Dict
+    num_blocks: int,
+    block_constructor: Callable,
+    block_kwargs: Dict,
 ) -> nn.Sequential:
     blocks = []
     for i in range(num_blocks):
@@ -60,7 +63,7 @@ def construct_blocks(
 
 def create_multi_task_blocks_with_first_adaptor_block(
     num_blocks: int,
-    branch_names,
+    branch_names: Sequence[str],
     block_constructor: Callable,
     block_constructor_kwargs: Dict,
     first_layer_kwargs_overload: Dict,
@@ -162,7 +165,10 @@ def get_final_layer(
 
 
 def _get_mlp_residual_final_spec(
-    in_features: int, num_outputs: int, dropout_p: float
+    in_features: int,
+    num_outputs: int,
+    dropout_p: float,
+    stochastic_depth_p: float,
 ) -> Tuple[Type[nn.Module], Dict[str, Any]]:
     spec = (
         MLPResidualBlock,
@@ -170,6 +176,7 @@ def _get_mlp_residual_final_spec(
             "in_features": in_features,
             "out_features": num_outputs,
             "dropout_p": dropout_p,
+            "stochastic_depth_p": stochastic_depth_p,
         },
     )
 
