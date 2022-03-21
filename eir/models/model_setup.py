@@ -832,7 +832,10 @@ def _load_model_weights(
 
     incompatible_keys = model.load_state_dict(state_dict=state_dict, strict=False)
 
-    if incompatible_keys.missing_keys or incompatible_keys.unexpected_keys:
+    no_missing = len(incompatible_keys.missing_keys)
+    no_unexpected = len(incompatible_keys.unexpected_keys)
+    no_incompatible_keys = no_missing + no_unexpected
+    if no_incompatible_keys > 0:
         repr_object = reprlib.Repr()
         repr_object.maxother = 256
         repr_object.maxstring = 256

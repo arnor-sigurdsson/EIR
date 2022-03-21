@@ -1,6 +1,6 @@
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from typing import Dict, Callable, Sequence, List, TYPE_CHECKING
+from typing import Literal, Union, Dict, Callable, Sequence, List, TYPE_CHECKING
 
 import torch
 from aislib.misc_utils import get_logger
@@ -43,7 +43,10 @@ class FusionModelConfig:
         Dropout in each MLP residual block.
 
     :param fc_do:
-        Dropout before last FC layer.
+        Dropout before final layer.
+
+    :param final_layer_type:
+        Which type of final layer to use to construct prediction.
     """
 
     layers: List[int] = field(default_factory=lambda: [2])
@@ -52,6 +55,8 @@ class FusionModelConfig:
 
     rb_do: float = 0.00
     fc_do: float = 0.00
+
+    final_layer_type: Union[Literal["linear"], Literal["mlp_residual"]] = "linear"
 
 
 class FusionModel(nn.Module):
@@ -88,38 +93,18 @@ class FusionModel(nn.Module):
             first_layer_kwargs_overload={"in_features": cur_dim},
         )
 
-        final_act_spec = self.get_final_act_spec(
-            in_features=self.model_config.fc_task_dim, dropout_p=self.model_config.fc_do
-        )
-        final_act = construct_multi_branches(
-            branch_names=task_names,
-            branch_factory=initialize_modules_from_spec,
-            branch_factory_kwargs={"spec": final_act_spec},
-        )
-
-        final_layer = get_final_layer(
-            in_features=self.model_config.fc_task_dim,
+        final_layers = _get_default_fusion_final_layers(
+            fc_task_dim=self.model_config.fc_task_dim,
+            dropout_p=self.model_config.fc_do,
             num_outputs_per_target=self.num_outputs_per_target,
+            task_names=task_names,
+            final_layer_type=self.model_config.final_layer_type,
         )
-
         self.multi_task_branches = merge_module_dicts(
-            (multi_task_branches, final_act, final_layer)
+            (multi_task_branches, *final_layers)
         )
 
         self._init_weights()
-
-    @staticmethod
-    def get_final_act_spec(in_features: int, dropout_p: float):
-
-        spec = OrderedDict(
-            {
-                "bn_final": (nn.BatchNorm1d, {"num_features": in_features}),
-                "act_final": (Swish, {}),
-                "do_final": (nn.Dropout, {"p": dropout_p}),
-            }
-        )
-
-        return spec
 
     def _init_weights(self):
         pass
@@ -138,3 +123,60 @@ class FusionModel(nn.Module):
         )
 
         return out
+
+
+def get_linear_final_act_spec(in_features: int, dropout_p: float):
+
+    spec = OrderedDict(
+        {
+            "norm_final": (nn.BatchNorm1d, {"num_features": in_features}),
+            "act_final": (Swish, {}),
+            "do_final": (nn.Dropout, {"p": dropout_p}),
+        }
+    )
+
+    return spec
+
+
+def _get_default_fusion_final_layers(
+    fc_task_dim: int,
+    dropout_p: float,
+    num_outputs_per_target: "al_num_outputs_per_target",
+    task_names: Union[None, Sequence[str]],
+    final_layer_type: Union[Literal["linear"], Literal["mlp_residual"]],
+) -> Sequence[nn.Module]:
+
+    final_layers = []
+    if final_layer_type == "linear":
+        if task_names is None:
+            raise ValueError(
+                "Task names are needed when using '%s' as final layer type.",
+                final_layer_type,
+            )
+
+        final_act_spec = get_linear_final_act_spec(
+            in_features=fc_task_dim, dropout_p=dropout_p
+        )
+        final_act = construct_multi_branches(
+            branch_names=task_names,
+            branch_factory=initialize_modules_from_spec,
+            branch_factory_kwargs={"spec": final_act_spec},
+        )
+        final_layers.append(final_act)
+        final_layer_specific_kwargs = {}
+
+    elif final_layer_type == "mlp_residual":
+        final_layer_specific_kwargs = {"dropout_p": dropout_p}
+
+    else:
+        raise ValueError("Unknown final layer type: '%s'.", final_layer_type)
+
+    final_layer = get_final_layer(
+        in_features=fc_task_dim,
+        num_outputs_per_target=num_outputs_per_target,
+        layer_type=final_layer_type,
+        layer_type_specific_kwargs=final_layer_specific_kwargs,
+    )
+    final_layers.append(final_layer)
+
+    return tuple(final_layers)

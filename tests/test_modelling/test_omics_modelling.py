@@ -330,7 +330,12 @@ def test_regression(prep_modelling_test_configs):
                     },
                 ],
                 "predictor_configs": {
-                    "model_config": {"fc_task_dim": 64, "rb_do": 0.10, "fc_do": 0.10},
+                    "model_config": {
+                        "fc_task_dim": 64,
+                        "rb_do": 0.10,
+                        "fc_do": 0.10,
+                        "final_layer_type": "mlp_residual",
+                    },
                 },
                 "target_configs": {
                     "target_cat_columns": ["Origin"],
@@ -409,6 +414,7 @@ def test_regression(prep_modelling_test_configs):
                         "fc_task_dim": 64,
                         "fc_do": 0.20,
                         "rb_do": 0.20,
+                        "final_layer_type": "mlp_residual",
                     },
                 },
                 "target_configs": {

@@ -4,6 +4,7 @@ from typing import (
     List,
     Tuple,
     Dict,
+    Type,
     Callable,
     Iterable,
     Any,
@@ -17,6 +18,7 @@ from aislib.misc_utils import get_logger
 from torch import nn
 from transformers import PreTrainedModel
 
+from eir.models.layers import MLPResidualBlock
 from eir.models.sequence.transformer_models import get_hf_transformer_forward
 
 if TYPE_CHECKING:
@@ -132,27 +134,61 @@ def construct_multi_branches(
 
 
 def get_final_layer(
-    in_features: int, num_outputs_per_target: "al_num_outputs_per_target"
-):
+    in_features: int,
+    num_outputs_per_target: "al_num_outputs_per_target",
+    layer_type: Union[Literal["linear"], Literal["mlp_residual"]] = "linear",
+    layer_type_specific_kwargs: Union[None, Dict] = None,
+) -> nn.ModuleDict:
     final_module_dict = nn.ModuleDict()
 
+    if layer_type_specific_kwargs is None:
+        layer_type_specific_kwargs = {}
+
+    spec_func = _get_mlp_basic_final_spec
+    if layer_type == "mlp_residual":
+        spec_func = _get_mlp_residual_final_spec
+
     for task, num_outputs in num_outputs_per_target.items():
-        cur_spec = OrderedDict(
-            {
-                "fc_final": (
-                    nn.Linear,
-                    {
-                        "in_features": in_features,
-                        "out_features": num_outputs,
-                        "bias": True,
-                    },
-                )
-            }
+        spec_init_kwargs = spec_func(
+            in_features=in_features,
+            num_outputs=num_outputs,
+            **layer_type_specific_kwargs,
         )
+        cur_spec = OrderedDict({"final": spec_init_kwargs})
         cur_module = initialize_modules_from_spec(spec=cur_spec)
         final_module_dict[task] = cur_module
 
     return final_module_dict
+
+
+def _get_mlp_residual_final_spec(
+    in_features: int, num_outputs: int, dropout_p: float
+) -> Tuple[Type[nn.Module], Dict[str, Any]]:
+    spec = (
+        MLPResidualBlock,
+        {
+            "in_features": in_features,
+            "out_features": num_outputs,
+            "dropout_p": dropout_p,
+        },
+    )
+
+    return spec
+
+
+def _get_mlp_basic_final_spec(
+    in_features: int, num_outputs: int, bias: bool = True
+) -> Tuple[Type[nn.Module], Dict[str, Any]]:
+    spec = (
+        nn.Linear,
+        {
+            "in_features": in_features,
+            "out_features": num_outputs,
+            "bias": bias,
+        },
+    )
+
+    return spec
 
 
 def compose_spec_creation_and_initalization(spec_func, **spec_kwargs):

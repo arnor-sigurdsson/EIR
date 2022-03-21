@@ -163,7 +163,7 @@ class MGMoEModel(nn.Module):
 
         spec = OrderedDict(
             {
-                "bn_final": (nn.BatchNorm1d, {"num_features": in_features}),
+                "norm_final": (nn.BatchNorm1d, {"num_features": in_features}),
                 "act_final": (Swish, {}),
                 "do_final": (nn.Dropout, {"p": dropout_p}),
             }
