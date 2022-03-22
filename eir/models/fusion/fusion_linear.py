@@ -52,7 +52,7 @@ class LinearFusionModel(nn.Module):
         l1_parameters = []
 
         for module in self.multi_task_branches.values():
-            weight_flat = torch.flatten(module.fc_final.weight)
+            weight_flat = torch.flatten(module.final.weight)
             l1_parameters.append(weight_flat)
 
         return torch.cat(l1_parameters)
