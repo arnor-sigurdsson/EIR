@@ -74,7 +74,7 @@ class CNNModelConfig:
     :param rb_do:
         Dropout in the convolutional residual blocks.
 
-     :param stochastic_depth_p:
+    :param stochastic_depth_p:
         Probability of dropping input.
 
     :param sa:
