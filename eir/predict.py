@@ -322,7 +322,6 @@ def get_default_predict_config(
     loaded_train_experiment: "LoadedTrainExperiment",
     predict_cl_args: Namespace,
 ) -> PredictConfig:
-
     configs_overloaded_for_predict = _converge_train_and_predict_configs(
         train_configs=loaded_train_experiment.configs, predict_cl_args=predict_cl_args
     )
@@ -778,6 +777,13 @@ def overload_train_configs_for_predict(
     main_overloaded_kwargs = {}
 
     for name, train_config_dict, predict_config_dict_to_inject in matched_dict_iterator:
+
+        _maybe_warn_about_output_folder_overload_from_predict(
+            name=name,
+            predict_config_dict_to_inject=predict_config_dict_to_inject,
+            train_config_dict=train_config_dict,
+        )
+
         overloaded_dict = recursive_dict_replace(
             dict_=train_config_dict, dict_to_inject=predict_config_dict_to_inject
         )
@@ -809,6 +815,26 @@ def overload_train_configs_for_predict(
     )
 
     return train_configs_overloaded
+
+
+def _maybe_warn_about_output_folder_overload_from_predict(
+    name: str, predict_config_dict_to_inject: Dict, train_config_dict: Dict
+) -> None:
+    if name == "global_config" and "output_folder" in predict_config_dict_to_inject:
+
+        output_folder_from_predict = predict_config_dict_to_inject["output_folder"]
+        output_folder_from_train = train_config_dict["output_folder"]
+
+        if output_folder_from_predict == output_folder_from_train:
+            return
+
+        logger.warning(
+            "output_folder in '%s' will be replaced with '%s' from given prediction "
+            "output configuration ('%s'). If this is intentional, you can ignore this"
+            "message but most likely this is a mistake and will cause an error."
+            "Resolution: Remove 'output_folder' from the global prediction as it will"
+            "be automatically looked up based on the experiment."
+        )
 
 
 def _load_labels_for_predict(

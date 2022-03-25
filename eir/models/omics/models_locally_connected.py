@@ -368,6 +368,7 @@ def generate_split_resblocks_auto(split_parameter_spec: LCParameterSpec):
             split_size=cur_kernel_width,
             out_feature_sets=cur_out_feature_sets,
             dropout_p=s.dropout_p,
+            stochastic_depth_p=s.stochastic_depth_p,
         )
 
         block_modules.append(cur_block)

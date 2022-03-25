@@ -1,3 +1,4 @@
+import reprlib
 from collections import defaultdict
 from copy import copy
 from dataclasses import dataclass
@@ -241,6 +242,9 @@ class DatasetBase(Dataset):
                 num_missing,
             )
 
+        _log_missing_samples_between_modalities(
+            samples=samples, input_keys=self.inputs.keys()
+        )
         return samples
 
     def __getitem__(self, index: int):
@@ -285,6 +289,39 @@ class DatasetBase(Dataset):
                     f"Expected all observations to have a label associated "
                     f"with them, but got {no_target_labels}."
                 )
+
+
+def _log_missing_samples_between_modalities(
+    samples: Sequence[Sample], input_keys: Iterable[str]
+) -> None:
+    missing_counts = {k: 0 for k in input_keys}
+    missing_ids = {k: [] for k in input_keys}
+
+    for sample in samples:
+        for key in input_keys:
+            if key not in sample.inputs:
+                missing_counts[key] += 1
+                missing_ids[key].append(sample.sample_id)
+
+    no_samples = len(samples)
+    message = (
+        f"Using total of {no_samples} samples with following counts per "
+        f"modality (note missing tabular modalities have been imputed already):\n"
+    )
+
+    for key in input_keys:
+        cur_missing = missing_counts[key]
+        cur_present = no_samples - cur_missing
+        cur_missing_ids = reprlib.repr(missing_ids[key])
+        cur_str = (
+            f"Available {key}: {cur_present} "
+            f"(missing: {cur_missing}, missing IDs: {cur_missing_ids})"
+        )
+
+        cur_str += "\n"
+        message += cur_str
+
+    logger.debug(message.rstrip())
 
 
 def _add_target_labels_to_samples(
