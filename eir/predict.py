@@ -833,7 +833,10 @@ def _maybe_warn_about_output_folder_overload_from_predict(
             "output configuration ('%s'). If this is intentional, you can ignore this"
             "message but most likely this is a mistake and will cause an error."
             "Resolution: Remove 'output_folder' from the global prediction as it will"
-            "be automatically looked up based on the experiment."
+            "be automatically looked up based on the experiment.",
+            train_config_dict,
+            output_folder_from_predict,
+            predict_config_dict_to_inject,
         )
 
 
