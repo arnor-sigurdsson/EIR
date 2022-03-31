@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Union, Dict, Callable, Sequence, Tuple, Iterab
 
 import numpy as np
 import torch
+from aislib.misc_utils import get_logger
 from torch import nn
 from timm.data.mixup import rand_bbox
 
@@ -24,6 +25,8 @@ al_int_tensors = Union[
     torch.LongTensor,
     torch.BoolTensor,
 ]
+
+logger = get_logger(name=__name__)
 
 
 @dataclass
@@ -106,9 +109,12 @@ def hook_default_mix_data(
 
     batch = state["batch"]
 
+    batch_size = modify_bs_for_multi_gpu(
+        multi_gpu=gc.multi_gpu, batch_size=gc.batch_size
+    )
     mixing_info = get_mixing_info(
         mixing_alpha=gc.mixing_alpha,
-        batch_size=gc.batch_size,
+        batch_size=batch_size,
         target_labels=batch.target_labels,
         target_columns=experiment.target_columns,
     )
@@ -344,3 +350,15 @@ def make_random_omics_columns_missing(
     omics_array[:, :, random_to_drop] = missing_arr
 
     return omics_array
+
+
+def modify_bs_for_multi_gpu(multi_gpu: bool, batch_size: int) -> int:
+    if multi_gpu:
+        batch_size = torch.cuda.device_count() * batch_size
+        logger.info(
+            "Batch size set to %d to account for %d GPUs.",
+            batch_size,
+            torch.cuda.device_count(),
+        )
+
+    return batch_size

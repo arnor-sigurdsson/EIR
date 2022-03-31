@@ -6,6 +6,7 @@ from torch.optim import SGD
 from torch.optim.adamw import AdamW
 from torch.utils.data import WeightedRandomSampler, SequentialSampler, RandomSampler
 
+import eir.data_load.data_augmentation
 import eir.data_load.data_utils
 import eir.models.model_setup
 import eir.models.omics.omics_models
@@ -83,16 +84,6 @@ def test_get_default_experiment(create_test_config):
     assert set(default_experiment.inputs.keys()) == {"test_genotype"}
 
     assert default_experiment.target_columns == {"cat": ["Origin"], "con": []}
-
-
-def test_modify_bs_for_multi_gpu():
-    no_gpu = train._modify_bs_for_multi_gpu(multi_gpu=False, batch_size=64)
-    assert no_gpu == 64
-
-    with patch("eir.train.torch.cuda.device_count", autospec=True) as mocked:
-        mocked.return_value = 4
-        gpu = train._modify_bs_for_multi_gpu(multi_gpu=True, batch_size=64)
-        assert gpu == 64 * 4
 
 
 @pytest.mark.parametrize("create_test_data", [{"task_type": "multi"}], indirect=True)
@@ -178,15 +169,6 @@ def test_get_dataloaders(create_test_config, create_test_data, create_test_datas
 
     assert isinstance(train_dataloader.sampler, RandomSampler)
     assert isinstance(valid_dataloader.sampler, SequentialSampler)
-
-
-def _modify_bs_for_multi_gpu():
-    patch_target = "eir.train.torch.cuda.device_count"
-    with patch(patch_target, autospec=True) as m:
-        m.return_value = 2
-
-        assert train._modify_bs_for_multi_gpu(True, 32) == 64
-        assert train._modify_bs_for_multi_gpu(False, 32) == 64
 
 
 def test_get_optimizer():

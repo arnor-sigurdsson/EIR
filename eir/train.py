@@ -28,7 +28,11 @@ from torch.utils.tensorboard import SummaryWriter
 
 from eir.data_load import data_utils
 from eir.data_load import datasets
-from eir.data_load.data_augmentation import hook_mix_loss, get_mix_data_hook
+from eir.data_load.data_augmentation import (
+    hook_mix_loss,
+    get_mix_data_hook,
+    modify_bs_for_multi_gpu,
+)
 from eir.data_load.data_utils import Batch, get_train_sampler
 from eir.data_load.label_setup import (
     al_target_columns,
@@ -254,7 +258,7 @@ def get_default_experiment(
         inputs_as_dict=inputs,
     )
 
-    batch_size = _modify_bs_for_multi_gpu(
+    batch_size = modify_bs_for_multi_gpu(
         multi_gpu=configs.global_config.multi_gpu,
         batch_size=configs.global_config.batch_size,
     )
@@ -402,18 +406,6 @@ def _prepare_run_folder(output_folder: str) -> Path:
     ensure_path_exists(path=run_folder, is_folder=True)
 
     return run_folder
-
-
-def _modify_bs_for_multi_gpu(multi_gpu: bool, batch_size: int) -> int:
-    if multi_gpu:
-        batch_size = torch.cuda.device_count() * batch_size
-        logger.info(
-            "Batch size set to %d to account for %d GPUs.",
-            batch_size,
-            torch.cuda.device_count(),
-        )
-
-    return batch_size
 
 
 def get_dataloaders(

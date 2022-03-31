@@ -10,6 +10,7 @@ from hypothesis.strategies import lists, integers, floats
 from torch import nn
 from torch.nn import functional as F
 
+import eir.data_load
 from eir.data_load import data_augmentation
 from tests.test_modelling.setup_modelling_test_data.setup_omics_test_data import (
     _set_up_base_test_array,
@@ -404,3 +405,17 @@ def test_make_random_snps_missing_none():
 
     assert (array.sum(1) != 1).sum() == 0
     assert (array[:, 3, :] == 0).all()
+
+
+def test_modify_bs_for_multi_gpu():
+    no_gpu = eir.data_load.data_augmentation.modify_bs_for_multi_gpu(
+        multi_gpu=False, batch_size=64
+    )
+    assert no_gpu == 64
+
+    with patch("eir.train.torch.cuda.device_count", autospec=True) as mocked:
+        mocked.return_value = 4
+        gpu = eir.data_load.data_augmentation.modify_bs_for_multi_gpu(
+            multi_gpu=True, batch_size=64
+        )
+        assert gpu == 64 * 4
