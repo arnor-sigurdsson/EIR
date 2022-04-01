@@ -65,6 +65,7 @@ from eir.setup.config import (
     get_all_targets,
 )
 from eir.setup.input_setup import al_input_objects_as_dict, set_up_inputs_for_training
+from eir.train_utils import distributed
 from eir.train_utils import utils
 from eir.train_utils.metrics import (
     calculate_batch_metrics,
@@ -115,10 +116,17 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 def main():
     configs = get_configs()
 
+    configs, local_rank = distributed.maybe_initialize_distributed_environment(
+        configs=configs
+    )
+
     utils.configure_root_logger(output_folder=configs.global_config.output_folder)
 
     default_hooks = get_default_hooks(configs=configs)
-    default_experiment = get_default_experiment(configs=configs, hooks=default_hooks)
+    default_experiment = get_default_experiment(
+        configs=configs,
+        hooks=default_hooks,
+    )
 
     run_experiment(experiment=default_experiment)
 
@@ -209,7 +217,8 @@ def set_up_target_labels_wrapper(
 
 
 def get_default_experiment(
-    configs: Configs, hooks: Union["Hooks", None] = None
+    configs: Configs,
+    hooks: Union["Hooks", None] = None,
 ) -> "Experiment":
     run_folder = _prepare_run_folder(output_folder=configs.global_config.output_folder)
 

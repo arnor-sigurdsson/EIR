@@ -38,6 +38,7 @@ from eir.models.tabular.tabular import (
     SimpleTabularModel,
     SimpleTabularModelConfig,
 )
+from eir.train_utils.distributed import maybe_make_model_distributed
 from eir.setup import schemas
 from torch import nn
 from transformers import (
@@ -97,8 +98,9 @@ def get_model(
     fusion_model = fusion_class(**fusion_kwargs)
     fusion_model = fusion_model.to(device=global_config.device)
 
-    if global_config.multi_gpu:
-        fusion_model = GetAttrDelegatedDataParallel(module=fusion_model)
+    fusion_model = maybe_make_model_distributed(
+        device=global_config.device, model=fusion_model
+    )
 
     return fusion_model
 

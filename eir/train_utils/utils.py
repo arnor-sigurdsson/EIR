@@ -20,6 +20,8 @@ import torch
 from aislib.misc_utils import get_logger, ensure_path_exists
 from ignite.engine import Engine
 
+from eir.train_utils.distributed import only_call_on_master_node
+
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 if TYPE_CHECKING:
@@ -60,6 +62,7 @@ def prep_sample_outfolder(output_folder: str, column_name: str, iteration: int) 
     return sample_outfolder
 
 
+@only_call_on_master_node
 def configure_root_logger(output_folder: str):
 
     logfile_path = get_run_folder(output_folder=output_folder) / "logging_history.log"
