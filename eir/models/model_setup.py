@@ -1,15 +1,22 @@
 import math
+import reprlib
+import typing
 from collections import OrderedDict
 from copy import copy
 from dataclasses import dataclass
 from pathlib import Path
-import reprlib
-import typing
 from typing import Union, Dict, Any, Sequence, Set, Type, Tuple, Literal, TYPE_CHECKING
 
 import timm
 import torch
 from aislib.misc_utils import get_logger
+from torch import nn
+from transformers import (
+    PreTrainedModel,
+    AutoModel,
+    AutoConfig,
+)
+
 from eir.experiment_io.experiment_io import (
     get_run_folder_from_model_path,
     load_serialized_train_experiment,
@@ -38,28 +45,14 @@ from eir.models.tabular.tabular import (
     SimpleTabularModel,
     SimpleTabularModelConfig,
 )
-from eir.train_utils.distributed import maybe_make_model_distributed
 from eir.setup import schemas
-from torch import nn
-from transformers import (
-    PreTrainedModel,
-    AutoModel,
-    AutoConfig,
-)
+from eir.train_utils.distributed import maybe_make_model_distributed
 
 if TYPE_CHECKING:
     from eir.setup.input_setup import al_input_objects_as_dict, DataDimensions
     from eir.train import al_num_outputs_per_target
 
 logger = get_logger(name=__name__)
-
-
-class GetAttrDelegatedDataParallel(nn.DataParallel):
-    def __getattr__(self, name):
-        try:
-            return super().__getattr__(name)
-        except AttributeError:
-            return getattr(self.module, name)
 
 
 def get_model(

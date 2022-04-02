@@ -1,4 +1,4 @@
-import atexit
+import os
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
@@ -14,6 +14,7 @@ from typing import (
 )
 
 import aislib.misc_utils
+import atexit
 import pandas as pd
 import yaml
 from aislib.misc_utils import get_logger
@@ -92,6 +93,10 @@ def configure_trainer(
         monitoring_metrics=monitoring_metrics,
     )
 
+    _call_and_undo_ignite_local_rank_side_effects(
+        func=_attach_running_average_metrics,
+        kwargs={"engine": trainer, "monitoring_metrics": monitoring_metrics},
+    )
     _attach_running_average_metrics(
         engine=trainer, monitoring_metrics=monitoring_metrics
     )
@@ -406,6 +411,27 @@ def _attach_running_average_metrics(
         RunningAverage(
             output_transform=partial_func, alpha=0.98, epoch_bound=False
         ).attach(engine, name=metric_name)
+
+
+def _call_and_undo_ignite_local_rank_side_effects(func: Callable, kwargs: Dict):
+    """
+    This weird function is needed in the case where a GPU is available, calling some
+    functions will trigger obscure ignite side effects that change some environment
+    variables without warning.
+    """
+    original_local_rank = os.environ.get("LOCAL_RANK", 0)
+
+    result = func(**kwargs)
+
+    cur_local_rank = os.environ.get("LOCAL_RANK", 0)
+    if cur_local_rank != original_local_rank:
+        logger.debug(
+            "Enforcing local rank to be '%d' after ignite side effects",
+            original_local_rank,
+        )
+        os.environ["LOCAL_RANK"] = original_local_rank
+
+    return result
 
 
 @only_call_on_master_node

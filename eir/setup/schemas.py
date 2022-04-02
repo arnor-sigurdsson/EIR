@@ -191,8 +191,6 @@ class GlobalConfig:
     :param n_saved_models:
         Number of top N models to saved during training.
 
-    :param multi_gpu:
-        Whether to run the training on multiple GPUs for the current node.
 
     :param get_acts:
         Whether to compute activations w.r.t. inputs.
@@ -252,7 +250,6 @@ class GlobalConfig:
     sample_interval: int = 200
     checkpoint_interval: Union[None, int] = None
     n_saved_models: int = 1
-    multi_gpu: bool = False
     get_acts: bool = False
     act_classes: Union[None, List[str]] = None
     max_acts_per_class: Union[None, int] = None

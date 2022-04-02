@@ -3,9 +3,9 @@ from copy import copy
 from functools import wraps
 from typing import Callable, Any, TYPE_CHECKING, Tuple, Union
 
-from torch.nn.parallel import DistributedDataParallel
-from torch import distributed as dist
 from aislib.misc_utils import get_logger
+from torch import distributed as dist
+from torch.nn.parallel import DistributedDataParallel
 
 if TYPE_CHECKING:
     from eir.setup.config import Configs
@@ -21,8 +21,9 @@ def maybe_initialize_distributed_environment(
     is_distributed_run = in_distributed_env()
     if is_distributed_run:
         logger.info(
-            "'LOCAL_RANK' environment variable found. Assuming"
-            "distributed distributed training."
+            "'LOCAL_RANK': '%s' environment variable found. Assuming "
+            "distributed distributed training.",
+            os.environ["LOCAL_RANK"],
         )
     else:
         return configs, None
@@ -31,7 +32,7 @@ def maybe_initialize_distributed_environment(
 
     configs_copy = copy(configs)
 
-    local_rank = int(os.environ.get("LOCAL_RANK", 0))
+    local_rank = int(os.environ["LOCAL_RANK"])
     if "cuda" in configs.global_config.device:
         configs_copy.global_config.device = f"cuda:{local_rank}"
 
@@ -49,7 +50,7 @@ def maybe_make_model_distributed(device: str, model: "al_fusion_models"):
     if "cuda" in device:
         ddp_kwargs = {"device_ids": [local_rank], "output_device": local_rank}
 
-    model = DistributedDataParallel(module=model, **ddp_kwargs)
+    model = AttrDelegatedDistributedDataParallel(module=model, **ddp_kwargs)
 
     logger.info(
         "Initialized distributed model with rank '%d' and arguments: '%s'.",
@@ -79,3 +80,11 @@ def only_call_on_master_node(func: Callable):
         return
 
     return wrapper
+
+
+class AttrDelegatedDistributedDataParallel(DistributedDataParallel):
+    def __getattr__(self, name):
+        try:
+            return super().__getattr__(name)
+        except AttributeError:
+            return getattr(self.module, name)

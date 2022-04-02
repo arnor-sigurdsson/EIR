@@ -31,7 +31,6 @@ from eir.data_load import datasets
 from eir.data_load.data_augmentation import (
     hook_mix_loss,
     get_mix_data_hook,
-    modify_bs_for_multi_gpu,
 )
 from eir.data_load.data_utils import Batch, get_train_sampler
 from eir.data_load.label_setup import (
@@ -114,6 +113,8 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
 def main():
+    torch.backends.cudnn.benchmark = True
+
     configs = get_configs()
 
     configs, local_rank = distributed.maybe_initialize_distributed_environment(
@@ -267,11 +268,6 @@ def get_default_experiment(
         inputs_as_dict=inputs,
     )
 
-    batch_size = modify_bs_for_multi_gpu(
-        multi_gpu=configs.global_config.multi_gpu,
-        batch_size=configs.global_config.batch_size,
-    )
-
     train_sampler = get_train_sampler(
         columns_to_sample=configs.global_config.weighted_sampling_columns,
         train_dataset=train_dataset,
@@ -281,7 +277,7 @@ def get_default_experiment(
         train_dataset=train_dataset,
         train_sampler=train_sampler,
         valid_dataset=valid_dataset,
-        batch_size=batch_size,
+        batch_size=configs.global_config.batch_size,
         num_workers=configs.global_config.dataloader_workers,
     )
 

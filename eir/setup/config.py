@@ -1,14 +1,13 @@
 import argparse
 import ast
-import atexit
 import json
 import operator
 import shutil
 import sys
 import tempfile
 import types
-from collections import Counter
 from argparse import Namespace
+from collections import Counter
 from collections import defaultdict
 from copy import copy
 from dataclasses import dataclass
@@ -29,16 +28,15 @@ from typing import (
     Mapping,
 )
 
+import atexit
 import configargparse
-import torch
 import yaml
 from aislib.misc_utils import get_logger
 
 from eir.models.fusion.fusion_default import FusionModelConfig
 from eir.models.fusion.fusion_linear import LinearFusionModelConfig
 from eir.models.fusion.fusion_mgmoe import MGMoEModelConfig
-
-from eir.models.tabular.tabular import TabularModelConfig, SimpleTabularModelConfig
+from eir.models.image.image_models import ImageModelConfig
 from eir.models.omics.omics_models import (
     get_omics_config_dataclass_mapping,
     OmicsModelConfig,
@@ -48,7 +46,7 @@ from eir.models.sequence.transformer_models import (
     PerceiverIOModelConfig,
     SequenceModelConfig,
 )
-from eir.models.image.image_models import ImageModelConfig
+from eir.models.tabular.tabular import TabularModelConfig, SimpleTabularModelConfig
 from eir.setup import schemas
 from eir.setup.presets import gln
 
@@ -290,15 +288,6 @@ def modify_global_config(global_config: schemas.GlobalConfig) -> schemas.GlobalC
 
     if gc_copy.valid_size > 1.0:
         gc_copy.valid_size = int(gc_copy.valid_size)
-
-    gc_copy.device = "cuda:" + gc_copy.gpu_num if torch.cuda.is_available() else "cpu"
-
-    # benchmark breaks if we run it with multiple GPUs
-    if not gc_copy.multi_gpu:
-        torch.backends.cudnn.benchmark = True
-    else:
-        logger.debug("Setting device to cuda:0 since running with multiple GPUs.")
-        gc_copy.device = "cuda:0"
 
     return gc_copy
 
