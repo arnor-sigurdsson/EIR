@@ -118,10 +118,7 @@ class GlobalConfig:
         Number of workers for multi-process training and validation data loading.
 
     :param device:
-        Device to run the training on (i.e. GPU / CPU).
-
-    :param gpu_num:
-        Which GPU to run (according to CUDA order).
+        Device to run the training on (e.g. 'cuda:0' / 'cpu').
 
     :param weighted_sampling_columns:
         Target column to apply weighted sampling on. Only applies to categorical
@@ -229,7 +226,6 @@ class GlobalConfig:
     manual_valid_ids_file: Union[str, None] = None
     dataloader_workers: int = 0
     device: str = "cpu"
-    gpu_num: str = "0"
     weighted_sampling_columns: Union[None, Sequence[str]] = None
     lr: float = 1e-03
     lr_lb: float = 0.0

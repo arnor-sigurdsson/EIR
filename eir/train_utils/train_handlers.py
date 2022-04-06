@@ -419,17 +419,17 @@ def _call_and_undo_ignite_local_rank_side_effects(func: Callable, kwargs: Dict):
     functions will trigger obscure ignite side effects that change some environment
     variables without warning.
     """
-    original_local_rank = os.environ.get("LOCAL_RANK", 0)
+    original_local_rank = int(os.environ.get("LOCAL_RANK", 0))
 
     result = func(**kwargs)
 
-    cur_local_rank = os.environ.get("LOCAL_RANK", 0)
+    cur_local_rank = int(os.environ.get("LOCAL_RANK", 0))
     if cur_local_rank != original_local_rank:
         logger.debug(
             "Enforcing local rank to be '%d' after ignite side effects",
             original_local_rank,
         )
-        os.environ["LOCAL_RANK"] = original_local_rank
+        os.environ["LOCAL_RANK"] = str(original_local_rank)
 
     return result
 

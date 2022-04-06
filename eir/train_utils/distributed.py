@@ -67,13 +67,21 @@ def in_distributed_env() -> bool:
     return False
 
 
+def in_master_node() -> bool:
+    local_rank = int(os.environ.get("LOCAL_RANK", 0))
+    global_rank = int(os.environ.get("RANK", 0))
+
+    if local_rank == 0 and global_rank == 0:
+        return True
+
+    return False
+
+
 def only_call_on_master_node(func: Callable):
     @wraps(func)
     def wrapper(*args, **kwargs) -> Any:
 
-        local_rank = int(os.environ.get("LOCAL_RANK", 0))
-
-        if local_rank == 0:
+        if in_master_node():
             result = func(*args, **kwargs)
             return result
 
