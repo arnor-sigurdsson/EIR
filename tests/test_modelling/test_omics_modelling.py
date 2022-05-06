@@ -434,6 +434,7 @@ def test_regression(prep_modelling_test_configs):
                 "global_configs": {
                     "output_folder": "mgmoe",
                     "lr": 1e-03,
+                    "save_evaluation_sample_results": False,
                 },
                 "input_configs": [
                     {

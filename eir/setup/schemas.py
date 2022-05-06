@@ -182,6 +182,11 @@ class GlobalConfig:
         Iteration interval to perform validation and possibly activation analysis if
         set.
 
+    :param save_evaluation_sample_results:
+        Whether to save evaluation results (e.g. confusion matrix for classification
+        tasks, regression plot and predictions for regression tasks). Setting to
+        False can be useful to save space during large scale experiments.
+
     :param checkpoint_interval:
         Iteration interval to checkpoint (i.e. save) model.
 
@@ -244,6 +249,7 @@ class GlobalConfig:
     wd: float = 1e-04
     memory_dataset: bool = False
     sample_interval: int = 200
+    save_evaluation_sample_results: bool = True
     checkpoint_interval: Union[None, int] = None
     n_saved_models: int = 1
     get_acts: bool = False

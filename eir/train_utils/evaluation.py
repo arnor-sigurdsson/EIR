@@ -86,13 +86,14 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
         prefixes={"metrics": "validation_", "writer": "validation"},
     )
 
-    save_evaluation_results_wrapper(
-        val_outputs=val_outputs_total,
-        val_labels=val_target_labels,
-        val_ids=val_ids_total,
-        iteration=iteration,
-        experiment=handler_config.experiment,
-    )
+    if gc.save_evaluation_sample_results:
+        save_evaluation_results_wrapper(
+            val_outputs=val_outputs_total,
+            val_labels=val_target_labels,
+            val_ids=val_ids_total,
+            iteration=iteration,
+            experiment=handler_config.experiment,
+        )
 
 
 def save_evaluation_results_wrapper(
