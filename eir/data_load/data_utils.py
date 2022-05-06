@@ -1,11 +1,12 @@
 from dataclasses import dataclass
-from typing import Tuple, Dict, List, overload, TYPE_CHECKING
+from typing import Tuple, Dict, List, overload, TYPE_CHECKING, Union
 
 import torch
-from torch.utils.data import WeightedRandomSampler
+from torch.utils.data import WeightedRandomSampler, DistributedSampler
 
 from eir.data_load.data_loading_funcs import get_weighted_random_sampler
 from eir.data_load.label_setup import al_target_columns
+from eir.train_utils.distributed import in_distributed_env
 
 if TYPE_CHECKING:
     from eir.data_load.datasets import DatasetBase
@@ -32,7 +33,7 @@ def get_train_sampler(columns_to_sample: None, train_dataset: "DatasetBase") -> 
 @overload
 def get_train_sampler(
     columns_to_sample: List[str], train_dataset: "DatasetBase"
-) -> WeightedRandomSampler:
+) -> Union[WeightedRandomSampler, DistributedSampler]:
     ...
 
 
@@ -41,8 +42,18 @@ def get_train_sampler(columns_to_sample, train_dataset):
     TODO:   Refactor, remove dependency on train_dataset and use instead
             Iterable[Samples], and target_columns directly.
     """
+    in_distributed_run = in_distributed_env()
+
     if columns_to_sample is None:
-        return None
+        if in_distributed_run:
+            return DistributedSampler(dataset=train_dataset)
+        else:
+            return None
+
+    if in_distributed_run:
+        raise NotImplementedError(
+            "Weighted sampling not yet implemented for distributed training."
+        )
 
     loaded_target_columns = (
         train_dataset.target_columns["con"] + train_dataset.target_columns["cat"]

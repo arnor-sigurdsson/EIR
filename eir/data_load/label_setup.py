@@ -908,7 +908,8 @@ def _split_ids_manual(
     ids: Sequence[str], manual_valid_ids: Sequence[str]
 ) -> Tuple[Sequence[str], Sequence[str]]:
 
-    not_found = tuple(i for i in manual_valid_ids if i not in ids)
+    ids_set = set(ids)
+    not_found = tuple(i for i in manual_valid_ids if i not in ids_set)
     if not_found:
         raise ValueError(
             f"Did not find {len(not_found)} manual validation IDs "

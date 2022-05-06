@@ -1,4 +1,4 @@
-import atexit
+import os
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
@@ -14,6 +14,7 @@ from typing import (
 )
 
 import aislib.misc_utils
+import atexit
 import pandas as pd
 import yaml
 from aislib.misc_utils import get_logger
@@ -30,6 +31,7 @@ from eir.interpretation.interpretation import activation_analysis_handler
 from eir.setup.config import object_to_primitives
 from eir.setup.schemas import GlobalConfig
 from eir.train_utils import H_PARAMS
+from eir.train_utils.distributed import only_call_on_master_node
 from eir.train_utils.evaluation import validation_handler
 from eir.train_utils.lr_scheduling import (
     set_up_lr_scheduler,
@@ -91,29 +93,24 @@ def configure_trainer(
         monitoring_metrics=monitoring_metrics,
     )
 
+    _call_and_undo_ignite_local_rank_side_effects(
+        func=_attach_running_average_metrics,
+        kwargs={"engine": trainer, "monitoring_metrics": monitoring_metrics},
+    )
     _attach_running_average_metrics(
         engine=trainer, monitoring_metrics=monitoring_metrics
     )
 
-    if not gc.no_pbar:
-        pbar = ProgressBar()
-        pbar.attach(engine=trainer, metric_names=["loss-average"])
-        trainer.add_event_handler(
-            event_name=Events.EPOCH_COMPLETED,
-            handler=_log_stats_to_pbar,
-            pbar=pbar,
-        )
+    _maybe_attach_progress_bar(trainer=trainer, do_not_attach=gc.no_pbar)
 
-    trainer = _attach_sample_interval_handlers(
+    _attach_sample_interval_handlers(
         trainer=trainer,
         handler_config=handler_config,
         validation_handler_callable=validation_handler_callable,
     )
 
     if gc.early_stopping_patience:
-        trainer = _attach_early_stopping_handler(
-            trainer=trainer, handler_config=handler_config
-        )
+        _attach_early_stopping_handler(trainer=trainer, handler_config=handler_config)
 
     # TODO: Implement warmup for same LR scheduling
     if gc.lr_schedule != "same":
@@ -125,13 +122,12 @@ def configure_trainer(
         raise NotImplementedError("Warmup not yet implemented for 'same' LR schedule.")
 
     if handler_config.output_folder:
-        trainer = _attach_run_event_handlers(
-            trainer=trainer, handler_config=handler_config
-        )
+        _attach_run_event_handlers(trainer=trainer, handler_config=handler_config)
 
     return trainer
 
 
+@only_call_on_master_node
 def _attach_sample_interval_handlers(
     trainer: Engine,
     handler_config: "HandlerConfig",
@@ -279,6 +275,7 @@ def _get_monitoring_metrics(
 @validate_handler_dependencies(
     [validation_handler],
 )
+@only_call_on_master_node
 def _attach_early_stopping_handler(trainer: Engine, handler_config: "HandlerConfig"):
     gc = handler_config.experiment.configs.global_config
 
@@ -416,6 +413,41 @@ def _attach_running_average_metrics(
         ).attach(engine, name=metric_name)
 
 
+def _call_and_undo_ignite_local_rank_side_effects(func: Callable, kwargs: Dict):
+    """
+    This weird function is needed in the case where a GPU is available, calling some
+    functions will trigger obscure ignite side effects that change some environment
+    variables without warning.
+    """
+    original_local_rank = int(os.environ.get("LOCAL_RANK", 0))
+
+    result = func(**kwargs)
+
+    cur_local_rank = int(os.environ.get("LOCAL_RANK", 0))
+    if cur_local_rank != original_local_rank:
+        logger.debug(
+            "Enforcing local rank to be '%d' after ignite side effects",
+            original_local_rank,
+        )
+        os.environ["LOCAL_RANK"] = str(original_local_rank)
+
+    return result
+
+
+@only_call_on_master_node
+def _maybe_attach_progress_bar(trainer: Engine, do_not_attach: bool) -> None:
+    do_attach = not do_not_attach
+    if do_attach:
+
+        pbar = ProgressBar()
+        pbar.attach(engine=trainer, metric_names=["loss-average"])
+        trainer.add_event_handler(
+            event_name=Events.EPOCH_COMPLETED,
+            handler=_log_stats_to_pbar,
+            pbar=pbar,
+        )
+
+
 def _log_stats_to_pbar(engine: Engine, pbar: ProgressBar) -> None:
     log_string = f"[Epoch {engine.state.epoch}/{engine.state.max_epochs}]"
 
@@ -426,6 +458,7 @@ def _log_stats_to_pbar(engine: Engine, pbar: ProgressBar) -> None:
     pbar.log_message(log_string)
 
 
+@only_call_on_master_node
 def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
     exp = handler_config.experiment
     gc = handler_config.experiment.configs.global_config

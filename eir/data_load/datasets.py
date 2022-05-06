@@ -119,7 +119,16 @@ def construct_default_dataset_kwargs_from_cl_args(
 def _check_valid_and_train_datasets(
     train_dataset: al_datasets, valid_dataset: al_datasets
 ) -> None:
-    assert len(train_dataset) > len(valid_dataset)
+
+    if len(train_dataset) < len(valid_dataset):
+        logger.warning(
+            "Size of training dataset (size: %d) is smaller than validation dataset ("
+            "size: %d). Generally it is the opposite, but if this intended please"
+            "ignore this message.",
+            len(train_dataset),
+            len(valid_dataset),
+        )
+
     assert set(valid_dataset.target_labels_dict.keys()).isdisjoint(
         train_dataset.target_labels_dict.keys()
     )

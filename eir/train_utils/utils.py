@@ -20,6 +20,12 @@ import torch
 from aislib.misc_utils import get_logger, ensure_path_exists
 from ignite.engine import Engine
 
+from eir.train_utils.distributed import (
+    only_call_on_master_node,
+    in_master_node,
+    in_distributed_env,
+)
+
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 if TYPE_CHECKING:
@@ -60,6 +66,7 @@ def prep_sample_outfolder(output_folder: str, column_name: str, iteration: int) 
     return sample_outfolder
 
 
+@only_call_on_master_node
 def configure_root_logger(output_folder: str):
 
     logfile_path = get_run_folder(output_folder=output_folder) / "logging_history.log"
@@ -89,14 +96,15 @@ def validate_handler_dependencies(handler_dependencies: Sequence[Callable]):
 
             for dep in handler_dependencies:
                 if not engine_object.has_event_handler(dep):
-                    logger.warning(
-                        f"Dependency '{dep.__name__}' missing from engine. "
-                        f"If your are running EIR directly through the CLI, "
-                        f"this is likely a bug. If you are customizing "
-                        f"EIR (e.g. the validation handler), this can "
-                        f"be expected, please ignore this warning in "
-                        f"that case."
-                    )
+                    if in_master_node() or not in_distributed_env():
+                        logger.warning(
+                            f"Dependency '{dep.__name__}' missing from engine. "
+                            f"If your are running EIR directly through the CLI, "
+                            f"this is likely a bug. If you are customizing "
+                            f"EIR (e.g. the validation handler), this can "
+                            f"be expected, please ignore this warning in "
+                            f"that case."
+                        )
 
             func_output = func(*args, **kwargs)
             return func_output
