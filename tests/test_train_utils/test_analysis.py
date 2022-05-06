@@ -1,5 +1,3 @@
-from unittest.mock import patch
-
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder
@@ -7,7 +5,7 @@ from sklearn.preprocessing import LabelEncoder
 from eir.train_utils import evaluation
 
 
-def test_get_most_wrong_preds():
+def test_parse_valid_classification_preds():
     test_val_true = np.array([0, 0, 0, 0, 0, 1, 1, 1, 1, 1])
     test_val_preds = np.array([1, 1, 1, 0, 0, 1, 1, 0, 0, 0])
     test_val_probs = np.array(
@@ -24,34 +22,25 @@ def test_get_most_wrong_preds():
             [0.75, 0.25],  # wrong, 10
         ]
     )
+    val_classes = ["Ember", "Ash"]
+
     test_ids = np.array(["Test_ID_" + str(i) for i in range(1, 11)])
 
-    def dummy_function(x, *args, **kwargs):
-        return x
+    df_valid_preds = evaluation._parse_valid_classification_preds(
+        val_true=test_val_true,
+        val_preds=test_val_preds,
+        val_outputs=test_val_probs,
+        val_classes=val_classes,
+        ids=test_ids,
+    )
 
-    # patch so we get back the probs above after softmax
-    with patch(
-        "eir.train_utils.evaluation.softmax",
-        side_effect=dummy_function,
-        autospec=True,
-    ):
-        df_most_wrong = evaluation.get_most_wrong_cls_preds(
-            val_true=test_val_true,
-            val_preds=test_val_preds,
-            val_outputs=test_val_probs,
-            ids=test_ids,
-        )
+    assert df_valid_preds.shape[0] == 10
+    assert set(df_valid_preds["ID"]) == set("Test_ID_" + str(i) for i in range(1, 11))
+    assert (df_valid_preds["True_Label"] == test_val_true).all()
+    assert (df_valid_preds["Predicted"] == test_val_preds).all()
 
-    assert df_most_wrong.shape[0] == 6
-    assert list(df_most_wrong["Sample_ID"]) == [
-        "Test_ID_" + str(i) for i in (8, 1, 9, 2, 10, 3)
-    ]
-    assert df_most_wrong["True_Prob"].iloc[0] == 0.05
-    assert df_most_wrong["True_Prob"].iloc[-1] == 0.3
-
-    assert ((df_most_wrong["True_Prob"] + df_most_wrong["Wrong_Prob"]) == 1.0).all()
-
-    assert (df_most_wrong["True_Label"] != df_most_wrong["Wrong_Label"]).all()
+    assert (df_valid_preds["Score Class Ember"] == test_val_probs[:, 0]).all()
+    assert (df_valid_preds["Score Class Ash"] == test_val_probs[:, 1]).all()
 
 
 def test_inverse_numerical_labels_hook():
