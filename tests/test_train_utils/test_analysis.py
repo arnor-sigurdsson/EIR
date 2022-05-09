@@ -48,7 +48,7 @@ def test_inverse_numerical_labels_hook():
     test_target_transformer.fit(["Asia", "Europe"])
 
     test_df = pd.DataFrame(
-        columns=["True_Label", "Wrong_Label"], data=[[0, 1], [0, 1], [1, 0], [1, 0]]
+        columns=["True_Label", "Predicted"], data=[[0, 1], [0, 1], [1, 0], [1, 0]]
     )
 
     test_df_encoded = evaluation._inverse_numerical_labels_hook(
@@ -56,4 +56,4 @@ def test_inverse_numerical_labels_hook():
     )
 
     assert list(test_df_encoded["True_Label"]) == ["Asia"] * 2 + ["Europe"] * 2
-    assert list(test_df_encoded["Wrong_Label"]) == ["Europe"] * 2 + ["Asia"] * 2
+    assert list(test_df_encoded["Predicted"]) == ["Europe"] * 2 + ["Asia"] * 2
