@@ -15,6 +15,7 @@ import eir.setup.input_setup
 import eir.train
 from eir import train
 from eir.data_load import label_setup
+from eir.models.model_setup import get_default_model_registry_per_input_type
 from eir.models.fusion.fusion_default import FusionModel
 from eir.models.omics.models_cnn import CNNModel
 from eir.models.omics.models_linear import LinearModel
@@ -249,11 +250,14 @@ def test_get_model(create_test_config: Configs, create_test_labels):
         hooks=None,
     )
 
+    default_registry = get_default_model_registry_per_input_type()
+
     model = eir.models.model_setup.get_model(
         inputs_as_dict=inputs_as_dict,
         global_config=gc,
         predictor_config=create_test_config.predictor_config,
         num_outputs_per_target=num_outputs_per_class,
+        model_registry_per_input_type=default_registry,
     )
 
     assert len(test_config.input_configs) == 1

@@ -5,7 +5,18 @@ from collections import OrderedDict
 from copy import copy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Union, Dict, Any, Sequence, Set, Type, Tuple, Literal, TYPE_CHECKING
+from typing import (
+    Union,
+    Callable,
+    Dict,
+    Any,
+    Sequence,
+    Set,
+    Type,
+    Tuple,
+    Literal,
+    TYPE_CHECKING,
+)
 
 import timm
 import torch
@@ -60,6 +71,7 @@ def get_model(
     predictor_config: schemas.PredictorConfig,
     global_config: schemas.GlobalConfig,
     num_outputs_per_target: "al_num_outputs_per_target",
+    model_registry_per_input_type: Dict[str, Callable[[str], Type[nn.Module]]],
 ) -> Union[nn.Module, nn.DataParallel]:
 
     fusion_class, fusion_kwargs = get_fusion_model_class_and_kwargs_from_configs(
@@ -67,6 +79,7 @@ def get_model(
         predictor_config=predictor_config,
         num_outputs_per_target=num_outputs_per_target,
         inputs_as_dicts=inputs_as_dict,
+        model_registry_per_input_type=model_registry_per_input_type,
     )
 
     if global_config.pretrained_checkpoint:
@@ -84,7 +97,9 @@ def get_model(
         return loaded_fusion_model
 
     modules_to_fuse = overload_fusion_model_feature_extractors_with_pretrained(
-        modules_to_fuse=fusion_kwargs["modules_to_fuse"], inputs_as_dict=inputs_as_dict
+        modules_to_fuse=fusion_kwargs["modules_to_fuse"],
+        inputs_as_dict=inputs_as_dict,
+        model_registry_per_input_type=model_registry_per_input_type,
     )
     fusion_kwargs["modules_to_fuse"] = modules_to_fuse
 
@@ -99,7 +114,9 @@ def get_model(
 
 
 def get_modules_to_fuse_from_inputs(
-    inputs_as_dict: "al_input_objects_as_dict", device: str
+    inputs_as_dict: "al_input_objects_as_dict",
+    model_registry_per_input_type: Dict[str, Callable[[str], Type[nn.Module]]],
+    device: str,
 ) -> nn.ModuleDict:
     models = nn.ModuleDict()
 
@@ -139,9 +156,12 @@ def get_modules_to_fuse_from_inputs(
 
         elif input_type == "sequence":
 
+            sequence_model_registry = model_registry_per_input_type["sequence"]
+
             num_tokens = len(inputs_object.vocab)
             sequence_model = get_sequence_model(
                 sequence_model_config=inputs_object.input_config.model_config,
+                model_registry_lookup=sequence_model_registry,
                 num_tokens=num_tokens,
                 max_length=inputs_object.computed_max_length,
                 embedding_dim=model_config.embedding_dim,
@@ -151,10 +171,13 @@ def get_modules_to_fuse_from_inputs(
 
         elif input_type == "bytes":
 
+            sequence_model_registry = model_registry_per_input_type["sequence"]
+
             num_tokens = len(inputs_object.vocab)
             sequence_model = get_sequence_model(
                 sequence_model_config=inputs_object.input_config.model_config,
                 num_tokens=num_tokens,
+                model_registry_lookup=sequence_model_registry,
                 max_length=inputs_object.computed_max_length,
                 embedding_dim=model_config.embedding_dim,
                 device=device,
@@ -266,6 +289,7 @@ class SequenceModelObjectsForWrapperModel:
 
 def get_sequence_model(
     sequence_model_config: SequenceModelConfig,
+    model_registry_lookup: Callable[[str], Type[nn.Module]],
     num_tokens: int,
     max_length: int,
     embedding_dim: int,
@@ -284,6 +308,7 @@ def get_sequence_model(
 
     objects_for_wrapper = _get_sequence_feature_extractor_objects_for_wrapper_model(
         model_type=sequence_model_config.model_type,
+        model_registry_lookup=model_registry_lookup,
         pretrained=sequence_model_config.pretrained_model,
         pretrained_frozen=sequence_model_config.freeze_pretrained_model,
         model_config=sequence_model_config.model_init_config,
@@ -294,7 +319,8 @@ def get_sequence_model(
         pool=sequence_model_config.pool,
     )
 
-    sequence_model = TransformerWrapperModel(
+    wrapper_model_class = model_registry_lookup(model_type="sequence-wrapper-default")
+    sequence_model = wrapper_model_class(
         feature_extractor=objects_for_wrapper.feature_extractor,
         external_feature_extractor=objects_for_wrapper.external,
         model_config=sequence_model_config,
@@ -309,8 +335,26 @@ def get_sequence_model(
     return sequence_model
 
 
+def get_default_model_registry_per_input_type() -> Dict[
+    str, Callable[[str], Type[nn.Module]]
+]:
+    mapping = {"sequence": _sequence_model_registry}
+
+    return mapping
+
+
+def _sequence_model_registry(model_type: str) -> Type[nn.Module]:
+    if model_type == "sequence-default":
+        return TransformerFeatureExtractor
+    elif model_type == "sequence-wrapper-default":
+        return TransformerWrapperModel
+    else:
+        raise ValueError()
+
+
 def _get_sequence_feature_extractor_objects_for_wrapper_model(
     model_type: str,
+    model_registry_lookup: Callable[[str], Type[nn.Module]],
     pretrained: bool,
     pretrained_frozen: bool,
     model_config: Union[
@@ -324,11 +368,13 @@ def _get_sequence_feature_extractor_objects_for_wrapper_model(
 ) -> SequenceModelObjectsForWrapperModel:
 
     if model_type == "sequence-default":
+        model_class = model_registry_lookup(model_type=model_type)
         objects_for_wrapper = _get_basic_sequence_feature_extractor_objects(
             model_config=model_config,
             num_tokens=num_tokens,
             feature_extractor_max_length=feature_extractor_max_length,
             embedding_dim=embedding_dim,
+            feature_extractor_class=model_class,
         )
     elif model_type == "perceiver":
         objects_for_wrapper = _get_perceiver_sequence_feature_extractor_objects(
@@ -504,6 +550,7 @@ def _get_basic_sequence_feature_extractor_objects(
     num_tokens: int,
     feature_extractor_max_length: int,
     embedding_dim: int,
+    feature_extractor_class: Callable = TransformerFeatureExtractor,
 ) -> SequenceModelObjectsForWrapperModel:
 
     parsed_embedding_dim = get_embedding_dim_for_sequence_model(
@@ -512,7 +559,7 @@ def _get_basic_sequence_feature_extractor_objects(
         num_heads=model_config.num_heads,
     )
 
-    feature_extractor = TransformerFeatureExtractor(
+    feature_extractor = feature_extractor_class(
         model_config=model_config,
         num_tokens=num_tokens,
         max_length=feature_extractor_max_length,
@@ -610,11 +657,14 @@ def get_fusion_kwargs_from_configs(
     predictor_config: schemas.PredictorConfig,
     inputs_as_dict: "al_input_objects_as_dict",
     num_outputs_per_target: "al_num_outputs_per_target",
+    model_registry_per_input_type: Dict[str, Callable[[str], Type[nn.Module]]],
 ) -> Dict[str, Any]:
 
     kwargs = {}
     modules_to_fuse = get_modules_to_fuse_from_inputs(
-        inputs_as_dict=inputs_as_dict, device=global_config.device
+        inputs_as_dict=inputs_as_dict,
+        device=global_config.device,
+        model_registry_per_input_type=model_registry_per_input_type,
     )
     kwargs["modules_to_fuse"] = modules_to_fuse
     kwargs["num_outputs_per_target"] = num_outputs_per_target
@@ -637,7 +687,9 @@ def _warn_abount_unsupported_hf_model(model_name: str) -> None:
 
 
 def overload_fusion_model_feature_extractors_with_pretrained(
-    modules_to_fuse: nn.ModuleDict, inputs_as_dict: "al_input_objects_as_dict"
+    modules_to_fuse: nn.ModuleDict,
+    inputs_as_dict: "al_input_objects_as_dict",
+    model_registry_per_input_type: Dict[str, Callable[[str], Type[nn.Module]]],
 ) -> nn.ModuleDict:
 
     """
@@ -684,6 +736,7 @@ def overload_fusion_model_feature_extractors_with_pretrained(
             predictor_config=load_configs.predictor_config,
             num_outputs_per_target=load_experiment.num_outputs_per_target,
             inputs_as_dicts=inputs_as_dict,
+            model_registry_per_input_type=model_registry_per_input_type,
         )
 
         pretrained_name = pretrained_config.load_module_name
@@ -720,6 +773,7 @@ def get_fusion_model_class_and_kwargs_from_configs(
     predictor_config: schemas.PredictorConfig,
     num_outputs_per_target: "al_num_outputs_per_target",
     inputs_as_dicts: "al_input_objects_as_dict",
+    model_registry_per_input_type: Dict[str, Callable[[str], Type[nn.Module]]],
 ) -> Tuple[Type[nn.Module], Dict[str, Any]]:
 
     fusion_model_class = get_fusion_class(fusion_model_type=predictor_config.model_type)
@@ -729,6 +783,7 @@ def get_fusion_model_class_and_kwargs_from_configs(
         predictor_config=predictor_config,
         num_outputs_per_target=num_outputs_per_target,
         inputs_as_dict=inputs_as_dicts,
+        model_registry_per_input_type=model_registry_per_input_type,
     )
 
     return fusion_model_class, fusion_model_kwargs

@@ -53,6 +53,7 @@ from eir.models import al_fusion_models
 from eir.models.model_setup import (
     get_fusion_model_class_and_kwargs_from_configs,
     load_model,
+    get_default_model_registry_per_input_type,
 )
 from eir.models.model_training_utils import gather_pred_outputs_from_dloader
 from eir.setup import config
@@ -371,12 +372,15 @@ def get_default_predict_config(
         num_workers=configs_overloaded_for_predict.global_config.dataloader_workers,
     )
 
+    default_model_registry = get_default_model_registry_per_input_type()
+
     func = get_fusion_model_class_and_kwargs_from_configs
     fusion_model_class, fusion_model_kwargs = func(
         global_config=configs_overloaded_for_predict.global_config,
         predictor_config=configs_overloaded_for_predict.predictor_config,
         num_outputs_per_target=loaded_train_experiment.num_outputs_per_target,
         inputs_as_dicts=test_inputs,
+        model_registry_per_input_type=default_model_registry,
     )
 
     model = load_model(

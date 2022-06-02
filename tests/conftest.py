@@ -36,7 +36,7 @@ from eir.experiment_io.experiment_io import (
     serialize_all_input_transformers,
     serialize_chosen_input_objects,
 )
-from eir.models.model_setup import get_model
+from eir.models.model_setup import get_model, get_default_model_registry_per_input_type
 from eir.setup import schemas, config
 from eir.setup.config import recursive_dict_replace
 from eir.train import (
@@ -635,8 +635,10 @@ def create_test_model(
         hooks=None,
     )
 
+    model_registry = get_default_model_registry_per_input_type()
     model = get_model(
         inputs_as_dict=inputs_as_dict,
+        model_registry_per_input_type=model_registry,
         global_config=gc,
         predictor_config=create_test_config.predictor_config,
         num_outputs_per_target=num_outputs_per_class,

@@ -52,7 +52,7 @@ from eir.experiment_io.experiment_io import (
 )
 from eir.models import al_fusion_models
 from eir.models import model_training_utils
-from eir.models.model_setup import get_model
+from eir.models.model_setup import get_model, get_default_model_registry_per_input_type
 from eir.models.model_training_utils import run_lr_find
 from eir.models.tabular.tabular import (
     get_tabular_inputs,
@@ -285,11 +285,14 @@ def get_default_experiment(
         target_transformers=target_labels.label_transformers
     )
 
+    default_registry = get_default_model_registry_per_input_type()
+
     model = get_model(
         inputs_as_dict=inputs,
         global_config=configs.global_config,
         predictor_config=configs.predictor_config,
         num_outputs_per_target=num_outputs_per_target,
+        model_registry_per_input_type=default_registry,
     )
 
     criterions = _get_criterions(
