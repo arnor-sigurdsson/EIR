@@ -96,7 +96,7 @@ class LCLModelConfig:
         With of the locally connected kernels. Note that this refers to the flattened
         input, meaning that if we have a one-hot encoding of 4 values (e.g. SNPs), 12
         refers to 12/4 = 3 SNPs per locally connected window. Can be set to ``None`` if
-        the ``split_mlp_num_splits`` paramter is set, which means that the kernel width
+        the ``split_mlp_num_splits`` parameter is set, which means that the kernel width
         will be set automatically according to
 
     :param first_kernel_expansion:
