@@ -21,7 +21,7 @@ from typing import (
 
 import numpy as np
 from aislib.misc_utils import get_logger
-from timm.models.registry import _model_default_cfgs
+from timm.models.registry import _model_pretrained_cfgs
 from torchtext.data.utils import get_tokenizer as get_pytorch_tokenizer
 from torchtext.vocab import build_vocab_from_iterator, Vocab
 from torchtext.vocab import vocab as pytorch_vocab_builder
@@ -303,7 +303,7 @@ class PretrainedImageModelInfo:
 def get_timm_configs() -> Dict[str, PretrainedImageModelInfo]:
     default_configs = {}
     field_names = {i.name for i in fields(PretrainedImageModelInfo)}
-    for name, dict_ in _model_default_cfgs.items():
+    for name, dict_ in _model_pretrained_cfgs.items():
         common = {k: v for k, v in dict_.items() if k in field_names}
         default_configs[name] = PretrainedImageModelInfo(**common)
 

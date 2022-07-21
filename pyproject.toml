@@ -37,7 +37,7 @@ transformers = "^4.11.3"
 sentencepiece = "^0.1.96"
 ipython = "^8.4.0"
 perceiver-pytorch = "^0.8.1"
-timm = "^0.5.4"
+timm = "^0.6.5"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.0.0"

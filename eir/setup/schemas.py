@@ -5,7 +5,6 @@ from eir.models.fusion.fusion_default import FusionModelConfig
 from eir.models.fusion.fusion_linear import LinearFusionModelConfig
 from eir.models.fusion.fusion_mgmoe import MGMoEModelConfig
 from eir.models.image.image_models import ImageModelConfig
-from eir.models.image.image_models import get_all_timm_model_names
 from eir.models.omics.omics_models import (
     OmicsModelConfig,
     LinearModel,
@@ -23,7 +22,6 @@ from eir.models.omics.omics_models import (
 from eir.models.sequence.transformer_models import (
     BasicTransformerFeatureExtractorModelConfig,
     SequenceModelConfig,
-    get_all_hf_model_names,
 )
 from eir.models.tabular.tabular import (
     SimpleTabularModel,
@@ -33,14 +31,7 @@ from eir.models.tabular.tabular import (
 from eir.setup.setup_utils import get_all_optimizer_names
 
 al_input_configs = Sequence["InputConfig"]
-al_sequence_models = tuple(
-    Literal[i] for i in ["sequence-default"] + list(get_all_hf_model_names())
-)
-al_bytes_models = tuple(
-    Literal[i]
-    for i in ["sequence-default", "perceiver"] + list(get_all_hf_model_names())
-)
-al_image_models = tuple(Literal[i] for i in get_all_timm_model_names())
+
 al_optimizers = tuple(Literal[i] for i in get_all_optimizer_names())
 
 al_model_configs = Union[

@@ -68,7 +68,14 @@ Tabular Feature Extractors
 Sequence Feature Extractors
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+.. autoclass:: eir.models.sequence.transformer_models.SequenceModelConfig
+
 .. autoclass:: eir.models.sequence.transformer_models.BasicTransformerFeatureExtractorModelConfig
+
+Image Feature Extractors
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. autoclass:: eir.models.image.image_models.ImageModelConfig
 
 Predictor Configurations
 ------------------------
