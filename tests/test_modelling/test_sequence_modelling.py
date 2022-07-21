@@ -10,7 +10,7 @@ from eir.models.model_setup import (
     _get_hf_sequence_feature_extractor_objects,
     _get_manual_out_features_for_external_feature_extractor,
 )
-from eir.models.sequence.transformer_models import get_all_hf_model_names
+from eir.setup.setup_utils import get_all_hf_model_names
 from eir.setup.config import get_all_targets
 from eir.train_utils.utils import seed_everything
 from tests.conftest import should_skip_in_gha_macos

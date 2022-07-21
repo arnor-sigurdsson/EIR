@@ -16,7 +16,7 @@ import plotly.express as px
 import torch
 from aislib.misc_utils import get_logger
 from aislib.pytorch_modules import Swish
-from ignite.contrib.handlers import FastaiLRFinder
+from ignite.handlers.lr_finder import FastaiLRFinder
 from ignite.engine import Engine
 from torch import nn
 from torch.nn import Module

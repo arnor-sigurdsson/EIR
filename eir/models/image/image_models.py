@@ -1,13 +1,12 @@
 from dataclasses import dataclass
-from typing import Sequence, Dict, Any, TYPE_CHECKING
+from typing import Dict, Any, Literal
 
-from torch import nn
 from torch import Tensor
+from torch import nn
 
-import timm
+from eir.setup.setup_utils import get_all_timm_model_names
 
-if TYPE_CHECKING:
-    from eir.setup.schemas import al_image_models
+al_image_models = tuple(Literal[i] for i in get_all_timm_model_names())
 
 
 @dataclass
@@ -32,7 +31,7 @@ class ImageModelConfig:
           Whether to freeze the pretrained model weights.
     """
 
-    model_type: "al_image_models"
+    model_type: al_image_models
     model_init_config: Dict[str, Any]
 
     num_output_features: int = 256
@@ -60,12 +59,3 @@ class ImageWrapperModel(nn.Module):
         out = self.feature_extractor(input)
 
         return out
-
-
-def get_all_timm_model_names() -> Sequence[str]:
-    pretrained_names = {i for i in timm.list_models() if not i.startswith("tf")}
-    other_model_classes = {i for i in dir(timm.models) if "Net" in i}
-    all_models = set.union(pretrained_names, other_model_classes)
-    all_models_list = sorted(list(all_models))
-
-    return all_models_list

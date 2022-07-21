@@ -49,8 +49,8 @@ from eir.models.sequence.transformer_models import (
     TransformerFeatureExtractor,
     PerceiverIOModelConfig,
     PerceiverIOFeatureExtractor,
-    get_unsupported_hf_models,
 )
+from eir.setup.setup_utils import get_unsupported_hf_models
 from eir.models.tabular.tabular import (
     get_unique_values_from_transformers,
     SimpleTabularModel,
