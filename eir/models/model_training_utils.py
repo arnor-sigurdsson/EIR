@@ -436,8 +436,9 @@ def trace_eir_model(
         if hasattr(module, "script_submodules_for_tracing"):
             module.script_submodules_for_tracing()
 
-    traced_fusion_model = torch.jit.trace(
-        func=fusion_model, example_inputs=example_inputs, strict=False
-    )
+    with torch.no_grad():
+        traced_fusion_model = torch.jit.trace(
+            func=fusion_model, example_inputs=example_inputs, strict=False
+        )
 
     return traced_fusion_model

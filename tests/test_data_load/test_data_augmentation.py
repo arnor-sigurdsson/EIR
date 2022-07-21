@@ -164,7 +164,11 @@ def test_get_block_cutmix_indices(input_length: int, lambda_: float):
 
     num_snps_in_mixed_block = random_index_end - random_index_start
     num_snps_from_original = input_length - num_snps_in_mixed_block
-    assert num_snps_from_original == int(round(lambda_ * input_length))
+    assert num_snps_from_original + num_snps_in_mixed_block == input_length
+
+    expected_original_no_snps = int(round(lambda_ * input_length))
+    expected_diff = abs(num_snps_from_original - expected_original_no_snps)
+    assert 0 <= expected_diff <= 1
 
 
 @given(
@@ -235,7 +239,11 @@ def test_get_uniform_cutmix_indices(lambda_, input_length):
 
     num_mixed_snps = len(test_random_indices)
     num_snps_from_original = input_length - num_mixed_snps
-    assert num_snps_from_original == int(round(lambda_ * input_length))
+    assert num_snps_from_original + num_mixed_snps == input_length
+
+    expected_original_no_snps = int(round(lambda_ * input_length))
+    expected_diff = abs(num_snps_from_original - expected_original_no_snps)
+    assert 0 <= expected_diff <= 1
 
 
 @given(
