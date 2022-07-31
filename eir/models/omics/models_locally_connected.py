@@ -10,6 +10,7 @@ from aislib.pytorch_modules import Swish
 from torch import nn
 
 from eir.models.layers import SplitLinear, SplitMLPResidualBlock
+from eir.models.sequence.transformer_models import PositionalEmbedding
 
 if TYPE_CHECKING:
     from eir.setup.input_setup import DataDimensions
@@ -350,6 +351,12 @@ def generate_split_resblocks_auto(split_parameter_spec: LCParameterSpec):
 
     block_modules = [first_block]
 
+    cur_attention_block = SplitAttentionBlock(
+        in_feature_sets=2**s.channel_exp_base,
+        in_features=first_block.out_features,
+    )
+    block_modules.append(cur_attention_block)
+
     while True:
         cur_no_blocks = len(block_modules)
         cur_index = cur_no_blocks // 2
@@ -380,3 +387,37 @@ def generate_split_resblocks_auto(split_parameter_spec: LCParameterSpec):
         cur_size,
     )
     return nn.Sequential(*block_modules)
+
+
+class SplitAttentionBlock(nn.Module):
+    def __init__(
+        self,
+        in_feature_sets: int,
+        in_features: int,
+    ):
+        super().__init__()
+
+        self.in_feature_sets = in_feature_sets
+        self.in_features = in_features
+        self.out_features = in_features
+
+        self.encoder_layer = nn.TransformerEncoderLayer(
+            d_model=self.in_feature_sets,
+            nhead=4,
+            dim_feedforward=512,
+            batch_first=True,
+        )
+
+        self.pos_emb = PositionalEmbedding(
+            embedding_dim=self.in_feature_sets,
+            max_length=self.in_features // self.in_feature_sets,
+            dropout=0.1,
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        out = x.reshape(x.shape[0], -1, self.in_feature_sets)
+        out = self.pos_emb(out)
+        out = self.encoder_layer(out)
+        out = torch.flatten(input=out, start_dim=1)
+
+        return out
