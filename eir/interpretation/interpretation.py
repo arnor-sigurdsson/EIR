@@ -138,6 +138,8 @@ def activation_analysis_handler(
         )
         return
 
+    logger.debug("Running activation analysis.")
+
     activation_outfolder_callable = partial(
         _prepare_eval_activation_outfolder,
         output_folder=gc.output_folder,
