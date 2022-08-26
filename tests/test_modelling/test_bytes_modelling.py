@@ -28,12 +28,15 @@ seed_everything(seed=0)
                     "output_folder": "test_classification_vanilla_transformer_bytes",
                     "n_epochs": 12,
                     "memory_dataset": True,
-                    "mixing_alpha": 1.0,
+                    "mixing_alpha": 0.1,
                     "act_background_samples": 8,
                 },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_bytes"},
+                        "input_type_info": {
+                            "max_length": 128,
+                        },
                         "model_config": {
                             "position": "embed",
                             "window_size": 64,
@@ -60,7 +63,7 @@ seed_everything(seed=0)
     ],
     indirect=True,
 )
-def test_sequence_modelling(prep_modelling_test_configs):
+def test_bytes_modelling(prep_modelling_test_configs):
     experiment, test_config = prep_modelling_test_configs
 
     train.train(experiment=experiment)
