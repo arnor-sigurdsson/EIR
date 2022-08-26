@@ -357,7 +357,9 @@ def _check_model(model_type: str, model: nn.Module):
     ],
     indirect=True,
 )
-def test_get_criteria(create_test_config: Configs, create_test_labels: train.Labels):
+def test_get_criteria(
+    create_test_config: Configs, create_test_labels: train.MergedTargetLabels
+):
     target_labels = create_test_labels
 
     outputs_as_dict = set_up_outputs_for_training(
