@@ -9,7 +9,7 @@ from eir.setup.config import get_all_tabular_targets
 from eir.setup.schemas import BasicPretrainedConfig
 from tests.conftest import _get_cur_modelling_test_config, cleanup
 from tests.test_modelling.test_modelling_utils import (
-    check_performance_result_wrapper,
+    check_test_performance_results,
 )
 
 if TYPE_CHECKING:
@@ -246,11 +246,20 @@ def test_pre_training_and_loading(
 
     train.train(experiment=pretrained_experiment)
 
-    check_performance_result_wrapper(
-        outputs=experiment.outputs,
-        run_path=test_config.run_path,
-        thresholds=(0.9, 0.9),
-    )
+    # Note we skip checking R2 for now as we patch the metrics in conftest.py
+    # to check for both training and validation, but for now we will make do with
+    # checking only the MCC for this
+    for output_name, output_object in experiment.outputs.items():
+        cat_target_columns = output_object.target_columns["cat"]
+
+        for cat_target_column in cat_target_columns:
+            check_test_performance_results(
+                run_path=test_config.run_path,
+                target_column=cat_target_column,
+                output_name=output_name,
+                metric="mcc",
+                thresholds=(0.9, 0.9),
+            )
 
     (
         pretrained_checkpoint_experiment,
@@ -261,11 +270,17 @@ def test_pre_training_and_loading(
 
     train.train(experiment=pretrained_checkpoint_experiment)
 
-    check_performance_result_wrapper(
-        outputs=pretrained_checkpoint_experiment.outputs,
-        run_path=pretrained_checkpoint_test_config.run_path,
-        thresholds=(0.9, 0.9),
-    )
+    for output_name, output_object in pretrained_checkpoint_experiment.outputs.items():
+        cat_target_columns = output_object.target_columns["cat"]
+
+        for cat_target_column in cat_target_columns:
+            check_test_performance_results(
+                run_path=pretrained_checkpoint_test_config.run_path,
+                target_column=cat_target_column,
+                output_name=output_name,
+                metric="mcc",
+                thresholds=(0.9, 0.9),
+            )
 
 
 def _get_experiment_overloaded_for_pretrained_extractor(
