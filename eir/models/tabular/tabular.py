@@ -11,10 +11,10 @@ from sklearn.preprocessing import LabelEncoder, StandardScaler
 from torch import nn
 
 if TYPE_CHECKING:
-    from eir.train import al_training_labels_extra
     from eir.data_load.label_setup import al_label_dict
 
 # Aliases
+al_tabular_input = Dict[str, Union[List[str], torch.Tensor]]
 al_unique_embed_vals = Dict[str, Set[str]]
 al_emb_lookup_dict = Dict[str, Dict[str, Dict[int, int]]]
 
@@ -158,7 +158,7 @@ def get_tabular_inputs(
     input_cat_columns: Sequence[str],
     input_con_columns: Sequence[str],
     tabular_model: SimpleTabularModel,
-    tabular_input: "al_training_labels_extra",
+    tabular_input: "al_tabular_input",
     device: str,
 ) -> Union[torch.Tensor, None]:
     """

@@ -53,10 +53,13 @@ def get_run_folder(output_folder: str) -> Path:
     return Path(output_folder)
 
 
-def prep_sample_outfolder(output_folder: str, column_name: str, iteration: int) -> Path:
+def prep_sample_outfolder(
+    output_folder: str, output_name: str, column_name: str, iteration: int
+) -> Path:
     sample_outfolder = (
         get_run_folder(output_folder=output_folder)
         / "results"
+        / output_name
         / column_name
         / "samples"
         / str(iteration)

@@ -12,7 +12,9 @@ import torch
 from eir import train
 from eir.data_load import datasets
 from eir.data_load.datasets import al_datasets
-from eir.setup.config import get_all_targets, Configs
+from eir.data_load.label_setup import al_label_transformers
+from eir.setup.config import Configs
+from eir.setup.output_setup import set_up_outputs_for_training
 
 if TYPE_CHECKING:
     from ..conftest import TestDataConfig
@@ -43,6 +45,15 @@ if TYPE_CHECKING:
                         "model_config": {"model_type": "linear"},
                     }
                 ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    },
+                ],
             },
         }
     ],
@@ -63,8 +74,8 @@ def test_set_up_datasets(
         test_configs=test_configs, test_cl_args=parse_test_cl_args
     )
 
-    all_array_ids = train.gather_all_ids_from_target_configs(
-        target_configs=test_configs.target_configs
+    all_array_ids = train.gather_all_ids_from_output_configs(
+        output_configs=test_configs.output_configs
     )
     # Check that corrupted arrays / labels were added successfully
     assert len(all_array_ids) > test_data_config.n_per_class * n_classes
@@ -74,11 +85,11 @@ def test_set_up_datasets(
     )
 
     target_labels_info = train.get_tabular_target_file_infos(
-        target_configs=test_configs.target_configs
+        output_configs=test_configs.output_configs
     )
 
-    target_labels = train.set_up_target_labels_wrapper(
-        tabular_file_infos=target_labels_info,
+    target_labels = train.set_up_tabular_target_labels_wrapper(
+        tabular_target_file_infos=target_labels_info,
         custom_label_ops=None,
         train_ids=train_ids,
         valid_ids=valid_ids,
@@ -91,10 +102,16 @@ def test_set_up_datasets(
         hooks=None,
     )
 
+    outputs_as_dict = set_up_outputs_for_training(
+        output_configs=create_test_config.output_configs,
+        target_transformers=target_labels.label_transformers,
+    )
+
     train_dataset, valid_dataset = datasets.set_up_datasets_from_configs(
         configs=test_configs,
         target_labels=target_labels,
         inputs_as_dict=inputs,
+        outputs_as_dict=outputs_as_dict,
     )
 
     assert (
@@ -122,9 +139,9 @@ def _add_bad_arrays_and_targets_for_dataset_testing(
         n_snps=test_cl_args["n_snps"], output_folder=test_omics_folder
     )
 
-    target_configs = test_configs.target_configs
-    assert len(target_configs) == 1
-    test_target_label_file = Path(target_configs[0].label_file)
+    output_configs = test_configs.output_configs
+    assert len(output_configs) == 1
+    test_target_label_file = Path(output_configs[0].output_type_info.label_file)
     _set_up_bad_label_file_for_testing(label_file=test_target_label_file)
 
 
@@ -155,6 +172,15 @@ def _set_up_bad_label_file_for_testing(label_file: Path) -> None:
                         "input_info": {"input_name": "test_genotype"},
                         "model_config": {"model_type": "linear"},
                     }
+                ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    },
                 ],
             },
         }
@@ -209,19 +235,19 @@ def test_set_up_datasets_fails(
             n=dataset_fail_config.get("corrupt_labels_n", None),
         )
 
-    all_array_ids = train.gather_all_ids_from_target_configs(
-        target_configs=test_configs.target_configs
+    all_array_ids = train.gather_all_ids_from_output_configs(
+        output_configs=test_configs.output_configs
     )
     train_ids, valid_ids = train.split_ids(
         ids=all_array_ids, valid_size=test_configs.global_config.valid_size
     )
 
     target_labels_info = train.get_tabular_target_file_infos(
-        target_configs=test_configs.target_configs
+        output_configs=test_configs.output_configs
     )
 
-    target_configs = train.set_up_target_labels_wrapper(
-        tabular_file_infos=target_labels_info,
+    target_labels = train.set_up_tabular_target_labels_wrapper(
+        tabular_target_file_infos=target_labels_info,
         custom_label_ops=None,
         train_ids=train_ids,
         valid_ids=valid_ids,
@@ -234,18 +260,25 @@ def test_set_up_datasets_fails(
         hooks=None,
     )
 
+    outputs_as_dict = set_up_outputs_for_training(
+        output_configs=create_test_config.output_configs,
+        target_transformers=target_labels.label_transformers,
+    )
+
     if set(dataset_fail_config.keys()).issubset({"corrupt_labels", "corrupt_arrays"}):
         with pytest.raises(ValueError):
             datasets.set_up_datasets_from_configs(
                 configs=configs_copy,
-                target_labels=target_configs,
+                target_labels=target_labels,
                 inputs_as_dict=inputs,
+                outputs_as_dict=outputs_as_dict,
             )
     if set(dataset_fail_config.keys()).issubset({"corrupt_ids", "corrupt_inputs"}):
         train_dataset, valid_dataset = datasets.set_up_datasets_from_configs(
             configs=configs_copy,
-            target_labels=target_configs,
+            target_labels=target_labels,
             inputs_as_dict=inputs,
+            outputs_as_dict=outputs_as_dict,
         )
         if dataset_fail_config.get("corrupt_ids", None):
             train_dataset.samples[0].sample_id = ""
@@ -267,9 +300,9 @@ def test_set_up_datasets_fails(
 def _corrupt_label_file_for_testing(
     test_configs: Configs, n: Union[int, None] = None
 ) -> None:
-    target_configs = test_configs.target_configs
-    assert len(target_configs) == 1
-    test_target_label_file = Path(target_configs[0].label_file)
+    output_configs = test_configs.output_configs
+    assert len(output_configs) == 1
+    test_target_label_file = Path(output_configs[0].output_type_info.label_file)
 
     df_labels = pd.read_csv(test_target_label_file)
     if n:
@@ -320,10 +353,15 @@ def _corrupt_arrays_for_testing(
                         "model_config": {"model_type": "tabular"},
                     },
                 ],
-                "target_configs": {
-                    "target_cat_columns": ["Origin"],
-                    "target_con_columns": ["Height"],
-                },
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": ["Height"],
+                        },
+                    },
+                ],
             },
         }
     ],
@@ -335,19 +373,19 @@ def test_construct_dataset_init_params_from_cl_args(
 
     test_configs = create_test_config
 
-    all_array_ids = train.gather_all_ids_from_target_configs(
-        target_configs=test_configs.target_configs
+    all_array_ids = train.gather_all_ids_from_output_configs(
+        output_configs=test_configs.output_configs
     )
     train_ids, valid_ids = train.split_ids(
         ids=all_array_ids, valid_size=test_configs.global_config.valid_size
     )
 
     target_labels_info = train.get_tabular_target_file_infos(
-        target_configs=test_configs.target_configs
+        output_configs=test_configs.output_configs
     )
 
-    target_labels = train.set_up_target_labels_wrapper(
-        tabular_file_infos=target_labels_info,
+    target_labels = train.set_up_tabular_target_labels_wrapper(
+        tabular_target_file_infos=target_labels_info,
         custom_label_ops=None,
         train_ids=train_ids,
         valid_ids=valid_ids,
@@ -360,10 +398,14 @@ def test_construct_dataset_init_params_from_cl_args(
         hooks=None,
     )
 
-    targets = get_all_targets(targets_configs=test_configs.target_configs)
+    outputs_as_dict = set_up_outputs_for_training(
+        output_configs=create_test_config.output_configs,
+        target_transformers=target_labels.label_transformers,
+    )
+
     constructed_args = datasets.construct_default_dataset_kwargs_from_cl_args(
         target_labels_dict=target_labels.train_labels,
-        targets=targets,
+        outputs=outputs_as_dict,
         inputs=inputs,
         test_mode=False,
     )
@@ -377,8 +419,7 @@ def test_construct_dataset_init_params_from_cl_args(
 
     assert inputs["test_genotype"] == constructed_args["inputs"]["test_genotype"]
 
-    expected_target_cols = {"con": ["Height"], "cat": ["Origin"]}
-    assert constructed_args["target_columns"] == expected_target_cols
+    assert constructed_args["outputs"] == outputs_as_dict
 
 
 @pytest.mark.parametrize(
@@ -400,6 +441,15 @@ def test_construct_dataset_init_params_from_cl_args(
                             "model_type": "linear",
                         },
                     }
+                ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    },
                 ],
             },
         }
@@ -430,19 +480,19 @@ def test_datasets(
     train_no_samples = int(len(classes_tested) * c.n_per_class * (1 - gc.valid_size))
     valid_no_sample = int(len(classes_tested) * c.n_per_class * gc.valid_size)
 
-    all_array_ids = train.gather_all_ids_from_target_configs(
-        target_configs=test_configs.target_configs
+    all_array_ids = train.gather_all_ids_from_output_configs(
+        output_configs=test_configs.output_configs
     )
     train_ids, valid_ids = train.split_ids(
         ids=all_array_ids, valid_size=test_configs.global_config.valid_size
     )
 
     target_labels_info = train.get_tabular_target_file_infos(
-        target_configs=test_configs.target_configs
+        output_configs=test_configs.output_configs
     )
 
-    target_labels = train.set_up_target_labels_wrapper(
-        tabular_file_infos=target_labels_info,
+    target_labels = train.set_up_tabular_target_labels_wrapper(
+        tabular_target_file_infos=target_labels_info,
         custom_label_ops=None,
         train_ids=train_ids,
         valid_ids=valid_ids,
@@ -455,10 +505,16 @@ def test_datasets(
         hooks=None,
     )
 
+    outputs_as_dict = set_up_outputs_for_training(
+        output_configs=create_test_config.output_configs,
+        target_transformers=target_labels.label_transformers,
+    )
+
     train_dataset, valid_dataset = datasets.set_up_datasets_from_configs(
         configs=test_configs,
         target_labels=target_labels,
         inputs_as_dict=inputs,
+        outputs_as_dict=outputs_as_dict,
     )
 
     check_dataset(
@@ -479,8 +535,9 @@ def check_dataset(
     dataset: al_datasets,
     exp_no_sample: int,
     classes_tested: List[str],
-    target_transformers,
+    target_transformers: Dict[str, al_label_transformers],
     check_targets: bool = True,
+    output_name: str = "test_output",
     target_column="Origin",
 ) -> None:
 
@@ -490,16 +547,16 @@ def check_dataset(
 
     if check_targets:
         transformed_values_in_dataset = set(
-            i.target_labels[target_column] for i in dataset.samples
+            i.target_labels[output_name][target_column] for i in dataset.samples
         )
         expected_transformed_values = set(range(len(classes_tested)))
         assert transformed_values_in_dataset == expected_transformed_values
 
-        tt_it = target_transformers[target_column].inverse_transform
+        tt_it = target_transformers[output_name][target_column].inverse_transform
 
         assert (tt_it(range(len(classes_tested))) == classes_tested).all()
 
-        assert target_labels[target_column] in expected_transformed_values
+        assert target_labels[output_name][target_column] in expected_transformed_values
 
     test_genotype = test_inputs["test_genotype"]
     assert (test_genotype.sum(1) == 1).all()
@@ -552,6 +609,15 @@ def test_prepare_genotype_array_test_mode():
                         "input_info": {"input_name": "test_genotype"},
                         "model_config": {"model_type": "linear"},
                     }
+                ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    },
                 ],
             },
         }
@@ -650,6 +716,15 @@ def test_sample_sequence_uniform():
                         "model_config": {"model_type": "tabular"},
                     },
                 ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    },
+                ],
             },
         }
     ],
@@ -663,8 +738,8 @@ def test_impute_missing_modalities(
     test_experiment_config = create_test_config
     test_data_config = create_test_data
 
-    all_array_ids = train.gather_all_ids_from_target_configs(
-        target_configs=test_experiment_config.target_configs
+    all_array_ids = train.gather_all_ids_from_output_configs(
+        output_configs=test_experiment_config.output_configs
     )
     train_ids, valid_ids = train.split_ids(
         ids=all_array_ids, valid_size=test_experiment_config.global_config.valid_size

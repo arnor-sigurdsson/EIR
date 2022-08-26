@@ -32,11 +32,8 @@ from tqdm import tqdm
 from eir.data_load.data_augmentation import make_random_omics_columns_missing
 from eir.data_load.label_setup import (
     al_label_dict,
-    al_target_columns,
     get_array_path_iterator,
-    Labels,
 )
-from eir.data_load.label_setup import merge_target_columns
 from eir.setup import config
 from eir.setup.input_setup import _get_split_func
 
@@ -48,39 +45,41 @@ if TYPE_CHECKING:
         BytesInputInfo,
         ImageInputInfo,
     )
+    from eir.setup.output_setup import al_output_objects_as_dict
+    from eir.train import MergedTargetLabels
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 # Type Aliases
 al_datasets = Union["MemoryDataset", "DiskDataset"]
 # embeddings --> remain str, cat targets --> int, con extra/target --> float
-al_sample_label_dict_target = Dict[str, Union[int, float]]
+al_sample_label_dict_target = Dict[str, Dict[str, Union[int, float]]]
 al_inputs = Union[Dict[str, torch.Tensor], Dict[str, Any]]
 al_getitem_return = Tuple[Dict[str, torch.Tensor], al_sample_label_dict_target, str]
 
 
 def set_up_datasets_from_configs(
     configs: config.Configs,
-    target_labels: Labels,
+    target_labels: "MergedTargetLabels",
     inputs_as_dict: "al_input_objects_as_dict",
+    outputs_as_dict: "al_output_objects_as_dict",
 ) -> Tuple[al_datasets, al_datasets]:
 
     dataset_class = (
         MemoryDataset if configs.global_config.memory_dataset else DiskDataset
     )
 
-    targets = config.get_all_targets(targets_configs=configs.target_configs)
     train_kwargs = construct_default_dataset_kwargs_from_cl_args(
         target_labels_dict=target_labels.train_labels,
-        targets=targets,
         inputs=inputs_as_dict,
+        outputs=outputs_as_dict,
         test_mode=False,
     )
 
     valid_kwargs = construct_default_dataset_kwargs_from_cl_args(
         target_labels_dict=target_labels.valid_labels,
-        targets=targets,
         inputs=inputs_as_dict,
+        outputs=outputs_as_dict,
         test_mode=True,
     )
 
@@ -96,19 +95,14 @@ def set_up_datasets_from_configs(
 
 def construct_default_dataset_kwargs_from_cl_args(
     target_labels_dict: Union[None, al_label_dict],
-    targets: config.Targets,
     inputs: "al_input_objects_as_dict",
+    outputs: "al_output_objects_as_dict",
     test_mode: bool,
 ) -> Dict[str, Any]:
 
-    target_columns = merge_target_columns(
-        target_con_columns=targets.con_targets,
-        target_cat_columns=targets.cat_targets,
-    )
-
     dataset_kwargs = {
-        "target_columns": target_columns,
         "inputs": inputs,
+        "outputs": outputs,
         "target_labels_dict": target_labels_dict,
         "test_mode": test_mode,
     }
@@ -149,7 +143,7 @@ class DatasetBase(Dataset):
     def __init__(
         self,
         inputs: "al_input_objects_as_dict",
-        target_columns: al_target_columns,
+        outputs: "al_output_objects_as_dict",
         test_mode: bool,
         target_labels_dict: al_label_dict = None,
     ):
@@ -158,12 +152,12 @@ class DatasetBase(Dataset):
         self.samples: Union[List[Sample], None] = None
 
         self.inputs = inputs
+        self.outputs = outputs
         self.test_mode = test_mode
-        self.target_columns = target_columns
         self.target_labels_dict = target_labels_dict if target_labels_dict else {}
 
     def init_label_attributes(self):
-        if not self.target_columns:
+        if not self.outputs:
             raise ValueError("Please specify label column name.")
 
     def set_up_samples(

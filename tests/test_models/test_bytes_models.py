@@ -35,6 +35,16 @@ from tests.test_models.model_testing_utils import prepare_example_batch
                         },
                     }
                 ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                        "model_config": {"model_init_config": {"fc_task_dim": 32}},
+                    }
+                ],
             },
         },
         # Case 2: Classification - Perceiver
@@ -57,7 +67,16 @@ from tests.test_models.model_testing_utils import prepare_example_batch
                         },
                     }
                 ],
-                "predictor_configs": {"model_config": {"fc_task_dim": 32}},
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                        "model_config": {"model_init_config": {"fc_task_dim": 32}},
+                    }
+                ],
             },
         },
     ],
@@ -77,4 +96,4 @@ def test_bytes_models(
     )
 
     model.eval()
-    _ = trace_eir_model(fusion_model=model, example_inputs=example_batch.inputs)
+    _ = trace_eir_model(meta_model=model, example_inputs=example_batch.inputs)

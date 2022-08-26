@@ -1,4 +1,6 @@
 import math
+from dataclasses import dataclass, field
+from typing import List
 
 import torch
 import torch.nn.functional as F
@@ -351,6 +353,38 @@ def calc_split_input(input: torch.Tensor, weight: torch.Tensor, bias: torch.Tens
         final = flattened + bias
 
     return final
+
+
+@dataclass
+class ResidualMLPConfig:
+    """
+    :param layers:
+        Number of residual MLP layers to use in for each output predictor after fusing.
+
+    :param fc_task_dim:
+        Number of hidden nodes in each MLP residual block.
+
+    :param rb_do:
+        Dropout in each MLP residual block.
+
+    :param fc_do:
+        Dropout before final layer.
+
+    :param stochastic_depth_p:
+        Probability of dropping input.
+
+    :param final_layer_type:
+        Which type of final layer to use to construct prediction.
+    """
+
+    layers: List[int] = field(default_factory=lambda: [2])
+
+    fc_task_dim: int = 256
+
+    rb_do: float = 0.10
+    fc_do: float = 0.10
+
+    stochastic_depth_p: float = 0.10
 
 
 class MLPResidualBlock(nn.Module):

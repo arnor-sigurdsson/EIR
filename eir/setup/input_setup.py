@@ -1,8 +1,8 @@
 from collections import OrderedDict
+from copy import deepcopy
 from dataclasses import dataclass, fields
 from functools import partial
 from pathlib import Path
-from copy import deepcopy
 from typing import (
     Dict,
     Union,
@@ -187,6 +187,7 @@ def get_input_setup_function_map() -> Dict[str, Callable[..., al_input_objects]]
 
 def set_up_tabular_input_from_pretrained(
     input_config: schemas.InputConfig,
+    custom_input_name: str,
     train_ids: Sequence[str],
     valid_ids: Sequence[str],
     hooks: Union["Hooks", None],
@@ -203,8 +204,9 @@ def set_up_tabular_input_from_pretrained(
     loaded_transformers = load_transformers(
         run_folder=pretrained_run_folder, transformers_to_load=None
     )
+    loaded_transformers_input = loaded_transformers[custom_input_name]
 
-    tabular_input_object.labels.label_transformers = loaded_transformers
+    tabular_input_object.labels.label_transformers = loaded_transformers_input
 
     return tabular_input_object
 
@@ -214,7 +216,9 @@ def get_input_setup_from_pretrained_function_map(
 ) -> Dict[str, Callable]:
     pretrained_setup_mapping = {
         "omics": set_up_omics_input,
-        "tabular": set_up_tabular_input_from_pretrained,
+        "tabular": partial(
+            set_up_tabular_input_from_pretrained, custom_input_name=load_module_name
+        ),
         "sequence": partial(
             load_serialized_input_object,
             input_class=SequenceInputInfo,

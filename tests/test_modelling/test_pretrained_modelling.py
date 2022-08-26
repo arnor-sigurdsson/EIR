@@ -1,14 +1,16 @@
+from copy import deepcopy
 from pathlib import Path
 from typing import Tuple, Sequence, TYPE_CHECKING
-from copy import deepcopy
 
 import pytest
 
 from eir import train
+from eir.setup.config import get_all_tabular_targets
 from eir.setup.schemas import BasicPretrainedConfig
-from eir.setup.config import get_all_targets
-from tests.test_modelling.test_modelling_utils import check_test_performance_results
 from tests.conftest import _get_cur_modelling_test_config, cleanup
+from tests.test_modelling.test_modelling_utils import (
+    check_performance_result_wrapper,
+)
 
 if TYPE_CHECKING:
     from tests.conftest import ModelTestConfig
@@ -71,17 +73,22 @@ if TYPE_CHECKING:
                         },
                     },
                 ],
-                "predictor_configs": {
+                "fusion_configs": {
                     "model_config": {
-                        "fc_task_dim": 64,
+                        "fc_task_dim": 128,
                         "fc_do": 0.10,
                         "rb_do": 0.10,
                     },
                 },
-                "target_configs": {
-                    "target_cat_columns": ["Origin"],
-                    "target_con_columns": ["Height"],
-                },
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": ["Height"],
+                        },
+                    },
+                ],
             },
         }
     ],
@@ -202,17 +209,22 @@ def _add_new_feature_extractor_to_experiment(
                         },
                     },
                 ],
-                "predictor_configs": {
+                "fusion_configs": {
                     "model_config": {
-                        "fc_task_dim": 64,
+                        "fc_task_dim": 128,
                         "fc_do": 0.10,
                         "rb_do": 0.10,
                     },
                 },
-                "target_configs": {
-                    "target_cat_columns": ["Origin"],
-                    "target_con_columns": ["Height"],
-                },
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": ["Height"],
+                        },
+                    },
+                ],
             },
         }
     ],
@@ -234,19 +246,11 @@ def test_pre_training_and_loading(
 
     train.train(experiment=pretrained_experiment)
 
-    targets = get_all_targets(targets_configs=experiment.configs.target_configs)
-
-    # Note we skip checking R2 for now as we patch the metrics in conftest.py
-    # to check for both training and validation, but for now we will make do with
-    # checking only the MCC for this
-    for cat_column in targets.cat_targets:
-
-        check_test_performance_results(
-            run_path=pretrained_test_config.run_path,
-            target_column=cat_column,
-            metric="mcc",
-            thresholds=(0.9, 0.9),
-        )
+    check_performance_result_wrapper(
+        outputs=experiment.outputs,
+        run_path=test_config.run_path,
+        thresholds=(0.9, 0.9),
+    )
 
     (
         pretrained_checkpoint_experiment,
@@ -257,14 +261,11 @@ def test_pre_training_and_loading(
 
     train.train(experiment=pretrained_checkpoint_experiment)
 
-    for cat_column in targets.cat_targets:
-
-        check_test_performance_results(
-            run_path=pretrained_checkpoint_test_config.run_path,
-            target_column=cat_column,
-            metric="mcc",
-            thresholds=(0.9, 0.9),
-        )
+    check_performance_result_wrapper(
+        outputs=pretrained_checkpoint_experiment.outputs,
+        run_path=pretrained_checkpoint_test_config.run_path,
+        thresholds=(0.9, 0.9),
+    )
 
 
 def _get_experiment_overloaded_for_pretrained_extractor(
@@ -314,8 +315,8 @@ def _get_experiment_overloaded_for_pretrained_extractor(
         configs=pretrained_configs, hooks=default_hooks
     )
 
-    targets = get_all_targets(
-        targets_configs=pretrained_experiment.configs.target_configs
+    targets = get_all_tabular_targets(
+        output_configs=pretrained_experiment.configs.output_configs
     )
     pretrained_test_config = _get_cur_modelling_test_config(
         train_loader=pretrained_experiment.train_loader,
@@ -351,8 +352,8 @@ def _get_experiment_overloaded_for_pretrained_checkpoint(
         configs=pretrained_configs, hooks=default_hooks
     )
 
-    targets = get_all_targets(
-        targets_configs=pretrained_experiment.configs.target_configs
+    targets = get_all_tabular_targets(
+        output_configs=pretrained_experiment.configs.output_configs
     )
     pretrained_test_config = _get_cur_modelling_test_config(
         train_loader=pretrained_experiment.train_loader,

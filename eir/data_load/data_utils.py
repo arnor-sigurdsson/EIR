@@ -1,27 +1,44 @@
 from dataclasses import dataclass
-from typing import Tuple, Dict, List, overload, TYPE_CHECKING, Union
+from typing import (
+    Tuple,
+    Dict,
+    List,
+    overload,
+    TYPE_CHECKING,
+    Union,
+    Generator,
+    Sequence,
+)
 
 import torch
 from torch.utils.data import WeightedRandomSampler, DistributedSampler
 
 from eir.data_load.data_loading_funcs import get_weighted_random_sampler
-from eir.data_load.label_setup import al_target_columns
 from eir.train_utils.distributed import in_distributed_env
 
 if TYPE_CHECKING:
     from eir.data_load.datasets import DatasetBase
+    from eir.setup.output_setup import al_output_objects_as_dict
 
 
-def get_target_columns_generator(target_columns: al_target_columns) -> Tuple[str, str]:
-    for column_type, list_of_cols_of_this_type in target_columns.items():
-        for cur_column in list_of_cols_of_this_type:
-            yield column_type, cur_column
+def get_tabular_target_columns_generator(
+    outputs_as_dict: "al_output_objects_as_dict",
+) -> Generator[Tuple[str, str, str], None, None]:
+
+    for output_name, output_object in outputs_as_dict.items():
+        if output_object.output_config.output_info.output_type != "tabular":
+            continue
+
+        target_columns = output_object.target_columns
+        for column_type, list_of_cols_of_this_type in target_columns.items():
+            for cur_column in list_of_cols_of_this_type:
+                yield output_name, column_type, cur_column
 
 
 @dataclass(frozen=True)
 class Batch:
     inputs: Dict[str, torch.Tensor]
-    target_labels: Dict[str, torch.Tensor]
+    target_labels: Dict[str, Dict[str, torch.Tensor]]
     ids: List[str]
 
 
@@ -55,11 +72,10 @@ def get_train_sampler(columns_to_sample, train_dataset):
             "Weighted sampling not yet implemented for distributed training."
         )
 
-    loaded_target_columns = (
-        train_dataset.target_columns["con"] + train_dataset.target_columns["cat"]
-    )
+    loaded_target_columns = _gather_all_loaded_columns(outputs=train_dataset.outputs)
 
-    is_sample_column_loaded = set(columns_to_sample).issubset(
+    parsed_columns_to_sample = set(i.split(".", 1)[1] for i in columns_to_sample)
+    is_sample_column_loaded = parsed_columns_to_sample.issubset(
         set(loaded_target_columns)
     )
     is_sample_all_cols = columns_to_sample == ["all"]
@@ -74,6 +90,19 @@ def get_train_sampler(columns_to_sample, train_dataset):
         columns_to_sample = train_dataset.target_columns["cat"]
 
     train_sampler = get_weighted_random_sampler(
-        samples=train_dataset.samples, target_columns=columns_to_sample
+        samples=train_dataset.samples, columns_to_sample=columns_to_sample
     )
     return train_sampler
+
+
+def _gather_all_loaded_columns(outputs: "al_output_objects_as_dict") -> Sequence[str]:
+    loaded_cat_columns = []
+    loaded_con_columns = []
+
+    for output_name, output_object in outputs.items():
+        cur_target_columns = output_object.target_columns
+        loaded_cat_columns += cur_target_columns["cat"]
+        loaded_con_columns += cur_target_columns["con"]
+    loaded_target_columns = loaded_cat_columns + loaded_cat_columns
+
+    return loaded_target_columns
