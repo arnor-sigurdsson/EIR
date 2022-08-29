@@ -1,3 +1,0 @@
-label_file: eir_tutorials/01_basic_tutorial/data/processed_sample_data/human_origins_labels.csv
-target_cat_columns:
-  - Origin

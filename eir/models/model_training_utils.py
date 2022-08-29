@@ -145,7 +145,6 @@ def gather_pred_outputs_from_dloader(
         list_of_target_batch_dicts=all_output_batches
     )
 
-    print(all_output_batches)
     return all_output_batches, all_label_batches, ids_total
 
 

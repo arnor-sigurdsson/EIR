@@ -89,7 +89,7 @@ class LCLModelConfig:
 
     :param layers:
         Controls the number of layers in the model. If set to ``None``, the model will
-        automatically set up the number of layers according to the ``cutoff`` paramter
+        automatically set up the number of layers according to the ``cutoff`` parameter
         value.
 
     :param kernel_width:
@@ -138,16 +138,16 @@ class LCLModelConfig:
 
     layers: Union[None, List[int]] = None
 
-    kernel_width: Union[None, int] = 12
-    first_kernel_expansion: int = 1
+    kernel_width: Union[None, int] = 16
+    first_kernel_expansion: int = -2
 
     channel_exp_base: int = 2
     first_channel_expansion: int = 1
 
     split_mlp_num_splits: Union[None, int] = None
 
-    rb_do: float = 0.00
-    stochastic_depth_p: float = 0.00
+    rb_do: float = 0.10
+    stochastic_depth_p: float = 0.10
     l1: float = 0.00
 
     cutoff: int = 1024

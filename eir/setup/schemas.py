@@ -343,8 +343,8 @@ class OmicsInputDataConfig:
     """
 
     snp_file: Optional[str] = None
-    na_augment_perc: float = 0.0
-    na_augment_prob: float = 0.0
+    na_augment_perc: float = 0.2
+    na_augment_prob: float = 0.8
     omics_format: Literal["one-hot"] = "one-hot"
     mixing_subtype: Union[Literal["mixup", "cutmix-block", "cutmix-uniform"]] = "mixup"
 

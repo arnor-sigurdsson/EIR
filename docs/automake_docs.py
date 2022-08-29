@@ -21,11 +21,11 @@ if __name__ == "__main__":
     experiment_iter = chain.from_iterable(
         [
             a_experiments,
-            b_experiments,
-            c_experiments,
-            d_experiments,
-            e_experiments,
-            f_experiments,
+            # b_experiments,
+            # c_experiments,
+            # d_experiments,
+            # e_experiments,
+            # f_experiments,
         ]
     )
     for experiment in experiment_iter:
