@@ -582,9 +582,6 @@ class OutputInfoConfig:
 @dataclass
 class TabularOutputTypeConfig:
     """
-    :param label_file:
-        Label ``.csv`` file to load targets from.
-
     :param label_parsing_chunk_size:
         Number of rows to process at time when loading in the ``input_source``. Useful
         when RAM is limited.
@@ -596,7 +593,6 @@ class TabularOutputTypeConfig:
         Which columns from ``label_file`` to use as continuous targets.
     """
 
-    label_file: str
     label_parsing_chunk_size: Union[None, int] = None
     target_cat_columns: Sequence[str] = field(default_factory=list)
     target_con_columns: Sequence[str] = field(default_factory=list)

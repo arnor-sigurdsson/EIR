@@ -448,7 +448,6 @@ def get_test_base_output_inits(test_path: Path, split_to_test: bool) -> Dict:
             "output_source": str(label_file),
         },
         "output_type_info": {
-            "label_file": str(label_file),
             "target_cat_columns": ["Origin"],
         },
         "model_config": {

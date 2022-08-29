@@ -141,7 +141,7 @@ def _add_bad_arrays_and_targets_for_dataset_testing(
 
     output_configs = test_configs.output_configs
     assert len(output_configs) == 1
-    test_target_label_file = Path(output_configs[0].output_type_info.label_file)
+    test_target_label_file = Path(output_configs[0].output_info.output_source)
     _set_up_bad_label_file_for_testing(label_file=test_target_label_file)
 
 
@@ -302,7 +302,7 @@ def _corrupt_label_file_for_testing(
 ) -> None:
     output_configs = test_configs.output_configs
     assert len(output_configs) == 1
-    test_target_label_file = Path(output_configs[0].output_type_info.label_file)
+    test_target_label_file = Path(output_configs[0].output_info.output_source)
 
     df_labels = pd.read_csv(test_target_label_file)
     if n:

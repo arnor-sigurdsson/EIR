@@ -96,7 +96,6 @@ def _get_metrics_test_module_test_outputs_as_dict():
                     output_name="test_output", output_type="tabular", output_source=None
                 ),
                 output_type_info=TabularOutputTypeConfig(
-                    label_file="fake_file",
                     target_con_columns=["Height", "BMI"],
                     target_cat_columns=["Origin"],
                 ),
