@@ -57,12 +57,12 @@ def set_up_outputs_general(
     for name, output_config in name_config_iter:
         setup_func = setup_func_getter(output_config=output_config)
 
-        cur_input_data_config = output_config.output_info
+        cur_output_data_config = output_config.output_info
         logger.info(
             "Setting up %s outputs '%s' from %s.",
-            cur_input_data_config.output_name,
-            cur_input_data_config.output_type,
-            cur_input_data_config.output_source,
+            cur_output_data_config.output_name,
+            cur_output_data_config.output_type,
+            cur_output_data_config.output_source,
         )
 
         set_up_output = setup_func(output_config=output_config, **setup_func_kwargs)
@@ -141,8 +141,20 @@ def set_up_num_outputs_per_target(
 
 
 def get_output_name_config_iterator(output_configs: schemas.al_output_configs):
+    """
+    We do not allow '.' as it is used in the weighted sampling setup.
+    """
 
     for output_config in output_configs:
         cur_input_data_config = output_config.output_info
         cur_name = cur_input_data_config.output_name
+
+        if "." in cur_name:
+            raise ValueError(
+                "Having '.' in the output name is currently not supported. Got '%s'."
+                "Kindly rename '%s' to not include any '.' symbols.",
+                cur_name,
+                cur_name,
+            )
+
         yield cur_name, output_config

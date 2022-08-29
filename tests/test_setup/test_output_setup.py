@@ -1,3 +1,4 @@
+from copy import deepcopy
 from typing import TYPE_CHECKING
 
 import pytest
@@ -80,3 +81,13 @@ def test_get_input_name_config_iterator(create_test_config: "Configs"):
     for name, config in named_output_configs:
         name_from_config = config.output_info.output_name
         assert name == name_from_config
+
+    expected_to_fail = deepcopy(test_configs)
+    expected_to_fail.output_configs[0].output_info.output_name = "test_genotype.failme"
+
+    with pytest.raises(ValueError):
+        named_output_configs = get_output_name_config_iterator(
+            output_configs=expected_to_fail.output_configs
+        )
+        for _ in named_output_configs:
+            pass
