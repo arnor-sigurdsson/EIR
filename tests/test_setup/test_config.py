@@ -115,6 +115,59 @@ def test_generate_aggregated_config_basic(
     ],
     indirect=True,
 )
+def test_generate_aggregated_config_fail(
+    create_cl_args_config_files: Dict[str, List[str]],
+):
+
+    input_file = create_cl_args_config_files["input_configs"][0]
+    with open(input_file, "r") as infile:
+        original_config = yaml.load(stream=infile, Loader=yaml.FullLoader)
+
+    original_config["input_info"]["input_name"] = "test_output"
+
+    with open(input_file, "w") as outfile:
+        yaml.dump(data=original_config, stream=outfile)
+
+    test_cl_args = Namespace(**create_cl_args_config_files)
+
+    with pytest.raises(ValueError):
+        config.generate_aggregated_config(cl_args=test_cl_args)
+
+
+@pytest.mark.parametrize(
+    "create_test_data",
+    [
+        {
+            "task_type": "binary",
+        },
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize(
+    "create_test_config_init_base",
+    [
+        {
+            "injections": {
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "model_config": {"model_type": "linear"},
+                    }
+                ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    },
+                ],
+            },
+        }
+    ],
+    indirect=True,
+)
 def test_generate_aggregated_config_with_overload(create_cl_args_config_files):
     test_cl_args = Namespace(**create_cl_args_config_files)
 

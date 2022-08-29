@@ -177,6 +177,10 @@ def generate_aggregated_config(
     )
     output_configs = load_output_configs(output_configs=output_config_iter)
 
+    _check_input_and_output_config_names(
+        input_configs=input_configs, output_configs=output_configs
+    )
+
     aggregated_configs = Configs(
         global_config=global_config,
         input_configs=input_configs,
@@ -728,6 +732,27 @@ def get_all_tabular_targets(
 
     targets = TabularTargets(con_targets=con_targets, cat_targets=cat_targets)
     return targets
+
+
+def _check_input_and_output_config_names(
+    input_configs: Sequence[schemas.InputConfig],
+    output_configs: Sequence[schemas.OutputConfig],
+) -> None:
+    input_names = set(i.input_info.input_name for i in input_configs)
+    output_names = set(i.output_info.output_name for i in output_configs)
+
+    intersection = output_names.intersection(input_names)
+    if len(intersection) > 0:
+        raise ValueError(
+            "Found common names in input and output configs. Please ensure"
+            " that there are no common names between the input and output configs."
+            " Input config names: '%s'.\n"
+            " Output config names: '%s'.\n",
+            " Common names: '%s'.\n",
+            input_names,
+            output_names,
+            intersection,
+        )
 
 
 def combine_dicts(dicts: Iterable[dict]) -> dict:
