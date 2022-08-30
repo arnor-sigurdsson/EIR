@@ -15,10 +15,8 @@ def get_04_imdb_run_1_transformer_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/04_imdb_globals.yaml",
         "--input_configs",
         f"{conf_output_path}/04_imdb_input.yaml",
-        "--predictor_configs",
-        f"{conf_output_path}/04_imdb_predictor.yaml",
-        "--target_configs",
-        f"{conf_output_path}/04_imdb_target.yaml",
+        "--output_configs",
+        f"{conf_output_path}/04_imdb_output.yaml",
     ]
 
     mapping = [
@@ -73,10 +71,8 @@ def get_04_imdb_run_2_local_transformer_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/04_imdb_globals.yaml",
         "--input_configs",
         f"{conf_output_path}/04_imdb_input_windowed.yaml",
-        "--predictor_configs",
-        f"{conf_output_path}/04_imdb_predictor.yaml",
-        "--target_configs",
-        f"{conf_output_path}/04_imdb_target.yaml",
+        "--output_configs",
+        f"{conf_output_path}/04_imdb_output.yaml",
         "--04_imdb_globals.output_folder=eir_tutorials/tutorial_runs"
         "/tutorial_04_imdb_run_local",
     ]
@@ -117,10 +113,8 @@ def get_04_imdb_run_3_longformer_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/04_imdb_globals.yaml",
         "--input_configs",
         f"{conf_output_path}/04_imdb_input_longformer.yaml",
-        "--predictor_configs",
-        f"{conf_output_path}/04_imdb_predictor.yaml",
-        "--target_configs",
-        f"{conf_output_path}/04_imdb_target.yaml",
+        "--output_configs",
+        f"{conf_output_path}/04_imdb_output.yaml",
         "--04_imdb_globals.output_folder=eir_tutorials/tutorial_runs"
         "/tutorial_04_imdb_run_longformer",
     ]
@@ -161,10 +155,8 @@ def get_04_imdb_run_4_tiny_bert_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/04_imdb_globals.yaml",
         "--input_configs",
         f"{conf_output_path}/04_imdb_input_tiny-bert.yaml",
-        "--predictor_configs",
-        f"{conf_output_path}/04_imdb_predictor.yaml",
-        "--target_configs",
-        f"{conf_output_path}/04_imdb_target.yaml",
+        "--output_configs",
+        f"{conf_output_path}/04_imdb_output.yaml",
         "--04_imdb_globals.output_folder=eir_tutorials/tutorial_runs"
         "/tutorial_04_imdb_run_tiny-bert",
     ]
@@ -207,10 +199,8 @@ def get_04_imdb_run_5_combined_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/04_imdb_input_windowed.yaml",
         f"{conf_output_path}/04_imdb_input_longformer.yaml",
         f"{conf_output_path}/04_imdb_input_tiny-bert.yaml",
-        "--predictor_configs",
-        f"{conf_output_path}/04_imdb_predictor.yaml",
-        "--target_configs",
-        f"{conf_output_path}/04_imdb_target.yaml",
+        "--output_configs",
+        f"{conf_output_path}/04_imdb_output.yaml",
         "--04_imdb_globals.output_folder=eir_tutorials/tutorial_runs"
         "/tutorial_04_imdb_run_combined",
     ]

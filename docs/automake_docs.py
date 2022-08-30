@@ -22,8 +22,8 @@ if __name__ == "__main__":
         [
             # a_experiments,
             # b_experiments,
-            c_experiments,
-            # d_experiments,
+            # c_experiments,
+            d_experiments,
             # e_experiments,
             # f_experiments,
         ]
