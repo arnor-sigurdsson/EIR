@@ -57,7 +57,7 @@ def get_train_sampler(
 def get_train_sampler(columns_to_sample, train_dataset):
     """
     TODO:   Refactor, remove dependency on train_dataset and use instead
-            Iterable[Samples], and target_columns directly.
+            Iterable[Samples], and outputs directly.
     """
     in_distributed_run = in_distributed_env()
 
@@ -74,11 +74,16 @@ def get_train_sampler(columns_to_sample, train_dataset):
 
     loaded_target_columns = _gather_all_loaded_columns(outputs=train_dataset.outputs)
 
-    parsed_columns_to_sample = set(i.split(".", 1)[1] for i in columns_to_sample)
-    is_sample_column_loaded = parsed_columns_to_sample.issubset(
-        set(loaded_target_columns)
-    )
-    is_sample_all_cols = columns_to_sample == ["all"]
+    is_sample_column_loaded = False
+    is_sample_all_cols = False
+
+    if columns_to_sample == ["all"]:
+        is_sample_all_cols = True
+    else:
+        parsed_columns_to_sample = set(i.split(".", 1)[1] for i in columns_to_sample)
+        is_sample_column_loaded = parsed_columns_to_sample.issubset(
+            set(loaded_target_columns)
+        )
 
     if not is_sample_column_loaded and not is_sample_all_cols:
         raise ValueError(
@@ -87,7 +92,16 @@ def get_train_sampler(columns_to_sample, train_dataset):
         )
 
     if is_sample_all_cols:
-        columns_to_sample = train_dataset.target_columns["cat"]
+        columns_to_sample = []
+        for output_name, output_object in train_dataset.outputs.items():
+
+            if output_object.output_config.output_info.output_type != "tabular":
+                continue
+
+            cat_columns_with_output_prefix = [
+                output_name + "." + i for i in output_object.target_columns["cat"]
+            ]
+            columns_to_sample += cat_columns_with_output_prefix
 
     train_sampler = get_weighted_random_sampler(
         samples=train_dataset.samples, columns_to_sample=columns_to_sample

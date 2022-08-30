@@ -1,3 +1,0 @@
-label_file: eir_tutorials/03_sequence_tutorial/data/Anticancer_Peptides/breast_cancer_labels.csv
-target_cat_columns:
-  - class

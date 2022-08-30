@@ -83,6 +83,7 @@ def _build_weighted_sample_dict_from_config_sequence(
         if weighted_sample_config_string == "all":
             return {"all": ["all"]}
 
+        breakpoint()
         output_name, sample_column = weighted_sample_config_string.split(".", 1)
         if output_name not in weighted_sample_dict:
             weighted_sample_dict[output_name] = [sample_column]

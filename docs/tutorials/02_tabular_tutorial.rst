@@ -58,11 +58,11 @@ the global, input, target and predictor parts respectively:
     :language: yaml
     :caption:
 
-.. literalinclude:: tutorial_files/02_tabular_tutorial/02_poker_hands_target.yaml
+.. literalinclude:: tutorial_files/02_tabular_tutorial/02_poker_hands_fusion.yaml
     :language: yaml
     :caption:
 
-.. literalinclude:: tutorial_files/02_tabular_tutorial/02_poker_hands_predictor.yaml
+.. literalinclude:: tutorial_files/02_tabular_tutorial/02_poker_hands_output.yaml
     :language: yaml
     :caption:
 
@@ -171,7 +171,7 @@ and they even use the Poker Hand dataset as well!
    * - Rule-based
      - 100.0
 
-So using our humble model before we saw an accuracy of 98.8%. Of course, since the
+So using our humble model before we saw an accuracy of 99.0%. Of course, since the
 dataset is highly imbalanced, it can be difficult to compare with the numbers in the
 table above. For example it can be that TabNet is performing very well on the rare
 classes, which will not have a large effect on the total test accuracy. However, our

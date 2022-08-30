@@ -1,4 +1,11 @@
 eir_tutorials/tutorial_runs/tutorial_01_run/
+├── ancestry_output
+│   └── Origin
+│       ├── confusion_matrix.pdf
+│       ├── mc_pr_curve.pdf
+│       ├── mc_roc_curve.pdf
+│       └── predictions.csv
+├── calculated_metrics.json
 ├── configs
 ├── model_info.txt
 ├── results

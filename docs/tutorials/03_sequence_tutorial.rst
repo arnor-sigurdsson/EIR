@@ -80,11 +80,7 @@ we will start by defining our configurations.
     :language: yaml
     :caption:
 
-.. literalinclude:: tutorial_files/03_sequence_tutorial/a_IMDB/03a_imdb_target.yaml
-    :language: yaml
-    :caption:
-
-.. literalinclude:: tutorial_files/03_sequence_tutorial/a_IMDB/03a_imdb_predictor.yaml
+.. literalinclude:: tutorial_files/03_sequence_tutorial/a_IMDB/03a_imdb_output.yaml
     :language: yaml
     :caption:
 
@@ -229,11 +225,7 @@ we do not split on whitespace anymore, but rather on "".
     :language: yaml
     :caption:
 
-.. literalinclude:: tutorial_files/03_sequence_tutorial/b_Anticancer_peptides/03b_peptides_target.yaml
-    :language: yaml
-    :caption:
-
-.. literalinclude:: tutorial_files/03_sequence_tutorial/b_Anticancer_peptides/03b_peptides_predictor.yaml
+.. literalinclude:: tutorial_files/03_sequence_tutorial/b_Anticancer_peptides/03b_peptides_output.yaml
     :language: yaml
     :caption:
 
@@ -275,10 +267,10 @@ we will check activations towards the moderately active class:
 .. image:: tutorial_files/03_sequence_tutorial/b_Anticancer_peptides/figures/tutorial_03b_feature_importance_mod._active.png
 
 It seems that the
-Aspartic acid (D) and Leucine (L) amino acids
+Tryptophan (W) and Lysine (K) amino acids
 influences the model towards a
 moderately active prediction,
-while Glutamine (Q) does the opposite.
+while Methionine (M) does the opposite.
 
 Looking at an example
 of single moderately active sample

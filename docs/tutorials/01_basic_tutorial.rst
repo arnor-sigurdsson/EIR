@@ -211,7 +211,7 @@ similar to ``eirtrain``:
 
 Generally we do not change much of the configs when predicting, with the exception of
 the input configs (and then mainly setting the ``input_source``,
-i.e. where to load our samples to predict on from) and perhaps the global config
+i.e. where to load our samples to predict/test on from) and perhaps the global config
 (e.g. we might not compute activations during training, but compute them on our test set
 by activating ``get_acts`` in the global config when predicting). Specific to
 ``eirpredict``, we have to choose a saved model (``--model_path``), whether we want to
@@ -231,17 +231,17 @@ to predict on the same data as before.
 Run the commands below, making sure you add the correct path of a saved model to the
 ``--model_path`` argument.
 
-.. code-block:: console
+To test, we can run the following command
+(note that you will have to add the path to your saved model for the ``--model_path``
+parameter below).
 
-    mkdir runs/eir_tutorial_prediction_output
-    eirpredict \
-    --global_configs 01_basic_tutorial/tutorial_01_globals.yaml \
-    --input_configs 01_basic_tutorial/tutorial_01_input.yaml \
-    --output_configs 01_basic_tutorial/tutorial_01_outputs.yaml \
-    --model_path runs/tutorial_01_run/saved_models/<chosen model> \
-    --evaluate \
-    --output_folder runs/eir_tutorial_prediction_output
+.. literalinclude:: tutorial_files/01_basic_tutorial/commands/GLN_2_PREDICT.txt
+    :language: console
 
+This will generate a file called
+``calculated_metrics.json`` in the supplied ``output_folder`` as well
+as a folder for each output (in this case called ``ancestry_output``
+containing the actual predictions and plots.
 
 D - Applying to your own data
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
