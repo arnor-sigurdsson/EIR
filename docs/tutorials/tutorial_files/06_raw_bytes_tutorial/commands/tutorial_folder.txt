@@ -3,8 +3,6 @@ eir_tutorials/06_raw_bytes_tutorial/
 │   ├── globals.yaml
 │   ├── input.yaml
 │   ├── output.yaml
-│   ├── predictor.yaml
-│   └── target.yaml
 └── data
     └── IMDB
         ├── conf

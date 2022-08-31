@@ -58,6 +58,14 @@ As always, configurations first!
     :caption:
 
 .. note::
+    Training these sequence models
+    can take quite some time if
+    one is using a laptop.
+    If possible,
+    try using a system with a GPU available!
+    If not, set the device setting to 'cpu'.
+
+.. note::
 
     You might notice that we have a new configuration in our global config,
     ``mixing_alpha``.

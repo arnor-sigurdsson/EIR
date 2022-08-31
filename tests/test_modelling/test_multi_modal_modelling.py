@@ -105,5 +105,5 @@ def test_multi_modal_multi_task(
     check_performance_result_wrapper(
         outputs=experiment.outputs,
         run_path=test_config.run_path,
-        thresholds=(0.9, 0.9),
+        thresholds=(0.85, 0.85),
     )
