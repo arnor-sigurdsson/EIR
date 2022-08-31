@@ -19,7 +19,6 @@ def get_05_hot_dog_run_1_resnet_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/output.yaml",
     ]
 
-
     mapping = [
         (
             "training_curve_ACC",
