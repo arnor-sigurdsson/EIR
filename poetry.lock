@@ -485,7 +485,7 @@ pyflakes = ">=2.5.0,<2.6.0"
 
 [[package]]
 name = "fsspec"
-version = "2022.7.1"
+version = "2022.8.0"
 description = "File-system specification"
 category = "main"
 optional = false
@@ -505,7 +505,7 @@ github = ["requests"]
 gs = ["gcsfs"]
 gui = ["panel"]
 hdfs = ["pyarrow (>=1)"]
-http = ["requests", "aiohttp"]
+http = ["requests", "aiohttp (!=4.0.0a0,!=4.0.0a1)"]
 libarchive = ["libarchive-c"]
 oci = ["ocifs"]
 s3 = ["s3fs"]
@@ -736,7 +736,7 @@ python-versions = "*"
 
 [[package]]
 name = "ipykernel"
-version = "6.15.1"
+version = "6.15.2"
 description = "IPython Kernel for Jupyter"
 category = "dev"
 optional = false
@@ -1347,11 +1347,11 @@ complete = ["blosc", "pyzmq", "pandas (>=0.19.0)", "numpy (>=1.9.0)"]
 
 [[package]]
 name = "pathspec"
-version = "0.9.0"
+version = "0.10.0"
 description = "Utility library for gitignore style pattern matching of file paths."
 category = "dev"
 optional = false
-python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,>=2.7"
+python-versions = ">=3.7"
 
 [[package]]
 name = "pdf2image"
@@ -2174,7 +2174,7 @@ tests = ["cython", "littleutils", "pygments", "typeguard", "pytest"]
 
 [[package]]
 name = "sympy"
-version = "1.11"
+version = "1.11.1"
 description = "Computer algebra system (CAS) in Python"
 category = "main"
 optional = false
@@ -2534,7 +2534,7 @@ socks = ["PySocks (>=1.5.6,!=1.5.7,<2.0)"]
 
 [[package]]
 name = "virtualenv"
-version = "20.16.3"
+version = "20.16.4"
 description = "Virtual Python Environment builder"
 category = "dev"
 optional = false
@@ -3008,8 +3008,8 @@ flake8 = [
     {file = "flake8-5.0.4.tar.gz", hash = "sha256:6fbe320aad8d6b95cec8b8e47bc933004678dc63095be98528b7bdd2a9f510db"},
 ]
 fsspec = [
-    {file = "fsspec-2022.7.1-py3-none-any.whl", hash = "sha256:36c5a8e7c4fc20cf32ef6934ac0a122accc8a593ddc8478d30c3ca4dbbd95500"},
-    {file = "fsspec-2022.7.1.tar.gz", hash = "sha256:7f9fb19d811b027b97c4636c6073eb53bc4cbee2d3c4b33fa88b9f26906fd7d7"},
+    {file = "fsspec-2022.8.0-py3-none-any.whl", hash = "sha256:d1b4850f659bbb63366f3aeee45c4f638ef68847692a614a71e834f6837947fc"},
+    {file = "fsspec-2022.8.0.tar.gz", hash = "sha256:85f46cfe0750b96f8c18cb7cdc0edb9ab7fb7ab0dbc7e38cb400039fc4fb426c"},
 ]
 future = [
     {file = "future-0.18.2.tar.gz", hash = "sha256:b1bead90b70cf6ec3f0710ae53a525360fa360d306a86583adc6bf83a4db537d"},
@@ -3165,8 +3165,8 @@ iniconfig = [
     {file = "iniconfig-1.1.1.tar.gz", hash = "sha256:bc3af051d7d14b2ee5ef9969666def0cd1a000e121eaea580d4a313df4b37f32"},
 ]
 ipykernel = [
-    {file = "ipykernel-6.15.1-py3-none-any.whl", hash = "sha256:d8969c5b23b0e453a23166da5a669c954db399789293fcb03fec5cb25367e43c"},
-    {file = "ipykernel-6.15.1.tar.gz", hash = "sha256:37acc3254caa8a0dafcddddc8dc863a60ad1b46487b68aee361d9a15bda98112"},
+    {file = "ipykernel-6.15.2-py3-none-any.whl", hash = "sha256:59183ef833b82c72211aace3fb48fd20eae8e2d0cae475f3d5c39d4a688e81ec"},
+    {file = "ipykernel-6.15.2.tar.gz", hash = "sha256:e7481083b438609c9c8a22d6362e8e1bc6ec94ba0741b666941e634f2d61bdf3"},
 ]
 ipython = [
     {file = "ipython-8.4.0-py3-none-any.whl", hash = "sha256:7ca74052a38fa25fe9bedf52da0be7d3fdd2fb027c3b778ea78dfe8c212937d1"},
@@ -3664,8 +3664,8 @@ partd = [
     {file = "partd-1.3.0.tar.gz", hash = "sha256:ce91abcdc6178d668bcaa431791a5a917d902341cb193f543fe445d494660485"},
 ]
 pathspec = [
-    {file = "pathspec-0.9.0-py2.py3-none-any.whl", hash = "sha256:7d15c4ddb0b5c802d161efc417ec1a2558ea2653c2e8ad9c19098201dc1c993a"},
-    {file = "pathspec-0.9.0.tar.gz", hash = "sha256:e564499435a2673d586f6b2130bb5b95f04a3ba06f81b8f895b651a3c76aabb1"},
+    {file = "pathspec-0.10.0-py3-none-any.whl", hash = "sha256:aefa80ac32d5bf1f96139dca67cefb69a431beff4e6bf1168468f37d7ab87015"},
+    {file = "pathspec-0.10.0.tar.gz", hash = "sha256:01eecd304ba0e6eeed188ae5fa568e99ef10265af7fd9ab737d6412b4ee0ab85"},
 ]
 pdf2image = [
     {file = "pdf2image-1.16.0-py3-none-any.whl", hash = "sha256:84f79f2b8fad943e36323ea4e937fcb05f26ded0caa0a01181df66049e42fb65"},
@@ -4389,8 +4389,8 @@ stack-data = [
     {file = "stack_data-0.5.0.tar.gz", hash = "sha256:715c8855fbf5c43587b141e46cc9d9339cc0d1f8d6e0f98ed0d01c6cb974e29f"},
 ]
 sympy = [
-    {file = "sympy-1.11-py3-none-any.whl", hash = "sha256:b53069f5f30e4a4690b57cdb8e3d0d9065fff42627239db718214f804e442481"},
-    {file = "sympy-1.11.tar.gz", hash = "sha256:1fe96b4c56bb7a7630cdf150a6cd98bc97a79e6be233e30502aba1cf54dee33d"},
+    {file = "sympy-1.11.1-py3-none-any.whl", hash = "sha256:938f984ee2b1e8eae8a07b884c8b7a1146010040fccddc6539c54f401c8f6fcf"},
+    {file = "sympy-1.11.1.tar.gz", hash = "sha256:e32380dce63cb7c0108ed525570092fd45168bdae2faa17e528221ef72e88658"},
 ]
 tabulate = [
     {file = "tabulate-0.8.10-py3-none-any.whl", hash = "sha256:0ba055423dbaa164b9e456abe7920c5e8ed33fcc16f6d1b2f2d152c8e1e8b4fc"},
@@ -4585,8 +4585,8 @@ urllib3 = [
     {file = "urllib3-1.26.12.tar.gz", hash = "sha256:3fa96cf423e6987997fc326ae8df396db2a8b7c667747d47ddd8ecba91f4a74e"},
 ]
 virtualenv = [
-    {file = "virtualenv-20.16.3-py2.py3-none-any.whl", hash = "sha256:4193b7bc8a6cd23e4eb251ac64f29b4398ab2c233531e66e40b19a6b7b0d30c1"},
-    {file = "virtualenv-20.16.3.tar.gz", hash = "sha256:d86ea0bb50e06252d79e6c241507cb904fcd66090c3271381372d6221a3970f9"},
+    {file = "virtualenv-20.16.4-py3-none-any.whl", hash = "sha256:035ed57acce4ac35c82c9d8802202b0e71adac011a511ff650cbcf9635006a22"},
+    {file = "virtualenv-20.16.4.tar.gz", hash = "sha256:014f766e4134d0008dcaa1f95bafa0fb0f575795d07cae50b1bee514185d6782"},
 ]
 visidata = [
     {file = "visidata-2.10-py2.py3-none-any.whl", hash = "sha256:f73e1176e8b7e9c9d38444f4894b80c84ecc7deb524828d78c70bf1e1df7bb80"},
