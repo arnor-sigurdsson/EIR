@@ -281,8 +281,9 @@ def build_bytes_vocab(
     for token in range(num_tokens):
         bytes_vocab[token] = token
 
+    base_num_tokens = len(bytes_vocab)
     for idx, special in enumerate(specials):
-        bytes_vocab[special] = len(bytes_vocab) + idx
+        bytes_vocab[special] = base_num_tokens + idx
 
     return bytes_vocab
 
