@@ -1,6 +1,5 @@
 eirtrain \
 --global_configs eir_tutorials/05_image_tutorial/conf/globals.yaml \
 --input_configs eir_tutorials/05_image_tutorial/conf/inputs_efficientnet_b0.yaml eir_tutorials/05_image_tutorial/conf/inputs_resnet18.yaml \
---predictor_configs eir_tutorials/05_image_tutorial/conf/predictor.yaml \
---target_configs eir_tutorials/05_image_tutorial/conf/target.yaml \
+--output_configs eir_tutorials/05_image_tutorial/conf/output.yaml \
 --globals.output_folder=eir_tutorials/tutorial_runs/tutorial_05_is_it_a_hot_dog_pretrained_combined

@@ -89,7 +89,7 @@ def get_02_poker_hands_run_1_predict_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/02_poker_hands_output_test.yaml",
         "--model_path",
         "eir_tutorials/tutorial_runs/tutorial_02_run/saved_models"
-        "/tutorial_02_run_model_16000_perf-average=0.9821.pt",
+        "/tutorial_02_run_model_15000_perf-average=0.9807.pt",
         "--evaluate",
         "--output_folder",
         "eir_tutorials/tutorial_runs/tutorial_02_run",

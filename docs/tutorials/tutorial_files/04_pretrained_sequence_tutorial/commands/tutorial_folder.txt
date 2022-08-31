@@ -1,16 +1,16 @@
 eir_tutorials/04_pretrained_sequence_tutorial/
 ├── conf
 │   ├── 04_imdb_globals.yaml
-│   ├── 04_imdb_input.yaml
 │   ├── 04_imdb_input_longformer.yaml
 │   ├── 04_imdb_input_tiny-bert.yaml
 │   ├── 04_imdb_input_windowed.yaml
+│   ├── 04_imdb_input.yaml
 │   ├── 04_imdb_output.yaml
 │   ├── 04_imdb_predictor.yaml
 │   └── 04_imdb_target.yaml
 └── data
     └── IMDB
-        ├── IMDB_Reviews
         ├── conf
-        ├── imdb.vocab
-        └── imdb_labels.csv
+        ├── imdb_labels.csv
+        ├── IMDB_Reviews
+        └── imdb.vocab

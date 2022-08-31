@@ -15,10 +15,8 @@ def get_06_imdb_binary_run_1_transformer_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/globals.yaml",
         "--input_configs",
         f"{conf_output_path}/input.yaml",
-        "--predictor_configs",
-        f"{conf_output_path}/predictor.yaml",
-        "--target_configs",
-        f"{conf_output_path}/target.yaml",
+        "--output_configs",
+        f"{conf_output_path}/output.yaml",
     ]
 
     mapping = [
