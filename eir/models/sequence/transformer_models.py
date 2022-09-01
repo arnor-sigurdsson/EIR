@@ -78,7 +78,7 @@ class SequenceModelConfig:
 
     model_type: al_sequence_models = "sequence-default"
 
-    embedding_dim: int = 8
+    embedding_dim: int = 64
 
     position: Literal["encode", "embed"] = "encode"
     position_dropout: float = 0.10
