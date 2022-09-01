@@ -61,14 +61,15 @@ seed_everything(seed=0)
                 ],
             },
         },
-        # Case 2: Classification - Positional Embedding, Windowed, Auto dff
-        # and Avg Pooling
+        # Case 2: Classification - Positional Embedding, Windowed, Auto dff,
+        # Avg Pooling and mixing
         {
             "injections": {
                 "global_configs": {
                     "output_folder": "test_classification",
                     "n_epochs": 12,
                     "memory_dataset": True,
+                    "mixing_alpha": 0.1,
                 },
                 "input_configs": [
                     {
@@ -99,6 +100,7 @@ seed_everything(seed=0)
                     "n_epochs": 12,
                     "memory_dataset": True,
                     "output_folder": "test_regression",
+                    "mixing_alpha": 0.5,
                 },
                 "input_configs": [
                     {
@@ -109,8 +111,8 @@ seed_everything(seed=0)
                     {
                         "output_info": {"output_name": "test_output"},
                         "output_type_info": {
-                            "target_cat_columns": ["Origin"],
-                            "target_con_columns": [],
+                            "target_cat_columns": [],
+                            "target_con_columns": ["Height"],
                         },
                     }
                 ],
@@ -123,10 +125,12 @@ seed_everything(seed=0)
                     "n_epochs": 12,
                     "memory_dataset": True,
                     "output_folder": "test_multi_task",
+                    "gradient_noise": 0.001,
                 },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_sequence"},
+                        "model_config": {"position": "embed", "pool": "avg"},
                     }
                 ],
                 "output_configs": [
@@ -268,6 +272,7 @@ def get_sequence_test_args(mixing: float) -> Tuple[float, float]:
 def _check_sequence_activations_wrapper(
     activation_root_folder: Path,
     target_classes: Sequence[str],
+    strict: bool = True,
 ):
 
     seq_csv_gen = _get_sequence_activations_csv_generator(
@@ -287,12 +292,17 @@ def _check_sequence_activations_wrapper(
             top_n_activations=40,
             expected_top_tokens_pool=expected_tokens,
             must_match_n=len(expected_tokens) - 3,
-            fail_fast=multi_class,
+            fail_fast=strict,
         )
         targets_acts_success.append(success)
 
     if multi_class:
-        assert all(targets_acts_success)
+
+        must_n_successes = len(target_classes) - 1
+        if strict:
+            must_n_successes = len(target_classes)
+
+        assert sum(targets_acts_success) >= must_n_successes
     else:
         assert any(targets_acts_success)
 
@@ -324,7 +334,7 @@ def _check_sequence_activations(
 
     success = len(matching) >= must_match_n
     if fail_fast:
-        assert success, matching
+        assert success, (matching, top_tokens)
     return success
 
 

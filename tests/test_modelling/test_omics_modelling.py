@@ -238,6 +238,7 @@ def _get_regression_output_configs() -> Sequence[Dict]:
         # Case 2: CNN
         {
             "injections": {
+                "global_configs": {"mixing_alpha": 0.5},
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},

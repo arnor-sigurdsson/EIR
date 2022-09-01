@@ -712,7 +712,7 @@ class TabularTargets:
 
     def __len__(self):
         all_con = sum(len(i) for i in self.con_targets.values())
-        all_cat = sum(len(i) for i in self.con_targets.values())
+        all_cat = sum(len(i) for i in self.cat_targets.values())
         return all_con + all_cat
 
 
