@@ -66,6 +66,7 @@ def _get_classification_output_configs() -> Sequence[Dict]:
             "injections": {
                 "global_configs": {
                     "weighted_sampling_columns": ["Origin"],
+                    "gradient_noise": 0.05,
                 },
                 "input_configs": [
                     {
@@ -446,6 +447,7 @@ def _get_multi_task_output_configs() -> Sequence[Dict]:
             "injections": {
                 "global_configs": {
                     "lr": 1e-03,
+                    "gradient_noise": 0.05,
                 },
                 "input_configs": [
                     {

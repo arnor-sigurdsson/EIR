@@ -156,6 +156,12 @@ class GlobalConfig:
     :param gradient_clipping:
         Max norm used for gradient clipping, with p=2.
 
+    :param gradient_accumulation_steps:
+        Number of steps to use for gradient accumulation.
+
+    :param gradient_noise:
+        Gradient noise to inject during training.
+
     :param early_stopping_patience:
         Number of validation performance steps without improvement over
         best performance before terminating run.
@@ -245,6 +251,7 @@ class GlobalConfig:
     lr_plateau_factor: float = 0.2
     gradient_clipping: float = 0.0
     gradient_accumulation_steps: Union[None, int] = None
+    gradient_noise: float = 0.0
     early_stopping_patience: int = 10
     early_stopping_buffer: Union[None, int] = None
     warmup_steps: Union[Literal["auto"], int] = "auto"
