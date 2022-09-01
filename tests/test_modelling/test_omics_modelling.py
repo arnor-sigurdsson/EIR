@@ -46,6 +46,9 @@ def _get_classification_output_configs() -> Sequence[Dict]:
         # Case 1: MLP
         {
             "injections": {
+                "global_configs": {
+                    "weighted_sampling_columns": ["all"],
+                },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
@@ -61,6 +64,9 @@ def _get_classification_output_configs() -> Sequence[Dict]:
         # Case 2: CNN
         {
             "injections": {
+                "global_configs": {
+                    "weighted_sampling_columns": ["Origin"],
+                },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
