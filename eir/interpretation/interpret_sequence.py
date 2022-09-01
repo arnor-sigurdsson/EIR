@@ -31,6 +31,7 @@ logger = get_logger(name=__name__)
 def analyze_sequence_input_activations(
     experiment: "Experiment",
     input_name: str,
+    output_name: str,
     target_column_name: str,
     target_column_type: str,
     activation_outfolder: Path,
@@ -40,7 +41,9 @@ def analyze_sequence_input_activations(
 
     exp = experiment
 
-    target_transformer = exp.target_transformers[target_column_name]
+    output_object = exp.outputs[output_name]
+    target_transformer = output_object.target_transformers[target_column_name]
+
     input_object = exp.inputs[input_name]
     interpretation_config = input_object.input_config.interpretation_config
 
@@ -54,7 +57,7 @@ def analyze_sequence_input_activations(
         sample_target_labels = sample_activation.sample_info.target_labels
 
         cur_label_name = get_target_class_name(
-            sample_label=sample_target_labels[target_column_name],
+            sample_label=sample_target_labels[output_name][target_column_name],
             target_transformer=target_transformer,
             column_type=target_column_type,
             target_column_name=target_column_name,
@@ -63,6 +66,7 @@ def analyze_sequence_input_activations(
         extracted_sample_info = extract_sample_info_for_sequence_activation(
             sample_activation_object=sample_activation,
             cur_label_name=cur_label_name,
+            output_name=output_name,
             target_column_name=target_column_name,
             target_column_type=target_column_type,
             input_name=input_name,
@@ -106,6 +110,7 @@ def analyze_sequence_input_activations(
     acts_stratified_by_target = stratify_activations_by_target_classes(
         all_activations=all_activations,
         target_transformer=target_transformer,
+        output_name=output_name,
         target_column=target_column_name,
         column_type=target_column_type,
     )
@@ -140,6 +145,7 @@ class SequenceActivationSampleInfo:
 def extract_sample_info_for_sequence_activation(
     sample_activation_object: "SampleActivation",
     cur_label_name: str,
+    output_name: str,
     target_column_name: str,
     target_column_type: str,
     input_name: str,
@@ -154,6 +160,7 @@ def extract_sample_info_for_sequence_activation(
 
     cur_sample_expected_value = _parse_out_sequence_expected_value(
         sample_target_labels=sample_activation_object.sample_info.target_labels,
+        output_name=output_name,
         target_column_name=target_column_name,
         target_column_type=target_column_type,
         expected_values=expected_target_classes_shap_values,
@@ -176,6 +183,7 @@ def extract_raw_inputs_from_tokens(tokens: torch.Tensor, vocab) -> Sequence[str]
 
 def _parse_out_sequence_expected_value(
     sample_target_labels: Dict[str, torch.Tensor],
+    output_name: str,
     target_column_name: str,
     expected_values: Sequence[float],
     target_column_type: str,
@@ -185,7 +193,7 @@ def _parse_out_sequence_expected_value(
         assert len(expected_values) == 1
         return expected_values[0]
 
-    cur_base_values_index = sample_target_labels[target_column_name].item()
+    cur_base_values_index = sample_target_labels[output_name][target_column_name].item()
     cur_sample_expected_value = expected_values[cur_base_values_index]
 
     return cur_sample_expected_value

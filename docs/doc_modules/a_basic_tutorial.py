@@ -15,8 +15,8 @@ def get_tutorial_01_run_1_gln_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/tutorial_01_globals.yaml",
         "--input_configs",
         f"{conf_output_path}/tutorial_01_input.yaml",
-        "--target_configs",
-        f"{conf_output_path}/tutorial_01_targets.yaml",
+        "--output_configs",
+        f"{conf_output_path}/tutorial_01_outputs.yaml",
     ]
 
     mapping = [
@@ -31,7 +31,7 @@ def get_tutorial_01_run_1_gln_info() -> AutoDocExperimentInfo:
     get_data_folder = (
         run_capture_and_save,
         {
-            "command": ["tree", str(data_output_path.parent), "-L", "2", "--noreport"],
+            "command": ["tree", str(data_output_path.parent), "-L", "3", "--noreport"],
             "output_path": Path(base_path) / "commands/input_folder.txt",
         },
     )
@@ -116,8 +116,8 @@ def get_tutorial_01_run_2_gln_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/tutorial_01_globals.yaml",
         "--input_configs",
         f"{conf_output_path}/tutorial_01_input.yaml",
-        "--target_configs",
-        f"{conf_output_path}/tutorial_01_targets.yaml",
+        "--output_configs",
+        f"{conf_output_path}/tutorial_01_outputs.yaml",
         "--tutorial_01_globals.output_folder=eir_tutorials/tutorial_runs"
         "/tutorial_01_run_lr=0.002_epochs=20",
         "--tutorial_01_globals.lr=0.002",
@@ -145,41 +145,52 @@ def get_tutorial_01_run_2_gln_info() -> AutoDocExperimentInfo:
     return ade
 
 
-def get_tutorial_01_run_3_linear_info() -> AutoDocExperimentInfo:
+def get_tutorial_01_run_2_gln_predict_info() -> AutoDocExperimentInfo:
+    """
+    We are abusing the `make_tutorial_data` here a bit by switching to the predict
+    code, but we'll allow it for now.
+    """
     base_path = "docs/tutorials/tutorial_files/01_basic_tutorial"
 
     conf_output_path = "eir_tutorials/01_basic_tutorial/conf"
 
     command = [
-        "eirtrain",
+        "eirpredict",
         "--global_configs",
         f"{conf_output_path}/tutorial_01_globals.yaml",
         "--input_configs",
-        f"{conf_output_path}/tutorial_01b_input_identity.yaml",
-        "--target_configs",
-        f"{conf_output_path}/tutorial_01_targets.yaml",
-        "--predictor_configs",
-        f"{conf_output_path}/tutorial_01b_predictor_linear.yaml",
-        "--tutorial_01_globals.output_folder=eir_tutorials/tutorial_runs"
-        "/tutorial_01_run_linear",
-        "--tutorial_01_globals.n_epochs=20",
+        f"{conf_output_path}/tutorial_01_input.yaml",
+        "--output_configs",
+        f"{conf_output_path}/tutorial_01_outputs.yaml",
+        "--model_path",
+        "eir_tutorials/tutorial_runs/tutorial_01_run_lr=0.002_epochs=20/saved_models"
+        "/tutorial_01_run_lr=0.002_epochs=20_model_1400_perf-average=0.8051.pt",
+        "--evaluate",
+        "--output_folder",
+        "eir_tutorials/tutorial_runs/tutorial_01_run_lr=0.002_epochs=20",
     ]
 
+    data_output_path = Path(
+        "data/tutorial_data/01_basic_tutorial/processed_sample_data.zip"
+    )
+
     mapping = [
-        ("training_curve_ACC", "figures/tutorial_01_training_curve_ACC_linear_1.pdf"),
+        (
+            "calculated_metrics",
+            "tutorial_data/calculated_metrics_test.json",
+        ),
     ]
 
     ade = AutoDocExperimentInfo(
-        name="LINEAR_1",
+        name="GLN_2_PREDICT",
         data_url="https://drive.google.com/file/d/1MELauhv7zFwxM8nonnj3iu_SmS69MuNi",
-        data_output_path=Path(
-            "data/tutorial_data/01_basic_tutorial/processed_sample_data.zip"
-        ),
+        data_output_path=data_output_path,
         conf_output_path=Path(conf_output_path),
         base_path=Path(base_path),
         command=command,
         files_to_copy_mapping=mapping,
         post_run_functions=(),
+        force_run_command=True,
     )
 
     return ade
@@ -188,6 +199,6 @@ def get_tutorial_01_run_3_linear_info() -> AutoDocExperimentInfo:
 def get_experiments() -> Sequence[AutoDocExperimentInfo]:
     exp_1 = get_tutorial_01_run_1_gln_info()
     exp_2 = get_tutorial_01_run_2_gln_info()
-    exp_3 = get_tutorial_01_run_3_linear_info()
+    exp_3 = get_tutorial_01_run_2_gln_predict_info()
 
     return [exp_1, exp_2, exp_3]

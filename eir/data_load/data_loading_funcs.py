@@ -19,7 +19,9 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 al_sample_weight_and_counts = Dict[str, Union[torch.Tensor, List[int]]]
 
 
-def get_weighted_random_sampler(samples: Iterable["Sample"], target_columns: List[str]):
+def get_weighted_random_sampler(
+    samples: Iterable["Sample"], columns_to_sample: List[str]
+):
     """
     Labels spec:
 
@@ -27,10 +29,13 @@ def get_weighted_random_sampler(samples: Iterable["Sample"], target_columns: Lis
         {
         ID1:
             {
-                Label Column: Target Value,
-                Extra Column 1: Extra Column 1 Value
-                Extra Column 2: Extra Column 2 Value}
-            }
+                output_name:
+                {
+                    Label Column: Target Value,
+                    Extra Column 1: Extra Column 1 Value
+                    Extra Column 2: Extra Column 2 Value}
+                }
+            },
         },
         ID2: {...}
     }
@@ -38,9 +43,19 @@ def get_weighted_random_sampler(samples: Iterable["Sample"], target_columns: Lis
     The list comprehension is going over all the label dicts associated with the IDs,
     then just parsing the label (converting to int in the case of classification).
     """
-    all_column_weights = _gather_column_sampling_weights(
-        samples=samples, target_columns=target_columns
+    parsed_weighted_sample_columns = _build_weighted_sample_dict_from_config_sequence(
+        config_list=columns_to_sample
     )
+
+    all_column_weights = {}
+    for output_name, weighted_columns_list in parsed_weighted_sample_columns.items():
+        cur_column_weights = _gather_column_sampling_weights(
+            samples=samples,
+            output_name=output_name,
+            columns_to_sample=weighted_columns_list,
+        )
+        for cur_target, cur_weight_object in cur_column_weights.items():
+            all_column_weights[f"{output_name}.{cur_target}"] = cur_weight_object
 
     samples_weighted, num_sample_per_epoch = _aggregate_column_sampling_weights(
         all_target_columns_weights_and_counts=all_column_weights
@@ -48,7 +63,7 @@ def get_weighted_random_sampler(samples: Iterable["Sample"], target_columns: Lis
 
     logger.debug(
         "Num samples per epoch according to average target class counts in %s: %d",
-        target_columns,
+        columns_to_sample,
         num_sample_per_epoch,
     )
     sampler = WeightedRandomSampler(
@@ -58,13 +73,32 @@ def get_weighted_random_sampler(samples: Iterable["Sample"], target_columns: Lis
     return sampler
 
 
+def _build_weighted_sample_dict_from_config_sequence(
+    config_list: List[str],
+) -> Dict[str, List[str]]:
+    weighted_sample_dict = {}
+
+    for weighted_sample_config_string in config_list:
+
+        if weighted_sample_config_string == "all":
+            return {"all": ["all"]}
+
+        output_name, sample_column = weighted_sample_config_string.split(".", 1)
+        if output_name not in weighted_sample_dict:
+            weighted_sample_dict[output_name] = [sample_column]
+        else:
+            weighted_sample_dict[output_name].append(sample_column)
+
+    return weighted_sample_dict
+
+
 def _gather_column_sampling_weights(
-    samples: Iterable["Sample"], target_columns: Iterable[str]
+    samples: Iterable["Sample"], output_name: str, columns_to_sample: Iterable[str]
 ) -> Dict[str, al_sample_weight_and_counts]:
     all_target_label_weight_dicts = {}
 
-    for column in target_columns:
-        cur_label_iterable = (i.target_labels[column] for i in samples)
+    for column in columns_to_sample:
+        cur_label_iterable = (i.target_labels[output_name][column] for i in samples)
         cur_weight_dict = _get_column_label_weights_and_counts(
             label_iterable=cur_label_iterable
         )

@@ -2,7 +2,6 @@ import pytest
 import torch
 
 from eir.models.model_training_utils import trace_eir_model
-
 from tests.test_models.model_testing_utils import prepare_example_batch
 
 
@@ -61,17 +60,23 @@ from tests.test_models.model_testing_utils import prepare_example_batch
                         },
                     },
                 ],
-                "predictor_configs": {
+                "fusion_configs": {
+                    "model_type": "default",
                     "model_config": {
                         "fc_task_dim": 64,
                         "fc_do": 0.10,
                         "rb_do": 0.10,
                     },
                 },
-                "target_configs": {
-                    "target_cat_columns": ["Origin"],
-                    "target_con_columns": ["Height"],
-                },
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": ["Height"],
+                        },
+                    },
+                ],
             },
         }
     ],
@@ -92,4 +97,4 @@ def test_multi_modal_multi_task(
 
     model.eval()
     with torch.no_grad():
-        _ = trace_eir_model(fusion_model=model, example_inputs=example_batch.inputs)
+        _ = trace_eir_model(meta_model=model, example_inputs=example_batch.inputs)

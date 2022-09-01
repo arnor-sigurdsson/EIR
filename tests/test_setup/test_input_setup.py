@@ -86,6 +86,15 @@ def _get_simple_sample_pool() -> Sequence[str]:
                         "model_config": {"model_type": "tabular"},
                     },
                 ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    },
+                ],
             },
         }
     ],

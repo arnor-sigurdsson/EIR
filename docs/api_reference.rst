@@ -77,29 +77,36 @@ Image Feature Extractors
 
 .. autoclass:: eir.models.image.image_models.ImageModelConfig
 
-Predictor Configurations
-------------------------
+Fusion Configurations
+---------------------
 
-Note that the settings here currently only
-refer to the predictor branches.
-Future work includes
-adding more configurations
-to the fusion operations themselves,
-and having therefore separate configurations
-for those and the predictor branches.
+.. autoclass:: eir.setup.schemas.FusionConfig
 
-.. autoclass:: eir.setup.schemas.PredictorConfig
+Fusion Module Configuration
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Predictor Modules
-^^^^^^^^^^^^^^^^^
-
-.. autoclass:: eir.models.fusion.fusion_default.FusionModelConfig
+.. autoclass:: eir.models.fusion.fusion_default.ResidualMLPConfig
 
 .. autoclass:: eir.models.fusion.fusion_mgmoe.MGMoEModelConfig
 
-.. autoclass:: eir.models.fusion.fusion_linear.LinearFusionModelConfig
+.. autoclass:: eir.models.fusion.fusion_identity.IdentityConfig
 
-Target Configurations
+Output Configurations
 ---------------------
 
-.. autoclass:: eir.setup.schemas.TargetConfig
+.. autoclass:: eir.setup.schemas.OutputConfig
+
+Output Info Configuration
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. autoclass:: eir.setup.schemas.OutputInfoConfig
+
+Output Type Configuration
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. autoclass:: eir.setup.schemas.TabularOutputTypeConfig
+
+Output Module Configuration
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. autoclass:: eir.models.output.tabular_output.TabularModelOutputConfig

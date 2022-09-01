@@ -99,7 +99,16 @@ def create_test_column_ops():
                         "model_config": {"model_type": "tabular"},
                     },
                 ],
-                "target_configs": {"label_parsing_chunk_size": 50},
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                            "label_parsing_chunk_size": 50,
+                        },
+                    },
+                ],
             },
         },
         {
@@ -118,7 +127,16 @@ def create_test_column_ops():
                         "model_config": {"model_type": "tabular"},
                     },
                 ],
-                "target_configs": {"label_parsing_chunk_size": None},
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                            "label_parsing_chunk_size": None,
+                        },
+                    },
+                ],
             },
         },
     ],
@@ -133,16 +151,16 @@ def test_set_up_train_and_valid_tabular_data(
     dc = create_test_data
     n_classes = len(dc.target_classes)
 
-    all_array_ids = train.gather_all_ids_from_target_configs(
-        target_configs=test_configs.target_configs
+    all_array_ids = train.gather_all_ids_from_output_configs(
+        output_configs=test_configs.output_configs
     )
     train_ids, valid_ids = train.split_ids(ids=all_array_ids, valid_size=gc.valid_size)
 
     target_file_infos = train.get_tabular_target_file_infos(
-        target_configs=test_configs.target_configs
+        output_configs=test_configs.output_configs
     )
-    target_labels = train.set_up_target_labels_wrapper(
-        tabular_file_infos=target_file_infos,
+    target_labels = train.set_up_tabular_target_labels_wrapper(
+        tabular_target_file_infos=target_file_infos,
         custom_label_ops=None,
         train_ids=train_ids,
         valid_ids=valid_ids,
@@ -299,7 +317,16 @@ def test_transform_all_labels_in_sample_with_extra_con(
                         "model_config": {"model_type": "tabular"},
                     },
                 ],
-                "target_configs": {"label_parsing_chunk_size": 50},
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                            "label_parsing_chunk_size": 50,
+                        },
+                    },
+                ],
             },
         },
         {
@@ -318,7 +345,16 @@ def test_transform_all_labels_in_sample_with_extra_con(
                         "model_config": {"model_type": "tabular"},
                     },
                 ],
-                "target_configs": {"label_parsing_chunk_size": None},
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                            "label_parsing_chunk_size": None,
+                        },
+                    },
+                ],
             },
         },
     ],
@@ -331,13 +367,13 @@ def test_label_df_parse_wrapper(
     dc = create_test_data
     test_configs = create_test_config
 
-    assert len(test_configs.target_configs) == 1
-    main_target_info = test_configs.target_configs[0]
+    assert len(test_configs.output_configs) == 1
+    main_target_info = test_configs.output_configs[0].output_type_info
 
     test_target_column = main_target_info.target_cat_columns[0]  # ["Origin"]
 
     target_file_infos = train.get_tabular_target_file_infos(
-        target_configs=test_configs.target_configs
+        output_configs=test_configs.output_configs
     )
     assert len(target_file_infos) == 1
 
@@ -345,7 +381,7 @@ def test_label_df_parse_wrapper(
         label_parsing_chunk_size=main_target_info.label_parsing_chunk_size
     )
     df_labels = parse_wrapper(
-        label_file_tabular_info=target_file_infos[0],
+        label_file_tabular_info=target_file_infos["test_output"],
         ids_to_keep=None,
     )
 
@@ -933,17 +969,36 @@ def test_check_parsed_label_df_fail(
 
 
 @pytest.mark.parametrize(
+    "create_test_config_init_base",
+    [
+        {
+            "injections": {
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    },
+                ],
+            },
+        },
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize(
     "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
 )
 def test_split_df_by_ids(create_test_data, create_test_config):
     test_configs = create_test_config
 
     target_file_infos = train.get_tabular_target_file_infos(
-        target_configs=test_configs.target_configs
+        output_configs=test_configs.output_configs
     )
     assert len(target_file_infos) == 1
 
-    main_target_file_info = target_file_infos[0]
+    main_target_file_info = target_file_infos["test_output"]
 
     df_labels = label_setup.label_df_parse_wrapper(
         label_file_tabular_info=main_target_file_info,
@@ -970,17 +1025,36 @@ def test_split_df_by_ids(create_test_data, create_test_config):
 
 
 @pytest.mark.parametrize(
+    "create_test_config_init_base",
+    [
+        {
+            "injections": {
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    },
+                ],
+            },
+        },
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize(
     "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
 )
 def test_split_ids(create_test_data, create_test_config):
     test_configs = create_test_config
 
     target_file_infos = train.get_tabular_target_file_infos(
-        target_configs=test_configs.target_configs
+        output_configs=test_configs.output_configs
     )
     assert len(target_file_infos) == 1
 
-    main_target_file_info = target_file_infos[0]
+    main_target_file_info = target_file_infos["test_output"]
 
     df_labels = label_setup.label_df_parse_wrapper(
         label_file_tabular_info=main_target_file_info,
@@ -1180,6 +1254,7 @@ def test_save_target_transformer(patched_joblib):
     label_setup.save_label_transformer(
         run_folder=Path("/tmp/"),
         transformer_name="harry_du_bois",
+        output_name="test_output",
         target_transformer_object=test_transformer,
     )
     assert patched_joblib.dump.call_count == 1

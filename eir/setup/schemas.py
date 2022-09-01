@@ -1,10 +1,10 @@
 from dataclasses import dataclass, field
 from typing import Union, Literal, List, Optional, Sequence, Type
 
-from eir.models.fusion.fusion_default import FusionModelConfig
-from eir.models.fusion.fusion_linear import LinearFusionModelConfig
+from eir.models.fusion.fusion_identity import IdentityConfig
 from eir.models.fusion.fusion_mgmoe import MGMoEModelConfig
 from eir.models.image.image_models import ImageModelConfig
+from eir.models.layers import ResidualMLPConfig
 from eir.models.omics.omics_models import (
     OmicsModelConfig,
     LinearModel,
@@ -19,6 +19,9 @@ from eir.models.omics.omics_models import (
     IdentityModelConfig,
     Dataclass,
 )
+from eir.models.output.tabular_output import (
+    TabularModelOutputConfig,
+)
 from eir.models.sequence.transformer_models import (
     BasicTransformerFeatureExtractorModelConfig,
     SequenceModelConfig,
@@ -31,14 +34,15 @@ from eir.models.tabular.tabular import (
 from eir.setup.setup_utils import get_all_optimizer_names
 
 al_input_configs = Sequence["InputConfig"]
+al_output_configs = Sequence["OutputConfig"]
 
 al_optimizers = tuple(Literal[i] for i in get_all_optimizer_names())
 
-al_model_configs = Union[
+al_feature_extractor_configs = Union[
     OmicsModelConfig, TabularModelConfig, ImageModelConfig, SequenceModelConfig
 ]
 
-al_model_configs_classes = Union[
+al_feature_extractor_configs_classes = Union[
     Type[OmicsModelConfig],
     Type[TabularModelConfig],
     Type[ImageModelConfig],
@@ -46,7 +50,7 @@ al_model_configs_classes = Union[
 ]
 
 al_model_type_configs = Union[
-    FusionModelConfig,
+    ResidualMLPConfig,
     MGMoEModelConfig,
     CNNModelConfig,
     LinearModelConfig,
@@ -67,6 +71,16 @@ al_models_classes = Union[
     Type[SimpleTabularModel],
     Type[IdentityModel],
 ]
+
+
+al_output_module_configs_classes = Union[
+    Type[TabularModelOutputConfig],
+]
+
+al_output_module_configs = Union[
+    TabularModelOutputConfig,
+]
+
 
 al_tokenizer_choices = (
     Union[
@@ -284,7 +298,7 @@ class InputConfig:
         "ByteInputDataConfig",
         "ImageInputDataConfig",
     ]
-    model_config: al_model_configs
+    model_config: al_feature_extractor_configs
     pretrained_config: Union[None, "BasicPretrainedConfig"] = None
     interpretation_config: Union[None, "BasicInterpretationConfig"] = None
 
@@ -329,8 +343,8 @@ class OmicsInputDataConfig:
     """
 
     snp_file: Optional[str] = None
-    na_augment_perc: float = 0.0
-    na_augment_prob: float = 0.0
+    na_augment_perc: float = 0.2
+    na_augment_prob: float = 0.8
     omics_format: Literal["one-hot"] = "one-hot"
     mixing_subtype: Union[Literal["mixup", "cutmix-block", "cutmix-uniform"]] = "mixup"
 
@@ -534,25 +548,40 @@ class ImageInputDataConfig:
 
 
 @dataclass
-class PredictorConfig:
+class FusionConfig:
     """
     :param model_type:
         Which type of fusion model to use.
 
     :param model_config:
-        Predictor model configuration.
+        Fusion model configuration.
     """
 
     model_type: Literal["default", "linear", "mgmoe"]
-    model_config: Union[FusionModelConfig, LinearFusionModelConfig, MGMoEModelConfig]
+    model_config: Union[ResidualMLPConfig, IdentityConfig, MGMoEModelConfig]
 
 
 @dataclass
-class TargetConfig:
+class OutputInfoConfig:
     """
-    :param label_file:
-        Label ``.csv`` file to load targets from.
+    :param output_source:
+        Where on the filesystem to locate the output (if applicable)
 
+    :param output_name:
+        Name to identify the output.
+
+    :param output_type:
+        Type of the output.
+    """
+
+    output_source: Union[str, None]
+    output_name: str
+    output_type: Literal["tabular"]
+
+
+@dataclass
+class TabularOutputTypeConfig:
+    """
     :param label_parsing_chunk_size:
         Number of rows to process at time when loading in the ``input_source``. Useful
         when RAM is limited.
@@ -564,7 +593,27 @@ class TargetConfig:
         Which columns from ``label_file`` to use as continuous targets.
     """
 
-    label_file: str
     label_parsing_chunk_size: Union[None, int] = None
     target_cat_columns: Sequence[str] = field(default_factory=list)
     target_con_columns: Sequence[str] = field(default_factory=list)
+
+
+@dataclass
+class OutputConfig:
+
+    """
+    :param output_info:
+        Information about the output source, name and type.
+
+    :param output_type_info:
+       Information specific to the output type, e.g. which columns to predict
+       from a tabular file.
+
+    :param model_config:
+        Configuration for the chosen model (i.e. output module after fusion) for this
+        output.
+    """
+
+    output_info: OutputInfoConfig
+    output_type_info: Union[TabularOutputTypeConfig]
+    model_config: Union[TabularModelOutputConfig]

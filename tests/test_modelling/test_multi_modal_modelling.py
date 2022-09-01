@@ -3,8 +3,9 @@ from typing import Tuple, TYPE_CHECKING
 import pytest
 
 from eir import train
-from eir.setup.config import get_all_targets
-from tests.test_modelling.test_modelling_utils import check_test_performance_results
+from tests.test_modelling.test_modelling_utils import (
+    check_performance_result_wrapper,
+)
 
 if TYPE_CHECKING:
     from tests.conftest import ModelTestConfig
@@ -66,17 +67,29 @@ if TYPE_CHECKING:
                         },
                     },
                 ],
-                "predictor_configs": {
+                "fusion_configs": {
                     "model_config": {
-                        "fc_task_dim": 64,
+                        "fc_task_dim": 256,
                         "fc_do": 0.10,
                         "rb_do": 0.10,
                     },
                 },
-                "target_configs": {
-                    "target_cat_columns": ["Origin"],
-                    "target_con_columns": ["Height"],
-                },
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output_copy"},
+                        "output_type_info": {
+                            "target_cat_columns": [],
+                            "target_con_columns": ["Height"],
+                        },
+                    },
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": ["Height"],
+                        },
+                    },
+                ],
             },
         }
     ],
@@ -89,21 +102,8 @@ def test_multi_modal_multi_task(
 
     train.train(experiment=experiment)
 
-    targets = get_all_targets(targets_configs=experiment.configs.target_configs)
-    for cat_column in targets.cat_targets:
-
-        check_test_performance_results(
-            run_path=test_config.run_path,
-            target_column=cat_column,
-            metric="mcc",
-            thresholds=(0.9, 0.9),
-        )
-
-    for con_column in targets.con_targets:
-
-        check_test_performance_results(
-            run_path=test_config.run_path,
-            target_column=con_column,
-            metric="r2",
-            thresholds=(0.9, 0.9),
-        )
+    check_performance_result_wrapper(
+        outputs=experiment.outputs,
+        run_path=test_config.run_path,
+        thresholds=(0.85, 0.85),
+    )

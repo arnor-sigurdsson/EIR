@@ -1,5 +1,4 @@
 eirtrain \
 --global_configs eir_tutorials/05_image_tutorial/conf/globals.yaml \
 --input_configs eir_tutorials/05_image_tutorial/conf/inputs.yaml \
---predictor_configs eir_tutorials/05_image_tutorial/conf/predictor.yaml \
---target_configs eir_tutorials/05_image_tutorial/conf/target.yaml
+--output_configs eir_tutorials/05_image_tutorial/conf/output.yaml

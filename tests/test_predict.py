@@ -23,14 +23,15 @@ from eir.models.omics.omics_models import get_omics_model_init_kwargs
 from eir.setup import config
 from eir.setup import schemas
 from eir.setup.config import object_to_primitives
+from eir.setup.output_setup import set_up_outputs_for_training
 from tests.conftest import TestDataConfig, ModelTestConfig
 from tests.test_data_load.test_datasets import check_dataset
 
 al_config_instances = Union[
     schemas.GlobalConfig,
     schemas.InputConfig,
-    schemas.PredictorConfig,
-    schemas.TargetConfig,
+    schemas.OutputConfig,
+    schemas.TabularModelOutputConfig,
 ]
 
 
@@ -51,6 +52,15 @@ al_config_instances = Union[
                         "input_info": {"input_name": "test_genotype"},
                         "model_config": {"model_type": "cnn"},
                     }
+                ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    },
                 ],
             },
         },
@@ -107,7 +117,7 @@ def test_load_model(create_test_config: config.Configs, tmp_path: Path):
 
 def test_get_named_pred_dict_iterators(tmp_path: Path) -> None:
 
-    keys = {"global_configs", "input_configs", "predictor_configs", "target_configs"}
+    keys = {"global_configs", "input_configs", "fusion_configs", "output_configs"}
     paths = {}
 
     for k in keys:
@@ -148,6 +158,15 @@ def test_get_named_pred_dict_iterators(tmp_path: Path) -> None:
                         "input_info": {"input_name": "test_genotype"},
                         "model_config": {"model_type": "linear"},
                     }
+                ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    },
                 ],
             },
         },
@@ -191,10 +210,10 @@ def _setup_test_namespace_for_matched_config_test(
     do_inject_test_values: bool = True,
     monkeypatch_train_to_test_paths: bool = False,
 ) -> Namespace:
-    keys = ("global_configs", "input_configs", "predictor_configs", "target_configs")
+    keys = ("global_configs", "input_configs", "fusion_configs", "output_configs")
     name_to_attr_map = {
         "global_configs": "global_config",
-        "predictor_configs": "predictor_config",
+        "fusion_configs": "fusion_config",
     }
     paths = {}
     for k in keys:
@@ -285,6 +304,15 @@ def _overload_test_yaml_object_for_predict(
                         "model_config": {"model_type": "linear"},
                     }
                 ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    },
+                ],
             },
         },
     ],
@@ -344,10 +372,15 @@ def test_overload_train_configs_for_predict(
                         "model_config": {"model_type": "tabular"},
                     },
                 ],
-                "target_configs": {
-                    "target_cat_columns": ["Origin"],
-                    "target_con_columns": ["Height"],
-                },
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": ["Height"],
+                        },
+                    },
+                ],
             },
         },
     ],
@@ -363,15 +396,15 @@ def test_load_labels_for_predict(
     """
     test_configs = create_test_config
 
-    test_ids = predict.gather_all_ids_from_target_configs(
-        target_configs=test_configs.target_configs
+    test_ids = predict.gather_all_ids_from_output_configs(
+        output_configs=test_configs.output_configs
     )
 
     tabular_infos = train.get_tabular_target_file_infos(
-        target_configs=test_configs.target_configs
+        output_configs=test_configs.output_configs
     )
     assert len(tabular_infos) == 1
-    target_tabular_info = tabular_infos[0]
+    target_tabular_info = tabular_infos["test_output"]
 
     df_test = predict._load_labels_for_predict(
         tabular_info=target_tabular_info, ids_to_keep=test_ids
@@ -401,6 +434,15 @@ def test_load_labels_for_predict(
                         "model_config": {"model_type": "linear"},
                     },
                 ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    },
+                ],
             },
         },
         {
@@ -410,6 +452,15 @@ def test_load_labels_for_predict(
                     {
                         "input_info": {"input_name": "test_genotype"},
                         "model_config": {"model_type": "linear"},
+                    },
+                ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
                     },
                 ],
             },
@@ -426,31 +477,57 @@ def test_set_up_test_dataset(
     test_data_config = create_test_data
     test_configs = create_test_config
 
-    test_ids = predict.gather_all_ids_from_target_configs(
-        target_configs=test_configs.target_configs
+    test_ids = predict.gather_all_ids_from_output_configs(
+        output_configs=test_configs.output_configs
     )
 
-    tabular_infos = train.get_tabular_target_file_infos(
-        target_configs=test_configs.target_configs
+    tabular_file_infos = train.get_tabular_target_file_infos(
+        output_configs=test_configs.output_configs
     )
-    assert len(tabular_infos) == 1
-    target_tabular_info = tabular_infos[0]
+    assert len(tabular_file_infos) == 1
+    target_tabular_info = tabular_file_infos["test_output"]
 
-    df_test = predict._load_labels_for_predict(
-        tabular_info=target_tabular_info, ids_to_keep=test_ids
-    )
+    # df_test = predict._load_labels_for_predict(
+    #     tabular_info=target_tabular_info, ids_to_keep=test_ids
+    # )
+
+    # predict_labels = predict.get_labels_for_predict(
+    #     output_folder=test_configs.global_config.output_folder,
+    #     tabular_file_infos=tabular_file_infos,
+    #     custom_column_label_parsing_ops=None,
+    #     ids=test_ids,
+    # )
+
+    df_labels_test = pd.DataFrame(index=test_ids)
+    for output_name, tabular_info in tabular_file_infos.items():
+
+        all_columns = list(tabular_info.cat_columns) + list(tabular_info.con_columns)
+        if not all_columns:
+            raise ValueError(f"No columns specified in {tabular_file_infos}.")
+
+        df_cur_labels = predict._load_labels_for_predict(
+            tabular_info=tabular_info,
+            ids_to_keep=test_ids,
+            custom_label_ops=None,
+        )
+        df_cur_labels["Output Name"] = output_name
+
+        df_labels_test = pd.concat((df_labels_test, df_cur_labels))
+
+    df_labels_test = df_labels_test.set_index("Output Name", append=True)
+    df_labels_test = df_labels_test.dropna(how="all")
 
     assert len(target_tabular_info.cat_columns) == 1
     target_column = target_tabular_info.cat_columns[0]
     mock_encoder = LabelEncoder().fit(["Asia", "Europe", "Africa"])
-    transformers = {target_column: mock_encoder}
+    transformers = {"test_output": {target_column: mock_encoder}}
 
     test_target_labels = None
     if with_target_labels:
         test_target_labels = predict.parse_labels_for_predict(
-            con_targets=target_tabular_info.con_columns,
-            cat_targets=target_tabular_info.cat_columns,
-            df_labels_test=df_test,
+            con_columns=target_tabular_info.con_columns,
+            cat_columns=target_tabular_info.cat_columns,
+            df_labels_test=df_labels_test,
             label_transformers=transformers,
         )
 
@@ -461,10 +538,16 @@ def test_set_up_test_dataset(
         output_folder=test_configs.global_config.output_folder,
     )
 
+    outputs_as_dict = set_up_outputs_for_training(
+        output_configs=create_test_config.output_configs,
+        target_transformers=transformers,
+    )
+
     test_dataset = predict._set_up_default_dataset(
         configs=test_configs,
         target_labels_dict=test_target_labels,
         inputs_as_dict=test_inputs,
+        outputs_as_dict=outputs_as_dict,
     )
 
     classes_tested = sorted(list(test_data_config.target_classes.keys()))
@@ -552,10 +635,26 @@ def grab_best_model_path(saved_models_folder: Path):
                     {
                         "input_info": {"input_name": "test_tabular"},
                         "input_type_info": {
-                            "input_cat_columns": [],
-                            "input_con_columns": ["ExtraTarget"],
+                            "input_cat_columns": ["OriginExtraCol"],
+                            "input_con_columns": [],
                         },
                         "model_config": {"model_type": "tabular"},
+                    },
+                ],
+                "fusion_configs": {
+                    "model_config": {
+                        "fc_task_dim": 256,
+                        "fc_do": 0.10,
+                        "rb_do": 0.10,
+                    },
+                },
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
                     },
                 ],
             },
@@ -610,19 +709,20 @@ def test_predict(
         predict_config=predict_config,
     )
 
-    origin_predictions_path = tmp_path / "Origin" / "predictions.csv"
+    origin_predictions_path = tmp_path / "test_output" / "Origin" / "predictions.csv"
     df_test = pd.read_csv(origin_predictions_path, index_col="ID")
 
     tabular_infos = train.get_tabular_target_file_infos(
-        target_configs=train_configs_for_testing.configs.target_configs
+        output_configs=train_configs_for_testing.configs.output_configs
     )
     assert len(tabular_infos) == 1
-    target_tabular_info = tabular_infos[0]
+    target_tabular_info = tabular_infos["test_output"]
 
     assert len(target_tabular_info.cat_columns) == 1
     target_column = target_tabular_info.cat_columns[0]
 
-    target_classes = sorted(experiment.target_transformers[target_column].classes_)
+    output = experiment.outputs["test_output"]
+    target_classes = sorted(output.target_transformers[target_column].classes_)
 
     # check that columns in predictions.csv are in correct sorted order
     assert set(target_classes).issubset(set(df_test.columns))
@@ -633,4 +733,4 @@ def test_predict(
     preds_accuracy = (preds == true_labels).sum() / len(true_labels)
     assert preds_accuracy > 0.7
 
-    assert (tmp_path / "Origin/activations").exists()
+    assert (tmp_path / "test_output/Origin/activations").exists()

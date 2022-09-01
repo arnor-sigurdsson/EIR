@@ -33,6 +33,7 @@ class ParsedOmicsActivations:
 def get_omics_consumer(
     target_transformer: "al_label_transformers_object",
     input_name: str,
+    output_name: str,
     target_column: str,
     column_type: str,
 ) -> Callable[[Union["SampleActivation", None]], ParsedOmicsActivations]:
@@ -65,7 +66,7 @@ def get_omics_consumer(
         sample_target_labels = activation.sample_info.target_labels
 
         cur_label_name = get_target_class_name(
-            sample_label=sample_target_labels[target_column],
+            sample_label=sample_target_labels[output_name][target_column],
             target_transformer=target_transformer,
             column_type=column_type,
             target_column_name=target_column,
@@ -243,13 +244,15 @@ def _add_absolute_summed_snp_gradients_to_df(
 def parse_single_omics_activations(
     experiment: "Experiment",
     omics_input_name: str,
-    target_column: str,
+    output_name: str,
+    target_column_name: str,
     column_type: str,
     activations: Sequence["SampleActivation"],
 ) -> Tuple[Dict, Dict]:
 
     exp = experiment
-    target_transformer = exp.target_transformers[target_column]
+    output_object = exp.outputs[output_name]
+    target_transformer = output_object.target_transformers[target_column_name]
 
     acc_acts = defaultdict(list)
     acc_acts_masked = defaultdict(list)
@@ -265,10 +268,10 @@ def parse_single_omics_activations(
         single_sample_copy = deepcopy(inputs_omics).cpu().numpy().squeeze()
 
         cur_label_name = get_target_class_name(
-            sample_label=sample_target_labels[target_column],
+            sample_label=sample_target_labels[output_name][target_column_name],
             target_transformer=target_transformer,
             column_type=column_type,
-            target_column_name=target_column,
+            target_column_name=target_column_name,
         )
 
         acc_acts[cur_label_name].append(sample_acts.squeeze())

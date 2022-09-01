@@ -15,10 +15,8 @@ def get_05_hot_dog_run_1_resnet_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/globals.yaml",
         "--input_configs",
         f"{conf_output_path}/inputs.yaml",
-        "--predictor_configs",
-        f"{conf_output_path}/predictor.yaml",
-        "--target_configs",
-        f"{conf_output_path}/target.yaml",
+        "--output_configs",
+        f"{conf_output_path}/output.yaml",
     ]
 
     mapping = [
@@ -71,10 +69,8 @@ def get_05_hot_dog_run_2_resnet_pretrained_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/globals.yaml",
         "--input_configs",
         f"{conf_output_path}/inputs_resnet18.yaml",
-        "--predictor_configs",
-        f"{conf_output_path}/predictor.yaml",
-        "--target_configs",
-        f"{conf_output_path}/target.yaml",
+        "--output_configs",
+        f"{conf_output_path}/output.yaml",
         "--globals.output_folder=eir_tutorials/tutorial_runs"
         "/tutorial_05_is_it_a_hot_dog_pretrained_resnet",
     ]
@@ -118,10 +114,8 @@ def get_05_hot_dog_run_2_combined_pretrained_info() -> AutoDocExperimentInfo:
         "--input_configs",
         f"{conf_output_path}/inputs_efficientnet_b0.yaml",
         f"{conf_output_path}/inputs_resnet18.yaml",
-        "--predictor_configs",
-        f"{conf_output_path}/predictor.yaml",
-        "--target_configs",
-        f"{conf_output_path}/target.yaml",
+        "--output_configs",
+        f"{conf_output_path}/output.yaml",
         "--globals.output_folder=eir_tutorials/tutorial_runs"
         "/tutorial_05_is_it_a_hot_dog_pretrained_combined",
     ]

@@ -3,8 +3,7 @@ eir_tutorials/03_sequence_tutorial/
 │   └── conf
 │       ├── 03b_peptides_globals.yaml
 │       ├── 03b_peptides_input.yaml
-│       ├── 03b_peptides_predictor.yaml
-│       └── 03b_peptides_target.yaml
+│       └── 03b_peptides_output.yaml
 └── data
     └── Anticancer_Peptides
         ├── breast_cancer_labels.csv

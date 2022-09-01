@@ -9,7 +9,7 @@ from aislib.misc_utils import get_logger
 from ignite.engine import Engine
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
-from eir.data_load.data_utils import get_target_columns_generator
+from eir.data_load.data_utils import get_tabular_target_columns_generator
 from eir.data_load.label_setup import al_label_transformers_object
 from eir.models import model_training_utils
 from eir.train_utils import metrics
@@ -49,14 +49,14 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
     exp.model.train()
 
     val_target_labels = model_training_utils.parse_target_labels(
-        target_columns=exp.target_columns, device=gc.device, labels=val_target_labels
+        output_objects=exp.outputs, device=gc.device, labels=val_target_labels
     )
 
     val_losses = exp.loss_function(inputs=val_outputs_total, targets=val_target_labels)
     val_loss_avg = metrics.aggregate_losses(losses_dict=val_losses)
 
     eval_metrics_dict = metrics.calculate_batch_metrics(
-        target_columns=exp.target_columns,
+        outputs_as_dict=exp.outputs,
         outputs=val_outputs_total,
         labels=val_target_labels,
         mode="val",
@@ -64,14 +64,14 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
     )
 
     eval_metrics_dict_w_loss = metrics.add_loss_to_metrics(
-        target_columns=exp.target_columns,
+        outputs_as_dict=exp.outputs,
         losses=val_losses,
         metric_dict=eval_metrics_dict,
     )
 
     eval_metrics_dict_w_avgs = metrics.add_multi_task_average_metrics(
         batch_metrics_dict=eval_metrics_dict_w_loss,
-        target_columns=exp.target_columns,
+        outputs_as_dict=exp.outputs,
         loss=val_loss_avg.item(),
         performance_average_functions=exp.metrics["averaging_functions"],
     )
@@ -97,27 +97,31 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
 
 def save_evaluation_results_wrapper(
     val_outputs: Dict[str, torch.Tensor],
-    val_labels: Dict[str, torch.Tensor],
+    val_labels: Dict[str, Dict[str, torch.Tensor]],
     val_ids: List[str],
     iteration: int,
     experiment: "Experiment",
 ):
 
-    target_columns_gen = get_target_columns_generator(
-        target_columns=experiment.target_columns
+    target_columns_gen = get_tabular_target_columns_generator(
+        outputs_as_dict=experiment.outputs
     )
-    transformers = experiment.target_transformers
 
-    for column_type, column_name in target_columns_gen:
+    for output_name, column_type, column_name in target_columns_gen:
         cur_sample_outfolder = utils.prep_sample_outfolder(
             output_folder=experiment.configs.global_config.output_folder,
             column_name=column_name,
+            output_name=output_name,
             iteration=iteration,
         )
 
-        cur_val_outputs = val_outputs[column_name].cpu().numpy()
-        cur_val_labels = val_labels[column_name].cpu().numpy()
+        cur_val_outputs = val_outputs[output_name][column_name]
+        cur_val_outputs = cur_val_outputs.cpu().numpy()
 
+        cur_val_labels = val_labels[output_name][column_name]
+        cur_val_labels = cur_val_labels.cpu().numpy()
+
+        target_transformers = experiment.outputs[output_name].target_transformers
         plot_config = PerformancePlotConfig(
             val_outputs=cur_val_outputs,
             val_labels=cur_val_labels,
@@ -125,7 +129,7 @@ def save_evaluation_results_wrapper(
             iteration=iteration,
             column_name=column_name,
             column_type=column_type,
-            target_transformer=transformers[column_name],
+            target_transformer=target_transformers[column_name],
             output_folder=cur_sample_outfolder,
         )
 

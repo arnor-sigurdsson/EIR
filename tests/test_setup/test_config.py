@@ -1,77 +1,227 @@
 from argparse import Namespace
+from pathlib import Path
+from typing import Dict, List
+
+import pytest
+import yaml
 
 from eir.setup import config
-from eir.setup.presets.gln import PRESET as GLN_PRESET
+from tests.conftest import TestConfigInits
 
 
-def test_add_preset_to_cl_args():
-    test_cl_args = Namespace(preset="gln")
-    cl_args_with_preset_configs = config.add_preset_to_cl_args(cl_args=test_cl_args)
-    assert len(cl_args_with_preset_configs.__dict__) == 5
+@pytest.fixture()
+def create_cl_args_config_files(
+    create_test_config_init_base: TestConfigInits, tmp_path
+) -> Dict[str, List[str]]:
+    test_init_base = create_test_config_init_base[0]
+
+    config_file_paths = {}
+    for config_name in test_init_base.__dataclass_fields__.keys():
+        cur_paths = []
+        for idx, cur_config in enumerate(getattr(test_init_base, config_name)):
+            cur_outpath = tmp_path / f"{config_name.split('_')[0]}_{idx}.yaml"
+            with open(cur_outpath, "w") as out_yaml:
+                yaml.dump(data=cur_config, stream=out_yaml)
+            cur_paths.append(str(cur_outpath))
+        config_file_paths[config_name] = cur_paths
+
+    return config_file_paths
 
 
-def test_prepare_preset_tmp_dir():
-    preset_yaml_files = config.prepare_preset_tmp_dir(
-        preset_dict=GLN_PRESET, preset_name="gln"
-    )
-    assert len(GLN_PRESET) == len(preset_yaml_files)
-    assert set(preset_yaml_files.keys()) == {
-        "global_configs",
-        "input_configs",
-        "predictor_configs",
-        "target_configs",
-    }
+@pytest.mark.parametrize(
+    "create_test_data",
+    [
+        {
+            "task_type": "binary",
+        },
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize(
+    "create_test_config_init_base",
+    [
+        {
+            "injections": {
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "model_config": {"model_type": "linear"},
+                    }
+                ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    },
+                ],
+            },
+        }
+    ],
+    indirect=True,
+)
+def test_generate_aggregated_config_basic(
+    create_cl_args_config_files: Dict[str, List[str]],
+):
 
-    for config_name, yaml_file_paths in preset_yaml_files.items():
-        assert len(yaml_file_paths) == 1
-        yaml_file_path = yaml_file_paths[0]
-        loaded_dict_from_yaml = config.load_yaml_config(config_path=yaml_file_path)
+    test_cl_args = Namespace(**create_cl_args_config_files)
 
-        preset_dict_configs = GLN_PRESET[config_name]
-        assert len(preset_dict_configs) == 1
-        preset_config = list(preset_dict_configs.values())[0]
-
-        assert loaded_dict_from_yaml == preset_config
-
-
-def test_generate_aggregated_config_basic():
-    test_cl_args = Namespace(preset="gln")
-    cl_args_with_preset_configs = config.add_preset_to_cl_args(cl_args=test_cl_args)
-
-    aggregated_config = config.generate_aggregated_config(
-        cl_args=cl_args_with_preset_configs
-    )
-    assert aggregated_config.global_config.output_folder == "gln_run"
+    aggregated_config = config.generate_aggregated_config(cl_args=test_cl_args)
+    assert aggregated_config.global_config.output_folder == "runs/test_run"
 
     assert len(aggregated_config.input_configs) == 1
-    assert aggregated_config.input_configs[0].input_info.input_source == "MUST_FILL"
+    assert aggregated_config.input_configs[0].input_info.input_name == "test_genotype"
+    assert aggregated_config.input_configs[0].input_info.input_type == "omics"
 
-    assert len(aggregated_config.target_configs) == 1
-    assert aggregated_config.target_configs[0].target_cat_columns == "MUST_FILL"
+    assert len(aggregated_config.output_configs) == 1
+    assert aggregated_config.output_configs[0].output_type_info.target_cat_columns == [
+        "Origin"
+    ]
 
 
-def test_generate_aggregated_config_with_overload():
-    test_cl_args = Namespace(preset="gln")
-    cl_args_with_preset_configs = config.add_preset_to_cl_args(cl_args=test_cl_args)
+@pytest.mark.parametrize(
+    "create_test_data",
+    [
+        {
+            "task_type": "binary",
+        },
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize(
+    "create_test_config_init_base",
+    [
+        {
+            "injections": {
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "model_config": {"model_type": "linear"},
+                    }
+                ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    },
+                ],
+            },
+        }
+    ],
+    indirect=True,
+)
+def test_generate_aggregated_config_fail(
+    create_cl_args_config_files: Dict[str, List[str]],
+):
+
+    input_file = create_cl_args_config_files["input_configs"][0]
+    with open(input_file, "r") as infile:
+        original_config = yaml.load(stream=infile, Loader=yaml.FullLoader)
+
+    original_config["input_info"]["input_name"] = "test_output"
+
+    with open(input_file, "w") as outfile:
+        yaml.dump(data=original_config, stream=outfile)
+
+    test_cl_args = Namespace(**create_cl_args_config_files)
+
+    with pytest.raises(ValueError):
+        config.generate_aggregated_config(cl_args=test_cl_args)
+
+
+@pytest.mark.parametrize(
+    "create_test_data",
+    [
+        {
+            "task_type": "binary",
+        },
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize(
+    "create_test_config_init_base",
+    [
+        {
+            "injections": {
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "model_config": {"model_type": "linear"},
+                    }
+                ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    },
+                ],
+            },
+        }
+    ],
+    indirect=True,
+)
+def test_generate_aggregated_config_with_overload(create_cl_args_config_files):
+    test_cl_args = Namespace(**create_cl_args_config_files)
 
     aggregated_config = config.generate_aggregated_config(
-        cl_args=cl_args_with_preset_configs,
-        extra_cl_args_overload=["--gln_input.input_info.input_source=test_value"],
+        cl_args=test_cl_args,
+        extra_cl_args_overload=["--input_0.input_info.input_source=test_value"],
     )
-    assert aggregated_config.global_config.output_folder == "gln_run"
+    assert aggregated_config.global_config.output_folder == "runs/test_run"
     assert len(aggregated_config.input_configs) == 1
     assert aggregated_config.input_configs[0].input_info.input_source == "test_value"
 
 
-def test_get_yaml_iterator_with_injections():
-    test_cl_args = Namespace(preset="gln")
-    cl_args_with_preset_configs = config.add_preset_to_cl_args(cl_args=test_cl_args)
+@pytest.mark.parametrize(
+    "create_test_data",
+    [
+        {
+            "task_type": "binary",
+        },
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize(
+    "create_test_config_init_base",
+    [
+        {
+            "injections": {
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "model_config": {"model_type": "linear"},
+                    }
+                ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    },
+                ],
+            },
+        }
+    ],
+    indirect=True,
+)
+def test_get_yaml_iterator_with_injections(create_cl_args_config_files):
+    test_cl_args = Namespace(**create_cl_args_config_files)
 
-    input_yaml_files = cl_args_with_preset_configs.input_configs
+    input_yaml_files = test_cl_args.input_configs
     assert len(input_yaml_files) == 1
-    assert input_yaml_files[0].stem == "gln_input"
+    assert Path(input_yaml_files[0]).stem == "input_0"
 
-    extra_cl_args_overload = ["--gln_input.input_info.input_source=test_value"]
+    extra_cl_args_overload = ["--input_0.input_info.input_source=test_value"]
 
     yaml_iter_with_injections = config.get_yaml_iterator_with_injections(
         yaml_config_files=input_yaml_files, extra_cl_args=extra_cl_args_overload

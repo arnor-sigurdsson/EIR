@@ -77,7 +77,7 @@ def _create_test_sequence(
     random_pool: Sequence[str],
     target_keywords_to_include: Sequence[str],
     target_class: str,
-    min_targets_to_include: int = 3,
+    min_targets_to_include: int = 5,
     max_targets_to_include: int = 20,
 ) -> SequenceTestSample:
 

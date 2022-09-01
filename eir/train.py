@@ -11,7 +11,6 @@ from typing import (
     Callable,
     Iterable,
     Sequence,
-    Any,
 )
 
 import pandas as pd
@@ -19,7 +18,6 @@ import torch
 from aislib.misc_utils import ensure_path_exists
 from aislib.misc_utils import get_logger
 from ignite.engine import Engine
-from sklearn.preprocessing import StandardScaler
 from torch import nn
 from torch.nn.utils import clip_grad_norm_
 from torch.optim.optimizer import Optimizer
@@ -34,15 +32,14 @@ from eir.data_load.data_augmentation import (
 )
 from eir.data_load.data_utils import Batch, get_train_sampler
 from eir.data_load.label_setup import (
-    al_target_columns,
-    al_label_transformers,
     al_all_column_ops,
+    al_label_dict,
+    al_label_transformers,
     set_up_train_and_valid_tabular_data,
     gather_ids_from_tabular_file,
     split_ids,
     TabularFileInfo,
     save_transformer_set,
-    Labels,
 )
 from eir.experiment_io.experiment_io import (
     serialize_experiment,
@@ -52,7 +49,7 @@ from eir.experiment_io.experiment_io import (
 )
 from eir.models import al_fusion_models
 from eir.models import model_training_utils
-from eir.models.model_setup import get_model
+from eir.models.model_setup import get_model, get_default_model_registry_per_input_type
 from eir.models.model_training_utils import run_lr_find
 from eir.models.tabular.tabular import (
     get_tabular_inputs,
@@ -61,9 +58,13 @@ from eir.setup import schemas
 from eir.setup.config import (
     get_configs,
     Configs,
-    get_all_targets,
+    get_all_tabular_targets,
 )
 from eir.setup.input_setup import al_input_objects_as_dict, set_up_inputs_for_training
+from eir.setup.output_setup import (
+    al_output_objects_as_dict,
+    set_up_outputs_for_training,
+)
 from eir.train_utils import distributed
 from eir.train_utils import utils
 from eir.train_utils.metrics import (
@@ -94,19 +95,18 @@ if TYPE_CHECKING:
     )
 
 # aliases
-al_criterions = Dict[str, Union[nn.CrossEntropyLoss, nn.MSELoss]]
+al_criteria = Dict[str, Dict[str, Union[nn.CrossEntropyLoss, nn.MSELoss]]]
 # these are all after being collated by torch dataloaders
-al_training_labels_target = Dict[str, Union[torch.LongTensor, torch.Tensor]]
-al_training_labels_extra = Dict[str, Union[List[str], torch.Tensor]]
-al_training_labels_batch = Dict[
-    str, Union[al_training_labels_target, al_training_labels_extra]
-]
+# output name -> target column: value
+al_training_labels_target = Dict[str, Dict[str, torch.Tensor]]
+al_input_batch = Dict[str, Union[torch.Tensor, Dict[str, torch.Tensor]]]
+al_ids = List[str]
+
 al_dataloader_getitem_batch = Tuple[
-    Union[Dict[str, torch.Tensor], Dict[str, Any]],
+    al_input_batch,
     al_training_labels_target,
-    List[str],
+    al_ids,
 ]
-al_num_outputs_per_target = Dict[str, int]
 
 utils.seed_everything()
 logger = get_logger(name=__name__, tqdm_compatible=True)
@@ -153,38 +153,42 @@ def run_experiment(experiment: "Experiment") -> None:
 class Experiment:
     configs: Configs
     inputs: al_input_objects_as_dict
+    outputs: al_output_objects_as_dict
     train_loader: torch.utils.data.DataLoader
     valid_loader: torch.utils.data.DataLoader
     valid_dataset: torch.utils.data.Dataset
-    target_transformers: al_label_transformers
-    target_columns: al_target_columns
-    num_outputs_per_target: al_num_outputs_per_target
     model: al_fusion_models
     optimizer: Optimizer
-    criterions: al_criterions
+    criteria: al_criteria
     loss_function: Callable
     writer: SummaryWriter
     metrics: "al_metric_record_dict"
     hooks: Union["Hooks", None]
 
 
-def set_up_target_labels_wrapper(
-    tabular_file_infos: Sequence[TabularFileInfo],
+@dataclass
+class MergedTargetLabels:
+    train_labels: al_label_dict
+    valid_labels: al_label_dict
+    label_transformers: Dict[str, al_label_transformers]
+
+    @property
+    def all_labels(self):
+        return {**self.train_labels, **self.valid_labels}
+
+
+def set_up_tabular_target_labels_wrapper(
+    tabular_target_file_infos: Dict[str, TabularFileInfo],
     custom_label_ops: al_all_column_ops,
     train_ids: Sequence[str],
     valid_ids: Sequence[str],
-) -> Labels:
-    """
-    TODO:   Log if some were dropped on merge.
-    TODO:   Decide if we want to keep this merging here, or have a key reference to
-            target_name or something like that?
-    """
+) -> MergedTargetLabels:
 
     df_labels_train = pd.DataFrame(index=train_ids)
     df_labels_valid = pd.DataFrame(index=valid_ids)
     label_transformers = {}
 
-    for tabular_info in tabular_file_infos:
+    for output_name, tabular_info in tabular_target_file_infos.items():
         cur_labels = set_up_train_and_valid_tabular_data(
             tabular_file_info=tabular_info,
             custom_label_ops=custom_label_ops,
@@ -195,20 +199,25 @@ def set_up_target_labels_wrapper(
         df_train_cur = pd.DataFrame.from_dict(cur_labels.train_labels, orient="index")
         df_valid_cur = pd.DataFrame.from_dict(cur_labels.valid_labels, orient="index")
 
-        df_labels_train = pd.merge(
-            df_labels_train, df_train_cur, left_index=True, right_index=True
-        )
-        df_labels_valid = pd.merge(
-            df_labels_valid, df_valid_cur, left_index=True, right_index=True
-        )
+        df_train_cur["Output Name"] = output_name
+        df_valid_cur["Output Name"] = output_name
+
+        df_labels_train = pd.concat((df_labels_train, df_train_cur))
+        df_labels_valid = pd.concat((df_labels_valid, df_valid_cur))
 
         cur_transformers = cur_labels.label_transformers
-        label_transformers = {**label_transformers, **cur_transformers}
+        label_transformers[output_name] = cur_transformers
 
-    train_labels_dict = df_labels_train.to_dict("index")
-    valid_labels_dict = df_labels_valid.to_dict("index")
+    df_labels_train = df_labels_train.set_index("Output Name", append=True)
+    df_labels_valid = df_labels_valid.set_index("Output Name", append=True)
 
-    labels_data_object = Labels(
+    df_labels_train = df_labels_train.dropna(how="all")
+    df_labels_valid = df_labels_valid.dropna(how="all")
+
+    train_labels_dict = df_to_nested_dict(df=df_labels_train)
+    valid_labels_dict = df_to_nested_dict(df=df_labels_valid)
+
+    labels_data_object = MergedTargetLabels(
         train_labels=train_labels_dict,
         valid_labels=valid_labels_dict,
         label_transformers=label_transformers,
@@ -217,14 +226,20 @@ def set_up_target_labels_wrapper(
     return labels_data_object
 
 
+def df_to_nested_dict(df: pd.DataFrame) -> Dict:
+    nested_dict = {level: df.xs(level).to_dict("index") for level in df.index.levels[0]}
+
+    return nested_dict
+
+
 def get_default_experiment(
     configs: Configs,
     hooks: Union["Hooks", None] = None,
 ) -> "Experiment":
     run_folder = _prepare_run_folder(output_folder=configs.global_config.output_folder)
 
-    all_array_ids = gather_all_ids_from_target_configs(
-        target_configs=configs.target_configs
+    all_array_ids = gather_all_ids_from_output_configs(
+        output_configs=configs.output_configs
     )
     manual_valid_ids = _read_manual_ids_if_exist(
         manual_valid_ids_file=configs.global_config.manual_valid_ids_file
@@ -238,34 +253,40 @@ def get_default_experiment(
 
     logger.info("Setting up target labels.")
     target_labels_info = get_tabular_target_file_infos(
-        target_configs=configs.target_configs
+        output_configs=configs.output_configs
     )
 
     custom_ops = hooks.custom_column_label_parsing_ops if hooks else None
-    target_labels = set_up_target_labels_wrapper(
-        tabular_file_infos=target_labels_info,
+    target_labels = set_up_tabular_target_labels_wrapper(
+        tabular_target_file_infos=target_labels_info,
         custom_label_ops=custom_ops,
         train_ids=train_ids,
         valid_ids=valid_ids,
     )
     save_transformer_set(
-        transformers=target_labels.label_transformers, run_folder=run_folder
+        transformers_per_source=target_labels.label_transformers, run_folder=run_folder
     )
 
-    inputs = set_up_inputs_for_training(
+    inputs_as_dict = set_up_inputs_for_training(
         inputs_configs=configs.input_configs,
         train_ids=train_ids,
         valid_ids=valid_ids,
         hooks=hooks,
     )
 
-    serialize_all_input_transformers(inputs_dict=inputs, run_folder=run_folder)
-    serialize_chosen_input_objects(inputs_dict=inputs, run_folder=run_folder)
+    serialize_all_input_transformers(inputs_dict=inputs_as_dict, run_folder=run_folder)
+    serialize_chosen_input_objects(inputs_dict=inputs_as_dict, run_folder=run_folder)
+
+    outputs_as_dict = set_up_outputs_for_training(
+        output_configs=configs.output_configs,
+        target_transformers=target_labels.label_transformers,
+    )
 
     train_dataset, valid_dataset = datasets.set_up_datasets_from_configs(
         configs=configs,
         target_labels=target_labels,
-        inputs_as_dict=inputs,
+        inputs_as_dict=inputs_as_dict,
+        outputs_as_dict=outputs_as_dict,
     )
 
     train_sampler = get_train_sampler(
@@ -281,25 +302,24 @@ def get_default_experiment(
         num_workers=configs.global_config.dataloader_workers,
     )
 
-    num_outputs_per_target = set_up_num_outputs_per_target(
-        target_transformers=target_labels.label_transformers
-    )
+    default_registry = get_default_model_registry_per_input_type()
 
     model = get_model(
-        inputs_as_dict=inputs,
+        inputs_as_dict=inputs_as_dict,
         global_config=configs.global_config,
-        predictor_config=configs.predictor_config,
-        num_outputs_per_target=num_outputs_per_target,
+        fusion_config=configs.fusion_config,
+        outputs_as_dict=outputs_as_dict,
+        model_registry_per_input_type=default_registry,
     )
 
-    criterions = _get_criterions(
-        target_columns=train_dataset.target_columns,
+    criteria = _get_criteria(
+        outputs_as_dict=outputs_as_dict,
     )
 
     writer = get_summary_writer(run_folder=run_folder)
 
     loss_func = _get_loss_callable(
-        criterions=criterions,
+        criteria=criteria,
     )
 
     optimizer = get_optimizer(
@@ -310,16 +330,14 @@ def get_default_experiment(
 
     experiment = Experiment(
         configs=configs,
-        inputs=inputs,
+        inputs=inputs_as_dict,
+        outputs=outputs_as_dict,
         train_loader=train_dloader,
         valid_loader=valid_dloader,
         valid_dataset=valid_dataset,
-        target_transformers=target_labels.label_transformers,
-        num_outputs_per_target=num_outputs_per_target,
-        target_columns=train_dataset.target_columns,
         model=model,
         optimizer=optimizer,
-        criterions=criterions,
+        criteria=criteria,
         loss_function=loss_func,
         writer=writer,
         metrics=metrics,
@@ -329,12 +347,12 @@ def get_default_experiment(
     return experiment
 
 
-def gather_all_ids_from_target_configs(
-    target_configs: Sequence[schemas.TargetConfig],
+def gather_all_ids_from_output_configs(
+    output_configs: Sequence[schemas.OutputConfig],
 ) -> Tuple[str, ...]:
     all_ids = set()
-    for config in target_configs:
-        cur_label_file = Path(config.label_file)
+    for config in output_configs:
+        cur_label_file = Path(config.output_info.output_source)
         cur_ids = gather_ids_from_tabular_file(file_path=cur_label_file)
         all_ids.update(cur_ids)
 
@@ -355,46 +373,25 @@ def _read_manual_ids_if_exist(
 
 
 def get_tabular_target_file_infos(
-    target_configs: Iterable[schemas.TargetConfig],
-) -> Sequence[TabularFileInfo]:
+    output_configs: Iterable[schemas.OutputConfig],
+) -> Dict[str, TabularFileInfo]:
 
-    tabular_infos = []
+    tabular_infos = {}
 
-    for target_config in target_configs:
+    for output_config in output_configs:
+        if output_config.output_info.output_type != "tabular":
+            raise NotImplementedError()
 
+        output_name = output_config.output_info.output_name
         tabular_info = TabularFileInfo(
-            file_path=Path(target_config.label_file),
-            con_columns=target_config.target_con_columns,
-            cat_columns=target_config.target_cat_columns,
-            parsing_chunk_size=target_config.label_parsing_chunk_size,
+            file_path=Path(output_config.output_info.output_source),
+            con_columns=output_config.output_type_info.target_con_columns,
+            cat_columns=output_config.output_type_info.target_cat_columns,
+            parsing_chunk_size=output_config.output_type_info.label_parsing_chunk_size,
         )
-        tabular_infos.append(tabular_info)
+        tabular_infos[output_name] = tabular_info
 
     return tabular_infos
-
-
-def set_up_num_outputs_per_target(
-    target_transformers: al_label_transformers,
-) -> al_num_outputs_per_target:
-
-    num_outputs_per_target_dict = {}
-    for target_column, transformer in target_transformers.items():
-        if isinstance(transformer, StandardScaler):
-            num_outputs = 1
-        else:
-            num_outputs = len(transformer.classes_)
-
-            if num_outputs < 2:
-                logger.warning(
-                    f"Only {num_outputs} unique values found in categorical label "
-                    f"column {target_column} (returned by {transformer}). This means "
-                    f"that most likely an error will be raised if e.g. using "
-                    f"nn.CrossEntropyLoss as it expects an output dimension of >=2."
-                )
-
-        num_outputs_per_target_dict[target_column] = num_outputs
-
-    return num_outputs_per_target_dict
 
 
 def _prepare_run_folder(output_folder: str) -> Path:
@@ -464,34 +461,38 @@ def check_dataset_and_batch_size_compatiblity(
         )
 
 
-def _get_criterions(target_columns: al_target_columns) -> al_criterions:
-    criterions_dict = {}
+def _get_criteria(outputs_as_dict: al_output_objects_as_dict) -> al_criteria:
+    criteria_dict = {}
 
-    def get_criterion(column_type_):
+    def get_criterion(
+        column_type_: str,
+    ) -> Union[nn.CrossEntropyLoss, Callable]:
 
         if column_type_ == "con":
             return partial(_calc_mse, mse_loss_func=nn.MSELoss())
         elif column_type_ == "cat":
             return nn.CrossEntropyLoss()
 
-    target_columns_gen = data_utils.get_target_columns_generator(
-        target_columns=target_columns
+    target_columns_gen = data_utils.get_tabular_target_columns_generator(
+        outputs_as_dict=outputs_as_dict
     )
 
-    for column_type, column_name in target_columns_gen:
+    for output_name, column_type, column_name in target_columns_gen:
         criterion = get_criterion(column_type_=column_type)
-        criterions_dict[column_name] = criterion
+        if output_name not in criteria_dict:
+            criteria_dict[output_name] = {}
+        criteria_dict[output_name][column_name] = criterion
 
-    return criterions_dict
+    return criteria_dict
 
 
 def _calc_mse(input, target, mse_loss_func: nn.MSELoss):
     return mse_loss_func(input=input.squeeze(), target=target.squeeze())
 
 
-def _get_loss_callable(criterions: al_criterions):
+def _get_loss_callable(criteria: al_criteria):
 
-    single_task_loss_func = partial(calculate_prediction_losses, criterions=criterions)
+    single_task_loss_func = partial(calculate_prediction_losses, criteria=criteria)
     return single_task_loss_func
 
 
@@ -522,7 +523,7 @@ def get_base_trainer(experiment: Experiment) -> Engine:
 
     def step(
         engine: Engine,
-        loader_batch: Tuple[torch.Tensor, al_training_labels_batch, List[str]],
+        loader_batch: Tuple[torch.Tensor, al_training_labels_target, List[str]],
     ) -> "al_step_metric_dict":
         """
         The output here goes to trainer.output.
@@ -655,14 +656,13 @@ def _get_default_step_function_hooks_init_kwargs(
         init_kwargs["post_prepare_batch"].append(mix_hook)
         init_kwargs["loss"][0] = hook_mix_loss
 
-    all_targets = get_all_targets(targets_configs=configs.target_configs)
+    all_targets = get_all_tabular_targets(output_configs=configs.output_configs)
     if len(all_targets) > 1:
         logger.debug(
             "Setting up hook for uncertainty weighted loss for multi task modelling."
         )
         uncertainty_hook = get_uncertainty_loss_hook(
-            target_cat_columns=all_targets.cat_targets,
-            target_con_columns=all_targets.con_targets,
+            output_configs=configs.output_configs,
             device=configs.global_config.device,
         )
         init_kwargs["loss"].append(uncertainty_hook)
@@ -692,7 +692,7 @@ def add_l1_loss_hook_if_applicable(
         getattr(input_config.model_config.model_init_config, "l1", None)
         for input_config in configs.input_configs
     )
-    preds_l1 = getattr(configs.predictor_config.model_config, "l1", None)
+    preds_l1 = getattr(configs.fusion_config.model_config, "l1", None)
     if input_l1 or preds_l1:
         logger.info("Adding L1 loss hook.")
         step_function_hooks_init_kwargs["loss"].append(hook_add_l1_loss)
@@ -724,7 +724,7 @@ def hook_default_prepare_batch(
     batch = prepare_base_batch_default(
         loader_batch=loader_batch,
         input_objects=experiment.inputs,
-        target_columns=experiment.target_columns,
+        output_objects=experiment.outputs,
         model=experiment.model,
         device=experiment.configs.global_config.device,
     )
@@ -737,7 +737,7 @@ def hook_default_prepare_batch(
 def prepare_base_batch_default(
     loader_batch: al_dataloader_getitem_batch,
     input_objects: al_input_objects_as_dict,
-    target_columns: al_target_columns,
+    output_objects: al_output_objects_as_dict,
     model: nn.Module,
     device: str,
 ) -> Batch:
@@ -757,9 +757,9 @@ def prepare_base_batch_default(
 
         elif input_type == "tabular":
 
-            tabular_source_input: Dict[str, torch.Tensor] = inputs[input_name]
-            for name, tensor in tabular_source_input.items():
-                tabular_source_input[name] = tensor.to(device=device)
+            tabular_source_input = inputs[input_name]
+            for tabular_name, tensor in tabular_source_input.items():
+                tabular_source_input[tabular_name] = tensor.to(device=device)
 
             tabular_input_type_info = input_object.input_config.input_type_info
             cat_columns = tabular_input_type_info.input_cat_columns
@@ -767,7 +767,7 @@ def prepare_base_batch_default(
             tabular = get_tabular_inputs(
                 input_cat_columns=cat_columns,
                 input_con_columns=con_columns,
-                tabular_model=getattr(model.modules_to_fuse, input_name),
+                tabular_model=getattr(model.input_modules, input_name),
                 tabular_input=tabular_source_input,
                 device=device,
             )
@@ -776,7 +776,7 @@ def prepare_base_batch_default(
         elif input_type in ("sequence", "bytes"):
             cur_seq = inputs[input_name]
             cur_seq = cur_seq.to(device=device)
-            cur_module = getattr(model.modules_to_fuse, input_name)
+            cur_module = getattr(model.input_modules, input_name)
             cur_module_embedding = cur_module.embedding
             cur_embedding = cur_module_embedding(input=cur_seq)
             inputs_prepared[input_name] = cur_embedding
@@ -785,7 +785,7 @@ def prepare_base_batch_default(
 
     if target_labels:
         target_labels = model_training_utils.parse_target_labels(
-            target_columns=target_columns,
+            output_objects=output_objects,
             device=device,
             labels=target_labels,
         )
@@ -851,7 +851,7 @@ def hook_default_compute_metrics(
 ):
 
     train_batch_metrics = calculate_batch_metrics(
-        target_columns=experiment.target_columns,
+        outputs_as_dict=experiment.outputs,
         outputs=state["model_outputs"],
         labels=batch.target_labels,
         mode="train",
@@ -859,14 +859,14 @@ def hook_default_compute_metrics(
     )
 
     train_batch_metrics_w_loss = add_loss_to_metrics(
-        target_columns=experiment.target_columns,
+        outputs_as_dict=experiment.outputs,
         losses=state["per_target_train_losses"],
         metric_dict=train_batch_metrics,
     )
 
     train_batch_metrics_with_averages = add_multi_task_average_metrics(
         batch_metrics_dict=train_batch_metrics_w_loss,
-        target_columns=experiment.target_columns,
+        outputs_as_dict=experiment.outputs,
         loss=state["loss"].item(),
         performance_average_functions=experiment.metrics["averaging_functions"],
     )

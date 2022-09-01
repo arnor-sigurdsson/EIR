@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from shutil import rmtree
 from typing import (
-    List,
+    Callable,
     Tuple,
     Dict,
     Sequence,
@@ -36,12 +36,14 @@ from eir.experiment_io.experiment_io import (
     serialize_all_input_transformers,
     serialize_chosen_input_objects,
 )
-from eir.models.model_setup import get_model
+from eir.models.model_setup import get_model, get_default_model_registry_per_input_type
 from eir.setup import schemas, config
 from eir.setup.config import recursive_dict_replace
+from eir.setup.output_setup import (
+    set_up_outputs_for_training,
+)
 from eir.train import (
     Experiment,
-    set_up_num_outputs_per_target,
 )
 from eir.train_utils import optimizers, metrics
 from eir.train_utils.utils import configure_root_logger, get_run_folder, seed_everything
@@ -131,8 +133,8 @@ def parse_test_cl_args(request) -> Dict[str, Any]:
 class TestConfigInits:
     global_configs: Sequence[dict]
     input_configs: Sequence[dict]
-    predictor_configs: Sequence[dict]
-    target_configs: Sequence[dict]
+    fusion_configs: Sequence[dict]
+    output_configs: Sequence[dict]
 
 
 @pytest.fixture
@@ -160,28 +162,25 @@ def create_test_config_init_base(
         split_to_test=create_test_data.request_params.get("split_to_test", False),
     )
 
-    model_type = injections.get("predictor_configs", {}).get("model_type", "nn")
-    test_predictor_init = get_test_base_predictor_init(model_type=model_type)
+    model_type = injections.get("fusion_configs", {}).get("model_type", "default")
+    test_fusion_init = get_test_base_fusion_init(model_type=model_type)
 
-    test_predictor_init = general_sequence_inject(
-        sequence=test_predictor_init,
-        inject_dict=injections.get("predictor_configs", {}),
+    test_fusion_init = general_sequence_inject(
+        sequence=test_fusion_init,
+        inject_dict=injections.get("fusion_configs", {}),
     )
 
-    test_target_inits = get_test_base_target_inits(
-        test_data_config=create_test_data,
+    test_output_init = get_test_outputs_inits(
+        test_path=create_test_data.scoped_tmp_path,
+        output_configs_dicts=injections.get("output_configs", {}),
         split_to_test=create_test_data.request_params.get("split_to_test", False),
-    )
-    test_target_inits = general_sequence_inject(
-        sequence=test_target_inits,
-        inject_dict=injections.get("target_configs", {}),
     )
 
     test_config = TestConfigInits(
         global_configs=test_global_init,
         input_configs=test_input_init,
-        predictor_configs=test_predictor_init,
-        target_configs=test_target_inits,
+        fusion_configs=test_fusion_init,
+        output_configs=test_output_init,
     )
 
     return test_config, create_test_data
@@ -245,7 +244,42 @@ def get_test_inputs_inits(
     return inits
 
 
-def get_input_test_init_base_func_map():
+def get_test_outputs_inits(
+    test_path: Path, output_configs_dicts: Sequence[dict], split_to_test: bool
+) -> Sequence[dict]:
+
+    inits = []
+
+    base_func_map = get_output_test_init_base_func_map()
+
+    for init_dict in output_configs_dicts:
+        cur_name = init_dict["output_info"]["output_name"]
+
+        cur_base_func_keys = [i for i in base_func_map.keys() if cur_name == i]
+        assert len(cur_base_func_keys) == 1
+        cur_base_func_key = cur_base_func_keys[0]
+
+        cur_base_func = base_func_map.get(cur_base_func_key)
+        cur_init_base = cur_base_func(test_path=test_path, split_to_test=split_to_test)
+
+        cur_init_injected = recursive_dict_replace(
+            dict_=cur_init_base, dict_to_inject=init_dict
+        )
+        inits.append(cur_init_injected)
+
+    return inits
+
+
+def get_output_test_init_base_func_map() -> Dict[str, Callable]:
+    mapping = {
+        "test_output": get_test_base_output_inits,
+        "test_output_copy": get_test_base_output_inits,
+    }
+
+    return mapping
+
+
+def get_input_test_init_base_func_map() -> Dict[str, Callable]:
     mapping = {
         "test_genotype": get_test_omics_input_init,
         "test_tabular": get_test_tabular_input_init,
@@ -383,29 +417,48 @@ def get_test_image_input_init(test_path: Path, split_to_test: bool) -> Dict:
     return input_init_kwargs
 
 
-def get_test_base_predictor_init(model_type: Literal["nn", "linear"]) -> Sequence[dict]:
-    if model_type == "linear":
+def get_test_base_fusion_init(model_type: str) -> Sequence[dict]:
+    if model_type == "identity":
         return [{}]
-    return [{"model_config": {"rb_do": 0.25, "fc_do": 0.25}}]
+    elif model_type in ("default", "mgmoe"):
+        return [
+            {
+                "model_config": {
+                    "rb_do": 0.1,
+                    "fc_do": 0.1,
+                    "layers": [1],
+                    "fc_task_dim": 128,
+                }
+            }
+        ]
+    else:
+        raise ValueError()
 
 
-def get_test_base_target_inits(
-    test_data_config: "TestDataConfig", split_to_test: bool
-) -> Sequence[dict]:
-    test_path = test_data_config.scoped_tmp_path
+def get_test_base_output_inits(test_path: Path, split_to_test: bool) -> Dict:
 
     label_file = test_path / "labels.csv"
     if split_to_test:
         label_file = test_path / "labels_train.csv"
 
     test_target_init_kwargs = {
-        "label_file": str(label_file),
-        "target_cat_columns": ["Origin"],
+        "output_info": {
+            "output_name": "test_output",
+            "output_type": "tabular",
+            "output_source": str(label_file),
+        },
+        "output_type_info": {
+            "target_cat_columns": ["Origin"],
+        },
+        "model_config": {
+            "model_init_config": {
+                "layers": [1],
+                "fc_task_dim": 128,
+            }
+        },
     }
 
-    test_target_init_kwargs_sequence = [test_target_init_kwargs]
-
-    return test_target_init_kwargs_sequence
+    return test_target_init_kwargs
 
 
 @pytest.fixture()
@@ -543,18 +596,18 @@ def create_test_config(
     )
 
     test_input_configs = config.get_input_configs(input_configs=test_init.input_configs)
-    test_predictor_configs = config.load_predictor_config(
-        predictor_configs=test_init.predictor_configs
+    test_fusion_configs = config.load_fusion_configs(
+        fusion_configs=test_init.fusion_configs
     )
-    test_target_configs = config.load_configs_general(
-        config_dict_iterable=test_init.target_configs, cls=schemas.TargetConfig
+    test_output_configs = config.load_output_configs(
+        output_configs=test_init.output_configs
     )
 
     test_configs = config.Configs(
         global_config=test_global_config,
         input_configs=test_input_configs,
-        predictor_config=test_predictor_configs,
-        target_configs=test_target_configs,
+        fusion_config=test_fusion_configs,
+        output_configs=test_output_configs,
     )
 
     # This is done after in case tests modify output_folder
@@ -563,7 +616,7 @@ def create_test_config(
         + "_"
         + "_".join(i.model_config.model_type for i in test_configs.input_configs)
         + "_"
-        + f"{test_configs.predictor_config.model_type}"
+        + f"{test_configs.output_configs[0].model_config.model_type}"
         + "_"
         + test_data_config.request_params["task_type"]
     )
@@ -624,10 +677,6 @@ def create_test_model(
     gc = create_test_config.global_config
     target_labels = create_test_labels
 
-    num_outputs_per_class = set_up_num_outputs_per_target(
-        target_transformers=target_labels.label_transformers
-    )
-
     inputs_as_dict = eir.setup.input_setup.set_up_inputs_for_training(
         inputs_configs=create_test_config.input_configs,
         train_ids=tuple(create_test_labels.train_labels.keys()),
@@ -635,11 +684,19 @@ def create_test_model(
         hooks=None,
     )
 
+    model_registry = get_default_model_registry_per_input_type()
+
+    outputs_as_dict = set_up_outputs_for_training(
+        output_configs=create_test_config.output_configs,
+        target_transformers=target_labels.label_transformers,
+    )
+
     model = get_model(
         inputs_as_dict=inputs_as_dict,
+        model_registry_per_input_type=model_registry,
+        fusion_config=create_test_config.fusion_config,
+        outputs_as_dict=outputs_as_dict,
         global_config=gc,
-        predictor_config=create_test_config.predictor_config,
-        num_outputs_per_target=num_outputs_per_class,
     )
 
     return model
@@ -660,30 +717,30 @@ def cleanup(run_path: Union[Path, str]) -> None:
 @pytest.fixture()
 def create_test_labels(
     create_test_data, create_test_config: config.Configs
-) -> train.Labels:
+) -> train.MergedTargetLabels:
 
     c = create_test_config
     gc = c.global_config
 
     run_folder = get_run_folder(output_folder=gc.output_folder)
 
-    all_array_ids = train.gather_all_ids_from_target_configs(
-        target_configs=c.target_configs
+    all_array_ids = train.gather_all_ids_from_output_configs(
+        output_configs=c.output_configs
     )
     train_ids, valid_ids = train.split_ids(ids=all_array_ids, valid_size=gc.valid_size)
 
     target_labels_info = train.get_tabular_target_file_infos(
-        target_configs=c.target_configs
+        output_configs=c.output_configs
     )
-    target_labels = train.set_up_target_labels_wrapper(
-        tabular_file_infos=target_labels_info,
+    target_labels = train.set_up_tabular_target_labels_wrapper(
+        tabular_target_file_infos=target_labels_info,
         custom_label_ops=None,
         train_ids=train_ids,
         valid_ids=valid_ids,
     )
 
     train.save_transformer_set(
-        transformers=target_labels.label_transformers, run_folder=run_folder
+        transformers_per_source=target_labels.label_transformers, run_folder=run_folder
     )
 
     return target_labels
@@ -706,10 +763,16 @@ def create_test_datasets(
         hooks=None,
     )
 
+    outputs_as_dict = set_up_outputs_for_training(
+        output_configs=create_test_config.output_configs,
+        target_transformers=target_labels.label_transformers,
+    )
+
     train_dataset, valid_dataset = datasets.set_up_datasets_from_configs(
         configs=configs,
         target_labels=target_labels,
         inputs_as_dict=inputs,
+        outputs_as_dict=outputs_as_dict,
     )
 
     return train_dataset, valid_dataset
@@ -742,7 +805,7 @@ def create_test_optimizer(
     TODO: Refactor loss module construction out of this function.
     """
 
-    loss_module = train._get_loss_callable(criterions=criterions)
+    loss_module = train._get_loss_callable(criteria=criterions)
 
     optimizer = optimizers.get_optimizer(
         model=model, loss_callable=loss_module, global_config=global_config
@@ -755,8 +818,8 @@ def create_test_optimizer(
 class ModelTestConfig:
     iteration: int
     run_path: Path
-    last_sample_folders: Dict[str, Path]
-    activations_paths: Dict[str, Dict[str, Path]]
+    last_sample_folders: Dict[str, Dict[str, Path]]
+    activations_paths: Dict[str, Dict[str, Dict[str, Path]]]
 
 
 @pytest.fixture()
@@ -779,11 +842,12 @@ def prep_modelling_test_configs(
 
     model = create_test_model
 
-    num_outputs_per_target = set_up_num_outputs_per_target(
-        target_transformers=target_labels.label_transformers
+    outputs_as_dict = set_up_outputs_for_training(
+        output_configs=create_test_config.output_configs,
+        target_transformers=target_labels.label_transformers,
     )
 
-    criterions = train._get_criterions(target_columns=train_dataset.target_columns)
+    criteria = train._get_criteria(outputs_as_dict=outputs_as_dict)
     test_metrics = metrics.get_default_metrics(
         target_transformers=target_labels.label_transformers,
     )
@@ -792,7 +856,7 @@ def prep_modelling_test_configs(
     optimizer, loss_module = create_test_optimizer(
         global_config=gc,
         model=model,
-        criterions=criterions,
+        criterions=criteria,
     )
 
     train_dataset, valid_dataset = create_test_datasets
@@ -813,17 +877,15 @@ def prep_modelling_test_configs(
     experiment = Experiment(
         configs=c,
         inputs=inputs,
+        outputs=outputs_as_dict,
         train_loader=train_loader,
         valid_loader=valid_loader,
         valid_dataset=valid_dataset,
         model=model,
         optimizer=optimizer,
-        criterions=criterions,
+        criteria=criteria,
         loss_function=loss_module,
         metrics=test_metrics,
-        target_transformers=target_labels.label_transformers,
-        num_outputs_per_target=num_outputs_per_target,
-        target_columns=train_dataset.target_columns,
         writer=train.get_summary_writer(run_folder=Path(gc.output_folder)),
         hooks=hooks,
     )
@@ -837,7 +899,7 @@ def prep_modelling_test_configs(
         keys_to_serialize=keys_to_serialize,
     )
 
-    targets = config.get_all_targets(targets_configs=c.target_configs)
+    targets = config.get_all_tabular_targets(output_configs=c.output_configs)
     test_config = _get_cur_modelling_test_config(
         train_loader=train_loader,
         global_config=gc,
@@ -867,7 +929,7 @@ def _patch_metrics(
 def _get_cur_modelling_test_config(
     train_loader: DataLoader,
     global_config: schemas.GlobalConfig,
-    targets: config.Targets,
+    targets: config.TabularTargets,
     input_names: Iterable[str],
 ) -> ModelTestConfig:
 
@@ -875,11 +937,12 @@ def _get_cur_modelling_test_config(
     run_path = Path(f"{global_config.output_folder}/")
 
     last_sample_folders = _get_all_last_sample_folders(
-        target_columns=targets.all_targets, run_path=run_path, iteration=last_iter
+        targets=targets, run_path=run_path, iteration=last_iter
     )
 
     all_activation_paths = _get_all_activation_paths(
-        last_sample_folder_per_target=last_sample_folders, input_names=input_names
+        last_sample_folder_per_target_in_each_output=last_sample_folders,
+        input_names=input_names,
     )
 
     test_config = ModelTestConfig(
@@ -893,35 +956,73 @@ def _get_cur_modelling_test_config(
 
 
 def _get_all_activation_paths(
-    last_sample_folder_per_target: Dict[str, Path], input_names: Iterable[str]
-) -> Dict[str, Dict[str, Path]]:
+    last_sample_folder_per_target_in_each_output: Dict[str, Dict[str, Path]],
+    input_names: Iterable[str],
+) -> Dict[str, Dict[str, Dict[str, Path]]]:
+    """
+    output_name -> target_name -> input_name: path
+    """
 
     all_activation_paths = {}
 
-    for target_name, last_sample_folder in last_sample_folder_per_target.items():
-        all_activation_paths[target_name] = {}
-        for input_name in input_names:
-            all_activation_paths[target_name][input_name] = (
-                last_sample_folder / "activations" / input_name
-            )
+    dict_to_iter = last_sample_folder_per_target_in_each_output
+    for (output_name, file_per_target_dict) in dict_to_iter.items():
+        if output_name not in all_activation_paths:
+            all_activation_paths[output_name] = {}
+
+        for target_name, last_sample_folder in file_per_target_dict.items():
+            all_activation_paths[output_name][target_name] = {}
+
+            for input_name in input_names:
+                path = last_sample_folder / "activations" / input_name
+                all_activation_paths[output_name][target_name][input_name] = path
 
     return all_activation_paths
 
 
 def _get_all_last_sample_folders(
-    target_columns: List[str], run_path: Path, iteration: int
-) -> Dict[str, Path]:
+    targets: config.TabularTargets, run_path: Path, iteration: int
+) -> Dict[str, Dict[str, Path]]:
+    """
+    output_name -> target_name: path
+    """
     sample_folders = {}
-    for col in target_columns:
-        sample_folders[col] = _get_test_sample_folder(
-            run_path=run_path, iteration=iteration, column_name=col
-        )
+
+    for output_name in targets.con_targets:
+        if output_name not in sample_folders:
+            sample_folders[output_name] = {}
+
+        cur_con_columns = targets.con_targets[output_name]
+        for con_column_name in cur_con_columns:
+            sample_folders[output_name][con_column_name] = _get_test_sample_folder(
+                run_path=run_path,
+                iteration=iteration,
+                output_name=output_name,
+                column_name=con_column_name,
+            )
+
+    for output_name in targets.cat_targets:
+        if output_name not in sample_folders:
+            sample_folders[output_name] = {}
+
+        cur_cat_columns = targets.cat_targets[output_name]
+        for cat_column_name in cur_cat_columns:
+            sample_folders[output_name][cat_column_name] = _get_test_sample_folder(
+                run_path=run_path,
+                iteration=iteration,
+                output_name=output_name,
+                column_name=cat_column_name,
+            )
 
     return sample_folders
 
 
-def _get_test_sample_folder(run_path: Path, iteration: int, column_name: str) -> Path:
-    sample_folder = run_path / f"results/{column_name}/samples/{iteration}"
+def _get_test_sample_folder(
+    run_path: Path, iteration: int, output_name: str, column_name: str
+) -> Path:
+    sample_folder = (
+        run_path / f"results/{output_name}/{column_name}/samples/{iteration}"
+    )
 
     return sample_folder
 

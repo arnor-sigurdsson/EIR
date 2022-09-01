@@ -259,14 +259,20 @@ def test_mixup_all_targets(test_targets):
     }
     random_indices = torch.randperm(len(test_targets)).to(dtype=torch.long)
     all_target_columns = target_columns["con"] + target_columns["cat"]
-    targets = {c: test_targets for c in all_target_columns}
+    targets = {"test_output": {c: test_targets for c in all_target_columns}}
+
+    def _target_columns_gen():
+        for con_column in target_columns["con"]:
+            yield "test_output", "con", con_column
+        for cat_column in target_columns["cat"]:
+            yield "test_output", "cat", cat_column
 
     all_mixed_targets = data_augmentation.mixup_all_targets(
         targets=targets,
         random_index_for_mixing=random_indices,
-        target_columns=target_columns,
+        target_columns_gen=_target_columns_gen(),
     )
-    for _, targets_permuted in all_mixed_targets.items():
+    for _, targets_permuted in all_mixed_targets["test_output"].items():
         assert set(test_targets.tolist()) == set(targets_permuted.tolist())
 
 
@@ -340,8 +346,16 @@ def test_calc_all_mixed_losses(test_inputs, expected_output):
     }
     all_target_columns = target_columns["con"] + target_columns["cat"]
 
-    targets = {c: test_inputs["targets"] for c in all_target_columns}
-    targets_permuted = {c: test_inputs["targets_permuted"] for c in all_target_columns}
+    def _target_columns_gen():
+        for con_column in target_columns["con"]:
+            yield "test_output", "con", con_column
+        for cat_column in target_columns["cat"]:
+            yield "test_output", "cat", cat_column
+
+    targets = {"test_output": {c: test_inputs["targets"] for c in all_target_columns}}
+    targets_permuted = {
+        "test_output": {c: test_inputs["targets_permuted"] for c in all_target_columns}
+    }
     mixed_object = data_augmentation.MixingObject(
         targets=targets,
         targets_permuted=targets_permuted,
@@ -349,15 +363,15 @@ def test_calc_all_mixed_losses(test_inputs, expected_output):
         permuted_indexes=torch.LongTensor([0]),
     )
 
-    test_criterions = {c: nn.MSELoss() for c in all_target_columns}
-    outputs = {c: test_inputs["outputs"] for c in all_target_columns}
+    test_criterions = {"test_output": {c: nn.MSELoss() for c in all_target_columns}}
+    outputs = {"test_output": {c: test_inputs["outputs"] for c in all_target_columns}}
     all_losses = data_augmentation.calc_all_mixed_losses(
-        target_columns=target_columns,
-        criterions=test_criterions,
+        target_columns_gen=_target_columns_gen(),
+        criteria=test_criterions,
         outputs=outputs,
         mixed_object=mixed_object,
     )
-    for _, loss in all_losses.items():
+    for _, loss in all_losses["test_output"].items():
         assert loss.item() == expected_output
 
 
