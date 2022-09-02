@@ -340,7 +340,6 @@ def calc_mixed_loss(
     permuted_loss = (1.0 - lambda_) * criterion(input=outputs, target=targets_permuted)
 
     total_loss = base_loss + permuted_loss
-    print(lambda_, base_loss, permuted_loss, total_loss)
 
     return total_loss
 

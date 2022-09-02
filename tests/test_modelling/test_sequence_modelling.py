@@ -100,7 +100,6 @@ seed_everything(seed=0)
                     "n_epochs": 12,
                     "memory_dataset": True,
                     "output_folder": "test_regression",
-                    "mixing_alpha": 0.5,
                 },
                 "input_configs": [
                     {
