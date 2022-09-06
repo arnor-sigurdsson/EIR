@@ -290,7 +290,7 @@ def _check_sequence_activations_wrapper(
             df_activations=df_seq_acts,
             top_n_activations=40,
             expected_top_tokens_pool=expected_tokens,
-            must_match_n=len(expected_tokens) - 3,
+            must_match_n=len(expected_tokens) - 4,
             fail_fast=strict,
         )
         targets_acts_success.append(success)
