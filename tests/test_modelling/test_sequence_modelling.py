@@ -1,6 +1,6 @@
 from copy import copy
 from pathlib import Path
-from typing import Iterable, Sequence, Tuple
+from typing import Iterable, Sequence, Tuple, Dict
 
 import pandas as pd
 import pytest
@@ -21,6 +21,20 @@ from tests.test_modelling.test_modelling_utils import (
 )
 
 seed_everything(seed=0)
+
+
+def _get_sequence_test_specific_fusion_configs() -> Dict:
+    sequence_fusion_configs = {
+        "model_config": {
+            "fc_task_dim": 256,
+            "fc_do": 0.05,
+            "rb_do": 0.05,
+            "stochastic_depth_p": 0.0,
+            "layers": [2],
+        }
+    }
+
+    return sequence_fusion_configs
 
 
 @pytest.mark.skipif(
@@ -52,13 +66,7 @@ seed_everything(seed=0)
                         "model_config": {"position": "encode", "pool": "max"},
                     }
                 ],
-                "fusion_configs": {
-                    "model_config": {
-                        "fc_task_dim": 256,
-                        "fc_do": 0.05,
-                        "rb_do": 0.05,
-                    },
-                },
+                "fusion_configs": _get_sequence_test_specific_fusion_configs(),
                 "output_configs": [
                     {
                         "output_info": {"output_name": "test_output"},
@@ -138,16 +146,10 @@ seed_everything(seed=0)
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_sequence"},
-                        "model_config": {"position": "embed"},
+                        "model_config": {"position": "embed", "pool": "avg"},
                     }
                 ],
-                "fusion_configs": {
-                    "model_config": {
-                        "fc_task_dim": 256,
-                        "fc_do": 0.05,
-                        "rb_do": 0.05,
-                    },
-                },
+                "fusion_configs": _get_sequence_test_specific_fusion_configs(),
                 "output_configs": [
                     {
                         "output_info": {"output_name": "test_output"},
@@ -173,13 +175,7 @@ seed_everything(seed=0)
                         "input_info": {"input_name": "test_sequence"},
                     }
                 ],
-                "fusion_configs": {
-                    "model_config": {
-                        "fc_task_dim": 256,
-                        "fc_do": 0.05,
-                        "rb_do": 0.05,
-                    },
-                },
+                "fusion_configs": _get_sequence_test_specific_fusion_configs(),
                 "output_configs": [
                     {
                         "output_info": {"output_name": "test_output"},
@@ -217,13 +213,7 @@ seed_everything(seed=0)
                         },
                     },
                 ],
-                "fusion_configs": {
-                    "model_config": {
-                        "fc_task_dim": 256,
-                        "fc_do": 0.05,
-                        "rb_do": 0.05,
-                    },
-                },
+                "fusion_configs": _get_sequence_test_specific_fusion_configs(),
                 "output_configs": [
                     {
                         "output_info": {"output_name": "test_output"},
@@ -272,7 +262,7 @@ def test_sequence_modelling(prep_modelling_test_configs):
                 _check_sequence_activations_wrapper(
                     activation_root_folder=cur_activation_root,
                     target_classes=target_transformer.classes_,
-                    strict=True,
+                    strict=False,
                 )
 
         for _ in con_targets:
@@ -318,7 +308,7 @@ def _check_sequence_activations_wrapper(
         expected_tokens = cat_class_keyword_map[target_class]
         success = _check_sequence_activations(
             df_activations=df_seq_acts,
-            top_n_activations=40,
+            top_n_activations=30,
             expected_top_tokens_pool=expected_tokens,
             must_match_n=len(expected_tokens) - 4,
             fail_fast=strict,
