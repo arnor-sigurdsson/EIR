@@ -1,6 +1,6 @@
 import reprlib
 from collections import defaultdict
-from copy import copy
+from copy import copy, deepcopy
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
@@ -508,7 +508,7 @@ class MemoryDataset(DatasetBase):
     def __getitem__(self, index: int) -> al_getitem_return:
         sample = self.samples[index]
 
-        inputs_prepared = copy(sample.inputs)
+        inputs_prepared = deepcopy(sample.inputs)
         inputs_prepared = prepare_inputs_memory(
             inputs=inputs_prepared, inputs_objects=self.inputs, test_mode=self.test_mode
         )

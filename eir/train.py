@@ -828,6 +828,11 @@ def hook_default_optimizer_backward(
 
     loss.backward(**optimizer_backward_kwargs)
 
+    gradient_noise = experiment.configs.global_config.gradient_noise
+    if gradient_noise:
+        for name, weight in experiment.model.named_parameters():
+            weight.grad = weight.grad + torch.randn_like(weight.grad) * gradient_noise
+
     gradient_clipping = experiment.configs.global_config.gradient_clipping
     if gradient_clipping:
         clip_grad_norm_(

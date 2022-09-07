@@ -147,7 +147,7 @@ class LCLModelConfig:
     split_mlp_num_splits: Union[None, int] = None
 
     rb_do: float = 0.10
-    stochastic_depth_p: float = 0.10
+    stochastic_depth_p: float = 0.00
     l1: float = 0.00
 
     cutoff: int = 1024

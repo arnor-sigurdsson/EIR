@@ -275,6 +275,10 @@ def test_mixup_all_targets(test_targets):
     for _, targets_permuted in all_mixed_targets["test_output"].items():
         assert set(test_targets.tolist()) == set(targets_permuted.tolist())
 
+        # Probabilistic guarantee here (i.e. would fail if all were the same)
+        if len(set(test_targets.tolist())) > 3:
+            assert test_targets.tolist() != targets_permuted.tolist()
+
 
 @given(
     test_targets=lists(
@@ -288,6 +292,10 @@ def test_mixup_targets(test_targets):
         targets=test_targets, random_index_for_mixing=random_indices
     )
     assert set(test_targets.tolist()) == set(targets_permuted.tolist())
+
+    # Probabilistic guarantee here (i.e. would fail if all were the same)
+    if len(set(test_targets.tolist())) > 3:
+        assert test_targets.tolist() != targets_permuted.tolist()
 
 
 def _get_mixed_loss_test_cases_for_parametrization():

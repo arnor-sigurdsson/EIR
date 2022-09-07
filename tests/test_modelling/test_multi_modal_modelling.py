@@ -37,6 +37,7 @@ if TYPE_CHECKING:
                     "n_epochs": 6,
                     "act_background_samples": 8,
                     "gradient_clipping": 1.0,
+                    "gradient_noise": 0.01,
                 },
                 "input_configs": [
                     {
