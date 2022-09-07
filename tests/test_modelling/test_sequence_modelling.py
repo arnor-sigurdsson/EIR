@@ -37,6 +37,8 @@ seed_everything(seed=0)
     "create_test_config_init_base",
     [
         # Case 1: Classification - Positional Encoding and Max Pooling
+        # Note we add more capacity to fusion models as it helps make activation
+        # analysis more stable
         {
             "injections": {
                 "global_configs": {
@@ -50,6 +52,13 @@ seed_everything(seed=0)
                         "model_config": {"position": "encode", "pool": "max"},
                     }
                 ],
+                "fusion_configs": {
+                    "model_config": {
+                        "fc_task_dim": 256,
+                        "fc_do": 0.05,
+                        "rb_do": 0.05,
+                    },
+                },
                 "output_configs": [
                     {
                         "output_info": {"output_name": "test_output"},
@@ -132,6 +141,13 @@ seed_everything(seed=0)
                         "model_config": {"position": "embed"},
                     }
                 ],
+                "fusion_configs": {
+                    "model_config": {
+                        "fc_task_dim": 256,
+                        "fc_do": 0.05,
+                        "rb_do": 0.05,
+                    },
+                },
                 "output_configs": [
                     {
                         "output_info": {"output_name": "test_output"},
@@ -157,6 +173,13 @@ seed_everything(seed=0)
                         "input_info": {"input_name": "test_sequence"},
                     }
                 ],
+                "fusion_configs": {
+                    "model_config": {
+                        "fc_task_dim": 256,
+                        "fc_do": 0.05,
+                        "rb_do": 0.05,
+                    },
+                },
                 "output_configs": [
                     {
                         "output_info": {"output_name": "test_output"},
@@ -197,8 +220,8 @@ seed_everything(seed=0)
                 "fusion_configs": {
                     "model_config": {
                         "fc_task_dim": 256,
-                        "fc_do": 0.10,
-                        "rb_do": 0.10,
+                        "fc_do": 0.05,
+                        "rb_do": 0.05,
                     },
                 },
                 "output_configs": [
