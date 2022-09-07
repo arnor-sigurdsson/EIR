@@ -334,6 +334,11 @@ class OmicsInputDataConfig:
     :param snp_file:
         Path to the relevant ``.bim`` file, used for activation analysis.
 
+    :param subset_snps_file:
+        Path to a file with corresponding SNP IDs to subset from the main
+        arrays for the modelling. Requires the ``snp_file`` parameter to
+        be passed in.
+
     :param na_augment_perc:
         Percentage of the input (i.e. percentage of SNPs) to augment by setting the
         SNPs to 'missing' (i.e. ``[0, 0, 0, 1]`` in one-hot encoding).
@@ -350,6 +355,7 @@ class OmicsInputDataConfig:
     """
 
     snp_file: Optional[str] = None
+    subset_snps_file: Optional[str] = None
     na_augment_perc: float = 0.2
     na_augment_prob: float = 0.8
     omics_format: Literal["one-hot"] = "one-hot"

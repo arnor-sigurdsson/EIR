@@ -100,7 +100,6 @@ seed_everything(seed=0)
                     "n_epochs": 12,
                     "memory_dataset": True,
                     "output_folder": "test_regression",
-                    "mixing_alpha": 0.5,
                 },
                 "input_configs": [
                     {
@@ -130,7 +129,7 @@ seed_everything(seed=0)
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_sequence"},
-                        "model_config": {"position": "embed", "pool": "avg"},
+                        "model_config": {"position": "embed"},
                     }
                 ],
                 "output_configs": [
@@ -250,6 +249,7 @@ def test_sequence_modelling(prep_modelling_test_configs):
                 _check_sequence_activations_wrapper(
                     activation_root_folder=cur_activation_root,
                     target_classes=target_transformer.classes_,
+                    strict=True,
                 )
 
         for _ in con_targets:
@@ -274,6 +274,12 @@ def _check_sequence_activations_wrapper(
     target_classes: Sequence[str],
     strict: bool = True,
 ):
+    """
+    We have the strict flag as in some cases it will by default predict one class,
+    not being specifically activated by input tokens for that class, while only
+    being activated by the other N-1 class tokens to move the prediction towards
+    those.
+    """
 
     seq_csv_gen = _get_sequence_activations_csv_generator(
         activation_root_folder=activation_root_folder,
@@ -291,7 +297,7 @@ def _check_sequence_activations_wrapper(
             df_activations=df_seq_acts,
             top_n_activations=40,
             expected_top_tokens_pool=expected_tokens,
-            must_match_n=len(expected_tokens) - 3,
+            must_match_n=len(expected_tokens) - 4,
             fail_fast=strict,
         )
         targets_acts_success.append(success)

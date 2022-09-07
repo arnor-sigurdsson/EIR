@@ -67,7 +67,7 @@ def generate_snp_gradient_matrix(
 def plot_top_gradients(
     gathered_scaled_grads: "al_scaled_grads_dict",
     top_gradients_dict: "al_top_gradients_dict",
-    snp_df: pd.DataFrame,
+    df_snps: pd.DataFrame,
     output_folder: Path,
     fname: str = "top_snps.pdf",
     custom_ylabel: str = None,
@@ -78,10 +78,10 @@ def plot_top_gradients(
     fig = plt.figure(figsize=(n_cls * 4, n_cls * 2 + 1))
     gs = gridspec.GridSpec(n_cls, n_cls, wspace=0.2, hspace=0.2)
 
-    snp_names = snp_df["VAR_ID"].array
+    snp_names = df_snps["VAR_ID"].array
     for grad_idx, col_name in enumerate(classes):
         cls_top_idxs = top_gradients_dict[col_name]["top_n_idxs"]
-        cur_snp_matrix = generate_snp_gradient_matrix(snp_df, cls_top_idxs)
+        cur_snp_matrix = generate_snp_gradient_matrix(df_snps, cls_top_idxs)
 
         for cls_idx, row_name in enumerate(classes):
 

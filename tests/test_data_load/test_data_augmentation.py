@@ -113,7 +113,7 @@ def test_block_cutmix_omics_input(patched_indices: List[int]) -> None:
     test_batch = torch.stack(test_arrays)
 
     # Needed since mixing overwrites input
-    test_batch_original = test_batch.clone()
+    test_batch_original = test_batch.detach().clone()
 
     batch_indices_for_mixing = torch.LongTensor([1, 0])
 
@@ -193,7 +193,7 @@ def test_uniform_cutmix_omics_input(patched_indices: List[int]):
     test_batch = torch.stack(test_arrays)
 
     # Needed since mixing overwrites input
-    test_batch_original = test_batch.clone()
+    test_batch_original = test_batch.detach().clone()
 
     batch_indices_for_mixing = torch.LongTensor([1, 0])
 

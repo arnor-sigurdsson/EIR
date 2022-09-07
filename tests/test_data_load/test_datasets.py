@@ -1,19 +1,22 @@
 import csv
 from copy import deepcopy
 from pathlib import Path
-from typing import List, TYPE_CHECKING, Dict, Union, Any
+from typing import List, TYPE_CHECKING, Dict, Union, Any, Sequence
 from uuid import uuid4
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pandas as pd
 import pytest
 import torch
+from PIL import Image
 
 from eir import train
 from eir.data_load import datasets
 from eir.data_load.datasets import al_datasets
 from eir.data_load.label_setup import al_label_transformers
 from eir.setup.config import Configs
+from eir.setup.input_setup import get_image_transforms, ImageNormalizationStats
 from eir.setup.output_setup import set_up_outputs_for_training
 
 if TYPE_CHECKING:
@@ -565,29 +568,104 @@ def check_dataset(
 
 
 def test_prepare_genotype_array_train_mode():
-    test_array = torch.zeros((1, 4, 100), dtype=torch.bool)
+    test_array = torch.zeros((4, 100), dtype=torch.uint8).detach().numpy()
+    test_array_copy = deepcopy(test_array)
 
-    prepared_array = datasets.prepare_one_hot_omics_data(
+    prepared_array_train = datasets.prepare_one_hot_omics_data(
         genotype_array=test_array,
         na_augment_perc=1.0,
         na_augment_prob=1.0,
         test_mode=False,
     )
 
-    assert (prepared_array[:, -1, :] == 1).all()
+    assert prepared_array_train != test_array
+    assert (test_array_copy == test_array).all()
+
+    assert (prepared_array_train[:, -1, :] == 1).all()
 
 
 def test_prepare_genotype_array_test_mode():
-    test_array = torch.zeros((1, 4, 100), dtype=torch.bool)
+    test_array = torch.zeros((1, 4, 100), dtype=torch.uint8).detach().numpy()
+    test_array_copy = deepcopy(test_array)
 
-    prepared_array_train = datasets.prepare_one_hot_omics_data(
+    prepared_array_test = datasets.prepare_one_hot_omics_data(
         genotype_array=test_array,
         na_augment_perc=1.0,
         na_augment_prob=1.0,
         test_mode=True,
     )
+    assert prepared_array_test != test_array
+    assert (test_array_copy == test_array).all()
 
-    assert prepared_array_train.sum().item() == 0
+    assert prepared_array_test.sum().item() == 0
+
+
+def test_prepare_sequence_data():
+    test_input = [i for i in range(100)]
+    test_input_copy = deepcopy(test_input)
+
+    input_config_mock = MagicMock()
+    input_config_mock.computed_max_length = 64
+    input_config_mock.encode_func.return_value = [0]
+    prepared_tensor = datasets.prepare_sequence_data(
+        sequence_input_object=input_config_mock,
+        cur_file_content_tokenized=test_input,
+        test_mode=False,
+    )
+
+    assert test_input == test_input_copy
+    assert prepared_tensor != test_input
+
+    assert len(prepared_tensor) == 64
+    assert len(test_input) == 100
+
+
+def test_prepare_bytes_data():
+    test_input = np.array([i for i in range(100)])
+    test_input_copy = deepcopy(test_input)
+
+    input_config_mock = MagicMock()
+    input_config_mock.input_config.input_type_info.max_length = 64
+    input_config_mock.vocab.get.return_value = 0
+    prepared_tensor = datasets.prepare_bytes_data(
+        bytes_input_object=input_config_mock,
+        bytes_data=test_input,
+        test_mode=False,
+    )
+
+    assert (test_input == test_input_copy).all()
+    assert prepared_tensor != test_input
+
+    assert len(prepared_tensor) == 64
+    assert len(test_input) == 100
+
+
+def test_prepare_image_data():
+
+    normalization_stats = ImageNormalizationStats(channel_means=[0], channel_stds=[0.1])
+    base_transforms, all_transforms = get_image_transforms(
+        target_size=(32, 32),
+        normalization_stats=normalization_stats,
+        auto_augment=False,
+    )
+
+    input_config_mock = MagicMock()
+    input_config_mock.base_transforms = base_transforms
+    input_config_mock.all_transforms = all_transforms
+
+    arr = np.random.rand(64, 64)
+    image_data = Image.fromarray(np.uint8(arr * 255))
+    arr_pil = np.array(image_data)
+
+    prepared_tensor = datasets.prepare_image_data(
+        image_input_object=input_config_mock, image_data=image_data, test_mode=False
+    )
+
+    assert (arr != image_data).any()
+    assert arr_pil.shape == (64, 64)
+    assert arr.shape == (64, 64)
+
+    assert prepared_tensor.shape == (1, 32, 32)
 
 
 @pytest.mark.parametrize(
@@ -806,3 +884,36 @@ def test_impute_single_missing_modality():
     assert imputed_test_tensor.shape[1] == 10
 
     assert (imputed_test_tensor == 0.0).all()
+
+
+@pytest.mark.parametrize(
+    "subset_indices",
+    [
+        None,
+        range(10),
+        range(0, 50, 2),
+        range(50, 100),
+        range(0, 100, 2),
+    ],
+)
+def test_load_array_from_disk(subset_indices: Union[None, Sequence[int]]):
+    test_arr = np.zeros((4, 100))
+    test_arr[-1, :50] = 1
+    test_arr[0, 50:] = 1
+
+    with patch(
+        "eir.data_load.datasets.np.load",
+        return_value=test_arr,
+        autospec=True,
+    ):
+
+        loaded = datasets._load_one_hot_array_from_disk(
+            path=Path("fake"),
+            subset_indices=subset_indices,
+        )
+
+    expected = test_arr
+    if subset_indices is not None:
+        expected = test_arr[:, subset_indices]
+
+    assert (loaded == expected).all()

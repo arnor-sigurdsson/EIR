@@ -1,4 +1,3 @@
-from copy import deepcopy
 from dataclasses import dataclass
 from functools import partial
 from typing import (
@@ -282,11 +281,15 @@ def mixup_all_targets(
     random_index_for_mixing: al_int_tensors,
     target_columns_gen: Generator[Tuple[str, str, str], None, None],
 ) -> "al_training_labels_target":
-    targets_permuted = deepcopy(targets)
+
+    targets_permuted = {}
 
     for output_name, target_type, target_name in target_columns_gen:
 
-        cur_targets = targets_permuted[output_name][target_name]
+        if output_name not in targets_permuted:
+            targets_permuted[output_name] = {}
+
+        cur_targets = targets[output_name][target_name]
         cur_targets_permuted = mixup_targets(
             targets=cur_targets, random_index_for_mixing=random_index_for_mixing
         )
@@ -300,7 +303,7 @@ def mixup_targets(
     random_index_for_mixing: torch.Tensor,
 ) -> al_target_values:
 
-    targets_permuted = deepcopy(targets)
+    targets_permuted = targets.detach().clone()
     targets_permuted = targets_permuted[random_index_for_mixing]
 
     return targets_permuted
@@ -340,7 +343,6 @@ def calc_mixed_loss(
     permuted_loss = (1.0 - lambda_) * criterion(input=outputs, target=targets_permuted)
 
     total_loss = base_loss + permuted_loss
-    print(lambda_, base_loss, permuted_loss, total_loss)
 
     return total_loss
 

@@ -99,8 +99,9 @@ def _gather_column_sampling_weights(
 
     for column in columns_to_sample:
         cur_label_iterable = (i.target_labels[output_name][column] for i in samples)
+        cur_label_iterable_int = (int(i) for i in cur_label_iterable)
         cur_weight_dict = _get_column_label_weights_and_counts(
-            label_iterable=cur_label_iterable
+            label_iterable=cur_label_iterable_int
         )
 
         logger.debug(
