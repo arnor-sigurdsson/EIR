@@ -220,7 +220,9 @@ def get_test_base_global_init() -> Sequence[dict]:
 
 
 def get_test_inputs_inits(
-    test_path: Path, input_config_dicts: Sequence[dict], split_to_test: bool
+    test_path: Path,
+    input_config_dicts: Sequence[dict],
+    split_to_test: bool,
 ) -> Sequence[dict]:
 
     inits = []
@@ -234,7 +236,9 @@ def get_test_inputs_inits(
         cur_base_func_key = cur_base_func_keys[0]
 
         cur_base_func = base_func_map.get(cur_base_func_key)
-        cur_init_base = cur_base_func(test_path=test_path, split_to_test=split_to_test)
+        cur_init_base = cur_base_func(
+            init_dict=init_dict, test_path=test_path, split_to_test=split_to_test
+        )
 
         cur_init_injected = recursive_dict_replace(
             dict_=cur_init_base, dict_to_inject=init_dict
@@ -291,7 +295,9 @@ def get_input_test_init_base_func_map() -> Dict[str, Callable]:
     return mapping
 
 
-def get_test_omics_input_init(test_path: Path, split_to_test: bool) -> dict:
+def get_test_omics_input_init(
+    test_path: Path, split_to_test: bool, init_dict: Dict
+) -> dict:
 
     input_source = test_path / "omics"
     if split_to_test:
@@ -311,10 +317,16 @@ def get_test_omics_input_init(test_path: Path, split_to_test: bool) -> dict:
         "model_config": {"model_type": "genome-local-net"},
     }
 
+    if init_dict.get("input_type_info", {}).get("subset_snps_file", None) == "auto":
+        subset_path = str(test_path / "test_subset_snps.txt")
+        init_dict["input_type_info"]["subset_snps_file"] = subset_path
+
     return input_init_kwargs
 
 
-def get_test_tabular_input_init(test_path: Path, split_to_test: bool) -> dict:
+def get_test_tabular_input_init(
+    test_path: Path, split_to_test: bool, *args, **kwargs
+) -> dict:
 
     input_source = test_path / "labels.csv"
     if split_to_test:
@@ -333,7 +345,9 @@ def get_test_tabular_input_init(test_path: Path, split_to_test: bool) -> dict:
     return input_init_kwargs
 
 
-def get_test_sequence_input_init(test_path: Path, split_to_test: bool) -> dict:
+def get_test_sequence_input_init(
+    test_path: Path, split_to_test: bool, *args, **kwargs
+) -> dict:
 
     input_source = test_path / "sequence"
     if split_to_test:
@@ -363,7 +377,9 @@ def get_test_sequence_input_init(test_path: Path, split_to_test: bool) -> dict:
     return input_init_kwargs
 
 
-def get_test_bytes_input_init(test_path: Path, split_to_test: bool) -> Dict:
+def get_test_bytes_input_init(
+    test_path: Path, split_to_test: bool, *args, **kwargs
+) -> Dict:
     input_source = test_path / "sequence"
     if split_to_test:
         input_source = input_source / "train_set"
@@ -387,7 +403,9 @@ def get_test_bytes_input_init(test_path: Path, split_to_test: bool) -> Dict:
     return input_init_kwargs
 
 
-def get_test_image_input_init(test_path: Path, split_to_test: bool) -> Dict:
+def get_test_image_input_init(
+    test_path: Path, split_to_test: bool, *args, **kwargs
+) -> Dict:
     input_source = test_path / "image"
     if split_to_test:
         input_source = input_source / "train_set"

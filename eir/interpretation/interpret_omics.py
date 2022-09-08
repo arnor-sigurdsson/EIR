@@ -10,6 +10,7 @@ from aislib.misc_utils import get_logger
 
 from eir.interpretation.interpretation_utils import get_target_class_name
 from eir.visualization import interpretation_visualization as av
+from eir.setup.input_setup import read_subset_file, read_bim
 
 if TYPE_CHECKING:
     from eir.train import Experiment
@@ -113,7 +114,13 @@ def analyze_omics_input_activations(
 
     omics_data_type_config = exp.inputs[input_name].input_config.input_type_info
     cur_snp_path = Path(omics_data_type_config.snp_file)
-    snp_df = read_snp_df(snp_file_path=cur_snp_path)
+    df_snps = read_bim(bim_file_path=str(cur_snp_path))
+
+    if omics_data_type_config.subset_snps_file:
+        subset_snps = read_subset_file(
+            subset_snp_file_path=omics_data_type_config.subset_snps_file
+        )
+        df_snps = df_snps[df_snps["VAR_ID"].isin(subset_snps)]
 
     classes = sorted(list(top_gradients_dict.keys()))
     scaled_grads = gather_and_rescale_snps(
@@ -124,7 +131,7 @@ def analyze_omics_input_activations(
     av.plot_top_gradients(
         gathered_scaled_grads=scaled_grads,
         top_gradients_dict=top_gradients_dict,
-        snp_df=snp_df,
+        df_snps=df_snps,
         output_folder=activation_outfolder,
     )
 
@@ -133,12 +140,12 @@ def analyze_omics_input_activations(
     save_masked_grads(
         acc_grads_times_inp=acc_acts_masked,
         top_gradients_dict=top_gradients_dict,
-        snp_df=snp_df,
+        df_snps=df_snps,
         sample_outfolder=activation_outfolder,
     )
 
     df_snp_grads = _save_snp_gradients(
-        accumulated_grads=acc_acts, outfolder=activation_outfolder, snp_df=snp_df
+        accumulated_grads=acc_acts, outfolder=activation_outfolder, df_snps=df_snps
     )
     df_snp_grads_with_abs = _add_absolute_summed_snp_gradients_to_df(
         df_snp_grads=df_snp_grads
@@ -150,60 +157,11 @@ def analyze_omics_input_activations(
     )
 
 
-def read_snp_df(
-    snp_file_path: Path, data_source: Union[Path, None] = None
-) -> pd.DataFrame:
-    """
-    TODO: Deprecate support for .snp files – see hacky note below.
-
-    NOTE:
-        Here we have actually flipped the order of ALT / REF in the eigenstrat snp
-        format. This is because while plink .raw format counts alternative alleles
-        (usually minor, A1), eigensoft counts the major allele.
-
-        That is, a high activation for the first position ([x, 0, 0, 0]) in a snp column
-        means high activation for ALT in eigensoft format (0 REF counted) but
-        high activation for REF in .bim format (0 ALT, i.e. 2 REF counted). In
-        `generate_snp_gradient_matrix` we are assuming the .bim format, hence
-        we have a little hack for now by using flipped eigensoft columns for
-        compatibility (support for eigensoft to be deprecated).
-
-        So if we were to have the correct eigensoft column order, we would have to
-        change `generate_snp_gradient_matrix` row order and `plot_top_gradients` y-label
-        order of (REF / HET / ALT).
-    """
-
-    if not snp_file_path:
-        snp_file_path = infer_snp_file_path(data_source)
-
-    bim_columns = ["CHR_CODE", "VAR_ID", "POS_CM", "BP_COORD", "ALT", "REF"]
-    eig_snp_file_columns = ["VAR_ID", "CHR_CODE", "POS_CM", "BP_COORD", "ALT", "REF"]
-
-    if snp_file_path.suffix == ".snp":
-        logger.warning(
-            "Support for .snp files will be deprecated soon, for now the program "
-            "runs but when reading file %s, reference and alternative "
-            "allele columns will probably be switched. Please consider using .bim.",
-            snp_file_path,
-        )
-        snp_names = eig_snp_file_columns
-    elif snp_file_path.suffix == ".bim":
-        snp_names = bim_columns
-    else:
-        raise ValueError(
-            "Please input either a .snp file or a .bim file for the snp_file argument."
-        )
-
-    df = pd.read_csv(snp_file_path, names=snp_names, sep=r"\s+")
-
-    return df
-
-
 def _save_snp_gradients(
-    accumulated_grads: Dict[str, np.ndarray], outfolder: Path, snp_df: pd.DataFrame
+    accumulated_grads: Dict[str, np.ndarray], outfolder: Path, df_snps: pd.DataFrame
 ) -> pd.DataFrame:
 
-    df_output = deepcopy(snp_df)
+    df_output = deepcopy(df_snps)
     for label, grads in accumulated_grads.items():
 
         grads_np = grads
@@ -440,7 +398,7 @@ def gather_and_rescale_snps(
 def save_masked_grads(
     acc_grads_times_inp: Dict[str, np.ndarray],
     top_gradients_dict: al_top_gradients_dict,
-    snp_df: pd.DataFrame,
+    df_snps: pd.DataFrame,
     sample_outfolder: Path,
 ) -> None:
     top_grads_msk_inputs = index_masked_grads(
@@ -457,7 +415,7 @@ def save_masked_grads(
     av.plot_top_gradients(
         gathered_scaled_grads=scaled_grads,
         top_gradients_dict=top_grads_msk_inputs,
-        snp_df=snp_df,
+        df_snps=df_snps,
         output_folder=sample_outfolder,
         fname="top_snps_masked.pdf",
     )

@@ -132,3 +132,10 @@ def write_test_data_snp_file(base_folder: Path, n_snps: int) -> None:
 
             cur_snp_string = "\t".join(cur_snp_list)
             snpfile.write(cur_snp_string + "\n")
+
+    subset_file = base_folder / "test_subset_snps.txt"
+
+    n_subset_snps = n_snps // 5
+    with open(str(subset_file), "w") as subset_snp_file:
+        for snp_idx in range(n_subset_snps):
+            subset_snp_file.write(str(snp_idx) + "\n")

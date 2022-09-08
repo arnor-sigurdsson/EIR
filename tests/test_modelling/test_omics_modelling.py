@@ -145,6 +145,82 @@ def test_classification(prep_modelling_test_configs):
         )
 
 
+@pytest.mark.skipif(
+    condition=should_skip_in_gha_macos(), reason="In GHA and platform is Darwin."
+)
+@pytest.mark.parametrize(
+    "create_test_data",
+    [
+        {"task_type": "binary"},
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize(
+    "create_test_config_init_base",
+    [
+        # Case 1: Identity Fusion, SNP subset
+        {
+            "injections": {
+                "global_configs": {"lr": 1e-03},
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "input_type_info": {"subset_snps_file": "auto"},
+                        "model_config": {"model_type": "identity"},
+                    },
+                ],
+                "fusion_configs": {
+                    "model_type": "identity",
+                },
+                "output_configs": _get_classification_output_configs(),
+            },
+        },
+        # Case 2: Identity Fusion, SNP subset, memory dataset
+        {
+            "injections": {
+                "global_configs": {"lr": 1e-03, "memory_dataset": True},
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "input_type_info": {"subset_snps_file": "auto"},
+                        "model_config": {"model_type": "identity"},
+                    },
+                ],
+                "fusion_configs": {
+                    "model_type": "identity",
+                },
+                "output_configs": _get_classification_output_configs(),
+            },
+        },
+    ],
+    indirect=True,
+)
+def test_classification_subset(prep_modelling_test_configs):
+    experiment, test_config = prep_modelling_test_configs
+
+    train.train(experiment=experiment)
+
+    output_configs = experiment.configs.output_configs
+
+    for output_config in output_configs:
+        output_name = output_config.output_info.output_name
+
+        check_performance_result_wrapper(
+            outputs=experiment.outputs,
+            run_path=test_config.run_path,
+            thresholds=(0.7, 0.7),
+        )
+
+        top_row_grads_dict = {"Asia": [0] * 10, "Europe": [1] * 10, "Africa": [2] * 10}
+        _check_snps_wrapper(
+            test_config=test_config,
+            output_name=output_name,
+            target_name="Origin",
+            top_row_grads_dict=top_row_grads_dict,
+            at_least_n=2,
+        )
+
+
 def _check_snps_wrapper(
     test_config: "ModelTestConfig",
     output_name: str,
@@ -250,7 +326,7 @@ def _get_regression_output_configs() -> Sequence[Dict]:
                 "output_configs": _get_regression_output_configs(),
             },
         },
-        # Case 3: MLP
+        # Case 3: MLP with subset
         {
             "injections": {
                 "input_configs": [

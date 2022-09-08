@@ -19,6 +19,7 @@ from typing import (
     Any,
 )
 
+import pandas as pd
 import numpy as np
 from aislib.misc_utils import get_logger
 from timm.models.registry import _model_pretrained_cfgs
@@ -945,6 +946,7 @@ def get_tabular_num_features(
 class OmicsInputInfo:
     input_config: schemas.InputConfig
     data_dimensions: "DataDimensions"
+    subset_indices: Union[None, Sequence[int]]
 
 
 def set_up_omics_input(
@@ -954,8 +956,30 @@ def set_up_omics_input(
     data_dimensions = get_data_dimension_from_data_source(
         data_source=Path(input_config.input_info.input_source)
     )
+
+    subset_indices = None
+    input_type_info = input_config.input_type_info
+    if input_type_info.subset_snps_file:
+        df_bim = read_bim(bim_file_path=input_type_info.snp_file)
+        snps_to_subset = read_subset_file(
+            subset_snp_file_path=input_type_info.subset_snps_file
+        )
+        subset_indices = _setup_snp_subset_indices(
+            df_bim=df_bim,
+            snps_to_subset=snps_to_subset,
+            snp_file_name=input_type_info.snp_file,
+            subset_file_name=input_type_info.subset_snps_file,
+        )
+        data_dimensions = DataDimensions(
+            channels=data_dimensions.channels,
+            height=data_dimensions.height,
+            width=len(subset_indices),
+        )
+
     omics_input_info = OmicsInputInfo(
-        input_config=input_config, data_dimensions=data_dimensions
+        input_config=input_config,
+        data_dimensions=data_dimensions,
+        subset_indices=subset_indices,
     )
 
     return omics_input_info
@@ -992,3 +1016,61 @@ def get_data_dimension_from_data_source(
         raise ValueError("Currently max 3 dimensional inputs supported")
 
     return DataDimensions(channels=channels, height=height, width=width)
+
+
+def _setup_snp_subset_indices(
+    df_bim: pd.DataFrame,
+    snps_to_subset: List[str],
+    subset_file_name: str = "",
+    snp_file_name: str = "",
+) -> np.ndarray:
+    """
+    .bim columns: ["CHR_CODE", "VAR_ID", "POS_CM", "BP_COORD", "ALT", "REF"]
+    """
+
+    df_subset = df_bim[df_bim["VAR_ID"].isin(snps_to_subset)]
+
+    if len(df_subset) < len(snps_to_subset):
+        num_missing = len(snps_to_subset) - len(df_subset)
+        missing = [i for i in snps_to_subset if i not in df_subset["VAR_ID"]]
+        logger.warning(
+            "Did not find all SNPs in subset file '%s' in base .bim file '%s'. "
+            "Number of missing SNPs: %d. Example: '%s'.",
+            subset_file_name,
+            snp_file_name,
+            num_missing,
+            missing[:3],
+        )
+    else:
+        logger.info(
+            "Using %d SNPs from subset file %s.", len(df_subset), subset_file_name
+        )
+
+    return df_subset.index
+
+
+def read_subset_file(subset_snp_file_path: str) -> List[str]:
+    with open(subset_snp_file_path, "r") as infile:
+        snps_to_subset = infile.read().split()
+
+    return snps_to_subset
+
+
+def read_bim(bim_file_path: str) -> pd.DataFrame:
+    bim_headers = _get_bim_headers()
+    df_bim = pd.read_csv(bim_file_path, names=bim_headers, sep=r"\s+")
+    df_bim["VAR_ID"] = df_bim["VAR_ID"].astype(str)
+
+    if not len(df_bim.columns) == 6:
+        raise ValueError(
+            "Expected 6 columns in bim file '%s', got %d.",
+            bim_file_path,
+            len(df_bim.columns),
+        )
+
+    return df_bim
+
+
+def _get_bim_headers() -> List[str]:
+    bim_headers = ["CHR_CODE", "VAR_ID", "POS_CM", "BP_COORD", "ALT", "REF"]
+    return bim_headers

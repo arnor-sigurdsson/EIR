@@ -85,6 +85,7 @@ class WrapperModelForSHAP(nn.Module):
 
     def __init__(self, wrapped_model, input_names: Iterable[str], *args, **kwargs):
         super().__init__()
+        assert not wrapped_model.training
         self.wrapped_model = wrapped_model
         self.input_names = input_names
 
@@ -191,6 +192,7 @@ def activation_analysis_wrapper(
     gc = experiment.configs.global_config
 
     model_copy = copy.deepcopy(model)
+    model_copy.eval()
     target_columns_gen = get_tabular_target_columns_generator(
         outputs_as_dict=exp.outputs
     )
@@ -322,6 +324,7 @@ def get_shap_object(
     input_names, input_values = zip(*background.items())
     input_names, input_values = list(input_names), list(input_values)
 
+    assert not model.training
     wrapped_model = WrapperModelForSHAP(wrapped_model=model, input_names=input_names)
     explainer = DeepExplainer(model=wrapped_model, data=input_values)
 
