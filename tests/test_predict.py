@@ -606,6 +606,7 @@ def grab_best_model_path(saved_models_folder: Path):
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
+                        "input_type_info": {"subset_snps_file": "auto"},
                         "model_config": {"model_type": "genome-local-net"},
                     },
                     {

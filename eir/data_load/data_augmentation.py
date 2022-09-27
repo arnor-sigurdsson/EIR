@@ -17,7 +17,7 @@ from aislib.misc_utils import get_logger
 from timm.data.mixup import rand_bbox
 from torch import nn
 
-from eir.data_load.data_utils import Batch, get_tabular_target_columns_generator
+from eir.data_load.data_utils import Batch, get_output_info_generator
 
 if TYPE_CHECKING:
     from eir.train import al_training_labels_target, al_criteria, Experiment
@@ -116,9 +116,7 @@ def hook_default_mix_data(
 
     batch = state["batch"]
 
-    target_columns_gen = get_tabular_target_columns_generator(
-        outputs_as_dict=experiment.outputs
-    )
+    target_columns_gen = get_output_info_generator(outputs_as_dict=experiment.outputs)
 
     mixing_info = get_mixing_info(
         mixing_alpha=gc.mixing_alpha,
@@ -190,9 +188,7 @@ def _sample_lambda(mixing_alpha: float) -> float:
 
 def hook_mix_loss(experiment: "Experiment", state: Dict, *args, **kwargs) -> Dict:
 
-    target_columns_gen = get_tabular_target_columns_generator(
-        outputs_as_dict=experiment.outputs
-    )
+    target_columns_gen = get_output_info_generator(outputs_as_dict=experiment.outputs)
 
     mixed_losses = calc_all_mixed_losses(
         target_columns_gen=target_columns_gen,

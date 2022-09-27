@@ -30,7 +30,7 @@ class MetaModel(nn.Module):
             module = self.input_modules[module_name]
             feature_extractors_out[module_name] = module(module_input)
 
-        fused_features = self.fusion_module(inputs=feature_extractors_out)
+        fused_features = self.fusion_module(feature_extractors_out)
 
         output_modules_out = calculate_module_dict_outputs(
             input_=fused_features, module_dict=self.output_modules

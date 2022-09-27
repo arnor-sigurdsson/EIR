@@ -34,7 +34,7 @@ from torch import nn
 from torch.linalg import vector_norm
 from torch.utils.tensorboard import SummaryWriter
 
-from eir.data_load.data_utils import get_tabular_target_columns_generator
+from eir.data_load.data_utils import get_output_info_generator
 from eir.data_load.label_setup import al_label_transformers
 from eir.setup.schemas import OutputConfig
 
@@ -82,41 +82,50 @@ def calculate_batch_metrics(
 ) -> al_step_metric_dict:
     assert mode in ["val", "train"]
 
-    target_columns_gen = get_tabular_target_columns_generator(
-        outputs_as_dict=outputs_as_dict
-    )
+    target_columns_gen = get_output_info_generator(outputs_as_dict=outputs_as_dict)
 
     master_metric_dict = {}
 
-    for output_name, column_type, column_name in target_columns_gen:
+    for output_name, output_target_type, target_name in target_columns_gen:
+
+        cur_metric_dict = {}
 
         if output_name not in master_metric_dict:
             master_metric_dict[output_name] = {}
 
-        cur_metric_dict = {}
+        if output_target_type == "general":
+            master_metric_dict[output_name][target_name] = cur_metric_dict
 
-        cur_metric_records: Tuple[MetricRecord, ...] = metric_record_dict[column_type]
+        elif output_target_type in ("con", "cat"):
+            cur_output_object = outputs_as_dict[output_name]
+            cur_output_type = cur_output_object.output_config.output_info.output_type
+            assert cur_output_type == "tabular"
 
-        cur_outputs = outputs[output_name][column_name]
-        cur_outputs = cur_outputs.detach().cpu().numpy()
+            al_record = Tuple[MetricRecord, ...]
+            cur_metric_records: al_record = metric_record_dict[output_target_type]
 
-        cur_labels = labels[output_name][column_name]
-        cur_labels = cur_labels.cpu().numpy()
+            cur_outputs = outputs[output_name][target_name]
+            cur_outputs = cur_outputs.detach().cpu().numpy()
 
-        for metric_record in cur_metric_records:
+            cur_labels = labels[output_name][target_name]
+            cur_labels = cur_labels.cpu().numpy()
 
-            if metric_record.only_val and mode == "train":
-                continue
+            for metric_record in cur_metric_records:
 
-            cur_key = f"{output_name}_{column_name}_{metric_record.name}"
-            cur_metric_dict[cur_key] = metric_record.function(
-                outputs=cur_outputs,
-                labels=cur_labels,
-                column_name=column_name,
-                output_name=output_name,
-            )
+                if metric_record.only_val and mode == "train":
+                    continue
 
-        master_metric_dict[output_name][column_name] = cur_metric_dict
+                cur_key = f"{output_name}_{target_name}_{metric_record.name}"
+                cur_metric_dict[cur_key] = metric_record.function(
+                    outputs=cur_outputs,
+                    labels=cur_labels,
+                    column_name=target_name,
+                    output_name=output_name,
+                )
+
+            master_metric_dict[output_name][target_name] = cur_metric_dict
+        else:
+            raise NotImplementedError()
 
     return master_metric_dict
 
@@ -127,9 +136,7 @@ def add_loss_to_metrics(
     metric_dict: al_step_metric_dict,
 ) -> al_step_metric_dict:
 
-    target_columns_gen = get_tabular_target_columns_generator(
-        outputs_as_dict=outputs_as_dict
-    )
+    target_columns_gen = get_output_info_generator(outputs_as_dict=outputs_as_dict)
     metric_dict_copy = copy(metric_dict)
 
     for output_name, column_type, column_name in target_columns_gen:
@@ -168,7 +175,7 @@ def average_performances_across_tasks(
         str, Callable[[al_step_metric_dict], float]
     ],
 ) -> float:
-    target_columns_gen = get_tabular_target_columns_generator(outputs_as_dict)
+    target_columns_gen = get_output_info_generator(outputs_as_dict)
 
     all_metrics = []
 
@@ -506,7 +513,7 @@ def persist_metrics(
     exp = handler_config.experiment
     gc = exp.configs.global_config
 
-    target_generator = get_tabular_target_columns_generator(outputs_as_dict=exp.outputs)
+    target_generator = get_output_info_generator(outputs_as_dict=exp.outputs)
 
     metrics_files = get_metrics_files(
         target_generator=target_generator,
@@ -725,6 +732,7 @@ def get_default_performance_averaging_functions(
     performance_averaging_functions = {
         "cat": partial(_calc_cat_averaging_value, metric_name=cat_metric_name),
         "con": partial(_calc_con_averaging_value, metric_name=con_metric_name),
+        "general": partial(_calc_con_averaging_value, metric_name="loss"),
     }
 
     return performance_averaging_functions

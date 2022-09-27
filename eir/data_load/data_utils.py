@@ -21,18 +21,24 @@ if TYPE_CHECKING:
     from eir.setup.output_setup import al_output_objects_as_dict
 
 
-def get_tabular_target_columns_generator(
+def get_output_info_generator(
     outputs_as_dict: "al_output_objects_as_dict",
 ) -> Generator[Tuple[str, str, str], None, None]:
+    """
+    Here we are returning roughly the following structure:
+
+    (output name, output type specific info, target for current output)
+    """
 
     for output_name, output_object in outputs_as_dict.items():
         if output_object.output_config.output_info.output_type != "tabular":
-            continue
+            yield output_name, "general", output_name
 
-        target_columns = output_object.target_columns
-        for column_type, list_of_cols_of_this_type in target_columns.items():
-            for cur_column in list_of_cols_of_this_type:
-                yield output_name, column_type, cur_column
+        elif output_object.output_config.output_info.output_type == "tabular":
+            target_columns = output_object.target_columns
+            for column_type, list_of_cols_of_this_type in target_columns.items():
+                for cur_column in list_of_cols_of_this_type:
+                    yield output_name, column_type, cur_column
 
 
 @dataclass(frozen=True)

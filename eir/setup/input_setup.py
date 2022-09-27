@@ -498,7 +498,7 @@ class SequenceInputInfo:
 
 def set_up_sequence_input_for_training(
     input_config: schemas.InputConfig, *args, **kwargs
-):
+) -> SequenceInputInfo:
 
     sequence_input_object_func = _get_sequence_input_object_func(
         pretrained=input_config.model_config.pretrained_model

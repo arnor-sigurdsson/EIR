@@ -35,6 +35,6 @@ class IdentityFusionModel(nn.Module):
         return self.fusion_in_dim
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> torch.Tensor:
-        fused_features = self.fusion_callable(tuple(inputs.values()))
+        fused_features = self.fusion_callable(inputs)
 
         return fused_features

@@ -25,7 +25,7 @@ from ignite.metrics import RunningAverage
 from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 
-from eir.data_load.data_utils import get_tabular_target_columns_generator
+from eir.data_load.data_utils import get_output_info_generator
 from eir.interpretation.interpretation import activation_analysis_handler
 from eir.setup.config import object_to_primitives
 from eir.setup.output_setup import al_output_objects_as_dict
@@ -244,9 +244,7 @@ def _get_monitoring_metrics(
     The spec for the tuple here follows the metric dict spec, i.e. the tuple is:
     (column_name, metric).
     """
-    target_columns_gen = get_tabular_target_columns_generator(
-        outputs_as_dict=outputs_as_dict
-    )
+    target_columns_gen = get_output_info_generator(outputs_as_dict=outputs_as_dict)
 
     loss_average_metrics = tuple(["average", "average", "loss-average"])
     perf_average_metrics = tuple(["average", "average", "perf-average"])
@@ -257,20 +255,26 @@ def _get_monitoring_metrics(
     ) -> str:
         return f"{output_name_}_{column_name_}_{metric_name}"
 
-    for output_name, column_type, column_name in target_columns_gen:
+    for output_name, output_target_type, column_name in target_columns_gen:
 
-        cur_metric_records: Tuple[MetricRecord, ...] = metric_record_dict[column_type]
+        if output_target_type in ("con", "cat"):
+            cur_output_object = outputs_as_dict[output_name]
+            cur_output_type = cur_output_object.output_config.output_info.output_type
+            assert cur_output_type == "tabular"
 
-        for metric in cur_metric_records:
-            if not metric.only_val:
+            al_record = Tuple[MetricRecord, ...]
+            cur_metric_records: al_record = metric_record_dict[output_target_type]
 
-                parsed_metric = _parse_target_metrics(
-                    output_name_=output_name,
-                    column_name_=column_name,
-                    metric_name=metric.name,
-                )
-                cur_tuple = tuple([output_name, column_name, parsed_metric])
-                monitoring_metrics.append(cur_tuple)
+            for metric in cur_metric_records:
+                if not metric.only_val:
+
+                    parsed_metric = _parse_target_metrics(
+                        output_name_=output_name,
+                        column_name_=column_name,
+                        metric_name=metric.name,
+                    )
+                    cur_tuple = tuple([output_name, column_name, parsed_metric])
+                    monitoring_metrics.append(cur_tuple)
 
         # manually add loss record as it's not in metric records, but from criteria
         loss_name = _parse_target_metrics(
@@ -605,9 +609,7 @@ def _get_metric_writing_funcs(
 ) -> Dict[str, Dict[str, Callable]]:
     buffer_interval = sample_interval // 2
 
-    target_generator = get_tabular_target_columns_generator(
-        outputs_as_dict=outputs_as_dict
-    )
+    target_generator = get_output_info_generator(outputs_as_dict=outputs_as_dict)
 
     metrics_files = get_metrics_files(
         target_generator=target_generator,
@@ -825,9 +827,7 @@ def add_hparams_to_tensorboard(
 
     run_folder = get_run_folder(output_folder=gc.output_folder)
 
-    target_generator = get_tabular_target_columns_generator(
-        outputs_as_dict=experiment.outputs
-    )
+    target_generator = get_output_info_generator(outputs_as_dict=experiment.outputs)
 
     metrics_files = get_metrics_files(
         target_generator=target_generator,

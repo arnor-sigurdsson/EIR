@@ -92,6 +92,7 @@ def get_model(
     fusion_config: schemas.FusionConfig,
     outputs_as_dict: "al_output_objects_as_dict",
     model_registry_per_input_type: Dict[str, Callable[[str], Type[nn.Module]]],
+    model_registry_per_output_type: Dict[str, Callable[[str], Type[nn.Module]]],
     meta_class_getter: al_fusion_class_callable = get_default_meta_class,
 ) -> Union[nn.Module, nn.DataParallel]:
 
@@ -101,6 +102,7 @@ def get_model(
         inputs_as_dict=inputs_as_dict,
         outputs_as_dict=outputs_as_dict,
         model_registry_per_input_type=model_registry_per_input_type,
+        model_registry_per_output_type=model_registry_per_output_type,
         meta_class_getter=meta_class_getter,
     )
 
@@ -123,6 +125,7 @@ def get_model(
         inputs_as_dict=inputs_as_dict,
         outputs_as_dict=outputs_as_dict,
         model_registry_per_input_type=model_registry_per_input_type,
+        model_registry_per_output_type=model_registry_per_output_type,
         meta_class_getter=meta_class_getter,
     )
     meta_kwargs["input_modules"] = input_modules
@@ -158,6 +161,20 @@ def get_output_modules(
                 device=device,
             )
             output_modules[output_name] = tabular_output_module
+
+        elif output_type in model_registry_per_output_type:
+
+            output_type_class_registry = model_registry_per_output_type[output_type]
+            output_model_type = output_model_config.model_type
+            output_type_class = output_type_class_registry(model_type=output_model_type)
+
+            custom_output_module = output_type_class(
+                output_object=output_object,
+                output_name=output_name,
+                input_dimension=input_dimension,
+                device=device,
+            )
+            output_modules[output_name] = custom_output_module
         else:
             raise NotImplementedError()
 
@@ -445,7 +462,7 @@ def _get_sequence_feature_extractor_objects_for_wrapper_model(
     pool: Union[Literal["max"], Literal["avg"], None],
 ) -> SequenceModelObjectsForWrapperModel:
 
-    if model_type == "sequence-default":
+    if "sequence-default" in model_type or model_type.startswith("eir-"):
         model_class = model_registry_lookup(model_type=model_type)
         objects_for_wrapper = _get_basic_sequence_feature_extractor_objects(
             model_config=model_config,
@@ -724,6 +741,7 @@ def get_meta_model_kwargs_from_configs(
     inputs_as_dict: "al_input_objects_as_dict",
     outputs_as_dict: "al_output_objects_as_dict",
     model_registry_per_input_type: Dict[str, Callable[[str], Type[nn.Module]]],
+    model_registry_per_output_type: Dict[str, Callable[[str], Type[nn.Module]]],
 ) -> Dict[str, Any]:
 
     kwargs = {}
@@ -743,7 +761,7 @@ def get_meta_model_kwargs_from_configs(
 
     output_modules = get_output_modules(
         outputs_as_dict=outputs_as_dict,
-        model_registry_per_output_type={},
+        model_registry_per_output_type=model_registry_per_output_type,
         input_dimension=fusion_module.num_out_features,
         device=global_config.device,
     )
@@ -770,6 +788,7 @@ def overload_fusion_model_feature_extractors_with_pretrained(
     inputs_as_dict: "al_input_objects_as_dict",
     outputs_as_dict: "al_output_objects_as_dict",
     model_registry_per_input_type: Dict[str, Callable[[str], Type[nn.Module]]],
+    model_registry_per_output_type: Dict[str, Callable[[str], Type[nn.Module]]],
     meta_class_getter: al_fusion_class_callable = get_default_meta_class,
 ) -> nn.ModuleDict:
 
@@ -818,6 +837,8 @@ def overload_fusion_model_feature_extractors_with_pretrained(
             inputs_as_dict=inputs_as_dict,
             outputs_as_dict=outputs_as_dict,
             model_registry_per_input_type=model_registry_per_input_type,
+            model_registry_per_output_type=model_registry_per_output_type,
+            meta_class_getter=meta_class_getter,
         )
 
         pretrained_name = pretrained_config.load_module_name
@@ -855,6 +876,7 @@ def get_meta_model_class_and_kwargs_from_configs(
     inputs_as_dict: "al_input_objects_as_dict",
     outputs_as_dict: "al_output_objects_as_dict",
     model_registry_per_input_type: Dict[str, Callable[[str], Type[nn.Module]]],
+    model_registry_per_output_type: Dict[str, Callable[[str], Type[nn.Module]]],
     meta_class_getter: Callable[[str], Type[nn.Module]] = get_default_meta_class,
 ) -> Tuple[Type[nn.Module], Dict[str, Any]]:
 
@@ -866,6 +888,7 @@ def get_meta_model_class_and_kwargs_from_configs(
         inputs_as_dict=inputs_as_dict,
         outputs_as_dict=outputs_as_dict,
         model_registry_per_input_type=model_registry_per_input_type,
+        model_registry_per_output_type=model_registry_per_output_type,
     )
 
     return meta_model_class, meta_model_kwargs

@@ -1,4 +1,4 @@
-from typing import Callable, Sequence, Dict, TYPE_CHECKING
+from typing import Callable, Dict, Union, TYPE_CHECKING
 
 import torch
 from aislib.misc_utils import get_logger
@@ -13,14 +13,16 @@ from eir.models.models_base import (
 if TYPE_CHECKING:
     pass
 
-al_features = Callable[[Sequence[torch.Tensor]], torch.Tensor]
+al_features = Callable[
+    [Dict[str, torch.Tensor]], Union[torch.Tensor, Dict[str, torch.Tensor]]
+]
 
 
 logger = get_logger(__name__)
 
 
-def default_fuse_features(features: Sequence[torch.Tensor]) -> torch.Tensor:
-    return torch.cat(tuple(features), dim=1)
+def default_fuse_features(features: Dict[str, torch.Tensor]) -> torch.Tensor:
+    return torch.cat(tuple(features.values()), dim=1)
 
 
 class FusionModule(nn.Module):
@@ -59,7 +61,7 @@ class FusionModule(nn.Module):
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> torch.Tensor:
 
-        fused_features = self.fusion_callable(tuple(inputs.values()))
+        fused_features = self.fusion_callable(inputs)
         out = calculate_module_dict_outputs(
             input_=fused_features, module_dict=self.fusion_modules
         )

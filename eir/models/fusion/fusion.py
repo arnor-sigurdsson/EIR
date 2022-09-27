@@ -1,9 +1,15 @@
-from typing import Type, Union
+from typing import Type, Union, Dict
+from functools import partial
 
 from torch import nn
+import torch
 
 from eir.models.fusion import fusion_mgmoe, fusion_default, fusion_identity
 from eir.models.layers import ResidualMLPConfig
+
+
+def pass_through_fuse(features: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    return features
 
 
 def get_fusion_module(
@@ -35,4 +41,8 @@ def get_fusion_class(
         return fusion_default.FusionModule
     elif fusion_model_type == "identity":
         return fusion_identity.IdentityFusionModel
+    elif fusion_model_type == "pass-through":
+        return partial(
+            fusion_identity.IdentityFusionModel, fusion_callable=pass_through_fuse
+        )
     raise ValueError(f"Unrecognized fusion model type: {fusion_model_type}.")

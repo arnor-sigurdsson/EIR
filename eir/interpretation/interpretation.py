@@ -37,7 +37,7 @@ from torch import nn
 from torch.utils.data import DataLoader, Subset
 from torch.utils.hooks import RemovableHandle
 
-from eir.data_load.data_utils import get_tabular_target_columns_generator, Batch
+from eir.data_load.data_utils import get_output_info_generator, Batch
 from eir.data_load.datasets import al_datasets
 from eir.interpretation.interpret_omics import (
     analyze_omics_input_activations,
@@ -193,9 +193,7 @@ def activation_analysis_wrapper(
 
     model_copy = copy.deepcopy(model)
     model_copy.eval()
-    target_columns_gen = get_tabular_target_columns_generator(
-        outputs_as_dict=exp.outputs
-    )
+    target_columns_gen = get_output_info_generator(outputs_as_dict=exp.outputs)
 
     for output_name, target_column_type, target_column_name in target_columns_gen:
 

@@ -22,7 +22,7 @@ from torch.nn import Module
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 
-from eir.data_load.data_utils import get_tabular_target_columns_generator
+from eir.data_load.data_utils import get_output_info_generator
 from eir.train_utils.utils import (
     call_hooks_stage_iterable,
 )
@@ -67,9 +67,7 @@ def parse_target_labels(
     labels: "al_training_labels_target",
 ) -> "al_training_labels_target":
 
-    target_columns_gen = get_tabular_target_columns_generator(
-        outputs_as_dict=output_objects
-    )
+    target_columns_gen = get_output_info_generator(outputs_as_dict=output_objects)
 
     labels_casted = {}
 

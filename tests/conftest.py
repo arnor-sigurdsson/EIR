@@ -617,8 +617,16 @@ def create_test_config(
     test_fusion_configs = config.load_fusion_configs(
         fusion_configs=test_init.fusion_configs
     )
+
+    tabular_output_setup = config.DynamicOutputSetup(
+        output_types_schema_map=config.get_outputs_types_schema_map(),
+        output_module_config_class_getter=config.get_output_module_config_class,
+        output_module_init_class_map=config.get_output_config_type_init_callable_map(),
+    )
+
     test_output_configs = config.load_output_configs(
-        output_configs=test_init.output_configs
+        output_configs=test_init.output_configs,
+        dynamic_output_setup=tabular_output_setup,
     )
 
     test_configs = config.Configs(
@@ -702,7 +710,7 @@ def create_test_model(
         hooks=None,
     )
 
-    model_registry = get_default_model_registry_per_input_type()
+    input_model_registry = get_default_model_registry_per_input_type()
 
     outputs_as_dict = set_up_outputs_for_training(
         output_configs=create_test_config.output_configs,
@@ -711,7 +719,8 @@ def create_test_model(
 
     model = get_model(
         inputs_as_dict=inputs_as_dict,
-        model_registry_per_input_type=model_registry,
+        model_registry_per_input_type=input_model_registry,
+        model_registry_per_output_type={},
         fusion_config=create_test_config.fusion_config,
         outputs_as_dict=outputs_as_dict,
         global_config=gc,

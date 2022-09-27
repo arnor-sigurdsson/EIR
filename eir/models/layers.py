@@ -431,7 +431,7 @@ class MLPResidualBlock(nn.Module):
         if self.zero_init_last_bn:
             nn.init.zeros_(self.bn_2.weight)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         out = self.bn_1(x)
         out = self.act_1(out)
 
@@ -513,7 +513,7 @@ class SplitMLPResidualBlock(nn.Module):
         if self.zero_init_last_bn:
             nn.init.zeros_(self.bn_2.weight)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         out = self.bn_1(x)
         out = self.act_1(out)
 

@@ -15,9 +15,7 @@ al_num_outputs_per_target = Dict[str, int]
 
 logger = get_logger(name=__name__)
 
-al_output_objects = Union[
-    "TabularOutputInfo",
-]
+al_output_objects = Union["TabularOutputInfo", Any]
 al_output_objects_as_dict = Dict[str, al_output_objects]
 
 
@@ -46,7 +44,7 @@ def set_up_outputs_for_training(
 def set_up_outputs_general(
     output_configs: schemas.al_output_configs,
     setup_func_getter: Callable[
-        [schemas.OutputConfig], Callable[..., al_output_objects]
+        [Union[schemas.OutputConfig, Any]], Callable[..., al_output_objects]
     ],
     setup_func_kwargs: Dict[str, Any],
 ) -> al_output_objects_as_dict:

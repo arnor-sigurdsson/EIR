@@ -132,7 +132,7 @@ class MGMoEModel(nn.Module):
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> torch.Tensor:
 
-        fused_features = self.fusion_callable(tuple(inputs.values()))
+        fused_features = self.fusion_callable(inputs)
 
         gate_attentions = calculate_module_dict_outputs(
             input_=fused_features, module_dict=self.gates
@@ -150,4 +150,4 @@ class MGMoEModel(nn.Module):
 
             final_out[expert_name] = weighted_expert_sum
 
-        return self.fusion_callable(tuple(final_out.values()))
+        return self.fusion_callable(final_out)

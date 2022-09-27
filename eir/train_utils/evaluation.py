@@ -9,7 +9,7 @@ from aislib.misc_utils import get_logger
 from ignite.engine import Engine
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
-from eir.data_load.data_utils import get_tabular_target_columns_generator
+from eir.data_load.data_utils import get_output_info_generator
 from eir.data_load.label_setup import al_label_transformers_object
 from eir.models import model_training_utils
 from eir.train_utils import metrics
@@ -103,9 +103,7 @@ def save_evaluation_results_wrapper(
     experiment: "Experiment",
 ):
 
-    target_columns_gen = get_tabular_target_columns_generator(
-        outputs_as_dict=experiment.outputs
-    )
+    target_columns_gen = get_output_info_generator(outputs_as_dict=experiment.outputs)
 
     for output_name, column_type, column_name in target_columns_gen:
         cur_sample_outfolder = utils.prep_sample_outfolder(

@@ -26,7 +26,7 @@ from torch.utils.data import DataLoader
 
 import eir.visualization.visualization_funcs as vf
 from eir.data_load import datasets, label_setup
-from eir.data_load.data_utils import get_tabular_target_columns_generator
+from eir.data_load.data_utils import get_output_info_generator
 from eir.data_load.datasets import (
     al_datasets,
 )
@@ -181,7 +181,7 @@ def predict(
             output_folder=Path(predict_cl_args.output_folder), metrics=metrics
         )
 
-    target_columns_gen = get_tabular_target_columns_generator(
+    target_columns_gen = get_output_info_generator(
         outputs_as_dict=predict_config.outputs
     )
 
@@ -395,6 +395,7 @@ def get_default_predict_config(
         inputs_as_dict=test_inputs,
         outputs_as_dict=loaded_train_experiment.outputs,
         model_registry_per_input_type=default_model_registry,
+        model_registry_per_output_type={},
         meta_class_getter=get_default_meta_class,
     )
 
@@ -888,8 +889,16 @@ def overload_train_configs_for_predict(
     fusion_config_overloaded = config.load_fusion_configs(
         [main_overloaded_kwargs.get("fusion_config")]
     )
+
+    tabular_output_setup = config.DynamicOutputSetup(
+        output_types_schema_map=config.get_outputs_types_schema_map(),
+        output_module_config_class_getter=config.get_output_module_config_class,
+        output_module_init_class_map=config.get_output_config_type_init_callable_map(),
+    )
+
     output_configs_overloaded = config.load_output_configs(
         output_configs=main_overloaded_kwargs.get("output_configs"),
+        dynamic_output_setup=tabular_output_setup,
     )
 
     train_configs_overloaded = config.Configs(

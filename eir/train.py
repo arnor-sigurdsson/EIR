@@ -10,6 +10,7 @@ from typing import (
     TYPE_CHECKING,
     Callable,
     Iterable,
+    Any,
     Sequence,
 )
 
@@ -37,6 +38,7 @@ from eir.data_load.label_setup import (
     al_label_transformers,
     set_up_train_and_valid_tabular_data,
     gather_ids_from_tabular_file,
+    gather_ids_from_data_source,
     split_ids,
     TabularFileInfo,
     save_transformer_set,
@@ -310,6 +312,7 @@ def get_default_experiment(
         fusion_config=configs.fusion_config,
         outputs_as_dict=outputs_as_dict,
         model_registry_per_input_type=default_registry,
+        model_registry_per_output_type={},
     )
 
     criteria = _get_criteria(
@@ -352,8 +355,13 @@ def gather_all_ids_from_output_configs(
 ) -> Tuple[str, ...]:
     all_ids = set()
     for config in output_configs:
-        cur_label_file = Path(config.output_info.output_source)
-        cur_ids = gather_ids_from_tabular_file(file_path=cur_label_file)
+        cur_source = Path(config.output_info.output_source)
+        if cur_source.suffix == ".csv":
+            cur_ids = gather_ids_from_tabular_file(file_path=cur_source)
+        elif cur_source.is_dir():
+            cur_ids = gather_ids_from_data_source(data_source=cur_source)
+        else:
+            raise NotImplementedError()
         all_ids.update(cur_ids)
 
     return tuple(all_ids)
@@ -473,7 +481,7 @@ def _get_criteria(outputs_as_dict: al_output_objects_as_dict) -> al_criteria:
         elif column_type_ == "cat":
             return nn.CrossEntropyLoss()
 
-    target_columns_gen = data_utils.get_tabular_target_columns_generator(
+    target_columns_gen = data_utils.get_output_info_generator(
         outputs_as_dict=outputs_as_dict
     )
 
@@ -744,12 +752,38 @@ def prepare_base_batch_default(
 
     inputs, target_labels, train_ids = loader_batch
 
+    inputs_prepared = _prepare_inputs_for_model(
+        batch_inputs=inputs, input_objects=input_objects, model=model, device=device
+    )
+
+    if target_labels:
+        target_labels = model_training_utils.parse_target_labels(
+            output_objects=output_objects,
+            device=device,
+            labels=target_labels,
+        )
+
+    batch = Batch(
+        inputs=inputs_prepared,
+        target_labels=target_labels,
+        ids=train_ids,
+    )
+
+    return batch
+
+
+def _prepare_inputs_for_model(
+    batch_inputs: Dict[str, Any],
+    input_objects: al_input_objects_as_dict,
+    model: nn.Module,
+    device: str,
+) -> Dict[str, torch.Tensor]:
     inputs_prepared = {}
     for input_name, input_object in input_objects.items():
         input_type = input_object.input_config.input_info.input_type
 
         if input_type in ("omics", "image"):
-            cur_tensor = inputs[input_name]
+            cur_tensor = batch_inputs[input_name]
             cur_tensor = cur_tensor.to(device=device)
             cur_tensor = cur_tensor.to(dtype=torch.float32)
 
@@ -757,7 +791,7 @@ def prepare_base_batch_default(
 
         elif input_type == "tabular":
 
-            tabular_source_input = inputs[input_name]
+            tabular_source_input = batch_inputs[input_name]
             for tabular_name, tensor in tabular_source_input.items():
                 tabular_source_input[tabular_name] = tensor.to(device=device)
 
@@ -774,7 +808,7 @@ def prepare_base_batch_default(
             inputs_prepared[input_name] = tabular
 
         elif input_type in ("sequence", "bytes"):
-            cur_seq = inputs[input_name]
+            cur_seq = batch_inputs[input_name]
             cur_seq = cur_seq.to(device=device)
             cur_module = getattr(model.input_modules, input_name)
             cur_module_embedding = cur_module.embedding
@@ -783,20 +817,7 @@ def prepare_base_batch_default(
         else:
             raise ValueError(f"Unrecognized input type {input_name}.")
 
-    if target_labels:
-        target_labels = model_training_utils.parse_target_labels(
-            output_objects=output_objects,
-            device=device,
-            labels=target_labels,
-        )
-
-    batch = Batch(
-        inputs=inputs_prepared,
-        target_labels=target_labels,
-        ids=train_ids,
-    )
-
-    return batch
+    return inputs_prepared
 
 
 def hook_default_model_forward(

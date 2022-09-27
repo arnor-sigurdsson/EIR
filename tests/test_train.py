@@ -307,6 +307,7 @@ def test_get_model(create_test_config: Configs, create_test_labels):
         fusion_config=test_config.fusion_config,
         global_config=gc,
         model_registry_per_input_type=default_registry,
+        model_registry_per_output_type={},
     )
 
     assert len(test_config.input_configs) == 1
