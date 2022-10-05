@@ -694,10 +694,10 @@ def _get_default_step_function_hooks_init_kwargs(
     do_amp = configs.global_config.amp
     if do_amp:
         logger.debug("Setting up AMP training.")
-        optimizer_backward_hook_with_grad_scaler = [
-            get_hook_amp_grad_scaler(device=configs.global_config.device)
-        ] + init_kwargs["optimizer_backward"]
-        init_kwargs["optimizer_backward"] = optimizer_backward_hook_with_grad_scaler
+        model_forward_with_amp_objects = [
+            get_hook_amp_objects(device=configs.global_config.device)
+        ] + init_kwargs["model_forward"]
+        init_kwargs["model_forward"] = model_forward_with_amp_objects
 
     return init_kwargs
 
@@ -866,7 +866,7 @@ def hook_default_optimizer_backward(
 
     amp = experiment.configs.global_config.amp
     amp_gradient_scaler = None
-    if amp:
+    if amp and experiment.configs.global_config.device != "cpu":
         amp_gradient_scaler = state["amp_scaler"]
         loss = amp_gradient_scaler.scale(loss)
 
@@ -885,7 +885,7 @@ def hook_default_optimizer_backward(
         )
 
     step_func = experiment.optimizer.step
-    if amp:
+    if amp and experiment.configs.global_config.device != "cpu":
         step_func = partial(amp_gradient_scaler.step, optimizer=experiment.optimizer)
 
     if grad_acc_steps and grad_acc_steps > 1:
@@ -895,7 +895,7 @@ def hook_default_optimizer_backward(
     else:
         step_func()
 
-    if amp:
+    if amp and experiment.configs.global_config.device != "cpu":
         amp_gradient_scaler.update()
 
     return {}
@@ -976,24 +976,25 @@ def get_hook_iteration_counter() -> Callable:
     return _counter_iterator
 
 
-def get_hook_amp_grad_scaler(device: str):
+def get_hook_amp_objects(device: str):
     device_type = "cpu" if device == "cpu" else "cuda"
 
     if device == "cpu":
-        raise ValueError(
-            "Currently AMP is not supported when running on CPUs. Please"
-            "turn off AMP if training on CPUs or set the device to use"
-            "a GPU if one is available on your system."
-        )
+        logger.warning("Using AMP is on a CPU, speedups will most likely be minimal.")
 
-    scaler = GradScaler()
+    scaler = None
+    if device != "cpu":
+        scaler = GradScaler()
+
     amp_context_manager = get_amp_context_manager(device_type=device_type)
 
     def _get_objects(*args, **kwargs) -> Dict[str, GradScaler]:
         state_updates = {
-            "amp_scaler": scaler,
             "amp_context_manager": amp_context_manager,
         }
+        if device != "cpu":
+            state_updates["amp_scaler"] = scaler
+
         return state_updates
 
     return _get_objects
