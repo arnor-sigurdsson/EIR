@@ -82,6 +82,15 @@ def test_get_cur_dilation(test_input, expected):
                         },
                     }
                 ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    },
+                ],
             },
         },
         # Case 2: CNN
@@ -100,6 +109,15 @@ def test_get_cur_dilation(test_input, expected):
                         },
                     }
                 ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    },
+                ],
             },
         },
         # Case 3: Linear
@@ -112,10 +130,18 @@ def test_get_cur_dilation(test_input, expected):
                         "model_config": {"model_type": "identity"},
                     },
                 ],
-                "predictor_configs": {
-                    "model_type": "linear",
-                    "model_config": {"l1": 1e-03},
+                "fusion_configs": {
+                    "model_type": "identity",
                 },
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    },
+                ],
             },
         },
         # Case 4: Check that we add and use extra inputs.
@@ -141,10 +167,15 @@ def test_get_cur_dilation(test_input, expected):
                         "model_config": {"model_type": "tabular"},
                     },
                 ],
-                "target_configs": {
-                    "target_cat_columns": ["Origin"],
-                    "target_con_columns": ["Height"],
-                },
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": ["Height"],
+                        },
+                    },
+                ],
             },
         },
         # Case 5: Normal multi task with CNN
@@ -164,13 +195,18 @@ def test_get_cur_dilation(test_input, expected):
                         },
                     },
                 ],
-                "predictor_configs": {
+                "fusion_configs": {
                     "model_config": {"fc_task_dim": 64, "rb_do": 0.10, "fc_do": 0.10},
                 },
-                "target_configs": {
-                    "target_cat_columns": ["Origin"],
-                    "target_con_columns": ["Height", "ExtraTarget"],
-                },
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": ["Height", "ExtraTarget"],
+                        },
+                    },
+                ],
             },
         },
         # Case 6:  Normal multi task with MLP, note we have to reduce the LR for
@@ -187,13 +223,18 @@ def test_get_cur_dilation(test_input, expected):
                         },
                     },
                 ],
-                "predictor_configs": {
+                "fusion_configs": {
                     "model_config": {"fc_task_dim": 64, "rb_do": 0.10, "fc_do": 0.10},
                 },
-                "target_configs": {
-                    "target_cat_columns": ["Origin"],
-                    "target_con_columns": ["Height", "ExtraTarget"],
-                },
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": ["Height", "ExtraTarget"],
+                        },
+                    },
+                ],
             },
         },
         # Case 7: Using the Simple LCL model
@@ -213,10 +254,15 @@ def test_get_cur_dilation(test_input, expected):
                         },
                     },
                 ],
-                "target_configs": {
-                    "target_cat_columns": ["Origin"],
-                    "target_con_columns": ["Height", "ExtraTarget"],
-                },
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": ["Height", "ExtraTarget"],
+                        },
+                    },
+                ],
             },
         },
         # Case 8: Using the GLN
@@ -239,17 +285,22 @@ def test_get_cur_dilation(test_input, expected):
                         },
                     },
                 ],
-                "predictor_configs": {
+                "fusion_configs": {
                     "model_config": {
                         "fc_task_dim": 64,
                         "fc_do": 0.20,
                         "rb_do": 0.20,
                     },
                 },
-                "target_configs": {
-                    "target_cat_columns": ["Origin"],
-                    "target_con_columns": ["Height", "ExtraTarget"],
-                },
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": ["Height", "ExtraTarget"],
+                        },
+                    },
+                ],
             },
         },
         # Case 9: Using the MGMoE fusion
@@ -272,14 +323,19 @@ def test_get_cur_dilation(test_input, expected):
                         },
                     },
                 ],
-                "predictor_configs": {
+                "fusion_configs": {
                     "model_type": "mgmoe",
                     "model_config": {"mg_num_experts": 3},
                 },
-                "target_configs": {
-                    "target_cat_columns": ["Origin"],
-                    "target_con_columns": ["Height", "ExtraTarget"],
-                },
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": ["Height", "ExtraTarget"],
+                        },
+                    },
+                ],
             },
         },
         # Case 10: Using the GLN with mixing
@@ -306,17 +362,22 @@ def test_get_cur_dilation(test_input, expected):
                         },
                     },
                 ],
-                "predictor_configs": {
+                "fusion_configs": {
                     "model_config": {
                         "fc_task_dim": 64,
                         "fc_do": 0.10,
                         "rb_do": 0.10,
                     },
                 },
-                "target_configs": {
-                    "target_cat_columns": ["Origin"],
-                    "target_con_columns": ["Height", "ExtraTarget"],
-                },
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": ["Height", "ExtraTarget"],
+                        },
+                    },
+                ],
             },
         },
         # Case 11: Using the GLN with limited activations
@@ -341,17 +402,22 @@ def test_get_cur_dilation(test_input, expected):
                         },
                     },
                 ],
-                "predictor_configs": {
+                "fusion_configs": {
                     "model_config": {
                         "fc_task_dim": 64,
                         "fc_do": 0.20,
                         "rb_do": 0.20,
                     },
                 },
-                "target_configs": {
-                    "target_cat_columns": ["Origin"],
-                    "target_con_columns": ["Height", "ExtraTarget"],
-                },
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": ["Height", "ExtraTarget"],
+                        },
+                    },
+                ],
             },
         },
     ],
@@ -371,4 +437,4 @@ def test_omics_models(
     )
 
     model.eval()
-    _ = trace_eir_model(fusion_model=model, example_inputs=example_batch.inputs)
+    _ = trace_eir_model(meta_model=model, example_inputs=example_batch.inputs)

@@ -37,7 +37,7 @@ from torch import nn
 from torch.utils.data import DataLoader, Subset
 from torch.utils.hooks import RemovableHandle
 
-from eir.data_load.data_utils import get_target_columns_generator, Batch
+from eir.data_load.data_utils import get_output_info_generator, Batch
 from eir.data_load.datasets import al_datasets
 from eir.interpretation.interpret_omics import (
     analyze_omics_input_activations,
@@ -50,7 +50,7 @@ from eir.interpretation.interpret_tabular import (
 )
 from eir.interpretation.interpret_sequence import analyze_sequence_input_activations
 from eir.interpretation.interpret_image import analyze_image_input_activations
-from eir.models.model_training_utils import gather_dloader_samples
+from eir.models.model_training_utils import gather_data_loader_samples
 from eir.models.omics.models_cnn import CNNModel
 from eir.models.omics.models_linear import LinearModel
 from eir.train_utils.evaluation import validation_handler
@@ -85,6 +85,7 @@ class WrapperModelForSHAP(nn.Module):
 
     def __init__(self, wrapped_model, input_names: Iterable[str], *args, **kwargs):
         super().__init__()
+        assert not wrapped_model.training
         self.wrapped_model = wrapped_model
         self.input_names = input_names
 
@@ -138,6 +139,8 @@ def activation_analysis_handler(
         )
         return
 
+    logger.debug("Running activation analysis.")
+
     activation_outfolder_callable = partial(
         _prepare_eval_activation_outfolder,
         output_folder=gc.output_folder,
@@ -189,14 +192,16 @@ def activation_analysis_wrapper(
     gc = experiment.configs.global_config
 
     model_copy = copy.deepcopy(model)
-    target_columns_gen = get_target_columns_generator(target_columns=exp.target_columns)
+    model_copy.eval()
+    target_columns_gen = get_output_info_generator(outputs_as_dict=exp.outputs)
 
-    for target_column_type, target_column_name in target_columns_gen:
+    for output_name, target_column_type, target_column_name in target_columns_gen:
 
         explainer, hook_handle = get_shap_object(
             experiment=exp,
             model=model_copy,
             column_name=target_column_name,
+            output_name=output_name,
             background_loader=background_loader,
             n_background_samples=gc.act_background_samples,
         )
@@ -218,21 +223,26 @@ def activation_analysis_wrapper(
             experiment=exp,
             column_name=target_column_name,
             column_type=target_column_type,
+            output_name=output_name,
             dataset=dataset_to_interpret,
         )
 
         act_producer = get_sample_activation_producer(
             data_producer=data_producer,
             act_func=act_func,
+            output_name=output_name,
             target_column_name=target_column_name,
         )
 
         input_names_and_types = {
             i: exp.inputs[i].input_config.input_info.input_type for i in input_names
         }
+        output_object = exp.outputs[output_name]
+        target_transformer = output_object.target_transformers[target_column_name]
         act_consumers = get_activation_consumers(
             input_names_and_types=input_names_and_types,
-            target_transformer=exp.target_transformers[target_column_name],
+            target_transformer=target_transformer,
+            output_name=output_name,
             target_column=target_column_name,
             column_type=target_column_type,
         )
@@ -249,7 +259,9 @@ def activation_analysis_wrapper(
                 continue
 
             activation_outfolder = outfolder_target_callable(
-                column_name=target_column_name, input_name=input_name
+                column_name=target_column_name,
+                input_name=input_name,
+                output_name=output_name,
             )
             common_kwargs = {
                 "experiment": experiment,
@@ -264,15 +276,20 @@ def activation_analysis_wrapper(
                 analyze_omics_input_activations(**common_kwargs)
 
             elif input_type == "tabular":
-                analyze_tabular_input_activations(**common_kwargs)
+                analyze_tabular_input_activations(
+                    **common_kwargs, output_name=output_name
+                )
 
             elif input_type == "sequence":
                 analyze_sequence_input_activations(
                     **common_kwargs,
                     expected_target_classes_shap_values=explainer.expected_value,
+                    output_name=output_name
                 )
             elif input_type == "image":
-                analyze_image_input_activations(**common_kwargs)
+                analyze_image_input_activations(
+                    **common_kwargs, output_name=output_name
+                )
 
         hook_handle.remove()
 
@@ -281,10 +298,11 @@ def get_shap_object(
     experiment: "Experiment",
     model: nn.Module,
     column_name: str,
+    output_name: str,
     background_loader: DataLoader,
     n_background_samples: int,
 ) -> Tuple[DeepExplainer, RemovableHandle]:
-    background, *_ = gather_dloader_samples(
+    background, *_ = gather_data_loader_samples(
         batch_prep_hook=experiment.hooks.step_func_hooks.base_prepare_batch,
         batch_prep_hook_kwargs={"experiment": experiment},
         data_loader=background_loader,
@@ -294,7 +312,9 @@ def get_shap_object(
     background = _detach_all_inputs(tensor_inputs=background)
 
     hook_partial = partial(
-        _grab_single_target_from_model_output_hook, output_target_column=column_name
+        _grab_single_target_from_model_output_hook,
+        output_target_column=column_name,
+        output_name=output_name,
     )
     hook_handle = model.register_forward_hook(hook_partial)
 
@@ -302,6 +322,7 @@ def get_shap_object(
     input_names, input_values = zip(*background.items())
     input_names, input_values = list(input_names), list(input_values)
 
+    assert not model.training
     wrapped_model = WrapperModelForSHAP(wrapped_model=model, input_names=input_names)
     explainer = DeepExplainer(model=wrapped_model, data=input_values)
 
@@ -362,7 +383,10 @@ class SampleActivation:
 
 
 def accumulate_all_activations(
-    data_producer: Iterable["Batch"], act_func: Callable, target_column_name: str
+    data_producer: Iterable["Batch"],
+    act_func: Callable,
+    target_column_name: str,
+    output_name: str,
 ) -> Sequence["SampleActivation"]:
 
     all_activations = []
@@ -371,7 +395,8 @@ def accumulate_all_activations(
         sample_target_labels = batch.target_labels
 
         sample_all_modalities_activations = act_func(
-            inputs=batch.inputs, sample_label=sample_target_labels[target_column_name]
+            inputs=batch.inputs,
+            sample_label=sample_target_labels[output_name][target_column_name],
         )
 
         if sample_all_modalities_activations is None:
@@ -391,6 +416,7 @@ def accumulate_all_activations(
 def get_activation_consumers(
     input_names_and_types: Dict[str, str],
     target_transformer: "al_label_transformers_object",
+    output_name: str,
     target_column: str,
     column_type: str,
 ) -> Dict[str, Callable[[Union["SampleActivation", None]], Any]]:
@@ -401,6 +427,7 @@ def get_activation_consumers(
             input_type=input_type,
             input_name=input_name,
             target_transformer=target_transformer,
+            output_name=output_name,
             target_column=target_column,
             column_type=column_type,
         )
@@ -414,6 +441,7 @@ def _get_consumer_from_input_type(
     target_transformer: "al_label_transformers_object",
     input_type: str,
     input_name: str,
+    output_name: str,
     target_column: str,
     column_type: str,
 ) -> Callable[
@@ -428,19 +456,24 @@ def _get_consumer_from_input_type(
         return get_omics_consumer(
             target_transformer=target_transformer,
             input_name=input_name,
+            output_name=output_name,
             target_column=target_column,
             column_type=column_type,
         )
 
 
 def get_sample_activation_producer(
-    data_producer: Iterable["Batch"], act_func: Callable, target_column_name: str
+    data_producer: Iterable["Batch"],
+    act_func: Callable,
+    target_column_name: str,
+    output_name: str,
 ):
     for batch, raw_inputs in data_producer:
         sample_target_labels = batch.target_labels
 
         sample_all_modalities_activations = act_func(
-            inputs=batch.inputs, sample_label=sample_target_labels[target_column_name]
+            inputs=batch.inputs,
+            sample_label=sample_target_labels[output_name][target_column_name],
         )
 
         if sample_all_modalities_activations is None:
@@ -523,7 +556,11 @@ def _convert_all_batch_tensors_to_cpu(batch: Batch) -> Batch:
     new_batch_kwargs = {}
 
     new_inputs = {k: v.cpu() for k, v in batch.inputs.items()}
-    new_target_labels = {k: v.cpu() for k, v in batch.target_labels.items()}
+
+    new_target_labels = {}
+    for output_name, output_object in batch.target_labels.items():
+        target_labels_on_cpu = {k: v.cpu() for k, v in output_object.items()}
+        new_target_labels[output_name] = target_labels_on_cpu
 
     new_batch_kwargs["inputs"] = new_inputs
     new_batch_kwargs["target_labels"] = new_target_labels
@@ -538,12 +575,16 @@ def _prepare_eval_activation_outfolder(
     output_folder: str,
     input_name: str,
     column_name: str,
+    output_name: str,
     iteration: int,
     *args,
     **kwargs
 ):
     sample_outfolder = prep_sample_outfolder(
-        output_folder=output_folder, column_name=column_name, iteration=iteration
+        output_folder=output_folder,
+        column_name=column_name,
+        output_name=output_name,
+        iteration=iteration,
     )
     activation_outfolder = sample_outfolder / "activations" / input_name
     ensure_path_exists(path=activation_outfolder, is_folder=True)
@@ -556,8 +597,9 @@ def _grab_single_target_from_model_output_hook(
     input_: torch.Tensor,
     output: Dict[str, torch.Tensor],
     output_target_column: str,
+    output_name: str,
 ) -> torch.Tensor:
-    return output[output_target_column]
+    return output[output_name][output_target_column]
 
 
 def get_shap_sample_acts_deep_correct_only(
@@ -614,10 +656,12 @@ def _get_interpretation_data_producer(
     experiment: "Experiment",
     column_name: str,
     column_type: str,
+    output_name: str,
     dataset: al_datasets,
 ) -> Generator["Batch", None, None]:
 
-    target_transformer = experiment.target_transformers[column_name]
+    cur_output = experiment.outputs[output_name]
+    target_transformer = cur_output.target_transformers[column_name]
     gc = experiment.configs.global_config
 
     target_classes_numerical = _get_numerical_target_classes(
@@ -629,6 +673,7 @@ def _get_interpretation_data_producer(
     activations_data_loader = _get_activations_dataloader(
         dataset=dataset,
         max_acts_per_class=gc.max_acts_per_class,
+        output_name=output_name,
         target_column=column_name,
         column_type=column_type,
         target_classes_numerical=target_classes_numerical,
@@ -665,6 +710,7 @@ def _detach_all_inputs(tensor_inputs: Dict[str, torch.Tensor]):
 def _get_activations_dataloader(
     dataset: al_datasets,
     max_acts_per_class: int,
+    output_name: str,
     target_column: str,
     column_type: str,
     target_classes_numerical: Sequence[int],
@@ -683,6 +729,7 @@ def _get_activations_dataloader(
         dataset=dataset,
         max_acts_per_class=max_acts_per_class,
         target_column=target_column,
+        output_name=output_name,
         target_classes_numerical=target_classes_numerical,
     )
     subset_dataset = _subsample_dataset(dataset=dataset, indices=subset_indices)
@@ -693,6 +740,7 @@ def _get_activations_dataloader(
 def _get_categorical_sample_indices_for_activations(
     dataset: al_datasets,
     max_acts_per_class: int,
+    output_name: str,
     target_column: str,
     target_classes_numerical: Sequence[int],
 ) -> Tuple[int, ...]:
@@ -702,7 +750,7 @@ def _get_categorical_sample_indices_for_activations(
 
     for index, sample in enumerate(dataset.samples):
         target_labels = sample.target_labels
-        cur_sample_target_label = target_labels[target_column]
+        cur_sample_target_label = target_labels[output_name][target_column]
 
         is_over_limit = acc_label_counts[cur_sample_target_label] == acc_label_limit
         is_not_in_target_classes = (

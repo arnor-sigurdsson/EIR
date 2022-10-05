@@ -908,7 +908,8 @@ def _split_ids_manual(
     ids: Sequence[str], manual_valid_ids: Sequence[str]
 ) -> Tuple[Sequence[str], Sequence[str]]:
 
-    not_found = tuple(i for i in manual_valid_ids if i not in ids)
+    ids_set = set(ids)
+    not_found = tuple(i for i in manual_valid_ids if i not in ids_set)
     if not_found:
         raise ValueError(
             f"Did not find {len(not_found)} manual validation IDs "
@@ -1067,8 +1068,16 @@ def _get_missing_stats_string(
     return missing_count_dict
 
 
-def get_transformer_path(run_path: Path, transformer_name: str) -> Path:
-    transformer_path = run_path / "transformers" / f"{transformer_name}.save"
+def get_transformer_path(
+    run_path: Path, source_name: str, transformer_name: str
+) -> Path:
+
+    if not transformer_name.endswith(".save"):
+        transformer_name = f"{transformer_name}.save"
+
+    transformer_path = (
+        run_path / "serializations/transformers" / source_name / f"{transformer_name}"
+    )
 
     return transformer_path
 
@@ -1090,23 +1099,28 @@ def merge_target_columns(
     return all_target_columns
 
 
-def save_transformer_set(transformers: al_label_transformers, run_folder: Path) -> None:
+def save_transformer_set(
+    transformers_per_source: Dict[str, al_label_transformers], run_folder: Path
+) -> None:
 
-    for (transformer_name, transformer_object) in transformers.items():
-        save_label_transformer(
-            run_folder=run_folder,
-            transformer_name=transformer_name,
-            target_transformer_object=transformer_object,
-        )
+    for output_name, transformers in transformers_per_source.items():
+        for (transformer_name, transformer_object) in transformers.items():
+            save_label_transformer(
+                run_folder=run_folder,
+                output_name=output_name,
+                transformer_name=transformer_name,
+                target_transformer_object=transformer_object,
+            )
 
 
 def save_label_transformer(
     run_folder: Path,
+    output_name: str,
     transformer_name: str,
     target_transformer_object: al_label_transformers_object,
 ) -> Path:
     target_transformer_outpath = get_transformer_path(
-        run_path=run_folder, transformer_name=transformer_name
+        run_path=run_folder, source_name=output_name, transformer_name=transformer_name
     )
     ensure_path_exists(target_transformer_outpath)
     joblib.dump(value=target_transformer_object, filename=target_transformer_outpath)

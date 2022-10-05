@@ -1,6 +1,6 @@
 from copy import copy
 from pathlib import Path
-from typing import Iterable, Sequence, Tuple
+from typing import Iterable, Sequence, Tuple, Dict
 
 import pandas as pd
 import pytest
@@ -10,16 +10,31 @@ from eir.models.model_setup import (
     _get_hf_sequence_feature_extractor_objects,
     _get_manual_out_features_for_external_feature_extractor,
 )
-from eir.models.sequence.transformer_models import get_all_hf_model_names
-from eir.setup.config import get_all_targets
+from eir.setup.setup_utils import get_all_hf_model_names
 from eir.train_utils.utils import seed_everything
 from tests.conftest import should_skip_in_gha_macos
 from tests.test_modelling.setup_modelling_test_data.setup_sequence_test_data import (
     get_continent_keyword_map,
 )
-from tests.test_modelling.test_modelling_utils import check_test_performance_results
+from tests.test_modelling.test_modelling_utils import (
+    check_performance_result_wrapper,
+)
 
 seed_everything(seed=0)
+
+
+def _get_sequence_test_specific_fusion_configs() -> Dict:
+    sequence_fusion_configs = {
+        "model_config": {
+            "fc_task_dim": 256,
+            "fc_do": 0.05,
+            "rb_do": 0.05,
+            "stochastic_depth_p": 0.0,
+            "layers": [2],
+        }
+    }
+
+    return sequence_fusion_configs
 
 
 @pytest.mark.skipif(
@@ -36,6 +51,8 @@ seed_everything(seed=0)
     "create_test_config_init_base",
     [
         # Case 1: Classification - Positional Encoding and Max Pooling
+        # Note we add more capacity to fusion models as it helps make activation
+        # analysis more stable
         {
             "injections": {
                 "global_configs": {
@@ -49,16 +66,27 @@ seed_everything(seed=0)
                         "model_config": {"position": "encode", "pool": "max"},
                     }
                 ],
+                "fusion_configs": _get_sequence_test_specific_fusion_configs(),
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    }
+                ],
             },
         },
-        # Case 2: Classification - Positional Embedding, Windowed, Auto dff
-        # and Avg Pooling
+        # Case 2: Classification - Positional Embedding, Windowed, Auto dff,
+        # Avg Pooling and mixing
         {
             "injections": {
                 "global_configs": {
                     "output_folder": "test_classification",
                     "n_epochs": 12,
                     "memory_dataset": True,
+                    "mixing_alpha": 0.1,
                 },
                 "input_configs": [
                     {
@@ -68,6 +96,15 @@ seed_everything(seed=0)
                             "position": "embed",
                             "pool": "avg",
                             "model_init_config": {"dim_feedforward": "auto"},
+                        },
+                    }
+                ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
                         },
                     }
                 ],
@@ -86,10 +123,15 @@ seed_everything(seed=0)
                         "input_info": {"input_name": "test_sequence"},
                     }
                 ],
-                "target_configs": {
-                    "target_cat_columns": [],
-                    "target_con_columns": ["Height"],
-                },
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": [],
+                            "target_con_columns": ["Height"],
+                        },
+                    }
+                ],
             },
         },
         # Case 4: Multi Task
@@ -99,16 +141,24 @@ seed_everything(seed=0)
                     "n_epochs": 12,
                     "memory_dataset": True,
                     "output_folder": "test_multi_task",
+                    "gradient_noise": 0.001,
                 },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_sequence"},
+                        "model_config": {"position": "embed", "pool": "avg"},
                     }
                 ],
-                "target_configs": {
-                    "target_cat_columns": ["Origin"],
-                    "target_con_columns": ["Height", "ExtraTarget"],
-                },
+                "fusion_configs": _get_sequence_test_specific_fusion_configs(),
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": ["Height", "ExtraTarget"],
+                        },
+                    }
+                ],
             },
         },
         # Case 5: Multi Task with Mixing
@@ -125,10 +175,16 @@ seed_everything(seed=0)
                         "input_info": {"input_name": "test_sequence"},
                     }
                 ],
-                "target_configs": {
-                    "target_cat_columns": ["Origin"],
-                    "target_con_columns": ["Height", "ExtraTarget"],
-                },
+                "fusion_configs": _get_sequence_test_specific_fusion_configs(),
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": ["Height", "ExtraTarget"],
+                        },
+                    }
+                ],
             },
         },
         # Case 6: External model: Albert
@@ -138,7 +194,7 @@ seed_everything(seed=0)
                     "n_epochs": 12,
                     "memory_dataset": True,
                     "output_folder": "test_albert",
-                    "mixing_alpha": 0.5,
+                    "mixing_alpha": 0.0,
                 },
                 "input_configs": [
                     {
@@ -157,10 +213,16 @@ seed_everything(seed=0)
                         },
                     },
                 ],
-                "target_configs": {
-                    "target_cat_columns": ["Origin"],
-                    "target_con_columns": ["Height", "ExtraTarget"],
-                },
+                "fusion_configs": _get_sequence_test_specific_fusion_configs(),
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": ["Height", "ExtraTarget"],
+                        },
+                    }
+                ],
             },
         },
     ],
@@ -171,46 +233,43 @@ def test_sequence_modelling(prep_modelling_test_configs):
 
     train.train(experiment=experiment)
 
-    targets = get_all_targets(targets_configs=experiment.configs.target_configs)
+    output_configs = experiment.configs.output_configs
 
     thresholds = get_sequence_test_args(
         mixing=experiment.configs.global_config.mixing_alpha
     )
-    for cat_target_column in targets.cat_targets:
-        target_transformer = experiment.target_transformers[cat_target_column]
-        target_classes = target_transformer.classes_
 
-        activation_paths = test_config.activations_paths[cat_target_column]
+    for output_config in output_configs:
+        output_name = output_config.output_info.output_name
+        cat_targets = output_config.output_type_info.target_cat_columns
+        con_targets = output_config.output_type_info.target_con_columns
 
-        check_test_performance_results(
-            run_path=test_config.run_path,
-            target_column=cat_target_column,
-            metric="mcc",
-            thresholds=thresholds,
-        )
+        for target_name in cat_targets:
 
-        for input_name in experiment.inputs.keys():
-            cur_activation_root = activation_paths[input_name]
-            _get_sequence_activations_csv_generator(
-                activation_root_folder=cur_activation_root,
-                target_classes=target_classes,
+            activation_paths = test_config.activations_paths[output_name][target_name]
+            target_transformer = experiment.outputs[output_name].target_transformers[
+                target_name
+            ]
+
+            check_performance_result_wrapper(
+                outputs=experiment.outputs,
+                run_path=test_config.run_path,
+                thresholds=thresholds,
             )
 
-    for con_target_column in targets.con_targets:
-        activation_paths = test_config.activations_paths[con_target_column]
+            for input_name in experiment.inputs.keys():
+                cur_activation_root = activation_paths[input_name]
+                _check_sequence_activations_wrapper(
+                    activation_root_folder=cur_activation_root,
+                    target_classes=target_transformer.classes_,
+                    strict=False,
+                )
 
-        check_test_performance_results(
-            run_path=test_config.run_path,
-            target_column=con_target_column,
-            metric="r2",
-            thresholds=thresholds,
-        )
-
-        for input_name in experiment.inputs.keys():
-            cur_activation_root = activation_paths[input_name]
-            _get_sequence_activations_csv_generator(
-                activation_root_folder=cur_activation_root,
-                target_classes=[con_target_column],
+        for _ in con_targets:
+            check_performance_result_wrapper(
+                outputs=experiment.outputs,
+                run_path=test_config.run_path,
+                thresholds=thresholds,
             )
 
 
@@ -226,7 +285,14 @@ def get_sequence_test_args(mixing: float) -> Tuple[float, float]:
 def _check_sequence_activations_wrapper(
     activation_root_folder: Path,
     target_classes: Sequence[str],
+    strict: bool = True,
 ):
+    """
+    We have the strict flag as in some cases it will by default predict one class,
+    not being specifically activated by input tokens for that class, while only
+    being activated by the other N-1 class tokens to move the prediction towards
+    those.
+    """
 
     seq_csv_gen = _get_sequence_activations_csv_generator(
         activation_root_folder=activation_root_folder,
@@ -242,15 +308,20 @@ def _check_sequence_activations_wrapper(
         expected_tokens = cat_class_keyword_map[target_class]
         success = _check_sequence_activations(
             df_activations=df_seq_acts,
-            top_n_activations=20,
+            top_n_activations=30,
             expected_top_tokens_pool=expected_tokens,
-            must_match_n=len(expected_tokens) - 3,
-            fail_fast=multi_class,
+            must_match_n=len(expected_tokens) - 4,
+            fail_fast=strict,
         )
         targets_acts_success.append(success)
 
     if multi_class:
-        assert all(targets_acts_success)
+
+        must_n_successes = len(target_classes) - 1
+        if strict:
+            must_n_successes = len(target_classes)
+
+        assert sum(targets_acts_success) >= must_n_successes
     else:
         assert any(targets_acts_success)
 
@@ -262,7 +333,7 @@ def _get_sequence_activations_csv_generator(
         cur_path = (
             activation_root_folder
             / target_class
-            / f"feature_importance_{target_class}.csv"
+            / f"token_influence_{target_class}.csv"
         )
         yield target_class, cur_path
 
@@ -282,7 +353,7 @@ def _check_sequence_activations(
 
     success = len(matching) >= must_match_n
     if fail_fast:
-        assert success, matching
+        assert success, (matching, top_tokens)
     return success
 
 

@@ -1,7 +1,0 @@
-eirtrain \
---global_configs eir_tutorials/01_basic_tutorial/conf/tutorial_01_globals.yaml \
---input_configs eir_tutorials/01_basic_tutorial/conf/tutorial_01b_input_identity.yaml \
---target_configs eir_tutorials/01_basic_tutorial/conf/tutorial_01_targets.yaml \
---predictor_configs eir_tutorials/01_basic_tutorial/conf/tutorial_01b_predictor_linear.yaml \
---tutorial_01_globals.output_folder=eir_tutorials/tutorial_runs/tutorial_01_run_linear \
---tutorial_01_globals.n_epochs=20

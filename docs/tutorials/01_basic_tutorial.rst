@@ -9,8 +9,7 @@ A - Setup
 In this tutorial,
 we will be using
 `genotype data <https://en.wikipedia.org/wiki/Genotyping>`__
-to train deep learning
-and linear models
+to train deep learning models
 for ancestry prediction.
 
 To start, please download `processed sample data`_
@@ -59,7 +58,7 @@ we can see the configurations needed:
 
 Above we can see that
 there are four types of configurations we can use:
-*global*, *input*, *predictor* and *target*.
+*global*, *inputs*, *fusion* and *outputs*.
 To see more details about
 what should be in these configuration files,
 we can check the :ref:`api-reference` reference.
@@ -71,7 +70,8 @@ we can check the :ref:`api-reference` reference.
     in the `project repository <https://github.com/arnor-sigurdsson/EIR>`_
 
 While the **global** configuration has a lot of options,
-the only one we really need to fill in now is ``output_folder``,
+the only one we really need to fill in now is
+``output_folder`` and evaluation interval (in batch iterations),
 so we have the following ``tutorial_01_globals.yaml`` file:
 
 
@@ -100,20 +100,20 @@ For more information about the
 configurations, e.g. which parameters are relevant for the chosen models and what they
 do, head over to the :ref:`api-reference` reference.
 
-Finally, we need to specify what **targets** to predict during training. For that we
-will use the ``tutorial_01_targets.yaml`` file with the following content:
+Finally, we need to specify what **outputs** to predict during training. For that we
+will use the ``tutorial_01_outputs.yaml`` file with the following content:
 
-.. literalinclude:: tutorial_files/01_basic_tutorial/tutorial_01_targets.yaml
+.. literalinclude:: tutorial_files/01_basic_tutorial/tutorial_01_outputs.yaml
     :language: yaml
     :caption:
 
 .. note::
-    You might notice that we have not written any predictor config so far.
-    The predictor configuration controls the final parts of our models that
-    lead to a prediction. While we indeed *can* configure these predictors,
-    we will leave use the defaults for now. The default predictor is a fully
-    connected neural network, but see below for an example of how we can change
-    that.
+    You might notice that we have not written any fusion config so far.
+    The fusion configuration controls how different modalities
+    (i.e. input data types, for example genotype and clinical data)
+    are combined using a neural network. While we indeed *can* configure the fusion,
+    we will leave use the defaults for now. The default fusion model is a fully
+    connected neural network.
 
 With all this, we should have our project directory looking something like this:
 
@@ -151,7 +151,7 @@ Examining the directory, we see the following structure
 .. literalinclude:: tutorial_files/01_basic_tutorial/commands/experiment_01_folder.txt
     :language: console
 
-In the results folder,
+In the results folder for a given output,
 the [200, 400, 600] folders
 contain our validation results
 according to our ``sample_interval`` configuration
@@ -189,38 +189,14 @@ Looking at the training curve from that run, we can see we did a bit better:
 
 .. image:: tutorial_files/01_basic_tutorial/figures/tutorial_01_training_curve_ACC_gln_2.png
 
-Training a linear model
-"""""""""""""""""""""""
-
-We can also try training a linear model with L1 regularisation (LASSO),
-for that we can use the following input configuration:
-
-.. literalinclude:: tutorial_files/01_basic_tutorial/tutorial_01b_input_identity.yaml
-    :language: yaml
-    :caption:
-
-This model type will flatten the omics input and propagate it to the predictor. For our
-linear model, we therefore use a linear predictor with L1 regularisation.
-
-.. literalinclude:: tutorial_files/01_basic_tutorial/tutorial_01b_predictor_linear.yaml
-    :language: yaml
-    :caption:
-
-
-Now, we can train the linear model with the following command:
-
-.. literalinclude:: tutorial_files/01_basic_tutorial/commands/LINEAR_1.txt
-    :language: console
-
-.. note::
-    You might notice that we we did not set a predictor configuration before, that is
-    because it defaults to a residual MLP predictor model if not specified.
-
-We can see that the linear model performs pretty well also. It does show a little more
-sign of overfitting as training performance is better than validation performance, so
-perhaps more L1 regularization is needed.
-
-.. image:: tutorial_files/01_basic_tutorial/figures/tutorial_01_training_curve_ACC_linear_1.png
+We also notice that there is a gap
+between the training and evaluation performances,
+indicating that the model is starting to
+overfit on the training data.
+There are a bunch of regularisation settings
+we could try, such as increasing dropout in
+the input, fusion and output modules.
+Check the :ref:`api-reference` reference for a full overview.
 
 C - Predicting on external samples
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -233,15 +209,14 @@ similar to ``eirtrain``:
     :language: console
     :lines: 2-
 
-
 Generally we do not change much of the configs when predicting, with the exception of
 the input configs (and then mainly setting the ``input_source``,
-i.e. where to load our samples to predict on from) and perhaps the global config
+i.e. where to load our samples to predict/test on from) and perhaps the global config
 (e.g. we might not compute activations during training, but compute them on our test set
 by activating ``get_acts`` in the global config when predicting). Specific to
 ``eirpredict``, we have to choose a saved model (``--model_path``), whether we want to
 evaluate the performance on the test set (``--evaluate`` this means that the respective
-labels must be present in the ``--target_configs``) and where to save the prediction
+labels must be present in the ``--output_configs``) and where to save the prediction
 results (``--output_folder``).
 
 For the sake of this tutorial, we use one of the saved models from our previous training
@@ -256,17 +231,17 @@ to predict on the same data as before.
 Run the commands below, making sure you add the correct path of a saved model to the
 ``--model_path`` argument.
 
-.. code-block:: console
+To test, we can run the following command
+(note that you will have to add the path to your saved model for the ``--model_path``
+parameter below).
 
-    mkdir runs/eir_tutorial_prediction_output
-    eirpredict \
-    --global_configs 01_basic_tutorial/tutorial_01_globals.yaml \
-    --input_configs 01_basic_tutorial/tutorial_01_input.yaml \
-    --target_configs 01_basic_tutorial/tutorial_01_targets.yaml \
-    --model_path runs/tutorial_01_run/saved_models/<chosen model> \
-    --evaluate \
-    --output_folder runs/eir_tutorial_prediction_output
+.. literalinclude:: tutorial_files/01_basic_tutorial/commands/GLN_2_PREDICT.txt
+    :language: console
 
+This will generate a file called
+``calculated_metrics.json`` in the supplied ``output_folder`` as well
+as a folder for each output (in this case called ``ancestry_output``
+containing the actual predictions and plots.
 
 D - Applying to your own data
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -274,5 +249,6 @@ D - Applying to your own data
 Thank you for reading this far! Hopefully this tutorial introduced you well enough to
 the framework so you can apply it to your own data. For that, you will have to process
 it first (see: `plink pipelines`_). Then you will have to set the relevant paths for the
-inputs (e.g. ``input_source``, ``snp_file``) and targets
-(e.g. ``label_file``, ``target_cat_columns``).
+inputs (e.g. ``input_source``, ``snp_file``) and outputs
+(e.g. ``output_source``, ``target_cat_columns`` or ``target_con_columns``
+if you have continuous targets).

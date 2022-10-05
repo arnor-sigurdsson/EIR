@@ -73,11 +73,7 @@ To the configuration!
     :language: yaml
     :caption:
 
-.. literalinclude:: tutorial_files/05_image_tutorial/target.yaml
-    :language: yaml
-    :caption:
-
-.. literalinclude:: tutorial_files/05_image_tutorial/predictor.yaml
+.. literalinclude:: tutorial_files/05_image_tutorial/output.yaml
     :language: yaml
     :caption:
 
@@ -100,7 +96,7 @@ Now for the results, we see the following:
 
 That looks *kind of* ok, but far from great. Our validation performance is all over the place
 (a contributing factor could be that our validation set here is very small),
-and we don't get a better performance than around 72%. Certainly not good enough
+and we don't get a better performance than around 76%. Certainly not good enough
 for an actual app!
 
 B - Pretrained Image Model
@@ -206,9 +202,8 @@ And then the EfficientNet-B0 feature extractor:
 While it's definitely more clear
 to the human eye in the ResNet18 case,
 both feature extractors seem to be focusing
-on that piece of french fry
-(or is that perhaps an onion?
-I actually have no clue what food this is...)
-when deciding that this is indeed, not a hot dog.
+on the french fries
+when deciding that this is indeed,
+not a hot dog.
 
 With that, we conclude this image tutorial. Thank you for reading!

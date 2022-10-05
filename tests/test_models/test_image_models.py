@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 import timm
 import torch
-from timm.models.registry import get_model_default_value
+from timm.models.registry import get_pretrained_cfg_value
 
 from eir.models.model_training_utils import trace_eir_model
 from tests.conftest import should_skip_in_gha
@@ -43,7 +43,16 @@ def get_test_internal_image_models_parametrization() -> Sequence[Dict]:
                             "model_init_config": model_init_config,
                         },
                     }
-                ]
+                ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    },
+                ],
             }
         }
 
@@ -79,7 +88,7 @@ def test_internal_image_models(
 
     model.eval()
     with torch.no_grad():
-        _ = trace_eir_model(fusion_model=model, example_inputs=example_batch.inputs)
+        _ = trace_eir_model(meta_model=model, example_inputs=example_batch.inputs)
 
 
 def get_timm_models_to_test() -> List[str]:
@@ -118,7 +127,7 @@ def get_test_external_image_models_parametrization() -> Sequence[Dict]:
 
     for model_type in models:
 
-        size = get_model_default_value(model_name=model_type, cfg_key="input_size")
+        size = get_pretrained_cfg_value(model_name=model_type, cfg_key="input_size")
         if not size:
             size = 224
         else:
@@ -141,7 +150,16 @@ def get_test_external_image_models_parametrization() -> Sequence[Dict]:
                             "model_init_config": {},
                         },
                     }
-                ]
+                ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    },
+                ],
             }
         }
         all_parametrizations.append(cur_params)
@@ -177,4 +195,4 @@ def test_external_image_models(
 
     model.eval()
     with torch.no_grad():
-        _ = trace_eir_model(fusion_model=model, example_inputs=example_batch.inputs)
+        _ = trace_eir_model(meta_model=model, example_inputs=example_batch.inputs)

@@ -11,10 +11,10 @@ from sklearn.preprocessing import LabelEncoder, StandardScaler
 from torch import nn
 
 if TYPE_CHECKING:
-    from eir.train import al_training_labels_extra
     from eir.data_load.label_setup import al_label_dict
 
 # Aliases
+al_tabular_input = Dict[str, Union[List[str], torch.Tensor]]
 al_unique_embed_vals = Dict[str, Set[str]]
 al_emb_lookup_dict = Dict[str, Dict[str, Dict[int, int]]]
 
@@ -39,14 +39,21 @@ class SimpleTabularModelConfig:
     """
     :param l1:
         L1 regularization applied to the embeddings for categorical tabular inputs.
+
+    :param fc_layer:
+        Whether to add a single fully-connected layer to the model, alternative
+        to looking up and passing the inputs through directly.
     """
 
     l1: float = 0.00
+
+    fc_layer: bool = False
 
 
 class SimpleTabularModel(nn.Module):
     def __init__(
         self,
+        model_init_config: SimpleTabularModelConfig,
         cat_columns: Sequence[str],
         con_columns: Sequence[str],
         unique_label_values_per_column: Dict[str, Set[str]],
@@ -86,6 +93,12 @@ class SimpleTabularModel(nn.Module):
 
         self.input_dim = emb_total_dim + con_total_dim
 
+        self.layer = nn.Identity()
+        if model_init_config.fc_layer:
+            self.layer = nn.Linear(
+                in_features=self.input_dim, out_features=self.input_dim, bias=False
+            )
+
     @property
     def num_out_features(self) -> int:
         return self.input_dim
@@ -104,7 +117,7 @@ class SimpleTabularModel(nn.Module):
         return torch.cat([torch.flatten(i) for i in self.parameters()])
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
-        return input
+        return self.layer(input)
 
 
 def set_up_embedding_dict(
@@ -145,7 +158,7 @@ def get_tabular_inputs(
     input_cat_columns: Sequence[str],
     input_con_columns: Sequence[str],
     tabular_model: SimpleTabularModel,
-    tabular_input: "al_training_labels_extra",
+    tabular_input: "al_tabular_input",
     device: str,
 ) -> Union[torch.Tensor, None]:
     """

@@ -89,14 +89,14 @@ class LCLModelConfig:
 
     :param layers:
         Controls the number of layers in the model. If set to ``None``, the model will
-        automatically set up the number of layers according to the ``cutoff`` paramter
+        automatically set up the number of layers according to the ``cutoff`` parameter
         value.
 
     :param kernel_width:
         With of the locally connected kernels. Note that this refers to the flattened
         input, meaning that if we have a one-hot encoding of 4 values (e.g. SNPs), 12
         refers to 12/4 = 3 SNPs per locally connected window. Can be set to ``None`` if
-        the ``split_mlp_num_splits`` paramter is set, which means that the kernel width
+        the ``split_mlp_num_splits`` parameter is set, which means that the kernel width
         will be set automatically according to
 
     :param first_kernel_expansion:
@@ -126,6 +126,9 @@ class LCLModelConfig:
     :param rb_do:
         Dropout in the residual blocks.
 
+    :param stochastic_depth_p:
+        Probability of dropping input.
+
     :param l1:
         L1 regularization applied to the first layer in the network.
 
@@ -135,15 +138,16 @@ class LCLModelConfig:
 
     layers: Union[None, List[int]] = None
 
-    kernel_width: Union[None, int] = 12
-    first_kernel_expansion: int = 1
+    kernel_width: Union[None, int] = 16
+    first_kernel_expansion: int = -2
 
     channel_exp_base: int = 2
     first_channel_expansion: int = 1
 
     split_mlp_num_splits: Union[None, int] = None
 
-    rb_do: float = 0.00
+    rb_do: float = 0.10
+    stochastic_depth_p: float = 0.00
     l1: float = 0.00
 
     cutoff: int = 1024
@@ -177,6 +181,7 @@ class LCLModel(nn.Module):
             channel_exp_base=self.model_config.channel_exp_base,
             dropout_p=self.model_config.rb_do,
             cutoff=self.model_config.cutoff,
+            stochastic_depth_p=self.model_config.stochastic_depth_p,
         )
         self.split_blocks = _get_split_blocks(
             split_parameter_spec=split_parameter_spec,
@@ -257,6 +262,7 @@ class LCParameterSpec:
     kernel_width: int
     channel_exp_base: int
     dropout_p: float
+    stochastic_depth_p: float
     cutoff: int
 
 
@@ -318,6 +324,7 @@ def _generate_split_blocks_from_spec(
                 split_size=cur_kernel_width,
                 out_feature_sets=cur_out_feature_sets,
                 dropout_p=s.dropout_p,
+                stochastic_depth_p=s.stochastic_depth_p,
             )
 
             block_modules.append(cur_block)
@@ -361,6 +368,7 @@ def generate_split_resblocks_auto(split_parameter_spec: LCParameterSpec):
             split_size=cur_kernel_width,
             out_feature_sets=cur_out_feature_sets,
             dropout_p=s.dropout_p,
+            stochastic_depth_p=s.stochastic_depth_p,
         )
 
         block_modules.append(cur_block)

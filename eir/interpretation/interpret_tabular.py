@@ -10,12 +10,13 @@ import shap
 import torch
 from aislib.misc_utils import get_logger, ensure_path_exists
 from matplotlib import MatplotlibDeprecationWarning
+from sklearn.preprocessing import LabelEncoder
 
+from eir.experiment_io.experiment_io import load_transformers
 from eir.interpretation.interpretation_utils import (
     stratify_activations_by_target_classes,
     plot_activations_bar,
 )
-from eir.experiment_io.experiment_io import load_transformers
 
 if TYPE_CHECKING:
     from eir.train import Experiment
@@ -28,6 +29,7 @@ logger = get_logger(__name__)
 def analyze_tabular_input_activations(
     experiment: "Experiment",
     input_name: str,
+    output_name: str,
     target_column_name: str,
     target_column_type: str,
     activation_outfolder: Path,
@@ -39,7 +41,7 @@ def analyze_tabular_input_activations(
     cat_columns = tabular_type_info_config.input_cat_columns
     con_columns = tabular_type_info_config.input_con_columns
 
-    tabular_model = experiment.model.modules_to_fuse[input_name]
+    tabular_model = experiment.model.input_modules[input_name]
     activation_tensor_slices = set_up_tabular_tensor_slices(
         cat_input_columns=cat_columns,
         con_input_columns=con_columns,
@@ -56,10 +58,15 @@ def analyze_tabular_input_activations(
         df_activations=df_activations,
         outpath=activation_outfolder / "feature_importance.pdf",
     )
+    df_activations.to_csv(activation_outfolder / "feature_importances.csv")
 
+    target_transformer = exp.outputs[output_name].target_transformers[
+        target_column_name
+    ]
     all_activations_class_stratified = stratify_activations_by_target_classes(
         all_activations=all_activations,
-        target_transformer=experiment.target_transformers[target_column_name],
+        target_transformer=target_transformer,
+        output_name=output_name,
         target_column=target_column_name,
         column_type=target_column_type,
     )
@@ -92,6 +99,7 @@ def analyze_tabular_input_activations(
                 class_name=class_name,
             )
 
+        cat_act_dfs = []
         for cat_column in cat_columns:
 
             categorical_shap = _gather_categorical_shap_values(
@@ -106,11 +114,11 @@ def analyze_tabular_input_activations(
             )
             cat_column_transformers = load_transformers(
                 output_folder=experiment.configs.global_config.output_folder,
-                transformers_to_load=[cat_column],
+                transformers_to_load={input_name: [cat_column]},
             )
 
             categorical_inputs_mapped = map_categorical_labels_to_names(
-                cat_column_transformers=cat_column_transformers,
+                cat_column_transformers=cat_column_transformers[input_name],
                 cat_column=cat_column,
                 categorical_inputs=categorical_inputs,
             )
@@ -122,6 +130,19 @@ def analyze_tabular_input_activations(
                 class_name=class_name,
                 activation_outfolder=cur_class_outfolder,
             )
+
+            df_cur_categorical_acts = _parse_categorical_shap_values_for_serialization(
+                categorical_inputs_mapped=categorical_inputs_mapped,
+                shap_values_for_input=categorical_shap,
+                column_name=cat_column,
+            )
+            cat_act_dfs.append(df_cur_categorical_acts)
+
+        _save_categorical_acts(
+            dfs_categorical_acts_for_class=cat_act_dfs,
+            class_name=class_name,
+            output_folder=cur_class_outfolder,
+        )
 
 
 def set_up_tabular_tensor_slices(
@@ -299,7 +320,9 @@ def _gather_categorical_inputs(
 
 
 def map_categorical_labels_to_names(
-    cat_column_transformers: Dict, cat_column: str, categorical_inputs: pd.DataFrame
+    cat_column_transformers: Dict[str, LabelEncoder],
+    cat_column: str,
+    categorical_inputs: pd.DataFrame,
 ) -> pd.DataFrame:
     cat_column_transformer = cat_column_transformers[cat_column]
 
@@ -338,7 +361,7 @@ def plot_tabular_categorical_feature(
 
     fig = plt.gcf()
 
-    plt.title(feature_name_to_plot, fontsize=14)
+    plt.title(class_name, fontsize=14)
     plt.yticks(fontsize=10, wrap=True)
 
     plt.tight_layout()
@@ -356,6 +379,39 @@ def plot_tabular_categorical_feature(
         )
 
     plt.close("all")
+
+
+def _save_categorical_acts(
+    dfs_categorical_acts_for_class: Sequence[pd.DataFrame],
+    class_name: str,
+    output_folder: Path,
+) -> None:
+
+    if len(dfs_categorical_acts_for_class) == 0:
+        return None
+
+    df_cat_categorical_acts = pd.concat(dfs_categorical_acts_for_class)
+    df_cat_categorical_acts.index.name = "Input_Value"
+    csv_name = f"cat_features_{class_name}.csv"
+    output_path = str(output_folder / csv_name)
+    df_cat_categorical_acts.to_csv(path_or_buf=output_path)
+
+
+def _parse_categorical_shap_values_for_serialization(
+    categorical_inputs_mapped: pd.DataFrame,
+    shap_values_for_input: np.ndarray,
+    column_name: str,
+) -> pd.DataFrame:
+
+    categorical_inputs_copy = categorical_inputs_mapped.copy()
+
+    assert len(categorical_inputs_copy) == shap_values_for_input.shape[0]
+
+    categorical_inputs_copy["Shap_Value"] = shap_values_for_input
+    average_effects = categorical_inputs_copy.groupby(by=column_name).mean()
+    average_effects["Input_Name"] = average_effects.index.name
+
+    return average_effects
 
 
 def plot_tabular_beeswarm(

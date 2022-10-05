@@ -1,18 +1,26 @@
-from copy import copy
 from dataclasses import dataclass
 from functools import partial
-from typing import TYPE_CHECKING, Union, Dict, Callable, Sequence, Tuple, Iterable
+from typing import (
+    TYPE_CHECKING,
+    Union,
+    Dict,
+    Callable,
+    Sequence,
+    Tuple,
+    Iterable,
+    Generator,
+)
 
 import numpy as np
 import torch
-from torch import nn
+from aislib.misc_utils import get_logger
 from timm.data.mixup import rand_bbox
+from torch import nn
 
-from eir.data_load.data_utils import Batch
-from eir.data_load.label_setup import al_target_columns
+from eir.data_load.data_utils import Batch, get_output_info_generator
 
 if TYPE_CHECKING:
-    from eir.train import al_training_labels_target, al_criterions, Experiment
+    from eir.train import al_training_labels_target, al_criteria, Experiment
     from eir.setup.schemas import InputConfig
 
 al_target_values = Union[torch.LongTensor, torch.Tensor]
@@ -24,6 +32,8 @@ al_int_tensors = Union[
     torch.LongTensor,
     torch.BoolTensor,
 ]
+
+logger = get_logger(name=__name__)
 
 
 @dataclass
@@ -106,11 +116,13 @@ def hook_default_mix_data(
 
     batch = state["batch"]
 
+    target_columns_gen = get_output_info_generator(outputs_as_dict=experiment.outputs)
+
     mixing_info = get_mixing_info(
         mixing_alpha=gc.mixing_alpha,
         batch_size=gc.batch_size,
         target_labels=batch.target_labels,
-        target_columns=experiment.target_columns,
+        target_columns_gen=target_columns_gen,
     )
 
     mixed_inputs = {}
@@ -143,7 +155,7 @@ def get_mixing_info(
     mixing_alpha: float,
     batch_size: int,
     target_labels: "al_training_labels_target",
-    target_columns: al_target_columns,
+    target_columns_gen: Generator[Tuple[str, str, str], None, None],
 ) -> MixingObject:
     lambda_ = _sample_lambda(mixing_alpha=mixing_alpha)
 
@@ -151,7 +163,7 @@ def get_mixing_info(
     targets_permuted = mixup_all_targets(
         targets=target_labels,
         random_index_for_mixing=permuted_indexes,
-        target_columns=target_columns,
+        target_columns_gen=target_columns_gen,
     )
 
     mixing_info = MixingObject(
@@ -176,9 +188,11 @@ def _sample_lambda(mixing_alpha: float) -> float:
 
 def hook_mix_loss(experiment: "Experiment", state: Dict, *args, **kwargs) -> Dict:
 
+    target_columns_gen = get_output_info_generator(outputs_as_dict=experiment.outputs)
+
     mixed_losses = calc_all_mixed_losses(
-        target_columns=experiment.target_columns,
-        criterions=experiment.criterions,
+        target_columns_gen=target_columns_gen,
+        criteria=experiment.criteria,
         outputs=state["model_outputs"],
         mixed_object=state["mixing_info"],
     )
@@ -261,18 +275,21 @@ def get_uniform_cutmix_indices(input_length: int, lambda_: float) -> torch.Tenso
 def mixup_all_targets(
     targets: "al_training_labels_target",
     random_index_for_mixing: al_int_tensors,
-    target_columns: al_target_columns,
+    target_columns_gen: Generator[Tuple[str, str, str], None, None],
 ) -> "al_training_labels_target":
-    targets_permuted = copy(targets)
 
-    all_target_cols = target_columns["cat"] + target_columns["con"]
-    for target_col in all_target_cols:
+    targets_permuted = {}
 
-        cur_targets = targets_permuted[target_col]
+    for output_name, target_type, target_name in target_columns_gen:
+
+        if output_name not in targets_permuted:
+            targets_permuted[output_name] = {}
+
+        cur_targets = targets[output_name][target_name]
         cur_targets_permuted = mixup_targets(
             targets=cur_targets, random_index_for_mixing=random_index_for_mixing
         )
-        targets_permuted[target_col] = cur_targets_permuted
+        targets_permuted[output_name][target_name] = cur_targets_permuted
 
     return targets_permuted
 
@@ -282,31 +299,30 @@ def mixup_targets(
     random_index_for_mixing: torch.Tensor,
 ) -> al_target_values:
 
-    targets_permuted = copy(targets)
+    targets_permuted = targets.detach().clone()
     targets_permuted = targets_permuted[random_index_for_mixing]
 
     return targets_permuted
 
 
 def calc_all_mixed_losses(
-    target_columns: al_target_columns,
-    criterions: "al_criterions",
-    outputs: Dict[str, torch.Tensor],
+    target_columns_gen: Generator[Tuple[str, str, str], None, None],
+    criteria: "al_criteria",
+    outputs: Dict[str, Dict[str, torch.Tensor]],
     mixed_object: MixingObject,
 ):
 
-    losses = {}
+    losses = {output_name: {} for output_name in outputs.keys()}
 
-    all_target_columns = target_columns["con"] + target_columns["cat"]
-    for target_col in all_target_columns:
+    for output_name, target_type, target_name in target_columns_gen:
         cur_loss = calc_mixed_loss(
-            criterion=criterions[target_col],
-            outputs=outputs[target_col],
-            targets=mixed_object.targets[target_col],
-            targets_permuted=mixed_object.targets_permuted[target_col],
+            criterion=criteria[output_name][target_name],
+            outputs=outputs[output_name][target_name],
+            targets=mixed_object.targets[output_name][target_name],
+            targets_permuted=mixed_object.targets_permuted[output_name][target_name],
             lambda_=mixed_object.lambda_,
         )
-        losses[target_col] = cur_loss
+        losses[output_name][target_name] = cur_loss
 
     return losses
 
@@ -330,7 +346,7 @@ def calc_mixed_loss(
 def make_random_omics_columns_missing(
     omics_array: torch.Tensor, percentage: float = 0.05, probability: float = 1.0
 ) -> torch.Tensor:
-    random_draw = np.random.uniform()
+    random_draw = torch.rand(1).item()
     if random_draw > probability:
         return omics_array
 

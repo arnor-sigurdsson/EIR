@@ -9,7 +9,6 @@ from typing import (
     Tuple,
     Dict,
     Sequence,
-    TYPE_CHECKING,
     Callable,
 )
 
@@ -20,12 +19,15 @@ from torch import nn, Tensor
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
 from torch.nn.functional import pad
 from transformers import PreTrainedModel, PretrainedConfig
-from transformers.models.auto.modeling_auto import MODEL_MAPPING_NAMES
 
+from eir.setup.setup_utils import get_all_hf_model_names
 from eir.models.layers import _find_split_padding_needed
 
-if TYPE_CHECKING:
-    from eir.setup.schemas import al_sequence_models
+
+al_sequence_models = tuple(
+    Literal[i]
+    for i in ["sequence-default", "perceiver"] + list(get_all_hf_model_names())
+)
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -74,9 +76,9 @@ class SequenceModelConfig:
 
     model_init_config: Union["BasicTransformerFeatureExtractorModelConfig", Dict]
 
-    model_type: "al_sequence_models" = "sequence-default"
+    model_type: al_sequence_models = "sequence-default"
 
-    embedding_dim: int = 8
+    embedding_dim: int = 64
 
     position: Literal["encode", "embed"] = "encode"
     position_dropout: float = 0.10
@@ -579,48 +581,3 @@ class PositionalEmbedding(nn.Module):
     def forward(self, x: Tensor) -> Tensor:
         x = x + self.embedding[:, : self.max_length, :]
         return self.dropout(x)
-
-
-def get_all_hf_model_names() -> Sequence[str]:
-    all_models = sorted(list(MODEL_MAPPING_NAMES.keys()))
-    unsupported = get_unsupported_hf_models()
-    unsupported_names = unsupported.keys()
-    return [i for i in all_models if i not in unsupported_names]
-
-
-def get_unsupported_hf_models() -> dict:
-    unsupported = {
-        "beit": "Not strictly sequence model.",
-        "canine": "Cannot do straightforward look up of embeddings.",
-        "clip": "Not strictly sequence model.",
-        "convbert": "HF error.",
-        "gpt_neo": "Configuration troublesome w.r.t. attn layers matching num_layers.",
-        "deit": "Not strictly sequence model.",
-        "detr": "Not strictly sequence model.",
-        "dpr": "Not strictly sequence model.",
-        "fsmt": "Not strictly sequence model.",
-        "funnel": "HF error.",
-        "hubert": "Cannot do straightforward look up of embeddings.",
-        "layoutlmv2": "LayoutLMv2Model requires the detectron2 library.",
-        "lxmert": "Not strictly sequence model.",
-        "mt5": "Not implemented in EIR for feature extraction yet.",
-        "retribert": "Cannot do straightforward look up of embeddings.",
-        "segformer": "Not strictly sequence model.",
-        "sew": "Not strictly sequence model.",
-        "sew-d": "Not strictly sequence model.",
-        "speech_to_text": "Not strictly sequence model.",
-        "swin": "Not strictly sequence model.",
-        "tapas": "TapasModel requires the torch-scatter library.",
-        "perceiver": "Not strictly sequence model.",
-        "qdqbert": "ImportError.",
-        "unispeech": "Not strictly sequence model.",
-        "unispeech-sat": "Not strictly sequence model.",
-        "vilt": "Not strictly sequence model.",
-        "vit": "Not strictly sequence model.",
-        "vit_mae": "Not strictly sequence model.",
-        "vision-text-dual-encoder": "Not strictly sequence model.",
-        "wav2vec2": "Not strictly sequence model.",
-        "wavlm": "NotImplementedError.",
-    }
-
-    return unsupported

@@ -6,18 +6,21 @@ from torch.optim import SGD
 from torch.optim.adamw import AdamW
 from torch.utils.data import WeightedRandomSampler, SequentialSampler, RandomSampler
 
+import eir.data_load.data_augmentation
 import eir.data_load.data_utils
 import eir.models.model_setup
 import eir.models.omics.omics_models
 import eir.setup.config
 import eir.setup.input_setup
+import eir.setup.output_setup
 import eir.train
 from eir import train
-from eir.data_load import label_setup
-from eir.models.fusion.fusion_default import FusionModel
+from eir.models import MetaModel
+from eir.models.model_setup import get_default_model_registry_per_input_type
 from eir.models.omics.models_cnn import CNNModel
 from eir.models.omics.models_linear import LinearModel
 from eir.setup.config import Configs
+from eir.setup.output_setup import set_up_outputs_for_training
 from eir.setup.schemas import GlobalConfig
 from eir.train_utils import optimizers
 
@@ -63,12 +66,23 @@ def test_prepare_run_folder_fail(patched_get_run_folder, tmp_path):
                         "model_config": {"model_type": "linear"},
                     },
                 ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    }
+                ],
             },
         },
     ],
     indirect=True,
 )
-def test_get_default_experiment(create_test_config):
+def test_get_default_experiment(
+    create_test_config: Configs,
+):
     test_configs = create_test_config
 
     default_experiment = train.get_default_experiment(configs=test_configs, hooks=None)
@@ -76,23 +90,19 @@ def test_get_default_experiment(create_test_config):
 
     assert default_experiment.hooks is None
 
-    assert len(default_experiment.criterions) == 1
-    assert isinstance(default_experiment.criterions["Origin"], nn.CrossEntropyLoss)
+    assert len(default_experiment.criteria) == 1
+    assert isinstance(
+        default_experiment.criteria["test_output"]["Origin"], nn.CrossEntropyLoss
+    )
 
     assert len(default_experiment.inputs) == 1
     assert set(default_experiment.inputs.keys()) == {"test_genotype"}
 
-    assert default_experiment.target_columns == {"cat": ["Origin"], "con": []}
-
-
-def test_modify_bs_for_multi_gpu():
-    no_gpu = train._modify_bs_for_multi_gpu(multi_gpu=False, batch_size=64)
-    assert no_gpu == 64
-
-    with patch("eir.train.torch.cuda.device_count", autospec=True) as mocked:
-        mocked.return_value = 4
-        gpu = train._modify_bs_for_multi_gpu(multi_gpu=True, batch_size=64)
-        assert gpu == 64 * 4
+    assert len(default_experiment.outputs) == 1
+    assert default_experiment.outputs["test_output"].target_columns == {
+        "cat": ["Origin"],
+        "con": [],
+    }
 
 
 @pytest.mark.parametrize("create_test_data", [{"task_type": "multi"}], indirect=True)
@@ -109,6 +119,15 @@ def test_modify_bs_for_multi_gpu():
                         "model_config": {"model_type": "linear"},
                     },
                 ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    }
+                ],
             },
         },
     ],
@@ -120,7 +139,7 @@ def test_get_train_sampler(create_test_data, create_test_datasets, create_test_c
     gc = test_config.global_config
 
     train_dataset, *_ = create_test_datasets
-    gc.weighted_sampling_columns = ["Origin"]
+    gc.weighted_sampling_columns = ["test_output.Origin"]
 
     test_sampler = eir.data_load.data_utils.get_train_sampler(
         columns_to_sample=gc.weighted_sampling_columns, train_dataset=train_dataset
@@ -148,15 +167,26 @@ def test_get_train_sampler(create_test_data, create_test_datasets, create_test_c
                         "model_config": {"model_type": "linear"},
                     },
                 ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    }
+                ],
             },
         },
     ],
     indirect=True,
 )
-def test_get_dataloaders(create_test_config, create_test_data, create_test_datasets):
+def test_get_dataloaders(
+    create_test_config: Configs, create_test_data, create_test_datasets
+):
     test_config = create_test_config
     gc = test_config.global_config
-    gc.weighted_sampling_columns = ["Origin"]
+    gc.weighted_sampling_columns = ["test_output.Origin"]
 
     train_dataset, valid_dataset = create_test_datasets
     train_sampler = eir.data_load.data_utils.get_train_sampler(
@@ -178,15 +208,6 @@ def test_get_dataloaders(create_test_config, create_test_data, create_test_datas
 
     assert isinstance(train_dataloader.sampler, RandomSampler)
     assert isinstance(valid_dataloader.sampler, SequentialSampler)
-
-
-def _modify_bs_for_multi_gpu():
-    patch_target = "eir.train.torch.cuda.device_count"
-    with patch(patch_target, autospec=True) as m:
-        m.return_value = 2
-
-        assert train._modify_bs_for_multi_gpu(True, 32) == 64
-        assert train._modify_bs_for_multi_gpu(False, 32) == 64
 
 
 def test_get_optimizer():
@@ -228,10 +249,15 @@ def test_get_optimizer():
                         "model_config": {"model_type": "cnn"},
                     },
                 ],
-                "target_configs": {
-                    "target_cat_columns": ["Origin"],
-                    "target_con_columns": ["Height"],
-                },
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": ["Height"],
+                        },
+                    }
+                ],
             }
         },
         {
@@ -242,10 +268,15 @@ def test_get_optimizer():
                         "model_config": {"model_type": "linear"},
                     },
                 ],
-                "target_configs": {
-                    "target_cat_columns": ["Origin"],
-                    "target_con_columns": ["Height"],
-                },
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": ["Height"],
+                        },
+                    }
+                ],
             }
         },
     ],
@@ -256,10 +287,6 @@ def test_get_model(create_test_config: Configs, create_test_labels):
     gc = create_test_config.global_config
     target_labels = create_test_labels
 
-    num_outputs_per_class = train.set_up_num_outputs_per_target(
-        target_transformers=target_labels.label_transformers
-    )
-
     inputs_as_dict = eir.setup.input_setup.set_up_inputs_for_training(
         inputs_configs=create_test_config.input_configs,
         train_ids=tuple(create_test_labels.train_labels.keys()),
@@ -267,11 +294,20 @@ def test_get_model(create_test_config: Configs, create_test_labels):
         hooks=None,
     )
 
+    default_registry = get_default_model_registry_per_input_type()
+
+    outputs_as_dict = set_up_outputs_for_training(
+        output_configs=create_test_config.output_configs,
+        target_transformers=target_labels.label_transformers,
+    )
+
     model = eir.models.model_setup.get_model(
         inputs_as_dict=inputs_as_dict,
+        outputs_as_dict=outputs_as_dict,
+        fusion_config=test_config.fusion_config,
         global_config=gc,
-        predictor_config=create_test_config.predictor_config,
-        num_outputs_per_target=num_outputs_per_class,
+        model_registry_per_input_type=default_registry,
+        model_registry_per_output_type={},
     )
 
     assert len(test_config.input_configs) == 1
@@ -282,45 +318,65 @@ def test_get_model(create_test_config: Configs, create_test_labels):
 def _check_model(model_type: str, model: nn.Module):
 
     if model_type == "cnn":
-        assert isinstance(model, FusionModel)
-        assert model.multi_task_branches["Origin"][-1][-1].out_features == 3
-        assert model.multi_task_branches["Height"][-1][-1].out_features == 1
-        assert isinstance(model.modules_to_fuse["test_genotype"], CNNModel)
+        assert isinstance(model, MetaModel)
+        output_module = model.output_modules.test_output
+        origin_module = output_module.multi_task_branches["Origin"]
+        assert origin_module[-1][-1].out_features == 3
+
+        height_module = output_module.multi_task_branches["Height"]
+        assert height_module[-1][-1].out_features == 1
+
+        assert isinstance(model.input_modules["test_genotype"], CNNModel)
 
     elif model_type == "linear":
-        assert isinstance(model.modules_to_fuse["test_genotype"], LinearModel)
+        assert isinstance(model.input_modules["test_genotype"], LinearModel)
 
 
-def test_get_criterions():
+@pytest.mark.parametrize("create_test_data", [{"task_type": "multi"}], indirect=True)
+@pytest.mark.parametrize(
+    "create_test_config_init_base",
+    [
+        {
+            "injections": {
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "model_config": {"model_type": "cnn"},
+                    },
+                ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": ["Height"],
+                        },
+                    }
+                ],
+            }
+        },
+    ],
+    indirect=True,
+)
+def test_get_criteria(
+    create_test_config: Configs, create_test_labels: train.MergedTargetLabels
+):
+    target_labels = create_test_labels
 
-    test_target_columns_dict = {
-        "con": ["Height", "BMI"],
-        "cat": ["Origin", "HairColor"],
-    }
-
-    test_criterions = train._get_criterions(
-        test_target_columns_dict,
+    outputs_as_dict = set_up_outputs_for_training(
+        output_configs=create_test_config.output_configs,
+        target_transformers=target_labels.label_transformers,
     )
-    for column_name in test_target_columns_dict["con"]:
-        assert test_criterions[column_name].func is train._calc_mse
 
-    for column_name in test_target_columns_dict["cat"]:
-        assert isinstance(test_criterions[column_name], nn.CrossEntropyLoss)
+    test_criteria = train._get_criteria(outputs_as_dict=outputs_as_dict)
+    for output_name, output_object in outputs_as_dict.items():
+        for column_name in output_object.target_columns["con"]:
+            assert test_criteria[output_name][column_name].func is train._calc_mse
 
-
-def test_set_up_num_classes(get_transformer_test_data):
-    df_test, test_target_columns_dict = get_transformer_test_data
-
-    test_transformers = label_setup._get_fit_label_transformers(
-        df_labels=df_test, label_columns=test_target_columns_dict
-    )
-
-    num_classes = train.set_up_num_outputs_per_target(
-        target_transformers=test_transformers
-    )
-
-    assert num_classes["Height"] == 1
-    assert num_classes["Origin"] == 3
+        for column_name in output_object.target_columns["cat"]:
+            assert isinstance(
+                test_criteria[output_name][column_name], nn.CrossEntropyLoss
+            )
 
 
 @pytest.mark.parametrize(
@@ -347,6 +403,15 @@ def test_set_up_num_classes(get_transformer_test_data):
                         },
                     }
                 ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    }
+                ],
             },
         },
         # With gradient accumulation
@@ -358,6 +423,15 @@ def test_set_up_num_classes(get_transformer_test_data):
                         "input_info": {"input_name": "test_genotype"},
                         "model_config": {
                             "model_type": "linear",
+                        },
+                    }
+                ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
                         },
                     }
                 ],

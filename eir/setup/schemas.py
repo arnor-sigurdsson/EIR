@@ -1,11 +1,10 @@
 from dataclasses import dataclass, field
 from typing import Union, Literal, List, Optional, Sequence, Type
 
-from eir.models.fusion.fusion_default import FusionModelConfig
-from eir.models.fusion.fusion_linear import LinearFusionModelConfig
+from eir.models.fusion.fusion_identity import IdentityConfig
 from eir.models.fusion.fusion_mgmoe import MGMoEModelConfig
 from eir.models.image.image_models import ImageModelConfig
-from eir.models.image.image_models import get_all_timm_model_names
+from eir.models.layers import ResidualMLPConfig
 from eir.models.omics.omics_models import (
     OmicsModelConfig,
     LinearModel,
@@ -20,10 +19,12 @@ from eir.models.omics.omics_models import (
     IdentityModelConfig,
     Dataclass,
 )
+from eir.models.output.tabular_output import (
+    TabularModelOutputConfig,
+)
 from eir.models.sequence.transformer_models import (
     BasicTransformerFeatureExtractorModelConfig,
     SequenceModelConfig,
-    get_all_hf_model_names,
 )
 from eir.models.tabular.tabular import (
     SimpleTabularModel,
@@ -33,21 +34,15 @@ from eir.models.tabular.tabular import (
 from eir.setup.setup_utils import get_all_optimizer_names
 
 al_input_configs = Sequence["InputConfig"]
-al_sequence_models = tuple(
-    Literal[i] for i in ["sequence-default"] + list(get_all_hf_model_names())
-)
-al_bytes_models = tuple(
-    Literal[i]
-    for i in ["sequence-default", "perceiver"] + list(get_all_hf_model_names())
-)
-al_image_models = tuple(Literal[i] for i in get_all_timm_model_names())
+al_output_configs = Sequence["OutputConfig"]
+
 al_optimizers = tuple(Literal[i] for i in get_all_optimizer_names())
 
-al_model_configs = Union[
+al_feature_extractor_configs = Union[
     OmicsModelConfig, TabularModelConfig, ImageModelConfig, SequenceModelConfig
 ]
 
-al_model_configs_classes = Union[
+al_feature_extractor_configs_classes = Union[
     Type[OmicsModelConfig],
     Type[TabularModelConfig],
     Type[ImageModelConfig],
@@ -55,7 +50,7 @@ al_model_configs_classes = Union[
 ]
 
 al_model_type_configs = Union[
-    FusionModelConfig,
+    ResidualMLPConfig,
     MGMoEModelConfig,
     CNNModelConfig,
     LinearModelConfig,
@@ -76,6 +71,16 @@ al_models_classes = Union[
     Type[SimpleTabularModel],
     Type[IdentityModel],
 ]
+
+
+al_output_module_configs_classes = Union[
+    Type[TabularModelOutputConfig],
+]
+
+al_output_module_configs = Union[
+    TabularModelOutputConfig,
+]
+
 
 al_tokenizer_choices = (
     Union[
@@ -118,10 +123,7 @@ class GlobalConfig:
         Number of workers for multi-process training and validation data loading.
 
     :param device:
-        Device to run the training on (i.e. GPU / CPU).
-
-    :param gpu_num:
-        Which GPU to run (according to CUDA order).
+        Device to run the training on (e.g. 'cuda:0' / 'cpu').
 
     :param amp:
         Whether to use Automatic Mixed Precision. Currently only supported when
@@ -158,6 +160,12 @@ class GlobalConfig:
     :param gradient_clipping:
         Max norm used for gradient clipping, with p=2.
 
+    :param gradient_accumulation_steps:
+        Number of steps to use for gradient accumulation.
+
+    :param gradient_noise:
+        Gradient noise to inject during training.
+
     :param early_stopping_patience:
         Number of validation performance steps without improvement over
         best performance before terminating run.
@@ -189,14 +197,17 @@ class GlobalConfig:
         Iteration interval to perform validation and possibly activation analysis if
         set.
 
+    :param save_evaluation_sample_results:
+        Whether to save evaluation results (e.g. confusion matrix for classification
+        tasks, regression plot and predictions for regression tasks). Setting to
+        False can be useful to save space during large scale experiments.
+
     :param checkpoint_interval:
         Iteration interval to checkpoint (i.e. save) model.
 
     :param n_saved_models:
         Number of top N models to saved during training.
 
-    :param multi_gpu:
-        Whether to run the training on multiple GPUs for the current node.
 
     :param get_acts:
         Whether to compute activations w.r.t. inputs.
@@ -235,7 +246,6 @@ class GlobalConfig:
     manual_valid_ids_file: Union[str, None] = None
     dataloader_workers: int = 0
     device: str = "cpu"
-    gpu_num: str = "0"
     amp: bool = False
     weighted_sampling_columns: Union[None, Sequence[str]] = None
     lr: float = 1e-03
@@ -246,6 +256,7 @@ class GlobalConfig:
     lr_plateau_factor: float = 0.2
     gradient_clipping: float = 0.0
     gradient_accumulation_steps: Union[None, int] = None
+    gradient_noise: float = 0.0
     early_stopping_patience: int = 10
     early_stopping_buffer: Union[None, int] = None
     warmup_steps: Union[Literal["auto"], int] = "auto"
@@ -255,9 +266,9 @@ class GlobalConfig:
     wd: float = 1e-04
     memory_dataset: bool = False
     sample_interval: int = 200
+    save_evaluation_sample_results: bool = True
     checkpoint_interval: Union[None, int] = None
     n_saved_models: int = 1
-    multi_gpu: bool = False
     get_acts: bool = False
     act_classes: Union[None, List[str]] = None
     max_acts_per_class: Union[None, int] = None
@@ -299,7 +310,7 @@ class InputConfig:
         "ByteInputDataConfig",
         "ImageInputDataConfig",
     ]
-    model_config: al_model_configs
+    model_config: al_feature_extractor_configs
     pretrained_config: Union[None, "BasicPretrainedConfig"] = None
     interpretation_config: Union[None, "BasicInterpretationConfig"] = None
 
@@ -328,6 +339,11 @@ class OmicsInputDataConfig:
     :param snp_file:
         Path to the relevant ``.bim`` file, used for activation analysis.
 
+    :param subset_snps_file:
+        Path to a file with corresponding SNP IDs to subset from the main
+        arrays for the modelling. Requires the ``snp_file`` parameter to
+        be passed in.
+
     :param na_augment_perc:
         Percentage of the input (i.e. percentage of SNPs) to augment by setting the
         SNPs to 'missing' (i.e. ``[0, 0, 0, 1]`` in one-hot encoding).
@@ -344,8 +360,9 @@ class OmicsInputDataConfig:
     """
 
     snp_file: Optional[str] = None
-    na_augment_perc: float = 0.0
-    na_augment_prob: float = 0.0
+    subset_snps_file: Optional[str] = None
+    na_augment_perc: float = 0.2
+    na_augment_prob: float = 0.8
     omics_format: Literal["one-hot"] = "one-hot"
     mixing_subtype: Union[Literal["mixup", "cutmix-block", "cutmix-uniform"]] = "mixup"
 
@@ -549,25 +566,40 @@ class ImageInputDataConfig:
 
 
 @dataclass
-class PredictorConfig:
+class FusionConfig:
     """
     :param model_type:
         Which type of fusion model to use.
 
     :param model_config:
-        Predictor model configuration.
+        Fusion model configuration.
     """
 
     model_type: Literal["default", "linear", "mgmoe"]
-    model_config: Union[FusionModelConfig, LinearFusionModelConfig, MGMoEModelConfig]
+    model_config: Union[ResidualMLPConfig, IdentityConfig, MGMoEModelConfig]
 
 
 @dataclass
-class TargetConfig:
+class OutputInfoConfig:
     """
-    :param label_file:
-        Label ``.csv`` file to load targets from.
+    :param output_source:
+        Where on the filesystem to locate the output (if applicable)
 
+    :param output_name:
+        Name to identify the output.
+
+    :param output_type:
+        Type of the output.
+    """
+
+    output_source: Union[str, None]
+    output_name: str
+    output_type: Literal["tabular"]
+
+
+@dataclass
+class TabularOutputTypeConfig:
+    """
     :param label_parsing_chunk_size:
         Number of rows to process at time when loading in the ``input_source``. Useful
         when RAM is limited.
@@ -579,7 +611,27 @@ class TargetConfig:
         Which columns from ``label_file`` to use as continuous targets.
     """
 
-    label_file: str
     label_parsing_chunk_size: Union[None, int] = None
     target_cat_columns: Sequence[str] = field(default_factory=list)
     target_con_columns: Sequence[str] = field(default_factory=list)
+
+
+@dataclass
+class OutputConfig:
+
+    """
+    :param output_info:
+        Information about the output source, name and type.
+
+    :param output_type_info:
+       Information specific to the output type, e.g. which columns to predict
+       from a tabular file.
+
+    :param model_config:
+        Configuration for the chosen model (i.e. output module after fusion) for this
+        output.
+    """
+
+    output_info: OutputInfoConfig
+    output_type_info: Union[TabularOutputTypeConfig]
+    model_config: Union[TabularModelOutputConfig]

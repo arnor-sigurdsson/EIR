@@ -33,14 +33,17 @@ def get_target_class_name(
 def stratify_activations_by_target_classes(
     all_activations: Sequence["SampleActivation"],
     target_transformer: "al_label_transformers_object",
+    output_name: str,
     target_column: str,
     column_type: str,
 ) -> Dict[str, Sequence["SampleActivation"]]:
     all_activations_target_class_stratified = defaultdict(list)
 
     for sample in all_activations:
+        cur_labels_all = sample.sample_info.target_labels
+        cur_labels = cur_labels_all[output_name][target_column]
         cur_label_name = get_target_class_name(
-            sample_label=sample.sample_info.target_labels[target_column],
+            sample_label=cur_labels,
             target_transformer=target_transformer,
             column_type=column_type,
             target_column_name=target_column,

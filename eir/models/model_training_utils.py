@@ -5,7 +5,6 @@ from typing import (
     Tuple,
     Union,
     Dict,
-    overload,
     TYPE_CHECKING,
     Callable,
     Any,
@@ -16,15 +15,14 @@ import plotly.express as px
 import torch
 from aislib.misc_utils import get_logger
 from aislib.pytorch_modules import Swish
-from ignite.contrib.handlers import FastaiLRFinder
 from ignite.engine import Engine
+from ignite.handlers.lr_finder import FastaiLRFinder
 from torch import nn
 from torch.nn import Module
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 
-from eir.data_load.data_utils import get_target_columns_generator
-from eir.data_load.label_setup import al_target_columns
+from eir.data_load.data_utils import get_output_info_generator
 from eir.train_utils.utils import (
     call_hooks_stage_iterable,
 )
@@ -35,13 +33,15 @@ if TYPE_CHECKING:
         Experiment,
         al_training_labels_batch,
         al_training_labels_target,
-        al_training_labels_extra,
+        al_input_batch,
+        al_ids,
         Batch,
     )
+    from eir.setup.output_setup import al_output_objects_as_dict
 
 # Aliases
 al_dloader_gathered_preds = Tuple[
-    Dict[str, torch.Tensor], Union[List[str], Dict[str, torch.Tensor]], List[str]
+    Dict[str, Dict[str, torch.Tensor]], "al_training_labels_target", List[str]
 ]
 al_dloader_gathered_raw = Tuple[
     Dict[str, torch.Tensor], "al_training_labels_target", Sequence[str]
@@ -53,28 +53,36 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 
 def predict_on_batch(
     model: Module, inputs: Dict[str, torch.Tensor]
-) -> Dict[str, torch.Tensor]:
+) -> Dict[str, Dict[str, torch.Tensor]]:
     assert not model.training
     with torch.no_grad():
-        val_outputs = model(inputs)
+        val_outputs = model(inputs=inputs)
 
     return val_outputs
 
 
 def parse_target_labels(
-    target_columns: al_target_columns, device: str, labels: Dict[str, torch.Tensor]
-) -> Dict[str, torch.Tensor]:
+    output_objects: "al_output_objects_as_dict",
+    device: str,
+    labels: "al_training_labels_target",
+) -> "al_training_labels_target":
 
-    target_columns_gen = get_target_columns_generator(target_columns=target_columns)
+    target_columns_gen = get_output_info_generator(outputs_as_dict=output_objects)
 
     labels_casted = {}
-    for column_type, column_name in target_columns_gen:
-        cur_labels = labels[column_name]
+
+    for output_name, column_type, column_name in target_columns_gen:
+
+        if output_name not in labels_casted:
+            labels_casted[output_name] = {}
+
+        cur_labels = labels[output_name][column_name]
         cur_labels = cur_labels.to(device=device)
+
         if column_type == "con":
-            labels_casted[column_name] = cur_labels.to(dtype=torch.float)
+            labels_casted[output_name][column_name] = cur_labels.to(dtype=torch.float)
         elif column_type == "cat":
-            labels_casted[column_name] = cur_labels.to(dtype=torch.long)
+            labels_casted[output_name][column_name] = cur_labels.to(dtype=torch.long)
 
     return labels_casted
 
@@ -127,18 +135,18 @@ def gather_pred_outputs_from_dloader(
         del ids
 
     if with_labels:
-        all_label_batches = _stack_list_of_tensor_dicts(
-            list_of_batch_dicts=all_label_batches
+        all_label_batches = _stack_list_of_output_target_dicts(
+            list_of_target_batch_dicts=all_label_batches
         )
 
-    all_output_batches = _stack_list_of_tensor_dicts(
-        list_of_batch_dicts=all_output_batches
+    all_output_batches = _stack_list_of_output_target_dicts(
+        list_of_target_batch_dicts=all_output_batches
     )
 
     return all_output_batches, all_label_batches, ids_total
 
 
-def gather_dloader_samples(
+def gather_data_loader_samples(
     data_loader: DataLoader,
     batch_prep_hook: Sequence[Callable],
     batch_prep_hook_kwargs: Dict[str, Any],
@@ -158,9 +166,9 @@ def gather_dloader_samples(
         )
         batch = state["batch"]
 
-        inputs: Dict[str, torch.Tensor] = batch.inputs
-        target_labels: Dict[str, torch.Tensor] = batch.target_labels
-        ids: Sequence[str] = batch.ids
+        inputs: "al_input_batch" = batch.inputs
+        target_labels: "al_training_labels_target" = batch.target_labels
+        ids: "al_ids" = batch.ids
 
         all_input_batches.append(inputs)
         all_label_batches.append(target_labels)
@@ -171,10 +179,10 @@ def gather_dloader_samples(
                 ids_total = ids_total[:n_samples]
                 break
 
-    all_label_batches = _stack_list_of_tensor_dicts(
-        list_of_batch_dicts=all_label_batches
+    all_label_batches = _stack_list_of_output_target_dicts(
+        list_of_target_batch_dicts=all_label_batches
     )
-    all_input_batches = _stack_list_of_tensor_dicts(
+    all_input_batches = _stack_list_of_batch_dicts(
         list_of_batch_dicts=all_input_batches
     )
 
@@ -185,9 +193,11 @@ def gather_dloader_samples(
             input_subset = all_input_batches[input_name][:n_samples]
             inputs_final[input_name] = input_subset
 
-        for target_name in all_label_batches.keys():
-            target_subset = all_label_batches[target_name][:n_samples]
-            target_labels_final[target_name] = target_subset
+        for output_name in all_label_batches.keys():
+            cur_output = all_label_batches[output_name]
+            for target_name in cur_output.keys():
+                target_subset = cur_output[target_name][:n_samples]
+                target_labels_final[target_name] = target_subset
 
     else:
         inputs_final, target_labels_final = all_input_batches, all_label_batches
@@ -195,43 +205,60 @@ def gather_dloader_samples(
     return inputs_final, target_labels_final, ids_total
 
 
-@overload
-def _stack_list_of_tensor_dicts(
-    list_of_batch_dicts: List["al_training_labels_target"],
+def _stack_list_of_output_target_dicts(
+    list_of_target_batch_dicts: List["al_training_labels_target"],
 ) -> "al_training_labels_target":
-    ...
-
-
-@overload
-def _stack_list_of_tensor_dicts(
-    list_of_batch_dicts: List["al_training_labels_extra"],
-) -> "al_training_labels_extra":
-    ...
-
-
-def _stack_list_of_tensor_dicts(list_of_batch_dicts):
     """
     Spec:
         [batch_1, batch_2, batch_3]
 
         batch_1 =   {
-                        'Target_Column_1': torch.Tensor(...), # with obs as rows
-                        'Target_Column_2': torch.Tensor(...),
+                        'Output_Name_1': {'Target_Column_1': torch.Tensor(...)},
+                        'Output_Name_2': {'Target_Column_2': torch.Tensor(...)},
                     }
+                                                            with obs as rows in tensors
     """
 
-    def _do_stack(
-        list_of_elements: List[Union[torch.Tensor, torch.LongTensor, str]]
-    ) -> Union[torch.Tensor, List[str]]:
-        # check that they're all the same type
-        list_types = set(type(i) for i in list_of_elements)
-        assert len(list_types) == 1
+    output_names = list_of_target_batch_dicts[0].keys()
+    aggregated_batches = {output_name: {} for output_name in output_names}
+    for output_name in output_names:
+        cur_output_targets = list_of_target_batch_dicts[0][output_name]
+        for target_name in cur_output_targets.keys():
+            aggregated_batches[output_name][target_name] = []
 
-        are_tensors = isinstance(list_of_elements[0], (torch.Tensor, torch.LongTensor))
-        if are_tensors:
-            return torch.stack(list_of_elements)
+    for batch in list_of_target_batch_dicts:
+        assert set(batch.keys()) == output_names
 
-        return list_of_elements
+        for output_name in batch.keys():
+            cur_output_batch = batch[output_name]
+            for target_name in cur_output_batch.keys():
+                cur_column_batch = cur_output_batch[target_name]
+                cur_batch_value = [i for i in cur_column_batch]
+
+                aggregated_batches[output_name][target_name] += cur_batch_value
+
+    stacked_outputs = {}
+    for output_name, output_dict in aggregated_batches.items():
+        cur_stacked_outputs = {
+            key: _do_stack(list_of_elements)
+            for key, list_of_elements in output_dict.items()
+        }
+        stacked_outputs[output_name] = cur_stacked_outputs
+
+    return stacked_outputs
+
+
+def _stack_list_of_batch_dicts(
+    list_of_batch_dicts: List["al_input_batch"],
+) -> "al_input_batch":
+    """
+    Spec:
+        [batch_1, batch_2, batch_3]
+        batch_1 =   {
+                        'input_1': torch.Tensor(...), # with obs as rows
+                        'input_2': torch.Tensor(...),
+                    }
+    """
 
     target_columns = list_of_batch_dicts[0].keys()
     aggregated_batches = {key: [] for key in target_columns}
@@ -243,12 +270,26 @@ def _stack_list_of_tensor_dicts(list_of_batch_dicts):
             cur_column_batch = batch[column]
             aggregated_batches[column] += [i for i in cur_column_batch]
 
-    stacked_outputs = {
+    stacked_inputs = {
         key: _do_stack(list_of_elements)
         for key, list_of_elements in aggregated_batches.items()
     }
 
-    return stacked_outputs
+    return stacked_inputs
+
+
+def _do_stack(
+    list_of_elements: List[Union[torch.Tensor, torch.LongTensor, str]]
+) -> Union[torch.Tensor, List[str]]:
+    # check that they're all the same type
+    list_types = set(type(i) for i in list_of_elements)
+    assert len(list_types) == 1
+
+    are_tensors = isinstance(list_of_elements[0], (torch.Tensor, torch.LongTensor))
+    if are_tensors:
+        return torch.stack(list_of_elements)
+
+    return list_of_elements
 
 
 def add_wd_to_model_params(
@@ -427,17 +468,56 @@ def plot_lr_find_results(
 
 
 def trace_eir_model(
-    fusion_model: nn.Module, example_inputs: Dict[str, Any]
+    meta_model: nn.Module, example_inputs: Dict[str, Any]
 ) -> torch.jit.TracedModule:
+    """
+    Optimally we would like to trace the whole meta_model in one go, but since torch
+    currently does not like / support nested dict outputs when tracing a model,
+    we'll opt for tracing the individual modules like below for now (assuming it's
+    better than nothing).
+    """
 
-    fusion_model.eval()
+    meta_model.eval()
 
-    for name, module in fusion_model.named_modules():
+    for name, module in meta_model.named_modules():
         if hasattr(module, "script_submodules_for_tracing"):
             module.script_submodules_for_tracing()
 
-    traced_fusion_model = torch.jit.trace(
-        func=fusion_model, example_inputs=example_inputs, strict=False
+    with torch.no_grad():
+
+        traced_input_modules = nn.ModuleDict()
+        feature_extractors_out = {}
+        for module_name, module_input in example_inputs.items():
+            module = meta_model.input_modules[module_name]
+            traced_input_module = torch.jit.trace_module(
+                mod=module,
+                inputs={"forward": module_input},
+                strict=False,
+            )
+            traced_input_modules[module_name] = traced_input_module
+            feature_extractors_out[module_name] = module(module_input)
+
+        fusion_module = meta_model.fusion_module
+        traced_fusion_module = torch.jit.trace_module(
+            mod=fusion_module,
+            inputs={"forward": feature_extractors_out},
+            strict=False,
+        )
+        fused_features = fusion_module(feature_extractors_out)
+
+        traced_output_modules = nn.ModuleDict()
+        for output_module_name, output_module in meta_model.output_modules.items():
+            traced_output_module = torch.jit.trace_module(
+                mod=output_module,
+                inputs={"forward": fused_features},
+                strict=False,
+            )
+            traced_output_modules[output_module_name] = traced_output_module
+
+    traced_meta_model = meta_model.__class__(
+        input_modules=traced_input_modules,
+        fusion_module=traced_fusion_module,
+        output_modules=traced_output_modules,
     )
 
-    return traced_fusion_model
+    return traced_meta_model

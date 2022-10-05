@@ -113,7 +113,7 @@ def test_block_cutmix_omics_input(patched_indices: List[int]) -> None:
     test_batch = torch.stack(test_arrays)
 
     # Needed since mixing overwrites input
-    test_batch_original = test_batch.clone()
+    test_batch_original = test_batch.detach().clone()
 
     batch_indices_for_mixing = torch.LongTensor([1, 0])
 
@@ -164,7 +164,11 @@ def test_get_block_cutmix_indices(input_length: int, lambda_: float):
 
     num_snps_in_mixed_block = random_index_end - random_index_start
     num_snps_from_original = input_length - num_snps_in_mixed_block
-    assert num_snps_from_original == int(round(lambda_ * input_length))
+    assert num_snps_from_original + num_snps_in_mixed_block == input_length
+
+    expected_original_no_snps = int(round(lambda_ * input_length))
+    expected_diff = abs(num_snps_from_original - expected_original_no_snps)
+    assert 0 <= expected_diff <= 1
 
 
 @given(
@@ -189,7 +193,7 @@ def test_uniform_cutmix_omics_input(patched_indices: List[int]):
     test_batch = torch.stack(test_arrays)
 
     # Needed since mixing overwrites input
-    test_batch_original = test_batch.clone()
+    test_batch_original = test_batch.detach().clone()
 
     batch_indices_for_mixing = torch.LongTensor([1, 0])
 
@@ -235,7 +239,11 @@ def test_get_uniform_cutmix_indices(lambda_, input_length):
 
     num_mixed_snps = len(test_random_indices)
     num_snps_from_original = input_length - num_mixed_snps
-    assert num_snps_from_original == int(round(lambda_ * input_length))
+    assert num_snps_from_original + num_mixed_snps == input_length
+
+    expected_original_no_snps = int(round(lambda_ * input_length))
+    expected_diff = abs(num_snps_from_original - expected_original_no_snps)
+    assert 0 <= expected_diff <= 1
 
 
 @given(
@@ -251,15 +259,25 @@ def test_mixup_all_targets(test_targets):
     }
     random_indices = torch.randperm(len(test_targets)).to(dtype=torch.long)
     all_target_columns = target_columns["con"] + target_columns["cat"]
-    targets = {c: test_targets for c in all_target_columns}
+    targets = {"test_output": {c: test_targets for c in all_target_columns}}
+
+    def _target_columns_gen():
+        for con_column in target_columns["con"]:
+            yield "test_output", "con", con_column
+        for cat_column in target_columns["cat"]:
+            yield "test_output", "cat", cat_column
 
     all_mixed_targets = data_augmentation.mixup_all_targets(
         targets=targets,
         random_index_for_mixing=random_indices,
-        target_columns=target_columns,
+        target_columns_gen=_target_columns_gen(),
     )
-    for _, targets_permuted in all_mixed_targets.items():
+    for _, targets_permuted in all_mixed_targets["test_output"].items():
         assert set(test_targets.tolist()) == set(targets_permuted.tolist())
+
+        # Probabilistic guarantee here (i.e. would fail if all were the same)
+        if len(set(test_targets.tolist())) > 3:
+            assert test_targets.tolist() != targets_permuted.tolist()
 
 
 @given(
@@ -274,6 +292,10 @@ def test_mixup_targets(test_targets):
         targets=test_targets, random_index_for_mixing=random_indices
     )
     assert set(test_targets.tolist()) == set(targets_permuted.tolist())
+
+    # Probabilistic guarantee here (i.e. would fail if all were the same)
+    if len(set(test_targets.tolist())) > 3:
+        assert test_targets.tolist() != targets_permuted.tolist()
 
 
 def _get_mixed_loss_test_cases_for_parametrization():
@@ -332,8 +354,16 @@ def test_calc_all_mixed_losses(test_inputs, expected_output):
     }
     all_target_columns = target_columns["con"] + target_columns["cat"]
 
-    targets = {c: test_inputs["targets"] for c in all_target_columns}
-    targets_permuted = {c: test_inputs["targets_permuted"] for c in all_target_columns}
+    def _target_columns_gen():
+        for con_column in target_columns["con"]:
+            yield "test_output", "con", con_column
+        for cat_column in target_columns["cat"]:
+            yield "test_output", "cat", cat_column
+
+    targets = {"test_output": {c: test_inputs["targets"] for c in all_target_columns}}
+    targets_permuted = {
+        "test_output": {c: test_inputs["targets_permuted"] for c in all_target_columns}
+    }
     mixed_object = data_augmentation.MixingObject(
         targets=targets,
         targets_permuted=targets_permuted,
@@ -341,15 +371,15 @@ def test_calc_all_mixed_losses(test_inputs, expected_output):
         permuted_indexes=torch.LongTensor([0]),
     )
 
-    test_criterions = {c: nn.MSELoss() for c in all_target_columns}
-    outputs = {c: test_inputs["outputs"] for c in all_target_columns}
+    test_criterions = {"test_output": {c: nn.MSELoss() for c in all_target_columns}}
+    outputs = {"test_output": {c: test_inputs["outputs"] for c in all_target_columns}}
     all_losses = data_augmentation.calc_all_mixed_losses(
-        target_columns=target_columns,
-        criterions=test_criterions,
+        target_columns_gen=_target_columns_gen(),
+        criteria=test_criterions,
         outputs=outputs,
         mixed_object=mixed_object,
     )
-    for _, loss in all_losses.items():
+    for _, loss in all_losses["test_output"].items():
         assert loss.item() == expected_output
 
 

@@ -1,13 +1,12 @@
 from pathlib import Path
 from typing import TYPE_CHECKING, Sequence
 
+import matplotlib.pyplot as plt
 import numpy as np
 import shap
-import matplotlib.pyplot as plt
 import torch
 from aislib.misc_utils import ensure_path_exists
 from torchvision.transforms import Normalize
-
 
 from eir.interpretation.interpretation_utils import (
     get_target_class_name,
@@ -24,6 +23,7 @@ def analyze_image_input_activations(
     experiment: "Experiment",
     input_name: str,
     target_column_name: str,
+    output_name: str,
     target_column_type: str,
     activation_outfolder: Path,
     all_activations: Sequence["SampleActivation"],
@@ -31,7 +31,9 @@ def analyze_image_input_activations(
 
     exp = experiment
 
-    target_transformer = exp.target_transformers[target_column_name]
+    output_object = exp.outputs[output_name]
+    target_transformer = output_object.target_transformers[target_column_name]
+
     input_object = exp.inputs[input_name]
     interpretation_config = input_object.input_config.interpretation_config
 
@@ -44,7 +46,7 @@ def analyze_image_input_activations(
         sample_target_labels = sample_activation.sample_info.target_labels
 
         cur_label_name = get_target_class_name(
-            sample_label=sample_target_labels[target_column_name],
+            sample_label=sample_target_labels[output_name][target_column_name],
             target_transformer=target_transformer,
             column_type=target_column_type,
             target_column_name=target_column_name,

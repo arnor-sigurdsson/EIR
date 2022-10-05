@@ -15,10 +15,10 @@ def get_02_poker_hands_run_1_tabular_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/02_poker_hands_globals.yaml",
         "--input_configs",
         f"{conf_output_path}/02_poker_hands_input.yaml",
-        "--predictor_configs",
-        f"{conf_output_path}/02_poker_hands_predictor.yaml",
-        "--target_configs",
-        f"{conf_output_path}/02_poker_hands_target.yaml",
+        "--fusion_configs",
+        f"{conf_output_path}/02_poker_hands_fusion.yaml",
+        "--output_configs",
+        f"{conf_output_path}/02_poker_hands_output.yaml",
     ]
 
     mapping = [
@@ -83,13 +83,13 @@ def get_02_poker_hands_run_1_predict_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/02_poker_hands_globals.yaml",
         "--input_configs",
         f"{conf_output_path}/02_poker_hands_input_test.yaml",
-        "--predictor_configs",
-        f"{conf_output_path}/02_poker_hands_predictor.yaml",
-        "--target_configs",
-        f"{conf_output_path}/02_poker_hands_target_test.yaml",
+        "--fusion_configs",
+        f"{conf_output_path}/02_poker_hands_fusion.yaml",
+        "--output_configs",
+        f"{conf_output_path}/02_poker_hands_output_test.yaml",
         "--model_path",
         "eir_tutorials/tutorial_runs/tutorial_02_run/saved_models"
-        "/tutorial_02_run_model_15000_perf-average=0.9815.pt",
+        "/tutorial_02_run_model_15000_perf-average=0.9807.pt",
         "--evaluate",
         "--output_folder",
         "eir_tutorials/tutorial_runs/tutorial_02_run",

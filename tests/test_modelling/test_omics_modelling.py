@@ -5,12 +5,28 @@ import numpy as np
 import pytest
 
 from eir import train
-from eir.setup.config import get_all_targets, Configs
-from tests.test_modelling.test_modelling_utils import check_test_performance_results
+from eir.setup.config import Configs
 from tests.conftest import should_skip_in_gha_macos
+from tests.test_modelling.test_modelling_utils import (
+    check_performance_result_wrapper,
+)
 
 if TYPE_CHECKING:
     from tests.conftest import ModelTestConfig
+
+
+def _get_classification_output_configs() -> Sequence[Dict]:
+    output_configs = [
+        {
+            "output_info": {"output_name": "test_output"},
+            "output_type_info": {
+                "target_cat_columns": ["Origin"],
+                "target_con_columns": [],
+            },
+        }
+    ]
+
+    return output_configs
 
 
 @pytest.mark.skipif(
@@ -30,6 +46,9 @@ if TYPE_CHECKING:
         # Case 1: MLP
         {
             "injections": {
+                "global_configs": {
+                    "weighted_sampling_columns": ["all"],
+                },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
@@ -39,11 +58,16 @@ if TYPE_CHECKING:
                         },
                     }
                 ],
+                "output_configs": _get_classification_output_configs(),
             },
         },
         # Case 2: CNN
         {
             "injections": {
+                "global_configs": {
+                    "weighted_sampling_columns": ["Origin"],
+                    "gradient_noise": 0.05,
+                },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
@@ -57,9 +81,10 @@ if TYPE_CHECKING:
                         },
                     }
                 ],
+                "output_configs": _get_classification_output_configs(),
             },
         },
-        # Case 3: Linear
+        # Case 3: Identity Fusion
         {
             "injections": {
                 "global_configs": {"lr": 1e-03},
@@ -69,10 +94,10 @@ if TYPE_CHECKING:
                         "model_config": {"model_type": "identity"},
                     },
                 ],
-                "predictor_configs": {
-                    "model_type": "linear",
-                    "model_config": {"l1": 1e-03},
+                "fusion_configs": {
+                    "model_type": "identity",
                 },
+                "output_configs": _get_classification_output_configs(),
             },
         },
     ],
@@ -99,54 +124,143 @@ def test_classification(prep_modelling_test_configs):
 
     train.train(experiment=experiment)
 
-    target_column = experiment.configs.target_configs[0].target_cat_columns[0]
+    output_configs = experiment.configs.output_configs
 
-    check_test_performance_results(
-        run_path=test_config.run_path,
-        target_column=target_column,
-        metric="mcc",
-        thresholds=(0.8, 0.8),
-    )
+    for output_config in output_configs:
+        output_name = output_config.output_info.output_name
 
-    top_row_grads_dict = {"Asia": [0] * 10, "Europe": [1] * 10, "Africa": [2] * 10}
-    _check_snps_wrapper(
-        test_config=test_config,
-        target_column=target_column,
-        top_row_grads_dict=top_row_grads_dict,
-        at_least_n=5,
-    )
+        check_performance_result_wrapper(
+            outputs=experiment.outputs,
+            run_path=test_config.run_path,
+            thresholds=(0.8, 0.8),
+        )
+
+        top_row_grads_dict = {"Asia": [0] * 10, "Europe": [1] * 10, "Africa": [2] * 10}
+        _check_snps_wrapper(
+            test_config=test_config,
+            output_name=output_name,
+            target_name="Origin",
+            top_row_grads_dict=top_row_grads_dict,
+            at_least_n=5,
+        )
+
+
+@pytest.mark.skipif(
+    condition=should_skip_in_gha_macos(), reason="In GHA and platform is Darwin."
+)
+@pytest.mark.parametrize(
+    "create_test_data",
+    [
+        {"task_type": "binary"},
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize(
+    "create_test_config_init_base",
+    [
+        # Case 1: Identity Fusion, SNP subset
+        {
+            "injections": {
+                "global_configs": {"lr": 1e-03},
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "input_type_info": {"subset_snps_file": "auto"},
+                        "model_config": {"model_type": "identity"},
+                    },
+                ],
+                "fusion_configs": {
+                    "model_type": "identity",
+                },
+                "output_configs": _get_classification_output_configs(),
+            },
+        },
+        # Case 2: Identity Fusion, SNP subset, memory dataset
+        {
+            "injections": {
+                "global_configs": {"lr": 1e-03, "memory_dataset": True},
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "input_type_info": {"subset_snps_file": "auto"},
+                        "model_config": {"model_type": "identity"},
+                    },
+                ],
+                "fusion_configs": {
+                    "model_type": "identity",
+                },
+                "output_configs": _get_classification_output_configs(),
+            },
+        },
+    ],
+    indirect=True,
+)
+def test_classification_subset(prep_modelling_test_configs):
+    experiment, test_config = prep_modelling_test_configs
+
+    train.train(experiment=experiment)
+
+    output_configs = experiment.configs.output_configs
+
+    for output_config in output_configs:
+        output_name = output_config.output_info.output_name
+
+        check_performance_result_wrapper(
+            outputs=experiment.outputs,
+            run_path=test_config.run_path,
+            thresholds=(0.7, 0.7),
+        )
+
+        top_row_grads_dict = {"Asia": [0] * 10, "Europe": [1] * 10, "Africa": [2] * 10}
+        _check_snps_wrapper(
+            test_config=test_config,
+            output_name=output_name,
+            target_name="Origin",
+            top_row_grads_dict=top_row_grads_dict,
+            at_least_n=2,
+        )
 
 
 def _check_snps_wrapper(
     test_config: "ModelTestConfig",
-    target_column: str,
+    output_name: str,
+    target_name: str,
     top_row_grads_dict: Dict[str, List[int]],
     at_least_n: Union[str, int] = "all",
     check_types_skip_cls_names: Sequence[str] = tuple(),
 ):
     expected_top_indxs = list(range(50, 1000, 100))
 
-    cur_target_act_paths = test_config.activations_paths[target_column]
-    omics_acts_generator = _get_snp_activations_generator(
-        cur_target_act_paths=cur_target_act_paths
-    )
+    cur_output_act_paths = test_config.activations_paths[output_name]
 
-    for acts_array_path, is_masked in omics_acts_generator:
+    for target_folder_name, dict_with_path_to_input in cur_output_act_paths.items():
+        if target_folder_name != target_name:
+            continue
 
-        check_types = True if is_masked else False
-        _check_identified_snps(
-            arrpath=acts_array_path,
-            expected_top_indxs=expected_top_indxs,
-            top_row_grads_dict=top_row_grads_dict,
-            check_types=check_types,
-            at_least_n=at_least_n,
-            check_types_skip_cls_names=check_types_skip_cls_names,
+        omics_acts_generator = _get_snp_activations_generator(
+            cur_output_act_paths=dict_with_path_to_input
         )
 
+        for acts_array_path, is_masked in omics_acts_generator:
 
-def _get_snp_activations_generator(cur_target_act_paths: Dict[str, Path]):
-    for name, cur_path in cur_target_act_paths.items():
-        if name.startswith("omics_"):
+            check_types = True if is_masked else False
+            _check_identified_snps(
+                array_path=acts_array_path,
+                expected_top_indices=expected_top_indxs,
+                top_row_grads_dict=top_row_grads_dict,
+                check_types=check_types,
+                at_least_n=at_least_n,
+                check_types_skip_cls_names=check_types_skip_cls_names,
+            )
+
+
+def _get_snp_activations_generator(cur_output_act_paths: Dict[str, Path]):
+    did_run = False
+
+    for name, cur_path in cur_output_act_paths.items():
+        if "genotype" in name:
+            did_run = True
+
             top_acts_npy = cur_path / "top_acts.npy"
             assert top_acts_npy.exists()
             yield top_acts_npy, False
@@ -154,6 +268,22 @@ def _get_snp_activations_generator(cur_target_act_paths: Dict[str, Path]):
             top_acts_masked_npy = cur_path / "top_acts_masked.npy"
             assert top_acts_masked_npy.exists()
             yield top_acts_masked_npy, True
+
+    assert did_run
+
+
+def _get_regression_output_configs() -> Sequence[Dict]:
+    output_configs = [
+        {
+            "output_info": {"output_name": "test_output"},
+            "output_type_info": {
+                "target_cat_columns": [],
+                "target_con_columns": ["Height"],
+            },
+        }
+    ]
+
+    return output_configs
 
 
 @pytest.mark.skipif(
@@ -165,7 +295,7 @@ def _get_snp_activations_generator(cur_target_act_paths: Dict[str, Path]):
 @pytest.mark.parametrize(
     "create_test_config_init_base",
     [
-        # Case 1: Linear
+        # Case 1: Identity Fusion
         {
             "injections": {
                 "global_configs": {"lr": 1e-03},
@@ -175,14 +305,10 @@ def _get_snp_activations_generator(cur_target_act_paths: Dict[str, Path]):
                         "model_config": {"model_type": "identity"},
                     },
                 ],
-                "predictor_configs": {
-                    "model_type": "linear",
-                    "model_config": {"l1": 5e-03},
+                "fusion_configs": {
+                    "model_type": "identity",
                 },
-                "target_configs": {
-                    "target_cat_columns": [],
-                    "target_con_columns": ["Height"],
-                },
+                "output_configs": _get_regression_output_configs(),
             },
         },
         # Case 2: CNN
@@ -197,13 +323,10 @@ def _get_snp_activations_generator(cur_target_act_paths: Dict[str, Path]):
                         },
                     },
                 ],
-                "target_configs": {
-                    "target_cat_columns": [],
-                    "target_con_columns": ["Height"],
-                },
+                "output_configs": _get_regression_output_configs(),
             },
         },
-        # Case 3: MLP
+        # Case 3: MLP with subset
         {
             "injections": {
                 "input_configs": [
@@ -215,10 +338,7 @@ def _get_snp_activations_generator(cur_target_act_paths: Dict[str, Path]):
                         },
                     },
                 ],
-                "target_configs": {
-                    "target_cat_columns": [],
-                    "target_con_columns": ["Height"],
-                },
+                "output_configs": _get_regression_output_configs(),
             },
         },
         # Case 4: CNN Cycle
@@ -237,10 +357,7 @@ def _get_snp_activations_generator(cur_target_act_paths: Dict[str, Path]):
                         },
                     },
                 ],
-                "target_configs": {
-                    "target_cat_columns": [],
-                    "target_con_columns": ["Height"],
-                },
+                "output_configs": _get_regression_output_configs(),
             },
         },
     ],
@@ -251,27 +368,47 @@ def test_regression(prep_modelling_test_configs):
 
     train.train(experiment=experiment)
 
-    target_column = experiment.configs.target_configs[0].target_con_columns[0]
-    model_type = experiment.configs.input_configs[0].model_config.model_type == "linear"
+    output_configs = experiment.configs.output_configs
 
-    # linear regression performs slightly worse, but we don't want to lower expectations
-    # other models
-    thresholds = (0.70, 0.70) if model_type == "linear" else (0.8, 0.8)
-    check_test_performance_results(
-        run_path=test_config.run_path,
-        target_column=target_column,
-        metric="r2",
-        thresholds=thresholds,
-    )
+    for output_config in output_configs:
+        output_name = output_config.output_info.output_name
 
-    top_height_snp_index = 2
-    top_row_grads_dict = {target_column: [top_height_snp_index] * 10}
-    _check_snps_wrapper(
-        test_config=test_config,
-        target_column=target_column,
-        top_row_grads_dict=top_row_grads_dict,
-        at_least_n=5,
-    )
+        check_performance_result_wrapper(
+            outputs=experiment.outputs,
+            run_path=test_config.run_path,
+            thresholds=(0.8, 0.8),
+        )
+
+        top_height_snp_index = 2
+        top_row_grads_dict = {"Height": [top_height_snp_index] * 10}
+        _check_snps_wrapper(
+            test_config=test_config,
+            output_name=output_name,
+            target_name="Height",
+            top_row_grads_dict=top_row_grads_dict,
+            at_least_n=5,
+        )
+
+
+def _get_multi_task_output_configs() -> Sequence[Dict]:
+    output_configs = [
+        {
+            "output_info": {"output_name": "test_output_copy"},
+            "output_type_info": {
+                "target_cat_columns": [],
+                "target_con_columns": ["Height"],
+            },
+        },
+        {
+            "output_info": {"output_name": "test_output"},
+            "output_type_info": {
+                "target_cat_columns": ["Origin"],
+                "target_con_columns": ["Height"],
+            },
+        },
+    ]
+
+    return output_configs
 
 
 @pytest.mark.skipif(
@@ -283,7 +420,7 @@ def test_regression(prep_modelling_test_configs):
 @pytest.mark.parametrize(
     "create_test_config_init_base",
     [
-        # Case 0: Check that we add and use extra inputs.
+        # Case 1: Check that we add and use extra inputs.
         {
             "injections": {
                 "global_configs": {
@@ -294,7 +431,10 @@ def test_regression(prep_modelling_test_configs):
                         "input_info": {"input_name": "test_genotype"},
                         "model_config": {
                             "model_type": "cnn",
-                            "model_init_config": {"l1": 1e-03},
+                            "model_init_config": {
+                                "l1": 1e-03,
+                                "stochastic_depth_p": 0.2,
+                            },
                         },
                     },
                     {
@@ -306,13 +446,10 @@ def test_regression(prep_modelling_test_configs):
                         "model_config": {"model_type": "tabular"},
                     },
                 ],
-                "target_configs": {
-                    "target_cat_columns": ["Origin"],
-                    "target_con_columns": ["Height"],
-                },
+                "output_configs": _get_multi_task_output_configs(),
             },
         },
-        # Case 1: Normal multi task with CNN
+        # Case 2: Normal multi task with CNN
         {
             "injections": {
                 "input_configs": [
@@ -325,20 +462,23 @@ def test_regression(prep_modelling_test_configs):
                                 "rb_do": 0.15,
                                 "fc_repr_dim": 64,
                                 "l1": 1e-03,
+                                "stochastic_depth_p": 0.2,
                             },
                         },
                     },
                 ],
-                "predictor_configs": {
-                    "model_config": {"fc_task_dim": 64, "rb_do": 0.10, "fc_do": 0.10},
+                "fusion_configs": {
+                    "model_config": {
+                        "fc_task_dim": 64,
+                        "rb_do": 0.10,
+                        "fc_do": 0.10,
+                        "stochastic_depth_p": 0.5,
+                    },
                 },
-                "target_configs": {
-                    "target_cat_columns": ["Origin"],
-                    "target_con_columns": ["Height", "ExtraTarget"],
-                },
+                "output_configs": _get_multi_task_output_configs(),
             },
         },
-        # Case 2:  Normal multi task with MLP, note we have to reduce the LR for
+        # Case 3:  Normal multi task with MLP, note we have to reduce the LR for
         # stability and add L1 for regularization
         {
             "injections": {
@@ -352,16 +492,13 @@ def test_regression(prep_modelling_test_configs):
                         },
                     },
                 ],
-                "predictor_configs": {
+                "fusion_configs": {
                     "model_config": {"fc_task_dim": 64, "rb_do": 0.10, "fc_do": 0.10},
                 },
-                "target_configs": {
-                    "target_cat_columns": ["Origin"],
-                    "target_con_columns": ["Height", "ExtraTarget"],
-                },
+                "output_configs": _get_multi_task_output_configs(),
             },
         },
-        # Case 3: Using the Simple LCL model
+        # Case 4: Using the Simple LCL model
         {
             "injections": {
                 "global_configs": {"lr": 1e-03},
@@ -378,17 +515,15 @@ def test_regression(prep_modelling_test_configs):
                         },
                     },
                 ],
-                "target_configs": {
-                    "target_cat_columns": ["Origin"],
-                    "target_con_columns": ["Height", "ExtraTarget"],
-                },
+                "output_configs": _get_multi_task_output_configs(),
             },
         },
-        # Case 4: Using the GLN
+        # Case 5: Using the GLN
         {
             "injections": {
                 "global_configs": {
                     "lr": 1e-03,
+                    "gradient_noise": 0.05,
                 },
                 "input_configs": [
                     {
@@ -404,25 +539,23 @@ def test_regression(prep_modelling_test_configs):
                         },
                     },
                 ],
-                "predictor_configs": {
+                "fusion_configs": {
                     "model_config": {
                         "fc_task_dim": 64,
                         "fc_do": 0.20,
                         "rb_do": 0.20,
                     },
                 },
-                "target_configs": {
-                    "target_cat_columns": ["Origin"],
-                    "target_con_columns": ["Height", "ExtraTarget"],
-                },
+                "output_configs": _get_multi_task_output_configs(),
             },
         },
-        # Case 5: Using the MGMoE fusion
+        # Case 6: Using the MGMoE fusion
         {
             "injections": {
                 "global_configs": {
                     "output_folder": "mgmoe",
                     "lr": 1e-03,
+                    "save_evaluation_sample_results": False,
                 },
                 "input_configs": [
                     {
@@ -437,54 +570,48 @@ def test_regression(prep_modelling_test_configs):
                         },
                     },
                 ],
-                "predictor_configs": {
+                "fusion_configs": {
                     "model_type": "mgmoe",
-                    "model_config": {"mg_num_experts": 3},
+                    "model_config": {"mg_num_experts": 3, "stochastic_depth_p": 0.2},
                 },
-                "target_configs": {
-                    "target_cat_columns": ["Origin"],
-                    "target_con_columns": ["Height", "ExtraTarget"],
-                },
+                "output_configs": _get_multi_task_output_configs(),
             },
         },
-        # Case 6: Using the GLN with mixing
+        # Case 7: Using the GLN with mixing
         {
             "injections": {
                 "global_configs": {
                     "output_folder": "mixing_multi",
                     "lr": 1e-03,
-                    "mixing_alpha": 0.5,
+                    "mixing_alpha": 0.2,
                 },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
                         "input_type_info": {
-                            "mixing_subtype": "cutmix-uniform",
+                            "mixing_subtype": "mixup",
                         },
                         "model_config": {
                             "model_type": "genome-local-net",
                             "model_init_config": {
                                 "kernel_width": 8,
                                 "channel_exp_base": 2,
-                                "l1": 1e-03,
+                                "l1": 1e-04,
                             },
                         },
                     },
                 ],
-                "predictor_configs": {
+                "fusion_configs": {
                     "model_config": {
-                        "fc_task_dim": 64,
+                        "fc_task_dim": 256,
                         "fc_do": 0.10,
                         "rb_do": 0.10,
                     },
                 },
-                "target_configs": {
-                    "target_cat_columns": ["Origin"],
-                    "target_con_columns": ["Height", "ExtraTarget"],
-                },
+                "output_configs": _get_multi_task_output_configs(),
             },
         },
-        # Case 7: Using the GLN with limited activations
+        # Case 8: Using the GLN with limited activations
         {
             "injections": {
                 "global_configs": {
@@ -508,17 +635,14 @@ def test_regression(prep_modelling_test_configs):
                         },
                     },
                 ],
-                "predictor_configs": {
+                "fusion_configs": {
                     "model_config": {
                         "fc_task_dim": 64,
                         "fc_do": 0.20,
                         "rb_do": 0.20,
                     },
                 },
-                "target_configs": {
-                    "target_cat_columns": ["Origin"],
-                    "target_con_columns": ["Height", "ExtraTarget"],
-                },
+                "output_configs": _get_multi_task_output_configs(),
             },
         },
     ],
@@ -532,52 +656,61 @@ def test_multi_task(
 
     train.train(experiment=experiment)
 
-    targets = get_all_targets(targets_configs=experiment.configs.target_configs)
+    output_configs = experiment.configs.output_configs
     extra_columns = get_all_tabular_input_columns(configs=experiment.configs)
-    for cat_column in targets.cat_targets:
-        threshold, at_least_n = _get_multi_task_test_args(
-            extra_columns=extra_columns,
-            target_copy="OriginExtraCol",
-            mixing=gc.mixing_alpha,
-        )
 
-        check_test_performance_results(
-            run_path=test_config.run_path,
-            target_column=cat_column,
-            metric="mcc",
-            thresholds=threshold,
-        )
+    for output_config in output_configs:
+        output_name = output_config.output_info.output_name
+        cat_targets = output_config.output_type_info.target_cat_columns
+        con_targets = output_config.output_type_info.target_con_columns
 
-        top_row_grads_dict = {"Asia": [0] * 10, "Europe": [1] * 10, "Africa": [2] * 10}
-        _check_snps_wrapper(
-            test_config=test_config,
-            target_column=cat_column,
-            top_row_grads_dict=top_row_grads_dict,
-            at_least_n=at_least_n,
-        )
+        for target_name in cat_targets:
 
-    for con_column in targets.con_targets:
-        threshold, at_least_n = _get_multi_task_test_args(
-            extra_columns=extra_columns,
-            target_copy="ExtraTarget",
-            mixing=gc.mixing_alpha,
-        )
+            target_copy = "OriginExtraCol"
+            threshold, at_least_n = _get_multi_task_test_args(
+                extra_columns=extra_columns,
+                target_copy=target_copy,
+                mixing=gc.mixing_alpha,
+            )
+            check_performance_result_wrapper(
+                outputs=experiment.outputs,
+                run_path=test_config.run_path,
+                thresholds=threshold,
+            )
+            top_row_grads_dict = {
+                "Asia": [0] * 10,
+                "Europe": [1] * 10,
+                "Africa": [2] * 10,
+            }
+            _check_snps_wrapper(
+                test_config=test_config,
+                output_name=output_name,
+                target_name=target_name,
+                top_row_grads_dict=top_row_grads_dict,
+                at_least_n=at_least_n,
+            )
 
-        check_test_performance_results(
-            run_path=test_config.run_path,
-            target_column=con_column,
-            metric="r2",
-            thresholds=threshold,
-        )
-
-        top_height_snp_index = 2
-        top_row_grads_dict = {con_column: [top_height_snp_index] * 10}
-        _check_snps_wrapper(
-            test_config=test_config,
-            target_column=con_column,
-            top_row_grads_dict=top_row_grads_dict,
-            at_least_n=at_least_n,
-        )
+        for target_name in con_targets:
+            target_copy = "ExtraTarget"
+            threshold, at_least_n = _get_multi_task_test_args(
+                extra_columns=extra_columns,
+                target_copy=target_copy,
+                mixing=gc.mixing_alpha,
+            )
+            check_performance_result_wrapper(
+                outputs=experiment.outputs,
+                run_path=test_config.run_path,
+                thresholds=threshold,
+            )
+            top_height_snp_index = 2
+            top_row_grads_dict = {"Height": [top_height_snp_index] * 10}
+            _check_snps_wrapper(
+                test_config=test_config,
+                output_name=output_name,
+                target_name=target_name,
+                top_row_grads_dict=top_row_grads_dict,
+                at_least_n=at_least_n,
+            )
 
 
 def get_all_tabular_input_columns(configs: Configs):
@@ -606,17 +739,17 @@ def _get_multi_task_test_args(
     if an_extra_col_is_correlated_with_target:
         thresholds, at_least_n = (0.9, 0.9), 0
     else:
-        thresholds, at_least_n = (0.8, 0.8), 5
+        thresholds, at_least_n = (0.8, 0.6), 5
 
     if mixing:
-        thresholds, at_least_n = (0.0, 0.8), 5
+        thresholds, at_least_n = (0.0, 0.6), 5
 
     return thresholds, at_least_n
 
 
 def _check_identified_snps(
-    arrpath: Path,
-    expected_top_indxs: List[int],
+    array_path: Path,
+    expected_top_indices: List[int],
     top_row_grads_dict: Dict[str, List[int]],
     check_types: bool,
     check_types_skip_cls_names: Sequence[str] = tuple(),
@@ -630,8 +763,8 @@ def _check_identified_snps(
     using a "correctness criteria" for regression, like we do with classification (i.e.
     only gather activations for correctly predicted classes).
 
-    :param arrpath: Path to the accumulated grads / activation array.
-    :param expected_top_indxs: Expected SNPs to be identified.
+    :param array_path: Path to the accumulated grads / activation array.
+    :param expected_top_indices: Expected SNPs to be identified.
     :param top_row_grads_dict: What row is expected to be activated per class.
     :param check_types:  Whether to check the SNP types as well as the SNPs themselves
     (i.e. homozygous reference, etc).
@@ -639,14 +772,14 @@ def _check_identified_snps(
     :return:
     """
 
-    top_grads_array = np.load(str(arrpath), allow_pickle=True)
+    top_grads_array = np.load(str(array_path), allow_pickle=True)
 
     # get dict from array
     top_grads_dict: dict = top_grads_array[()]
 
     for cls in top_grads_dict.keys():
         actual_top = np.array(sorted(top_grads_dict[cls]["top_n_idxs"]))
-        expected_top = np.array(expected_top_indxs)
+        expected_top = np.array(expected_top_indices)
         if at_least_n == "all":
             assert (actual_top == expected_top).all()
         else:

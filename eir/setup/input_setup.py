@@ -1,8 +1,8 @@
 from collections import OrderedDict
+from copy import deepcopy
 from dataclasses import dataclass, fields
 from functools import partial
 from pathlib import Path
-from copy import deepcopy
 from typing import (
     Dict,
     Union,
@@ -16,11 +16,13 @@ from typing import (
     TYPE_CHECKING,
     Iterator,
     List,
+    Any,
 )
 
+import pandas as pd
 import numpy as np
 from aislib.misc_utils import get_logger
-from timm.models.registry import _model_default_cfgs
+from timm.models.registry import _model_pretrained_cfgs
 from torchtext.data.utils import get_tokenizer as get_pytorch_tokenizer
 from torchtext.vocab import build_vocab_from_iterator, Vocab
 from torchtext.vocab import vocab as pytorch_vocab_builder
@@ -57,16 +59,14 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-al_input_objects_as_dict = Dict[
-    str,
-    Union[
-        "OmicsInputInfo",
-        "TabularInputInfo",
-        "SequenceInputInfo",
-        "BytesInputInfo",
-        "ImageInputInfo",
-    ],
+al_input_objects = Union[
+    "OmicsInputInfo",
+    "TabularInputInfo",
+    "SequenceInputInfo",
+    "BytesInputInfo",
+    "ImageInputInfo",
 ]
+al_input_objects_as_dict = Dict[str, al_input_objects]
 al_hf_tokenizer_inputs = Union[TextInput, PreTokenizedInput, EncodedInput]
 al_sequence_input_objects_basic = Tuple[
     Vocab,
@@ -94,23 +94,20 @@ al_serializable_input_classes = Union[
 ]
 
 
-def set_up_inputs_for_training(
+def set_up_inputs_general(
     inputs_configs: schemas.al_input_configs,
-    train_ids: Sequence[str],
-    valid_ids: Sequence[str],
     hooks: Union["Hooks", None],
+    setup_func_getter: Callable[[schemas.InputConfig], Callable[..., al_input_objects]],
+    setup_func_kwargs: Dict[str, Any],
 ) -> al_input_objects_as_dict:
     all_inputs = {}
 
     name_config_iter = get_input_name_config_iterator(input_configs=inputs_configs)
+
     for name, input_config in name_config_iter:
+        setup_func = setup_func_getter(input_config=input_config)
+
         cur_input_data_config = input_config.input_info
-
-        setup_func = get_input_setup_function(
-            input_type=cur_input_data_config.input_type,
-            pretrained_config=input_config.pretrained_config,
-        )
-
         logger.info(
             "Setting up %s inputs '%s' from %s.",
             cur_input_data_config.input_type,
@@ -119,12 +116,30 @@ def set_up_inputs_for_training(
         )
 
         set_up_input = setup_func(
-            input_config=input_config,
-            train_ids=train_ids,
-            valid_ids=valid_ids,
-            hooks=hooks,
+            input_config=input_config, hooks=hooks, **setup_func_kwargs
         )
         all_inputs[name] = set_up_input
+
+    return all_inputs
+
+
+def set_up_inputs_for_training(
+    inputs_configs: schemas.al_input_configs,
+    train_ids: Sequence[str],
+    valid_ids: Sequence[str],
+    hooks: Union["Hooks", None],
+) -> al_input_objects_as_dict:
+
+    train_input_setup_kwargs = {
+        "train_ids": train_ids,
+        "valid_ids": valid_ids,
+    }
+    all_inputs = set_up_inputs_general(
+        inputs_configs=inputs_configs,
+        hooks=hooks,
+        setup_func_getter=get_input_setup_function_for_train,
+        setup_func_kwargs=train_input_setup_kwargs,
+    )
 
     return all_inputs
 
@@ -137,9 +152,13 @@ def get_input_name_config_iterator(input_configs: schemas.al_input_configs):
         yield cur_name, input_config
 
 
-def get_input_setup_function(
-    input_type: str, pretrained_config: schemas.BasicPretrainedConfig
-) -> Callable:
+def get_input_setup_function_for_train(
+    input_config: schemas.InputConfig,
+) -> Callable[..., al_input_objects]:
+
+    input_type = input_config.input_info.input_type
+    pretrained_config = input_config.pretrained_config
+
     from_scratch_mapping = get_input_setup_function_map()
 
     if pretrained_config:
@@ -155,7 +174,7 @@ def get_input_setup_function(
     return from_scratch_mapping[input_type]
 
 
-def get_input_setup_function_map() -> Dict[str, Callable]:
+def get_input_setup_function_map() -> Dict[str, Callable[..., al_input_objects]]:
     setup_mapping = {
         "omics": set_up_omics_input,
         "tabular": set_up_tabular_input_for_training,
@@ -169,6 +188,7 @@ def get_input_setup_function_map() -> Dict[str, Callable]:
 
 def set_up_tabular_input_from_pretrained(
     input_config: schemas.InputConfig,
+    custom_input_name: str,
     train_ids: Sequence[str],
     valid_ids: Sequence[str],
     hooks: Union["Hooks", None],
@@ -185,8 +205,9 @@ def set_up_tabular_input_from_pretrained(
     loaded_transformers = load_transformers(
         run_folder=pretrained_run_folder, transformers_to_load=None
     )
+    loaded_transformers_input = loaded_transformers[custom_input_name]
 
-    tabular_input_object.labels.label_transformers = loaded_transformers
+    tabular_input_object.labels.label_transformers = loaded_transformers_input
 
     return tabular_input_object
 
@@ -196,7 +217,9 @@ def get_input_setup_from_pretrained_function_map(
 ) -> Dict[str, Callable]:
     pretrained_setup_mapping = {
         "omics": set_up_omics_input,
-        "tabular": set_up_tabular_input_from_pretrained,
+        "tabular": partial(
+            set_up_tabular_input_from_pretrained, custom_input_name=load_module_name
+        ),
         "sequence": partial(
             load_serialized_input_object,
             input_class=SequenceInputInfo,
@@ -259,8 +282,9 @@ def build_bytes_vocab(
     for token in range(num_tokens):
         bytes_vocab[token] = token
 
-    for special in specials:
-        bytes_vocab[special] = len(bytes_vocab)
+    base_num_tokens = len(bytes_vocab)
+    for idx, special in enumerate(specials):
+        bytes_vocab[special] = base_num_tokens + idx
 
     return bytes_vocab
 
@@ -285,7 +309,7 @@ class PretrainedImageModelInfo:
 def get_timm_configs() -> Dict[str, PretrainedImageModelInfo]:
     default_configs = {}
     field_names = {i.name for i in fields(PretrainedImageModelInfo)}
-    for name, dict_ in _model_default_cfgs.items():
+    for name, dict_ in _model_pretrained_cfgs.items():
         common = {k: v for k, v in dict_.items() if k in field_names}
         default_configs[name] = PretrainedImageModelInfo(**common)
 
@@ -474,7 +498,7 @@ class SequenceInputInfo:
 
 def set_up_sequence_input_for_training(
     input_config: schemas.InputConfig, *args, **kwargs
-):
+) -> SequenceInputInfo:
 
     sequence_input_object_func = _get_sequence_input_object_func(
         pretrained=input_config.model_config.pretrained_model
@@ -922,6 +946,7 @@ def get_tabular_num_features(
 class OmicsInputInfo:
     input_config: schemas.InputConfig
     data_dimensions: "DataDimensions"
+    subset_indices: Union[None, Sequence[int]]
 
 
 def set_up_omics_input(
@@ -931,8 +956,30 @@ def set_up_omics_input(
     data_dimensions = get_data_dimension_from_data_source(
         data_source=Path(input_config.input_info.input_source)
     )
+
+    subset_indices = None
+    input_type_info = input_config.input_type_info
+    if input_type_info.subset_snps_file:
+        df_bim = read_bim(bim_file_path=input_type_info.snp_file)
+        snps_to_subset = read_subset_file(
+            subset_snp_file_path=input_type_info.subset_snps_file
+        )
+        subset_indices = _setup_snp_subset_indices(
+            df_bim=df_bim,
+            snps_to_subset=snps_to_subset,
+            snp_file_name=input_type_info.snp_file,
+            subset_file_name=input_type_info.subset_snps_file,
+        )
+        data_dimensions = DataDimensions(
+            channels=data_dimensions.channels,
+            height=data_dimensions.height,
+            width=len(subset_indices),
+        )
+
     omics_input_info = OmicsInputInfo(
-        input_config=input_config, data_dimensions=data_dimensions
+        input_config=input_config,
+        data_dimensions=data_dimensions,
+        subset_indices=subset_indices,
     )
 
     return omics_input_info
@@ -969,3 +1016,61 @@ def get_data_dimension_from_data_source(
         raise ValueError("Currently max 3 dimensional inputs supported")
 
     return DataDimensions(channels=channels, height=height, width=width)
+
+
+def _setup_snp_subset_indices(
+    df_bim: pd.DataFrame,
+    snps_to_subset: List[str],
+    subset_file_name: str = "",
+    snp_file_name: str = "",
+) -> np.ndarray:
+    """
+    .bim columns: ["CHR_CODE", "VAR_ID", "POS_CM", "BP_COORD", "ALT", "REF"]
+    """
+
+    df_subset = df_bim[df_bim["VAR_ID"].isin(snps_to_subset)]
+
+    if len(df_subset) < len(snps_to_subset):
+        num_missing = len(snps_to_subset) - len(df_subset)
+        missing = [i for i in snps_to_subset if i not in df_subset["VAR_ID"]]
+        logger.warning(
+            "Did not find all SNPs in subset file '%s' in base .bim file '%s'. "
+            "Number of missing SNPs: %d. Example: '%s'.",
+            subset_file_name,
+            snp_file_name,
+            num_missing,
+            missing[:3],
+        )
+    else:
+        logger.info(
+            "Using %d SNPs from subset file %s.", len(df_subset), subset_file_name
+        )
+
+    return df_subset.index
+
+
+def read_subset_file(subset_snp_file_path: str) -> List[str]:
+    with open(subset_snp_file_path, "r") as infile:
+        snps_to_subset = infile.read().split()
+
+    return snps_to_subset
+
+
+def read_bim(bim_file_path: str) -> pd.DataFrame:
+    bim_headers = _get_bim_headers()
+    df_bim = pd.read_csv(bim_file_path, names=bim_headers, sep=r"\s+")
+    df_bim["VAR_ID"] = df_bim["VAR_ID"].astype(str)
+
+    if not len(df_bim.columns) == 6:
+        raise ValueError(
+            "Expected 6 columns in bim file '%s', got %d.",
+            bim_file_path,
+            len(df_bim.columns),
+        )
+
+    return df_bim
+
+
+def _get_bim_headers() -> List[str]:
+    bim_headers = ["CHR_CODE", "VAR_ID", "POS_CM", "BP_COORD", "ALT", "REF"]
+    return bim_headers

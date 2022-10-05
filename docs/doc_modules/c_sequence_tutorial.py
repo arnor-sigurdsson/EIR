@@ -15,10 +15,8 @@ def get_03_imdb_run_1_transformer_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/03a_imdb_globals.yaml",
         "--input_configs",
         f"{conf_output_path}/03a_imdb_input.yaml",
-        "--predictor_configs",
-        f"{conf_output_path}/03a_imdb_predictor.yaml",
-        "--target_configs",
-        f"{conf_output_path}/03a_imdb_target.yaml",
+        "--output_configs",
+        f"{conf_output_path}/03a_imdb_output.yaml",
     ]
 
     mapping = [
@@ -35,7 +33,7 @@ def get_03_imdb_run_1_transformer_info() -> AutoDocExperimentInfo:
             "figures/tutorial_03a_feature_importance_Negative.pdf",
         ),
         (
-            ".*4000/activations/imdb_reviews/single_samples/.*10_Positive.*",
+            ".*4000/activations/imdb_reviews/single_samples/.*3_10_Positive.*",
             "figures/tutorial_03a_single_sample_example.html",
         ),
     ]
@@ -85,10 +83,8 @@ def get_03_peptides_run_1_transformer_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/03b_peptides_globals.yaml",
         "--input_configs",
         f"{conf_output_path}/03b_peptides_input.yaml",
-        "--predictor_configs",
-        f"{conf_output_path}/03b_peptides_predictor.yaml",
-        "--target_configs",
-        f"{conf_output_path}/03b_peptides_target.yaml",
+        "--output_configs",
+        f"{conf_output_path}/03b_peptides_output.yaml",
     ]
 
     mapping = [

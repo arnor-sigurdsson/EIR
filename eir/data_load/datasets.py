@@ -1,3 +1,4 @@
+import reprlib
 from collections import defaultdict
 from copy import copy
 from dataclasses import dataclass
@@ -31,11 +32,8 @@ from tqdm import tqdm
 from eir.data_load.data_augmentation import make_random_omics_columns_missing
 from eir.data_load.label_setup import (
     al_label_dict,
-    al_target_columns,
     get_array_path_iterator,
-    Labels,
 )
-from eir.data_load.label_setup import merge_target_columns
 from eir.setup import config
 from eir.setup.input_setup import _get_split_func
 
@@ -47,39 +45,41 @@ if TYPE_CHECKING:
         BytesInputInfo,
         ImageInputInfo,
     )
+    from eir.setup.output_setup import al_output_objects_as_dict
+    from eir.train import MergedTargetLabels
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 # Type Aliases
 al_datasets = Union["MemoryDataset", "DiskDataset"]
 # embeddings --> remain str, cat targets --> int, con extra/target --> float
-al_sample_label_dict_target = Dict[str, Union[int, float]]
+al_sample_label_dict_target = Dict[str, Dict[str, Union[int, float]]]
 al_inputs = Union[Dict[str, torch.Tensor], Dict[str, Any]]
 al_getitem_return = Tuple[Dict[str, torch.Tensor], al_sample_label_dict_target, str]
 
 
 def set_up_datasets_from_configs(
     configs: config.Configs,
-    target_labels: Labels,
+    target_labels: "MergedTargetLabels",
     inputs_as_dict: "al_input_objects_as_dict",
+    outputs_as_dict: "al_output_objects_as_dict",
 ) -> Tuple[al_datasets, al_datasets]:
 
     dataset_class = (
         MemoryDataset if configs.global_config.memory_dataset else DiskDataset
     )
 
-    targets = config.get_all_targets(targets_configs=configs.target_configs)
     train_kwargs = construct_default_dataset_kwargs_from_cl_args(
         target_labels_dict=target_labels.train_labels,
-        targets=targets,
         inputs=inputs_as_dict,
+        outputs=outputs_as_dict,
         test_mode=False,
     )
 
     valid_kwargs = construct_default_dataset_kwargs_from_cl_args(
         target_labels_dict=target_labels.valid_labels,
-        targets=targets,
         inputs=inputs_as_dict,
+        outputs=outputs_as_dict,
         test_mode=True,
     )
 
@@ -95,19 +95,14 @@ def set_up_datasets_from_configs(
 
 def construct_default_dataset_kwargs_from_cl_args(
     target_labels_dict: Union[None, al_label_dict],
-    targets: config.Targets,
     inputs: "al_input_objects_as_dict",
+    outputs: "al_output_objects_as_dict",
     test_mode: bool,
 ) -> Dict[str, Any]:
 
-    target_columns = merge_target_columns(
-        target_con_columns=targets.con_targets,
-        target_cat_columns=targets.cat_targets,
-    )
-
     dataset_kwargs = {
-        "target_columns": target_columns,
         "inputs": inputs,
+        "outputs": outputs,
         "target_labels_dict": target_labels_dict,
         "test_mode": test_mode,
     }
@@ -118,7 +113,16 @@ def construct_default_dataset_kwargs_from_cl_args(
 def _check_valid_and_train_datasets(
     train_dataset: al_datasets, valid_dataset: al_datasets
 ) -> None:
-    assert len(train_dataset) > len(valid_dataset)
+
+    if len(train_dataset) < len(valid_dataset):
+        logger.warning(
+            "Size of training dataset (size: %d) is smaller than validation dataset ("
+            "size: %d). Generally it is the opposite, but if this intended please"
+            "ignore this message.",
+            len(train_dataset),
+            len(valid_dataset),
+        )
+
     assert set(valid_dataset.target_labels_dict.keys()).isdisjoint(
         train_dataset.target_labels_dict.keys()
     )
@@ -139,7 +143,7 @@ class DatasetBase(Dataset):
     def __init__(
         self,
         inputs: "al_input_objects_as_dict",
-        target_columns: al_target_columns,
+        outputs: "al_output_objects_as_dict",
         test_mode: bool,
         target_labels_dict: al_label_dict = None,
     ):
@@ -148,12 +152,12 @@ class DatasetBase(Dataset):
         self.samples: Union[List[Sample], None] = None
 
         self.inputs = inputs
+        self.outputs = outputs
         self.test_mode = test_mode
-        self.target_columns = target_columns
         self.target_labels_dict = target_labels_dict if target_labels_dict else {}
 
     def init_label_attributes(self):
-        if not self.target_columns:
+        if not self.outputs:
             raise ValueError("Please specify label column name.")
 
     def set_up_samples(
@@ -166,11 +170,10 @@ class DatasetBase(Dataset):
         train/val and test folders.
 
         Note that there is a slight weirdness in how we handle the file loading hooks
-        for omics and sequence data. Omics is currently treated as being quite simple,
-        where we always just load a file straight from the disk. However, with sequence
-        data, we might do different things depending on the source, e.g. split on
-        different tokens. That's why we use the `source_name` there to grab file loading
-        hooks, instead of just a general 'sequence' key.
+        for different data types. Image is always just loaded from the disk, so
+        we use the file loading hooks with 'image' key in those cases. For omics
+        and sequence, we can have specific configurations specific to inputs,
+        so we grab file loading hooks for the ``source_name``.
         """
 
         mode_str = "evaluation/test" if self.test_mode else "train"
@@ -198,7 +201,17 @@ class DatasetBase(Dataset):
 
             input_type = source_data.input_config.input_info.input_type
             input_source = source_data.input_config.input_info.input_source
-            if input_type == "omics" or input_type == "image":
+
+            if input_type == "omics":
+                samples = _add_file_data_to_samples(
+                    source_data=input_source,
+                    samples=samples,
+                    ids_to_keep=ids_to_keep,
+                    file_loading_hook=file_loading_hooks[source_name],
+                    source_name=source_name,
+                )
+
+            elif input_type == "image":
 
                 samples = _add_file_data_to_samples(
                     source_data=input_source,
@@ -241,6 +254,9 @@ class DatasetBase(Dataset):
                 num_missing,
             )
 
+        _log_missing_samples_between_modalities(
+            samples=samples, input_keys=self.inputs.keys()
+        )
         return samples
 
     def __getitem__(self, index: int):
@@ -285,6 +301,39 @@ class DatasetBase(Dataset):
                     f"Expected all observations to have a label associated "
                     f"with them, but got {no_target_labels}."
                 )
+
+
+def _log_missing_samples_between_modalities(
+    samples: Sequence[Sample], input_keys: Iterable[str]
+) -> None:
+    missing_counts = {k: 0 for k in input_keys}
+    missing_ids = {k: [] for k in input_keys}
+
+    for sample in samples:
+        for key in input_keys:
+            if key not in sample.inputs:
+                missing_counts[key] += 1
+                missing_ids[key].append(sample.sample_id)
+
+    no_samples = len(samples)
+    message = (
+        f"Using total of {no_samples} samples with following counts per "
+        f"modality (note missing tabular modalities have been imputed already):\n"
+    )
+
+    for key in input_keys:
+        cur_missing = missing_counts[key]
+        cur_present = no_samples - cur_missing
+        cur_missing_ids = reprlib.repr(missing_ids[key])
+        cur_str = (
+            f"Available {key}: {cur_present} "
+            f"(missing: {cur_missing}, missing IDs: {cur_missing_ids})"
+        )
+
+        cur_str += "\n"
+        message += cur_str
+
+    logger.debug(message.rstrip())
 
 
 def _add_target_labels_to_samples(
@@ -448,14 +497,22 @@ class MemoryDataset(DatasetBase):
     def _get_file_loading_hooks(
         self,
     ) -> Mapping[str, Callable[..., torch.Tensor]]:
-        mapping = {"omics": _load_one_hot_array, "image": default_loader}
+        mapping = {"omics": _load_one_hot_array_from_disk, "image": default_loader}
 
         for source_name, source_data in self.inputs.items():
             input_type = source_data.input_config.input_info.input_type
-            if input_type == "sequence":
+
+            if input_type == "omics":
                 mapping[source_name] = partial(
-                    load_sequence_from_disk,
+                    _load_one_hot_array_from_disk,
+                    subset_indices=self.inputs[source_name].subset_indices,
+                )
+
+            elif input_type == "sequence":
+                mapping[source_name] = partial(
+                    load_sequence_from_disk_and_tokenize,
                     split_on=source_data.input_config.input_type_info.split_on,
+                    encode_func=self.inputs[source_name].encode_func,
                 )
             elif input_type == "bytes":
                 mapping[source_name] = partial(
@@ -468,9 +525,9 @@ class MemoryDataset(DatasetBase):
     def __getitem__(self, index: int) -> al_getitem_return:
         sample = self.samples[index]
 
-        inputs_prepared = copy(sample.inputs)
+        inputs = copy(sample.inputs)
         inputs_prepared = prepare_inputs_memory(
-            inputs=inputs_prepared, inputs_objects=self.inputs, test_mode=self.test_mode
+            inputs=inputs, inputs_objects=self.inputs, test_mode=self.test_mode
         )
 
         inputs_final = impute_missing_modalities_wrapper(
@@ -484,6 +541,20 @@ class MemoryDataset(DatasetBase):
 
     def __len__(self):
         return len(self.samples)
+
+
+def load_sequence_from_disk_and_tokenize(
+    sequence_file_path: Path,
+    split_on: str,
+    encode_func: Callable[[Sequence[str]], List[int]],
+) -> List[int]:
+    file_content_split = load_sequence_from_disk(
+        sequence_file_path=sequence_file_path, split_on=split_on
+    )
+
+    sequence_tokenized = encode_func(file_content_split)
+
+    return sequence_tokenized
 
 
 def _get_default_impute_fill_values(inputs_objects: "al_input_objects_as_dict"):
@@ -534,21 +605,26 @@ def _get_default_impute_dtypes(inputs_objects: "al_input_objects_as_dict"):
 
 
 def prepare_one_hot_omics_data(
-    genotype_array: torch.Tensor,
+    genotype_array: np.ndarray,
     na_augment_perc: float,
     na_augment_prob: float,
     test_mode: bool,
 ) -> torch.BoolTensor:
-    array_bool = genotype_array.to(dtype=torch.bool)
+    """
+    We use clone here to copy the original data, vs. using from_numpy
+    which shares memory, causing us to modify the original data.
+    """
+
+    tensor_bool = torch.BoolTensor(genotype_array).unsqueeze(0).detach().clone()
 
     if not test_mode and na_augment_perc > 0 and na_augment_prob > 0:
-        array_bool = make_random_omics_columns_missing(
-            omics_array=array_bool,
+        tensor_bool = make_random_omics_columns_missing(
+            omics_array=tensor_bool,
             percentage=na_augment_perc,
             probability=na_augment_prob,
         )
 
-    return array_bool
+    return tensor_bool
 
 
 class DiskDataset(DatasetBase):
@@ -565,9 +641,9 @@ class DiskDataset(DatasetBase):
     def __getitem__(self, index: int) -> al_getitem_return:
         sample = self.samples[index]
 
-        inputs_prepared = copy(sample.inputs)
+        inputs = copy(sample.inputs)
         inputs_prepared = prepare_inputs_disk(
-            inputs=inputs_prepared, inputs_objects=self.inputs, test_mode=self.test_mode
+            inputs=inputs, inputs_objects=self.inputs, test_mode=self.test_mode
         )
 
         inputs_final = impute_missing_modalities_wrapper(
@@ -595,7 +671,9 @@ def prepare_inputs_disk(
 
         if input_type == "omics":
 
-            array_raw = _load_one_hot_array(path=data)
+            array_raw = _load_one_hot_array_from_disk(
+                path=data, subset_indices=input_object.subset_indices
+            )
             array_prepared = prepare_one_hot_omics_data(
                 genotype_array=array_raw,
                 na_augment_perc=input_type_info.na_augment_perc,
@@ -606,13 +684,14 @@ def prepare_inputs_disk(
 
         elif input_type == "sequence":
 
-            sequence_split = load_sequence_from_disk(
+            sequence_tokenized = load_sequence_from_disk_and_tokenize(
                 sequence_file_path=data,
                 split_on=input_type_info.split_on,
+                encode_func=input_object.encode_func,
             )
             prepared_sequence_inputs = prepare_sequence_data(
                 sequence_input_object=inputs_objects[name],
-                cur_file_content_split=sequence_split,
+                cur_file_content_tokenized=sequence_tokenized,
                 test_mode=test_mode,
             )
             prepared_inputs[name] = prepared_sequence_inputs
@@ -650,10 +729,16 @@ def prepare_image_data(
     image_input_object: "ImageInputInfo", image_data: Image, test_mode: bool
 ) -> torch.Tensor:
 
+    """
+    The transforms take care of converting the image object to a copied tensor.
+    """
+
+    image_data_clone = image_data.copy()
+
     if test_mode:
-        image_prepared = image_input_object.base_transforms(img=image_data)
+        image_prepared = image_input_object.base_transforms(img=image_data_clone)
     else:
-        image_prepared = image_input_object.all_transforms(img=image_data)
+        image_prepared = image_input_object.all_transforms(img=image_data_clone)
 
     return image_prepared
 
@@ -661,13 +746,17 @@ def prepare_image_data(
 def prepare_bytes_data(
     bytes_input_object: "BytesInputInfo", bytes_data: np.ndarray, test_mode: bool
 ) -> torch.Tensor:
+    """
+    We use clone here to copy the original data, vs. using from_numpy
+    which shares memory, causing us to modify the original data.
+    """
     bio = bytes_input_object
 
     sampling_strat = bio.input_config.input_type_info.sampling_strategy_if_longer
     if test_mode:
         sampling_strat = "from_start"
 
-    bytes_tensor = torch.LongTensor(bytes_data)
+    bytes_tensor = torch.LongTensor(bytes_data).detach().clone()
 
     padding_value = bio.vocab.get("<pad>", 0)
     cur_bytes_padded = process_tensor_to_length(
@@ -682,14 +771,17 @@ def prepare_bytes_data(
 
 def prepare_sequence_data(
     sequence_input_object: "SequenceInputInfo",
-    cur_file_content_split: List[str],
+    cur_file_content_tokenized: List[int],
     test_mode: bool,
 ) -> torch.Tensor:
+    """
+    We use clone here to copy the original data, vs. using from_numpy
+    which shares memory, causing us to modify the original data.
+    """
 
     sio = sequence_input_object
 
-    cur_tokens_tokenized = sequence_input_object.encode_func(cur_file_content_split)
-    cur_tokens_as_tensor = torch.LongTensor(cur_tokens_tokenized)
+    cur_tokens_as_tensor = torch.LongTensor(cur_file_content_tokenized).detach().clone()
 
     sampling_strat = sio.input_config.input_type_info.sampling_strategy_if_longer
     if test_mode:
@@ -778,7 +870,7 @@ def prepare_inputs_memory(
             sequence_raw_in_memory = data
             prepared_sequence_inputs = prepare_sequence_data(
                 sequence_input_object=inputs_objects[name],
-                cur_file_content_split=sequence_raw_in_memory,
+                cur_file_content_tokenized=sequence_raw_in_memory,
                 test_mode=test_mode,
             )
             prepared_inputs[name] = prepared_sequence_inputs
@@ -887,8 +979,13 @@ def impute_single_missing_modality(
     return imputed_tensor
 
 
-def _load_one_hot_array(path: Path) -> torch.Tensor:
+def _load_one_hot_array_from_disk(
+    path: Path, subset_indices: Union[Sequence[int], None]
+) -> np.ndarray:
     genotype_array_raw = np.load(str(path))
-    genotype_array_raw = torch.from_numpy(genotype_array_raw).unsqueeze(0)
 
-    return genotype_array_raw
+    if subset_indices is not None:
+        genotype_array_raw = genotype_array_raw[:, subset_indices]
+
+    genotype_array_raw_bool = genotype_array_raw.astype(bool)
+    return genotype_array_raw_bool

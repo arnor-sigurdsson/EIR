@@ -74,6 +74,9 @@ class CNNModelConfig:
     :param rb_do:
         Dropout in the convolutional residual blocks.
 
+    :param stochastic_depth_p:
+        Probability of dropping input.
+
     :param sa:
         Whether to add a self-attention layer to the network after a width of 1024
         has been reached.
@@ -97,6 +100,8 @@ class CNNModelConfig:
     dilation_factor: int = 1
 
     rb_do: float = 0.00
+
+    stochastic_depth_p: float = 0.00
 
     sa: bool = False
     l1: float = 0.00
@@ -295,6 +300,7 @@ def _get_conv_resblock(
         dilation=cur_dilation_factor,
         full_preact=True if len(conv_blocks) == 1 else False,
         rb_do=mc.rb_do,
+        stochastic_depth_p=mc.stochastic_depth_p,
     )
 
     return cur_layer, cur_width

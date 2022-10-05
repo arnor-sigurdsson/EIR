@@ -4,15 +4,7 @@ input_info:
   input_type: omics
 
 input_type_info:
-  na_augment_perc: 0.4
-  na_augment_prob: 1.0
   snp_file: eir_tutorials/01_basic_tutorial/data/processed_sample_data/data_final_gen.bim
 
 model_config:
   model_type: genome-local-net
-  model_init_config:
-    rb_do: 0.25
-    channel_exp_base: 2
-    layers:
-      - 2
-    kernel_width: 8

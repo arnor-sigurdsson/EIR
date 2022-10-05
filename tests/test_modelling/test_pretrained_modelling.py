@@ -1,14 +1,16 @@
-from pathlib import Path
-from typing import Tuple, TYPE_CHECKING
 from copy import deepcopy
+from pathlib import Path
+from typing import Tuple, Sequence, TYPE_CHECKING
 
 import pytest
 
 from eir import train
+from eir.setup.config import get_all_tabular_targets
 from eir.setup.schemas import BasicPretrainedConfig
-from eir.setup.config import get_all_targets
-from tests.test_modelling.test_modelling_utils import check_test_performance_results
 from tests.conftest import _get_cur_modelling_test_config, cleanup
+from tests.test_modelling.test_modelling_utils import (
+    check_test_performance_results,
+)
 
 if TYPE_CHECKING:
     from tests.conftest import ModelTestConfig
@@ -71,17 +73,22 @@ if TYPE_CHECKING:
                         },
                     },
                 ],
-                "predictor_configs": {
+                "fusion_configs": {
                     "model_config": {
-                        "fc_task_dim": 64,
+                        "fc_task_dim": 128,
                         "fc_do": 0.10,
                         "rb_do": 0.10,
                     },
                 },
-                "target_configs": {
-                    "target_cat_columns": ["Origin"],
-                    "target_con_columns": ["Height"],
-                },
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": ["Height"],
+                        },
+                    },
+                ],
             },
         }
     ],
@@ -105,6 +112,44 @@ def test_pre_trained_module_setup(
     _get_experiment_overloaded_for_pretrained_checkpoint(
         experiment=experiment, test_config=test_config
     )
+
+    experiment_overwritten = _add_new_feature_extractor_to_experiment(
+        experiment=experiment
+    )
+    _get_experiment_overloaded_for_pretrained_extractor(
+        experiment=experiment_overwritten,
+        test_config=test_config,
+        rename_pretrained_inputs=False,
+    )
+
+    _get_experiment_overloaded_for_pretrained_extractor(
+        experiment=experiment_overwritten,
+        test_config=test_config,
+        rename_pretrained_inputs=True,
+    )
+
+
+def _add_new_feature_extractor_to_experiment(
+    experiment: train.Experiment,
+) -> train.Experiment:
+    """
+    Used to check that we can do a partial loading of pretrained feature extractors.
+    """
+
+    experiment_attrs = experiment.__dict__
+    experiment_configs = deepcopy(experiment.configs)
+    first_config_modified = deepcopy(experiment_configs.input_configs[0])
+
+    extra_input_name = first_config_modified.input_info.input_name + "_copy"
+    first_config_modified.input_info.input_name = extra_input_name
+
+    inputs_configs = list(experiment_configs.input_configs)
+    inputs_configs_with_extra = inputs_configs + [first_config_modified]
+    experiment_attrs["configs"].input_configs = inputs_configs_with_extra
+
+    experiment_overwritten = train.Experiment(**experiment_attrs)
+
+    return experiment_overwritten
 
 
 @pytest.mark.parametrize(
@@ -164,17 +209,22 @@ def test_pre_trained_module_setup(
                         },
                     },
                 ],
-                "predictor_configs": {
+                "fusion_configs": {
                     "model_config": {
-                        "fc_task_dim": 64,
+                        "fc_task_dim": 128,
                         "fc_do": 0.10,
                         "rb_do": 0.10,
                     },
                 },
-                "target_configs": {
-                    "target_cat_columns": ["Origin"],
-                    "target_con_columns": ["Height"],
-                },
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": ["Height"],
+                        },
+                    },
+                ],
             },
         }
     ],
@@ -196,19 +246,20 @@ def test_pre_training_and_loading(
 
     train.train(experiment=pretrained_experiment)
 
-    targets = get_all_targets(targets_configs=experiment.configs.target_configs)
-
     # Note we skip checking R2 for now as we patch the metrics in conftest.py
     # to check for both training and validation, but for now we will make do with
     # checking only the MCC for this
-    for cat_column in targets.cat_targets:
+    for output_name, output_object in experiment.outputs.items():
+        cat_target_columns = output_object.target_columns["cat"]
 
-        check_test_performance_results(
-            run_path=pretrained_test_config.run_path,
-            target_column=cat_column,
-            metric="mcc",
-            thresholds=(0.9, 0.9),
-        )
+        for cat_target_column in cat_target_columns:
+            check_test_performance_results(
+                run_path=test_config.run_path,
+                target_column=cat_target_column,
+                output_name=output_name,
+                metric="mcc",
+                thresholds=(0.9, 0.9),
+            )
 
     (
         pretrained_checkpoint_experiment,
@@ -219,20 +270,24 @@ def test_pre_training_and_loading(
 
     train.train(experiment=pretrained_checkpoint_experiment)
 
-    for cat_column in targets.cat_targets:
+    for output_name, output_object in pretrained_checkpoint_experiment.outputs.items():
+        cat_target_columns = output_object.target_columns["cat"]
 
-        check_test_performance_results(
-            run_path=pretrained_checkpoint_test_config.run_path,
-            target_column=cat_column,
-            metric="mcc",
-            thresholds=(0.9, 0.9),
-        )
+        for cat_target_column in cat_target_columns:
+            check_test_performance_results(
+                run_path=pretrained_checkpoint_test_config.run_path,
+                target_column=cat_target_column,
+                output_name=output_name,
+                metric="mcc",
+                thresholds=(0.9, 0.9),
+            )
 
 
 def _get_experiment_overloaded_for_pretrained_extractor(
     experiment: train.Experiment,
     test_config: "ModelTestConfig",
     rename_pretrained_inputs: bool,
+    skip_pretrained_keys: Sequence[str] = tuple(),
 ) -> Tuple[train.Experiment, "ModelTestConfig"]:
 
     input_configs = deepcopy(experiment.configs.input_configs)
@@ -242,6 +297,9 @@ def _get_experiment_overloaded_for_pretrained_extractor(
     input_configs_with_pretrained = []
     for cur_input_config in input_configs:
         cur_name = cur_input_config.input_info.input_name
+
+        if cur_name in skip_pretrained_keys:
+            continue
 
         cur_pretrained_config = BasicPretrainedConfig(
             model_path=str(saved_model_path), load_module_name=cur_name
@@ -272,8 +330,8 @@ def _get_experiment_overloaded_for_pretrained_extractor(
         configs=pretrained_configs, hooks=default_hooks
     )
 
-    targets = get_all_targets(
-        targets_configs=pretrained_experiment.configs.target_configs
+    targets = get_all_tabular_targets(
+        output_configs=pretrained_experiment.configs.output_configs
     )
     pretrained_test_config = _get_cur_modelling_test_config(
         train_loader=pretrained_experiment.train_loader,
@@ -309,8 +367,8 @@ def _get_experiment_overloaded_for_pretrained_checkpoint(
         configs=pretrained_configs, hooks=default_hooks
     )
 
-    targets = get_all_targets(
-        targets_configs=pretrained_experiment.configs.target_configs
+    targets = get_all_tabular_targets(
+        output_configs=pretrained_experiment.configs.output_configs
     )
     pretrained_test_config = _get_cur_modelling_test_config(
         train_loader=pretrained_experiment.train_loader,

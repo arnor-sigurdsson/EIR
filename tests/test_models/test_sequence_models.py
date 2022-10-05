@@ -4,12 +4,12 @@ import pytest
 import torch
 
 from eir.models.model_training_utils import trace_eir_model
-from eir.models.sequence.transformer_models import get_all_hf_model_names
+from eir.setup.setup_utils import get_all_hf_model_names
+from tests.conftest import should_skip_in_gha
 from tests.test_modelling.test_sequence_modelling import (
     _get_common_model_config_overload,
     _parse_model_specific_config_values,
 )
-from tests.conftest import should_skip_in_gha
 from tests.test_models.model_testing_utils import prepare_example_batch
 
 
@@ -37,6 +37,15 @@ from tests.test_models.model_testing_utils import prepare_example_batch
                         "model_config": {"position": "encode"},
                     }
                 ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    },
+                ],
             },
         },
         # Case 2: Classification - Positional Embedding and Windowed
@@ -52,6 +61,15 @@ from tests.test_models.model_testing_utils import prepare_example_batch
                         "input_info": {"input_name": "test_sequence"},
                         "model_config": {"window_size": 16, "position": "embed"},
                     }
+                ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    },
                 ],
             },
         },
@@ -72,7 +90,7 @@ def test_internal_sequence_models(
     )
 
     model.eval()
-    _ = trace_eir_model(fusion_model=model, example_inputs=example_batch.inputs)
+    _ = trace_eir_model(meta_model=model, example_inputs=example_batch.inputs)
 
 
 def get_test_external_sequence_models_parametrization() -> Sequence[Dict]:
@@ -113,7 +131,16 @@ def get_test_external_sequence_models_parametrization() -> Sequence[Dict]:
                             "model_init_config": model_init_config_parsed,
                         },
                     }
-                ]
+                ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    },
+                ],
             }
         }
         all_parametrizations.append(cur_params)
@@ -149,4 +176,4 @@ def test_external_sequence_models(
 
     model.eval()
     with torch.no_grad():
-        _ = trace_eir_model(fusion_model=model, example_inputs=example_batch.inputs)
+        _ = trace_eir_model(meta_model=model, example_inputs=example_batch.inputs)
