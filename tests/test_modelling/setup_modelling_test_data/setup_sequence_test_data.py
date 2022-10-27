@@ -77,7 +77,7 @@ def create_test_sequence_data(
         df_sequence_train.to_csv(c.scoped_tmp_path / "sequence_train.csv", index=False)
         df_sequence_test.to_csv(c.scoped_tmp_path / "sequence_test.csv", index=False)
     else:
-        df_sequence.to_csv(path_or_buf=sequence_outfolder / "sequence.csv", index=False)
+        df_sequence.to_csv(path_or_buf=c.scoped_tmp_path / "sequence.csv", index=False)
 
     return sequence_outfolder
 

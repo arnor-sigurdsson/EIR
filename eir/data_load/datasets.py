@@ -179,11 +179,6 @@ class DatasetBase(Dataset):
         available for. This is quite likely if we have e.g. pre-split data into
         train/val and test folders.
 
-        Note that there is a slight weirdness in how we handle the file loading hooks
-        for different data types. Image is always just loaded from the disk, so
-        we use the file loading hooks with 'image' key in those cases. For omics
-        and sequence, we can have specific configurations specific to inputs,
-        so we grab file loading hooks for the ``source_name``.
         """
 
         mode_str = "evaluation/test" if self.test_mode else "train"
@@ -232,12 +227,11 @@ class DatasetBase(Dataset):
 
             elif input_type == "image":
 
-                image_specific_file_loading_hook = file_loading_hooks[input_type]
                 samples = _add_data_to_samples_wrapper(
                     input_source=input_source,
                     samples=samples,
                     ids_to_keep=ids_to_keep,
-                    file_loading_hook=image_specific_file_loading_hook,
+                    file_loading_hook=file_loading_hooks[input_name],
                     input_name=input_name,
                     deeplake_input_inner_key=input_inner_key,
                 )
@@ -479,7 +473,7 @@ class MemoryDataset(DatasetBase):
     def _get_file_loading_hooks(
         self,
     ) -> Mapping[str, Callable[..., torch.Tensor]]:
-        mapping = {"image": _image_load_wrapper}
+        mapping = {}
 
         for input_name, input_object in self.inputs.items():
             input_type = input_object.input_config.input_info.input_type
@@ -489,6 +483,12 @@ class MemoryDataset(DatasetBase):
                 mapping[input_name] = partial(
                     _omics_load_wrapper,
                     subset_indices=self.inputs[input_name].subset_indices,
+                    input_source=input_source,
+                )
+
+            elif input_type == "image":
+                mapping[input_name] = partial(
+                    _image_load_wrapper,
                     input_source=input_source,
                 )
 
