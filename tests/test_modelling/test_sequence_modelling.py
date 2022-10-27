@@ -43,7 +43,7 @@ def _get_sequence_test_specific_fusion_configs() -> Dict:
 @pytest.mark.parametrize(
     "create_test_data",
     [
-        {"task_type": "multi", "modalities": ("sequence",)},
+        {"task_type": "multi", "modalities": ("sequence",), "source": "local"},
     ],
     indirect=True,
 )

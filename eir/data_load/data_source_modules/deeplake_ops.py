@@ -52,7 +52,7 @@ def add_deeplake_data_to_samples(
     input_name: str,
     deeplake_input_inner_key: str,
     samples: DefaultDict[str, "Sample"],
-    file_loading_hook: Callable,
+    data_loading_hook: Callable,
     ids_to_keep: Union[None, Sequence[str]],
 ) -> DefaultDict[str, "Sample"]:
     """
@@ -87,7 +87,8 @@ def add_deeplake_data_to_samples(
         if sample_id not in ids_to_keep_set:
             continue
 
-        sample_data = deeplake_sample.index.values[0].value
+        sample_data_pointer = deeplake_sample.index.values[0].value
+        sample_data = data_loading_hook(sample_data_pointer)
 
         samples = add_id_to_samples(samples=samples, sample_id=sample_id)
         samples[sample_id].inputs[input_name] = sample_data

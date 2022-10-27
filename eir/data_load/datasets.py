@@ -171,7 +171,7 @@ class DatasetBase(Dataset):
             raise ValueError("Please specify label column name.")
 
     def set_up_samples(
-        self, file_loading_hooks: Mapping[str, Callable] = None
+        self, data_loading_hooks: Mapping[str, Callable] = None
     ) -> List[Sample]:
         """
         We do an extra filtering step at the end to account for the situation where
@@ -187,8 +187,8 @@ class DatasetBase(Dataset):
         def _identity(sample_data: Any) -> Any:
             return sample_data
 
-        if file_loading_hooks is None:
-            file_loading_hooks = defaultdict(lambda: _identity)
+        if data_loading_hooks is None:
+            data_loading_hooks = defaultdict(lambda: _identity)
 
         def _default_sample_factory() -> Sample:
             return Sample(sample_id="", inputs={}, target_labels={})
@@ -221,7 +221,7 @@ class DatasetBase(Dataset):
                     input_name=input_name,
                     samples=samples,
                     ids_to_keep=ids_to_keep,
-                    file_loading_hook=file_loading_hooks[input_name],
+                    data_loading_hook=data_loading_hooks[input_name],
                     deeplake_input_inner_key=input_inner_key,
                 )
 
@@ -231,7 +231,7 @@ class DatasetBase(Dataset):
                     input_source=input_source,
                     samples=samples,
                     ids_to_keep=ids_to_keep,
-                    file_loading_hook=file_loading_hooks[input_name],
+                    data_loading_hook=data_loading_hooks[input_name],
                     input_name=input_name,
                     deeplake_input_inner_key=input_inner_key,
                 )
@@ -252,7 +252,7 @@ class DatasetBase(Dataset):
                         input_name=input_name,
                         samples=samples,
                         ids_to_keep=ids_to_keep,
-                        file_loading_hook=file_loading_hooks[input_name],
+                        data_loading_hook=data_loading_hooks[input_name],
                         deeplake_input_inner_key=input_inner_key,
                     )
 
@@ -381,7 +381,7 @@ def _add_data_to_samples_wrapper(
     input_name: str,
     samples: DefaultDict[str, Sample],
     ids_to_keep: Union[None, Sequence[str]],
-    file_loading_hook: Callable,
+    data_loading_hook: Callable,
     deeplake_input_inner_key: Optional[str] = None,
 ) -> DefaultDict[str, Sample]:
 
@@ -392,7 +392,7 @@ def _add_data_to_samples_wrapper(
             samples=samples,
             ids_to_keep=ids_to_keep,
             deeplake_input_inner_key=deeplake_input_inner_key,
-            file_loading_hook=file_loading_hook,
+            data_loading_hook=data_loading_hook,
         )
 
     else:
@@ -400,7 +400,7 @@ def _add_data_to_samples_wrapper(
             input_source=input_source,
             samples=samples,
             ids_to_keep=ids_to_keep,
-            file_loading_hook=file_loading_hook,
+            data_loading_hook=data_loading_hook,
             input_name=input_name,
         )
 
@@ -412,7 +412,7 @@ def _add_file_data_to_samples(
     input_name: str,
     samples: DefaultDict[str, Sample],
     ids_to_keep: Union[None, Sequence[str]],
-    file_loading_hook: Callable,
+    data_loading_hook: Callable,
 ) -> DefaultDict[str, Sample]:
 
     file_data_iterator = get_file_sample_id_iterator_basic(
@@ -422,7 +422,7 @@ def _add_file_data_to_samples(
 
     for sample_id, file in file_iterator_tqdm:
 
-        sample_data = file_loading_hook(file)
+        sample_data = data_loading_hook(file)
 
         samples = add_id_to_samples(samples=samples, sample_id=sample_id)
 
@@ -466,11 +466,11 @@ class MemoryDataset(DatasetBase):
         if self.target_labels_dict:
             self.init_label_attributes()
 
-        file_loading_hooks = self._get_file_loading_hooks()
-        self.samples = self.set_up_samples(file_loading_hooks=file_loading_hooks)
+        data_loading_hooks = self.data_loading_hooks()
+        self.samples = self.set_up_samples(data_loading_hooks=data_loading_hooks)
         self.check_samples()
 
-    def _get_file_loading_hooks(
+    def data_loading_hooks(
         self,
     ) -> Mapping[str, Callable[..., torch.Tensor]]:
         mapping = {}
@@ -493,11 +493,13 @@ class MemoryDataset(DatasetBase):
                 )
 
             elif input_type == "sequence":
+                inner_key = input_object.input_config.input_info.input_inner_key
                 mapping[input_name] = partial(
                     _sequence_load_wrapper,
                     split_on=input_object.input_config.input_type_info.split_on,
                     encode_func=self.inputs[input_name].encode_func,
                     input_source=input_source,
+                    deeplake_inner_key=inner_key,
                 )
             elif input_type == "bytes":
                 mapping[input_name] = partial(
