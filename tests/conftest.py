@@ -2,7 +2,7 @@ import json
 import random
 import warnings
 from copy import copy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from shutil import rmtree
 from typing import (
@@ -13,6 +13,7 @@ from typing import (
     Mapping,
     Union,
     Literal,
+    Optional,
     Iterable,
     Any,
 )
@@ -22,6 +23,7 @@ import pandas as pd
 import pytest
 import torch.utils.data
 from _pytest.fixtures import SubRequest
+import deeplake
 from aislib.misc_utils import ensure_path_exists
 from torch import nn
 from torch.utils.data import DataLoader
@@ -139,7 +141,7 @@ class TestConfigInits:
 
 @pytest.fixture
 def create_test_config_init_base(
-    request, create_test_data
+    request, create_test_data: "TestDataConfig"
 ) -> Tuple[TestConfigInits, "TestDataConfig"]:
 
     injections = {}
@@ -160,6 +162,8 @@ def create_test_config_init_base(
         test_path=create_test_data.scoped_tmp_path,
         input_config_dicts=injections.get("input_configs", {}),
         split_to_test=create_test_data.request_params.get("split_to_test", False),
+        source=create_test_data.source,
+        extra_kwargs=create_test_data.extras,
     )
 
     model_type = injections.get("fusion_configs", {}).get("model_type", "default")
@@ -223,7 +227,12 @@ def get_test_inputs_inits(
     test_path: Path,
     input_config_dicts: Sequence[dict],
     split_to_test: bool,
+    source: Literal["local", "deeplake"],
+    extra_kwargs: Optional[dict] = None,
 ) -> Sequence[dict]:
+
+    if extra_kwargs is None:
+        extra_kwargs = {}
 
     inits = []
 
@@ -237,7 +246,11 @@ def get_test_inputs_inits(
 
         cur_base_func = base_func_map.get(cur_base_func_key)
         cur_init_base = cur_base_func(
-            init_dict=init_dict, test_path=test_path, split_to_test=split_to_test
+            init_dict=init_dict,
+            test_path=test_path,
+            split_to_test=split_to_test,
+            source=source,
+            extra_kwargs=extra_kwargs,
         )
 
         cur_init_injected = recursive_dict_replace(
@@ -295,19 +308,53 @@ def get_input_test_init_base_func_map() -> Dict[str, Callable]:
     return mapping
 
 
+def _inject_train_source_path(
+    test_path: Path,
+    source: Literal["local", "deeplake"],
+    local_name: Literal["omics", "sequence", "image"],
+    split_to_test: bool,
+) -> Path:
+
+    if source == "local":
+        input_source = test_path / local_name
+
+        if split_to_test:
+            input_source = input_source / "train_set"
+
+    elif source == "deeplake":
+
+        input_source = test_path / "deeplake"
+        if split_to_test:
+            input_source = test_path / "deeplake_train_set"
+
+    else:
+        raise ValueError(f"Source {source} not supported.")
+
+    return input_source
+
+
 def get_test_omics_input_init(
-    test_path: Path, split_to_test: bool, init_dict: Dict
+    test_path: Path,
+    split_to_test: bool,
+    init_dict: Dict,
+    source: Literal["local", "deeplake"],
+    *args,
+    **kwargs,
 ) -> dict:
 
-    input_source = test_path / "omics"
-    if split_to_test:
-        input_source = input_source / "train_set"
+    input_source = _inject_train_source_path(
+        test_path=test_path,
+        source=source,
+        local_name="omics",
+        split_to_test=split_to_test,
+    )
 
     input_init_kwargs = {
         "input_info": {
             "input_source": str(input_source),
             "input_name": "test_genotype",
             "input_type": "omics",
+            "input_inner_key": "test_genotype",
         },
         "input_type_info": {
             "na_augment_perc": 0.10,
@@ -346,18 +393,34 @@ def get_test_tabular_input_init(
 
 
 def get_test_sequence_input_init(
-    test_path: Path, split_to_test: bool, *args, **kwargs
+    test_path: Path,
+    split_to_test: bool,
+    source: Literal["local", "deeplake"],
+    extra_kwargs: dict,
+    *args,
+    **kwargs,
 ) -> dict:
 
-    input_source = test_path / "sequence"
-    if split_to_test:
-        input_source = input_source / "train_set"
+    if extra_kwargs.get("sequence_csv_source", False):
+        assert source == "local"
+        name = "sequence.csv"
+        if split_to_test:
+            name = "sequence_train.csv"
+        input_source = test_path / name
+    else:
+        input_source = _inject_train_source_path(
+            test_path=test_path,
+            source=source,
+            local_name="sequence",
+            split_to_test=split_to_test,
+        )
 
     input_init_kwargs = {
         "input_info": {
             "input_source": str(input_source),
             "input_name": "test_sequence",
             "input_type": "sequence",
+            "input_inner_key": "test_sequence",
         },
         "input_type_info": {
             "max_length": "max",
@@ -404,17 +467,26 @@ def get_test_bytes_input_init(
 
 
 def get_test_image_input_init(
-    test_path: Path, split_to_test: bool, *args, **kwargs
+    test_path: Path,
+    split_to_test: bool,
+    source: Literal["local", "deeplake"],
+    *args,
+    **kwargs,
 ) -> Dict:
-    input_source = test_path / "image"
-    if split_to_test:
-        input_source = input_source / "train_set"
+
+    input_source = _inject_train_source_path(
+        test_path=test_path,
+        source=source,
+        local_name="image",
+        split_to_test=split_to_test,
+    )
 
     input_init_kwargs = {
         "input_info": {
             "input_source": str(input_source),
             "input_name": "test_image",
             "input_type": "image",
+            "input_inner_key": "test_image",
         },
         "input_type_info": {
             "auto_augment": False,
@@ -527,7 +599,76 @@ def create_test_data(request, tmp_path_factory, parse_test_cl_args) -> "TestData
         label_file = test_data_config.scoped_tmp_path / "labels.csv"
         _delete_random_rows_from_csv(csv_file=label_file, n_to_drop=50)
 
+    if test_data_config.request_params.get("split_to_test", False):
+        _make_deeplake_test_dataset(
+            base_output_folder=base_outfolder, sub_folder_name="train_set"
+        )
+        _make_deeplake_test_dataset(
+            base_output_folder=base_outfolder, sub_folder_name="test_set"
+        )
+    else:
+        _make_deeplake_test_dataset(
+            base_output_folder=base_outfolder, sub_folder_name=None
+        )
+
     return test_data_config
+
+
+def _make_deeplake_test_dataset(
+    base_output_folder: Path,
+    sub_folder_name: Union[None, Literal["train_set", "test_set"]],
+) -> None:
+
+    if sub_folder_name is None:
+        suffix = ""
+    else:
+        suffix = f"_{sub_folder_name}"
+
+    if (base_output_folder / f"deeplake{suffix}").exists():
+        return
+
+    samples = {}
+    for f in base_output_folder.iterdir():
+        if not f.is_dir() or "deeplake" in f.name:
+            continue
+
+        file_iterator = f.iterdir()
+        if sub_folder_name is not None:
+            file_iterator = (f / sub_folder_name).iterdir()
+
+        for sample_file in file_iterator:
+
+            sample_id = sample_file.stem
+            if sample_id not in samples:
+                samples[sample_id] = {"ID": sample_id}
+
+            if f.name == "omics":
+                cur_name = "test_genotype"
+                sample_data = np.load(str(sample_file))
+            elif f.name == "image":
+                cur_name = "test_image"
+                sample_data = datasets.default_loader(str(sample_file))
+                sample_data = np.array(sample_data)
+            elif f.name == "sequence":
+                cur_name = "test_sequence"
+                sample_data = sample_file.read_text().strip()
+            else:
+                raise ValueError()
+
+            samples[sample_id][cur_name] = sample_data
+
+    name = "deeplake"
+    if sub_folder_name is not None:
+        name = f"{name}_{sub_folder_name}"
+    ds = deeplake.empty(base_output_folder / name, overwrite=True)
+
+    ds.create_tensor("ID", htype="text")
+    ds.create_tensor("test_genotype")
+    ds.create_tensor("test_image", htype="image", sample_compression="jpg")
+    ds.create_tensor("test_sequence", htype="text")
+    with ds:
+        for sample_id, sample in samples.items():
+            ds.append(sample, append_empty=True)
 
 
 def _delete_random_rows_from_csv(csv_file: Path, n_to_drop: int):
@@ -555,6 +696,8 @@ class TestDataConfig:
     n_snps: int
     modalities: Sequence[Union[Literal["omics"], Literal["sequence"]]] = ("omics",)
     random_samples_dropped_from_modalities: bool = False
+    source: Literal["local", "deeplake"] = "local"
+    extras: Dict[str, Any] = field(default_factory=dict)
 
 
 def _create_test_data_config(
@@ -592,6 +735,8 @@ def _create_test_data_config(
         random_samples_dropped_from_modalities=request_params.get(
             "random_samples_dropped_from_modalities", False
         ),
+        source=request_params.get("source", "local"),
+        extras=request_params.get("extras", {}),
     )
 
     return test_data_config

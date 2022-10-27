@@ -273,6 +273,100 @@ def test_sequence_modelling(prep_modelling_test_configs):
             )
 
 
+@pytest.mark.skipif(
+    condition=should_skip_in_gha_macos(), reason="In GHA and platform is Darwin."
+)
+@pytest.mark.parametrize(
+    "create_test_data",
+    [
+        {
+            "task_type": "multi",
+            "modalities": ("sequence",),
+            "extras": {"sequence_csv_source": True},
+            "split_to_test": True,
+        }
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize(
+    "create_test_config_init_base",
+    [
+        # Case 1: Classification - Positional Encoding and Max Pooling
+        # Note we add more capacity to fusion models as it helps make activation
+        # analysis more stable
+        {
+            "injections": {
+                "global_configs": {
+                    "output_folder": "test_classification",
+                    "n_epochs": 12,
+                    "memory_dataset": True,
+                },
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_sequence"},
+                        "model_config": {"position": "encode", "pool": "max"},
+                    }
+                ],
+                "fusion_configs": _get_sequence_test_specific_fusion_configs(),
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    }
+                ],
+            },
+        },
+    ],
+    indirect=True,
+)
+def test_sequence_modelling_csv(prep_modelling_test_configs):
+    experiment, test_config = prep_modelling_test_configs
+
+    train.train(experiment=experiment)
+
+    output_configs = experiment.configs.output_configs
+
+    thresholds = get_sequence_test_args(
+        mixing=experiment.configs.global_config.mixing_alpha
+    )
+
+    for output_config in output_configs:
+        output_name = output_config.output_info.output_name
+        cat_targets = output_config.output_type_info.target_cat_columns
+        con_targets = output_config.output_type_info.target_con_columns
+
+        for target_name in cat_targets:
+
+            activation_paths = test_config.activations_paths[output_name][target_name]
+            target_transformer = experiment.outputs[output_name].target_transformers[
+                target_name
+            ]
+
+            check_performance_result_wrapper(
+                outputs=experiment.outputs,
+                run_path=test_config.run_path,
+                thresholds=thresholds,
+            )
+
+            for input_name in experiment.inputs.keys():
+                cur_activation_root = activation_paths[input_name]
+                _check_sequence_activations_wrapper(
+                    activation_root_folder=cur_activation_root,
+                    target_classes=target_transformer.classes_,
+                    strict=False,
+                )
+
+        for _ in con_targets:
+            check_performance_result_wrapper(
+                outputs=experiment.outputs,
+                run_path=test_config.run_path,
+                thresholds=thresholds,
+            )
+
+
 def get_sequence_test_args(mixing: float) -> Tuple[float, float]:
 
     thresholds = (0.8, 0.7)

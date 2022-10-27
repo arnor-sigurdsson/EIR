@@ -487,17 +487,6 @@ def test_set_up_test_dataset(
     assert len(tabular_file_infos) == 1
     target_tabular_info = tabular_file_infos["test_output"]
 
-    # df_test = predict._load_labels_for_predict(
-    #     tabular_info=target_tabular_info, ids_to_keep=test_ids
-    # )
-
-    # predict_labels = predict.get_labels_for_predict(
-    #     output_folder=test_configs.global_config.output_folder,
-    #     tabular_file_infos=tabular_file_infos,
-    #     custom_column_label_parsing_ops=None,
-    #     ids=test_ids,
-    # )
-
     df_labels_test = pd.DataFrame(index=test_ids)
     for output_name, tabular_info in tabular_file_infos.items():
 
@@ -585,7 +574,19 @@ def grab_best_model_path(saved_models_folder: Path):
                 "image",
             ),
             "manual_test_data_creator": lambda: "test_predict",
-        }
+            "source": "local",
+        },
+        {
+            "task_type": "multi",
+            "split_to_test": True,
+            "modalities": (
+                "omics",
+                "sequence",
+                "image",
+            ),
+            "manual_test_data_creator": lambda: "test_predict",
+            "source": "deeplake",
+        },
     ],
     indirect=True,
 )
@@ -596,7 +597,7 @@ def grab_best_model_path(saved_models_folder: Path):
             "injections": {
                 "global_configs": {
                     "output_folder": "test_run_predict",
-                    "n_epochs": 12,
+                    "n_epochs": 6,
                     "checkpoint_interval": 200,
                     "sample_interval": 200,
                     "act_background_samples": 128,

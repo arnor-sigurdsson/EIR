@@ -5,6 +5,7 @@ from typing import List, TYPE_CHECKING, Dict, Union, Any, Sequence
 from uuid import uuid4
 from unittest.mock import MagicMock, patch
 
+import eir.data_load.data_source_modules.local_ops
 import numpy as np
 import pandas as pd
 import pytest
@@ -413,7 +414,7 @@ def test_construct_dataset_init_params_from_cl_args(
         test_mode=False,
     )
 
-    assert len(constructed_args) == 4
+    assert len(constructed_args) == 5
     assert len(constructed_args.get("inputs")) == 2
 
     gotten_input_names = set(constructed_args.get("inputs").keys())
@@ -601,7 +602,7 @@ def test_prepare_genotype_array_test_mode():
 
 
 def test_prepare_sequence_data():
-    test_input = [i for i in range(100)]
+    test_input = np.array([i for i in range(100)])
     test_input_copy = deepcopy(test_input)
 
     input_config_mock = MagicMock()
@@ -613,7 +614,7 @@ def test_prepare_sequence_data():
         test_mode=False,
     )
 
-    assert test_input == test_input_copy
+    assert (test_input == test_input_copy).all()
     assert prepared_tensor != test_input
 
     assert len(prepared_tensor) == 64
@@ -715,7 +716,7 @@ def test_get_file_sample_id_iterator(
 
     input_data_source = input_configs[0].input_info.input_source
 
-    iterator = datasets.get_file_sample_id_iterator(
+    iterator = eir.data_load.data_source_modules.local_ops.get_file_sample_id_iterator(
         data_source=input_data_source, ids_to_keep=None
     )
     all_ids = [i for i in iterator]
@@ -724,8 +725,10 @@ def test_get_file_sample_id_iterator(
         test_data_config.target_classes
     )
 
-    iterator_empty = datasets.get_file_sample_id_iterator(
-        data_source=input_data_source, ids_to_keep=["does_not_exists"]
+    iterator_empty = (
+        eir.data_load.data_source_modules.local_ops.get_file_sample_id_iterator(
+            data_source=input_data_source, ids_to_keep=["does_not_exists"]
+        )
     )
     all_ids = [i for i in iterator_empty]
     assert len(all_ids) == 0
@@ -907,8 +910,9 @@ def test_load_array_from_disk(subset_indices: Union[None, Sequence[int]]):
         autospec=True,
     ):
 
-        loaded = datasets._load_one_hot_array_from_disk(
-            path=Path("fake"),
+        loaded = datasets._omics_load_wrapper(
+            input_source="fake",
+            data_pointer=Path("fake"),
             subset_indices=subset_indices,
         )
 
