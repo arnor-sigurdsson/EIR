@@ -37,9 +37,7 @@ def _get_sequence_test_specific_fusion_configs() -> Dict:
     return sequence_fusion_configs
 
 
-@pytest.mark.skipif(
-    condition=should_skip_in_gha_macos(), reason="In GHA and platform is Darwin."
-)
+@pytest.mark.skipif(condition=should_skip_in_gha_macos(), reason="In GHA.")
 @pytest.mark.parametrize(
     "create_test_data",
     [
@@ -134,6 +132,28 @@ def _get_sequence_test_specific_fusion_configs() -> Dict:
                 ],
             },
         },
+    ],
+    indirect=True,
+)
+def test_sequence_modelling(prep_modelling_test_configs):
+    experiment, test_config = prep_modelling_test_configs
+
+    train.train(experiment=experiment)
+
+    _sequence_test_check_wrapper(experiment=experiment, test_config=test_config)
+
+
+@pytest.mark.skipif(condition=should_skip_in_gha_macos(), reason="In GHA.")
+@pytest.mark.parametrize(
+    "create_test_data",
+    [
+        {"task_type": "multi", "modalities": ("sequence",), "source": "local"},
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize(
+    "create_test_config_init_base",
+    [
         # Case 4: Multi Task
         {
             "injections": {
@@ -142,6 +162,7 @@ def _get_sequence_test_specific_fusion_configs() -> Dict:
                     "memory_dataset": True,
                     "output_folder": "test_multi_task",
                     "gradient_noise": 0.001,
+                    "act_background_samples": 64,
                 },
                 "input_configs": [
                     {
@@ -169,6 +190,7 @@ def _get_sequence_test_specific_fusion_configs() -> Dict:
                     "memory_dataset": True,
                     "output_folder": "test_multi_task_with_mixing",
                     "mixing_alpha": 0.5,
+                    "act_background_samples": 64,
                 },
                 "input_configs": [
                     {
@@ -195,6 +217,7 @@ def _get_sequence_test_specific_fusion_configs() -> Dict:
                     "memory_dataset": True,
                     "output_folder": "test_albert",
                     "mixing_alpha": 0.0,
+                    "act_background_samples": 64,
                 },
                 "input_configs": [
                     {
@@ -228,54 +251,15 @@ def _get_sequence_test_specific_fusion_configs() -> Dict:
     ],
     indirect=True,
 )
-def test_sequence_modelling(prep_modelling_test_configs):
+def test_mt_sequence_modelling(prep_modelling_test_configs):
     experiment, test_config = prep_modelling_test_configs
 
     train.train(experiment=experiment)
 
-    output_configs = experiment.configs.output_configs
-
-    thresholds = get_sequence_test_args(
-        mixing=experiment.configs.global_config.mixing_alpha
-    )
-
-    for output_config in output_configs:
-        output_name = output_config.output_info.output_name
-        cat_targets = output_config.output_type_info.target_cat_columns
-        con_targets = output_config.output_type_info.target_con_columns
-
-        for target_name in cat_targets:
-
-            activation_paths = test_config.activations_paths[output_name][target_name]
-            target_transformer = experiment.outputs[output_name].target_transformers[
-                target_name
-            ]
-
-            check_performance_result_wrapper(
-                outputs=experiment.outputs,
-                run_path=test_config.run_path,
-                thresholds=thresholds,
-            )
-
-            for input_name in experiment.inputs.keys():
-                cur_activation_root = activation_paths[input_name]
-                _check_sequence_activations_wrapper(
-                    activation_root_folder=cur_activation_root,
-                    target_classes=target_transformer.classes_,
-                    strict=False,
-                )
-
-        for _ in con_targets:
-            check_performance_result_wrapper(
-                outputs=experiment.outputs,
-                run_path=test_config.run_path,
-                thresholds=thresholds,
-            )
+    _sequence_test_check_wrapper(experiment=experiment, test_config=test_config)
 
 
-@pytest.mark.skipif(
-    condition=should_skip_in_gha_macos(), reason="In GHA and platform is Darwin."
-)
+@pytest.mark.skipif(condition=should_skip_in_gha_macos(), reason="In GHA.")
 @pytest.mark.parametrize(
     "create_test_data",
     [
@@ -327,6 +311,10 @@ def test_sequence_modelling_csv(prep_modelling_test_configs):
 
     train.train(experiment=experiment)
 
+    _sequence_test_check_wrapper(experiment=experiment, test_config=test_config)
+
+
+def _sequence_test_check_wrapper(experiment, test_config):
     output_configs = experiment.configs.output_configs
 
     thresholds = get_sequence_test_args(
@@ -451,6 +439,7 @@ def _check_sequence_activations(
     return success
 
 
+@pytest.mark.skipif(condition=should_skip_in_gha_macos(), reason="In GHA.")
 @pytest.mark.parametrize(
     "model_name",
     get_all_hf_model_names(),

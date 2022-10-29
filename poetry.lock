@@ -235,14 +235,14 @@ wcwidth = ">=0.1.4"
 
 [[package]]
 name = "boto3"
-version = "1.25.2"
+version = "1.25.3"
 description = "The AWS SDK for Python"
 category = "main"
 optional = false
 python-versions = ">= 3.7"
 
 [package.dependencies]
-botocore = ">=1.28.2,<1.29.0"
+botocore = ">=1.28.3,<1.29.0"
 jmespath = ">=0.7.1,<2.0.0"
 s3transfer = ">=0.6.0,<0.7.0"
 
@@ -251,7 +251,7 @@ crt = ["botocore[crt] (>=1.21.0,<2.0a0)"]
 
 [[package]]
 name = "botocore"
-version = "1.28.2"
+version = "1.28.3"
 description = "Low-level, data-driven core of boto 3."
 category = "main"
 optional = false
@@ -416,7 +416,7 @@ python-versions = ">=3.5"
 
 [[package]]
 name = "deeplake"
-version = "3.0.12"
+version = "3.0.13"
 description = "Activeloop Deep Lake"
 category = "main"
 optional = false
@@ -427,7 +427,7 @@ boto3 = "*"
 click = "*"
 hub = ">=2.8.7"
 humbug = ">=0.2.6"
-libdeeplake = "0.0.22"
+libdeeplake = "0.0.23"
 numcodecs = "*"
 numpy = "*"
 pathos = "*"
@@ -783,7 +783,7 @@ zoneinfo = ["backports.zoneinfo (>=0.2.1)", "tzdata (>=2022.5)"]
 
 [[package]]
 name = "identify"
-version = "2.5.7"
+version = "2.5.8"
 description = "File identification library for Python"
 category = "dev"
 optional = false
@@ -1132,7 +1132,7 @@ python-versions = ">=3.7"
 
 [[package]]
 name = "libdeeplake"
-version = "0.0.22"
+version = "0.0.23"
 description = "C++ backend for Deep Lake"
 category = "main"
 optional = false
@@ -1336,7 +1336,7 @@ test = ["black", "check-manifest", "flake8", "ipykernel", "ipython", "ipywidgets
 
 [[package]]
 name = "nbconvert"
-version = "7.2.2"
+version = "7.2.3"
 description = "Converting Jupyter Notebooks"
 category = "dev"
 optional = false
@@ -1699,7 +1699,7 @@ test = ["appdirs (==1.4.4)", "pytest (>=6)", "pytest-cov (>=2.7)", "pytest-mock 
 
 [[package]]
 name = "plotly"
-version = "5.10.0"
+version = "5.11.0"
 description = "An open-source, interactive data visualization library for Python"
 category = "main"
 optional = false
@@ -1899,7 +1899,7 @@ hook_testing = ["execnet (>=1.5.0)", "psutil", "pytest (>=2.7.3)"]
 
 [[package]]
 name = "pyinstaller-hooks-contrib"
-version = "2022.10"
+version = "2022.11"
 description = "Community maintained hooks for PyInstaller"
 category = "dev"
 optional = false
@@ -3147,12 +3147,12 @@ blessed = [
     {file = "blessed-1.19.1.tar.gz", hash = "sha256:9a0d099695bf621d4680dd6c73f6ad547f6a3442fbdbe80c4b1daa1edbc492fc"},
 ]
 boto3 = [
-    {file = "boto3-1.25.2-py3-none-any.whl", hash = "sha256:bc711ab94f90af40a52ddb56c4ef9d997edfbeae9fe39c76a802574fab92ccd9"},
-    {file = "boto3-1.25.2.tar.gz", hash = "sha256:43a93f8cecd882cccb2815cd76fc07a73b076027ab092a1c7cede89cb9b075f8"},
+    {file = "boto3-1.25.3-py3-none-any.whl", hash = "sha256:2284a107d43f73b6007c7c8b946a8fd6f9baa6c97b5c956edc67d9be864def58"},
+    {file = "boto3-1.25.3.tar.gz", hash = "sha256:7ddc2c5622dd006502d72f9b7b53eaca3da6f699ada4ec57f4ef1db9d2023e2f"},
 ]
 botocore = [
-    {file = "botocore-1.28.2-py3-none-any.whl", hash = "sha256:cedc8e76cf4baa411fa6af62eec1fc569053b5f9c059e0f2ac074c649039200a"},
-    {file = "botocore-1.28.2.tar.gz", hash = "sha256:9890005735652555d1183b44bad729603d26922dc08e261e1e0a35a7bf26ba38"},
+    {file = "botocore-1.28.3-py3-none-any.whl", hash = "sha256:4ea45626d8c5875c12e5767aa637388ce81871162f494eaf7b3888e875de84b7"},
+    {file = "botocore-1.28.3.tar.gz", hash = "sha256:2c2604262e5ab35ea83e9d5cf8be267e7fcdab6c815a432cfe15f23d92ce723d"},
 ]
 cachetools = [
     {file = "cachetools-5.2.0-py3-none-any.whl", hash = "sha256:f9f17d2aec496a9aa6b76f53e3b614c965223c061982d434d160f930c698a9db"},
@@ -3337,8 +3337,8 @@ decorator = [
     {file = "decorator-5.1.1.tar.gz", hash = "sha256:637996211036b6385ef91435e4fae22989472f9d571faba8927ba8253acbc330"},
 ]
 deeplake = [
-    {file = "deeplake-3.0.12-py3-none-any.whl", hash = "sha256:af8f3638fa672a76d6161312743ebfdf698c2b165b6d490c2d342b29adb8a5ba"},
-    {file = "deeplake-3.0.12.tar.gz", hash = "sha256:b40a9f4746b0163805c37fcfad224c1893fca1127e38ba63862ac79bf351c5db"},
+    {file = "deeplake-3.0.13-py3-none-any.whl", hash = "sha256:a094b94856e77e508c09d6b0727c74d36179927dcb8f961d1d1fcbeaff5a6236"},
+    {file = "deeplake-3.0.13.tar.gz", hash = "sha256:89c0522df4f2821d3887f9164eab4d3a91e9e8d46183971cffddf01d5f515a0f"},
 ]
 defusedxml = [
     {file = "defusedxml-0.7.1-py2.py3-none-any.whl", hash = "sha256:a352e7e428770286cc899e2542b6cdaedb2b4953ff269a210103ec58f6198a61"},
@@ -3540,8 +3540,8 @@ hypothesis = [
     {file = "hypothesis-6.56.3.tar.gz", hash = "sha256:15dae5d993339aefa57e00f5cb5a5817ff300eeb661d96d1c9d094eb62b04c9a"},
 ]
 identify = [
-    {file = "identify-2.5.7-py2.py3-none-any.whl", hash = "sha256:7a67b2a6208d390fd86fd04fb3def94a3a8b7f0bcbd1d1fcd6736f4defe26390"},
-    {file = "identify-2.5.7.tar.gz", hash = "sha256:5b8fd1e843a6d4bf10685dd31f4520a7f1c7d0e14e9bc5d34b1d6f111cabc011"},
+    {file = "identify-2.5.8-py2.py3-none-any.whl", hash = "sha256:48b7925fe122720088aeb7a6c34f17b27e706b72c61070f27fe3789094233440"},
+    {file = "identify-2.5.8.tar.gz", hash = "sha256:7a214a10313b9489a0d61467db2856ae8d0b8306fc923e03a9effa53d8aedc58"},
 ]
 idna = [
     {file = "idna-3.4-py3-none-any.whl", hash = "sha256:90b77e79eaa3eba6de819a0c442c0b4ceefc341a7a2ab77d7562bf49f425c5c2"},
@@ -3703,24 +3703,24 @@ kiwisolver = [
     {file = "kiwisolver-1.4.4.tar.gz", hash = "sha256:d41997519fcba4a1e46eb4a2fe31bc12f0ff957b2b81bac28db24744f333e955"},
 ]
 libdeeplake = [
-    {file = "libdeeplake-0.0.22-cp310-cp310-macosx_10_12_x86_64.whl", hash = "sha256:cfb644480677888488f1262ef6d383dd5366de9424723c894bc653c79204e502"},
-    {file = "libdeeplake-0.0.22-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:ab4c8291b012c5754fc3f82df77eeb79ba72e93616ffb4dcf48647331216c70a"},
-    {file = "libdeeplake-0.0.22-cp310-cp310-manylinux2010_x86_64.whl", hash = "sha256:8e6d36b466237bf004ba48945ac1badaf86d2df23d5808f7d93e327cb35d5cac"},
-    {file = "libdeeplake-0.0.22-cp310-cp310-manylinux2014_x86_64.whl", hash = "sha256:5e6a2e73c7099f2909383dda394af119ee11bfc3227a089158c74f2688b80937"},
-    {file = "libdeeplake-0.0.22-cp36-cp36m-manylinux2010_x86_64.whl", hash = "sha256:7ff60f563c75c2ead08103d706241e794b6d64b18e492b9f4a3bb8fb8825f8dc"},
-    {file = "libdeeplake-0.0.22-cp36-cp36m-manylinux2014_x86_64.whl", hash = "sha256:33487a3aca0bb47165905033ea9c5faef3ed3c330bb076f2e488b1c5902a001e"},
-    {file = "libdeeplake-0.0.22-cp37-cp37m-macosx_10_12_x86_64.whl", hash = "sha256:794c7d439575bc56e6fb30e49cd5b5436e8f6a897b459cc5cf7df194ed5808f2"},
-    {file = "libdeeplake-0.0.22-cp37-cp37m-macosx_11_0_arm64.whl", hash = "sha256:3451644daacd634b8bad9a343e0d961a1a6008eb8bc0fb6e2101216d96916bde"},
-    {file = "libdeeplake-0.0.22-cp37-cp37m-manylinux2010_x86_64.whl", hash = "sha256:f87de43f0439804a361dee87c41b646485a7d86855e31b0d9cb76de8d36cf132"},
-    {file = "libdeeplake-0.0.22-cp37-cp37m-manylinux2014_x86_64.whl", hash = "sha256:1dde73dcec311164f84896d7a874216ddce778d195d96f6cec776e9f5b682fe9"},
-    {file = "libdeeplake-0.0.22-cp38-cp38-macosx_10_12_x86_64.whl", hash = "sha256:baf6d14e0e07a14c452acbf212b164553a7c9dccd4494f60913407339ad1e079"},
-    {file = "libdeeplake-0.0.22-cp38-cp38-macosx_11_0_arm64.whl", hash = "sha256:6530d9a1aa353a6d8abd8024b7f3565efb94e73db9bb8f0fc1af50f3fe3d81eb"},
-    {file = "libdeeplake-0.0.22-cp38-cp38-manylinux2010_x86_64.whl", hash = "sha256:8274642524d766692e79c1f1b189de3b1f6060049df270e486f0d6c1dad16b79"},
-    {file = "libdeeplake-0.0.22-cp38-cp38-manylinux2014_x86_64.whl", hash = "sha256:be738469bd4faef70350df68399e2e374ba59e6fbc74dd98901179bdddf4ec66"},
-    {file = "libdeeplake-0.0.22-cp39-cp39-macosx_10_12_x86_64.whl", hash = "sha256:44a2941a154eb1acba5776fa00f0c18f709d2c812713dfa4bfcddb5df1b0d747"},
-    {file = "libdeeplake-0.0.22-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:8e6f3d242423ba4ce4627d9ee7e9a7f3900797c7e14b8b299ffeeee34b60f0c9"},
-    {file = "libdeeplake-0.0.22-cp39-cp39-manylinux2010_x86_64.whl", hash = "sha256:1dcc435707b249cd0f9fbcffa1543aa0020a419309cf7fbd03b8cddb4d707c20"},
-    {file = "libdeeplake-0.0.22-cp39-cp39-manylinux2014_x86_64.whl", hash = "sha256:40022510fe70dece2fe3e128904c39cc4ac6b2f70f8608a46dce0f0ab9a6c004"},
+    {file = "libdeeplake-0.0.23-cp310-cp310-macosx_10_12_x86_64.whl", hash = "sha256:f7584a27c69f2e6973f6113619a646a8a16596c334d8340c85469280cc2aea90"},
+    {file = "libdeeplake-0.0.23-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:2a9e7abd695a1447ceeef07b79d26c9bb2cb2381516f852f74a2233b33a8efba"},
+    {file = "libdeeplake-0.0.23-cp310-cp310-manylinux2010_x86_64.whl", hash = "sha256:e5e707a68ba8ddcff7a9dfc430941d3cae0beeacafa493927a2861794e0d3d03"},
+    {file = "libdeeplake-0.0.23-cp310-cp310-manylinux2014_x86_64.whl", hash = "sha256:f518846510351482ed781ab1fd70be60f1db4974466359e42a9ea19e6a5ba429"},
+    {file = "libdeeplake-0.0.23-cp36-cp36m-manylinux2010_x86_64.whl", hash = "sha256:e80b41cb08b2d611e612ff564e37bbb37fd412c0fc7b7b7141dab0910d065ad5"},
+    {file = "libdeeplake-0.0.23-cp36-cp36m-manylinux2014_x86_64.whl", hash = "sha256:d84edc6effddab7fe54f074a886d8fd3ac52624c5ac0fc1b157f89bead89545e"},
+    {file = "libdeeplake-0.0.23-cp37-cp37m-macosx_10_12_x86_64.whl", hash = "sha256:6c4ebb9e2911a1f6302c94735d0cc29e9fbbacc9045e61f2c06a5329614ae63a"},
+    {file = "libdeeplake-0.0.23-cp37-cp37m-macosx_11_0_arm64.whl", hash = "sha256:b9abe17bc040578a258c871cb6287df6fb5b4dc5882209cbac00567e272f9b9e"},
+    {file = "libdeeplake-0.0.23-cp37-cp37m-manylinux2010_x86_64.whl", hash = "sha256:0aceb078baf1fb5a5c8e84352cb98e0e6f2c245d1215f8a4f8e2e32adac400a1"},
+    {file = "libdeeplake-0.0.23-cp37-cp37m-manylinux2014_x86_64.whl", hash = "sha256:40faec103242675149b92f3feb33292f846d641ad65efb7c41c47004752c917f"},
+    {file = "libdeeplake-0.0.23-cp38-cp38-macosx_10_12_x86_64.whl", hash = "sha256:21f6855e28cd10ed8b81bf10575ab2fd66aaa4f6be184924de22c8e1bc054b94"},
+    {file = "libdeeplake-0.0.23-cp38-cp38-macosx_11_0_arm64.whl", hash = "sha256:46803b6b2e3604576aba043e343652ea429f2f0733963890331abe5dbdbabe77"},
+    {file = "libdeeplake-0.0.23-cp38-cp38-manylinux2010_x86_64.whl", hash = "sha256:4436b3d99efe6d70fb9dea7feee2d6ed62689ddbab4b105ac381c5cb29d2f5f7"},
+    {file = "libdeeplake-0.0.23-cp38-cp38-manylinux2014_x86_64.whl", hash = "sha256:0173718e7553cd74745a12a9a2ae91f09f92933e7c54e1d84774e0ee2fe5c4c2"},
+    {file = "libdeeplake-0.0.23-cp39-cp39-macosx_10_12_x86_64.whl", hash = "sha256:8d9b986df5571da3945a407f80edfcdc3ae459e847e44b8ad2a5e05a7703b627"},
+    {file = "libdeeplake-0.0.23-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:6d90edbb05b7e14d569d80bb9468c7bbed728bbda7e888d3db2c48f5d2710102"},
+    {file = "libdeeplake-0.0.23-cp39-cp39-manylinux2010_x86_64.whl", hash = "sha256:99ccfdb05119a7e19d15acba922b7ccd5b801d841ec67342e45ab81013800370"},
+    {file = "libdeeplake-0.0.23-cp39-cp39-manylinux2014_x86_64.whl", hash = "sha256:50c4887a3e4cac581c8e4ef058ab1272a6865c6cc2221a4ffe26166e795e1f2d"},
 ]
 llvmlite = [
     {file = "llvmlite-0.39.1-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:6717c7a6e93c9d2c3d07c07113ec80ae24af45cde536b34363d4bcd9188091d9"},
@@ -3931,8 +3931,8 @@ nbclient = [
     {file = "nbclient-0.7.0.tar.gz", hash = "sha256:a1d844efd6da9bc39d2209bf996dbd8e07bf0f36b796edfabaa8f8a9ab77c3aa"},
 ]
 nbconvert = [
-    {file = "nbconvert-7.2.2-py3-none-any.whl", hash = "sha256:fc7a3787c927cbd45a52e088e934fbbaab39afe61767522168a724b7483992be"},
-    {file = "nbconvert-7.2.2.tar.gz", hash = "sha256:24acfaa466d2c9b7eb524800e4a45afbed862c5d058cfb30fc7aa24d448c95eb"},
+    {file = "nbconvert-7.2.3-py3-none-any.whl", hash = "sha256:66326174c190dc4f0a6cbbff96f30c632774b441fa3c7565662bb3d41992fb0f"},
+    {file = "nbconvert-7.2.3.tar.gz", hash = "sha256:7ae7ccc68495b565dab153459ee7e65039970913eb115070da6e2c673cf0e9f8"},
 ]
 nbformat = [
     {file = "nbformat-5.7.0-py3-none-any.whl", hash = "sha256:1b05ec2c552c2f1adc745f4eddce1eac8ca9ffd59bb9fd859e827eaa031319f9"},
@@ -4206,8 +4206,8 @@ platformdirs = [
     {file = "platformdirs-2.5.2.tar.gz", hash = "sha256:58c8abb07dcb441e6ee4b11d8df0ac856038f944ab98b7be6b27b2a3c7feef19"},
 ]
 plotly = [
-    {file = "plotly-5.10.0-py2.py3-none-any.whl", hash = "sha256:989b13825cc974390aa0169479485d9257d37848a47bc63957251f8e1a7046ba"},
-    {file = "plotly-5.10.0.tar.gz", hash = "sha256:4d36d9859b7a153b273562deeed8c292587a472eb1fd57cd4158ec89d9defadb"},
+    {file = "plotly-5.11.0-py2.py3-none-any.whl", hash = "sha256:52fd74b08aa4fd5a55b9d3034a30dbb746e572d7ed84897422f927fdf687ea5f"},
+    {file = "plotly-5.11.0.tar.gz", hash = "sha256:4efef479c2ec1d86dcdac8405b6ca70ca65649a77408e39a7e84a1ea2db6c787"},
 ]
 pluggy = [
     {file = "pluggy-1.0.0-py2.py3-none-any.whl", hash = "sha256:74134bbf457f031a36d68416e1509f34bd5ccc019f0bcc952c7b909d06b37bd3"},
@@ -4348,8 +4348,8 @@ pyinstaller = [
     {file = "pyinstaller-5.6.1.tar.gz", hash = "sha256:a7fac3fa8f75bce2839e0ab910baf0e935ff2b5f327c32aedade563e1b610967"},
 ]
 pyinstaller-hooks-contrib = [
-    {file = "pyinstaller-hooks-contrib-2022.10.tar.gz", hash = "sha256:e5edd4094175e78c178ef987b61be19efff6caa23d266ade456fc753e847f62e"},
-    {file = "pyinstaller_hooks_contrib-2022.10-py2.py3-none-any.whl", hash = "sha256:d1dd6ea059dc30e77813cc12a5efa8b1d228e7da8f5b884fe11775f946db1784"},
+    {file = "pyinstaller-hooks-contrib-2022.11.tar.gz", hash = "sha256:2e1870350bb9ef2e09c1c1bb30347eb3185c5ef38c040ed04190d6d0b4b5df62"},
+    {file = "pyinstaller_hooks_contrib-2022.11-py2.py3-none-any.whl", hash = "sha256:8db4064d9c127940455ec363bebbf74228be21cdafb44f7ea4f44cf434d9bcaa"},
 ]
 PyJWT = [
     {file = "PyJWT-2.6.0-py3-none-any.whl", hash = "sha256:d83c3d892a77bbb74d3e1a2cfa90afaadb60945205d1095d9221f04466f64c14"},

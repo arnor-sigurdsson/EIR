@@ -1,7 +1,7 @@
 from argparse import Namespace
 from copy import deepcopy
 from pathlib import Path
-from typing import Union, Sequence, Mapping, Tuple
+from typing import Union, Sequence, Mapping, Tuple, List, Dict, Any
 
 import pandas as pd
 import pytest
@@ -24,7 +24,7 @@ from eir.setup import config
 from eir.setup import schemas
 from eir.setup.config import object_to_primitives
 from eir.setup.output_setup import set_up_outputs_for_training
-from tests.conftest import TestDataConfig, ModelTestConfig
+from tests.conftest import TestDataConfig, ModelTestConfig, get_system_info
 from tests.test_data_load.test_datasets import check_dataset
 
 al_config_instances = Union[
@@ -559,12 +559,13 @@ def grab_best_model_path(saved_models_folder: Path):
     return saved_models[-1]
 
 
-@pytest.mark.parametrize(
-    argnames="act_background_source", argvalues=["train", "predict"]
-)
-@pytest.mark.parametrize(
-    "create_test_data",
-    [
+def _get_predict_test_data_parametrization() -> List[Dict[str, Any]]:
+    """
+    We skip the deeplake tests in the GHA Linux host, as for some reason it raises
+    a SIGKILL (-9).
+    """
+
+    params = [
         {
             "task_type": "multi",
             "split_to_test": True,
@@ -575,7 +576,15 @@ def grab_best_model_path(saved_models_folder: Path):
             ),
             "manual_test_data_creator": lambda: "test_predict",
             "source": "local",
-        },
+        }
+    ]
+
+    in_gha, platform = get_system_info()
+
+    if in_gha and platform == "Linux":
+        return params
+
+    deeplake_params = [
         {
             "task_type": "multi",
             "split_to_test": True,
@@ -586,8 +595,20 @@ def grab_best_model_path(saved_models_folder: Path):
             ),
             "manual_test_data_creator": lambda: "test_predict",
             "source": "deeplake",
-        },
-    ],
+        }
+    ]
+
+    params += deeplake_params
+
+    return params
+
+
+@pytest.mark.parametrize(
+    argnames="act_background_source", argvalues=["train", "predict"]
+)
+@pytest.mark.parametrize(
+    argnames="create_test_data",
+    argvalues=_get_predict_test_data_parametrization(),
     indirect=True,
 )
 @pytest.mark.parametrize(
@@ -597,7 +618,7 @@ def grab_best_model_path(saved_models_folder: Path):
             "injections": {
                 "global_configs": {
                     "output_folder": "test_run_predict",
-                    "n_epochs": 6,
+                    "n_epochs": 8,
                     "checkpoint_interval": 200,
                     "sample_interval": 200,
                     "act_background_samples": 128,
