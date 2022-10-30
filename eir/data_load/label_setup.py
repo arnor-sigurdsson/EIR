@@ -1,7 +1,7 @@
 import reprlib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Tuple, Dict, Union, List, Callable, Any, Sequence
+from typing import Tuple, Dict, Union, List, Callable, Any, Sequence, Iterator
 
 import joblib
 import numpy as np
@@ -11,7 +11,11 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from tqdm import tqdm
 
-from eir.data_load.common_ops import ColumnOperation
+from eir.data_load.data_source_modules.csv_ops import ColumnOperation
+from eir.data_load.data_source_modules.deeplake_ops import (
+    is_deeplake_dataset,
+    load_deeplake_dataset,
+)
 from eir.setup.schemas import InputConfig
 from eir.train_utils.utils import get_seed
 
@@ -433,10 +437,19 @@ def gather_all_ids_from_all_inputs(
     return tuple(ids)
 
 
-def gather_ids_from_data_source(data_source: Path, validate: bool = True):
-    iterator = get_array_path_iterator(data_source=data_source, validate=validate)
+def gather_ids_from_data_source(
+    data_source: Path, validate: bool = True
+) -> Tuple[str, ...]:
+
+    if is_deeplake_dataset(data_source=str(data_source)):
+        deeplake_ds = load_deeplake_dataset(data_source=str(data_source))
+        iterator = (sample.numpy().item() for sample in deeplake_ds["ID"])
+    else:
+        iterator = get_file_path_iterator(data_source=data_source, validate=validate)
+        iterator = (i.stem for i in iterator)
+
     logger.debug("Gathering IDs from %s.", data_source)
-    all_ids = tuple(i.stem for i in tqdm(iterator, desc="Progress"))
+    all_ids = tuple(i for i in tqdm(iterator, desc="Progress"))
 
     return all_ids
 
@@ -448,7 +461,7 @@ def gather_ids_from_tabular_file(file_path: Path):
     return all_ids
 
 
-def get_array_path_iterator(data_source: Path, validate: bool = True):
+def get_file_path_iterator(data_source: Path, validate: bool = True) -> Iterator[Path]:
     def _file_iterator(file_path: Path):
         with open(str(file_path), "r") as infile:
             for line in infile:

@@ -23,7 +23,18 @@ if TYPE_CHECKING:
             ),
             "manual_test_data_creator": lambda: "test_multi_modal_multi_task",
             "random_samples_dropped_from_modalities": True,
-        }
+            "source": "local",
+        },
+        {
+            "task_type": "multi_task",
+            "modalities": (
+                "omics",
+                "sequence",
+                "image",
+            ),
+            "manual_test_data_creator": lambda: "test_multi_modal_multi_task",
+            "source": "deeplake",
+        },
     ],
     indirect=True,
 )

@@ -51,7 +51,9 @@ def set_up_test_data_root_outpath(base_folder: Path) -> Path:
     return base_folder
 
 
-def common_split_test_data_wrapper(test_folder: Path, name: str):
+def common_split_test_data_wrapper(
+    test_folder: Path, name: str
+) -> Tuple[Sequence[str], Sequence[str]]:
     train_ids = None
     test_ids = None
     train_labels_path = test_folder / "labels_train.csv"
@@ -65,11 +67,11 @@ def common_split_test_data_wrapper(test_folder: Path, name: str):
         test_ids = list(pd.read_csv(test_labels_path)["ID"].values)
 
     data_folder = test_folder / name
-    train_arrays, test_arrays = split_test_array_folder(
+    train_files, test_files = split_test_file_folder(
         test_folder=data_folder, train_ids=train_ids, test_ids=test_ids
     )
-    train_ids = get_ids_from_paths(paths=train_arrays)
-    test_ids = get_ids_from_paths(paths=test_arrays)
+    train_ids = get_ids_from_paths(paths=train_files)
+    test_ids = get_ids_from_paths(paths=test_files)
 
     if not test_labels_path.exists():
         split_label_file(
@@ -78,8 +80,10 @@ def common_split_test_data_wrapper(test_folder: Path, name: str):
             test_ids=test_ids,
         )
 
+    return train_ids, test_ids
 
-def split_test_array_folder(
+
+def split_test_file_folder(
     test_folder: Path,
     train_ids: Union[Sequence[str], None] = None,
     test_ids: Union[Sequence[str], None] = None,

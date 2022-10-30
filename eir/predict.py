@@ -405,6 +405,7 @@ def get_default_predict_config(
         model_init_kwargs=fusion_model_kwargs,
         device=configs_overloaded_for_predict.global_config.device,
         test_mode=True,
+        strict_shapes=True,
     )
     assert not model.training
 
@@ -972,11 +973,11 @@ def parse_labels_for_predict(
 
     assert len(label_transformers) > 0
     for name, output_transformer_set in label_transformers.items():
-        df_labels_test_transformed = transform_label_df(
+        df_labels_test = transform_label_df(
             df_labels=df_labels_test, label_transformers=output_transformer_set
         )
 
-    test_labels_dict = df_to_nested_dict(df=df_labels_test_transformed)
+    test_labels_dict = df_to_nested_dict(df=df_labels_test)
 
     return test_labels_dict
 
