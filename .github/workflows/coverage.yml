@@ -6,19 +6,19 @@ jobs:
     name: Coverage
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Setup Python
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4
       with:
         python-version: '3.8'
         architecture: x64
     - name: Run tests
       run: |
-        pip install tox==3.25.1
-        pip install poetry==1.2.0
+        pip install tox==3.27.0
+        pip install poetry==1.2.2
         tox -e py38
     - name: Generate report
-      uses: codecov/codecov-action@v1
+      uses: codecov/codecov-action@v3
       with:
         fail_ci_if_error: true
 

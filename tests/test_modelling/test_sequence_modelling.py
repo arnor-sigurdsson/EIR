@@ -37,13 +37,11 @@ def _get_sequence_test_specific_fusion_configs() -> Dict:
     return sequence_fusion_configs
 
 
-@pytest.mark.skipif(
-    condition=should_skip_in_gha_macos(), reason="In GHA and platform is Darwin."
-)
+@pytest.mark.skipif(condition=should_skip_in_gha_macos(), reason="In GHA.")
 @pytest.mark.parametrize(
     "create_test_data",
     [
-        {"task_type": "multi", "modalities": ("sequence",)},
+        {"task_type": "multi", "modalities": ("sequence",), "source": "local"},
     ],
     indirect=True,
 )
@@ -134,6 +132,28 @@ def _get_sequence_test_specific_fusion_configs() -> Dict:
                 ],
             },
         },
+    ],
+    indirect=True,
+)
+def test_sequence_modelling(prep_modelling_test_configs):
+    experiment, test_config = prep_modelling_test_configs
+
+    train.train(experiment=experiment)
+
+    _sequence_test_check_wrapper(experiment=experiment, test_config=test_config)
+
+
+@pytest.mark.skipif(condition=should_skip_in_gha_macos(), reason="In GHA.")
+@pytest.mark.parametrize(
+    "create_test_data",
+    [
+        {"task_type": "multi", "modalities": ("sequence",), "source": "local"},
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize(
+    "create_test_config_init_base",
+    [
         # Case 4: Multi Task
         {
             "injections": {
@@ -142,6 +162,7 @@ def _get_sequence_test_specific_fusion_configs() -> Dict:
                     "memory_dataset": True,
                     "output_folder": "test_multi_task",
                     "gradient_noise": 0.001,
+                    "act_background_samples": 64,
                 },
                 "input_configs": [
                     {
@@ -169,6 +190,7 @@ def _get_sequence_test_specific_fusion_configs() -> Dict:
                     "memory_dataset": True,
                     "output_folder": "test_multi_task_with_mixing",
                     "mixing_alpha": 0.5,
+                    "act_background_samples": 64,
                 },
                 "input_configs": [
                     {
@@ -195,6 +217,7 @@ def _get_sequence_test_specific_fusion_configs() -> Dict:
                     "memory_dataset": True,
                     "output_folder": "test_albert",
                     "mixing_alpha": 0.0,
+                    "act_background_samples": 64,
                 },
                 "input_configs": [
                     {
@@ -228,11 +251,70 @@ def _get_sequence_test_specific_fusion_configs() -> Dict:
     ],
     indirect=True,
 )
-def test_sequence_modelling(prep_modelling_test_configs):
+def test_mt_sequence_modelling(prep_modelling_test_configs):
     experiment, test_config = prep_modelling_test_configs
 
     train.train(experiment=experiment)
 
+    _sequence_test_check_wrapper(experiment=experiment, test_config=test_config)
+
+
+@pytest.mark.skipif(condition=should_skip_in_gha_macos(), reason="In GHA.")
+@pytest.mark.parametrize(
+    "create_test_data",
+    [
+        {
+            "task_type": "multi",
+            "modalities": ("sequence",),
+            "extras": {"sequence_csv_source": True},
+            "split_to_test": True,
+        }
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize(
+    "create_test_config_init_base",
+    [
+        # Case 1: Classification - Positional Encoding and Max Pooling
+        # Note we add more capacity to fusion models as it helps make activation
+        # analysis more stable
+        {
+            "injections": {
+                "global_configs": {
+                    "output_folder": "test_classification",
+                    "n_epochs": 12,
+                    "memory_dataset": True,
+                },
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_sequence"},
+                        "model_config": {"position": "encode", "pool": "max"},
+                    }
+                ],
+                "fusion_configs": _get_sequence_test_specific_fusion_configs(),
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    }
+                ],
+            },
+        },
+    ],
+    indirect=True,
+)
+def test_sequence_modelling_csv(prep_modelling_test_configs):
+    experiment, test_config = prep_modelling_test_configs
+
+    train.train(experiment=experiment)
+
+    _sequence_test_check_wrapper(experiment=experiment, test_config=test_config)
+
+
+def _sequence_test_check_wrapper(experiment, test_config):
     output_configs = experiment.configs.output_configs
 
     thresholds = get_sequence_test_args(
@@ -357,6 +439,7 @@ def _check_sequence_activations(
     return success
 
 
+@pytest.mark.skipif(condition=should_skip_in_gha_macos(), reason="In GHA.")
 @pytest.mark.parametrize(
     "model_name",
     get_all_hf_model_names(),

@@ -9,6 +9,7 @@ from typing import (
     Generator,
     Sequence,
     Callable,
+    Optional,
     Literal,
     Type,
     Hashable,
@@ -42,7 +43,12 @@ from eir.data_load.label_setup import (
     Labels,
     set_up_train_and_valid_tabular_data,
     TabularFileInfo,
-    get_array_path_iterator,
+    get_file_path_iterator,
+)
+from eir.data_load.data_source_modules.deeplake_ops import (
+    is_deeplake_dataset,
+    load_deeplake_dataset,
+    get_deeplake_input_source_iterable,
 )
 from eir.experiment_io.experiment_io import (
     load_serialized_input_object,
@@ -333,7 +339,8 @@ def set_up_image_input_for_training(
     num_channels = input_type_info.num_channels
     if not num_channels:
         num_channels = infer_num_channels(
-            data_source=input_config.input_info.input_source
+            data_source=input_config.input_info.input_source,
+            deeplake_inner_key=input_config.input_info.input_inner_key,
         )
 
     normalization_stats = get_image_normalization_values(input_config=input_config)
@@ -355,10 +362,23 @@ def set_up_image_input_for_training(
     return image_input_info
 
 
-def infer_num_channels(data_source: str) -> int:
-    test_file = next(Path(data_source).iterdir())
-    test_image = default_loader(path=str(test_file))
-    test_image_array = np.array(test_image)
+def infer_num_channels(data_source: str, deeplake_inner_key: str) -> int:
+
+    if is_deeplake_dataset(data_source=data_source):
+        deeplake_ds = load_deeplake_dataset(data_source=data_source)
+        deeplake_iter = get_deeplake_input_source_iterable(
+            deeplake_dataset=deeplake_ds, inner_key=deeplake_inner_key
+        )
+        test_image_array = next(deeplake_iter).numpy()
+        data_pointer = (
+            f"[deeplake dataset {data_source}, input {deeplake_inner_key}, "
+            f"image ID: {deeplake_ds['ID'][0].text()}]"
+        )
+    else:
+        test_file = next(Path(data_source).iterdir())
+        test_image = default_loader(path=str(test_file))
+        test_image_array = np.array(test_image)
+        data_pointer = test_file.name
 
     if test_image_array.ndim == 2:
         num_channels = 1
@@ -366,9 +386,9 @@ def infer_num_channels(data_source: str) -> int:
         num_channels = test_image_array.shape[-1]
 
     logger.info(
-        "Inferring number of channels from source %s (using file %s) as: %d",
+        "Inferring number of channels from source %s (using %s) as: %d",
         data_source,
-        test_file.name,
+        data_pointer,
         num_channels,
     )
 
@@ -433,15 +453,24 @@ def get_image_normalization_values(
     else:
         if not means or not stds:
             input_source = input_config.input_info.input_source
+            deeplake_inner_key = input_config.input_info.input_inner_key
             logger.info(
                 "Not using a pretrained model and no mean and standard deviation "
                 "statistics passed in. Gathering running image means and standard "
                 "deviations from %s.",
                 input_source,
             )
-            file_iterator = Path(input_source).rglob("*")
-            image_iterator = (default_loader(str(f)) for f in file_iterator)
-            tensor_iterator = (to_tensor(i) for i in image_iterator)
+
+            if is_deeplake_dataset(data_source=input_source):
+                deeplake_ds = load_deeplake_dataset(data_source=input_source)
+                image_iter = get_deeplake_input_source_iterable(
+                    deeplake_dataset=deeplake_ds, inner_key=deeplake_inner_key
+                )
+                tensor_iterator = (to_tensor(i.numpy()) for i in image_iter)
+            else:
+                file_iterator = Path(input_source).rglob("*")
+                image_iterator = (default_loader(str(f)) for f in file_iterator)
+                tensor_iterator = (to_tensor(i) for i in image_iterator)
 
             gathered_stats = collect_stats(tensor_iterable=tensor_iterator)
             means = gathered_stats.mean
@@ -560,6 +589,7 @@ def get_sequence_input_objects_from_input(
         split_on=input_config.input_type_info.split_on,
         gathered_stats=gathered_stats,
         vocab_file=input_config.input_type_info.vocab_file,
+        deeplake_inner_key=input_config.input_info.input_inner_key,
     )
     tokenizer = get_basic_tokenizer(
         tokenizer_name=input_config.input_type_info.tokenizer,
@@ -742,6 +772,7 @@ def get_vocab_iterator(
     split_on: str,
     gathered_stats: "GatheredSequenceStats",
     vocab_file: Union[str, None] = None,
+    deeplake_inner_key: Optional[str] = None,
 ) -> Generator[Sequence[str], None, None]:
 
     if vocab_file is None:
@@ -755,6 +786,7 @@ def get_vocab_iterator(
             data_source=input_source,
             split_on=split_on,
             gathered_stats=gathered_stats,
+            deeplake_inner_key=deeplake_inner_key,
         )
     else:
         logger.info(
@@ -770,15 +802,63 @@ def get_vocab_iterator(
 
 
 def yield_tokens_from_source(
-    data_source: str, split_on: str, gathered_stats: GatheredSequenceStats
+    data_source: str,
+    split_on: str,
+    gathered_stats: GatheredSequenceStats,
+    deeplake_inner_key: Optional[str] = None,
 ):
-    iterator = tqdm(Path(data_source).iterdir(), desc="Vocabulary Setup")
 
-    for file in iterator:
-        yield from yield_tokens_from_file(
-            file_path=str(file), split_on=split_on, gathered_stats=gathered_stats
+    data_source_path = Path(data_source)
+
+    if is_deeplake_dataset(data_source=str(data_source_path)):
+        assert deeplake_inner_key is not None
+        yield from yield_tokens_from_deeplake_dataset(
+            data_source=data_source_path,
+            split_on=split_on,
+            gathered_stats=gathered_stats,
+            inner_key=deeplake_inner_key,
         )
+
+    elif data_source_path.is_dir():
+        iterator = tqdm(Path(data_source).iterdir(), desc="Vocabulary Setup")
+        for file in iterator:
+            yield from yield_tokens_from_file(
+                file_path=str(file), split_on=split_on, gathered_stats=gathered_stats
+            )
+
+    elif data_source_path.is_file():
+        assert data_source_path.suffix == ".csv"
+        yield from yield_tokens_from_csv(
+            file_path=data_source, split_on=split_on, gathered_stats=gathered_stats
+        )
+
     return gathered_stats
+
+
+def yield_tokens_from_deeplake_dataset(
+    data_source: Path,
+    split_on: str,
+    gathered_stats: GatheredSequenceStats,
+    inner_key: str,
+) -> Generator[Sequence[str], None, None]:
+    deeplake_ds = load_deeplake_dataset(data_source=str(data_source))
+    deeplake_iter = get_deeplake_input_source_iterable(
+        deeplake_dataset=deeplake_ds, inner_key=inner_key
+    )
+
+    split_func = get_sequence_split_function(split_on=split_on)
+
+    for sample in deeplake_iter:
+        cur_sequence = sample.text()
+        cur_line = split_func(cur_sequence)
+
+        cur_length = len(cur_line)
+        gathered_stats.total_count += len(cur_line)
+
+        if cur_length > gathered_stats.max_length:
+            gathered_stats.max_length = cur_length
+
+        yield cur_line
 
 
 def yield_tokens_from_file(
@@ -786,7 +866,7 @@ def yield_tokens_from_file(
 ):
     gathered_stats.total_files += 1
 
-    split_func = _get_split_func(split_on=split_on)
+    split_func = get_sequence_split_function(split_on=split_on)
 
     with open(file_path, "r") as f:
         for line in f:
@@ -801,7 +881,39 @@ def yield_tokens_from_file(
             yield cur_line
 
 
-def _get_split_func(split_on: str) -> Callable[[str], List[str]]:
+def yield_tokens_from_csv(
+    file_path: str, split_on: str, gathered_stats: GatheredSequenceStats
+) -> Generator[Sequence[str], None, None]:
+    gathered_stats.total_files += 1
+
+    split_func = get_sequence_split_function(split_on=split_on)
+
+    df = pd.read_csv(filepath_or_buffer=file_path, index_col="ID", dtype={"ID": str})
+    if "Sequence" not in df.columns:
+        raise ValueError(
+            "CSV file '%s' does not have a column named 'Sequence'. "
+            "Please ensure that the column name is correct and present.",
+            file_path,
+        )
+
+    iterator = tqdm(df.itertuples(), desc="Vocabulary Setup")
+    for row in iterator:
+        cur_sequence = row.Sequence
+        if pd.isna(cur_sequence):
+            cur_sequence = ""
+
+        cur_line = split_func(cur_sequence)
+
+        cur_length = len(cur_line)
+        gathered_stats.total_count += len(cur_line)
+
+        if cur_length > gathered_stats.max_length:
+            gathered_stats.max_length = cur_length
+
+        yield cur_line
+
+
+def get_sequence_split_function(split_on: str) -> Callable[[str], List[str]]:
     if split_on == "":
         return lambda x: list(x)
     return lambda x: x.split(split_on)
@@ -954,7 +1066,8 @@ def set_up_omics_input(
 ) -> OmicsInputInfo:
 
     data_dimensions = get_data_dimension_from_data_source(
-        data_source=Path(input_config.input_info.input_source)
+        data_source=Path(input_config.input_info.input_source),
+        deeplake_inner_key=input_config.input_info.input_inner_key,
     )
 
     subset_indices = None
@@ -997,14 +1110,23 @@ class DataDimensions:
 
 def get_data_dimension_from_data_source(
     data_source: Path,
+    deeplake_inner_key: Optional[str] = None,
 ) -> DataDimensions:
     """
     TODO: Make more dynamic / robust. Also weird to say "width" for a 1D vector.
     """
 
-    iterator = get_array_path_iterator(data_source=data_source)
-    path = next(iterator)
-    shape = np.load(file=path).shape
+    if is_deeplake_dataset(data_source=str(data_source)):
+        assert deeplake_inner_key is not None, data_source
+        deeplake_ds = load_deeplake_dataset(data_source=str(data_source))
+        deeplake_iter = get_deeplake_input_source_iterable(
+            deeplake_dataset=deeplake_ds, inner_key=deeplake_inner_key
+        )
+        shape = next(deeplake_iter).shape
+    else:
+        iterator = get_file_path_iterator(data_source=data_source)
+        path = next(iterator)
+        shape = np.load(file=path).shape
 
     if len(shape) == 1:
         channels, height, width = 1, 1, shape[0]
@@ -1013,7 +1135,7 @@ def get_data_dimension_from_data_source(
     elif len(shape) == 3:
         channels, height, width = shape
     else:
-        raise ValueError("Currently max 3 dimensional inputs supported")
+        raise ValueError("Currently max 3 dimensional inputs supported.")
 
     return DataDimensions(channels=channels, height=height, width=width)
 

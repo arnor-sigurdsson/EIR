@@ -8,7 +8,7 @@ from sklearn.preprocessing import StandardScaler, LabelEncoder
 
 from eir import train
 from eir.data_load import label_setup
-from eir.data_load.common_ops import ColumnOperation
+from eir.data_load.data_source_modules.csv_ops import ColumnOperation
 from eir.data_load.label_setup import merge_target_columns
 from eir.setup.config import Configs
 
@@ -433,7 +433,7 @@ def test_get_array_path_iterator_file(create_test_data):
             test_label_file.write(str(path) + "\n")
 
     expected_num_samples = c.n_per_class * len(c.target_classes)
-    text_file_iterator = label_setup.get_array_path_iterator(
+    text_file_iterator = label_setup.get_file_path_iterator(
         data_source=test_label_file_path
     )
 
@@ -447,7 +447,7 @@ def test_get_array_path_iterator_folder(create_test_data):
     test_path = c.scoped_tmp_path / "omics"
 
     expected_num_samples = c.n_per_class * len(c.target_classes)
-    folder_iterator = label_setup.get_array_path_iterator(data_source=test_path)
+    folder_iterator = label_setup.get_file_path_iterator(data_source=test_path)
 
     assert len([i for i in folder_iterator]) == expected_num_samples
 
@@ -457,7 +457,7 @@ def test_get_array_path_iterator_fail(create_test_data):
     c = create_test_data
 
     with pytest.raises(FileNotFoundError):
-        label_setup.get_array_path_iterator(data_source=Path("does/not/exist"))
+        label_setup.get_file_path_iterator(data_source=Path("does/not/exist"))
 
     test_label_file_path = c.scoped_tmp_path / "test_paths_fail.txt"
 
@@ -466,7 +466,7 @@ def test_get_array_path_iterator_fail(create_test_data):
             test_label_file.write("non/existent/path.npy" + "\n")
 
     with pytest.raises(FileNotFoundError):
-        iterator = label_setup.get_array_path_iterator(data_source=test_label_file_path)
+        iterator = label_setup.get_file_path_iterator(data_source=test_label_file_path)
         _ = [i for i in iterator]
 
 

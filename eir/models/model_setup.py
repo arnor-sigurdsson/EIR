@@ -2,7 +2,7 @@ import math
 import reprlib
 import typing
 from collections import OrderedDict
-from copy import copy
+from copy import copy, deepcopy
 from dataclasses import dataclass
 from pathlib import Path
 from typing import (
@@ -934,6 +934,7 @@ def load_model(
     test_mode: bool,
     state_dict_keys_to_keep: Union[None, Sequence[str]] = None,
     state_dict_key_rename: Union[None, Sequence[Tuple[str, str]]] = None,
+    strict_shapes: bool = True,
 ) -> Union[al_fusion_models, nn.Module]:
 
     model = model_class(**model_init_kwargs)
@@ -944,6 +945,7 @@ def load_model(
         device=device,
         state_dict_keys_to_keep=state_dict_keys_to_keep,
         state_dict_key_rename=state_dict_key_rename,
+        strict_shapes=strict_shapes,
     )
 
     if test_mode:
@@ -958,17 +960,18 @@ def _load_model_weights(
     device: str,
     state_dict_keys_to_keep: Union[None, Sequence[str]] = None,
     state_dict_key_rename: Union[None, Sequence[Tuple[str, str]]] = None,
+    strict_shapes: bool = True,
 ) -> nn.Module:
-    state_dict = torch.load(model_state_dict_path, map_location=device)
+    source_state_dict = torch.load(model_state_dict_path, map_location=device)
 
     if state_dict_keys_to_keep:
-        no_keys_before = len(state_dict)
-        state_dict = _filter_state_dict_keys(
-            state_dict=state_dict, keys_to_keep=state_dict_keys_to_keep
+        no_keys_before = len(source_state_dict)
+        source_state_dict = _filter_state_dict_keys(
+            state_dict=source_state_dict, keys_to_keep=state_dict_keys_to_keep
         )
         logger.info(
             "Extracting %d/%d modules for feature extractors: '%s' from %s.",
-            len(state_dict),
+            len(source_state_dict),
             no_keys_before,
             state_dict_keys_to_keep,
             model_state_dict_path,
@@ -981,11 +984,19 @@ def _load_model_weights(
                 replace_tuple[0],
                 replace_tuple[1],
             )
-            state_dict = _replace_dict_key_names(
-                dict_=state_dict, replace_pattern=replace_tuple
+            source_state_dict = _replace_dict_key_names(
+                dict_=source_state_dict, replace_pattern=replace_tuple
             )
 
-    incompatible_keys = model.load_state_dict(state_dict=state_dict, strict=False)
+    if not strict_shapes:
+        model_state_dict = model.state_dict()
+        source_state_dict = _filter_incompatible_parameter_shapes_for_loading(
+            source_state_dict=source_state_dict, destination_state_dict=model_state_dict
+        )
+
+    incompatible_keys = model.load_state_dict(
+        state_dict=source_state_dict, strict=False
+    )
 
     no_missing = len(incompatible_keys.missing_keys)
     no_unexpected = len(incompatible_keys.unexpected_keys)
@@ -1036,3 +1047,23 @@ def _filter_state_dict_keys(
             filtered_state_dict[module_name] = module_parameter
 
     return filtered_state_dict
+
+
+def _filter_incompatible_parameter_shapes_for_loading(
+    source_state_dict: Dict[str, Any], destination_state_dict: Dict[str, Any]
+) -> Dict[str, Any]:
+
+    destination_state_dict = deepcopy(destination_state_dict)
+
+    for k in destination_state_dict:
+        if k in source_state_dict:
+            if destination_state_dict[k].shape != source_state_dict[k].shape:
+                logger.info(
+                    f"Skipping loading of parameter: {k} "
+                    f"due to incompatible shapes. "
+                    f"Source shape: {source_state_dict[k].shape}. "
+                    f"Destination shape: {destination_state_dict[k].shape}."
+                )
+                destination_state_dict[k] = source_state_dict[k]
+
+    return destination_state_dict

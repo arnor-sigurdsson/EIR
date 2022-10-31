@@ -326,11 +326,16 @@ class InputDataConfig:
 
     :param input_type:
         Type of the input.
+
+    :param input_inner_key:
+        Inner key to use for the input. Only used when input_source is a deeplake
+        dataset.
     """
 
     input_source: str
     input_name: str
     input_type: Literal["omics", "tabular", "sequence", "image", "bytes"]
+    input_inner_key: Union[None, str] = None
 
 
 @dataclass
