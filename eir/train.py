@@ -229,9 +229,24 @@ def set_up_tabular_target_labels_wrapper(
 
 
 def df_to_nested_dict(df: pd.DataFrame) -> Dict:
-    nested_dict = {level: df.xs(level).to_dict("index") for level in df.index.levels[0]}
 
-    return nested_dict
+    """
+    The df has a 2-level multi index, like so ['ID', output_name]
+
+    We want to convert it to a nested dict like so:
+
+        {'ID': {output_name: {target_output_column: target_column_value}}}
+    """
+    index_dict = df.to_dict(orient="index")
+
+    parsed_dict = {}
+    for key_tuple, value in index_dict.items():
+        cur_id, cur_output_name = key_tuple
+
+        parsed_dict[cur_id] = {}
+        parsed_dict[cur_id][cur_output_name] = value
+
+    return parsed_dict
 
 
 def get_default_experiment(

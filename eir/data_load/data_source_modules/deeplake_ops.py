@@ -1,6 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
-from typing import DefaultDict, Union, Sequence, Callable, Generator, TYPE_CHECKING
+from typing import DefaultDict, Union, Callable, Generator, Set, TYPE_CHECKING
 
 import deeplake
 
@@ -53,7 +53,7 @@ def add_deeplake_data_to_samples(
     deeplake_input_inner_key: str,
     samples: DefaultDict[str, "Sample"],
     data_loading_hook: Callable,
-    ids_to_keep: Union[None, Sequence[str]],
+    ids_to_keep: Union[None, Set[str]],
 ) -> DefaultDict[str, "Sample"]:
     """
     For normal files in a folder, this is holding the paths, which we can think of as
@@ -74,8 +74,6 @@ def add_deeplake_data_to_samples(
             f"{deeplake_ds.tensors.keys()}."
         )
 
-    ids_to_keep_set = set(ids_to_keep)
-
     for deeplake_sample in deeplake_ds:
 
         cur_input_from_sample = deeplake_sample[deeplake_input_inner_key]
@@ -84,7 +82,7 @@ def add_deeplake_data_to_samples(
 
         sample_id = deeplake_sample["ID"].numpy().item()
 
-        if sample_id not in ids_to_keep_set:
+        if ids_to_keep is not None and sample_id not in ids_to_keep:
             continue
 
         sample_data_pointer = deeplake_sample.index.values[0].value
