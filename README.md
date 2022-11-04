@@ -38,6 +38,28 @@ Supervised modelling on genotype, tabular, sequence, image and binary data.
 
 Please refer to the [Documentation](https://eir.readthedocs.io/en/latest/index.html) for examples and information.
 
+## Use Cases
+
+EIR allows for training and evaluating various deep-learning models directly from the command line. This can be useful for:
+
+- Quick prototyping and iteration when doing supervised modelling on new datasets.
+- Establishing baselines to compare against other methods.
+- Fitting on data sources such as large-scale genomics, where DL implementations are not commonly available.
+
+If you are a ML/DL researcher developing new models, etc., it might not fit your use case. However, it might provie a quick baseline for comparison to the cool stuff you are developing.
+
+## Features
+
+- Train models directly from the command line through `.yaml` configuration files.
+- Training on [genotype](https://eir.readthedocs.io/en/latest/tutorials/01_basic_tutorial.html), [tabular](https://eir.readthedocs.io/en/latest/tutorials/02_tabular_tutorial.html), [sequence](https://eir.readthedocs.io/en/latest/tutorials/03_sequence_tutorial.html), [image](https://eir.readthedocs.io/en/latest/tutorials/05_image_tutorial.html) and [binary](https://eir.readthedocs.io/en/latest/tutorials/06_raw_bytes_tutorial.html) input data, with various modality-specific settings available.
+- Seamless multi-modal (e.g. combining text + image, or any combination of the modalities above) training.
+- Train multiple features extractors on the same data source, e.g. [combining vanilla transformer, longformer and a pre-trained BERT variant](https://eir.readthedocs.io/en/latest/tutorials/04_pretrained_sequence_tutorial.html) for text classification.
+- Supports continuous (i.e., regression) and categorical (i.e., classification) targets.
+- Multi-task / multi-label prediction supported out-of-the-box.
+- Model explainability for genotype, tabular, sequence and image data built in.
+- Computes and graphs various evaluation metrics (e.g., RMSE, PCC and R2 for regression tasks, accuracy, ROC-ACU, etc. for classification tasks) during training.
+- [Many more settings](https://eir.readthedocs.io/en/latest/api_reference.html) and configurations (e.g., augmentation, regularization, optimizers) available.
+
 ## Citation
 
 If you use `EIR` in a scientific publication, we would appreciate if you could use the following citation:
