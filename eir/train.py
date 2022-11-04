@@ -243,7 +243,9 @@ def df_to_nested_dict(df: pd.DataFrame) -> Dict:
     for key_tuple, value in index_dict.items():
         cur_id, cur_output_name = key_tuple
 
-        parsed_dict[cur_id] = {}
+        if cur_id not in parsed_dict:
+            parsed_dict[cur_id] = {}
+
         parsed_dict[cur_id][cur_output_name] = value
 
     return parsed_dict
