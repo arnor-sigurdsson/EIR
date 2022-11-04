@@ -72,3 +72,8 @@ If you use `EIR` in a scientific publication, we would appreciate if you could u
   year={2021},
   publisher={Cold Spring Harbor Laboratory}
 }
+```
+
+## Acknowledgements
+
+Massive thanks to everyone publishing and developing the [packages](https://eir.readthedocs.io/en/latest/acknowledgements.html) this project directly and indirectly depends on.
