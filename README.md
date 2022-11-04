@@ -57,7 +57,7 @@ If you are a ML/DL researcher developing new models, etc., it might not fit your
 - Supports continuous (i.e., regression) and categorical (i.e., classification) targets.
 - Multi-task / multi-label prediction supported out-of-the-box.
 - Model explainability for genotype, tabular, sequence and image data built in.
-- Computes and graphs various evaluation metrics (e.g., RMSE, PCC and R2 for regression tasks, accuracy, ROC-ACU, etc. for classification tasks) during training.
+- Computes and graphs various evaluation metrics (e.g., RMSE, PCC and R2 for regression tasks, accuracy, ROC-AUC, etc. for classification tasks) during training.
 - [Many more settings](https://eir.readthedocs.io/en/latest/api_reference.html) and configurations (e.g., augmentation, regularization, optimizers) available.
 
 ## Citation
