@@ -24,3 +24,4 @@ To get started, please, read :ref:`01-genotype-tutorial`.
     tutorials/tutorial_index
     api_reference
     license
+    acknowledgements
