@@ -235,14 +235,14 @@ wcwidth = ">=0.1.4"
 
 [[package]]
 name = "boto3"
-version = "1.26.6"
+version = "1.26.9"
 description = "The AWS SDK for Python"
 category = "main"
 optional = false
 python-versions = ">= 3.7"
 
 [package.dependencies]
-botocore = ">=1.29.6,<1.30.0"
+botocore = ">=1.29.9,<1.30.0"
 jmespath = ">=0.7.1,<2.0.0"
 s3transfer = ">=0.6.0,<0.7.0"
 
@@ -251,7 +251,7 @@ crt = ["botocore[crt] (>=1.21.0,<2.0a0)"]
 
 [[package]]
 name = "botocore"
-version = "1.29.6"
+version = "1.29.9"
 description = "Low-level, data-driven core of boto 3."
 category = "main"
 optional = false
@@ -417,7 +417,7 @@ python-versions = ">=3.5"
 
 [[package]]
 name = "deeplake"
-version = "3.0.17"
+version = "3.0.18"
 description = "Activeloop Deep Lake"
 category = "main"
 optional = false
@@ -428,7 +428,7 @@ boto3 = "*"
 click = "*"
 hub = ">=2.8.7"
 humbug = ">=0.2.6"
-libdeeplake = "0.0.25"
+libdeeplake = "0.0.26"
 numcodecs = "*"
 numpy = "*"
 pathos = "*"
@@ -514,7 +514,7 @@ python-versions = ">=3.6"
 
 [[package]]
 name = "exceptiongroup"
-version = "1.0.1"
+version = "1.0.4"
 description = "Backport of PEP 654 (exception groups)"
 category = "main"
 optional = false
@@ -704,7 +704,7 @@ protobuf = ["grpcio-tools (>=1.50.0)"]
 
 [[package]]
 name = "hub"
-version = "3.0.0"
+version = "3.0.1"
 description = "Activeloop Deep Lake"
 category = "main"
 optional = false
@@ -756,7 +756,7 @@ distribute = ["setuptools", "twine", "wheel"]
 
 [[package]]
 name = "hypothesis"
-version = "6.56.4"
+version = "6.57.1"
 description = "A library for property-based testing"
 category = "main"
 optional = false
@@ -768,7 +768,7 @@ exceptiongroup = {version = ">=1.0.0", markers = "python_version < \"3.11\""}
 sortedcontainers = ">=2.1.0,<3.0.0"
 
 [package.extras]
-all = ["backports.zoneinfo (>=0.2.1)", "black (>=19.10b0)", "click (>=7.0)", "django (>=3.2)", "dpcontracts (>=0.4)", "importlib-metadata (>=3.6)", "lark-parser (>=0.6.5)", "libcst (>=0.3.16)", "numpy (>=1.9.0)", "pandas (>=1.0)", "pytest (>=4.6)", "python-dateutil (>=1.4)", "pytz (>=2014.1)", "redis (>=3.0.0)", "rich (>=9.0.0)", "tzdata (>=2022.5)"]
+all = ["backports.zoneinfo (>=0.2.1)", "black (>=19.10b0)", "click (>=7.0)", "django (>=3.2)", "dpcontracts (>=0.4)", "importlib-metadata (>=3.6)", "lark-parser (>=0.6.5)", "libcst (>=0.3.16)", "numpy (>=1.9.0)", "pandas (>=1.0)", "pytest (>=4.6)", "python-dateutil (>=1.4)", "pytz (>=2014.1)", "redis (>=3.0.0)", "rich (>=9.0.0)", "tzdata (>=2022.6)"]
 cli = ["black (>=19.10b0)", "click (>=7.0)", "rich (>=9.0.0)"]
 codemods = ["libcst (>=0.3.16)"]
 dateutil = ["python-dateutil (>=1.4)"]
@@ -781,7 +781,7 @@ pandas = ["pandas (>=1.0)"]
 pytest = ["pytest (>=4.6)"]
 pytz = ["pytz (>=2014.1)"]
 redis = ["redis (>=3.0.0)"]
-zoneinfo = ["backports.zoneinfo (>=0.2.1)", "tzdata (>=2022.5)"]
+zoneinfo = ["backports.zoneinfo (>=0.2.1)", "tzdata (>=2022.6)"]
 
 [[package]]
 name = "identify"
@@ -1027,7 +1027,7 @@ qtconsole = "*"
 
 [[package]]
 name = "jupyter-client"
-version = "7.4.4"
+version = "7.4.6"
 description = "Jupyter protocol implementation and client libraries"
 category = "dev"
 optional = false
@@ -1082,8 +1082,8 @@ test = ["ipykernel", "pre-commit", "pytest", "pytest-cov", "pytest-timeout"]
 
 [[package]]
 name = "jupyter-server"
-version = "1.23.1"
-description = "=?utf-8?q?The_backend=E2=80=94i=2Ee=2E_core_services=2C_APIs=2C_and_REST_endpoints=E2=80=94to_Jupyter_web_applications=2E?="
+version = "1.23.2"
+description = "The backend—i.e. core services, APIs, and REST endpoints—to Jupyter web applications."
 category = "dev"
 optional = false
 python-versions = ">=3.7"
@@ -1135,7 +1135,7 @@ python-versions = ">=3.7"
 
 [[package]]
 name = "libdeeplake"
-version = "0.0.25"
+version = "0.0.26"
 description = "C++ backend for Deep Lake"
 category = "main"
 optional = false
@@ -1339,7 +1339,7 @@ test = ["black", "check-manifest", "flake8", "ipykernel", "ipython", "ipywidgets
 
 [[package]]
 name = "nbconvert"
-version = "7.2.4"
+version = "7.2.5"
 description = "Converting Jupyter Notebooks"
 category = "dev"
 optional = false
@@ -1609,7 +1609,7 @@ ppft = ">=1.7.6.6"
 
 [[package]]
 name = "pathspec"
-version = "0.10.1"
+version = "0.10.2"
 description = "Utility library for gitignore style pattern matching of file paths."
 category = "dev"
 optional = false
@@ -1690,7 +1690,7 @@ python-versions = ">=3.6"
 
 [[package]]
 name = "platformdirs"
-version = "2.5.3"
+version = "2.5.4"
 description = "A small Python package for determining appropriate platform-specific dirs, e.g. a \"user data dir\"."
 category = "dev"
 optional = false
@@ -2396,18 +2396,18 @@ test = ["cython", "html5lib", "pytest (>=4.6)", "typed_ast"]
 
 [[package]]
 name = "sphinx-copybutton"
-version = "0.5.0"
+version = "0.5.1"
 description = "Add a copy button to each of your code cells."
 category = "dev"
 optional = false
-python-versions = ">=3.6"
+python-versions = ">=3.7"
 
 [package.dependencies]
 sphinx = ">=1.8"
 
 [package.extras]
 code-style = ["pre-commit (==2.12.1)"]
-rtd = ["ipython", "myst-nb", "sphinx", "sphinx-book-theme"]
+rtd = ["ipython", "myst-nb", "sphinx", "sphinx-book-theme", "sphinx-examples"]
 
 [[package]]
 name = "sphinx-rtd-theme"
@@ -2497,7 +2497,7 @@ test = ["pytest"]
 
 [[package]]
 name = "stack-data"
-version = "0.6.0"
+version = "0.6.1"
 description = "Extract data from python stack frames and tracebacks for informative displays"
 category = "main"
 optional = false
@@ -2747,7 +2747,7 @@ python-versions = ">= 3.7"
 
 [[package]]
 name = "tox"
-version = "3.27.0"
+version = "3.27.1"
 description = "tox is a generic virtualenv management and test command line tool"
 category = "dev"
 optional = false
@@ -2880,7 +2880,7 @@ socks = ["PySocks (>=1.5.6,!=1.5.7,<2.0)"]
 
 [[package]]
 name = "virtualenv"
-version = "20.16.6"
+version = "20.16.7"
 description = "Virtual Python Environment builder"
 category = "dev"
 optional = false
@@ -3150,12 +3150,12 @@ blessed = [
     {file = "blessed-1.19.1.tar.gz", hash = "sha256:9a0d099695bf621d4680dd6c73f6ad547f6a3442fbdbe80c4b1daa1edbc492fc"},
 ]
 boto3 = [
-    {file = "boto3-1.26.6-py3-none-any.whl", hash = "sha256:2bd7d3e8362f0e0d84fe4c3a06f1bd46fd2dbedbea76ac24e89f28439837a9e7"},
-    {file = "boto3-1.26.6.tar.gz", hash = "sha256:4943faf38979ac445627390b431b0c08a73ccd5ecd46983e1d29cee454d14aaa"},
+    {file = "boto3-1.26.9-py3-none-any.whl", hash = "sha256:27efa5eb229364bc4643d9e182de0891f73c21b65ef80b5bd02a977caeaf595c"},
+    {file = "boto3-1.26.9.tar.gz", hash = "sha256:15b059251990706c5d5a556c42a6e6e781a51edadf48a42afdd06bd313adfaf2"},
 ]
 botocore = [
-    {file = "botocore-1.29.6-py3-none-any.whl", hash = "sha256:bb595ed6a42ff85b4d5fb7a2e31b8584b87df46933a6f830fd98f91b1feea279"},
-    {file = "botocore-1.29.6.tar.gz", hash = "sha256:574a9dc8b7cf1d866e6255c57af25de1f0da1babc6ce9faf05f227fd28ca905e"},
+    {file = "botocore-1.29.9-py3-none-any.whl", hash = "sha256:c876a7c6a07d7f86f46a8cc765f0d38999b84ac1d7b0666d6ce08c0503e13145"},
+    {file = "botocore-1.29.9.tar.gz", hash = "sha256:01f168e2418419a6d8b335ecc4330faa6a7332d5a097029fc9b4a3ae3c41cea2"},
 ]
 cachetools = [
     {file = "cachetools-5.2.0-py3-none-any.whl", hash = "sha256:f9f17d2aec496a9aa6b76f53e3b614c965223c061982d434d160f930c698a9db"},
@@ -3340,7 +3340,7 @@ decorator = [
     {file = "decorator-5.1.1.tar.gz", hash = "sha256:637996211036b6385ef91435e4fae22989472f9d571faba8927ba8253acbc330"},
 ]
 deeplake = [
-    {file = "deeplake-3.0.17.tar.gz", hash = "sha256:edd52c87c686520cd50dfec2877de623efc218e8faf8b8c55611dea7744dcd0f"},
+    {file = "deeplake-3.0.18.tar.gz", hash = "sha256:3b9b60625fed36f2af138dcaf6a6f14d24381392d4c52ed8c74d15f4faa87f6f"},
 ]
 defusedxml = [
     {file = "defusedxml-0.7.1-py2.py3-none-any.whl", hash = "sha256:a352e7e428770286cc899e2542b6cdaedb2b4953ff269a210103ec58f6198a61"},
@@ -3371,8 +3371,8 @@ entrypoints = [
     {file = "entrypoints-0.4.tar.gz", hash = "sha256:b706eddaa9218a19ebcd67b56818f05bb27589b1ca9e8d797b74affad4ccacd4"},
 ]
 exceptiongroup = [
-    {file = "exceptiongroup-1.0.1-py3-none-any.whl", hash = "sha256:4d6c0aa6dd825810941c792f53d7b8d71da26f5e5f84f20f9508e8f2d33b140a"},
-    {file = "exceptiongroup-1.0.1.tar.gz", hash = "sha256:73866f7f842ede6cb1daa42c4af078e2035e5f7607f0e2c762cc51bb31bbe7b2"},
+    {file = "exceptiongroup-1.0.4-py3-none-any.whl", hash = "sha256:542adf9dea4055530d6e1279602fa5cb11dab2395fa650b8674eaec35fc4a828"},
+    {file = "exceptiongroup-1.0.4.tar.gz", hash = "sha256:bd14967b79cd9bdb54d97323216f8fdf533e278df937aa2a90089e7d6e06e5ec"},
 ]
 executing = [
     {file = "executing-1.2.0-py2.py3-none-any.whl", hash = "sha256:0314a69e37426e3608aada02473b4161d4caf5a4b244d1d0c48072b8fee7bacc"},
@@ -3518,7 +3518,8 @@ grpcio = [
     {file = "grpcio-1.50.0.tar.gz", hash = "sha256:12b479839a5e753580b5e6053571de14006157f2ef9b71f38c56dc9b23b95ad6"},
 ]
 hub = [
-    {file = "hub-3.0.0-py3-none-any.whl", hash = "sha256:795ae7f7dfe72669202d5192fd55bc8a043ca47f443e9518b8b4c5f9b33452a9"},
+    {file = "hub-3.0.1-py3-none-any.whl", hash = "sha256:16d20fbf44700b438dc372d697ee683f0d7c58b178ad01d2daf81efe88bc692d"},
+    {file = "hub-3.0.1.tar.gz", hash = "sha256:3866425914ed522090f0634887f06ff77517e8e6d7b9370e42009d774b725514"},
 ]
 huggingface-hub = [
     {file = "huggingface_hub-0.10.1-py3-none-any.whl", hash = "sha256:dc3b0e9a663fe6cad6a8522055c02a9d8673dbd527223288e2442bc028c253db"},
@@ -3529,8 +3530,8 @@ humbug = [
     {file = "humbug-0.2.7.tar.gz", hash = "sha256:ee85cd404b138dd7fdb30e499bb9f10298c1f28acc76b6386a182a177b8f88a3"},
 ]
 hypothesis = [
-    {file = "hypothesis-6.56.4-py3-none-any.whl", hash = "sha256:67950103ee930c66673494b3671474a083ea71f1ebe8f0ff849ba8ad5317772d"},
-    {file = "hypothesis-6.56.4.tar.gz", hash = "sha256:313bc1c0f377ec6c98815d3237a69add7558eadee4effe4ed613d0ba36513a52"},
+    {file = "hypothesis-6.57.1-py3-none-any.whl", hash = "sha256:91c22db726ffd68f2658e273af111a6fcae2e53fa430580862e8522686b5c071"},
+    {file = "hypothesis-6.57.1.tar.gz", hash = "sha256:1d8ed5136f368e343f39172b06f68aa7fd1312cf643c332ab18a75d56789fa90"},
 ]
 identify = [
     {file = "identify-2.5.8-py2.py3-none-any.whl", hash = "sha256:48b7925fe122720088aeb7a6c34f17b27e706b72c61070f27fe3789094233440"},
@@ -3602,8 +3603,8 @@ jupyter = [
     {file = "jupyter-1.0.0.zip", hash = "sha256:3e1f86076bbb7c8c207829390305a2b1fe836d471ed54be66a3b8c41e7f46cc7"},
 ]
 jupyter-client = [
-    {file = "jupyter_client-7.4.4-py3-none-any.whl", hash = "sha256:1c1d418ef32a45a1fae0b243e6f01cc9bf65fa8ddbd491a034b9ba6ac6502951"},
-    {file = "jupyter_client-7.4.4.tar.gz", hash = "sha256:5616db609ac720422e6a4b893d6572b8d655ff41e058367f4459a0d2c0726832"},
+    {file = "jupyter_client-7.4.6-py3-none-any.whl", hash = "sha256:540b6a5c9c2dc481c5dd54fd5acb260f03dfaaa7c5325b2ffb1f676710f8c7c4"},
+    {file = "jupyter_client-7.4.6.tar.gz", hash = "sha256:f7f9a9dc3a0ecd223ed6a5a00cf4140a5c252ec72e52d6de370748ed0aa083dd"},
 ]
 jupyter-console = [
     {file = "jupyter_console-6.4.4-py3-none-any.whl", hash = "sha256:756df7f4f60c986e7bc0172e4493d3830a7e6e75c08750bbe59c0a5403ad6dee"},
@@ -3614,8 +3615,8 @@ jupyter-core = [
     {file = "jupyter_core-5.0.0.tar.gz", hash = "sha256:4ed68b7c606197c7e344a24b7195eef57898157075a69655a886074b6beb7043"},
 ]
 jupyter-server = [
-    {file = "jupyter_server-1.23.1-py3-none-any.whl", hash = "sha256:4bdcde2aa576b05da5cf89f33b7d97adcaea5cad4f5863a0db09dcc9eecd66bf"},
-    {file = "jupyter_server-1.23.1.tar.gz", hash = "sha256:cee48d9d96cecd0f94b7cb41ecd4f0ab05b01643769f61c5d397b7873bc9a1e2"},
+    {file = "jupyter_server-1.23.2-py3-none-any.whl", hash = "sha256:c01d0e84c22a14dd6b0e7d8ce4105b08a3426b46582668e28046a64c07311a4f"},
+    {file = "jupyter_server-1.23.2.tar.gz", hash = "sha256:69cb954ef02c0ba1837787e34e4a1240c93c8eb590662fae1840778861957660"},
 ]
 jupyterlab-pygments = [
     {file = "jupyterlab_pygments-0.2.2-py2.py3-none-any.whl", hash = "sha256:2405800db07c9f770863bcf8049a529c3dd4d3e28536638bd7c1c01d2748309f"},
@@ -3696,19 +3697,19 @@ kiwisolver = [
     {file = "kiwisolver-1.4.4.tar.gz", hash = "sha256:d41997519fcba4a1e46eb4a2fe31bc12f0ff957b2b81bac28db24744f333e955"},
 ]
 libdeeplake = [
-    {file = "libdeeplake-0.0.25-cp310-cp310-macosx_10_12_x86_64.whl", hash = "sha256:d2382ec4d1bcdb3610b611b08d9fe980c21de09d3bef2a9884bcb2ddb1e0f579"},
-    {file = "libdeeplake-0.0.25-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:79f82188adfc318aa9a04a6a39b8a869a09d3c389d460f2da04945e4960a8696"},
-    {file = "libdeeplake-0.0.25-cp310-cp310-manylinux2014_x86_64.whl", hash = "sha256:2ccae28e28e5186736cedf0cec3ebabb226cd5cc8d79e7be448fd2170f83a4af"},
-    {file = "libdeeplake-0.0.25-cp36-cp36m-manylinux2014_x86_64.whl", hash = "sha256:56445e4003c6f75b24b64fc13bb200d27325eb2b95a63e6cf201eb183852136d"},
-    {file = "libdeeplake-0.0.25-cp37-cp37m-macosx_10_12_x86_64.whl", hash = "sha256:ce26f53c615078fcfc65651a68acbc5e7519bda369c8328543026ff4573a47fe"},
-    {file = "libdeeplake-0.0.25-cp37-cp37m-macosx_11_0_arm64.whl", hash = "sha256:0acad386e97f4096bace6db9fe47a38bf7d90d1bcfa738c7ce5e2deb16fefbf5"},
-    {file = "libdeeplake-0.0.25-cp37-cp37m-manylinux2014_x86_64.whl", hash = "sha256:117483a9b18f54437532a4a4b48db7d3a8fc930970ddd7edce14054ecbcccd02"},
-    {file = "libdeeplake-0.0.25-cp38-cp38-macosx_10_12_x86_64.whl", hash = "sha256:f1482fe86a0f8969568af73e51aac349e4d53af6d612eace76cda3ee8a436210"},
-    {file = "libdeeplake-0.0.25-cp38-cp38-macosx_11_0_arm64.whl", hash = "sha256:ff9ef1e93a285e623b80f306eae6a16c0364ddab55c263d28d759ba9a03fa8c2"},
-    {file = "libdeeplake-0.0.25-cp38-cp38-manylinux2014_x86_64.whl", hash = "sha256:2a9369efa2c004c5f47ccbfd4b71ffb0857ef97cf912be27ebe0f4d8555ed525"},
-    {file = "libdeeplake-0.0.25-cp39-cp39-macosx_10_12_x86_64.whl", hash = "sha256:ba0b160f0c325f549bb9736c94bef75212be44cc1c94806e56075cc72a6d723e"},
-    {file = "libdeeplake-0.0.25-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:41363da77b56f2b3e09c229728740a062f3020af73fc895f46d5bd637578bf27"},
-    {file = "libdeeplake-0.0.25-cp39-cp39-manylinux2014_x86_64.whl", hash = "sha256:fd10bf83769a30021c5b1af13287542d87803b7c95f39e13fdc89c4975eaed03"},
+    {file = "libdeeplake-0.0.26-cp310-cp310-macosx_10_12_x86_64.whl", hash = "sha256:2217d3daf0c366849874707c8c480f06b1b602f5633b65d798c029db30f827c0"},
+    {file = "libdeeplake-0.0.26-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:fa0a1c04890e700d28bff91823be7f01c7c88dea5dc68a6fa5267194ea724ea1"},
+    {file = "libdeeplake-0.0.26-cp310-cp310-manylinux2014_x86_64.whl", hash = "sha256:aae912a4a46c0241d1b2d954e9b1060c30d6dc4256ca1fe74e3fc07bed17790e"},
+    {file = "libdeeplake-0.0.26-cp36-cp36m-manylinux2014_x86_64.whl", hash = "sha256:59006aabe69fd7fb8c9d875bd4048ac21fbc6d3b40260fdfe976da3150efe33f"},
+    {file = "libdeeplake-0.0.26-cp37-cp37m-macosx_10_12_x86_64.whl", hash = "sha256:90b27c034b1ac6c57b94b0d14169c4adeb4eef0b9895077bd44ebfba22827c1d"},
+    {file = "libdeeplake-0.0.26-cp37-cp37m-macosx_11_0_arm64.whl", hash = "sha256:2a87734afcd08ce8b647cad861748f4510fe755eb056f6bf1cc0d47d1f09674f"},
+    {file = "libdeeplake-0.0.26-cp37-cp37m-manylinux2014_x86_64.whl", hash = "sha256:b30bb7feb4de2d9faf692ba9680a19a738e51a27291441e0fdd8dc1f0324cd28"},
+    {file = "libdeeplake-0.0.26-cp38-cp38-macosx_10_12_x86_64.whl", hash = "sha256:76a8d28d1bcb83bc1ec95c3fb2730768767107d82b775746c0622f0321058d28"},
+    {file = "libdeeplake-0.0.26-cp38-cp38-macosx_11_0_arm64.whl", hash = "sha256:4642ff99bfa13ea7bda179fd3a1e9f66dc61985293391bda0768546665ad4877"},
+    {file = "libdeeplake-0.0.26-cp38-cp38-manylinux2014_x86_64.whl", hash = "sha256:334eaad98852be6b7b16dc9abe6dda5a0a89060568b0ad99529c05f539067126"},
+    {file = "libdeeplake-0.0.26-cp39-cp39-macosx_10_12_x86_64.whl", hash = "sha256:fc0cbe8d4f0473ccbe078b60dce2e96b593735f8ed2e88a8c9579437b4977d1e"},
+    {file = "libdeeplake-0.0.26-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:5a31b9bc39bed980dd9d05e64791390ad20749b7f23dc5403665a2552ba0013b"},
+    {file = "libdeeplake-0.0.26-cp39-cp39-manylinux2014_x86_64.whl", hash = "sha256:7bdd8f991c1fee1b2304e80975856ab159f13dc84e76a0e1327554b5da27e0b2"},
 ]
 llvmlite = [
     {file = "llvmlite-0.39.1-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:6717c7a6e93c9d2c3d07c07113ec80ae24af45cde536b34363d4bcd9188091d9"},
@@ -3919,8 +3920,8 @@ nbclient = [
     {file = "nbclient-0.7.0.tar.gz", hash = "sha256:a1d844efd6da9bc39d2209bf996dbd8e07bf0f36b796edfabaa8f8a9ab77c3aa"},
 ]
 nbconvert = [
-    {file = "nbconvert-7.2.4-py3-none-any.whl", hash = "sha256:ed6eb42c2700a1aa5253db25db932db789e3a1ee01e1adf004bfed13c56bff50"},
-    {file = "nbconvert-7.2.4.tar.gz", hash = "sha256:7bee39e41835642f84599c2841ea53f21f4099257102c07c09347202c3ef732a"},
+    {file = "nbconvert-7.2.5-py3-none-any.whl", hash = "sha256:3e90e108bb5637b5b8a1422af1156af1368b39dd25369ff7faa7dfdcdef18f81"},
+    {file = "nbconvert-7.2.5.tar.gz", hash = "sha256:8fdc44fd7d9424db7fdc6e1e834a02f6b8620ffb653767388be2f9eb16f84184"},
 ]
 nbformat = [
     {file = "nbformat-5.7.0-py3-none-any.whl", hash = "sha256:1b05ec2c552c2f1adc745f4eddce1eac8ca9ffd59bb9fd859e827eaa031319f9"},
@@ -4103,8 +4104,8 @@ pathos = [
     {file = "pathos-0.3.0.tar.gz", hash = "sha256:24fa8db51fbd9284da8e191794097c4bb2aa3fce411090e57af6385e61b97e09"},
 ]
 pathspec = [
-    {file = "pathspec-0.10.1-py3-none-any.whl", hash = "sha256:46846318467efc4556ccfd27816e004270a9eeeeb4d062ce5e6fc7a87c573f93"},
-    {file = "pathspec-0.10.1.tar.gz", hash = "sha256:7ace6161b621d31e7902eb6b5ae148d12cfd23f4a249b9ffb6b9fee12084323d"},
+    {file = "pathspec-0.10.2-py3-none-any.whl", hash = "sha256:88c2606f2c1e818b978540f73ecc908e13999c6c3a383daf3705652ae79807a5"},
+    {file = "pathspec-0.10.2.tar.gz", hash = "sha256:8f6bf73e5758fd365ef5d58ce09ac7c27d2833a8d7da51712eac6e27e35141b0"},
 ]
 pdf2image = [
     {file = "pdf2image-1.16.0-py3-none-any.whl", hash = "sha256:84f79f2b8fad943e36323ea4e937fcb05f26ded0caa0a01181df66049e42fb65"},
@@ -4191,8 +4192,8 @@ pkgutil-resolve-name = [
     {file = "pkgutil_resolve_name-1.3.10.tar.gz", hash = "sha256:357d6c9e6a755653cfd78893817c0853af365dd51ec97f3d358a819373bbd174"},
 ]
 platformdirs = [
-    {file = "platformdirs-2.5.3-py3-none-any.whl", hash = "sha256:0cb405749187a194f444c25c82ef7225232f11564721eabffc6ec70df83b11cb"},
-    {file = "platformdirs-2.5.3.tar.gz", hash = "sha256:6e52c21afff35cb659c6e52d8b4d61b9bd544557180440538f255d9382c8cbe0"},
+    {file = "platformdirs-2.5.4-py3-none-any.whl", hash = "sha256:af0276409f9a02373d540bf8480021a048711d572745aef4b7842dad245eba10"},
+    {file = "platformdirs-2.5.4.tar.gz", hash = "sha256:1006647646d80f16130f052404c6b901e80ee4ed6bef6792e1f238a8969106f7"},
 ]
 plotly = [
     {file = "plotly-5.11.0-py2.py3-none-any.whl", hash = "sha256:52fd74b08aa4fd5a55b9d3034a30dbb746e572d7ed84897422f927fdf687ea5f"},
@@ -4797,8 +4798,8 @@ sphinx = [
     {file = "sphinx-5.3.0-py3-none-any.whl", hash = "sha256:060ca5c9f7ba57a08a1219e547b269fadf125ae25b06b9fa7f66768efb652d6d"},
 ]
 sphinx-copybutton = [
-    {file = "sphinx-copybutton-0.5.0.tar.gz", hash = "sha256:a0c059daadd03c27ba750da534a92a63e7a36a7736dcf684f26ee346199787f6"},
-    {file = "sphinx_copybutton-0.5.0-py3-none-any.whl", hash = "sha256:9684dec7434bd73f0eea58dda93f9bb879d24bff2d8b187b1f2ec08dfe7b5f48"},
+    {file = "sphinx-copybutton-0.5.1.tar.gz", hash = "sha256:366251e28a6f6041514bfb5439425210418d6c750e98d3a695b73e56866a677a"},
+    {file = "sphinx_copybutton-0.5.1-py3-none-any.whl", hash = "sha256:0842851b5955087a7ec7fc870b622cb168618ad408dee42692e9a5c97d071da8"},
 ]
 sphinx-rtd-theme = [
     {file = "sphinx_rtd_theme-1.1.1-py2.py3-none-any.whl", hash = "sha256:31faa07d3e97c8955637fc3f1423a5ab2c44b74b8cc558a51498c202ce5cbda7"},
@@ -4829,8 +4830,8 @@ sphinxcontrib-serializinghtml = [
     {file = "sphinxcontrib_serializinghtml-1.1.5-py2.py3-none-any.whl", hash = "sha256:352a9a00ae864471d3a7ead8d7d79f5fc0b57e8b3f95e9867eb9eb28999b92fd"},
 ]
 stack-data = [
-    {file = "stack_data-0.6.0-py3-none-any.whl", hash = "sha256:b92d206ef355a367d14316b786ab41cb99eb453a21f2cb216a4204625ff7bc07"},
-    {file = "stack_data-0.6.0.tar.gz", hash = "sha256:8e515439f818efaa251036af72d89e4026e2b03993f3453c000b200fb4f2d6aa"},
+    {file = "stack_data-0.6.1-py3-none-any.whl", hash = "sha256:960cb054d6a1b2fdd9cbd529e365b3c163e8dabf1272e02cfe36b58403cff5c6"},
+    {file = "stack_data-0.6.1.tar.gz", hash = "sha256:6c9a10eb5f342415fe085db551d673955611afb821551f554d91772415464315"},
 ]
 sympy = [
     {file = "sympy-1.11.1-py3-none-any.whl", hash = "sha256:938f984ee2b1e8eae8a07b884c8b7a1146010040fccddc6539c54f401c8f6fcf"},
@@ -5007,8 +5008,8 @@ tornado = [
     {file = "tornado-6.2.tar.gz", hash = "sha256:9b630419bde84ec666bfd7ea0a4cb2a8a651c2d5cccdbdd1972a0c859dfc3c13"},
 ]
 tox = [
-    {file = "tox-3.27.0-py2.py3-none-any.whl", hash = "sha256:89e4bc6df3854e9fc5582462e328dd3660d7d865ba625ae5881bbc63836a6324"},
-    {file = "tox-3.27.0.tar.gz", hash = "sha256:d2c945f02a03d4501374a3d5430877380deb69b218b1df9b7f1d2f2a10befaf9"},
+    {file = "tox-3.27.1-py2.py3-none-any.whl", hash = "sha256:f52ca66eae115fcfef0e77ef81fd107133d295c97c52df337adedb8dfac6ab84"},
+    {file = "tox-3.27.1.tar.gz", hash = "sha256:b2a920e35a668cc06942ffd1cf3a4fb221a4d909ca72191fb6d84b0b18a7be04"},
 ]
 tqdm = [
     {file = "tqdm-4.64.1-py2.py3-none-any.whl", hash = "sha256:6fee160d6ffcd1b1c68c65f14c829c22832bc401726335ce92c52d395944a6a1"},
@@ -5031,8 +5032,8 @@ urllib3 = [
     {file = "urllib3-1.26.12.tar.gz", hash = "sha256:3fa96cf423e6987997fc326ae8df396db2a8b7c667747d47ddd8ecba91f4a74e"},
 ]
 virtualenv = [
-    {file = "virtualenv-20.16.6-py3-none-any.whl", hash = "sha256:186ca84254abcbde98180fd17092f9628c5fe742273c02724972a1d8a2035108"},
-    {file = "virtualenv-20.16.6.tar.gz", hash = "sha256:530b850b523c6449406dfba859d6345e48ef19b8439606c5d74d7d3c9e14d76e"},
+    {file = "virtualenv-20.16.7-py3-none-any.whl", hash = "sha256:efd66b00386fdb7dbe4822d172303f40cd05e50e01740b19ea42425cbe653e29"},
+    {file = "virtualenv-20.16.7.tar.gz", hash = "sha256:8691e3ff9387f743e00f6bb20f70121f5e4f596cae754531f2b3b3a1b1ac696e"},
 ]
 visidata = [
     {file = "visidata-2.10.2-py3-none-any.whl", hash = "sha256:fe10c88f585e8e1c79a60a7e5dc08e1097d84c73d741a1fa10db0422252b6318"},

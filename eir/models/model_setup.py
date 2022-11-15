@@ -15,6 +15,7 @@ from typing import (
     Type,
     Tuple,
     Literal,
+    Optional,
     TYPE_CHECKING,
 )
 
@@ -63,17 +64,25 @@ from eir.models.tabular.tabular import (
     SimpleTabularModelConfig,
 )
 from eir.setup import schemas
+from eir.setup.input_setup import al_input_objects_as_dict, DataDimensions
 from eir.setup.setup_utils import get_unsupported_hf_models
 from eir.train_utils.distributed import maybe_make_model_distributed
 
 if TYPE_CHECKING:
-    from eir.setup.input_setup import al_input_objects_as_dict, DataDimensions
     from eir.setup.output_setup import (
         al_output_objects_as_dict,
         al_num_outputs_per_target,
     )
 
 al_fusion_class_callable = Callable[[str], Type[nn.Module]]
+al_data_dimensions = Dict[
+    str,
+    Union[
+        DataDimensions,
+        "OmicsDataDimensions",
+        "SequenceDataDimensions",
+    ],
+]
 
 logger = get_logger(name=__name__)
 
@@ -88,7 +97,7 @@ def get_default_meta_class(
 
 def get_model(
     global_config: schemas.GlobalConfig,
-    inputs_as_dict: "al_input_objects_as_dict",
+    inputs_as_dict: al_input_objects_as_dict,
     fusion_config: schemas.FusionConfig,
     outputs_as_dict: "al_output_objects_as_dict",
     model_registry_per_input_type: Dict[str, Callable[[str], Type[nn.Module]]],
@@ -145,6 +154,8 @@ def get_output_modules(
     model_registry_per_output_type: Dict[str, Callable[[str], Type[nn.Module]]],
     input_dimension: int,
     device: str,
+    in_features_per_input: Optional[Dict[str, DataDimensions]] = None,
+    out_features_per_feature_extractor: Optional[Dict[str, int]] = None,
 ) -> nn.ModuleDict:
     output_modules = nn.ModuleDict()
 
@@ -172,6 +183,8 @@ def get_output_modules(
                 output_object=output_object,
                 output_name=output_name,
                 input_dimension=input_dimension,
+                in_features_per_feature_extractor=in_features_per_input,
+                out_features_per_feature_extractor=out_features_per_feature_extractor,
                 device=device,
             )
             output_modules[output_name] = custom_output_module
@@ -198,7 +211,7 @@ def get_tabular_output_module_from_model_config(
 
 
 def get_input_modules(
-    inputs_as_dict: "al_input_objects_as_dict",
+    inputs_as_dict: al_input_objects_as_dict,
     model_registry_per_input_type: Dict[str, Callable[[str], Type[nn.Module]]],
     device: str,
 ) -> nn.ModuleDict:
@@ -717,7 +730,7 @@ def get_tabular_model(
 
 def get_omics_model_from_model_config(
     model_init_config: al_omics_model_configs,
-    data_dimensions: "DataDimensions",
+    data_dimensions: DataDimensions,
     model_type: str,
 ):
 
@@ -738,7 +751,7 @@ def get_omics_model_from_model_config(
 def get_meta_model_kwargs_from_configs(
     global_config: schemas.GlobalConfig,
     fusion_config: schemas.FusionConfig,
-    inputs_as_dict: "al_input_objects_as_dict",
+    inputs_as_dict: al_input_objects_as_dict,
     outputs_as_dict: "al_output_objects_as_dict",
     model_registry_per_input_type: Dict[str, Callable[[str], Type[nn.Module]]],
     model_registry_per_output_type: Dict[str, Callable[[str], Type[nn.Module]]],
@@ -759,15 +772,92 @@ def get_meta_model_kwargs_from_configs(
     )
     kwargs["fusion_module"] = fusion_module
 
+    in_features_per_input = _get_feature_extractors_input_dimensions_per_axis(
+        inputs_as_dict=inputs_as_dict, input_modules=input_modules
+    )
+    out_feature_per_feature_extractor = _get_feature_extractors_output_dimensions(
+        input_modules=input_modules
+    )
     output_modules = get_output_modules(
         outputs_as_dict=outputs_as_dict,
         model_registry_per_output_type=model_registry_per_output_type,
         input_dimension=fusion_module.num_out_features,
         device=global_config.device,
+        in_features_per_input=in_features_per_input,
+        out_features_per_feature_extractor=out_feature_per_feature_extractor,
     )
     kwargs["output_modules"] = output_modules
 
     return kwargs
+
+
+def _get_feature_extractors_output_dimensions(
+    input_modules: nn.ModuleDict,
+) -> Dict[str, int]:
+    fusion_in_dims = {name: i.num_out_features for name, i in input_modules.items()}
+    return fusion_in_dims
+
+
+@dataclass
+class SequenceDataDimensions(DataDimensions):
+    @property
+    def max_length(self) -> int:
+        return self.height
+
+    @property
+    def embedding_dim(self) -> int:
+        return self.width
+
+
+@dataclass
+class OmicsDataDimensions(DataDimensions):
+    @property
+    def num_snps(self) -> int:
+        return self.width
+
+    @property
+    def one_hot_encoding_dim(self) -> int:
+        return self.height
+
+
+def _get_feature_extractors_input_dimensions_per_axis(
+    inputs_as_dict: al_input_objects_as_dict,
+    input_modules: nn.ModuleDict,
+) -> al_data_dimensions:
+
+    fusion_in_dims = {}
+
+    for name, input_object in inputs_as_dict.items():
+        input_type = input_object.input_config.input_info.input_type
+        input_type_info = input_object.input_config.input_type_info
+        input_model_config = input_object.input_config.model_config
+
+        if input_type in ("sequence", "bytes"):
+            fusion_in_dims[name] = SequenceDataDimensions(
+                channels=1,
+                height=input_object.computed_max_length,
+                width=input_model_config.embedding_dim,
+            )
+        elif input_type == "image":
+            fusion_in_dims[name] = DataDimensions(
+                channels=input_type_info.num_channels,
+                height=input_type_info.size[0],
+                width=input_type_info.size[-1],
+            )
+        elif input_type == "tabular":
+            fusion_in_dims[name] = DataDimensions(
+                channels=1,
+                height=1,
+                width=input_modules[name].input_dim,
+            )
+        elif input_type == "omics":
+            fusion_in_dims[name] = OmicsDataDimensions(
+                **input_object.data_dimensions.__dict__
+            )
+        else:
+            raise ValueError(f"Unknown input type {input_type}.")
+
+    return fusion_in_dims
 
 
 def _warn_about_unsupported_hf_model(model_name: str) -> None:
@@ -785,7 +875,7 @@ def _warn_about_unsupported_hf_model(model_name: str) -> None:
 
 def overload_fusion_model_feature_extractors_with_pretrained(
     input_modules: nn.ModuleDict,
-    inputs_as_dict: "al_input_objects_as_dict",
+    inputs_as_dict: al_input_objects_as_dict,
     outputs_as_dict: "al_output_objects_as_dict",
     model_registry_per_input_type: Dict[str, Callable[[str], Type[nn.Module]]],
     model_registry_per_output_type: Dict[str, Callable[[str], Type[nn.Module]]],
@@ -873,7 +963,7 @@ def overload_fusion_model_feature_extractors_with_pretrained(
 def get_meta_model_class_and_kwargs_from_configs(
     global_config: schemas.GlobalConfig,
     fusion_config: schemas.FusionConfig,
-    inputs_as_dict: "al_input_objects_as_dict",
+    inputs_as_dict: al_input_objects_as_dict,
     outputs_as_dict: "al_output_objects_as_dict",
     model_registry_per_input_type: Dict[str, Callable[[str], Type[nn.Module]]],
     model_registry_per_output_type: Dict[str, Callable[[str], Type[nn.Module]]],
@@ -962,16 +1052,16 @@ def _load_model_weights(
     state_dict_key_rename: Union[None, Sequence[Tuple[str, str]]] = None,
     strict_shapes: bool = True,
 ) -> nn.Module:
-    source_state_dict = torch.load(model_state_dict_path, map_location=device)
+    loaded_weights_state_dict = torch.load(model_state_dict_path, map_location=device)
 
     if state_dict_keys_to_keep:
-        no_keys_before = len(source_state_dict)
-        source_state_dict = _filter_state_dict_keys(
-            state_dict=source_state_dict, keys_to_keep=state_dict_keys_to_keep
+        no_keys_before = len(loaded_weights_state_dict)
+        loaded_weights_state_dict = _filter_state_dict_keys(
+            state_dict=loaded_weights_state_dict, keys_to_keep=state_dict_keys_to_keep
         )
         logger.info(
             "Extracting %d/%d modules for feature extractors: '%s' from %s.",
-            len(source_state_dict),
+            len(loaded_weights_state_dict),
             no_keys_before,
             state_dict_keys_to_keep,
             model_state_dict_path,
@@ -984,18 +1074,19 @@ def _load_model_weights(
                 replace_tuple[0],
                 replace_tuple[1],
             )
-            source_state_dict = _replace_dict_key_names(
-                dict_=source_state_dict, replace_pattern=replace_tuple
+            loaded_weights_state_dict = _replace_dict_key_names(
+                dict_=loaded_weights_state_dict, replace_pattern=replace_tuple
             )
 
     if not strict_shapes:
         model_state_dict = model.state_dict()
-        source_state_dict = _filter_incompatible_parameter_shapes_for_loading(
-            source_state_dict=source_state_dict, destination_state_dict=model_state_dict
+        loaded_weights_state_dict = _filter_incompatible_parameter_shapes_for_loading(
+            source_state_dict=model_state_dict,
+            destination_state_dict=loaded_weights_state_dict,
         )
 
     incompatible_keys = model.load_state_dict(
-        state_dict=source_state_dict, strict=False
+        state_dict=loaded_weights_state_dict, strict=False
     )
 
     no_missing = len(incompatible_keys.missing_keys)
