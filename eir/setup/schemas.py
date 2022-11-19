@@ -90,6 +90,7 @@ al_tokenizer_choices = (
         Literal["toktok"],
         Literal["revtok"],
         Literal["subword"],
+        Literal["bpe"],
         None,
     ],
 )

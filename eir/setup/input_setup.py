@@ -38,6 +38,10 @@ from transformers.tokenization_utils_base import (
     PreTokenizedInput,
     EncodedInput,
 )
+from tokenizers import Tokenizer
+from tokenizers.models import BPE
+from tokenizers.trainers import BpeTrainer
+from tokenizers.pre_tokenizers import Whitespace
 
 from eir.data_load.label_setup import (
     Labels,
@@ -584,17 +588,17 @@ def get_sequence_input_objects_from_input(
     gathered_stats = GatheredSequenceStats()
 
     vocab_file = input_config.input_type_info.vocab_file
-    vocab_iter = get_vocab_iterator(
+
+    tokenizer = get_tokenizer(input_config=input_config)
+
+    vocab_iter_kwargs = dict(
         input_source=input_config.input_info.input_source,
         split_on=input_config.input_type_info.split_on,
         gathered_stats=gathered_stats,
         vocab_file=input_config.input_type_info.vocab_file,
         deeplake_inner_key=input_config.input_info.input_inner_key,
     )
-    tokenizer = get_basic_tokenizer(
-        tokenizer_name=input_config.input_type_info.tokenizer,
-        tokenizer_language=input_config.input_type_info.tokenizer_language,
-    )
+    vocab_iter = get_vocab_iterator(**vocab_iter_kwargs)
     tokenized_vocab_iter = get_tokenized_vocab_iterator(
         vocab_iterator=vocab_iter, tokenizer=tokenizer
     )
@@ -620,6 +624,34 @@ def get_sequence_input_objects_from_input(
     )
 
     return vocab, gathered_stats, tokenizer, encode_func
+
+
+def get_tokenizer(
+    input_config: schemas.InputConfig,
+) -> Callable[[Sequence[str]], Sequence[str]]:
+
+    tokenizer_name = input_config.input_type_info.tokenizer
+
+    if tokenizer_name == "bpe":
+        vocab_iter_kwargs = dict(
+            input_source=input_config.input_info.input_source,
+            split_on=input_config.input_type_info.split_on,
+            gathered_stats=GatheredSequenceStats(),
+            vocab_file=input_config.input_type_info.vocab_file,
+            deeplake_inner_key=input_config.input_info.input_inner_key,
+        )
+        vocab_iter = get_vocab_iterator(**vocab_iter_kwargs)
+
+        vocab_file = input_config.input_type_info.vocab_file
+        tokenizer = get_bpe_tokenizer(vocab_iterator=vocab_iter, vocab_file=vocab_file)
+
+    else:
+        tokenizer = get_basic_tokenizer(
+            tokenizer_name=tokenizer_name,
+            tokenizer_language=input_config.input_type_info.tokenizer_language,
+        )
+
+    return tokenizer
 
 
 def _get_default_specials_map() -> dict:
@@ -700,9 +732,50 @@ def _add_specials_to_hf_tokenizer(
     return hf_tokenizer_copy
 
 
+def get_bpe_tokenizer(vocab_iterator: Optional[Iterator], vocab_file: Optional[str]):
+
+    tokenizer = _get_bpe_tokenizer_object(
+        vocab_iterator=vocab_iterator, vocab_file=vocab_file
+    )
+
+    def _tokenize(raw_input_split: Sequence[str]) -> Sequence[str]:
+        return tokenizer.encode(raw_input_split, is_pretokenized=True).tokens
+
+    return _tokenize
+
+
+def _get_bpe_tokenizer_object(
+    vocab_iterator: Optional[Iterator], vocab_file: Optional[str]
+):
+    if vocab_file:
+        logger.info("Loading BPE vocabulary from file %s.", vocab_file)
+
+        if not vocab_file.endswith(".json"):
+            raise ValueError(
+                "Vocabulary file must be a HuggingFace Tokenizers "
+                "compatible .json file."
+            )
+
+        tokenizer = Tokenizer.from_file(path=vocab_file)
+    else:
+        assert vocab_iterator is not None
+
+        logger.info("Training BPE tokenizer from source data.")
+
+        tokenizer = Tokenizer(BPE(unk_token="<unk>"))
+        tokenizer.pre_tokenizer = Whitespace()
+
+        special_tokens = _get_default_specials()
+        trainer = BpeTrainer(special_tokens=special_tokens)
+
+        tokenizer.train_from_iterator(iterator=vocab_iterator, trainer=trainer)
+
+    return tokenizer
+
+
 def get_basic_tokenizer(
     tokenizer_name: al_tokenizer_choices,
-    tokenizer_language: Union[str, None],
+    tokenizer_language: Optional[str],
 ) -> Callable[[Sequence[str]], Sequence[str]]:
 
     if not tokenizer_name:
