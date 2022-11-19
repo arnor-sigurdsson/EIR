@@ -235,14 +235,14 @@ wcwidth = ">=0.1.4"
 
 [[package]]
 name = "boto3"
-version = "1.26.9"
+version = "1.26.13"
 description = "The AWS SDK for Python"
 category = "main"
 optional = false
 python-versions = ">= 3.7"
 
 [package.dependencies]
-botocore = ">=1.29.9,<1.30.0"
+botocore = ">=1.29.13,<1.30.0"
 jmespath = ">=0.7.1,<2.0.0"
 s3transfer = ">=0.6.0,<0.7.0"
 
@@ -251,7 +251,7 @@ crt = ["botocore[crt] (>=1.21.0,<2.0a0)"]
 
 [[package]]
 name = "botocore"
-version = "1.29.9"
+version = "1.29.13"
 description = "Low-level, data-driven core of boto 3."
 category = "main"
 optional = false
@@ -374,7 +374,7 @@ python-versions = ">=3.6"
 
 [[package]]
 name = "dask"
-version = "2022.10.2"
+version = "2022.11.1"
 description = "Parallel PyData with Task Scheduling"
 category = "main"
 optional = false
@@ -393,10 +393,10 @@ toolz = ">=0.8.2"
 
 [package.extras]
 array = ["numpy (>=1.18)"]
-complete = ["bokeh (>=2.4.2,<3)", "distributed (==2022.10.2)", "jinja2", "numpy (>=1.18)", "pandas (>=1.0)"]
+complete = ["bokeh (>=2.4.2,<3)", "distributed (==2022.11.1)", "jinja2", "numpy (>=1.18)", "pandas (>=1.0)"]
 dataframe = ["numpy (>=1.18)", "pandas (>=1.0)"]
 diagnostics = ["bokeh (>=2.4.2,<3)", "jinja2"]
-distributed = ["distributed (==2022.10.2)"]
+distributed = ["distributed (==2022.11.1)"]
 test = ["pandas[test]", "pre-commit", "pytest", "pytest-rerunfailures", "pytest-xdist"]
 
 [[package]]
@@ -417,7 +417,7 @@ python-versions = ">=3.5"
 
 [[package]]
 name = "deeplake"
-version = "3.0.18"
+version = "3.1.0"
 description = "Activeloop Deep Lake"
 category = "main"
 optional = false
@@ -428,7 +428,6 @@ boto3 = "*"
 click = "*"
 hub = ">=2.8.7"
 humbug = ">=0.2.6"
-libdeeplake = "0.0.26"
 numcodecs = "*"
 numpy = "*"
 pathos = "*"
@@ -437,10 +436,11 @@ pyjwt = "*"
 tqdm = "*"
 
 [package.extras]
-all = ["IPython", "av (>=8.1.0)", "flask", "google-api-python-client (>=2.31.0,<2.32.0)", "google-auth (>=2.0.1,<2.1.0)", "google-auth-oauthlib (>=0.4.5,<0.5.0)", "google-cloud-storage (>=1.42.0,<1.43.0)", "laspy", "oauth2client (>=4.1.3,<4.2.0)", "pydicom"]
+all = ["IPython", "av (>=8.1.0)", "flask", "google-api-python-client (>=2.31.0,<2.32.0)", "google-auth (>=2.0.1,<2.1.0)", "google-auth-oauthlib (>=0.4.5,<0.5.0)", "google-cloud-storage (>=1.42.0,<1.43.0)", "laspy", "libdeeplake (==0.0.29)", "oauth2client (>=4.1.3,<4.2.0)", "pydicom"]
 audio = ["av (>=8.1.0)"]
 av = ["av (>=8.1.0)"]
 dicom = ["pydicom"]
+enterprise = ["libdeeplake (==0.0.29)"]
 gcp = ["google-auth (>=2.0.1,<2.1.0)", "google-auth-oauthlib (>=0.4.5,<0.5.0)", "google-cloud-storage (>=1.42.0,<1.43.0)"]
 gdrive = ["google-api-python-client (>=2.31.0,<2.32.0)", "google-auth (>=2.0.1,<2.1.0)", "google-auth-oauthlib (>=0.4.5,<0.5.0)", "oauth2client (>=4.1.3,<4.2.0)"]
 point-cloud = ["laspy"]
@@ -715,7 +715,7 @@ deeplake = "*"
 
 [[package]]
 name = "huggingface-hub"
-version = "0.10.1"
+version = "0.11.0"
 description = "Client library to download and publish models, datasets and other repos on the huggingface.co hub"
 category = "main"
 optional = false
@@ -730,14 +730,15 @@ tqdm = "*"
 typing-extensions = ">=3.7.4.3"
 
 [package.extras]
-all = ["InquirerPy (==0.3.4)", "Jinja2", "black (==22.3)", "flake8 (>=3.8.3)", "flake8-bugbear", "isort (>=5.5.4)", "jedi", "mypy", "pytest", "pytest-cov", "soundfile"]
+all = ["InquirerPy (==0.3.4)", "Jinja2", "black (==22.3)", "flake8 (>=3.8.3)", "flake8-bugbear", "isort (>=5.5.4)", "jedi", "mypy (==0.982)", "pytest", "pytest-cov", "pytest-env", "soundfile", "types-PyYAML", "types-requests", "types-simplejson", "types-toml", "types-tqdm", "types-urllib3"]
 cli = ["InquirerPy (==0.3.4)"]
-dev = ["InquirerPy (==0.3.4)", "Jinja2", "black (==22.3)", "flake8 (>=3.8.3)", "flake8-bugbear", "isort (>=5.5.4)", "jedi", "mypy", "pytest", "pytest-cov", "soundfile"]
+dev = ["InquirerPy (==0.3.4)", "Jinja2", "black (==22.3)", "flake8 (>=3.8.3)", "flake8-bugbear", "isort (>=5.5.4)", "jedi", "mypy (==0.982)", "pytest", "pytest-cov", "pytest-env", "soundfile", "types-PyYAML", "types-requests", "types-simplejson", "types-toml", "types-tqdm", "types-urllib3"]
 fastai = ["fastai (>=2.4)", "fastcore (>=1.3.27)", "toml"]
-quality = ["black (==22.3)", "flake8 (>=3.8.3)", "flake8-bugbear", "isort (>=5.5.4)", "mypy"]
+quality = ["black (==22.3)", "flake8 (>=3.8.3)", "flake8-bugbear", "isort (>=5.5.4)", "mypy (==0.982)"]
 tensorflow = ["graphviz", "pydot", "tensorflow"]
-testing = ["InquirerPy (==0.3.4)", "Jinja2", "isort (>=5.5.4)", "jedi", "pytest", "pytest-cov", "soundfile"]
+testing = ["InquirerPy (==0.3.4)", "Jinja2", "isort (>=5.5.4)", "jedi", "pytest", "pytest-cov", "pytest-env", "soundfile"]
 torch = ["torch"]
+typing = ["types-PyYAML", "types-requests", "types-simplejson", "types-toml", "types-tqdm", "types-urllib3"]
 
 [[package]]
 name = "humbug"
@@ -785,7 +786,7 @@ zoneinfo = ["backports.zoneinfo (>=0.2.1)", "tzdata (>=2022.6)"]
 
 [[package]]
 name = "identify"
-version = "2.5.8"
+version = "2.5.9"
 description = "File identification library for Python"
 category = "dev"
 optional = false
@@ -1027,7 +1028,7 @@ qtconsole = "*"
 
 [[package]]
 name = "jupyter-client"
-version = "7.4.6"
+version = "7.4.7"
 description = "Jupyter protocol implementation and client libraries"
 category = "dev"
 optional = false
@@ -1132,18 +1133,6 @@ description = "A fast implementation of the Cassowary constraint solver"
 category = "main"
 optional = false
 python-versions = ">=3.7"
-
-[[package]]
-name = "libdeeplake"
-version = "0.0.26"
-description = "C++ backend for Deep Lake"
-category = "main"
-optional = false
-python-versions = "*"
-
-[package.dependencies]
-numpy = "*"
-pathos = "*"
 
 [[package]]
 name = "llvmlite"
@@ -2266,7 +2255,7 @@ python-versions = "*"
 
 [[package]]
 name = "setuptools"
-version = "65.5.1"
+version = "65.6.0"
 description = "Easily download, build, install, upgrade, and uninstall Python packages"
 category = "main"
 optional = false
@@ -3150,12 +3139,12 @@ blessed = [
     {file = "blessed-1.19.1.tar.gz", hash = "sha256:9a0d099695bf621d4680dd6c73f6ad547f6a3442fbdbe80c4b1daa1edbc492fc"},
 ]
 boto3 = [
-    {file = "boto3-1.26.9-py3-none-any.whl", hash = "sha256:27efa5eb229364bc4643d9e182de0891f73c21b65ef80b5bd02a977caeaf595c"},
-    {file = "boto3-1.26.9.tar.gz", hash = "sha256:15b059251990706c5d5a556c42a6e6e781a51edadf48a42afdd06bd313adfaf2"},
+    {file = "boto3-1.26.13-py3-none-any.whl", hash = "sha256:a8ad13a23745b6d4a56d5bdde53a7a80cd7b40016cd411b9a94e6bbfb2ca5dd2"},
+    {file = "boto3-1.26.13.tar.gz", hash = "sha256:853cf4b2136c4deec4e01a17b89126377bfca30223535795d879ca65af4c4a69"},
 ]
 botocore = [
-    {file = "botocore-1.29.9-py3-none-any.whl", hash = "sha256:c876a7c6a07d7f86f46a8cc765f0d38999b84ac1d7b0666d6ce08c0503e13145"},
-    {file = "botocore-1.29.9.tar.gz", hash = "sha256:01f168e2418419a6d8b335ecc4330faa6a7332d5a097029fc9b4a3ae3c41cea2"},
+    {file = "botocore-1.29.13-py3-none-any.whl", hash = "sha256:9c73a180fad9a7da7797530ced3b5069872bff915b1ae9fa11fc1ed79b584c8e"},
+    {file = "botocore-1.29.13.tar.gz", hash = "sha256:9d39db398f472c0aa97098870c8c4cf12636b2667a18e694fea5fae046af907e"},
 ]
 cachetools = [
     {file = "cachetools-5.2.0-py3-none-any.whl", hash = "sha256:f9f17d2aec496a9aa6b76f53e3b614c965223c061982d434d160f930c698a9db"},
@@ -3312,8 +3301,8 @@ cycler = [
     {file = "cycler-0.11.0.tar.gz", hash = "sha256:9c87405839a19696e837b3b818fed3f5f69f16f1eec1a1ad77e043dcea9c772f"},
 ]
 dask = [
-    {file = "dask-2022.10.2-py3-none-any.whl", hash = "sha256:928003a97b890a14c8a09a01f15320d261053bda530a8bf191d84f33db4a63b8"},
-    {file = "dask-2022.10.2.tar.gz", hash = "sha256:42cb43f601709575fa46ce09e74bea83fdd464187024f56954e09d9b428ceaab"},
+    {file = "dask-2022.11.1-py3-none-any.whl", hash = "sha256:89e3772c30072c7dacd83846164eca6bc0a8b347df7bc0ab2ce69f7effdc03bd"},
+    {file = "dask-2022.11.1.tar.gz", hash = "sha256:18e5c442778cdbb177041dadf9950546884c0f1ce1ac25c98aa2cade2a9d83f0"},
 ]
 debugpy = [
     {file = "debugpy-1.6.3-cp310-cp310-macosx_10_15_x86_64.whl", hash = "sha256:c4b2bd5c245eeb49824bf7e539f95fb17f9a756186e51c3e513e32999d8846f3"},
@@ -3340,7 +3329,7 @@ decorator = [
     {file = "decorator-5.1.1.tar.gz", hash = "sha256:637996211036b6385ef91435e4fae22989472f9d571faba8927ba8253acbc330"},
 ]
 deeplake = [
-    {file = "deeplake-3.0.18.tar.gz", hash = "sha256:3b9b60625fed36f2af138dcaf6a6f14d24381392d4c52ed8c74d15f4faa87f6f"},
+    {file = "deeplake-3.1.0.tar.gz", hash = "sha256:0772441e7a07ece048904a3c91a312cac648d10de131d153a87b6061171c0f80"},
 ]
 defusedxml = [
     {file = "defusedxml-0.7.1-py2.py3-none-any.whl", hash = "sha256:a352e7e428770286cc899e2542b6cdaedb2b4953ff269a210103ec58f6198a61"},
@@ -3522,8 +3511,8 @@ hub = [
     {file = "hub-3.0.1.tar.gz", hash = "sha256:3866425914ed522090f0634887f06ff77517e8e6d7b9370e42009d774b725514"},
 ]
 huggingface-hub = [
-    {file = "huggingface_hub-0.10.1-py3-none-any.whl", hash = "sha256:dc3b0e9a663fe6cad6a8522055c02a9d8673dbd527223288e2442bc028c253db"},
-    {file = "huggingface_hub-0.10.1.tar.gz", hash = "sha256:5c188d5b16bec4b78449f8681f9975ff9d321c16046cc29bcf0d7e464ff29276"},
+    {file = "huggingface_hub-0.11.0-py3-none-any.whl", hash = "sha256:1f540c6d57cb1684d3578d7bf2d35041a5145b17e8af932505db7f4fbcc7640d"},
+    {file = "huggingface_hub-0.11.0.tar.gz", hash = "sha256:b48860d791502c2b8a0e6c841214df19c67999198a75d1417512b45752508ac6"},
 ]
 humbug = [
     {file = "humbug-0.2.7-py3-none-any.whl", hash = "sha256:dec2871ce3ba9c9c176be837ea6c53d6001d1c15c7102620a8f58998fa01519c"},
@@ -3534,8 +3523,8 @@ hypothesis = [
     {file = "hypothesis-6.57.1.tar.gz", hash = "sha256:1d8ed5136f368e343f39172b06f68aa7fd1312cf643c332ab18a75d56789fa90"},
 ]
 identify = [
-    {file = "identify-2.5.8-py2.py3-none-any.whl", hash = "sha256:48b7925fe122720088aeb7a6c34f17b27e706b72c61070f27fe3789094233440"},
-    {file = "identify-2.5.8.tar.gz", hash = "sha256:7a214a10313b9489a0d61467db2856ae8d0b8306fc923e03a9effa53d8aedc58"},
+    {file = "identify-2.5.9-py2.py3-none-any.whl", hash = "sha256:a390fb696e164dbddb047a0db26e57972ae52fbd037ae68797e5ae2f4492485d"},
+    {file = "identify-2.5.9.tar.gz", hash = "sha256:906036344ca769539610436e40a684e170c3648b552194980bb7b617a8daeb9f"},
 ]
 idna = [
     {file = "idna-3.4-py3-none-any.whl", hash = "sha256:90b77e79eaa3eba6de819a0c442c0b4ceefc341a7a2ab77d7562bf49f425c5c2"},
@@ -3603,8 +3592,8 @@ jupyter = [
     {file = "jupyter-1.0.0.zip", hash = "sha256:3e1f86076bbb7c8c207829390305a2b1fe836d471ed54be66a3b8c41e7f46cc7"},
 ]
 jupyter-client = [
-    {file = "jupyter_client-7.4.6-py3-none-any.whl", hash = "sha256:540b6a5c9c2dc481c5dd54fd5acb260f03dfaaa7c5325b2ffb1f676710f8c7c4"},
-    {file = "jupyter_client-7.4.6.tar.gz", hash = "sha256:f7f9a9dc3a0ecd223ed6a5a00cf4140a5c252ec72e52d6de370748ed0aa083dd"},
+    {file = "jupyter_client-7.4.7-py3-none-any.whl", hash = "sha256:df56ae23b8e1da1b66f89dee1368e948b24a7f780fa822c5735187589fc4c157"},
+    {file = "jupyter_client-7.4.7.tar.gz", hash = "sha256:330f6b627e0b4bf2f54a3a0dd9e4a22d2b649c8518168afedce2c96a1ceb2860"},
 ]
 jupyter-console = [
     {file = "jupyter_console-6.4.4-py3-none-any.whl", hash = "sha256:756df7f4f60c986e7bc0172e4493d3830a7e6e75c08750bbe59c0a5403ad6dee"},
@@ -3695,21 +3684,6 @@ kiwisolver = [
     {file = "kiwisolver-1.4.4-pp39-pypy39_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:f6cb459eea32a4e2cf18ba5fcece2dbdf496384413bc1bae15583f19e567f3b2"},
     {file = "kiwisolver-1.4.4-pp39-pypy39_pp73-win_amd64.whl", hash = "sha256:36dafec3d6d6088d34e2de6b85f9d8e2324eb734162fba59d2ba9ed7a2043d5b"},
     {file = "kiwisolver-1.4.4.tar.gz", hash = "sha256:d41997519fcba4a1e46eb4a2fe31bc12f0ff957b2b81bac28db24744f333e955"},
-]
-libdeeplake = [
-    {file = "libdeeplake-0.0.26-cp310-cp310-macosx_10_12_x86_64.whl", hash = "sha256:2217d3daf0c366849874707c8c480f06b1b602f5633b65d798c029db30f827c0"},
-    {file = "libdeeplake-0.0.26-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:fa0a1c04890e700d28bff91823be7f01c7c88dea5dc68a6fa5267194ea724ea1"},
-    {file = "libdeeplake-0.0.26-cp310-cp310-manylinux2014_x86_64.whl", hash = "sha256:aae912a4a46c0241d1b2d954e9b1060c30d6dc4256ca1fe74e3fc07bed17790e"},
-    {file = "libdeeplake-0.0.26-cp36-cp36m-manylinux2014_x86_64.whl", hash = "sha256:59006aabe69fd7fb8c9d875bd4048ac21fbc6d3b40260fdfe976da3150efe33f"},
-    {file = "libdeeplake-0.0.26-cp37-cp37m-macosx_10_12_x86_64.whl", hash = "sha256:90b27c034b1ac6c57b94b0d14169c4adeb4eef0b9895077bd44ebfba22827c1d"},
-    {file = "libdeeplake-0.0.26-cp37-cp37m-macosx_11_0_arm64.whl", hash = "sha256:2a87734afcd08ce8b647cad861748f4510fe755eb056f6bf1cc0d47d1f09674f"},
-    {file = "libdeeplake-0.0.26-cp37-cp37m-manylinux2014_x86_64.whl", hash = "sha256:b30bb7feb4de2d9faf692ba9680a19a738e51a27291441e0fdd8dc1f0324cd28"},
-    {file = "libdeeplake-0.0.26-cp38-cp38-macosx_10_12_x86_64.whl", hash = "sha256:76a8d28d1bcb83bc1ec95c3fb2730768767107d82b775746c0622f0321058d28"},
-    {file = "libdeeplake-0.0.26-cp38-cp38-macosx_11_0_arm64.whl", hash = "sha256:4642ff99bfa13ea7bda179fd3a1e9f66dc61985293391bda0768546665ad4877"},
-    {file = "libdeeplake-0.0.26-cp38-cp38-manylinux2014_x86_64.whl", hash = "sha256:334eaad98852be6b7b16dc9abe6dda5a0a89060568b0ad99529c05f539067126"},
-    {file = "libdeeplake-0.0.26-cp39-cp39-macosx_10_12_x86_64.whl", hash = "sha256:fc0cbe8d4f0473ccbe078b60dce2e96b593735f8ed2e88a8c9579437b4977d1e"},
-    {file = "libdeeplake-0.0.26-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:5a31b9bc39bed980dd9d05e64791390ad20749b7f23dc5403665a2552ba0013b"},
-    {file = "libdeeplake-0.0.26-cp39-cp39-manylinux2014_x86_64.whl", hash = "sha256:7bdd8f991c1fee1b2304e80975856ab159f13dc84e76a0e1327554b5da27e0b2"},
 ]
 llvmlite = [
     {file = "llvmlite-0.39.1-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:6717c7a6e93c9d2c3d07c07113ec80ae24af45cde536b34363d4bcd9188091d9"},
@@ -4734,8 +4708,8 @@ sentencepiece = [
     {file = "sentencepiece-0.1.97.tar.gz", hash = "sha256:c901305e0a710bbcd296f66d79e96f744e6e175b29812bd5178318437d4e1f6c"},
 ]
 setuptools = [
-    {file = "setuptools-65.5.1-py3-none-any.whl", hash = "sha256:d0b9a8433464d5800cbe05094acf5c6d52a91bfac9b52bcfc4d41382be5d5d31"},
-    {file = "setuptools-65.5.1.tar.gz", hash = "sha256:e197a19aa8ec9722928f2206f8de752def0e4c9fc6953527360d1c36d94ddb2f"},
+    {file = "setuptools-65.6.0-py3-none-any.whl", hash = "sha256:6211d2f5eddad8757bd0484923ca7c0a6302ebc4ab32ea5e94357176e0ca0840"},
+    {file = "setuptools-65.6.0.tar.gz", hash = "sha256:d1eebf881c6114e51df1664bc2c9133d022f78d12d5f4f665b9191f084e2862d"},
 ]
 shap = [
     {file = "shap-0.41.0-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:9e867dd8be6c0644c8d954dcc9efc51c0f0eec432de2d4cb253a7878489bb9f1"},
