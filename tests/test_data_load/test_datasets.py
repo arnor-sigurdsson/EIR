@@ -2,16 +2,16 @@ import csv
 from copy import deepcopy
 from pathlib import Path
 from typing import List, TYPE_CHECKING, Dict, Union, Any, Sequence
-from uuid import uuid4
 from unittest.mock import MagicMock, patch
+from uuid import uuid4
 
-import eir.data_load.data_source_modules.local_ops
 import numpy as np
 import pandas as pd
 import pytest
 import torch
 from PIL import Image
 
+import eir.data_load.data_source_modules.local_ops
 from eir import train
 from eir.data_load import datasets
 from eir.data_load.datasets import al_datasets
@@ -782,7 +782,7 @@ def test_sample_sequence_uniform():
                         "input_info": {"input_name": "test_genotype"},
                         "model_config": {
                             "model_type": "cnn",
-                            "model_init_config": {"l1": 1e-03},
+                            "model_init_config": {"l1": 1e-04},
                         },
                     },
                     {

@@ -130,7 +130,7 @@ class CNNModel(nn.Module):
         self.fc = nn.Sequential(
             OrderedDict(
                 {
-                    "fc_1_bn_1": nn.BatchNorm1d(self.fc_1_in_features),
+                    "fc_1_bn_1": nn.LayerNorm(self.fc_1_in_features),
                     "fc_1_act_1": Swish(),
                     "fc_1_linear_1": nn.Linear(
                         self.fc_1_in_features, self.model_config.fc_repr_dim, bias=False
@@ -158,9 +158,6 @@ class CNNModel(nn.Module):
             if isinstance(m, nn.Conv2d):
                 # Swish slope is roughly 0.5 around 0
                 nn.init.kaiming_normal_(m.weight, a=0.5, mode="fan_out")
-            elif isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.BatchNorm1d):
-                nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0)
 
     @property
     def resblocks(self) -> List[int]:

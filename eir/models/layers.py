@@ -144,7 +144,7 @@ class CNNResidualBlockBase(nn.Module):
         self.rb_do = nn.Dropout2d(rb_do)
         self.act_1 = Swish()
 
-        self.bn_1 = nn.BatchNorm2d(in_channels)
+        self.norm_1 = nn.GroupNorm(num_groups=1, num_channels=in_channels)
         self.conv_1 = nn.Conv2d(
             in_channels,
             out_channels,
@@ -159,8 +159,6 @@ class CNNResidualBlockBase(nn.Module):
         )
         conv_2_padding = conv_2_kernel_w // 2
 
-        self.act_2 = Swish()
-        self.bn_2 = nn.BatchNorm2d(out_channels)
         self.conv_2 = nn.Conv2d(
             out_channels,
             out_channels,
@@ -194,11 +192,9 @@ class FirstCNNBlock(CNNResidualBlockBase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        delattr(self, "bn_1")
-        delattr(self, "act_1")
+        delattr(self, "norm_1")
         delattr(self, "downsample_identity")
-        delattr(self, "bn_2")
-        delattr(self, "act_2")
+        delattr(self, "act_1")
         delattr(self, "rb_do")
         delattr(self, "conv_2")
         delattr(self, "se_block")
@@ -216,8 +212,7 @@ class CNNResidualBlock(CNNResidualBlockBase):
         self.full_preact = full_preact
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        out = self.bn_1(x)
-        out = self.act_1(out)
+        out = self.norm_1(x)
 
         if self.full_preact:
             identity = self.downsample_identity(out)
@@ -226,9 +221,7 @@ class CNNResidualBlock(CNNResidualBlockBase):
 
         out = self.conv_1(out)
 
-        out = self.bn_2(out)
-        out = self.act_2(out)
-
+        out = self.act_1(out)
         out = self.rb_do(out)
         out = self.conv_2(out)
 
@@ -406,14 +399,13 @@ class MLPResidualBlock(nn.Module):
         self.zero_init_last_bn = zero_init_last_bn
         self.stochastic_depth_p = stochastic_depth_p
 
-        self.bn_1 = nn.BatchNorm1d(num_features=in_features)
-        self.act_1 = Swish()
+        self.norm_1 = nn.LayerNorm(normalized_shape=in_features)
+
         self.fc_1 = nn.Linear(
             in_features=in_features, out_features=out_features, bias=False
         )
 
-        self.bn_2 = nn.BatchNorm1d(num_features=out_features)
-        self.act_2 = Swish()
+        self.act_1 = Swish()
         self.do = nn.Dropout(p=dropout_p)
         self.fc_2 = nn.Linear(
             in_features=out_features, out_features=out_features, bias=False
@@ -429,19 +421,17 @@ class MLPResidualBlock(nn.Module):
         self.stochastic_depth = StochasticDepth(p=self.stochastic_depth_p, mode="batch")
 
         if self.zero_init_last_bn:
-            nn.init.zeros_(self.bn_2.weight)
+            nn.init.zeros_(self.norm_2.weight)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        out = self.bn_1(x)
-        out = self.act_1(out)
+        out = self.norm_1(x)
 
         identity = out if self.full_preactivation else x
         identity = self.downsample_identity(identity)
 
         out = self.fc_1(out)
 
-        out = self.bn_2(out)
-        out = self.act_2(out)
+        out = self.act_1(out)
         out = self.do(out)
         out = self.fc_2(out)
 
@@ -474,8 +464,7 @@ class SplitMLPResidualBlock(nn.Module):
         self.reduce_both = reduce_both
         self.stochastic_depth_p = stochastic_depth_p
 
-        self.bn_1 = nn.BatchNorm1d(num_features=in_features)
-        self.act_1 = Swish()
+        self.norm_1 = nn.LayerNorm(normalized_shape=in_features)
         self.fc_1 = SplitLinear(
             in_features=self.in_features,
             out_feature_sets=self.out_feature_sets,
@@ -483,8 +472,7 @@ class SplitMLPResidualBlock(nn.Module):
             split_size=self.split_size,
         )
 
-        self.bn_2 = nn.BatchNorm1d(num_features=self.fc_1.out_features)
-        self.act_2 = Swish()
+        self.act_1 = Swish()
         self.do = nn.Dropout(p=dropout_p)
 
         fc_2_kwargs = _get_split_fc_2_kwargs(
@@ -511,19 +499,17 @@ class SplitMLPResidualBlock(nn.Module):
         self.out_features = self.fc_2.out_features
 
         if self.zero_init_last_bn:
-            nn.init.zeros_(self.bn_2.weight)
+            nn.init.zeros_(self.norm_2.weight)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        out = self.bn_1(x)
-        out = self.act_1(out)
+        out = self.norm_1(x)
 
         identity = out if self.full_preactivation else x
         identity = self.downsample_identity(identity)
 
         out = self.fc_1(out)
 
-        out = self.bn_2(out)
-        out = self.act_2(out)
+        out = self.act_1(out)
         out = self.do(out)
         out = self.fc_2(out)
 

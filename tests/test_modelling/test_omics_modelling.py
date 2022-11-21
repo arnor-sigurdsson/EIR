@@ -54,7 +54,7 @@ def _get_classification_output_configs() -> Sequence[Dict]:
                         "input_info": {"input_name": "test_genotype"},
                         "model_config": {
                             "model_type": "linear",
-                            "model_init_config": {"l1": 1e-03},
+                            "model_init_config": {"l1": 1e-04},
                         },
                     }
                 ],
@@ -66,7 +66,7 @@ def _get_classification_output_configs() -> Sequence[Dict]:
             "injections": {
                 "global_configs": {
                     "weighted_sampling_columns": ["Origin"],
-                    "gradient_noise": 0.05,
+                    "gradient_noise": 0.01,
                 },
                 "input_configs": [
                     {
@@ -76,7 +76,7 @@ def _get_classification_output_configs() -> Sequence[Dict]:
                             "model_init_config": {
                                 "rb_do": 0.25,
                                 "channel_exp_base": 3,
-                                "l1": 1e-03,
+                                "l1": 1e-04,
                             },
                         },
                     }
@@ -319,7 +319,7 @@ def _get_regression_output_configs() -> Sequence[Dict]:
                         "input_info": {"input_name": "test_genotype"},
                         "model_config": {
                             "model_type": "cnn",
-                            "model_init_config": {"l1": 1e-03},
+                            "model_init_config": {"l1": 1e-04},
                         },
                     },
                 ],
@@ -334,7 +334,7 @@ def _get_regression_output_configs() -> Sequence[Dict]:
                         "input_info": {"input_name": "test_genotype"},
                         "model_config": {
                             "model_type": "linear",
-                            "model_init_config": {"l1": 1e-03},
+                            "model_init_config": {"l1": 1e-04},
                         },
                     },
                 ],
@@ -353,7 +353,7 @@ def _get_regression_output_configs() -> Sequence[Dict]:
                         "input_info": {"input_name": "test_genotype"},
                         "model_config": {
                             "model_type": "cnn",
-                            "model_init_config": {"l1": 1e-03},
+                            "model_init_config": {"l1": 1e-04},
                         },
                     },
                 ],
@@ -432,7 +432,7 @@ def _get_multi_task_output_configs() -> Sequence[Dict]:
                         "model_config": {
                             "model_type": "cnn",
                             "model_init_config": {
-                                "l1": 1e-03,
+                                "l1": 1e-04,
                                 "stochastic_depth_p": 0.2,
                             },
                         },
@@ -461,7 +461,7 @@ def _get_multi_task_output_configs() -> Sequence[Dict]:
                                 "channel_exp_base": 5,
                                 "rb_do": 0.15,
                                 "fc_repr_dim": 64,
-                                "l1": 1e-03,
+                                "l1": 1e-04,
                                 "stochastic_depth_p": 0.2,
                             },
                         },
@@ -488,7 +488,7 @@ def _get_multi_task_output_configs() -> Sequence[Dict]:
                         "input_info": {"input_name": "test_genotype"},
                         "model_config": {
                             "model_type": "linear",
-                            "model_init_config": {"l1": 1e-03},
+                            "model_init_config": {"l1": 1e-04},
                         },
                     },
                 ],
@@ -510,7 +510,7 @@ def _get_multi_task_output_configs() -> Sequence[Dict]:
                             "model_init_config": {
                                 "fc_repr_dim": 8,
                                 "split_mlp_num_splits": 64,
-                                "l1": 1e-03,
+                                "l1": 1e-04,
                             },
                         },
                     },
@@ -533,7 +533,7 @@ def _get_multi_task_output_configs() -> Sequence[Dict]:
                             "model_init_config": {
                                 "kernel_width": 8,
                                 "channel_exp_base": 2,
-                                "l1": 1e-03,
+                                "l1": 1e-04,
                                 "rb_do": 0.20,
                             },
                         },
@@ -565,7 +565,7 @@ def _get_multi_task_output_configs() -> Sequence[Dict]:
                             "model_init_config": {
                                 "kernel_width": 8,
                                 "channel_exp_base": 2,
-                                "l1": 1e-03,
+                                "l1": 1e-04,
                             },
                         },
                     },
@@ -582,7 +582,6 @@ def _get_multi_task_output_configs() -> Sequence[Dict]:
             "injections": {
                 "global_configs": {
                     "output_folder": "mixing_multi",
-                    "lr": 1e-03,
                     "mixing_alpha": 0.2,
                 },
                 "input_configs": [
@@ -596,7 +595,7 @@ def _get_multi_task_output_configs() -> Sequence[Dict]:
                             "model_init_config": {
                                 "kernel_width": 8,
                                 "channel_exp_base": 2,
-                                "l1": 1e-04,
+                                "l1": 2e-05,
                             },
                         },
                     },
@@ -611,7 +610,7 @@ def _get_multi_task_output_configs() -> Sequence[Dict]:
                 "output_configs": _get_multi_task_output_configs(),
             },
         },
-        # Case 8: Using the GLN with limited activations
+        # Case 8: Using the GLN with limited activations and gradient accumulation
         {
             "injections": {
                 "global_configs": {
@@ -629,7 +628,7 @@ def _get_multi_task_output_configs() -> Sequence[Dict]:
                             "model_init_config": {
                                 "kernel_width": 8,
                                 "channel_exp_base": 2,
-                                "l1": 1e-03,
+                                "l1": 1e-04,
                                 "rb_do": 0.20,
                             },
                         },

@@ -36,7 +36,7 @@ from tests.test_models.model_testing_utils import prepare_example_batch
                         "input_info": {"input_name": "test_genotype"},
                         "model_config": {
                             "model_type": "cnn",
-                            "model_init_config": {"l1": 1e-03},
+                            "model_init_config": {"l1": 1e-04},
                         },
                     },
                     {

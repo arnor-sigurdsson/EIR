@@ -11,7 +11,6 @@ from tests.test_modelling.setup_modelling_test_data.setup_test_data_utils import
     set_up_label_line_dict,
     get_current_test_label_values,
     set_up_test_data_root_outpath,
-    common_split_test_data_wrapper,
 )
 
 if TYPE_CHECKING:
@@ -26,7 +25,7 @@ def create_test_image_data(
 
     fieldnames = ["ID", "Origin", "Height", "OriginExtraCol", "ExtraTarget"]
     label_file_handle, label_file_writer = set_up_label_file_writing(
-        path=c.scoped_tmp_path, fieldnames=fieldnames
+        base_path=c.scoped_tmp_path, fieldnames=fieldnames, extra_name="_image"
     )
 
     image_output_folder = set_up_test_data_root_outpath(base_folder=image_output_folder)
@@ -52,9 +51,6 @@ def create_test_image_data(
             label_file_writer.writerow(label_line_dict)
 
     label_file_handle.close()
-
-    if c.request_params.get("split_to_test", False):
-        common_split_test_data_wrapper(test_folder=c.scoped_tmp_path, name="image")
 
     return image_output_folder
 

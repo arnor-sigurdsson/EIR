@@ -10,7 +10,6 @@ from tests.test_modelling.setup_modelling_test_data.setup_test_data_utils import
     set_up_label_line_dict,
     get_current_test_label_values,
     set_up_test_data_root_outpath,
-    common_split_test_data_wrapper,
 )
 
 if TYPE_CHECKING:
@@ -25,7 +24,7 @@ def create_test_sequence_data(
 
     fieldnames = ["ID", "Origin", "Height", "OriginExtraCol", "ExtraTarget"]
     label_file_handle, label_file_writer = set_up_label_file_writing(
-        path=c.scoped_tmp_path, fieldnames=fieldnames
+        base_path=c.scoped_tmp_path, fieldnames=fieldnames, extra_name="_sequence"
     )
 
     sequence_outfolder = set_up_test_data_root_outpath(base_folder=sequence_outfolder)
@@ -66,18 +65,8 @@ def create_test_sequence_data(
             label_file_writer.writerow(label_line_dict)
 
     label_file_handle.close()
-    df_sequence = pd.DataFrame(samples_for_csv)
-
-    if c.request_params.get("split_to_test", False):
-        train_ids, test_ids = common_split_test_data_wrapper(
-            test_folder=c.scoped_tmp_path, name="sequence"
-        )
-        df_sequence_train = df_sequence[df_sequence["ID"].isin(train_ids)]
-        df_sequence_test = df_sequence[df_sequence["ID"].isin(test_ids)]
-        df_sequence_train.to_csv(c.scoped_tmp_path / "sequence_train.csv", index=False)
-        df_sequence_test.to_csv(c.scoped_tmp_path / "sequence_test.csv", index=False)
-    else:
-        df_sequence.to_csv(path_or_buf=c.scoped_tmp_path / "sequence.csv", index=False)
+    df_sequence = pd.DataFrame(data=samples_for_csv)
+    df_sequence.to_csv(path_or_buf=c.scoped_tmp_path / "sequence.csv", index=False)
 
     return sequence_outfolder
 
