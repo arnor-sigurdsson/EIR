@@ -215,7 +215,7 @@ def get_test_base_global_init() -> Sequence[dict]:
             "n_epochs": 12,
             "warmup_steps": 100,
             "lr": 2e-03,
-            "optimizer": "adamw",
+            "optimizer": "adabelief",
             "lr_lb": 1e-05,
             "batch_size": 32,
             "valid_size": 0.05,
@@ -360,7 +360,7 @@ def get_test_omics_input_init(
         },
         "input_type_info": {
             "na_augment_perc": 0.10,
-            "na_augment_prob": 0.10,
+            "na_augment_prob": 0.80,
             "snp_file": str(test_path / "test_snps.bim"),
         },
         "model_config": {"model_type": "genome-local-net"},

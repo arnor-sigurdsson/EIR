@@ -114,6 +114,13 @@ class CNNModel(nn.Module):
 
         self.model_config = model_config
         self.data_dimensions = data_dimensions
+
+        self.pos_representation = GenomicPositionalEmbedding(
+            embedding_dim=self.data_dimensions.height,
+            max_length=self.data_dimensions.width,
+            dropout=0.0,
+        )
+
         self.conv = nn.Sequential(
             *_make_conv_layers(
                 residual_blocks=self.resblocks,
@@ -177,7 +184,8 @@ class CNNModel(nn.Module):
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
 
-        out = self.conv(input)
+        out = self.pos_representation(input)
+        out = self.conv(out)
         out = out.view(out.shape[0], -1)
 
         out = self.fc(out)
@@ -354,3 +362,25 @@ def find_no_cnn_resblocks_needed(
         cur_width = cur_width // stride
 
     return [i for i in resblocks if i != 0]
+
+
+class GenomicPositionalEmbedding(nn.Module):
+    def __init__(
+        self,
+        embedding_dim: int,
+        max_length: int,
+        dropout: float = 0.1,
+    ) -> None:
+
+        super().__init__()
+        self.embedding_dim = embedding_dim
+        self.max_length = max_length
+        self.dropout = nn.Dropout(p=dropout)
+
+        self.embedding = torch.nn.Parameter(
+            data=torch.zeros(1, self.embedding_dim, self.max_length), requires_grad=True
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = x + self.embedding
+        return self.dropout(x)

@@ -762,7 +762,7 @@ def _get_bpe_tokenizer_object(
 
         logger.info("Training BPE tokenizer from source data.")
 
-        tokenizer = Tokenizer(BPE(unk_token="<unk>"))
+        tokenizer = Tokenizer(model=BPE(unk_token="<unk>"))
         tokenizer.pre_tokenizer = Whitespace()
 
         special_tokens = _get_default_specials()

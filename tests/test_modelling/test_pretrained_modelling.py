@@ -174,7 +174,7 @@ def _add_new_feature_extractor_to_experiment(
             "injections": {
                 "global_configs": {
                     "output_folder": "multi_task_multi_modal",
-                    "n_epochs": 2,
+                    "n_epochs": 3,
                     "act_background_samples": 8,
                     "sample_interval": 50,
                     "checkpoint_interval": 50,
@@ -258,7 +258,7 @@ def test_pre_training_and_loading(
                 target_column=cat_target_column,
                 output_name=output_name,
                 metric="mcc",
-                thresholds=(0.9, 0.9),
+                thresholds=(0.85, 0.85),
             )
 
     (
@@ -279,7 +279,7 @@ def test_pre_training_and_loading(
                 target_column=cat_target_column,
                 output_name=output_name,
                 metric="mcc",
-                thresholds=(0.9, 0.9),
+                thresholds=(0.85, 0.85),
             )
 
 
