@@ -24,6 +24,22 @@ if TYPE_CHECKING:
 class TabularMLPResidualModelConfig(ResidualMLPConfig):
 
     """
+    :param layers:
+        Number of residual MLP residual blocks to use in the output module.
+
+    :param fc_task_dim:
+        Number of hidden nodes in each MLP residual block.
+
+    :param rb_do:
+        Dropout in each MLP residual block.
+
+    :param fc_do:
+        Dropout before final layer.
+
+    :param stochastic_depth_p:
+        Stochastic depth probability (probability of dropping input)
+        for each residual block.
+
     :param final_layer_type:
         Which type of final layer to use to construct tabular output prediction.
     """

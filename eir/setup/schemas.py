@@ -12,24 +12,16 @@ from eir.models.omics.omics_models import (
     LCLModel,
     SimpleLCLModel,
     IdentityModel,
-    CNNModelConfig,
-    LCLModelConfig,
-    LinearModelConfig,
-    SimpleLCLModelConfig,
-    IdentityModelConfig,
-    Dataclass,
 )
 from eir.models.output.tabular_output import (
     TabularModelOutputConfig,
 )
 from eir.models.sequence.transformer_models import (
-    BasicTransformerFeatureExtractorModelConfig,
     SequenceModelConfig,
 )
 from eir.models.tabular.tabular import (
     SimpleTabularModel,
     TabularModelConfig,
-    SimpleTabularModelConfig,
 )
 from eir.setup.setup_utils import get_all_optimizer_names
 
@@ -47,20 +39,6 @@ al_feature_extractor_configs_classes = Union[
     Type[TabularModelConfig],
     Type[ImageModelConfig],
     Type[SequenceModelConfig],
-]
-
-al_model_type_configs = Union[
-    ResidualMLPConfig,
-    MGMoEModelConfig,
-    CNNModelConfig,
-    LinearModelConfig,
-    SimpleLCLModelConfig,
-    LCLModelConfig,
-    SimpleTabularModelConfig,
-    IdentityModelConfig,
-    BasicTransformerFeatureExtractorModelConfig,
-    ImageModelConfig,
-    Dataclass,
 ]
 
 al_models_classes = Union[

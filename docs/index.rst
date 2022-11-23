@@ -1,8 +1,23 @@
 EIR
 ===
 
-``EIR`` is a framework for training linear and
-deep learning models on genotype and tabular data.
+``EIR`` is a framework
+for supervised training
+of deep learning models
+on genotype, tabular, sequence, image and binary data.
+It is designed to provide
+a high-level, yet modular API
+that reduces the amount of boilerplate code
+and pre-processing required to train a model.
+
+.. image:: source/_static/img/EIR_data_supported.pdf
+   :width: 85%
+   :align: center
+
+.. raw:: html
+
+   <div style="text-align:center"><img src="source/_static/img/EIR_data_supported.pdf" width="100%"></div>
+
 
 
 Installation
@@ -16,7 +31,7 @@ Installation
 Documentation
 -------------
 
-To get started, please, read :ref:`01-genotype-tutorial`.
+To get started, please read :ref:`01-genotype-tutorial`.
 
 .. toctree::
     :maxdepth: 2
