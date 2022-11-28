@@ -18,6 +18,7 @@ class IdentityFusionModel(nn.Module):
         model_config: IdentityConfig,
         fusion_in_dim: int,
         fusion_callable: al_features = default_fuse_features,
+        **kwargs,
     ):
         super().__init__()
 

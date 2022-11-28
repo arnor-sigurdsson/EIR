@@ -765,18 +765,19 @@ def get_meta_model_kwargs_from_configs(
     )
     kwargs["input_modules"] = input_modules
 
+    out_feature_per_feature_extractor = _get_feature_extractors_output_dimensions(
+        input_modules=input_modules
+    )
     fusion_module = eir.models.fusion.fusion.get_fusion_module(
         model_type=fusion_config.model_type,
         model_config=fusion_config.model_config,
         modules_to_fuse=input_modules,
+        out_feature_per_feature_extractor=out_feature_per_feature_extractor,
     )
     kwargs["fusion_module"] = fusion_module
 
     in_features_per_input = _get_feature_extractors_input_dimensions_per_axis(
         inputs_as_dict=inputs_as_dict, input_modules=input_modules
-    )
-    out_feature_per_feature_extractor = _get_feature_extractors_output_dimensions(
-        input_modules=input_modules
     )
     output_modules = get_output_modules(
         outputs_as_dict=outputs_as_dict,
