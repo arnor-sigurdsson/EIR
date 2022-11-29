@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Sequence
 
 from .experiments import AutoDocExperimentInfo, run_capture_and_save
+from .utils import get_saved_model_path
 
 
 def get_02_poker_hands_run_1_tabular_info() -> AutoDocExperimentInfo:
@@ -77,6 +78,9 @@ def get_02_poker_hands_run_1_predict_info() -> AutoDocExperimentInfo:
 
     conf_output_path = "eir_tutorials/02_tabular_tutorial/conf"
 
+    run_1_output_path = "eir_tutorials/tutorial_runs/tutorial_02_run/"
+    model_path = get_saved_model_path(run_folder=Path(run_1_output_path))
+
     command = [
         "eirpredict",
         "--global_configs",
@@ -88,11 +92,10 @@ def get_02_poker_hands_run_1_predict_info() -> AutoDocExperimentInfo:
         "--output_configs",
         f"{conf_output_path}/02_poker_hands_output_test.yaml",
         "--model_path",
-        "eir_tutorials/tutorial_runs/tutorial_02_run/saved_models"
-        "/tutorial_02_run_model_15000_perf-average=0.9807.pt",
+        model_path,
         "--evaluate",
         "--output_folder",
-        "eir_tutorials/tutorial_runs/tutorial_02_run",
+        run_1_output_path,
     ]
 
     data_output_path = Path(
