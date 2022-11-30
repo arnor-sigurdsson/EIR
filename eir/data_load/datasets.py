@@ -484,16 +484,20 @@ class MemoryDataset(DatasetBase):
             input_source = input_object.input_config.input_info.input_source
 
             if input_type == "omics":
+                inner_key = input_object.input_config.input_info.input_inner_key
                 mapping[input_name] = partial(
                     _omics_load_wrapper,
                     subset_indices=self.inputs[input_name].subset_indices,
                     input_source=input_source,
+                    deeplake_inner_key=inner_key,
                 )
 
             elif input_type == "image":
+                inner_key = input_object.input_config.input_info.input_inner_key
                 mapping[input_name] = partial(
                     _image_load_wrapper,
                     input_source=input_source,
+                    deeplake_inner_key=inner_key,
                 )
 
             elif input_type == "sequence":
