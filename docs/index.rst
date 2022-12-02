@@ -10,14 +10,9 @@ a high-level, yet modular API
 that reduces the amount of boilerplate code
 and pre-processing required to train a model.
 
-.. image:: source/_static/img/EIR_data_supported.pdf
+.. figure:: source/_static/img/EIR_data_supported.png
    :width: 85%
    :align: center
-
-.. raw:: html
-
-   <div style="text-align:center"><img src="source/_static/img/EIR_data_supported.pdf" width="100%"></div>
-
 
 
 Installation

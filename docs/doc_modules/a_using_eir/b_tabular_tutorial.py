@@ -1,8 +1,8 @@
 from pathlib import Path
 from typing import Sequence
 
-from .experiments import AutoDocExperimentInfo, run_capture_and_save
-from .utils import get_saved_model_path
+from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
+from docs.doc_modules.utils import get_saved_model_path
 
 
 def get_02_poker_hands_run_1_tabular_info() -> AutoDocExperimentInfo:

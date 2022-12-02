@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Sequence
 
-from .experiments import AutoDocExperimentInfo, run_capture_and_save
+from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
 
 
 def get_06_imdb_binary_run_1_transformer_info() -> AutoDocExperimentInfo:

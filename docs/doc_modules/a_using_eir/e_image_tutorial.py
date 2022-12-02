@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Sequence
 
-from .experiments import AutoDocExperimentInfo, run_capture_and_save
+from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
 
 
 def get_05_hot_dog_run_1_resnet_info() -> AutoDocExperimentInfo:
