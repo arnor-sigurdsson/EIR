@@ -183,7 +183,6 @@ class GlobalConfig:
     :param n_saved_models:
         Number of top N models to saved during training.
 
-
     :param get_acts:
         Whether to compute activations w.r.t. inputs.
 
@@ -211,7 +210,16 @@ class GlobalConfig:
         Alpha parameter used for mixing (higher means more mixing).
 
     :param plot_skip_steps:
-        How many iterations to skip in in plots.
+        How many iterations to skip in plots.
+
+    :param pretrained_checkpoint:
+        Path to a pretrained checkpoint model file (under saved_models/ in the
+        experiment output folder) to load and use as a starting point for training.
+
+    :param strict_pretrained_loading:
+        Whether to enforce that the loaded pretrained model exactly the same
+        architecture as the current model. If False, will only load the layers
+        that match between the two models.
     """
 
     output_folder: str
@@ -253,6 +261,7 @@ class GlobalConfig:
     mixing_alpha: float = 0.0
     plot_skip_steps: int = 200
     pretrained_checkpoint: Union[None, str] = None
+    strict_pretrained_loading: bool = True
 
 
 @dataclass

@@ -120,14 +120,15 @@ def get_model(
             "Loading pretrained checkpoint from '%s'.",
             global_config.pretrained_checkpoint,
         )
-        loaded_fusion_model = load_model(
+        loaded_meta_model = load_model(
             model_path=Path(global_config.pretrained_checkpoint),
             model_class=meta_class,
             model_init_kwargs=meta_kwargs,
             device=global_config.device,
             test_mode=False,
+            strict_shapes=global_config.strict_pretrained_loading,
         )
-        return loaded_fusion_model
+        return loaded_meta_model
 
     input_modules = overload_fusion_model_feature_extractors_with_pretrained(
         input_modules=meta_kwargs["input_modules"],
@@ -933,7 +934,7 @@ def overload_fusion_model_feature_extractors_with_pretrained(
         )
 
         pretrained_name = pretrained_config.load_module_name
-        loaded_and_renamed_fusion_model = load_model(
+        loaded_and_renamed_meta_model = load_model(
             model_path=load_model_path,
             model_class=meta_model_class,
             model_init_kwargs=meta_model_kwargs,
@@ -943,7 +944,7 @@ def overload_fusion_model_feature_extractors_with_pretrained(
             state_dict_keys_to_keep=(pretrained_name,),
         )
         loaded_and_renamed_fusion_extractors = (
-            loaded_and_renamed_fusion_model.input_modules
+            loaded_and_renamed_meta_model.input_modules
         )
 
         module_name_to_load = pretrained_config.load_module_name
