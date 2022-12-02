@@ -14,7 +14,7 @@ and pre-processing required to train a model.
    :width: 85%
    :align: center
 
-
+|
 Installation
 ------------
 
