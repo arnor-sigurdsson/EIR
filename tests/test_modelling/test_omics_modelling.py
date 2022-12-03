@@ -399,7 +399,7 @@ def test_regression(prep_modelling_test_configs):
         )
 
 
-def _get_multi_task_output_configs() -> Sequence[Dict]:
+def _get_multi_task_output_configs(label_smoothing: float = 0.0) -> Sequence[Dict]:
     output_configs = [
         {
             "output_info": {"output_name": "test_output_copy"},
@@ -413,6 +413,7 @@ def _get_multi_task_output_configs() -> Sequence[Dict]:
             "output_type_info": {
                 "target_cat_columns": ["Origin"],
                 "target_con_columns": ["Height"],
+                "cat_label_smoothing": label_smoothing,
             },
         },
     ]
@@ -558,7 +559,7 @@ def _get_multi_task_output_configs() -> Sequence[Dict]:
                         "rb_do": 0.20,
                     },
                 },
-                "output_configs": _get_multi_task_output_configs(),
+                "output_configs": _get_multi_task_output_configs(label_smoothing=0.1),
             },
         },
         # Case 6: Using the MGMoE fusion
@@ -619,7 +620,7 @@ def _get_multi_task_output_configs() -> Sequence[Dict]:
                         "rb_do": 0.10,
                     },
                 },
-                "output_configs": _get_multi_task_output_configs(),
+                "output_configs": _get_multi_task_output_configs(label_smoothing=0.1),
             },
         },
         # Case 8: Using the GLN with limited activations and gradient accumulation

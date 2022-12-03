@@ -490,25 +490,43 @@ def _get_criteria(outputs_as_dict: al_output_objects_as_dict) -> al_criteria:
     criteria_dict = {}
 
     def get_criterion(
-        column_type_: str,
+        column_type_: str, label_smoothing_: float = 0.0
     ) -> Union[nn.CrossEntropyLoss, Callable]:
 
         if column_type_ == "con":
+            assert label_smoothing_ == 0.0
             return partial(_calc_mse, mse_loss_func=nn.MSELoss())
         elif column_type_ == "cat":
-            return nn.CrossEntropyLoss()
+            return nn.CrossEntropyLoss(label_smoothing=label_smoothing_)
 
     target_columns_gen = data_utils.get_output_info_generator(
         outputs_as_dict=outputs_as_dict
     )
 
     for output_name, column_type, column_name in target_columns_gen:
-        criterion = get_criterion(column_type_=column_type)
+
+        label_smoothing = _get_label_smoothing(
+            output_config=outputs_as_dict[output_name].output_config
+        )
+
+        criterion = get_criterion(
+            column_type_=column_type, label_smoothing_=label_smoothing
+        )
+
         if output_name not in criteria_dict:
             criteria_dict[output_name] = {}
         criteria_dict[output_name][column_name] = criterion
 
     return criteria_dict
+
+
+def _get_label_smoothing(
+    output_config: schemas.OutputConfig,
+) -> float:
+    if output_config.output_info.output_type == "tabular":
+        return output_config.output_type_info.cat_label_smoothing
+    else:
+        return 0.0
 
 
 def _calc_mse(input, target, mse_loss_func: nn.MSELoss):
