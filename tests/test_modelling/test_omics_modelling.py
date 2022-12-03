@@ -677,8 +677,6 @@ def test_multi_task(
     output_configs = experiment.configs.output_configs
     extra_columns = get_all_tabular_input_columns(configs=experiment.configs)
 
-    all_act_classes_must_pass = True if gc.mixing_alpha else False
-
     for output_config in output_configs:
         output_name = output_config.output_info.output_name
         cat_targets = output_config.output_type_info.target_cat_columns
@@ -708,7 +706,7 @@ def test_multi_task(
                 target_name=target_name,
                 top_row_grads_dict=top_row_grads_dict,
                 at_least_n_snps=at_least_n,
-                all_act_classes_must_pass=all_act_classes_must_pass,
+                all_act_classes_must_pass=False,
             )
 
         for target_name in con_targets:
@@ -731,11 +729,11 @@ def test_multi_task(
                 target_name=target_name,
                 top_row_grads_dict=top_row_grads_dict,
                 at_least_n_snps=at_least_n,
-                all_act_classes_must_pass=all_act_classes_must_pass,
+                all_act_classes_must_pass=True,
             )
 
 
-def get_all_tabular_input_columns(configs: Configs):
+def get_all_tabular_input_columns(configs: Configs) -> List[str]:
     extra_columns = []
     for input_config in configs.input_configs:
         if input_config.input_info.input_type == "tabular":
@@ -777,7 +775,7 @@ def _check_identified_snps(
     check_types_skip_cls_names: Sequence[str] = tuple(),
     at_least_n: Union[str, int] = "all",
     all_classes_must_pass: bool = True,
-):
+) -> None:
     """
     NOTE: We have the `at_least_n` to check for a partial match of found SNPs. Why?
     Because when doing these tests, we are making the inputs per class the same
@@ -804,6 +802,7 @@ def _check_identified_snps(
     for cls in top_grads_dict.keys():
         actual_top = np.array(sorted(top_grads_dict[cls]["top_n_idxs"]))
         expected_top = np.array(expected_top_indices)
+
         if at_least_n == "all":
             snp_success = (actual_top == expected_top).all()
         else:
@@ -826,7 +825,9 @@ def _check_identified_snps(
     if all_classes_must_pass:
         assert all(classes_acts_success)
     else:
-        assert sum(classes_acts_success) >= len(classes_acts_success) - 1
+        must_match_n = len(classes_acts_success) - 1
+        must_match_n = max(must_match_n, 1)
+        assert sum(classes_acts_success) >= must_match_n
 
 
 def _check_snp_types(
