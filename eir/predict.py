@@ -925,9 +925,10 @@ def _maybe_warn_about_output_folder_overload_from_predict(
 
         logger.warning(
             "output_folder in '%s' will be replaced with '%s' from given prediction "
-            "output configuration ('%s'). If this is intentional, you can ignore this"
-            "message but most likely this is a mistake and will cause an error."
-            "Resolution: Remove 'output_folder' from the global prediction as it will"
+            "output configuration ('%s'). If this is intentional, you can ignore this "
+            "message but most likely this is a mistake and will cause an error. "
+            "Resolution: Remove 'output_folder' from "
+            "the global output config as it will "
             "be automatically looked up based on the experiment.",
             train_config_dict,
             output_folder_from_predict,

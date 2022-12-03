@@ -92,8 +92,8 @@ def get_base_optimizers_dict() -> Dict[str, Type[Optimizer]]:
         "adam": Adam,
         "adamw": AdamW,
         "adahessian": AdaHessian,
-        "adabelief": AdaBelief,
-        "adabeliefw": partial(AdaBelief, weight_decouple=True),
+        "adabelief": partial(AdaBelief, print_change_log=False),
+        "adabeliefw": partial(AdaBelief, weight_decouple=True, print_change_log=False),
     }
     assert set(base_optimizers) == get_base_optimizer_names()
     return base_optimizers

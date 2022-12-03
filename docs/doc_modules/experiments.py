@@ -87,6 +87,7 @@ def find_and_copy_files(
             if re.match(pattern=pattern, string=str(path)) or pattern in str(path):
 
                 output_destination = output_folder / target
+                ensure_path_exists(path=output_destination, is_folder=False)
                 copy2(path, output_destination)
 
                 if output_destination.suffix == ".pdf":

@@ -1,7 +1,8 @@
 from pathlib import Path
 from typing import Sequence
 
-from .experiments import AutoDocExperimentInfo, run_capture_and_save
+from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
+from docs.doc_modules.utils import get_saved_model_path
 
 
 def get_tutorial_01_run_1_gln_info() -> AutoDocExperimentInfo:
@@ -154,6 +155,9 @@ def get_tutorial_01_run_2_gln_predict_info() -> AutoDocExperimentInfo:
 
     conf_output_path = "eir_tutorials/01_basic_tutorial/conf"
 
+    run_2_output_path = "eir_tutorials/tutorial_runs/tutorial_01_run_lr=0.002_epochs=20"
+    model_path = get_saved_model_path(run_folder=Path(run_2_output_path))
+
     command = [
         "eirpredict",
         "--global_configs",
@@ -163,11 +167,10 @@ def get_tutorial_01_run_2_gln_predict_info() -> AutoDocExperimentInfo:
         "--output_configs",
         f"{conf_output_path}/tutorial_01_outputs.yaml",
         "--model_path",
-        "eir_tutorials/tutorial_runs/tutorial_01_run_lr=0.002_epochs=20/saved_models"
-        "/tutorial_01_run_lr=0.002_epochs=20_model_1400_perf-average=0.8051.pt",
+        model_path,
         "--evaluate",
         "--output_folder",
-        "eir_tutorials/tutorial_runs/tutorial_01_run_lr=0.002_epochs=20",
+        run_2_output_path,
     ]
 
     data_output_path = Path(

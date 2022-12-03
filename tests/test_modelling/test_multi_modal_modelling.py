@@ -45,9 +45,10 @@ if TYPE_CHECKING:
             "injections": {
                 "global_configs": {
                     "output_folder": "multi_task_multi_modal",
-                    "n_epochs": 6,
+                    "n_epochs": 8,
                     "act_background_samples": 8,
                     "gradient_clipping": 1.0,
+                    "lr": 0.001,
                     "gradient_noise": 0.01,
                 },
                 "input_configs": [
@@ -55,7 +56,7 @@ if TYPE_CHECKING:
                         "input_info": {"input_name": "test_genotype"},
                         "model_config": {
                             "model_type": "cnn",
-                            "model_init_config": {"l1": 1e-03},
+                            "model_init_config": {"l1": 1e-04},
                         },
                     },
                     {
@@ -75,7 +76,7 @@ if TYPE_CHECKING:
                         },
                         "model_config": {
                             "model_type": "tabular",
-                            "model_init_config": {"l1": 1e-03},
+                            "model_init_config": {"l1": 1e-04},
                         },
                     },
                 ],

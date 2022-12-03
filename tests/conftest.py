@@ -18,12 +18,12 @@ from typing import (
     Any,
 )
 
+import deeplake
 import numpy as np
 import pandas as pd
 import pytest
 import torch.utils.data
 from _pytest.fixtures import SubRequest
-import deeplake
 from aislib.misc_utils import ensure_path_exists
 from torch import nn
 from torch.utils.data import DataLoader
@@ -60,6 +60,7 @@ from tests.test_modelling.setup_modelling_test_data.setup_sequence_test_data imp
 )
 from tests.test_modelling.setup_modelling_test_data.setup_test_data_utils import (
     set_up_test_data_root_outpath,
+    common_split_test_data_wrapper,
 )
 
 al_prep_modelling_test_configs = Tuple[Experiment, "ModelTestConfig"]
@@ -213,7 +214,8 @@ def get_test_base_global_init() -> Sequence[dict]:
             "act_background_samples": 256,
             "n_epochs": 12,
             "warmup_steps": 100,
-            "lr": 1e-02,
+            "lr": 2e-03,
+            "optimizer": "adabelief",
             "lr_lb": 1e-05,
             "batch_size": 32,
             "valid_size": 0.05,
@@ -358,7 +360,7 @@ def get_test_omics_input_init(
         },
         "input_type_info": {
             "na_augment_perc": 0.10,
-            "na_augment_prob": 0.10,
+            "na_augment_prob": 0.80,
             "snp_file": str(test_path / "test_snps.bim"),
         },
         "model_config": {"model_type": "genome-local-net"},
@@ -575,6 +577,15 @@ def create_test_data(request, tmp_path_factory, parse_test_cl_args) -> "TestData
         if drop_random_samples:
             _delete_random_files_from_folder(folder=omics_sample_path, n_to_drop=50)
 
+    image_path = base_outfolder / "image"
+    if "image" in test_data_config.modalities and not image_path.exists():
+        image_sample_folder = create_test_image_data(
+            test_data_config=test_data_config,
+            image_output_folder=image_path,
+        )
+        if drop_random_samples:
+            _delete_random_files_from_folder(folder=image_sample_folder, n_to_drop=50)
+
     sequence_path = base_outfolder / "sequence"
     if "sequence" in test_data_config.modalities and not sequence_path.exists():
         sequence_sample_folder = create_test_sequence_data(
@@ -586,18 +597,20 @@ def create_test_data(request, tmp_path_factory, parse_test_cl_args) -> "TestData
                 folder=sequence_sample_folder, n_to_drop=50
             )
 
-    image_path = base_outfolder / "image"
-    if "image" in test_data_config.modalities and not image_path.exists():
-        image_sample_folder = create_test_image_data(
-            test_data_config=test_data_config,
-            image_output_folder=image_path,
-        )
-        if drop_random_samples:
-            _delete_random_files_from_folder(folder=image_sample_folder, n_to_drop=50)
+    _merge_labels_from_modalities(base_path=base_outfolder)
 
     if drop_random_samples:
         label_file = test_data_config.scoped_tmp_path / "labels.csv"
         _delete_random_rows_from_csv(csv_file=label_file, n_to_drop=50)
+
+    if test_data_config.request_params.get("split_to_test", False):
+        post_split_callables = _get_test_post_split_callables()
+        for modality in test_data_config.modalities:
+            common_split_test_data_wrapper(
+                test_folder=test_data_config.scoped_tmp_path,
+                name=modality,
+                post_split_callables=post_split_callables,
+            )
 
     if test_data_config.request_params.get("split_to_test", False):
         _make_deeplake_test_dataset(
@@ -612,6 +625,59 @@ def create_test_data(request, tmp_path_factory, parse_test_cl_args) -> "TestData
         )
 
     return test_data_config
+
+
+def _get_test_post_split_callables() -> Dict[str, Callable]:
+    def _sequence_post_split(
+        test_root_folder: Path,
+        train_ids: Sequence[str],
+        test_ids: Sequence[str],
+    ) -> None:
+        df_sequence = pd.read_csv(test_root_folder / "sequence.csv")
+
+        df_sequence_train = df_sequence[df_sequence["ID"].isin(train_ids)]
+        df_sequence_test = df_sequence[df_sequence["ID"].isin(test_ids)]
+
+        df_sequence_train.to_csv(test_root_folder / "sequence_train.csv", index=False)
+        df_sequence_test.to_csv(test_root_folder / "sequence_test.csv", index=False)
+
+        (test_root_folder / "sequence.csv").unlink()
+
+    callables = {"sequence": _sequence_post_split}
+
+    return callables
+
+
+def _merge_labels_from_modalities(base_path: Path) -> None:
+    dfs = []
+
+    for file in base_path.iterdir():
+        # if we have already merged the labels
+        if file.name in ("labels.csv", "labels_train.csv", "labels_test.csv"):
+            return
+
+        elif file.name.startswith("labels_"):
+            assert file.suffix == ".csv"
+            dfs.append(pd.read_csv(file, index_col="ID"))
+
+    df_final = dfs[0].copy()
+
+    if len(dfs) == 1:
+        df_final.to_csv(base_path / "labels.csv")
+        return
+
+    for df in dfs[1:]:
+        assert df["Origin"].equals(df_final["Origin"])
+        assert df["OriginExtraCol"].equals(df_final["Origin"])
+        assert df.index.equals(df_final.index)
+
+        df_final["Height"] += df["Height"]
+        df_final["ExtraTarget"] += df["ExtraTarget"]
+
+    df_final["Height"] /= len(dfs)
+    df_final["ExtraTarget"] /= len(dfs)
+
+    df_final.to_csv(base_path / "labels.csv")
 
 
 def _make_deeplake_test_dataset(

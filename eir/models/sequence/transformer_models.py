@@ -442,7 +442,9 @@ class TransformerFeatureExtractor(nn.Module):
             nhead=model_config.num_heads,
             dim_feedforward=dim_feed_forward,
             dropout=model_config.dropout,
+            activation="gelu",
             batch_first=True,
+            norm_first=True,
         )
         self.transformer_encoder = TransformerEncoder(
             encoder_layer=encoder_layer_base, num_layers=model_config.num_layers

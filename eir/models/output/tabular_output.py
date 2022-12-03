@@ -1,5 +1,5 @@
-from dataclasses import dataclass
 from collections import OrderedDict
+from dataclasses import dataclass
 from typing import Sequence, Union, Literal, Dict, TYPE_CHECKING
 
 import torch
@@ -24,6 +24,22 @@ if TYPE_CHECKING:
 class TabularMLPResidualModelConfig(ResidualMLPConfig):
 
     """
+    :param layers:
+        Number of residual MLP residual blocks to use in the output module.
+
+    :param fc_task_dim:
+        Number of hidden nodes in each MLP residual block.
+
+    :param rb_do:
+        Dropout in each MLP residual block.
+
+    :param fc_do:
+        Dropout before final layer.
+
+    :param stochastic_depth_p:
+        Stochastic depth probability (probability of dropping input)
+        for each residual block.
+
     :param final_layer_type:
         Which type of final layer to use to construct tabular output prediction.
     """
@@ -33,6 +49,12 @@ class TabularMLPResidualModelConfig(ResidualMLPConfig):
 
 @dataclass
 class TabularModelOutputConfig:
+    """
+    :param model_init_config:
+          Configuration / arguments used to initialise model.
+
+    :param model_type:
+         Which type of image model to use."""
 
     model_init_config: Union[TabularMLPResidualModelConfig]
     model_type: Literal["mlp_residual"] = "mlp_residual"
@@ -93,7 +115,7 @@ def get_linear_final_act_spec(in_features: int, dropout_p: float):
 
     spec = OrderedDict(
         {
-            "norm_final": (nn.BatchNorm1d, {"num_features": in_features}),
+            "norm_final": (nn.LayerNorm, {"normalized_shape": in_features}),
             "act_final": (Swish, {}),
             "do_final": (nn.Dropout, {"p": dropout_p}),
         }

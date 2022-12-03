@@ -18,11 +18,16 @@ def get_fusion_module(
         ResidualMLPConfig, fusion_identity.IdentityConfig, fusion_mgmoe.MGMoEModelConfig
     ],
     modules_to_fuse: nn.ModuleDict,
+    out_feature_per_feature_extractor: Dict[str, int],
 ) -> nn.Module:
 
     fusion_in_dim = _get_fusion_input_dimension(modules_to_fuse=modules_to_fuse)
     fusion_class = get_fusion_class(fusion_model_type=model_type)
-    fusion_module = fusion_class(model_config=model_config, fusion_in_dim=fusion_in_dim)
+    fusion_module = fusion_class(
+        model_config=model_config,
+        fusion_in_dim=fusion_in_dim,
+        out_feature_per_feature_extractor=out_feature_per_feature_extractor,
+    )
 
     return fusion_module
 

@@ -171,6 +171,91 @@ def test_get_vocab_iterator_basic(tmp_path: Path):
     assert gathered_stats.total_files == 100
 
 
+def test_get_bpe_tokenizer(tmp_path: Path):
+
+    seq_path = tmp_path / "test_sequence"
+    test_pool = _get_simple_sample_pool()
+    set_up_simple_sequence_test_data(
+        path=seq_path, pool=test_pool, sep=" ", n_samples=100, max_length=20
+    )
+
+    # Core functionality
+    vocab_iter_test_training = input_setup.get_vocab_iterator(
+        input_source=str(seq_path),
+        split_on=" ",
+        gathered_stats=input_setup.GatheredSequenceStats(),
+    )
+    bpe_tokenizer_from_scratch = input_setup.get_bpe_tokenizer(
+        vocab_iterator=vocab_iter_test_training, vocab_file=None
+    )
+    known_sequence = "cat dog mouse".split()
+    known_sequence_tokenized = bpe_tokenizer_from_scratch(known_sequence)
+    assert known_sequence_tokenized == ["cat", "dog", "mouse"]
+
+    unknown_sequence = "edge knot city".split()
+    unknown_sequence_tokenized = bpe_tokenizer_from_scratch(unknown_sequence)
+    assert unknown_sequence_tokenized == [
+        "e",
+        "d",
+        "g",
+        "e",
+        "<unk>",
+        "n",
+        "o",
+        "t",
+        "c",
+        "i",
+        "t",
+        "<unk>",
+    ]
+
+    # Saving and loading
+    vocab_iter_test_saving = input_setup.get_vocab_iterator(
+        input_source=str(seq_path),
+        split_on=" ",
+        gathered_stats=input_setup.GatheredSequenceStats(),
+    )
+    bpe_tokenizer_object = input_setup._get_bpe_tokenizer_object(
+        vocab_iterator=vocab_iter_test_saving, vocab_file=None
+    )
+    saved_bpe_path = tmp_path / "test_bpe.json"
+    bpe_tokenizer_object.save(str(saved_bpe_path))
+
+    bpe_tokenizer_from_pretrained = input_setup.get_bpe_tokenizer(
+        vocab_iterator=None, vocab_file=str(saved_bpe_path)
+    )
+    known_sequence_tokenized_pretrained = bpe_tokenizer_from_pretrained(known_sequence)
+    assert known_sequence_tokenized_pretrained == ["cat", "dog", "mouse"]
+    unknown_sequence_tokenized_pretrained = bpe_tokenizer_from_pretrained(
+        unknown_sequence
+    )
+    assert unknown_sequence_tokenized_pretrained == [
+        "e",
+        "d",
+        "g",
+        "e",
+        "<unk>",
+        "n",
+        "o",
+        "t",
+        "c",
+        "i",
+        "t",
+        "<unk>",
+    ]
+
+    # General checks
+    gathered_stats_general = input_setup.GatheredSequenceStats()
+    vocab_iter_test_general = input_setup.get_vocab_iterator(
+        input_source=str(seq_path),
+        split_on=" ",
+        gathered_stats=gathered_stats_general,
+    )
+    vocab = set(word for sequence in vocab_iter_test_general for word in sequence)
+    assert vocab == set(test_pool)
+    assert gathered_stats_general.total_files == 100
+
+
 def test_get_vocab_iterator_basic_diff_split(tmp_path: Path):
     seq_path_diff_split = tmp_path / "test_sequence_no_split"
     test_pool = _get_simple_sample_pool()

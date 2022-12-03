@@ -1,14 +1,16 @@
 import csv
 from pathlib import Path
 from random import shuffle
-from typing import List, Tuple, Sequence, Iterable, Union
+from typing import List, Tuple, Sequence, Iterable, Union, Dict, Callable, Optional
 
 import numpy as np
 import pandas as pd
 
 
-def set_up_label_file_writing(path: Path, fieldnames: List[str]):
-    label_file = str(path / "labels.csv")
+def set_up_label_file_writing(
+    base_path: Path, fieldnames: List[str], extra_name: str = ""
+):
+    label_file = str(base_path / f"labels{extra_name}.csv")
 
     label_file_handle = open(str(label_file), "w")
 
@@ -52,12 +54,20 @@ def set_up_test_data_root_outpath(base_folder: Path) -> Path:
 
 
 def common_split_test_data_wrapper(
-    test_folder: Path, name: str
-) -> Tuple[Sequence[str], Sequence[str]]:
+    test_folder: Path,
+    name: str,
+    post_split_callables: Optional[Dict[str, Callable]] = None,
+) -> None:
     train_ids = None
     test_ids = None
     train_labels_path = test_folder / "labels_train.csv"
     test_labels_path = test_folder / "labels_test.csv"
+
+    data_folder = test_folder / name
+    if (data_folder / "train_set").exists() or (data_folder / "test_set").exists():
+        assert (data_folder / "train_set").exists()
+        assert (data_folder / "test_set").exists()
+        return
 
     if test_labels_path.exists() or train_labels_path.exists():
         assert train_labels_path.exists()
@@ -66,7 +76,6 @@ def common_split_test_data_wrapper(
         train_ids = list(pd.read_csv(train_labels_path)["ID"].values)
         test_ids = list(pd.read_csv(test_labels_path)["ID"].values)
 
-    data_folder = test_folder / name
     train_files, test_files = split_test_file_folder(
         test_folder=data_folder, train_ids=train_ids, test_ids=test_ids
     )
@@ -80,7 +89,9 @@ def common_split_test_data_wrapper(
             test_ids=test_ids,
         )
 
-    return train_ids, test_ids
+    if post_split_callables is not None and name in post_split_callables:
+        cur_func = post_split_callables[name]
+        cur_func(test_root_folder=test_folder, train_ids=train_ids, test_ids=test_ids)
 
 
 def split_test_file_folder(

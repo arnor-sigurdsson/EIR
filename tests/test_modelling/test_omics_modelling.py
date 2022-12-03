@@ -52,12 +52,19 @@ def _get_classification_output_configs() -> Sequence[Dict]:
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
+                        "input_type_info": {"na_augment_prob": 0.8},
                         "model_config": {
                             "model_type": "linear",
-                            "model_init_config": {"l1": 1e-03},
+                            "model_init_config": {"l1": 1e-04},
                         },
                     }
                 ],
+                "fusion_configs": {
+                    "model_config": {
+                        "fc_task_dim": 256,
+                        "layers": [2],
+                    }
+                },
                 "output_configs": _get_classification_output_configs(),
             },
         },
@@ -66,7 +73,7 @@ def _get_classification_output_configs() -> Sequence[Dict]:
             "injections": {
                 "global_configs": {
                     "weighted_sampling_columns": ["Origin"],
-                    "gradient_noise": 0.05,
+                    "gradient_noise": 0.01,
                 },
                 "input_configs": [
                     {
@@ -76,7 +83,7 @@ def _get_classification_output_configs() -> Sequence[Dict]:
                             "model_init_config": {
                                 "rb_do": 0.25,
                                 "channel_exp_base": 3,
-                                "l1": 1e-03,
+                                "l1": 1e-04,
                             },
                         },
                     }
@@ -141,7 +148,7 @@ def test_classification(prep_modelling_test_configs):
             output_name=output_name,
             target_name="Origin",
             top_row_grads_dict=top_row_grads_dict,
-            at_least_n=5,
+            at_least_n_snps=5,
         )
 
 
@@ -217,7 +224,7 @@ def test_classification_subset(prep_modelling_test_configs):
             output_name=output_name,
             target_name="Origin",
             top_row_grads_dict=top_row_grads_dict,
-            at_least_n=2,
+            at_least_n_snps=2,
         )
 
 
@@ -226,7 +233,7 @@ def _check_snps_wrapper(
     output_name: str,
     target_name: str,
     top_row_grads_dict: Dict[str, List[int]],
-    at_least_n: Union[str, int] = "all",
+    at_least_n_snps: Union[str, int] = "all",
     check_types_skip_cls_names: Sequence[str] = tuple(),
 ):
     expected_top_indxs = list(range(50, 1000, 100))
@@ -249,7 +256,7 @@ def _check_snps_wrapper(
                 expected_top_indices=expected_top_indxs,
                 top_row_grads_dict=top_row_grads_dict,
                 check_types=check_types,
-                at_least_n=at_least_n,
+                at_least_n=at_least_n_snps,
                 check_types_skip_cls_names=check_types_skip_cls_names,
             )
 
@@ -319,7 +326,7 @@ def _get_regression_output_configs() -> Sequence[Dict]:
                         "input_info": {"input_name": "test_genotype"},
                         "model_config": {
                             "model_type": "cnn",
-                            "model_init_config": {"l1": 1e-03},
+                            "model_init_config": {"l1": 1e-04, "channel_exp_base": 4},
                         },
                     },
                 ],
@@ -334,7 +341,7 @@ def _get_regression_output_configs() -> Sequence[Dict]:
                         "input_info": {"input_name": "test_genotype"},
                         "model_config": {
                             "model_type": "linear",
-                            "model_init_config": {"l1": 1e-03},
+                            "model_init_config": {"l1": 1e-04},
                         },
                     },
                 ],
@@ -353,7 +360,7 @@ def _get_regression_output_configs() -> Sequence[Dict]:
                         "input_info": {"input_name": "test_genotype"},
                         "model_config": {
                             "model_type": "cnn",
-                            "model_init_config": {"l1": 1e-03},
+                            "model_init_config": {"l1": 1e-04, "channel_exp_base": 4},
                         },
                     },
                 ],
@@ -386,7 +393,7 @@ def test_regression(prep_modelling_test_configs):
             output_name=output_name,
             target_name="Height",
             top_row_grads_dict=top_row_grads_dict,
-            at_least_n=5,
+            at_least_n_snps=5,
         )
 
 
@@ -432,7 +439,7 @@ def _get_multi_task_output_configs() -> Sequence[Dict]:
                         "model_config": {
                             "model_type": "cnn",
                             "model_init_config": {
-                                "l1": 1e-03,
+                                "l1": 2e-05,
                                 "stochastic_depth_p": 0.2,
                             },
                         },
@@ -449,9 +456,12 @@ def _get_multi_task_output_configs() -> Sequence[Dict]:
                 "output_configs": _get_multi_task_output_configs(),
             },
         },
-        # Case 2: Normal multi task with CNN
+        # Case 2: Normal multitask with CNN
         {
             "injections": {
+                "global_configs": {
+                    "mixing_alpha": 0.2,
+                },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
@@ -459,26 +469,26 @@ def _get_multi_task_output_configs() -> Sequence[Dict]:
                             "model_type": "cnn",
                             "model_init_config": {
                                 "channel_exp_base": 5,
-                                "rb_do": 0.15,
-                                "fc_repr_dim": 64,
-                                "l1": 1e-03,
-                                "stochastic_depth_p": 0.2,
+                                "rb_do": 0.10,
+                                "fc_repr_dim": 256,
+                                "l1": 2e-05,
+                                "stochastic_depth_p": 0.1,
                             },
                         },
                     },
                 ],
                 "fusion_configs": {
                     "model_config": {
-                        "fc_task_dim": 64,
+                        "fc_task_dim": 256,
                         "rb_do": 0.10,
                         "fc_do": 0.10,
-                        "stochastic_depth_p": 0.5,
+                        "stochastic_depth_p": 0.1,
                     },
                 },
                 "output_configs": _get_multi_task_output_configs(),
             },
         },
-        # Case 3:  Normal multi task with MLP, note we have to reduce the LR for
+        # Case 3:  Normal multitask with MLP, note we reduce the LR for
         # stability and add L1 for regularization
         {
             "injections": {
@@ -488,7 +498,7 @@ def _get_multi_task_output_configs() -> Sequence[Dict]:
                         "input_info": {"input_name": "test_genotype"},
                         "model_config": {
                             "model_type": "linear",
-                            "model_init_config": {"l1": 1e-03},
+                            "model_init_config": {"l1": 2e-05},
                         },
                     },
                 ],
@@ -510,7 +520,7 @@ def _get_multi_task_output_configs() -> Sequence[Dict]:
                             "model_init_config": {
                                 "fc_repr_dim": 8,
                                 "split_mlp_num_splits": 64,
-                                "l1": 1e-03,
+                                "l1": 2e-05,
                             },
                         },
                     },
@@ -533,7 +543,7 @@ def _get_multi_task_output_configs() -> Sequence[Dict]:
                             "model_init_config": {
                                 "kernel_width": 8,
                                 "channel_exp_base": 2,
-                                "l1": 1e-03,
+                                "l1": 2e-05,
                                 "rb_do": 0.20,
                             },
                         },
@@ -565,7 +575,7 @@ def _get_multi_task_output_configs() -> Sequence[Dict]:
                             "model_init_config": {
                                 "kernel_width": 8,
                                 "channel_exp_base": 2,
-                                "l1": 1e-03,
+                                "l1": 2e-05,
                             },
                         },
                     },
@@ -582,7 +592,6 @@ def _get_multi_task_output_configs() -> Sequence[Dict]:
             "injections": {
                 "global_configs": {
                     "output_folder": "mixing_multi",
-                    "lr": 1e-03,
                     "mixing_alpha": 0.2,
                 },
                 "input_configs": [
@@ -596,7 +605,7 @@ def _get_multi_task_output_configs() -> Sequence[Dict]:
                             "model_init_config": {
                                 "kernel_width": 8,
                                 "channel_exp_base": 2,
-                                "l1": 1e-04,
+                                "l1": 2e-05,
                             },
                         },
                     },
@@ -611,7 +620,7 @@ def _get_multi_task_output_configs() -> Sequence[Dict]:
                 "output_configs": _get_multi_task_output_configs(),
             },
         },
-        # Case 8: Using the GLN with limited activations
+        # Case 8: Using the GLN with limited activations and gradient accumulation
         {
             "injections": {
                 "global_configs": {
@@ -629,7 +638,7 @@ def _get_multi_task_output_configs() -> Sequence[Dict]:
                             "model_init_config": {
                                 "kernel_width": 8,
                                 "channel_exp_base": 2,
-                                "l1": 1e-03,
+                                "l1": 2e-05,
                                 "rb_do": 0.20,
                             },
                         },
@@ -687,7 +696,7 @@ def test_multi_task(
                 output_name=output_name,
                 target_name=target_name,
                 top_row_grads_dict=top_row_grads_dict,
-                at_least_n=at_least_n,
+                at_least_n_snps=at_least_n,
             )
 
         for target_name in con_targets:
@@ -709,7 +718,7 @@ def test_multi_task(
                 output_name=output_name,
                 target_name=target_name,
                 top_row_grads_dict=top_row_grads_dict,
-                at_least_n=at_least_n,
+                at_least_n_snps=at_least_n,
             )
 
 
@@ -797,8 +806,8 @@ def _check_identified_snps(
 
 def _check_snp_types(cls_name: str, top_grads_msk, expected_idxs, at_least_n: int):
     """
-    Adds an additional check for SNP types (i.e. reference homozygous, heterozygous,
-    alternative homozygous, missing).
+    Adds a check for SNP types (i.e. reference homozygous, heterozygous, alternative
+    homozygous, missing).
 
     Used when we have masked out the SNPs (otherwise the 0s in the one hot might have
     a high activation, since they're saying the same thing as a 1 being in a spot).

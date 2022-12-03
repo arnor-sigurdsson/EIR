@@ -1,0 +1,5 @@
+python \
+docs/doc_modules/b_customizing_eir/a_customizing_fusion.py \
+--global_configs eir_tutorials/b_customizing_eir/01_customizing_fusion/conf/tutorial_01_globals.yaml \
+--input_configs eir_tutorials/b_customizing_eir/01_customizing_fusion/conf/tutorial_01_input.yaml \
+--output_configs eir_tutorials/b_customizing_eir/01_customizing_fusion/conf/tutorial_01_outputs.yaml

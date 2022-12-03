@@ -12,6 +12,7 @@ from typing import (
     Dict,
     overload,
     Literal,
+    Iterator,
 )
 
 import aislib.misc_utils
@@ -753,6 +754,16 @@ def _attach_plot_progress_handler(
     return trainer
 
 
+def _iterdir_ignore_hidden(path: Path) -> Iterator[Path]:
+    """
+    Mostly to avoid hidden files like .DS_Store on Macs.
+    """
+    for child in path.iterdir():
+        if child.name.startswith("."):
+            continue
+        yield child
+
+
 def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> None:
     ca = handler_config.experiment.configs.global_config
 
@@ -762,8 +773,9 @@ def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> Non
 
     run_folder = get_run_folder(ca.output_folder)
 
-    for output_dir in (run_folder / "results").iterdir():
-        for target_dir in output_dir.iterdir():
+    for output_dir in _iterdir_ignore_hidden(path=run_folder / "results"):
+
+        for target_dir in _iterdir_ignore_hidden(path=output_dir):
             target_column = target_dir.name
 
             train_history_df, valid_history_df = get_metrics_dataframes(

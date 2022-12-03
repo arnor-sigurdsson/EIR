@@ -44,7 +44,7 @@ Feature Extractor Configurations
 --------------------------------
 
 The documentation below details what the parameters passed to the respective models
-(trough the `model_config` field in the `\-\-input_configs` `.yaml` files).
+(trough the `model_init_config` field in the `\-\-input_configs` `.yaml` files).
 
 
 Omics Feature Extractors
@@ -110,3 +110,9 @@ Output Module Configuration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. autoclass:: eir.models.output.tabular_output.TabularModelOutputConfig
+
+The documentation below details what the parameters passed to the respective output
+output heads
+(trough the `model_init_config` field in the `\-\-output_configs` `.yaml` files).
+
+.. autoclass:: eir.models.output.tabular_output.TabularMLPResidualModelConfig

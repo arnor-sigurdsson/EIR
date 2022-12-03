@@ -12,24 +12,16 @@ from eir.models.omics.omics_models import (
     LCLModel,
     SimpleLCLModel,
     IdentityModel,
-    CNNModelConfig,
-    LCLModelConfig,
-    LinearModelConfig,
-    SimpleLCLModelConfig,
-    IdentityModelConfig,
-    Dataclass,
 )
 from eir.models.output.tabular_output import (
     TabularModelOutputConfig,
 )
 from eir.models.sequence.transformer_models import (
-    BasicTransformerFeatureExtractorModelConfig,
     SequenceModelConfig,
 )
 from eir.models.tabular.tabular import (
     SimpleTabularModel,
     TabularModelConfig,
-    SimpleTabularModelConfig,
 )
 from eir.setup.setup_utils import get_all_optimizer_names
 
@@ -47,20 +39,6 @@ al_feature_extractor_configs_classes = Union[
     Type[TabularModelConfig],
     Type[ImageModelConfig],
     Type[SequenceModelConfig],
-]
-
-al_model_type_configs = Union[
-    ResidualMLPConfig,
-    MGMoEModelConfig,
-    CNNModelConfig,
-    LinearModelConfig,
-    SimpleLCLModelConfig,
-    LCLModelConfig,
-    SimpleTabularModelConfig,
-    IdentityModelConfig,
-    BasicTransformerFeatureExtractorModelConfig,
-    ImageModelConfig,
-    Dataclass,
 ]
 
 al_models_classes = Union[
@@ -90,6 +68,7 @@ al_tokenizer_choices = (
         Literal["toktok"],
         Literal["revtok"],
         Literal["subword"],
+        Literal["bpe"],
         None,
     ],
 )
@@ -204,7 +183,6 @@ class GlobalConfig:
     :param n_saved_models:
         Number of top N models to saved during training.
 
-
     :param get_acts:
         Whether to compute activations w.r.t. inputs.
 
@@ -232,7 +210,16 @@ class GlobalConfig:
         Alpha parameter used for mixing (higher means more mixing).
 
     :param plot_skip_steps:
-        How many iterations to skip in in plots.
+        How many iterations to skip in plots.
+
+    :param pretrained_checkpoint:
+        Path to a pretrained checkpoint model file (under saved_models/ in the
+        experiment output folder) to load and use as a starting point for training.
+
+    :param strict_pretrained_loading:
+        Whether to enforce that the loaded pretrained model exactly the same
+        architecture as the current model. If False, will only load the layers
+        that match between the two models.
     """
 
     output_folder: str
@@ -274,6 +261,7 @@ class GlobalConfig:
     mixing_alpha: float = 0.0
     plot_skip_steps: int = 200
     pretrained_checkpoint: Union[None, str] = None
+    strict_pretrained_loading: bool = True
 
 
 @dataclass
