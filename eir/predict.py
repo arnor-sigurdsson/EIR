@@ -16,7 +16,6 @@ import pandas as pd
 import torch
 from aislib.misc_utils import get_logger, ensure_path_exists
 from sklearn.preprocessing import LabelEncoder
-from torch import nn
 from torch.utils.data import DataLoader
 
 import eir.visualization.visualization_funcs as vf
@@ -387,12 +386,6 @@ def get_default_predict_config(
         metrics=loaded_train_experiment.metrics,
     )
     return test_config
-
-
-@dataclass
-class LoadedTrainExperimentMixedWithPredict(LoadedTrainExperiment):
-    model: nn.Module
-    inputs: al_input_objects_as_dict
 
 
 def _get_default_predict_hooks(train_hooks: "Hooks") -> PredictHooks:

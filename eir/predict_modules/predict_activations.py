@@ -1,10 +1,12 @@
 from copy import copy
+from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 from random import sample
 from typing import Literal, Union, TYPE_CHECKING
 
 from aislib.misc_utils import ensure_path_exists, get_logger
+from torch import nn
 from torch.utils.data import DataLoader
 
 from eir.data_load import label_setup
@@ -14,11 +16,12 @@ from eir.predict_modules.predict_data import set_up_default_dataset
 from eir.predict_modules.predict_input_setup import set_up_inputs_for_predict
 from eir.predict_modules.predict_target_setup import get_target_labels_for_testing
 from eir.setup.config import Configs
+from eir.setup.input_setup import al_input_objects_as_dict
 from eir.setup.output_setup import al_output_objects_as_dict
 from eir.train import Hooks, check_dataset_and_batch_size_compatiblity
 
 if TYPE_CHECKING:
-    from eir.predict import PredictConfig, LoadedTrainExperimentMixedWithPredict
+    from eir.predict import PredictConfig
 
 logger = get_logger(name=__name__)
 
@@ -89,6 +92,12 @@ def get_background_source_config(
         return train_configs
 
     raise ValueError()
+
+
+@dataclass
+class LoadedTrainExperimentMixedWithPredict(LoadedTrainExperiment):
+    model: nn.Module
+    inputs: al_input_objects_as_dict
 
 
 def _overload_train_experiment_for_predict_activations(
