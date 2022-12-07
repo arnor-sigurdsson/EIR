@@ -597,11 +597,15 @@ class TabularOutputTypeConfig:
 
     :param target_con_columns:
         Which columns from ``label_file`` to use as continuous targets.
+
+    :param cat_label_smoothing:
+        Label smoothing to apply to categorical targets.
     """
 
     label_parsing_chunk_size: Union[None, int] = None
     target_cat_columns: Sequence[str] = field(default_factory=list)
     target_con_columns: Sequence[str] = field(default_factory=list)
+    cat_label_smoothing: float = 0.0
 
 
 @dataclass
