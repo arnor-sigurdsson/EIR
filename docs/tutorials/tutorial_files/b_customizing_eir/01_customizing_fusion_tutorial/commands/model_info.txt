@@ -16,7 +16,7 @@ MetaModel(
     )
   )
   (fusion_module): MyLSTMFusionModule(
-    (fusion): LSTM(128, 256, batch_first=True)
+    (fusion): LSTM(128, 128, batch_first=True)
   )
   (output_modules): ModuleDict(
     (ancestry_output): TabularOutputModule(
@@ -25,11 +25,12 @@ MetaModel(
           (0): Sequential(
             (0): Sequential(
               (0): MLPResidualBlock(
-                (norm_1): LayerNorm((256,), eps=1e-05, elementwise_affine=True)
-                (fc_1): Linear(in_features=256, out_features=256, bias=False)
+                (norm_1): LayerNorm((128,), eps=1e-05, elementwise_affine=True)
+                (fc_1): Linear(in_features=128, out_features=256, bias=False)
                 (act_1): Swish(num_parameters=1)
                 (do): Dropout(p=0.1, inplace=False)
                 (fc_2): Linear(in_features=256, out_features=256, bias=False)
+                (downsample_identity): Linear(in_features=128, out_features=256, bias=False)
                 (stochastic_depth): StochasticDepth(p=0.1, mode=batch)
               )
             )

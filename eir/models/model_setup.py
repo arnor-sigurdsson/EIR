@@ -83,6 +83,7 @@ al_data_dimensions = Dict[
         "SequenceDataDimensions",
     ],
 ]
+al_model_registry = Dict[str, Callable[[str], Type[nn.Module]]]
 
 logger = get_logger(name=__name__)
 
@@ -100,8 +101,8 @@ def get_model(
     inputs_as_dict: al_input_objects_as_dict,
     fusion_config: schemas.FusionConfig,
     outputs_as_dict: "al_output_objects_as_dict",
-    model_registry_per_input_type: Dict[str, Callable[[str], Type[nn.Module]]],
-    model_registry_per_output_type: Dict[str, Callable[[str], Type[nn.Module]]],
+    model_registry_per_input_type: al_model_registry,
+    model_registry_per_output_type: al_model_registry,
     meta_class_getter: al_fusion_class_callable = get_default_meta_class,
 ) -> Union[nn.Module, nn.DataParallel]:
 
@@ -152,13 +153,17 @@ def get_model(
 
 def get_output_modules(
     outputs_as_dict: "al_output_objects_as_dict",
-    model_registry_per_output_type: Dict[str, Callable[[str], Type[nn.Module]]],
     input_dimension: int,
     device: str,
+    model_registry_per_output_type: Optional[al_model_registry] = None,
     in_features_per_input: Optional[Dict[str, DataDimensions]] = None,
     out_features_per_feature_extractor: Optional[Dict[str, int]] = None,
 ) -> nn.ModuleDict:
+
     output_modules = nn.ModuleDict()
+
+    if model_registry_per_output_type is None:
+        model_registry_per_output_type = {}
 
     for output_name, output_object in outputs_as_dict.items():
         output_type = output_object.output_config.output_info.output_type
@@ -437,9 +442,7 @@ def get_sequence_model(
     return sequence_model
 
 
-def get_default_model_registry_per_input_type() -> Dict[
-    str, Callable[[str], Type[nn.Module]]
-]:
+def get_default_model_registry_per_input_type() -> al_model_registry:
     mapping = {"sequence": _sequence_model_registry, "image": _image_model_registry}
 
     return mapping
@@ -754,8 +757,8 @@ def get_meta_model_kwargs_from_configs(
     fusion_config: schemas.FusionConfig,
     inputs_as_dict: al_input_objects_as_dict,
     outputs_as_dict: "al_output_objects_as_dict",
-    model_registry_per_input_type: Dict[str, Callable[[str], Type[nn.Module]]],
-    model_registry_per_output_type: Dict[str, Callable[[str], Type[nn.Module]]],
+    model_registry_per_input_type: al_model_registry,
+    model_registry_per_output_type: al_model_registry,
 ) -> Dict[str, Any]:
 
     kwargs = {}
@@ -879,8 +882,8 @@ def overload_fusion_model_feature_extractors_with_pretrained(
     input_modules: nn.ModuleDict,
     inputs_as_dict: al_input_objects_as_dict,
     outputs_as_dict: "al_output_objects_as_dict",
-    model_registry_per_input_type: Dict[str, Callable[[str], Type[nn.Module]]],
-    model_registry_per_output_type: Dict[str, Callable[[str], Type[nn.Module]]],
+    model_registry_per_input_type: al_model_registry,
+    model_registry_per_output_type: al_model_registry,
     meta_class_getter: al_fusion_class_callable = get_default_meta_class,
 ) -> nn.ModuleDict:
 
@@ -890,7 +893,7 @@ def overload_fusion_model_feature_extractors_with_pretrained(
     but then we have to setup things from there such as hooks, valid_ids, train_ids,
     etc.
 
-    For now we will enforce that the feature extractor architecture that is set-up
+    For now, we will enforce that the feature extractor architecture that is set-up
     and then uses pre-trained weights from a previous experiment must match that of
     the feature extractor that did the pre-training. Simply put, we must ensure
     that all input setup parameters that have to do with architecture match exactly
@@ -967,8 +970,8 @@ def get_meta_model_class_and_kwargs_from_configs(
     fusion_config: schemas.FusionConfig,
     inputs_as_dict: al_input_objects_as_dict,
     outputs_as_dict: "al_output_objects_as_dict",
-    model_registry_per_input_type: Dict[str, Callable[[str], Type[nn.Module]]],
-    model_registry_per_output_type: Dict[str, Callable[[str], Type[nn.Module]]],
+    model_registry_per_input_type: al_model_registry,
+    model_registry_per_output_type: al_model_registry,
     meta_class_getter: Callable[[str], Type[nn.Module]] = get_default_meta_class,
 ) -> Tuple[Type[nn.Module], Dict[str, Any]]:
 

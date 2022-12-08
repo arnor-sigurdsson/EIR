@@ -15,6 +15,7 @@ from typing import (
     Iterable,
     Dict,
     List,
+    Literal,
     Union,
     Tuple,
     Type,
@@ -103,7 +104,9 @@ def get_main_cl_args() -> Tuple[argparse.Namespace, List[str]]:
     return cl_args, extra_cl_args
 
 
-def get_main_parser() -> configargparse.ArgumentParser:
+def get_main_parser(
+    output_nargs: Literal["+", "*"] = "+"
+) -> configargparse.ArgumentParser:
     parser_ = configargparse.ArgumentParser(
         config_file_parser_class=configargparse.YAMLConfigFileParser
     )
@@ -137,7 +140,7 @@ def get_main_parser() -> configargparse.ArgumentParser:
     parser_.add_argument(
         "--output_configs",
         type=str,
-        nargs="+",
+        nargs=output_nargs,
         required=True,
         help="Output .yaml configurations.",
     )
