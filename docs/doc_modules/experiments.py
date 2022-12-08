@@ -22,6 +22,7 @@ class AutoDocExperimentInfo:
     base_path: Path
     command: List[str]
     files_to_copy_mapping: Sequence[Tuple[str, str]]
+    pre_run_command_modifications: Sequence[Callable[[List[str]], List[str]]] = ()
     post_run_functions: Sequence[Tuple[Callable, Dict]] = ()
     force_run_command: bool = False
 
@@ -34,12 +35,16 @@ def make_tutorial_data(auto_doc_experiment_info: AutoDocExperimentInfo) -> None:
 
     set_up_conf_files(base_path=ade.base_path, conf_output_path=ade.conf_output_path)
 
+    command = ade.command
+    for command_modification in ade.pre_run_command_modifications:
+        command = command_modification(ade.command)
+
     run_folder = run_experiment_from_command(
-        command=ade.command, force_run=ade.force_run_command
+        command=command, force_run=ade.force_run_command
     )
 
     save_command_as_text(
-        command=ade.command,
+        command=command,
         output_path=(ade.base_path / "commands" / ade.name).with_suffix(".txt"),
     )
 

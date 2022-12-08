@@ -235,7 +235,7 @@ To test, we can run the following command
 (note that you will have to add the path to your saved model for the ``--model_path``
 parameter below).
 
-.. literalinclude:: tutorial_files/01_basic_tutorial/commands/GLN_2_PREDICT.txt
+.. literalinclude:: tutorial_files/01_basic_tutorial/commands/GLN_1_PREDICT.txt
     :language: console
 
 This will generate a file called
