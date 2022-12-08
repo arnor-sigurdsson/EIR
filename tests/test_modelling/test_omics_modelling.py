@@ -149,6 +149,7 @@ def test_classification(prep_modelling_test_configs):
             target_name="Origin",
             top_row_grads_dict=top_row_grads_dict,
             at_least_n_snps=5,
+            all_act_classes_must_pass=False,
         )
 
 

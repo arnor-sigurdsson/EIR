@@ -8,11 +8,11 @@ A - Setup
 
 In this tutorial,
 we will be looking at
-how to customize ``EIR``.
+how to customize EIR.
 Specifically, we will
 be writing our own
 fusion module through
-the ``EIR`` Python API.
+the EIR Python API.
 
 If you want to skip
 straight to the code,
@@ -26,7 +26,7 @@ write a custom fusion
 module that uses an LSTM
 to fuse the outputs of
 the individual feature extractors
-included in ``EIR``.
+included in EIR.
 This is a bit of a contrived example,
 since, we are only using one input modality,
 but hopefully it will serve as a good example
@@ -49,11 +49,14 @@ There are two specific things to note here:
     :pyobject: MyLSTMFusionModule
 
 Having defined our fusion module, we now want to register and run our experiment
-(which is using our custom fusion module) with ``EIR``. For this demo, we will be
+(which is using our custom fusion module) with EIR. For this demo, we will be
 use a little function that replaces a couple of attributes in a default experiment,
 but there are other ways to do this as well. Of note:
 
-1. We are using the default ``MetaModel`` module included in ``EIR``, which
+1. After defining our fusion module, we also set up the output modules by calling
+   ``get_output_modules``. This is necessary because the output modules
+   need to know the size of the output coming from the fusion module.
+2. We are using the default ``MetaModel`` module included in EIR, which
    is a simple wrapper around the input, fusion and output modules. But you could
    also use a custom module here.
 
@@ -86,18 +89,15 @@ We also have our configuration files:
 
 .. literalinclude:: ../tutorial_files/b_customizing_eir/01_customizing_fusion_tutorial/tutorial_01_globals.yaml
     :language: yaml
-    :caption:
 
 .. literalinclude:: ../tutorial_files/b_customizing_eir/01_customizing_fusion_tutorial/tutorial_01_input.yaml
     :language: yaml
-    :caption:
 
 .. literalinclude:: ../tutorial_files/b_customizing_eir/01_customizing_fusion_tutorial/tutorial_01_outputs.yaml
     :language: yaml
-    :caption:
 
 Now we can train, using our custom module but taking advantage of the rest of the
-default ``EIR`` functionalities.
+default EIR functionalities.
 
 .. literalinclude:: ../tutorial_files/b_customizing_eir/01_customizing_fusion_tutorial/commands/CUSTOM_FUSION.txt
     :language: console
@@ -123,8 +123,8 @@ Not too bad! We can also look at the confusion matrix:
 
 .. image:: ../tutorial_files/b_customizing_eir/01_customizing_fusion_tutorial/figures/tutorial_01_confusion_matrix_gln_1.png
 
-This marks the end of our tutorial on customizing the fusion module in ``EIR``.
-In the future, there might be more tutorials customizing other aspects of ``EIR``
+This marks the end of our tutorial on customizing the fusion module in EIR.
+In the future, there might be more tutorials customizing other aspects of EIR
 (e.g., the input modules, output modules, etc.),
 but for now, hopefully this tutorial was helpful.
 
