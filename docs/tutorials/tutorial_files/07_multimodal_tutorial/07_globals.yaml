@@ -1,0 +1,13 @@
+output_folder: eir_tutorials/tutorial_runs/tutorial_07_multimodal_run
+valid_size: 0.10
+checkpoint_interval: 100
+sample_interval: 100
+memory_dataset: true
+n_epochs: 125
+gradient_clipping: 1.0
+early_stopping_patience: 10
+get_acts: false
+act_every_sample_factor: 5
+mixing_alpha: 0.4
+weighted_sampling_columns:
+  - all

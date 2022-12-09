@@ -957,7 +957,6 @@ def yield_tokens_from_file(
 def yield_tokens_from_csv(
     file_path: str, split_on: str, gathered_stats: GatheredSequenceStats
 ) -> Generator[Sequence[str], None, None]:
-    gathered_stats.total_files += 1
 
     split_func = get_sequence_split_function(split_on=split_on)
 
@@ -979,6 +978,7 @@ def yield_tokens_from_csv(
 
         cur_length = len(cur_line)
         gathered_stats.total_count += len(cur_line)
+        gathered_stats.total_files += 1
 
         if cur_length > gathered_stats.max_length:
             gathered_stats.max_length = cur_length
