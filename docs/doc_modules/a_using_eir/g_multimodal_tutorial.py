@@ -1,6 +1,8 @@
 from pathlib import Path
 from typing import Sequence
 
+import pandas as pd
+
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
 
 
@@ -29,6 +31,11 @@ def get_07_multimodal_run_1_tabular_info() -> AutoDocExperimentInfo:
             "training_curve_MCC",
             "figures/07_multimodal_training_curve_MCC_tabular.pdf",
         ),
+        (
+            "4000/activations/pets_tabular/D: 100+ Days/cat_features_Breed1_"
+            "D: 100+ Days.pdf",
+            "figures/tutorial_07a_feature_importance_D.pdf",
+        ),
     ]
 
     data_output_path = Path("eir_tutorials/07_multimodal_tutorial/pet_adoption.zip")
@@ -49,6 +56,32 @@ def get_07_multimodal_run_1_tabular_info() -> AutoDocExperimentInfo:
         },
     )
 
+    tabular_preview = (
+        _show_tabular_csv_example,
+        {
+            "input_path": Path("eir_tutorials/07_multimodal_tutorial/data/tabular.csv"),
+            "output_path": Path(base_path) / "commands/tabular_preview.html",
+        },
+    )
+
+    description_preview = (
+        _show_text_description_example,
+        {
+            "input_path": Path(
+                "eir_tutorials/07_multimodal_tutorial/data/descriptions.csv"
+            ),
+            "output_path": Path(base_path) / "commands/description_preview.txt",
+        },
+    )
+
+    image_preview = (
+        _show_image_example,
+        {
+            "input_path": Path("eir_tutorials/07_multimodal_tutorial/data/images"),
+            "output_path": Path(base_path) / "commands/image_preview.jpg",
+        },
+    )
+
     ade = AutoDocExperimentInfo(
         name="MULTIMODAL_1_TABULAR",
         data_url="https://drive.google.com/file/d/1DVS-t1ne-TMam8-6gkCz2YzKNjEHEIGr",
@@ -57,10 +90,43 @@ def get_07_multimodal_run_1_tabular_info() -> AutoDocExperimentInfo:
         base_path=Path(base_path),
         command=command,
         files_to_copy_mapping=mapping,
-        post_run_functions=(get_tutorial_folder,),
+        post_run_functions=(
+            get_tutorial_folder,
+            tabular_preview,
+            description_preview,
+            image_preview,
+        ),
     )
 
     return ade
+
+
+def _show_tabular_csv_example(input_path: Path, output_path: Path) -> None:
+
+    df = pd.read_csv(input_path, nrows=1).T
+
+    html = df.to_html(index=True, header=False)
+    with open(output_path, "w") as f:
+        f.write(html)
+
+
+def _show_text_description_example(input_path: Path, output_path: Path) -> None:
+
+    description_text = pd.read_csv(input_path, nrows=1)["Sequence"].values[0]
+
+    with open(output_path, "w") as f:
+        f.write(description_text)
+
+
+def _show_image_example(input_path: Path, output_path: Path) -> None:
+
+    example_file = next(input_path.iterdir())
+
+    with open(example_file, "rb") as f:
+        img_bytes = f.read()
+
+    with open(output_path, "wb") as f:
+        f.write(img_bytes)
 
 
 def get_07_multimodal_run_2_tabular_description_info() -> AutoDocExperimentInfo:
@@ -262,4 +328,3 @@ def get_experiments() -> Sequence[AutoDocExperimentInfo]:
     exp_a2 = get_07_mm_apx_run_2_tab_desc_mt_info()
 
     return [exp_1, exp_2, exp_3, exp_a1, exp_a2]
-
