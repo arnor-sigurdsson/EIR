@@ -600,12 +600,16 @@ class TabularOutputTypeConfig:
 
     :param cat_label_smoothing:
         Label smoothing to apply to categorical targets.
+
+    :param uncertainty_weighted_mt_loss:
+        Whether to use uncertainty weighted loss for multitask / multilabel learning.
     """
 
     label_parsing_chunk_size: Union[None, int] = None
     target_cat_columns: Sequence[str] = field(default_factory=list)
     target_con_columns: Sequence[str] = field(default_factory=list)
     cat_label_smoothing: float = 0.0
+    uncertainty_weighted_mt_loss: bool = True
 
 
 @dataclass
