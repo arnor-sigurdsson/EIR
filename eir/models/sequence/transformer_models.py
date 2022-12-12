@@ -472,7 +472,8 @@ def parse_dim_feedforward(
     if dim_feedforward == "auto":
         dim_feedforward = embedding_dim * 4
         logger.info(
-            "Setting dim_feedfoward to %d based on %d and 'auto' option.",
+            "Setting dim_feedfoward to %d based on embedding_dim=%d and 'auto' "
+            "option.",
             dim_feedforward,
             embedding_dim,
         )
