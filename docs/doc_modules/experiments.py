@@ -156,4 +156,3 @@ def run_subprocess_and_capture_output(command: List[str]):
     result = subprocess.run(args=command, capture_output=True, text=True).stdout
 
     return result
-

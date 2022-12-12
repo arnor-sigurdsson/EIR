@@ -305,7 +305,8 @@ def get_07_mm_apx_run_2_tab_desc_mt_info() -> AutoDocExperimentInfo:
         (
             "PERF-AVERAGE",
             "figures/"
-            "07_multimodal_training_curve_perf-average_tabular_description_multi_task.pdf",
+            "07_multimodal_training_curve_"
+            "perf-average_tabular_description_multi_task.pdf",
         ),
         (
             "training_curve_MCC",
@@ -356,4 +357,3 @@ def get_experiments() -> Sequence[AutoDocExperimentInfo]:
     exp_a2 = get_07_mm_apx_run_2_tab_desc_mt_info()
 
     return [exp_1, exp_2, exp_3, exp_a1, exp_a2]
-
