@@ -6,8 +6,9 @@ input_info:
 input_type_info:
   mixing_subtype: "cutmix"
   size:
-    - 64
+    - 128
 
 model_config:
   model_type: "resnet18"
   pretrained_model: True
+  freeze_pretrained_model: True

@@ -6,5 +6,8 @@ output_info:
 output_type_info:
   target_cat_columns:
     - AdoptionSpeed
-    - Breed1
+  target_con_columns:
+    - Age
+    - Quantity
   cat_label_smoothing: 0.1
+

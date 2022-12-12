@@ -6,6 +6,8 @@ input_info:
 input_type_info:
   input_cat_columns:
           - Type
+          - Breed1
+          - Breed2
           - Gender
           - Color1
           - Color2
@@ -20,11 +22,10 @@ input_type_info:
           - Fee
 
   input_con_columns:
-          - Age
-          - Quantity
           - VideoAmt
           - PhotoAmt
 
 model_config:
   model_type: tabular
+
 

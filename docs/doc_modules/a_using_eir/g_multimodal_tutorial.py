@@ -16,6 +16,8 @@ def get_07_multimodal_run_1_tabular_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/07_globals.yaml",
         "--input_configs",
         f"{conf_output_path}/07_input_tabular.yaml",
+        "--fusion_configs",
+        f"{conf_output_path}/07_fusion.yaml",
         "--output_configs",
         f"{conf_output_path}/07_output.yaml",
         f"--07_globals.output_folder={output_folder}",
@@ -76,6 +78,8 @@ def get_07_multimodal_run_2_tabular_description_info() -> AutoDocExperimentInfo:
         "--input_configs",
         f"{conf_output_path}/07_input_tabular.yaml",
         f"{conf_output_path}/07_input_description.yaml",
+        "--fusion_configs",
+        f"{conf_output_path}/07_fusion.yaml",
         "--output_configs",
         f"{conf_output_path}/07_output.yaml",
         f"--07_globals.output_folder={output_folder}",
@@ -119,9 +123,13 @@ def get_07_multimodal_run_3_tabular_description_image_info() -> AutoDocExperimen
         f"{conf_output_path}/07_input_tabular.yaml",
         f"{conf_output_path}/07_input_description.yaml",
         f"{conf_output_path}/07_input_image.yaml",
+        "--fusion_configs",
+        f"{conf_output_path}/07_fusion.yaml",
         "--output_configs",
         f"{conf_output_path}/07_output.yaml",
         f"--07_globals.output_folder={output_folder}",
+        "--07_globals.device='cuda:0'",
+        "--07_globals.dataloader_workers=4",
     ]
 
     mapping = [
@@ -164,9 +172,13 @@ def get_07_mm_apx_run_1_tab_desc_pre_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/07_input_description.yaml",
         f"{conf_output_path}/07_apx-a_input_description_pretrained.yaml",
         f"{conf_output_path}/07_input_image.yaml",
+        "--fusion_configs",
+        f"{conf_output_path}/07_fusion.yaml",
         "--output_configs",
         f"{conf_output_path}/07_output.yaml",
         f"--07_globals.output_folder={output_folder}",
+        "--07_globals.device='cuda:0'",
+        "--07_globals.dataloader_workers=4",
     ]
 
     mapping = [
@@ -210,9 +222,13 @@ def get_07_mm_apx_run_2_tab_desc_mt_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/07_input_description.yaml",
         f"{conf_output_path}/07_apx-a_input_description_pretrained.yaml",
         f"{conf_output_path}/07_input_image.yaml",
+        "--fusion_configs",
+        f"{conf_output_path}/07_fusion.yaml",
         "--output_configs",
-        f"{conf_output_path}/07_output.yaml",
+        f"{conf_output_path}/07_apx-b_mt_output.yaml",
         f"--07_globals.output_folder={output_folder}",
+        "--07_globals.device='cuda:0'",
+        "--07_globals.dataloader_workers=4",
     ]
 
     mapping = [
@@ -246,3 +262,4 @@ def get_experiments() -> Sequence[AutoDocExperimentInfo]:
     exp_a2 = get_07_mm_apx_run_2_tab_desc_mt_info()
 
     return [exp_1, exp_2, exp_3, exp_a1, exp_a2]
+
