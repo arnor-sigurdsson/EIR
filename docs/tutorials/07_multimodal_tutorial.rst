@@ -97,6 +97,38 @@ When training, I got the following training curve:
 
 .. image:: tutorial_files/07_multimodal_tutorial/figures/07_multimodal_training_curve_MCC_tabular.png
 
+Now, since we set the ``--get_acts=true`` parameter,
+we can have a look at the activations (notice in the global
+configuration, we set ``get_acts_ever_sample_factor=10``,
+which means they are computed every
+10 sampling iterations,
+i.e. 200 * 10 = 2000 training iterations).
+Specifically, we check the file under ``samples/4000/activations/``
+in the ``results`` folder. First, we can have a look at the
+feature importance for the tabular data.
+
+.. image:: tutorial_files/07_multimodal_tutorial/figures/tutorial_07a_feature_importance_D.png
+
+Here we can see that ``Breed1`` is the feature that most strongly influenced
+the model's prediction. In the ``activations`` folder, we can also
+see how the inputs influence the model towards a specific class.
+Here, we will look at how the ``Breed1`` input values influence the model
+towards the class "D: 100+ Days", meaning the pet was adopted
+after 100 days:
+
+.. image:: tutorial_files/07_multimodal_tutorial/figures/tutorial_07a_breed_importance_D.png
+
+So from this it seems that, unfortunately, mixed breed pets
+are less likely to be adopted
+(that is, the value "Mixed Breed" pushes the model towards
+making the "D: 100+ Days" prediction).
+This does perhaps make intuitive sense,
+but keep in mind that this is specifically analyzing the behavior
+of the model, and not guaranteed to be true, causal relationships.
+Additionally, this is something that could likely be discovered with simpler
+methods, such as a logistic regression model. However, this is just
+an example of how to use the SHAP activations to analyze the deep-learning model.
+
 
 B - Tabular + Text Data
 -----------------------
@@ -245,12 +277,12 @@ The command:
 .. literalinclude:: tutorial_files/07_multimodal_tutorial/commands/MULTIMODAL_APX-2_TABULAR_DESCRIPTION_IMAGE_PRETRAINED_MT.txt
     :language: console
 
-The training curve for the adoption speed:
+First we can have a look at the average performance:
 
-.. image:: tutorial_files/07_multimodal_tutorial/figures/07_multimodal_training_curve_MCC_tabular_description_multi_task.png
+.. image:: tutorial_files/07_multimodal_tutorial/figures/07_multimodal_training_curve_perf-average_tabular_description_multi_task.png
 
 .. note::
-    The average performance is the average of the MCC for th
+    The average performance by default is the average of the MCC for the
     categorical targets, and (1.0 - loss) for the regression targets.
 
 So, since we are using different inputs and outputs in this task,
@@ -258,3 +290,28 @@ we cannot compare directly to the previous results. However, we can
 see that the model seems to be able to learn to predict the
 3 different targets fairly well.
 
+The training curves for the adoption speed, age and quantity:
+
+.. image:: tutorial_files/07_multimodal_tutorial/figures/07_multimodal_training_curve_MCC_tabular_description_multi_task.png
+
+.. image:: tutorial_files/07_multimodal_tutorial/figures/07_multimodal_training_curve_R2_tabular_description_multi_task_Age.png
+
+.. image:: tutorial_files/07_multimodal_tutorial/figures/07_multimodal_training_curve_R2_tabular_description_multi_task_Quantity.png
+
+
+Finally, we can also look at the regression predictions
+by checking the ``samples`` folder for the ``Age`` and ``Quantity``
+targets. Here are a couple of examples:
+
+.. image:: tutorial_files/07_multimodal_tutorial/figures/regression_predictions_age.png
+
+.. image:: tutorial_files/07_multimodal_tutorial/figures/regression_predictions_quantity.png
+
+
+So in the case of quantity, it is expected that the model
+gets some of the predictions wrong, since in our parsed
+data we are only using randomly chosen one image, but the original
+data includes multiple images (it can also be that it can learn some
+of this from the descriptions).
+However, the model seems to be able
+to predict the quantity fairly well, and same for the age.

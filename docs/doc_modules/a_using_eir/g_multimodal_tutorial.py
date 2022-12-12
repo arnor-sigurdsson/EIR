@@ -32,9 +32,13 @@ def get_07_multimodal_run_1_tabular_info() -> AutoDocExperimentInfo:
             "figures/07_multimodal_training_curve_MCC_tabular.pdf",
         ),
         (
+            "4000/activations/pets_tabular/feature_importance.pdf",
+            "figures/tutorial_07a_feature_importance_D.pdf",
+        ),
+        (
             "4000/activations/pets_tabular/D: 100+ Days/cat_features_Breed1_"
             "D: 100+ Days.pdf",
-            "figures/tutorial_07a_feature_importance_D.pdf",
+            "figures/tutorial_07a_breed_importance_D.pdf",
         ),
     ]
 
@@ -299,9 +303,33 @@ def get_07_mm_apx_run_2_tab_desc_mt_info() -> AutoDocExperimentInfo:
 
     mapping = [
         (
+            "PERF-AVERAGE",
+            "figures/"
+            "07_multimodal_training_curve_perf-average_tabular_description_multi_task.pdf",
+        ),
+        (
             "training_curve_MCC",
             "figures/"
             "07_multimodal_training_curve_MCC_tabular_description_multi_task.pdf",
+        ),
+        (
+            "Age/training_curve_R2.pdf",
+            "figures/"
+            "07_multimodal_training_curve_R2_tabular_description_multi_task_Age.pdf",
+        ),
+        (
+            "Quantity/training_curve_R2.pdf",
+            "figures/"
+            "07_multimodal_training_curve_"
+            "R2_tabular_description_multi_task_Quantity.pdf",
+        ),
+        (
+            "Age/samples/2000/regression_predictions.pdf",
+            "figures/regression_predictions_age.pdf",
+        ),
+        (
+            "Quantity/samples/2000/regression_predictions.pdf",
+            "figures/regression_predictions_quantity.pdf",
         ),
     ]
 
@@ -328,3 +356,4 @@ def get_experiments() -> Sequence[AutoDocExperimentInfo]:
     exp_a2 = get_07_mm_apx_run_2_tab_desc_mt_info()
 
     return [exp_1, exp_2, exp_3, exp_a1, exp_a2]
+

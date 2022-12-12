@@ -9,7 +9,11 @@ eir_tutorials/07_multimodal_tutorial/
 │   ├── 07_input_image.yaml
 │   ├── 07_input_tabular.yaml
 │   └── 07_output.yaml
-└── data
+├── data
+│   ├── descriptions.csv
+│   ├── images
+│   └── tabular.csv
+└── data_sample
     ├── descriptions.csv
     ├── images
     └── tabular.csv
