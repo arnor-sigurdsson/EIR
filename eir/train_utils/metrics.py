@@ -341,6 +341,13 @@ def get_uncertainty_loss_hook(
         if output_config.output_info.output_type != "tabular":
             continue
 
+        if not output_config.output_type_info.uncertainty_weighted_mt_loss:
+            continue
+
+        logger.info(
+            f"Adding uncertainty loss for {output_config.output_info.output_name}."
+        )
+
         output_type_info = output_config.output_type_info
         cur_target_cat_columns = list(output_type_info.target_cat_columns)
         cur_target_con_columns = list(output_type_info.target_con_columns)
@@ -367,17 +374,21 @@ def hook_add_uncertainty_loss(
     loss_key: str = "per_target_train_losses",
     *args,
     **kwargs,
-):
-    base_losses_dict = state[loss_key]
+) -> Dict[str, Dict[str, torch.Tensor]]:
+    """
+    Note that we only update the relevant losses in the base dict.
+    """
 
-    uncertainty_losses = {}
+    base_losses_dict = state[loss_key]
+    updated_losses = copy(base_losses_dict)
+
     for output_name, module in uncertainty_modules.items():
         cur_module = uncertainty_modules[output_name]
         cur_loss_dict = base_losses_dict[output_name]
         cur_uncertainty_losses = cur_module(losses_dict=cur_loss_dict)
-        uncertainty_losses[output_name] = cur_uncertainty_losses
+        updated_losses[output_name] = cur_uncertainty_losses
 
-    state_updates = {loss_key: uncertainty_losses}
+    state_updates = {loss_key: updated_losses}
 
     return state_updates
 
@@ -401,16 +412,22 @@ class UncertaintyMultiTaskLoss(nn.Module):
         )
 
     @staticmethod
-    def _construct_params(cur_target_columns: List[str], device: str):
+    def _construct_params(
+        cur_target_columns: List[str], device: str
+    ) -> Dict[str, nn.Parameter]:
+
         param_dict = {}
         for column_name in cur_target_columns:
-            param_dict[column_name] = nn.Parameter(
-                torch.zeros(1), requires_grad=True
-            ).to(device=device)
+            cur_param = nn.Parameter(torch.zeros(1), requires_grad=True).to(
+                device=device
+            )
+            param_dict[column_name] = cur_param
 
         return param_dict
 
-    def _calc_uncertainty_loss(self, name, loss_value):
+    def _calc_uncertainty_loss(
+        self, name: str, loss_value: torch.Tensor
+    ) -> torch.Tensor:
         log_var = self.log_vars[name]
         scalar = 2.0 if name in self.target_cat_columns else 1.0
 
@@ -419,7 +436,7 @@ class UncertaintyMultiTaskLoss(nn.Module):
 
         return loss
 
-    def forward(self, losses_dict: Dict):
+    def forward(self, losses_dict: Dict) -> Dict[str, torch.Tensor]:
         losses_uncertain = {}
 
         for target_column, loss_value_base in losses_dict.items():

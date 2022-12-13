@@ -400,13 +400,16 @@ def test_regression(prep_modelling_test_configs):
         )
 
 
-def _get_multi_task_output_configs(label_smoothing: float = 0.0) -> Sequence[Dict]:
+def _get_multi_task_output_configs(
+    label_smoothing: float = 0.0, uncertainty_mt_loss: bool = True
+) -> Sequence[Dict]:
     output_configs = [
         {
             "output_info": {"output_name": "test_output_copy"},
             "output_type_info": {
                 "target_cat_columns": [],
                 "target_con_columns": ["Height"],
+                "uncertainty_weighted_mt_loss": uncertainty_mt_loss,
             },
         },
         {
@@ -415,6 +418,7 @@ def _get_multi_task_output_configs(label_smoothing: float = 0.0) -> Sequence[Dic
                 "target_cat_columns": ["Origin"],
                 "target_con_columns": ["Height"],
                 "cat_label_smoothing": label_smoothing,
+                "uncertainty_weighted_mt_loss": uncertainty_mt_loss,
             },
         },
     ]
@@ -560,7 +564,9 @@ def _get_multi_task_output_configs(label_smoothing: float = 0.0) -> Sequence[Dic
                         "rb_do": 0.20,
                     },
                 },
-                "output_configs": _get_multi_task_output_configs(label_smoothing=0.1),
+                "output_configs": _get_multi_task_output_configs(
+                    label_smoothing=0.1, uncertainty_mt_loss=False
+                ),
             },
         },
         # Case 6: Using the MGMoE fusion
@@ -588,7 +594,9 @@ def _get_multi_task_output_configs(label_smoothing: float = 0.0) -> Sequence[Dic
                     "model_type": "mgmoe",
                     "model_config": {"mg_num_experts": 3, "stochastic_depth_p": 0.2},
                 },
-                "output_configs": _get_multi_task_output_configs(),
+                "output_configs": _get_multi_task_output_configs(
+                    uncertainty_mt_loss=False
+                ),
             },
         },
         # Case 7: Using the GLN with mixing

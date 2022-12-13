@@ -10,6 +10,7 @@ Using EIR
     04_pretrained_sequence_tutorial.rst
     05_image_tutorial.rst
     06_raw_bytes_tutorial.rst
+    07_multimodal_tutorial.rst
 
 Customizing EIR
 ===============

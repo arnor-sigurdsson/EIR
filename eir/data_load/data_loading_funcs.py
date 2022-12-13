@@ -1,6 +1,6 @@
 from collections import Counter
 from statistics import mean
-from typing import TYPE_CHECKING, List, Tuple, Union, Dict, Iterable
+from typing import TYPE_CHECKING, List, Tuple, Union, Dict, Iterable, Optional
 
 import torch
 from aislib.misc_utils import get_logger
@@ -114,7 +114,7 @@ def _gather_column_sampling_weights(
 
 
 def _get_column_label_weights_and_counts(
-    label_iterable: Iterable[int],
+    label_iterable: Iterable[int], column_name: Optional[str] = None
 ) -> al_sample_weight_and_counts:
     """
     We have the assertion to make sure we have a unique integer for each label, starting
@@ -126,7 +126,21 @@ def _get_column_label_weights_and_counts(
 
     def _check_labels(label_list: List[int]):
         labels_set = set(label_list)
-        assert sorted(list(labels_set)) == list(range(len(labels_set)))
+        found_labels = sorted(list(labels_set))
+        expected_labels = list(range(len(found_labels)))
+
+        if found_labels != expected_labels:
+            raise ValueError(
+                f"When setting up weighed sampling for column {column_name}, "
+                f"all labels must be present in the training set. "
+                f"Expected at least {max(expected_labels)} labels, "
+                f"but got {len(found_labels)}. "
+                "This is likely due to a mismatch between the training set and the "
+                "validation set, possibly due to rare labels in the data that e.g. "
+                "only appear in the validation set after splitting. "
+                "Weighed sampling is therefore not supported for this "
+                "column."
+            )
 
     labels = list(label_iterable)
     _check_labels(label_list=labels)

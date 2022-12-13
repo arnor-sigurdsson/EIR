@@ -6,11 +6,13 @@ import re
 from typing import List, Sequence, Tuple, Callable, Dict
 
 from PIL.Image import Image
-from aislib.misc_utils import ensure_path_exists
+from aislib.misc_utils import ensure_path_exists, get_logger
 from pdf2image import convert_from_path
 
 from docs.doc_modules.data import get_data
 from eir.setup.config import load_yaml_config
+
+logger = get_logger(name=__name__)
 
 
 @dataclass
@@ -85,8 +87,13 @@ def set_up_conf_files(base_path: Path, conf_output_path: Path):
 
 
 def find_and_copy_files(
-    run_folder: Path, output_folder: Path, patterns: Sequence[Tuple[str, str]]
+    run_folder: Path,
+    output_folder: Path,
+    patterns: Sequence[Tuple[str, str]],
+    strict: bool = True,
 ):
+    matched_patterns = {}
+
     for path in run_folder.rglob("*"):
         for pattern, target in patterns:
             if re.match(pattern=pattern, string=str(path)) or pattern in str(path):
@@ -106,6 +113,17 @@ def find_and_copy_files(
 
                     pil_image.save(output_destination.with_suffix(".png"))
                     output_destination.unlink()
+
+                matched_patterns[pattern] = True
+
+    for pattern, _ in patterns:
+        if pattern not in matched_patterns:
+            if strict:
+                raise FileNotFoundError(
+                    f"No files found for pattern {pattern} in {run_folder}."
+                )
+            else:
+                logger.warning(f"No files found for pattern {pattern} in {run_folder}.")
 
 
 def run_experiment_from_command(command: List[str], force_run: bool = False):

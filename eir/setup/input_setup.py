@@ -1,5 +1,6 @@
 from collections import OrderedDict
 from copy import deepcopy
+import os
 from dataclasses import dataclass, fields
 from functools import partial
 from pathlib import Path
@@ -680,7 +681,7 @@ def get_sequence_input_objects_from_pretrained(
     vocab_file = input_config.input_type_info.vocab_file
     if vocab_file:
         raise ValueError(
-            "Using a vocabulary file not supported when using pre-trained models "
+            "Using a vocabulary file not supported when using pre-trained models as "
             "their training vocabulary will be used."
         )
 
@@ -707,6 +708,12 @@ def _sync_hf_and_pytorch_vocab(hf_tokenizer: PreTrainedTokenizer) -> Vocab:
 
 
 def _get_hf_tokenizer(hf_model_name: str) -> PreTrainedTokenizer:
+    """
+    See https://github.com/huggingface/transformers/issues/5486 for why we need to
+    set the environment variable.
+    """
+    os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
     hf_tokenizer = AutoTokenizer.from_pretrained(
         pretrained_model_name_or_path=hf_model_name, add_prefix_space=True
     )
@@ -957,7 +964,6 @@ def yield_tokens_from_file(
 def yield_tokens_from_csv(
     file_path: str, split_on: str, gathered_stats: GatheredSequenceStats
 ) -> Generator[Sequence[str], None, None]:
-    gathered_stats.total_files += 1
 
     split_func = get_sequence_split_function(split_on=split_on)
 
@@ -979,6 +985,7 @@ def yield_tokens_from_csv(
 
         cur_length = len(cur_line)
         gathered_stats.total_count += len(cur_line)
+        gathered_stats.total_files += 1
 
         if cur_length > gathered_stats.max_length:
             gathered_stats.max_length = cur_length

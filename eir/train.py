@@ -704,11 +704,7 @@ def _get_default_step_function_hooks_init_kwargs(
         init_kwargs["post_prepare_batch"].append(mix_hook)
         init_kwargs["loss"][0] = hook_mix_loss
 
-    all_targets = get_all_tabular_targets(output_configs=configs.output_configs)
-    if len(all_targets) > 1:
-        logger.debug(
-            "Setting up hook for uncertainty weighted loss for multi task modelling."
-        )
+    if _should_add_uncertainty_loss_hook(output_configs=configs.output_configs):
         uncertainty_hook = get_uncertainty_loss_hook(
             output_configs=configs.output_configs,
             device=configs.global_config.device,
@@ -730,6 +726,19 @@ def _get_default_step_function_hooks_init_kwargs(
         init_kwargs["loss"].append(get_hook_iteration_counter())
 
     return init_kwargs
+
+
+def _should_add_uncertainty_loss_hook(
+    output_configs: Sequence[schemas.OutputConfig],
+) -> bool:
+    all_targets = get_all_tabular_targets(output_configs=output_configs)
+
+    more_than_one_target = len(all_targets) > 1
+
+    any_uncertainty_targets = any(
+        c.output_type_info.uncertainty_weighted_mt_loss for c in output_configs
+    )
+    return more_than_one_target and any_uncertainty_targets
 
 
 def add_l1_loss_hook_if_applicable(

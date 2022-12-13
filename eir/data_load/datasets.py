@@ -540,12 +540,15 @@ class MemoryDataset(DatasetBase):
 
 
 def _sequence_load_wrapper(
-    data_pointer: Union[Path, int],
+    data_pointer: Union[Path, int, np.ndarray],
     input_source: str,
     split_on: str,
     encode_func: Callable[[Sequence[str]], List[int]],
     deeplake_inner_key: Optional[str] = None,
 ) -> np.ndarray:
+    """
+    In the case of .csv input sources, we have already loaded and tokenized the data.
+    """
 
     split_func = get_sequence_split_function(split_on=split_on)
     if deeplake_ops.is_deeplake_dataset(data_source=input_source):
@@ -556,6 +559,8 @@ def _sequence_load_wrapper(
             inner_key=deeplake_inner_key,
         )
         content = text_as_np_array[0]
+    elif input_source.endswith(".csv"):
+        return data_pointer
     else:
         content = load_sequence_from_disk(sequence_file_path=data_pointer)
 
