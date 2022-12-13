@@ -105,10 +105,10 @@ def calculate_batch_metrics(
             cur_metric_records: al_record = metric_record_dict[output_target_type]
 
             cur_outputs = outputs[output_name][target_name]
-            cur_outputs = cur_outputs.detach().cpu().numpy()
+            cur_outputs = cur_outputs.detach().cpu().to(dtype=torch.float32).numpy()
 
             cur_labels = labels[output_name][target_name]
-            cur_labels = cur_labels.cpu().numpy()
+            cur_labels = cur_labels.cpu().to(dtype=torch.float32).numpy()
 
             for metric_record in cur_metric_records:
 

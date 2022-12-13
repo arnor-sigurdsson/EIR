@@ -104,6 +104,10 @@ class GlobalConfig:
     :param device:
         Device to run the training on (e.g. 'cuda:0' / 'cpu').
 
+    :param amp:
+        Whether to use Automatic Mixed Precision. Currently only supported when
+        training on GPUs.
+
     :param weighted_sampling_columns:
         Target column to apply weighted sampling on. Only applies to categorical
         columns. Passing in 'all' here will use an average of all the target columns.
@@ -229,6 +233,7 @@ class GlobalConfig:
     manual_valid_ids_file: Union[str, None] = None
     dataloader_workers: int = 0
     device: str = "cpu"
+    amp: bool = False
     weighted_sampling_columns: Union[None, Sequence[str]] = None
     lr: float = 1e-03
     lr_lb: float = 0.0

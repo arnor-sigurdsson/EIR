@@ -1,4 +1,5 @@
 import sys
+from contextlib import nullcontext
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
@@ -19,7 +20,8 @@ import torch
 from aislib.misc_utils import ensure_path_exists
 from aislib.misc_utils import get_logger
 from ignite.engine import Engine
-from torch import nn
+from torch import nn, autocast
+from torch.cuda.amp import GradScaler
 from torch.nn.utils import clip_grad_norm_
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader, WeightedRandomSampler
@@ -725,6 +727,14 @@ def _get_default_step_function_hooks_init_kwargs(
         )
         init_kwargs["loss"].append(get_hook_iteration_counter())
 
+    do_amp = configs.global_config.amp
+    if do_amp:
+        logger.debug("Setting up AMP training.")
+        model_forward_with_amp_objects = [
+            get_hook_amp_objects(device=configs.global_config.device)
+        ] + init_kwargs["model_forward"]
+        init_kwargs["model_forward"] = model_forward_with_amp_objects
+
     return init_kwargs
 
 
@@ -870,15 +880,22 @@ def _prepare_inputs_for_model(
 
 
 def hook_default_model_forward(
-    experiment: "Experiment", batch: "Batch", *args, **kwargs
+    experiment: "Experiment", state: Dict, batch: "Batch", *args, **kwargs
 ) -> Dict:
 
     inputs = batch.inputs
-    train_outputs = experiment.model(inputs=inputs)
+
+    context_manager = get_maybe_amp_context_manager_from_state(state=state)
+    with context_manager:
+        train_outputs = experiment.model(inputs=inputs)
 
     state_updates = {"model_outputs": train_outputs}
 
     return state_updates
+
+
+def get_amp_context_manager(device_type: str) -> autocast:
+    return autocast(device_type=device_type)
 
 
 def hook_default_optimizer_backward(
@@ -896,6 +913,12 @@ def hook_default_optimizer_backward(
     else:
         loss = state["loss"]
 
+    amp = experiment.configs.global_config.amp
+    amp_gradient_scaler = None
+    if amp and experiment.configs.global_config.device != "cpu":
+        amp_gradient_scaler = state["amp_scaler"]
+        loss = amp_gradient_scaler.scale(loss)
+
     loss.backward(**optimizer_backward_kwargs)
 
     gradient_noise = experiment.configs.global_config.gradient_noise
@@ -910,13 +933,19 @@ def hook_default_optimizer_backward(
             max_norm=gradient_clipping,
         )
 
+    step_func = experiment.optimizer.step
+    if amp and experiment.configs.global_config.device != "cpu":
+        step_func = partial(amp_gradient_scaler.step, optimizer=experiment.optimizer)
+
     if grad_acc_steps and grad_acc_steps > 1:
         cur_step = state["iteration"]
         if cur_step % grad_acc_steps == 0:
-            experiment.optimizer.step()
-
+            step_func()
     else:
-        experiment.optimizer.step()
+        step_func()
+
+    if amp and experiment.configs.global_config.device != "cpu":
+        amp_gradient_scaler.update()
 
     return {}
 
@@ -955,24 +984,34 @@ def hook_default_per_target_loss(
     experiment: "Experiment", batch: "Batch", state: Dict, *args, **kwargs
 ) -> Dict:
 
-    per_target_train_losses = experiment.loss_function(
-        inputs=state["model_outputs"], targets=batch.target_labels
-    )
+    context_manager = get_maybe_amp_context_manager_from_state(state=state)
+    with context_manager:
+        per_target_train_losses = experiment.loss_function(
+            inputs=state["model_outputs"], targets=batch.target_labels
+        )
 
-    state_updates = {"per_target_train_losses": per_target_train_losses}
+        state_updates = {"per_target_train_losses": per_target_train_losses}
 
     return state_updates
 
 
 def hook_default_aggregate_losses(state: Dict, *args, **kwargs) -> Dict:
-
-    train_loss_avg = aggregate_losses(losses_dict=state["per_target_train_losses"])
-    state_updates = {"loss": train_loss_avg}
+    context_manager = get_maybe_amp_context_manager_from_state(state=state)
+    with context_manager:
+        train_loss_avg = aggregate_losses(losses_dict=state["per_target_train_losses"])
+        state_updates = {"loss": train_loss_avg}
 
     return state_updates
 
 
-def get_hook_iteration_counter():
+def get_maybe_amp_context_manager_from_state(
+    state: Dict,
+) -> Union[nullcontext, autocast]:
+    context_manager = state.get("amp_context_manager", nullcontext())
+    return context_manager
+
+
+def get_hook_iteration_counter() -> Callable:
     iteration_count = 0
 
     def _counter_iterator(do_increment: bool = True, *args, **kwargs) -> Dict[str, int]:
@@ -984,6 +1023,30 @@ def get_hook_iteration_counter():
         return state_updates
 
     return _counter_iterator
+
+
+def get_hook_amp_objects(device: str):
+    device_type = "cpu" if device == "cpu" else "cuda"
+
+    if device == "cpu":
+        logger.warning("Using AMP is on a CPU, speedups will most likely be minimal.")
+
+    scaler = None
+    if device != "cpu":
+        scaler = GradScaler()
+
+    amp_context_manager = get_amp_context_manager(device_type=device_type)
+
+    def _get_objects(*args, **kwargs) -> Dict[str, GradScaler]:
+        state_updates = {
+            "amp_context_manager": amp_context_manager,
+        }
+        if device != "cpu":
+            state_updates["amp_scaler"] = scaler
+
+        return state_updates
+
+    return _get_objects
 
 
 def hook_adjust_loss_for_gradient_accumulation(
