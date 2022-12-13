@@ -64,6 +64,7 @@ class MGMoEModel(nn.Module):
         model_config: MGMoEModelConfig,
         fusion_in_dim: int,
         fusion_callable: al_features = default_fuse_features,
+        **kwargs,
     ):
         super().__init__()
 

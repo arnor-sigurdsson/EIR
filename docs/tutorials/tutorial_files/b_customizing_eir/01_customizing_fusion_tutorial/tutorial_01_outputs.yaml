@@ -1,0 +1,7 @@
+output_info:
+  output_name: ancestry_output
+  output_source: eir_tutorials/01_basic_tutorial/data/processed_sample_data/human_origins_labels.csv
+  output_type: tabular
+output_type_info:
+  target_cat_columns:
+    - Origin

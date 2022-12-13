@@ -76,7 +76,7 @@ def _get_filter_iterator(base_iterator, filter_callable) -> Generator[Any, None,
 
 def get_file_sample_id_iterator_basic(
     data_source: str,
-    ids_to_keep: Union[None, Sequence[str]],
+    ids_to_keep: Union[None, Set[str]],
 ) -> Generator[Tuple[Any, str], None, None]:
 
     base_file_iterator = get_file_path_iterator(
@@ -96,7 +96,7 @@ def get_file_sample_id_iterator_basic(
 def add_sequence_data_from_csv_to_samples(
     input_object: str,
     samples: DefaultDict[str, "Sample"],
-    ids_to_keep: Union[None, Sequence[str]],
+    ids_to_keep: Union[None, Set[str]],
     split_on: str,
     encode_func: Callable,
     source_name: str = "CSV File Data",

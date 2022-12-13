@@ -1,9 +1,9 @@
-15:04:55 - DEBUG - eir.train_utils.utils - Global random seed set to 0.
+14:27:43 - DEBUG - eir.train_utils.utils - Global random seed set to 0.
 usage: eirpredict [-h] --global_configs GLOBAL_CONFIGS [GLOBAL_CONFIGS ...]
                   --input_configs INPUT_CONFIGS [INPUT_CONFIGS ...]
                   [--fusion_configs [FUSION_CONFIGS ...]] --output_configs
-                  OUTPUT_CONFIGS [OUTPUT_CONFIGS ...] --model_path MODEL_PATH
-                  [--evaluate] --output_folder OUTPUT_FOLDER
+                  [OUTPUT_CONFIGS ...] --model_path MODEL_PATH [--evaluate]
+                  --output_folder OUTPUT_FOLDER
                   [--act_background_source {train,predict}]
 
 optional arguments:
@@ -15,7 +15,7 @@ optional arguments:
                         configuration represents one input.
   --fusion_configs [FUSION_CONFIGS ...]
                         Fusion .yaml configurations.
-  --output_configs OUTPUT_CONFIGS [OUTPUT_CONFIGS ...]
+  --output_configs [OUTPUT_CONFIGS ...]
                         Output .yaml configurations.
   --model_path MODEL_PATH
                         Path to model to use for predictions.

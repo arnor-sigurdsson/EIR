@@ -1,0 +1,60 @@
+MetaModel(
+  (input_modules): ModuleDict(
+    (genotype): LCLModel(
+      (fc_0): SplitLinear(in_features=4000, num_chunks=500, split_size=8, out_feature_sets=4, out_features=2000, bias=False)
+      (split_blocks): Sequential(
+        (0): SplitMLPResidualBlock(
+          (norm_1): LayerNorm((2000,), eps=1e-05, elementwise_affine=True)
+          (fc_1): SplitLinear(in_features=2000, num_chunks=125, split_size=16, out_feature_sets=4, out_features=500, bias=False)
+          (act_1): Swish(num_parameters=1)
+          (do): Dropout(p=0.1, inplace=False)
+          (fc_2): SplitLinear(in_features=500, num_chunks=32, split_size=16, out_feature_sets=4, out_features=128, bias=False)
+          (downsample_identity): SplitLinear(in_features=2000, num_chunks=128, split_size=16, out_feature_sets=1, out_features=128, bias=False)
+          (stochastic_depth): StochasticDepth(p=0.0, mode=batch)
+        )
+      )
+    )
+  )
+  (fusion_module): MyLSTMFusionModule(
+    (fusion): LSTM(128, 128, batch_first=True)
+  )
+  (output_modules): ModuleDict(
+    (ancestry_output): TabularOutputModule(
+      (multi_task_branches): ModuleDict(
+        (Origin): Sequential(
+          (0): Sequential(
+            (0): Sequential(
+              (0): MLPResidualBlock(
+                (norm_1): LayerNorm((128,), eps=1e-05, elementwise_affine=True)
+                (fc_1): Linear(in_features=128, out_features=256, bias=False)
+                (act_1): Swish(num_parameters=1)
+                (do): Dropout(p=0.1, inplace=False)
+                (fc_2): Linear(in_features=256, out_features=256, bias=False)
+                (downsample_identity): Linear(in_features=128, out_features=256, bias=False)
+                (stochastic_depth): StochasticDepth(p=0.1, mode=batch)
+              )
+            )
+            (1): Sequential(
+              (0): MLPResidualBlock(
+                (norm_1): LayerNorm((256,), eps=1e-05, elementwise_affine=True)
+                (fc_1): Linear(in_features=256, out_features=256, bias=False)
+                (act_1): Swish(num_parameters=1)
+                (do): Dropout(p=0.1, inplace=False)
+                (fc_2): Linear(in_features=256, out_features=256, bias=False)
+                (stochastic_depth): StochasticDepth(p=0.1, mode=batch)
+              )
+            )
+          )
+          (1): Sequential(
+            (norm_final): LayerNorm((256,), eps=1e-05, elementwise_affine=True)
+            (act_final): Swish(num_parameters=1)
+            (do_final): Dropout(p=0.1, inplace=False)
+          )
+          (2): Sequential(
+            (final): Linear(in_features=256, out_features=6, bias=True)
+          )
+        )
+      )
+    )
+  )
+)

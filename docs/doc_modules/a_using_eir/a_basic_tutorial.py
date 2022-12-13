@@ -1,7 +1,8 @@
 from pathlib import Path
-from typing import Sequence
+from typing import Sequence, List
 
-from .experiments import AutoDocExperimentInfo, run_capture_and_save
+from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
+from docs.doc_modules.utils import get_saved_model_path
 
 
 def get_tutorial_01_run_1_gln_info() -> AutoDocExperimentInfo:
@@ -31,7 +32,7 @@ def get_tutorial_01_run_1_gln_info() -> AutoDocExperimentInfo:
     get_data_folder = (
         run_capture_and_save,
         {
-            "command": ["tree", str(data_output_path.parent), "-L", "3", "--noreport"],
+            "command": ["tree", str(data_output_path.parent), "-L", "2", "--noreport"],
             "output_path": Path(base_path) / "commands/input_folder.txt",
         },
     )
@@ -154,6 +155,8 @@ def get_tutorial_01_run_2_gln_predict_info() -> AutoDocExperimentInfo:
 
     conf_output_path = "eir_tutorials/01_basic_tutorial/conf"
 
+    run_1_output_path = "eir_tutorials/tutorial_runs/tutorial_01_run"
+
     command = [
         "eirpredict",
         "--global_configs",
@@ -163,11 +166,10 @@ def get_tutorial_01_run_2_gln_predict_info() -> AutoDocExperimentInfo:
         "--output_configs",
         f"{conf_output_path}/tutorial_01_outputs.yaml",
         "--model_path",
-        "eir_tutorials/tutorial_runs/tutorial_01_run_lr=0.002_epochs=20/saved_models"
-        "/tutorial_01_run_lr=0.002_epochs=20_model_1400_perf-average=0.8051.pt",
+        "FILL_MODEL",
         "--evaluate",
         "--output_folder",
-        "eir_tutorials/tutorial_runs/tutorial_01_run_lr=0.002_epochs=20",
+        run_1_output_path,
     ]
 
     data_output_path = Path(
@@ -182,18 +184,32 @@ def get_tutorial_01_run_2_gln_predict_info() -> AutoDocExperimentInfo:
     ]
 
     ade = AutoDocExperimentInfo(
-        name="GLN_2_PREDICT",
+        name="GLN_1_PREDICT",
         data_url="https://drive.google.com/file/d/1MELauhv7zFwxM8nonnj3iu_SmS69MuNi",
         data_output_path=data_output_path,
         conf_output_path=Path(conf_output_path),
         base_path=Path(base_path),
         command=command,
         files_to_copy_mapping=mapping,
+        pre_run_command_modifications=(_add_model_path_to_command,),
         post_run_functions=(),
         force_run_command=True,
     )
 
     return ade
+
+
+def _get_model_path_for_predict() -> str:
+    run_1_output_path = "eir_tutorials/tutorial_runs/tutorial_01_run"
+    model_path = get_saved_model_path(run_folder=Path(run_1_output_path))
+
+    return model_path
+
+
+def _add_model_path_to_command(command: List[str]) -> List[str]:
+    model_path = _get_model_path_for_predict()
+    command = [x.replace("FILL_MODEL", model_path) for x in command]
+    return command
 
 
 def get_experiments() -> Sequence[AutoDocExperimentInfo]:

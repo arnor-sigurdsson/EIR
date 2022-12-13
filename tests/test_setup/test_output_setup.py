@@ -43,7 +43,7 @@ def test_set_up_num_classes(get_transformer_test_data):
                         "input_info": {"input_name": "test_genotype"},
                         "model_config": {
                             "model_type": "cnn",
-                            "model_init_config": {"l1": 1e-03},
+                            "model_init_config": {"l1": 1e-04},
                         },
                     },
                     {

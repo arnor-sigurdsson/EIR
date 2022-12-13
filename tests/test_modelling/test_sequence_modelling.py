@@ -77,7 +77,7 @@ def _get_sequence_test_specific_fusion_configs() -> Dict:
             },
         },
         # Case 2: Classification - Positional Embedding, Windowed, Auto dff,
-        # Avg Pooling and mixing
+        # Avg Pooling and mixing, bpe tokenizer
         {
             "injections": {
                 "global_configs": {
@@ -89,6 +89,7 @@ def _get_sequence_test_specific_fusion_configs() -> Dict:
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_sequence"},
+                        "input_type_info": {"tokenizer": "bpe"},
                         "model_config": {
                             "window_size": 16,
                             "position": "embed",

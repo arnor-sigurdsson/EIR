@@ -1,6 +1,7 @@
 import reprlib
 from collections import defaultdict
 from copy import copy
+import warnings
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
@@ -111,6 +112,8 @@ def construct_default_dataset_kwargs_from_cl_args(
     ids_to_keep: Union[None, Sequence[str]] = None,
 ) -> Dict[str, Any]:
 
+    ids_to_keep = set(ids_to_keep) if ids_to_keep is not None else None
+
     dataset_kwargs = {
         "inputs": inputs,
         "outputs": outputs,
@@ -164,7 +167,7 @@ class DatasetBase(Dataset):
         self.outputs = outputs
         self.test_mode = test_mode
         self.target_labels_dict = target_labels_dict if target_labels_dict else {}
-        self.ids_to_keep = ids_to_keep
+        self.ids_to_keep = set(ids_to_keep) if ids_to_keep else None
 
     def init_label_attributes(self):
         if not self.outputs:
@@ -201,11 +204,11 @@ class DatasetBase(Dataset):
                 target_labels_dict=self.target_labels_dict, samples=samples
             )
             if ids_to_keep:
-                ids_to_keep = tuple(
+                ids_to_keep = set(
                     i for i in self.target_labels_dict.keys() if i in ids_to_keep
                 )
             else:
-                ids_to_keep = tuple(self.target_labels_dict.keys())
+                ids_to_keep = set(self.target_labels_dict.keys())
 
         for input_name, input_object in self.inputs.items():
 
@@ -380,7 +383,7 @@ def _add_data_to_samples_wrapper(
     input_source: str,
     input_name: str,
     samples: DefaultDict[str, Sample],
-    ids_to_keep: Union[None, Sequence[str]],
+    ids_to_keep: Union[None, Set[str]],
     data_loading_hook: Callable,
     deeplake_input_inner_key: Optional[str] = None,
 ) -> DefaultDict[str, Sample]:
@@ -411,7 +414,7 @@ def _add_file_data_to_samples(
     input_source: str,
     input_name: str,
     samples: DefaultDict[str, Sample],
-    ids_to_keep: Union[None, Sequence[str]],
+    ids_to_keep: Union[None, Set[str]],
     data_loading_hook: Callable,
 ) -> DefaultDict[str, Sample]:
 
@@ -437,18 +440,19 @@ def _add_tabular_data_to_samples(
     ids_to_keep: Union[None, Sequence[str]],
     source_name: str = "Tabular Data",
 ) -> DefaultDict[str, Sample]:
-    def _get_tabular_iterator():
-        for sample_id_, tabular_inputs_ in tabular_dict.items():
-            if ids_to_keep and sample_id_ not in ids_to_keep:
-                continue
-            yield sample_id_, tabular_inputs_
+    def _get_tabular_iterator(ids_to_keep_: Union[None, set]):
 
-    if ids_to_keep is None:
-        ids_to_keep = []
+        for sample_id_, tabular_inputs_ in tabular_dict.items():
+            if ids_to_keep_ and sample_id_ not in ids_to_keep_:
+                continue
+
+            yield sample_id_, tabular_inputs_
 
     known_length = None if not ids_to_keep else len(ids_to_keep)
     tabular_iterator = tqdm(
-        _get_tabular_iterator(), desc=source_name, total=known_length
+        _get_tabular_iterator(ids_to_keep_=ids_to_keep),
+        desc=source_name,
+        total=known_length,
     )
 
     for sample_id, tabular_inputs in tabular_iterator:
@@ -480,16 +484,20 @@ class MemoryDataset(DatasetBase):
             input_source = input_object.input_config.input_info.input_source
 
             if input_type == "omics":
+                inner_key = input_object.input_config.input_info.input_inner_key
                 mapping[input_name] = partial(
                     _omics_load_wrapper,
                     subset_indices=self.inputs[input_name].subset_indices,
                     input_source=input_source,
+                    deeplake_inner_key=inner_key,
                 )
 
             elif input_type == "image":
+                inner_key = input_object.input_config.input_info.input_inner_key
                 mapping[input_name] = partial(
                     _image_load_wrapper,
                     input_source=input_source,
+                    deeplake_inner_key=inner_key,
                 )
 
             elif input_type == "sequence":
@@ -532,12 +540,15 @@ class MemoryDataset(DatasetBase):
 
 
 def _sequence_load_wrapper(
-    data_pointer: Union[Path, int],
+    data_pointer: Union[Path, int, np.ndarray],
     input_source: str,
     split_on: str,
     encode_func: Callable[[Sequence[str]], List[int]],
     deeplake_inner_key: Optional[str] = None,
 ) -> np.ndarray:
+    """
+    In the case of .csv input sources, we have already loaded and tokenized the data.
+    """
 
     split_func = get_sequence_split_function(split_on=split_on)
     if deeplake_ops.is_deeplake_dataset(data_source=input_source):
@@ -548,6 +559,8 @@ def _sequence_load_wrapper(
             inner_key=deeplake_inner_key,
         )
         content = text_as_np_array[0]
+    elif input_source.endswith(".csv"):
+        return data_pointer
     else:
         content = load_sequence_from_disk(sequence_file_path=data_pointer)
 
@@ -1054,9 +1067,16 @@ def _omics_load_wrapper(
 def _load_deeplake_sample(
     data_pointer: int, input_source: str, inner_key: str
 ) -> np.ndarray:
+    """
+    Deeplake warns about indexing directly into a DS, vs. random access. For now we'll
+    use this random access pattern here as we have to be able to connect to other
+    data sources (which might be outside deeplake).
+    """
     assert inner_key is not None
     deeplake_ds = deeplake_ops.load_deeplake_dataset(data_source=input_source)
     deeplake_ds_index = data_pointer
-    sample_data = deeplake_ds[deeplake_ds_index][inner_key].numpy()
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        sample_data = deeplake_ds[deeplake_ds_index][inner_key].numpy()
 
     return sample_data

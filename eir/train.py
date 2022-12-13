@@ -231,9 +231,26 @@ def set_up_tabular_target_labels_wrapper(
 
 
 def df_to_nested_dict(df: pd.DataFrame) -> Dict:
-    nested_dict = {level: df.xs(level).to_dict("index") for level in df.index.levels[0]}
 
-    return nested_dict
+    """
+    The df has a 2-level multi index, like so ['ID', output_name]
+
+    We want to convert it to a nested dict like so:
+
+        {'ID': {output_name: {target_output_column: target_column_value}}}
+    """
+    index_dict = df.to_dict(orient="index")
+
+    parsed_dict = {}
+    for key_tuple, value in index_dict.items():
+        cur_id, cur_output_name = key_tuple
+
+        if cur_id not in parsed_dict:
+            parsed_dict[cur_id] = {}
+
+        parsed_dict[cur_id][cur_output_name] = value
+
+    return parsed_dict
 
 
 def get_default_experiment(
@@ -475,25 +492,48 @@ def _get_criteria(outputs_as_dict: al_output_objects_as_dict) -> al_criteria:
     criteria_dict = {}
 
     def get_criterion(
-        column_type_: str,
+        column_type_: str, cat_label_smoothing_: float = 0.0
     ) -> Union[nn.CrossEntropyLoss, Callable]:
 
         if column_type_ == "con":
+            assert cat_label_smoothing_ == 0.0
             return partial(_calc_mse, mse_loss_func=nn.MSELoss())
         elif column_type_ == "cat":
-            return nn.CrossEntropyLoss()
+            return nn.CrossEntropyLoss(label_smoothing=cat_label_smoothing_)
 
     target_columns_gen = data_utils.get_output_info_generator(
         outputs_as_dict=outputs_as_dict
     )
 
     for output_name, column_type, column_name in target_columns_gen:
-        criterion = get_criterion(column_type_=column_type)
+
+        label_smoothing = _get_label_smoothing(
+            output_config=outputs_as_dict[output_name].output_config,
+            column_type=column_type,
+        )
+
+        criterion = get_criterion(
+            column_type_=column_type, cat_label_smoothing_=label_smoothing
+        )
+
         if output_name not in criteria_dict:
             criteria_dict[output_name] = {}
         criteria_dict[output_name][column_name] = criterion
 
     return criteria_dict
+
+
+def _get_label_smoothing(
+    output_config: schemas.OutputConfig,
+    column_type: str,
+) -> float:
+
+    if column_type == "con":
+        return 0.0
+    elif column_type == "cat":
+        return output_config.output_type_info.cat_label_smoothing
+
+    raise ValueError(f"Unknown column type: {column_type}")
 
 
 def _calc_mse(input, target, mse_loss_func: nn.MSELoss):
@@ -666,11 +706,7 @@ def _get_default_step_function_hooks_init_kwargs(
         init_kwargs["post_prepare_batch"].append(mix_hook)
         init_kwargs["loss"][0] = hook_mix_loss
 
-    all_targets = get_all_tabular_targets(output_configs=configs.output_configs)
-    if len(all_targets) > 1:
-        logger.debug(
-            "Setting up hook for uncertainty weighted loss for multi task modelling."
-        )
+    if _should_add_uncertainty_loss_hook(output_configs=configs.output_configs):
         uncertainty_hook = get_uncertainty_loss_hook(
             output_configs=configs.output_configs,
             device=configs.global_config.device,
@@ -700,6 +736,19 @@ def _get_default_step_function_hooks_init_kwargs(
         init_kwargs["model_forward"] = model_forward_with_amp_objects
 
     return init_kwargs
+
+
+def _should_add_uncertainty_loss_hook(
+    output_configs: Sequence[schemas.OutputConfig],
+) -> bool:
+    all_targets = get_all_tabular_targets(output_configs=output_configs)
+
+    more_than_one_target = len(all_targets) > 1
+
+    any_uncertainty_targets = any(
+        c.output_type_info.uncertainty_weighted_mt_loss for c in output_configs
+    )
+    return more_than_one_target and any_uncertainty_targets
 
 
 def add_l1_loss_hook_if_applicable(

@@ -31,6 +31,7 @@ class FusionModule(nn.Module):
         model_config: ResidualMLPConfig,
         fusion_in_dim: int,
         fusion_callable: al_features = default_fuse_features,
+        **kwargs,
     ):
         super().__init__()
 

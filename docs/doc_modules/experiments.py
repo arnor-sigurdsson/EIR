@@ -6,11 +6,13 @@ import re
 from typing import List, Sequence, Tuple, Callable, Dict
 
 from PIL.Image import Image
-from aislib.misc_utils import ensure_path_exists
+from aislib.misc_utils import ensure_path_exists, get_logger
 from pdf2image import convert_from_path
 
 from docs.doc_modules.data import get_data
 from eir.setup.config import load_yaml_config
+
+logger = get_logger(name=__name__)
 
 
 @dataclass
@@ -22,6 +24,7 @@ class AutoDocExperimentInfo:
     base_path: Path
     command: List[str]
     files_to_copy_mapping: Sequence[Tuple[str, str]]
+    pre_run_command_modifications: Sequence[Callable[[List[str]], List[str]]] = ()
     post_run_functions: Sequence[Tuple[Callable, Dict]] = ()
     force_run_command: bool = False
 
@@ -34,12 +37,16 @@ def make_tutorial_data(auto_doc_experiment_info: AutoDocExperimentInfo) -> None:
 
     set_up_conf_files(base_path=ade.base_path, conf_output_path=ade.conf_output_path)
 
+    command = ade.command
+    for command_modification in ade.pre_run_command_modifications:
+        command = command_modification(ade.command)
+
     run_folder = run_experiment_from_command(
-        command=ade.command, force_run=ade.force_run_command
+        command=command, force_run=ade.force_run_command
     )
 
     save_command_as_text(
-        command=ade.command,
+        command=command,
         output_path=(ade.base_path / "commands" / ade.name).with_suffix(".txt"),
     )
 
@@ -80,13 +87,19 @@ def set_up_conf_files(base_path: Path, conf_output_path: Path):
 
 
 def find_and_copy_files(
-    run_folder: Path, output_folder: Path, patterns: Sequence[Tuple[str, str]]
+    run_folder: Path,
+    output_folder: Path,
+    patterns: Sequence[Tuple[str, str]],
+    strict: bool = True,
 ):
+    matched_patterns = {}
+
     for path in run_folder.rglob("*"):
         for pattern, target in patterns:
             if re.match(pattern=pattern, string=str(path)) or pattern in str(path):
 
                 output_destination = output_folder / target
+                ensure_path_exists(path=output_destination, is_folder=False)
                 copy2(path, output_destination)
 
                 if output_destination.suffix == ".pdf":
@@ -100,6 +113,17 @@ def find_and_copy_files(
 
                     pil_image.save(output_destination.with_suffix(".png"))
                     output_destination.unlink()
+
+                matched_patterns[pattern] = True
+
+    for pattern, _ in patterns:
+        if pattern not in matched_patterns:
+            if strict:
+                raise FileNotFoundError(
+                    f"No files found for pattern {pattern} in {run_folder}."
+                )
+            else:
+                logger.warning(f"No files found for pattern {pattern} in {run_folder}.")
 
 
 def run_experiment_from_command(command: List[str], force_run: bool = False):
