@@ -553,6 +553,7 @@ def _get_multi_task_output_configs(
                                 "channel_exp_base": 2,
                                 "l1": 2e-05,
                                 "rb_do": 0.20,
+                                "attention_inclusion_cutoff": 512,
                             },
                         },
                     },

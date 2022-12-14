@@ -571,14 +571,19 @@ class PositionalEmbedding(nn.Module):
         embedding_dim: int,
         max_length: int,
         dropout: float = 0.1,
+        zero_init: bool = False,
     ) -> None:
 
         super().__init__()
         self.dropout = nn.Dropout(p=dropout)
         self.max_length = max_length
 
+        init_func = torch.randn
+        if zero_init:
+            init_func = torch.zeros
+
         self.embedding = torch.nn.Parameter(
-            data=torch.randn(1, max_length, embedding_dim), requires_grad=True
+            data=init_func(1, max_length, embedding_dim), requires_grad=True
         )
 
     def forward(self, x: Tensor) -> Tensor:

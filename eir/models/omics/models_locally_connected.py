@@ -1,7 +1,7 @@
 from copy import copy
 from dataclasses import dataclass
 from functools import partial
-from typing import List, Callable, Sequence, TYPE_CHECKING, Union
+from typing import List, Callable, Sequence, TYPE_CHECKING, Union, Literal, Optional
 
 import torch
 from aislib.misc_utils import get_logger
@@ -133,6 +133,14 @@ class LCLModelConfig:
 
     :param cutoff:
         Feature dimension cutoff where the automatic network setup stops adding layers.
+
+    :param attention_inclusion_cutoff:
+        Cutoff to start including attention blocks in the network. If set to ``None``,
+        no attention blocks will be included. The cutoff here refers to the "length"
+        dimension of the input after reshaping according to the output_feature_sets
+        in the preceding layer. For example, if we 1024 output features, and we have
+        4 output feature sets, the length dimension will be 1024/4 = 256. With an
+        attention cutoff >= 256, the attention block will be included.
     """
 
     layers: Union[None, List[int]] = None
@@ -150,6 +158,7 @@ class LCLModelConfig:
     l1: float = 0.00
 
     cutoff: int = 1024
+    attention_inclusion_cutoff: Optional[int] = None
 
 
 class LCLModel(nn.Module):
@@ -181,6 +190,7 @@ class LCLModel(nn.Module):
             dropout_p=self.model_config.rb_do,
             cutoff=self.model_config.cutoff,
             stochastic_depth_p=self.model_config.stochastic_depth_p,
+            attention_inclusion_cutoff=self.model_config.attention_inclusion_cutoff,
         )
         self.split_blocks = _get_split_blocks(
             split_parameter_spec=split_parameter_spec,
@@ -241,6 +251,7 @@ class LCParameterSpec:
     dropout_p: float
     stochastic_depth_p: float
     cutoff: int
+    attention_inclusion_cutoff: Optional[int] = None
 
 
 def _get_split_blocks(
@@ -327,11 +338,16 @@ def generate_split_resblocks_auto(split_parameter_spec: LCParameterSpec):
 
     block_modules = [first_block]
 
-    cur_attention_block = SplitAttentionBlock(
-        in_feature_sets=2**s.channel_exp_base,
+    if _do_add_attention(
+        attention_inclusion_cutoff=s.attention_inclusion_cutoff,
         in_features=first_block.out_features,
-    )
-    block_modules.append(cur_attention_block)
+        embedding_dim=first_block.out_feature_sets,
+    ):
+        cur_attention_block = LCLAttentionBlock(
+            embedding_dim=first_block.out_feature_sets,
+            in_features=first_block.out_features,
+        )
+        block_modules.append(cur_attention_block)
 
     while True:
         cur_no_blocks = len(block_modules)
@@ -356,6 +372,17 @@ def generate_split_resblocks_auto(split_parameter_spec: LCParameterSpec):
 
         block_modules.append(cur_block)
 
+        if _do_add_attention(
+            attention_inclusion_cutoff=s.attention_inclusion_cutoff,
+            in_features=cur_block.out_features,
+            embedding_dim=cur_block.out_feature_sets,
+        ):
+            cur_attention_block = LCLAttentionBlock(
+                embedding_dim=cur_block.out_feature_sets,
+                in_features=cur_block.out_features,
+            )
+            block_modules.append(cur_attention_block)
+
     logger.info(
         "No SplitLinear residual blocks specified in CL arguments. Created %d "
         "blocks with final output dimension of %d.",
@@ -365,35 +392,55 @@ def generate_split_resblocks_auto(split_parameter_spec: LCParameterSpec):
     return nn.Sequential(*block_modules)
 
 
-class SplitAttentionBlock(nn.Module):
+class LCLAttentionBlock(nn.Module):
     def __init__(
         self,
-        in_feature_sets: int,
+        embedding_dim: int,
         in_features: int,
+        num_heads: Union[int, Literal["auto"]] = "auto",
+        dropout_p: float = 0.0,
     ):
         super().__init__()
 
-        self.in_feature_sets = in_feature_sets
+        self.embedding_dim = embedding_dim
         self.in_features = in_features
+        self.dropout_p = dropout_p
         self.out_features = in_features
 
+        if num_heads == "auto":
+            self.num_heads = embedding_dim
+
         self.encoder_layer = nn.TransformerEncoderLayer(
-            d_model=self.in_feature_sets,
-            nhead=4,
-            dim_feedforward=512,
+            d_model=self.embedding_dim,
+            nhead=self.num_heads,
+            dim_feedforward=self.embedding_dim * 4,
+            activation="gelu",
+            norm_first=True,
             batch_first=True,
         )
 
         self.pos_emb = PositionalEmbedding(
-            embedding_dim=self.in_feature_sets,
-            max_length=self.in_features // self.in_feature_sets,
-            dropout=0.1,
+            embedding_dim=self.embedding_dim,
+            max_length=self.in_features // self.embedding_dim,
+            dropout=self.dropout_p,
+            zero_init=True,
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        out = x.reshape(x.shape[0], -1, self.in_feature_sets)
+        out = x.reshape(x.shape[0], -1, self.embedding_dim)
         out = self.pos_emb(out)
         out = self.encoder_layer(out)
         out = torch.flatten(input=out, start_dim=1)
 
         return out
+
+
+def _do_add_attention(
+    in_features: int, embedding_dim: int, attention_inclusion_cutoff: Optional[int]
+) -> bool:
+
+    if attention_inclusion_cutoff is None:
+        return False
+
+    attention_sequence_length = in_features // embedding_dim
+    return attention_sequence_length <= attention_inclusion_cutoff
