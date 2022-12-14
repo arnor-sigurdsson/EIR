@@ -8,7 +8,6 @@ from tests.test_modelling.setup_modelling_test_data.setup_test_data_utils import
     set_up_label_line_dict,
     get_current_test_label_values,
     set_up_test_data_root_outpath,
-    common_split_test_data_wrapper,
 )
 
 if TYPE_CHECKING:
@@ -23,7 +22,7 @@ def create_test_omics_data_and_labels(
 
     fieldnames = ["ID", "Origin", "Height", "OriginExtraCol", "ExtraTarget"]
     label_file_handle, label_file_writer = set_up_label_file_writing(
-        path=c.scoped_tmp_path, fieldnames=fieldnames
+        base_path=c.scoped_tmp_path, fieldnames=fieldnames, extra_name="_omics"
     )
 
     array_outfolder = set_up_test_data_root_outpath(base_folder=array_outfolder)
@@ -53,9 +52,6 @@ def create_test_omics_data_and_labels(
     label_file_handle.close()
 
     write_test_data_snp_file(base_folder=c.scoped_tmp_path, n_snps=c.n_snps)
-
-    if c.request_params.get("split_to_test", False):
-        common_split_test_data_wrapper(test_folder=c.scoped_tmp_path, name="omics")
 
     return array_outfolder
 
@@ -132,3 +128,10 @@ def write_test_data_snp_file(base_folder: Path, n_snps: int) -> None:
 
             cur_snp_string = "\t".join(cur_snp_list)
             snpfile.write(cur_snp_string + "\n")
+
+    subset_file = base_folder / "test_subset_snps.txt"
+
+    n_subset_snps = n_snps // 5
+    with open(str(subset_file), "w") as subset_snp_file:
+        for snp_idx in range(n_subset_snps):
+            subset_snp_file.write(str(snp_idx) + "\n")

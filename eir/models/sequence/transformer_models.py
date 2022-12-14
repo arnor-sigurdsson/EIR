@@ -78,7 +78,7 @@ class SequenceModelConfig:
 
     model_type: al_sequence_models = "sequence-default"
 
-    embedding_dim: int = 8
+    embedding_dim: int = 64
 
     position: Literal["encode", "embed"] = "encode"
     position_dropout: float = 0.10
@@ -442,7 +442,9 @@ class TransformerFeatureExtractor(nn.Module):
             nhead=model_config.num_heads,
             dim_feedforward=dim_feed_forward,
             dropout=model_config.dropout,
+            activation="gelu",
             batch_first=True,
+            norm_first=True,
         )
         self.transformer_encoder = TransformerEncoder(
             encoder_layer=encoder_layer_base, num_layers=model_config.num_layers
@@ -470,7 +472,8 @@ def parse_dim_feedforward(
     if dim_feedforward == "auto":
         dim_feedforward = embedding_dim * 4
         logger.info(
-            "Setting dim_feedfoward to %d based on %d and 'auto' option.",
+            "Setting dim_feedfoward to %d based on embedding_dim=%d and 'auto' "
+            "option.",
             dim_feedforward,
             embedding_dim,
         )

@@ -1,6 +1,7 @@
 import reprlib
 from collections import defaultdict
 from copy import copy
+import warnings
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
@@ -11,8 +12,9 @@ from typing import (
     Tuple,
     Callable,
     Sequence,
+    Optional,
+    Set,
     Iterable,
-    Generator,
     Mapping,
     DefaultDict,
     Any,
@@ -22,7 +24,7 @@ from typing import (
 
 import numpy as np
 import torch
-from PIL.Image import Image
+from PIL.Image import Image, fromarray
 from aislib.misc_utils import get_logger
 from torch.nn.functional import pad
 from torch.utils.data import Dataset
@@ -30,15 +32,17 @@ from torchvision.datasets.folder import default_loader
 from tqdm import tqdm
 
 from eir.data_load.data_augmentation import make_random_omics_columns_missing
+from eir.data_load.data_source_modules import deeplake_ops
+from eir.data_load.data_source_modules.common_utils import add_id_to_samples
+from eir.data_load.data_source_modules.local_ops import (
+    get_file_sample_id_iterator_basic,
+    add_sequence_data_from_csv_to_samples,
+)
 from eir.data_load.label_setup import (
     al_label_dict,
-    al_target_columns,
-    get_array_path_iterator,
-    Labels,
 )
-from eir.data_load.label_setup import merge_target_columns
 from eir.setup import config
-from eir.setup.input_setup import _get_split_func
+from eir.setup.input_setup import get_sequence_split_function
 
 if TYPE_CHECKING:
     from eir.setup.input_setup import (
@@ -48,40 +52,46 @@ if TYPE_CHECKING:
         BytesInputInfo,
         ImageInputInfo,
     )
+    from eir.setup.output_setup import al_output_objects_as_dict
+    from eir.train import MergedTargetLabels
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 # Type Aliases
 al_datasets = Union["MemoryDataset", "DiskDataset"]
 # embeddings --> remain str, cat targets --> int, con extra/target --> float
-al_sample_label_dict_target = Dict[str, Union[int, float]]
+al_sample_label_dict_target = Dict[str, Dict[str, Union[int, float]]]
 al_inputs = Union[Dict[str, torch.Tensor], Dict[str, Any]]
 al_getitem_return = Tuple[Dict[str, torch.Tensor], al_sample_label_dict_target, str]
 
 
 def set_up_datasets_from_configs(
     configs: config.Configs,
-    target_labels: Labels,
+    target_labels: "MergedTargetLabels",
     inputs_as_dict: "al_input_objects_as_dict",
+    outputs_as_dict: "al_output_objects_as_dict",
+    train_ids_to_keep: Optional[Sequence[str]] = None,
+    valid_ids_to_keep: Optional[Sequence[str]] = None,
 ) -> Tuple[al_datasets, al_datasets]:
 
     dataset_class = (
         MemoryDataset if configs.global_config.memory_dataset else DiskDataset
     )
 
-    targets = config.get_all_targets(targets_configs=configs.target_configs)
     train_kwargs = construct_default_dataset_kwargs_from_cl_args(
         target_labels_dict=target_labels.train_labels,
-        targets=targets,
         inputs=inputs_as_dict,
+        outputs=outputs_as_dict,
         test_mode=False,
+        ids_to_keep=train_ids_to_keep,
     )
 
     valid_kwargs = construct_default_dataset_kwargs_from_cl_args(
         target_labels_dict=target_labels.valid_labels,
-        targets=targets,
         inputs=inputs_as_dict,
+        outputs=outputs_as_dict,
         test_mode=True,
+        ids_to_keep=valid_ids_to_keep,
     )
 
     train_dataset = dataset_class(**train_kwargs)
@@ -96,21 +106,20 @@ def set_up_datasets_from_configs(
 
 def construct_default_dataset_kwargs_from_cl_args(
     target_labels_dict: Union[None, al_label_dict],
-    targets: config.Targets,
     inputs: "al_input_objects_as_dict",
+    outputs: "al_output_objects_as_dict",
     test_mode: bool,
+    ids_to_keep: Union[None, Sequence[str]] = None,
 ) -> Dict[str, Any]:
 
-    target_columns = merge_target_columns(
-        target_con_columns=targets.con_targets,
-        target_cat_columns=targets.cat_targets,
-    )
+    ids_to_keep = set(ids_to_keep) if ids_to_keep is not None else None
 
     dataset_kwargs = {
-        "target_columns": target_columns,
         "inputs": inputs,
+        "outputs": outputs,
         "target_labels_dict": target_labels_dict,
         "test_mode": test_mode,
+        "ids_to_keep": ids_to_keep,
     }
 
     return dataset_kwargs
@@ -136,10 +145,6 @@ def _check_valid_and_train_datasets(
 
 @dataclass
 class Sample:
-    """
-    array: can be path to array or the loaded array itself
-    """
-
     sample_id: str
     inputs: Dict[str, Any]
     target_labels: al_sample_label_dict_target
@@ -149,25 +154,27 @@ class DatasetBase(Dataset):
     def __init__(
         self,
         inputs: "al_input_objects_as_dict",
-        target_columns: al_target_columns,
+        outputs: "al_output_objects_as_dict",
         test_mode: bool,
         target_labels_dict: al_label_dict = None,
+        ids_to_keep: Optional[Set[str]] = None,
     ):
         super().__init__()
 
         self.samples: Union[List[Sample], None] = None
 
         self.inputs = inputs
+        self.outputs = outputs
         self.test_mode = test_mode
-        self.target_columns = target_columns
         self.target_labels_dict = target_labels_dict if target_labels_dict else {}
+        self.ids_to_keep = set(ids_to_keep) if ids_to_keep else None
 
     def init_label_attributes(self):
-        if not self.target_columns:
+        if not self.outputs:
             raise ValueError("Please specify label column name.")
 
     def set_up_samples(
-        self, file_loading_hooks: Mapping[str, Callable] = None
+        self, data_loading_hooks: Mapping[str, Callable] = None
     ) -> List[Sample]:
         """
         We do an extra filtering step at the end to account for the situation where
@@ -175,12 +182,6 @@ class DatasetBase(Dataset):
         available for. This is quite likely if we have e.g. pre-split data into
         train/val and test folders.
 
-        Note that there is a slight weirdness in how we handle the file loading hooks
-        for omics and sequence data. Omics is currently treated as being quite simple,
-        where we always just load a file straight from the disk. However, with sequence
-        data, we might do different things depending on the source, e.g. split on
-        different tokens. That's why we use the `source_name` there to grab file loading
-        hooks, instead of just a general 'sequence' key.
         """
 
         mode_str = "evaluation/test" if self.test_mode else "train"
@@ -189,51 +190,84 @@ class DatasetBase(Dataset):
         def _identity(sample_data: Any) -> Any:
             return sample_data
 
-        if file_loading_hooks is None:
-            file_loading_hooks = defaultdict(lambda: _identity)
+        if data_loading_hooks is None:
+            data_loading_hooks = defaultdict(lambda: _identity)
 
         def _default_sample_factory() -> Sample:
             return Sample(sample_id="", inputs={}, target_labels={})
 
         samples = defaultdict(_default_sample_factory)
 
-        ids_to_keep = None
+        ids_to_keep = self.ids_to_keep
         if self.target_labels_dict:
             samples = _add_target_labels_to_samples(
                 target_labels_dict=self.target_labels_dict, samples=samples
             )
-            ids_to_keep = self.target_labels_dict.keys()
+            if ids_to_keep:
+                ids_to_keep = set(
+                    i for i in self.target_labels_dict.keys() if i in ids_to_keep
+                )
+            else:
+                ids_to_keep = set(self.target_labels_dict.keys())
 
-        for source_name, source_data in self.inputs.items():
+        for input_name, input_object in self.inputs.items():
 
-            input_type = source_data.input_config.input_info.input_type
-            input_source = source_data.input_config.input_info.input_source
-            if input_type == "omics" or input_type == "image":
+            input_info = input_object.input_config.input_info
+            input_source = input_info.input_source
+            input_type = input_info.input_type
+            input_inner_key = input_info.input_inner_key
 
-                samples = _add_file_data_to_samples(
-                    source_data=input_source,
+            if input_type == "omics":
+
+                samples = _add_data_to_samples_wrapper(
+                    input_source=input_source,
+                    input_name=input_name,
                     samples=samples,
                     ids_to_keep=ids_to_keep,
-                    file_loading_hook=file_loading_hooks[input_type],
-                    source_name=source_name,
+                    data_loading_hook=data_loading_hooks[input_name],
+                    deeplake_input_inner_key=input_inner_key,
+                )
+
+            elif input_type == "image":
+
+                samples = _add_data_to_samples_wrapper(
+                    input_source=input_source,
+                    samples=samples,
+                    ids_to_keep=ids_to_keep,
+                    data_loading_hook=data_loading_hooks[input_name],
+                    input_name=input_name,
+                    deeplake_input_inner_key=input_inner_key,
                 )
 
             elif input_type == "tabular":
                 samples = _add_tabular_data_to_samples(
-                    tabular_dict=source_data.labels.all_labels,
+                    tabular_dict=input_object.labels.all_labels,
                     samples=samples,
                     ids_to_keep=ids_to_keep,
-                    source_name=source_name,
+                    source_name=input_name,
                 )
 
             elif input_type in ("sequence", "bytes"):
-                samples = _add_file_data_to_samples(
-                    source_data=input_source,
-                    samples=samples,
-                    ids_to_keep=ids_to_keep,
-                    file_loading_hook=file_loading_hooks[source_name],
-                    source_name=source_name,
-                )
+
+                if Path(input_source).is_dir():
+                    samples = _add_data_to_samples_wrapper(
+                        input_source=input_source,
+                        input_name=input_name,
+                        samples=samples,
+                        ids_to_keep=ids_to_keep,
+                        data_loading_hook=data_loading_hooks[input_name],
+                        deeplake_input_inner_key=input_inner_key,
+                    )
+
+                elif Path(input_source).suffix == ".csv":
+                    samples = add_sequence_data_from_csv_to_samples(
+                        input_object=input_source,
+                        samples=samples,
+                        encode_func=input_object.encode_func,
+                        split_on=input_object.input_config.input_type_info.split_on,
+                        ids_to_keep=ids_to_keep,
+                        source_name=input_name,
+                    )
 
         num_samples_raw = len(samples)
         if self.target_labels_dict:
@@ -274,7 +308,7 @@ class DatasetBase(Dataset):
                 if not s.target_labels:
                     no_target_labels.append(s)
 
-        if not self.samples:
+        if self.samples is None or len(self.samples) == 0:
             raise ValueError(
                 f"Expected to have at least one sample, but got {self.samples} instead."
                 f" Possibly there is a mismatch between input IDs and target IDs."
@@ -339,32 +373,63 @@ def _add_target_labels_to_samples(
     target_label_iterator = tqdm(target_labels_dict.items(), desc="Target Labels")
 
     for sample_id, sample_target_labels in target_label_iterator:
-        _add_id_to_samples(samples=samples, sample_id=sample_id)
+        add_id_to_samples(samples=samples, sample_id=sample_id)
         samples[sample_id].target_labels = sample_target_labels
 
     return samples
 
 
-def _add_file_data_to_samples(
-    source_data: str,
+def _add_data_to_samples_wrapper(
+    input_source: str,
+    input_name: str,
     samples: DefaultDict[str, Sample],
-    ids_to_keep: Union[None, Sequence[str]],
-    file_loading_hook: Callable,
-    source_name: str = "File Data",
+    ids_to_keep: Union[None, Set[str]],
+    data_loading_hook: Callable,
+    deeplake_input_inner_key: Optional[str] = None,
+) -> DefaultDict[str, Sample]:
+
+    if deeplake_ops.is_deeplake_dataset(data_source=input_source):
+        samples = deeplake_ops.add_deeplake_data_to_samples(
+            input_source=input_source,
+            input_name=input_name,
+            samples=samples,
+            ids_to_keep=ids_to_keep,
+            deeplake_input_inner_key=deeplake_input_inner_key,
+            data_loading_hook=data_loading_hook,
+        )
+
+    else:
+        samples = _add_file_data_to_samples(
+            input_source=input_source,
+            samples=samples,
+            ids_to_keep=ids_to_keep,
+            data_loading_hook=data_loading_hook,
+            input_name=input_name,
+        )
+
+    return samples
+
+
+def _add_file_data_to_samples(
+    input_source: str,
+    input_name: str,
+    samples: DefaultDict[str, Sample],
+    ids_to_keep: Union[None, Set[str]],
+    data_loading_hook: Callable,
 ) -> DefaultDict[str, Sample]:
 
     file_data_iterator = get_file_sample_id_iterator_basic(
-        data_source=source_data, ids_to_keep=ids_to_keep
+        data_source=input_source, ids_to_keep=ids_to_keep
     )
-    file_iterator_tqdm = tqdm(file_data_iterator, desc=source_name)
+    file_iterator_tqdm = tqdm(file_data_iterator, desc=input_name)
 
     for sample_id, file in file_iterator_tqdm:
 
-        sample_data = file_loading_hook(file)
+        sample_data = data_loading_hook(file)
 
-        samples = _add_id_to_samples(samples=samples, sample_id=sample_id)
+        samples = add_id_to_samples(samples=samples, sample_id=sample_id)
 
-        samples[sample_id].inputs[source_name] = sample_data
+        samples[sample_id].inputs[input_name] = sample_data
 
     return samples
 
@@ -375,109 +440,27 @@ def _add_tabular_data_to_samples(
     ids_to_keep: Union[None, Sequence[str]],
     source_name: str = "Tabular Data",
 ) -> DefaultDict[str, Sample]:
-    def _get_tabular_iterator():
-        for sample_id_, tabular_inputs_ in tabular_dict.items():
-            if ids_to_keep and sample_id_ not in ids_to_keep:
-                continue
-            yield sample_id_, tabular_inputs_
+    def _get_tabular_iterator(ids_to_keep_: Union[None, set]):
 
-    if ids_to_keep is None:
-        ids_to_keep = []
+        for sample_id_, tabular_inputs_ in tabular_dict.items():
+            if ids_to_keep_ and sample_id_ not in ids_to_keep_:
+                continue
+
+            yield sample_id_, tabular_inputs_
 
     known_length = None if not ids_to_keep else len(ids_to_keep)
     tabular_iterator = tqdm(
-        _get_tabular_iterator(), desc=source_name, total=known_length
+        _get_tabular_iterator(ids_to_keep_=ids_to_keep),
+        desc=source_name,
+        total=known_length,
     )
 
     for sample_id, tabular_inputs in tabular_iterator:
-        samples = _add_id_to_samples(samples=samples, sample_id=sample_id)
+        samples = add_id_to_samples(samples=samples, sample_id=sample_id)
 
         samples[sample_id].inputs[source_name] = tabular_inputs
 
     return samples
-
-
-def _add_id_to_samples(
-    samples: DefaultDict[str, Sample], sample_id: str
-) -> DefaultDict[str, Sample]:
-    """
-    This kind of weird function is used because in some cases, we cannot expect the
-    target labels to have added samples, because we could be predicting on completely
-    unknown samples without any target label data.
-
-    Hence, we might have sparse modular data available for the samples, e.g. only omics
-    for some samples, but only tabular data for others. So we want to ensure that the
-    data is filled in.
-    """
-    if not samples[sample_id].sample_id:
-        samples[sample_id].sample_id = sample_id
-    else:
-        assert samples[sample_id].sample_id == sample_id
-
-    return samples
-
-
-def get_file_sample_id_iterator_basic(
-    data_source: str,
-    ids_to_keep: Union[None, Sequence[str]],
-) -> Generator[Tuple[Any, str], None, None]:
-
-    base_file_iterator = get_array_path_iterator(
-        data_source=Path(data_source), validate=False
-    )
-
-    for file in base_file_iterator:
-        sample_id = file.stem
-
-        if ids_to_keep:
-            if sample_id in ids_to_keep:
-                yield sample_id, file
-        else:
-            yield sample_id, file
-
-
-def get_file_sample_id_iterator(
-    data_source: str, ids_to_keep: Union[None, Sequence[str]]
-) -> Generator[Tuple[Any, str], None, None]:
-    def _id_from_filename(file: Path) -> str:
-        return file.stem
-
-    def _filter_ids_callable(item, sample_id):
-        if sample_id in ids_to_keep:
-            return True
-        return False
-
-    base_file_iterator = get_array_path_iterator(
-        data_source=Path(data_source), validate=False
-    )
-
-    sample_id_and_file_iterator = _get_sample_id_data_iterator(
-        base_iterator=base_file_iterator, id_callable=_id_from_filename
-    )
-
-    if ids_to_keep:
-        final_iterator = _get_filter_iterator(
-            base_iterator=sample_id_and_file_iterator,
-            filter_callable=_filter_ids_callable,
-        )
-    else:
-        final_iterator = sample_id_and_file_iterator
-
-    yield from final_iterator
-
-
-def _get_sample_id_data_iterator(
-    base_iterator: Iterable[str], id_callable: Callable
-) -> Generator[Tuple[Any, str], None, None]:
-    for item in base_iterator:
-        sample_id = id_callable(item)
-        yield item, sample_id
-
-
-def _get_filter_iterator(base_iterator, filter_callable) -> Generator[Any, None, None]:
-    for item in base_iterator:
-        if filter_callable(*item):
-            yield item
 
 
 class MemoryDataset(DatasetBase):
@@ -487,26 +470,50 @@ class MemoryDataset(DatasetBase):
         if self.target_labels_dict:
             self.init_label_attributes()
 
-        file_loading_hooks = self._get_file_loading_hooks()
-        self.samples = self.set_up_samples(file_loading_hooks=file_loading_hooks)
+        data_loading_hooks = self.data_loading_hooks()
+        self.samples = self.set_up_samples(data_loading_hooks=data_loading_hooks)
         self.check_samples()
 
-    def _get_file_loading_hooks(
+    def data_loading_hooks(
         self,
     ) -> Mapping[str, Callable[..., torch.Tensor]]:
-        mapping = {"omics": _load_one_hot_array, "image": default_loader}
+        mapping = {}
 
-        for source_name, source_data in self.inputs.items():
-            input_type = source_data.input_config.input_info.input_type
-            if input_type == "sequence":
-                mapping[source_name] = partial(
-                    load_sequence_from_disk,
-                    split_on=source_data.input_config.input_type_info.split_on,
+        for input_name, input_object in self.inputs.items():
+            input_type = input_object.input_config.input_info.input_type
+            input_source = input_object.input_config.input_info.input_source
+
+            if input_type == "omics":
+                inner_key = input_object.input_config.input_info.input_inner_key
+                mapping[input_name] = partial(
+                    _omics_load_wrapper,
+                    subset_indices=self.inputs[input_name].subset_indices,
+                    input_source=input_source,
+                    deeplake_inner_key=inner_key,
+                )
+
+            elif input_type == "image":
+                inner_key = input_object.input_config.input_info.input_inner_key
+                mapping[input_name] = partial(
+                    _image_load_wrapper,
+                    input_source=input_source,
+                    deeplake_inner_key=inner_key,
+                )
+
+            elif input_type == "sequence":
+                inner_key = input_object.input_config.input_info.input_inner_key
+                mapping[input_name] = partial(
+                    _sequence_load_wrapper,
+                    split_on=input_object.input_config.input_type_info.split_on,
+                    encode_func=self.inputs[input_name].encode_func,
+                    input_source=input_source,
+                    deeplake_inner_key=inner_key,
                 )
             elif input_type == "bytes":
-                mapping[source_name] = partial(
-                    load_bytes_from_disk,
-                    dtype=source_data.input_config.input_type_info.byte_encoding,
+                mapping[input_name] = partial(
+                    _bytes_load_wrapper,
+                    dtype=input_object.input_config.input_type_info.byte_encoding,
+                    input_source=input_source,
                 )
 
         return mapping
@@ -514,9 +521,9 @@ class MemoryDataset(DatasetBase):
     def __getitem__(self, index: int) -> al_getitem_return:
         sample = self.samples[index]
 
-        inputs_prepared = copy(sample.inputs)
+        inputs = copy(sample.inputs)
         inputs_prepared = prepare_inputs_memory(
-            inputs=inputs_prepared, inputs_objects=self.inputs, test_mode=self.test_mode
+            inputs=inputs, inputs_objects=self.inputs, test_mode=self.test_mode
         )
 
         inputs_final = impute_missing_modalities_wrapper(
@@ -530,6 +537,38 @@ class MemoryDataset(DatasetBase):
 
     def __len__(self):
         return len(self.samples)
+
+
+def _sequence_load_wrapper(
+    data_pointer: Union[Path, int, np.ndarray],
+    input_source: str,
+    split_on: str,
+    encode_func: Callable[[Sequence[str]], List[int]],
+    deeplake_inner_key: Optional[str] = None,
+) -> np.ndarray:
+    """
+    In the case of .csv input sources, we have already loaded and tokenized the data.
+    """
+
+    split_func = get_sequence_split_function(split_on=split_on)
+    if deeplake_ops.is_deeplake_dataset(data_source=input_source):
+        assert deeplake_inner_key is not None
+        text_as_np_array = _load_deeplake_sample(
+            data_pointer=data_pointer,
+            input_source=input_source,
+            inner_key=deeplake_inner_key,
+        )
+        content = text_as_np_array[0]
+    elif input_source.endswith(".csv"):
+        return data_pointer
+    else:
+        content = load_sequence_from_disk(sequence_file_path=data_pointer)
+
+    file_content_split = split_func(content)
+    file_content_encoded = encode_func(file_content_split)
+    sequence_tokenized = np.array(file_content_encoded)
+
+    return sequence_tokenized
 
 
 def _get_default_impute_fill_values(inputs_objects: "al_input_objects_as_dict"):
@@ -580,21 +619,26 @@ def _get_default_impute_dtypes(inputs_objects: "al_input_objects_as_dict"):
 
 
 def prepare_one_hot_omics_data(
-    genotype_array: torch.Tensor,
+    genotype_array: np.ndarray,
     na_augment_perc: float,
     na_augment_prob: float,
     test_mode: bool,
 ) -> torch.BoolTensor:
-    array_bool = genotype_array.to(dtype=torch.bool)
+    """
+    We use clone here to copy the original data, vs. using from_numpy
+    which shares memory, causing us to modify the original data.
+    """
+
+    tensor_bool = torch.BoolTensor(genotype_array).unsqueeze(0).detach().clone()
 
     if not test_mode and na_augment_perc > 0 and na_augment_prob > 0:
-        array_bool = make_random_omics_columns_missing(
-            omics_array=array_bool,
+        tensor_bool = make_random_omics_columns_missing(
+            omics_array=tensor_bool,
             percentage=na_augment_perc,
             probability=na_augment_prob,
         )
 
-    return array_bool
+    return tensor_bool
 
 
 class DiskDataset(DatasetBase):
@@ -611,9 +655,9 @@ class DiskDataset(DatasetBase):
     def __getitem__(self, index: int) -> al_getitem_return:
         sample = self.samples[index]
 
-        inputs_prepared = copy(sample.inputs)
+        inputs = copy(sample.inputs)
         inputs_prepared = prepare_inputs_disk(
-            inputs=inputs_prepared, inputs_objects=self.inputs, test_mode=self.test_mode
+            inputs=inputs, inputs_objects=self.inputs, test_mode=self.test_mode
         )
 
         inputs_final = impute_missing_modalities_wrapper(
@@ -632,62 +676,77 @@ def prepare_inputs_disk(
     inputs: Dict[str, Any], inputs_objects: "al_input_objects_as_dict", test_mode: bool
 ) -> Dict[str, torch.Tensor]:
     prepared_inputs = {}
-    for name, data in inputs.items():
+    for input_name, data_pointer in inputs.items():
 
-        input_object = inputs_objects[name]
+        input_object = inputs_objects[input_name]
 
+        input_source = input_object.input_config.input_info.input_source
+        deeplake_inner_key = input_object.input_config.input_info.input_inner_key
         input_type_info = input_object.input_config.input_type_info
         input_type = input_object.input_config.input_info.input_type
 
         if input_type == "omics":
-
-            array_raw = _load_one_hot_array(path=data)
+            array_raw = _omics_load_wrapper(
+                input_source=input_source,
+                data_pointer=data_pointer,
+                deeplake_inner_key=deeplake_inner_key,
+                subset_indices=input_object.subset_indices,
+            )
             array_prepared = prepare_one_hot_omics_data(
                 genotype_array=array_raw,
                 na_augment_perc=input_type_info.na_augment_perc,
                 na_augment_prob=input_type_info.na_augment_prob,
                 test_mode=test_mode,
             )
-            prepared_inputs[name] = array_prepared
+            prepared_inputs[input_name] = array_prepared
 
         elif input_type == "sequence":
 
-            sequence_split = load_sequence_from_disk(
-                sequence_file_path=data,
+            sequence_tokenized = _sequence_load_wrapper(
+                data_pointer=data_pointer,
+                input_source=input_source,
+                deeplake_inner_key=deeplake_inner_key,
                 split_on=input_type_info.split_on,
+                encode_func=input_object.encode_func,
             )
             prepared_sequence_inputs = prepare_sequence_data(
-                sequence_input_object=inputs_objects[name],
-                cur_file_content_split=sequence_split,
+                sequence_input_object=inputs_objects[input_name],
+                cur_file_content_tokenized=sequence_tokenized,
                 test_mode=test_mode,
             )
-            prepared_inputs[name] = prepared_sequence_inputs
+            prepared_inputs[input_name] = prepared_sequence_inputs
 
         elif input_type == "bytes":
 
-            bytes_data = load_bytes_from_disk(
-                file_path=data,
+            bytes_data = _bytes_load_wrapper(
+                data_pointer=data_pointer,
                 dtype=input_type_info.byte_encoding,
+                input_source=input_source,
+                deeplake_inner_key=deeplake_inner_key,
             )
             prepared_bytes_input = prepare_bytes_data(
-                bytes_input_object=inputs_objects[name],
+                bytes_input_object=inputs_objects[input_name],
                 bytes_data=bytes_data,
                 test_mode=test_mode,
             )
-
-            prepared_inputs[name] = prepared_bytes_input
+            prepared_inputs[input_name] = prepared_bytes_input
 
         elif input_type == "image":
-            image_data = default_loader(path=data)
+            image_data = _image_load_wrapper(
+                input_source=input_source,
+                data_pointer=data_pointer,
+                deeplake_inner_key=deeplake_inner_key,
+            )
+
             prepared_image_data = prepare_image_data(
-                image_input_object=inputs_objects[name],
+                image_input_object=inputs_objects[input_name],
                 image_data=image_data,
                 test_mode=test_mode,
             )
-            prepared_inputs[name] = prepared_image_data
+            prepared_inputs[input_name] = prepared_image_data
 
         else:
-            prepared_inputs[name] = inputs[name]
+            prepared_inputs[input_name] = inputs[input_name]
 
     return prepared_inputs
 
@@ -696,10 +755,16 @@ def prepare_image_data(
     image_input_object: "ImageInputInfo", image_data: Image, test_mode: bool
 ) -> torch.Tensor:
 
+    """
+    The transforms take care of converting the image object to a copied tensor.
+    """
+
+    image_data_clone = image_data.copy()
+
     if test_mode:
-        image_prepared = image_input_object.base_transforms(img=image_data)
+        image_prepared = image_input_object.base_transforms(img=image_data_clone)
     else:
-        image_prepared = image_input_object.all_transforms(img=image_data)
+        image_prepared = image_input_object.all_transforms(img=image_data_clone)
 
     return image_prepared
 
@@ -707,13 +772,17 @@ def prepare_image_data(
 def prepare_bytes_data(
     bytes_input_object: "BytesInputInfo", bytes_data: np.ndarray, test_mode: bool
 ) -> torch.Tensor:
+    """
+    We use clone here to copy the original data, vs. using from_numpy
+    which shares memory, causing us to modify the original data.
+    """
     bio = bytes_input_object
 
     sampling_strat = bio.input_config.input_type_info.sampling_strategy_if_longer
     if test_mode:
         sampling_strat = "from_start"
 
-    bytes_tensor = torch.LongTensor(bytes_data)
+    bytes_tensor = torch.LongTensor(bytes_data).detach().clone()
 
     padding_value = bio.vocab.get("<pad>", 0)
     cur_bytes_padded = process_tensor_to_length(
@@ -728,25 +797,28 @@ def prepare_bytes_data(
 
 def prepare_sequence_data(
     sequence_input_object: "SequenceInputInfo",
-    cur_file_content_split: List[str],
+    cur_file_content_tokenized: np.ndarray,
     test_mode: bool,
 ) -> torch.Tensor:
+    """
+    We use clone here to copy the original data, vs. using from_numpy
+    which shares memory, causing us to modify the original data.
+    """
 
     sio = sequence_input_object
 
-    cur_tokens_tokenized = sequence_input_object.encode_func(cur_file_content_split)
-    cur_tokens_as_tensor = torch.LongTensor(cur_tokens_tokenized)
+    cur_tokens_as_tensor = torch.LongTensor(cur_file_content_tokenized).detach().clone()
 
-    sampling_strat = sio.input_config.input_type_info.sampling_strategy_if_longer
+    sampling_strategy = sio.input_config.input_type_info.sampling_strategy_if_longer
     if test_mode:
-        sampling_strat = "from_start"
+        sampling_strategy = "from_start"
 
     padding_token = getattr(sio.tokenizer, "pad_token", "<pad>")
     padding_value = sio.encode_func([padding_token])[0]
     cur_tokens_padded = process_tensor_to_length(
         tensor=cur_tokens_as_tensor,
         max_length=sio.computed_max_length,
-        sampling_strategy_if_longer=sampling_strat,
+        sampling_strategy_if_longer=sampling_strategy,
         padding_value=padding_value,
     )
 
@@ -787,15 +859,49 @@ def _sample_sequence_uniform(
     return tensor[random_index_start:random_index_end]
 
 
-def load_bytes_from_disk(file_path: Path, dtype: str) -> np.ndarray:
-    data = np.fromfile(file=file_path, dtype=dtype)
-    return data
+def _bytes_load_wrapper(
+    data_pointer: Union[Path, int],
+    input_source: str,
+    dtype: str,
+    deeplake_inner_key: Optional[str] = None,
+) -> np.ndarray:
+
+    if deeplake_ops.is_deeplake_dataset(data_source=input_source):
+        assert deeplake_inner_key is not None
+        bytes_data = _load_deeplake_sample(
+            data_pointer=data_pointer,
+            input_source=input_source,
+            inner_key=deeplake_inner_key,
+        ).astype(dtype=dtype)
+    else:
+        bytes_data = np.fromfile(file=data_pointer, dtype=dtype)
+
+    return bytes_data
 
 
-def load_sequence_from_disk(sequence_file_path: Path, split_on: str) -> List[str]:
-    split_func = _get_split_func(split_on=split_on)
+def _image_load_wrapper(
+    data_pointer: Union[Path, int],
+    input_source: str,
+    deeplake_inner_key: Optional[str] = None,
+) -> Image:
+
+    if deeplake_ops.is_deeplake_dataset(data_source=input_source):
+        assert deeplake_inner_key is not None
+        image_data = _load_deeplake_sample(
+            data_pointer=data_pointer,
+            input_source=input_source,
+            inner_key=deeplake_inner_key,
+        )
+        pil_image = fromarray(obj=np.uint8(image_data * 255))
+    else:
+        pil_image = default_loader(path=str(data_pointer))
+
+    return pil_image
+
+
+def load_sequence_from_disk(sequence_file_path: Path) -> str:
     with open(sequence_file_path, "r") as infile:
-        return split_func(infile.read().strip())
+        return infile.read().strip()
 
 
 def prepare_inputs_memory(
@@ -824,7 +930,7 @@ def prepare_inputs_memory(
             sequence_raw_in_memory = data
             prepared_sequence_inputs = prepare_sequence_data(
                 sequence_input_object=inputs_objects[name],
-                cur_file_content_split=sequence_raw_in_memory,
+                cur_file_content_tokenized=sequence_raw_in_memory,
                 test_mode=test_mode,
             )
             prepared_inputs[name] = prepared_sequence_inputs
@@ -933,8 +1039,44 @@ def impute_single_missing_modality(
     return imputed_tensor
 
 
-def _load_one_hot_array(path: Path) -> torch.Tensor:
-    genotype_array_raw = np.load(str(path))
-    genotype_array_raw = torch.from_numpy(genotype_array_raw).unsqueeze(0)
+def _omics_load_wrapper(
+    data_pointer: Union[Path, int],
+    input_source: str,
+    subset_indices: Union[Sequence[int], None],
+    deeplake_inner_key: Optional[str] = None,
+) -> np.ndarray:
 
-    return genotype_array_raw
+    if deeplake_ops.is_deeplake_dataset(data_source=input_source):
+        assert deeplake_inner_key is not None
+        genotype_array_raw = _load_deeplake_sample(
+            data_pointer=data_pointer,
+            input_source=input_source,
+            inner_key=deeplake_inner_key,
+        )
+    else:
+        genotype_array_raw = np.load(str(data_pointer))
+
+    if subset_indices is not None:
+        genotype_array_raw = genotype_array_raw[:, subset_indices]
+
+    genotype_array_raw_bool = genotype_array_raw.astype(bool)
+
+    return genotype_array_raw_bool
+
+
+def _load_deeplake_sample(
+    data_pointer: int, input_source: str, inner_key: str
+) -> np.ndarray:
+    """
+    Deeplake warns about indexing directly into a DS, vs. random access. For now we'll
+    use this random access pattern here as we have to be able to connect to other
+    data sources (which might be outside deeplake).
+    """
+    assert inner_key is not None
+    deeplake_ds = deeplake_ops.load_deeplake_dataset(data_source=input_source)
+    deeplake_ds_index = data_pointer
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        sample_data = deeplake_ds[deeplake_ds_index][inner_key].numpy()
+
+    return sample_data

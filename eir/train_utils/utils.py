@@ -4,9 +4,7 @@ import random
 from functools import wraps
 from pathlib import Path
 from typing import (
-    List,
     Dict,
-    TYPE_CHECKING,
     Sequence,
     Callable,
     Iterable,
@@ -28,35 +26,18 @@ from eir.train_utils.distributed import (
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
-if TYPE_CHECKING:
-    from eir.data_load.label_setup import al_label_dict
-
-
-def get_extra_labels_from_ids(
-    labels_dict: "al_label_dict", cur_ids: List[str], target_columns: List[str]
-) -> List[Dict[str, str]]:
-    """
-    Returns a batch in same order as cur_ids.
-    """
-    extra_labels = []
-    for sample_id in cur_ids:
-        cur_labels_all = labels_dict.get(sample_id)
-        cur_labels_extra = {
-            k: v for k, v in cur_labels_all.items() if k in target_columns
-        }
-        extra_labels.append(cur_labels_extra)
-
-    return extra_labels
-
 
 def get_run_folder(output_folder: str) -> Path:
     return Path(output_folder)
 
 
-def prep_sample_outfolder(output_folder: str, column_name: str, iteration: int) -> Path:
+def prep_sample_outfolder(
+    output_folder: str, output_name: str, column_name: str, iteration: int
+) -> Path:
     sample_outfolder = (
         get_run_folder(output_folder=output_folder)
         / "results"
+        / output_name
         / column_name
         / "samples"
         / str(iteration)

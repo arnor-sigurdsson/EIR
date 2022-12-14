@@ -1,7 +1,7 @@
 eirtrain \
 --global_configs eir_tutorials/01_basic_tutorial/conf/tutorial_01_globals.yaml \
 --input_configs eir_tutorials/01_basic_tutorial/conf/tutorial_01_input.yaml \
---target_configs eir_tutorials/01_basic_tutorial/conf/tutorial_01_targets.yaml \
+--output_configs eir_tutorials/01_basic_tutorial/conf/tutorial_01_outputs.yaml \
 --tutorial_01_globals.output_folder=eir_tutorials/tutorial_runs/tutorial_01_run_lr=0.002_epochs=20 \
 --tutorial_01_globals.lr=0.002 \
 --tutorial_01_globals.n_epochs=20

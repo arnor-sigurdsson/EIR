@@ -1,3 +1,0 @@
-label_file: eir_tutorials/04_pretrained_sequence_tutorial/data/IMDB/imdb_labels.csv
-target_cat_columns:
-  - Sentiment

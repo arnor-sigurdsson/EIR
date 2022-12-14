@@ -1,7 +1,8 @@
 import random
 from pathlib import Path
-from typing import Sequence, TYPE_CHECKING
+from typing import Sequence, TYPE_CHECKING, List
 
+import pandas as pd
 import pytest
 from aislib.misc_utils import ensure_path_exists
 
@@ -86,6 +87,15 @@ def _get_simple_sample_pool() -> Sequence[str]:
                         "model_config": {"model_type": "tabular"},
                     },
                 ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    },
+                ],
             },
         }
     ],
@@ -159,6 +169,91 @@ def test_get_vocab_iterator_basic(tmp_path: Path):
     vocab = set(word for sequence in vocab_iter for word in sequence)
     assert vocab == set(test_pool)
     assert gathered_stats.total_files == 100
+
+
+def test_get_bpe_tokenizer(tmp_path: Path):
+
+    seq_path = tmp_path / "test_sequence"
+    test_pool = _get_simple_sample_pool()
+    set_up_simple_sequence_test_data(
+        path=seq_path, pool=test_pool, sep=" ", n_samples=100, max_length=20
+    )
+
+    # Core functionality
+    vocab_iter_test_training = input_setup.get_vocab_iterator(
+        input_source=str(seq_path),
+        split_on=" ",
+        gathered_stats=input_setup.GatheredSequenceStats(),
+    )
+    bpe_tokenizer_from_scratch = input_setup.get_bpe_tokenizer(
+        vocab_iterator=vocab_iter_test_training, vocab_file=None
+    )
+    known_sequence = "cat dog mouse".split()
+    known_sequence_tokenized = bpe_tokenizer_from_scratch(known_sequence)
+    assert known_sequence_tokenized == ["cat", "dog", "mouse"]
+
+    unknown_sequence = "edge knot city".split()
+    unknown_sequence_tokenized = bpe_tokenizer_from_scratch(unknown_sequence)
+    assert unknown_sequence_tokenized == [
+        "e",
+        "d",
+        "g",
+        "e",
+        "<unk>",
+        "n",
+        "o",
+        "t",
+        "c",
+        "i",
+        "t",
+        "<unk>",
+    ]
+
+    # Saving and loading
+    vocab_iter_test_saving = input_setup.get_vocab_iterator(
+        input_source=str(seq_path),
+        split_on=" ",
+        gathered_stats=input_setup.GatheredSequenceStats(),
+    )
+    bpe_tokenizer_object = input_setup._get_bpe_tokenizer_object(
+        vocab_iterator=vocab_iter_test_saving, vocab_file=None
+    )
+    saved_bpe_path = tmp_path / "test_bpe.json"
+    bpe_tokenizer_object.save(str(saved_bpe_path))
+
+    bpe_tokenizer_from_pretrained = input_setup.get_bpe_tokenizer(
+        vocab_iterator=None, vocab_file=str(saved_bpe_path)
+    )
+    known_sequence_tokenized_pretrained = bpe_tokenizer_from_pretrained(known_sequence)
+    assert known_sequence_tokenized_pretrained == ["cat", "dog", "mouse"]
+    unknown_sequence_tokenized_pretrained = bpe_tokenizer_from_pretrained(
+        unknown_sequence
+    )
+    assert unknown_sequence_tokenized_pretrained == [
+        "e",
+        "d",
+        "g",
+        "e",
+        "<unk>",
+        "n",
+        "o",
+        "t",
+        "c",
+        "i",
+        "t",
+        "<unk>",
+    ]
+
+    # General checks
+    gathered_stats_general = input_setup.GatheredSequenceStats()
+    vocab_iter_test_general = input_setup.get_vocab_iterator(
+        input_source=str(seq_path),
+        split_on=" ",
+        gathered_stats=gathered_stats_general,
+    )
+    vocab = set(word for sequence in vocab_iter_test_general for word in sequence)
+    assert vocab == set(test_pool)
+    assert gathered_stats_general.total_files == 100
 
 
 def test_get_vocab_iterator_basic_diff_split(tmp_path: Path):
@@ -282,3 +377,49 @@ def test_get_max_length(tmp_path):
         max_length_config_value="average", gathered_stats=gathered_stats_max_length
     )
     assert avg_length_from_func < 20
+
+
+@pytest.mark.parametrize(
+    "indices_to_subset,expected",
+    [
+        ([0, 10, 20, 30, 40, 50, 60, 70], [0, 10, 20, 30, 40, 50, 60, 70]),
+        ([0, 10, 20, 30, 40, 50, 60, 70, 120, 999], [0, 10, 20, 30, 40, 50, 60, 70]),
+    ],
+)
+def test_setup_subset_indices(indices_to_subset: List[int], expected: List[int]):
+    test_data = []
+    for i in range(100):
+        cur_row_data = ["1", str(i), "0.1", str(i), "A", "T"]
+        test_data.append(cur_row_data)
+
+    df_bim_test = pd.DataFrame(test_data, columns=input_setup._get_bim_headers())
+
+    snps_to_subset = [str(i) for i in indices_to_subset]
+
+    subset_indices = input_setup._setup_snp_subset_indices(
+        df_bim=df_bim_test, snps_to_subset=snps_to_subset
+    )
+    assert subset_indices.tolist() == expected
+
+
+def test_read_snp_df(tmp_path):
+    snp_file_str = """
+            1     rs3094315        0.020130          752566 G A
+            1    rs7419119         0.022518          842013 G T
+            1   rs13302957         0.024116          891021 G A
+            1    rs6696609         0.024457          903426 T C
+            1       rs8997         0.025727          949654 A G
+            1    rs9442372         0.026288         1018704 A G
+            1    rs4970405         0.026674         1048955 G A
+            1   rs11807848         0.026711         1061166 C T
+            1    rs4970421         0.028311         1108637 A G
+            1    rs1320571         0.028916         1120431 A G
+               """
+    file_ = tmp_path / "data_final.bim"
+    file_.write_text(snp_file_str)
+
+    df_bim = input_setup.read_bim(bim_file_path=str(file_))
+    snp_arr = df_bim["VAR_ID"].array
+    assert len(snp_arr) == 10
+    assert snp_arr[0] == "rs3094315"
+    assert snp_arr[-1] == "rs1320571"

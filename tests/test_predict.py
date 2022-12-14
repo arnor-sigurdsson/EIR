@@ -1,18 +1,19 @@
 from argparse import Namespace
-from copy import deepcopy
 from pathlib import Path
-from typing import Union, Sequence, Mapping, Tuple
+from typing import Tuple, List, Dict, Any
 
 import pandas as pd
 import pytest
 import torch
-import yaml
-from aislib.misc_utils import ensure_path_exists
-from sklearn.preprocessing import LabelEncoder
 
 import eir.experiment_io.experiment_io
 import eir.models.model_setup
 import eir.models.omics.omics_models
+import eir.predict_modules.predict_activations
+import eir.predict_modules.predict_config
+import eir.predict_modules.predict_data
+import eir.predict_modules.predict_input_setup
+import eir.predict_modules.predict_target_setup
 import eir.setup.config
 import eir.setup.input_setup
 import eir.train
@@ -21,17 +22,10 @@ from eir import train
 from eir.models.omics.models_cnn import CNNModel
 from eir.models.omics.omics_models import get_omics_model_init_kwargs
 from eir.setup import config
-from eir.setup import schemas
-from eir.setup.config import object_to_primitives
-from tests.conftest import TestDataConfig, ModelTestConfig
-from tests.test_data_load.test_datasets import check_dataset
-
-al_config_instances = Union[
-    schemas.GlobalConfig,
-    schemas.InputConfig,
-    schemas.PredictorConfig,
-    schemas.TargetConfig,
-]
+from tests.conftest import ModelTestConfig, get_system_info
+from tests.test_predict_modules.test_predict_config import (
+    setup_test_namespace_for_matched_config_test,
+)
 
 
 @pytest.mark.parametrize(
@@ -51,6 +45,15 @@ al_config_instances = Union[
                         "input_info": {"input_name": "test_genotype"},
                         "model_config": {"model_type": "cnn"},
                     }
+                ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    },
                 ],
             },
         },
@@ -105,381 +108,6 @@ def test_load_model(create_test_config: config.Configs, tmp_path: Path):
         assert param_model.data.ne(param_loaded.data).sum() == 0
 
 
-def test_get_named_pred_dict_iterators(tmp_path: Path) -> None:
-
-    keys = {"global_configs", "input_configs", "predictor_configs", "target_configs"}
-    paths = {}
-
-    for k in keys:
-        test_yaml_data = {f"key_{k}": f"value_{k}"}
-        cur_outpath = (tmp_path / k).with_suffix(".yaml")
-        ensure_path_exists(path=cur_outpath)
-
-        with open(cur_outpath, "w") as out_yaml:
-            yaml.dump(data=test_yaml_data, stream=out_yaml)
-
-        paths.setdefault(k, []).append(cur_outpath)
-
-    test_predict_cl_args = Namespace(**paths)
-
-    named_iterators = predict.get_named_pred_dict_iterators(
-        predict_cl_args=test_predict_cl_args
-    )
-
-    for key, key_iter in named_iterators.items():
-        for dict_ in key_iter:
-            assert dict_ == {f"key_{key}": f"value_{key}"}
-
-
-@pytest.mark.parametrize(
-    "create_test_data",
-    [
-        {"task_type": "binary"},
-    ],
-    indirect=True,
-)
-@pytest.mark.parametrize(
-    "create_test_config_init_base",
-    [
-        {
-            "injections": {
-                "input_configs": [
-                    {
-                        "input_info": {"input_name": "test_genotype"},
-                        "model_config": {"model_type": "linear"},
-                    }
-                ],
-            },
-        },
-    ],
-    indirect=True,
-)
-def test_get_train_predict_matched_config_generator(create_test_config, tmp_path: Path):
-    test_configs = create_test_config
-
-    test_predict_cl_args = _setup_test_namespace_for_matched_config_test(
-        test_configs=test_configs,
-        predict_cl_args_save_path=tmp_path,
-        do_inject_test_values=True,
-    )
-
-    named_test_iterators = predict.get_named_pred_dict_iterators(
-        predict_cl_args=test_predict_cl_args
-    )
-
-    matched_iterator = predict.get_train_predict_matched_config_generator(
-        train_configs=test_configs, named_dict_iterators=named_test_iterators
-    )
-
-    # TODO: Note that these conditions currently come from
-    #       _overload_test_yaml_object_for_predict. Later we can configure this
-    #       further.
-    for name, train_config_dict, predict_config_dict_to_inject in matched_iterator:
-        if name == "input_configs":
-            assert train_config_dict != predict_config_dict_to_inject
-            assert (
-                predict_config_dict_to_inject["input_info"]["input_source"]
-                == "predict_input_source_overloaded"
-            )
-        else:
-            assert train_config_dict == predict_config_dict_to_inject
-
-
-def _setup_test_namespace_for_matched_config_test(
-    test_configs: config.Configs,
-    predict_cl_args_save_path: Path,
-    do_inject_test_values: bool = True,
-    monkeypatch_train_to_test_paths: bool = False,
-) -> Namespace:
-    keys = ("global_configs", "input_configs", "predictor_configs", "target_configs")
-    name_to_attr_map = {
-        "global_configs": "global_config",
-        "predictor_configs": "predictor_config",
-    }
-    paths = {}
-    for k in keys:
-        attr_name = name_to_attr_map.get(k, k)
-        test_yaml_obj = getattr(test_configs, attr_name)
-
-        obj_as_primitives = _overload_test_yaml_object_for_predict(
-            test_yaml_obj=test_yaml_obj,
-            cur_key=k,
-            do_inject_test_values=do_inject_test_values,
-        )
-
-        if isinstance(obj_as_primitives, Sequence):
-            name_object_iterator = enumerate(obj_as_primitives)
-        elif isinstance(obj_as_primitives, Mapping):
-            name_object_iterator = enumerate([obj_as_primitives])
-        else:
-            raise ValueError()
-
-        for idx, obj_primitive_to_dump in name_object_iterator:
-            cur_outpath = (predict_cl_args_save_path / f"{k}_{idx}").with_suffix(
-                ".yaml"
-            )
-            ensure_path_exists(path=cur_outpath)
-
-            if monkeypatch_train_to_test_paths:
-                obj_primitive_to_dump = _recursive_dict_str_value_replace(
-                    dict_=obj_primitive_to_dump, old="train", new="test"
-                )
-
-            with open(cur_outpath, "w") as out_yaml:
-                yaml.dump(data=obj_primitive_to_dump, stream=out_yaml)
-
-            paths.setdefault(k, []).append(cur_outpath)
-
-    test_predict_cl_args = Namespace(**paths)
-
-    return test_predict_cl_args
-
-
-def _recursive_dict_str_value_replace(dict_: dict, old: str, new: str):
-    for key, value in dict_.items():
-        if isinstance(value, dict):
-            _recursive_dict_str_value_replace(dict_=value, old=old, new=new)
-        elif isinstance(value, str):
-            if old in value:
-                dict_[key] = value.replace(old, new)
-
-    return dict_
-
-
-def _overload_test_yaml_object_for_predict(
-    test_yaml_obj: al_config_instances, cur_key: str, do_inject_test_values: bool = True
-):
-    test_yaml_obj_copy = deepcopy(test_yaml_obj)
-    obj_as_primitives = object_to_primitives(obj=test_yaml_obj_copy)
-    if cur_key == "input_configs":
-        for idx, input_dict in enumerate(obj_as_primitives):
-            if do_inject_test_values:
-                input_dict = eir.setup.config.recursive_dict_replace(
-                    dict_=input_dict,
-                    dict_to_inject={
-                        "input_info": {
-                            "input_source": "predict_input_source_overloaded"
-                        }
-                    },
-                )
-            obj_as_primitives[idx] = input_dict
-
-    return obj_as_primitives
-
-
-@pytest.mark.parametrize(
-    "create_test_data",
-    [
-        {"task_type": "binary"},
-    ],
-    indirect=True,
-)
-@pytest.mark.parametrize(
-    "create_test_config_init_base",
-    [
-        {
-            "injections": {
-                "input_configs": [
-                    {
-                        "input_info": {"input_name": "test_genotype"},
-                        "model_config": {"model_type": "linear"},
-                    }
-                ],
-            },
-        },
-    ],
-    indirect=True,
-)
-def test_overload_train_configs_for_predict(
-    create_test_config: config.Configs, tmp_path: Path
-) -> None:
-
-    test_configs = create_test_config
-
-    test_predict_cl_args = _setup_test_namespace_for_matched_config_test(
-        test_configs=test_configs,
-        predict_cl_args_save_path=tmp_path,
-        do_inject_test_values=True,
-    )
-
-    named_test_iterators = predict.get_named_pred_dict_iterators(
-        predict_cl_args=test_predict_cl_args
-    )
-
-    matched_iterator = predict.get_train_predict_matched_config_generator(
-        train_configs=test_configs, named_dict_iterators=named_test_iterators
-    )
-
-    overloaded_train_config = predict.overload_train_configs_for_predict(
-        matched_dict_iterator=matched_iterator
-    )
-
-    # TODO: Note that these conditions currently come from
-    #       _overload_test_yaml_object_for_predict. Later we can configure this
-    #       further.
-    for input_config in overloaded_train_config.input_configs:
-        assert input_config.input_info.input_source == "predict_input_source_overloaded"
-
-
-@pytest.mark.parametrize("create_test_data", [{"task_type": "multi"}], indirect=True)
-@pytest.mark.parametrize(
-    "create_test_config_init_base",
-    [
-        {
-            "injections": {
-                "global_configs": {
-                    "output_folder": "extra_inputs",
-                },
-                "input_configs": [
-                    {
-                        "input_info": {"input_name": "test_genotype"},
-                        "model_config": {"model_type": "linear"},
-                    },
-                    {
-                        "input_info": {"input_name": "test_tabular"},
-                        "input_type_info": {
-                            "input_cat_columns": [],
-                            "input_con_columns": ["ExtraTarget"],
-                        },
-                        "model_config": {"model_type": "tabular"},
-                    },
-                ],
-                "target_configs": {
-                    "target_cat_columns": ["Origin"],
-                    "target_con_columns": ["Height"],
-                },
-            },
-        },
-    ],
-    indirect=True,
-)
-def test_load_labels_for_predict(
-    create_test_data: TestDataConfig,
-    create_test_config: config.Configs,
-):
-    """
-    Note here we are treating the generated test data (i.e. by tests, not test-set-data)
-    as the testing-set.
-    """
-    test_configs = create_test_config
-
-    test_ids = predict.gather_all_ids_from_target_configs(
-        target_configs=test_configs.target_configs
-    )
-
-    tabular_infos = train.get_tabular_target_file_infos(
-        target_configs=test_configs.target_configs
-    )
-    assert len(tabular_infos) == 1
-    target_tabular_info = tabular_infos[0]
-
-    df_test = predict._load_labels_for_predict(
-        tabular_info=target_tabular_info, ids_to_keep=test_ids
-    )
-
-    # make sure that target columns are unchanged (within expected bounds)
-    assert len(target_tabular_info.con_columns) == 1
-    con_target_column = target_tabular_info.con_columns[0]
-    assert df_test[con_target_column].max() < 220
-    assert df_test[con_target_column].min() > 130
-
-    assert len(target_tabular_info.cat_columns) == 1
-    cat_target_column = target_tabular_info.cat_columns[0]
-    assert set(df_test[cat_target_column]) == {"Asia", "Africa", "Europe"}
-
-
-@pytest.mark.parametrize("create_test_data", [{"task_type": "multi"}], indirect=True)
-@pytest.mark.parametrize(
-    "create_test_config_init_base",
-    [
-        {
-            "injections": {
-                "global_configs": {"memory_dataset": True},
-                "input_configs": [
-                    {
-                        "input_info": {"input_name": "test_genotype"},
-                        "model_config": {"model_type": "linear"},
-                    },
-                ],
-            },
-        },
-        {
-            "injections": {
-                "global_configs": {"memory_dataset": False},
-                "input_configs": [
-                    {
-                        "input_info": {"input_name": "test_genotype"},
-                        "model_config": {"model_type": "linear"},
-                    },
-                ],
-            },
-        },
-    ],
-    indirect=True,
-)
-@pytest.mark.parametrize("with_target_labels", [True, False])
-def test_set_up_test_dataset(
-    create_test_data: TestDataConfig,
-    create_test_config: config.Configs,
-    with_target_labels: bool,
-):
-    test_data_config = create_test_data
-    test_configs = create_test_config
-
-    test_ids = predict.gather_all_ids_from_target_configs(
-        target_configs=test_configs.target_configs
-    )
-
-    tabular_infos = train.get_tabular_target_file_infos(
-        target_configs=test_configs.target_configs
-    )
-    assert len(tabular_infos) == 1
-    target_tabular_info = tabular_infos[0]
-
-    df_test = predict._load_labels_for_predict(
-        tabular_info=target_tabular_info, ids_to_keep=test_ids
-    )
-
-    assert len(target_tabular_info.cat_columns) == 1
-    target_column = target_tabular_info.cat_columns[0]
-    mock_encoder = LabelEncoder().fit(["Asia", "Europe", "Africa"])
-    transformers = {target_column: mock_encoder}
-
-    test_target_labels = None
-    if with_target_labels:
-        test_target_labels = predict.parse_labels_for_predict(
-            con_targets=target_tabular_info.con_columns,
-            cat_targets=target_tabular_info.cat_columns,
-            df_labels_test=df_test,
-            label_transformers=transformers,
-        )
-
-    test_inputs = predict.set_up_inputs_for_predict(
-        test_inputs_configs=test_configs.input_configs,
-        ids=test_ids,
-        hooks=None,
-        output_folder=test_configs.global_config.output_folder,
-    )
-
-    test_dataset = predict._set_up_default_dataset(
-        configs=test_configs,
-        target_labels_dict=test_target_labels,
-        inputs_as_dict=test_inputs,
-    )
-
-    classes_tested = sorted(list(test_data_config.target_classes.keys()))
-    exp_no_samples = test_data_config.n_per_class * len(classes_tested)
-
-    check_dataset(
-        dataset=test_dataset,
-        exp_no_sample=exp_no_samples,
-        classes_tested=classes_tested,
-        target_transformers=transformers,
-        target_column=target_column,
-        check_targets=with_target_labels,
-    )
-
-
 def grab_best_model_path(saved_models_folder: Path):
     saved_models = [i for i in saved_models_folder.iterdir()]
     saved_models.sort(key=lambda x: float(x.stem.split("=")[-1]))
@@ -487,12 +115,13 @@ def grab_best_model_path(saved_models_folder: Path):
     return saved_models[-1]
 
 
-@pytest.mark.parametrize(
-    argnames="act_background_source", argvalues=["train", "predict"]
-)
-@pytest.mark.parametrize(
-    "create_test_data",
-    [
+def _get_predict_test_data_parametrization() -> List[Dict[str, Any]]:
+    """
+    We skip the deeplake tests in the GHA Linux host, as for some reason it raises
+    a SIGKILL (-9).
+    """
+
+    params = [
         {
             "task_type": "multi",
             "split_to_test": True,
@@ -502,8 +131,40 @@ def grab_best_model_path(saved_models_folder: Path):
                 "image",
             ),
             "manual_test_data_creator": lambda: "test_predict",
+            "source": "local",
         }
-    ],
+    ]
+
+    in_gha, platform = get_system_info()
+
+    if in_gha and platform == "Linux":
+        return params
+
+    deeplake_params = [
+        {
+            "task_type": "multi",
+            "split_to_test": True,
+            "modalities": (
+                "omics",
+                "sequence",
+                "image",
+            ),
+            "manual_test_data_creator": lambda: "test_predict",
+            "source": "deeplake",
+        }
+    ]
+
+    params += deeplake_params
+
+    return params
+
+
+@pytest.mark.parametrize(
+    argnames="act_background_source", argvalues=["train", "predict"]
+)
+@pytest.mark.parametrize(
+    argnames="create_test_data",
+    argvalues=_get_predict_test_data_parametrization(),
     indirect=True,
 )
 @pytest.mark.parametrize(
@@ -513,9 +174,10 @@ def grab_best_model_path(saved_models_folder: Path):
             "injections": {
                 "global_configs": {
                     "output_folder": "test_run_predict",
-                    "n_epochs": 12,
+                    "n_epochs": 8,
                     "checkpoint_interval": 200,
                     "sample_interval": 200,
+                    "lr": 0.001,
                     "act_background_samples": 128,
                     "get_acts": False,
                     "batch_size": 64,
@@ -523,6 +185,7 @@ def grab_best_model_path(saved_models_folder: Path):
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
+                        "input_type_info": {"subset_snps_file": "auto"},
                         "model_config": {"model_type": "genome-local-net"},
                     },
                     {
@@ -552,10 +215,26 @@ def grab_best_model_path(saved_models_folder: Path):
                     {
                         "input_info": {"input_name": "test_tabular"},
                         "input_type_info": {
-                            "input_cat_columns": [],
-                            "input_con_columns": ["ExtraTarget"],
+                            "input_cat_columns": ["OriginExtraCol"],
+                            "input_con_columns": [],
                         },
                         "model_config": {"model_type": "tabular"},
+                    },
+                ],
+                "fusion_configs": {
+                    "model_config": {
+                        "fc_task_dim": 256,
+                        "fc_do": 0.10,
+                        "rb_do": 0.10,
+                    },
+                },
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
                     },
                 ],
             },
@@ -573,7 +252,7 @@ def test_predict(
 
     train.train(experiment=experiment)
 
-    test_predict_cl_args_files_only = _setup_test_namespace_for_matched_config_test(
+    test_predict_cl_args_files_only = setup_test_namespace_for_matched_config_test(
         test_configs=train_configs_for_testing,
         predict_cl_args_save_path=tmp_path,
         do_inject_test_values=False,
@@ -605,24 +284,25 @@ def test_predict(
 
     predict.predict(predict_cl_args=predict_cl_args, predict_config=predict_config)
 
-    predict._compute_predict_activations(
+    eir.predict_modules.predict_activations.compute_predict_activations(
         loaded_train_experiment=train_configs_for_testing,
         predict_config=predict_config,
     )
 
-    origin_predictions_path = tmp_path / "Origin" / "predictions.csv"
+    origin_predictions_path = tmp_path / "test_output" / "Origin" / "predictions.csv"
     df_test = pd.read_csv(origin_predictions_path, index_col="ID")
 
     tabular_infos = train.get_tabular_target_file_infos(
-        target_configs=train_configs_for_testing.configs.target_configs
+        output_configs=train_configs_for_testing.configs.output_configs
     )
     assert len(tabular_infos) == 1
-    target_tabular_info = tabular_infos[0]
+    target_tabular_info = tabular_infos["test_output"]
 
     assert len(target_tabular_info.cat_columns) == 1
     target_column = target_tabular_info.cat_columns[0]
 
-    target_classes = sorted(experiment.target_transformers[target_column].classes_)
+    output = experiment.outputs["test_output"]
+    target_classes = sorted(output.target_transformers[target_column].classes_)
 
     # check that columns in predictions.csv are in correct sorted order
     assert set(target_classes).issubset(set(df_test.columns))
@@ -633,4 +313,4 @@ def test_predict(
     preds_accuracy = (preds == true_labels).sum() / len(true_labels)
     assert preds_accuracy > 0.7
 
-    assert (tmp_path / "Origin/activations").exists()
+    assert (tmp_path / "test_output/Origin/activations").exists()

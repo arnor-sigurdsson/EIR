@@ -46,11 +46,7 @@ are here:
     :language: yaml
     :caption:
 
-.. literalinclude:: tutorial_files/06_raw_bytes_tutorial/target.yaml
-    :language: yaml
-    :caption:
-
-.. literalinclude:: tutorial_files/06_raw_bytes_tutorial/predictor.yaml
+.. literalinclude:: tutorial_files/06_raw_bytes_tutorial/output.yaml
     :language: yaml
     :caption:
 

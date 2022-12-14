@@ -1,25 +1,22 @@
-18:32:49 - DEBUG - eir.train_utils.utils - Global random seed set to 0.
-usage: eirpredict [-h] [--preset {gln}] --global_configs GLOBAL_CONFIGS
-                  [GLOBAL_CONFIGS ...] --input_configs INPUT_CONFIGS
-                  [INPUT_CONFIGS ...]
-                  [--predictor_configs [PREDICTOR_CONFIGS [PREDICTOR_CONFIGS ...]]]
-                  --target_configs TARGET_CONFIGS [TARGET_CONFIGS ...]
-                  --model_path MODEL_PATH [--evaluate] --output_folder
-                  OUTPUT_FOLDER [--act_background_source {train,predict}]
+14:27:43 - DEBUG - eir.train_utils.utils - Global random seed set to 0.
+usage: eirpredict [-h] --global_configs GLOBAL_CONFIGS [GLOBAL_CONFIGS ...]
+                  --input_configs INPUT_CONFIGS [INPUT_CONFIGS ...]
+                  [--fusion_configs [FUSION_CONFIGS ...]] --output_configs
+                  [OUTPUT_CONFIGS ...] --model_path MODEL_PATH [--evaluate]
+                  --output_folder OUTPUT_FOLDER
+                  [--act_background_source {train,predict}]
 
 optional arguments:
   -h, --help            show this help message and exit
-  --preset {gln}        Whether and which preset to use that is built into the
-                        framework.
   --global_configs GLOBAL_CONFIGS [GLOBAL_CONFIGS ...]
                         Global .yaml configurations for the experiment.
   --input_configs INPUT_CONFIGS [INPUT_CONFIGS ...]
                         Input feature extraction .yaml configurations. Each
                         configuration represents one input.
-  --predictor_configs [PREDICTOR_CONFIGS [PREDICTOR_CONFIGS ...]]
-                        Predictor .yaml configurations.
-  --target_configs TARGET_CONFIGS [TARGET_CONFIGS ...]
-                        Target .yaml configurations.
+  --fusion_configs [FUSION_CONFIGS ...]
+                        Fusion .yaml configurations.
+  --output_configs [OUTPUT_CONFIGS ...]
+                        Output .yaml configurations.
   --model_path MODEL_PATH
                         Path to model to use for predictions.
   --evaluate

@@ -2,7 +2,7 @@ from copy import copy
 from dataclasses import dataclass, fields
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Union, TYPE_CHECKING, Iterable, Sequence
+from typing import Union, TYPE_CHECKING, Iterable, Sequence, Dict
 
 import dill
 import joblib
@@ -10,16 +10,16 @@ from aislib.misc_utils import get_logger, ensure_path_exists
 
 from eir.data_load import label_setup
 from eir.data_load.label_setup import (
-    al_target_columns,
     al_label_transformers,
     save_transformer_set,
 )
 from eir.setup import schemas
 from eir.setup.config import Configs
+from eir.setup.output_setup import al_output_objects_as_dict
 from eir.train_utils.utils import get_run_folder
 
 if TYPE_CHECKING:
-    from eir.train import Hooks, al_num_outputs_per_target, Experiment
+    from eir.train import Hooks, Experiment
     from eir.setup.input_setup import (
         al_input_objects_as_dict,
         al_serializable_input_objects,
@@ -46,9 +46,7 @@ class LoadedTrainExperiment:
     configs: Configs
     hooks: Union["Hooks", None]
     metrics: "al_metric_record_dict"
-    num_outputs_per_target: "al_num_outputs_per_target"
-    target_columns: al_target_columns
-    target_transformers: al_label_transformers
+    outputs: al_output_objects_as_dict
 
 
 def load_serialized_train_experiment(run_folder: Path) -> LoadedTrainExperiment:
@@ -109,9 +107,7 @@ def serialize_namespace(namespace: SimpleNamespace, output_path: Path) -> None:
 def get_default_experiment_keys_to_serialize() -> Iterable[str]:
     return (
         "configs",
-        "num_outputs_per_target",
-        "target_transformers",
-        "target_columns",
+        "outputs",
         "metrics",
         "hooks",
     )
@@ -224,7 +220,8 @@ def serialize_all_input_transformers(
         input_type = input_.input_config.input_info.input_type
         if input_type == "tabular":
             save_transformer_set(
-                transformers=input_.labels.label_transformers, run_folder=run_folder
+                transformers_per_source={input_name: input_.labels.label_transformers},
+                run_folder=run_folder,
             )
 
 
@@ -249,26 +246,38 @@ def serialize_chosen_input_objects(
 
 
 def load_transformers(
-    transformers_to_load: Union[Sequence[str], None],
+    transformers_to_load: Union[Dict[str, Sequence[str]], None],
     output_folder: Union[str, None] = None,
     run_folder: Union[None, Path] = None,
-) -> al_label_transformers:
+) -> Dict[str, al_label_transformers]:
 
     assert run_folder or output_folder
 
     if not run_folder:
         run_folder = get_run_folder(output_folder=output_folder)
 
-    all_transformers = (i.stem for i in (run_folder / "transformers").iterdir())
+    if not transformers_to_load:
+        transformers_to_load = {}
+        transformer_sources = run_folder / "serializations/transformers"
+        for transformer_source in transformer_sources.iterdir():
+            transformers_to_load[transformer_source.stem] = [
+                i.stem for i in transformer_source.iterdir()
+            ]
 
-    iterable = transformers_to_load if transformers_to_load else all_transformers
+    loaded_transformers = {}
 
-    label_transformers = {}
-    for transformer_name in iterable:
-        target_transformer_path = label_setup.get_transformer_path(
-            run_path=run_folder, transformer_name=transformer_name
-        )
-        target_transformer_object = joblib.load(filename=target_transformer_path)
-        label_transformers[transformer_name] = target_transformer_object
+    for source_name, source_transformers_to_load in transformers_to_load.items():
+        loaded_transformers[source_name] = {}
 
-    return label_transformers
+        for transformer_name in source_transformers_to_load:
+            target_transformer_path = label_setup.get_transformer_path(
+                run_path=run_folder,
+                transformer_name=transformer_name,
+                source_name=source_name,
+            )
+            target_transformer_object = joblib.load(filename=target_transformer_path)
+            loaded_transformers[source_name][
+                transformer_name
+            ] = target_transformer_object
+
+    return loaded_transformers

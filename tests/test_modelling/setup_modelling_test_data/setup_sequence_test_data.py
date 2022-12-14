@@ -3,12 +3,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence, Dict, TYPE_CHECKING
 
+import pandas as pd
+
 from tests.test_modelling.setup_modelling_test_data.setup_test_data_utils import (
     set_up_label_file_writing,
     set_up_label_line_dict,
     get_current_test_label_values,
     set_up_test_data_root_outpath,
-    common_split_test_data_wrapper,
 )
 
 if TYPE_CHECKING:
@@ -23,13 +24,14 @@ def create_test_sequence_data(
 
     fieldnames = ["ID", "Origin", "Height", "OriginExtraCol", "ExtraTarget"]
     label_file_handle, label_file_writer = set_up_label_file_writing(
-        path=c.scoped_tmp_path, fieldnames=fieldnames
+        base_path=c.scoped_tmp_path, fieldnames=fieldnames, extra_name="_sequence"
     )
 
     sequence_outfolder = set_up_test_data_root_outpath(base_folder=sequence_outfolder)
     test_sequence_label_keywords = get_continent_keyword_map()
     test_sequence_random_pool = tuple(_get_text_sequence_base())
 
+    samples_for_csv = []
     for cls, snp_row_idx in c.target_classes.items():
         for sample_idx in range(c.n_per_class):
             sample_outpath = sequence_outfolder / f"{sample_idx}_{cls}.txt"
@@ -42,6 +44,12 @@ def create_test_sequence_data(
                 target_class=cls,
             )
             sample_outpath.write_text(data=cur_sequence.sequence)
+            samples_for_csv.append(
+                {
+                    "ID": sample_outpath.stem,
+                    "Sequence": cur_sequence.sequence,
+                }
+            )
 
             label_line_base = set_up_label_line_dict(
                 sample_name=sample_outpath.stem, fieldnames=fieldnames
@@ -57,9 +65,8 @@ def create_test_sequence_data(
             label_file_writer.writerow(label_line_dict)
 
     label_file_handle.close()
-
-    if c.request_params.get("split_to_test", False):
-        common_split_test_data_wrapper(test_folder=c.scoped_tmp_path, name="sequence")
+    df_sequence = pd.DataFrame(data=samples_for_csv)
+    df_sequence.to_csv(path_or_buf=c.scoped_tmp_path / "sequence.csv", index=False)
 
     return sequence_outfolder
 
@@ -77,7 +84,7 @@ def _create_test_sequence(
     random_pool: Sequence[str],
     target_keywords_to_include: Sequence[str],
     target_class: str,
-    min_targets_to_include: int = 3,
+    min_targets_to_include: int = 5,
     max_targets_to_include: int = 20,
 ) -> SequenceTestSample:
 

@@ -10,7 +10,7 @@ from hypothesis.strategies import lists, integers
 
 from eir.data_load import data_loading_funcs
 from eir.data_load.datasets import Sample
-from eir.setup.config import get_all_targets
+from eir.setup.config import get_all_tabular_targets
 from eir.train import get_dataloaders
 
 
@@ -38,10 +38,15 @@ from eir.train import get_dataloaders
                         "model_config": {"model_type": "tabular"},
                     },
                 ],
-                "target_configs": {
-                    "target_cat_columns": ["Origin", "OriginExtraCol"],
-                    "target_con_columns": ["Height"],
-                },
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin", "OriginExtraCol"],
+                            "target_con_columns": ["Height"],
+                        },
+                    }
+                ],
             },
         },
     ],
@@ -51,12 +56,16 @@ def test_get_weighted_random_sampler(
     create_test_config, create_test_data, create_test_datasets
 ):
     test_config = create_test_config
-    targets_object = get_all_targets(targets_configs=test_config.target_configs)
+    targets_object = get_all_tabular_targets(output_configs=test_config.output_configs)
     train_dataset, valid_dataset = create_test_datasets
 
     patched_train_dataset = patch_dataset_to_be_unbalanced(dataset=train_dataset)
+    columns_to_sample = [
+        "test_output." + i for i in targets_object.cat_targets["test_output"]
+    ]
     random_sampler = data_loading_funcs.get_weighted_random_sampler(
-        samples=patched_train_dataset.samples, target_columns=targets_object.cat_targets
+        samples=patched_train_dataset.samples,
+        columns_to_sample=columns_to_sample,
     )
 
     assert random_sampler.replacement
@@ -70,7 +79,7 @@ def test_get_weighted_random_sampler(
     )
 
     label_counts = _gather_dataloader_target_label_distributions(
-        dataloader=train_dataloader, target_col="Origin"
+        dataloader=train_dataloader, target_col="Origin", output_name="test_output"
     )
     are_close = _check_if_all_numbers_close(
         list_of_numbers=list(label_counts.values()), abs_tol=200
@@ -87,7 +96,7 @@ def test_get_weighted_random_sampler(
     )
 
     label_counts_imbalanced = _gather_dataloader_target_label_distributions(
-        dataloader=train_dataloader, target_col="Origin"
+        dataloader=train_dataloader, target_col="Origin", output_name="test_output"
     )
     are_close_imb = _check_if_all_numbers_close(
         list_of_numbers=list(label_counts_imbalanced.values()), abs_tol=100
@@ -112,7 +121,7 @@ def patch_dataset_to_be_unbalanced(dataset):
     cur_values = 0
     for sample in dataset.samples:
 
-        if sample.target_labels["Origin"] == 1:
+        if sample.target_labels["test_output"]["Origin"] == 1:
             if cur_values < max_values:
                 new_samples.append(sample)
                 cur_values += 1
@@ -125,7 +134,7 @@ def patch_dataset_to_be_unbalanced(dataset):
 
 
 def _gather_dataloader_target_label_distributions(
-    dataloader, target_col: str, num_epochs: int = 5
+    dataloader, target_col: str, output_name: str, num_epochs: int = 5
 ):
     total_counts = {}  # above step function
 
@@ -134,7 +143,7 @@ def _gather_dataloader_target_label_distributions(
         for batch in dataloader:
             _, labels, _ = batch
 
-            counts = Counter(labels[target_col].numpy())
+            counts = Counter(labels[output_name][target_col].numpy())
             for key, item in counts.items():
                 if key not in total_counts:
                     total_counts[key] = item
@@ -156,10 +165,14 @@ def test_gather_column_sampling_weights(test_labels):
     """
     test_target_columns = ["Origin", "HairColor"]
     test_samples = generate_test_samples(
-        test_labels=test_labels, target_columns=test_target_columns
+        test_labels=test_labels,
+        target_columns=test_target_columns,
+        output_name="test_output",
     )
     all_target_weights_test_dict = data_loading_funcs._gather_column_sampling_weights(
-        samples=test_samples, target_columns=test_target_columns
+        samples=test_samples,
+        columns_to_sample=test_target_columns,
+        output_name="test_output",
     )
 
     for cur_label_weight_dict in all_target_weights_test_dict.values():
@@ -168,10 +181,14 @@ def test_gather_column_sampling_weights(test_labels):
         )
 
 
-def generate_test_samples(test_labels: List[int], target_columns: List[str]):
+def generate_test_samples(
+    test_labels: List[int], target_columns: List[str], output_name: str
+):
     test_samples = []
     for idx, label in enumerate(test_labels):
-        cur_label_dict = {column_name: label for column_name in target_columns}
+        cur_label_dict = {
+            output_name: {column_name: label for column_name in target_columns}
+        }
         cur_inputs = {"omics_test": f"fake_path_{idx}.npy"}
         cur_test_sample = Sample(
             sample_id=str(idx), inputs=cur_inputs, target_labels=cur_label_dict
@@ -227,12 +244,16 @@ def test_aggregate_column_sampling_weights_auto(test_labels):
     """
     target_columns = ["Origin", "HairColor"]
     test_samples = generate_test_samples(
-        test_labels=test_labels, target_columns=target_columns
+        test_labels=test_labels,
+        target_columns=target_columns,
+        output_name="test_output",
     )
 
     gather_func = data_loading_funcs._gather_column_sampling_weights
     test_all_label_weights_and_counts = gather_func(
-        samples=test_samples, target_columns=target_columns
+        samples=test_samples,
+        columns_to_sample=target_columns,
+        output_name="test_output",
     )
     agg_func = data_loading_funcs._aggregate_column_sampling_weights
     test_weights, test_samples_per_epoch = agg_func(

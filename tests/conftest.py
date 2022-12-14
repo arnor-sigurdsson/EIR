@@ -2,21 +2,23 @@ import json
 import random
 import warnings
 from copy import copy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from shutil import rmtree
 from typing import (
-    List,
+    Callable,
     Tuple,
     Dict,
     Sequence,
     Mapping,
     Union,
     Literal,
+    Optional,
     Iterable,
     Any,
 )
 
+import deeplake
 import numpy as np
 import pandas as pd
 import pytest
@@ -36,12 +38,14 @@ from eir.experiment_io.experiment_io import (
     serialize_all_input_transformers,
     serialize_chosen_input_objects,
 )
-from eir.models.model_setup import get_model
+from eir.models.model_setup import get_model, get_default_model_registry_per_input_type
 from eir.setup import schemas, config
 from eir.setup.config import recursive_dict_replace
+from eir.setup.output_setup import (
+    set_up_outputs_for_training,
+)
 from eir.train import (
     Experiment,
-    set_up_num_outputs_per_target,
 )
 from eir.train_utils import optimizers, metrics
 from eir.train_utils.utils import configure_root_logger, get_run_folder, seed_everything
@@ -56,6 +60,7 @@ from tests.test_modelling.setup_modelling_test_data.setup_sequence_test_data imp
 )
 from tests.test_modelling.setup_modelling_test_data.setup_test_data_utils import (
     set_up_test_data_root_outpath,
+    common_split_test_data_wrapper,
 )
 
 al_prep_modelling_test_configs = Tuple[Experiment, "ModelTestConfig"]
@@ -131,13 +136,13 @@ def parse_test_cl_args(request) -> Dict[str, Any]:
 class TestConfigInits:
     global_configs: Sequence[dict]
     input_configs: Sequence[dict]
-    predictor_configs: Sequence[dict]
-    target_configs: Sequence[dict]
+    fusion_configs: Sequence[dict]
+    output_configs: Sequence[dict]
 
 
 @pytest.fixture
 def create_test_config_init_base(
-    request, create_test_data
+    request, create_test_data: "TestDataConfig"
 ) -> Tuple[TestConfigInits, "TestDataConfig"]:
 
     injections = {}
@@ -158,30 +163,29 @@ def create_test_config_init_base(
         test_path=create_test_data.scoped_tmp_path,
         input_config_dicts=injections.get("input_configs", {}),
         split_to_test=create_test_data.request_params.get("split_to_test", False),
+        source=create_test_data.source,
+        extra_kwargs=create_test_data.extras,
     )
 
-    model_type = injections.get("predictor_configs", {}).get("model_type", "nn")
-    test_predictor_init = get_test_base_predictor_init(model_type=model_type)
+    model_type = injections.get("fusion_configs", {}).get("model_type", "default")
+    test_fusion_init = get_test_base_fusion_init(model_type=model_type)
 
-    test_predictor_init = general_sequence_inject(
-        sequence=test_predictor_init,
-        inject_dict=injections.get("predictor_configs", {}),
+    test_fusion_init = general_sequence_inject(
+        sequence=test_fusion_init,
+        inject_dict=injections.get("fusion_configs", {}),
     )
 
-    test_target_inits = get_test_base_target_inits(
-        test_data_config=create_test_data,
+    test_output_init = get_test_outputs_inits(
+        test_path=create_test_data.scoped_tmp_path,
+        output_configs_dicts=injections.get("output_configs", {}),
         split_to_test=create_test_data.request_params.get("split_to_test", False),
-    )
-    test_target_inits = general_sequence_inject(
-        sequence=test_target_inits,
-        inject_dict=injections.get("target_configs", {}),
     )
 
     test_config = TestConfigInits(
         global_configs=test_global_init,
         input_configs=test_input_init,
-        predictor_configs=test_predictor_init,
-        target_configs=test_target_inits,
+        fusion_configs=test_fusion_init,
+        output_configs=test_output_init,
     )
 
     return test_config, create_test_data
@@ -210,7 +214,8 @@ def get_test_base_global_init() -> Sequence[dict]:
             "act_background_samples": 256,
             "n_epochs": 12,
             "warmup_steps": 100,
-            "lr": 1e-02,
+            "lr": 2e-03,
+            "optimizer": "adabelief",
             "lr_lb": 1e-05,
             "batch_size": 32,
             "valid_size": 0.05,
@@ -221,8 +226,15 @@ def get_test_base_global_init() -> Sequence[dict]:
 
 
 def get_test_inputs_inits(
-    test_path: Path, input_config_dicts: Sequence[dict], split_to_test: bool
+    test_path: Path,
+    input_config_dicts: Sequence[dict],
+    split_to_test: bool,
+    source: Literal["local", "deeplake"],
+    extra_kwargs: Optional[dict] = None,
 ) -> Sequence[dict]:
+
+    if extra_kwargs is None:
+        extra_kwargs = {}
 
     inits = []
 
@@ -231,6 +243,38 @@ def get_test_inputs_inits(
         cur_name = init_dict["input_info"]["input_name"]
 
         cur_base_func_keys = [i for i in base_func_map.keys() if cur_name.startswith(i)]
+        assert len(cur_base_func_keys) == 1
+        cur_base_func_key = cur_base_func_keys[0]
+
+        cur_base_func = base_func_map.get(cur_base_func_key)
+        cur_init_base = cur_base_func(
+            init_dict=init_dict,
+            test_path=test_path,
+            split_to_test=split_to_test,
+            source=source,
+            extra_kwargs=extra_kwargs,
+        )
+
+        cur_init_injected = recursive_dict_replace(
+            dict_=cur_init_base, dict_to_inject=init_dict
+        )
+        inits.append(cur_init_injected)
+
+    return inits
+
+
+def get_test_outputs_inits(
+    test_path: Path, output_configs_dicts: Sequence[dict], split_to_test: bool
+) -> Sequence[dict]:
+
+    inits = []
+
+    base_func_map = get_output_test_init_base_func_map()
+
+    for init_dict in output_configs_dicts:
+        cur_name = init_dict["output_info"]["output_name"]
+
+        cur_base_func_keys = [i for i in base_func_map.keys() if cur_name == i]
         assert len(cur_base_func_keys) == 1
         cur_base_func_key = cur_base_func_keys[0]
 
@@ -245,7 +289,16 @@ def get_test_inputs_inits(
     return inits
 
 
-def get_input_test_init_base_func_map():
+def get_output_test_init_base_func_map() -> Dict[str, Callable]:
+    mapping = {
+        "test_output": get_test_base_output_inits,
+        "test_output_copy": get_test_base_output_inits,
+    }
+
+    return mapping
+
+
+def get_input_test_init_base_func_map() -> Dict[str, Callable]:
     mapping = {
         "test_genotype": get_test_omics_input_init,
         "test_tabular": get_test_tabular_input_init,
@@ -257,30 +310,72 @@ def get_input_test_init_base_func_map():
     return mapping
 
 
-def get_test_omics_input_init(test_path: Path, split_to_test: bool) -> dict:
+def _inject_train_source_path(
+    test_path: Path,
+    source: Literal["local", "deeplake"],
+    local_name: Literal["omics", "sequence", "image"],
+    split_to_test: bool,
+) -> Path:
 
-    input_source = test_path / "omics"
-    if split_to_test:
-        input_source = input_source / "train_set"
+    if source == "local":
+        input_source = test_path / local_name
+
+        if split_to_test:
+            input_source = input_source / "train_set"
+
+    elif source == "deeplake":
+
+        input_source = test_path / "deeplake"
+        if split_to_test:
+            input_source = test_path / "deeplake_train_set"
+
+    else:
+        raise ValueError(f"Source {source} not supported.")
+
+    return input_source
+
+
+def get_test_omics_input_init(
+    test_path: Path,
+    split_to_test: bool,
+    init_dict: Dict,
+    source: Literal["local", "deeplake"],
+    *args,
+    **kwargs,
+) -> dict:
+
+    input_source = _inject_train_source_path(
+        test_path=test_path,
+        source=source,
+        local_name="omics",
+        split_to_test=split_to_test,
+    )
 
     input_init_kwargs = {
         "input_info": {
             "input_source": str(input_source),
             "input_name": "test_genotype",
             "input_type": "omics",
+            "input_inner_key": "test_genotype",
         },
         "input_type_info": {
             "na_augment_perc": 0.10,
-            "na_augment_prob": 0.10,
+            "na_augment_prob": 0.80,
             "snp_file": str(test_path / "test_snps.bim"),
         },
         "model_config": {"model_type": "genome-local-net"},
     }
 
+    if init_dict.get("input_type_info", {}).get("subset_snps_file", None) == "auto":
+        subset_path = str(test_path / "test_subset_snps.txt")
+        init_dict["input_type_info"]["subset_snps_file"] = subset_path
+
     return input_init_kwargs
 
 
-def get_test_tabular_input_init(test_path: Path, split_to_test: bool) -> dict:
+def get_test_tabular_input_init(
+    test_path: Path, split_to_test: bool, *args, **kwargs
+) -> dict:
 
     input_source = test_path / "labels.csv"
     if split_to_test:
@@ -299,17 +394,35 @@ def get_test_tabular_input_init(test_path: Path, split_to_test: bool) -> dict:
     return input_init_kwargs
 
 
-def get_test_sequence_input_init(test_path: Path, split_to_test: bool) -> dict:
+def get_test_sequence_input_init(
+    test_path: Path,
+    split_to_test: bool,
+    source: Literal["local", "deeplake"],
+    extra_kwargs: dict,
+    *args,
+    **kwargs,
+) -> dict:
 
-    input_source = test_path / "sequence"
-    if split_to_test:
-        input_source = input_source / "train_set"
+    if extra_kwargs.get("sequence_csv_source", False):
+        assert source == "local"
+        name = "sequence.csv"
+        if split_to_test:
+            name = "sequence_train.csv"
+        input_source = test_path / name
+    else:
+        input_source = _inject_train_source_path(
+            test_path=test_path,
+            source=source,
+            local_name="sequence",
+            split_to_test=split_to_test,
+        )
 
     input_init_kwargs = {
         "input_info": {
             "input_source": str(input_source),
             "input_name": "test_sequence",
             "input_type": "sequence",
+            "input_inner_key": "test_sequence",
         },
         "input_type_info": {
             "max_length": "max",
@@ -317,11 +430,11 @@ def get_test_sequence_input_init(test_path: Path, split_to_test: bool) -> dict:
         },
         "model_config": {
             "model_type": "sequence-default",
-            "embedding_dim": 8,
+            "embedding_dim": 64,
             "model_init_config": {
                 "num_heads": 2,
                 "num_layers": 1,
-                "dropout": 0.25,
+                "dropout": 0.10,
             },
         },
     }
@@ -329,7 +442,9 @@ def get_test_sequence_input_init(test_path: Path, split_to_test: bool) -> dict:
     return input_init_kwargs
 
 
-def get_test_bytes_input_init(test_path: Path, split_to_test: bool) -> Dict:
+def get_test_bytes_input_init(
+    test_path: Path, split_to_test: bool, *args, **kwargs
+) -> Dict:
     input_source = test_path / "sequence"
     if split_to_test:
         input_source = input_source / "train_set"
@@ -353,16 +468,27 @@ def get_test_bytes_input_init(test_path: Path, split_to_test: bool) -> Dict:
     return input_init_kwargs
 
 
-def get_test_image_input_init(test_path: Path, split_to_test: bool) -> Dict:
-    input_source = test_path / "image"
-    if split_to_test:
-        input_source = input_source / "train_set"
+def get_test_image_input_init(
+    test_path: Path,
+    split_to_test: bool,
+    source: Literal["local", "deeplake"],
+    *args,
+    **kwargs,
+) -> Dict:
+
+    input_source = _inject_train_source_path(
+        test_path=test_path,
+        source=source,
+        local_name="image",
+        split_to_test=split_to_test,
+    )
 
     input_init_kwargs = {
         "input_info": {
             "input_source": str(input_source),
             "input_name": "test_image",
             "input_type": "image",
+            "input_inner_key": "test_image",
         },
         "input_type_info": {
             "auto_augment": False,
@@ -383,29 +509,48 @@ def get_test_image_input_init(test_path: Path, split_to_test: bool) -> Dict:
     return input_init_kwargs
 
 
-def get_test_base_predictor_init(model_type: Literal["nn", "linear"]) -> Sequence[dict]:
-    if model_type == "linear":
+def get_test_base_fusion_init(model_type: str) -> Sequence[dict]:
+    if model_type == "identity":
         return [{}]
-    return [{"model_config": {"rb_do": 0.25, "fc_do": 0.25}}]
+    elif model_type in ("default", "mgmoe"):
+        return [
+            {
+                "model_config": {
+                    "rb_do": 0.1,
+                    "fc_do": 0.1,
+                    "layers": [1],
+                    "fc_task_dim": 128,
+                }
+            }
+        ]
+    else:
+        raise ValueError()
 
 
-def get_test_base_target_inits(
-    test_data_config: "TestDataConfig", split_to_test: bool
-) -> Sequence[dict]:
-    test_path = test_data_config.scoped_tmp_path
+def get_test_base_output_inits(test_path: Path, split_to_test: bool) -> Dict:
 
     label_file = test_path / "labels.csv"
     if split_to_test:
         label_file = test_path / "labels_train.csv"
 
     test_target_init_kwargs = {
-        "label_file": str(label_file),
-        "target_cat_columns": ["Origin"],
+        "output_info": {
+            "output_name": "test_output",
+            "output_type": "tabular",
+            "output_source": str(label_file),
+        },
+        "output_type_info": {
+            "target_cat_columns": ["Origin"],
+        },
+        "model_config": {
+            "model_init_config": {
+                "layers": [1],
+                "fc_task_dim": 128,
+            }
+        },
     }
 
-    test_target_init_kwargs_sequence = [test_target_init_kwargs]
-
-    return test_target_init_kwargs_sequence
+    return test_target_init_kwargs
 
 
 @pytest.fixture()
@@ -432,6 +577,15 @@ def create_test_data(request, tmp_path_factory, parse_test_cl_args) -> "TestData
         if drop_random_samples:
             _delete_random_files_from_folder(folder=omics_sample_path, n_to_drop=50)
 
+    image_path = base_outfolder / "image"
+    if "image" in test_data_config.modalities and not image_path.exists():
+        image_sample_folder = create_test_image_data(
+            test_data_config=test_data_config,
+            image_output_folder=image_path,
+        )
+        if drop_random_samples:
+            _delete_random_files_from_folder(folder=image_sample_folder, n_to_drop=50)
+
     sequence_path = base_outfolder / "sequence"
     if "sequence" in test_data_config.modalities and not sequence_path.exists():
         sequence_sample_folder = create_test_sequence_data(
@@ -443,20 +597,144 @@ def create_test_data(request, tmp_path_factory, parse_test_cl_args) -> "TestData
                 folder=sequence_sample_folder, n_to_drop=50
             )
 
-    image_path = base_outfolder / "image"
-    if "image" in test_data_config.modalities and not image_path.exists():
-        image_sample_folder = create_test_image_data(
-            test_data_config=test_data_config,
-            image_output_folder=image_path,
-        )
-        if drop_random_samples:
-            _delete_random_files_from_folder(folder=image_sample_folder, n_to_drop=50)
+    _merge_labels_from_modalities(base_path=base_outfolder)
 
     if drop_random_samples:
         label_file = test_data_config.scoped_tmp_path / "labels.csv"
         _delete_random_rows_from_csv(csv_file=label_file, n_to_drop=50)
 
+    if test_data_config.request_params.get("split_to_test", False):
+        post_split_callables = _get_test_post_split_callables()
+        for modality in test_data_config.modalities:
+            common_split_test_data_wrapper(
+                test_folder=test_data_config.scoped_tmp_path,
+                name=modality,
+                post_split_callables=post_split_callables,
+            )
+
+    if test_data_config.request_params.get("split_to_test", False):
+        _make_deeplake_test_dataset(
+            base_output_folder=base_outfolder, sub_folder_name="train_set"
+        )
+        _make_deeplake_test_dataset(
+            base_output_folder=base_outfolder, sub_folder_name="test_set"
+        )
+    else:
+        _make_deeplake_test_dataset(
+            base_output_folder=base_outfolder, sub_folder_name=None
+        )
+
     return test_data_config
+
+
+def _get_test_post_split_callables() -> Dict[str, Callable]:
+    def _sequence_post_split(
+        test_root_folder: Path,
+        train_ids: Sequence[str],
+        test_ids: Sequence[str],
+    ) -> None:
+        df_sequence = pd.read_csv(test_root_folder / "sequence.csv")
+
+        df_sequence_train = df_sequence[df_sequence["ID"].isin(train_ids)]
+        df_sequence_test = df_sequence[df_sequence["ID"].isin(test_ids)]
+
+        df_sequence_train.to_csv(test_root_folder / "sequence_train.csv", index=False)
+        df_sequence_test.to_csv(test_root_folder / "sequence_test.csv", index=False)
+
+        (test_root_folder / "sequence.csv").unlink()
+
+    callables = {"sequence": _sequence_post_split}
+
+    return callables
+
+
+def _merge_labels_from_modalities(base_path: Path) -> None:
+    dfs = []
+
+    for file in base_path.iterdir():
+        # if we have already merged the labels
+        if file.name in ("labels.csv", "labels_train.csv", "labels_test.csv"):
+            return
+
+        elif file.name.startswith("labels_"):
+            assert file.suffix == ".csv"
+            dfs.append(pd.read_csv(file, index_col="ID"))
+
+    df_final = dfs[0].copy()
+
+    if len(dfs) == 1:
+        df_final.to_csv(base_path / "labels.csv")
+        return
+
+    for df in dfs[1:]:
+        assert df["Origin"].equals(df_final["Origin"])
+        assert df["OriginExtraCol"].equals(df_final["Origin"])
+        assert df.index.equals(df_final.index)
+
+        df_final["Height"] += df["Height"]
+        df_final["ExtraTarget"] += df["ExtraTarget"]
+
+    df_final["Height"] /= len(dfs)
+    df_final["ExtraTarget"] /= len(dfs)
+
+    df_final.to_csv(base_path / "labels.csv")
+
+
+def _make_deeplake_test_dataset(
+    base_output_folder: Path,
+    sub_folder_name: Union[None, Literal["train_set", "test_set"]],
+) -> None:
+
+    if sub_folder_name is None:
+        suffix = ""
+    else:
+        suffix = f"_{sub_folder_name}"
+
+    if (base_output_folder / f"deeplake{suffix}").exists():
+        return
+
+    samples = {}
+    for f in base_output_folder.iterdir():
+        if not f.is_dir() or "deeplake" in f.name:
+            continue
+
+        file_iterator = f.iterdir()
+        if sub_folder_name is not None:
+            file_iterator = (f / sub_folder_name).iterdir()
+
+        for sample_file in file_iterator:
+
+            sample_id = sample_file.stem
+            if sample_id not in samples:
+                samples[sample_id] = {"ID": sample_id}
+
+            if f.name == "omics":
+                cur_name = "test_genotype"
+                sample_data = np.load(str(sample_file))
+            elif f.name == "image":
+                cur_name = "test_image"
+                sample_data = datasets.default_loader(str(sample_file))
+                sample_data = np.array(sample_data)
+            elif f.name == "sequence":
+                cur_name = "test_sequence"
+                sample_data = sample_file.read_text().strip()
+            else:
+                raise ValueError()
+
+            samples[sample_id][cur_name] = sample_data
+
+    name = "deeplake"
+    if sub_folder_name is not None:
+        name = f"{name}_{sub_folder_name}"
+    ds = deeplake.empty(base_output_folder / name, overwrite=True)
+
+    ds.create_tensor("ID", htype="text")
+    ds.create_tensor("test_genotype")
+    ds.create_tensor("test_image", htype="image", sample_compression="jpg")
+    ds.create_tensor("test_sequence", htype="text")
+    with ds:
+        for sample_id, sample in samples.items():
+            ds.append(sample, append_empty=True)
 
 
 def _delete_random_rows_from_csv(csv_file: Path, n_to_drop: int):
@@ -484,6 +762,8 @@ class TestDataConfig:
     n_snps: int
     modalities: Sequence[Union[Literal["omics"], Literal["sequence"]]] = ("omics",)
     random_samples_dropped_from_modalities: bool = False
+    source: Literal["local", "deeplake"] = "local"
+    extras: Dict[str, Any] = field(default_factory=dict)
 
 
 def _create_test_data_config(
@@ -521,6 +801,8 @@ def _create_test_data_config(
         random_samples_dropped_from_modalities=request_params.get(
             "random_samples_dropped_from_modalities", False
         ),
+        source=request_params.get("source", "local"),
+        extras=request_params.get("extras", {}),
     )
 
     return test_data_config
@@ -543,18 +825,26 @@ def create_test_config(
     )
 
     test_input_configs = config.get_input_configs(input_configs=test_init.input_configs)
-    test_predictor_configs = config.load_predictor_config(
-        predictor_configs=test_init.predictor_configs
+    test_fusion_configs = config.load_fusion_configs(
+        fusion_configs=test_init.fusion_configs
     )
-    test_target_configs = config.load_configs_general(
-        config_dict_iterable=test_init.target_configs, cls=schemas.TargetConfig
+
+    tabular_output_setup = config.DynamicOutputSetup(
+        output_types_schema_map=config.get_outputs_types_schema_map(),
+        output_module_config_class_getter=config.get_output_module_config_class,
+        output_module_init_class_map=config.get_output_config_type_init_callable_map(),
+    )
+
+    test_output_configs = config.load_output_configs(
+        output_configs=test_init.output_configs,
+        dynamic_output_setup=tabular_output_setup,
     )
 
     test_configs = config.Configs(
         global_config=test_global_config,
         input_configs=test_input_configs,
-        predictor_config=test_predictor_configs,
-        target_configs=test_target_configs,
+        fusion_config=test_fusion_configs,
+        output_configs=test_output_configs,
     )
 
     # This is done after in case tests modify output_folder
@@ -563,7 +853,7 @@ def create_test_config(
         + "_"
         + "_".join(i.model_config.model_type for i in test_configs.input_configs)
         + "_"
-        + f"{test_configs.predictor_config.model_type}"
+        + f"{test_configs.output_configs[0].model_config.model_type}"
         + "_"
         + test_data_config.request_params["task_type"]
     )
@@ -624,10 +914,6 @@ def create_test_model(
     gc = create_test_config.global_config
     target_labels = create_test_labels
 
-    num_outputs_per_class = set_up_num_outputs_per_target(
-        target_transformers=target_labels.label_transformers
-    )
-
     inputs_as_dict = eir.setup.input_setup.set_up_inputs_for_training(
         inputs_configs=create_test_config.input_configs,
         train_ids=tuple(create_test_labels.train_labels.keys()),
@@ -635,11 +921,20 @@ def create_test_model(
         hooks=None,
     )
 
+    input_model_registry = get_default_model_registry_per_input_type()
+
+    outputs_as_dict = set_up_outputs_for_training(
+        output_configs=create_test_config.output_configs,
+        target_transformers=target_labels.label_transformers,
+    )
+
     model = get_model(
         inputs_as_dict=inputs_as_dict,
+        model_registry_per_input_type=input_model_registry,
+        model_registry_per_output_type={},
+        fusion_config=create_test_config.fusion_config,
+        outputs_as_dict=outputs_as_dict,
         global_config=gc,
-        predictor_config=create_test_config.predictor_config,
-        num_outputs_per_target=num_outputs_per_class,
     )
 
     return model
@@ -660,30 +955,30 @@ def cleanup(run_path: Union[Path, str]) -> None:
 @pytest.fixture()
 def create_test_labels(
     create_test_data, create_test_config: config.Configs
-) -> train.Labels:
+) -> train.MergedTargetLabels:
 
     c = create_test_config
     gc = c.global_config
 
     run_folder = get_run_folder(output_folder=gc.output_folder)
 
-    all_array_ids = train.gather_all_ids_from_target_configs(
-        target_configs=c.target_configs
+    all_array_ids = train.gather_all_ids_from_output_configs(
+        output_configs=c.output_configs
     )
     train_ids, valid_ids = train.split_ids(ids=all_array_ids, valid_size=gc.valid_size)
 
     target_labels_info = train.get_tabular_target_file_infos(
-        target_configs=c.target_configs
+        output_configs=c.output_configs
     )
-    target_labels = train.set_up_target_labels_wrapper(
-        tabular_file_infos=target_labels_info,
+    target_labels = train.set_up_tabular_target_labels_wrapper(
+        tabular_target_file_infos=target_labels_info,
         custom_label_ops=None,
         train_ids=train_ids,
         valid_ids=valid_ids,
     )
 
     train.save_transformer_set(
-        transformers=target_labels.label_transformers, run_folder=run_folder
+        transformers_per_source=target_labels.label_transformers, run_folder=run_folder
     )
 
     return target_labels
@@ -706,10 +1001,16 @@ def create_test_datasets(
         hooks=None,
     )
 
+    outputs_as_dict = set_up_outputs_for_training(
+        output_configs=create_test_config.output_configs,
+        target_transformers=target_labels.label_transformers,
+    )
+
     train_dataset, valid_dataset = datasets.set_up_datasets_from_configs(
         configs=configs,
         target_labels=target_labels,
         inputs_as_dict=inputs,
+        outputs_as_dict=outputs_as_dict,
     )
 
     return train_dataset, valid_dataset
@@ -742,7 +1043,7 @@ def create_test_optimizer(
     TODO: Refactor loss module construction out of this function.
     """
 
-    loss_module = train._get_loss_callable(criterions=criterions)
+    loss_module = train._get_loss_callable(criteria=criterions)
 
     optimizer = optimizers.get_optimizer(
         model=model, loss_callable=loss_module, global_config=global_config
@@ -755,8 +1056,8 @@ def create_test_optimizer(
 class ModelTestConfig:
     iteration: int
     run_path: Path
-    last_sample_folders: Dict[str, Path]
-    activations_paths: Dict[str, Dict[str, Path]]
+    last_sample_folders: Dict[str, Dict[str, Path]]
+    activations_paths: Dict[str, Dict[str, Dict[str, Path]]]
 
 
 @pytest.fixture()
@@ -779,11 +1080,12 @@ def prep_modelling_test_configs(
 
     model = create_test_model
 
-    num_outputs_per_target = set_up_num_outputs_per_target(
-        target_transformers=target_labels.label_transformers
+    outputs_as_dict = set_up_outputs_for_training(
+        output_configs=create_test_config.output_configs,
+        target_transformers=target_labels.label_transformers,
     )
 
-    criterions = train._get_criterions(target_columns=train_dataset.target_columns)
+    criteria = train._get_criteria(outputs_as_dict=outputs_as_dict)
     test_metrics = metrics.get_default_metrics(
         target_transformers=target_labels.label_transformers,
     )
@@ -792,7 +1094,7 @@ def prep_modelling_test_configs(
     optimizer, loss_module = create_test_optimizer(
         global_config=gc,
         model=model,
-        criterions=criterions,
+        criterions=criteria,
     )
 
     train_dataset, valid_dataset = create_test_datasets
@@ -813,17 +1115,15 @@ def prep_modelling_test_configs(
     experiment = Experiment(
         configs=c,
         inputs=inputs,
+        outputs=outputs_as_dict,
         train_loader=train_loader,
         valid_loader=valid_loader,
         valid_dataset=valid_dataset,
         model=model,
         optimizer=optimizer,
-        criterions=criterions,
+        criteria=criteria,
         loss_function=loss_module,
         metrics=test_metrics,
-        target_transformers=target_labels.label_transformers,
-        num_outputs_per_target=num_outputs_per_target,
-        target_columns=train_dataset.target_columns,
         writer=train.get_summary_writer(run_folder=Path(gc.output_folder)),
         hooks=hooks,
     )
@@ -837,7 +1137,7 @@ def prep_modelling_test_configs(
         keys_to_serialize=keys_to_serialize,
     )
 
-    targets = config.get_all_targets(targets_configs=c.target_configs)
+    targets = config.get_all_tabular_targets(output_configs=c.output_configs)
     test_config = _get_cur_modelling_test_config(
         train_loader=train_loader,
         global_config=gc,
@@ -867,7 +1167,7 @@ def _patch_metrics(
 def _get_cur_modelling_test_config(
     train_loader: DataLoader,
     global_config: schemas.GlobalConfig,
-    targets: config.Targets,
+    targets: config.TabularTargets,
     input_names: Iterable[str],
 ) -> ModelTestConfig:
 
@@ -875,11 +1175,12 @@ def _get_cur_modelling_test_config(
     run_path = Path(f"{global_config.output_folder}/")
 
     last_sample_folders = _get_all_last_sample_folders(
-        target_columns=targets.all_targets, run_path=run_path, iteration=last_iter
+        targets=targets, run_path=run_path, iteration=last_iter
     )
 
     all_activation_paths = _get_all_activation_paths(
-        last_sample_folder_per_target=last_sample_folders, input_names=input_names
+        last_sample_folder_per_target_in_each_output=last_sample_folders,
+        input_names=input_names,
     )
 
     test_config = ModelTestConfig(
@@ -893,35 +1194,73 @@ def _get_cur_modelling_test_config(
 
 
 def _get_all_activation_paths(
-    last_sample_folder_per_target: Dict[str, Path], input_names: Iterable[str]
-) -> Dict[str, Dict[str, Path]]:
+    last_sample_folder_per_target_in_each_output: Dict[str, Dict[str, Path]],
+    input_names: Iterable[str],
+) -> Dict[str, Dict[str, Dict[str, Path]]]:
+    """
+    output_name -> target_name -> input_name: path
+    """
 
     all_activation_paths = {}
 
-    for target_name, last_sample_folder in last_sample_folder_per_target.items():
-        all_activation_paths[target_name] = {}
-        for input_name in input_names:
-            all_activation_paths[target_name][input_name] = (
-                last_sample_folder / "activations" / input_name
-            )
+    dict_to_iter = last_sample_folder_per_target_in_each_output
+    for (output_name, file_per_target_dict) in dict_to_iter.items():
+        if output_name not in all_activation_paths:
+            all_activation_paths[output_name] = {}
+
+        for target_name, last_sample_folder in file_per_target_dict.items():
+            all_activation_paths[output_name][target_name] = {}
+
+            for input_name in input_names:
+                path = last_sample_folder / "activations" / input_name
+                all_activation_paths[output_name][target_name][input_name] = path
 
     return all_activation_paths
 
 
 def _get_all_last_sample_folders(
-    target_columns: List[str], run_path: Path, iteration: int
-) -> Dict[str, Path]:
+    targets: config.TabularTargets, run_path: Path, iteration: int
+) -> Dict[str, Dict[str, Path]]:
+    """
+    output_name -> target_name: path
+    """
     sample_folders = {}
-    for col in target_columns:
-        sample_folders[col] = _get_test_sample_folder(
-            run_path=run_path, iteration=iteration, column_name=col
-        )
+
+    for output_name in targets.con_targets:
+        if output_name not in sample_folders:
+            sample_folders[output_name] = {}
+
+        cur_con_columns = targets.con_targets[output_name]
+        for con_column_name in cur_con_columns:
+            sample_folders[output_name][con_column_name] = _get_test_sample_folder(
+                run_path=run_path,
+                iteration=iteration,
+                output_name=output_name,
+                column_name=con_column_name,
+            )
+
+    for output_name in targets.cat_targets:
+        if output_name not in sample_folders:
+            sample_folders[output_name] = {}
+
+        cur_cat_columns = targets.cat_targets[output_name]
+        for cat_column_name in cur_cat_columns:
+            sample_folders[output_name][cat_column_name] = _get_test_sample_folder(
+                run_path=run_path,
+                iteration=iteration,
+                output_name=output_name,
+                column_name=cat_column_name,
+            )
 
     return sample_folders
 
 
-def _get_test_sample_folder(run_path: Path, iteration: int, column_name: str) -> Path:
-    sample_folder = run_path / f"results/{column_name}/samples/{iteration}"
+def _get_test_sample_folder(
+    run_path: Path, iteration: int, output_name: str, column_name: str
+) -> Path:
+    sample_folder = (
+        run_path / f"results/{output_name}/{column_name}/samples/{iteration}"
+    )
 
     return sample_folder
 

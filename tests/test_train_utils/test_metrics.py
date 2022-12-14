@@ -6,6 +6,14 @@ import torch
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 
 from eir import train
+from eir.models.output.tabular_output import TabularMLPResidualModelConfig
+from eir.setup.output_setup import TabularOutputInfo
+from eir.setup.schemas import (
+    OutputConfig,
+    OutputInfoConfig,
+    TabularOutputTypeConfig,
+    TabularModelOutputConfig,
+)
 from eir.train_utils import metrics
 
 
@@ -13,53 +21,64 @@ def test_calculate_batch_metrics():
     test_batch_metrics_kwargs = get_calculate_batch_metrics_data_test_kwargs()
     test_batch_metrics = metrics.calculate_batch_metrics(**test_batch_metrics_kwargs)
 
-    loss_kwargs = _get_add_loss_to_metrics_kwargs()
+    loss_kwargs = _get_add_loss_to_metrics_kwargs(
+        outputs_as_dict=test_batch_metrics_kwargs["outputs_as_dict"]
+    )
     test_batch_metrics_w_loss = metrics.add_loss_to_metrics(
         metric_dict=test_batch_metrics, **loss_kwargs
     )
 
-    assert test_batch_metrics_w_loss["Origin"]["Origin_mcc"] == 1.0
-    assert test_batch_metrics_w_loss["Origin"]["Origin_loss"] == 0.0
+    test_batch_metrics_w_loss = test_batch_metrics_w_loss["test_output"]
 
-    assert test_batch_metrics_w_loss["BMI"]["BMI_r2"] == 1.0
-    assert test_batch_metrics_w_loss["BMI"]["BMI_rmse"] == 0.0
+    assert test_batch_metrics_w_loss["Origin"]["test_output_Origin_mcc"] == 1.0
+    assert test_batch_metrics_w_loss["Origin"]["test_output_Origin_loss"] == 0.0
+
+    assert test_batch_metrics_w_loss["BMI"]["test_output_BMI_r2"] == 1.0
+    assert test_batch_metrics_w_loss["BMI"]["test_output_BMI_rmse"] == 0.0
 
     # sometimes slight numerical instability with scipy pearsonr
-    assert isclose(test_batch_metrics_w_loss["BMI"]["BMI_pcc"], 1.0)
-    assert test_batch_metrics_w_loss["BMI"]["BMI_loss"] == 0.0
+    assert isclose(test_batch_metrics_w_loss["BMI"]["test_output_BMI_pcc"], 1.0)
+    assert test_batch_metrics_w_loss["BMI"]["test_output_BMI_loss"] == 0.0
 
-    assert test_batch_metrics_w_loss["Height"]["Height_r2"] < 0
-    assert test_batch_metrics_w_loss["Height"]["Height_rmse"] > 0.0
-    assert isclose(test_batch_metrics_w_loss["Height"]["Height_pcc"], -1.0)
-    assert test_batch_metrics_w_loss["Height"]["Height_loss"] == 1.0
+    assert test_batch_metrics_w_loss["Height"]["test_output_Height_r2"] < 0
+    assert test_batch_metrics_w_loss["Height"]["test_output_Height_rmse"] > 0.0
+    assert isclose(test_batch_metrics_w_loss["Height"]["test_output_Height_pcc"], -1.0)
+    assert test_batch_metrics_w_loss["Height"]["test_output_Height_loss"] == 1.0
 
 
 def get_calculate_batch_metrics_data_test_kwargs():
-    target_columns = {"cat": ["Origin"], "con": ["BMI", "Height"]}
 
     standard_scaler_fit_arr = [[0.0], [1.0], [2.0]]
 
     outputs = {
-        "Origin": torch.tensor([[1, 0, 0], [0, 1, 0], [0, 0, 1]]),
-        "BMI": torch.tensor([1.0, 2.0, 3.0]).unsqueeze(1),
-        "Height": torch.tensor([1.0, 2.0, 3.0]).unsqueeze(1),
+        "test_output": {
+            "Origin": torch.tensor([[1, 0, 0], [0, 1, 0], [0, 0, 1]]),
+            "BMI": torch.tensor([1.0, 2.0, 3.0]).unsqueeze(1),
+            "Height": torch.tensor([1.0, 2.0, 3.0]).unsqueeze(1),
+        }
     }
 
     labels = {
-        "Origin": torch.tensor([0, 1, 2]),
-        "BMI": torch.tensor([1.0, 2.0, 3.0]).unsqueeze(1),
-        "Height": torch.tensor([-1.0, -2.0, -3.0]).unsqueeze(1),
+        "test_output": {
+            "Origin": torch.tensor([0, 1, 2]),
+            "BMI": torch.tensor([1.0, 2.0, 3.0]).unsqueeze(1),
+            "Height": torch.tensor([-1.0, -2.0, -3.0]).unsqueeze(1),
+        }
     }
 
     target_transformers = {
-        "Origin": LabelEncoder().fit([1, 2, 3]),
-        "BMI": StandardScaler().fit(standard_scaler_fit_arr),
-        "Height": StandardScaler().fit(standard_scaler_fit_arr),
+        "test_output": {
+            "Origin": LabelEncoder().fit([1, 2, 3]),
+            "BMI": StandardScaler().fit(standard_scaler_fit_arr),
+            "Height": StandardScaler().fit(standard_scaler_fit_arr),
+        }
     }
     metrics_ = metrics.get_default_metrics(target_transformers=target_transformers)
 
+    test_outputs_as_dict = _get_metrics_test_module_test_outputs_as_dict()
+
     batch_metrics_function_kwargs = {
-        "target_columns": target_columns,
+        "outputs_as_dict": test_outputs_as_dict,
         "outputs": outputs,
         "labels": labels,
         "mode": "val",
@@ -69,15 +88,42 @@ def get_calculate_batch_metrics_data_test_kwargs():
     return batch_metrics_function_kwargs
 
 
-def _get_add_loss_to_metrics_kwargs():
-    target_columns = {"cat": ["Origin"], "con": ["BMI", "Height"]}
+def _get_metrics_test_module_test_outputs_as_dict():
+    test_outputs_as_dict = {
+        "test_output": TabularOutputInfo(
+            output_config=OutputConfig(
+                output_info=OutputInfoConfig(
+                    output_name="test_output", output_type="tabular", output_source=None
+                ),
+                output_type_info=TabularOutputTypeConfig(
+                    target_con_columns=["Height", "BMI"],
+                    target_cat_columns=["Origin"],
+                ),
+                model_config=TabularModelOutputConfig(
+                    model_init_config=TabularMLPResidualModelConfig()
+                ),
+            ),
+            num_outputs_per_target={},
+            target_columns={
+                "con": ["Height", "BMI"],
+                "cat": ["Origin"],
+            },
+            target_transformers={},
+        )
+    }
+    return test_outputs_as_dict
+
+
+def _get_add_loss_to_metrics_kwargs(outputs_as_dict):
     losses = {
-        "Origin": torch.tensor(0.0),
-        "BMI": torch.tensor(0.0),
-        "Height": torch.tensor(1.0),
+        "test_output": {
+            "Origin": torch.tensor(0.0),
+            "BMI": torch.tensor(0.0),
+            "Height": torch.tensor(1.0),
+        }
     }
 
-    return {"losses": losses, "target_columns": target_columns}
+    return {"losses": losses, "outputs_as_dict": outputs_as_dict}
 
 
 def test_calculate_losses_good():
@@ -95,19 +141,18 @@ def test_calculate_losses_good():
     """
 
     common_values = torch.tensor([0, 1, 2, 3, 4], dtype=torch.int64)
-    test_criterions, test_labels, test_outputs = set_up_calculate_losses_data(
+    test_criteria, test_labels, test_outputs = set_up_calculate_losses_data(
         label_values=common_values, output_values=common_values
     )
 
     perfect_pred_loss = metrics.calculate_prediction_losses(
-        criterions=test_criterions, targets=test_labels, inputs=test_outputs
+        criteria=test_criteria, targets=test_labels, inputs=test_outputs
     )
 
-    assert perfect_pred_loss["Height"].item() == 0.0
-    assert perfect_pred_loss["BMI"].item() == 0.0
+    assert perfect_pred_loss["test_output"]["Height"].item() == 0.0
+    assert perfect_pred_loss["test_output"]["BMI"].item() == 0.0
 
-    assert 0.904 < perfect_pred_loss["Origin"].item() < 0.905
-    assert 0.904 < perfect_pred_loss["HairColor"].item() < 0.905
+    assert 0.904 < perfect_pred_loss["test_output"]["Origin"].item() < 0.905
 
 
 def test_calculate_losses_bad():
@@ -120,27 +165,21 @@ def test_calculate_losses_bad():
     )
 
     bad_pred_loss = metrics.calculate_prediction_losses(
-        criterions=test_criterions, targets=test_labels, inputs=test_outputs
+        criteria=test_criterions, targets=test_labels, inputs=test_outputs
     )
 
     expected_rmse = 4.0
-    assert bad_pred_loss["Height"].item() == expected_rmse
-    assert bad_pred_loss["BMI"].item() == expected_rmse
+    assert bad_pred_loss["test_output"]["Height"].item() == expected_rmse
+    assert bad_pred_loss["test_output"]["BMI"].item() == expected_rmse
 
     # check that the loss is more than upper bound (0.905) in perfect case
     perfect_upper_bound = 0.905
-    assert bad_pred_loss["Origin"].item() > perfect_upper_bound
-    assert bad_pred_loss["HairColor"].item() > perfect_upper_bound
+    assert bad_pred_loss["test_output"]["Origin"].item() > perfect_upper_bound
 
 
 def set_up_calculate_losses_data(
     label_values: torch.Tensor, output_values: torch.Tensor
 ):
-    test_target_columns_dict = {
-        "con": ["Height", "BMI"],
-        "cat": ["Origin", "HairColor"],
-    }
-
     def generate_base_dict(values: torch.Tensor):
 
         base_dict = {
@@ -152,9 +191,8 @@ def set_up_calculate_losses_data(
 
         return base_dict
 
-    test_criterions = train._get_criterions(
-        target_columns=test_target_columns_dict,
-    )
+    test_outputs_as_dict = _get_metrics_test_module_test_outputs_as_dict()
+    test_criteria = train._get_criteria(outputs_as_dict=test_outputs_as_dict)
     test_labels = generate_base_dict(values=label_values)
 
     test_outputs = generate_base_dict(output_values)
@@ -166,12 +204,14 @@ def set_up_calculate_losses_data(
     test_outputs["HairColor"] = one_hot(test_outputs["HairColor"])
     test_outputs["HairColor"] = test_outputs["HairColor"].to(dtype=torch.float32)
 
-    return test_criterions, test_labels, test_outputs
+    return test_criteria, {"test_output": test_labels}, {"test_output": test_outputs}
 
 
 def test_aggregate_losses():
     # expected average of [0,1,2,3,4] = 2.0
-    losses_dict = {str(i): torch.tensor(i, dtype=torch.float32) for i in range(5)}
+    losses_dict = {
+        "test_output": {str(i): torch.tensor(i, dtype=torch.float32) for i in range(5)}
+    }
 
     test_aggregated_losses = metrics.aggregate_losses(losses_dict)
     assert test_aggregated_losses.item() == 2.0
@@ -234,6 +274,15 @@ def test_get_model_l1_loss(get_l1_test_model):
                         },
                     }
                 ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    },
+                ],
             },
         },
         # Case 2: Omics Feature extractor: CNN
@@ -252,6 +301,15 @@ def test_get_model_l1_loss(get_l1_test_model):
                         },
                     }
                 ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    },
+                ],
             },
         },
         # Case 3: Omics feature extractor: Simple LCL
@@ -268,6 +326,15 @@ def test_get_model_l1_loss(get_l1_test_model):
                                 "split_mlp_num_splits": 64,
                                 "l1": 1e-03,
                             },
+                        },
+                    },
+                ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
                         },
                     },
                 ],
@@ -293,6 +360,15 @@ def test_get_model_l1_loss(get_l1_test_model):
                         },
                     },
                 ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    },
+                ],
             },
         },
         # Case 5: Omics feature extractor: Linear
@@ -308,31 +384,21 @@ def test_get_model_l1_loss(get_l1_test_model):
                         },
                     },
                 ],
-                "predictor_configs": {
-                    "model_type": "linear",
-                    "model_config": {"l1": 0.0},
+                "fusion_configs": {
+                    "model_type": "identity",
                 },
-            },
-        },
-        # Case 6: Omics predictor: Linear
-        {
-            "injections": {
-                "global_configs": {"lr": 1e-03},
-                "input_configs": [
+                "output_configs": [
                     {
-                        "input_info": {"input_name": "test_genotype"},
-                        "model_config": {
-                            "model_type": "identity",
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
                         },
                     },
                 ],
-                "predictor_configs": {
-                    "model_type": "linear",
-                    "model_config": {"l1": 1e-02},
-                },
             },
         },
-        # Case 7: Tabular feature extractor
+        # Case 6: Tabular feature extractor
         {
             "injections": {
                 "global_configs": {
@@ -355,6 +421,15 @@ def test_get_model_l1_loss(get_l1_test_model):
                         "model_config": {
                             "model_type": "tabular",
                             "model_init_config": {"l1": 1e-02},
+                        },
+                    },
+                ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
                         },
                     },
                 ],

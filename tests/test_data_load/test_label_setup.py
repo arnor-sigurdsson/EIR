@@ -8,7 +8,7 @@ from sklearn.preprocessing import StandardScaler, LabelEncoder
 
 from eir import train
 from eir.data_load import label_setup
-from eir.data_load.common_ops import ColumnOperation
+from eir.data_load.data_source_modules.csv_ops import ColumnOperation
 from eir.data_load.label_setup import merge_target_columns
 from eir.setup.config import Configs
 
@@ -99,7 +99,16 @@ def create_test_column_ops():
                         "model_config": {"model_type": "tabular"},
                     },
                 ],
-                "target_configs": {"label_parsing_chunk_size": 50},
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                            "label_parsing_chunk_size": 50,
+                        },
+                    },
+                ],
             },
         },
         {
@@ -118,7 +127,16 @@ def create_test_column_ops():
                         "model_config": {"model_type": "tabular"},
                     },
                 ],
-                "target_configs": {"label_parsing_chunk_size": None},
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                            "label_parsing_chunk_size": None,
+                        },
+                    },
+                ],
             },
         },
     ],
@@ -133,16 +151,16 @@ def test_set_up_train_and_valid_tabular_data(
     dc = create_test_data
     n_classes = len(dc.target_classes)
 
-    all_array_ids = train.gather_all_ids_from_target_configs(
-        target_configs=test_configs.target_configs
+    all_array_ids = train.gather_all_ids_from_output_configs(
+        output_configs=test_configs.output_configs
     )
     train_ids, valid_ids = train.split_ids(ids=all_array_ids, valid_size=gc.valid_size)
 
     target_file_infos = train.get_tabular_target_file_infos(
-        target_configs=test_configs.target_configs
+        output_configs=test_configs.output_configs
     )
-    target_labels = train.set_up_target_labels_wrapper(
-        tabular_file_infos=target_file_infos,
+    target_labels = train.set_up_tabular_target_labels_wrapper(
+        tabular_target_file_infos=target_file_infos,
         custom_label_ops=None,
         train_ids=train_ids,
         valid_ids=valid_ids,
@@ -299,7 +317,16 @@ def test_transform_all_labels_in_sample_with_extra_con(
                         "model_config": {"model_type": "tabular"},
                     },
                 ],
-                "target_configs": {"label_parsing_chunk_size": 50},
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                            "label_parsing_chunk_size": 50,
+                        },
+                    },
+                ],
             },
         },
         {
@@ -318,7 +345,16 @@ def test_transform_all_labels_in_sample_with_extra_con(
                         "model_config": {"model_type": "tabular"},
                     },
                 ],
-                "target_configs": {"label_parsing_chunk_size": None},
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                            "label_parsing_chunk_size": None,
+                        },
+                    },
+                ],
             },
         },
     ],
@@ -331,13 +367,13 @@ def test_label_df_parse_wrapper(
     dc = create_test_data
     test_configs = create_test_config
 
-    assert len(test_configs.target_configs) == 1
-    main_target_info = test_configs.target_configs[0]
+    assert len(test_configs.output_configs) == 1
+    main_target_info = test_configs.output_configs[0].output_type_info
 
     test_target_column = main_target_info.target_cat_columns[0]  # ["Origin"]
 
     target_file_infos = train.get_tabular_target_file_infos(
-        target_configs=test_configs.target_configs
+        output_configs=test_configs.output_configs
     )
     assert len(target_file_infos) == 1
 
@@ -345,7 +381,7 @@ def test_label_df_parse_wrapper(
         label_parsing_chunk_size=main_target_info.label_parsing_chunk_size
     )
     df_labels = parse_wrapper(
-        label_file_tabular_info=target_file_infos[0],
+        label_file_tabular_info=target_file_infos["test_output"],
         ids_to_keep=None,
     )
 
@@ -397,7 +433,7 @@ def test_get_array_path_iterator_file(create_test_data):
             test_label_file.write(str(path) + "\n")
 
     expected_num_samples = c.n_per_class * len(c.target_classes)
-    text_file_iterator = label_setup.get_array_path_iterator(
+    text_file_iterator = label_setup.get_file_path_iterator(
         data_source=test_label_file_path
     )
 
@@ -411,7 +447,7 @@ def test_get_array_path_iterator_folder(create_test_data):
     test_path = c.scoped_tmp_path / "omics"
 
     expected_num_samples = c.n_per_class * len(c.target_classes)
-    folder_iterator = label_setup.get_array_path_iterator(data_source=test_path)
+    folder_iterator = label_setup.get_file_path_iterator(data_source=test_path)
 
     assert len([i for i in folder_iterator]) == expected_num_samples
 
@@ -421,7 +457,7 @@ def test_get_array_path_iterator_fail(create_test_data):
     c = create_test_data
 
     with pytest.raises(FileNotFoundError):
-        label_setup.get_array_path_iterator(data_source=Path("does/not/exist"))
+        label_setup.get_file_path_iterator(data_source=Path("does/not/exist"))
 
     test_label_file_path = c.scoped_tmp_path / "test_paths_fail.txt"
 
@@ -430,7 +466,7 @@ def test_get_array_path_iterator_fail(create_test_data):
             test_label_file.write("non/existent/path.npy" + "\n")
 
     with pytest.raises(FileNotFoundError):
-        iterator = label_setup.get_array_path_iterator(data_source=test_label_file_path)
+        iterator = label_setup.get_file_path_iterator(data_source=test_label_file_path)
         _ = [i for i in iterator]
 
 
@@ -933,17 +969,36 @@ def test_check_parsed_label_df_fail(
 
 
 @pytest.mark.parametrize(
+    "create_test_config_init_base",
+    [
+        {
+            "injections": {
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    },
+                ],
+            },
+        },
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize(
     "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
 )
 def test_split_df_by_ids(create_test_data, create_test_config):
     test_configs = create_test_config
 
     target_file_infos = train.get_tabular_target_file_infos(
-        target_configs=test_configs.target_configs
+        output_configs=test_configs.output_configs
     )
     assert len(target_file_infos) == 1
 
-    main_target_file_info = target_file_infos[0]
+    main_target_file_info = target_file_infos["test_output"]
 
     df_labels = label_setup.label_df_parse_wrapper(
         label_file_tabular_info=main_target_file_info,
@@ -970,17 +1025,36 @@ def test_split_df_by_ids(create_test_data, create_test_config):
 
 
 @pytest.mark.parametrize(
+    "create_test_config_init_base",
+    [
+        {
+            "injections": {
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    },
+                ],
+            },
+        },
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize(
     "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
 )
 def test_split_ids(create_test_data, create_test_config):
     test_configs = create_test_config
 
     target_file_infos = train.get_tabular_target_file_infos(
-        target_configs=test_configs.target_configs
+        output_configs=test_configs.output_configs
     )
     assert len(target_file_infos) == 1
 
-    main_target_file_info = target_file_infos[0]
+    main_target_file_info = target_file_infos["test_output"]
 
     df_labels = label_setup.label_df_parse_wrapper(
         label_file_tabular_info=main_target_file_info,
@@ -1180,6 +1254,7 @@ def test_save_target_transformer(patched_joblib):
     label_setup.save_label_transformer(
         run_folder=Path("/tmp/"),
         transformer_name="harry_du_bois",
+        output_name="test_output",
         target_transformer_object=test_transformer,
     )
     assert patched_joblib.dump.call_count == 1

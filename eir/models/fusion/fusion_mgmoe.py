@@ -1,27 +1,24 @@
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from typing import Literal, Union, Dict, Sequence, TYPE_CHECKING
+from typing import Dict, Sequence, TYPE_CHECKING
 
 import torch
 from torch import nn
 
 from eir.models.fusion.fusion_default import (
-    default_fuse_features,
     al_features,
-    get_default_fusion_final_layers,
+    default_fuse_features,
 )
 from eir.models.layers import MLPResidualBlock
 from eir.models.models_base import (
     construct_multi_branches,
     initialize_modules_from_spec,
     create_multi_task_blocks_with_first_adaptor_block,
-    construct_blocks,
-    merge_module_dicts,
     calculate_module_dict_outputs,
 )
 
 if TYPE_CHECKING:
-    from eir.train import al_num_outputs_per_target
+    pass
 
 
 @dataclass
@@ -60,37 +57,25 @@ class MGMoEModelConfig:
 
     stochastic_depth_p: float = 0.00
 
-    final_layer_type: Union[Literal["linear"], Literal["mlp_residual"]] = "linear"
-
 
 class MGMoEModel(nn.Module):
     def __init__(
         self,
         model_config: MGMoEModelConfig,
-        num_outputs_per_target: "al_num_outputs_per_target",
-        modules_to_fuse: nn.ModuleDict,
+        fusion_in_dim: int,
         fusion_callable: al_features = default_fuse_features,
+        **kwargs,
     ):
         super().__init__()
 
         self.model_config = model_config
-        self.num_outputs_per_target = num_outputs_per_target
-        self.modules_to_fuse = modules_to_fuse
+        self.fusion_in_dim = fusion_in_dim
         self.fusion_callable = fusion_callable
 
         self.num_experts = self.model_config.mg_num_experts
 
-        cur_dim = sum(i.num_out_features for i in self.modules_to_fuse.values())
-
-        self.task_names = sorted(tuple(self.num_outputs_per_target.keys()))
         gate_spec = self.get_gate_spec(
-            in_features=cur_dim, out_features=self.num_experts
-        )
-
-        self.gates = construct_multi_branches(
-            branch_names=self.task_names,
-            branch_factory=initialize_modules_from_spec,
-            branch_factory_kwargs={"spec": gate_spec},
+            in_features=self.fusion_in_dim, out_features=self.num_experts
         )
 
         expert_names = tuple(f"expert_{i}" for i in range(self.num_experts))
@@ -98,8 +83,8 @@ class MGMoEModel(nn.Module):
             "in_features": self.model_config.fc_task_dim,
             "out_features": self.model_config.fc_task_dim,
             "dropout_p": self.model_config.rb_do,
-            "full_preactivation": False,
             "stochastic_depth_p": self.model_config.stochastic_depth_p,
+            "full_preactivation": False,
         }
         self.expert_branches = create_multi_task_blocks_with_first_adaptor_block(
             num_blocks=self.model_config.layers[0],
@@ -108,36 +93,14 @@ class MGMoEModel(nn.Module):
             block_constructor_kwargs=layer_kwargs,
             first_layer_kwargs_overload={
                 "full_preactivation": True,
-                "in_features": cur_dim,
+                "in_features": fusion_in_dim,
             },
         )
 
-        task_resblocks_kwargs = {
-            "in_features": self.model_config.fc_task_dim,
-            "out_features": self.model_config.fc_task_dim,
-            "dropout_p": self.model_config.rb_do,
-            "full_preactivation": False,
-        }
-        multi_task_branches = construct_multi_branches(
-            branch_names=self.task_names,
-            branch_factory=construct_blocks,
-            branch_factory_kwargs={
-                "num_blocks": self.model_config.layers[1],
-                "block_constructor": MLPResidualBlock,
-                "block_kwargs": task_resblocks_kwargs,
-            },
-        )
-
-        task_names = tuple(self.num_outputs_per_target.keys())
-        final_layers = get_default_fusion_final_layers(
-            fc_task_dim=self.model_config.fc_task_dim,
-            dropout_p=self.model_config.fc_do,
-            num_outputs_per_target=self.num_outputs_per_target,
-            task_names=task_names,
-            final_layer_type=self.model_config.final_layer_type,
-        )
-        self.multi_task_branches = merge_module_dicts(
-            (multi_task_branches, *final_layers)
+        self.gates = construct_multi_branches(
+            branch_names=expert_names,
+            branch_factory=initialize_modules_from_spec,
+            branch_factory_kwargs={"spec": gate_spec},
         )
 
         self._init_weights()
@@ -164,14 +127,13 @@ class MGMoEModel(nn.Module):
     def _init_weights(self):
         pass
 
-    def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    @property
+    def num_out_features(self) -> int:
+        return self.model_config.fc_task_dim * len(self.expert_branches)
 
-        out = {}
-        for module_name, module in self.modules_to_fuse.items():
-            module_input = inputs[module_name]
-            out[module] = module(module_input)
+    def forward(self, inputs: Dict[str, torch.Tensor]) -> torch.Tensor:
 
-        fused_features = default_fuse_features(tuple(out.values()))
+        fused_features = self.fusion_callable(inputs)
 
         gate_attentions = calculate_module_dict_outputs(
             input_=fused_features, module_dict=self.gates
@@ -183,13 +145,10 @@ class MGMoEModel(nn.Module):
 
         final_out = {}
         stacked_expert_outputs = torch.stack(list(expert_outputs.values()), dim=2)
-        for task_name, task_attention in gate_attentions.items():
-            weighted_expert_outputs = (
-                task_attention.unsqueeze(1) * stacked_expert_outputs
-            )
+        for expert_name, attention in gate_attentions.items():
+            weighted_expert_outputs = attention.unsqueeze(1) * stacked_expert_outputs
             weighted_expert_sum = weighted_expert_outputs.sum(dim=2)
 
-            cur_task_branch = self.multi_task_branches[task_name]
-            final_out[task_name] = cur_task_branch(weighted_expert_sum)
+            final_out[expert_name] = weighted_expert_sum
 
-        return final_out
+        return self.fusion_callable(final_out)

@@ -1,0 +1,4 @@
+output_folder: eir_tutorials/tutorial_runs/b_customizing_eir/tutorial_01_run
+checkpoint_interval: 200
+sample_interval: 200
+n_epochs: 15

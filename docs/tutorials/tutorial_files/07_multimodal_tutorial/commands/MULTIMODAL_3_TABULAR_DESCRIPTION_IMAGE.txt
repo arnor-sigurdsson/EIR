@@ -1,0 +1,8 @@
+eirtrain \
+--global_configs eir_tutorials/07_multimodal_tutorial/conf/07_globals.yaml \
+--input_configs eir_tutorials/07_multimodal_tutorial/conf/07_input_tabular.yaml eir_tutorials/07_multimodal_tutorial/conf/07_input_description.yaml eir_tutorials/07_multimodal_tutorial/conf/07_input_image.yaml \
+--fusion_configs eir_tutorials/07_multimodal_tutorial/conf/07_fusion.yaml \
+--output_configs eir_tutorials/07_multimodal_tutorial/conf/07_output.yaml \
+--07_globals.output_folder=eir_tutorials/tutorial_runs/tutorial_07c_multimodal_tabular_description_image \
+--07_globals.device='cuda:0' \
+--07_globals.dataloader_workers=4

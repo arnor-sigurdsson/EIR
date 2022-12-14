@@ -1,17 +1,81 @@
-from pathlib import Path
-from typing import Tuple, Sequence, TYPE_CHECKING
 from copy import deepcopy
+from pathlib import Path
+from typing import Tuple, Sequence, TYPE_CHECKING, Dict
 
 import pytest
 
 from eir import train
+from eir.setup.config import get_all_tabular_targets
 from eir.setup.schemas import BasicPretrainedConfig
-from eir.setup.config import get_all_targets
-from tests.test_modelling.test_modelling_utils import check_test_performance_results
 from tests.conftest import _get_cur_modelling_test_config, cleanup
+from tests.test_modelling.test_modelling_utils import (
+    check_test_performance_results,
+)
 
 if TYPE_CHECKING:
     from tests.conftest import ModelTestConfig
+
+
+def _get_pre_trained_module_setup_parametrization() -> Dict:
+    base = {
+        "injections": {
+            "global_configs": {
+                "output_folder": "multi_task_multi_modal",
+                "n_epochs": 1,
+                "act_background_samples": 8,
+                "sample_interval": 50,
+                "checkpoint_interval": 50,
+                "n_saved_models": 2,
+                "get_acts": False,
+            },
+            "input_configs": [
+                {
+                    "input_info": {"input_name": "test_genotype"},
+                    "model_config": {
+                        "model_type": "cnn",
+                        "model_init_config": {"l1": 1e-03},
+                    },
+                },
+                {
+                    "input_info": {"input_name": "test_sequence"},
+                },
+                {
+                    "input_info": {"input_name": "test_bytes"},
+                },
+                {
+                    "input_info": {"input_name": "test_image"},
+                },
+                {
+                    "input_info": {"input_name": "test_tabular"},
+                    "input_type_info": {
+                        "input_cat_columns": ["OriginExtraCol"],
+                        "input_con_columns": ["ExtraTarget"],
+                    },
+                    "model_config": {
+                        "model_type": "tabular",
+                        "model_init_config": {"l1": 1e-03},
+                    },
+                },
+            ],
+            "fusion_configs": {
+                "model_config": {
+                    "fc_task_dim": 128,
+                    "fc_do": 0.10,
+                    "rb_do": 0.10,
+                },
+            },
+            "output_configs": [
+                {
+                    "output_info": {"output_name": "test_output"},
+                    "output_type_info": {
+                        "target_cat_columns": ["Origin"],
+                        "target_con_columns": ["Height"],
+                    },
+                },
+            ],
+        },
+    }
+    return base
 
 
 @pytest.mark.parametrize(
@@ -32,58 +96,7 @@ if TYPE_CHECKING:
 @pytest.mark.parametrize(
     "create_test_config_init_base",
     [
-        {
-            "injections": {
-                "global_configs": {
-                    "output_folder": "multi_task_multi_modal",
-                    "n_epochs": 1,
-                    "act_background_samples": 8,
-                    "sample_interval": 50,
-                    "checkpoint_interval": 50,
-                    "n_saved_models": 2,
-                },
-                "input_configs": [
-                    {
-                        "input_info": {"input_name": "test_genotype"},
-                        "model_config": {
-                            "model_type": "cnn",
-                            "model_init_config": {"l1": 1e-03},
-                        },
-                    },
-                    {
-                        "input_info": {"input_name": "test_sequence"},
-                    },
-                    {
-                        "input_info": {"input_name": "test_bytes"},
-                    },
-                    {
-                        "input_info": {"input_name": "test_image"},
-                    },
-                    {
-                        "input_info": {"input_name": "test_tabular"},
-                        "input_type_info": {
-                            "input_cat_columns": ["OriginExtraCol"],
-                            "input_con_columns": ["ExtraTarget"],
-                        },
-                        "model_config": {
-                            "model_type": "tabular",
-                            "model_init_config": {"l1": 1e-03},
-                        },
-                    },
-                ],
-                "predictor_configs": {
-                    "model_config": {
-                        "fc_task_dim": 64,
-                        "fc_do": 0.10,
-                        "rb_do": 0.10,
-                    },
-                },
-                "target_configs": {
-                    "target_cat_columns": ["Origin"],
-                    "target_con_columns": ["Height"],
-                },
-            },
-        }
+        _get_pre_trained_module_setup_parametrization(),
     ],
     indirect=True,
 )
@@ -104,6 +117,12 @@ def test_pre_trained_module_setup(
 
     _get_experiment_overloaded_for_pretrained_checkpoint(
         experiment=experiment, test_config=test_config
+    )
+
+    _get_experiment_overloaded_for_pretrained_checkpoint(
+        experiment=experiment,
+        test_config=test_config,
+        change_architecture=True,
     )
 
     experiment_overwritten = _add_new_feature_extractor_to_experiment(
@@ -167,7 +186,7 @@ def _add_new_feature_extractor_to_experiment(
             "injections": {
                 "global_configs": {
                     "output_folder": "multi_task_multi_modal",
-                    "n_epochs": 2,
+                    "n_epochs": 3,
                     "act_background_samples": 8,
                     "sample_interval": 50,
                     "checkpoint_interval": 50,
@@ -202,17 +221,22 @@ def _add_new_feature_extractor_to_experiment(
                         },
                     },
                 ],
-                "predictor_configs": {
+                "fusion_configs": {
                     "model_config": {
-                        "fc_task_dim": 64,
+                        "fc_task_dim": 128,
                         "fc_do": 0.10,
                         "rb_do": 0.10,
                     },
                 },
-                "target_configs": {
-                    "target_cat_columns": ["Origin"],
-                    "target_con_columns": ["Height"],
-                },
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": ["Height"],
+                        },
+                    },
+                ],
             },
         }
     ],
@@ -234,19 +258,20 @@ def test_pre_training_and_loading(
 
     train.train(experiment=pretrained_experiment)
 
-    targets = get_all_targets(targets_configs=experiment.configs.target_configs)
-
     # Note we skip checking R2 for now as we patch the metrics in conftest.py
     # to check for both training and validation, but for now we will make do with
     # checking only the MCC for this
-    for cat_column in targets.cat_targets:
+    for output_name, output_object in experiment.outputs.items():
+        cat_target_columns = output_object.target_columns["cat"]
 
-        check_test_performance_results(
-            run_path=pretrained_test_config.run_path,
-            target_column=cat_column,
-            metric="mcc",
-            thresholds=(0.9, 0.9),
-        )
+        for cat_target_column in cat_target_columns:
+            check_test_performance_results(
+                run_path=test_config.run_path,
+                target_column=cat_target_column,
+                output_name=output_name,
+                metric="mcc",
+                thresholds=(0.85, 0.85),
+            )
 
     (
         pretrained_checkpoint_experiment,
@@ -257,14 +282,17 @@ def test_pre_training_and_loading(
 
     train.train(experiment=pretrained_checkpoint_experiment)
 
-    for cat_column in targets.cat_targets:
+    for output_name, output_object in pretrained_checkpoint_experiment.outputs.items():
+        cat_target_columns = output_object.target_columns["cat"]
 
-        check_test_performance_results(
-            run_path=pretrained_checkpoint_test_config.run_path,
-            target_column=cat_column,
-            metric="mcc",
-            thresholds=(0.9, 0.9),
-        )
+        for cat_target_column in cat_target_columns:
+            check_test_performance_results(
+                run_path=pretrained_checkpoint_test_config.run_path,
+                target_column=cat_target_column,
+                output_name=output_name,
+                metric="mcc",
+                thresholds=(0.85, 0.85),
+            )
 
 
 def _get_experiment_overloaded_for_pretrained_extractor(
@@ -314,8 +342,8 @@ def _get_experiment_overloaded_for_pretrained_extractor(
         configs=pretrained_configs, hooks=default_hooks
     )
 
-    targets = get_all_targets(
-        targets_configs=pretrained_experiment.configs.target_configs
+    targets = get_all_tabular_targets(
+        output_configs=pretrained_experiment.configs.output_configs
     )
     pretrained_test_config = _get_cur_modelling_test_config(
         train_loader=pretrained_experiment.train_loader,
@@ -328,8 +356,16 @@ def _get_experiment_overloaded_for_pretrained_extractor(
 
 
 def _get_experiment_overloaded_for_pretrained_checkpoint(
-    experiment: train.Experiment, test_config: "ModelTestConfig"
+    experiment: train.Experiment,
+    test_config: "ModelTestConfig",
+    change_architecture: bool = False,
 ) -> Tuple[train.Experiment, "ModelTestConfig"]:
+    """
+    :param change_architecture:
+        If True, we will change the architecture of the model to be different from the
+        original model. This is to test that we can partially load models with
+        different shapes.
+    """
 
     pretrained_configs = deepcopy(experiment.configs)
     saved_model_path = next((test_config.run_path / "saved_models").iterdir())
@@ -342,6 +378,11 @@ def _get_experiment_overloaded_for_pretrained_checkpoint(
         pretrained_configs.global_config.output_folder + "_with_pretrained_checkpoint"
     )
 
+    if change_architecture:
+        pretrained_configs.global_config.strict_pretrained_loading = False
+        fus_task_dim = pretrained_configs.fusion_config.model_config.fc_task_dim
+        pretrained_configs.fusion_config.model_config.fc_task_dim = fus_task_dim * 2
+
     run_path = Path(f"{pretrained_configs.global_config.output_folder}/")
     if run_path.exists():
         cleanup(run_path=run_path)
@@ -351,8 +392,8 @@ def _get_experiment_overloaded_for_pretrained_checkpoint(
         configs=pretrained_configs, hooks=default_hooks
     )
 
-    targets = get_all_targets(
-        targets_configs=pretrained_experiment.configs.target_configs
+    targets = get_all_tabular_targets(
+        output_configs=pretrained_experiment.configs.output_configs
     )
     pretrained_test_config = _get_cur_modelling_test_config(
         train_loader=pretrained_experiment.train_loader,

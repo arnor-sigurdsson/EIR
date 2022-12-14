@@ -114,6 +114,13 @@ class CNNModel(nn.Module):
 
         self.model_config = model_config
         self.data_dimensions = data_dimensions
+
+        self.pos_representation = GenomicPositionalEmbedding(
+            embedding_dim=self.data_dimensions.height,
+            max_length=self.data_dimensions.width,
+            dropout=0.0,
+        )
+
         self.conv = nn.Sequential(
             *_make_conv_layers(
                 residual_blocks=self.resblocks,
@@ -130,7 +137,7 @@ class CNNModel(nn.Module):
         self.fc = nn.Sequential(
             OrderedDict(
                 {
-                    "fc_1_bn_1": nn.BatchNorm1d(self.fc_1_in_features),
+                    "fc_1_bn_1": nn.LayerNorm(self.fc_1_in_features),
                     "fc_1_act_1": Swish(),
                     "fc_1_linear_1": nn.Linear(
                         self.fc_1_in_features, self.model_config.fc_repr_dim, bias=False
@@ -158,9 +165,6 @@ class CNNModel(nn.Module):
             if isinstance(m, nn.Conv2d):
                 # Swish slope is roughly 0.5 around 0
                 nn.init.kaiming_normal_(m.weight, a=0.5, mode="fan_out")
-            elif isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.BatchNorm1d):
-                nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0)
 
     @property
     def resblocks(self) -> List[int]:
@@ -180,7 +184,8 @@ class CNNModel(nn.Module):
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
 
-        out = self.conv(input)
+        out = self.pos_representation(input)
+        out = self.conv(out)
         out = out.view(out.shape[0], -1)
 
         out = self.fc(out)
@@ -357,3 +362,25 @@ def find_no_cnn_resblocks_needed(
         cur_width = cur_width // stride
 
     return [i for i in resblocks if i != 0]
+
+
+class GenomicPositionalEmbedding(nn.Module):
+    def __init__(
+        self,
+        embedding_dim: int,
+        max_length: int,
+        dropout: float = 0.1,
+    ) -> None:
+
+        super().__init__()
+        self.embedding_dim = embedding_dim
+        self.max_length = max_length
+        self.dropout = nn.Dropout(p=dropout)
+
+        self.embedding = torch.nn.Parameter(
+            data=torch.zeros(1, self.embedding_dim, self.max_length), requires_grad=True
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = x + self.embedding
+        return self.dropout(x)

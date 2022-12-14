@@ -1,3 +1,0 @@
-model_type: linear
-model_config:
-  l1: 0.001

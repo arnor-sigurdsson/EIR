@@ -1,14 +1,16 @@
 from collections import OrderedDict
+from copy import deepcopy
+import os
 from dataclasses import dataclass, fields
 from functools import partial
 from pathlib import Path
-from copy import deepcopy
 from typing import (
     Dict,
     Union,
     Generator,
     Sequence,
     Callable,
+    Optional,
     Literal,
     Type,
     Hashable,
@@ -19,6 +21,7 @@ from typing import (
     Any,
 )
 
+import pandas as pd
 import numpy as np
 from aislib.misc_utils import get_logger
 from timm.models.registry import _model_pretrained_cfgs
@@ -36,12 +39,21 @@ from transformers.tokenization_utils_base import (
     PreTokenizedInput,
     EncodedInput,
 )
+from tokenizers import Tokenizer
+from tokenizers.models import BPE
+from tokenizers.trainers import BpeTrainer
+from tokenizers.pre_tokenizers import Whitespace
 
 from eir.data_load.label_setup import (
     Labels,
     set_up_train_and_valid_tabular_data,
     TabularFileInfo,
-    get_array_path_iterator,
+    get_file_path_iterator,
+)
+from eir.data_load.data_source_modules.deeplake_ops import (
+    is_deeplake_dataset,
+    load_deeplake_dataset,
+    get_deeplake_input_source_iterable,
 )
 from eir.experiment_io.experiment_io import (
     load_serialized_input_object,
@@ -187,6 +199,7 @@ def get_input_setup_function_map() -> Dict[str, Callable[..., al_input_objects]]
 
 def set_up_tabular_input_from_pretrained(
     input_config: schemas.InputConfig,
+    custom_input_name: str,
     train_ids: Sequence[str],
     valid_ids: Sequence[str],
     hooks: Union["Hooks", None],
@@ -203,8 +216,9 @@ def set_up_tabular_input_from_pretrained(
     loaded_transformers = load_transformers(
         run_folder=pretrained_run_folder, transformers_to_load=None
     )
+    loaded_transformers_input = loaded_transformers[custom_input_name]
 
-    tabular_input_object.labels.label_transformers = loaded_transformers
+    tabular_input_object.labels.label_transformers = loaded_transformers_input
 
     return tabular_input_object
 
@@ -214,7 +228,9 @@ def get_input_setup_from_pretrained_function_map(
 ) -> Dict[str, Callable]:
     pretrained_setup_mapping = {
         "omics": set_up_omics_input,
-        "tabular": set_up_tabular_input_from_pretrained,
+        "tabular": partial(
+            set_up_tabular_input_from_pretrained, custom_input_name=load_module_name
+        ),
         "sequence": partial(
             load_serialized_input_object,
             input_class=SequenceInputInfo,
@@ -277,8 +293,9 @@ def build_bytes_vocab(
     for token in range(num_tokens):
         bytes_vocab[token] = token
 
-    for special in specials:
-        bytes_vocab[special] = len(bytes_vocab)
+    base_num_tokens = len(bytes_vocab)
+    for idx, special in enumerate(specials):
+        bytes_vocab[special] = base_num_tokens + idx
 
     return bytes_vocab
 
@@ -327,7 +344,8 @@ def set_up_image_input_for_training(
     num_channels = input_type_info.num_channels
     if not num_channels:
         num_channels = infer_num_channels(
-            data_source=input_config.input_info.input_source
+            data_source=input_config.input_info.input_source,
+            deeplake_inner_key=input_config.input_info.input_inner_key,
         )
 
     normalization_stats = get_image_normalization_values(input_config=input_config)
@@ -349,10 +367,23 @@ def set_up_image_input_for_training(
     return image_input_info
 
 
-def infer_num_channels(data_source: str) -> int:
-    test_file = next(Path(data_source).iterdir())
-    test_image = default_loader(path=str(test_file))
-    test_image_array = np.array(test_image)
+def infer_num_channels(data_source: str, deeplake_inner_key: str) -> int:
+
+    if is_deeplake_dataset(data_source=data_source):
+        deeplake_ds = load_deeplake_dataset(data_source=data_source)
+        deeplake_iter = get_deeplake_input_source_iterable(
+            deeplake_dataset=deeplake_ds, inner_key=deeplake_inner_key
+        )
+        test_image_array = next(deeplake_iter).numpy()
+        data_pointer = (
+            f"[deeplake dataset {data_source}, input {deeplake_inner_key}, "
+            f"image ID: {deeplake_ds['ID'][0].text()}]"
+        )
+    else:
+        test_file = next(Path(data_source).iterdir())
+        test_image = default_loader(path=str(test_file))
+        test_image_array = np.array(test_image)
+        data_pointer = test_file.name
 
     if test_image_array.ndim == 2:
         num_channels = 1
@@ -360,9 +391,9 @@ def infer_num_channels(data_source: str) -> int:
         num_channels = test_image_array.shape[-1]
 
     logger.info(
-        "Inferring number of channels from source %s (using file %s) as: %d",
+        "Inferring number of channels from source %s (using %s) as: %d",
         data_source,
-        test_file.name,
+        data_pointer,
         num_channels,
     )
 
@@ -427,15 +458,24 @@ def get_image_normalization_values(
     else:
         if not means or not stds:
             input_source = input_config.input_info.input_source
+            deeplake_inner_key = input_config.input_info.input_inner_key
             logger.info(
                 "Not using a pretrained model and no mean and standard deviation "
                 "statistics passed in. Gathering running image means and standard "
                 "deviations from %s.",
                 input_source,
             )
-            file_iterator = Path(input_source).rglob("*")
-            image_iterator = (default_loader(str(f)) for f in file_iterator)
-            tensor_iterator = (to_tensor(i) for i in image_iterator)
+
+            if is_deeplake_dataset(data_source=input_source):
+                deeplake_ds = load_deeplake_dataset(data_source=input_source)
+                image_iter = get_deeplake_input_source_iterable(
+                    deeplake_dataset=deeplake_ds, inner_key=deeplake_inner_key
+                )
+                tensor_iterator = (to_tensor(i.numpy()) for i in image_iter)
+            else:
+                file_iterator = Path(input_source).rglob("*")
+                image_iterator = (default_loader(str(f)) for f in file_iterator)
+                tensor_iterator = (to_tensor(i) for i in image_iterator)
 
             gathered_stats = collect_stats(tensor_iterable=tensor_iterator)
             means = gathered_stats.mean
@@ -492,7 +532,7 @@ class SequenceInputInfo:
 
 def set_up_sequence_input_for_training(
     input_config: schemas.InputConfig, *args, **kwargs
-):
+) -> SequenceInputInfo:
 
     sequence_input_object_func = _get_sequence_input_object_func(
         pretrained=input_config.model_config.pretrained_model
@@ -549,16 +589,17 @@ def get_sequence_input_objects_from_input(
     gathered_stats = GatheredSequenceStats()
 
     vocab_file = input_config.input_type_info.vocab_file
-    vocab_iter = get_vocab_iterator(
+
+    tokenizer = get_tokenizer(input_config=input_config)
+
+    vocab_iter_kwargs = dict(
         input_source=input_config.input_info.input_source,
         split_on=input_config.input_type_info.split_on,
         gathered_stats=gathered_stats,
         vocab_file=input_config.input_type_info.vocab_file,
+        deeplake_inner_key=input_config.input_info.input_inner_key,
     )
-    tokenizer = get_basic_tokenizer(
-        tokenizer_name=input_config.input_type_info.tokenizer,
-        tokenizer_language=input_config.input_type_info.tokenizer_language,
-    )
+    vocab_iter = get_vocab_iterator(**vocab_iter_kwargs)
     tokenized_vocab_iter = get_tokenized_vocab_iterator(
         vocab_iterator=vocab_iter, tokenizer=tokenizer
     )
@@ -584,6 +625,34 @@ def get_sequence_input_objects_from_input(
     )
 
     return vocab, gathered_stats, tokenizer, encode_func
+
+
+def get_tokenizer(
+    input_config: schemas.InputConfig,
+) -> Callable[[Sequence[str]], Sequence[str]]:
+
+    tokenizer_name = input_config.input_type_info.tokenizer
+
+    if tokenizer_name == "bpe":
+        vocab_iter_kwargs = dict(
+            input_source=input_config.input_info.input_source,
+            split_on=input_config.input_type_info.split_on,
+            gathered_stats=GatheredSequenceStats(),
+            vocab_file=input_config.input_type_info.vocab_file,
+            deeplake_inner_key=input_config.input_info.input_inner_key,
+        )
+        vocab_iter = get_vocab_iterator(**vocab_iter_kwargs)
+
+        vocab_file = input_config.input_type_info.vocab_file
+        tokenizer = get_bpe_tokenizer(vocab_iterator=vocab_iter, vocab_file=vocab_file)
+
+    else:
+        tokenizer = get_basic_tokenizer(
+            tokenizer_name=tokenizer_name,
+            tokenizer_language=input_config.input_type_info.tokenizer_language,
+        )
+
+    return tokenizer
 
 
 def _get_default_specials_map() -> dict:
@@ -612,7 +681,7 @@ def get_sequence_input_objects_from_pretrained(
     vocab_file = input_config.input_type_info.vocab_file
     if vocab_file:
         raise ValueError(
-            "Using a vocabulary file not supported when using pre-trained models "
+            "Using a vocabulary file not supported when using pre-trained models as "
             "their training vocabulary will be used."
         )
 
@@ -639,6 +708,12 @@ def _sync_hf_and_pytorch_vocab(hf_tokenizer: PreTrainedTokenizer) -> Vocab:
 
 
 def _get_hf_tokenizer(hf_model_name: str) -> PreTrainedTokenizer:
+    """
+    See https://github.com/huggingface/transformers/issues/5486 for why we need to
+    set the environment variable.
+    """
+    os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
     hf_tokenizer = AutoTokenizer.from_pretrained(
         pretrained_model_name_or_path=hf_model_name, add_prefix_space=True
     )
@@ -664,9 +739,50 @@ def _add_specials_to_hf_tokenizer(
     return hf_tokenizer_copy
 
 
+def get_bpe_tokenizer(vocab_iterator: Optional[Iterator], vocab_file: Optional[str]):
+
+    tokenizer = _get_bpe_tokenizer_object(
+        vocab_iterator=vocab_iterator, vocab_file=vocab_file
+    )
+
+    def _tokenize(raw_input_split: Sequence[str]) -> Sequence[str]:
+        return tokenizer.encode(raw_input_split, is_pretokenized=True).tokens
+
+    return _tokenize
+
+
+def _get_bpe_tokenizer_object(
+    vocab_iterator: Optional[Iterator], vocab_file: Optional[str]
+):
+    if vocab_file:
+        logger.info("Loading BPE vocabulary from file %s.", vocab_file)
+
+        if not vocab_file.endswith(".json"):
+            raise ValueError(
+                "Vocabulary file must be a HuggingFace Tokenizers "
+                "compatible .json file."
+            )
+
+        tokenizer = Tokenizer.from_file(path=vocab_file)
+    else:
+        assert vocab_iterator is not None
+
+        logger.info("Training BPE tokenizer from source data.")
+
+        tokenizer = Tokenizer(model=BPE(unk_token="<unk>"))
+        tokenizer.pre_tokenizer = Whitespace()
+
+        special_tokens = _get_default_specials()
+        trainer = BpeTrainer(special_tokens=special_tokens)
+
+        tokenizer.train_from_iterator(iterator=vocab_iterator, trainer=trainer)
+
+    return tokenizer
+
+
 def get_basic_tokenizer(
     tokenizer_name: al_tokenizer_choices,
-    tokenizer_language: Union[str, None],
+    tokenizer_language: Optional[str],
 ) -> Callable[[Sequence[str]], Sequence[str]]:
 
     if not tokenizer_name:
@@ -736,6 +852,7 @@ def get_vocab_iterator(
     split_on: str,
     gathered_stats: "GatheredSequenceStats",
     vocab_file: Union[str, None] = None,
+    deeplake_inner_key: Optional[str] = None,
 ) -> Generator[Sequence[str], None, None]:
 
     if vocab_file is None:
@@ -749,6 +866,7 @@ def get_vocab_iterator(
             data_source=input_source,
             split_on=split_on,
             gathered_stats=gathered_stats,
+            deeplake_inner_key=deeplake_inner_key,
         )
     else:
         logger.info(
@@ -764,15 +882,63 @@ def get_vocab_iterator(
 
 
 def yield_tokens_from_source(
-    data_source: str, split_on: str, gathered_stats: GatheredSequenceStats
+    data_source: str,
+    split_on: str,
+    gathered_stats: GatheredSequenceStats,
+    deeplake_inner_key: Optional[str] = None,
 ):
-    iterator = tqdm(Path(data_source).iterdir(), desc="Vocabulary Setup")
 
-    for file in iterator:
-        yield from yield_tokens_from_file(
-            file_path=str(file), split_on=split_on, gathered_stats=gathered_stats
+    data_source_path = Path(data_source)
+
+    if is_deeplake_dataset(data_source=str(data_source_path)):
+        assert deeplake_inner_key is not None
+        yield from yield_tokens_from_deeplake_dataset(
+            data_source=data_source_path,
+            split_on=split_on,
+            gathered_stats=gathered_stats,
+            inner_key=deeplake_inner_key,
         )
+
+    elif data_source_path.is_dir():
+        iterator = tqdm(Path(data_source).iterdir(), desc="Vocabulary Setup")
+        for file in iterator:
+            yield from yield_tokens_from_file(
+                file_path=str(file), split_on=split_on, gathered_stats=gathered_stats
+            )
+
+    elif data_source_path.is_file():
+        assert data_source_path.suffix == ".csv"
+        yield from yield_tokens_from_csv(
+            file_path=data_source, split_on=split_on, gathered_stats=gathered_stats
+        )
+
     return gathered_stats
+
+
+def yield_tokens_from_deeplake_dataset(
+    data_source: Path,
+    split_on: str,
+    gathered_stats: GatheredSequenceStats,
+    inner_key: str,
+) -> Generator[Sequence[str], None, None]:
+    deeplake_ds = load_deeplake_dataset(data_source=str(data_source))
+    deeplake_iter = get_deeplake_input_source_iterable(
+        deeplake_dataset=deeplake_ds, inner_key=inner_key
+    )
+
+    split_func = get_sequence_split_function(split_on=split_on)
+
+    for sample in deeplake_iter:
+        cur_sequence = sample.text()
+        cur_line = split_func(cur_sequence)
+
+        cur_length = len(cur_line)
+        gathered_stats.total_count += len(cur_line)
+
+        if cur_length > gathered_stats.max_length:
+            gathered_stats.max_length = cur_length
+
+        yield cur_line
 
 
 def yield_tokens_from_file(
@@ -780,7 +946,7 @@ def yield_tokens_from_file(
 ):
     gathered_stats.total_files += 1
 
-    split_func = _get_split_func(split_on=split_on)
+    split_func = get_sequence_split_function(split_on=split_on)
 
     with open(file_path, "r") as f:
         for line in f:
@@ -795,7 +961,39 @@ def yield_tokens_from_file(
             yield cur_line
 
 
-def _get_split_func(split_on: str) -> Callable[[str], List[str]]:
+def yield_tokens_from_csv(
+    file_path: str, split_on: str, gathered_stats: GatheredSequenceStats
+) -> Generator[Sequence[str], None, None]:
+
+    split_func = get_sequence_split_function(split_on=split_on)
+
+    df = pd.read_csv(filepath_or_buffer=file_path, index_col="ID", dtype={"ID": str})
+    if "Sequence" not in df.columns:
+        raise ValueError(
+            "CSV file '%s' does not have a column named 'Sequence'. "
+            "Please ensure that the column name is correct and present.",
+            file_path,
+        )
+
+    iterator = tqdm(df.itertuples(), desc="Vocabulary Setup")
+    for row in iterator:
+        cur_sequence = row.Sequence
+        if pd.isna(cur_sequence):
+            cur_sequence = ""
+
+        cur_line = split_func(cur_sequence)
+
+        cur_length = len(cur_line)
+        gathered_stats.total_count += len(cur_line)
+        gathered_stats.total_files += 1
+
+        if cur_length > gathered_stats.max_length:
+            gathered_stats.max_length = cur_length
+
+        yield cur_line
+
+
+def get_sequence_split_function(split_on: str) -> Callable[[str], List[str]]:
     if split_on == "":
         return lambda x: list(x)
     return lambda x: x.split(split_on)
@@ -940,6 +1138,7 @@ def get_tabular_num_features(
 class OmicsInputInfo:
     input_config: schemas.InputConfig
     data_dimensions: "DataDimensions"
+    subset_indices: Union[None, Sequence[int]]
 
 
 def set_up_omics_input(
@@ -947,10 +1146,33 @@ def set_up_omics_input(
 ) -> OmicsInputInfo:
 
     data_dimensions = get_data_dimension_from_data_source(
-        data_source=Path(input_config.input_info.input_source)
+        data_source=Path(input_config.input_info.input_source),
+        deeplake_inner_key=input_config.input_info.input_inner_key,
     )
+
+    subset_indices = None
+    input_type_info = input_config.input_type_info
+    if input_type_info.subset_snps_file:
+        df_bim = read_bim(bim_file_path=input_type_info.snp_file)
+        snps_to_subset = read_subset_file(
+            subset_snp_file_path=input_type_info.subset_snps_file
+        )
+        subset_indices = _setup_snp_subset_indices(
+            df_bim=df_bim,
+            snps_to_subset=snps_to_subset,
+            snp_file_name=input_type_info.snp_file,
+            subset_file_name=input_type_info.subset_snps_file,
+        )
+        data_dimensions = DataDimensions(
+            channels=data_dimensions.channels,
+            height=data_dimensions.height,
+            width=len(subset_indices),
+        )
+
     omics_input_info = OmicsInputInfo(
-        input_config=input_config, data_dimensions=data_dimensions
+        input_config=input_config,
+        data_dimensions=data_dimensions,
+        subset_indices=subset_indices,
     )
 
     return omics_input_info
@@ -968,14 +1190,23 @@ class DataDimensions:
 
 def get_data_dimension_from_data_source(
     data_source: Path,
+    deeplake_inner_key: Optional[str] = None,
 ) -> DataDimensions:
     """
     TODO: Make more dynamic / robust. Also weird to say "width" for a 1D vector.
     """
 
-    iterator = get_array_path_iterator(data_source=data_source)
-    path = next(iterator)
-    shape = np.load(file=path).shape
+    if is_deeplake_dataset(data_source=str(data_source)):
+        assert deeplake_inner_key is not None, data_source
+        deeplake_ds = load_deeplake_dataset(data_source=str(data_source))
+        deeplake_iter = get_deeplake_input_source_iterable(
+            deeplake_dataset=deeplake_ds, inner_key=deeplake_inner_key
+        )
+        shape = next(deeplake_iter).shape
+    else:
+        iterator = get_file_path_iterator(data_source=data_source)
+        path = next(iterator)
+        shape = np.load(file=path).shape
 
     if len(shape) == 1:
         channels, height, width = 1, 1, shape[0]
@@ -984,6 +1215,64 @@ def get_data_dimension_from_data_source(
     elif len(shape) == 3:
         channels, height, width = shape
     else:
-        raise ValueError("Currently max 3 dimensional inputs supported")
+        raise ValueError("Currently max 3 dimensional inputs supported.")
 
     return DataDimensions(channels=channels, height=height, width=width)
+
+
+def _setup_snp_subset_indices(
+    df_bim: pd.DataFrame,
+    snps_to_subset: List[str],
+    subset_file_name: str = "",
+    snp_file_name: str = "",
+) -> np.ndarray:
+    """
+    .bim columns: ["CHR_CODE", "VAR_ID", "POS_CM", "BP_COORD", "ALT", "REF"]
+    """
+
+    df_subset = df_bim[df_bim["VAR_ID"].isin(snps_to_subset)]
+
+    if len(df_subset) < len(snps_to_subset):
+        num_missing = len(snps_to_subset) - len(df_subset)
+        missing = [i for i in snps_to_subset if i not in df_subset["VAR_ID"]]
+        logger.warning(
+            "Did not find all SNPs in subset file '%s' in base .bim file '%s'. "
+            "Number of missing SNPs: %d. Example: '%s'.",
+            subset_file_name,
+            snp_file_name,
+            num_missing,
+            missing[:3],
+        )
+    else:
+        logger.info(
+            "Using %d SNPs from subset file %s.", len(df_subset), subset_file_name
+        )
+
+    return df_subset.index
+
+
+def read_subset_file(subset_snp_file_path: str) -> List[str]:
+    with open(subset_snp_file_path, "r") as infile:
+        snps_to_subset = infile.read().split()
+
+    return snps_to_subset
+
+
+def read_bim(bim_file_path: str) -> pd.DataFrame:
+    bim_headers = _get_bim_headers()
+    df_bim = pd.read_csv(bim_file_path, names=bim_headers, sep=r"\s+")
+    df_bim["VAR_ID"] = df_bim["VAR_ID"].astype(str)
+
+    if not len(df_bim.columns) == 6:
+        raise ValueError(
+            "Expected 6 columns in bim file '%s', got %d.",
+            bim_file_path,
+            len(df_bim.columns),
+        )
+
+    return df_bim
+
+
+def _get_bim_headers() -> List[str]:
+    bim_headers = ["CHR_CODE", "VAR_ID", "POS_CM", "BP_COORD", "ALT", "REF"]
+    return bim_headers

@@ -58,6 +58,14 @@ As always, configurations first!
     :caption:
 
 .. note::
+    Training these sequence models
+    can take quite some time if
+    one is using a laptop.
+    If possible,
+    try using a system with a GPU available!
+    If not, set the device setting to 'cpu'.
+
+.. note::
 
     You might notice that we have a new configuration in our global config,
     ``mixing_alpha``.
@@ -73,13 +81,10 @@ As always, configurations first!
     :language: yaml
     :caption:
 
-.. literalinclude:: tutorial_files/04_pretrained_sequence_tutorial/04_imdb_target.yaml
+.. literalinclude:: tutorial_files/04_pretrained_sequence_tutorial/04_imdb_output.yaml
     :language: yaml
     :caption:
 
-.. literalinclude:: tutorial_files/04_pretrained_sequence_tutorial/04_imdb_predictor.yaml
-    :language: yaml
-    :caption:
 
 As before, we do our training with the following command:
 
@@ -113,7 +118,7 @@ and can be controlled with the ``window_size`` parameter
 of the ``input_type_info`` field when training sequence models.
 
 Now, let's try training one such model, using a window size of 64 and
-increasing your maximum length to 512:
+increasing the maximum sequence length to 512:
 
 .. literalinclude:: tutorial_files/04_pretrained_sequence_tutorial/04_imdb_input_windowed.yaml
     :language: yaml

@@ -23,8 +23,7 @@ from eir.models.layers import MLPResidualBlock
 from eir.models.sequence.transformer_models import get_hf_transformer_forward
 
 if TYPE_CHECKING:
-    from eir.train import al_num_outputs_per_target
-
+    from eir.setup.output_setup import al_num_outputs_per_target
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -227,11 +226,11 @@ def initialize_module(module: nn.Module, module_args: Dict) -> nn.Module:
 def calculate_module_dict_outputs(
     input_: torch.Tensor, module_dict: nn.ModuleDict
 ) -> "OrderedDict[str, torch.Tensor]":
-    final_out = OrderedDict()
-    for target_column, linear_layer in module_dict.items():
-        final_out[target_column] = linear_layer(input_)
+    out = OrderedDict()
+    for name, module in module_dict.items():
+        out[name] = module(input_)
 
-    return final_out
+    return out
 
 
 def get_output_dimensions_for_input(

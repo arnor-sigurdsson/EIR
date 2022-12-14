@@ -12,14 +12,16 @@ from tests.conftest import al_prep_modelling_test_configs
 
 def test_unflatten_engine_metrics_dict():
     test_step_base = {
-        "Origin": {"Origin_mcc": 0.9, "Origin_loss": 0.1},
-        "Height": {"Height_pcc": 0.9, "Height_rmse": 0.1},
+        "test_output": {
+            "Origin": {"test_output_Origin_mcc": 0.9, "test_output_Origin_loss": 0.1},
+            "Height": {"test_output_Height_pcc": 0.9, "test_output_Height_rmse": 0.1},
+        }
     }
     test_flat_metrics_dict = {
-        "Origin_mcc": 0.99,
-        "Origin_loss": 0.11,
-        "Height_pcc": 0.99,
-        "Height_rmse": 0.11,
+        "test_output_Origin_mcc": 0.99,
+        "test_output_Origin_loss": 0.11,
+        "test_output_Height_pcc": 0.99,
+        "test_output_Height_rmse": 0.11,
     }
 
     test_output = train_handlers._unflatten_engine_metrics_dict(
@@ -27,11 +29,11 @@ def test_unflatten_engine_metrics_dict():
     )
 
     # we want to make sure the original values are present
-    assert test_output["Origin"]["Origin_mcc"] == 0.99
-    assert test_output["Height"]["Height_pcc"] == 0.99
+    assert test_output["test_output"]["Origin"]["test_output_Origin_mcc"] == 0.99
+    assert test_output["test_output"]["Height"]["test_output_Height_pcc"] == 0.99
 
-    assert test_output["Origin"]["Origin_loss"] == 0.11
-    assert test_output["Height"]["Height_rmse"] == 0.11
+    assert test_output["test_output"]["Origin"]["test_output_Origin_loss"] == 0.11
+    assert test_output["test_output"]["Height"]["test_output_Height_rmse"] == 0.11
 
 
 def test_get_activation_handler_and_event_no_act_sample_factor():
@@ -111,13 +113,22 @@ def test_get_early_stopping_event_kwargs():
                 "global_configs": {
                     "output_folder": "test_hparam_summary_writer",
                     "lr": 1e-03,
-                    "n_epochs": 2,
+                    "n_epochs": 4,
                     "sample_interval": 100,
                 },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
                         "model_config": {"model_type": "linear"},
+                    },
+                ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
                     },
                 ],
             },
@@ -164,6 +175,15 @@ def test_add_hparams_to_tensorboard(
                     {
                         "input_info": {"input_name": "test_genotype"},
                         "model_config": {"model_type": "linear"},
+                    },
+                ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
                     },
                 ],
             },

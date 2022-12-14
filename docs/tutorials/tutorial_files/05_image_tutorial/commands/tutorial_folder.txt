@@ -4,8 +4,7 @@ eir_tutorials/05_image_tutorial/
 │   ├── inputs_efficientnet_b0.yaml
 │   ├── inputs_resnet18.yaml
 │   ├── inputs.yaml
-│   ├── predictor.yaml
-│   └── target.yaml
+│   └── output.yaml
 └── data
     └── hot_dog_not_hot_dog
         ├── food_images

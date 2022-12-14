@@ -1,4 +1,3 @@
-from collections import OrderedDict
 from copy import copy
 from dataclasses import dataclass
 from functools import partial
@@ -6,7 +5,6 @@ from typing import List, Callable, Sequence, TYPE_CHECKING, Union
 
 import torch
 from aislib.misc_utils import get_logger
-from aislib.pytorch_modules import Swish
 from torch import nn
 
 from eir.models.layers import SplitLinear, SplitMLPResidualBlock
@@ -90,7 +88,7 @@ class LCLModelConfig:
 
     :param layers:
         Controls the number of layers in the model. If set to ``None``, the model will
-        automatically set up the number of layers according to the ``cutoff`` paramter
+        automatically set up the number of layers according to the ``cutoff`` parameter
         value.
 
     :param kernel_width:
@@ -139,15 +137,15 @@ class LCLModelConfig:
 
     layers: Union[None, List[int]] = None
 
-    kernel_width: Union[None, int] = 12
-    first_kernel_expansion: int = 1
+    kernel_width: Union[None, int] = 16
+    first_kernel_expansion: int = -2
 
     channel_exp_base: int = 2
     first_channel_expansion: int = 1
 
     split_mlp_num_splits: Union[None, int] = None
 
-    rb_do: float = 0.00
+    rb_do: float = 0.10
     stochastic_depth_p: float = 0.00
     l1: float = 0.00
 
@@ -233,28 +231,6 @@ def calc_value_after_expansion(base: int, expansion: int, min_value: int = 0) ->
         abs_expansion = abs(expansion)
         return max(min_value, base // abs_expansion)
     return base
-
-
-def get_split_extractor_spec(
-    in_features: int, out_feature_sets: int, split_size: int, dropout_p: float
-):
-    spec = OrderedDict(
-        {
-            "bn_1": (nn.BatchNorm1d, {"num_features": in_features}),
-            "act_1": (Swish, {}),
-            "do_1": (nn.Dropout, {"p": dropout_p}),
-            "split_1": (
-                SplitLinear,
-                {
-                    "in_features": in_features,
-                    "out_feature_sets": out_feature_sets,
-                    "split_size": split_size,
-                    "bias": False,
-                },
-            ),
-        }
-    )
-    return spec
 
 
 @dataclass

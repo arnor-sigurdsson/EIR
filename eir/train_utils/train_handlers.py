@@ -1,3 +1,4 @@
+import atexit
 import os
 from dataclasses import dataclass
 from functools import partial
@@ -11,10 +12,10 @@ from typing import (
     Dict,
     overload,
     Literal,
+    Iterator,
 )
 
 import aislib.misc_utils
-import atexit
 import pandas as pd
 import yaml
 from aislib.misc_utils import get_logger
@@ -25,10 +26,10 @@ from ignite.metrics import RunningAverage
 from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 
-from eir.data_load.data_utils import get_target_columns_generator
-from eir.data_load.label_setup import al_target_columns
+from eir.data_load.data_utils import get_output_info_generator
 from eir.interpretation.interpretation import activation_analysis_handler
 from eir.setup.config import object_to_primitives
+from eir.setup.output_setup import al_output_objects_as_dict
 from eir.setup.schemas import GlobalConfig
 from eir.train_utils import H_PARAMS
 from eir.train_utils.distributed import only_call_on_master_node
@@ -70,7 +71,7 @@ class HandlerConfig:
     experiment: "Experiment"
     run_folder: Path
     output_folder: str
-    monitoring_metrics: List[Tuple[str, str]]
+    monitoring_metrics: List[Tuple[str, str, str]]
 
 
 def configure_trainer(
@@ -83,7 +84,7 @@ def configure_trainer(
     run_folder = get_run_folder(output_folder=gc.output_folder)
 
     monitoring_metrics = _get_monitoring_metrics(
-        target_columns=experiment.target_columns, metric_record_dict=experiment.metrics
+        outputs_as_dict=experiment.outputs, metric_record_dict=experiment.metrics
     )
 
     handler_config = HandlerConfig(
@@ -237,37 +238,51 @@ def _do_run_completed_handler(iter_per_epoch: int, n_epochs: int, sample_interva
 
 
 def _get_monitoring_metrics(
-    target_columns: al_target_columns, metric_record_dict: al_metric_record_dict
-) -> List[Tuple[str, str]]:
+    outputs_as_dict: al_output_objects_as_dict,
+    metric_record_dict: al_metric_record_dict,
+) -> List[Tuple[str, str, str]]:
     """
     The spec for the tuple here follows the metric dict spec, i.e. the tuple is:
     (column_name, metric).
     """
-    target_columns_gen = get_target_columns_generator(target_columns=target_columns)
+    target_columns_gen = get_output_info_generator(outputs_as_dict=outputs_as_dict)
 
-    loss_average_metrics = tuple(["average", "loss-average"])
-    perf_average_metrics = tuple(["average", "perf-average"])
+    loss_average_metrics = tuple(["average", "average", "loss-average"])
+    perf_average_metrics = tuple(["average", "average", "perf-average"])
     monitoring_metrics = [loss_average_metrics, perf_average_metrics]
 
-    def _parse_target_metrics(metric_name: str, column_name_: str) -> str:
-        return f"{column_name_}_{metric_name}"
+    def _parse_target_metrics(
+        output_name_: str, metric_name: str, column_name_: str
+    ) -> str:
+        return f"{output_name_}_{column_name_}_{metric_name}"
 
-    for column_type, column_name in target_columns_gen:
+    for output_name, output_target_type, column_name in target_columns_gen:
 
-        cur_metric_records: Tuple[MetricRecord, ...] = metric_record_dict[column_type]
+        if output_target_type in ("con", "cat"):
+            cur_output_object = outputs_as_dict[output_name]
+            cur_output_type = cur_output_object.output_config.output_info.output_type
+            assert cur_output_type == "tabular"
 
-        for metric in cur_metric_records:
-            if not metric.only_val:
+            al_record = Tuple[MetricRecord, ...]
+            cur_metric_records: al_record = metric_record_dict[output_target_type]
 
-                parsed_metric = _parse_target_metrics(
-                    metric_name=metric.name, column_name_=column_name
-                )
-                cur_tuple = tuple([column_name, parsed_metric])
-                monitoring_metrics.append(cur_tuple)
+            for metric in cur_metric_records:
+                if not metric.only_val:
 
-        # manually add loss record as it's not in metric records, but from criterions
-        loss_name = _parse_target_metrics(metric_name="loss", column_name_=column_name)
-        monitoring_metrics.append(tuple([column_name, loss_name]))
+                    parsed_metric = _parse_target_metrics(
+                        output_name_=output_name,
+                        column_name_=column_name,
+                        metric_name=metric.name,
+                    )
+                    cur_tuple = tuple([output_name, column_name, parsed_metric])
+                    monitoring_metrics.append(cur_tuple)
+
+        # manually add loss record as it's not in metric records, but from criteria
+        loss_name = _parse_target_metrics(
+            output_name_=output_name, metric_name="loss", column_name_=column_name
+        )
+        metrics_keys = (output_name, column_name, loss_name)
+        monitoring_metrics.append(metrics_keys)
 
     return monitoring_metrics
 
@@ -383,7 +398,7 @@ def _get_latest_validation_value_score_function(run_folder: Path, column: str):
 
 
 def _attach_running_average_metrics(
-    engine: Engine, monitoring_metrics: List[Tuple[str, str]]
+    engine: Engine, monitoring_metrics: List[Tuple[str, str, str]]
 ) -> None:
     """
     For each metric, we create an output_transform function that grabs the
@@ -395,17 +410,24 @@ def _attach_running_average_metrics(
     We use a partial so each lambda has it's own metric variable (otherwise
     they all reference the same object as it gets overwritten).
     """
-    for column_name, metric_name in monitoring_metrics:
+    for output_name, column_name, metric_name in monitoring_metrics:
 
         def output_transform(
             metric_dict_from_step: "al_step_metric_dict",
+            output_name_key: str,
             column_name_key: str,
             metric_name_key: str,
         ) -> float:
-            return metric_dict_from_step[column_name_key][metric_name_key]
+            value = metric_dict_from_step[output_name_key][column_name_key][
+                metric_name_key
+            ]
+            return value
 
         partial_func = partial(
-            output_transform, column_name_key=column_name, metric_name_key=metric_name
+            output_transform,
+            output_name_key=output_name,
+            column_name_key=column_name,
+            metric_name_key=metric_name,
         )
 
         RunningAverage(
@@ -478,7 +500,7 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
 
     metric_writing_funcs = _get_metric_writing_funcs(
         sample_interval=gc.sample_interval,
-        target_columns=exp.target_columns,
+        outputs_as_dict=exp.outputs,
         run_folder=handler_config.run_folder,
     )
     trainer.add_event_handler(
@@ -584,18 +606,27 @@ def _add_checkpoint_handler_wrapper(
 
 
 def _get_metric_writing_funcs(
-    sample_interval: int, target_columns: Dict[str, List[str]], run_folder: Path
-) -> Dict[str, Callable]:
+    sample_interval: int, outputs_as_dict: al_output_objects_as_dict, run_folder: Path
+) -> Dict[str, Dict[str, Callable]]:
     buffer_interval = sample_interval // 2
+
+    target_generator = get_output_info_generator(outputs_as_dict=outputs_as_dict)
+
     metrics_files = get_metrics_files(
-        target_columns=target_columns,
+        target_generator=target_generator,
         run_folder=run_folder,
         train_or_val_target_prefix="train_",
     )
-    writer_funcs = {
-        file_name: get_buffered_metrics_writer(buffer_interval=buffer_interval)
-        for file_name in metrics_files.keys()
-    }
+
+    writer_funcs = {}
+    for output_name, target_name_file_dict in metrics_files.items():
+        writer_funcs[output_name] = {}
+
+        for target_name, target_file in target_name_file_dict.items():
+
+            writer_funcs[output_name][target_name] = get_buffered_metrics_writer(
+                buffer_interval=buffer_interval
+            )
 
     return writer_funcs
 
@@ -680,15 +711,22 @@ def _unflatten_engine_metrics_dict(
     """
     We need this to streamline the 1D dictionary that comes from engine.state.metrics.
     """
-    unflattened_dict = {}
-    for column_name, column_metric_dict in step_base.items():
-        unflattened_dict[column_name] = {}
 
-        for column_metric_name in column_metric_dict.keys():
-            eng_run_avg_value = engine_metrics_dict[column_metric_name]
-            unflattened_dict[column_name][column_metric_name] = eng_run_avg_value
+    nested_dict = {}
 
-    return unflattened_dict
+    for output_name, output_metric_dict in step_base.items():
+        nested_dict[output_name] = {}
+
+        for target_name, target_metric_dict in output_metric_dict.items():
+            nested_dict[output_name][target_name] = {}
+
+            for target_metric_name in target_metric_dict.keys():
+                eng_run_avg_value = engine_metrics_dict[target_metric_name]
+                nested_dict[output_name][target_name][
+                    target_metric_name
+                ] = eng_run_avg_value
+
+    return nested_dict
 
 
 def _get_plot_events(
@@ -716,6 +754,16 @@ def _attach_plot_progress_handler(
     return trainer
 
 
+def _iterdir_ignore_hidden(path: Path) -> Iterator[Path]:
+    """
+    Mostly to avoid hidden files like .DS_Store on Macs.
+    """
+    for child in path.iterdir():
+        if child.name.startswith("."):
+            continue
+        yield child
+
+
 def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> None:
     ca = handler_config.experiment.configs.global_config
 
@@ -725,20 +773,22 @@ def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> Non
 
     run_folder = get_run_folder(ca.output_folder)
 
-    for results_dir in (run_folder / "results").iterdir():
-        target_column = results_dir.name
+    for output_dir in _iterdir_ignore_hidden(path=run_folder / "results"):
 
-        train_history_df, valid_history_df = get_metrics_dataframes(
-            results_dir=results_dir, target_string=target_column
-        )
+        for target_dir in _iterdir_ignore_hidden(path=output_dir):
+            target_column = target_dir.name
 
-        vf.generate_all_training_curves(
-            training_history_df=train_history_df,
-            valid_history_df=valid_history_df,
-            output_folder=results_dir,
-            title_extra=target_column,
-            plot_skip_steps=ca.plot_skip_steps,
-        )
+            train_history_df, valid_history_df = get_metrics_dataframes(
+                results_dir=target_dir, target_string=target_column
+            )
+
+            vf.generate_all_training_curves(
+                training_history_df=train_history_df,
+                valid_history_df=valid_history_df,
+                output_folder=target_dir,
+                title_extra=target_column,
+                plot_skip_steps=ca.plot_skip_steps,
+            )
 
     train_avg_history_df, valid_avg_history_df = get_metrics_dataframes(
         results_dir=run_folder, target_string="average"
@@ -789,14 +839,16 @@ def add_hparams_to_tensorboard(
 
     run_folder = get_run_folder(output_folder=gc.output_folder)
 
+    target_generator = get_output_info_generator(outputs_as_dict=experiment.outputs)
+
     metrics_files = get_metrics_files(
-        target_columns=exp.target_columns,
+        target_generator=target_generator,
         run_folder=run_folder,
         train_or_val_target_prefix="validation_",
     )
 
     try:
-        average_loss_file = metrics_files["average"]
+        average_loss_file = metrics_files["average"]["average"]
         average_loss_df = pd.read_csv(average_loss_file)
 
     except FileNotFoundError as e:

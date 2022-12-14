@@ -1,10 +1,10 @@
 from dataclasses import dataclass, field
 from typing import Union, Literal, List, Optional, Sequence, Type
 
-from eir.models.fusion.fusion_default import FusionModelConfig
-from eir.models.fusion.fusion_linear import LinearFusionModelConfig
+from eir.models.fusion.fusion_identity import IdentityConfig
 from eir.models.fusion.fusion_mgmoe import MGMoEModelConfig
 from eir.models.image.image_models import ImageModelConfig
+from eir.models.layers import ResidualMLPConfig
 from eir.models.omics.omics_models import (
     OmicsModelConfig,
     LinearModel,
@@ -12,51 +12,33 @@ from eir.models.omics.omics_models import (
     LCLModel,
     SimpleLCLModel,
     IdentityModel,
-    CNNModelConfig,
-    LCLModelConfig,
-    LinearModelConfig,
-    SimpleLCLModelConfig,
-    IdentityModelConfig,
-    Dataclass,
+)
+from eir.models.output.tabular_output import (
+    TabularModelOutputConfig,
 )
 from eir.models.sequence.transformer_models import (
-    BasicTransformerFeatureExtractorModelConfig,
     SequenceModelConfig,
 )
 from eir.models.tabular.tabular import (
     SimpleTabularModel,
     TabularModelConfig,
-    SimpleTabularModelConfig,
 )
 from eir.setup.setup_utils import get_all_optimizer_names
 
 al_input_configs = Sequence["InputConfig"]
+al_output_configs = Sequence["OutputConfig"]
 
 al_optimizers = tuple(Literal[i] for i in get_all_optimizer_names())
 
-al_model_configs = Union[
+al_feature_extractor_configs = Union[
     OmicsModelConfig, TabularModelConfig, ImageModelConfig, SequenceModelConfig
 ]
 
-al_model_configs_classes = Union[
+al_feature_extractor_configs_classes = Union[
     Type[OmicsModelConfig],
     Type[TabularModelConfig],
     Type[ImageModelConfig],
     Type[SequenceModelConfig],
-]
-
-al_model_type_configs = Union[
-    FusionModelConfig,
-    MGMoEModelConfig,
-    CNNModelConfig,
-    LinearModelConfig,
-    SimpleLCLModelConfig,
-    LCLModelConfig,
-    SimpleTabularModelConfig,
-    IdentityModelConfig,
-    BasicTransformerFeatureExtractorModelConfig,
-    ImageModelConfig,
-    Dataclass,
 ]
 
 al_models_classes = Union[
@@ -68,6 +50,16 @@ al_models_classes = Union[
     Type[IdentityModel],
 ]
 
+
+al_output_module_configs_classes = Union[
+    Type[TabularModelOutputConfig],
+]
+
+al_output_module_configs = Union[
+    TabularModelOutputConfig,
+]
+
+
 al_tokenizer_choices = (
     Union[
         Literal["basic_english"],
@@ -76,6 +68,7 @@ al_tokenizer_choices = (
         Literal["toktok"],
         Literal["revtok"],
         Literal["subword"],
+        Literal["bpe"],
         None,
     ],
 )
@@ -111,6 +104,10 @@ class GlobalConfig:
     :param device:
         Device to run the training on (e.g. 'cuda:0' / 'cpu').
 
+    :param amp:
+        Whether to use Automatic Mixed Precision. Currently only supported when
+        training on GPUs.
+
     :param weighted_sampling_columns:
         Target column to apply weighted sampling on. Only applies to categorical
         columns. Passing in 'all' here will use an average of all the target columns.
@@ -141,6 +138,12 @@ class GlobalConfig:
 
     :param gradient_clipping:
         Max norm used for gradient clipping, with p=2.
+
+    :param gradient_accumulation_steps:
+        Number of steps to use for gradient accumulation.
+
+    :param gradient_noise:
+        Gradient noise to inject during training.
 
     :param early_stopping_patience:
         Number of validation performance steps without improvement over
@@ -184,7 +187,6 @@ class GlobalConfig:
     :param n_saved_models:
         Number of top N models to saved during training.
 
-
     :param get_acts:
         Whether to compute activations w.r.t. inputs.
 
@@ -212,7 +214,16 @@ class GlobalConfig:
         Alpha parameter used for mixing (higher means more mixing).
 
     :param plot_skip_steps:
-        How many iterations to skip in in plots.
+        How many iterations to skip in plots.
+
+    :param pretrained_checkpoint:
+        Path to a pretrained checkpoint model file (under saved_models/ in the
+        experiment output folder) to load and use as a starting point for training.
+
+    :param strict_pretrained_loading:
+        Whether to enforce that the loaded pretrained model exactly the same
+        architecture as the current model. If False, will only load the layers
+        that match between the two models.
     """
 
     output_folder: str
@@ -222,6 +233,7 @@ class GlobalConfig:
     manual_valid_ids_file: Union[str, None] = None
     dataloader_workers: int = 0
     device: str = "cpu"
+    amp: bool = False
     weighted_sampling_columns: Union[None, Sequence[str]] = None
     lr: float = 1e-03
     lr_lb: float = 0.0
@@ -231,6 +243,7 @@ class GlobalConfig:
     lr_plateau_factor: float = 0.2
     gradient_clipping: float = 0.0
     gradient_accumulation_steps: Union[None, int] = None
+    gradient_noise: float = 0.0
     early_stopping_patience: int = 10
     early_stopping_buffer: Union[None, int] = None
     warmup_steps: Union[Literal["auto"], int] = "auto"
@@ -253,6 +266,7 @@ class GlobalConfig:
     mixing_alpha: float = 0.0
     plot_skip_steps: int = 200
     pretrained_checkpoint: Union[None, str] = None
+    strict_pretrained_loading: bool = True
 
 
 @dataclass
@@ -284,7 +298,7 @@ class InputConfig:
         "ByteInputDataConfig",
         "ImageInputDataConfig",
     ]
-    model_config: al_model_configs
+    model_config: al_feature_extractor_configs
     pretrained_config: Union[None, "BasicPretrainedConfig"] = None
     interpretation_config: Union[None, "BasicInterpretationConfig"] = None
 
@@ -300,11 +314,16 @@ class InputDataConfig:
 
     :param input_type:
         Type of the input.
+
+    :param input_inner_key:
+        Inner key to use for the input. Only used when input_source is a deeplake
+        dataset.
     """
 
     input_source: str
     input_name: str
     input_type: Literal["omics", "tabular", "sequence", "image", "bytes"]
+    input_inner_key: Union[None, str] = None
 
 
 @dataclass
@@ -312,6 +331,11 @@ class OmicsInputDataConfig:
     """
     :param snp_file:
         Path to the relevant ``.bim`` file, used for activation analysis.
+
+    :param subset_snps_file:
+        Path to a file with corresponding SNP IDs to subset from the main
+        arrays for the modelling. Requires the ``snp_file`` parameter to
+        be passed in.
 
     :param na_augment_perc:
         Percentage of the input (i.e. percentage of SNPs) to augment by setting the
@@ -329,8 +353,9 @@ class OmicsInputDataConfig:
     """
 
     snp_file: Optional[str] = None
-    na_augment_perc: float = 0.0
-    na_augment_prob: float = 0.0
+    subset_snps_file: Optional[str] = None
+    na_augment_perc: float = 0.2
+    na_augment_prob: float = 0.8
     omics_format: Literal["one-hot"] = "one-hot"
     mixing_subtype: Union[Literal["mixup", "cutmix-block", "cutmix-uniform"]] = "mixup"
 
@@ -534,25 +559,40 @@ class ImageInputDataConfig:
 
 
 @dataclass
-class PredictorConfig:
+class FusionConfig:
     """
     :param model_type:
         Which type of fusion model to use.
 
     :param model_config:
-        Predictor model configuration.
+        Fusion model configuration.
     """
 
     model_type: Literal["default", "linear", "mgmoe"]
-    model_config: Union[FusionModelConfig, LinearFusionModelConfig, MGMoEModelConfig]
+    model_config: Union[ResidualMLPConfig, IdentityConfig, MGMoEModelConfig]
 
 
 @dataclass
-class TargetConfig:
+class OutputInfoConfig:
     """
-    :param label_file:
-        Label ``.csv`` file to load targets from.
+    :param output_source:
+        Where on the filesystem to locate the output (if applicable)
 
+    :param output_name:
+        Name to identify the output.
+
+    :param output_type:
+        Type of the output.
+    """
+
+    output_source: Union[str, None]
+    output_name: str
+    output_type: Literal["tabular"]
+
+
+@dataclass
+class TabularOutputTypeConfig:
+    """
     :param label_parsing_chunk_size:
         Number of rows to process at time when loading in the ``input_source``. Useful
         when RAM is limited.
@@ -562,9 +602,37 @@ class TargetConfig:
 
     :param target_con_columns:
         Which columns from ``label_file`` to use as continuous targets.
+
+    :param cat_label_smoothing:
+        Label smoothing to apply to categorical targets.
+
+    :param uncertainty_weighted_mt_loss:
+        Whether to use uncertainty weighted loss for multitask / multilabel learning.
     """
 
-    label_file: str
     label_parsing_chunk_size: Union[None, int] = None
     target_cat_columns: Sequence[str] = field(default_factory=list)
     target_con_columns: Sequence[str] = field(default_factory=list)
+    cat_label_smoothing: float = 0.0
+    uncertainty_weighted_mt_loss: bool = True
+
+
+@dataclass
+class OutputConfig:
+
+    """
+    :param output_info:
+        Information about the output source, name and type.
+
+    :param output_type_info:
+       Information specific to the output type, e.g. which columns to predict
+       from a tabular file.
+
+    :param model_config:
+        Configuration for the chosen model (i.e. output module after fusion) for this
+        output.
+    """
+
+    output_info: OutputInfoConfig
+    output_type_info: Union[TabularOutputTypeConfig]
+    model_config: Union[TabularModelOutputConfig]
