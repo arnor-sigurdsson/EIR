@@ -399,24 +399,31 @@ class LCLAttentionBlock(nn.Module):
         in_features: int,
         num_heads: Union[int, Literal["auto"]] = "auto",
         dropout_p: float = 0.0,
+        num_layers: int = 2,
     ):
         super().__init__()
 
         self.embedding_dim = embedding_dim
         self.in_features = in_features
         self.dropout_p = dropout_p
+        self.num_layers = num_layers
         self.out_features = in_features
 
         if num_heads == "auto":
             self.num_heads = embedding_dim
 
-        self.encoder_layer = nn.TransformerEncoderLayer(
+        encoder_layer = nn.TransformerEncoderLayer(
             d_model=self.embedding_dim,
             nhead=self.num_heads,
             dim_feedforward=self.embedding_dim * 4,
             activation="gelu",
             norm_first=True,
             batch_first=True,
+        )
+
+        self.encoder = nn.TransformerEncoder(
+            encoder_layer=encoder_layer,
+            num_layers=self.num_layers,
         )
 
         self.pos_emb = PositionalEmbedding(
@@ -429,7 +436,7 @@ class LCLAttentionBlock(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         out = x.reshape(x.shape[0], -1, self.embedding_dim)
         out = self.pos_emb(out)
-        out = self.encoder_layer(out)
+        out = self.encoder(out)
         out = torch.flatten(input=out, start_dim=1)
 
         return out
