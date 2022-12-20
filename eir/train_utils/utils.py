@@ -48,20 +48,20 @@ def prep_sample_outfolder(
 
 
 @only_call_on_master_node
-def configure_root_logger(output_folder: str):
+def configure_root_logger(output_folder: str) -> None:
 
     logfile_path = get_run_folder(output_folder=output_folder) / "logging_history.log"
 
-    ensure_path_exists(logfile_path)
-    file_handler = logging.FileHandler(str(logfile_path))
-    file_handler.setLevel(logging.DEBUG)
+    ensure_path_exists(path=logfile_path)
+    file_handler = logging.FileHandler(filename=str(logfile_path))
+    file_handler.setLevel(level=logging.DEBUG)
 
     formatter = logging.Formatter(
-        "%(asctime)s - %(levelname)s - %(name)s - %(message)s", "%H:%M:%S"
+        "%(asctime)s - %(levelname)s - %(name)s - %(message)s", "%Y-%m-%d %H:%M:%S"
     )
-    file_handler.setFormatter(formatter)
+    file_handler.setFormatter(fmt=formatter)
 
-    logging.getLogger("").addHandler(file_handler)
+    logging.getLogger(name="").addHandler(hdlr=file_handler)
 
 
 def validate_handler_dependencies(handler_dependencies: Sequence[Callable]):
