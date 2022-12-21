@@ -10,7 +10,7 @@
         <img src="https://img.shields.io/badge/Paper-bioRxiv-B5232F.svg" /></a>
   
   <a href="https://www.python.org/downloads/" alt="Python">
-        <img src="https://img.shields.io/badge/python-3.8|3.9-blue.svg" /></a>
+        <img src="https://img.shields.io/badge/python-3.10-blue.svg" /></a>
   
    <a href="https://pypi.org/project/eir-dl/" alt="Python">
         <img src="https://img.shields.io/pypi/v/eir-dl.svg" /></a>
