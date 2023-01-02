@@ -102,6 +102,8 @@ def get_timm_models_to_test() -> List[str]:
     )
 
     df = pd.read_csv(filepath_or_buffer=url)
+
+    df["param_count"] = df["param_count"].str.replace(",", "").astype(float)
     df = df[df["param_count"] <= 12]
 
     models = list(df["model"])
