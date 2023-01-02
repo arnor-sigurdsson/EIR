@@ -541,7 +541,7 @@ def _get_multi_task_output_configs(
             "injections": {
                 "global_configs": {
                     "lr": 1e-03,
-                    "gradient_noise": 0.05,
+                    "gradient_noise": 0.001,
                 },
                 "input_configs": [
                     {
