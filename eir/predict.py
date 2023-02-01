@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 import torch
 from aislib.misc_utils import get_logger, ensure_path_exists
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import LabelEncoder, StandardScaler
 from torch.utils.data import DataLoader
 
 import eir.visualization.visualization_funcs as vf
@@ -191,15 +191,22 @@ def predict(
         )
         ensure_path_exists(path=output_folder, is_folder=True)
 
-        merged_predictions = _merge_ids_predictions_and_labels(
+        df_merged_predictions = _merge_ids_predictions_and_labels(
             ids=all_ids,
             predictions=predictions,
             labels=target_labels,
             prediction_classes=classes,
         )
+        df_predictions = _add_inverse_transformed_columns_to_predictions(
+            df=df_merged_predictions,
+            target_column_name=target_column_name,
+            target_column_type=target_column_type,
+            transformer=cur_target_transformer,
+            evaluation=predict_cl_args.evaluate,
+        )
 
         _save_predictions(
-            df_predictions=merged_predictions,
+            df_predictions=df_predictions,
             outfolder=output_folder,
         )
 
@@ -240,6 +247,57 @@ def _merge_ids_predictions_and_labels(
     df[prediction_classes] = predictions
 
     return df
+
+
+def _add_inverse_transformed_columns_to_predictions(
+    df: pd.DataFrame,
+    target_column_name: str,
+    target_column_type: str,
+    transformer: al_label_transformers_object,
+    evaluation: bool,
+) -> pd.DataFrame:
+    df_copy = df.copy()
+
+    assert target_column_type in ["con", "cat"], target_column_type
+
+    if evaluation:
+        df = _add_inverse_transformed_column(
+            df=df_copy,
+            column_name="True Label",
+            transformer=transformer,
+        )
+
+    if target_column_type == "con":
+        df = _add_inverse_transformed_column(
+            df=df,
+            column_name=target_column_name,
+            transformer=transformer,
+        )
+
+    return df
+
+
+def _add_inverse_transformed_column(
+    df: pd.DataFrame,
+    column_name: str,
+    transformer: al_label_transformers_object,
+) -> pd.DataFrame:
+
+    df_copy = df.copy()
+
+    tt_it = transformer.inverse_transform
+    values = df[column_name].values
+    col_name = f"{column_name} Untransformed"
+
+    match transformer:
+        case LabelEncoder():
+            df_copy.insert(loc=0, column=col_name, value=tt_it(values))
+        case StandardScaler():
+            values_parsed = tt_it(values.reshape(-1, 1)).flatten()
+            df_copy.insert(loc=0, column=col_name, value=values_parsed)
+        case _:
+            raise NotImplementedError(f"Transformer {transformer} not supported.")
+    return df_copy
 
 
 def serialize_prediction_metrics(output_folder: Path, metrics: al_step_metric_dict):
