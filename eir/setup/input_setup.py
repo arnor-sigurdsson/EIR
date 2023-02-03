@@ -1,6 +1,6 @@
+import os
 from collections import OrderedDict
 from copy import deepcopy
-import os
 from dataclasses import dataclass, fields
 from functools import partial
 from pathlib import Path
@@ -21,10 +21,13 @@ from typing import (
     Any,
 )
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 from aislib.misc_utils import get_logger
 from timm.models.registry import _model_pretrained_cfgs
+from tokenizers import Tokenizer
+from tokenizers.models import BPE
+from tokenizers.trainers import BpeTrainer
 from torchtext.data.utils import get_tokenizer as get_pytorch_tokenizer
 from torchtext.vocab import build_vocab_from_iterator, Vocab
 from torchtext.vocab import vocab as pytorch_vocab_builder
@@ -39,21 +42,17 @@ from transformers.tokenization_utils_base import (
     PreTokenizedInput,
     EncodedInput,
 )
-from tokenizers import Tokenizer
-from tokenizers.models import BPE
-from tokenizers.trainers import BpeTrainer
-from tokenizers.pre_tokenizers import Whitespace
 
+from eir.data_load.data_source_modules.deeplake_ops import (
+    is_deeplake_dataset,
+    load_deeplake_dataset,
+    get_deeplake_input_source_iterable,
+)
 from eir.data_load.label_setup import (
     Labels,
     set_up_train_and_valid_tabular_data,
     TabularFileInfo,
     get_file_path_iterator,
-)
-from eir.data_load.data_source_modules.deeplake_ops import (
-    is_deeplake_dataset,
-    load_deeplake_dataset,
-    get_deeplake_input_source_iterable,
 )
 from eir.experiment_io.experiment_io import (
     load_serialized_input_object,
@@ -770,7 +769,6 @@ def _get_bpe_tokenizer_object(
         logger.info("Training BPE tokenizer from source data.")
 
         tokenizer = Tokenizer(model=BPE(unk_token="<unk>"))
-        tokenizer.pre_tokenizer = Whitespace()
 
         special_tokens = _get_default_specials()
         trainer = BpeTrainer(special_tokens=special_tokens)

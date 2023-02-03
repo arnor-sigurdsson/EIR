@@ -307,7 +307,8 @@ def test_predict(
     # check that columns in predictions.csv are in correct sorted order
     assert set(target_classes).issubset(set(df_test.columns))
 
-    preds = df_test.drop("True Label", axis=1).values.argmax(axis=1)
+    label_columns = [i for i in df_test.columns if "True Label" in i]
+    preds = df_test.drop(label_columns, axis=1).values.argmax(axis=1)
     true_labels = df_test["True Label"]
 
     preds_accuracy = (preds == true_labels).sum() / len(true_labels)

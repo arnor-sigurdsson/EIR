@@ -746,7 +746,9 @@ def _should_add_uncertainty_loss_hook(
     more_than_one_target = len(all_targets) > 1
 
     any_uncertainty_targets = any(
-        c.output_type_info.uncertainty_weighted_mt_loss for c in output_configs
+        hasattr(c.output_type_info, "uncertainty_weighted_mt_loss")
+        and c.output_type_info.uncertainty_weighted_mt_loss
+        for c in output_configs
     )
     return more_than_one_target and any_uncertainty_targets
 
