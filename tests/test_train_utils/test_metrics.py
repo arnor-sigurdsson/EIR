@@ -73,7 +73,11 @@ def get_calculate_batch_metrics_data_test_kwargs():
             "Height": StandardScaler().fit(standard_scaler_fit_arr),
         }
     }
-    metrics_ = metrics.get_default_metrics(target_transformers=target_transformers)
+    metrics_ = metrics.get_default_metrics(
+        target_transformers=target_transformers,
+        cat_averaging_metrics=None,
+        con_averaging_metrics=None,
+    )
 
     test_outputs_as_dict = _get_metrics_test_module_test_outputs_as_dict()
 

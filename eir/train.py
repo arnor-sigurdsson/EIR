@@ -348,7 +348,11 @@ def get_default_experiment(
         model=model, loss_callable=loss_func, global_config=configs.global_config
     )
 
-    metrics = get_default_metrics(target_transformers=target_labels.label_transformers)
+    metrics = get_default_metrics(
+        target_transformers=target_labels.label_transformers,
+        cat_averaging_metrics=configs.global_config.cat_averaging_metrics,
+        con_averaging_metrics=configs.global_config.con_averaging_metrics,
+    )
 
     experiment = Experiment(
         configs=configs,

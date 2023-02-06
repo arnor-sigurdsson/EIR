@@ -1088,6 +1088,8 @@ def prep_modelling_test_configs(
     criteria = train._get_criteria(outputs_as_dict=outputs_as_dict)
     test_metrics = metrics.get_default_metrics(
         target_transformers=target_labels.label_transformers,
+        cat_averaging_metrics=gc.cat_averaging_metrics,
+        con_averaging_metrics=gc.con_averaging_metrics,
     )
     test_metrics = _patch_metrics(metrics_=test_metrics)
 

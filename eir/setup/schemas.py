@@ -145,6 +145,14 @@ class GlobalConfig:
     :param gradient_noise:
         Gradient noise to inject during training.
 
+    :param cat_averaging_metrics:
+        Which metrics to use for averaging categorical targets. If not set, will
+        use the default metrics for the task type.
+
+    :param con_averaging_metrics:
+        Which metrics to use for averaging continuous targets. If not set, will
+        use the default metrics for the task type.
+
     :param early_stopping_patience:
         Number of validation performance steps without improvement over
         best performance before terminating run.
@@ -244,6 +252,8 @@ class GlobalConfig:
     gradient_clipping: float = 0.0
     gradient_accumulation_steps: Union[None, int] = None
     gradient_noise: float = 0.0
+    cat_averaging_metrics: Optional[Sequence[str]] = None
+    con_averaging_metrics: Optional[Sequence[str]] = None
     early_stopping_patience: int = 10
     early_stopping_buffer: Union[None, int] = None
     warmup_steps: Union[Literal["auto"], int] = "auto"

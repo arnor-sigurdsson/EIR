@@ -440,6 +440,8 @@ def _get_multi_task_output_configs(
             "injections": {
                 "global_configs": {
                     "output_folder": "extra_inputs",
+                    "cat_averaging_metrics": ["mcc"],
+                    "con_averaging_metrics": ["r2"],
                 },
                 "input_configs": [
                     {

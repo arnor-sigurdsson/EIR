@@ -3,12 +3,15 @@ import warnings
 from copy import copy
 from dataclasses import dataclass
 from functools import partial
+from statistics import mean
 from pathlib import Path
 from typing import (
     Dict,
     TYPE_CHECKING,
     List,
     Tuple,
+    Optional,
+    Literal,
     Callable,
     Union,
     Generator,
@@ -61,6 +64,11 @@ al_metric_record_dict = Dict[
 al_averaging_functions_dict = Dict[
     str, Callable[["al_step_metric_dict", str, str], float]
 ]
+
+al_cat_averaging_metric_choices = list[
+    Literal["mcc", "acc", "roc-auc-macro", "ap-macro"]
+]
+al_con_averaging_metric_choices = list[Literal["r2", "pcc", "loss"]]
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -685,28 +693,32 @@ def get_metrics_dataframes(
 
 def get_default_metrics(
     target_transformers: Dict[str, al_label_transformers],
+    cat_averaging_metrics: Optional[al_cat_averaging_metric_choices],
+    con_averaging_metrics: Optional[al_con_averaging_metric_choices],
 ) -> "al_metric_record_dict":
     mcc = MetricRecord(name="mcc", function=calc_mcc)
     acc = MetricRecord(name="acc", function=calc_acc)
-
-    rmse = MetricRecord(
-        name="rmse",
-        function=partial(calc_rmse, target_transformers=target_transformers),
-        minimize_goal=True,
-    )
-
     roc_auc_macro = MetricRecord(
         name="roc-auc-macro", function=calc_roc_auc_ovo, only_val=True
     )
     ap_macro = MetricRecord(
         name="ap-macro", function=calc_average_precision, only_val=True
     )
+
+    rmse = MetricRecord(
+        name="rmse",
+        function=partial(calc_rmse, target_transformers=target_transformers),
+        minimize_goal=True,
+    )
     r2 = MetricRecord(name="r2", function=calc_r2, only_val=True)
     pcc = MetricRecord(name="pcc", function=calc_pcc, only_val=True)
 
-    averaging_functions = get_default_performance_averaging_functions(
-        cat_metric_name="mcc", con_metric_name="loss"
+    avg_metrics = parse_averaging_metrics(
+        cat_averaging_metrics=cat_averaging_metrics,
+        con_averaging_metrics=con_averaging_metrics,
     )
+    averaging_functions = get_performance_averaging_functions(**avg_metrics)
+
     default_metrics = {
         "cat": (mcc, acc, roc_auc_macro, ap_macro),
         "con": (rmse, r2, pcc),
@@ -715,41 +727,108 @@ def get_default_metrics(
     return default_metrics
 
 
-def get_default_performance_averaging_functions(
-    cat_metric_name: str, con_metric_name: str
+def parse_averaging_metrics(
+    cat_averaging_metrics: Optional[al_cat_averaging_metric_choices],
+    con_averaging_metrics: Optional[al_con_averaging_metric_choices],
+) -> Dict[str, list[str]]:
+
+    base = _get_default_averaging_metrics()
+
+    if cat_averaging_metrics:
+        _validate_metrics(
+            passed_in_metrics=cat_averaging_metrics,
+            expected_metrics=["loss", "acc", "mcc", "roc-auc-macro", "ap-macro"],
+            target_type="categorical",
+        )
+        base["cat_metric_names"] = cat_averaging_metrics
+    if con_averaging_metrics:
+        _validate_metrics(
+            passed_in_metrics=con_averaging_metrics,
+            expected_metrics=["loss", "rmse", "pcc", "r2"],
+            target_type="continuous",
+        )
+        base["con_metric_names"] = con_averaging_metrics
+
+    return base
+
+
+def _validate_metrics(
+    passed_in_metrics: list[str], expected_metrics: list[str], target_type: str
+) -> None:
+    for metric in passed_in_metrics:
+        if metric not in expected_metrics:
+            raise ValueError(
+                f"Metric {metric} not found in expected metrics {expected_metrics} for "
+                f" {target_type} targets."
+            )
+
+
+def _get_default_averaging_metrics() -> Dict[str, list[str]]:
+    return {
+        "cat_metric_names": ["mcc", "roc-auc-macro", "ap-macro"],
+        "con_metric_names": ["loss", "pcc", "r2"],
+    }
+
+
+def get_performance_averaging_functions(
+    cat_metric_names: al_cat_averaging_metric_choices,
+    con_metric_names: al_con_averaging_metric_choices,
 ) -> al_averaging_functions_dict:
 
-    logger.info(
-        "Default performance averaging functions across tasks set to %s for "
-        "categorical targets and %s for continuous targets.",
-        cat_metric_name.upper(),
-        con_metric_name.upper(),
+    logger.debug(
+        "Performance averaging functions across tasks set to averages "
+        "of %s for categorical targets and %s for continuous targets. These "
+        "values are used to determine overall performance, which is used to "
+        "control factors such as early stopping and LR scheduling.",
+        [i.upper() for i in cat_metric_names],
+        [i.upper() for i in con_metric_names],
     )
 
     def _calc_cat_averaging_value(
         metric_dict: "al_step_metric_dict",
         output_name: str,
         column_name: str,
-        metric_name: str,
+        metric_names: al_cat_averaging_metric_choices,
     ) -> float:
-        combined_key = f"{output_name}_{column_name}_{metric_name}"
-        value = metric_dict[output_name][column_name][combined_key]
-        return value
+
+        values = []
+        for metric_name in metric_names:
+            combined_key = f"{output_name}_{column_name}_{metric_name}"
+            value = metric_dict[output_name][column_name].get(combined_key, None)
+
+            if value is None:
+                continue
+
+            values.append(value)
+
+        return mean(values)
 
     def _calc_con_averaging_value(
         metric_dict: "al_step_metric_dict",
         output_name: str,
         column_name: str,
-        metric_name: str,
+        metric_names: al_con_averaging_metric_choices,
     ) -> float:
-        combined_key = f"{output_name}_{column_name}_{metric_name}"
-        value = 1.0 - metric_dict[output_name][column_name][combined_key]
-        return value
+
+        values = []
+        for metric_name in metric_names:
+            combined_key = f"{output_name}_{column_name}_{metric_name}"
+            value = metric_dict[output_name][column_name].get(combined_key, None)
+
+            if value is None:
+                continue
+
+            if metric_name == "loss":
+                value = 1.0 - value
+
+            values.append(value)
+
+        return mean(values)
 
     performance_averaging_functions = {
-        "cat": partial(_calc_cat_averaging_value, metric_name=cat_metric_name),
-        "con": partial(_calc_con_averaging_value, metric_name=con_metric_name),
-        "general": partial(_calc_con_averaging_value, metric_name="loss"),
+        "cat": partial(_calc_cat_averaging_value, metric_names=cat_metric_names),
+        "con": partial(_calc_con_averaging_value, metric_names=con_metric_names),
+        "general": partial(_calc_con_averaging_value, metric_names=["loss"]),
     }
 
     return performance_averaging_functions
