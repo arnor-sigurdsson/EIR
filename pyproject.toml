@@ -39,6 +39,7 @@ perceiver-pytorch = "^0.8.1"
 timm = "^0.6.5"
 deeplake = "^3.0.10"
 numba = "^0.56.4"
+captum = "^0.6.0"
 
 [tool.poetry.group.dev.dependencies]
 memory-profiler = "^0.60.0"

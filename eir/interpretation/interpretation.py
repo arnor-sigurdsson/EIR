@@ -9,7 +9,6 @@ from functools import partial
 from typing import (
     Union,
     Dict,
-    List,
     TYPE_CHECKING,
     Sequence,
     Iterable,
@@ -20,19 +19,19 @@ from typing import (
     Callable,
 )
 
-# Filter warnings from shap
-# TODO: Possibly catch some of these and log them?
+# Filter warnings from attribution calculation
 warnings.filterwarnings(
     "ignore",
-    "Using a non-full backward hook when the forward contains multiple autograd Nodes "
-    "is deprecated and will be removed in future versions.",
+    """Setting forward, backward hooks and attributes on non-linear
+               activations. The hooks and attributes will be removed
+            after the attribution is finished""",
 )
 
 import numpy as np
 import torch
 from aislib.misc_utils import get_logger, ensure_path_exists
 from ignite.engine import Engine
-from shap import DeepExplainer
+from captum.attr import DeepLift, DeepLiftShap, IntegratedGradients
 from torch import nn
 from torch.utils.data import DataLoader, Subset
 from torch.utils.hooks import RemovableHandle
@@ -71,10 +70,10 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 # Type aliases
 # would be better to use Tuple here, but shap does literal type check for list, i.e.
 # if type(data) == list:
-al_model_inputs = List[Union[torch.Tensor, Union[torch.Tensor, None]]]
+al_explainers = Union[DeepLift, DeepLiftShap, IntegratedGradients]
 
 
-class WrapperModelForSHAP(nn.Module):
+class WrapperModelForAttribution(nn.Module):
     """
     We need this wrapper module because SHAP only handles torch.Tensor or
     List[torch.Tensor] inputs (literally checks for list). However, we do not want to
@@ -107,14 +106,17 @@ class WrapperModelForSHAP(nn.Module):
 
 
 @contextmanager
-def suppress_stdout() -> None:
+def suppress_stdout_and_stderr() -> None:
     with open(os.devnull, "w") as devnull:
         old_stdout = sys.stdout
         sys.stdout = devnull
+        old_stderr = sys.stderr
+        sys.stderr = devnull
         try:
             yield
         finally:
             sys.stdout = old_stdout
+            sys.stderr = old_stderr
 
 
 @validate_handler_dependencies([validation_handler])
@@ -197,7 +199,7 @@ def activation_analysis_wrapper(
 
     for output_name, target_column_type, target_column_name in target_columns_gen:
 
-        explainer, hook_handle = get_shap_object(
+        ao = get_attribution_object(
             experiment=exp,
             model=model_copy,
             column_name=target_column_name,
@@ -206,17 +208,17 @@ def activation_analysis_wrapper(
             n_background_samples=gc.act_background_samples,
         )
 
-        act_callable = get_shap_activation_callable(
-            explainer=explainer,
+        act_callable = get_attribution_callable(
+            explainer=ao.explainer,
             column_type=target_column_type,
-            act_samples_per_class_limit=gc.max_acts_per_class,
+            baseline_values=ao.baseline_values_ordered,
+            baseline_names_ordered=ao.input_names_ordered,
         )
 
-        input_names = explainer.explainer.model.input_names
         act_func = partial(
             get_activation,
             activation_callable=act_callable,
-            input_names=input_names,
+            input_names=ao.input_names_ordered,
         )
 
         data_producer = _get_interpretation_data_producer(
@@ -235,7 +237,8 @@ def activation_analysis_wrapper(
         )
 
         input_names_and_types = {
-            i: exp.inputs[i].input_config.input_info.input_type for i in input_names
+            i: exp.inputs[i].input_config.input_info.input_type
+            for i in ao.input_names_ordered
         }
         output_object = exp.outputs[output_name]
         target_transformer = output_object.target_transformers[target_column_name]
@@ -251,14 +254,14 @@ def activation_analysis_wrapper(
             activation_producer=act_producer, activation_consumers=act_consumers
         )
 
-        for input_name in input_names:
+        for input_name in ao.input_names_ordered:
             input_object = exp.inputs[input_name]
             input_type = input_object.input_config.input_info.input_type
 
             if input_type == "bytes":
                 continue
 
-            activation_outfolder = outfolder_target_callable(
+            act_output_folder = outfolder_target_callable(
                 column_name=target_column_name,
                 input_name=input_name,
                 output_name=output_name,
@@ -269,7 +272,7 @@ def activation_analysis_wrapper(
                 "target_column_name": target_column_name,
                 "target_column_type": target_column_type,
                 "all_activations": all_activations[input_name],
-                "activation_outfolder": activation_outfolder,
+                "activation_outfolder": act_output_folder,
             }
 
             if input_type == "omics":
@@ -281,9 +284,12 @@ def activation_analysis_wrapper(
                 )
 
             elif input_type == "sequence":
+                expected_value = compute_expected_value(
+                    model=model_copy, baselines=ao.baselines
+                )
                 analyze_sequence_input_activations(
                     **common_kwargs,
-                    expected_target_classes_shap_values=explainer.expected_value,
+                    expected_target_classes_shap_values=expected_value,
                     output_name=output_name
                 )
             elif input_type == "image":
@@ -291,25 +297,47 @@ def activation_analysis_wrapper(
                     **common_kwargs, output_name=output_name
                 )
 
-        hook_handle.remove()
+        ao.hook_handle.remove()
 
 
-def get_shap_object(
+def compute_expected_value(
+    model: nn.Module,
+    baselines: Dict[str, torch.Tensor],
+) -> np.ndarray:
+    outputs = model(baselines)
+    return outputs.mean(0).detach().cpu().numpy()
+
+
+@dataclass
+class AttributionObject:
+    explainer: al_explainers
+    hook_handle: RemovableHandle
+    input_names_ordered: tuple[str]
+    baselines: Dict[str, torch.Tensor]
+    baseline_values_ordered: tuple[torch.Tensor]
+
+
+def get_attribution_object(
     experiment: "Experiment",
     model: nn.Module,
     column_name: str,
     output_name: str,
     background_loader: DataLoader,
     n_background_samples: int,
-) -> Tuple[DeepExplainer, RemovableHandle]:
-    background, *_ = gather_data_loader_samples(
+) -> AttributionObject:
+    """
+    Note that currently we are always grabbing at least one batch of samples
+    from the background loader (even when n_background_samples=0).
+    """
+
+    baseline_data, *_ = gather_data_loader_samples(
         batch_prep_hook=experiment.hooks.step_func_hooks.base_prepare_batch,
         batch_prep_hook_kwargs={"experiment": experiment},
         data_loader=background_loader,
         n_samples=n_background_samples,
     )
 
-    background = _detach_all_inputs(tensor_inputs=background)
+    baseline_data = _detach_all_inputs(tensor_inputs=baseline_data)
 
     hook_partial = partial(
         _grab_single_target_from_model_output_hook,
@@ -319,14 +347,25 @@ def get_shap_object(
     hook_handle = model.register_forward_hook(hook_partial)
 
     # Convert to list for wrapper model
-    input_names, input_values = zip(*background.items())
-    input_names, input_values = list(input_names), list(input_values)
+    input_names, values_ordered = zip(*baseline_data.items())
+    input_names, values_ordered = tuple(input_names), tuple(values_ordered)
 
     assert not model.training
-    wrapped_model = WrapperModelForSHAP(wrapped_model=model, input_names=input_names)
-    explainer = DeepExplainer(model=wrapped_model, data=input_values)
+    wrapped_model = WrapperModelForAttribution(
+        wrapped_model=model,
+        input_names=input_names,
+    )
+    explainer = DeepLiftShap(wrapped_model)
 
-    return explainer, hook_handle
+    attribution_object = AttributionObject(
+        explainer=explainer,
+        hook_handle=hook_handle,
+        baselines=baseline_data,
+        input_names_ordered=input_names,
+        baseline_values_ordered=values_ordered,
+    )
+
+    return attribution_object
 
 
 class ActivationCallable(Protocol):
@@ -354,23 +393,22 @@ def get_activation(
     return name_matched_activation
 
 
-def get_shap_activation_callable(
-    explainer: DeepExplainer,
+def get_attribution_callable(
+    explainer: DeepLift,
     column_type: str,
-    act_samples_per_class_limit: Union[int, None],
+    baseline_values: tuple[torch.Tensor, ...],
+    baseline_names_ordered: tuple[str, ...],
 ) -> Callable[
-    [DeepExplainer, al_model_inputs, torch.Tensor, str], Union[None, np.ndarray]
+    [DeepLift, Dict[str, torch.Tensor], torch.Tensor, str],
+    Union[None, np.ndarray],
 ]:
-    assert column_type in ("cat", "con")
-    act_sample_func = get_shap_sample_acts_deep_correct_only
-
-    if act_samples_per_class_limit is not None:
-        act_sample_func = get_shap_sample_acts_deep_all_classes
 
     act_func_partial = partial(
-        act_sample_func,
+        get_attributions,
         explainer=explainer,
         column_type=column_type,
+        baselines=baseline_values,
+        baseline_names_ordered=baseline_names_ordered,
     )
     return act_func_partial
 
@@ -467,7 +505,7 @@ def get_sample_activation_producer(
     act_func: Callable,
     target_column_name: str,
     output_name: str,
-):
+) -> Generator["SampleActivation", None, None]:
     for batch, raw_inputs in data_producer:
         sample_target_labels = batch.target_labels
 
@@ -602,54 +640,37 @@ def _grab_single_target_from_model_output_hook(
     return output[output_name][output_target_column]
 
 
-def get_shap_sample_acts_deep_correct_only(
-    explainer: DeepExplainer,
-    inputs: al_model_inputs,
+def get_attributions(
+    explainer: DeepLift,
+    inputs: Dict[str, torch.Tensor],
     sample_label: torch.Tensor,
     column_type: str,
-) -> Union[np.ndarray, None]:
-    """
-    Note: We only get the grads for a correct prediction.
+    baselines: tuple[torch.Tensor, ...],
+    baseline_names_ordered: tuple[str, ...],
+) -> list[np.ndarray]:
 
-    Note: We need the [0] as ranked_outputs gives us a list of lists, where the inner
-          is containing all the modalities.
+    list_inputs = tuple(inputs[n] for n in baseline_names_ordered)
 
-    TODO: Add functionality to use ranked_outputs or all outputs.
-    """
-    with suppress_stdout():
-        explained_input_order = explainer.explainer.model.input_names
-        list_inputs = [inputs[n] for n in explained_input_order]
-        output = explainer.shap_values(list_inputs, ranked_outputs=1)
+    with suppress_stdout_and_stderr():
+        if column_type == "con":
+            output = explainer.attribute(
+                inputs=list_inputs,
+                baselines=baselines,
+            )
+        else:
+            output = explainer.attribute(
+                inputs=list_inputs,
+                baselines=baselines,
+                target=sample_label,
+            )
+
+    output = [o.detach().cpu().numpy() for o in output]
 
     if column_type == "con":
         assert isinstance(output[0], np.ndarray)
         return output
 
-    assert len(output) == 2
-    shap_grads, pred_label = output
-    if pred_label.item() == sample_label.item():
-        return shap_grads[0]
-
-    return None
-
-
-def get_shap_sample_acts_deep_all_classes(
-    explainer: DeepExplainer,
-    inputs: al_model_inputs,
-    sample_label: torch.Tensor,
-    column_type: str,
-) -> np.ndarray:
-    with suppress_stdout():
-        explained_input_order = explainer.explainer.model.input_names
-        list_inputs = [inputs[n] for n in explained_input_order]
-        output = explainer.shap_values(list_inputs)
-
-    if column_type == "con":
-        assert isinstance(output[0], np.ndarray)
-        return output
-
-    shap_grads = output[sample_label.item()]
-    return shap_grads
+    return output
 
 
 def _get_interpretation_data_producer(
