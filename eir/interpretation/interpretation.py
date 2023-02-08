@@ -68,8 +68,6 @@ if TYPE_CHECKING:
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 # Type aliases
-# would be better to use Tuple here, but shap does literal type check for list, i.e.
-# if type(data) == list:
 al_explainers = Union[DeepLift, DeepLiftShap, IntegratedGradients]
 
 
@@ -355,7 +353,7 @@ def get_attribution_object(
         wrapped_model=model,
         input_names=input_names,
     )
-    explainer = DeepLiftShap(wrapped_model)
+    explainer = IntegratedGradients(wrapped_model)
 
     attribution_object = AttributionObject(
         explainer=explainer,
@@ -394,12 +392,12 @@ def get_activation(
 
 
 def get_attribution_callable(
-    explainer: DeepLift,
+    explainer: al_explainers,
     column_type: str,
     baseline_values: tuple[torch.Tensor, ...],
     baseline_names_ordered: tuple[str, ...],
 ) -> Callable[
-    [DeepLift, Dict[str, torch.Tensor], torch.Tensor, str],
+    [al_explainers, Dict[str, torch.Tensor], torch.Tensor, str],
     Union[None, np.ndarray],
 ]:
 
@@ -641,7 +639,7 @@ def _grab_single_target_from_model_output_hook(
 
 
 def get_attributions(
-    explainer: DeepLift,
+    explainer: al_explainers,
     inputs: Dict[str, torch.Tensor],
     sample_label: torch.Tensor,
     column_type: str,
@@ -650,6 +648,7 @@ def get_attributions(
 ) -> list[np.ndarray]:
 
     list_inputs = tuple(inputs[n] for n in baseline_names_ordered)
+    baselines = tuple(i.mean(0).unsqueeze(0) for i in baselines)
 
     with suppress_stdout_and_stderr():
         if column_type == "con":
