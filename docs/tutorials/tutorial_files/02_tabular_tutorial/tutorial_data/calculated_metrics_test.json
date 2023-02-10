@@ -1,1 +1,1 @@
-{"poker_prediction": {"CLASS": {"poker_prediction_CLASS_mcc": 0.9803188713056994, "poker_prediction_CLASS_acc": 0.9888639888639889, "poker_prediction_CLASS_roc-auc-macro": 0.936612711643669, "poker_prediction_CLASS_ap-macro": 0.55202169932093}}}
+{"poker_prediction": {"CLASS": {"poker_prediction_CLASS_mcc": 0.9779737976121884, "poker_prediction_CLASS_acc": 0.9875449875449875, "poker_prediction_CLASS_roc-auc-macro": 0.9393450527858054, "poker_prediction_CLASS_ap-macro": 0.5814687783948818}}}

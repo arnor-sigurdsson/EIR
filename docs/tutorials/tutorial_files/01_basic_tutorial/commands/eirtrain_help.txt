@@ -1,10 +1,10 @@
-14:27:37 - DEBUG - eir.train_utils.utils - Global random seed set to 0.
+12:32:20 - DEBUG - eir.train_utils.utils - Global random seed set to 0.
 usage: eirtrain [-h] --global_configs GLOBAL_CONFIGS [GLOBAL_CONFIGS ...]
                 --input_configs INPUT_CONFIGS [INPUT_CONFIGS ...]
                 [--fusion_configs [FUSION_CONFIGS ...]] --output_configs
                 OUTPUT_CONFIGS [OUTPUT_CONFIGS ...]
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   --global_configs GLOBAL_CONFIGS [GLOBAL_CONFIGS ...]
                         Global .yaml configurations for the experiment.
