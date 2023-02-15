@@ -377,14 +377,12 @@ def plot_tabular_categorical_attributions(
     )
     ax.set_title(f"Attribution plot for {feature_name_to_plot}")
     ax.set_xlabel(feature_name_to_plot)
-    ax.set_ylabel("Attribution")
+    ax.set_ylabel("Attribution (impact on model output)")
 
     plt.tight_layout()
+    name = f"categorical_attributions_{feature_name_to_plot}_{class_name}.pdf"
     plt.savefig(
-        str(
-            activation_output_folder
-            / f"categorical_attributions_{feature_name_to_plot}_{class_name}.pdf"
-        ),
+        str(activation_output_folder / name),
         bbox_inches="tight",
     )
     plt.close(fig)
@@ -472,9 +470,11 @@ def plot_tabular_continuous_attribution(
         va="center",
         rotation="vertical",
     )
+
     plt.tight_layout()
+    name = f"continuous_attributions_{class_name}.pdf"
     plt.savefig(
-        str(activation_output_folder / f"continuous_attributions_{class_name}.pdf"),
+        str(activation_output_folder / name),
         bbox_inches="tight",
     )
     plt.close(fig)
