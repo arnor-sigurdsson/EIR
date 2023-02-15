@@ -73,11 +73,10 @@ al_explainers = Union[DeepLift, DeepLiftShap, IntegratedGradients]
 
 class WrapperModelForAttribution(nn.Module):
     """
-    We need this wrapper module because SHAP only handles torch.Tensor or
-    List[torch.Tensor] inputs (literally checks for list). However, we do not want to
-    restrict our modules to only accept those formats, rather using a dict. Hence
-    we use this module to accept the list SHAP expects, but call the wrapped model with
-    a matched dict.
+    We need this wrapper module because libraries often only handle torch.Tensor or
+    List[torch.Tensor] inputs. However, we do not want to restrict our modules to
+    only accept those formats, rather using a dict. Hence, we use this module to
+    accept the list libraries expect, but call the wrapped model with a matched dict.
     """
 
     def __init__(self, wrapped_model, input_names: Iterable[str], *args, **kwargs):
@@ -287,7 +286,7 @@ def activation_analysis_wrapper(
                 )
                 analyze_sequence_input_activations(
                     **common_kwargs,
-                    expected_target_classes_shap_values=expected_value,
+                    expected_target_classes_attributions=expected_value,
                     output_name=output_name
                 )
             elif input_type == "image":

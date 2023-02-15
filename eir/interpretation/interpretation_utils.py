@@ -57,10 +57,13 @@ def plot_activations_bar(
     df_activations: pd.DataFrame, outpath: Path, top_n: int = 20, title: str = ""
 ) -> None:
 
-    df_activations_sorted = df_activations.sort_values(by="Shap_Value", ascending=False)
+    df_activations_sorted = df_activations.sort_values(
+        by="Attribution",
+        ascending=False,
+    )
     df_activations_filtered = df_activations_sorted.head(n=top_n)
     df_activations_renamed = df_activations_filtered.rename(
-        mapper={"Shap_Value": "Influence"}, axis=1
+        mapper={"Attribution": "Influence"}, axis=1
     )
 
     ax: plt.Axes = sns.barplot(

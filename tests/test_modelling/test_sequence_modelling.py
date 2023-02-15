@@ -428,7 +428,7 @@ def _check_sequence_activations(
     must_match_n: int,
     fail_fast: bool = True,
 ) -> bool:
-    df_activations = df_activations.sort_values(by="Shap_Value", ascending=False)
+    df_activations = df_activations.sort_values(by="Attribution", ascending=False)
     df_top_n_rows = df_activations.head(top_n_activations)
     top_tokens = df_top_n_rows["Token"]
 

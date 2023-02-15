@@ -3,9 +3,9 @@ from typing import TYPE_CHECKING, Sequence
 
 import matplotlib.pyplot as plt
 import numpy as np
-import shap
 import torch
 from aislib.misc_utils import ensure_path_exists
+from captum.attr._utils.visualization import visualize_image_attr
 from torchvision.transforms import Normalize
 
 from eir.interpretation.interpretation_utils import (
@@ -52,21 +52,21 @@ def analyze_image_input_activations(
             target_column_name=target_column_name,
         )
 
-        shap_values = sample_activation.sample_activations[input_name].squeeze()
+        attributions = sample_activation.sample_activations[input_name].squeeze()
         raw_input = sample_activation.raw_inputs[input_name].cpu().numpy().squeeze()
-        shap_values = shap_values.transpose(1, 2, 0)
+        attributions = attributions.transpose(1, 2, 0)
         raw_input = unnormalize(
             normalized_img=raw_input,
             normalization_stats=input_object.normalization_stats,
         )
         raw_input = raw_input.transpose(1, 2, 0)
 
-        shap.image_plot(
-            shap_values=shap_values,
-            pixel_values=raw_input,
-            show=False,
+        figure, _ = visualize_image_attr(
+            attr=attributions,
+            original_image=raw_input,
+            method="blended_heat_map",
+            sign="absolute_value",
         )
-        cur_figure = plt.gcf()
 
         outpath = (
             activation_outfolder
@@ -74,7 +74,7 @@ def analyze_image_input_activations(
             / f"image_{sample_activation.sample_info.ids[0]}_{cur_label_name}.pdf"
         )
         ensure_path_exists(path=outpath)
-        cur_figure.savefig(outpath, dpi=300)
+        figure.savefig(outpath, dpi=300)
         plt.close("all")
 
 
@@ -82,7 +82,7 @@ def unnormalize(
     normalized_img: np.ndarray, normalization_stats: "ImageNormalizationStats"
 ):
     """
-    Clip because sometimes we get values like 1.0000001 which will cause shap.image
+    Clip because sometimes we get values like 1.0000001 which will cause some libraries
     to do =/ 255, resulting in a black image.
     """
     means = torch.Tensor(normalization_stats.channel_means)

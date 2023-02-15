@@ -142,4 +142,3 @@ def get_experiments() -> Sequence[AutoDocExperimentInfo]:
     exp_2 = get_02_poker_hands_run_1_predict_info()
 
     return [exp_1, exp_2]
-

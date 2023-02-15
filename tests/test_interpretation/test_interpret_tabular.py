@@ -23,7 +23,7 @@ def generate_test_sample_activation(
     id_: int, tensor_elements: List[float]
 ) -> SampleActivation:
     """
-    We enforce two dimensions here, because that's the output dimension of SHAP.
+    We enforce two dimensions here, because that's the output dimension of attributions.
     """
     mock_batch = Batch(
         inputs={"test_input": torch.tensor(0)},
@@ -55,13 +55,13 @@ def generate_test_sample_activation(
     ),
 )
 @settings(deadline=500)
-def test_gather_continuous_shap_values(num_samples, activation_inputs):
+def test_gather_continuous_attributions(num_samples, activation_inputs):
     test_sequence = generate_test_activation_sequence(
         n=num_samples, tensor_elements=activation_inputs
     )
     cat_to_con_cutoff = min(0, len(activation_inputs) // 2)
 
-    gathered_values = it._gather_continuous_shap_values(
+    gathered_values = it._gather_continuous_attributions(
         all_activations=test_sequence,
         cat_to_con_cutoff=cat_to_con_cutoff,
         input_name="test_activations",
@@ -79,7 +79,7 @@ def test_gather_continuous_shap_values(num_samples, activation_inputs):
     ),
 )
 @settings(deadline=500)
-def test_gather_categorical_shap_values(num_samples, activation_inputs):
+def test_gather_categorical_attributions(num_samples, activation_inputs):
     """
     Note: We check for shape[1] == 1 here as we always sum up the categorical slices.
     """
@@ -90,7 +90,7 @@ def test_gather_categorical_shap_values(num_samples, activation_inputs):
     test_slice_end = len(activation_inputs)
     test_slice = slice(test_slice_start, test_slice_end)
 
-    gathered_values = it._gather_categorical_shap_values(
+    gathered_values = it._gather_categorical_attributions(
         all_activations=test_sequence,
         cur_slice=test_slice,
         input_name="test_activations",
