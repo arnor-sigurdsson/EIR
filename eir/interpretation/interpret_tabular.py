@@ -441,7 +441,12 @@ def plot_tabular_continuous_attribution(
     num_plots = len(top_n_features)
     num_cols = min(num_plots, 4)
     num_rows = (num_plots + num_cols - 1) // num_cols
-    fig, axes = plt.subplots(num_rows, num_cols, figsize=(4 * num_cols, 4 * num_rows))
+    fig, axes = plt.subplots(
+        nrows=num_rows,
+        ncols=num_cols,
+        figsize=(4 * num_cols, 4 * num_rows),
+        squeeze=False,
+    )
 
     for i, feature_index in enumerate(top_n_features):
         row_index = i // num_cols
