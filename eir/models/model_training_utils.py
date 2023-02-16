@@ -11,10 +11,10 @@ from typing import (
     Sequence,
 )
 
-import plotly.express as px
 import torch
 from aislib.misc_utils import get_logger
 from aislib.pytorch_modules import Swish
+import matplotlib.pyplot as plt
 from ignite.engine import Engine
 from ignite.handlers.lr_finder import FastaiLRFinder
 from torch import nn
@@ -362,7 +362,7 @@ def run_lr_find(
     plot_lr_find_results(
         lr_find_results=lr_range_results_parsed,
         lr_suggestion=lr_suggestion_parsed,
-        outfolder=output_folder,
+        output_folder=output_folder,
     )
 
 
@@ -437,34 +437,19 @@ def _parse_out_lr_find_multiple_param_groups_suggestion(
 def plot_lr_find_results(
     lr_find_results: al_lr_find_results,
     lr_suggestion: float,
-    outfolder: Path,
+    output_folder: Path,
 ):
     lr_values = copy(lr_find_results["lr"])
     loss_values = copy(lr_find_results["loss"])
 
-    fig = px.line(
-        x=lr_values,
-        y=loss_values,
-        log_x=True,
-        title="Learning Rate Search",
-    )
-    fig.update_layout(
-        xaxis_title="Learning Rate ",
-        yaxis_title="Loss",
-    )
+    plt.plot(lr_values, loss_values)
+    plt.xscale("log")
+    plt.title("Learning Rate Search")
+    plt.xlabel("Learning Rate")
+    plt.ylabel("Loss")
+    plt.axvline(x=lr_suggestion, color="red", linewidth=1)
 
-    fig.add_shape(
-        dict(
-            type="line",
-            x0=lr_suggestion,
-            y0=0,
-            x1=lr_suggestion,
-            y1=max(loss_values),
-            line=dict(color="Red", width=1),
-        )
-    )
-
-    fig.write_html(str(outfolder / "lr_search.html"))
+    plt.savefig(str(output_folder / "lr_search.pdf"))
 
 
 def trace_eir_model(
