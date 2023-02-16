@@ -45,8 +45,7 @@ if TYPE_CHECKING:
             "injections": {
                 "global_configs": {
                     "output_folder": "multi_task_multi_modal",
-                    "n_epochs": 8,
-                    "act_background_samples": 8,
+                    "n_epochs": 10,
                     "gradient_clipping": 1.0,
                     "lr": 0.001,
                     "gradient_noise": 0.01,
