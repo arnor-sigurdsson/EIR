@@ -28,7 +28,7 @@ def analyze_image_input_activations(
     target_column_name: str,
     output_name: str,
     target_column_type: str,
-    activation_output_folder: Path,
+    activation_outfolder: Path,
     all_activations: Sequence["SampleActivation"],
 ) -> None:
     exp = experiment
@@ -73,7 +73,7 @@ def analyze_image_input_activations(
         )
 
         name = f"image_{sample_activation.sample_info.ids[0]}_{cur_label_name}.pdf"
-        outpath = activation_output_folder / "single_samples" / name
+        outpath = activation_outfolder / "single_samples" / name
         ensure_path_exists(path=outpath)
         figure.savefig(outpath, dpi=300)
         plt.close("all")
