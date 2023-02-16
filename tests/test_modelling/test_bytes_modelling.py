@@ -29,7 +29,7 @@ seed_everything(seed=0)
                     "n_epochs": 12,
                     "memory_dataset": True,
                     "mixing_alpha": 0.1,
-                    "act_background_samples": 8,
+                    "act_background_samples": 256,
                 },
                 "input_configs": [
                     {
@@ -78,7 +78,6 @@ def test_bytes_modelling(prep_modelling_test_configs):
 
 
 def get_bytes_test_args(mixing: float) -> Tuple[float, float]:
-
     thresholds = (0.7, 0.6)
     if mixing:
         thresholds = (0.0, 0.6)

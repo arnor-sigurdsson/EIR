@@ -139,7 +139,6 @@ def set_up_inputs_for_training(
     valid_ids: Sequence[str],
     hooks: Union["Hooks", None],
 ) -> al_input_objects_as_dict:
-
     train_input_setup_kwargs = {
         "train_ids": train_ids,
         "valid_ids": valid_ids,
@@ -155,7 +154,6 @@ def set_up_inputs_for_training(
 
 
 def get_input_name_config_iterator(input_configs: schemas.al_input_configs):
-
     for input_config in input_configs:
         cur_input_data_config = input_config.input_info
         cur_name = cur_input_data_config.input_name
@@ -165,7 +163,6 @@ def get_input_name_config_iterator(input_configs: schemas.al_input_configs):
 def get_input_setup_function_for_train(
     input_config: schemas.InputConfig,
 ) -> Callable[..., al_input_objects]:
-
     input_type = input_config.input_info.input_type
     pretrained_config = input_config.pretrained_config
 
@@ -203,7 +200,6 @@ def set_up_tabular_input_from_pretrained(
     valid_ids: Sequence[str],
     hooks: Union["Hooks", None],
 ) -> "TabularInputInfo":
-
     tabular_input_object = set_up_tabular_input_for_training(
         input_config=input_config, train_ids=train_ids, valid_ids=valid_ids, hooks=hooks
     )
@@ -263,7 +259,6 @@ class BytesInputInfo:
 def set_up_bytes_input_for_training(
     input_config: schemas.InputConfig, add_specials: bool = True, *args, **kwargs
 ) -> BytesInputInfo:
-
     specials = tuple()
     if add_specials:
         specials = _get_default_specials()
@@ -367,7 +362,6 @@ def set_up_image_input_for_training(
 
 
 def infer_num_channels(data_source: str, deeplake_inner_key: str) -> int:
-
     if is_deeplake_dataset(data_source=data_source):
         deeplake_ds = load_deeplake_dataset(data_source=data_source)
         deeplake_iter = get_deeplake_input_source_iterable(
@@ -532,7 +526,6 @@ class SequenceInputInfo:
 def set_up_sequence_input_for_training(
     input_config: schemas.InputConfig, *args, **kwargs
 ) -> SequenceInputInfo:
-
     sequence_input_object_func = _get_sequence_input_object_func(
         pretrained=input_config.model_config.pretrained_model
     )
@@ -629,7 +622,6 @@ def get_sequence_input_objects_from_input(
 def get_tokenizer(
     input_config: schemas.InputConfig,
 ) -> Callable[[Sequence[str]], Sequence[str]]:
-
     tokenizer_name = input_config.input_type_info.tokenizer
 
     if tokenizer_name == "bpe":
@@ -739,7 +731,6 @@ def _add_specials_to_hf_tokenizer(
 
 
 def get_bpe_tokenizer(vocab_iterator: Optional[Iterator], vocab_file: Optional[str]):
-
     tokenizer = _get_bpe_tokenizer_object(
         vocab_iterator=vocab_iterator, vocab_file=vocab_file
     )
@@ -782,7 +773,6 @@ def get_basic_tokenizer(
     tokenizer_name: al_tokenizer_choices,
     tokenizer_language: Optional[str],
 ) -> Callable[[Sequence[str]], Sequence[str]]:
-
     if not tokenizer_name:
         return lambda x: x
 
@@ -852,7 +842,6 @@ def get_vocab_iterator(
     vocab_file: Union[str, None] = None,
     deeplake_inner_key: Optional[str] = None,
 ) -> Generator[Sequence[str], None, None]:
-
     if vocab_file is None:
         logger.info(
             "Vocabulary will be collected from input source %s, "
@@ -885,7 +874,6 @@ def yield_tokens_from_source(
     gathered_stats: GatheredSequenceStats,
     deeplake_inner_key: Optional[str] = None,
 ):
-
     data_source_path = Path(data_source)
 
     if is_deeplake_dataset(data_source=str(data_source_path)):
@@ -962,7 +950,6 @@ def yield_tokens_from_file(
 def yield_tokens_from_csv(
     file_path: str, split_on: str, gathered_stats: GatheredSequenceStats
 ) -> Generator[Sequence[str], None, None]:
-
     split_func = get_sequence_split_function(split_on=split_on)
 
     df = pd.read_csv(filepath_or_buffer=file_path, index_col="ID", dtype={"ID": str})
@@ -1106,7 +1093,6 @@ def get_tabular_input_file_info(
     input_source: str,
     tabular_data_type_config: schemas.TabularInputDataConfig,
 ) -> TabularFileInfo:
-
     table_info = TabularFileInfo(
         file_path=Path(input_source),
         con_columns=tabular_data_type_config.input_con_columns,
@@ -1142,7 +1128,6 @@ class OmicsInputInfo:
 def set_up_omics_input(
     input_config: schemas.InputConfig, *args, **kwargs
 ) -> OmicsInputInfo:
-
     data_dimensions = get_data_dimension_from_data_source(
         data_source=Path(input_config.input_info.input_source),
         deeplake_inner_key=input_config.input_info.input_inner_key,

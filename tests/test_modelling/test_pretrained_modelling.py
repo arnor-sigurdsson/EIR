@@ -22,7 +22,7 @@ def _get_pre_trained_module_setup_parametrization() -> Dict:
             "global_configs": {
                 "output_folder": "multi_task_multi_modal",
                 "n_epochs": 1,
-                "act_background_samples": 8,
+                "act_background_samples": 256,
                 "sample_interval": 50,
                 "checkpoint_interval": 50,
                 "n_saved_models": 2,
@@ -187,7 +187,7 @@ def _add_new_feature_extractor_to_experiment(
                 "global_configs": {
                     "output_folder": "multi_task_multi_modal",
                     "n_epochs": 3,
-                    "act_background_samples": 8,
+                    "act_background_samples": 256,
                     "sample_interval": 50,
                     "checkpoint_interval": 50,
                     "n_saved_models": 2,
@@ -301,7 +301,6 @@ def _get_experiment_overloaded_for_pretrained_extractor(
     rename_pretrained_inputs: bool,
     skip_pretrained_keys: Sequence[str] = tuple(),
 ) -> Tuple[train.Experiment, "ModelTestConfig"]:
-
     input_configs = deepcopy(experiment.configs.input_configs)
     pretrained_configs = deepcopy(experiment.configs)
     saved_model_path = next((test_config.run_path / "saved_models").iterdir())

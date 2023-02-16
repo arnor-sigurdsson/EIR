@@ -103,7 +103,6 @@ class TabularOutputModule(nn.Module):
         )
 
     def forward(self, inputs: torch.Tensor) -> Dict[str, torch.Tensor]:
-
         output_modules_out = calculate_module_dict_outputs(
             input_=inputs, module_dict=self.multi_task_branches
         )
@@ -112,7 +111,6 @@ class TabularOutputModule(nn.Module):
 
 
 def get_linear_final_act_spec(in_features: int, dropout_p: float):
-
     spec = OrderedDict(
         {
             "norm_final": (nn.LayerNorm, {"normalized_shape": in_features}),
@@ -131,7 +129,6 @@ def get_default_tabular_output_final_layers(
     task_names: Union[None, Sequence[str]],
     final_layer_type: Union[Literal["linear"], Literal["mlp_residual"]],
 ) -> Sequence[nn.Module]:
-
     final_layers = []
     if final_layer_type == "linear":
         if task_names is None:

@@ -17,7 +17,6 @@ logger = get_logger(name=__name__)
 def maybe_initialize_distributed_environment(
     configs: "Configs",
 ) -> Tuple["Configs", Union[int, None]]:
-
     is_distributed_run = in_distributed_env()
     if is_distributed_run:
         logger.info(
@@ -40,7 +39,6 @@ def maybe_initialize_distributed_environment(
 
 
 def maybe_make_model_distributed(device: str, model: "al_fusion_models"):
-
     if not in_distributed_env():
         return model
 
@@ -80,7 +78,6 @@ def in_master_node() -> bool:
 def only_call_on_master_node(func: Callable):
     @wraps(func)
     def wrapper(*args, **kwargs) -> Any:
-
         if in_master_node():
             result = func(*args, **kwargs)
             return result

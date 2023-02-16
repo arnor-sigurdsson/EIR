@@ -326,7 +326,6 @@ class SplitLinear(nn.Module):
 
 
 def _find_split_padding_needed(input_size: int, split_size: int, num_chunks: int):
-
     return num_chunks * split_size - input_size
 
 

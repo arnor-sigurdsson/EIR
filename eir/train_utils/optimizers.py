@@ -25,7 +25,6 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 def get_optimizer(
     model: nn.Module, loss_callable: Callable, global_config: "GlobalConfig"
 ) -> Optimizer:
-
     all_params = _get_all_params_to_optimize(
         model=model, weight_decay=global_config.wd, loss_callable=loss_callable
     )
@@ -65,7 +64,6 @@ def _get_external_optimizers(optimizer_name: str) -> Type[Optimizer]:
 
 
 def _get_optimizer_class(optimizer_name: str) -> Type[Optimizer]:
-
     optimizer_getter = _create_optimizer_class_getter(optimizer_name=optimizer_name)
     optimizer_class = optimizer_getter[optimizer_name]
     return optimizer_class

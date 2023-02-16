@@ -99,7 +99,6 @@ def split_test_file_folder(
     train_ids: Union[Sequence[str], None] = None,
     test_ids: Union[Sequence[str], None] = None,
 ) -> Tuple[Sequence[Path], Sequence[Path]]:
-
     all_arrays = [i for i in test_folder.iterdir()]
     shuffle(all_arrays)
 

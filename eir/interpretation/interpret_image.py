@@ -28,7 +28,6 @@ def analyze_image_input_activations(
     activation_outfolder: Path,
     all_activations: Sequence["SampleActivation"],
 ) -> None:
-
     exp = experiment
 
     output_object = exp.outputs[output_name]
@@ -42,7 +41,6 @@ def analyze_image_input_activations(
     )
 
     for sample_activation in samples_to_act_analyze_gen:
-
         sample_target_labels = sample_activation.sample_info.target_labels
 
         cur_label_name = get_target_class_name(

@@ -49,7 +49,6 @@ def analyze_sequence_input_activations(
     all_activations: Sequence["SampleActivation"],
     expected_target_classes_attributions: Sequence[float],
 ) -> None:
-
     exp = experiment
 
     output_object = exp.outputs[output_name]
@@ -65,7 +64,6 @@ def analyze_sequence_input_activations(
     viz_records = []
 
     for sample_activation in samples_to_act_analyze_gen:
-
         sample_target_labels = sample_activation.sample_info.target_labels
 
         cur_label_name = get_target_class_name(
@@ -163,7 +161,6 @@ def extract_sample_info_for_sequence_activation(
     vocab: Vocab,
     expected_target_classes_attributions: Sequence[float],
 ) -> SequenceActivationSampleInfo:
-
     attributions = sample_activation_object.sample_activations[input_name]
 
     sample_tokens = sample_activation_object.raw_inputs[input_name]
@@ -199,7 +196,6 @@ def _parse_out_sequence_expected_value(
     expected_values: Sequence[float],
     target_column_type: str,
 ) -> float:
-
     if target_column_type == "con":
         assert len(expected_values) == 1
         return expected_values[0]
@@ -251,7 +247,6 @@ def truncate_sequence_activation_to_padding(
 def _truncate_attributions_and_raw_inputs(
     attributions: np.ndarray, raw_inputs: Sequence[str], truncate_start_idx: int
 ) -> Tuple[np.ndarray, Sequence[str]]:
-
     attrs_copy = copy(attributions)
     raw_inputs_copy = copy(raw_inputs)
 
@@ -264,7 +259,6 @@ def _truncate_attributions_and_raw_inputs(
 
 
 def save_html(out_path: Path, html_string: str) -> None:
-
     with open(out_path, "w", encoding="utf-8") as outfile:
         outfile.write(html_string)
 
@@ -272,7 +266,6 @@ def save_html(out_path: Path, html_string: str) -> None:
 def get_label_transformer_mapping(
     transformer, order: Literal["int-to-string", "string-to-int"]
 ) -> dict:
-
     values = transformer.classes_, transformer.transform(transformer.classes_)
     if order == "int-to-string":
         values = transformer.transform(transformer.classes_), transformer.classes_
@@ -285,7 +278,6 @@ def get_label_transformer_mapping(
 def get_sequence_token_importance(
     activations: Sequence["SampleActivation"], vocab: Vocab, input_name: str
 ) -> Dict[str, float]:
-
     token_importances = defaultdict(lambda: 0.0)
     token_counts = defaultdict(lambda: 0)
 
@@ -326,7 +318,6 @@ def get_sequence_feature_importance_df(
 def get_sequence_html(
     data_records: Iterable[SequenceVisualizationDataRecord], legend: bool = True
 ) -> str:
-
     dom = [
         "<table width: 100%; border: 2px solid black; border-collapse: collapse;>",
         '<table class="table" style="text-align: center;">',

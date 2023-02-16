@@ -102,7 +102,6 @@ class TransformerWrapperModel(nn.Module):
         embeddings: nn.Embedding = None,
         pre_computed_num_out_features: int = 0,
     ) -> None:
-
         super().__init__()
         self.model_config = model_config
         self.embedding_dim = embedding_dim
@@ -147,7 +146,6 @@ class TransformerWrapperModel(nn.Module):
 
     @property
     def num_out_features(self) -> int:
-
         if self.pre_computed_num_out_features:
             return self.pre_computed_num_out_features
 
@@ -155,7 +153,6 @@ class TransformerWrapperModel(nn.Module):
         length_with_padding = self.max_length + padding
 
         if self.model_config.pool in ("avg", "max"):
-
             num_chunks = 1
             if self.model_config.window_size:
                 num_chunks = length_with_padding // self.model_config.window_size
@@ -182,7 +179,6 @@ class TransformerWrapperModel(nn.Module):
 def get_embedding_dim_for_sequence_model(
     embedding_dim: Union[None, int], num_tokens: int, num_heads: int
 ) -> int:
-
     if embedding_dim is None:
         auto_emb_dim = math.ceil((int(num_tokens**0.25) / num_heads)) * num_heads
         logger.info(
@@ -206,7 +202,6 @@ def _get_transformer_wrapper_feature_extractor(
     device: str,
     pool: Union[Literal["avg"], Literal["max"], None] = None,
 ) -> Tuple[Dict[str, int], Callable[[torch.Tensor], torch.Tensor]]:
-
     dynamic_extras = {"padding": 0}
 
     feature_extractor_forward = _get_feature_extractor_forward(
@@ -280,7 +275,6 @@ def _get_simple_transformer_forward(
         input: torch.Tensor,
         feature_extractor: "TransformerFeatureExtractor",
     ) -> torch.Tensor:
-
         tensor_out = feature_extractor(input)
         tensor_pooled = pooling_func(input=tensor_out)
         final_out = tensor_pooled.flatten(1)
@@ -297,7 +291,6 @@ def get_hf_transformer_forward(
     device: str,
     pool: Union[Literal["avg"], Literal["max"], None] = None,
 ):
-
     forward_argnames = inspect.getfullargspec(feature_extractor_.forward)[0]
 
     bound_kwargs = _build_transformer_forward_kwargs(
@@ -376,7 +369,6 @@ def _conv_transfomer_forward(
     window_size: int,
     padding: int,
 ) -> torch.Tensor:
-
     out = pad(input=input, pad=[0, 0, padding, 0])
     total_length = max_length + padding
 
@@ -546,7 +538,6 @@ class PositionalEncoding(nn.Module):
         max_length: int,
         dropout: float = 0.1,
     ) -> None:
-
         super().__init__()
         self.dropout = nn.Dropout(p=dropout)
         self.max_length = max_length
@@ -573,7 +564,6 @@ class PositionalEmbedding(nn.Module):
         dropout: float = 0.1,
         zero_init: bool = False,
     ) -> None:
-
         super().__init__()
         self.dropout = nn.Dropout(p=dropout)
         self.max_length = max_length

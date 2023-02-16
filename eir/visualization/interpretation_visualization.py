@@ -84,7 +84,6 @@ def plot_top_gradients(
         cur_snp_matrix = generate_snp_gradient_matrix(df_snps, cls_top_idxs)
 
         for cls_idx, row_name in enumerate(classes):
-
             cur_grads = gathered_scaled_grads[col_name][row_name]
 
             cur_ax = plt.subplot(gs[cls_idx, grad_idx])
@@ -132,7 +131,6 @@ def plot_top_gradients(
 def plot_snp_manhattan_plots(
     df_snp_grads: pd.DataFrame, outfolder: Path, title_extra: str = ""
 ):
-
     df_snp_grads_copy = df_snp_grads.copy()
 
     activations_columns = [

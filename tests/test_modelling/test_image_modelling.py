@@ -29,7 +29,7 @@ seed_everything(seed=0)
                     "n_epochs": 6,
                     "memory_dataset": True,
                     "get_acts": True,
-                    "act_background_samples": 8,
+                    "act_background_samples": 256,
                     "mixing_alpha": 1.0,
                 },
                 "input_configs": [
@@ -59,7 +59,7 @@ seed_everything(seed=0)
                     "n_epochs": 6,
                     "memory_dataset": True,
                     "get_acts": True,
-                    "act_background_samples": 8,
+                    "act_background_samples": 256,
                     "mixing_alpha": 0.0,
                     "lr": 1e-03,
                     "wd": 0.0,
@@ -105,7 +105,6 @@ def test_image_modelling(prep_modelling_test_configs):
 
 
 def get_image_test_args(mixing: float) -> Tuple[float, float]:
-
     thresholds = (0.7, 0.6)
     if mixing:
         thresholds = (0.0, 0.6)

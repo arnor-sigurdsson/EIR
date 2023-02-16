@@ -44,7 +44,6 @@ def get_deeplake_input_source_iterable(
         return x.shape[0] == 0
 
     for deeplake_sample in deeplake_dataset[inner_key]:
-
         if _is_empty(x=deeplake_sample):
             continue
 
@@ -84,7 +83,6 @@ def add_deeplake_data_to_samples(
         pbar = tqdm(total=len(ids_to_keep), desc=input_name)
 
     for deeplake_sample in deeplake_ds:
-
         cur_input_from_sample = deeplake_sample[deeplake_input_inner_key]
         if _is_empty(x=cur_input_from_sample):
             continue

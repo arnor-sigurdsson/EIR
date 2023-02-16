@@ -38,7 +38,6 @@ def create_dummy_test_optimizer(request):
     optimizer_type = request.param["optimizer_type"]
 
     if optimizer_type == "Adam":
-
         b2 = 0.999
         if "b2" in request.param:
             b2 = request.param["b2"]
@@ -403,12 +402,10 @@ def test_step_reduce_on_plateau_scheduler(
     create_dummy_val_history_file,
 ):
     def step_func(mock_return_value):
-
         # NOTE: A bit hacky, but lr_scheduling is getting it's dataframe by calling
         # a function in metrics.py, that's why we need to mock that
         patch_target = "eir.train_utils.metrics.pd.Series.iloc"
         with patch(target=patch_target, autospec=True) as m:
-
             # What we really are mocking is the __getitem__ called last in
             # validation_df["perf-average"].iloc[-1], but we cannot mock it directly
             m.__getitem__.return_value = mock_return_value

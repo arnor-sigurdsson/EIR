@@ -58,7 +58,6 @@ class MyLSTMFusionModule(nn.Module):
 
 
 def modify_experiment(experiment: train.Experiment) -> train.Experiment:
-
     my_experiment_attributes = experiment.__dict__
 
     input_modules = experiment.model.input_modules

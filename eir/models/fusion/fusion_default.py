@@ -61,7 +61,6 @@ class FusionModule(nn.Module):
         return self.model_config.fc_task_dim
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> torch.Tensor:
-
         fused_features = self.fusion_callable(inputs)
         out = calculate_module_dict_outputs(
             input_=fused_features, module_dict=self.fusion_modules

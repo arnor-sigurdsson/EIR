@@ -106,7 +106,6 @@ def get_07_multimodal_run_1_tabular_info() -> AutoDocExperimentInfo:
 
 
 def _show_tabular_csv_example(input_path: Path, output_path: Path) -> None:
-
     df = pd.read_csv(input_path, nrows=1).T
 
     html = df.to_html(index=True, header=False)
@@ -115,7 +114,6 @@ def _show_tabular_csv_example(input_path: Path, output_path: Path) -> None:
 
 
 def _show_text_description_example(input_path: Path, output_path: Path) -> None:
-
     description_text = pd.read_csv(input_path, nrows=1)["Sequence"].values[0]
 
     with open(output_path, "w") as f:
@@ -123,7 +121,6 @@ def _show_text_description_example(input_path: Path, output_path: Path) -> None:
 
 
 def _show_image_example(input_path: Path, output_path: Path) -> None:
-
     example_file = next(input_path.iterdir())
 
     with open(example_file, "rb") as f:

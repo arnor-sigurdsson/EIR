@@ -18,7 +18,6 @@ from eir.setup.config import object_to_primitives
 
 
 def test_get_named_pred_dict_iterators(tmp_path: Path) -> None:
-
     keys = {"global_configs", "input_configs", "fusion_configs", "output_configs"}
     paths = {}
 
@@ -231,7 +230,6 @@ def _overload_test_yaml_object_for_predict(
 def test_overload_train_configs_for_predict(
     create_test_config: config.Configs, tmp_path: Path
 ) -> None:
-
     test_configs = create_test_config
 
     test_predict_cl_args = setup_test_namespace_for_matched_config_test(

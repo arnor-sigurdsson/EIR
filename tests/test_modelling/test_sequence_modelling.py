@@ -163,7 +163,7 @@ def test_sequence_modelling(prep_modelling_test_configs):
                     "memory_dataset": True,
                     "output_folder": "test_multi_task",
                     "gradient_noise": 0.001,
-                    "act_background_samples": 64,
+                    "act_background_samples": 256,
                 },
                 "input_configs": [
                     {
@@ -191,7 +191,7 @@ def test_sequence_modelling(prep_modelling_test_configs):
                     "memory_dataset": True,
                     "output_folder": "test_multi_task_with_mixing",
                     "mixing_alpha": 0.5,
-                    "act_background_samples": 64,
+                    "act_background_samples": 256,
                 },
                 "input_configs": [
                     {
@@ -218,7 +218,7 @@ def test_sequence_modelling(prep_modelling_test_configs):
                     "memory_dataset": True,
                     "output_folder": "test_albert",
                     "mixing_alpha": 0.0,
-                    "act_background_samples": 64,
+                    "act_background_samples": 256,
                 },
                 "input_configs": [
                     {
@@ -328,7 +328,6 @@ def _sequence_test_check_wrapper(experiment, test_config):
         con_targets = output_config.output_type_info.target_con_columns
 
         for target_name in cat_targets:
-
             activation_paths = test_config.activations_paths[output_name][target_name]
             target_transformer = experiment.outputs[output_name].target_transformers[
                 target_name
@@ -357,7 +356,6 @@ def _sequence_test_check_wrapper(experiment, test_config):
 
 
 def get_sequence_test_args(mixing: float) -> Tuple[float, float]:
-
     thresholds = (0.8, 0.7)
     if mixing:
         thresholds = (0.0, 0.7)
@@ -399,7 +397,6 @@ def _check_sequence_activations_wrapper(
         targets_acts_success.append(success)
 
     if multi_class:
-
         must_n_successes = len(target_classes) - 1
         if strict:
             must_n_successes = len(target_classes)
@@ -446,7 +443,6 @@ def _check_sequence_activations(
     get_all_hf_model_names(),
 )
 def test_external_nlp_feature_extractor_forward(model_name: str):
-
     model_config = _get_common_model_config_overload()
     model_config_parsed = _parse_model_specific_config_values(
         model_config=model_config, model_name=model_name

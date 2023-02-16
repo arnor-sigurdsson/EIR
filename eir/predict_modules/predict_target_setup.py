@@ -33,14 +33,12 @@ def get_target_labels_for_predict(
     custom_column_label_parsing_ops: al_all_column_ops,
     ids: Sequence[str],
 ) -> PredictTargetLabels:
-
     df_labels_test = pd.DataFrame(index=ids)
     label_transformers = {}
     con_columns = []
     cat_columns = []
 
     for output_name, tabular_info in tabular_file_infos.items():
-
         all_columns = list(tabular_info.cat_columns) + list(tabular_info.con_columns)
         if not all_columns:
             raise ValueError(f"No columns specified in {tabular_file_infos}.")
@@ -85,7 +83,6 @@ def _load_labels_for_predict(
     ids_to_keep: Sequence[str],
     custom_label_ops: al_all_column_ops = None,
 ) -> pd.DataFrame:
-
     parse_wrapper = label_setup.get_label_parsing_wrapper(
         label_parsing_chunk_size=tabular_info.parsing_chunk_size
     )
@@ -104,7 +101,6 @@ def parse_labels_for_predict(
     df_labels_test: pd.DataFrame,
     label_transformers: Dict[str, al_label_transformers],
 ) -> al_label_dict:
-
     con_transformers = {k: v for k, v in label_transformers.items() if k in con_columns}
     train_con_column_means = prep_missing_con_dict(con_transformers=con_transformers)
 

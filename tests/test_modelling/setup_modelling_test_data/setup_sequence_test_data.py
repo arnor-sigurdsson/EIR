@@ -19,7 +19,6 @@ if TYPE_CHECKING:
 def create_test_sequence_data(
     test_data_config: "TestDataConfig", sequence_outfolder: Path
 ) -> Path:
-
     c = test_data_config
 
     fieldnames = ["ID", "Origin", "Height", "OriginExtraCol", "ExtraTarget"]
@@ -87,7 +86,6 @@ def _create_test_sequence(
     min_targets_to_include: int = 5,
     max_targets_to_include: int = 20,
 ) -> SequenceTestSample:
-
     seq_length = random.choice(seq=range(min_length, max_length))
 
     test_sequence = random.choices(population=random_pool, k=seq_length)

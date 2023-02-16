@@ -178,7 +178,6 @@ def generate_aggregated_config(
     extra_cl_args_overload: Union[List[str], None] = None,
     strict: bool = True,
 ) -> Configs:
-
     global_config_iter = get_yaml_iterator_with_injections(
         yaml_config_files=cl_args.global_configs, extra_cl_args=extra_cl_args_overload
     )
@@ -302,15 +301,17 @@ def init_input_config(yaml_config_as_dict: Dict[str, Any]) -> schemas.InputConfi
     return input_config
 
 
-def get_inputs_schema_map() -> Dict[
-    str,
-    Union[
-        Type[schemas.OmicsInputDataConfig],
-        Type[schemas.TabularInputDataConfig],
-        Type[schemas.SequenceInputDataConfig],
-        Type[schemas.ByteInputDataConfig],
-    ],
-]:
+def get_inputs_schema_map() -> (
+    Dict[
+        str,
+        Union[
+            Type[schemas.OmicsInputDataConfig],
+            Type[schemas.TabularInputDataConfig],
+            Type[schemas.SequenceInputDataConfig],
+            Type[schemas.ByteInputDataConfig],
+        ],
+    ]
+):
     mapping = {
         "omics": schemas.OmicsInputDataConfig,
         "tabular": schemas.TabularInputDataConfig,
@@ -327,7 +328,6 @@ def set_up_input_feature_extractor_config(
     input_type_info_object: al_input_types,
     model_init_kwargs_base: Union[None, dict],
 ) -> schemas.al_feature_extractor_configs:
-
     input_type = input_info_object.input_type
 
     model_config_class = get_input_feature_extractor_config_class(input_type=input_type)
@@ -377,9 +377,9 @@ def get_input_feature_extractor_config_class(
     return model_config_setup_map.get(input_type)
 
 
-def get_input_feature_extractor_config_init_class_map() -> Dict[
-    str, schemas.al_feature_extractor_configs_classes
-]:
+def get_input_feature_extractor_config_init_class_map() -> (
+    Dict[str, schemas.al_feature_extractor_configs_classes]
+):
     mapping = {
         "tabular": TabularModelConfig,
         "omics": OmicsModelConfig,
@@ -397,7 +397,6 @@ def set_up_feature_extractor_init_config(
     model_init_kwargs_base: Union[None, dict],
     model_type: str,
 ) -> Dict:
-
     if getattr(input_type_info_object, "pretrained_model", None):
         return {}
 
@@ -500,7 +499,6 @@ def get_feature_extractor_config_type_init_callable_map() -> Dict[str, Type]:
 def set_up_pretrained_config(
     pretrained_config_dict: Union[None, Dict[str, Any]]
 ) -> Union[None, schemas.BasicPretrainedConfig]:
-
     if pretrained_config_dict is None:
         return None
 
@@ -520,7 +518,6 @@ def get_pretrained_config_class() -> Type[schemas.BasicPretrainedConfig]:
 def set_up_interpretation_config(
     input_type: str, interpretation_config_dict: Union[None, Dict[str, Any]]
 ) -> Union[None, schemas.BasicInterpretationConfig]:
-
     config_class = get_interpretation_config_class(input_type=input_type)
     if config_class is None:
         return None
@@ -541,9 +538,9 @@ def get_interpretation_config_class(
     return mapping.get(input_type, None)
 
 
-def get_interpretation_config_schema_map() -> Dict[
-    str, Type[schemas.BasicInterpretationConfig]
-]:
+def get_interpretation_config_schema_map() -> (
+    Dict[str, Type[schemas.BasicInterpretationConfig]]
+):
     mapping = {
         "sequence": schemas.BasicInterpretationConfig,
         "image": schemas.BasicInterpretationConfig,
@@ -635,12 +632,14 @@ def init_output_config(
     return output_config
 
 
-def get_outputs_types_schema_map() -> Dict[
-    str,
-    Union[
-        Type[schemas.TabularOutputTypeConfig],
-    ],
-]:
+def get_outputs_types_schema_map() -> (
+    Dict[
+        str,
+        Union[
+            Type[schemas.TabularOutputTypeConfig],
+        ],
+    ]
+):
     mapping = {
         "tabular": schemas.TabularOutputTypeConfig,
     }
@@ -656,9 +655,9 @@ def get_output_module_config_class(
     return model_config_setup_map.get(output_type)
 
 
-def get_output_module_config_class_map() -> Dict[
-    str, schemas.al_output_module_configs_classes
-]:
+def get_output_module_config_class_map() -> (
+    Dict[str, schemas.al_output_module_configs_classes]
+):
     mapping = {
         "tabular": TabularModelOutputConfig,
     }
@@ -672,7 +671,6 @@ def set_up_output_module_config(
     output_module_config_class_getter: al_output_module_config_class_getter,
     output_module_init_class_map: al_output_model_init_map,
 ) -> schemas.al_output_module_configs:
-
     output_type = output_info_object.output_type
 
     model_config_class = output_module_config_class_getter(output_type=output_type)
@@ -715,7 +713,6 @@ def set_up_output_module_init_config(
     model_type: str,
     output_module_init_class_map: al_output_model_init_map,
 ) -> Union[TabularMLPResidualModelConfig, Any]:
-
     if not model_init_kwargs_base:
         model_init_kwargs_base = {}
 
@@ -870,7 +867,6 @@ def load_yaml_config(config_path: str) -> Dict[str, Any]:
 
 def recursive_dict_replace(dict_: dict, dict_to_inject: dict) -> dict:
     for cur_key, cur_value in dict_to_inject.items():
-
         if cur_key not in dict_:
             dict_[cur_key] = {}
 

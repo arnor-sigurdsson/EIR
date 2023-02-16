@@ -68,12 +68,10 @@ def analyze_tabular_input_activations(
         column_type=target_column_type,
     )
     for class_name, class_activations in all_activations_class_stratified.items():
-
         cur_class_outfolder = activation_outfolder / class_name
         ensure_path_exists(path=cur_class_outfolder, is_folder=True)
 
         if con_columns:
-
             cat_to_con_cutoff = get_cat_to_con_cutoff_from_slices(
                 slices=activation_tensor_slices,
                 cat_input_columns=cat_columns,
@@ -99,7 +97,6 @@ def analyze_tabular_input_activations(
 
         cat_act_dfs = []
         for cat_column in cat_columns:
-
             categorical_attr = _gather_categorical_attributions(
                 all_activations=class_activations,
                 cur_slice=activation_tensor_slices[cat_column],
@@ -252,7 +249,6 @@ def _gather_continuous_attributions(
     cat_to_con_cutoff: int,
     input_name: str,
 ) -> np.ndarray:
-
     con_acts = []
 
     for sample in all_activations:
@@ -306,7 +302,6 @@ def _gather_categorical_inputs(
     cat_inputs = []
 
     for sample in all_activations:
-
         cur_raw_cat_input = sample.raw_inputs[input_name][cat_name]
         cur_cat_input_part = cur_raw_cat_input
         cat_inputs.append(cur_cat_input_part)
@@ -393,7 +388,6 @@ def _save_categorical_acts(
     class_name: str,
     output_folder: Path,
 ) -> None:
-
     if len(dfs_categorical_acts_for_class) == 0:
         return None
 
@@ -409,7 +403,6 @@ def _parse_categorical_attrs_for_serialization(
     attributions_for_input: np.ndarray,
     column_name: str,
 ) -> pd.DataFrame:
-
     categorical_inputs_copy = categorical_inputs_mapped.copy()
 
     assert len(categorical_inputs_copy) == attributions_for_input.shape[0]

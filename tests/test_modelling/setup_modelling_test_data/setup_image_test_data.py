@@ -20,7 +20,6 @@ if TYPE_CHECKING:
 def create_test_image_data(
     test_data_config: "TestDataConfig", image_output_folder: Path
 ) -> Path:
-
     c = test_data_config
 
     fieldnames = ["ID", "Origin", "Height", "OriginExtraCol", "ExtraTarget"]
@@ -69,7 +68,6 @@ def create_test_image(
     min_active_patch_pixels: int = 4,
     max_active_patch_pixels: int = 16,
 ) -> ImageTestSample:
-
     sample_range = list(range(min_active_patch_pixels, max_active_patch_pixels))
     num_active_in_sample_patch = random.choice(sample_range)
     active_patch_indices = random.sample(

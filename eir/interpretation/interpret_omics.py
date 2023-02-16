@@ -38,7 +38,6 @@ def get_omics_consumer(
     target_column: str,
     column_type: str,
 ) -> Callable[[Union["SampleActivation", None]], ParsedOmicsActivations]:
-
     acc_acts = {}
     acc_acts_masked = {}
 
@@ -47,11 +46,9 @@ def get_omics_consumer(
     def _consumer(
         activation: Union["SampleActivation", None]
     ) -> ParsedOmicsActivations:
-
         nonlocal n_samples
 
         if activation is None:
-
             for key, value in acc_acts.items():
                 acc_acts[key] = value / n_samples
 
@@ -160,10 +157,8 @@ def analyze_omics_input_activations(
 def _save_snp_gradients(
     accumulated_grads: Dict[str, np.ndarray], outfolder: Path, df_snps: pd.DataFrame
 ) -> pd.DataFrame:
-
     df_output = deepcopy(df_snps)
     for label, grads in accumulated_grads.items():
-
         grads_np = grads
         grads_averaged = grads_np.sum(0)
 
@@ -177,7 +172,6 @@ def _save_snp_gradients(
 def _add_absolute_summed_snp_gradients_to_df(
     df_snp_grads: pd.DataFrame,
 ) -> pd.DataFrame:
-
     df_snp_grads_copy = df_snp_grads.copy()
 
     activations_columns = [
@@ -207,7 +201,6 @@ def parse_single_omics_activations(
     column_type: str,
     activations: Sequence["SampleActivation"],
 ) -> Tuple[Dict, Dict]:
-
     exp = experiment
     output_object = exp.outputs[output_name]
     target_transformer = output_object.target_transformers[target_column_name]
@@ -216,7 +209,6 @@ def parse_single_omics_activations(
     acc_acts_masked = defaultdict(list)
 
     for sample_activation in activations:
-
         sample_inputs = sample_activation.sample_info.inputs
         sample_target_labels = sample_activation.sample_info.target_labels
         sample_acts = sample_activation.sample_activations[omics_input_name]
@@ -269,7 +261,6 @@ def get_snp_cols_w_top_grads(
     top_snps_per_class = {}
 
     for cls, grads in accumulated_grads.items():
-
         if grads is not None:
             top_snps_per_class[cls] = {}
 

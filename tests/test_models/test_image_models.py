@@ -17,7 +17,6 @@ def get_test_internal_image_models_parametrization() -> Sequence[Dict]:
     all_parametrizations = []
 
     for model_type in models:
-
         if model_type == "ResNet":
             model_init_config = {
                 "layers": [1, 1, 1, 1],
@@ -122,13 +121,11 @@ def get_timm_models_to_test() -> List[str]:
 
 
 def get_test_external_image_models_parametrization() -> Sequence[Dict]:
-
     models = get_timm_models_to_test()
 
     all_parametrizations = []
 
     for model_type in models:
-
         size = get_pretrained_cfg_value(model_name=model_type, cfg_key="input_size")
         if not size:
             size = 224

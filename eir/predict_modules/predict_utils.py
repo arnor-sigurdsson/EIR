@@ -9,7 +9,6 @@ def log_and_raise_missing_or_multiple_input_matches(
     matches: Sequence[Dict],
     predict_names_and_types: Sequence[Tuple[str, str]],
 ) -> None:
-
     train_name = clr.Style.BRIGHT + clr.Fore.GREEN + train_name + clr.Style.RESET_ALL
     train_type = clr.Style.BRIGHT + clr.Fore.GREEN + train_type + clr.Style.RESET_ALL
 
@@ -60,7 +59,6 @@ def log_and_raise_missing_or_multiple_output_matches(
     matches: Sequence[Dict],
     predict_names_and_types: Sequence[Tuple[str, str, Sequence[str], Sequence[str]]],
 ) -> None:
-
     train_name = clr.Style.BRIGHT + clr.Fore.GREEN + train_name + clr.Style.RESET_ALL
     train_type = clr.Style.BRIGHT + clr.Fore.GREEN + train_type + clr.Style.RESET_ALL
     train_cat_columns = (

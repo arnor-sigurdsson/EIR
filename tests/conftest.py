@@ -103,7 +103,6 @@ def get_system_info() -> Tuple[bool, str]:
 
 
 def should_skip_in_gha():
-
     in_gha, _ = get_system_info()
     if in_gha:
         return True
@@ -144,7 +143,6 @@ class TestConfigInits:
 def create_test_config_init_base(
     request, create_test_data: "TestDataConfig"
 ) -> Tuple[TestConfigInits, "TestDataConfig"]:
-
     injections = {}
     if hasattr(request, "param"):
         assert "injections" in request.param.keys()
@@ -194,7 +192,6 @@ def create_test_config_init_base(
 def general_sequence_inject(
     sequence: Sequence[dict], inject_dict: dict
 ) -> Sequence[dict]:
-
     injected = []
 
     for dict_ in sequence:
@@ -232,7 +229,6 @@ def get_test_inputs_inits(
     source: Literal["local", "deeplake"],
     extra_kwargs: Optional[dict] = None,
 ) -> Sequence[dict]:
-
     if extra_kwargs is None:
         extra_kwargs = {}
 
@@ -266,7 +262,6 @@ def get_test_inputs_inits(
 def get_test_outputs_inits(
     test_path: Path, output_configs_dicts: Sequence[dict], split_to_test: bool
 ) -> Sequence[dict]:
-
     inits = []
 
     base_func_map = get_output_test_init_base_func_map()
@@ -316,7 +311,6 @@ def _inject_train_source_path(
     local_name: Literal["omics", "sequence", "image"],
     split_to_test: bool,
 ) -> Path:
-
     if source == "local":
         input_source = test_path / local_name
 
@@ -324,7 +318,6 @@ def _inject_train_source_path(
             input_source = input_source / "train_set"
 
     elif source == "deeplake":
-
         input_source = test_path / "deeplake"
         if split_to_test:
             input_source = test_path / "deeplake_train_set"
@@ -343,7 +336,6 @@ def get_test_omics_input_init(
     *args,
     **kwargs,
 ) -> dict:
-
     input_source = _inject_train_source_path(
         test_path=test_path,
         source=source,
@@ -376,7 +368,6 @@ def get_test_omics_input_init(
 def get_test_tabular_input_init(
     test_path: Path, split_to_test: bool, *args, **kwargs
 ) -> dict:
-
     input_source = test_path / "labels.csv"
     if split_to_test:
         input_source = test_path / "labels_train.csv"
@@ -402,7 +393,6 @@ def get_test_sequence_input_init(
     *args,
     **kwargs,
 ) -> dict:
-
     if extra_kwargs.get("sequence_csv_source", False):
         assert source == "local"
         name = "sequence.csv"
@@ -475,7 +465,6 @@ def get_test_image_input_init(
     *args,
     **kwargs,
 ) -> Dict:
-
     input_source = _inject_train_source_path(
         test_path=test_path,
         source=source,
@@ -528,7 +517,6 @@ def get_test_base_fusion_init(model_type: str) -> Sequence[dict]:
 
 
 def get_test_base_output_inits(test_path: Path, split_to_test: bool) -> Dict:
-
     label_file = test_path / "labels.csv"
     if split_to_test:
         label_file = test_path / "labels_train.csv"
@@ -684,7 +672,6 @@ def _make_deeplake_test_dataset(
     base_output_folder: Path,
     sub_folder_name: Union[None, Literal["train_set", "test_set"]],
 ) -> None:
-
     if sub_folder_name is None:
         suffix = ""
     else:
@@ -703,7 +690,6 @@ def _make_deeplake_test_dataset(
             file_iterator = (f / sub_folder_name).iterdir()
 
         for sample_file in file_iterator:
-
             sample_id = sample_file.stem
             if sample_id not in samples:
                 samples[sample_id] = {"ID": sample_id}
@@ -769,7 +755,6 @@ class TestDataConfig:
 def _create_test_data_config(
     create_test_data_fixture_request: SubRequest, tmp_path_factory, parsed_test_cl_args
 ) -> TestDataConfig:
-
     request_params = create_test_data_fixture_request.param
     task_type = request_params["task_type"]
 
@@ -817,7 +802,6 @@ def _hash_dict(dict_to_hash: dict) -> int:
 def create_test_config(
     create_test_config_init_base, keep_outputs: bool
 ) -> config.Configs:
-
     test_init, test_data_config = copy(create_test_config_init_base)
 
     test_global_config = config.get_global_config(
@@ -956,7 +940,6 @@ def cleanup(run_path: Union[Path, str]) -> None:
 def create_test_labels(
     create_test_data, create_test_config: config.Configs
 ) -> train.MergedTargetLabels:
-
     c = create_test_config
     gc = c.global_config
 
@@ -990,7 +973,6 @@ def create_test_datasets(
     create_test_labels,
     create_test_config: config.Configs,
 ) -> Tuple[torch.utils.data.Dataset, torch.utils.data.Dataset]:
-
     configs = create_test_config
     target_labels = create_test_labels
 
@@ -1038,7 +1020,6 @@ def create_test_optimizer(
     model: nn.Module,
     criterions,
 ):
-
     """
     TODO: Refactor loss module construction out of this function.
     """
@@ -1172,7 +1153,6 @@ def _get_cur_modelling_test_config(
     targets: config.TabularTargets,
     input_names: Iterable[str],
 ) -> ModelTestConfig:
-
     last_iter = len(train_loader) * global_config.n_epochs
     run_path = Path(f"{global_config.output_folder}/")
 
@@ -1206,7 +1186,7 @@ def _get_all_activation_paths(
     all_activation_paths = {}
 
     dict_to_iter = last_sample_folder_per_target_in_each_output
-    for (output_name, file_per_target_dict) in dict_to_iter.items():
+    for output_name, file_per_target_dict in dict_to_iter.items():
         if output_name not in all_activation_paths:
             all_activation_paths[output_name] = {}
 

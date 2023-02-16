@@ -100,7 +100,6 @@ def get_train_sampler(columns_to_sample, train_dataset):
     if is_sample_all_cols:
         columns_to_sample = []
         for output_name, output_object in train_dataset.outputs.items():
-
             if output_object.output_config.output_info.output_type != "tabular":
                 continue
 

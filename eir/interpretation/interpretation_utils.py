@@ -56,7 +56,6 @@ def stratify_activations_by_target_classes(
 def plot_activations_bar(
     df_activations: pd.DataFrame, outpath: Path, top_n: int = 20, title: str = ""
 ) -> None:
-
     df_activations_sorted = df_activations.sort_values(
         by="Attribution",
         ascending=False,
@@ -87,7 +86,6 @@ def get_basic_sample_activations_to_analyse_generator(
     interpretation_config: schemas.BasicInterpretationConfig,
     all_activations: Sequence["SampleActivation"],
 ) -> Generator["SampleActivation", None, None]:
-
     strategy = interpretation_config.interpretation_sampling_strategy
     n_samples = interpretation_config.num_samples_to_interpret
 

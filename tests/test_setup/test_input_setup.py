@@ -20,7 +20,6 @@ def set_up_simple_sequence_test_data(
     max_length: int = 20,
     sep: str = " ",
 ) -> Path:
-
     ensure_path_exists(path=path, is_folder=True)
 
     n_words_seq = tuple(range(min_length, max_length))
@@ -113,7 +112,6 @@ def test_get_input_name_config_iterator(create_test_config: "Configs"):
 
 
 def test_get_tokenizer():
-
     test_input = "the lazy dog JUMPED over:: the red fox or whatever".split()
 
     identity_tokenizer = input_setup.get_basic_tokenizer(
@@ -155,7 +153,6 @@ def test_get_tokenized_vocab_iterator():
 
 
 def test_get_vocab_iterator_basic(tmp_path: Path):
-
     seq_path = tmp_path / "test_sequence"
     test_pool = _get_simple_sample_pool()
     set_up_simple_sequence_test_data(
@@ -172,7 +169,6 @@ def test_get_vocab_iterator_basic(tmp_path: Path):
 
 
 def test_get_bpe_tokenizer(tmp_path: Path):
-
     seq_path = tmp_path / "test_sequence"
     test_pool = _get_simple_sample_pool()
     set_up_simple_sequence_test_data(

@@ -282,7 +282,6 @@ def _generate_split_blocks_from_spec(
     split_parameter_spec: LCParameterSpec,
     block_layer_spec: List[int],
 ) -> nn.Sequential:
-
     s = split_parameter_spec
     block_layer_spec_copy = copy(block_layer_spec)
 
@@ -299,7 +298,6 @@ def _generate_split_blocks_from_spec(
 
     for cur_layer_index, block_dim in enumerate(block_layer_spec_copy):
         for block in range(block_dim):
-
             cur_out_feature_sets = 2 ** (s.channel_exp_base + cur_layer_index)
             cur_kernel_width = s.kernel_width
             while cur_out_feature_sets >= cur_kernel_width:
@@ -445,7 +443,6 @@ class LCLAttentionBlock(nn.Module):
 def _do_add_attention(
     in_features: int, embedding_dim: int, attention_inclusion_cutoff: Optional[int]
 ) -> bool:
-
     if attention_inclusion_cutoff is None:
         return False
 

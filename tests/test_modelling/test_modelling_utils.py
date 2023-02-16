@@ -12,13 +12,11 @@ def check_performance_result_wrapper(
     run_path: Path,
     thresholds: Tuple[float, float],
 ) -> None:
-
     for output_name, output_object in outputs.items():
         cat_target_columns = output_object.target_columns["cat"]
         con_target_columns = output_object.target_columns["con"]
 
         for cat_target_column in cat_target_columns:
-
             check_test_performance_results(
                 run_path=run_path,
                 target_column=cat_target_column,
@@ -28,7 +26,6 @@ def check_performance_result_wrapper(
             )
 
         for con_target_column in con_target_columns:
-
             check_test_performance_results(
                 run_path=run_path,
                 output_name=output_name,

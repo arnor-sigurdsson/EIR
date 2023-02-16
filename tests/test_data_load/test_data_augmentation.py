@@ -60,7 +60,6 @@ def test_get_random_batch_indices_to_mix(test_batch_size):
 )
 @settings(deadline=500)
 def test_mixup_tensor(input_length: int, input_height: int, lambda_: float) -> None:
-
     tensor_1_one_hot_indices = torch.randint(0, input_height, (input_length,))
     tensor_2_one_hot_indices = torch.randint(0, input_height, (input_length,))
 

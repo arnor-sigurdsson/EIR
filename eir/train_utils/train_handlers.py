@@ -79,7 +79,6 @@ def configure_trainer(
     experiment: "Experiment",
     validation_handler_callable: al_handler = validation_handler,
 ) -> Engine:
-
     gc = experiment.configs.global_config
     run_folder = get_run_folder(output_folder=gc.output_folder)
 
@@ -134,7 +133,6 @@ def _attach_sample_interval_handlers(
     handler_config: "HandlerConfig",
     validation_handler_callable: Callable = validation_handler,
 ) -> Engine:
-
     exp = handler_config.experiment
     gc = exp.configs.global_config
 
@@ -158,7 +156,6 @@ def _attach_sample_interval_handlers(
         all_handler_events.append(activation_handler_and_event)
 
     for handler, event in all_handler_events:
-
         trainer.add_event_handler(
             event_name=event,
             handler=handler,
@@ -175,7 +172,6 @@ def _get_validation_handler_and_event(
     early_stopping_patience: int,
     validation_handler_callable: Callable,
 ) -> al_handler_and_event:
-
     validation_event = Events.ITERATION_COMPLETED(every=sample_interval_base)
 
     do_run_when_training_complete = _do_run_completed_handler(
@@ -197,7 +193,6 @@ def _get_activation_handler_and_event(
     act_every_sample_factor: int,
     early_stopping_patience: int,
 ) -> al_handler_and_event:
-
     activation_handler_callable = activation_analysis_handler
 
     if act_every_sample_factor == 0:
@@ -257,7 +252,6 @@ def _get_monitoring_metrics(
         return f"{output_name_}_{column_name_}_{metric_name}"
 
     for output_name, output_target_type, column_name in target_columns_gen:
-
         if output_target_type in ("con", "cat"):
             cur_output_object = outputs_as_dict[output_name]
             cur_output_type = cur_output_object.output_config.output_info.output_type
@@ -268,7 +262,6 @@ def _get_monitoring_metrics(
 
             for metric in cur_metric_records:
                 if not metric.only_val:
-
                     parsed_metric = _parse_target_metrics(
                         output_name_=output_name,
                         column_name_=column_name,
@@ -318,7 +311,6 @@ def _attach_early_stopping_handler(trainer: Engine, handler_config: "HandlerConf
 def _get_early_stopping_handler(
     trainer: Engine, handler_config: HandlerConfig, patience_steps: int
 ):
-
     scoring_function = _get_latest_validation_value_score_function(
         run_folder=handler_config.run_folder, column="perf-average"
     )
@@ -352,7 +344,6 @@ def _get_early_stopping_event_filter_kwargs(
 def _get_early_stopping_event_filter_kwargs(
     early_stopping_iteration_buffer, sample_interval
 ):
-
     if early_stopping_iteration_buffer is None:
         return {"every": sample_interval}
 
@@ -460,7 +451,6 @@ def _call_and_undo_ignite_local_rank_side_effects(func: Callable, kwargs: Dict):
 def _maybe_attach_progress_bar(trainer: Engine, do_not_attach: bool) -> None:
     do_attach = not do_not_attach
     if do_attach:
-
         pbar = ProgressBar()
         pbar.attach(engine=trainer, metric_names=["loss-average"])
         trainer.add_event_handler(
@@ -511,7 +501,6 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
     )
 
     for plot_event in _get_plot_events(sample_interval=gc.sample_interval):
-
         if plot_event == Events.COMPLETED and not _do_run_completed_handler(
             iter_per_epoch=len(exp.train_loader),
             n_epochs=gc.n_epochs,
@@ -543,7 +532,6 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
 
 
 def _save_yaml_configs(run_folder: Path, configs: "Configs"):
-
     for config_name, config_object in configs.__dict__.items():
         cur_outpath = Path(run_folder / "configs" / config_name).with_suffix(".yaml")
         aislib.misc_utils.ensure_path_exists(path=cur_outpath)
@@ -563,7 +551,6 @@ def _add_checkpoint_handler_wrapper(
     sample_interval: int,
     model: nn.Module,
 ) -> Engine:
-
     checkpoint_score_function, score_name = None, None
     if n_to_save is not None:
         logger.debug(
@@ -623,7 +610,6 @@ def _get_metric_writing_funcs(
         writer_funcs[output_name] = {}
 
         for target_name, target_file in target_name_file_dict.items():
-
             writer_funcs[output_name][target_name] = get_buffered_metrics_writer(
                 buffer_interval=buffer_interval
             )
@@ -663,7 +649,6 @@ def _attach_checkpoint_handler(
     checkpoint_interval: int,
     model: nn.Module,
 ) -> Engine:
-
     trainer.add_event_handler(
         event_name=Events.ITERATION_COMPLETED(every=checkpoint_interval),
         handler=checkpoint_handler,
@@ -774,7 +759,6 @@ def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> Non
     run_folder = get_run_folder(ca.output_folder)
 
     for output_dir in _iterdir_ignore_hidden(path=run_folder / "results"):
-
         for target_dir in _iterdir_ignore_hidden(path=output_dir):
             target_column = target_dir.name
 
@@ -807,7 +791,6 @@ def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> Non
 
 
 def _get_custom_handlers(handler_config: "HandlerConfig"):
-
     custom_handlers = handler_config.experiment.hooks.custom_handler_attachers
 
     return custom_handlers
@@ -828,7 +811,6 @@ def _attach_custom_handlers(
 def add_hparams_to_tensorboard(
     h_params: List[str], experiment: "Experiment", writer: SummaryWriter
 ) -> None:
-
     logger.debug(
         "Exiting and logging best hyperparameters for best average loss "
         "to tensorboard."
@@ -875,7 +857,6 @@ def add_hparams_to_tensorboard(
 def _generate_h_param_dict(
     global_config: GlobalConfig, h_params: List[str]
 ) -> Dict[str, Union[str, float, int]]:
-
     h_param_dict = {}
 
     for param_name in h_params:

@@ -66,13 +66,11 @@ def parse_target_labels(
     device: str,
     labels: "al_training_labels_target",
 ) -> "al_training_labels_target":
-
     target_columns_gen = get_output_info_generator(outputs_as_dict=output_objects)
 
     labels_casted = {}
 
     for output_name, column_type, column_name in target_columns_gen:
-
         if output_name not in labels_casted:
             labels_casted[output_name] = {}
 
@@ -109,7 +107,6 @@ def gather_pred_outputs_from_dloader(
 
     assert not model.training
     for loader_batch in data_loader:
-
         state = call_hooks_stage_iterable(
             hook_iterable=batch_prep_hook,
             common_kwargs={"loader_batch": loader_batch, **batch_prep_hook_kwargs},
@@ -152,13 +149,11 @@ def gather_data_loader_samples(
     batch_prep_hook_kwargs: Dict[str, Any],
     n_samples: Union[int, None] = None,
 ) -> al_dloader_gathered_raw:
-
     all_input_batches = []
     all_label_batches = []
     ids_total = []
 
     for loader_batch in data_loader:
-
         state = call_hooks_stage_iterable(
             hook_iterable=batch_prep_hook,
             common_kwargs={"loader_batch": loader_batch, **batch_prep_hook_kwargs},
@@ -393,7 +388,6 @@ def get_lr_range_results(
         output_transform=lambda x: x["average"]["loss-average"],
         num_iter=num_iter,
     ) as trainer_with_lr_finder:
-
         logger.info("Running LR range test for max %d iterations.", num_iter)
 
         default_max_epochs = trainer_with_lr_finder.state.max_epochs
@@ -469,7 +463,6 @@ def trace_eir_model(
             module.script_submodules_for_tracing()
 
     with torch.no_grad():
-
         traced_input_modules = nn.ModuleDict()
         feature_extractors_out = {}
         for module_name, module_input in example_inputs.items():

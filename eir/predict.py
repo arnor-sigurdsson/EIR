@@ -124,7 +124,6 @@ def _verify_predict_cl_args(predict_cl_args: Namespace):
 
 
 def run_predict(predict_cl_args: Namespace):
-
     run_folder = get_run_folder_from_model_path(model_path=predict_cl_args.model_path)
     loaded_train_experiment = load_serialized_train_experiment(run_folder=run_folder)
 
@@ -146,7 +145,6 @@ def predict(
     predict_config: "PredictConfig",
     predict_cl_args: Namespace,
 ) -> None:
-
     all_preds, all_labels, all_ids = gather_pred_outputs_from_dloader(
         data_loader=predict_config.test_dataloader,
         batch_prep_hook=predict_config.hooks.predict_stages.base_prepare_batch,
@@ -172,7 +170,6 @@ def predict(
     )
 
     for output_name, target_column_type, target_column_name in target_columns_gen:
-
         target_preds = all_preds[output_name][target_column_name]
         predictions = _parse_predictions(target_preds=target_preds)
 
@@ -282,7 +279,6 @@ def _add_inverse_transformed_column(
     column_name: str,
     transformer: al_label_transformers_object,
 ) -> pd.DataFrame:
-
     df_copy = df.copy()
 
     tt_it = transformer.inverse_transform
@@ -335,14 +331,12 @@ class PredictConfig:
 
 @dataclass
 class PredictHooks:
-
     predict_stages: "PredictHookStages"
     custom_column_label_parsing_ops: al_all_column_ops = None
 
 
 @dataclass
 class PredictHookStages:
-
     al_hook = Callable[..., Dict]
     al_hooks = [Iterable[al_hook]]
 
@@ -494,7 +488,6 @@ def extract_predict_specific_cl_args(
 
 
 def _parse_predictions(target_preds: torch.Tensor) -> np.ndarray:
-
     predictions = target_preds.cpu().numpy()
     return predictions
 

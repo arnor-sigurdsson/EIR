@@ -110,7 +110,6 @@ def get_test_external_sequence_models_parametrization() -> Sequence[Dict]:
     all_parametrizations = []
 
     for model_type in all_models_filtered:
-
         model_init_config = _get_common_model_config_overload()
         model_init_config_parsed = _parse_model_specific_config_values(
             model_config=model_init_config, model_name=model_type

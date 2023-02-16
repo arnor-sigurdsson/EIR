@@ -13,7 +13,6 @@ from eir.train import prepare_base_batch_default
 def prepare_example_batch(
     configs: Configs, labels: Labels, model: torch.nn.Module
 ) -> Batch:
-
     inputs_as_dict = set_up_inputs_for_training(
         inputs_configs=configs.input_configs,
         train_ids=tuple(labels.train_labels.keys()),

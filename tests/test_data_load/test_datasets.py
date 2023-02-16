@@ -68,7 +68,6 @@ def test_set_up_datasets(
     create_test_data,
     parse_test_cl_args,
 ):
-
     test_data_config = create_test_data
     n_classes = len(test_data_config.target_classes)
 
@@ -134,7 +133,6 @@ def test_set_up_datasets(
 def _add_bad_arrays_and_targets_for_dataset_testing(
     test_configs: Configs, test_cl_args: Dict
 ) -> None:
-
     test_inputs = test_configs.input_configs
     assert len(test_inputs) == 1
     test_omics_folder = Path(test_inputs[0].input_info.input_source)
@@ -222,7 +220,6 @@ def test_set_up_datasets_fails(
     create_test_config: Configs,
     create_test_data,
 ):
-
     test_configs = create_test_config
 
     configs_copy = deepcopy(test_configs)
@@ -374,7 +371,6 @@ def _corrupt_arrays_for_testing(
 def test_construct_dataset_init_params_from_cl_args(
     create_test_config, create_test_data, create_test_labels
 ):
-
     test_configs = create_test_config
 
     all_array_ids = train.gather_all_ids_from_output_configs(
@@ -544,7 +540,6 @@ def check_dataset(
     output_name: str = "test_output",
     target_column="Origin",
 ) -> None:
-
     assert len(dataset) == exp_no_sample
 
     test_inputs, target_labels, test_id = dataset[0]
@@ -642,7 +637,6 @@ def test_prepare_bytes_data():
 
 
 def test_prepare_image_data():
-
     normalization_stats = ImageNormalizationStats(channel_means=[0], channel_stds=[0.1])
     base_transforms, all_transforms = get_image_transforms(
         target_size=(32, 32),
@@ -909,7 +903,6 @@ def test_load_array_from_disk(subset_indices: Union[None, Sequence[int]]):
         return_value=test_arr,
         autospec=True,
     ):
-
         loaded = datasets._omics_load_wrapper(
             input_source="fake",
             data_pointer=Path("fake"),

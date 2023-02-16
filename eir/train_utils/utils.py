@@ -49,7 +49,6 @@ def prep_sample_outfolder(
 
 @only_call_on_master_node
 def configure_root_logger(output_folder: str) -> None:
-
     logfile_path = get_run_folder(output_folder=output_folder) / "logging_history.log"
 
     ensure_path_exists(path=logfile_path)
@@ -118,7 +117,6 @@ def state_registered_hook_call(
     *args,
     **kwargs,
 ) -> Tuple[Any, Dict[str, Any]]:
-
     if state is None:
         state = {}
 
@@ -130,7 +128,6 @@ def state_registered_hook_call(
 
 
 def seed_everything(seed: int = 0) -> None:
-
     seed, from_os = get_seed(default_seed=seed)
 
     extra_log = " grabbed from environment variable 'EIR_SEED '" if from_os else " "

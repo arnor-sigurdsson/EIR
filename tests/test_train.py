@@ -27,7 +27,6 @@ from eir.train_utils import optimizers
 
 @patch("eir.train.utils.get_run_folder", autospec=True)
 def test_prepare_run_folder_pass(patched_get_run_folder, tmp_path):
-
     # patch since we don't want to create run folders while testing
     patched_get_run_folder.return_value = tmp_path / "test_folder"
     train._prepare_run_folder("test_folder")
@@ -37,7 +36,6 @@ def test_prepare_run_folder_pass(patched_get_run_folder, tmp_path):
 
 @patch("eir.train.utils.get_run_folder", autospec=True)
 def test_prepare_run_folder_fail(patched_get_run_folder, tmp_path):
-
     patched_path = tmp_path / "test_folder"
     patched_get_run_folder.return_value = patched_path
     patched_path.mkdir()
@@ -134,7 +132,6 @@ def test_get_default_experiment(
     indirect=True,
 )
 def test_get_train_sampler(create_test_data, create_test_datasets, create_test_config):
-
     test_config = create_test_config
     gc = test_config.global_config
 
@@ -316,7 +313,6 @@ def test_get_model(create_test_config: Configs, create_test_labels):
 
 
 def _check_model(model_type: str, model: nn.Module):
-
     if model_type == "cnn":
         assert isinstance(model, MetaModel)
         output_module = model.output_modules.test_output
@@ -441,7 +437,6 @@ def test_get_criteria(
     indirect=True,
 )
 def test_hook_default_optimizer_backward(prep_modelling_test_configs):
-
     experiment, *_ = prep_modelling_test_configs
 
     experiment.__dict__["optimizer"] = MagicMock()

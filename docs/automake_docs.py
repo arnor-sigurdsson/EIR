@@ -35,7 +35,6 @@ def _get_a_using_eir_experiments() -> Iterable[AutoDocExperimentInfo]:
 
 
 def _get_b_customizing_eir_experiments() -> Iterable[AutoDocExperimentInfo]:
-
     a_experiments = a_customizing_fusion_tutorial.get_experiments()
 
     return chain(
@@ -44,7 +43,6 @@ def _get_b_customizing_eir_experiments() -> Iterable[AutoDocExperimentInfo]:
 
 
 if __name__ == "__main__":
-
     a_using_eir_experiments = _get_a_using_eir_experiments()
     b_customizing_eir_experiments = _get_b_customizing_eir_experiments()
 

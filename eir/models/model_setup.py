@@ -105,7 +105,6 @@ def get_model(
     model_registry_per_output_type: al_model_registry,
     meta_class_getter: al_fusion_class_callable = get_default_meta_class,
 ) -> Union[nn.Module, nn.DataParallel]:
-
     meta_class, meta_kwargs = get_meta_model_class_and_kwargs_from_configs(
         global_config=global_config,
         fusion_config=fusion_config,
@@ -159,7 +158,6 @@ def get_output_modules(
     in_features_per_input: Optional[Dict[str, DataDimensions]] = None,
     out_features_per_feature_extractor: Optional[Dict[str, int]] = None,
 ) -> nn.ModuleDict:
-
     output_modules = nn.ModuleDict()
 
     if model_registry_per_output_type is None:
@@ -170,7 +168,6 @@ def get_output_modules(
         output_model_config = output_object.output_config.model_config
 
         if output_type == "tabular":
-
             tabular_output_module = get_tabular_output_module_from_model_config(
                 model_init_config=output_model_config.model_init_config,
                 input_dimension=input_dimension,
@@ -180,7 +177,6 @@ def get_output_modules(
             output_modules[output_name] = tabular_output_module
 
         elif output_type in model_registry_per_output_type:
-
             output_type_class_registry = model_registry_per_output_type[output_type]
             output_model_type = output_model_config.model_type
             output_type_class = output_type_class_registry(model_type=output_model_type)
@@ -238,7 +234,6 @@ def get_input_modules(
             input_modules[input_name] = cur_omics_model
 
         elif input_type == "tabular":
-
             transformers = inputs_object.labels.label_transformers
             cat_columns = input_type_info.input_cat_columns
             con_columns = input_type_info.input_con_columns
@@ -258,7 +253,6 @@ def get_input_modules(
             input_modules[input_name] = tabular_model
 
         elif input_type == "sequence":
-
             sequence_model_registry = model_registry_per_input_type["sequence"]
 
             num_tokens = len(inputs_object.vocab)
@@ -273,7 +267,6 @@ def get_input_modules(
             input_modules[input_name] = sequence_model
 
         elif input_type == "bytes":
-
             sequence_model_registry = model_registry_per_input_type["sequence"]
 
             num_tokens = len(inputs_object.vocab)
@@ -306,7 +299,6 @@ def get_image_model(
     model_registry_lookup: Callable[[str], Type[nn.Module]],
     device: str,
 ) -> ImageWrapperModel:
-
     if model_config.model_type in timm.list_models():
         feature_extractor = timm.create_model(
             model_name=model_config.model_type,
@@ -402,7 +394,6 @@ def get_sequence_model(
     embedding_dim: int,
     device: str,
 ) -> TransformerWrapperModel:
-
     feature_extractor_max_length = max_length
     num_chunks = 1
     if sequence_model_config.window_size:
@@ -478,7 +469,6 @@ def _get_sequence_feature_extractor_objects_for_wrapper_model(
     num_chunks: int,
     pool: Union[Literal["max"], Literal["avg"], None],
 ) -> SequenceModelObjectsForWrapperModel:
-
     if "sequence-default" in model_type or model_type.startswith("eir-"):
         model_class = model_registry_lookup(model_type=model_type)
         objects_for_wrapper = _get_basic_sequence_feature_extractor_objects(
@@ -551,7 +541,6 @@ def _get_pretrained_hf_sequence_feature_extractor_objects(
     num_chunks: int,
     pool: Union[Literal["max"], Literal["avg"], None],
 ) -> SequenceModelObjectsForWrapperModel:
-
     pretrained_model = _get_hf_pretrained_model(model_name=model_name)
     pretrained_model.resize_token_embeddings(new_num_tokens=num_tokens)
     pretrained_model_embeddings = pretrained_model.get_input_embeddings()
@@ -606,7 +595,6 @@ def _get_hf_sequence_feature_extractor_objects(
     num_chunks: int,
     pool: Union[Literal["max"], Literal["avg"], None],
 ) -> SequenceModelObjectsForWrapperModel:
-
     feature_extractor = _get_hf_model(model_name=model_name, model_config=model_config)
     pretrained_model_embeddings = feature_extractor.get_input_embeddings()
 
@@ -664,7 +652,6 @@ def _get_basic_sequence_feature_extractor_objects(
     embedding_dim: int,
     feature_extractor_class: Callable = TransformerFeatureExtractor,
 ) -> SequenceModelObjectsForWrapperModel:
-
     parsed_embedding_dim = get_embedding_dim_for_sequence_model(
         embedding_dim=embedding_dim,
         num_tokens=num_tokens,
@@ -694,7 +681,6 @@ def _get_perceiver_sequence_feature_extractor_objects(
     max_length: int,
     num_chunks: int,
 ):
-
     feature_extractor = PerceiverIOFeatureExtractor(
         model_config=model_config,
         max_length=max_length,
@@ -720,7 +706,6 @@ def get_tabular_model(
     device: str,
     unique_label_values: Dict[str, Set[str]],
 ) -> SimpleTabularModel:
-
     tabular_model = SimpleTabularModel(
         model_init_config=model_init_config,
         cat_columns=cat_columns,
@@ -737,7 +722,6 @@ def get_omics_model_from_model_config(
     data_dimensions: DataDimensions,
     model_type: str,
 ):
-
     omics_model_class = get_model_class(model_type=model_type)
     model_init_kwargs = get_omics_model_init_kwargs(
         model_type=model_type,
@@ -760,7 +744,6 @@ def get_meta_model_kwargs_from_configs(
     model_registry_per_input_type: al_model_registry,
     model_registry_per_output_type: al_model_registry,
 ) -> Dict[str, Any]:
-
     kwargs = {}
     input_modules = get_input_modules(
         inputs_as_dict=inputs_as_dict,
@@ -829,7 +812,6 @@ def _get_feature_extractors_input_dimensions_per_axis(
     inputs_as_dict: al_input_objects_as_dict,
     input_modules: nn.ModuleDict,
 ) -> al_data_dimensions:
-
     fusion_in_dims = {}
 
     for name, input_object in inputs_as_dict.items():
@@ -886,7 +868,6 @@ def overload_fusion_model_feature_extractors_with_pretrained(
     model_registry_per_output_type: al_model_registry,
     meta_class_getter: al_fusion_class_callable = get_default_meta_class,
 ) -> nn.ModuleDict:
-
     """
     Note that `inputs_as_dict` here are coming from the current experiment, arguably
     it would be more robust / better to have them loaded from the pretrained experiment,
@@ -974,7 +955,6 @@ def get_meta_model_class_and_kwargs_from_configs(
     model_registry_per_output_type: al_model_registry,
     meta_class_getter: Callable[[str], Type[nn.Module]] = get_default_meta_class,
 ) -> Tuple[Type[nn.Module], Dict[str, Any]]:
-
     meta_model_class = meta_class_getter(meta_model_type="default")
 
     meta_model_kwargs = get_meta_model_kwargs_from_configs(
@@ -992,7 +972,6 @@ def get_meta_model_class_and_kwargs_from_configs(
 def _build_all_replacements_tuples_for_loading_pretrained_module(
     input_configs: Sequence[schemas.InputConfig],
 ) -> Sequence[Tuple[str, str]]:
-
     replacement_patterns = []
     for input_config in input_configs:
         if input_config.pretrained_config:
@@ -1009,7 +988,6 @@ def _build_all_replacements_tuples_for_loading_pretrained_module(
 def _build_replace_tuple_when_loading_pretrained_module(
     load_module_name: str, current_input_name: str
 ) -> Union[None, Tuple[str, str]]:
-
     if load_module_name == current_input_name:
         return None
 
@@ -1031,7 +1009,6 @@ def load_model(
     state_dict_key_rename: Union[None, Sequence[Tuple[str, str]]] = None,
     strict_shapes: bool = True,
 ) -> Union[al_fusion_models, nn.Module]:
-
     model = model_class(**model_init_kwargs)
 
     model = _load_model_weights(
@@ -1135,7 +1112,6 @@ def _replace_dict_key_names(
 def _filter_state_dict_keys(
     state_dict: typing.OrderedDict[str, torch.nn.Parameter], keys_to_keep: Sequence[str]
 ) -> typing.OrderedDict[str, torch.nn.Parameter]:
-
     filtered_state_dict = OrderedDict()
 
     for module_name, module_parameter in state_dict.items():
@@ -1148,7 +1124,6 @@ def _filter_state_dict_keys(
 def _filter_incompatible_parameter_shapes_for_loading(
     source_state_dict: Dict[str, Any], destination_state_dict: Dict[str, Any]
 ) -> Dict[str, Any]:
-
     destination_state_dict = deepcopy(destination_state_dict)
 
     for k in destination_state_dict:

@@ -122,7 +122,6 @@ def load_serialized_input_object(
     custom_input_name: Union[str, None] = None,
     **kwargs,
 ) -> "al_serializable_input_objects":
-
     assert output_folder or run_folder
     if not run_folder:
         run_folder = get_run_folder(output_folder=output_folder)
@@ -181,19 +180,16 @@ def _check_current_and_loaded_input_config_compatibility(
     loaded_input_config: schemas.InputConfig,
     serialized_input_config_path: Path,
 ) -> None:
-
     fieldnames = current_input_config.__dict__.keys()
     assert set(fieldnames) == set(loaded_input_config.__dict__.keys())
 
     should_be_same = ("model_config",)
 
     for key in should_be_same:
-
         current_value = getattr(current_input_config, key)
         loaded_value = getattr(loaded_input_config, key)
 
         if current_value != loaded_value:
-
             logger.warning(
                 "Expected '%s' to be the same in current input configuration '%s' and "
                 "loaded input configuration '%s' (loaded from '%s'). If you are loading"
@@ -250,7 +246,6 @@ def load_transformers(
     output_folder: Union[str, None] = None,
     run_folder: Union[None, Path] = None,
 ) -> Dict[str, al_label_transformers]:
-
     assert run_folder or output_folder
 
     if not run_folder:

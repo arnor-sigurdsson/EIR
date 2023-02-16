@@ -178,7 +178,7 @@ def _get_predict_test_data_parametrization() -> List[Dict[str, Any]]:
                     "checkpoint_interval": 200,
                     "sample_interval": 200,
                     "lr": 0.001,
-                    "act_background_samples": 128,
+                    "act_background_samples": 256,
                     "get_acts": False,
                     "batch_size": 64,
                 },

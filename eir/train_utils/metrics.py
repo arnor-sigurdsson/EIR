@@ -95,7 +95,6 @@ def calculate_batch_metrics(
     master_metric_dict = {}
 
     for output_name, output_target_type, target_name in target_columns_gen:
-
         cur_metric_dict = {}
 
         if output_name not in master_metric_dict:
@@ -119,7 +118,6 @@ def calculate_batch_metrics(
             cur_labels = cur_labels.cpu().to(dtype=torch.float32).numpy()
 
             for metric_record in cur_metric_records:
-
                 if metric_record.only_val and mode == "train":
                     continue
 
@@ -143,7 +141,6 @@ def add_loss_to_metrics(
     losses: Dict[str, Dict[str, torch.Tensor]],
     metric_dict: al_step_metric_dict,
 ) -> al_step_metric_dict:
-
     target_columns_gen = get_output_info_generator(outputs_as_dict=outputs_as_dict)
     metric_dict_copy = copy(metric_dict)
 
@@ -243,7 +240,6 @@ def calc_roc_auc_ovo(
 def calc_average_precision(
     outputs: np.ndarray, labels: np.ndarray, average: str = "macro", *args, **kwargs
 ) -> float:
-
     assert average in ["micro", "macro"]
 
     if outputs.shape[1] > 2:
@@ -266,7 +262,6 @@ def calc_acc(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
 
 
 def calc_pcc(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
-
     if len(outputs) < 2:
         return 0.0
 
@@ -275,7 +270,6 @@ def calc_pcc(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
 
 
 def calc_r2(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
-
     if len(outputs) < 2:
         return 0.0
 
@@ -316,7 +310,6 @@ def calculate_prediction_losses(
     losses_dict = {}
 
     for output_name, target_criterion_dict in criteria.items():
-
         for target_column, criterion in target_criterion_dict.items():
             cur_target_col_labels = targets[output_name][target_column]
             cur_target_col_outputs = inputs[output_name][target_column]
@@ -423,7 +416,6 @@ class UncertaintyMultiTaskLoss(nn.Module):
     def _construct_params(
         cur_target_columns: List[str], device: str
     ) -> Dict[str, nn.Parameter]:
-
         param_dict = {}
         for column_name in cur_target_columns:
             cur_param = nn.Parameter(torch.zeros(1), requires_grad=True).to(
@@ -472,7 +464,6 @@ def hook_add_l1_loss(
 
     l1_loss = torch.tensor(0.0, device=experiment.configs.global_config.device)
     for input_name, input_module in experiment.model.input_modules.items():
-
         cur_model_config = model_configs[input_name].input_config.model_config
         cur_model_init_config = cur_model_config.model_init_config
 
@@ -533,7 +524,6 @@ def persist_metrics(
     prefixes: Dict[str, str],
     writer_funcs: Union[None, Dict[str, Dict[str, Callable]]] = None,
 ):
-
     hc = handler_config
     exp = handler_config.experiment
     gc = exp.configs.global_config
@@ -551,7 +541,6 @@ def persist_metrics(
 
     for output_name, target_and_file_dict in metrics_files.items():
         for target_name, target_history_file in target_and_file_dict.items():
-
             cur_metric_dict = metrics_dict[output_name][target_name]
 
             _add_metrics_to_writer(
@@ -639,7 +628,6 @@ def get_buffered_metrics_writer(buffer_interval: int):
     def append_metrics_to_file(
         filepath: Path, metrics: Dict[str, float], iteration: int, write_header=False
     ):
-
         nonlocal buffer
 
         dict_to_write = {**{"iteration": iteration}, **metrics}
@@ -653,7 +641,6 @@ def get_buffered_metrics_writer(buffer_interval: int):
                     writer.writeheader()
 
         if iteration % buffer_interval == 0:
-
             buffer.append(dict_to_write)
 
             with open(str(filepath), "a") as logfile:
@@ -731,7 +718,6 @@ def parse_averaging_metrics(
     cat_averaging_metrics: Optional[al_cat_averaging_metric_choices],
     con_averaging_metrics: Optional[al_con_averaging_metric_choices],
 ) -> Dict[str, list[str]]:
-
     base = _get_default_averaging_metrics()
 
     if cat_averaging_metrics:
@@ -774,7 +760,6 @@ def get_performance_averaging_functions(
     cat_metric_names: al_cat_averaging_metric_choices,
     con_metric_names: al_con_averaging_metric_choices,
 ) -> al_averaging_functions_dict:
-
     logger.debug(
         "Performance averaging functions across tasks set to averages "
         "of %s for categorical targets and %s for continuous targets. These "
@@ -790,7 +775,6 @@ def get_performance_averaging_functions(
         column_name: str,
         metric_names: al_cat_averaging_metric_choices,
     ) -> float:
-
         values = []
         for metric_name in metric_names:
             combined_key = f"{output_name}_{column_name}_{metric_name}"
@@ -809,7 +793,6 @@ def get_performance_averaging_functions(
         column_name: str,
         metric_names: al_con_averaging_metric_choices,
     ) -> float:
-
         values = []
         for metric_name in metric_names:
             combined_key = f"{output_name}_{column_name}_{metric_name}"

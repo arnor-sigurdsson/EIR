@@ -30,7 +30,6 @@ def compute_predict_activations(
     loaded_train_experiment: "LoadedTrainExperiment",
     predict_config: "PredictConfig",
 ) -> None:
-
     gc = predict_config.train_configs_overloaded.global_config
 
     background_source = predict_config.predict_specific_cl_args.act_background_source

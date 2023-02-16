@@ -251,7 +251,6 @@ def _check_snps_wrapper(
         )
 
         for acts_array_path, is_masked in omics_acts_generator:
-
             check_types = True if is_masked else False
             _check_identified_snps(
                 array_path=acts_array_path,
@@ -695,7 +694,6 @@ def test_multi_task(
         con_targets = output_config.output_type_info.target_con_columns
 
         for target_name in cat_targets:
-
             target_copy = "OriginExtraCol"
             threshold, at_least_n = _get_multi_task_test_args(
                 extra_columns=extra_columns,

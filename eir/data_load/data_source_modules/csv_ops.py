@@ -24,7 +24,6 @@ def streamline_df(
 ) -> Callable[[Any], pd.DataFrame]:
     @wraps(df_func)
     def wrapper(*args, df=None, column_name=None, **kwargs) -> pd.DataFrame:
-
         df = df_func(*args, df=df, column_name=column_name, **kwargs)
 
         return df

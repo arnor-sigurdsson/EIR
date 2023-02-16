@@ -79,7 +79,6 @@ def _build_weighted_sample_dict_from_config_sequence(
     weighted_sample_dict = {}
 
     for weighted_sample_config_string in config_list:
-
         if weighted_sample_config_string == "all":
             return {"all": ["all"]}
 

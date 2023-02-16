@@ -88,7 +88,6 @@ class WrapperModelForAttribution(nn.Module):
     def match_tuple_inputs_and_names(
         self, input_sequence: Sequence[torch.Tensor]
     ) -> Dict[str, torch.Tensor]:
-
         if isinstance(input_sequence, torch.Tensor):
             input_sequence = list(input_sequence)
 
@@ -120,7 +119,6 @@ def suppress_stdout_and_stderr() -> None:
 def activation_analysis_handler(
     engine: Engine, handler_config: "HandlerConfig"
 ) -> None:
-
     exp = handler_config.experiment
     gc = exp.configs.global_config
     iteration = engine.state.iteration
@@ -195,7 +193,6 @@ def activation_analysis_wrapper(
     target_columns_gen = get_output_info_generator(outputs_as_dict=exp.outputs)
 
     for output_name, target_column_type, target_column_name in target_columns_gen:
-
         ao = get_attribution_object(
             experiment=exp,
             model=model_copy,
@@ -379,7 +376,6 @@ def get_activation(
     *args,
     **kwargs
 ) -> Union[Dict[str, torch.Tensor], None]:
-
     input_activations = activation_callable(inputs=inputs, *args, **kwargs)
 
     if input_activations is None:
@@ -399,7 +395,6 @@ def get_attribution_callable(
     [al_explainers, Dict[str, torch.Tensor], torch.Tensor, str],
     Union[None, np.ndarray],
 ]:
-
     act_func_partial = partial(
         get_attributions,
         explainer=explainer,
@@ -423,7 +418,6 @@ def accumulate_all_activations(
     target_column_name: str,
     output_name: str,
 ) -> Sequence["SampleActivation"]:
-
     all_activations = []
 
     for batch, raw_inputs in data_producer:
@@ -483,7 +477,6 @@ def _get_consumer_from_input_type(
     [Union["SampleActivation", None]],
     Union[Sequence["SampleActivation"], ParsedOmicsActivations],
 ]:
-
     if input_type in ("sequence", "tabular", "image"):
         return get_basic_sequence_consumer()
 
@@ -523,16 +516,14 @@ def get_sample_activation_producer(
         yield cur_sample_activation_info
 
 
-def get_basic_sequence_consumer() -> Callable[
-    [Union["SampleActivation", None]], Sequence["SampleActivation"]
-]:
-
+def get_basic_sequence_consumer() -> (
+    Callable[[Union["SampleActivation", None]], Sequence["SampleActivation"]]
+):
     results = []
 
     def _consumer(
         activation: Union["SampleActivation", None]
     ) -> Sequence["SampleActivation"]:
-
         if activation is None:
             return results
 
@@ -645,7 +636,6 @@ def get_attributions(
     baselines: tuple[torch.Tensor, ...],
     baseline_names_ordered: tuple[str, ...],
 ) -> list[np.ndarray]:
-
     list_inputs = tuple(inputs[n] for n in baseline_names_ordered)
     baselines = tuple(i.mean(0).unsqueeze(0) for i in baselines)
 
@@ -678,7 +668,6 @@ def _get_interpretation_data_producer(
     output_name: str,
     dataset: al_datasets,
 ) -> Generator["Batch", None, None]:
-
     cur_output = experiment.outputs[output_name]
     target_transformer = cur_output.target_transformers[column_name]
     gc = experiment.configs.global_config
@@ -787,7 +776,6 @@ def _get_categorical_sample_indices_for_activations(
 def _get_continuous_sample_indices_for_activations(
     dataset: al_datasets, max_acts_per_class: int, *args, **kwargs
 ) -> Tuple[int, ...]:
-
     acc_label_limit = max_acts_per_class
     num_sample = len(dataset)
     indices = np.random.choice(num_sample, acc_label_limit)

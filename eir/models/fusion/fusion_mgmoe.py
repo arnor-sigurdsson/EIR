@@ -107,7 +107,6 @@ class MGMoEModel(nn.Module):
 
     @staticmethod
     def get_gate_spec(in_features: int, out_features: int):
-
         spec = OrderedDict(
             {
                 "gate_fc": (
@@ -132,7 +131,6 @@ class MGMoEModel(nn.Module):
         return self.model_config.fc_task_dim * len(self.expert_branches)
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> torch.Tensor:
-
         fused_features = self.fusion_callable(inputs)
 
         gate_attentions = calculate_module_dict_outputs(
