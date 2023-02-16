@@ -51,13 +51,8 @@ al_models_classes = Union[
 ]
 
 
-al_output_module_configs_classes = Union[
-    Type[TabularModelOutputConfig],
-]
-
-al_output_module_configs = Union[
-    TabularModelOutputConfig,
-]
+al_output_module_configs_classes = Union[Type[TabularModelOutputConfig]]
+al_output_module_configs = Union[TabularModelOutputConfig]
 
 
 al_tokenizer_choices = (
