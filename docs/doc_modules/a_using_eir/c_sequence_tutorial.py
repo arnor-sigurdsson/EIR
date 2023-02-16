@@ -33,8 +33,8 @@ def get_03_imdb_run_1_transformer_info() -> AutoDocExperimentInfo:
             "figures/tutorial_03a_feature_importance_Negative.pdf",
         ),
         (
-            ".*4000/activations/imdb_reviews/single_samples/.*3_10_Positive.*",
-            "figures/tutorial_03a_single_sample_example.html",
+            ".*4000/activations/imdb_reviews/single_samples.html",
+            "figures/tutorial_03a_single_samples_example.html",
         ),
     ]
 
@@ -102,8 +102,8 @@ def get_03_peptides_run_1_transformer_info() -> AutoDocExperimentInfo:
             "figures/tutorial_03b_feature_importance_mod._active.pdf",
         ),
         (
-            ".*2400/activations/peptide_sequences/single_samples/.*mod. active.*",
-            "figures/tutorial_03b_single_sample_mod._active_example.html",
+            ".*2400/activations/peptide_sequences/single_samples.html",
+            "figures/tutorial_03b_single_samples.html",
         ),
     ]
 

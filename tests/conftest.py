@@ -208,7 +208,7 @@ def get_test_base_global_init() -> Sequence[dict]:
             "plot_skip_steps": 0,
             "get_acts": True,
             "act_every_sample_factor": 0,
-            "act_background_samples": 256,
+            "act_background_samples": 64,
             "n_epochs": 12,
             "warmup_steps": 100,
             "lr": 2e-03,

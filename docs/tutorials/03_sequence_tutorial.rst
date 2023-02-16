@@ -154,7 +154,7 @@ for 10 single samples,
 here is one such example, where we look at the activations towards a positive sentiment.
 
 .. raw:: html
-   :file: tutorial_files/03_sequence_tutorial/a_IMDB/figures/tutorial_03a_single_sample_example.html
+   :file: tutorial_files/03_sequence_tutorial/a_IMDB/figures/tutorial_03a_single_samples_example.html
 
 :raw-html:`<br />`
 
@@ -279,7 +279,7 @@ towards a prediction of
 the moderately active class, we see:
 
 .. raw:: html
-   :file: tutorial_files/03_sequence_tutorial/b_Anticancer_peptides/figures/tutorial_03b_single_sample_mod._active_example.html
+   :file: tutorial_files/03_sequence_tutorial/b_Anticancer_peptides/figures/tutorial_03b_single_samples.html
 
 :raw-html:`<br />`
 

@@ -5,7 +5,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from aislib.misc_utils import ensure_path_exists
-from captum.attr._utils.visualization import visualize_image_attr
+from captum.attr._utils.visualization import (
+    visualize_image_attr_multiple,
+)
+from matplotlib.colors import LinearSegmentedColormap
 from torchvision.transforms import Normalize
 
 from eir.interpretation.interpretation_utils import (
@@ -25,7 +28,7 @@ def analyze_image_input_activations(
     target_column_name: str,
     output_name: str,
     target_column_type: str,
-    activation_outfolder: Path,
+    activation_output_folder: Path,
     all_activations: Sequence["SampleActivation"],
 ) -> None:
     exp = experiment
@@ -53,30 +56,30 @@ def analyze_image_input_activations(
         attributions = sample_activation.sample_activations[input_name].squeeze()
         raw_input = sample_activation.raw_inputs[input_name].cpu().numpy().squeeze()
         attributions = attributions.transpose(1, 2, 0)
-        raw_input = unnormalize(
+        raw_input = un_normalize(
             normalized_img=raw_input,
             normalization_stats=input_object.normalization_stats,
         )
         raw_input = raw_input.transpose(1, 2, 0)
 
-        figure, _ = visualize_image_attr(
+        cmap = get_default_img_attribution_cmap()
+        figure, _ = visualize_image_attr_multiple(
             attr=attributions,
             original_image=raw_input,
-            method="blended_heat_map",
-            sign="absolute_value",
+            methods=["original_image", "blended_heat_map"],
+            signs=["all", "absolute_value"],
+            show_colorbar=True,
+            cmap=cmap,
         )
 
-        outpath = (
-            activation_outfolder
-            / "single_samples"
-            / f"image_{sample_activation.sample_info.ids[0]}_{cur_label_name}.pdf"
-        )
+        name = f"image_{sample_activation.sample_info.ids[0]}_{cur_label_name}.pdf"
+        outpath = activation_output_folder / "single_samples" / name
         ensure_path_exists(path=outpath)
         figure.savefig(outpath, dpi=300)
         plt.close("all")
 
 
-def unnormalize(
+def un_normalize(
     normalized_img: np.ndarray, normalization_stats: "ImageNormalizationStats"
 ):
     """
@@ -95,3 +98,11 @@ def unnormalize(
     img_final = img_unnormalized.clip(None, 1.0)
 
     return img_final
+
+
+def get_default_img_attribution_cmap() -> LinearSegmentedColormap:
+    default_cmap = LinearSegmentedColormap.from_list(
+        "custom blue", [(0, "#ffffff"), (0.25, "#252b36"), (1, "#000000")], N=256
+    )
+
+    return default_cmap

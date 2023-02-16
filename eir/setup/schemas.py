@@ -270,7 +270,7 @@ class GlobalConfig:
     act_classes: Union[None, List[str]] = None
     max_acts_per_class: Union[None, int] = None
     act_every_sample_factor: int = 1
-    act_background_samples: int = 256
+    act_background_samples: int = 64
     debug: bool = False
     no_pbar: bool = False
     mixing_alpha: float = 0.0
