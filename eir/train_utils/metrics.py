@@ -781,7 +781,7 @@ def get_performance_averaging_functions(
         "values are used to determine overall performance, which is used to "
         "control factors such as early stopping and LR scheduling.",
         [i.upper() for i in cat_metric_names],
-        [i.upper() for i in con_metric_names],
+        [i.upper().replace("LOSS", "1.0-LOSS") for i in con_metric_names],
     )
 
     def _calc_cat_averaging_value(

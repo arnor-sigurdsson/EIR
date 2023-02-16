@@ -333,7 +333,7 @@ def get_sequence_html(
     ]
     rows = [
         "<tr><th>ID</th>"
-        "<tr><th>True Label</th>"
+        "<th>True Label</th>"
         "<th>Attribution Score</th>"
         "<th>Token Importance</th>"
     ]
