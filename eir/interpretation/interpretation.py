@@ -352,8 +352,7 @@ def get_attribution_object(
         wrapped_model=model,
         input_names=input_names,
     )
-    explainer = IntegratedGradients(wrapped_model)
-    explainer = NoiseTunnel(attribution_method=explainer)
+    explainer = IntegratedGradients(forward_func=wrapped_model)
 
     attribution_object = AttributionObject(
         explainer=explainer,
@@ -402,15 +401,13 @@ def get_oom_adaptive_attribution_callable(
     batch_size: int,
 ) -> ActivationCallable:
     n_steps = min(batch_size, 128)
-    nt_samples = 16
-    nt_samples_batch_size = nt_samples
+    internal_batch_size = None
     has_successfully_run = False
 
     base_kwargs = dict(
         explainer=explainer,
         column_type=column_type,
         baselines=baseline_values,
-        nt_samples=nt_samples,
         baseline_names_ordered=baseline_names_ordered,
         n_steps=n_steps,
     )
@@ -419,42 +416,51 @@ def get_oom_adaptive_attribution_callable(
         inputs: Dict[str, torch.Tensor], sample_label: torch.Tensor
     ) -> list[np.ndarray]:
         nonlocal has_successfully_run
-        nonlocal nt_samples_batch_size
+        nonlocal internal_batch_size
 
         if has_successfully_run:
             return get_attributions(
                 inputs=inputs,
                 sample_label=sample_label,
-                nt_samples_batch_size=nt_samples_batch_size,
+                internal_batch_size=internal_batch_size,
                 **base_kwargs,
             )
         else:
-            try:
-                res = get_attributions(
-                    inputs=inputs,
-                    sample_label=sample_label,
-                    nt_samples_batch_size=nt_samples_batch_size,
-                    **base_kwargs,
-                )
-                has_successfully_run = True
-                logger.debug(
-                    "Attribution noise tunnel internal batch size successfully set "
-                    "to %d.",
-                    nt_samples_batch_size,
-                )
-                return res
+            while True:
+                try:
+                    res = get_attributions(
+                        inputs=inputs,
+                        sample_label=sample_label,
+                        internal_batch_size=internal_batch_size,
+                        **base_kwargs,
+                    )
+                    has_successfully_run = True
 
-            except OutOfMemoryError as e:
-                if nt_samples_batch_size == 1:
-                    raise e
+                    if internal_batch_size is not None:
+                        logger.debug(
+                            "Attribution IG internal batch size successfully set "
+                            "to %d.",
+                            internal_batch_size,
+                        )
 
-                nt_samples_batch_size = max(1, nt_samples_batch_size // 2)
-                logger.debug(
-                    "CUDA OOM error, reducing attribution noise tunnel "
-                    "internal batch size to %d.",
-                    nt_samples_batch_size,
-                )
-                torch.cuda.empty_cache()
+                    return res
+
+                except OutOfMemoryError as e:
+                    if internal_batch_size == 1:
+                        raise e
+
+                    if internal_batch_size is None:
+                        internal_batch_size = max(1, batch_size // 2)
+                    else:
+                        internal_batch_size = max(1, internal_batch_size // 2)
+
+                    logger.debug(
+                        "CUDA OOM error, reducing attribution IG "
+                        "internal batch size to %d.",
+                        internal_batch_size,
+                    )
+                    torch.cuda.empty_cache()
+                    continue
 
     return calculate_attributions_adaptive
 
@@ -713,20 +719,16 @@ def get_attributions(
     baselines: tuple[torch.Tensor, ...],
     baseline_names_ordered: tuple[str, ...],
     n_steps: int,
-    nt_samples: int,
-    nt_samples_batch_size: int,
+    internal_batch_size: Union[int, None],
 ) -> list[np.ndarray]:
     list_inputs = tuple(inputs[n] for n in baseline_names_ordered)
-    baselines = tuple(i.mean(0).unsqueeze(0) for i in baselines)
+    baselines_averaged = tuple(i.mean(0).unsqueeze(0) for i in baselines)
 
     common_kwargs = dict(
         inputs=list_inputs,
-        baselines=baselines,
-        nt_samples=nt_samples,
+        baselines=baselines_averaged,
         n_steps=n_steps,
-        nt_samples_batch_size=nt_samples_batch_size,
-        nt_type="smoothgrad_sq",
-        draw_baseline_from_distrib=True,
+        internal_batch_size=internal_batch_size,
     )
 
     with suppress_stdout_and_stderr():
