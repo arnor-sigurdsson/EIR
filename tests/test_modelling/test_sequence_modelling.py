@@ -12,7 +12,7 @@ from eir.models.model_setup import (
 )
 from eir.setup.setup_utils import get_all_hf_model_names
 from eir.train_utils.utils import seed_everything
-from tests.conftest import should_skip_in_gha_macos
+from tests.conftest import should_skip_in_gha_macos, should_skip_in_gha
 from tests.test_modelling.setup_modelling_test_data.setup_sequence_test_data import (
     get_continent_keyword_map,
 )
@@ -144,7 +144,7 @@ def test_sequence_modelling(prep_modelling_test_configs):
     _sequence_test_check_wrapper(experiment=experiment, test_config=test_config)
 
 
-@pytest.mark.skipif(condition=should_skip_in_gha_macos(), reason="In GHA.")
+@pytest.mark.skipif(condition=should_skip_in_gha(), reason="In GHA.")
 @pytest.mark.parametrize(
     "create_test_data",
     [
@@ -163,7 +163,7 @@ def test_sequence_modelling(prep_modelling_test_configs):
                     "memory_dataset": True,
                     "output_folder": "test_multi_task",
                     "gradient_noise": 0.001,
-                    "act_background_samples": 32,
+                    "act_background_samples": 8,
                 },
                 "input_configs": [
                     {
@@ -191,7 +191,7 @@ def test_sequence_modelling(prep_modelling_test_configs):
                     "memory_dataset": True,
                     "output_folder": "test_multi_task_with_mixing",
                     "mixing_alpha": 0.5,
-                    "act_background_samples": 32,
+                    "act_background_samples": 8,
                 },
                 "input_configs": [
                     {
@@ -218,7 +218,7 @@ def test_sequence_modelling(prep_modelling_test_configs):
                     "memory_dataset": True,
                     "output_folder": "test_albert",
                     "mixing_alpha": 0.0,
-                    "act_background_samples": 32,
+                    "act_background_samples": 8,
                 },
                 "input_configs": [
                     {
@@ -253,6 +253,12 @@ def test_sequence_modelling(prep_modelling_test_configs):
     indirect=True,
 )
 def test_mt_sequence_modelling(prep_modelling_test_configs):
+    """
+    NOTE: Currently we skip these in GHA as the runners sometimes get a SIGKILL -9
+    randomly, not due to this test in particular (running separately works),
+    but if the overall task takes too long / too many resources. Might be temporary
+    GHA issue, but for now we skip.
+    """
     experiment, test_config = prep_modelling_test_configs
 
     train.train(experiment=experiment)
@@ -427,7 +433,7 @@ def _check_sequence_activations(
 ) -> bool:
     df_activations = df_activations.sort_values(by="Attribution", ascending=False)
     df_top_n_rows = df_activations.head(top_n_activations)
-    top_tokens = df_top_n_rows["Token"]
+    top_tokens = df_top_n_rows["Input"]
 
     matching = [i for i in top_tokens if i in expected_top_tokens_pool]
 

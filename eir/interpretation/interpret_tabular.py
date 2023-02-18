@@ -203,24 +203,17 @@ def parse_tabular_activations_for_feature_importance(
             cur_column_activations = np.abs(sample_acts[cur_slice]).sum()
             column_activations[column].append(cur_column_activations)
 
-    finalized_activations = {}
-
-    for column, aggregated_activations in column_activations.items():
-        mean_activation = np.array(column_activations[column]).mean()
-        finalized_activations[column] = [mean_activation]
-
-    return finalized_activations
+    return column_activations
 
 
 def get_tabular_attribution_df(
     parsed_activations: Dict[str, List[float]]
 ) -> pd.DataFrame:
-    df_attributions = pd.DataFrame.from_dict(
-        parsed_activations, orient="index", columns=["Attribution"]
-    )
-    df_attributions = df_attributions.sort_values(by="Attribution", ascending=False)
+    df = pd.concat({k: pd.Series(v) for k, v in parsed_activations.items()})
+    df = df.reset_index(level=0).reset_index(drop=True)
+    df.columns = ["Input", "Attribution"]
 
-    return df_attributions
+    return df
 
 
 def _gather_continuous_inputs(

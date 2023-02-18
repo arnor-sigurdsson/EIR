@@ -21,17 +21,19 @@ from typing import (
 
 # Filter warnings from attribution calculation
 warnings.filterwarnings(
-    "ignore",
-    """Setting forward, backward hooks and attributes on non-linear
-               activations. The hooks and attributes will be removed
-            after the attribution is finished""",
+    "ignore", message="Setting forward, backward hooks and attributes on non-linear.*"
 )
+warnings.filterwarnings(
+    "ignore", message=".*Attempting to normalize by value approximately 0.*"
+)
+
 
 import numpy as np
 import torch
+from torch.cuda import OutOfMemoryError
 from aislib.misc_utils import get_logger, ensure_path_exists
 from ignite.engine import Engine
-from captum.attr import DeepLift, DeepLiftShap, IntegratedGradients
+from captum.attr import IntegratedGradients, NoiseTunnel
 from torch import nn
 from torch.utils.data import DataLoader, Subset
 from torch.utils.hooks import RemovableHandle
@@ -68,7 +70,7 @@ if TYPE_CHECKING:
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 # Type aliases
-al_explainers = Union[DeepLift, DeepLiftShap, IntegratedGradients]
+al_explainers = Union[IntegratedGradients, NoiseTunnel]
 
 
 class WrapperModelForAttribution(nn.Module):
@@ -202,11 +204,12 @@ def activation_analysis_wrapper(
             n_background_samples=gc.act_background_samples,
         )
 
-        act_callable = get_attribution_callable(
+        act_callable = get_oom_adaptive_attribution_callable(
             explainer=ao.explainer,
             column_type=target_column_type,
             baseline_values=ao.baseline_values_ordered,
             baseline_names_ordered=ao.input_names_ordered,
+            batch_size=gc.batch_size,
         )
 
         act_func = partial(
@@ -284,7 +287,7 @@ def activation_analysis_wrapper(
                 analyze_sequence_input_activations(
                     **common_kwargs,
                     expected_target_classes_attributions=expected_value,
-                    output_name=output_name
+                    output_name=output_name,
                 )
             elif input_type == "image":
                 analyze_image_input_activations(
@@ -349,7 +352,7 @@ def get_attribution_object(
         wrapped_model=model,
         input_names=input_names,
     )
-    explainer = IntegratedGradients(wrapped_model)
+    explainer = IntegratedGradients(forward_func=wrapped_model)
 
     attribution_object = AttributionObject(
         explainer=explainer,
@@ -364,17 +367,21 @@ def get_attribution_object(
 
 class ActivationCallable(Protocol):
     def __call__(
-        self, inputs: Sequence[torch.Tensor], *args, **kwargs
-    ) -> Sequence[torch.Tensor]:
+        self,
+        inputs: Dict[str, torch.Tensor],
+        sample_label: torch.Tensor,
+        *args,
+        **kwargs,
+    ) -> list[np.ndarray]:
         ...
 
 
 def get_activation(
     activation_callable: ActivationCallable,
-    inputs: Sequence[torch.Tensor],
+    inputs: Dict[str, torch.Tensor],
     input_names: Sequence[torch.Tensor],
     *args,
-    **kwargs
+    **kwargs,
 ) -> Union[Dict[str, torch.Tensor], None]:
     input_activations = activation_callable(inputs=inputs, *args, **kwargs)
 
@@ -386,21 +393,97 @@ def get_activation(
     return name_matched_activation
 
 
+def get_oom_adaptive_attribution_callable(
+    explainer: al_explainers,
+    column_type: str,
+    baseline_values: tuple[torch.Tensor, ...],
+    baseline_names_ordered: tuple[str, ...],
+    batch_size: int,
+) -> ActivationCallable:
+    n_steps = min(batch_size, 128)
+    internal_batch_size = None
+    has_successfully_run = False
+
+    base_kwargs = dict(
+        explainer=explainer,
+        column_type=column_type,
+        baselines=baseline_values,
+        baseline_names_ordered=baseline_names_ordered,
+        n_steps=n_steps,
+    )
+
+    def calculate_attributions_adaptive(
+        inputs: Dict[str, torch.Tensor], sample_label: torch.Tensor
+    ) -> list[np.ndarray]:
+        nonlocal has_successfully_run
+        nonlocal internal_batch_size
+
+        if has_successfully_run:
+            return get_attributions(
+                inputs=inputs,
+                sample_label=sample_label,
+                internal_batch_size=internal_batch_size,
+                **base_kwargs,
+            )
+        else:
+            while True:
+                try:
+                    res = get_attributions(
+                        inputs=inputs,
+                        sample_label=sample_label,
+                        internal_batch_size=internal_batch_size,
+                        **base_kwargs,
+                    )
+                    has_successfully_run = True
+
+                    if internal_batch_size is not None:
+                        logger.debug(
+                            "Attribution IG internal batch size successfully set "
+                            "to %d.",
+                            internal_batch_size,
+                        )
+
+                    return res
+
+                except OutOfMemoryError as e:
+                    if internal_batch_size == 1:
+                        raise e
+
+                    if internal_batch_size is None:
+                        internal_batch_size = max(1, batch_size // 2)
+                    else:
+                        internal_batch_size = max(1, internal_batch_size // 2)
+
+                    logger.debug(
+                        "CUDA OOM error, reducing attribution IG "
+                        "internal batch size to %d.",
+                        internal_batch_size,
+                    )
+                    torch.cuda.empty_cache()
+                    continue
+
+    return calculate_attributions_adaptive
+
+
 def get_attribution_callable(
     explainer: al_explainers,
     column_type: str,
     baseline_values: tuple[torch.Tensor, ...],
     baseline_names_ordered: tuple[str, ...],
+    batch_size: int,
 ) -> Callable[
     [al_explainers, Dict[str, torch.Tensor], torch.Tensor, str],
     Union[None, np.ndarray],
 ]:
+    n_steps = min(batch_size, 128)
+
     act_func_partial = partial(
         get_attributions,
         explainer=explainer,
         column_type=column_type,
         baselines=baseline_values,
         baseline_names_ordered=baseline_names_ordered,
+        n_steps=n_steps,
     )
     return act_func_partial
 
@@ -604,7 +687,7 @@ def _prepare_eval_activation_outfolder(
     output_name: str,
     iteration: int,
     *args,
-    **kwargs
+    **kwargs,
 ):
     sample_outfolder = prep_sample_outfolder(
         output_folder=output_folder,
@@ -635,22 +718,24 @@ def get_attributions(
     column_type: str,
     baselines: tuple[torch.Tensor, ...],
     baseline_names_ordered: tuple[str, ...],
+    n_steps: int,
+    internal_batch_size: Union[int, None],
 ) -> list[np.ndarray]:
     list_inputs = tuple(inputs[n] for n in baseline_names_ordered)
-    baselines = tuple(i.mean(0).unsqueeze(0) for i in baselines)
+    baselines_averaged = tuple(i.mean(0).unsqueeze(0) for i in baselines)
+
+    common_kwargs = dict(
+        inputs=list_inputs,
+        baselines=baselines_averaged,
+        n_steps=n_steps,
+        internal_batch_size=internal_batch_size,
+    )
 
     with suppress_stdout_and_stderr():
         if column_type == "con":
-            output = explainer.attribute(
-                inputs=list_inputs,
-                baselines=baselines,
-            )
+            output = explainer.attribute(**common_kwargs)
         else:
-            output = explainer.attribute(
-                inputs=list_inputs,
-                baselines=baselines,
-                target=sample_label,
-            )
+            output = explainer.attribute(target=sample_label, **common_kwargs)
 
     output = [o.detach().cpu().numpy() for o in output]
 

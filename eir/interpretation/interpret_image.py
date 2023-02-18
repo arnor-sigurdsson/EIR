@@ -66,7 +66,7 @@ def analyze_image_input_activations(
         figure, _ = visualize_image_attr_multiple(
             attr=attributions,
             original_image=raw_input,
-            methods=["original_image", "blended_heat_map"],
+            methods=["original_image", "heat_map"],
             signs=["all", "absolute_value"],
             show_colorbar=True,
             cmap=cmap,

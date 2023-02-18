@@ -277,9 +277,8 @@ def get_label_transformer_mapping(
 
 def get_sequence_token_importance(
     activations: Sequence["SampleActivation"], vocab: Vocab, input_name: str
-) -> Dict[str, float]:
-    token_importances = defaultdict(lambda: 0.0)
-    token_counts = defaultdict(lambda: 0)
+) -> Dict[str, list[float]]:
+    token_importances = defaultdict(list)
 
     for act in activations:
         orig_seq_input = extract_raw_inputs_from_tokens(
@@ -293,24 +292,17 @@ def get_sequence_token_importance(
         assert len(seq_attrs_values_sum) == len(orig_seq_input)
 
         for token, attribution in zip(orig_seq_input, seq_attrs_values_sum):
-            token_importances[token] += attribution
-            token_counts[token] += 1
-
-    n_samples = len(activations)
-    for token, total_attr in token_importances.items():
-        token_importances[token] = total_attr / (token_counts[token] * n_samples)
+            token_importances[token].append(attribution)
 
     return token_importances
 
 
 def get_sequence_feature_importance_df(
-    token_importances: Dict[str, float]
+    token_importances: Dict[str, list[float]]
 ) -> pd.DataFrame:
-    df = pd.DataFrame.from_dict(
-        token_importances, columns=["Attribution"], orient="index"
-    )
-
-    df.index.name = "Token"
+    df = pd.concat({k: pd.Series(v) for k, v in token_importances.items()})
+    df = df.reset_index(level=0).reset_index(drop=True)
+    df.columns = ["Input", "Attribution"]
 
     return df
 

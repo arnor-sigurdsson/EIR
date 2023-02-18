@@ -57,9 +57,7 @@ al_input_types = Union[
     schemas.ByteInputDataConfig,
 ]
 
-al_output_types = Union[
-    schemas.TabularOutputTypeConfig,
-]
+al_output_types = Union[schemas.TabularOutputTypeConfig]
 
 al_output_types_schema_map = Dict[
     str, Union[Type[schemas.TabularOutputTypeConfig], Type]
@@ -635,9 +633,7 @@ def init_output_config(
 def get_outputs_types_schema_map() -> (
     Dict[
         str,
-        Union[
-            Type[schemas.TabularOutputTypeConfig],
-        ],
+        Union[Type[schemas.TabularOutputTypeConfig]],
     ]
 ):
     mapping = {
