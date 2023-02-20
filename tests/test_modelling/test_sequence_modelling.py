@@ -443,7 +443,7 @@ def _check_sequence_activations(
     return success
 
 
-@pytest.mark.skipif(condition=should_skip_in_gha_macos(), reason="In GHA.")
+@pytest.mark.skipif(condition=should_skip_in_gha(), reason="In GHA.")
 @pytest.mark.parametrize(
     "model_name",
     get_all_hf_model_names(),
