@@ -449,6 +449,10 @@ def plot_tabular_continuous_attribution(
         axes[row_index, col_index].set_xlabel(feature_name)
         axes[row_index, col_index].set_ylabel("")
 
+    if num_plots < num_rows * num_cols:
+        for i in range(num_plots, num_rows * num_cols):
+            fig.delaxes(axes[i // num_cols, i % num_cols])
+
     fig.text(
         -0.01,
         0.5,
