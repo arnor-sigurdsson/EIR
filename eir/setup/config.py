@@ -272,6 +272,10 @@ def init_input_config(yaml_config_as_dict: Dict[str, Any]) -> schemas.InputConfi
     input_schema_map = get_inputs_schema_map()
     input_type_info_class = input_schema_map[input_info_object.input_type]
     input_type_info_object = input_type_info_class(**cfg.get("input_type_info", {}))
+    _validate_input_type_info_object(
+        input_type_info_object=input_type_info_object,
+        input_source=input_info_object.input_source,
+    )
 
     model_config = set_up_input_feature_extractor_config(
         input_info_object=input_info_object,
@@ -319,6 +323,24 @@ def get_inputs_schema_map() -> (
     }
 
     return mapping
+
+
+def _validate_input_type_info_object(
+    input_type_info_object: al_input_types, input_source: str
+) -> None:
+    ito = input_type_info_object
+    match ito:
+        case schemas.TabularInputDataConfig():
+            con = ito.input_con_columns
+            cat = ito.input_cat_columns
+            common = set(con).intersection(set(cat))
+            if common:
+                raise ValueError(
+                    f"Found columns passed in both continuous and categorical inputs: "
+                    f"{common}. In input source: {input_source}."
+                    f"Please make sure that each column is only in one of the two, "
+                    f"or create differently named copies of the columns."
+                )
 
 
 def set_up_input_feature_extractor_config(
