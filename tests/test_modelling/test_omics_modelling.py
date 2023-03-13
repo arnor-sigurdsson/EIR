@@ -240,13 +240,13 @@ def _check_snps_wrapper(
 ):
     expected_top_indxs = list(range(50, 1000, 100))
 
-    cur_output_act_paths = test_config.activations_paths[output_name]
+    cur_output_act_paths = test_config.attributions_paths[output_name]
 
     for target_folder_name, dict_with_path_to_input in cur_output_act_paths.items():
         if target_folder_name != target_name:
             continue
 
-        omics_acts_generator = _get_snp_activations_generator(
+        omics_acts_generator = _get_snp_attributions_generator(
             cur_output_act_paths=dict_with_path_to_input
         )
 
@@ -263,7 +263,7 @@ def _check_snps_wrapper(
             )
 
 
-def _get_snp_activations_generator(cur_output_act_paths: Dict[str, Path]):
+def _get_snp_attributions_generator(cur_output_act_paths: Dict[str, Path]):
     did_run = False
 
     for name, cur_path in cur_output_act_paths.items():
@@ -634,11 +634,11 @@ def _get_multi_task_output_configs(
                 "output_configs": _get_multi_task_output_configs(label_smoothing=0.1),
             },
         },
-        # Case 8: Using the GLN with limited activations and gradient accumulation
+        # Case 8: Using the GLN with limited attributions and gradient accumulation
         {
             "injections": {
                 "global_configs": {
-                    "output_folder": "limited_activations",
+                    "output_folder": "limited_attributions",
                     "lr": 1e-03 * 4,
                     "batch_size": 16,
                     "gradient_accumulation_steps": 4,
@@ -792,9 +792,9 @@ def _check_identified_snps(
     for multiple spots, in the case of regression this leads the network to only "need"
     to identify a part of the SNPs to create an output (possibly because we are not
     using a "correctness criteria" for regression, like we do with classification (i.e.
-    only gather activations for correctly predicted classes).
+    only gather attributions for correctly predicted classes).
 
-    :param array_path: Path to the accumulated grads / activation array.
+    :param array_path: Path to the accumulated grads / attribution array.
     :param expected_top_indices: Expected SNPs to be identified.
     :param top_row_grads_dict: What row is expected to be activated per class.
     :param check_types:  Whether to check the SNP types as well as the SNPs themselves
@@ -848,7 +848,7 @@ def _check_snp_types(
     homozygous, missing).
 
     Used when we have masked out the SNPs (otherwise the 0s in the one hot might have
-    a high activation, since they're saying the same thing as a 1 being in a spot).
+    a high attribution, since they're saying the same thing as a 1 being in a spot).
     """
     top_idxs = np.array(top_grads_msk[cls_name]["top_n_grads"].argmax(0))
     expected_idxs = np.array(expected_idxs)

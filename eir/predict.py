@@ -38,7 +38,7 @@ from eir.models.model_setup import (
     get_default_meta_class,
 )
 from eir.models.model_training_utils import gather_pred_outputs_from_dloader
-from eir.predict_modules.predict_activations import compute_predict_activations
+from eir.predict_modules.predict_attributions import compute_predict_attributions
 from eir.predict_modules.predict_config import converge_train_and_predict_configs
 from eir.predict_modules.predict_data import set_up_default_dataset
 from eir.predict_modules.predict_input_setup import (
@@ -100,7 +100,7 @@ def main():
     main_parser.add_argument(
         "--act_background_source",
         type=str,
-        help="For activation analysis, whether to load backgrounds from the data used "
+        help="For attribution analysis, whether to load backgrounds from the data used "
         "for training or to use the current data passed to the predict module.",
         choices=["train", "predict"],
         default="train",
@@ -135,7 +135,7 @@ def run_predict(predict_cl_args: Namespace):
     predict(predict_config=predict_config, predict_cl_args=predict_cl_args)
 
     if predict_config.train_configs_overloaded.global_config.compute_attributions:
-        compute_predict_activations(
+        compute_predict_attributions(
             loaded_train_experiment=loaded_train_experiment,
             predict_config=predict_config,
         )

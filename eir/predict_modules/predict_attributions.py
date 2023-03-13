@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 
 from eir.data_load import label_setup
 from eir.experiment_io.experiment_io import LoadedTrainExperiment
-from eir.interpretation.interpretation import activation_analysis_wrapper
+from eir.interpretation.interpretation import attribution_analysis_wrapper
 from eir.predict_modules.predict_data import set_up_default_dataset
 from eir.predict_modules.predict_input_setup import set_up_inputs_for_predict
 from eir.predict_modules.predict_target_setup import get_target_labels_for_testing
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 logger = get_logger(name=__name__)
 
 
-def compute_predict_activations(
+def compute_predict_attributions(
     loaded_train_experiment: "LoadedTrainExperiment",
     predict_config: "PredictConfig",
 ) -> None:
@@ -47,20 +47,20 @@ def compute_predict_activations(
         loaded_hooks=loaded_train_experiment.hooks,
     )
 
-    overloaded_train_experiment = _overload_train_experiment_for_predict_activations(
+    overloaded_train_experiment = _overload_train_experiment_for_predict_attributions(
         train_config=loaded_train_experiment,
         predict_config=predict_config,
     )
 
-    activation_outfolder_callable = partial(
-        _get_predict_activation_outfolder_target,
+    attribution_outfolder_callable = partial(
+        _get_predict_attribution_outfolder_target,
         predict_outfolder=Path(predict_config.predict_specific_cl_args.output_folder),
     )
 
-    activation_analysis_wrapper(
+    attribution_analysis_wrapper(
         model=predict_config.model,
         experiment=overloaded_train_experiment,
-        outfolder_target_callable=activation_outfolder_callable,
+        outfolder_target_callable=attribution_outfolder_callable,
         dataset_to_interpret=predict_config.test_dataset,
         background_loader=background_dataloader,
     )
@@ -77,14 +77,14 @@ def get_background_source_config(
     """
     if background_source_in_predict_cl_args == "predict":
         logger.info(
-            "Background for activation analysis will be loaded from sources "
+            "Background for attribution analysis will be loaded from sources "
             "passed to predict.py."
         )
         return predict_configs
 
     elif background_source_in_predict_cl_args == "train":
         logger.info(
-            "Background for activation analysis will be loaded from sources "
+            "Background for attribution analysis will be loaded from sources "
             "previously used for training run with name '%s'.",
             train_configs.global_config.output_folder,
         )
@@ -99,7 +99,7 @@ class LoadedTrainExperimentMixedWithPredict(LoadedTrainExperiment):
     inputs: al_input_objects_as_dict
 
 
-def _overload_train_experiment_for_predict_activations(
+def _overload_train_experiment_for_predict_attributions(
     train_config: LoadedTrainExperiment,
     predict_config: "PredictConfig",
 ) -> "LoadedTrainExperimentMixedWithPredict":
@@ -166,7 +166,7 @@ def _get_predict_background_loader(
     check_dataset_and_batch_size_compatiblity(
         dataset=background_dataset,
         batch_size=batch_size,
-        name="Test activation background",
+        name="Test attribution background",
     )
     background_loader = DataLoader(
         dataset=background_dataset,
@@ -178,12 +178,12 @@ def _get_predict_background_loader(
     return background_loader
 
 
-def _get_predict_activation_outfolder_target(
+def _get_predict_attribution_outfolder_target(
     predict_outfolder: Path, output_name: str, column_name: str, input_name: str
 ) -> Path:
-    activation_outfolder = (
-        predict_outfolder / output_name / column_name / "activations" / input_name
+    attribution_outfolder = (
+        predict_outfolder / output_name / column_name / "attributions" / input_name
     )
-    ensure_path_exists(path=activation_outfolder, is_folder=True)
+    ensure_path_exists(path=attribution_outfolder, is_folder=True)
 
-    return activation_outfolder
+    return attribution_outfolder

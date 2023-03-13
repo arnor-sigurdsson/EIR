@@ -11,26 +11,26 @@ from sklearn.preprocessing import LabelEncoder
 
 from eir.experiment_io.experiment_io import load_transformers
 from eir.interpretation.interpretation_utils import (
-    stratify_activations_by_target_classes,
-    plot_activations_bar,
+    stratify_attributions_by_target_classes,
+    plot_attributions_bar,
 )
 
 if TYPE_CHECKING:
     from eir.train import Experiment
-    from eir.interpretation.interpretation import SampleActivation
+    from eir.interpretation.interpretation import SampleAttribution
 
 
 logger = get_logger(__name__)
 
 
-def analyze_tabular_input_activations(
+def analyze_tabular_input_attributions(
     experiment: "Experiment",
     input_name: str,
     output_name: str,
     target_column_name: str,
     target_column_type: str,
-    activation_outfolder: Path,
-    all_activations: Sequence["SampleActivation"],
+    attribution_outfolder: Path,
+    all_attributions: Sequence["SampleAttribution"],
 ):
     exp = experiment
 
@@ -39,50 +39,52 @@ def analyze_tabular_input_activations(
     con_columns = tabular_type_info_config.input_con_columns
 
     tabular_model = experiment.model.input_modules[input_name]
-    activation_tensor_slices = set_up_tabular_tensor_slices(
+    attribution_tensor_slices = set_up_tabular_tensor_slices(
         cat_input_columns=cat_columns,
         con_input_columns=con_columns,
         embedding_module=tabular_model,
     )
 
-    parsed_activations = parse_tabular_activations_for_feature_importance(
-        activation_tensor_slices=activation_tensor_slices,
-        all_activations=all_activations,
+    parsed_attributions = parse_tabular_attributions_for_feature_importance(
+        attribution_tensor_slices=attribution_tensor_slices,
+        all_attributions=all_attributions,
         input_name=input_name,
     )
-    df_activations = get_tabular_attribution_df(parsed_activations=parsed_activations)
-    plot_activations_bar(
-        df_activations=df_activations,
-        outpath=activation_outfolder / "feature_importance.pdf",
+    df_attributions = get_tabular_attribution_df(
+        parsed_attributions=parsed_attributions
     )
-    df_activations.to_csv(activation_outfolder / "feature_importances.csv")
+    plot_attributions_bar(
+        df_attributions=df_attributions,
+        outpath=attribution_outfolder / "feature_importance.pdf",
+    )
+    df_attributions.to_csv(attribution_outfolder / "feature_importances.csv")
 
     target_transformer = exp.outputs[output_name].target_transformers[
         target_column_name
     ]
-    all_activations_class_stratified = stratify_activations_by_target_classes(
-        all_activations=all_activations,
+    all_attributions_class_stratified = stratify_attributions_by_target_classes(
+        all_attributions=all_attributions,
         target_transformer=target_transformer,
         output_name=output_name,
         target_column=target_column_name,
         column_type=target_column_type,
     )
-    for class_name, class_activations in all_activations_class_stratified.items():
-        cur_class_outfolder = activation_outfolder / class_name
+    for class_name, class_attributions in all_attributions_class_stratified.items():
+        cur_class_outfolder = attribution_outfolder / class_name
         ensure_path_exists(path=cur_class_outfolder, is_folder=True)
 
         if con_columns:
             cat_to_con_cutoff = get_cat_to_con_cutoff_from_slices(
-                slices=activation_tensor_slices,
+                slices=attribution_tensor_slices,
                 cat_input_columns=cat_columns,
             )
             continuous_attr = _gather_continuous_attributions(
-                all_activations=class_activations,
+                all_attributions=class_attributions,
                 cat_to_con_cutoff=cat_to_con_cutoff,
                 input_name=input_name,
             )
             continuous_inputs = _gather_continuous_inputs(
-                all_activations=class_activations,
+                all_attributions=class_attributions,
                 cat_to_con_cutoff=cat_to_con_cutoff,
                 con_names=con_columns,
                 input_name=input_name,
@@ -91,19 +93,19 @@ def analyze_tabular_input_activations(
             plot_tabular_continuous_attribution(
                 attributions=continuous_attr,
                 df_features=continuous_inputs,
-                activation_output_folder=cur_class_outfolder,
+                attribution_output_folder=cur_class_outfolder,
                 class_name=class_name,
             )
 
         cat_act_dfs = []
         for cat_column in cat_columns:
             categorical_attr = _gather_categorical_attributions(
-                all_activations=class_activations,
-                cur_slice=activation_tensor_slices[cat_column],
+                all_attributions=class_attributions,
+                cur_slice=attribution_tensor_slices[cat_column],
                 input_name=input_name,
             )
             categorical_inputs = _gather_categorical_inputs(
-                all_activations=class_activations,
+                all_attributions=class_attributions,
                 cat_name=cat_column,
                 input_name=input_name,
             )
@@ -123,7 +125,7 @@ def analyze_tabular_input_activations(
                 df_features=categorical_inputs_mapped,
                 feature_name_to_plot=cat_column,
                 class_name=class_name,
-                activation_output_folder=cur_class_outfolder,
+                attribution_output_folder=cur_class_outfolder,
             )
 
             df_cur_categorical_acts = _parse_categorical_attrs_for_serialization(
@@ -184,32 +186,32 @@ def get_cat_to_con_cutoff_from_slices(
     return cutoff
 
 
-def parse_tabular_activations_for_feature_importance(
-    activation_tensor_slices: Dict,
-    all_activations: Sequence["SampleActivation"],
+def parse_tabular_attributions_for_feature_importance(
+    attribution_tensor_slices: Dict,
+    all_attributions: Sequence["SampleAttribution"],
     input_name: str,
 ) -> Dict[str, List[float]]:
     """
     Note we need to use abs here to get the absolute feature importance, before
     we sum so different signs don't cancel each other out.
     """
-    column_activations = {column: [] for column in activation_tensor_slices.keys()}
+    column_attributions = {column: [] for column in attribution_tensor_slices.keys()}
 
-    for sample_activation in all_activations:
-        sample_acts = sample_activation.sample_activations[input_name].squeeze(0)
+    for sample_attribution in all_attributions:
+        sample_acts = sample_attribution.sample_attributions[input_name].squeeze(0)
 
-        for column in activation_tensor_slices.keys():
-            cur_slice = activation_tensor_slices[column]
-            cur_column_activations = np.abs(sample_acts[cur_slice]).sum()
-            column_activations[column].append(cur_column_activations)
+        for column in attribution_tensor_slices.keys():
+            cur_slice = attribution_tensor_slices[column]
+            cur_column_attributions = np.abs(sample_acts[cur_slice]).sum()
+            column_attributions[column].append(cur_column_attributions)
 
-    return column_activations
+    return column_attributions
 
 
 def get_tabular_attribution_df(
-    parsed_activations: Dict[str, List[float]]
+    parsed_attributions: Dict[str, List[float]]
 ) -> pd.DataFrame:
-    df = pd.concat({k: pd.Series(v) for k, v in parsed_activations.items()})
+    df = pd.concat({k: pd.Series(v) for k, v in parsed_attributions.items()})
     df = df.reset_index(level=0).reset_index(drop=True)
     df.columns = ["Input", "Attribution"]
 
@@ -217,14 +219,14 @@ def get_tabular_attribution_df(
 
 
 def _gather_continuous_inputs(
-    all_activations: Sequence["SampleActivation"],
+    all_attributions: Sequence["SampleAttribution"],
     cat_to_con_cutoff: int,
     con_names: Sequence[str],
     input_name: str,
 ) -> pd.DataFrame:
     con_inputs = []
 
-    for sample in all_activations:
+    for sample in all_attributions:
         cur_full_input = sample.sample_info.inputs[input_name]
         assert len(cur_full_input.shape) == 2
 
@@ -238,14 +240,14 @@ def _gather_continuous_inputs(
 
 
 def _gather_continuous_attributions(
-    all_activations: Sequence["SampleActivation"],
+    all_attributions: Sequence["SampleAttribution"],
     cat_to_con_cutoff: int,
     input_name: str,
 ) -> np.ndarray:
     con_acts = []
 
-    for sample in all_activations:
-        cur_full_input = sample.sample_activations[input_name]
+    for sample in all_attributions:
+        cur_full_input = sample.sample_attributions[input_name]
         assert len(cur_full_input.shape) == 2
         assert cur_full_input.shape[0] == 1
 
@@ -258,7 +260,7 @@ def _gather_continuous_attributions(
 
 
 def _gather_categorical_attributions(
-    all_activations: Sequence["SampleActivation"],
+    all_attributions: Sequence["SampleAttribution"],
     cur_slice: slice,
     input_name: str,
 ) -> np.ndarray:
@@ -268,8 +270,8 @@ def _gather_categorical_attributions(
     """
     cat_acts = []
 
-    for sample in all_activations:
-        cur_full_input = sample.sample_activations[input_name]
+    for sample in all_attributions:
+        cur_full_input = sample.sample_attributions[input_name]
         assert len(cur_full_input.shape) == 2
         assert cur_full_input.shape[0] == 1
 
@@ -288,13 +290,13 @@ def _gather_categorical_attributions(
 
 
 def _gather_categorical_inputs(
-    all_activations: Sequence["SampleActivation"],
+    all_attributions: Sequence["SampleAttribution"],
     cat_name: str,
     input_name: str,
 ) -> pd.DataFrame:
     cat_inputs = []
 
-    for sample in all_activations:
+    for sample in all_attributions:
         cur_raw_cat_input = sample.raw_inputs[input_name][cat_name]
         cur_cat_input_part = cur_raw_cat_input
         cat_inputs.append(cur_cat_input_part)
@@ -326,7 +328,7 @@ def plot_tabular_categorical_attributions(
     df_features: pd.DataFrame,
     feature_name_to_plot: str,
     class_name: str,
-    activation_output_folder: Path,
+    attribution_output_folder: Path,
 ) -> None:
     """
     attribution: (num_samples, num_features)
@@ -370,7 +372,7 @@ def plot_tabular_categorical_attributions(
     plt.tight_layout()
     name = f"categorical_attributions_{feature_name_to_plot}_{class_name}.pdf"
     plt.savefig(
-        str(activation_output_folder / name),
+        str(attribution_output_folder / name),
         bbox_inches="tight",
     )
     plt.close(fig)
@@ -411,7 +413,7 @@ def plot_tabular_continuous_attribution(
     attributions: np.ndarray,
     df_features: pd.DataFrame,
     class_name: str,
-    activation_output_folder: Path,
+    attribution_output_folder: Path,
     top_n_features_to_plot: int = 20,
 ) -> None:
     """
@@ -464,7 +466,7 @@ def plot_tabular_continuous_attribution(
     plt.tight_layout()
     name = f"continuous_attributions_{class_name}.pdf"
     plt.savefig(
-        str(activation_output_folder / name),
+        str(attribution_output_folder / name),
         bbox_inches="tight",
     )
     plt.close(fig)

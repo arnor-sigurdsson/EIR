@@ -27,7 +27,7 @@ from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 
 from eir.data_load.data_utils import get_output_info_generator
-from eir.interpretation.interpretation import activation_analysis_handler
+from eir.interpretation.interpretation import attribution_analysis_handler
 from eir.setup.config import object_to_primitives
 from eir.setup.output_setup import al_output_objects_as_dict
 from eir.setup.schemas import GlobalConfig
@@ -146,14 +146,14 @@ def _attach_sample_interval_handlers(
     all_handler_events = [validation_handler_and_event]
 
     if gc.compute_attributions:
-        activation_handler_and_event = _get_activation_handler_and_event(
+        attribution_handler_and_event = _get_attribution_handler_and_event(
             iter_per_epoch=len(exp.train_loader),
             n_epochs=gc.n_epochs,
             sample_interval_base=gc.sample_interval,
             attributions_every_sample_factor=gc.attributions_every_sample_factor,
             early_stopping_patience=gc.early_stopping_patience,
         )
-        all_handler_events.append(activation_handler_and_event)
+        all_handler_events.append(attribution_handler_and_event)
 
     for handler, event in all_handler_events:
         trainer.add_event_handler(
@@ -186,41 +186,41 @@ def _get_validation_handler_and_event(
     return validation_handler_callable, validation_event
 
 
-def _get_activation_handler_and_event(
+def _get_attribution_handler_and_event(
     iter_per_epoch: int,
     n_epochs: int,
     sample_interval_base: int,
     attributions_every_sample_factor: int,
     early_stopping_patience: int,
 ) -> al_handler_and_event:
-    activation_handler_callable = activation_analysis_handler
+    attribution_handler_callable = attribution_analysis_handler
 
     if attributions_every_sample_factor == 0:
-        activation_event = Events.COMPLETED
-        logger.debug("Activations will be computed at run end.")
+        attribution_event = Events.COMPLETED
+        logger.debug("Attributions will be computed at run end.")
 
-        return activation_handler_callable, activation_event
+        return attribution_handler_callable, attribution_event
 
-    activation_handler_interval = (
+    attribution_handler_interval = (
         sample_interval_base * attributions_every_sample_factor
     )
-    activation_event = Events.ITERATION_COMPLETED(every=activation_handler_interval)
+    attribution_event = Events.ITERATION_COMPLETED(every=attribution_handler_interval)
 
     do_run_when_training_complete = _do_run_completed_handler(
         iter_per_epoch=iter_per_epoch,
         n_epochs=n_epochs,
-        sample_interval=activation_handler_interval,
+        sample_interval=attribution_handler_interval,
     )
 
     if do_run_when_training_complete and not early_stopping_patience:
-        activation_event = activation_event | Events.COMPLETED
+        attribution_event = attribution_event | Events.COMPLETED
 
     logger.debug(
-        "Activations will be computed every %d iterations.",
-        activation_handler_interval,
+        "Attributions will be computed every %d iterations.",
+        attribution_handler_interval,
     )
 
-    return activation_handler_callable, activation_event
+    return attribution_handler_callable, attribution_event
 
 
 def _do_run_completed_handler(iter_per_epoch: int, n_epochs: int, sample_interval: int):

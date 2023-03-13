@@ -9,7 +9,7 @@ import torch
 import eir.experiment_io.experiment_io
 import eir.models.model_setup
 import eir.models.omics.omics_models
-import eir.predict_modules.predict_activations
+import eir.predict_modules.predict_attributions
 import eir.predict_modules.predict_config
 import eir.predict_modules.predict_data
 import eir.predict_modules.predict_input_setup
@@ -284,7 +284,7 @@ def test_predict(
 
     predict.predict(predict_cl_args=predict_cl_args, predict_config=predict_config)
 
-    eir.predict_modules.predict_activations.compute_predict_activations(
+    eir.predict_modules.predict_attributions.compute_predict_attributions(
         loaded_train_experiment=train_configs_for_testing,
         predict_config=predict_config,
     )
@@ -314,4 +314,4 @@ def test_predict(
     preds_accuracy = (preds == true_labels).sum() / len(true_labels)
     assert preds_accuracy > 0.7
 
-    assert (tmp_path / "test_output/Origin/activations").exists()
+    assert (tmp_path / "test_output/Origin/attributions").exists()
