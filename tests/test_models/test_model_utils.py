@@ -50,8 +50,8 @@ def test_get_model_params(create_test_util_model):
         model=test_model, wd=weight_decay
     )
 
-    # BN has weight and bias, hence 6 + 2 = 8 parameter groups
-    assert len(model_params) == 8
+    # BN has weight and bias, hence 6 [w] + 2 [b] + 2 = 10 parameter groups
+    assert len(model_params) == 10
 
     for param_group in model_params:
         if param_group["params"].shape[0] == 1:
