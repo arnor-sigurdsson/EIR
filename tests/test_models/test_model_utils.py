@@ -14,11 +14,11 @@ def create_test_util_model():
         def __init__(self):
             super().__init__()
 
-            self.fc_1 = nn.Linear(10, 10, bias=False)
+            self.fc_1 = nn.Linear(10, 10, bias=True)
             self.act_1 = nn.PReLU()
             self.bn_1 = nn.BatchNorm1d(10)
 
-            self.fc_2 = nn.Linear(10, 10, bias=False)
+            self.fc_2 = nn.Linear(10, 10, bias=True)
             self.act_2 = nn.PReLU()
             self.bn_2 = nn.BatchNorm1d(10)
 
@@ -50,8 +50,8 @@ def test_get_model_params(create_test_util_model):
         model=test_model, wd=weight_decay
     )
 
-    # BN has weight and bias, hence 6 + 2 = 8 parameter groups
-    assert len(model_params) == 8
+    # BN has weight and bias, hence 6 [w] + 2 [b] + 2 = 10 parameter groups
+    assert len(model_params) == 10
 
     for param_group in model_params:
         if param_group["params"].shape[0] == 1:

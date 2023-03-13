@@ -84,8 +84,6 @@ def plot_attributions_bar(
     plt.tight_layout()
     sns_figure: plt.Figure = ax.get_figure()
 
-    ax.set(xlim=(0, None))
-
     if title:
         ax.set_title(title)
 

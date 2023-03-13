@@ -140,7 +140,7 @@ class CNNModel(nn.Module):
                     "fc_1_bn_1": nn.LayerNorm(self.fc_1_in_features),
                     "fc_1_act_1": Swish(),
                     "fc_1_linear_1": nn.Linear(
-                        self.fc_1_in_features, self.model_config.fc_repr_dim, bias=False
+                        self.fc_1_in_features, self.model_config.fc_repr_dim, bias=True
                     ),
                 }
             )

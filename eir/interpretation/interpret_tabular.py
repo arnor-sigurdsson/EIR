@@ -369,6 +369,8 @@ def plot_tabular_categorical_attributions(
     ax.set_xlabel(feature_name_to_plot)
     ax.set_ylabel("Attribution (impact on model output)")
 
+    ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
+
     plt.tight_layout()
     name = f"categorical_attributions_{feature_name_to_plot}_{class_name}.pdf"
     plt.savefig(

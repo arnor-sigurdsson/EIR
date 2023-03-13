@@ -23,25 +23,25 @@ class SelfAttention(nn.Module):
             in_channels=in_channels,
             out_channels=self.reduction,
             kernel_size=1,
-            bias=False,
+            bias=True,
         )
         self.conv_phi = nn.Conv2d(
             in_channels=in_channels,
             out_channels=self.reduction,
             kernel_size=1,
-            bias=False,
+            bias=True,
         )
         self.conv_g = nn.Conv2d(
             in_channels=in_channels,
             out_channels=in_channels // 2,
             kernel_size=1,
-            bias=False,
+            bias=True,
         )
         self.conv_o = nn.Conv2d(
             in_channels=in_channels // 2,
             out_channels=in_channels,
             kernel_size=1,
-            bias=False,
+            bias=True,
         )
         self.pool = nn.AvgPool2d((1, 4), stride=(1, 4), padding=0)
         self.softmax = nn.Softmax(dim=-1)
@@ -89,7 +89,7 @@ class SEBlock(nn.Module):
             out_channels=reduced_channels,
             kernel_size=1,
             padding=0,
-            bias=False,
+            bias=True,
         )
         self.act_1 = Swish()
 
@@ -98,7 +98,7 @@ class SEBlock(nn.Module):
             out_channels=channels,
             kernel_size=1,
             padding=0,
-            bias=False,
+            bias=True,
         )
 
         self.sigmoid = nn.Sigmoid()
@@ -151,7 +151,7 @@ class CNNResidualBlockBase(nn.Module):
             kernel_size=(self.conv_1_kernel_h, conv_1_kernel_w),
             stride=(self.down_stride_h, down_stride_w),
             padding=(0, conv_1_padding),
-            bias=False,
+            bias=True,
         )
 
         conv_2_kernel_w = (
@@ -166,7 +166,7 @@ class CNNResidualBlockBase(nn.Module):
             stride=(1, 1),
             padding=(0, conv_2_padding * dilation),
             dilation=(1, dilation),
-            bias=False,
+            bias=True,
         )
 
         self.downsample_identity = nn.Sequential(
@@ -176,7 +176,7 @@ class CNNResidualBlockBase(nn.Module):
                 kernel_size=(self.conv_1_kernel_h, conv_1_kernel_w),
                 stride=(self.down_stride_h, down_stride_w),
                 padding=(0, conv_1_padding),
-                bias=False,
+                bias=True,
             )
         )
 
@@ -401,20 +401,20 @@ class MLPResidualBlock(nn.Module):
         self.norm_1 = nn.LayerNorm(normalized_shape=in_features)
 
         self.fc_1 = nn.Linear(
-            in_features=in_features, out_features=out_features, bias=False
+            in_features=in_features, out_features=out_features, bias=True
         )
 
         self.act_1 = Swish()
         self.do = nn.Dropout(p=dropout_p)
         self.fc_2 = nn.Linear(
-            in_features=out_features, out_features=out_features, bias=False
+            in_features=out_features, out_features=out_features, bias=True
         )
 
         if in_features == out_features:
             self.downsample_identity = lambda x: x
         else:
             self.downsample_identity = nn.Linear(
-                in_features=in_features, out_features=out_features, bias=False
+                in_features=in_features, out_features=out_features, bias=True
             )
 
         self.stochastic_depth = StochasticDepth(p=self.stochastic_depth_p, mode="batch")
@@ -467,7 +467,7 @@ class SplitMLPResidualBlock(nn.Module):
         self.fc_1 = SplitLinear(
             in_features=self.in_features,
             out_feature_sets=self.out_feature_sets,
-            bias=False,
+            bias=True,
             split_size=self.split_size,
         )
 
@@ -477,7 +477,7 @@ class SplitMLPResidualBlock(nn.Module):
         fc_2_kwargs = _get_split_fc_2_kwargs(
             in_features=self.fc_1.out_features,
             out_feature_sets=self.out_feature_sets,
-            bias=False,
+            bias=True,
             split_size=self.split_size,
             reduce_both=self.reduce_both,
         )
@@ -489,7 +489,7 @@ class SplitMLPResidualBlock(nn.Module):
             self.downsample_identity = SplitLinear(
                 in_features=self.in_features,
                 out_feature_sets=1,
-                bias=False,
+                bias=True,
                 num_chunks=self.fc_2.out_features,
             )
 
