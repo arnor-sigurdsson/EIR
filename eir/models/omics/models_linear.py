@@ -31,7 +31,7 @@ class LinearModel(nn.Module):
         self.data_dimensions = data_dimensions
 
         self.fc_0 = nn.Linear(
-            self.fc_1_in_features, self.model_config.fc_repr_dim, bias=False
+            self.fc_1_in_features, self.model_config.fc_repr_dim, bias=True
         )
 
         self._init_weights()

@@ -14,11 +14,11 @@ def create_test_util_model():
         def __init__(self):
             super().__init__()
 
-            self.fc_1 = nn.Linear(10, 10, bias=False)
+            self.fc_1 = nn.Linear(10, 10, bias=True)
             self.act_1 = nn.PReLU()
             self.bn_1 = nn.BatchNorm1d(10)
 
-            self.fc_2 = nn.Linear(10, 10, bias=False)
+            self.fc_2 = nn.Linear(10, 10, bias=True)
             self.act_2 = nn.PReLU()
             self.bn_2 = nn.BatchNorm1d(10)
 

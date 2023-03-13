@@ -51,7 +51,7 @@ class SimpleLCLModel(nn.Module):
             in_features=self.fc_1_in_features,
             out_feature_sets=self.model_config.fc_repr_dim,
             num_chunks=num_chunks,
-            bias=False,
+            bias=True,
         )
 
         self._init_weights()
@@ -180,7 +180,7 @@ class LCLModel(nn.Module):
             in_features=self.fc_1_in_features,
             out_feature_sets=2**fc_0_channel_exponent,
             split_size=fc_0_split_size,
-            bias=False,
+            bias=True,
         )
 
         split_parameter_spec = LCParameterSpec(

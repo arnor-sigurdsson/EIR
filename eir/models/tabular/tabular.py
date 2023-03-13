@@ -96,7 +96,7 @@ class SimpleTabularModel(nn.Module):
         self.layer = nn.Identity()
         if model_init_config.fc_layer:
             self.layer = nn.Linear(
-                in_features=self.input_dim, out_features=self.input_dim, bias=False
+                in_features=self.input_dim, out_features=self.input_dim, bias=True
             )
 
     @property
