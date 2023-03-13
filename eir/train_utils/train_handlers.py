@@ -145,12 +145,12 @@ def _attach_sample_interval_handlers(
     )
     all_handler_events = [validation_handler_and_event]
 
-    if gc.get_acts:
+    if gc.compute_attributions:
         activation_handler_and_event = _get_activation_handler_and_event(
             iter_per_epoch=len(exp.train_loader),
             n_epochs=gc.n_epochs,
             sample_interval_base=gc.sample_interval,
-            act_every_sample_factor=gc.act_every_sample_factor,
+            attributions_every_sample_factor=gc.attributions_every_sample_factor,
             early_stopping_patience=gc.early_stopping_patience,
         )
         all_handler_events.append(activation_handler_and_event)
@@ -190,18 +190,20 @@ def _get_activation_handler_and_event(
     iter_per_epoch: int,
     n_epochs: int,
     sample_interval_base: int,
-    act_every_sample_factor: int,
+    attributions_every_sample_factor: int,
     early_stopping_patience: int,
 ) -> al_handler_and_event:
     activation_handler_callable = activation_analysis_handler
 
-    if act_every_sample_factor == 0:
+    if attributions_every_sample_factor == 0:
         activation_event = Events.COMPLETED
         logger.debug("Activations will be computed at run end.")
 
         return activation_handler_callable, activation_event
 
-    activation_handler_interval = sample_interval_base * act_every_sample_factor
+    activation_handler_interval = (
+        sample_interval_base * attributions_every_sample_factor
+    )
     activation_event = Events.ITERATION_COMPLETED(every=activation_handler_interval)
 
     do_run_when_training_complete = _do_run_completed_handler(

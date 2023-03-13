@@ -130,10 +130,10 @@ def activation_analysis_handler(
     )
     if not should_run:
         logger.warning(
-            "Got get_acts: %s but none of the input types in %s currently "
+            "Got compute_attributions: %s but none of the input types in %s currently "
             "support activation analysis. "
             "Activation analysis will be skipped. ",
-            gc.get_acts,
+            gc.compute_attributions,
             types,
         )
         return
@@ -201,7 +201,7 @@ def activation_analysis_wrapper(
             column_name=target_column_name,
             output_name=output_name,
             background_loader=background_loader,
-            n_background_samples=gc.act_background_samples,
+            n_background_samples=gc.attribution_background_samples,
         )
 
         act_callable = get_oom_adaptive_attribution_callable(
@@ -760,12 +760,12 @@ def _get_interpretation_data_producer(
     target_classes_numerical = _get_numerical_target_classes(
         target_transformer=target_transformer,
         column_type=column_type,
-        act_classes=gc.act_classes,
+        attribution_target_classes=gc.attribution_target_classes,
     )
 
     activations_data_loader = _get_activations_dataloader(
         dataset=dataset,
-        max_acts_per_class=gc.max_acts_per_class,
+        max_attributions_per_class=gc.max_attributions_per_class,
         output_name=output_name,
         target_column=column_name,
         column_type=column_type,
@@ -802,7 +802,7 @@ def _detach_all_inputs(tensor_inputs: Dict[str, torch.Tensor]):
 
 def _get_activations_dataloader(
     dataset: al_datasets,
-    max_acts_per_class: int,
+    max_attributions_per_class: int,
     output_name: str,
     target_column: str,
     column_type: str,
@@ -810,7 +810,7 @@ def _get_activations_dataloader(
 ) -> DataLoader:
     common_args = {"batch_size": 1, "shuffle": False}
 
-    if max_acts_per_class is None:
+    if max_attributions_per_class is None:
         data_loader = DataLoader(dataset=dataset, **common_args)
         return data_loader
 
@@ -820,7 +820,7 @@ def _get_activations_dataloader(
 
     subset_indices = indices_func(
         dataset=dataset,
-        max_acts_per_class=max_acts_per_class,
+        max_attributions_per_class=max_attributions_per_class,
         target_column=target_column,
         output_name=output_name,
         target_classes_numerical=target_classes_numerical,
@@ -832,13 +832,13 @@ def _get_activations_dataloader(
 
 def _get_categorical_sample_indices_for_activations(
     dataset: al_datasets,
-    max_acts_per_class: int,
+    max_attributions_per_class: int,
     output_name: str,
     target_column: str,
     target_classes_numerical: Sequence[int],
 ) -> Tuple[int, ...]:
     acc_label_counts = defaultdict(lambda: 0)
-    acc_label_limit = max_acts_per_class
+    acc_label_limit = max_attributions_per_class
     indices = []
 
     for index, sample in enumerate(dataset.samples):
@@ -859,9 +859,9 @@ def _get_categorical_sample_indices_for_activations(
 
 
 def _get_continuous_sample_indices_for_activations(
-    dataset: al_datasets, max_acts_per_class: int, *args, **kwargs
+    dataset: al_datasets, max_attributions_per_class: int, *args, **kwargs
 ) -> Tuple[int, ...]:
-    acc_label_limit = max_acts_per_class
+    acc_label_limit = max_attributions_per_class
     num_sample = len(dataset)
     indices = np.random.choice(num_sample, acc_label_limit)
 
@@ -874,12 +874,14 @@ def _subsample_dataset(dataset: al_datasets, indices: Sequence[int]):
 
 
 def _get_numerical_target_classes(
-    target_transformer, column_type: str, act_classes: Union[Sequence[str], None]
+    target_transformer,
+    column_type: str,
+    attribution_target_classes: Union[Sequence[str], None],
 ):
     if column_type == "con":
         return [None]
 
-    if act_classes:
-        return target_transformer.transform(act_classes)
+    if attribution_target_classes:
+        return target_transformer.transform(attribution_target_classes)
 
     return target_transformer.transform(target_transformer.classes_)

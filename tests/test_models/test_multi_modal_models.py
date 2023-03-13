@@ -29,7 +29,7 @@ from tests.test_models.model_testing_utils import prepare_example_batch
                 "global_configs": {
                     "output_folder": "multi_task_multi_modal",
                     "n_epochs": 6,
-                    "act_background_samples": 8,
+                    "attribution_background_samples": 8,
                 },
                 "input_configs": [
                     {

@@ -89,7 +89,7 @@ As usual, we can run the following command to train:
     :language: console
 
 .. note::
-    Here we are setting the ``--get_acts=true`` parameter,
+    Here we are setting the ``--compute_attributions=true`` parameter,
     from the command line, to get the SHAP activations of the
     model w.r.t. the tabular input data.
 
@@ -97,9 +97,9 @@ When training, I got the following training curve:
 
 .. image:: tutorial_files/07_multimodal_tutorial/figures/07_multimodal_training_curve_MCC_tabular.png
 
-Now, since we set the ``--get_acts=true`` parameter,
+Now, since we set the ``--compute_attributions=true`` parameter,
 we can have a look at the activations (notice in the global
-configuration, we set ``get_acts_ever_sample_factor=10``,
+configuration, we set ``compute_attributions_ever_sample_factor=10``,
 which means they are computed every
 10 sampling iterations,
 i.e. 200 * 10 = 2000 training iterations).

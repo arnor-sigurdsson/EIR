@@ -134,7 +134,7 @@ In any case, let's have a look at what our models
 are focusing on
 when deciding something is *not* a hot dog.
 (perhaps you already noticed
-we set the ``get_acts`` value to ``True``
+we set the ``compute_attributions`` value to ``True``
 in the global configuration):
 
 .. image:: tutorial_files/05_image_tutorial/figures/pretrained_resnet_not_hot_dog_activations.png

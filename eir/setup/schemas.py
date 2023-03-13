@@ -190,21 +190,24 @@ class GlobalConfig:
     :param n_saved_models:
         Number of top N models to saved during training.
 
-    :param get_acts:
-        Whether to compute activations w.r.t. inputs.
+    :param compute_attributions:
+        Whether to compute attributions / feature importance scores
+        (using integrated gradients) assigned by the model with respect to the
+        input features.
 
-    :param max_acts_per_class:
-        Maximum number of samples per class to gather for activation analysis.
-        Good to use when modelling on imbalanced data.
+    :param max_attributions_per_class:
+        Maximum number of samples per class to gather for attribution / feature
+        importance analysis. Good to use when modelling on imbalanced data.
 
-    :param act_every_sample_factor:
-        Controls whether the activations are computed at every sample interval
-        (=1), every other sample interval (=2), etc. Useful when computing the
-        activations takes a long time and we don't want to do it every time we
-        evaluate.
+    :param attributions_every_sample_factor:
+        Controls whether the attributions / feature importance values
+        are computed at every sample interval (=1), every other sample interval (=2),
+        etc. Useful when computing the attributions takes a long time and we
+        don't want to do it every time we evaluate.
 
-    :param act_background_samples:
-        Number of samples to use for the background in activation computations.
+    :param attribution_background_samples:
+        Number of samples to use for the background in attribution / feature importance
+        computations.
 
     :param debug:
         Whether to run in debug mode.
@@ -261,11 +264,11 @@ class GlobalConfig:
     save_evaluation_sample_results: bool = True
     checkpoint_interval: Union[None, int] = None
     n_saved_models: int = 1
-    get_acts: bool = False
-    act_classes: Union[None, List[str]] = None
-    max_acts_per_class: Union[None, int] = None
-    act_every_sample_factor: int = 1
-    act_background_samples: int = 64
+    compute_attributions: bool = False
+    attribution_target_classes: Union[None, List[str]] = None
+    max_attributions_per_class: Union[None, int] = None
+    attributions_every_sample_factor: int = 1
+    attribution_background_samples: int = 64
     debug: bool = False
     no_pbar: bool = False
     mixing_alpha: float = 0.0

@@ -40,7 +40,7 @@ def compute_predict_activations(
     )
     background_dataloader = _get_predict_background_loader(
         batch_size=gc.batch_size,
-        num_act_background_samples=gc.act_background_samples,
+        num_attribution_background_samples=gc.attribution_background_samples,
         outputs_as_dict=loaded_train_experiment.outputs,
         configs=background_source_config,
         dataloader_workers=gc.dataloader_workers,
@@ -123,7 +123,7 @@ def _overload_train_experiment_for_predict_activations(
 
 def _get_predict_background_loader(
     batch_size: int,
-    num_act_background_samples: int,
+    num_attribution_background_samples: int,
     dataloader_workers: int,
     configs: Configs,
     outputs_as_dict: al_output_objects_as_dict,
@@ -141,7 +141,7 @@ def _get_predict_background_loader(
     )
     background_ids_sampled = sample(
         population=background_ids_pool,
-        k=num_act_background_samples,
+        k=num_attribution_background_samples,
     )
 
     target_labels = get_target_labels_for_testing(
