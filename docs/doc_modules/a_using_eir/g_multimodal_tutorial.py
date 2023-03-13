@@ -32,11 +32,11 @@ def get_07_multimodal_run_1_tabular_info() -> AutoDocExperimentInfo:
             "figures/07_multimodal_training_curve_MCC_tabular.pdf",
         ),
         (
-            "4000/activations/pets_tabular/feature_importance.pdf",
+            "4000/attributions/pets_tabular/feature_importance.pdf",
             "figures/tutorial_07a_feature_importance_D.pdf",
         ),
         (
-            "4000/activations/pets_tabular/D: 100+ Days/cat_features_Breed1_"
+            "4000/attributions/pets_tabular/D: 100+ Days/cat_features_Breed1_"
             "D: 100+ Days.pdf",
             "figures/tutorial_07a_breed_importance_D.pdf",
         ),
