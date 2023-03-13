@@ -36,8 +36,8 @@ def get_07_multimodal_run_1_tabular_info() -> AutoDocExperimentInfo:
             "figures/tutorial_07a_feature_importance_D.pdf",
         ),
         (
-            "4000/attributions/pets_tabular/D: 100+ Days/cat_features_Breed1_"
-            "D: 100+ Days.pdf",
+            "4000/attributions/pets_tabular/D: 100+ Days/"
+            "categorical_attributions_Breed1_D: 100+ Days.pdf",
             "figures/tutorial_07a_breed_importance_D.pdf",
         ),
     ]

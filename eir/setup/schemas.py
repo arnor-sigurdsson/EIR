@@ -268,7 +268,7 @@ class GlobalConfig:
     attribution_target_classes: Union[None, List[str]] = None
     max_attributions_per_class: Union[None, int] = None
     attributions_every_sample_factor: int = 1
-    attribution_background_samples: int = 64
+    attribution_background_samples: int = 256
     debug: bool = False
     no_pbar: bool = False
     mixing_alpha: float = 0.0

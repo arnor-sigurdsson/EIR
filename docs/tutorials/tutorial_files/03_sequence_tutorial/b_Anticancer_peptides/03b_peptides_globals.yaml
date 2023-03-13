@@ -9,6 +9,6 @@ batch_size: 32
 early_stopping_buffer: 2000
 compute_attributions: True
 attributions_every_sample_factor: 3
-max_attributions_per_class: 100
+max_attributions_per_class: 512
 weighted_sampling_columns:
   - all
