@@ -13,23 +13,23 @@ from torchvision.transforms import Normalize
 
 from eir.interpretation.interpretation_utils import (
     get_target_class_name,
-    get_basic_sample_activations_to_analyse_generator,
+    get_basic_sample_attributions_to_analyse_generator,
 )
 
 if TYPE_CHECKING:
     from eir.train import Experiment
-    from eir.interpretation.interpretation import SampleActivation
+    from eir.interpretation.interpretation import SampleAttribution
     from eir.setup.input_setup import ImageNormalizationStats
 
 
-def analyze_image_input_activations(
+def analyze_image_input_attributions(
     experiment: "Experiment",
     input_name: str,
     target_column_name: str,
     output_name: str,
     target_column_type: str,
-    activation_outfolder: Path,
-    all_activations: Sequence["SampleActivation"],
+    attribution_outfolder: Path,
+    all_attributions: Sequence["SampleAttribution"],
 ) -> None:
     exp = experiment
 
@@ -39,12 +39,12 @@ def analyze_image_input_activations(
     input_object = exp.inputs[input_name]
     interpretation_config = input_object.input_config.interpretation_config
 
-    samples_to_act_analyze_gen = get_basic_sample_activations_to_analyse_generator(
-        interpretation_config=interpretation_config, all_activations=all_activations
+    samples_to_act_analyze_gen = get_basic_sample_attributions_to_analyse_generator(
+        interpretation_config=interpretation_config, all_attributions=all_attributions
     )
 
-    for sample_activation in samples_to_act_analyze_gen:
-        sample_target_labels = sample_activation.sample_info.target_labels
+    for sample_attribution in samples_to_act_analyze_gen:
+        sample_target_labels = sample_attribution.sample_info.target_labels
 
         cur_label_name = get_target_class_name(
             sample_label=sample_target_labels[output_name][target_column_name],
@@ -53,8 +53,8 @@ def analyze_image_input_activations(
             target_column_name=target_column_name,
         )
 
-        attributions = sample_activation.sample_activations[input_name].squeeze()
-        raw_input = sample_activation.raw_inputs[input_name].cpu().numpy().squeeze()
+        attributions = sample_attribution.sample_attributions[input_name].squeeze()
+        raw_input = sample_attribution.raw_inputs[input_name].cpu().numpy().squeeze()
         attributions = attributions.transpose(1, 2, 0)
         raw_input = un_normalize(
             normalized_img=raw_input,
@@ -72,8 +72,8 @@ def analyze_image_input_activations(
             cmap=cmap,
         )
 
-        name = f"image_{sample_activation.sample_info.ids[0]}_{cur_label_name}.pdf"
-        outpath = activation_outfolder / "single_samples" / name
+        name = f"image_{sample_attribution.sample_info.ids[0]}_{cur_label_name}.pdf"
+        outpath = attribution_outfolder / "single_samples" / name
         ensure_path_exists(path=outpath)
         figure.savefig(outpath, dpi=300)
         plt.close("all")

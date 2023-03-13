@@ -12,7 +12,7 @@ from eir.setup import schemas
 
 if TYPE_CHECKING:
     from eir.data_load.label_setup import al_label_transformers_object
-    from eir.interpretation.interpretation import SampleActivation
+    from eir.interpretation.interpretation import SampleAttribution
 
 
 def get_target_class_name(
@@ -30,16 +30,16 @@ def get_target_class_name(
     return cur_trn_label
 
 
-def stratify_activations_by_target_classes(
-    all_activations: Sequence["SampleActivation"],
+def stratify_attributions_by_target_classes(
+    all_attributions: Sequence["SampleAttribution"],
     target_transformer: "al_label_transformers_object",
     output_name: str,
     target_column: str,
     column_type: str,
-) -> Dict[str, Sequence["SampleActivation"]]:
-    all_activations_target_class_stratified = defaultdict(list)
+) -> Dict[str, Sequence["SampleAttribution"]]:
+    all_attributions_target_class_stratified = defaultdict(list)
 
-    for sample in all_activations:
+    for sample in all_attributions:
         cur_labels_all = sample.sample_info.target_labels
         cur_labels = cur_labels_all[output_name][target_column]
         cur_label_name = get_target_class_name(
@@ -48,30 +48,30 @@ def stratify_activations_by_target_classes(
             column_type=column_type,
             target_column_name=target_column,
         )
-        all_activations_target_class_stratified[cur_label_name].append(sample)
+        all_attributions_target_class_stratified[cur_label_name].append(sample)
 
-    return all_activations_target_class_stratified
+    return all_attributions_target_class_stratified
 
 
-def plot_activations_bar(
-    df_activations: pd.DataFrame, outpath: Path, top_n: int = 20, title: str = ""
+def plot_attributions_bar(
+    df_attributions: pd.DataFrame, outpath: Path, top_n: int = 20, title: str = ""
 ) -> None:
-    df_token_means = df_activations.groupby("Input").mean()
+    df_token_means = df_attributions.groupby("Input").mean()
     df_token_top_n = df_token_means.nlargest(top_n, "Attribution")
     df_token_top_n_sorted = df_token_top_n.sort_values(
         by="Attribution", ascending=False
     )
 
-    df_activations_top_n = df_activations[
-        df_activations["Input"].isin(df_token_top_n_sorted.index)
+    df_attributions_top_n = df_attributions[
+        df_attributions["Input"].isin(df_token_top_n_sorted.index)
     ]
 
-    df_activations_top_n_sorted = df_activations_top_n.sort_values(
+    df_attributions_top_n_sorted = df_attributions_top_n.sort_values(
         by="Attribution", ascending=False
     )
 
     ax: plt.Axes = sns.barplot(
-        data=df_activations_top_n_sorted,
+        data=df_attributions_top_n_sorted,
         x="Attribution",
         y="Input",
         order=df_token_top_n.index,
@@ -95,25 +95,25 @@ def plot_activations_bar(
     plt.close("all")
 
 
-def get_basic_sample_activations_to_analyse_generator(
+def get_basic_sample_attributions_to_analyse_generator(
     interpretation_config: schemas.BasicInterpretationConfig,
-    all_activations: Sequence["SampleActivation"],
-) -> Generator["SampleActivation", None, None]:
+    all_attributions: Sequence["SampleAttribution"],
+) -> Generator["SampleAttribution", None, None]:
     strategy = interpretation_config.interpretation_sampling_strategy
     n_samples = interpretation_config.num_samples_to_interpret
 
     if strategy == "first_n":
-        base = all_activations[:n_samples]
+        base = all_attributions[:n_samples]
     elif strategy == "random_sample":
-        base = random.sample(all_activations, n_samples)
+        base = random.sample(all_attributions, n_samples)
     else:
         raise ValueError(f"Unrecognized option for sequence sampling: {strategy}.")
 
     manual_samples = interpretation_config.manual_samples_to_interpret
     if manual_samples:
-        for activation in all_activations:
-            if activation.sample_info.ids in manual_samples:
-                base.append(activation)
+        for attribution in all_attributions:
+            if attribution.sample_info.ids in manual_samples:
+                base.append(attribution)
 
     for item in base:
         yield item

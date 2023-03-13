@@ -153,7 +153,7 @@ class GlobalConfig:
         best performance before terminating run.
 
     :param early_stopping_buffer:
-        Number of iterations to run before activation early stopping checks,
+        Number of iterations to run before activating early stopping checks,
         useful if networks take a while to 'kick into gear'.
 
     :param warmup_steps:
@@ -176,7 +176,7 @@ class GlobalConfig:
         Whether to load all sample into memory during training.
 
     :param sample_interval:
-        Iteration interval to perform validation and possibly activation analysis if
+        Iteration interval to perform validation and possibly attribution analysis if
         set.
 
     :param save_evaluation_sample_results:
@@ -338,7 +338,7 @@ class InputDataConfig:
 class OmicsInputDataConfig:
     """
     :param snp_file:
-        Path to the relevant ``.bim`` file, used for activation analysis.
+        Path to the relevant ``.bim`` file, used for attribution analysis.
 
     :param subset_snps_file:
         Path to a file with corresponding SNP IDs to subset from the main
@@ -472,7 +472,7 @@ class BasicPretrainedConfig:
 class BasicInterpretationConfig:
     """
     :param interpretation_sampling_strategy:
-        How to sample sequences for activation analysis. `first_n` always grabs the
+        How to sample sequences for attribution analysis. `first_n` always grabs the
         same first n values from the beginning of the dataset to interpret, while
         `random_sample` will sample uniformly from the whole dataset without
         replacement.

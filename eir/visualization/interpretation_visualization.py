@@ -133,17 +133,19 @@ def plot_snp_manhattan_plots(
 ):
     df_snp_grads_copy = df_snp_grads.copy()
 
-    activations_columns = [
-        i for i in df_snp_grads_copy.columns if i.endswith("_activations")
+    attributions_columns = [
+        i for i in df_snp_grads_copy.columns if i.endswith("_attributions")
     ]
 
     df_snp_grads_copy = df_snp_grads_copy.sort_values(by=["CHR_CODE", "BP_COORD"])
 
-    for col in activations_columns:
-        label_name = col.split("_activations")[0]
+    for col in attributions_columns:
+        label_name = col.split("_attributions")[0]
 
         ax, fig = _get_manhattan_axis_and_figure(
-            df=df_snp_grads_copy, chr_column_name="CHR_CODE", activation_column_name=col
+            df=df_snp_grads_copy,
+            chr_column_name="CHR_CODE",
+            attribution_column_name=col,
         )
 
         y_ticks = ax.get_yticks()
@@ -152,7 +154,7 @@ def plot_snp_manhattan_plots(
         ax.set_ylim(ymin=0.0, ymax=y_max)
 
         ax.set_xlabel("Chromosome")
-        ax.set_ylabel("Activation")
+        ax.set_ylabel("Attribution")
 
         ax.set_title(f"{label_name}{title_extra}")
         plt.tight_layout()
@@ -166,7 +168,7 @@ def plot_snp_manhattan_plots(
 def _get_manhattan_axis_and_figure(
     df: pd.DataFrame,
     chr_column_name: str,
-    activation_column_name: str,
+    attribution_column_name: str,
     color=None,
     figure_size=(12, 6),
     ar=90,
@@ -181,7 +183,7 @@ def _get_manhattan_axis_and_figure(
 ):
     """Adapted from https://github.com/reneshbedre/bioinfokit#manhatten-plot."""
 
-    _x, _y = "Chromosome", r"Activation"
+    _x, _y = "Chromosome", r"Attribution"
     colors = (
         "#a7414a",
         "#282726",
@@ -225,7 +227,7 @@ def _get_manhattan_axis_and_figure(
         "#8c271e",
     )
 
-    df["tpval"] = df[activation_column_name]
+    df["tpval"] = df[attribution_column_name]
 
     df["ind"] = range(len(df))
 

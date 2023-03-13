@@ -1038,7 +1038,7 @@ class ModelTestConfig:
     iteration: int
     run_path: Path
     last_sample_folders: Dict[str, Dict[str, Path]]
-    activations_paths: Dict[str, Dict[str, Dict[str, Path]]]
+    attributions_paths: Dict[str, Dict[str, Dict[str, Path]]]
 
 
 @pytest.fixture()
@@ -1160,7 +1160,7 @@ def _get_cur_modelling_test_config(
         targets=targets, run_path=run_path, iteration=last_iter
     )
 
-    all_activation_paths = _get_all_activation_paths(
+    all_attribution_paths = _get_all_attribution_paths(
         last_sample_folder_per_target_in_each_output=last_sample_folders,
         input_names=input_names,
     )
@@ -1169,13 +1169,13 @@ def _get_cur_modelling_test_config(
         iteration=last_iter,
         run_path=run_path,
         last_sample_folders=last_sample_folders,
-        activations_paths=all_activation_paths,
+        attributions_paths=all_attribution_paths,
     )
 
     return test_config
 
 
-def _get_all_activation_paths(
+def _get_all_attribution_paths(
     last_sample_folder_per_target_in_each_output: Dict[str, Dict[str, Path]],
     input_names: Iterable[str],
 ) -> Dict[str, Dict[str, Dict[str, Path]]]:
@@ -1183,21 +1183,21 @@ def _get_all_activation_paths(
     output_name -> target_name -> input_name: path
     """
 
-    all_activation_paths = {}
+    all_attribution_paths = {}
 
     dict_to_iter = last_sample_folder_per_target_in_each_output
     for output_name, file_per_target_dict in dict_to_iter.items():
-        if output_name not in all_activation_paths:
-            all_activation_paths[output_name] = {}
+        if output_name not in all_attribution_paths:
+            all_attribution_paths[output_name] = {}
 
         for target_name, last_sample_folder in file_per_target_dict.items():
-            all_activation_paths[output_name][target_name] = {}
+            all_attribution_paths[output_name][target_name] = {}
 
             for input_name in input_names:
-                path = last_sample_folder / "activations" / input_name
-                all_activation_paths[output_name][target_name][input_name] = path
+                path = last_sample_folder / "attributions" / input_name
+                all_attribution_paths[output_name][target_name][input_name] = path
 
-    return all_activation_paths
+    return all_attribution_paths
 
 
 def _get_all_last_sample_folders(
