@@ -386,7 +386,7 @@ def test_get_cur_dilation(test_input, expected):
                 "global_configs": {
                     "output_folder": "limited_activations",
                     "lr": 1e-03,
-                    "max_acts_per_class": 100,
+                    "max_attributions_per_class": 100,
                 },
                 "input_configs": [
                     {

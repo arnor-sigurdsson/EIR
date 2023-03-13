@@ -71,8 +71,8 @@ we will start by defining our configurations.
 .. note::
 
     You might notice that in the global configuration in this tutorial, we have a couple
-    of new parameters going on. Namely the ``get_acts``, ``max_acts_per_class`` and
-    ``act_every_sample_factor``. These are settings related to computing activations
+    of new parameters going on. Namely the ``compute_attributions``, ``max_attributions_per_class`` and
+    ``attributions_every_sample_factor``. These are settings related to computing activations
     so we can interpret/explain how our inputs influence the model outputs. For more
     information, check out the :ref:`api-reference` reference.
 
@@ -128,7 +128,7 @@ A3 - IMDB Interpretation
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
 Now remember those new flags we used in the global configuration,
-``get_acts`` and friends? Setting those will instruct the
+``compute_attributions`` and friends? Setting those will instruct the
 framework to compute and analyze
 how the inputs influence the model
 towards a certain output. In this case,

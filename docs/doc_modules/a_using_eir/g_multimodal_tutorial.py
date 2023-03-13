@@ -23,7 +23,7 @@ def get_07_multimodal_run_1_tabular_info() -> AutoDocExperimentInfo:
         "--output_configs",
         f"{conf_output_path}/07_output.yaml",
         f"--07_globals.output_folder={output_folder}",
-        "--07_globals.get_acts=true",
+        "--07_globals.compute_attributions=true",
     ]
 
     mapping = [

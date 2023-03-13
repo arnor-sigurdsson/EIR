@@ -134,7 +134,7 @@ def run_predict(predict_cl_args: Namespace):
 
     predict(predict_config=predict_config, predict_cl_args=predict_cl_args)
 
-    if predict_config.train_configs_overloaded.global_config.get_acts:
+    if predict_config.train_configs_overloaded.global_config.compute_attributions:
         compute_predict_activations(
             loaded_train_experiment=loaded_train_experiment,
             predict_config=predict_config,

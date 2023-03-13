@@ -9,7 +9,7 @@ PRESET = {
             "n_saved_models": 3,
             "dataloader_workers": 0,
             "device": "cpu",
-            "get_acts": True,
+            "compute_attributions": True,
             "memory_dataset": False,
         },
     },

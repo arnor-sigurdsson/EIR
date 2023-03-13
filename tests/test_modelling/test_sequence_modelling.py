@@ -163,7 +163,7 @@ def test_sequence_modelling(prep_modelling_test_configs):
                     "memory_dataset": True,
                     "output_folder": "test_multi_task",
                     "gradient_noise": 0.001,
-                    "act_background_samples": 8,
+                    "attribution_background_samples": 8,
                 },
                 "input_configs": [
                     {
@@ -191,7 +191,7 @@ def test_sequence_modelling(prep_modelling_test_configs):
                     "memory_dataset": True,
                     "output_folder": "test_multi_task_with_mixing",
                     "mixing_alpha": 0.5,
-                    "act_background_samples": 8,
+                    "attribution_background_samples": 8,
                 },
                 "input_configs": [
                     {
@@ -218,7 +218,7 @@ def test_sequence_modelling(prep_modelling_test_configs):
                     "memory_dataset": True,
                     "output_folder": "test_albert",
                     "mixing_alpha": 0.0,
-                    "act_background_samples": 8,
+                    "attribution_background_samples": 8,
                 },
                 "input_configs": [
                     {

@@ -149,7 +149,7 @@ def test_classification(prep_modelling_test_configs):
             target_name="Origin",
             top_row_grads_dict=top_row_grads_dict,
             at_least_n_snps=5,
-            all_act_classes_must_pass=False,
+            all_attribution_target_classes_must_pass=False,
         )
 
 
@@ -236,7 +236,7 @@ def _check_snps_wrapper(
     top_row_grads_dict: Dict[str, List[int]],
     at_least_n_snps: Union[str, int] = "all",
     check_types_skip_cls_names: Sequence[str] = tuple(),
-    all_act_classes_must_pass: bool = True,
+    all_attribution_target_classes_must_pass: bool = True,
 ):
     expected_top_indxs = list(range(50, 1000, 100))
 
@@ -259,7 +259,7 @@ def _check_snps_wrapper(
                 check_types=check_types,
                 at_least_n=at_least_n_snps,
                 check_types_skip_cls_names=check_types_skip_cls_names,
-                all_classes_must_pass=all_act_classes_must_pass,
+                all_classes_must_pass=all_attribution_target_classes_must_pass,
             )
 
 
@@ -642,7 +642,7 @@ def _get_multi_task_output_configs(
                     "lr": 1e-03 * 4,
                     "batch_size": 16,
                     "gradient_accumulation_steps": 4,
-                    "max_acts_per_class": 100,
+                    "max_attributions_per_class": 100,
                     "mixing_alpha": 0.2,
                 },
                 "input_configs": [
@@ -716,7 +716,7 @@ def test_multi_task(
                 target_name=target_name,
                 top_row_grads_dict=top_row_grads_dict,
                 at_least_n_snps=at_least_n,
-                all_act_classes_must_pass=False,
+                all_attribution_target_classes_must_pass=False,
             )
 
         for target_name in con_targets:
@@ -739,7 +739,7 @@ def test_multi_task(
                 target_name=target_name,
                 top_row_grads_dict=top_row_grads_dict,
                 at_least_n_snps=at_least_n,
-                all_act_classes_must_pass=True,
+                all_attribution_target_classes_must_pass=True,
             )
 
 

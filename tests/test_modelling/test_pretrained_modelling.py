@@ -22,11 +22,11 @@ def _get_pre_trained_module_setup_parametrization() -> Dict:
             "global_configs": {
                 "output_folder": "multi_task_multi_modal",
                 "n_epochs": 1,
-                "act_background_samples": 8,
+                "attribution_background_samples": 8,
                 "sample_interval": 50,
                 "checkpoint_interval": 50,
                 "n_saved_models": 2,
-                "get_acts": False,
+                "compute_attributions": False,
             },
             "input_configs": [
                 {
@@ -187,7 +187,7 @@ def _add_new_feature_extractor_to_experiment(
                 "global_configs": {
                     "output_folder": "multi_task_multi_modal",
                     "n_epochs": 3,
-                    "act_background_samples": 8,
+                    "attribution_background_samples": 8,
                     "sample_interval": 50,
                     "checkpoint_interval": 50,
                     "n_saved_models": 2,
