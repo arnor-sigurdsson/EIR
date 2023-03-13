@@ -643,6 +643,7 @@ def _get_multi_task_output_configs(
                     "batch_size": 16,
                     "gradient_accumulation_steps": 4,
                     "max_acts_per_class": 100,
+                    "mixing_alpha": 0.2,
                 },
                 "input_configs": [
                     {
@@ -653,16 +654,15 @@ def _get_multi_task_output_configs(
                                 "kernel_width": 8,
                                 "channel_exp_base": 2,
                                 "l1": 2e-05,
-                                "rb_do": 0.20,
                             },
                         },
                     },
                 ],
                 "fusion_configs": {
                     "model_config": {
-                        "fc_task_dim": 64,
-                        "fc_do": 0.20,
-                        "rb_do": 0.20,
+                        "fc_task_dim": 256,
+                        "fc_do": 0.10,
+                        "rb_do": 0.10,
                     },
                 },
                 "output_configs": _get_multi_task_output_configs(),

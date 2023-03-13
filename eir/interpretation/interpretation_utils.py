@@ -56,22 +56,35 @@ def stratify_activations_by_target_classes(
 def plot_activations_bar(
     df_activations: pd.DataFrame, outpath: Path, top_n: int = 20, title: str = ""
 ) -> None:
-    df_activations_sorted = df_activations.sort_values(
-        by="Attribution",
-        ascending=False,
+    df_token_means = df_activations.groupby("Input").mean()
+    df_token_top_n = df_token_means.nlargest(top_n, "Attribution")
+    df_token_top_n_sorted = df_token_top_n.sort_values(
+        by="Attribution", ascending=False
     )
-    df_activations_filtered = df_activations_sorted.head(n=top_n)
-    df_activations_renamed = df_activations_filtered.rename(
-        mapper={"Attribution": "Influence"}, axis=1
+
+    df_activations_top_n = df_activations[
+        df_activations["Input"].isin(df_token_top_n_sorted.index)
+    ]
+
+    df_activations_top_n_sorted = df_activations_top_n.sort_values(
+        by="Attribution", ascending=False
     )
 
     ax: plt.Axes = sns.barplot(
-        x=df_activations_renamed["Influence"],
-        y=df_activations_renamed.index,
+        data=df_activations_top_n_sorted,
+        x="Attribution",
+        y="Input",
+        order=df_token_top_n.index,
         palette="Blues_d",
+        errcolor=".2",
+        capsize=0.1,
+        errorbar=("ci", 95),
     )
+
     plt.tight_layout()
     sns_figure: plt.Figure = ax.get_figure()
+
+    ax.set(xlim=(0, None))
 
     if title:
         ax.set_title(title)
