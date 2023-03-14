@@ -297,9 +297,7 @@ class SplitLinear(nn.Module):
         """
         nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))
         if self.bias is not None:
-            fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.weight)
-            bound = 1 / math.sqrt(fan_in)
-            nn.init.uniform_(self.bias, -bound, bound)
+            nn.init.zeros_(self.bias)
 
     def extra_repr(self):
         return (
