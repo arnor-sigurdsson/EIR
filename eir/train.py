@@ -125,8 +125,6 @@ def main():
         configs=configs
     )
 
-    utils.configure_root_logger(output_folder=configs.global_config.output_folder)
-
     default_hooks = get_default_hooks(configs=configs)
     default_experiment = get_default_experiment(
         configs=configs,
@@ -269,7 +267,7 @@ def get_default_experiment(
         manual_valid_ids=manual_valid_ids,
     )
 
-    logger.info("Setting up target labels.")
+    logger.debug("Setting up target labels.")
     target_labels_info = get_tabular_target_file_infos(
         output_configs=configs.output_configs
     )
@@ -556,7 +554,7 @@ def _log_model(model: nn.Module) -> None:
     no_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
     logger.info(
-        "Starting training with a %s parameter model. " "Num trainable parameters: %s.",
+        "Starting training with a %s parameter model. Trainable parameters: %s.",
         format(no_params, ",.0f"),
         format(no_trainable_params, ",.0f"),
     )
@@ -756,7 +754,7 @@ def add_l1_loss_hook_if_applicable(
     )
     preds_l1 = getattr(configs.fusion_config.model_config, "l1", None)
     if input_l1 or preds_l1:
-        logger.info("Adding L1 loss hook.")
+        logger.debug("Adding L1 loss hook.")
         step_function_hooks_init_kwargs["loss"].append(hook_add_l1_loss)
 
     return step_function_hooks_init_kwargs

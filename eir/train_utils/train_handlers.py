@@ -317,7 +317,7 @@ def _get_early_stopping_handler(
         run_folder=handler_config.run_folder, column="perf-average"
     )
 
-    logger.info(
+    logger.debug(
         "Setting early stopping patience to %d validation steps.", patience_steps
     )
 

@@ -49,6 +49,7 @@ from eir.models.sequence.transformer_models import (
 )
 from eir.models.tabular.tabular import TabularModelConfig, SimpleTabularModelConfig
 from eir.setup import schemas
+from eir.train_utils.utils import configure_global_eir_logging
 
 al_input_types = Union[
     schemas.OmicsInputDataConfig,
@@ -82,6 +83,11 @@ class DynamicOutputSetup:
 def get_configs():
     main_cl_args, extra_cl_args = get_main_cl_args()
 
+    output_folder, log_level = get_output_folder_and_log_level(
+        main_cl_args=main_cl_args
+    )
+    configure_global_eir_logging(output_folder=output_folder, log_level=log_level)
+
     tabular_output_setup = DynamicOutputSetup(
         output_types_schema_map=get_outputs_types_schema_map(),
         output_module_config_class_getter=get_output_module_config_class,
@@ -92,6 +98,7 @@ def get_configs():
         extra_cl_args_overload=extra_cl_args,
         dynamic_output_setup=tabular_output_setup,
     )
+
     return configs
 
 
@@ -100,6 +107,27 @@ def get_main_cl_args() -> Tuple[argparse.Namespace, List[str]]:
     cl_args, extra_cl_args = parser_.parse_known_args()
 
     return cl_args, extra_cl_args
+
+
+def get_output_folder_and_log_level(
+    main_cl_args: argparse.Namespace,
+) -> Tuple[str, str]:
+    global_configs = main_cl_args.global_configs
+
+    for config in global_configs:
+        with open(config, "r") as f:
+            config_dict = yaml.safe_load(f)
+
+            output_folder = config_dict.get("output_folder")
+            log_level = config_dict.get("log_level", "info")
+
+            if output_folder and log_level:
+                break
+
+    if output_folder is None:
+        raise ValueError("Output folder not found in global configs.")
+
+    return output_folder, log_level
 
 
 def get_main_parser(

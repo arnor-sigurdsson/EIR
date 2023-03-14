@@ -381,7 +381,7 @@ def generate_split_resblocks_auto(split_parameter_spec: LCParameterSpec):
             )
             block_modules.append(cur_attention_block)
 
-    logger.info(
+    logger.debug(
         "No SplitLinear residual blocks specified in CL arguments. Created %d "
         "blocks with final output dimension of %d.",
         len(block_modules),

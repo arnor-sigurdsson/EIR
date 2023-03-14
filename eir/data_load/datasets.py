@@ -266,14 +266,14 @@ class DatasetBase(Dataset):
         if self.target_labels_dict:
             samples = list(i for i in samples.values() if i.inputs and i.target_labels)
             num_missing = num_samples_raw - len(samples)
-            logger.debug(
+            logger.info(
                 "Filtered out %d samples that had no inputs or no target labels.",
                 num_missing,
             )
         else:
             samples = list(i for i in samples.values() if i.inputs)
             num_missing = num_samples_raw - len(samples)
-            logger.debug(
+            logger.info(
                 "Filtered out %d samples that had no inputs.",
                 num_missing,
             )
@@ -356,7 +356,7 @@ def _log_missing_samples_between_modalities(
         cur_str += "\n"
         message += cur_str
 
-    logger.debug(message.rstrip())
+    logger.info(message.rstrip())
 
 
 def _add_target_labels_to_samples(

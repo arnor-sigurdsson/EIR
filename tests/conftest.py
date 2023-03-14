@@ -48,7 +48,11 @@ from eir.train import (
     Experiment,
 )
 from eir.train_utils import optimizers, metrics
-from eir.train_utils.utils import configure_root_logger, get_run_folder, seed_everything
+from eir.train_utils.utils import (
+    configure_global_eir_logging,
+    get_run_folder,
+    seed_everything,
+)
 from tests.test_modelling.setup_modelling_test_data.setup_image_test_data import (
     create_test_image_data,
 )
@@ -855,7 +859,7 @@ def create_test_config(
 
     ensure_path_exists(path=run_folder, is_folder=True)
 
-    configure_root_logger(output_folder=output_folder)
+    configure_global_eir_logging(output_folder=output_folder, log_level="DEBUG")
 
     yield test_configs
 

@@ -35,7 +35,7 @@ def get_optimizer(
     )
     optimizer = optimizer_class(**optimizer_args)
 
-    logger.info(
+    logger.debug(
         "Optimizer %s created with arguments %s (note weight decay not included as it "
         "is added manually to parameter groups). Parameter groups %s.",
         optimizer_class,

@@ -209,12 +209,16 @@ class GlobalConfig:
         Number of samples to use for the background in attribution / feature importance
         computations.
 
-    :param debug:
-        Whether to run in debug mode.
+    :param plot_lr_schedule:
+        Whether to run LR search, plot the results and exit with status 0.
 
     :param no_pbar:
         Whether to not use progress bars. Useful when stdout/stderr is written
         to files.
+
+    :param log_level:
+        Logging level to use. Can be one of 'debug', 'info', 'warning', 'error',
+        'critical'.
 
     :param mixing_alpha:
         Alpha parameter used for mixing (higher means more mixing).
@@ -269,8 +273,9 @@ class GlobalConfig:
     max_attributions_per_class: Union[None, int] = None
     attributions_every_sample_factor: int = 1
     attribution_background_samples: int = 256
-    debug: bool = False
+    plot_lr_schedule: bool = False
     no_pbar: bool = False
+    log_level: Literal["debug", "info", "warning", "error", "critical"] = "info"
     mixing_alpha: float = 0.0
     plot_skip_steps: int = 200
     pretrained_checkpoint: Union[None, str] = None

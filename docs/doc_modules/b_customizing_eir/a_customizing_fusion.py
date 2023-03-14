@@ -5,7 +5,7 @@ from typing import Dict
 
 from eir import train
 from eir.setup.config import get_configs
-from eir.train_utils.utils import configure_root_logger
+from eir.train_utils.utils import configure_global_eir_logging
 from eir.models.model_setup import get_output_modules
 from eir.models.meta.meta import MetaModel
 
@@ -13,7 +13,7 @@ from eir.models.meta.meta import MetaModel
 def main():
     configs = get_configs()
 
-    configure_root_logger(output_folder=configs.global_config.output_folder)
+    configure_global_eir_logging(output_folder=configs.global_config.output_folder)
 
     default_hooks = train.get_default_hooks(configs=configs)
     default_experiment = train.get_default_experiment(

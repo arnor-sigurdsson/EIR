@@ -282,8 +282,9 @@ First we can have a look at the average performance:
 .. image:: tutorial_files/07_multimodal_tutorial/figures/07_multimodal_training_curve_perf-average_tabular_description_multi_task.png
 
 .. note::
-    The average performance by default is the average of the MCC for the
-    categorical targets, and (1.0 - loss) for the regression targets.
+    The average performance by default is the average of the
+    MCC, ROC-AUC and average precision (AP) for categorical targets and
+    1.0-LOSS, PCC, R2 for continuous targets.
 
 So, since we are using different inputs and outputs in this task,
 we cannot compare directly to the previous results. However, we can

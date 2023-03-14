@@ -760,7 +760,7 @@ def get_performance_averaging_functions(
     cat_metric_names: al_cat_averaging_metric_choices,
     con_metric_names: al_con_averaging_metric_choices,
 ) -> al_averaging_functions_dict:
-    logger.debug(
+    logger.info(
         "Performance averaging functions across tasks set to averages "
         "of %s for categorical targets and %s for continuous targets. These "
         "values are used to determine overall performance, which is used to "

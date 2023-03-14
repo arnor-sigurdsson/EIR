@@ -145,7 +145,7 @@ def set_up_lr_scheduler(
             n_epochs=gc.n_epochs, iter_per_epoch=len(exp.train_loader)
         )
 
-        if gc.debug:
+        if gc.plot_lr_schedule:
             _plot_lr_schedule(
                 lr_scheduler=lr_scheduler,
                 num_events=num_events,
@@ -154,7 +154,7 @@ def set_up_lr_scheduler(
             )
 
     elif gc.lr_schedule == "plateau":
-        logger.info("Plateau patience set to %d.", gc.lr_plateau_patience)
+        logger.debug("Plateau patience set to %d.", gc.lr_plateau_patience)
 
         """
         For compatibility with ignite EarlyStopping handler, we reduce the plateau
@@ -222,7 +222,7 @@ def _get_warmup_steps_from_cla(warmup_steps_arg, optimizer):
         return 0
     elif warmup_steps_arg == "auto":
         auto_steps = _calculate_auto_warmup_steps(optimizer=optimizer)
-        logger.info(
+        logger.debug(
             "Using calculated %d steps for learning rate warmup due to 'auto' "
             "option for warmup.",
             auto_steps,
