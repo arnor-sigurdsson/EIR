@@ -1,1 +1,1 @@
-{"ancestry_output": {"Origin": {"ancestry_output_Origin_mcc": 0.8859573792607639, "ancestry_output_Origin_acc": 0.906829992576095, "ancestry_output_Origin_roc-auc-macro": 0.9913077059744347, "ancestry_output_Origin_ap-macro": 0.9530672163214556}}}
+{"ancestry_output": {"Origin": {"ancestry_output_Origin_mcc": 0.8160797511769522, "ancestry_output_Origin_acc": 0.8476243504083147, "ancestry_output_Origin_roc-auc-macro": 0.9804086097828779, "ancestry_output_Origin_ap-macro": 0.9146223608645606}}}
