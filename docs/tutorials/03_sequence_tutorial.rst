@@ -72,7 +72,7 @@ we will start by defining our configurations.
 
     You might notice that in the global configuration in this tutorial, we have a couple
     of new parameters going on. Namely the ``compute_attributions``, ``max_attributions_per_class`` and
-    ``attributions_every_sample_factor``. These are settings related to computing activations
+    ``attributions_every_sample_factor``. These are settings related to computing attributions
     so we can interpret/explain how our inputs influence the model outputs. For more
     information, check out the :ref:`api-reference` reference.
 
@@ -132,9 +132,12 @@ Now remember those new flags we used in the global configuration,
 framework to compute and analyze
 how the inputs influence the model
 towards a certain output. In this case,
-the activations can be found in the
-``imdb_sentiment/results/Sentiment/samples/<every_2000_iterations>/activations``
-folders.
+the attributions can be found in the
+``imdb_sentiment/results/Sentiment/samples/<every_2000_iterations>/attributions``
+folders. Behind the scenes,
+the framework uses `integrated gradients <https://arxiv.org/abs/1703.01365>`__,
+implemented in the fantastic the `Captum <https://captum.ai/>`__ library,
+to compute the attributions.
 
 Firstly,
 let's have a look at
@@ -145,13 +148,24 @@ towards a Positive and Negative sentiment.
 
 .. image:: tutorial_files/03_sequence_tutorial/a_IMDB/figures/tutorial_03a_feature_importance_Negative.png
 
+.. note::
+
+    You might notice that some of the tokens in the plots above
+    have confidence intervals (CIs), while others do not. This is because
+    the attributions are computed on the validation set, and some of the tokens might
+    only appear once in the validation set,
+    for which the confidence interval cannot be computed.
+    For those that do have CIs, they represent the 95% confidence interval
+    after 1,000 bootstrap samples.
+
+
 So fortunately,
 it seems indeed that our model learned some relevant things!
 When training on sequences,
-the framework will also by default save activations
+the framework will also by default save attributions
 towards the relevant label
 for 10 single samples,
-here is one such example, where we look at the activations towards a positive sentiment.
+here is one such example, where we look at the attributions towards a positive sentiment.
 
 .. raw:: html
    :file: tutorial_files/03_sequence_tutorial/a_IMDB/figures/tutorial_03a_single_samples_example.html
@@ -261,8 +275,8 @@ We could probably squeeze out a better performance
 by playing with the hyperparameters a bit,
 but for now we will keep going!
 
-As before, let's have a look at the activations. In this case
-we will check activations towards the moderately active class:
+As before, let's have a look at the attributions. In this case
+we will check attributions towards the moderately active class:
 
 .. image:: tutorial_files/03_sequence_tutorial/b_Anticancer_peptides/figures/tutorial_03b_feature_importance_mod._active.png
 

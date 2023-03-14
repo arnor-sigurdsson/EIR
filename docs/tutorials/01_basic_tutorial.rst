@@ -212,7 +212,7 @@ similar to ``eirtrain``:
 Generally we do not change much of the configs when predicting, with the exception of
 the input configs (and then mainly setting the ``input_source``,
 i.e. where to load our samples to predict/test on from) and perhaps the global config
-(e.g. we might not compute activations during training, but compute them on our test set
+(e.g. we might not compute attributions during training, but compute them on our test set
 by activating ``compute_attributions`` in the global config when predicting). Specific to
 ``eirpredict``, we have to choose a saved model (``--model_path``), whether we want to
 evaluate the performance on the test set (``--evaluate`` this means that the respective
