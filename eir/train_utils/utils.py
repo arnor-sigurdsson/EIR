@@ -75,10 +75,9 @@ def configure_global_eir_logging(output_folder: str, log_level: str = "INFO") ->
     file_handler.setFormatter(fmt=formatter)
 
     root_logger = logging.getLogger(name="")
-    root_logger.setLevel(level=level)
     root_logger.addHandler(hdlr=file_handler)
 
-    loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
+    loggers = (logging.getLogger(name) for name in logging.root.manager.loggerDict)
     for logger_ in loggers:
         if logger_.name.split(".")[0] == "eir":
             logger_.setLevel(level=level)

@@ -83,9 +83,10 @@ class DynamicOutputSetup:
 def get_configs():
     main_cl_args, extra_cl_args = get_main_cl_args()
 
-    output_folder, log_level = get_output_folder_and_log_level(
-        main_cl_args=main_cl_args
+    output_folder, log_level = get_output_folder_and_log_level_from_cl_args(
+        main_cl_args=main_cl_args, extra_cl_args=extra_cl_args
     )
+
     configure_global_eir_logging(output_folder=output_folder, log_level=log_level)
 
     tabular_output_setup = DynamicOutputSetup(
@@ -109,11 +110,13 @@ def get_main_cl_args() -> Tuple[argparse.Namespace, List[str]]:
     return cl_args, extra_cl_args
 
 
-def get_output_folder_and_log_level(
+def get_output_folder_and_log_level_from_cl_args(
     main_cl_args: argparse.Namespace,
+    extra_cl_args: List[str],
 ) -> Tuple[str, str]:
     global_configs = main_cl_args.global_configs
 
+    output_folder = None
     for config in global_configs:
         with open(config, "r") as f:
             config_dict = yaml.safe_load(f)
@@ -123,6 +126,11 @@ def get_output_folder_and_log_level(
 
             if output_folder and log_level:
                 break
+
+    for arg in extra_cl_args:
+        if "output_folder=" in arg:
+            output_folder = arg.split("=")[1]
+            break
 
     if output_folder is None:
         raise ValueError("Output folder not found in global configs.")
