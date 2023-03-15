@@ -14,7 +14,7 @@ from eir.setup.input_setup import read_subset_file, read_bim
 
 if TYPE_CHECKING:
     from eir.train import Experiment
-    from eir.interpretation.interpretation import SampleActivation
+    from eir.interpretation.interpretation import SampleAttribution
     from eir.data_load.label_setup import al_label_transformers_object
 
 al_gradients_dict = Dict[str, List[np.ndarray]]
@@ -26,7 +26,7 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
 @dataclass
-class ParsedOmicsActivations:
+class ParsedOmicsAttributions:
     accumulated_acts: Dict[str, np.ndarray]
     accumulated_acts_masked: Dict[str, np.ndarray]
 
@@ -37,34 +37,31 @@ def get_omics_consumer(
     output_name: str,
     target_column: str,
     column_type: str,
-) -> Callable[[Union["SampleActivation", None]], ParsedOmicsActivations]:
-
+) -> Callable[[Union["SampleAttribution", None]], ParsedOmicsAttributions]:
     acc_acts = {}
     acc_acts_masked = {}
 
     n_samples = 0
 
     def _consumer(
-        activation: Union["SampleActivation", None]
-    ) -> ParsedOmicsActivations:
-
+        attribution: Union["SampleAttribution", None]
+    ) -> ParsedOmicsAttributions:
         nonlocal n_samples
 
-        if activation is None:
-
+        if attribution is None:
             for key, value in acc_acts.items():
                 acc_acts[key] = value / n_samples
 
             for key, value in acc_acts_masked.items():
                 acc_acts_masked[key] = value / n_samples
 
-            parsed_activations = ParsedOmicsActivations(
+            parsed_attributions = ParsedOmicsAttributions(
                 accumulated_acts=acc_acts, accumulated_acts_masked=acc_acts_masked
             )
-            return parsed_activations
+            return parsed_attributions
 
-        sample_inputs = activation.sample_info.inputs
-        sample_target_labels = activation.sample_info.target_labels
+        sample_inputs = attribution.sample_info.inputs
+        sample_target_labels = attribution.sample_info.target_labels
 
         cur_label_name = get_target_class_name(
             sample_label=sample_target_labels[output_name][target_column],
@@ -73,7 +70,7 @@ def get_omics_consumer(
             target_column_name=target_column,
         )
 
-        sample_acts = activation.sample_activations[input_name].squeeze()
+        sample_acts = attribution.sample_attributions[input_name].squeeze()
         if cur_label_name not in acc_acts:
             acc_acts[cur_label_name] = sample_acts
         else:
@@ -94,18 +91,18 @@ def get_omics_consumer(
     return _consumer
 
 
-def analyze_omics_input_activations(
+def analyze_omics_input_attributions(
     experiment: "Experiment",
     input_name: str,
     target_column_name: str,
     target_column_type: str,
-    activation_outfolder: Path,
-    all_activations: ParsedOmicsActivations,
+    attribution_outfolder: Path,
+    all_attributions: ParsedOmicsAttributions,
 ) -> None:
     exp = experiment
 
-    acc_acts = all_activations.accumulated_acts
-    acc_acts_masked = all_activations.accumulated_acts_masked
+    acc_acts = all_attributions.accumulated_acts
+    acc_acts_masked = all_attributions.accumulated_acts_masked
 
     abs_grads = True if target_column_type == "con" else False
     top_gradients_dict = get_snp_cols_w_top_grads(
@@ -132,27 +129,27 @@ def analyze_omics_input_activations(
         gathered_scaled_grads=scaled_grads,
         top_gradients_dict=top_gradients_dict,
         df_snps=df_snps,
-        output_folder=activation_outfolder,
+        output_folder=attribution_outfolder,
     )
 
-    np.save(file=str(activation_outfolder / "top_acts.npy"), arr=top_gradients_dict)
+    np.save(file=str(attribution_outfolder / "top_acts.npy"), arr=top_gradients_dict)
 
     save_masked_grads(
         acc_grads_times_inp=acc_acts_masked,
         top_gradients_dict=top_gradients_dict,
         df_snps=df_snps,
-        sample_outfolder=activation_outfolder,
+        sample_outfolder=attribution_outfolder,
     )
 
     df_snp_grads = _save_snp_gradients(
-        accumulated_grads=acc_acts, outfolder=activation_outfolder, df_snps=df_snps
+        accumulated_grads=acc_acts, outfolder=attribution_outfolder, df_snps=df_snps
     )
     df_snp_grads_with_abs = _add_absolute_summed_snp_gradients_to_df(
         df_snp_grads=df_snp_grads
     )
     av.plot_snp_manhattan_plots(
         df_snp_grads=df_snp_grads_with_abs,
-        outfolder=activation_outfolder,
+        outfolder=attribution_outfolder,
         title_extra=f" - {target_column_name}",
     )
 
@@ -160,54 +157,50 @@ def analyze_omics_input_activations(
 def _save_snp_gradients(
     accumulated_grads: Dict[str, np.ndarray], outfolder: Path, df_snps: pd.DataFrame
 ) -> pd.DataFrame:
-
     df_output = deepcopy(df_snps)
     for label, grads in accumulated_grads.items():
-
         grads_np = grads
         grads_averaged = grads_np.sum(0)
 
-        column_name = label + "_activations"
+        column_name = label + "_attributions"
         df_output[column_name] = grads_averaged
 
-    df_output.to_csv(path_or_buf=outfolder / "snp_activations.csv")
+    df_output.to_csv(path_or_buf=outfolder / "snp_attributions.csv")
     return df_output
 
 
 def _add_absolute_summed_snp_gradients_to_df(
     df_snp_grads: pd.DataFrame,
 ) -> pd.DataFrame:
-
     df_snp_grads_copy = df_snp_grads.copy()
 
-    activations_columns = [
-        i for i in df_snp_grads_copy.columns if i.endswith("_activations")
+    attributions_columns = [
+        i for i in df_snp_grads_copy.columns if i.endswith("_attributions")
     ]
-    if "Aggregated_activations" in activations_columns:
+    if "Aggregated_attributions" in attributions_columns:
         raise ValueError(
-            "Cannot compute aggregated activations as reserved column name "
-            "'Aggregated' already present as target (all activation columns: %s). "
+            "Cannot compute aggregated attributions as reserved column name "
+            "'Aggregated' already present as target (all attribution columns: %s). "
             "Please rename the column 'Aggregated' to something else "
             "in the relevant target file.",
-            activations_columns,
+            attributions_columns,
         )
 
-    df_snp_grads_copy["Aggregated_activations"] = (
-        df_snp_grads_copy[activations_columns].abs().sum(axis=1)
+    df_snp_grads_copy["Aggregated_attributions"] = (
+        df_snp_grads_copy[attributions_columns].abs().sum(axis=1)
     )
 
     return df_snp_grads_copy
 
 
-def parse_single_omics_activations(
+def parse_single_omics_attributions(
     experiment: "Experiment",
     omics_input_name: str,
     output_name: str,
     target_column_name: str,
     column_type: str,
-    activations: Sequence["SampleActivation"],
+    attributions: Sequence["SampleAttribution"],
 ) -> Tuple[Dict, Dict]:
-
     exp = experiment
     output_object = exp.outputs[output_name]
     target_transformer = output_object.target_transformers[target_column_name]
@@ -215,11 +208,10 @@ def parse_single_omics_activations(
     acc_acts = defaultdict(list)
     acc_acts_masked = defaultdict(list)
 
-    for sample_activation in activations:
-
-        sample_inputs = sample_activation.sample_info.inputs
-        sample_target_labels = sample_activation.sample_info.target_labels
-        sample_acts = sample_activation.sample_activations[omics_input_name]
+    for sample_attribution in attributions:
+        sample_inputs = sample_attribution.sample_info.inputs
+        sample_target_labels = sample_attribution.sample_info.target_labels
+        sample_acts = sample_attribution.sample_attributions[omics_input_name]
 
         # we want to keep the original sample for masking
         inputs_omics = sample_inputs[omics_input_name]
@@ -269,7 +261,6 @@ def get_snp_cols_w_top_grads(
     top_snps_per_class = {}
 
     for cls, grads in accumulated_grads.items():
-
         if grads is not None:
             top_snps_per_class[cls] = {}
 
@@ -291,7 +282,7 @@ def get_snp_cols_w_top_grads(
         else:
             logger.warning(
                 "No gradients aggregated for class %s due to no "
-                "correct predictions for the class, top activations "
+                "correct predictions for the class, top attributions "
                 "will not be plotted.",
                 cls,
             )

@@ -51,7 +51,7 @@ class SimpleLCLModel(nn.Module):
             in_features=self.fc_1_in_features,
             out_feature_sets=self.model_config.fc_repr_dim,
             num_chunks=num_chunks,
-            bias=False,
+            bias=True,
         )
 
         self._init_weights()
@@ -180,7 +180,7 @@ class LCLModel(nn.Module):
             in_features=self.fc_1_in_features,
             out_feature_sets=2**fc_0_channel_exponent,
             split_size=fc_0_split_size,
-            bias=False,
+            bias=True,
         )
 
         split_parameter_spec = LCParameterSpec(
@@ -282,7 +282,6 @@ def _generate_split_blocks_from_spec(
     split_parameter_spec: LCParameterSpec,
     block_layer_spec: List[int],
 ) -> nn.Sequential:
-
     s = split_parameter_spec
     block_layer_spec_copy = copy(block_layer_spec)
 
@@ -299,7 +298,6 @@ def _generate_split_blocks_from_spec(
 
     for cur_layer_index, block_dim in enumerate(block_layer_spec_copy):
         for block in range(block_dim):
-
             cur_out_feature_sets = 2 ** (s.channel_exp_base + cur_layer_index)
             cur_kernel_width = s.kernel_width
             while cur_out_feature_sets >= cur_kernel_width:
@@ -383,7 +381,7 @@ def generate_split_resblocks_auto(split_parameter_spec: LCParameterSpec):
             )
             block_modules.append(cur_attention_block)
 
-    logger.info(
+    logger.debug(
         "No SplitLinear residual blocks specified in CL arguments. Created %d "
         "blocks with final output dimension of %d.",
         len(block_modules),
@@ -445,7 +443,6 @@ class LCLAttentionBlock(nn.Module):
 def _do_add_attention(
     in_features: int, embedding_dim: int, attention_inclusion_cutoff: Optional[int]
 ) -> bool:
-
     if attention_inclusion_cutoff is None:
         return False
 

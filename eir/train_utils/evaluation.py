@@ -102,7 +102,6 @@ def save_evaluation_results_wrapper(
     iteration: int,
     experiment: "Experiment",
 ):
-
     target_columns_gen = get_output_info_generator(outputs_as_dict=experiment.outputs)
 
     for output_name, column_type, column_name in target_columns_gen:
@@ -149,7 +148,6 @@ class PerformancePlotConfig:
 def save_evaluation_results(
     plot_config: PerformancePlotConfig,
 ) -> None:
-
     pc = plot_config
 
     common_args = {
@@ -198,7 +196,6 @@ def _parse_valid_classification_preds(
     val_classes: Sequence[str],
     ids: np.ndarray,
 ) -> pd.DataFrame:
-
     assert len(val_classes) == val_outputs.shape[1]
 
     columns = ["ID", "True_Label", "Predicted"]
@@ -238,7 +235,6 @@ def scale_and_save_regression_preds(
     transformer: StandardScaler,
     outfolder: Path,
 ) -> None:
-
     val_labels_2d = val_labels.reshape(-1, 1)
     val_outputs_2d = val_outputs.reshape(-1, 1)
 

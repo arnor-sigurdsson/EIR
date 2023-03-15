@@ -73,7 +73,6 @@ def set_up_datasets_from_configs(
     train_ids_to_keep: Optional[Sequence[str]] = None,
     valid_ids_to_keep: Optional[Sequence[str]] = None,
 ) -> Tuple[al_datasets, al_datasets]:
-
     dataset_class = (
         MemoryDataset if configs.global_config.memory_dataset else DiskDataset
     )
@@ -111,7 +110,6 @@ def construct_default_dataset_kwargs_from_cl_args(
     test_mode: bool,
     ids_to_keep: Union[None, Sequence[str]] = None,
 ) -> Dict[str, Any]:
-
     ids_to_keep = set(ids_to_keep) if ids_to_keep is not None else None
 
     dataset_kwargs = {
@@ -128,7 +126,6 @@ def construct_default_dataset_kwargs_from_cl_args(
 def _check_valid_and_train_datasets(
     train_dataset: al_datasets, valid_dataset: al_datasets
 ) -> None:
-
     if len(train_dataset) < len(valid_dataset):
         logger.warning(
             "Size of training dataset (size: %d) is smaller than validation dataset ("
@@ -211,14 +208,12 @@ class DatasetBase(Dataset):
                 ids_to_keep = set(self.target_labels_dict.keys())
 
         for input_name, input_object in self.inputs.items():
-
             input_info = input_object.input_config.input_info
             input_source = input_info.input_source
             input_type = input_info.input_type
             input_inner_key = input_info.input_inner_key
 
             if input_type == "omics":
-
                 samples = _add_data_to_samples_wrapper(
                     input_source=input_source,
                     input_name=input_name,
@@ -229,7 +224,6 @@ class DatasetBase(Dataset):
                 )
 
             elif input_type == "image":
-
                 samples = _add_data_to_samples_wrapper(
                     input_source=input_source,
                     samples=samples,
@@ -248,7 +242,6 @@ class DatasetBase(Dataset):
                 )
 
             elif input_type in ("sequence", "bytes"):
-
                 if Path(input_source).is_dir():
                     samples = _add_data_to_samples_wrapper(
                         input_source=input_source,
@@ -273,14 +266,14 @@ class DatasetBase(Dataset):
         if self.target_labels_dict:
             samples = list(i for i in samples.values() if i.inputs and i.target_labels)
             num_missing = num_samples_raw - len(samples)
-            logger.debug(
+            logger.info(
                 "Filtered out %d samples that had no inputs or no target labels.",
                 num_missing,
             )
         else:
             samples = list(i for i in samples.values() if i.inputs)
             num_missing = num_samples_raw - len(samples)
-            logger.debug(
+            logger.info(
                 "Filtered out %d samples that had no inputs.",
                 num_missing,
             )
@@ -294,7 +287,6 @@ class DatasetBase(Dataset):
         raise NotImplementedError()
 
     def check_samples(self):
-
         no_ids, no_inputs, no_target_labels = [], [], []
 
         for s in self.samples:
@@ -364,7 +356,7 @@ def _log_missing_samples_between_modalities(
         cur_str += "\n"
         message += cur_str
 
-    logger.debug(message.rstrip())
+    logger.info(message.rstrip())
 
 
 def _add_target_labels_to_samples(
@@ -387,7 +379,6 @@ def _add_data_to_samples_wrapper(
     data_loading_hook: Callable,
     deeplake_input_inner_key: Optional[str] = None,
 ) -> DefaultDict[str, Sample]:
-
     if deeplake_ops.is_deeplake_dataset(data_source=input_source):
         samples = deeplake_ops.add_deeplake_data_to_samples(
             input_source=input_source,
@@ -417,14 +408,12 @@ def _add_file_data_to_samples(
     ids_to_keep: Union[None, Set[str]],
     data_loading_hook: Callable,
 ) -> DefaultDict[str, Sample]:
-
     file_data_iterator = get_file_sample_id_iterator_basic(
         data_source=input_source, ids_to_keep=ids_to_keep
     )
     file_iterator_tqdm = tqdm(file_data_iterator, desc=input_name)
 
     for sample_id, file in file_iterator_tqdm:
-
         sample_data = data_loading_hook(file)
 
         samples = add_id_to_samples(samples=samples, sample_id=sample_id)
@@ -441,7 +430,6 @@ def _add_tabular_data_to_samples(
     source_name: str = "Tabular Data",
 ) -> DefaultDict[str, Sample]:
     def _get_tabular_iterator(ids_to_keep_: Union[None, set]):
-
         for sample_id_, tabular_inputs_ in tabular_dict.items():
             if ids_to_keep_ and sample_id_ not in ids_to_keep_:
                 continue
@@ -677,7 +665,6 @@ def prepare_inputs_disk(
 ) -> Dict[str, torch.Tensor]:
     prepared_inputs = {}
     for input_name, data_pointer in inputs.items():
-
         input_object = inputs_objects[input_name]
 
         input_source = input_object.input_config.input_info.input_source
@@ -701,7 +688,6 @@ def prepare_inputs_disk(
             prepared_inputs[input_name] = array_prepared
 
         elif input_type == "sequence":
-
             sequence_tokenized = _sequence_load_wrapper(
                 data_pointer=data_pointer,
                 input_source=input_source,
@@ -717,7 +703,6 @@ def prepare_inputs_disk(
             prepared_inputs[input_name] = prepared_sequence_inputs
 
         elif input_type == "bytes":
-
             bytes_data = _bytes_load_wrapper(
                 data_pointer=data_pointer,
                 dtype=input_type_info.byte_encoding,
@@ -754,7 +739,6 @@ def prepare_inputs_disk(
 def prepare_image_data(
     image_input_object: "ImageInputInfo", image_data: Image, test_mode: bool
 ) -> torch.Tensor:
-
     """
     The transforms take care of converting the image object to a copied tensor.
     """
@@ -834,7 +818,6 @@ def process_tensor_to_length(
     tensor_length = len(tensor)
 
     if tensor_length > max_length:
-
         if sampling_strategy_if_longer == "from_start":
             truncated_tensor = tensor[:max_length]
             return truncated_tensor
@@ -865,7 +848,6 @@ def _bytes_load_wrapper(
     dtype: str,
     deeplake_inner_key: Optional[str] = None,
 ) -> np.ndarray:
-
     if deeplake_ops.is_deeplake_dataset(data_source=input_source):
         assert deeplake_inner_key is not None
         bytes_data = _load_deeplake_sample(
@@ -884,7 +866,6 @@ def _image_load_wrapper(
     input_source: str,
     deeplake_inner_key: Optional[str] = None,
 ) -> Image:
-
     if deeplake_ops.is_deeplake_dataset(data_source=input_source):
         assert deeplake_inner_key is not None
         image_data = _load_deeplake_sample(
@@ -910,7 +891,6 @@ def prepare_inputs_memory(
     prepared_inputs = {}
 
     for name, data in inputs.items():
-
         input_object = inputs_objects[name]
 
         input_type_info = input_object.input_config.input_type_info
@@ -981,7 +961,6 @@ def impute_missing_modalities(
     fill_values: Dict[str, Any],
     dtypes: Dict[str, Any],
 ) -> Dict[str, torch.Tensor]:
-
     for input_name, input_object in inputs_objects.items():
         input_type = input_object.input_config.input_info.input_type
 
@@ -1045,7 +1024,6 @@ def _omics_load_wrapper(
     subset_indices: Union[Sequence[int], None],
     deeplake_inner_key: Optional[str] = None,
 ) -> np.ndarray:
-
     if deeplake_ops.is_deeplake_dataset(data_source=input_source):
         assert deeplake_inner_key is not None
         genotype_array_raw = _load_deeplake_sample(

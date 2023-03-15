@@ -78,7 +78,6 @@ def get_file_sample_id_iterator_basic(
     data_source: str,
     ids_to_keep: Union[None, Set[str]],
 ) -> Generator[Tuple[Any, str], None, None]:
-
     base_file_iterator = get_file_path_iterator(
         data_source=Path(data_source), validate=False
     )
@@ -101,7 +100,6 @@ def add_sequence_data_from_csv_to_samples(
     encode_func: Callable,
     source_name: str = "CSV File Data",
 ) -> DefaultDict[str, "Sample"]:
-
     logger.info(
         "Loading sequence data from CSV file %s. Note that this will "
         "load all the sequence data into memory.",
@@ -115,7 +113,6 @@ def add_sequence_data_from_csv_to_samples(
     file_iterator_tqdm = tqdm(csv_sequence_iterator, desc=source_name)
 
     for sample_id, sequence in file_iterator_tqdm:
-
         samples = add_id_to_samples(samples=samples, sample_id=sample_id)
 
         sequence_split = split_func(sequence)
@@ -129,7 +126,6 @@ def add_sequence_data_from_csv_to_samples(
 def get_csv_id_sequence_iterator(
     data_source: str, ids_to_keep: Optional[Set[str]] = None
 ) -> Iterator[Tuple[str, str]]:
-
     df = pd.read_csv(data_source, index_col="ID", dtype={"ID": str})
 
     if "Sequence" not in df.columns:

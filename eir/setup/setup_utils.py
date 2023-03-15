@@ -35,7 +35,6 @@ class RunningStatistics:
                 self.num_var = new_var.mul_(new_n)
 
             else:
-
                 ratio = self.n / new_n
                 t = (self.sum / ratio).sub_(new_sum).pow_(2)
 

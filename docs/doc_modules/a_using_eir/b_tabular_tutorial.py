@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Sequence
+from typing import Sequence, List
 
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
 from docs.doc_modules.utils import get_saved_model_path
@@ -79,7 +79,6 @@ def get_02_poker_hands_run_1_predict_info() -> AutoDocExperimentInfo:
     conf_output_path = "eir_tutorials/02_tabular_tutorial/conf"
 
     run_1_output_path = "eir_tutorials/tutorial_runs/tutorial_02_run/"
-    model_path = get_saved_model_path(run_folder=Path(run_1_output_path))
 
     command = [
         "eirpredict",
@@ -92,7 +91,7 @@ def get_02_poker_hands_run_1_predict_info() -> AutoDocExperimentInfo:
         "--output_configs",
         f"{conf_output_path}/02_poker_hands_output_test.yaml",
         "--model_path",
-        model_path,
+        "FILL_MODEL",
         "--evaluate",
         "--output_folder",
         run_1_output_path,
@@ -116,12 +115,26 @@ def get_02_poker_hands_run_1_predict_info() -> AutoDocExperimentInfo:
         conf_output_path=Path(conf_output_path),
         base_path=Path(base_path),
         command=command,
+        pre_run_command_modifications=(_add_model_path_to_command,),
         files_to_copy_mapping=mapping,
         post_run_functions=(),
         force_run_command=True,
     )
 
     return ade
+
+
+def _get_model_path_for_predict() -> str:
+    run_1_output_path = "eir_tutorials/tutorial_runs/tutorial_02_run"
+    model_path = get_saved_model_path(run_folder=Path(run_1_output_path))
+
+    return model_path
+
+
+def _add_model_path_to_command(command: List[str]) -> List[str]:
+    model_path = _get_model_path_for_predict()
+    command = [x.replace("FILL_MODEL", model_path) for x in command]
+    return command
 
 
 def get_experiments() -> Sequence[AutoDocExperimentInfo]:

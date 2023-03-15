@@ -125,8 +125,6 @@ def main():
         configs=configs
     )
 
-    utils.configure_root_logger(output_folder=configs.global_config.output_folder)
-
     default_hooks = get_default_hooks(configs=configs)
     default_experiment = get_default_experiment(
         configs=configs,
@@ -137,7 +135,6 @@ def main():
 
 
 def run_experiment(experiment: "Experiment") -> None:
-
     _log_model(model=experiment.model)
 
     gc = experiment.configs.global_config
@@ -187,7 +184,6 @@ def set_up_tabular_target_labels_wrapper(
     train_ids: Sequence[str],
     valid_ids: Sequence[str],
 ) -> MergedTargetLabels:
-
     df_labels_train = pd.DataFrame(index=train_ids)
     df_labels_valid = pd.DataFrame(index=valid_ids)
     label_transformers = {}
@@ -231,7 +227,6 @@ def set_up_tabular_target_labels_wrapper(
 
 
 def df_to_nested_dict(df: pd.DataFrame) -> Dict:
-
     """
     The df has a 2-level multi index, like so ['ID', output_name]
 
@@ -272,7 +267,7 @@ def get_default_experiment(
         manual_valid_ids=manual_valid_ids,
     )
 
-    logger.info("Setting up target labels.")
+    logger.debug("Setting up target labels.")
     target_labels_info = get_tabular_target_file_infos(
         output_configs=configs.output_configs
     )
@@ -393,7 +388,6 @@ def gather_all_ids_from_output_configs(
 def _read_manual_ids_if_exist(
     manual_valid_ids_file: Union[None, str]
 ) -> Union[Sequence[str], None]:
-
     if not manual_valid_ids_file:
         return None
 
@@ -406,7 +400,6 @@ def _read_manual_ids_if_exist(
 def get_tabular_target_file_infos(
     output_configs: Iterable[schemas.OutputConfig],
 ) -> Dict[str, TabularFileInfo]:
-
     tabular_infos = {}
 
     for output_config in output_configs:
@@ -448,7 +441,6 @@ def get_dataloaders(
     batch_size: int,
     num_workers: int = 0,
 ) -> Tuple:
-
     check_dataset_and_batch_size_compatiblity(
         dataset=train_dataset, batch_size=batch_size, name="Training"
     )
@@ -498,7 +490,6 @@ def _get_criteria(outputs_as_dict: al_output_objects_as_dict) -> al_criteria:
     def get_criterion(
         column_type_: str, cat_label_smoothing_: float = 0.0
     ) -> Union[nn.CrossEntropyLoss, Callable]:
-
         if column_type_ == "con":
             assert cat_label_smoothing_ == 0.0
             return partial(_calc_mse, mse_loss_func=nn.MSELoss())
@@ -510,7 +501,6 @@ def _get_criteria(outputs_as_dict: al_output_objects_as_dict) -> al_criteria:
     )
 
     for output_name, column_type, column_name in target_columns_gen:
-
         label_smoothing = _get_label_smoothing(
             output_config=outputs_as_dict[output_name].output_config,
             column_type=column_type,
@@ -531,7 +521,6 @@ def _get_label_smoothing(
     output_config: schemas.OutputConfig,
     column_type: str,
 ) -> float:
-
     if column_type == "con":
         return 0.0
     elif column_type == "cat":
@@ -545,7 +534,6 @@ def _calc_mse(input, target, mse_loss_func: nn.MSELoss):
 
 
 def _get_loss_callable(criteria: al_criteria):
-
     single_task_loss_func = partial(calculate_prediction_losses, criteria=criteria)
     return single_task_loss_func
 
@@ -566,7 +554,7 @@ def _log_model(model: nn.Module) -> None:
     no_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
     logger.info(
-        "Starting training with a %s parameter model. " "Num trainable parameters: %s.",
+        "Starting training with a %s parameter model. Trainable parameters: %s.",
         format(no_params, ",.0f"),
         format(no_trainable_params, ",.0f"),
     )
@@ -690,7 +678,6 @@ def _get_default_step_function_hooks(configs: Configs):
 def _get_default_step_function_hooks_init_kwargs(
     configs: Configs,
 ) -> Dict[str, Sequence[Callable]]:
-
     init_kwargs = {
         "base_prepare_batch": [hook_default_prepare_batch],
         "post_prepare_batch": [],
@@ -767,7 +754,7 @@ def add_l1_loss_hook_if_applicable(
     )
     preds_l1 = getattr(configs.fusion_config.model_config, "l1", None)
     if input_l1 or preds_l1:
-        logger.info("Adding L1 loss hook.")
+        logger.debug("Adding L1 loss hook.")
         step_function_hooks_init_kwargs["loss"].append(hook_add_l1_loss)
 
     return step_function_hooks_init_kwargs
@@ -775,7 +762,6 @@ def add_l1_loss_hook_if_applicable(
 
 @dataclass
 class StepFunctionHookStages:
-
     al_hook = Callable[..., Dict]
     al_hooks = [Iterable[al_hook]]
 
@@ -793,7 +779,6 @@ def hook_default_prepare_batch(
     *args,
     **kwargs,
 ) -> Dict:
-
     batch = prepare_base_batch_default(
         loader_batch=loader_batch,
         input_objects=experiment.inputs,
@@ -814,7 +799,6 @@ def prepare_base_batch_default(
     model: nn.Module,
     device: str,
 ) -> Batch:
-
     inputs, target_labels, train_ids = loader_batch
 
     inputs_prepared = _prepare_inputs_for_model(
@@ -855,7 +839,6 @@ def _prepare_inputs_for_model(
             inputs_prepared[input_name] = cur_tensor
 
         elif input_type == "tabular":
-
             tabular_source_input = batch_inputs[input_name]
             for tabular_name, tensor in tabular_source_input.items():
                 tabular_source_input[tabular_name] = tensor.to(device=device)
@@ -888,7 +871,6 @@ def _prepare_inputs_for_model(
 def hook_default_model_forward(
     experiment: "Experiment", state: Dict, batch: "Batch", *args, **kwargs
 ) -> Dict:
-
     inputs = batch.inputs
 
     context_manager = get_maybe_amp_context_manager_from_state(state=state)
@@ -907,7 +889,6 @@ def get_amp_context_manager(device_type: str) -> autocast:
 def hook_default_optimizer_backward(
     experiment: "Experiment", state: Dict, *args, **kwargs
 ) -> Dict:
-
     optimizer_backward_kwargs = get_optimizer_backward_kwargs(
         optimizer_name=experiment.configs.global_config.optimizer
     )
@@ -959,7 +940,6 @@ def hook_default_optimizer_backward(
 def hook_default_compute_metrics(
     experiment: "Experiment", batch: "Batch", state: Dict, *args, **kwargs
 ):
-
     train_batch_metrics = calculate_batch_metrics(
         outputs_as_dict=experiment.outputs,
         outputs=state["model_outputs"],
@@ -989,7 +969,6 @@ def hook_default_compute_metrics(
 def hook_default_per_target_loss(
     experiment: "Experiment", batch: "Batch", state: Dict, *args, **kwargs
 ) -> Dict:
-
     context_manager = get_maybe_amp_context_manager_from_state(state=state)
     with context_manager:
         per_target_train_losses = experiment.loss_function(

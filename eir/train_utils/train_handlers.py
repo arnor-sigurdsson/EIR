@@ -27,7 +27,7 @@ from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 
 from eir.data_load.data_utils import get_output_info_generator
-from eir.interpretation.interpretation import activation_analysis_handler
+from eir.interpretation.interpretation import attribution_analysis_handler
 from eir.setup.config import object_to_primitives
 from eir.setup.output_setup import al_output_objects_as_dict
 from eir.setup.schemas import GlobalConfig
@@ -79,7 +79,6 @@ def configure_trainer(
     experiment: "Experiment",
     validation_handler_callable: al_handler = validation_handler,
 ) -> Engine:
-
     gc = experiment.configs.global_config
     run_folder = get_run_folder(output_folder=gc.output_folder)
 
@@ -134,7 +133,6 @@ def _attach_sample_interval_handlers(
     handler_config: "HandlerConfig",
     validation_handler_callable: Callable = validation_handler,
 ) -> Engine:
-
     exp = handler_config.experiment
     gc = exp.configs.global_config
 
@@ -147,18 +145,17 @@ def _attach_sample_interval_handlers(
     )
     all_handler_events = [validation_handler_and_event]
 
-    if gc.get_acts:
-        activation_handler_and_event = _get_activation_handler_and_event(
+    if gc.compute_attributions:
+        attribution_handler_and_event = _get_attribution_handler_and_event(
             iter_per_epoch=len(exp.train_loader),
             n_epochs=gc.n_epochs,
             sample_interval_base=gc.sample_interval,
-            act_every_sample_factor=gc.act_every_sample_factor,
+            attributions_every_sample_factor=gc.attributions_every_sample_factor,
             early_stopping_patience=gc.early_stopping_patience,
         )
-        all_handler_events.append(activation_handler_and_event)
+        all_handler_events.append(attribution_handler_and_event)
 
     for handler, event in all_handler_events:
-
         trainer.add_event_handler(
             event_name=event,
             handler=handler,
@@ -175,7 +172,6 @@ def _get_validation_handler_and_event(
     early_stopping_patience: int,
     validation_handler_callable: Callable,
 ) -> al_handler_and_event:
-
     validation_event = Events.ITERATION_COMPLETED(every=sample_interval_base)
 
     do_run_when_training_complete = _do_run_completed_handler(
@@ -190,40 +186,41 @@ def _get_validation_handler_and_event(
     return validation_handler_callable, validation_event
 
 
-def _get_activation_handler_and_event(
+def _get_attribution_handler_and_event(
     iter_per_epoch: int,
     n_epochs: int,
     sample_interval_base: int,
-    act_every_sample_factor: int,
+    attributions_every_sample_factor: int,
     early_stopping_patience: int,
 ) -> al_handler_and_event:
+    attribution_handler_callable = attribution_analysis_handler
 
-    activation_handler_callable = activation_analysis_handler
+    if attributions_every_sample_factor == 0:
+        attribution_event = Events.COMPLETED
+        logger.debug("Attributions will be computed at run end.")
 
-    if act_every_sample_factor == 0:
-        activation_event = Events.COMPLETED
-        logger.debug("Activations will be computed at run end.")
+        return attribution_handler_callable, attribution_event
 
-        return activation_handler_callable, activation_event
-
-    activation_handler_interval = sample_interval_base * act_every_sample_factor
-    activation_event = Events.ITERATION_COMPLETED(every=activation_handler_interval)
+    attribution_handler_interval = (
+        sample_interval_base * attributions_every_sample_factor
+    )
+    attribution_event = Events.ITERATION_COMPLETED(every=attribution_handler_interval)
 
     do_run_when_training_complete = _do_run_completed_handler(
         iter_per_epoch=iter_per_epoch,
         n_epochs=n_epochs,
-        sample_interval=activation_handler_interval,
+        sample_interval=attribution_handler_interval,
     )
 
     if do_run_when_training_complete and not early_stopping_patience:
-        activation_event = activation_event | Events.COMPLETED
+        attribution_event = attribution_event | Events.COMPLETED
 
     logger.debug(
-        "Activations will be computed every %d iterations.",
-        activation_handler_interval,
+        "Attributions will be computed every %d iterations.",
+        attribution_handler_interval,
     )
 
-    return activation_handler_callable, activation_event
+    return attribution_handler_callable, attribution_event
 
 
 def _do_run_completed_handler(iter_per_epoch: int, n_epochs: int, sample_interval: int):
@@ -257,7 +254,6 @@ def _get_monitoring_metrics(
         return f"{output_name_}_{column_name_}_{metric_name}"
 
     for output_name, output_target_type, column_name in target_columns_gen:
-
         if output_target_type in ("con", "cat"):
             cur_output_object = outputs_as_dict[output_name]
             cur_output_type = cur_output_object.output_config.output_info.output_type
@@ -268,7 +264,6 @@ def _get_monitoring_metrics(
 
             for metric in cur_metric_records:
                 if not metric.only_val:
-
                     parsed_metric = _parse_target_metrics(
                         output_name_=output_name,
                         column_name_=column_name,
@@ -318,12 +313,11 @@ def _attach_early_stopping_handler(trainer: Engine, handler_config: "HandlerConf
 def _get_early_stopping_handler(
     trainer: Engine, handler_config: HandlerConfig, patience_steps: int
 ):
-
     scoring_function = _get_latest_validation_value_score_function(
         run_folder=handler_config.run_folder, column="perf-average"
     )
 
-    logger.info(
+    logger.debug(
         "Setting early stopping patience to %d validation steps.", patience_steps
     )
 
@@ -352,7 +346,6 @@ def _get_early_stopping_event_filter_kwargs(
 def _get_early_stopping_event_filter_kwargs(
     early_stopping_iteration_buffer, sample_interval
 ):
-
     if early_stopping_iteration_buffer is None:
         return {"every": sample_interval}
 
@@ -460,7 +453,6 @@ def _call_and_undo_ignite_local_rank_side_effects(func: Callable, kwargs: Dict):
 def _maybe_attach_progress_bar(trainer: Engine, do_not_attach: bool) -> None:
     do_attach = not do_not_attach
     if do_attach:
-
         pbar = ProgressBar()
         pbar.attach(engine=trainer, metric_names=["loss-average"])
         trainer.add_event_handler(
@@ -511,7 +503,6 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
     )
 
     for plot_event in _get_plot_events(sample_interval=gc.sample_interval):
-
         if plot_event == Events.COMPLETED and not _do_run_completed_handler(
             iter_per_epoch=len(exp.train_loader),
             n_epochs=gc.n_epochs,
@@ -543,7 +534,6 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
 
 
 def _save_yaml_configs(run_folder: Path, configs: "Configs"):
-
     for config_name, config_object in configs.__dict__.items():
         cur_outpath = Path(run_folder / "configs" / config_name).with_suffix(".yaml")
         aislib.misc_utils.ensure_path_exists(path=cur_outpath)
@@ -563,7 +553,6 @@ def _add_checkpoint_handler_wrapper(
     sample_interval: int,
     model: nn.Module,
 ) -> Engine:
-
     checkpoint_score_function, score_name = None, None
     if n_to_save is not None:
         logger.debug(
@@ -623,7 +612,6 @@ def _get_metric_writing_funcs(
         writer_funcs[output_name] = {}
 
         for target_name, target_file in target_name_file_dict.items():
-
             writer_funcs[output_name][target_name] = get_buffered_metrics_writer(
                 buffer_interval=buffer_interval
             )
@@ -663,7 +651,6 @@ def _attach_checkpoint_handler(
     checkpoint_interval: int,
     model: nn.Module,
 ) -> Engine:
-
     trainer.add_event_handler(
         event_name=Events.ITERATION_COMPLETED(every=checkpoint_interval),
         handler=checkpoint_handler,
@@ -774,7 +761,6 @@ def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> Non
     run_folder = get_run_folder(ca.output_folder)
 
     for output_dir in _iterdir_ignore_hidden(path=run_folder / "results"):
-
         for target_dir in _iterdir_ignore_hidden(path=output_dir):
             target_column = target_dir.name
 
@@ -807,7 +793,6 @@ def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> Non
 
 
 def _get_custom_handlers(handler_config: "HandlerConfig"):
-
     custom_handlers = handler_config.experiment.hooks.custom_handler_attachers
 
     return custom_handlers
@@ -828,7 +813,6 @@ def _attach_custom_handlers(
 def add_hparams_to_tensorboard(
     h_params: List[str], experiment: "Experiment", writer: SummaryWriter
 ) -> None:
-
     logger.debug(
         "Exiting and logging best hyperparameters for best average loss "
         "to tensorboard."
@@ -875,7 +859,6 @@ def add_hparams_to_tensorboard(
 def _generate_h_param_dict(
     global_config: GlobalConfig, h_params: List[str]
 ) -> Dict[str, Union[str, float, int]]:
-
     h_param_dict = {}
 
     for param_name in h_params:

@@ -134,10 +134,10 @@ In any case, let's have a look at what our models
 are focusing on
 when deciding something is *not* a hot dog.
 (perhaps you already noticed
-we set the ``get_acts`` value to ``True``
+we set the ``compute_attributions`` value to ``True``
 in the global configuration):
 
-.. image:: tutorial_files/05_image_tutorial/figures/pretrained_resnet_not_hot_dog_activations.png
+.. image:: tutorial_files/05_image_tutorial/figures/pretrained_resnet_not_hot_dog_attributions.png
 
 That is not a hot dog alright, and our model seems to agree.
 
@@ -193,11 +193,11 @@ focus on for an example image.
 
 First the ResNet18 feature extractor:
 
-.. image:: tutorial_files/05_image_tutorial/figures/pretrained_combined_resnet_not_hot_dog_activations.png
+.. image:: tutorial_files/05_image_tutorial/figures/pretrained_combined_resnet_not_hot_dog_attributions.png
 
 And then the EfficientNet-B0 feature extractor:
 
-.. image:: tutorial_files/05_image_tutorial/figures/pretrained_combined_efficientnet_not_hot_dog_activations.png
+.. image:: tutorial_files/05_image_tutorial/figures/pretrained_combined_efficientnet_not_hot_dog_attributions.png
 
 While it's definitely more clear
 to the human eye in the ResNet18 case,

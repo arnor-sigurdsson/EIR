@@ -8,7 +8,7 @@ optimizer: adamw
 gradient_clipping: 1.0
 early_stopping_patience: 10
 early_stopping_buffer: 2000
-get_acts: false
-act_every_sample_factor: 10
-max_acts_per_class: 200
+compute_attributions: false
+attributions_every_sample_factor: 10
+max_attributions_per_class: 512
 mixing_alpha: 0.2

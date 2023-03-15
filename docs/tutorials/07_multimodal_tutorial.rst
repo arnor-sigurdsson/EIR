@@ -89,28 +89,28 @@ As usual, we can run the following command to train:
     :language: console
 
 .. note::
-    Here we are setting the ``--get_acts=true`` parameter,
-    from the command line, to get the SHAP activations of the
+    Here we are setting the ``--compute_attributions=true`` parameter,
+    from the command line, to get the integrated gradients attributions of the
     model w.r.t. the tabular input data.
 
 When training, I got the following training curve:
 
 .. image:: tutorial_files/07_multimodal_tutorial/figures/07_multimodal_training_curve_MCC_tabular.png
 
-Now, since we set the ``--get_acts=true`` parameter,
-we can have a look at the activations (notice in the global
-configuration, we set ``get_acts_ever_sample_factor=10``,
+Now, since we set the ``--compute_attributions=true`` parameter,
+we can have a look at the attributions (notice in the global
+configuration, we set ``compute_attributions_ever_sample_factor=10``,
 which means they are computed every
 10 sampling iterations,
 i.e. 200 * 10 = 2000 training iterations).
-Specifically, we check the file under ``samples/4000/activations/``
+Specifically, we check the file under ``samples/4000/attributions/``
 in the ``results`` folder. First, we can have a look at the
 feature importance for the tabular data.
 
 .. image:: tutorial_files/07_multimodal_tutorial/figures/tutorial_07a_feature_importance_D.png
 
 Here we can see that ``Breed1`` is the feature that most strongly influenced
-the model's prediction. In the ``activations`` folder, we can also
+the model's prediction. In the ``attributions`` folder, we can also
 see how the inputs influence the model towards a specific class.
 Here, we will look at how the ``Breed1`` input values influence the model
 towards the class "D: 100+ Days", meaning the pet was adopted
@@ -127,7 +127,7 @@ but keep in mind that this is specifically analyzing the behavior
 of the model, and not guaranteed to be true, causal relationships.
 Additionally, this is something that could likely be discovered with simpler
 methods, such as a logistic regression model. However, this is just
-an example of how to use the SHAP activations to analyze the deep-learning model.
+an example of how to use the integrated gradients attributions to analyze the deep-learning model.
 
 
 B - Tabular + Text Data
@@ -282,8 +282,9 @@ First we can have a look at the average performance:
 .. image:: tutorial_files/07_multimodal_tutorial/figures/07_multimodal_training_curve_perf-average_tabular_description_multi_task.png
 
 .. note::
-    The average performance by default is the average of the MCC for the
-    categorical targets, and (1.0 - loss) for the regression targets.
+    The average performance by default is the average of the
+    MCC, ROC-AUC and average precision (AP) for categorical targets and
+    1.0-LOSS, PCC, R2 for continuous targets.
 
 So, since we are using different inputs and outputs in this task,
 we cannot compare directly to the previous results. However, we can

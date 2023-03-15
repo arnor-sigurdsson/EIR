@@ -51,13 +51,8 @@ al_models_classes = Union[
 ]
 
 
-al_output_module_configs_classes = Union[
-    Type[TabularModelOutputConfig],
-]
-
-al_output_module_configs = Union[
-    TabularModelOutputConfig,
-]
+al_output_module_configs_classes = Union[Type[TabularModelOutputConfig]]
+al_output_module_configs = Union[TabularModelOutputConfig]
 
 
 al_tokenizer_choices = (
@@ -158,7 +153,7 @@ class GlobalConfig:
         best performance before terminating run.
 
     :param early_stopping_buffer:
-        Number of iterations to run before activation early stopping checks,
+        Number of iterations to run before activating early stopping checks,
         useful if networks take a while to 'kick into gear'.
 
     :param warmup_steps:
@@ -181,7 +176,7 @@ class GlobalConfig:
         Whether to load all sample into memory during training.
 
     :param sample_interval:
-        Iteration interval to perform validation and possibly activation analysis if
+        Iteration interval to perform validation and possibly attribution analysis if
         set.
 
     :param save_evaluation_sample_results:
@@ -195,28 +190,35 @@ class GlobalConfig:
     :param n_saved_models:
         Number of top N models to saved during training.
 
-    :param get_acts:
-        Whether to compute activations w.r.t. inputs.
+    :param compute_attributions:
+        Whether to compute attributions / feature importance scores
+        (using integrated gradients) assigned by the model with respect to the
+        input features.
 
-    :param max_acts_per_class:
-        Maximum number of samples per class to gather for activation analysis.
-        Good to use when modelling on imbalanced data.
+    :param max_attributions_per_class:
+        Maximum number of samples per class to gather for attribution / feature
+        importance analysis. Good to use when modelling on imbalanced data.
 
-    :param act_every_sample_factor:
-        Controls whether the activations are computed at every sample interval
-        (=1), every other sample interval (=2), etc. Useful when computing the
-        activations takes a long time and we don't want to do it every time we
-        evaluate.
+    :param attributions_every_sample_factor:
+        Controls whether the attributions / feature importance values
+        are computed at every sample interval (=1), every other sample interval (=2),
+        etc. Useful when computing the attributions takes a long time and we
+        don't want to do it every time we evaluate.
 
-    :param act_background_samples:
-        Number of samples to use for the background in activation computations.
+    :param attribution_background_samples:
+        Number of samples to use for the background in attribution / feature importance
+        computations.
 
-    :param debug:
-        Whether to run in debug mode.
+    :param plot_lr_schedule:
+        Whether to run LR search, plot the results and exit with status 0.
 
     :param no_pbar:
         Whether to not use progress bars. Useful when stdout/stderr is written
         to files.
+
+    :param log_level:
+        Logging level to use. Can be one of 'debug', 'info', 'warning', 'error',
+        'critical'.
 
     :param mixing_alpha:
         Alpha parameter used for mixing (higher means more mixing).
@@ -266,13 +268,14 @@ class GlobalConfig:
     save_evaluation_sample_results: bool = True
     checkpoint_interval: Union[None, int] = None
     n_saved_models: int = 1
-    get_acts: bool = False
-    act_classes: Union[None, List[str]] = None
-    max_acts_per_class: Union[None, int] = None
-    act_every_sample_factor: int = 1
-    act_background_samples: int = 64
-    debug: bool = False
+    compute_attributions: bool = False
+    attribution_target_classes: Union[None, List[str]] = None
+    max_attributions_per_class: Union[None, int] = None
+    attributions_every_sample_factor: int = 1
+    attribution_background_samples: int = 256
+    plot_lr_schedule: bool = False
     no_pbar: bool = False
+    log_level: Literal["debug", "info", "warning", "error", "critical"] = "info"
     mixing_alpha: float = 0.0
     plot_skip_steps: int = 200
     pretrained_checkpoint: Union[None, str] = None
@@ -340,7 +343,7 @@ class InputDataConfig:
 class OmicsInputDataConfig:
     """
     :param snp_file:
-        Path to the relevant ``.bim`` file, used for activation analysis.
+        Path to the relevant ``.bim`` file, used for attribution analysis.
 
     :param subset_snps_file:
         Path to a file with corresponding SNP IDs to subset from the main
@@ -474,7 +477,7 @@ class BasicPretrainedConfig:
 class BasicInterpretationConfig:
     """
     :param interpretation_sampling_strategy:
-        How to sample sequences for activation analysis. `first_n` always grabs the
+        How to sample sequences for attribution analysis. `first_n` always grabs the
         same first n values from the beginning of the dataset to interpret, while
         `random_sample` will sample uniformly from the whole dataset without
         replacement.

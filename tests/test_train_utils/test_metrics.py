@@ -47,7 +47,6 @@ def test_calculate_batch_metrics():
 
 
 def get_calculate_batch_metrics_data_test_kwargs():
-
     standard_scaler_fit_arr = [[0.0], [1.0], [2.0]]
 
     outputs = {
@@ -160,7 +159,6 @@ def test_calculate_losses_good():
 
 
 def test_calculate_losses_bad():
-
     # diff of 2 between each pair, RMSE expected to be 4.0
     label_values = torch.tensor([0, 1, 2, 3, 4], dtype=torch.int64)
     output_values = torch.tensor([2, 3, 4, 5, 6], dtype=torch.int64)
@@ -185,7 +183,6 @@ def set_up_calculate_losses_data(
     label_values: torch.Tensor, output_values: torch.Tensor
 ):
     def generate_base_dict(values: torch.Tensor):
-
         base_dict = {
             "Height": deepcopy(values).to(dtype=torch.float32),
             "BMI": deepcopy(values).to(dtype=torch.float32),

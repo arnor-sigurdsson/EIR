@@ -9,7 +9,6 @@ from functools import partial
 from typing import (
     Union,
     Dict,
-    List,
     TYPE_CHECKING,
     Sequence,
     Iterable,
@@ -20,19 +19,21 @@ from typing import (
     Callable,
 )
 
-# Filter warnings from shap
-# TODO: Possibly catch some of these and log them?
+# Filter warnings from attribution calculation
 warnings.filterwarnings(
-    "ignore",
-    "Using a non-full backward hook when the forward contains multiple autograd Nodes "
-    "is deprecated and will be removed in future versions.",
+    "ignore", message="Setting forward, backward hooks and attributes on non-linear.*"
 )
+warnings.filterwarnings(
+    "ignore", message=".*Attempting to normalize by value approximately 0.*"
+)
+
 
 import numpy as np
 import torch
+from torch.cuda import OutOfMemoryError
 from aislib.misc_utils import get_logger, ensure_path_exists
 from ignite.engine import Engine
-from shap import DeepExplainer
+from captum.attr import IntegratedGradients, NoiseTunnel
 from torch import nn
 from torch.utils.data import DataLoader, Subset
 from torch.utils.hooks import RemovableHandle
@@ -40,16 +41,16 @@ from torch.utils.hooks import RemovableHandle
 from eir.data_load.data_utils import get_output_info_generator, Batch
 from eir.data_load.datasets import al_datasets
 from eir.interpretation.interpret_omics import (
-    analyze_omics_input_activations,
+    analyze_omics_input_attributions,
     get_omics_consumer,
-    ParsedOmicsActivations,
+    ParsedOmicsAttributions,
 )
 from eir.setup.schemas import InputConfig
 from eir.interpretation.interpret_tabular import (
-    analyze_tabular_input_activations,
+    analyze_tabular_input_attributions,
 )
-from eir.interpretation.interpret_sequence import analyze_sequence_input_activations
-from eir.interpretation.interpret_image import analyze_image_input_activations
+from eir.interpretation.interpret_sequence import analyze_sequence_input_attributions
+from eir.interpretation.interpret_image import analyze_image_input_attributions
 from eir.models.model_training_utils import gather_data_loader_samples
 from eir.models.omics.models_cnn import CNNModel
 from eir.models.omics.models_linear import LinearModel
@@ -69,18 +70,15 @@ if TYPE_CHECKING:
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 # Type aliases
-# would be better to use Tuple here, but shap does literal type check for list, i.e.
-# if type(data) == list:
-al_model_inputs = List[Union[torch.Tensor, Union[torch.Tensor, None]]]
+al_explainers = Union[IntegratedGradients, NoiseTunnel]
 
 
-class WrapperModelForSHAP(nn.Module):
+class WrapperModelForAttribution(nn.Module):
     """
-    We need this wrapper module because SHAP only handles torch.Tensor or
-    List[torch.Tensor] inputs (literally checks for list). However, we do not want to
-    restrict our modules to only accept those formats, rather using a dict. Hence
-    we use this module to accept the list SHAP expects, but call the wrapped model with
-    a matched dict.
+    We need this wrapper module because libraries often only handle torch.Tensor or
+    List[torch.Tensor] inputs. However, we do not want to restrict our modules to
+    only accept those formats, rather using a dict. Hence, we use this module to
+    accept the list libraries expect, but call the wrapped model with a matched dict.
     """
 
     def __init__(self, wrapped_model, input_names: Iterable[str], *args, **kwargs):
@@ -92,7 +90,6 @@ class WrapperModelForSHAP(nn.Module):
     def match_tuple_inputs_and_names(
         self, input_sequence: Sequence[torch.Tensor]
     ) -> Dict[str, torch.Tensor]:
-
         if isinstance(input_sequence, torch.Tensor):
             input_sequence = list(input_sequence)
 
@@ -107,21 +104,23 @@ class WrapperModelForSHAP(nn.Module):
 
 
 @contextmanager
-def suppress_stdout() -> None:
+def suppress_stdout_and_stderr() -> None:
     with open(os.devnull, "w") as devnull:
         old_stdout = sys.stdout
         sys.stdout = devnull
+        old_stderr = sys.stderr
+        sys.stderr = devnull
         try:
             yield
         finally:
             sys.stdout = old_stdout
+            sys.stderr = old_stderr
 
 
 @validate_handler_dependencies([validation_handler])
-def activation_analysis_handler(
+def attribution_analysis_handler(
     engine: Engine, handler_config: "HandlerConfig"
 ) -> None:
-
     exp = handler_config.experiment
     gc = exp.configs.global_config
     iteration = engine.state.iteration
@@ -131,28 +130,28 @@ def activation_analysis_handler(
     )
     if not should_run:
         logger.warning(
-            "Got get_acts: %s but none of the input types in %s currently "
-            "support activation analysis. "
-            "Activation analysis will be skipped. ",
-            gc.get_acts,
+            "Got compute_attributions: %s but none of the input types in %s currently "
+            "support attribution analysis. "
+            "Attribution analysis will be skipped. ",
+            gc.compute_attributions,
             types,
         )
         return
 
-    logger.debug("Running activation analysis.")
+    logger.debug("Running attribution analysis.")
 
-    activation_outfolder_callable = partial(
-        _prepare_eval_activation_outfolder,
+    attribution_outfolder_callable = partial(
+        _prepare_eval_attribution_outfolder,
         output_folder=gc.output_folder,
         iteration=iteration,
     )
 
     background_loader = get_background_loader(experiment=exp)
 
-    activation_analysis_wrapper(
+    attribution_analysis_wrapper(
         model=exp.model,
         experiment=exp,
-        outfolder_target_callable=activation_outfolder_callable,
+        outfolder_target_callable=attribution_outfolder_callable,
         dataset_to_interpret=exp.valid_dataset,
         background_loader=background_loader,
     )
@@ -174,7 +173,7 @@ def get_background_loader(experiment: "Experiment") -> torch.utils.data.DataLoad
     return background_loader
 
 
-def activation_analysis_wrapper(
+def attribution_analysis_wrapper(
     model: nn.Module,
     experiment: Union["Experiment", "LoadedTrainExperiment"],
     outfolder_target_callable: Callable,
@@ -196,27 +195,27 @@ def activation_analysis_wrapper(
     target_columns_gen = get_output_info_generator(outputs_as_dict=exp.outputs)
 
     for output_name, target_column_type, target_column_name in target_columns_gen:
-
-        explainer, hook_handle = get_shap_object(
+        ao = get_attribution_object(
             experiment=exp,
             model=model_copy,
             column_name=target_column_name,
             output_name=output_name,
             background_loader=background_loader,
-            n_background_samples=gc.act_background_samples,
+            n_background_samples=gc.attribution_background_samples,
         )
 
-        act_callable = get_shap_activation_callable(
-            explainer=explainer,
+        act_callable = get_oom_adaptive_attribution_callable(
+            explainer=ao.explainer,
             column_type=target_column_type,
-            act_samples_per_class_limit=gc.max_acts_per_class,
+            baseline_values=ao.baseline_values_ordered,
+            baseline_names_ordered=ao.input_names_ordered,
+            batch_size=gc.batch_size,
         )
 
-        input_names = explainer.explainer.model.input_names
         act_func = partial(
-            get_activation,
-            activation_callable=act_callable,
-            input_names=input_names,
+            get_attribution,
+            attribution_callable=act_callable,
+            input_names=ao.input_names_ordered,
         )
 
         data_producer = _get_interpretation_data_producer(
@@ -227,7 +226,7 @@ def activation_analysis_wrapper(
             dataset=dataset_to_interpret,
         )
 
-        act_producer = get_sample_activation_producer(
+        act_producer = get_sample_attribution_producer(
             data_producer=data_producer,
             act_func=act_func,
             output_name=output_name,
@@ -235,11 +234,12 @@ def activation_analysis_wrapper(
         )
 
         input_names_and_types = {
-            i: exp.inputs[i].input_config.input_info.input_type for i in input_names
+            i: exp.inputs[i].input_config.input_info.input_type
+            for i in ao.input_names_ordered
         }
         output_object = exp.outputs[output_name]
         target_transformer = output_object.target_transformers[target_column_name]
-        act_consumers = get_activation_consumers(
+        act_consumers = get_attribution_consumers(
             input_names_and_types=input_names_and_types,
             target_transformer=target_transformer,
             output_name=output_name,
@@ -247,18 +247,18 @@ def activation_analysis_wrapper(
             column_type=target_column_type,
         )
 
-        all_activations = process_activations_for_all_modalities(
-            activation_producer=act_producer, activation_consumers=act_consumers
+        all_attributions = process_attributions_for_all_modalities(
+            attribution_producer=act_producer, attribution_consumers=act_consumers
         )
 
-        for input_name in input_names:
+        for input_name in ao.input_names_ordered:
             input_object = exp.inputs[input_name]
             input_type = input_object.input_config.input_info.input_type
 
             if input_type == "bytes":
                 continue
 
-            activation_outfolder = outfolder_target_callable(
+            act_output_folder = outfolder_target_callable(
                 column_name=target_column_name,
                 input_name=input_name,
                 output_name=output_name,
@@ -268,48 +268,73 @@ def activation_analysis_wrapper(
                 "input_name": input_name,
                 "target_column_name": target_column_name,
                 "target_column_type": target_column_type,
-                "all_activations": all_activations[input_name],
-                "activation_outfolder": activation_outfolder,
+                "all_attributions": all_attributions[input_name],
+                "attribution_outfolder": act_output_folder,
             }
 
             if input_type == "omics":
-                analyze_omics_input_activations(**common_kwargs)
+                analyze_omics_input_attributions(**common_kwargs)
 
             elif input_type == "tabular":
-                analyze_tabular_input_activations(
+                analyze_tabular_input_attributions(
                     **common_kwargs, output_name=output_name
                 )
 
             elif input_type == "sequence":
-                analyze_sequence_input_activations(
+                expected_value = compute_expected_value(
+                    model=model_copy, baselines=ao.baselines
+                )
+                analyze_sequence_input_attributions(
                     **common_kwargs,
-                    expected_target_classes_shap_values=explainer.expected_value,
-                    output_name=output_name
+                    expected_target_classes_attributions=expected_value,
+                    output_name=output_name,
                 )
             elif input_type == "image":
-                analyze_image_input_activations(
+                analyze_image_input_attributions(
                     **common_kwargs, output_name=output_name
                 )
 
-        hook_handle.remove()
+        ao.hook_handle.remove()
 
 
-def get_shap_object(
+def compute_expected_value(
+    model: nn.Module,
+    baselines: Dict[str, torch.Tensor],
+) -> np.ndarray:
+    outputs = model(baselines)
+    return outputs.mean(0).detach().cpu().numpy()
+
+
+@dataclass
+class AttributionObject:
+    explainer: al_explainers
+    hook_handle: RemovableHandle
+    input_names_ordered: tuple[str]
+    baselines: Dict[str, torch.Tensor]
+    baseline_values_ordered: tuple[torch.Tensor]
+
+
+def get_attribution_object(
     experiment: "Experiment",
     model: nn.Module,
     column_name: str,
     output_name: str,
     background_loader: DataLoader,
     n_background_samples: int,
-) -> Tuple[DeepExplainer, RemovableHandle]:
-    background, *_ = gather_data_loader_samples(
+) -> AttributionObject:
+    """
+    Note that currently we are always grabbing at least one batch of samples
+    from the background loader (even when n_background_samples=0).
+    """
+
+    baseline_data, *_ = gather_data_loader_samples(
         batch_prep_hook=experiment.hooks.step_func_hooks.base_prepare_batch,
         batch_prep_hook_kwargs={"experiment": experiment},
         data_loader=background_loader,
         n_samples=n_background_samples,
     )
 
-    background = _detach_all_inputs(tensor_inputs=background)
+    baseline_data = _detach_all_inputs(tensor_inputs=baseline_data)
 
     hook_partial = partial(
         _grab_single_target_from_model_output_hook,
@@ -319,107 +344,194 @@ def get_shap_object(
     hook_handle = model.register_forward_hook(hook_partial)
 
     # Convert to list for wrapper model
-    input_names, input_values = zip(*background.items())
-    input_names, input_values = list(input_names), list(input_values)
+    input_names, values_ordered = zip(*baseline_data.items())
+    input_names, values_ordered = tuple(input_names), tuple(values_ordered)
 
     assert not model.training
-    wrapped_model = WrapperModelForSHAP(wrapped_model=model, input_names=input_names)
-    explainer = DeepExplainer(model=wrapped_model, data=input_values)
+    wrapped_model = WrapperModelForAttribution(
+        wrapped_model=model,
+        input_names=input_names,
+    )
+    explainer = IntegratedGradients(forward_func=wrapped_model)
 
-    return explainer, hook_handle
+    attribution_object = AttributionObject(
+        explainer=explainer,
+        hook_handle=hook_handle,
+        baselines=baseline_data,
+        input_names_ordered=input_names,
+        baseline_values_ordered=values_ordered,
+    )
+
+    return attribution_object
 
 
-class ActivationCallable(Protocol):
+class AttributionCallable(Protocol):
     def __call__(
-        self, inputs: Sequence[torch.Tensor], *args, **kwargs
-    ) -> Sequence[torch.Tensor]:
+        self,
+        inputs: Dict[str, torch.Tensor],
+        sample_label: torch.Tensor,
+        *args,
+        **kwargs,
+    ) -> list[np.ndarray]:
         ...
 
 
-def get_activation(
-    activation_callable: ActivationCallable,
-    inputs: Sequence[torch.Tensor],
+def get_attribution(
+    attribution_callable: AttributionCallable,
+    inputs: Dict[str, torch.Tensor],
     input_names: Sequence[torch.Tensor],
     *args,
-    **kwargs
+    **kwargs,
 ) -> Union[Dict[str, torch.Tensor], None]:
+    input_attributions = attribution_callable(inputs=inputs, *args, **kwargs)
 
-    input_activations = activation_callable(inputs=inputs, *args, **kwargs)
-
-    if input_activations is None:
+    if input_attributions is None:
         return None
 
-    name_matched_activation = {k: v for k, v in zip(input_names, input_activations)}
+    name_matched_attribution = {k: v for k, v in zip(input_names, input_attributions)}
 
-    return name_matched_activation
+    return name_matched_attribution
 
 
-def get_shap_activation_callable(
-    explainer: DeepExplainer,
+def get_oom_adaptive_attribution_callable(
+    explainer: al_explainers,
     column_type: str,
-    act_samples_per_class_limit: Union[int, None],
-) -> Callable[
-    [DeepExplainer, al_model_inputs, torch.Tensor, str], Union[None, np.ndarray]
-]:
-    assert column_type in ("cat", "con")
-    act_sample_func = get_shap_sample_acts_deep_correct_only
+    baseline_values: tuple[torch.Tensor, ...],
+    baseline_names_ordered: tuple[str, ...],
+    batch_size: int,
+) -> AttributionCallable:
+    n_steps = min(batch_size, 128)
+    internal_batch_size = None
+    has_successfully_run = False
 
-    if act_samples_per_class_limit is not None:
-        act_sample_func = get_shap_sample_acts_deep_all_classes
-
-    act_func_partial = partial(
-        act_sample_func,
+    base_kwargs = dict(
         explainer=explainer,
         column_type=column_type,
+        baselines=baseline_values,
+        baseline_names_ordered=baseline_names_ordered,
+        n_steps=n_steps,
+    )
+
+    def calculate_attributions_adaptive(
+        inputs: Dict[str, torch.Tensor], sample_label: torch.Tensor
+    ) -> list[np.ndarray]:
+        nonlocal has_successfully_run
+        nonlocal internal_batch_size
+
+        if has_successfully_run:
+            return get_attributions(
+                inputs=inputs,
+                sample_label=sample_label,
+                internal_batch_size=internal_batch_size,
+                **base_kwargs,
+            )
+        else:
+            while True:
+                try:
+                    res = get_attributions(
+                        inputs=inputs,
+                        sample_label=sample_label,
+                        internal_batch_size=internal_batch_size,
+                        **base_kwargs,
+                    )
+                    has_successfully_run = True
+
+                    if internal_batch_size is not None:
+                        logger.debug(
+                            "Attribution IG internal batch size successfully set "
+                            "to %d.",
+                            internal_batch_size,
+                        )
+
+                    return res
+
+                except OutOfMemoryError as e:
+                    if internal_batch_size == 1:
+                        raise e
+
+                    if internal_batch_size is None:
+                        internal_batch_size = max(1, batch_size // 2)
+                    else:
+                        internal_batch_size = max(1, internal_batch_size // 2)
+
+                    logger.debug(
+                        "CUDA OOM error, reducing attribution IG "
+                        "internal batch size to %d.",
+                        internal_batch_size,
+                    )
+                    torch.cuda.empty_cache()
+                    continue
+
+    return calculate_attributions_adaptive
+
+
+def get_attribution_callable(
+    explainer: al_explainers,
+    column_type: str,
+    baseline_values: tuple[torch.Tensor, ...],
+    baseline_names_ordered: tuple[str, ...],
+    batch_size: int,
+) -> Callable[
+    [al_explainers, Dict[str, torch.Tensor], torch.Tensor, str],
+    Union[None, np.ndarray],
+]:
+    n_steps = min(batch_size, 128)
+
+    act_func_partial = partial(
+        get_attributions,
+        explainer=explainer,
+        column_type=column_type,
+        baselines=baseline_values,
+        baseline_names_ordered=baseline_names_ordered,
+        n_steps=n_steps,
     )
     return act_func_partial
 
 
 @dataclass
-class SampleActivation:
+class SampleAttribution:
     sample_info: "Batch"
-    sample_activations: Dict[str, np.ndarray]
+    sample_attributions: Dict[str, np.ndarray]
     raw_inputs: Dict
 
 
-def accumulate_all_activations(
+def accumulate_all_attributions(
     data_producer: Iterable["Batch"],
     act_func: Callable,
     target_column_name: str,
     output_name: str,
-) -> Sequence["SampleActivation"]:
-
-    all_activations = []
+) -> Sequence["SampleAttribution"]:
+    all_attributions = []
 
     for batch, raw_inputs in data_producer:
         sample_target_labels = batch.target_labels
 
-        sample_all_modalities_activations = act_func(
+        sample_all_modalities_attributions = act_func(
             inputs=batch.inputs,
             sample_label=sample_target_labels[output_name][target_column_name],
         )
 
-        if sample_all_modalities_activations is None:
+        if sample_all_modalities_attributions is None:
             continue
 
         batch_on_cpu = _convert_all_batch_tensors_to_cpu(batch=batch)
-        cur_sample_activation_info = SampleActivation(
+        cur_sample_attribution_info = SampleAttribution(
             sample_info=batch_on_cpu,
-            sample_activations=sample_all_modalities_activations,
+            sample_attributions=sample_all_modalities_attributions,
             raw_inputs=raw_inputs,
         )
-        all_activations.append(cur_sample_activation_info)
+        all_attributions.append(cur_sample_attribution_info)
 
-    return all_activations
+    return all_attributions
 
 
-def get_activation_consumers(
+def get_attribution_consumers(
     input_names_and_types: Dict[str, str],
     target_transformer: "al_label_transformers_object",
     output_name: str,
     target_column: str,
     column_type: str,
-) -> Dict[str, Callable[[Union["SampleActivation", None]], Any]]:
+) -> Dict[str, Callable[[Union["SampleAttribution", None]], Any]]:
     consumers_dict = {}
 
     for input_name, input_type in input_names_and_types.items():
@@ -445,10 +557,9 @@ def _get_consumer_from_input_type(
     target_column: str,
     column_type: str,
 ) -> Callable[
-    [Union["SampleActivation", None]],
-    Union[Sequence["SampleActivation"], ParsedOmicsActivations],
+    [Union["SampleAttribution", None]],
+    Union[Sequence["SampleAttribution"], ParsedOmicsAttributions],
 ]:
-
     if input_type in ("sequence", "tabular", "image"):
         return get_basic_sequence_consumer()
 
@@ -462,76 +573,74 @@ def _get_consumer_from_input_type(
         )
 
 
-def get_sample_activation_producer(
+def get_sample_attribution_producer(
     data_producer: Iterable["Batch"],
     act_func: Callable,
     target_column_name: str,
     output_name: str,
-):
+) -> Generator["SampleAttribution", None, None]:
     for batch, raw_inputs in data_producer:
         sample_target_labels = batch.target_labels
 
-        sample_all_modalities_activations = act_func(
+        sample_all_modalities_attributions = act_func(
             inputs=batch.inputs,
             sample_label=sample_target_labels[output_name][target_column_name],
         )
 
-        if sample_all_modalities_activations is None:
+        if sample_all_modalities_attributions is None:
             continue
 
         batch_on_cpu = _convert_all_batch_tensors_to_cpu(batch=batch)
-        cur_sample_activation_info = SampleActivation(
+        cur_sample_attribution_info = SampleAttribution(
             sample_info=batch_on_cpu,
-            sample_activations=sample_all_modalities_activations,
+            sample_attributions=sample_all_modalities_attributions,
             raw_inputs=raw_inputs,
         )
-        yield cur_sample_activation_info
+        yield cur_sample_attribution_info
 
 
-def get_basic_sequence_consumer() -> Callable[
-    [Union["SampleActivation", None]], Sequence["SampleActivation"]
-]:
-
+def get_basic_sequence_consumer() -> (
+    Callable[[Union["SampleAttribution", None]], Sequence["SampleAttribution"]]
+):
     results = []
 
     def _consumer(
-        activation: Union["SampleActivation", None]
-    ) -> Sequence["SampleActivation"]:
-
-        if activation is None:
+        attribution: Union["SampleAttribution", None]
+    ) -> Sequence["SampleAttribution"]:
+        if attribution is None:
             return results
 
-        results.append(activation)
+        results.append(attribution)
 
     return _consumer
 
 
-def process_activations_for_all_modalities(
-    activation_producer: Generator["SampleActivation", None, None],
-    activation_consumers: Dict[str, Callable],
-) -> Dict[str, Union[Sequence["SampleActivation"]]]:
-    processed_activations_all_modalities = {}
+def process_attributions_for_all_modalities(
+    attribution_producer: Generator["SampleAttribution", None, None],
+    attribution_consumers: Dict[str, Callable],
+) -> Dict[str, Union[Sequence["SampleAttribution"]]]:
+    processed_attributions_all_modalities = {}
 
-    for sample_activation in activation_producer:
-        for consumer_name, consumer in activation_consumers.items():
-            parsed_act = _parse_out_non_target_modality_activations(
-                sample_activation=sample_activation, modality_key=consumer_name
+    for sample_attribution in attribution_producer:
+        for consumer_name, consumer in attribution_consumers.items():
+            parsed_act = _parse_out_non_target_modality_attributions(
+                sample_attribution=sample_attribution, modality_key=consumer_name
             )
             consumer(parsed_act)
 
-    for consumer_name, consumer in activation_consumers.items():
-        processed_activations_all_modalities[consumer_name] = consumer(None)
+    for consumer_name, consumer in attribution_consumers.items():
+        processed_attributions_all_modalities[consumer_name] = consumer(None)
 
-    return processed_activations_all_modalities
+    return processed_attributions_all_modalities
 
 
-def _parse_out_non_target_modality_activations(
-    sample_activation: SampleActivation, modality_key: str
-) -> SampleActivation:
-    parsed_act = {modality_key: sample_activation.sample_activations[modality_key]}
-    parsed_inp = {modality_key: sample_activation.raw_inputs[modality_key]}
+def _parse_out_non_target_modality_attributions(
+    sample_attribution: SampleAttribution, modality_key: str
+) -> SampleAttribution:
+    parsed_act = {modality_key: sample_attribution.sample_attributions[modality_key]}
+    parsed_inp = {modality_key: sample_attribution.raw_inputs[modality_key]}
 
-    batch = sample_activation.sample_info
+    batch = sample_attribution.sample_info
 
     parsed_batch_inputs = {modality_key: batch.inputs[modality_key]}
 
@@ -539,16 +648,16 @@ def _parse_out_non_target_modality_activations(
         inputs=parsed_batch_inputs, target_labels=batch.target_labels, ids=batch.ids
     )
 
-    parsed_activation = SampleActivation(
-        sample_info=new_batch, sample_activations=parsed_act, raw_inputs=parsed_inp
+    parsed_attribution = SampleAttribution(
+        sample_info=new_batch, sample_attributions=parsed_act, raw_inputs=parsed_inp
     )
 
-    return parsed_activation
+    return parsed_attribution
 
 
 def _convert_all_batch_tensors_to_cpu(batch: Batch) -> Batch:
     """
-    We need this to avoid blowing up GPU memory when gathering all the activations and
+    We need this to avoid blowing up GPU memory when gathering all the attributions and
     raw inputs, as the inputs are tensors which can be on the GPU.
 
     If needed later maybe we can use some fancy recursion here, but this works for now.
@@ -571,14 +680,14 @@ def _convert_all_batch_tensors_to_cpu(batch: Batch) -> Batch:
     return new_batch
 
 
-def _prepare_eval_activation_outfolder(
+def _prepare_eval_attribution_outfolder(
     output_folder: str,
     input_name: str,
     column_name: str,
     output_name: str,
     iteration: int,
     *args,
-    **kwargs
+    **kwargs,
 ):
     sample_outfolder = prep_sample_outfolder(
         output_folder=output_folder,
@@ -586,10 +695,10 @@ def _prepare_eval_activation_outfolder(
         output_name=output_name,
         iteration=iteration,
     )
-    activation_outfolder = sample_outfolder / "activations" / input_name
-    ensure_path_exists(path=activation_outfolder, is_folder=True)
+    attribution_outfolder = sample_outfolder / "attributions" / input_name
+    ensure_path_exists(path=attribution_outfolder, is_folder=True)
 
-    return activation_outfolder
+    return attribution_outfolder
 
 
 def _grab_single_target_from_model_output_hook(
@@ -602,54 +711,39 @@ def _grab_single_target_from_model_output_hook(
     return output[output_name][output_target_column]
 
 
-def get_shap_sample_acts_deep_correct_only(
-    explainer: DeepExplainer,
-    inputs: al_model_inputs,
+def get_attributions(
+    explainer: al_explainers,
+    inputs: Dict[str, torch.Tensor],
     sample_label: torch.Tensor,
     column_type: str,
-) -> Union[np.ndarray, None]:
-    """
-    Note: We only get the grads for a correct prediction.
+    baselines: tuple[torch.Tensor, ...],
+    baseline_names_ordered: tuple[str, ...],
+    n_steps: int,
+    internal_batch_size: Union[int, None],
+) -> list[np.ndarray]:
+    list_inputs = tuple(inputs[n] for n in baseline_names_ordered)
+    baselines_averaged = tuple(i.mean(0).unsqueeze(0) for i in baselines)
 
-    Note: We need the [0] as ranked_outputs gives us a list of lists, where the inner
-          is containing all the modalities.
+    common_kwargs = dict(
+        inputs=list_inputs,
+        baselines=baselines_averaged,
+        n_steps=n_steps,
+        internal_batch_size=internal_batch_size,
+    )
 
-    TODO: Add functionality to use ranked_outputs or all outputs.
-    """
-    with suppress_stdout():
-        explained_input_order = explainer.explainer.model.input_names
-        list_inputs = [inputs[n] for n in explained_input_order]
-        output = explainer.shap_values(list_inputs, ranked_outputs=1)
+    with suppress_stdout_and_stderr():
+        if column_type == "con":
+            output = explainer.attribute(**common_kwargs)
+        else:
+            output = explainer.attribute(target=sample_label, **common_kwargs)
+
+    output = [o.detach().cpu().numpy() for o in output]
 
     if column_type == "con":
         assert isinstance(output[0], np.ndarray)
         return output
 
-    assert len(output) == 2
-    shap_grads, pred_label = output
-    if pred_label.item() == sample_label.item():
-        return shap_grads[0]
-
-    return None
-
-
-def get_shap_sample_acts_deep_all_classes(
-    explainer: DeepExplainer,
-    inputs: al_model_inputs,
-    sample_label: torch.Tensor,
-    column_type: str,
-) -> np.ndarray:
-    with suppress_stdout():
-        explained_input_order = explainer.explainer.model.input_names
-        list_inputs = [inputs[n] for n in explained_input_order]
-        output = explainer.shap_values(list_inputs)
-
-    if column_type == "con":
-        assert isinstance(output[0], np.ndarray)
-        return output
-
-    shap_grads = output[sample_label.item()]
-    return shap_grads
+    return output
 
 
 def _get_interpretation_data_producer(
@@ -659,7 +753,6 @@ def _get_interpretation_data_producer(
     output_name: str,
     dataset: al_datasets,
 ) -> Generator["Batch", None, None]:
-
     cur_output = experiment.outputs[output_name]
     target_transformer = cur_output.target_transformers[column_name]
     gc = experiment.configs.global_config
@@ -667,19 +760,19 @@ def _get_interpretation_data_producer(
     target_classes_numerical = _get_numerical_target_classes(
         target_transformer=target_transformer,
         column_type=column_type,
-        act_classes=gc.act_classes,
+        attribution_target_classes=gc.attribution_target_classes,
     )
 
-    activations_data_loader = _get_activations_dataloader(
+    attributions_data_loader = _get_attributions_dataloader(
         dataset=dataset,
-        max_acts_per_class=gc.max_acts_per_class,
+        max_attributions_per_class=gc.max_attributions_per_class,
         output_name=output_name,
         target_column=column_name,
         column_type=column_type,
         target_classes_numerical=target_classes_numerical,
     )
 
-    for loader_batch in activations_data_loader:
+    for loader_batch in attributions_data_loader:
         state = call_hooks_stage_iterable(
             hook_iterable=experiment.hooks.step_func_hooks.base_prepare_batch,
             common_kwargs={"experiment": experiment, "loader_batch": loader_batch},
@@ -707,9 +800,9 @@ def _detach_all_inputs(tensor_inputs: Dict[str, torch.Tensor]):
     return inputs_detached
 
 
-def _get_activations_dataloader(
+def _get_attributions_dataloader(
     dataset: al_datasets,
-    max_acts_per_class: int,
+    max_attributions_per_class: int,
     output_name: str,
     target_column: str,
     column_type: str,
@@ -717,17 +810,17 @@ def _get_activations_dataloader(
 ) -> DataLoader:
     common_args = {"batch_size": 1, "shuffle": False}
 
-    if max_acts_per_class is None:
+    if max_attributions_per_class is None:
         data_loader = DataLoader(dataset=dataset, **common_args)
         return data_loader
 
-    indices_func = _get_categorical_sample_indices_for_activations
+    indices_func = _get_categorical_sample_indices_for_attributions
     if column_type == "con":
-        indices_func = _get_continuous_sample_indices_for_activations
+        indices_func = _get_continuous_sample_indices_for_attributions
 
     subset_indices = indices_func(
         dataset=dataset,
-        max_acts_per_class=max_acts_per_class,
+        max_attributions_per_class=max_attributions_per_class,
         target_column=target_column,
         output_name=output_name,
         target_classes_numerical=target_classes_numerical,
@@ -737,15 +830,15 @@ def _get_activations_dataloader(
     return data_loader
 
 
-def _get_categorical_sample_indices_for_activations(
+def _get_categorical_sample_indices_for_attributions(
     dataset: al_datasets,
-    max_acts_per_class: int,
+    max_attributions_per_class: int,
     output_name: str,
     target_column: str,
     target_classes_numerical: Sequence[int],
 ) -> Tuple[int, ...]:
     acc_label_counts = defaultdict(lambda: 0)
-    acc_label_limit = max_acts_per_class
+    acc_label_limit = max_attributions_per_class
     indices = []
 
     for index, sample in enumerate(dataset.samples):
@@ -765,11 +858,10 @@ def _get_categorical_sample_indices_for_activations(
     return tuple(indices)
 
 
-def _get_continuous_sample_indices_for_activations(
-    dataset: al_datasets, max_acts_per_class: int, *args, **kwargs
+def _get_continuous_sample_indices_for_attributions(
+    dataset: al_datasets, max_attributions_per_class: int, *args, **kwargs
 ) -> Tuple[int, ...]:
-
-    acc_label_limit = max_acts_per_class
+    acc_label_limit = max_attributions_per_class
     num_sample = len(dataset)
     indices = np.random.choice(num_sample, acc_label_limit)
 
@@ -782,12 +874,14 @@ def _subsample_dataset(dataset: al_datasets, indices: Sequence[int]):
 
 
 def _get_numerical_target_classes(
-    target_transformer, column_type: str, act_classes: Union[Sequence[str], None]
+    target_transformer,
+    column_type: str,
+    attribution_target_classes: Union[Sequence[str], None],
 ):
     if column_type == "con":
         return [None]
 
-    if act_classes:
-        return target_transformer.transform(act_classes)
+    if attribution_target_classes:
+        return target_transformer.transform(attribution_target_classes)
 
     return target_transformer.transform(target_transformer.classes_)

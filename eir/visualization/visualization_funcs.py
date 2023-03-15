@@ -38,7 +38,6 @@ def add_series_to_axis(
     skiprows: int,
     ax_plot_kwargs: Union[Dict, None] = None,
 ) -> plt.Axes:
-
     if ax_plot_kwargs is None:
         ax_plot_kwargs = {}
     series_cut = series[series.index > skiprows]
@@ -125,14 +124,12 @@ def _get_min_or_max_funcs(
 
 
 def _parse_metrics_colname(column_name: str) -> str:
-
     return column_name.split("_")[-1].upper()
 
 
 def _get_validation_extreme_value_and_iter(
     extreme_index_func: Union[np.argmax, np.argmin], validation_values: pd.Series
 ) -> Tuple[int, float]:
-
     extreme_index: int = extreme_index_func(validation_values)
     extreme_value: float = validation_values[extreme_index]
 
@@ -548,7 +545,6 @@ def generate_all_training_curves(
     plot_skip_steps: int,
     title_extra: str = "",
 ) -> None:
-
     if training_history_df.shape[0] <= plot_skip_steps:
         return
 

@@ -52,7 +52,6 @@ def attach_lr_scheduler(
         )
 
     elif gc.lr_schedule == "plateau":
-
         if gc.warmup_steps:
             logger.debug("Setting first iteration optimizer LR to %.0e.", gc.lr_lb)
             update_optimizer_lr(lr=gc.lr_lb, optimizer=experiment.optimizer)
@@ -73,7 +72,6 @@ def attach_lr_scheduler(
 def _get_reduce_lr_on_plateau_step_params(
     global_config: GlobalConfig, optimizer: Optimizer
 ) -> Dict:
-
     run_folder = get_run_folder(output_folder=global_config.output_folder)
     validation_history_fpath = get_average_history_filepath(
         run_folder=run_folder, train_or_val_target_prefix="validation_"
@@ -98,7 +96,6 @@ def _get_reduce_lr_on_plateau_step_params(
 def set_up_lr_scheduler(
     handler_config: "HandlerConfig",
 ) -> Union[ConcatScheduler, CosineAnnealingScheduler, ReduceLROnPlateau]:
-
     exp = handler_config.experiment
     gc = exp.configs.global_config
 
@@ -148,7 +145,7 @@ def set_up_lr_scheduler(
             n_epochs=gc.n_epochs, iter_per_epoch=len(exp.train_loader)
         )
 
-        if gc.debug:
+        if gc.plot_lr_schedule:
             _plot_lr_schedule(
                 lr_scheduler=lr_scheduler,
                 num_events=num_events,
@@ -157,7 +154,7 @@ def set_up_lr_scheduler(
             )
 
     elif gc.lr_schedule == "plateau":
-        logger.info("Plateau patience set to %d.", gc.lr_plateau_patience)
+        logger.debug("Plateau patience set to %d.", gc.lr_plateau_patience)
 
         """
         For compatibility with ignite EarlyStopping handler, we reduce the plateau
@@ -188,7 +185,6 @@ def _get_cosine_lr_scheduler(
     cycle_iter_size: int,
     schedule: str,
 ) -> Tuple[CosineAnnealingScheduler, Dict]:
-
     """
     We return the arguments because the simulate_values are classmethods, which
     we need to pass the arguments too.
@@ -226,7 +222,7 @@ def _get_warmup_steps_from_cla(warmup_steps_arg, optimizer):
         return 0
     elif warmup_steps_arg == "auto":
         auto_steps = _calculate_auto_warmup_steps(optimizer=optimizer)
-        logger.info(
+        logger.debug(
             "Using calculated %d steps for learning rate warmup due to 'auto' "
             "option for warmup.",
             auto_steps,
@@ -254,7 +250,6 @@ def _plot_lr_schedule(
     lr_scheduler_args: Dict,
     output_folder: Path,
 ):
-
     simulated_vals = np.array(
         lr_scheduler.simulate_values(num_events=num_events, **lr_scheduler_args)
     )
@@ -344,7 +339,6 @@ def _step_reduce_on_plateau_scheduler(
         cur_bad_steps = reduce_on_plateau_scheduler.num_bad_epochs
 
         if iteration % sample_interval == 0 and not isclose(prev_lr, lr_lower_bound):
-
             validation_df = read_metrics_history_file(
                 file_path=validation_history_fpath
             )

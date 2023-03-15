@@ -65,7 +65,6 @@ def create_cl_args_config_files(
 def test_generate_aggregated_config_basic(
     create_cl_args_config_files: Dict[str, List[str]],
 ):
-
     test_cl_args = Namespace(**create_cl_args_config_files)
 
     tabular_output_setup = config.DynamicOutputSetup(
@@ -126,7 +125,6 @@ def test_generate_aggregated_config_basic(
 def test_generate_aggregated_config_fail(
     create_cl_args_config_files: Dict[str, List[str]],
 ):
-
     input_file = create_cl_args_config_files["input_configs"][0]
     with open(input_file, "r") as infile:
         original_config = yaml.load(stream=infile, Loader=yaml.FullLoader)

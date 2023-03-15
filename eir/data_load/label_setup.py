@@ -107,7 +107,6 @@ def set_up_train_and_valid_tabular_data(
 def _get_fit_label_transformers(
     df_labels: pd.DataFrame, label_columns: al_target_columns
 ) -> al_label_transformers:
-
     label_transformers = {}
 
     for column_type in label_columns:
@@ -187,11 +186,9 @@ def _streamline_values_for_transformers(
 def transform_label_df(
     df_labels: pd.DataFrame, label_transformers: al_label_transformers
 ) -> pd.DataFrame:
-
     df_labels_copy = df_labels.copy()
 
     for column_name, transformer_instance in label_transformers.items():
-
         series_values = df_labels_copy[column_name].values
         series_values_streamlined = _streamline_values_for_transformers(
             transformer=transformer_instance, values=series_values
@@ -311,7 +308,6 @@ def chunked_label_df_parse_wrapper(
     supplied_columns = get_passed_in_columns(tabular_info=label_file_tabular_info)
 
     for chunk in chunk_generator:
-
         df_labels_filtered = _filter_ids_from_label_df(
             df_labels=chunk, ids_to_keep=ids_to_keep
         )
@@ -393,10 +389,8 @@ def _get_label_df_chunk_generator(
 
 
 def ensure_categorical_columns_and_format(df: pd.DataFrame) -> pd.DataFrame:
-
     df_copy = df.copy()
     for column in df_copy.columns:
-
         if df_copy[column].dtype == object:
             logger.info(
                 "Implicitly casting %s of type 'object' to categorical dtype.", column
@@ -404,7 +398,6 @@ def ensure_categorical_columns_and_format(df: pd.DataFrame) -> pd.DataFrame:
             df_copy[column] = df_copy[column].astype(pd.CategoricalDtype())
 
         if isinstance(df_copy[column].dtype, pd.CategoricalDtype):
-
             mapping = {k: str(k) for k in df_copy[column].cat.categories}
             df_copy[column] = df_copy[column].cat.rename_categories(mapping)
 
@@ -416,7 +409,6 @@ def gather_all_ids_from_all_inputs(
 ) -> Tuple[str, ...]:
     ids = set()
     for input_config in input_configs:
-
         cur_source = Path(input_config.input_info.input_source)
         cur_type = input_config.input_info.input_type
         if cur_type in ["omics", "sequence", "bytes", "image"]:
@@ -440,7 +432,6 @@ def gather_all_ids_from_all_inputs(
 def gather_ids_from_data_source(
     data_source: Path, validate: bool = True
 ) -> Tuple[str, ...]:
-
     if is_deeplake_dataset(data_source=str(data_source)):
         deeplake_ds = load_deeplake_dataset(data_source=str(data_source))
         iterator = (sample.numpy().item() for sample in deeplake_ds["ID"])
@@ -492,7 +483,6 @@ def _get_all_label_columns_and_dtypes(
     con_columns: Sequence[str],
     column_ops: al_all_column_ops,
 ) -> Tuple[Sequence[str], Dict[str, Any]]:
-
     supplied_label_columns = _get_column_dtypes(
         cat_columns=cat_columns, con_columns=con_columns
     )
@@ -540,7 +530,6 @@ def _get_extra_columns(
 
     extra_columns = {}
     for column_name in label_columns + ["base", "post"]:
-
         if column_name in all_column_ops:
             cur_column_operations_sequence = all_column_ops.get(column_name)
 
@@ -651,7 +640,6 @@ def _get_currently_available_columns(
 def _filter_ids_from_label_df(
     df_labels: pd.DataFrame, ids_to_keep: Union[None, Tuple[str, ...]] = None
 ) -> pd.DataFrame:
-
     if not ids_to_keep:
         return df_labels
 
@@ -710,7 +698,6 @@ def _apply_column_operations_to_df(
     """
 
     for operation_name, operation_sequences in operations_dict.items():
-
         if len(df) == 0:
             return df
 
@@ -719,7 +706,6 @@ def _apply_column_operations_to_df(
             columns_in_df=df.columns,
             label_columns=label_columns,
         ):
-
             df = _apply_operation_sequence(
                 df=df,
                 operation_sequence=operation_sequences,
@@ -762,15 +748,12 @@ def _apply_operation_sequence(
     operation_name: str,
     label_columns: Sequence[str],
 ) -> pd.DataFrame:
-
     for operation in operation_sequence:
-
         if _should_apply_single_op(
             column_operation=operation,
             operation_name=operation_name,
             label_columns=label_columns,
         ):
-
             df = apply_column_op(
                 df=df,
                 operation=operation,
@@ -796,7 +779,6 @@ def apply_column_op(
     operation: ColumnOperation,
     operation_name: str,
 ) -> pd.DataFrame:
-
     func, args_dict = operation.function, operation.function_args
     logger.debug(
         "Applying func %s with args %s to column %s in pre-processing.",
@@ -814,7 +796,6 @@ def apply_column_op(
 def _check_parsed_label_df(
     df_labels: pd.DataFrame, supplied_label_columns: Sequence[str]
 ) -> pd.DataFrame:
-
     missing_columns = set(supplied_label_columns) - set(df_labels.columns)
     if missing_columns:
         raise ValueError(
@@ -851,7 +832,6 @@ def get_passed_in_columns(tabular_info: TabularFileInfo) -> Sequence[str]:
 def _drop_not_needed_label_columns(
     df: pd.DataFrame, needed_label_columns: Sequence[str]
 ) -> pd.DataFrame:
-
     to_drop = [i for i in df.columns if i not in needed_label_columns]
 
     if to_drop:
@@ -863,7 +843,6 @@ def _drop_not_needed_label_columns(
 def _split_df_by_ids(
     df: pd.DataFrame, train_ids: Sequence[str], valid_ids: Sequence[str]
 ) -> al_train_val_dfs:
-
     df_labels_train = df.loc[df.index.intersection(train_ids)]
     df_labels_valid = df.loc[df.index.intersection(valid_ids)]
     assert len(df_labels_train) + len(df_labels_valid) == len(df)
@@ -881,7 +860,6 @@ def split_ids(
     """
 
     if manual_valid_ids:
-
         logger.info(
             "Doing a manual split into validation set with %d IDs read from file.",
             len(manual_valid_ids),
@@ -906,7 +884,6 @@ def split_ids(
 def _split_ids_auto(
     ids: Sequence[str], valid_size: Union[int, float]
 ) -> Tuple[Sequence[str], Sequence[str]]:
-
     seed, _ = get_seed()
     ids_sorted = sorted(list(ids))
 
@@ -920,7 +897,6 @@ def _split_ids_auto(
 def _split_ids_manual(
     ids: Sequence[str], manual_valid_ids: Sequence[str]
 ) -> Tuple[Sequence[str], Sequence[str]]:
-
     ids_set = set(ids)
     not_found = tuple(i for i in manual_valid_ids if i not in ids_set)
     if not_found:
@@ -1006,7 +982,6 @@ def handle_missing_label_values_in_df(
     name: str = "df",
     include_missing: bool = False,
 ) -> pd.DataFrame:
-
     df_filled_cat = _fill_categorical_nans(
         df=df,
         column_names=cat_label_columns,
@@ -1043,7 +1018,6 @@ def _fill_categorical_nans(
         name,
     )
     for column in column_names:
-
         na_found = df[column].isna().sum() != 0
         if na_found or include_missing:
             df[column] = df[column].cat.add_categories("NA").fillna("NA")
@@ -1057,7 +1031,6 @@ def _fill_continuous_nans(
     con_means_dict: Dict[str, float],
     name: str = "df",
 ) -> pd.DataFrame:
-
     missing_stats = _get_missing_stats_string(df, column_names)
     logger.debug(
         "Replacing NaNs in continuous columns %s (counts: %s) in %s with %s",
@@ -1084,7 +1057,6 @@ def _get_missing_stats_string(
 def get_transformer_path(
     run_path: Path, source_name: str, transformer_name: str
 ) -> Path:
-
     if not transformer_name.endswith(".save"):
         transformer_name = f"{transformer_name}.save"
 
@@ -1098,7 +1070,6 @@ def get_transformer_path(
 def merge_target_columns(
     target_con_columns: List[str], target_cat_columns: List[str]
 ) -> al_target_columns:
-
     if len(target_con_columns + target_cat_columns) == 0:
         raise ValueError("Expected at least 1 label column")
 
@@ -1115,9 +1086,8 @@ def merge_target_columns(
 def save_transformer_set(
     transformers_per_source: Dict[str, al_label_transformers], run_folder: Path
 ) -> None:
-
     for output_name, transformers in transformers_per_source.items():
-        for (transformer_name, transformer_object) in transformers.items():
+        for transformer_name, transformer_object in transformers.items():
             save_label_transformer(
                 run_folder=run_folder,
                 output_name=output_name,

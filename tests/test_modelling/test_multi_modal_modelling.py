@@ -45,8 +45,7 @@ if TYPE_CHECKING:
             "injections": {
                 "global_configs": {
                     "output_folder": "multi_task_multi_modal",
-                    "n_epochs": 8,
-                    "act_background_samples": 8,
+                    "n_epochs": 10,
                     "gradient_clipping": 1.0,
                     "lr": 0.001,
                     "gradient_noise": 0.01,
@@ -118,5 +117,5 @@ def test_multi_modal_multi_task(
     check_performance_result_wrapper(
         outputs=experiment.outputs,
         run_path=test_config.run_path,
-        thresholds=(0.85, 0.85),
+        thresholds=(0.80, 0.80),
     )

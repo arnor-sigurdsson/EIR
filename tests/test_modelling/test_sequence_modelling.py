@@ -12,7 +12,7 @@ from eir.models.model_setup import (
 )
 from eir.setup.setup_utils import get_all_hf_model_names
 from eir.train_utils.utils import seed_everything
-from tests.conftest import should_skip_in_gha_macos
+from tests.conftest import should_skip_in_gha_macos, should_skip_in_gha
 from tests.test_modelling.setup_modelling_test_data.setup_sequence_test_data import (
     get_continent_keyword_map,
 )
@@ -49,7 +49,7 @@ def _get_sequence_test_specific_fusion_configs() -> Dict:
     "create_test_config_init_base",
     [
         # Case 1: Classification - Positional Encoding and Max Pooling
-        # Note we add more capacity to fusion models as it helps make activation
+        # Note we add more capacity to fusion models as it helps make attribution
         # analysis more stable
         {
             "injections": {
@@ -144,7 +144,7 @@ def test_sequence_modelling(prep_modelling_test_configs):
     _sequence_test_check_wrapper(experiment=experiment, test_config=test_config)
 
 
-@pytest.mark.skipif(condition=should_skip_in_gha_macos(), reason="In GHA.")
+@pytest.mark.skipif(condition=should_skip_in_gha(), reason="In GHA.")
 @pytest.mark.parametrize(
     "create_test_data",
     [
@@ -163,7 +163,7 @@ def test_sequence_modelling(prep_modelling_test_configs):
                     "memory_dataset": True,
                     "output_folder": "test_multi_task",
                     "gradient_noise": 0.001,
-                    "act_background_samples": 64,
+                    "attribution_background_samples": 8,
                 },
                 "input_configs": [
                     {
@@ -191,7 +191,7 @@ def test_sequence_modelling(prep_modelling_test_configs):
                     "memory_dataset": True,
                     "output_folder": "test_multi_task_with_mixing",
                     "mixing_alpha": 0.5,
-                    "act_background_samples": 64,
+                    "attribution_background_samples": 8,
                 },
                 "input_configs": [
                     {
@@ -218,7 +218,7 @@ def test_sequence_modelling(prep_modelling_test_configs):
                     "memory_dataset": True,
                     "output_folder": "test_albert",
                     "mixing_alpha": 0.0,
-                    "act_background_samples": 64,
+                    "attribution_background_samples": 8,
                 },
                 "input_configs": [
                     {
@@ -253,6 +253,12 @@ def test_sequence_modelling(prep_modelling_test_configs):
     indirect=True,
 )
 def test_mt_sequence_modelling(prep_modelling_test_configs):
+    """
+    NOTE: Currently we skip these in GHA as the runners sometimes get a SIGKILL -9
+    randomly, not due to this test in particular (running separately works),
+    but if the overall task takes too long / too many resources. Might be temporary
+    GHA issue, but for now we skip.
+    """
     experiment, test_config = prep_modelling_test_configs
 
     train.train(experiment=experiment)
@@ -277,7 +283,7 @@ def test_mt_sequence_modelling(prep_modelling_test_configs):
     "create_test_config_init_base",
     [
         # Case 1: Classification - Positional Encoding and Max Pooling
-        # Note we add more capacity to fusion models as it helps make activation
+        # Note we add more capacity to fusion models as it helps make attribution
         # analysis more stable
         {
             "injections": {
@@ -328,8 +334,7 @@ def _sequence_test_check_wrapper(experiment, test_config):
         con_targets = output_config.output_type_info.target_con_columns
 
         for target_name in cat_targets:
-
-            activation_paths = test_config.activations_paths[output_name][target_name]
+            attribution_paths = test_config.attributions_paths[output_name][target_name]
             target_transformer = experiment.outputs[output_name].target_transformers[
                 target_name
             ]
@@ -341,9 +346,9 @@ def _sequence_test_check_wrapper(experiment, test_config):
             )
 
             for input_name in experiment.inputs.keys():
-                cur_activation_root = activation_paths[input_name]
-                _check_sequence_activations_wrapper(
-                    activation_root_folder=cur_activation_root,
+                cur_attribution_root = attribution_paths[input_name]
+                _check_sequence_attributions_wrapper(
+                    attribution_root_folder=cur_attribution_root,
                     target_classes=target_transformer.classes_,
                     strict=False,
                 )
@@ -357,7 +362,6 @@ def _sequence_test_check_wrapper(experiment, test_config):
 
 
 def get_sequence_test_args(mixing: float) -> Tuple[float, float]:
-
     thresholds = (0.8, 0.7)
     if mixing:
         thresholds = (0.0, 0.7)
@@ -365,8 +369,8 @@ def get_sequence_test_args(mixing: float) -> Tuple[float, float]:
     return thresholds
 
 
-def _check_sequence_activations_wrapper(
-    activation_root_folder: Path,
+def _check_sequence_attributions_wrapper(
+    attribution_root_folder: Path,
     target_classes: Sequence[str],
     strict: bool = True,
 ):
@@ -377,8 +381,8 @@ def _check_sequence_activations_wrapper(
     those.
     """
 
-    seq_csv_gen = _get_sequence_activations_csv_generator(
-        activation_root_folder=activation_root_folder,
+    seq_csv_gen = _get_sequence_attributions_csv_generator(
+        attribution_root_folder=attribution_root_folder,
         target_classes=target_classes,
     )
     cat_class_keyword_map = get_continent_keyword_map()
@@ -389,9 +393,9 @@ def _check_sequence_activations_wrapper(
     for target_class, csv_file in seq_csv_gen:
         df_seq_acts = pd.read_csv(filepath_or_buffer=csv_file)
         expected_tokens = cat_class_keyword_map[target_class]
-        success = _check_sequence_activations(
-            df_activations=df_seq_acts,
-            top_n_activations=30,
+        success = _check_sequence_attributions(
+            df_attributions=df_seq_acts,
+            top_n_attributions=30,
             expected_top_tokens_pool=expected_tokens,
             must_match_n=len(expected_tokens) - 4,
             fail_fast=strict,
@@ -399,7 +403,6 @@ def _check_sequence_activations_wrapper(
         targets_acts_success.append(success)
 
     if multi_class:
-
         must_n_successes = len(target_classes) - 1
         if strict:
             must_n_successes = len(target_classes)
@@ -409,28 +412,28 @@ def _check_sequence_activations_wrapper(
         assert any(targets_acts_success)
 
 
-def _get_sequence_activations_csv_generator(
-    activation_root_folder: Path, target_classes: Iterable[str]
+def _get_sequence_attributions_csv_generator(
+    attribution_root_folder: Path, target_classes: Iterable[str]
 ):
     for target_class in target_classes:
         cur_path = (
-            activation_root_folder
+            attribution_root_folder
             / target_class
             / f"token_influence_{target_class}.csv"
         )
         yield target_class, cur_path
 
 
-def _check_sequence_activations(
-    df_activations: pd.DataFrame,
-    top_n_activations: int,
+def _check_sequence_attributions(
+    df_attributions: pd.DataFrame,
+    top_n_attributions: int,
     expected_top_tokens_pool: Iterable[str],
     must_match_n: int,
     fail_fast: bool = True,
 ) -> bool:
-    df_activations = df_activations.sort_values(by="Shap_Value", ascending=False)
-    df_top_n_rows = df_activations.head(top_n_activations)
-    top_tokens = df_top_n_rows["Token"]
+    df_attributions = df_attributions.sort_values(by="Attribution", ascending=False)
+    df_top_n_rows = df_attributions.head(top_n_attributions)
+    top_tokens = df_top_n_rows["Input"]
 
     matching = [i for i in top_tokens if i in expected_top_tokens_pool]
 
@@ -440,13 +443,12 @@ def _check_sequence_activations(
     return success
 
 
-@pytest.mark.skipif(condition=should_skip_in_gha_macos(), reason="In GHA.")
+@pytest.mark.skipif(condition=should_skip_in_gha(), reason="In GHA.")
 @pytest.mark.parametrize(
     "model_name",
     get_all_hf_model_names(),
 )
 def test_external_nlp_feature_extractor_forward(model_name: str):
-
     model_config = _get_common_model_config_overload()
     model_config_parsed = _parse_model_specific_config_values(
         model_config=model_config, model_name=model_name

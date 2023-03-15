@@ -23,7 +23,7 @@ def get_07_multimodal_run_1_tabular_info() -> AutoDocExperimentInfo:
         "--output_configs",
         f"{conf_output_path}/07_output.yaml",
         f"--07_globals.output_folder={output_folder}",
-        "--07_globals.get_acts=true",
+        "--07_globals.compute_attributions=true",
     ]
 
     mapping = [
@@ -32,12 +32,12 @@ def get_07_multimodal_run_1_tabular_info() -> AutoDocExperimentInfo:
             "figures/07_multimodal_training_curve_MCC_tabular.pdf",
         ),
         (
-            "4000/activations/pets_tabular/feature_importance.pdf",
+            "4000/attributions/pets_tabular/feature_importance.pdf",
             "figures/tutorial_07a_feature_importance_D.pdf",
         ),
         (
-            "4000/activations/pets_tabular/D: 100+ Days/cat_features_Breed1_"
-            "D: 100+ Days.pdf",
+            "4000/attributions/pets_tabular/D: 100+ Days/"
+            "categorical_attributions_Breed1_D: 100+ Days.pdf",
             "figures/tutorial_07a_breed_importance_D.pdf",
         ),
     ]
@@ -106,7 +106,6 @@ def get_07_multimodal_run_1_tabular_info() -> AutoDocExperimentInfo:
 
 
 def _show_tabular_csv_example(input_path: Path, output_path: Path) -> None:
-
     df = pd.read_csv(input_path, nrows=1).T
 
     html = df.to_html(index=True, header=False)
@@ -115,7 +114,6 @@ def _show_tabular_csv_example(input_path: Path, output_path: Path) -> None:
 
 
 def _show_text_description_example(input_path: Path, output_path: Path) -> None:
-
     description_text = pd.read_csv(input_path, nrows=1)["Sequence"].values[0]
 
     with open(output_path, "w") as f:
@@ -123,7 +121,6 @@ def _show_text_description_example(input_path: Path, output_path: Path) -> None:
 
 
 def _show_image_example(input_path: Path, output_path: Path) -> None:
-
     example_file = next(input_path.iterdir())
 
     with open(example_file, "rb") as f:

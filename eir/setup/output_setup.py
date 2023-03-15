@@ -31,7 +31,6 @@ def set_up_outputs_for_training(
     output_configs: schemas.al_output_configs,
     target_transformers: Dict[str, al_label_transformers],
 ) -> al_output_objects_as_dict:
-
     all_inputs = set_up_outputs_general(
         output_configs=output_configs,
         setup_func_getter=get_output_setup_function_for_train,
@@ -72,7 +71,6 @@ def set_up_outputs_general(
 def get_output_setup_function_for_train(
     output_config: schemas.OutputConfig,
 ) -> Callable[..., al_output_objects]:
-
     output_type = output_config.output_info.output_type
 
     mapping = get_output_setup_function_map()
@@ -117,7 +115,6 @@ def set_up_tabular_output(
 def set_up_num_outputs_per_target(
     target_transformers: al_label_transformers,
 ) -> al_num_outputs_per_target:
-
     num_outputs_per_target_dict = {}
     for target_column, transformer in target_transformers.items():
         if isinstance(transformer, StandardScaler):

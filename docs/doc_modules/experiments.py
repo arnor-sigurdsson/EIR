@@ -30,7 +30,6 @@ class AutoDocExperimentInfo:
 
 
 def make_tutorial_data(auto_doc_experiment_info: AutoDocExperimentInfo) -> None:
-
     ade = auto_doc_experiment_info
 
     get_data(url=ade.data_url, output_path=ade.data_output_path)
@@ -97,7 +96,6 @@ def find_and_copy_files(
     for path in run_folder.rglob("*"):
         for pattern, target in patterns:
             if re.match(pattern=pattern, string=str(path)) or pattern in str(path):
-
                 output_destination = output_folder / target
                 ensure_path_exists(path=output_destination, is_folder=False)
                 copy2(path, output_destination)
@@ -127,7 +125,6 @@ def find_and_copy_files(
 
 
 def run_experiment_from_command(command: List[str], force_run: bool = False):
-
     globals_file = next(i for i in command if "globals" in i)
     globals_dict = load_yaml_config(config_path=globals_file)
     run_folder = Path(globals_dict["output_folder"])

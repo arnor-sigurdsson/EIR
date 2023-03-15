@@ -11,10 +11,10 @@ from typing import (
     Sequence,
 )
 
-import plotly.express as px
 import torch
 from aislib.misc_utils import get_logger
 from aislib.pytorch_modules import Swish
+import matplotlib.pyplot as plt
 from ignite.engine import Engine
 from ignite.handlers.lr_finder import FastaiLRFinder
 from torch import nn
@@ -66,13 +66,11 @@ def parse_target_labels(
     device: str,
     labels: "al_training_labels_target",
 ) -> "al_training_labels_target":
-
     target_columns_gen = get_output_info_generator(outputs_as_dict=output_objects)
 
     labels_casted = {}
 
     for output_name, column_type, column_name in target_columns_gen:
-
         if output_name not in labels_casted:
             labels_casted[output_name] = {}
 
@@ -109,7 +107,6 @@ def gather_pred_outputs_from_dloader(
 
     assert not model.training
     for loader_batch in data_loader:
-
         state = call_hooks_stage_iterable(
             hook_iterable=batch_prep_hook,
             common_kwargs={"loader_batch": loader_batch, **batch_prep_hook_kwargs},
@@ -152,13 +149,11 @@ def gather_data_loader_samples(
     batch_prep_hook_kwargs: Dict[str, Any],
     n_samples: Union[int, None] = None,
 ) -> al_dloader_gathered_raw:
-
     all_input_batches = []
     all_label_batches = []
     ids_total = []
 
     for loader_batch in data_loader:
-
         state = call_hooks_stage_iterable(
             hook_iterable=batch_prep_hook,
             common_kwargs={"loader_batch": loader_batch, **batch_prep_hook_kwargs},
@@ -362,7 +357,7 @@ def run_lr_find(
     plot_lr_find_results(
         lr_find_results=lr_range_results_parsed,
         lr_suggestion=lr_suggestion_parsed,
-        outfolder=output_folder,
+        output_folder=output_folder,
     )
 
 
@@ -393,7 +388,6 @@ def get_lr_range_results(
         output_transform=lambda x: x["average"]["loss-average"],
         num_iter=num_iter,
     ) as trainer_with_lr_finder:
-
         logger.info("Running LR range test for max %d iterations.", num_iter)
 
         default_max_epochs = trainer_with_lr_finder.state.max_epochs
@@ -437,34 +431,19 @@ def _parse_out_lr_find_multiple_param_groups_suggestion(
 def plot_lr_find_results(
     lr_find_results: al_lr_find_results,
     lr_suggestion: float,
-    outfolder: Path,
+    output_folder: Path,
 ):
     lr_values = copy(lr_find_results["lr"])
     loss_values = copy(lr_find_results["loss"])
 
-    fig = px.line(
-        x=lr_values,
-        y=loss_values,
-        log_x=True,
-        title="Learning Rate Search",
-    )
-    fig.update_layout(
-        xaxis_title="Learning Rate ",
-        yaxis_title="Loss",
-    )
+    plt.plot(lr_values, loss_values)
+    plt.xscale("log")
+    plt.title("Learning Rate Search")
+    plt.xlabel("Learning Rate")
+    plt.ylabel("Loss")
+    plt.axvline(x=lr_suggestion, color="red", linewidth=1)
 
-    fig.add_shape(
-        dict(
-            type="line",
-            x0=lr_suggestion,
-            y0=0,
-            x1=lr_suggestion,
-            y1=max(loss_values),
-            line=dict(color="Red", width=1),
-        )
-    )
-
-    fig.write_html(str(outfolder / "lr_search.html"))
+    plt.savefig(str(output_folder / "lr_search.pdf"))
 
 
 def trace_eir_model(
@@ -484,7 +463,6 @@ def trace_eir_model(
             module.script_submodules_for_tracing()
 
     with torch.no_grad():
-
         traced_input_modules = nn.ModuleDict()
         feature_extractors_out = {}
         for module_name, module_input in example_inputs.items():

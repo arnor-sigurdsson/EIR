@@ -96,7 +96,7 @@ class SimpleTabularModel(nn.Module):
         self.layer = nn.Identity()
         if model_init_config.fc_layer:
             self.layer = nn.Linear(
-                in_features=self.input_dim, out_features=self.input_dim, bias=False
+                in_features=self.input_dim, out_features=self.input_dim, bias=True
             )
 
     @property
@@ -166,7 +166,6 @@ def get_tabular_inputs(
     """
     extra_embeddings = None
     if input_cat_columns:
-
         extra_embeddings = get_embeddings_from_labels(
             categorical_columns=input_cat_columns,
             labels=tabular_input,
@@ -178,7 +177,6 @@ def get_tabular_inputs(
 
     extra_continuous = None
     if input_con_columns:
-
         extra_continuous = get_extra_continuous_inputs_from_labels(
             labels=tabular_input, continuous_columns=input_con_columns
         )
@@ -198,7 +196,6 @@ def get_embeddings_from_labels(
     labels: Dict[str, Sequence[torch.Tensor]],
     model: SimpleTabularModel,
 ) -> torch.Tensor:
-
     """
     Note that the extra_embeddings is a list of tensors, where each tensor is a batch
     of embeddings for a given extra categorical column.
@@ -257,7 +254,6 @@ def get_unique_embed_values(
 def get_extra_continuous_inputs_from_labels(
     labels: Dict[str, torch.Tensor], continuous_columns: Iterable[str]
 ) -> torch.Tensor:
-
     extra_continuous = []
     for col in continuous_columns:
         cur_con_labels = labels[col].unsqueeze(1).to(dtype=torch.float)
@@ -317,7 +313,6 @@ def get_unique_values_from_transformers(
     transformers: Dict[str, Union[LabelEncoder, StandardScaler]],
     keys_to_use: Union[str, Iterable[str]],
 ) -> Dict[str, Any]:
-
     out = {}
 
     if not keys_to_use:

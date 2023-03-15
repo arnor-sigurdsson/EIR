@@ -23,7 +23,6 @@ logger = get_logger(name=__name__)
 def converge_train_and_predict_configs(
     train_configs: Configs, predict_cl_args: Namespace
 ) -> Configs:
-
     train_configs_copy = deepcopy(train_configs)
 
     named_dict_iterators = get_named_pred_dict_iterators(
@@ -53,9 +52,7 @@ def get_named_pred_dict_iterators(
 
     dict_of_generators = {}
     for key, value in predict_cl_args.__dict__.items():
-
         if key in target_keys:
-
             if not value:
                 value = ()
             cur_gen = config.get_yaml_to_dict_iterator(yaml_config_files=value)
@@ -163,7 +160,6 @@ def get_config_sequence_matching_func(
         train_config: schemas.OutputConfig,
         predict_dict_iterator: Iterable[Dict],
     ):
-
         matches = []
         predict_names_and_types = []
 
@@ -218,11 +214,9 @@ def get_config_sequence_matching_func(
 def overload_train_configs_for_predict(
     matched_dict_iterator: Generator[Tuple[str, Dict, Dict], None, None],
 ) -> Configs:
-
     main_overloaded_kwargs = {}
 
     for name, train_config_dict, predict_config_dict_to_inject in matched_dict_iterator:
-
         _maybe_warn_about_output_folder_overload_from_predict(
             name=name,
             predict_config_dict_to_inject=predict_config_dict_to_inject,
@@ -273,7 +267,6 @@ def _maybe_warn_about_output_folder_overload_from_predict(
     name: str, predict_config_dict_to_inject: Dict, train_config_dict: Dict
 ) -> None:
     if name == "global_config" and "output_folder" in predict_config_dict_to_inject:
-
         output_folder_from_predict = predict_config_dict_to_inject["output_folder"]
         output_folder_from_train = train_config_dict["output_folder"]
 

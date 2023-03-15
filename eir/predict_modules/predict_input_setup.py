@@ -46,7 +46,6 @@ def setup_tabular_input_for_testing(
     hooks: Union["Hooks", None],
     output_folder: str,
 ) -> PredictTabularInputInfo:
-
     tabular_file_info = input_setup.get_tabular_input_file_info(
         input_source=input_config.input_info.input_source,
         tabular_data_type_config=input_config.input_type_info,
@@ -75,7 +74,6 @@ def get_input_labels_for_predict(
     ids: Sequence[str],
     output_folder: str,
 ) -> PredictInputLabels:
-
     if len(tabular_file_info.con_columns) + len(tabular_file_info.cat_columns) < 1:
         raise ValueError(f"No label columns specified in {tabular_file_info}.")
 
@@ -133,7 +131,6 @@ def set_up_inputs_for_predict(
     hooks: Union["Hooks", None],
     output_folder: str,
 ) -> al_input_objects_as_dict:
-
     train_input_setup_kwargs = {
         "ids": ids,
         "output_folder": output_folder,
@@ -157,9 +154,9 @@ def get_input_setup_function_for_predict(
     return mapping[input_type]
 
 
-def get_input_setup_function_map_for_predict() -> Dict[
-    str, Callable[..., input_setup.al_input_objects]
-]:
+def get_input_setup_function_map_for_predict() -> (
+    Dict[str, Callable[..., input_setup.al_input_objects]]
+):
     setup_mapping = {
         "omics": input_setup.set_up_omics_input,
         "tabular": setup_tabular_input_for_testing,
@@ -174,7 +171,6 @@ def get_input_setup_function_map_for_predict() -> Dict[
 
 
 def prep_missing_con_dict(con_transformers: al_label_transformers) -> Dict[str, float]:
-
     train_means = {
         column: transformer.mean_[0] for column, transformer in con_transformers.items()
     }

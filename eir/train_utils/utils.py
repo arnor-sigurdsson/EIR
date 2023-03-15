@@ -48,20 +48,39 @@ def prep_sample_outfolder(
 
 
 @only_call_on_master_node
-def configure_root_logger(output_folder: str) -> None:
+def configure_global_eir_logging(output_folder: str, log_level: str = "INFO") -> None:
+    log_levels = {
+        "CRITICAL": logging.CRITICAL,
+        "ERROR": logging.ERROR,
+        "WARNING": logging.WARNING,
+        "INFO": logging.INFO,
+        "DEBUG": logging.DEBUG,
+        "NOTSET": logging.NOTSET,
+    }
+
+    if log_level.upper() not in log_levels:
+        raise ValueError(f"Invalid log level: {log_level}")
+
+    level = log_levels[log_level.upper()]
 
     logfile_path = get_run_folder(output_folder=output_folder) / "logging_history.log"
 
     ensure_path_exists(path=logfile_path)
     file_handler = logging.FileHandler(filename=str(logfile_path))
-    file_handler.setLevel(level=logging.DEBUG)
+    file_handler.setLevel(level=level)
 
     formatter = logging.Formatter(
         "%(asctime)s - %(levelname)s - %(name)s - %(message)s", "%Y-%m-%d %H:%M:%S"
     )
     file_handler.setFormatter(fmt=formatter)
 
-    logging.getLogger(name="").addHandler(hdlr=file_handler)
+    root_logger = logging.getLogger(name="")
+    root_logger.addHandler(hdlr=file_handler)
+
+    loggers = (logging.getLogger(name) for name in logging.root.manager.loggerDict)
+    for logger_ in loggers:
+        if logger_.name.split(".")[0] == "eir":
+            logger_.setLevel(level=level)
 
 
 def validate_handler_dependencies(handler_dependencies: Sequence[Callable]):
@@ -118,7 +137,6 @@ def state_registered_hook_call(
     *args,
     **kwargs,
 ) -> Tuple[Any, Dict[str, Any]]:
-
     if state is None:
         state = {}
 
@@ -130,11 +148,10 @@ def state_registered_hook_call(
 
 
 def seed_everything(seed: int = 0) -> None:
-
     seed, from_os = get_seed(default_seed=seed)
 
     extra_log = " grabbed from environment variable 'EIR_SEED '" if from_os else " "
-    logger.debug("Global random seed%sset to %d.", extra_log, seed)
+    logger.info("Global random seed%sset to %d.", extra_log, seed)
 
     random.seed(seed)
     np.random.seed(seed)

@@ -1,44 +1,54 @@
-import io
 from collections import defaultdict
 from copy import copy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Sequence, Literal, Tuple, Dict
+from typing import TYPE_CHECKING, Sequence, Literal, Tuple, Dict, Iterable
 
 import numpy as np
 import pandas as pd
-import shap
 import torch
 from aislib.misc_utils import ensure_path_exists, get_logger
-from shap._explanation import Explanation
+from captum.attr._utils.visualization import (
+    format_classname,
+    format_word_importances,
+    _get_color,
+)
+
 from torchtext.vocab import Vocab
 
 from eir.interpretation.interpretation_utils import (
     get_target_class_name,
-    stratify_activations_by_target_classes,
-    plot_activations_bar,
-    get_basic_sample_activations_to_analyse_generator,
+    stratify_attributions_by_target_classes,
+    plot_attributions_bar,
+    get_basic_sample_attributions_to_analyse_generator,
 )
-from eir.visualization.sequence_visualization_forward_port import text
 
 if TYPE_CHECKING:
     from eir.train import Experiment
-    from eir.interpretation.interpretation import SampleActivation
+    from eir.interpretation.interpretation import SampleAttribution
 
 logger = get_logger(name=__name__)
 
 
-def analyze_sequence_input_activations(
+@dataclass()
+class SequenceVisualizationDataRecord:
+    sample_id: str
+    token_attributions: Sequence[float]
+    label_name: str
+    attribution_score: float
+    raw_input_tokens: Sequence[str]
+
+
+def analyze_sequence_input_attributions(
     experiment: "Experiment",
     input_name: str,
     output_name: str,
     target_column_name: str,
     target_column_type: str,
-    activation_outfolder: Path,
-    all_activations: Sequence["SampleActivation"],
-    expected_target_classes_shap_values: Sequence[float],
+    attribution_outfolder: Path,
+    all_attributions: Sequence["SampleAttribution"],
+    expected_target_classes_attributions: Sequence[float],
 ) -> None:
-
     exp = experiment
 
     output_object = exp.outputs[output_name]
@@ -47,14 +57,14 @@ def analyze_sequence_input_activations(
     input_object = exp.inputs[input_name]
     interpretation_config = input_object.input_config.interpretation_config
 
-    samples_to_act_analyze_gen = get_basic_sample_activations_to_analyse_generator(
-        interpretation_config=interpretation_config, all_activations=all_activations
+    samples_to_act_analyze_gen = get_basic_sample_attributions_to_analyse_generator(
+        interpretation_config=interpretation_config, all_attributions=all_attributions
     )
     vocab = exp.inputs[input_name].vocab
+    viz_records = []
 
-    for sample_activation in samples_to_act_analyze_gen:
-
-        sample_target_labels = sample_activation.sample_info.target_labels
+    for sample_attribution in samples_to_act_analyze_gen:
+        sample_target_labels = sample_attribution.sample_info.target_labels
 
         cur_label_name = get_target_class_name(
             sample_label=sample_target_labels[output_name][target_column_name],
@@ -63,69 +73,68 @@ def analyze_sequence_input_activations(
             target_column_name=target_column_name,
         )
 
-        extracted_sample_info = extract_sample_info_for_sequence_activation(
-            sample_activation_object=sample_activation,
+        extracted_sample_info = extract_sample_info_for_sequence_attribution(
+            sample_attribution_object=sample_attribution,
             cur_label_name=cur_label_name,
             output_name=output_name,
             target_column_name=target_column_name,
             target_column_type=target_column_type,
             input_name=input_name,
             vocab=vocab,
-            expected_target_classes_shap_values=expected_target_classes_shap_values,
+            expected_target_classes_attributions=expected_target_classes_attributions,
         )
 
         index_to_truncate = get_sequence_index_to_truncate_unknown(
             raw_inputs=extracted_sample_info.raw_inputs
         )
 
-        truncated_sample_info = truncate_sequence_activation_to_padding(
-            sequence_activation_sample_info=extracted_sample_info,
+        truncated_sample_info = truncate_sequence_attribution_to_padding(
+            sequence_attribution_sample_info=extracted_sample_info,
             truncate_start_idx=index_to_truncate,
         )
+        tsi = truncated_sample_info
 
-        if not truncated_sample_info.raw_inputs:
+        if not tsi.raw_inputs:
             logger.debug(
-                "Skipping sequence activation analysis of single sample %s as it is "
+                "Skipping sequence attribution analysis of single sample %s as it is "
                 "empty after truncating unknowns.",
-                sample_activation.sample_info.ids[0],
+                sample_attribution.sample_info.ids[0],
             )
             continue
 
-        explanation = Explanation(
-            values=truncated_sample_info.sequence_shap_values,
-            data=np.array(truncated_sample_info.raw_inputs),
-            base_values=extracted_sample_info.expected_shap_value,
+        viz_record = SequenceVisualizationDataRecord(
+            sample_id=sample_attribution.sample_info.ids[0],
+            token_attributions=tsi.sequence_attributions,
+            label_name=tsi.sample_target_label_name,
+            attribution_score=tsi.sequence_attributions.sum(),
+            raw_input_tokens=tsi.raw_inputs,
         )
+        viz_records.append(viz_record)
 
-        html_string = text(shap_values=explanation, display=False)
+    html_string = get_sequence_html(data_records=viz_records)
+    outpath = attribution_outfolder / "single_samples.html"
+    ensure_path_exists(path=outpath)
+    save_html(out_path=outpath, html_string=html_string)
 
-        outpath = (
-            activation_outfolder
-            / "single_samples"
-            / f"sequence_{sample_activation.sample_info.ids[0]}_{cur_label_name}.html"
-        )
-        ensure_path_exists(path=outpath)
-        save_html(out_path=outpath, html_string=html_string)
-
-    acts_stratified_by_target = stratify_activations_by_target_classes(
-        all_activations=all_activations,
+    acts_stratified_by_target = stratify_attributions_by_target_classes(
+        all_attributions=all_attributions,
         target_transformer=target_transformer,
         output_name=output_name,
         target_column=target_column_name,
         column_type=target_column_type,
     )
 
-    for class_name, target_activations in acts_stratified_by_target.items():
+    for class_name, target_attributions in acts_stratified_by_target.items():
         token_importances = get_sequence_token_importance(
-            activations=target_activations, vocab=vocab, input_name=input_name
+            attributions=target_attributions, vocab=vocab, input_name=input_name
         )
         df_token_importances = get_sequence_feature_importance_df(
             token_importances=token_importances
         )
-        target_outfolder = activation_outfolder / f"{class_name}"
+        target_outfolder = attribution_outfolder / f"{class_name}"
         ensure_path_exists(path=target_outfolder, is_folder=True)
-        plot_activations_bar(
-            df_activations=df_token_importances,
+        plot_attributions_bar(
+            df_attributions=df_token_importances,
             outpath=target_outfolder / f"token_influence_{class_name}.pdf",
             title=f"{target_column_name} – {class_name}",
         )
@@ -135,41 +144,40 @@ def analyze_sequence_input_activations(
 
 
 @dataclass
-class SequenceActivationSampleInfo:
-    sequence_shap_values: np.ndarray
+class SequenceAttributionSampleInfo:
+    sequence_attributions: np.ndarray
     raw_inputs: Sequence[str]
-    expected_shap_value: float
+    expected_attr_value: float
     sample_target_label_name: str
 
 
-def extract_sample_info_for_sequence_activation(
-    sample_activation_object: "SampleActivation",
+def extract_sample_info_for_sequence_attribution(
+    sample_attribution_object: "SampleAttribution",
     cur_label_name: str,
     output_name: str,
     target_column_name: str,
     target_column_type: str,
     input_name: str,
     vocab: Vocab,
-    expected_target_classes_shap_values: Sequence[float],
-) -> SequenceActivationSampleInfo:
+    expected_target_classes_attributions: Sequence[float],
+) -> SequenceAttributionSampleInfo:
+    attributions = sample_attribution_object.sample_attributions[input_name]
 
-    shap_values = sample_activation_object.sample_activations[input_name]
-
-    sample_tokens = sample_activation_object.raw_inputs[input_name]
+    sample_tokens = sample_attribution_object.raw_inputs[input_name]
     raw_inputs = extract_raw_inputs_from_tokens(tokens=sample_tokens, vocab=vocab)
 
     cur_sample_expected_value = _parse_out_sequence_expected_value(
-        sample_target_labels=sample_activation_object.sample_info.target_labels,
+        sample_target_labels=sample_attribution_object.sample_info.target_labels,
         output_name=output_name,
         target_column_name=target_column_name,
         target_column_type=target_column_type,
-        expected_values=expected_target_classes_shap_values,
+        expected_values=expected_target_classes_attributions,
     )
 
-    extracted_sequence_info = SequenceActivationSampleInfo(
-        sequence_shap_values=shap_values,
+    extracted_sequence_info = SequenceAttributionSampleInfo(
+        sequence_attributions=attributions,
         raw_inputs=raw_inputs,
-        expected_shap_value=cur_sample_expected_value,
+        expected_attr_value=cur_sample_expected_value,
         sample_target_label_name=cur_label_name,
     )
 
@@ -182,13 +190,12 @@ def extract_raw_inputs_from_tokens(tokens: torch.Tensor, vocab) -> Sequence[str]
 
 
 def _parse_out_sequence_expected_value(
-    sample_target_labels: Dict[str, torch.Tensor],
+    sample_target_labels: Dict[str, Dict[str, torch.Tensor]],
     output_name: str,
     target_column_name: str,
     expected_values: Sequence[float],
     target_column_type: str,
 ) -> float:
-
     if target_column_type == "con":
         assert len(expected_values) == 1
         return expected_values[0]
@@ -215,67 +222,50 @@ def get_sequence_index_to_truncate_unknown(
     return index_to_truncate
 
 
-def truncate_sequence_activation_to_padding(
-    sequence_activation_sample_info: SequenceActivationSampleInfo,
+def truncate_sequence_attribution_to_padding(
+    sequence_attribution_sample_info: SequenceAttributionSampleInfo,
     truncate_start_idx: int,
-) -> SequenceActivationSampleInfo:
-    si = sequence_activation_sample_info
+) -> SequenceAttributionSampleInfo:
+    si = sequence_attribution_sample_info
 
-    shap_values_truncated, raw_inputs_truncated = _truncate_shap_values_and_raw_inputs(
-        shap_values=si.sequence_shap_values,
+    attrs_truncated, raw_inputs_truncated = _truncate_attributions_and_raw_inputs(
+        attributions=si.sequence_attributions,
         raw_inputs=si.raw_inputs,
         truncate_start_idx=truncate_start_idx,
     )
 
-    truncated_activation = SequenceActivationSampleInfo(
-        sequence_shap_values=shap_values_truncated,
+    truncated_attribution = SequenceAttributionSampleInfo(
+        sequence_attributions=attrs_truncated,
         raw_inputs=raw_inputs_truncated,
-        expected_shap_value=si.expected_shap_value,
+        expected_attr_value=si.expected_attr_value,
         sample_target_label_name=si.sample_target_label_name,
     )
 
-    return truncated_activation
+    return truncated_attribution
 
 
-def _truncate_shap_values_and_raw_inputs(
-    shap_values: np.ndarray, raw_inputs: Sequence[str], truncate_start_idx: int
+def _truncate_attributions_and_raw_inputs(
+    attributions: np.ndarray, raw_inputs: Sequence[str], truncate_start_idx: int
 ) -> Tuple[np.ndarray, Sequence[str]]:
-
-    shap_values_copy = copy(shap_values)
+    attrs_copy = copy(attributions)
     raw_inputs_copy = copy(raw_inputs)
 
-    shap_values_summed = shap_values_copy.squeeze().sum(1)
-    shap_values_truncated = shap_values_summed[:truncate_start_idx]
+    attrs_summed = attrs_copy.squeeze().sum(1)
+    attrs_truncated = attrs_summed[:truncate_start_idx]
 
     raw_inputs_truncated = [i + " " for i in raw_inputs_copy][:truncate_start_idx]
 
-    return shap_values_truncated, raw_inputs_truncated
+    return attrs_truncated, raw_inputs_truncated
 
 
 def save_html(out_path: Path, html_string: str) -> None:
-
     with open(out_path, "w", encoding="utf-8") as outfile:
-
-        outfile.write("<html><head><script>\n")
-
-        shap_plots_module_path = Path(shap.plots.__file__).parent
-        bundle_path = shap_plots_module_path / "resources" / "bundle.js"
-
-        with io.open(bundle_path, encoding="utf-8") as f:
-            bundle_data = f.read()
-
-        outfile.write(bundle_data)
-        outfile.write("</script></head><body>\n")
-
         outfile.write(html_string)
-
-        outfile.write("</body></html>\n")
 
 
 def get_label_transformer_mapping(
     transformer, order: Literal["int-to-string", "string-to-int"]
 ) -> dict:
-
     values = transformer.classes_, transformer.transform(transformer.classes_)
     if order == "int-to-string":
         values = transformer.transform(transformer.classes_), transformer.classes_
@@ -286,41 +276,85 @@ def get_label_transformer_mapping(
 
 
 def get_sequence_token_importance(
-    activations: Sequence["SampleActivation"], vocab: Vocab, input_name: str
-) -> Dict[str, float]:
+    attributions: Sequence["SampleAttribution"], vocab: Vocab, input_name: str
+) -> Dict[str, list[float]]:
+    token_importances = defaultdict(list)
 
-    token_importances = defaultdict(lambda: 0.0)
-    token_counts = defaultdict(lambda: 0)
-
-    for act in activations:
+    for act in attributions:
         orig_seq_input = extract_raw_inputs_from_tokens(
             tokens=act.raw_inputs[input_name], vocab=vocab
         )
-        seq_shap_values = act.sample_activations[input_name]
-        seq_shap_values_abs = seq_shap_values.squeeze()
-        assert len(seq_shap_values_abs.shape) == 2
+        seq_attrs = act.sample_attributions[input_name]
+        seq_attrs_abs = seq_attrs.squeeze()
+        assert len(seq_attrs_abs.shape) == 2
 
-        seq_shap_values_sum = seq_shap_values_abs.sum(1).squeeze()
-        assert len(seq_shap_values_sum) == len(orig_seq_input)
+        seq_attrs_values_sum = seq_attrs_abs.sum(1).squeeze()
+        assert len(seq_attrs_values_sum) == len(orig_seq_input)
 
-        for token, shap_value in zip(orig_seq_input, seq_shap_values_sum):
-            token_importances[token] += shap_value
-            token_counts[token] += 1
-
-    n_samples = len(activations)
-    for token, total_shap_value in token_importances.items():
-        token_importances[token] = total_shap_value / (token_counts[token] * n_samples)
+        for token, attribution in zip(orig_seq_input, seq_attrs_values_sum):
+            token_importances[token].append(attribution)
 
     return token_importances
 
 
 def get_sequence_feature_importance_df(
-    token_importances: Dict[str, float]
+    token_importances: Dict[str, list[float]]
 ) -> pd.DataFrame:
-    df = pd.DataFrame.from_dict(
-        token_importances, columns=["Shap_Value"], orient="index"
-    )
-
-    df.index.name = "Token"
+    df = pd.concat({k: pd.Series(v) for k, v in token_importances.items()})
+    df = df.reset_index(level=0).reset_index(drop=True)
+    df.columns = ["Input", "Attribution"]
 
     return df
+
+
+def get_sequence_html(
+    data_records: Iterable[SequenceVisualizationDataRecord], legend: bool = True
+) -> str:
+    dom = [
+        "<table width: 100%; border: 2px solid black; border-collapse: collapse;>",
+        '<table class="table" style="text-align: center;">',
+    ]
+    rows = [
+        "<tr><th>ID</th>"
+        "<th>True Label</th>"
+        "<th>Attribution Score</th>"
+        "<th>Token Importance</th>"
+    ]
+    for record in data_records:
+        rows.append(
+            "".join(
+                [
+                    "<tr>",
+                    format_classname(record.sample_id),
+                    format_classname(record.label_name),
+                    format_classname("{0:.2f}".format(record.attribution_score)),
+                    format_word_importances(
+                        record.raw_input_tokens, record.token_attributions
+                    ),
+                    "<tr>",
+                ]
+            )
+        )
+
+    if legend:
+        dom.append(
+            '<div style="border-top: 1px solid; margin-top: 5px; \
+            padding-top: 5px; display: inline-block">'
+        )
+        dom.append("<b>Legend: </b>")
+
+        for value, label in zip([-1, 0, 1], ["Negative", "Neutral", "Positive"]):
+            dom.append(
+                '<span style="display: inline-block; width: 10px; height: 10px; \
+                border: 1px solid; background-color: \
+                {value}"></span> {label}  '.format(
+                    value=_get_color(value), label=label
+                )
+            )
+        dom.append("</div>")
+
+    dom.append("".join(rows))
+    dom.append("</table>")
+    html = "".join(dom)
+
+    return html

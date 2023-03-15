@@ -140,7 +140,7 @@ class CNNModel(nn.Module):
                     "fc_1_bn_1": nn.LayerNorm(self.fc_1_in_features),
                     "fc_1_act_1": Swish(),
                     "fc_1_linear_1": nn.Linear(
-                        self.fc_1_in_features, self.model_config.fc_repr_dim, bias=False
+                        self.fc_1_in_features, self.model_config.fc_repr_dim, bias=True
                     ),
                 }
             )
@@ -183,7 +183,6 @@ class CNNModel(nn.Module):
         return self.model_config.layers
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
-
         out = self.pos_representation(input)
         out = self.conv(out)
         out = out.view(out.shape[0], -1)
@@ -371,7 +370,6 @@ class GenomicPositionalEmbedding(nn.Module):
         max_length: int,
         dropout: float = 0.1,
     ) -> None:
-
         super().__init__()
         self.embedding_dim = embedding_dim
         self.max_length = max_length

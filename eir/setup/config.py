@@ -49,6 +49,7 @@ from eir.models.sequence.transformer_models import (
 )
 from eir.models.tabular.tabular import TabularModelConfig, SimpleTabularModelConfig
 from eir.setup import schemas
+from eir.train_utils.utils import configure_global_eir_logging
 
 al_input_types = Union[
     schemas.OmicsInputDataConfig,
@@ -57,9 +58,7 @@ al_input_types = Union[
     schemas.ByteInputDataConfig,
 ]
 
-al_output_types = Union[
-    schemas.TabularOutputTypeConfig,
-]
+al_output_types = Union[schemas.TabularOutputTypeConfig]
 
 al_output_types_schema_map = Dict[
     str, Union[Type[schemas.TabularOutputTypeConfig], Type]
@@ -84,6 +83,12 @@ class DynamicOutputSetup:
 def get_configs():
     main_cl_args, extra_cl_args = get_main_cl_args()
 
+    output_folder, log_level = get_output_folder_and_log_level_from_cl_args(
+        main_cl_args=main_cl_args, extra_cl_args=extra_cl_args
+    )
+
+    configure_global_eir_logging(output_folder=output_folder, log_level=log_level)
+
     tabular_output_setup = DynamicOutputSetup(
         output_types_schema_map=get_outputs_types_schema_map(),
         output_module_config_class_getter=get_output_module_config_class,
@@ -94,6 +99,7 @@ def get_configs():
         extra_cl_args_overload=extra_cl_args,
         dynamic_output_setup=tabular_output_setup,
     )
+
     return configs
 
 
@@ -102,6 +108,34 @@ def get_main_cl_args() -> Tuple[argparse.Namespace, List[str]]:
     cl_args, extra_cl_args = parser_.parse_known_args()
 
     return cl_args, extra_cl_args
+
+
+def get_output_folder_and_log_level_from_cl_args(
+    main_cl_args: argparse.Namespace,
+    extra_cl_args: List[str],
+) -> Tuple[str, str]:
+    global_configs = main_cl_args.global_configs
+
+    output_folder = None
+    for config in global_configs:
+        with open(config, "r") as f:
+            config_dict = yaml.safe_load(f)
+
+            output_folder = config_dict.get("output_folder")
+            log_level = config_dict.get("log_level", "info")
+
+            if output_folder and log_level:
+                break
+
+    for arg in extra_cl_args:
+        if "output_folder=" in arg:
+            output_folder = arg.split("=")[1]
+            break
+
+    if output_folder is None:
+        raise ValueError("Output folder not found in global configs.")
+
+    return output_folder, log_level
 
 
 def get_main_parser(
@@ -178,7 +212,6 @@ def generate_aggregated_config(
     extra_cl_args_overload: Union[List[str], None] = None,
     strict: bool = True,
 ) -> Configs:
-
     global_config_iter = get_yaml_iterator_with_injections(
         yaml_config_files=cl_args.global_configs, extra_cl_args=extra_cl_args_overload
     )
@@ -275,6 +308,10 @@ def init_input_config(yaml_config_as_dict: Dict[str, Any]) -> schemas.InputConfi
     input_schema_map = get_inputs_schema_map()
     input_type_info_class = input_schema_map[input_info_object.input_type]
     input_type_info_object = input_type_info_class(**cfg.get("input_type_info", {}))
+    _validate_input_type_info_object(
+        input_type_info_object=input_type_info_object,
+        input_source=input_info_object.input_source,
+    )
 
     model_config = set_up_input_feature_extractor_config(
         input_info_object=input_info_object,
@@ -302,15 +339,17 @@ def init_input_config(yaml_config_as_dict: Dict[str, Any]) -> schemas.InputConfi
     return input_config
 
 
-def get_inputs_schema_map() -> Dict[
-    str,
-    Union[
-        Type[schemas.OmicsInputDataConfig],
-        Type[schemas.TabularInputDataConfig],
-        Type[schemas.SequenceInputDataConfig],
-        Type[schemas.ByteInputDataConfig],
-    ],
-]:
+def get_inputs_schema_map() -> (
+    Dict[
+        str,
+        Union[
+            Type[schemas.OmicsInputDataConfig],
+            Type[schemas.TabularInputDataConfig],
+            Type[schemas.SequenceInputDataConfig],
+            Type[schemas.ByteInputDataConfig],
+        ],
+    ]
+):
     mapping = {
         "omics": schemas.OmicsInputDataConfig,
         "tabular": schemas.TabularInputDataConfig,
@@ -322,12 +361,29 @@ def get_inputs_schema_map() -> Dict[
     return mapping
 
 
+def _validate_input_type_info_object(
+    input_type_info_object: al_input_types, input_source: str
+) -> None:
+    ito = input_type_info_object
+    match ito:
+        case schemas.TabularInputDataConfig():
+            con = ito.input_con_columns
+            cat = ito.input_cat_columns
+            common = set(con).intersection(set(cat))
+            if common:
+                raise ValueError(
+                    f"Found columns passed in both continuous and categorical inputs: "
+                    f"{common}. In input source: {input_source}."
+                    f"Please make sure that each column is only in one of the two, "
+                    f"or create differently named copies of the columns."
+                )
+
+
 def set_up_input_feature_extractor_config(
     input_info_object: schemas.InputDataConfig,
     input_type_info_object: al_input_types,
     model_init_kwargs_base: Union[None, dict],
 ) -> schemas.al_feature_extractor_configs:
-
     input_type = input_info_object.input_type
 
     model_config_class = get_input_feature_extractor_config_class(input_type=input_type)
@@ -377,9 +433,9 @@ def get_input_feature_extractor_config_class(
     return model_config_setup_map.get(input_type)
 
 
-def get_input_feature_extractor_config_init_class_map() -> Dict[
-    str, schemas.al_feature_extractor_configs_classes
-]:
+def get_input_feature_extractor_config_init_class_map() -> (
+    Dict[str, schemas.al_feature_extractor_configs_classes]
+):
     mapping = {
         "tabular": TabularModelConfig,
         "omics": OmicsModelConfig,
@@ -397,7 +453,6 @@ def set_up_feature_extractor_init_config(
     model_init_kwargs_base: Union[None, dict],
     model_type: str,
 ) -> Dict:
-
     if getattr(input_type_info_object, "pretrained_model", None):
         return {}
 
@@ -500,7 +555,6 @@ def get_feature_extractor_config_type_init_callable_map() -> Dict[str, Type]:
 def set_up_pretrained_config(
     pretrained_config_dict: Union[None, Dict[str, Any]]
 ) -> Union[None, schemas.BasicPretrainedConfig]:
-
     if pretrained_config_dict is None:
         return None
 
@@ -520,7 +574,6 @@ def get_pretrained_config_class() -> Type[schemas.BasicPretrainedConfig]:
 def set_up_interpretation_config(
     input_type: str, interpretation_config_dict: Union[None, Dict[str, Any]]
 ) -> Union[None, schemas.BasicInterpretationConfig]:
-
     config_class = get_interpretation_config_class(input_type=input_type)
     if config_class is None:
         return None
@@ -541,9 +594,9 @@ def get_interpretation_config_class(
     return mapping.get(input_type, None)
 
 
-def get_interpretation_config_schema_map() -> Dict[
-    str, Type[schemas.BasicInterpretationConfig]
-]:
+def get_interpretation_config_schema_map() -> (
+    Dict[str, Type[schemas.BasicInterpretationConfig]]
+):
     mapping = {
         "sequence": schemas.BasicInterpretationConfig,
         "image": schemas.BasicInterpretationConfig,
@@ -635,12 +688,12 @@ def init_output_config(
     return output_config
 
 
-def get_outputs_types_schema_map() -> Dict[
-    str,
-    Union[
-        Type[schemas.TabularOutputTypeConfig],
-    ],
-]:
+def get_outputs_types_schema_map() -> (
+    Dict[
+        str,
+        Union[Type[schemas.TabularOutputTypeConfig]],
+    ]
+):
     mapping = {
         "tabular": schemas.TabularOutputTypeConfig,
     }
@@ -656,9 +709,9 @@ def get_output_module_config_class(
     return model_config_setup_map.get(output_type)
 
 
-def get_output_module_config_class_map() -> Dict[
-    str, schemas.al_output_module_configs_classes
-]:
+def get_output_module_config_class_map() -> (
+    Dict[str, schemas.al_output_module_configs_classes]
+):
     mapping = {
         "tabular": TabularModelOutputConfig,
     }
@@ -672,7 +725,6 @@ def set_up_output_module_config(
     output_module_config_class_getter: al_output_module_config_class_getter,
     output_module_init_class_map: al_output_model_init_map,
 ) -> schemas.al_output_module_configs:
-
     output_type = output_info_object.output_type
 
     model_config_class = output_module_config_class_getter(output_type=output_type)
@@ -715,7 +767,6 @@ def set_up_output_module_init_config(
     model_type: str,
     output_module_init_class_map: al_output_model_init_map,
 ) -> Union[TabularMLPResidualModelConfig, Any]:
-
     if not model_init_kwargs_base:
         model_init_kwargs_base = {}
 
@@ -870,7 +921,6 @@ def load_yaml_config(config_path: str) -> Dict[str, Any]:
 
 def recursive_dict_replace(dict_: dict, dict_to_inject: dict) -> dict:
     for cur_key, cur_value in dict_to_inject.items():
-
         if cur_key not in dict_:
             dict_[cur_key] = {}
 

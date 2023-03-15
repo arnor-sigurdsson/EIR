@@ -78,7 +78,6 @@ def test_set_up_test_dataset(
 
     df_labels_test = pd.DataFrame(index=test_ids)
     for output_name, tabular_info in tabular_file_infos.items():
-
         all_columns = list(tabular_info.cat_columns) + list(tabular_info.con_columns)
         if not all_columns:
             raise ValueError(f"No columns specified in {tabular_file_infos}.")

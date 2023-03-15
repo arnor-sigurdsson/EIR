@@ -3,6 +3,6 @@ eirpredict \
 --input_configs eir_tutorials/02_tabular_tutorial/conf/02_poker_hands_input_test.yaml \
 --fusion_configs eir_tutorials/02_tabular_tutorial/conf/02_poker_hands_fusion.yaml \
 --output_configs eir_tutorials/02_tabular_tutorial/conf/02_poker_hands_output_test.yaml \
---model_path eir_tutorials/tutorial_runs/tutorial_02_run/saved_models/tutorial_02_run_model_12000_perf-average=0.9812.pt \
+--model_path eir_tutorials/tutorial_runs/tutorial_02_run/saved_models/tutorial_02_run_model_14000_perf-average=0.8538.pt \
 --evaluate \
 --output_folder eir_tutorials/tutorial_runs/tutorial_02_run/

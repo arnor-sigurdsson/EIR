@@ -24,7 +24,6 @@ class MetaModel(nn.Module):
     def forward(
         self, inputs: Dict[str, torch.Tensor]
     ) -> Dict[str, Dict[str, torch.Tensor]]:
-
         feature_extractors_out = {}
         for module_name, module_input in inputs.items():
             module = self.input_modules[module_name]

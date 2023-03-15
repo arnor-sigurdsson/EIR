@@ -149,7 +149,7 @@ def test_classification(prep_modelling_test_configs):
             target_name="Origin",
             top_row_grads_dict=top_row_grads_dict,
             at_least_n_snps=5,
-            all_act_classes_must_pass=False,
+            all_attribution_target_classes_must_pass=False,
         )
 
 
@@ -236,22 +236,21 @@ def _check_snps_wrapper(
     top_row_grads_dict: Dict[str, List[int]],
     at_least_n_snps: Union[str, int] = "all",
     check_types_skip_cls_names: Sequence[str] = tuple(),
-    all_act_classes_must_pass: bool = True,
+    all_attribution_target_classes_must_pass: bool = True,
 ):
     expected_top_indxs = list(range(50, 1000, 100))
 
-    cur_output_act_paths = test_config.activations_paths[output_name]
+    cur_output_act_paths = test_config.attributions_paths[output_name]
 
     for target_folder_name, dict_with_path_to_input in cur_output_act_paths.items():
         if target_folder_name != target_name:
             continue
 
-        omics_acts_generator = _get_snp_activations_generator(
+        omics_acts_generator = _get_snp_attributions_generator(
             cur_output_act_paths=dict_with_path_to_input
         )
 
         for acts_array_path, is_masked in omics_acts_generator:
-
             check_types = True if is_masked else False
             _check_identified_snps(
                 array_path=acts_array_path,
@@ -260,11 +259,11 @@ def _check_snps_wrapper(
                 check_types=check_types,
                 at_least_n=at_least_n_snps,
                 check_types_skip_cls_names=check_types_skip_cls_names,
-                all_classes_must_pass=all_act_classes_must_pass,
+                all_classes_must_pass=all_attribution_target_classes_must_pass,
             )
 
 
-def _get_snp_activations_generator(cur_output_act_paths: Dict[str, Path]):
+def _get_snp_attributions_generator(cur_output_act_paths: Dict[str, Path]):
     did_run = False
 
     for name, cur_path in cur_output_act_paths.items():
@@ -635,15 +634,16 @@ def _get_multi_task_output_configs(
                 "output_configs": _get_multi_task_output_configs(label_smoothing=0.1),
             },
         },
-        # Case 8: Using the GLN with limited activations and gradient accumulation
+        # Case 8: Using the GLN with limited attributions and gradient accumulation
         {
             "injections": {
                 "global_configs": {
-                    "output_folder": "limited_activations",
+                    "output_folder": "limited_attributions",
                     "lr": 1e-03 * 4,
                     "batch_size": 16,
                     "gradient_accumulation_steps": 4,
-                    "max_acts_per_class": 100,
+                    "max_attributions_per_class": 100,
+                    "mixing_alpha": 0.2,
                 },
                 "input_configs": [
                     {
@@ -654,16 +654,15 @@ def _get_multi_task_output_configs(
                                 "kernel_width": 8,
                                 "channel_exp_base": 2,
                                 "l1": 2e-05,
-                                "rb_do": 0.20,
                             },
                         },
                     },
                 ],
                 "fusion_configs": {
                     "model_config": {
-                        "fc_task_dim": 64,
-                        "fc_do": 0.20,
-                        "rb_do": 0.20,
+                        "fc_task_dim": 256,
+                        "fc_do": 0.10,
+                        "rb_do": 0.10,
                     },
                 },
                 "output_configs": _get_multi_task_output_configs(),
@@ -695,7 +694,6 @@ def test_multi_task(
         con_targets = output_config.output_type_info.target_con_columns
 
         for target_name in cat_targets:
-
             target_copy = "OriginExtraCol"
             threshold, at_least_n = _get_multi_task_test_args(
                 extra_columns=extra_columns,
@@ -718,7 +716,7 @@ def test_multi_task(
                 target_name=target_name,
                 top_row_grads_dict=top_row_grads_dict,
                 at_least_n_snps=at_least_n,
-                all_act_classes_must_pass=False,
+                all_attribution_target_classes_must_pass=False,
             )
 
         for target_name in con_targets:
@@ -741,7 +739,7 @@ def test_multi_task(
                 target_name=target_name,
                 top_row_grads_dict=top_row_grads_dict,
                 at_least_n_snps=at_least_n,
-                all_act_classes_must_pass=True,
+                all_attribution_target_classes_must_pass=True,
             )
 
 
@@ -794,9 +792,9 @@ def _check_identified_snps(
     for multiple spots, in the case of regression this leads the network to only "need"
     to identify a part of the SNPs to create an output (possibly because we are not
     using a "correctness criteria" for regression, like we do with classification (i.e.
-    only gather activations for correctly predicted classes).
+    only gather attributions for correctly predicted classes).
 
-    :param array_path: Path to the accumulated grads / activation array.
+    :param array_path: Path to the accumulated grads / attribution array.
     :param expected_top_indices: Expected SNPs to be identified.
     :param top_row_grads_dict: What row is expected to be activated per class.
     :param check_types:  Whether to check the SNP types as well as the SNPs themselves
@@ -850,7 +848,7 @@ def _check_snp_types(
     homozygous, missing).
 
     Used when we have masked out the SNPs (otherwise the 0s in the one hot might have
-    a high activation, since they're saying the same thing as a 1 being in a spot).
+    a high attribution, since they're saying the same thing as a 1 being in a spot).
     """
     top_idxs = np.array(top_grads_msk[cls_name]["top_n_grads"].argmax(0))
     expected_idxs = np.array(expected_idxs)

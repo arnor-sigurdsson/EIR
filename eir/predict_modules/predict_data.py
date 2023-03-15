@@ -14,7 +14,6 @@ def set_up_default_dataset(
     inputs_as_dict: al_input_objects_as_dict,
     outputs_as_dict: al_output_objects_as_dict,
 ) -> al_datasets:
-
     test_dataset_kwargs = datasets.construct_default_dataset_kwargs_from_cl_args(
         target_labels_dict=target_labels_dict,
         outputs=outputs_as_dict,

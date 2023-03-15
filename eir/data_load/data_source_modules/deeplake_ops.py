@@ -1,8 +1,12 @@
 from functools import lru_cache
 from pathlib import Path
 from typing import DefaultDict, Union, Callable, Generator, Set, TYPE_CHECKING
+import warnings
+
+warnings.filterwarnings("ignore", message=".*newer version of deeplake.*")
 
 import deeplake
+from tqdm import tqdm
 
 from eir.data_load.data_source_modules.common_utils import add_id_to_samples
 
@@ -40,7 +44,6 @@ def get_deeplake_input_source_iterable(
         return x.shape[0] == 0
 
     for deeplake_sample in deeplake_dataset[inner_key]:
-
         if _is_empty(x=deeplake_sample):
             continue
 
@@ -57,7 +60,7 @@ def add_deeplake_data_to_samples(
 ) -> DefaultDict[str, "Sample"]:
     """
     For normal files in a folder, this is holding the paths, which we can think of as
-    as unique pointer to the sample data, for this source.
+    unique pointer to the sample data, for this source.
 
     In the DeepLake case, this is an integer index pointing to the sample.
     """
@@ -74,8 +77,12 @@ def add_deeplake_data_to_samples(
             f"{deeplake_ds.tensors.keys()}."
         )
 
-    for deeplake_sample in deeplake_ds:
+    if ids_to_keep is None:
+        pbar = tqdm(total=len(deeplake_ds), desc=input_name)
+    else:
+        pbar = tqdm(total=len(ids_to_keep), desc=input_name)
 
+    for deeplake_sample in deeplake_ds:
         cur_input_from_sample = deeplake_sample[deeplake_input_inner_key]
         if _is_empty(x=cur_input_from_sample):
             continue
@@ -90,5 +97,7 @@ def add_deeplake_data_to_samples(
 
         samples = add_id_to_samples(samples=samples, sample_id=sample_id)
         samples[sample_id].inputs[input_name] = sample_data
+
+        pbar.update(1)
 
     return samples

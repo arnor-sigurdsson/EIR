@@ -8,7 +8,6 @@ from aislib.misc_utils import ensure_path_exists
 def download_google_drive_file(
     url: str, output_path: Path, overwrite: bool = False
 ) -> None:
-
     if output_path.exists() and not overwrite:
         return
 
@@ -26,9 +25,7 @@ def _parse_google_url(url_to_parse: str):
 
 
 def unzip_file(file: Path, overwrite: bool = False):
-
     with zipfile.ZipFile(file, "r") as zip_ref:
-
         root_from_zip = zip_ref.namelist()[0]
         if (file.parent / root_from_zip).exists() and not overwrite:
             return file.parent

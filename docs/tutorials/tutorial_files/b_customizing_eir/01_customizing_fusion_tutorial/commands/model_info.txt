@@ -1,15 +1,15 @@
 MetaModel(
   (input_modules): ModuleDict(
     (genotype): LCLModel(
-      (fc_0): SplitLinear(in_features=4000, num_chunks=500, split_size=8, out_feature_sets=4, out_features=2000, bias=False)
+      (fc_0): SplitLinear(in_features=4000, num_chunks=500, split_size=8, out_feature_sets=4, out_features=2000, bias=True)
       (split_blocks): Sequential(
         (0): SplitMLPResidualBlock(
           (norm_1): LayerNorm((2000,), eps=1e-05, elementwise_affine=True)
-          (fc_1): SplitLinear(in_features=2000, num_chunks=125, split_size=16, out_feature_sets=4, out_features=500, bias=False)
+          (fc_1): SplitLinear(in_features=2000, num_chunks=125, split_size=16, out_feature_sets=4, out_features=500, bias=True)
           (act_1): Swish(num_parameters=1)
           (do): Dropout(p=0.1, inplace=False)
-          (fc_2): SplitLinear(in_features=500, num_chunks=32, split_size=16, out_feature_sets=4, out_features=128, bias=False)
-          (downsample_identity): SplitLinear(in_features=2000, num_chunks=128, split_size=16, out_feature_sets=1, out_features=128, bias=False)
+          (fc_2): SplitLinear(in_features=500, num_chunks=32, split_size=16, out_feature_sets=4, out_features=128, bias=True)
+          (downsample_identity): SplitLinear(in_features=2000, num_chunks=128, split_size=16, out_feature_sets=1, out_features=128, bias=True)
           (stochastic_depth): StochasticDepth(p=0.0, mode=batch)
         )
       )
@@ -26,21 +26,21 @@ MetaModel(
             (0): Sequential(
               (0): MLPResidualBlock(
                 (norm_1): LayerNorm((128,), eps=1e-05, elementwise_affine=True)
-                (fc_1): Linear(in_features=128, out_features=256, bias=False)
+                (fc_1): Linear(in_features=128, out_features=256, bias=True)
                 (act_1): Swish(num_parameters=1)
                 (do): Dropout(p=0.1, inplace=False)
-                (fc_2): Linear(in_features=256, out_features=256, bias=False)
-                (downsample_identity): Linear(in_features=128, out_features=256, bias=False)
+                (fc_2): Linear(in_features=256, out_features=256, bias=True)
+                (downsample_identity): Linear(in_features=128, out_features=256, bias=True)
                 (stochastic_depth): StochasticDepth(p=0.1, mode=batch)
               )
             )
             (1): Sequential(
               (0): MLPResidualBlock(
                 (norm_1): LayerNorm((256,), eps=1e-05, elementwise_affine=True)
-                (fc_1): Linear(in_features=256, out_features=256, bias=False)
+                (fc_1): Linear(in_features=256, out_features=256, bias=True)
                 (act_1): Swish(num_parameters=1)
                 (do): Dropout(p=0.1, inplace=False)
-                (fc_2): Linear(in_features=256, out_features=256, bias=False)
+                (fc_2): Linear(in_features=256, out_features=256, bias=True)
                 (stochastic_depth): StochasticDepth(p=0.1, mode=batch)
               )
             )

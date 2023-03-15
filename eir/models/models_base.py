@@ -67,7 +67,6 @@ def create_multi_task_blocks_with_first_adaptor_block(
     block_constructor_kwargs: Dict,
     first_layer_kwargs_overload: Dict,
 ):
-
     adaptor_block = construct_multi_branches(
         branch_names=branch_names,
         branch_factory=construct_blocks,
@@ -120,10 +119,8 @@ def construct_multi_branches(
     branch_factory_kwargs,
     extra_hooks: List[Callable] = (),
 ) -> nn.ModuleDict:
-
     branched_module_dict = nn.ModuleDict()
     for name in branch_names:
-
         cur_branch = branch_factory(**branch_factory_kwargs)
         assert callable(cur_branch)
         branched_module_dict[name] = cur_branch
@@ -206,7 +203,6 @@ def compose_spec_creation_and_initalization(spec_func, **spec_kwargs):
 def initialize_modules_from_spec(
     spec: "OrderedDict[str, Tuple[nn.Module, Dict]]",
 ) -> nn.Sequential:
-
     module_dict = OrderedDict()
     for name, recipe in spec.items():
         module_class = recipe[0]
@@ -239,7 +235,6 @@ def get_output_dimensions_for_input(
     pool: Union[Literal["max"], Literal["avg"], None],
     hf_model: bool = False,
 ) -> torch.LongTensor:
-
     module_copy = deepcopy(module).to(device="cpu")
 
     with torch.no_grad():

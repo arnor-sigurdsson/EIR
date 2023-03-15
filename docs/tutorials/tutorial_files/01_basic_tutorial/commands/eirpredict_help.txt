@@ -1,4 +1,4 @@
-14:27:43 - DEBUG - eir.train_utils.utils - Global random seed set to 0.
+09:07:01 - DEBUG - eir.train_utils.utils - Global random seed set to 0.
 usage: eirpredict [-h] --global_configs GLOBAL_CONFIGS [GLOBAL_CONFIGS ...]
                   --input_configs INPUT_CONFIGS [INPUT_CONFIGS ...]
                   [--fusion_configs [FUSION_CONFIGS ...]] --output_configs
@@ -6,7 +6,7 @@ usage: eirpredict [-h] --global_configs GLOBAL_CONFIGS [GLOBAL_CONFIGS ...]
                   --output_folder OUTPUT_FOLDER
                   [--act_background_source {train,predict}]
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   --global_configs GLOBAL_CONFIGS [GLOBAL_CONFIGS ...]
                         Global .yaml configurations for the experiment.
@@ -23,6 +23,6 @@ optional arguments:
   --output_folder OUTPUT_FOLDER
                         Where to save prediction results.
   --act_background_source {train,predict}
-                        For activation analysis, whether to load backgrounds
+                        For attribution analysis, whether to load backgrounds
                         from the data used for training or to use the current
                         data passed to the predict module.

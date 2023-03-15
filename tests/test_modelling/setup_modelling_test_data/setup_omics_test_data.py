@@ -17,7 +17,6 @@ if TYPE_CHECKING:
 def create_test_omics_data_and_labels(
     test_data_config: "TestDataConfig", array_outfolder: Path
 ) -> Path:
-
     c = test_data_config
 
     fieldnames = ["ID", "Origin", "Height", "OriginExtraCol", "ExtraTarget"]
@@ -29,7 +28,6 @@ def create_test_omics_data_and_labels(
 
     for cls, snp_row_idx in c.target_classes.items():
         for sample_idx in range(c.n_per_class):
-
             sample_outpath = array_outfolder / f"{sample_idx}_{cls}"
 
             num_active_snps_in_sample = _create_and_save_test_array_omics(

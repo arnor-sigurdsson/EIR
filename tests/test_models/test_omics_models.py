@@ -380,13 +380,13 @@ def test_get_cur_dilation(test_input, expected):
                 ],
             },
         },
-        # Case 11: Using the GLN with limited activations
+        # Case 11: Using the GLN with limited attributions
         {
             "injections": {
                 "global_configs": {
-                    "output_folder": "limited_activations",
+                    "output_folder": "limited_attributions",
                     "lr": 1e-03,
-                    "max_acts_per_class": 100,
+                    "max_attributions_per_class": 100,
                 },
                 "input_configs": [
                     {

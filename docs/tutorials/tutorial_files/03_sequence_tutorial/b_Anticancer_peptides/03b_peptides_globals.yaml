@@ -7,8 +7,8 @@ n_epochs: 500
 memory_dataset: True
 batch_size: 32
 early_stopping_buffer: 2000
-get_acts: True
-act_every_sample_factor: 3
-max_acts_per_class: 100
+compute_attributions: True
+attributions_every_sample_factor: 3
+max_attributions_per_class: 512
 weighted_sampling_columns:
   - all

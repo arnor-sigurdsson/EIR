@@ -507,7 +507,6 @@ def test_get_array_path_iterator_fail(create_test_data):
 def test_get_all_label_columns_and_dtypes(
     test_input_args, expected, create_test_column_ops
 ):
-
     cat_columns = []
     con_columns = []
     for key, value in test_input_args.items():
@@ -815,7 +814,6 @@ def test_parse_label_df_not_applied(
     """
 
     def _check_mocked_logger_call_count():
-
         calls = []
         for call in m_logger.call_args_list:
             cur_call_first_arg = call[0][0]
@@ -1008,7 +1006,6 @@ def test_split_df_by_ids(create_test_data, create_test_config):
     ids = tuple(df_labels.index)
 
     for valid_fraction in (0.1, 0.5, 0.7):
-
         ids_train, ids_valid = label_setup.split_ids(ids=ids, valid_size=valid_fraction)
         df_train, df_valid = label_setup._split_df_by_ids(
             df=df_labels, train_ids=ids_train, valid_ids=ids_valid
@@ -1065,7 +1062,6 @@ def test_split_ids(create_test_data, create_test_config):
 
     # Automatic splitting
     for valid_fraction in (0.1, 0.5, 0.7):
-
         ids_train, ids_valid = label_setup.split_ids(ids=ids, valid_size=valid_fraction)
         expected_train = df_labels.shape[0] * (1 - valid_fraction)
         expected_valid = df_labels.shape[0] * valid_fraction
@@ -1247,7 +1243,6 @@ def get_joblib_patch_target():
 
 @patch(get_joblib_patch_target(), autospec=True)
 def test_save_target_transformer(patched_joblib):
-
     test_transformer = StandardScaler()
     test_transformer.fit([[1, 2, 3, 4, 5]])
 

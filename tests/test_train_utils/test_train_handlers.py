@@ -36,53 +36,53 @@ def test_unflatten_engine_metrics_dict():
     assert test_output["test_output"]["Height"]["test_output_Height_rmse"] == 0.11
 
 
-def test_get_activation_handler_and_event_no_act_sample_factor():
-    f = train_handlers._get_activation_handler_and_event
+def test_get_attribution_handler_and_event_no_act_sample_factor():
+    f = train_handlers._get_attribution_handler_and_event
     base_kwargs = {
         "iter_per_epoch": 10,
         "n_epochs": 5,
         "sample_interval_base": 10,
-        "act_every_sample_factor": 0,
+        "attributions_every_sample_factor": 0,
         "early_stopping_patience": 5,
     }
 
-    # Check act_every_sample_factor = 0 causing acts computed at end only
-    activation_handler_callable, activation_event = f(**base_kwargs)
-    assert activation_event == Events.COMPLETED
+    # Check attributions_every_sample_factor = 0 causing acts computed at end only
+    attribution_handler_callable, attribution_event = f(**base_kwargs)
+    assert attribution_event == Events.COMPLETED
 
 
 @patch("eir.train_utils.train_handlers.Events", autospec=True)
-def test_get_activation_handler_and_event_only_interval(patched_events):
-    f = train_handlers._get_activation_handler_and_event
+def test_get_attribution_handler_and_event_only_interval(patched_events):
+    f = train_handlers._get_attribution_handler_and_event
     base_kwargs = {
         "iter_per_epoch": 10,
         "n_epochs": 5,
         "sample_interval_base": 10,
-        "act_every_sample_factor": 0,
+        "attributions_every_sample_factor": 0,
         "early_stopping_patience": 5,
     }
 
-    _ = f(**{**base_kwargs, **{"act_every_sample_factor": 2}})
+    _ = f(**{**base_kwargs, **{"attributions_every_sample_factor": 2}})
     assert patched_events.ITERATION_COMPLETED.call_count == 1
     assert patched_events.ITERATION_COMPLETED.call_args.kwargs["every"] == 20
 
 
-def test_get_activation_handler_and_event_interval_and_end():
-    f = train_handlers._get_activation_handler_and_event
+def test_get_attribution_handler_and_event_interval_and_end():
+    f = train_handlers._get_attribution_handler_and_event
     base_kwargs = {
         "iter_per_epoch": 10,
         "n_epochs": 5,
         "sample_interval_base": 7,
-        "act_every_sample_factor": 0,
+        "attributions_every_sample_factor": 0,
         "early_stopping_patience": None,
     }
 
-    activation_handler_callable, activation_event = f(
-        **{**base_kwargs, **{"act_every_sample_factor": 2}}
+    attribution_handler_callable, attribution_event = f(
+        **{**base_kwargs, **{"attributions_every_sample_factor": 2}}
     )
-    assert len(activation_event) == 2
-    assert activation_event[0] == Events.ITERATION_COMPLETED
-    assert activation_event[1] == Events.COMPLETED
+    assert len(attribution_event) == 2
+    assert attribution_event[0] == Events.ITERATION_COMPLETED
+    assert attribution_event[1] == Events.COMPLETED
 
 
 def test_get_early_stopping_event_kwargs():

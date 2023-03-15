@@ -5,6 +5,6 @@ checkpoint_interval: 500
 sample_interval: 500
 memory_dataset: true
 n_epochs: 25
-get_acts: true
-max_acts_per_class: 100
-act_every_sample_factor: 4
+compute_attributions: true
+max_attributions_per_class: 512
+attributions_every_sample_factor: 4

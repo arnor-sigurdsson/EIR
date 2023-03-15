@@ -82,7 +82,7 @@ def get_05_hot_dog_run_2_resnet_pretrained_info() -> AutoDocExperimentInfo:
         ),
         (
             ".*/600/.*_Not Hot Dog.pdf",
-            "figures/pretrained_resnet_not_hot_dog_activations.pdf",
+            "figures/pretrained_resnet_not_hot_dog_attributions.pdf",
         ),
     ]
 
@@ -127,11 +127,11 @@ def get_05_hot_dog_run_2_combined_pretrained_info() -> AutoDocExperimentInfo:
         ),
         (
             ".*/600/.*resnet18.*_Not Hot Dog.pdf",
-            "figures/pretrained_combined_resnet_not_hot_dog_activations.pdf",
+            "figures/pretrained_combined_resnet_not_hot_dog_attributions.pdf",
         ),
         (
             ".*/600/.*efficientnet.*_Not Hot Dog.pdf",
-            "figures/pretrained_combined_efficientnet_not_hot_dog_activations.pdf",
+            "figures/pretrained_combined_efficientnet_not_hot_dog_attributions.pdf",
         ),
     ]
 

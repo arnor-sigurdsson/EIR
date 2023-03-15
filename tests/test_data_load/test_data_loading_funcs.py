@@ -120,7 +120,6 @@ def patch_dataset_to_be_unbalanced(dataset):
     new_samples = []
     cur_values = 0
     for sample in dataset.samples:
-
         if sample.target_labels["test_output"]["Origin"] == 1:
             if cur_values < max_values:
                 new_samples.append(sample)
@@ -139,7 +138,6 @@ def _gather_dataloader_target_label_distributions(
     total_counts = {}  # above step function
 
     for epoch in range(num_epochs):
-
         for batch in dataloader:
             _, labels, _ = batch
 

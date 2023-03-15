@@ -18,7 +18,7 @@ from tests.test_models.model_testing_utils import prepare_example_batch
                     "n_epochs": 12,
                     "memory_dataset": True,
                     "mixing_alpha": 1.0,
-                    "act_background_samples": 8,
+                    "attribution_background_samples": 8,
                 },
                 "input_configs": [
                     {
