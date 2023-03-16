@@ -103,6 +103,10 @@ class GlobalConfig:
         Whether to use Automatic Mixed Precision. Currently only supported when
         training on GPUs.
 
+    :param compile_model:
+        Whether to compile the model before training. This can be useful to
+        speed up training, but may not work for all models.
+
     :param weighted_sampling_columns:
         Target column to apply weighted sampling on. Only applies to categorical
         columns. Passing in 'all' here will use an average of all the target columns.
@@ -244,6 +248,7 @@ class GlobalConfig:
     dataloader_workers: int = 0
     device: str = "cpu"
     amp: bool = False
+    compile_model: bool = False
     weighted_sampling_columns: Union[None, Sequence[str]] = None
     lr: float = 1e-03
     lr_lb: float = 0.0

@@ -321,8 +321,8 @@ def get_default_experiment(
     default_registry = get_default_model_registry_per_input_type()
 
     model = get_model(
-        inputs_as_dict=inputs_as_dict,
         global_config=configs.global_config,
+        inputs_as_dict=inputs_as_dict,
         fusion_config=configs.fusion_config,
         outputs_as_dict=outputs_as_dict,
         model_registry_per_input_type=default_registry,

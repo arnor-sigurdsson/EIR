@@ -147,6 +147,9 @@ def get_model(
         device=global_config.device, model=meta_model
     )
 
+    if global_config.compile_model:
+        meta_model = torch.compile(model=meta_model)
+
     return meta_model
 
 
