@@ -9,7 +9,7 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.11.0"
+python = "^3.10.0"
 pandas = "^1.2.0"
 numpy = "^1.19.2"
 torch = "^2.0.0"
@@ -34,7 +34,7 @@ transformers = "^4.11.3"
 sentencepiece = "^0.1.96"
 ipython = "^8.4.0"
 perceiver-pytorch = "^0.8.1"
-timm = "^0.6.5"
+timm = "^0.6.12"
 deeplake = "^3.0.10"
 captum = "^0.6.0"
 
