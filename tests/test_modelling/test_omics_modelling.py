@@ -543,6 +543,7 @@ def _get_multi_task_output_configs(
                 "global_configs": {
                     "lr": 1e-03,
                     "gradient_noise": 0.001,
+                    "compile_model": True,
                 },
                 "input_configs": [
                     {

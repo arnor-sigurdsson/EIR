@@ -104,7 +104,7 @@ def get_model(
     model_registry_per_input_type: al_model_registry,
     model_registry_per_output_type: al_model_registry,
     meta_class_getter: al_fusion_class_callable = get_default_meta_class,
-) -> Union[nn.Module, nn.DataParallel]:
+) -> Union[nn.Module, nn.DataParallel, Callable]:
     meta_class, meta_kwargs = get_meta_model_class_and_kwargs_from_configs(
         global_config=global_config,
         fusion_config=fusion_config,
@@ -146,6 +146,9 @@ def get_model(
     meta_model = maybe_make_model_distributed(
         device=global_config.device, model=meta_model
     )
+
+    if global_config.compile_model:
+        meta_model = torch.compile(model=meta_model)
 
     return meta_model
 
