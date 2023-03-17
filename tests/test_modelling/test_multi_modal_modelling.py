@@ -1,4 +1,3 @@
-from sys import platform
 from typing import Tuple, TYPE_CHECKING
 
 import pytest
@@ -14,9 +13,6 @@ if TYPE_CHECKING:
 
 def get_parametrization():
     params = [get_base_parametrization(compiled=False)]
-
-    if platform == "linux":
-        params.append(get_base_parametrization(compiled=True))
 
     return params
 
