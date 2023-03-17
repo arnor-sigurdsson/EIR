@@ -65,6 +65,7 @@ from eir.train_utils.metrics import (
     calculate_batch_metrics,
     al_step_metric_dict,
 )
+from eir.train_utils.utils import set_log_level_for_eir_loggers
 
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
@@ -126,6 +127,10 @@ def _verify_predict_cl_args(predict_cl_args: Namespace):
 def run_predict(predict_cl_args: Namespace):
     run_folder = get_run_folder_from_model_path(model_path=predict_cl_args.model_path)
     loaded_train_experiment = load_serialized_train_experiment(run_folder=run_folder)
+
+    set_log_level_for_eir_loggers(
+        log_level=loaded_train_experiment.configs.global_config.log_level
+    )
 
     predict_config = get_default_predict_config(
         loaded_train_experiment=loaded_train_experiment,

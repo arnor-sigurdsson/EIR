@@ -49,19 +49,7 @@ def prep_sample_outfolder(
 
 @only_call_on_master_node
 def configure_global_eir_logging(output_folder: str, log_level: str = "INFO") -> None:
-    log_levels = {
-        "CRITICAL": logging.CRITICAL,
-        "ERROR": logging.ERROR,
-        "WARNING": logging.WARNING,
-        "INFO": logging.INFO,
-        "DEBUG": logging.DEBUG,
-        "NOTSET": logging.NOTSET,
-    }
-
-    if log_level.upper() not in log_levels:
-        raise ValueError(f"Invalid log level: {log_level}")
-
-    level = log_levels[log_level.upper()]
+    level = parse_log_level(log_level=log_level)
 
     logfile_path = get_run_folder(output_folder=output_folder) / "logging_history.log"
 
@@ -76,6 +64,28 @@ def configure_global_eir_logging(output_folder: str, log_level: str = "INFO") ->
 
     root_logger = logging.getLogger(name="")
     root_logger.addHandler(hdlr=file_handler)
+
+    set_log_level_for_eir_loggers(log_level=log_level)
+
+
+def parse_log_level(log_level: str) -> int:
+    log_levels = {
+        "CRITICAL": logging.CRITICAL,
+        "ERROR": logging.ERROR,
+        "WARNING": logging.WARNING,
+        "INFO": logging.INFO,
+        "DEBUG": logging.DEBUG,
+        "NOTSET": logging.NOTSET,
+    }
+
+    if log_level.upper() not in log_levels:
+        raise ValueError(f"Invalid log level: {log_level}")
+
+    return log_levels[log_level.upper()]
+
+
+def set_log_level_for_eir_loggers(log_level: str = "INFO") -> None:
+    level = parse_log_level(log_level=log_level)
 
     loggers = (logging.getLogger(name) for name in logging.root.manager.loggerDict)
     for logger_ in loggers:
