@@ -6,7 +6,7 @@ import pytest
 
 from eir import train
 from eir.setup.config import Configs
-from tests.conftest import should_skip_in_gha_macos
+from tests.conftest import should_skip_in_gha_macos, get_system_info
 from tests.test_modelling.test_modelling_utils import (
     check_performance_result_wrapper,
 )
@@ -425,6 +425,14 @@ def _get_multi_task_output_configs(
     return output_configs
 
 
+def _should_compile():
+    in_gha, _ = get_system_info()
+
+    if in_gha:
+        return False
+    return True
+
+
 @pytest.mark.skipif(
     condition=should_skip_in_gha_macos(), reason="In GHA and platform is Darwin."
 )
@@ -543,7 +551,7 @@ def _get_multi_task_output_configs(
                 "global_configs": {
                     "lr": 1e-03,
                     "gradient_noise": 0.001,
-                    "compile_model": False,
+                    "compile_model": _should_compile(),
                 },
                 "input_configs": [
                     {
