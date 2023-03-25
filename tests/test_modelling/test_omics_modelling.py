@@ -48,6 +48,7 @@ def _get_classification_output_configs() -> Sequence[Dict]:
             "injections": {
                 "global_configs": {
                     "weighted_sampling_columns": ["all"],
+                    "n_iter_before_swa": 50,
                 },
                 "input_configs": [
                     {

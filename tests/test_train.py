@@ -1,8 +1,10 @@
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, Mock, call, ANY
 
 import pytest
+import torch
 from torch import nn
 from torch.optim import SGD
+from torch.cuda.amp import GradScaler
 from torch.optim.adamw import AdamW
 from torch.utils.data import WeightedRandomSampler, SequentialSampler, RandomSampler
 
@@ -22,7 +24,7 @@ from eir.models.omics.models_linear import LinearModel
 from eir.setup.config import Configs
 from eir.setup.output_setup import set_up_outputs_for_training
 from eir.setup.schemas import GlobalConfig
-from eir.train_utils import optimizers
+from eir.train_utils import optim
 
 
 @patch("eir.train.utils.get_run_folder", autospec=True)
@@ -221,13 +223,13 @@ def test_get_optimizer():
 
     gc_adamw = GlobalConfig(output_folder="test", optimizer="adamw")
 
-    adamw_optimizer = optimizers.get_optimizer(
+    adamw_optimizer = optim.get_optimizer(
         model=model, loss_callable=lambda x: x, global_config=gc_adamw
     )
     assert isinstance(adamw_optimizer, AdamW)
 
     gc_sgdm = GlobalConfig(output_folder="test", optimizer="sgdm")
-    sgdm_optimizer = optimizers.get_optimizer(
+    sgdm_optimizer = optim.get_optimizer(
         model=model, loss_callable=lambda x: x, global_config=gc_sgdm
     )
     assert isinstance(sgdm_optimizer, SGD)
@@ -456,3 +458,202 @@ def test_hook_default_optimizer_backward(prep_modelling_test_configs):
     else:
         assert state["loss"].backward.call_count == num_test_steps
         assert experiment.optimizer.step.call_count == num_test_steps
+
+
+@pytest.mark.parametrize(
+    "do_amp, loss, amp_scaler, device, expected",
+    [
+        (
+            True,
+            torch.tensor(2.0),
+            Mock(scale=Mock(return_value=torch.tensor(4.0))),
+            "cuda",
+            torch.tensor(4.0),
+        ),
+        (False, torch.tensor(2.0), None, "cpu", torch.tensor(2.0)),
+        (True, torch.tensor(2.0), None, "cpu", torch.tensor(2.0)),
+    ],
+)
+def test_maybe_scale_loss_with_amp_scaler(
+    do_amp: bool,
+    loss: torch.Tensor,
+    amp_scaler: Mock,
+    device: str,
+    expected: torch.Tensor,
+):
+    result = train.maybe_scale_loss_with_amp_scaler(
+        do_amp=do_amp, loss=loss, amp_scaler=amp_scaler, device=device
+    )
+    assert torch.isclose(result, expected)
+    if amp_scaler and device != "cpu":
+        amp_scaler.scale.assert_called_once_with(loss)
+
+
+@pytest.mark.parametrize(
+    "loss, grad_acc_steps, expected",
+    [
+        (torch.tensor(2.0), 2, torch.tensor(1.0)),
+        (torch.tensor(2.0), 1, torch.tensor(2.0)),
+        (torch.tensor(2.0), 0, torch.tensor(2.0)),
+    ],
+)
+def test_maybe_scale_loss_with_grad_accumulation_steps(
+    loss: torch.Tensor, grad_acc_steps: int, expected: torch.Tensor
+):
+    result = train.maybe_scale_loss_with_grad_accumulation_steps(
+        loss=loss, grad_acc_steps=grad_acc_steps
+    )
+    assert torch.isclose(result, expected)
+
+
+def test_maybe_apply_gradient_noise_to_model():
+    model = nn.Sequential(
+        nn.Linear(2, 3, bias=False),
+        nn.Linear(3, 4, bias=False),
+    )
+
+    for param in model.parameters():
+        param.grad = torch.zeros_like(param, requires_grad=True)
+
+    gradient_noise = 0.1
+    train.maybe_apply_gradient_noise_to_model(
+        model=model, gradient_noise=gradient_noise
+    )
+
+    for name, param in model.named_parameters():
+        assert (param.grad.data != torch.zeros_like(param)).all()
+
+
+def test_maybe_apply_gradient_clipping_to_model():
+    model = nn.Sequential(
+        nn.Linear(2, 3, bias=False),
+        nn.Linear(3, 4, bias=False),
+    )
+
+    for param in model.parameters():
+        param.grad = torch.zeros_like(param)
+
+    gradient_clipping = 0.1
+
+    with patch("eir.train.clip_grad_norm_") as mock_clip_grad_norm:
+        train.maybe_apply_gradient_clipping_to_model(
+            model=model, gradient_clipping=gradient_clipping
+        )
+
+        expected_parameters = list(model.parameters())
+        actual_parameters = list(mock_clip_grad_norm.call_args[1]["parameters"])
+        assert expected_parameters == actual_parameters
+
+        mock_clip_grad_norm.assert_called_once_with(
+            parameters=ANY,
+            max_norm=gradient_clipping,
+        )
+
+
+def test_get_optimizer_step_func():
+    optimizer_step = MagicMock()
+    amp_scaler = GradScaler()
+
+    step_func = train.get_optimizer_step_func(
+        do_amp=True, optimizer_step=optimizer_step, amp_scaler=amp_scaler, device="cuda"
+    )
+    assert step_func.func.__self__ is amp_scaler
+    assert step_func.keywords == {"optimizer": optimizer_step}
+
+    step_func = train.get_optimizer_step_func(
+        do_amp=False,
+        optimizer_step=optimizer_step,
+        amp_scaler=amp_scaler,
+        device="cuda",
+    )
+    assert step_func is optimizer_step
+
+    step_func = train.get_optimizer_step_func(
+        do_amp=True, optimizer_step=optimizer_step, amp_scaler=amp_scaler, device="cpu"
+    )
+    assert step_func is optimizer_step
+
+
+@pytest.mark.parametrize(
+    "iteration, grad_acc_steps, expected",
+    [
+        (1, 0, True),
+        (1, 1, True),
+        (1, 2, False),
+        (2, 2, True),
+        (3, 2, False),
+    ],
+)
+def test_should_perform_optimizer_step(
+    iteration: int, grad_acc_steps: int, expected: bool
+):
+    result = train.should_perform_optimizer_step(
+        iteration=iteration, grad_acc_steps=grad_acc_steps
+    )
+    assert result == expected
+
+
+def test_maybe_update_model_parameters_with_swa_basics():
+    model = MagicMock()
+    model.module = MagicMock()
+
+    n_iter_before_swa = 10
+    sample_interval = 5
+
+    train.maybe_update_model_parameters_with_swa(
+        n_iter_before_swa=None,
+        model=model,
+        iteration=12,
+        sample_interval=sample_interval,
+    )
+    model.update_parameters.assert_not_called()
+
+    train.maybe_update_model_parameters_with_swa(
+        n_iter_before_swa=n_iter_before_swa,
+        model=model,
+        iteration=8,
+        sample_interval=sample_interval,
+    )
+    model.update_parameters.assert_not_called()
+
+    train.maybe_update_model_parameters_with_swa(
+        n_iter_before_swa=n_iter_before_swa,
+        model=model,
+        iteration=11,
+        sample_interval=sample_interval,
+    )
+    model.update_parameters.assert_not_called()
+
+    train.maybe_update_model_parameters_with_swa(
+        n_iter_before_swa=n_iter_before_swa,
+        model=model,
+        iteration=15,
+        sample_interval=sample_interval,
+    )
+    model.update_parameters.assert_called_once_with(model.module)
+
+
+def test_maybe_update_model_parameters_with_swa_multiple_iterations():
+    model = MagicMock()
+    model.module = MagicMock()
+
+    n_iter_before_swa = 10
+    sample_interval = 5
+    num_iterations = 30
+
+    update_parameters_call_count = 0
+
+    for iteration in range(num_iterations):
+        train.maybe_update_model_parameters_with_swa(
+            n_iter_before_swa=n_iter_before_swa,
+            model=model,
+            iteration=iteration,
+            sample_interval=sample_interval,
+        )
+
+        if iteration >= n_iter_before_swa and iteration % sample_interval == 0:
+            update_parameters_call_count += 1
+
+    model.update_parameters.assert_has_calls(
+        [call(model.module)] * update_parameters_call_count
+    )

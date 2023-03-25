@@ -247,6 +247,7 @@ class GlobalConfig:
     manual_valid_ids_file: Union[str, None] = None
     dataloader_workers: int = 0
     device: str = "cpu"
+    n_iter_before_swa: Union[None, int] = None
     amp: bool = False
     compile_model: bool = False
     weighted_sampling_columns: Union[None, Sequence[str]] = None

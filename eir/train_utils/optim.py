@@ -2,8 +2,9 @@ import reprlib
 from collections import defaultdict
 from functools import partial
 from inspect import signature
-from typing import Callable, List, Type, Dict, TYPE_CHECKING
+from typing import Callable, List, Type, Dict, TYPE_CHECKING, Optional, Union
 
+import torch
 from adabelief_pytorch import AdaBelief
 from aislib.misc_utils import get_logger
 from aislib.pytorch_modules import AdaHessian
@@ -119,3 +120,24 @@ def get_optimizer_backward_kwargs(optimizer_name: str) -> Dict:
 
 def get_optimizer_defaults(optimizer: Optimizer) -> Dict:
     return optimizer.defaults
+
+
+class AttrDelegatedSWAWrapper(torch.optim.swa_utils.AveragedModel):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def __getattr__(self, name):
+        try:
+            return super().__getattr__(name)
+        except AttributeError:
+            return getattr(self.module, name)
+
+
+def maybe_wrap_model_with_swa(
+    n_iter_before_swa: Optional[int], model: nn.Module, device: torch.device
+) -> Union[nn.Module, AttrDelegatedSWAWrapper]:
+    if n_iter_before_swa is None:
+        return model
+
+    swa_model = AttrDelegatedSWAWrapper(model=model, device=device)
+    return swa_model
