@@ -11,6 +11,7 @@ from typing import (
     TYPE_CHECKING,
     Callable,
     Iterable,
+    Optional,
     Any,
     Sequence,
 )
@@ -82,9 +83,10 @@ from eir.train_utils.metrics import (
     get_uncertainty_loss_hook,
     add_loss_to_metrics,
 )
-from eir.train_utils.optimizers import (
+from eir.train_utils.optim import (
     get_optimizer,
     get_optimizer_backward_kwargs,
+    maybe_wrap_model_with_swa,
 )
 from eir.train_utils.train_handlers import HandlerConfig
 from eir.train_utils.train_handlers import configure_trainer
@@ -327,6 +329,12 @@ def get_default_experiment(
         outputs_as_dict=outputs_as_dict,
         model_registry_per_input_type=default_registry,
         model_registry_per_output_type={},
+    )
+
+    model = maybe_wrap_model_with_swa(
+        n_iter_before_swa=configs.global_config.n_iter_before_swa,
+        model=model,
+        device=torch.device(configs.global_config.device),
     )
 
     criteria = _get_criteria(
@@ -716,7 +724,7 @@ def _get_default_step_function_hooks_init_kwargs(
             "Adding gradient accumulation hook with steps=%d.",
             configs.global_config.gradient_accumulation_steps,
         )
-        init_kwargs["loss"].append(get_hook_iteration_counter())
+    init_kwargs["loss"].append(get_hook_iteration_counter())
 
     do_amp = configs.global_config.amp
     if do_amp:
@@ -889,52 +897,122 @@ def get_amp_context_manager(device_type: str) -> autocast:
 def hook_default_optimizer_backward(
     experiment: "Experiment", state: Dict, *args, **kwargs
 ) -> Dict:
+    gc = experiment.configs.global_config
     optimizer_backward_kwargs = get_optimizer_backward_kwargs(
-        optimizer_name=experiment.configs.global_config.optimizer
+        optimizer_name=gc.optimizer
     )
 
-    grad_acc_steps = experiment.configs.global_config.gradient_accumulation_steps
+    loss = maybe_scale_loss_with_grad_accumulation_steps(
+        loss=state["loss"], grad_acc_steps=gc.gradient_accumulation_steps
+    )
 
-    if grad_acc_steps and grad_acc_steps > 1:
-        loss = state["loss"] / grad_acc_steps
-    else:
-        loss = state["loss"]
-
-    amp = experiment.configs.global_config.amp
-    amp_gradient_scaler = None
-    if amp and experiment.configs.global_config.device != "cpu":
-        amp_gradient_scaler = state["amp_scaler"]
-        loss = amp_gradient_scaler.scale(loss)
+    amp_scaler = state.get("amp_scaler")
+    loss = maybe_scale_loss_with_amp_scaler(
+        do_amp=gc.amp, loss=loss, amp_scaler=amp_scaler, device=gc.device
+    )
 
     loss.backward(**optimizer_backward_kwargs)
 
-    gradient_noise = experiment.configs.global_config.gradient_noise
+    maybe_apply_gradient_noise_to_model(
+        model=experiment.model, gradient_noise=gc.gradient_noise
+    )
+    maybe_apply_gradient_clipping_to_model(
+        model=experiment.model, gradient_clipping=gc.gradient_clipping
+    )
+
+    step_func = get_optimizer_step_func(
+        do_amp=gc.amp,
+        optimizer_step=experiment.optimizer.step,
+        amp_scaler=amp_scaler,
+        device=gc.device,
+    )
+
+    if should_perform_optimizer_step(
+        iteration=state["iteration"],
+        grad_acc_steps=gc.gradient_accumulation_steps,
+    ):
+        step_func()
+
+    if gc.amp and gc.device != "cpu":
+        amp_scaler.update()
+
+    maybe_update_model_parameters_with_swa(
+        n_iter_before_swa=gc.n_iter_before_swa,
+        model=experiment.model,
+        iteration=state["iteration"],
+        sample_interval=gc.sample_interval,
+    )
+
+    return {}
+
+
+def maybe_scale_loss_with_amp_scaler(
+    do_amp: bool, loss: torch.Tensor, amp_scaler: Optional["GradScaler"], device: str
+) -> torch.Tensor:
+    if do_amp and device != "cpu":
+        return amp_scaler.scale(loss)
+    else:
+        return loss
+
+
+def maybe_scale_loss_with_grad_accumulation_steps(
+    loss: torch.Tensor, grad_acc_steps: int
+) -> torch.Tensor:
+    if grad_acc_steps and grad_acc_steps > 1:
+        return loss / grad_acc_steps
+    else:
+        return loss
+
+
+def maybe_apply_gradient_noise_to_model(
+    model: "nn.Module", gradient_noise: float
+) -> None:
     if gradient_noise:
-        for name, weight in experiment.model.named_parameters():
+        for name, weight in model.named_parameters():
             weight.grad = weight.grad + torch.randn_like(weight.grad) * gradient_noise
 
-    gradient_clipping = experiment.configs.global_config.gradient_clipping
+
+def maybe_apply_gradient_clipping_to_model(
+    model: "nn.Module", gradient_clipping: float
+) -> None:
     if gradient_clipping:
         clip_grad_norm_(
-            parameters=experiment.model.parameters(),
+            parameters=model.parameters(),
             max_norm=gradient_clipping,
         )
 
-    step_func = experiment.optimizer.step
-    if amp and experiment.configs.global_config.device != "cpu":
-        step_func = partial(amp_gradient_scaler.step, optimizer=experiment.optimizer)
 
-    if grad_acc_steps and grad_acc_steps > 1:
-        cur_step = state["iteration"]
-        if cur_step % grad_acc_steps == 0:
-            step_func()
+def get_optimizer_step_func(
+    do_amp: bool,
+    optimizer_step: Callable,
+    amp_scaler: Optional["GradScaler"],
+    device: str,
+) -> Callable:
+    if do_amp and device != "cpu":
+        return partial(amp_scaler.step, optimizer=optimizer_step)
     else:
-        step_func()
+        return optimizer_step
 
-    if amp and experiment.configs.global_config.device != "cpu":
-        amp_gradient_scaler.update()
 
-    return {}
+def should_perform_optimizer_step(iteration: int, grad_acc_steps: int) -> bool:
+    if grad_acc_steps and grad_acc_steps > 1:
+        return iteration % grad_acc_steps == 0
+    else:
+        return True
+
+
+def maybe_update_model_parameters_with_swa(
+    n_iter_before_swa: Optional[int],
+    model: "nn.Module",
+    iteration: int,
+    sample_interval: int,
+) -> None:
+    should_not_be_called_ever = n_iter_before_swa is None
+    if should_not_be_called_ever:
+        return
+
+    if iteration >= n_iter_before_swa and iteration % sample_interval == 0:
+        model.update_parameters(model.module)
 
 
 def hook_default_compute_metrics(

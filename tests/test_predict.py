@@ -57,6 +57,26 @@ from tests.test_predict_modules.test_predict_config import (
                 ],
             },
         },
+        {
+            "injections": {
+                "global_configs": {"n_iter_before_swa": 20},
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "model_config": {"model_type": "cnn"},
+                    }
+                ],
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    },
+                ],
+            },
+        },
     ],
     indirect=True,
 )
@@ -173,6 +193,7 @@ def _get_predict_test_data_parametrization() -> List[Dict[str, Any]]:
         {
             "injections": {
                 "global_configs": {
+                    "n_iter_before_swa": 200,
                     "output_folder": "test_run_predict",
                     "n_epochs": 8,
                     "checkpoint_interval": 200,

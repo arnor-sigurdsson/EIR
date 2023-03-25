@@ -48,6 +48,8 @@ from eir.train_utils.metrics import (
     get_average_history_filepath,
     get_buffered_metrics_writer,
 )
+from eir.train_utils.optim import AttrDelegatedSWAWrapper
+from eir.train_utils.distributed import AttrDelegatedDistributedDataParallel
 from eir.train_utils.utils import get_run_folder, validate_handler_dependencies
 from eir.visualization import visualization_funcs as vf
 
@@ -649,12 +651,20 @@ def _attach_checkpoint_handler(
     trainer: Engine,
     checkpoint_handler: ModelCheckpoint,
     checkpoint_interval: int,
-    model: nn.Module,
+    model: Union[
+        nn.Module, AttrDelegatedSWAWrapper, AttrDelegatedDistributedDataParallel
+    ],
 ) -> Engine:
+    match model:
+        case AttrDelegatedSWAWrapper() | AttrDelegatedDistributedDataParallel():
+            model_to_save = model.module
+        case _:
+            model_to_save = model
+
     trainer.add_event_handler(
         event_name=Events.ITERATION_COMPLETED(every=checkpoint_interval),
         handler=checkpoint_handler,
-        to_save={"model": model},
+        to_save={"model": model_to_save},
     )
 
     return trainer

@@ -75,12 +75,15 @@ def parse_target_labels(
             labels_casted[output_name] = {}
 
         cur_labels = labels[output_name][column_name]
-        cur_labels = cur_labels.to(device=device)
 
         if column_type == "con":
-            labels_casted[output_name][column_name] = cur_labels.to(dtype=torch.float)
+            labels_casted[output_name][column_name] = cur_labels.to(
+                dtype=torch.float, device=device
+            )
         elif column_type == "cat":
-            labels_casted[output_name][column_name] = cur_labels.to(dtype=torch.long)
+            labels_casted[output_name][column_name] = cur_labels.to(
+                dtype=torch.long, device=device
+            )
 
     return labels_casted
 

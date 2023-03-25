@@ -44,10 +44,9 @@ from eir.setup.config import recursive_dict_replace
 from eir.setup.output_setup import (
     set_up_outputs_for_training,
 )
-from eir.train import (
-    Experiment,
-)
-from eir.train_utils import optimizers, metrics
+from eir.train import Experiment
+from eir.train_utils.optim import maybe_wrap_model_with_swa
+from eir.train_utils import optim, metrics
 from eir.train_utils.utils import (
     configure_global_eir_logging,
     get_run_folder,
@@ -925,6 +924,12 @@ def create_test_model(
         global_config=gc,
     )
 
+    model = maybe_wrap_model_with_swa(
+        n_iter_before_swa=gc.n_iter_before_swa,
+        model=model,
+        device=torch.device(gc.device),
+    )
+
     return model
 
 
@@ -1030,7 +1035,7 @@ def create_test_optimizer(
 
     loss_module = train._get_loss_callable(criteria=criterions)
 
-    optimizer = optimizers.get_optimizer(
+    optimizer = optim.get_optimizer(
         model=model, loss_callable=loss_module, global_config=global_config
     )
 
