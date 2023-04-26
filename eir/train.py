@@ -850,7 +850,10 @@ def _prepare_inputs_for_model(
             tabular_source_input = batch_inputs[input_name]
             for tabular_name, tensor in tabular_source_input.items():
                 cur_tensor = tensor.to(device=device)
-                cur_tensor = cur_tensor.to(dtype=torch.float32)
+
+                if torch.is_floating_point(input=tensor):
+                    cur_tensor = cur_tensor.to(dtype=torch.float32)
+
                 tabular_source_input[tabular_name] = cur_tensor
 
             tabular_input_type_info = input_object.input_config.input_type_info
