@@ -902,7 +902,7 @@ def _split_ids_manual(
     if not_found:
         raise ValueError(
             f"Did not find {len(not_found)} manual validation IDs "
-            f"'{reprlib.repr(not_found)}' among those IDs. Possibly some validation"
+            f"'{reprlib.repr(not_found)}' among those IDs. Possibly some validation "
             f"IDs are not present, or this is a bug."
         )
 
@@ -1031,7 +1031,7 @@ def _fill_continuous_nans(
     con_means_dict: Dict[str, float],
     name: str = "df",
 ) -> pd.DataFrame:
-    missing_stats = _get_missing_stats_string(df, column_names)
+    missing_stats = _get_missing_stats_string(df=df, columns_to_check=column_names)
     logger.debug(
         "Replacing NaNs in continuous columns %s (counts: %s) in %s with %s",
         column_names,

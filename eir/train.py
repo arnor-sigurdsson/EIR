@@ -807,7 +807,7 @@ def prepare_base_batch_default(
     model: nn.Module,
     device: str,
 ) -> Batch:
-    inputs, target_labels, train_ids = loader_batch
+    inputs, target_labels, ids = loader_batch
 
     inputs_prepared = _prepare_inputs_for_model(
         batch_inputs=inputs, input_objects=input_objects, model=model, device=device
@@ -823,7 +823,7 @@ def prepare_base_batch_default(
     batch = Batch(
         inputs=inputs_prepared,
         target_labels=target_labels,
-        ids=train_ids,
+        ids=ids,
     )
 
     return batch
@@ -849,7 +849,9 @@ def _prepare_inputs_for_model(
         elif input_type == "tabular":
             tabular_source_input = batch_inputs[input_name]
             for tabular_name, tensor in tabular_source_input.items():
-                tabular_source_input[tabular_name] = tensor.to(device=device)
+                cur_tensor = tensor.to(device=device)
+                cur_tensor = cur_tensor.to(dtype=torch.float32)
+                tabular_source_input[tabular_name] = cur_tensor
 
             tabular_input_type_info = input_object.input_config.input_type_info
             cat_columns = tabular_input_type_info.input_cat_columns
