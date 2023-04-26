@@ -453,16 +453,17 @@ def test_external_nlp_feature_extractor_forward(model_name: str):
     model_config_parsed = _parse_model_specific_config_values(
         model_config=model_config, model_name=model_name
     )
+    sequence_length = 64
 
     feature_extractor_objects = _get_hf_sequence_feature_extractor_objects(
         model_name=model_name,
         model_config=model_config_parsed,
-        feature_extractor_max_length=64,
+        feature_extractor_max_length=sequence_length,
         num_chunks=1,
         pool=None,
     )
     _get_manual_out_features_for_external_feature_extractor(
-        input_length=64,
+        input_length=sequence_length,
         embedding_dim=feature_extractor_objects.embedding_dim,
         num_chunks=1,
         feature_extractor=feature_extractor_objects.feature_extractor,
@@ -485,8 +486,9 @@ def _get_common_model_config_overload() -> dict:
         "block_sizes": [2],
         "attention_head_size": 4,
         "embedding_size": embedding_dim,
+        "rotary_dim": n_heads,
         "d_embed": embedding_dim,
-        "hidden_size": 16,
+        "hidden_size": n_heads * 4,
         "num_attention_heads": n_heads,
         "encoder_attention_heads": n_heads,
         "decoder_attention_heads": n_heads,

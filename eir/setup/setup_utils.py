@@ -119,6 +119,7 @@ def get_unsupported_hf_models() -> dict:
         "convbert": "HF error.",
         "convnext": "Not strictly sequence model..",
         "convnextv2": "Not strictly sequence model..",
+        "cpmant": "AttributeError: 'NoneType' object has no attribute 'dtype'",
         "cvt": "Not strictly sequence model.",
         "data2vec-audio": "Not strictly sequence model.",
         "data2vec-vision": "Not strictly sequence model.",
