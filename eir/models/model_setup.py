@@ -42,8 +42,15 @@ from eir.models.models_base import (
 )
 from eir.models.omics.omics_models import (
     al_omics_model_configs,
-    get_model_class,
+    get_omics_model_class,
     get_omics_model_init_kwargs,
+)
+from eir.models.array.array_models import (
+    al_array_model_configs,
+    get_array_model_class,
+    get_array_model_init_kwargs,
+    ArrayModelConfig,
+    ArrayWrapperModel,
 )
 from eir.models.output.tabular_output import (
     TabularMLPResidualModelConfig,
@@ -293,7 +300,50 @@ def get_input_modules(
             )
             input_modules[input_name] = image_model
 
+        elif input_type == "array":
+            array_feature_extractor = get_array_feature_extractor(
+                model_type=input_model_config.model_type,
+                model_init_config=input_model_config.model_init_config,
+                data_dimensions=inputs_object.data_dimensions,
+            )
+            cur_array_model = get_array_model(
+                array_feature_extractor=array_feature_extractor,
+                model_config=input_model_config,
+            )
+
+            input_modules[input_name] = cur_array_model
+
     return input_modules
+
+
+def get_array_model(
+    array_feature_extractor: nn.Module, model_config: ArrayModelConfig
+) -> nn.Module:
+    wrapper_model = ArrayWrapperModel(
+        feature_extractor=array_feature_extractor,
+        normalization=model_config.pre_normalization,
+    )
+
+    return wrapper_model
+
+
+def get_array_feature_extractor(
+    model_init_config: al_array_model_configs,
+    data_dimensions: DataDimensions,
+    model_type: str,
+):
+    array_model_class = get_array_model_class(model_type=model_type)
+    model_init_kwargs = get_array_model_init_kwargs(
+        model_type=model_type,
+        model_config=model_init_config,
+        data_dimensions=data_dimensions,
+    )
+    array_model = array_model_class(**model_init_kwargs)
+
+    if model_type == "cnn":
+        assert array_model.data_size_after_conv >= 8
+
+    return array_model
 
 
 def get_image_model(
@@ -725,7 +775,7 @@ def get_omics_model_from_model_config(
     data_dimensions: DataDimensions,
     model_type: str,
 ):
-    omics_model_class = get_model_class(model_type=model_type)
+    omics_model_class = get_omics_model_class(model_type=model_type)
     model_init_kwargs = get_omics_model_init_kwargs(
         model_type=model_type,
         model_config=model_init_config,
@@ -844,6 +894,9 @@ def _get_feature_extractors_input_dimensions_per_axis(
             fusion_in_dims[name] = OmicsDataDimensions(
                 **input_object.data_dimensions.__dict__
             )
+        elif input_type == "array":
+            fusion_in_dims[name] = input_object.data_dimensions
+
         else:
             raise ValueError(f"Unknown input type {input_type}.")
 

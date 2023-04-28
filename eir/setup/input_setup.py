@@ -75,6 +75,7 @@ al_input_objects = Union[
     "SequenceInputInfo",
     "BytesInputInfo",
     "ImageInputInfo",
+    "ArrayInputInfo",
 ]
 al_input_objects_as_dict = Dict[str, al_input_objects]
 al_hf_tokenizer_inputs = Union[TextInput, PreTokenizedInput, EncodedInput]
@@ -188,6 +189,7 @@ def get_input_setup_function_map() -> Dict[str, Callable[..., al_input_objects]]
         "sequence": set_up_sequence_input_for_training,
         "bytes": set_up_bytes_input_for_training,
         "image": set_up_image_input_for_training,
+        "array": set_up_array_input,
     }
 
     return setup_mapping
@@ -244,6 +246,7 @@ def get_input_setup_from_pretrained_function_map(
             run_folder=run_folder,
             custom_input_name=load_module_name,
         ),
+        "array": set_up_array_input,
     }
 
     return pretrained_setup_mapping
@@ -1166,9 +1169,14 @@ class DataDimensions:
     channels: int
     height: int
     width: int
+    extra_dims: tuple = tuple()
 
     def num_elements(self):
-        return self.channels * self.height * self.width
+        base = self.channels * self.height * self.width
+        return base * np.prod(self.extra_dims)
+
+    def full_shape(self):
+        return (self.channels, self.height, self.width) + self.extra_dims
 
 
 def get_data_dimension_from_data_source(
@@ -1191,6 +1199,7 @@ def get_data_dimension_from_data_source(
         path = next(iterator)
         shape = np.load(file=path).shape
 
+    extra_dims = tuple()
     if len(shape) == 1:
         channels, height, width = 1, 1, shape[0]
     elif len(shape) == 2:
@@ -1198,9 +1207,12 @@ def get_data_dimension_from_data_source(
     elif len(shape) == 3:
         channels, height, width = shape
     else:
-        raise ValueError("Currently max 3 dimensional inputs supported.")
+        channels, height, width = shape[0], shape[1], shape[2]
+        extra_dims = shape[3:]
 
-    return DataDimensions(channels=channels, height=height, width=width)
+    return DataDimensions(
+        channels=channels, height=height, width=width, extra_dims=extra_dims
+    )
 
 
 def _setup_snp_subset_indices(
@@ -1259,3 +1271,25 @@ def read_bim(bim_file_path: str) -> pd.DataFrame:
 def _get_bim_headers() -> List[str]:
     bim_headers = ["CHR_CODE", "VAR_ID", "POS_CM", "BP_COORD", "ALT", "REF"]
     return bim_headers
+
+
+@dataclass
+class ArrayInputInfo:
+    input_config: schemas.InputConfig
+    data_dimensions: "DataDimensions"
+
+
+def set_up_array_input(
+    input_config: schemas.InputConfig, *args, **kwargs
+) -> ArrayInputInfo:
+    data_dimensions = get_data_dimension_from_data_source(
+        data_source=Path(input_config.input_info.input_source),
+        deeplake_inner_key=input_config.input_info.input_inner_key,
+    )
+
+    array_input_info = ArrayInputInfo(
+        input_config=input_config,
+        data_dimensions=data_dimensions,
+    )
+
+    return array_input_info

@@ -165,6 +165,7 @@ def get_input_setup_function_map_for_predict() -> (
         ),
         "bytes": partial(load_serialized_input_object, input_class=BytesInputInfo),
         "image": partial(load_serialized_input_object, input_class=ImageInputInfo),
+        "array": input_setup.set_up_array_input,
     }
 
     return setup_mapping

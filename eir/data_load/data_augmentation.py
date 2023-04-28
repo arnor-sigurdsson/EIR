@@ -79,6 +79,7 @@ def _get_mixing_func_map() -> Dict[str, Dict[str, Callable]]:
         "sequence": {"mixup": mixup_tensor},
         "bytes": {"mixup": mixup_tensor},
         "image": {"mixup": mixup_tensor, "cutmix": cutmix_image},
+        "array": {"mixup": mixup_tensor},
     }
 
     return mapping

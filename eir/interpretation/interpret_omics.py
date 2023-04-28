@@ -41,7 +41,7 @@ def get_omics_consumer(
     acc_acts = {}
     acc_acts_masked = {}
 
-    n_samples = 0
+    n_samples = {}
 
     def _consumer(
         attribution: Union["SampleAttribution", None]
@@ -50,10 +50,10 @@ def get_omics_consumer(
 
         if attribution is None:
             for key, value in acc_acts.items():
-                acc_acts[key] = value / n_samples
+                acc_acts[key] = value / n_samples[key]
 
             for key, value in acc_acts_masked.items():
-                acc_acts_masked[key] = value / n_samples
+                acc_acts_masked[key] = value / n_samples[key]
 
             parsed_attributions = ParsedOmicsAttributions(
                 accumulated_acts=acc_acts, accumulated_acts_masked=acc_acts_masked
@@ -83,10 +83,10 @@ def get_omics_consumer(
 
         if cur_label_name not in acc_acts_masked:
             acc_acts_masked[cur_label_name] = single_acts_masked
+            n_samples[cur_label_name] = 1
         else:
             acc_acts_masked[cur_label_name] += single_acts_masked
-
-        n_samples += 1
+            n_samples[cur_label_name] += 1
 
     return _consumer
 

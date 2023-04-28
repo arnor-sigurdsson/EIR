@@ -226,10 +226,10 @@ class DatasetBase(Dataset):
             elif input_type == "image":
                 samples = _add_data_to_samples_wrapper(
                     input_source=input_source,
+                    input_name=input_name,
                     samples=samples,
                     ids_to_keep=ids_to_keep,
                     data_loading_hook=data_loading_hooks[input_name],
-                    input_name=input_name,
                     deeplake_input_inner_key=input_inner_key,
                 )
 
@@ -261,6 +261,16 @@ class DatasetBase(Dataset):
                         ids_to_keep=ids_to_keep,
                         source_name=input_name,
                     )
+
+            elif input_type == "array":
+                samples = _add_data_to_samples_wrapper(
+                    input_source=input_source,
+                    input_name=input_name,
+                    samples=samples,
+                    ids_to_keep=ids_to_keep,
+                    data_loading_hook=data_loading_hooks[input_name],
+                    deeplake_input_inner_key=input_inner_key,
+                )
 
         num_samples_raw = len(samples)
         if self.target_labels_dict:
@@ -504,6 +514,14 @@ class MemoryDataset(DatasetBase):
                     input_source=input_source,
                 )
 
+            elif input_type == "array":
+                inner_key = input_object.input_config.input_info.input_inner_key
+                mapping[input_name] = partial(
+                    _array_load_wrapper,
+                    input_source=input_source,
+                    deeplake_inner_key=inner_key,
+                )
+
         return mapping
 
     def __getitem__(self, index: int) -> al_getitem_return:
@@ -730,6 +748,15 @@ def prepare_inputs_disk(
             )
             prepared_inputs[input_name] = prepared_image_data
 
+        elif input_type == "array":
+            array_data = _array_load_wrapper(
+                input_source=input_source,
+                data_pointer=data_pointer,
+                deeplake_inner_key=deeplake_inner_key,
+            )
+            prepared_array_data = prepare_array_data(array_data=array_data)
+            prepared_inputs[input_name] = prepared_array_data
+
         else:
             prepared_inputs[input_name] = inputs[input_name]
 
@@ -880,6 +907,45 @@ def _image_load_wrapper(
     return pil_image
 
 
+def _array_load_wrapper(
+    data_pointer: Union[Path, int],
+    input_source: str,
+    deeplake_inner_key: Optional[str] = None,
+) -> np.ndarray:
+    if deeplake_ops.is_deeplake_dataset(data_source=input_source):
+        assert deeplake_inner_key is not None
+        array_data = _load_deeplake_sample(
+            data_pointer=data_pointer,
+            input_source=input_source,
+            inner_key=deeplake_inner_key,
+        )
+    else:
+        array_data = np.load(str(data_pointer))
+
+    return array_data
+
+
+def prepare_array_data(array_data: np.ndarray) -> torch.Tensor:
+    """Enforce 3 dimensions for now."""
+
+    tensor = torch.from_numpy(array_data).float()
+
+    match len(tensor.shape):
+        case 1:
+            tensor = tensor.unsqueeze(dim=0).unsqueeze(dim=0)
+        case 2:
+            tensor = tensor.unsqueeze(dim=0)
+        case 3:
+            tensor = tensor
+        case _:
+            raise ValueError(
+                f"Array has {len(tensor.shape)} dimensions, currently only "
+                f"1, 2, or 3 are supported."
+            )
+
+    return tensor
+
+
 def load_sequence_from_disk(sequence_file_path: Path) -> str:
     with open(sequence_file_path, "r") as infile:
         return infile.read().strip()
@@ -933,6 +999,10 @@ def prepare_inputs_memory(
                 test_mode=test_mode,
             )
             prepared_inputs[name] = prepared_image_data
+
+        elif input_type == "array":
+            array_raw_in_memory = data
+            prepared_inputs[name] = array_raw_in_memory
 
         else:
             prepared_inputs[name] = inputs[name]
@@ -1007,6 +1077,13 @@ def impute_missing_modalities(
 
             elif input_type == "tabular":
                 inputs_values[input_name] = fill_value
+
+            elif input_type == "array":
+                shape = input_object.data_dimensions.full_shape()
+                imputed_tensor = impute_single_missing_modality(
+                    shape=shape, fill_value=fill_value, dtype=dtype
+                )
+                inputs_values[input_name] = imputed_tensor
 
     return inputs_values
 

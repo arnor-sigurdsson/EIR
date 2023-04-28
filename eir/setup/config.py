@@ -33,6 +33,7 @@ from aislib.misc_utils import get_logger
 from eir.models.fusion.fusion_identity import IdentityConfig
 from eir.models.fusion.fusion_mgmoe import MGMoEModelConfig
 from eir.models.image.image_models import ImageModelConfig
+from eir.models.array.array_models import ArrayModelConfig
 from eir.models.layers import ResidualMLPConfig
 from eir.models.omics.omics_models import (
     get_omics_config_dataclass_mapping,
@@ -356,6 +357,7 @@ def get_inputs_schema_map() -> (
         "sequence": schemas.SequenceInputDataConfig,
         "bytes": schemas.ByteInputDataConfig,
         "image": schemas.ImageInputDataConfig,
+        "array": schemas.ArrayInputDataConfig,
     }
 
     return mapping
@@ -442,6 +444,7 @@ def get_input_feature_extractor_config_init_class_map() -> (
         "sequence": SequenceModelConfig,
         "bytes": SequenceModelConfig,
         "image": ImageModelConfig,
+        "array": ArrayModelConfig,
     }
 
     return mapping
@@ -527,6 +530,7 @@ def get_model_config_type_setup_hook_map():
         "sequence": set_up_config_object_init_kwargs_identity,
         "bytes": set_up_config_object_init_kwargs_identity,
         "image": set_up_config_object_init_kwargs_identity,
+        "array": set_up_config_object_init_kwargs_identity,
     }
 
     return mapping

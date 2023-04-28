@@ -72,7 +72,7 @@ def get_omics_model_mapping() -> Dict[str, al_omics_model_classes]:
     return mapping
 
 
-def get_model_class(model_type: str) -> al_omics_model_classes:
+def get_omics_model_class(model_type: str) -> al_omics_model_classes:
     mapping = get_omics_model_mapping()
     return mapping[model_type]
 

@@ -51,6 +51,10 @@ from eir.interpretation.interpret_tabular import (
 )
 from eir.interpretation.interpret_sequence import analyze_sequence_input_attributions
 from eir.interpretation.interpret_image import analyze_image_input_attributions
+from eir.interpretation.interpret_array import (
+    analyze_array_input_attributions,
+    get_array_sum_consumer,
+)
 from eir.models.model_training_utils import gather_data_loader_samples
 from eir.models.omics.models_cnn import CNNModel
 from eir.models.omics.models_linear import LinearModel
@@ -292,6 +296,12 @@ def attribution_analysis_wrapper(
             elif input_type == "image":
                 analyze_image_input_attributions(
                     **common_kwargs, output_name=output_name
+                )
+
+            elif input_type == "array":
+                analyze_array_input_attributions(
+                    attribution_outfolder=act_output_folder,
+                    all_attributions=all_attributions[input_name],
                 )
 
         ao.hook_handle.remove()
@@ -561,10 +571,19 @@ def _get_consumer_from_input_type(
     Union[Sequence["SampleAttribution"], ParsedOmicsAttributions],
 ]:
     if input_type in ("sequence", "tabular", "image"):
-        return get_basic_sequence_consumer()
+        return get_basic_consumer()
 
     elif input_type == "omics":
         return get_omics_consumer(
+            target_transformer=target_transformer,
+            input_name=input_name,
+            output_name=output_name,
+            target_column=target_column,
+            column_type=column_type,
+        )
+
+    elif input_type == "array":
+        return get_array_sum_consumer(
             target_transformer=target_transformer,
             input_name=input_name,
             output_name=output_name,
@@ -599,7 +618,7 @@ def get_sample_attribution_producer(
         yield cur_sample_attribution_info
 
 
-def get_basic_sequence_consumer() -> (
+def get_basic_consumer() -> (
     Callable[[Union["SampleAttribution", None]], Sequence["SampleAttribution"]]
 ):
     results = []
@@ -618,7 +637,7 @@ def get_basic_sequence_consumer() -> (
 def process_attributions_for_all_modalities(
     attribution_producer: Generator["SampleAttribution", None, None],
     attribution_consumers: Dict[str, Callable],
-) -> Dict[str, Union[Sequence["SampleAttribution"]]]:
+) -> Dict[str, Union[Sequence["SampleAttribution"], np.ndarray]]:
     processed_attributions_all_modalities = {}
 
     for sample_attribution in attribution_producer:

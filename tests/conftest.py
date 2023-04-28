@@ -61,6 +61,9 @@ from tests.test_modelling.setup_modelling_test_data.setup_omics_test_data import
 from tests.test_modelling.setup_modelling_test_data.setup_sequence_test_data import (
     create_test_sequence_data,
 )
+from tests.test_modelling.setup_modelling_test_data.setup_array_test_data import (
+    create_test_array_data_and_labels,
+)
 from tests.test_modelling.setup_modelling_test_data.setup_test_data_utils import (
     set_up_test_data_root_outpath,
     common_split_test_data_wrapper,
@@ -303,6 +306,7 @@ def get_input_test_init_base_func_map() -> Dict[str, Callable]:
         "test_sequence": get_test_sequence_input_init,
         "test_bytes": get_test_bytes_input_init,
         "test_image": get_test_image_input_init,
+        "test_array": get_test_array_input_init,
     }
 
     return mapping
@@ -311,7 +315,7 @@ def get_input_test_init_base_func_map() -> Dict[str, Callable]:
 def _inject_train_source_path(
     test_path: Path,
     source: Literal["local", "deeplake"],
-    local_name: Literal["omics", "sequence", "image"],
+    local_name: Literal["omics", "sequence", "image", "array"],
     split_to_test: bool,
 ) -> Path:
     if source == "local":
@@ -501,6 +505,33 @@ def get_test_image_input_init(
     return input_init_kwargs
 
 
+def get_test_array_input_init(
+    test_path: Path,
+    split_to_test: bool,
+    source: Literal["local", "deeplake"],
+    *args,
+    **kwargs,
+) -> dict:
+    input_source = _inject_train_source_path(
+        test_path=test_path,
+        source=source,
+        local_name="array",
+        split_to_test=split_to_test,
+    )
+
+    input_init_kwargs = {
+        "input_info": {
+            "input_source": str(input_source),
+            "input_name": "test_array",
+            "input_type": "array",
+            "input_inner_key": "test_array",
+        },
+        "model_config": {"model_type": "cnn"},
+    }
+
+    return input_init_kwargs
+
+
 def get_test_base_fusion_init(model_type: str) -> Sequence[dict]:
     if model_type == "identity":
         return [{}]
@@ -587,6 +618,14 @@ def create_test_data(request, tmp_path_factory, parse_test_cl_args) -> "TestData
             _delete_random_files_from_folder(
                 folder=sequence_sample_folder, n_to_drop=50
             )
+    arrays_path = base_outfolder / "array"
+    if "array" in test_data_config.modalities and not arrays_path.exists():
+        array_sample_folder = create_test_array_data_and_labels(
+            test_data_config=test_data_config,
+            array_outfolder=arrays_path,
+        )
+        if drop_random_samples:
+            _delete_random_files_from_folder(folder=array_sample_folder, n_to_drop=50)
 
     _merge_labels_from_modalities(base_path=base_outfolder)
 
@@ -697,18 +736,22 @@ def _make_deeplake_test_dataset(
             if sample_id not in samples:
                 samples[sample_id] = {"ID": sample_id}
 
-            if f.name == "omics":
-                cur_name = "test_genotype"
-                sample_data = np.load(str(sample_file))
-            elif f.name == "image":
-                cur_name = "test_image"
-                sample_data = datasets.default_loader(str(sample_file))
-                sample_data = np.array(sample_data)
-            elif f.name == "sequence":
-                cur_name = "test_sequence"
-                sample_data = sample_file.read_text().strip()
-            else:
-                raise ValueError()
+            match f.name:
+                case "omics":
+                    cur_name = "test_genotype"
+                    sample_data = np.load(str(sample_file))
+                case "image":
+                    cur_name = "test_image"
+                    sample_data = datasets.default_loader(str(sample_file))
+                    sample_data = np.array(sample_data)
+                case "sequence":
+                    cur_name = "test_sequence"
+                    sample_data = sample_file.read_text().strip()
+                case "array":
+                    cur_name = "test_array"
+                    sample_data = np.load(str(sample_file))
+                case _:
+                    raise ValueError()
 
             samples[sample_id][cur_name] = sample_data
 
@@ -721,6 +764,7 @@ def _make_deeplake_test_dataset(
     ds.create_tensor("test_genotype")
     ds.create_tensor("test_image", htype="image", sample_compression="jpg")
     ds.create_tensor("test_sequence", htype="text")
+    ds.create_tensor("test_array")
     with ds:
         for sample_id, sample in samples.items():
             ds.append(sample, append_empty=True)

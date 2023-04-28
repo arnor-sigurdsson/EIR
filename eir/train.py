@@ -839,7 +839,7 @@ def _prepare_inputs_for_model(
     for input_name, input_object in input_objects.items():
         input_type = input_object.input_config.input_info.input_type
 
-        if input_type in ("omics", "image"):
+        if input_type in ("omics", "image", "array"):
             cur_tensor = batch_inputs[input_name]
             cur_tensor = cur_tensor.to(device=device)
             cur_tensor = cur_tensor.to(dtype=torch.float32)

@@ -56,8 +56,9 @@ class CNNModelConfig:
         of multiplying.
 
     :param kernel_width:
-        Base kernel width of the convolutions. Differently from the LCL model
-        configurations, this number refers to the actual columns in the unflattened
+        Base kernel width of the convolutions. In case of omics,
+        differently from the LCL model configurations,
+        this number refers to the actual columns in the unflattened
         input. So assuming an omics input, setting kernel_width=2 means 2 SNPs covered
         at a time.
 
@@ -96,6 +97,7 @@ class CNNModelConfig:
     first_channel_expansion: int = 1
 
     kernel_width: int = 12
+    kernel_height: int = 4
     first_kernel_expansion: int = 1
     dilation_factor: int = 1
 
@@ -108,14 +110,17 @@ class CNNModelConfig:
 
 
 class CNNModel(nn.Module):
-    def __init__(self, model_config: CNNModelConfig, data_dimensions: "DataDimensions"):
-        # TODO: Make work for heights, this means modifying stuff in layers.py
+    def __init__(
+        self,
+        model_config: CNNModelConfig,
+        data_dimensions: "DataDimensions",
+    ):
         super().__init__()
 
         self.model_config = model_config
         self.data_dimensions = data_dimensions
 
-        self.pos_representation = GenomicPositionalEmbedding(
+        self.pos_representation = GeneralPositionalEmbedding(
             embedding_dim=self.data_dimensions.height,
             max_length=self.data_dimensions.width,
             dropout=0.0,
@@ -137,7 +142,7 @@ class CNNModel(nn.Module):
         self.fc = nn.Sequential(
             OrderedDict(
                 {
-                    "fc_1_bn_1": nn.LayerNorm(self.fc_1_in_features),
+                    "fc_1_norm_1": nn.LayerNorm(self.fc_1_in_features),
                     "fc_1_act_1": Swish(),
                     "fc_1_linear_1": nn.Linear(
                         self.fc_1_in_features, self.model_config.fc_repr_dim, bias=True
@@ -363,7 +368,7 @@ def find_no_cnn_resblocks_needed(
     return [i for i in resblocks if i != 0]
 
 
-class GenomicPositionalEmbedding(nn.Module):
+class GeneralPositionalEmbedding(nn.Module):
     def __init__(
         self,
         embedding_dim: int,
@@ -376,7 +381,8 @@ class GenomicPositionalEmbedding(nn.Module):
         self.dropout = nn.Dropout(p=dropout)
 
         self.embedding = torch.nn.Parameter(
-            data=torch.zeros(1, self.embedding_dim, self.max_length), requires_grad=True
+            data=torch.zeros(1, self.embedding_dim, self.max_length),
+            requires_grad=True,
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
