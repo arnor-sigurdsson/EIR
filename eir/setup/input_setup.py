@@ -1171,11 +1171,11 @@ class DataDimensions:
     width: int
     extra_dims: tuple = tuple()
 
-    def num_elements(self):
+    def num_elements(self) -> int:
         base = self.channels * self.height * self.width
-        return base * np.prod(self.extra_dims)
+        return int(base * np.prod(self.extra_dims))
 
-    def full_shape(self):
+    def full_shape(self) -> Tuple[int, ...]:
         return (self.channels, self.height, self.width) + self.extra_dims
 
 
