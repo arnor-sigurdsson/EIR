@@ -1,7 +1,16 @@
 from copy import copy
 from dataclasses import dataclass
 from functools import partial
-from typing import List, Callable, Sequence, TYPE_CHECKING, Union, Literal, Optional
+from typing import (
+    List,
+    Callable,
+    Sequence,
+    TYPE_CHECKING,
+    Union,
+    Literal,
+    Optional,
+    Protocol,
+)
 
 import torch
 from aislib.misc_utils import get_logger
@@ -11,9 +20,17 @@ from eir.models.layers import SplitLinear, SplitMLPResidualBlock
 from eir.models.sequence.transformer_models import PositionalEmbedding
 
 if TYPE_CHECKING:
-    from eir.setup.input_setup import DataDimensions
+    from eir.setup.input_setup_modules.common import DataDimensions
 
 logger = get_logger(__name__)
+
+
+class FlattenFunc(Protocol):
+    def __call__(
+        self,
+        x: torch.Tensor,
+    ) -> torch.Tensor:
+        ...
 
 
 @dataclass
@@ -39,12 +56,16 @@ class SimpleLCLModelConfig:
 
 class SimpleLCLModel(nn.Module):
     def __init__(
-        self, model_config: SimpleLCLModelConfig, data_dimensions: "DataDimensions"
+        self,
+        model_config: SimpleLCLModelConfig,
+        data_dimensions: "DataDimensions",
+        flatten_fn: FlattenFunc,
     ):
         super().__init__()
 
         self.model_config = model_config
         self.data_dimensions = data_dimensions
+        self.flatten_fn = flatten_fn
 
         num_chunks = self.model_config.split_mlp_num_splits
         self.fc_0 = SplitLinear(
@@ -72,7 +93,7 @@ class SimpleLCLModel(nn.Module):
         pass
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
-        out = flatten_h_w_fortran(x=input)
+        out = self.flatten_fn(x=input)
 
         out = self.fc_0(out)
 
@@ -162,11 +183,17 @@ class LCLModelConfig:
 
 
 class LCLModel(nn.Module):
-    def __init__(self, model_config: LCLModelConfig, data_dimensions: "DataDimensions"):
+    def __init__(
+        self,
+        model_config: LCLModelConfig,
+        data_dimensions: "DataDimensions",
+        flatten_fn: FlattenFunc,
+    ):
         super().__init__()
 
         self.model_config = model_config
         self.data_dimensions = data_dimensions
+        self.flatten_fn = flatten_fn
 
         fc_0_split_size = calc_value_after_expansion(
             base=self.model_config.kernel_width,
@@ -215,7 +242,7 @@ class LCLModel(nn.Module):
         pass
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
-        out = flatten_h_w_fortran(x=input)
+        out = self.flatten_fn(x=input)
 
         out = self.fc_0(out)
         out = self.split_blocks(out)

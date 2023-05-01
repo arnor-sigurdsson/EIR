@@ -11,7 +11,7 @@ from torch import nn
 from eir.models.layers import FirstCNNBlock, SelfAttention, CNNResidualBlock
 
 if TYPE_CHECKING:
-    from eir.setup.input_setup import DataDimensions
+    from eir.setup.input_setup_modules.common import DataDimensions
 
 logger = get_logger(__name__)
 
@@ -56,10 +56,14 @@ class CNNModelConfig:
         of multiplying.
 
     :param kernel_width:
-        Base kernel width of the convolutions. Differently from the LCL model
-        configurations, this number refers to the actual columns in the unflattened
+        Base kernel width of the convolutions. In case of omics,
+        differently from the LCL model configurations,
+        this number refers to the actual columns in the unflattened
         input. So assuming an omics input, setting kernel_width=2 means 2 SNPs covered
         at a time.
+
+    :param kernel_height:
+        Base kernel height of the convolutions.
 
     :param first_kernel_expansion:
         Factor to extend the first kernel. This value can both be positive or negative.
@@ -96,6 +100,7 @@ class CNNModelConfig:
     first_channel_expansion: int = 1
 
     kernel_width: int = 12
+    kernel_height: int = 4
     first_kernel_expansion: int = 1
     dilation_factor: int = 1
 
@@ -108,14 +113,17 @@ class CNNModelConfig:
 
 
 class CNNModel(nn.Module):
-    def __init__(self, model_config: CNNModelConfig, data_dimensions: "DataDimensions"):
-        # TODO: Make work for heights, this means modifying stuff in layers.py
+    def __init__(
+        self,
+        model_config: CNNModelConfig,
+        data_dimensions: "DataDimensions",
+    ):
         super().__init__()
 
         self.model_config = model_config
         self.data_dimensions = data_dimensions
 
-        self.pos_representation = GenomicPositionalEmbedding(
+        self.pos_representation = GeneralPositionalEmbedding(
             embedding_dim=self.data_dimensions.height,
             max_length=self.data_dimensions.width,
             dropout=0.0,
@@ -123,7 +131,7 @@ class CNNModel(nn.Module):
 
         self.conv = nn.Sequential(
             *_make_conv_layers(
-                residual_blocks=self.resblocks,
+                residual_blocks=self.residual_blocks,
                 cnn_model_configuration=self.model_config,
                 data_dimensions=self.data_dimensions,
             )
@@ -137,7 +145,7 @@ class CNNModel(nn.Module):
         self.fc = nn.Sequential(
             OrderedDict(
                 {
-                    "fc_1_bn_1": nn.LayerNorm(self.fc_1_in_features),
+                    "fc_1_norm_1": nn.LayerNorm(self.fc_1_in_features),
                     "fc_1_act_1": Swish(),
                     "fc_1_linear_1": nn.Linear(
                         self.fc_1_in_features, self.model_config.fc_repr_dim, bias=True
@@ -167,14 +175,14 @@ class CNNModel(nn.Module):
                 nn.init.kaiming_normal_(m.weight, a=0.5, mode="fan_out")
 
     @property
-    def resblocks(self) -> List[int]:
+    def residual_blocks(self) -> List[int]:
         if not self.model_config.layers:
             residual_blocks = find_no_cnn_resblocks_needed(
                 self.data_dimensions.width,
                 self.model_config.down_stride,
                 self.model_config.first_stride_expansion,
             )
-            logger.info(
+            logger.debug(
                 "No residual blocks specified in CL args, using input "
                 "%s based on width approximation calculation.",
                 residual_blocks,
@@ -363,7 +371,7 @@ def find_no_cnn_resblocks_needed(
     return [i for i in resblocks if i != 0]
 
 
-class GenomicPositionalEmbedding(nn.Module):
+class GeneralPositionalEmbedding(nn.Module):
     def __init__(
         self,
         embedding_dim: int,
@@ -376,7 +384,8 @@ class GenomicPositionalEmbedding(nn.Module):
         self.dropout = nn.Dropout(p=dropout)
 
         self.embedding = torch.nn.Parameter(
-            data=torch.zeros(1, self.embedding_dim, self.max_length), requires_grad=True
+            data=torch.zeros(1, self.embedding_dim, self.max_length),
+            requires_grad=True,
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:

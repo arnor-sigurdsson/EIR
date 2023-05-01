@@ -1,13 +1,14 @@
+from typing import Dict
+
 import torch
 from torch import nn
 
-from typing import Dict
-
 from eir import train
-from eir.setup.config import get_configs
-from eir.train_utils.utils import configure_global_eir_logging
-from eir.models.model_setup import get_output_modules
 from eir.models.meta.meta import MetaModel
+from eir.models.model_setup import get_output_modules
+from eir.setup.config import get_configs
+from eir.train_utils import step_logic
+from eir.train_utils.utils import configure_global_eir_logging
 
 
 def main():
@@ -15,7 +16,7 @@ def main():
 
     configure_global_eir_logging(output_folder=configs.global_config.output_folder)
 
-    default_hooks = train.get_default_hooks(configs=configs)
+    default_hooks = step_logic.get_default_hooks(configs=configs)
     default_experiment = train.get_default_experiment(
         configs=configs,
         hooks=default_hooks,

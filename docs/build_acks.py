@@ -22,7 +22,7 @@ with open(IN_PATH, "r") as f:
     flag = False
 
     m1 = "[tool.poetry.dependencies]"
-    m2 = "[tool.poetry.dev-dependencies]"
+    m2 = "[tool.poetry.group.dev.dependencies]"
     for line in toml.splitlines():
         if line == m1 or line == m2:
             flag = True

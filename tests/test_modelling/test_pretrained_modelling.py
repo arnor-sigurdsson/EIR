@@ -7,13 +7,19 @@ import pytest
 from eir import train
 from eir.setup.config import get_all_tabular_targets
 from eir.setup.schemas import BasicPretrainedConfig
-from tests.conftest import _get_cur_modelling_test_config, cleanup
+from eir.train_utils.step_logic import get_default_hooks
+from tests.setup_tests.fixtures_create_configs import cleanup
+from tests.setup_tests.fixtures_create_experiment import (
+    get_cur_modelling_test_config,
+)
 from tests.test_modelling.test_modelling_utils import (
     check_test_performance_results,
 )
 
 if TYPE_CHECKING:
-    from tests.conftest import ModelTestConfig
+    from tests.setup_tests.fixtures_create_experiment import (
+        ModelTestConfig,
+    )
 
 
 def _get_pre_trained_module_setup_parametrization() -> Dict:
@@ -336,7 +342,7 @@ def _get_experiment_overloaded_for_pretrained_extractor(
     if run_path.exists():
         cleanup(run_path=run_path)
 
-    default_hooks = train.get_default_hooks(configs=pretrained_configs)
+    default_hooks = get_default_hooks(configs=pretrained_configs)
     pretrained_experiment = train.get_default_experiment(
         configs=pretrained_configs, hooks=default_hooks
     )
@@ -344,7 +350,7 @@ def _get_experiment_overloaded_for_pretrained_extractor(
     targets = get_all_tabular_targets(
         output_configs=pretrained_experiment.configs.output_configs
     )
-    pretrained_test_config = _get_cur_modelling_test_config(
+    pretrained_test_config = get_cur_modelling_test_config(
         train_loader=pretrained_experiment.train_loader,
         global_config=pretrained_configs.global_config,
         targets=targets,
@@ -386,7 +392,7 @@ def _get_experiment_overloaded_for_pretrained_checkpoint(
     if run_path.exists():
         cleanup(run_path=run_path)
 
-    default_hooks = train.get_default_hooks(configs=pretrained_configs)
+    default_hooks = get_default_hooks(configs=pretrained_configs)
     pretrained_experiment = train.get_default_experiment(
         configs=pretrained_configs, hooks=default_hooks
     )
@@ -394,7 +400,7 @@ def _get_experiment_overloaded_for_pretrained_checkpoint(
     targets = get_all_tabular_targets(
         output_configs=pretrained_experiment.configs.output_configs
     )
-    pretrained_test_config = _get_cur_modelling_test_config(
+    pretrained_test_config = get_cur_modelling_test_config(
         train_loader=pretrained_experiment.train_loader,
         global_config=pretrained_configs.global_config,
         targets=targets,

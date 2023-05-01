@@ -7,14 +7,13 @@ import pytest
 import yaml
 from aislib.misc_utils import ensure_path_exists
 
-import eir.predict_modules
 from eir.predict_modules.predict_config import (
     get_named_pred_dict_iterators,
     get_train_predict_matched_config_generator,
+    overload_train_configs_for_predict,
 )
-import eir.setup
 from eir.setup import schemas, config
-from eir.setup.config import object_to_primitives
+from eir.setup.config import object_to_primitives, recursive_dict_replace
 
 
 def test_get_named_pred_dict_iterators(tmp_path: Path) -> None:
@@ -182,7 +181,7 @@ def _overload_test_yaml_object_for_predict(
     if cur_key == "input_configs":
         for idx, input_dict in enumerate(obj_as_primitives):
             if do_inject_test_values:
-                input_dict = eir.setup.config.recursive_dict_replace(
+                input_dict = recursive_dict_replace(
                     dict_=input_dict,
                     dict_to_inject={
                         "input_info": {
@@ -238,22 +237,16 @@ def test_overload_train_configs_for_predict(
         do_inject_test_values=True,
     )
 
-    named_test_iterators = (
-        eir.predict_modules.predict_config.get_named_pred_dict_iterators(
-            predict_cl_args=test_predict_cl_args
-        )
+    named_test_iterators = get_named_pred_dict_iterators(
+        predict_cl_args=test_predict_cl_args
     )
 
-    matched_iterator = (
-        eir.predict_modules.predict_config.get_train_predict_matched_config_generator(
-            train_configs=test_configs, named_dict_iterators=named_test_iterators
-        )
+    matched_iterator = get_train_predict_matched_config_generator(
+        train_configs=test_configs, named_dict_iterators=named_test_iterators
     )
 
-    overloaded_train_config = (
-        eir.predict_modules.predict_config.overload_train_configs_for_predict(
-            matched_dict_iterator=matched_iterator
-        )
+    overloaded_train_config = overload_train_configs_for_predict(
+        matched_dict_iterator=matched_iterator
     )
 
     # TODO: Note that these conditions currently come from

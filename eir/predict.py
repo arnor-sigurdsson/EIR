@@ -30,13 +30,13 @@ from eir.experiment_io.experiment_io import (
     LoadedTrainExperiment,
     load_serialized_train_experiment,
 )
-from eir.models import al_fusion_models
+from eir.models import al_meta_model
 from eir.models.model_setup import (
     get_meta_model_class_and_kwargs_from_configs,
-    load_model,
     get_default_model_registry_per_input_type,
     get_default_meta_class,
 )
+from eir.models.model_setup_modules.model_io import load_model
 from eir.models.model_training_utils import gather_pred_outputs_from_dloader
 from eir.predict_modules.predict_attributions import compute_predict_attributions
 from eir.predict_modules.predict_config import converge_train_and_predict_configs
@@ -53,10 +53,8 @@ from eir.setup.input_setup import (
     al_input_objects_as_dict,
 )
 from eir.setup.output_setup import al_output_objects_as_dict
+from eir.target_setup.target_label_setup import gather_all_ids_from_output_configs
 from eir.train import (
-    prepare_base_batch_default,
-    Hooks,
-    gather_all_ids_from_output_configs,
     check_dataset_and_batch_size_compatiblity,
 )
 from eir.train_utils.evaluation import PerformancePlotConfig
@@ -65,8 +63,8 @@ from eir.train_utils.metrics import (
     calculate_batch_metrics,
     al_step_metric_dict,
 )
+from eir.train_utils.step_logic import Hooks, prepare_base_batch_default
 from eir.train_utils.utils import set_log_level_for_eir_loggers
-
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -329,7 +327,7 @@ class PredictConfig:
     predict_specific_cl_args: PredictSpecificCLArgs
     test_dataset: datasets.DiskDataset
     test_dataloader: DataLoader
-    model: al_fusion_models
+    model: al_meta_model
     hooks: "PredictHooks"
     metrics: al_metric_record_dict
 

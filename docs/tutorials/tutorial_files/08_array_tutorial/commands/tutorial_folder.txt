@@ -1,0 +1,17 @@
+eir_tutorials/08_array_tutorial/
+├── conf
+│   ├── globals.yaml
+│   ├── input_1d_cnn.yaml
+│   ├── input_1d_lcl.yaml
+│   ├── input_2d_cnn.yaml
+│   ├── input_2d_lcl.yaml
+│   ├── input_3d_cnn.yaml
+│   ├── input_3d_lcl.yaml
+│   └── outputs.yaml
+└── data
+    ├── processed_sample_data
+    │   ├── arrays_1d
+    │   ├── arrays_2d
+    │   ├── arrays_3d
+    │   └── human_origins_labels.csv
+    └── processed_sample_data.zip

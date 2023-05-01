@@ -9,6 +9,7 @@ from docs.doc_modules.a_using_eir import (
     d_pretrained_models_tutorial,
     f_binary_tutorial,
     g_multimodal_tutorial,
+    h_array_tutorial,
 )
 from docs.doc_modules.b_customizing_eir import a_customizing_fusion_tutorial
 from docs.doc_modules.experiments import make_tutorial_data, AutoDocExperimentInfo
@@ -22,6 +23,7 @@ def _get_a_using_eir_experiments() -> Iterable[AutoDocExperimentInfo]:
     e_experiments = e_image_tutorial.get_experiments()
     f_experiments = f_binary_tutorial.get_experiments()
     g_experiments = g_multimodal_tutorial.get_experiments()
+    h_experiments = h_array_tutorial.get_experiments()
 
     return chain(
         a_experiments,
@@ -31,6 +33,7 @@ def _get_a_using_eir_experiments() -> Iterable[AutoDocExperimentInfo]:
         e_experiments,
         f_experiments,
         g_experiments,
+        h_experiments,
     )
 
 

@@ -6,14 +6,14 @@ import pandas as pd
 import pytest
 
 from eir import train
-from eir.models.model_setup import (
-    _get_hf_sequence_feature_extractor_objects,
+from eir.models.model_setup_modules.input_model_setup_sequence import (
     _get_manual_out_features_for_external_feature_extractor,
+    _get_hf_sequence_feature_extractor_objects,
 )
 from eir.setup.setup_utils import get_all_hf_model_names
 from eir.train_utils.utils import seed_everything
 from tests.conftest import should_skip_in_gha_macos, should_skip_in_gha
-from tests.test_modelling.setup_modelling_test_data.setup_sequence_test_data import (
+from tests.setup_tests.setup_modelling_test_data.setup_sequence_test_data import (
     get_continent_keyword_map,
 )
 from tests.test_modelling.test_modelling_utils import (

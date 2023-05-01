@@ -7,6 +7,8 @@ import pytest
 from aislib.misc_utils import ensure_path_exists
 
 from eir.setup import input_setup
+from eir.setup.input_setup_modules import setup_omics
+from eir.setup.input_setup_modules import setup_sequence
 
 if TYPE_CHECKING:
     from eir.setup.config import Configs
@@ -114,17 +116,17 @@ def test_get_input_name_config_iterator(create_test_config: "Configs"):
 def test_get_tokenizer():
     test_input = "the lazy dog JUMPED over:: the red fox or whatever".split()
 
-    identity_tokenizer = input_setup.get_basic_tokenizer(
+    identity_tokenizer = setup_sequence.get_basic_tokenizer(
         tokenizer_name=None, tokenizer_language=None
     )
     assert identity_tokenizer(test_input) == test_input
 
     with pytest.raises(ValueError):
-        input_setup.get_basic_tokenizer(
+        setup_sequence.get_basic_tokenizer(
             tokenizer_name="revtok", tokenizer_language="is"
         )
 
-    basic_english_tokenizer = input_setup.get_basic_tokenizer(
+    basic_english_tokenizer = setup_sequence.get_basic_tokenizer(
         tokenizer_name="basic_english", tokenizer_language="en"
     )
 
@@ -139,11 +141,11 @@ def test_get_tokenized_vocab_iterator():
     def _test_iterator():
         yield "the lazy dog JUMPED over:: the red fox or whatever".split()
 
-    basic_english_tokenizer = input_setup.get_basic_tokenizer(
+    basic_english_tokenizer = setup_sequence.get_basic_tokenizer(
         tokenizer_name="basic_english", tokenizer_language="en"
     )
 
-    tokenized_vocab_iterator = input_setup.get_tokenized_vocab_iterator(
+    tokenized_vocab_iterator = setup_sequence.get_tokenized_vocab_iterator(
         vocab_iterator=_test_iterator(), tokenizer=basic_english_tokenizer
     )
     results = [i for i in tokenized_vocab_iterator]
@@ -159,8 +161,8 @@ def test_get_vocab_iterator_basic(tmp_path: Path):
         path=seq_path, pool=test_pool, sep=" ", n_samples=100, max_length=20
     )
 
-    gathered_stats = input_setup.GatheredSequenceStats()
-    vocab_iter = input_setup.get_vocab_iterator(
+    gathered_stats = setup_sequence.GatheredSequenceStats()
+    vocab_iter = setup_sequence.get_vocab_iterator(
         input_source=str(seq_path), split_on=" ", gathered_stats=gathered_stats
     )
     vocab = set(word for sequence in vocab_iter for word in sequence)
@@ -176,12 +178,12 @@ def test_get_bpe_tokenizer(tmp_path: Path):
     )
 
     # Core functionality
-    vocab_iter_test_training = input_setup.get_vocab_iterator(
+    vocab_iter_test_training = setup_sequence.get_vocab_iterator(
         input_source=str(seq_path),
         split_on=" ",
-        gathered_stats=input_setup.GatheredSequenceStats(),
+        gathered_stats=setup_sequence.GatheredSequenceStats(),
     )
-    bpe_tokenizer_from_scratch = input_setup.get_bpe_tokenizer(
+    bpe_tokenizer_from_scratch = setup_sequence.get_bpe_tokenizer(
         vocab_iterator=vocab_iter_test_training, vocab_file=None
     )
     known_sequence = "cat dog mouse".split()
@@ -206,18 +208,18 @@ def test_get_bpe_tokenizer(tmp_path: Path):
     ]
 
     # Saving and loading
-    vocab_iter_test_saving = input_setup.get_vocab_iterator(
+    vocab_iter_test_saving = setup_sequence.get_vocab_iterator(
         input_source=str(seq_path),
         split_on=" ",
-        gathered_stats=input_setup.GatheredSequenceStats(),
+        gathered_stats=setup_sequence.GatheredSequenceStats(),
     )
-    bpe_tokenizer_object = input_setup._get_bpe_tokenizer_object(
+    bpe_tokenizer_object = setup_sequence._get_bpe_tokenizer_object(
         vocab_iterator=vocab_iter_test_saving, vocab_file=None
     )
     saved_bpe_path = tmp_path / "test_bpe.json"
     bpe_tokenizer_object.save(str(saved_bpe_path))
 
-    bpe_tokenizer_from_pretrained = input_setup.get_bpe_tokenizer(
+    bpe_tokenizer_from_pretrained = setup_sequence.get_bpe_tokenizer(
         vocab_iterator=None, vocab_file=str(saved_bpe_path)
     )
     known_sequence_tokenized_pretrained = bpe_tokenizer_from_pretrained(known_sequence)
@@ -241,8 +243,8 @@ def test_get_bpe_tokenizer(tmp_path: Path):
     ]
 
     # General checks
-    gathered_stats_general = input_setup.GatheredSequenceStats()
-    vocab_iter_test_general = input_setup.get_vocab_iterator(
+    gathered_stats_general = setup_sequence.GatheredSequenceStats()
+    vocab_iter_test_general = setup_sequence.get_vocab_iterator(
         input_source=str(seq_path),
         split_on=" ",
         gathered_stats=gathered_stats_general,
@@ -264,8 +266,8 @@ def test_get_vocab_iterator_basic_diff_split(tmp_path: Path):
         min_length=20,
         max_length=21,
     )
-    gathered_stats_diff_split = input_setup.GatheredSequenceStats()
-    vocab_iter_diff_split = input_setup.get_vocab_iterator(
+    gathered_stats_diff_split = setup_sequence.GatheredSequenceStats()
+    vocab_iter_diff_split = setup_sequence.get_vocab_iterator(
         input_source=str(seq_path_diff_split),
         split_on="---",
         gathered_stats=gathered_stats_diff_split,
@@ -284,11 +286,11 @@ def test_get_vocab_iterator_vocab_file(tmp_path: Path):
     test_pool = _get_simple_sample_pool()
     vocab_file = set_up_simple_vocab_file(vocab=test_pool, outpath=vocab_path)
 
-    gathered_stats_vocab = input_setup.GatheredSequenceStats()
+    gathered_stats_vocab = setup_sequence.GatheredSequenceStats()
     set_up_simple_sequence_test_data(
         path=seq_path, pool=test_pool, sep=" ", n_samples=100, max_length=20
     )
-    vocab_iter_diff_split = input_setup.get_vocab_iterator(
+    vocab_iter_diff_split = setup_sequence.get_vocab_iterator(
         input_source=str(vocab_file),
         split_on=" ",
         gathered_stats=gathered_stats_vocab,
@@ -305,7 +307,7 @@ def test_possibly_gather_all_stats_from_input(tmp_path):
     test_pool = _get_simple_sample_pool()
     vocab_file = set_up_simple_vocab_file(vocab=test_pool, outpath=vocab_path)
 
-    gathered_stats_vocab = input_setup.GatheredSequenceStats()
+    gathered_stats_vocab = setup_sequence.GatheredSequenceStats()
     set_up_simple_sequence_test_data(
         path=seq_path,
         pool=test_pool,
@@ -314,7 +316,7 @@ def test_possibly_gather_all_stats_from_input(tmp_path):
         min_length=20,
         max_length=21,
     )
-    vocab_iter_diff_split = input_setup.get_vocab_iterator(
+    vocab_iter_diff_split = setup_sequence.get_vocab_iterator(
         input_source=str(vocab_file),
         split_on=" ",
         gathered_stats=gathered_stats_vocab,
@@ -324,7 +326,7 @@ def test_possibly_gather_all_stats_from_input(tmp_path):
     assert vocab == set(test_pool)
     assert gathered_stats_vocab.total_count == len(vocab)
 
-    new_gathered_stats = input_setup.possibly_gather_all_stats_from_input(
+    new_gathered_stats = setup_sequence.possibly_gather_all_stats_from_input(
         prev_gathered_stats=gathered_stats_vocab,
         input_source=str(seq_path),
         vocab_file=str(vocab_file),
@@ -351,8 +353,8 @@ def test_get_max_length(tmp_path):
         min_length=15,
         max_length=21,
     )
-    gathered_stats_max_length = input_setup.GatheredSequenceStats()
-    vocab_iter_max_length = input_setup.get_vocab_iterator(
+    gathered_stats_max_length = setup_sequence.GatheredSequenceStats()
+    vocab_iter_max_length = setup_sequence.get_vocab_iterator(
         input_source=str(seq_path),
         split_on=" ",
         gathered_stats=gathered_stats_max_length,
@@ -364,12 +366,12 @@ def test_get_max_length(tmp_path):
     assert gathered_stats_max_length.total_files == 200
     assert gathered_stats_max_length.max_length == 20
 
-    max_length_from_func = input_setup.get_max_length(
+    max_length_from_func = setup_sequence.get_max_length(
         max_length_config_value="max", gathered_stats=gathered_stats_max_length
     )
     assert max_length_from_func == 20
 
-    avg_length_from_func = input_setup.get_max_length(
+    avg_length_from_func = setup_sequence.get_max_length(
         max_length_config_value="average", gathered_stats=gathered_stats_max_length
     )
     assert avg_length_from_func < 20
@@ -388,11 +390,11 @@ def test_setup_subset_indices(indices_to_subset: List[int], expected: List[int])
         cur_row_data = ["1", str(i), "0.1", str(i), "A", "T"]
         test_data.append(cur_row_data)
 
-    df_bim_test = pd.DataFrame(test_data, columns=input_setup._get_bim_headers())
+    df_bim_test = pd.DataFrame(test_data, columns=setup_omics._get_bim_headers())
 
     snps_to_subset = [str(i) for i in indices_to_subset]
 
-    subset_indices = input_setup._setup_snp_subset_indices(
+    subset_indices = setup_omics._setup_snp_subset_indices(
         df_bim=df_bim_test, snps_to_subset=snps_to_subset
     )
     assert subset_indices.tolist() == expected
@@ -414,7 +416,7 @@ def test_read_snp_df(tmp_path):
     file_ = tmp_path / "data_final.bim"
     file_.write_text(snp_file_str)
 
-    df_bim = input_setup.read_bim(bim_file_path=str(file_))
+    df_bim = setup_omics.read_bim(bim_file_path=str(file_))
     snp_arr = df_bim["VAR_ID"].array
     assert len(snp_arr) == 10
     assert snp_arr[0] == "rs3094315"

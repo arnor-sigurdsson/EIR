@@ -3,7 +3,7 @@ import pytest
 from eir.models import layers
 from eir.models.model_training_utils import trace_eir_model
 from eir.models.omics import models_cnn
-from eir.setup.input_setup import DataDimensions
+from eir.setup.input_setup_modules.common import DataDimensions
 from tests.test_models.model_testing_utils import prepare_example_batch
 
 
@@ -41,13 +41,6 @@ def test_make_conv_layers():
     assert len(conv_layers) == len(conv_layer_list) + 2
     assert isinstance(conv_layers[0], layers.FirstCNNBlock)
     assert isinstance(conv_layers[-2], layers.SelfAttention)
-
-
-def get_test_module_dict_data():
-    test_classes_dict = {"Origin": 10, "Height": 1, "BMI": 1}
-    test_fc_in = 128
-
-    return test_classes_dict, test_fc_in
 
 
 @pytest.mark.parametrize(

@@ -6,23 +6,18 @@ import pandas as pd
 import pytest
 import torch
 
-import eir.experiment_io.experiment_io
-import eir.models.model_setup
-import eir.models.omics.omics_models
-import eir.predict_modules.predict_attributions
-import eir.predict_modules.predict_config
-import eir.predict_modules.predict_data
-import eir.predict_modules.predict_input_setup
-import eir.predict_modules.predict_target_setup
-import eir.setup.config
-import eir.setup.input_setup
-import eir.train
 from eir import predict
 from eir import train
+from eir.experiment_io.experiment_io import load_serialized_train_experiment
+from eir.models.model_setup_modules.model_io import load_model
 from eir.models.omics.models_cnn import CNNModel
 from eir.models.omics.omics_models import get_omics_model_init_kwargs
+from eir.predict_modules.predict_attributions import compute_predict_attributions
 from eir.setup import config
-from tests.conftest import ModelTestConfig, get_system_info
+from eir.setup.input_setup_modules.common import DataDimensions
+from eir.target_setup.target_label_setup import get_tabular_target_file_infos
+from tests.conftest import get_system_info
+from tests.setup_tests.fixtures_create_experiment import ModelTestConfig
 from tests.test_predict_modules.test_predict_config import (
     setup_test_namespace_for_matched_config_test,
 )
@@ -90,9 +85,7 @@ def test_load_model(create_test_config: config.Configs, tmp_path: Path):
     test_configs = create_test_config
     gc = test_configs.global_config
 
-    data_dimension = eir.setup.input_setup.DataDimensions(
-        channels=1, height=4, width=1000
-    )
+    data_dimension = DataDimensions(channels=1, height=4, width=1000)
 
     assert len(test_configs.input_configs) == 1
     cnn_model_config = test_configs.input_configs[0].model_config
@@ -107,7 +100,7 @@ def test_load_model(create_test_config: config.Configs, tmp_path: Path):
     model_path = tmp_path / "model.pt"
     torch.save(obj=model.state_dict(), f=model_path)
 
-    loaded_model = eir.models.model_setup.load_model(
+    loaded_model = load_model(
         model_path=model_path,
         model_class=CNNModel,
         model_init_kwargs=cnn_init_kwargs,
@@ -149,9 +142,11 @@ def _get_predict_test_data_parametrization() -> List[Dict[str, Any]]:
                 "omics",
                 "sequence",
                 "image",
+                "array",
             ),
             "manual_test_data_creator": lambda: "test_predict",
             "source": "local",
+            "extras": {"array_dims": 1},
         }
     ]
 
@@ -171,6 +166,7 @@ def _get_predict_test_data_parametrization() -> List[Dict[str, Any]]:
             ),
             "manual_test_data_creator": lambda: "test_predict",
             "source": "deeplake",
+            "extras": {"array_dims": 1},
         }
     ]
 
@@ -237,9 +233,20 @@ def _get_predict_test_data_parametrization() -> List[Dict[str, Any]]:
                         "input_info": {"input_name": "test_tabular"},
                         "input_type_info": {
                             "input_cat_columns": ["OriginExtraCol"],
-                            "input_con_columns": [],
+                            "input_con_columns": ["ExtraTarget"],
                         },
                         "model_config": {"model_type": "tabular"},
+                    },
+                    {
+                        "input_info": {"input_name": "test_array"},
+                        "model_config": {
+                            "model_type": "cnn",
+                            "model_init_config": {
+                                "rb_do": 0.25,
+                                "channel_exp_base": 3,
+                                "l1": 1e-04,
+                            },
+                        },
                     },
                 ],
                 "fusion_configs": {
@@ -292,10 +299,8 @@ def test_predict(
     }
     predict_cl_args = Namespace(**all_predict_kwargs)
 
-    train_configs_for_testing = (
-        eir.experiment_io.experiment_io.load_serialized_train_experiment(
-            run_folder=model_test_config.run_path
-        )
+    train_configs_for_testing = load_serialized_train_experiment(
+        run_folder=model_test_config.run_path
     )
 
     predict_config = predict.get_default_predict_config(
@@ -305,7 +310,7 @@ def test_predict(
 
     predict.predict(predict_cl_args=predict_cl_args, predict_config=predict_config)
 
-    eir.predict_modules.predict_attributions.compute_predict_attributions(
+    compute_predict_attributions(
         loaded_train_experiment=train_configs_for_testing,
         predict_config=predict_config,
     )
@@ -313,7 +318,7 @@ def test_predict(
     origin_predictions_path = tmp_path / "test_output" / "Origin" / "predictions.csv"
     df_test = pd.read_csv(origin_predictions_path, index_col="ID")
 
-    tabular_infos = train.get_tabular_target_file_infos(
+    tabular_infos = get_tabular_target_file_infos(
         output_configs=train_configs_for_testing.configs.output_configs
     )
     assert len(tabular_infos) == 1

@@ -32,6 +32,7 @@ from eir.setup.config import object_to_primitives
 from eir.setup.output_setup import al_output_objects_as_dict
 from eir.setup.schemas import GlobalConfig
 from eir.train_utils import H_PARAMS
+from eir.train_utils.distributed import AttrDelegatedDistributedDataParallel
 from eir.train_utils.distributed import only_call_on_master_node
 from eir.train_utils.evaluation import validation_handler
 from eir.train_utils.lr_scheduling import (
@@ -49,7 +50,6 @@ from eir.train_utils.metrics import (
     get_buffered_metrics_writer,
 )
 from eir.train_utils.optim import AttrDelegatedSWAWrapper
-from eir.train_utils.distributed import AttrDelegatedDistributedDataParallel
 from eir.train_utils.utils import get_run_folder, validate_handler_dependencies
 from eir.visualization import visualization_funcs as vf
 
@@ -797,9 +797,6 @@ def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> Non
         title_extra="Multi Task Average",
         plot_skip_steps=ca.plot_skip_steps,
     )
-
-    with open(Path(handler_config.run_folder, "model_info.txt"), "w") as mfile:
-        mfile.write(str(handler_config.experiment.model))
 
 
 def _get_custom_handlers(handler_config: "HandlerConfig"):

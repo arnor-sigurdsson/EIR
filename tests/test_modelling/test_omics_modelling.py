@@ -12,7 +12,7 @@ from tests.test_modelling.test_modelling_utils import (
 )
 
 if TYPE_CHECKING:
-    from tests.conftest import ModelTestConfig
+    from tests.setup_tests.fixtures_create_experiment import ModelTestConfig
 
 
 def _get_classification_output_configs() -> Sequence[Dict]:
@@ -239,7 +239,7 @@ def _check_snps_wrapper(
     check_types_skip_cls_names: Sequence[str] = tuple(),
     all_attribution_target_classes_must_pass: bool = True,
 ):
-    expected_top_indxs = list(range(50, 1000, 100))
+    expected_top_indices = list(range(50, 1000, 100))
 
     cur_output_act_paths = test_config.attributions_paths[output_name]
 
@@ -255,7 +255,7 @@ def _check_snps_wrapper(
             check_types = True if is_masked else False
             _check_identified_snps(
                 array_path=acts_array_path,
-                expected_top_indices=expected_top_indxs,
+                expected_top_indices=expected_top_indices,
                 top_row_grads_dict=top_row_grads_dict,
                 check_types=check_types,
                 at_least_n=at_least_n_snps,
@@ -427,9 +427,9 @@ def _get_multi_task_output_configs(
 
 
 def _should_compile():
-    in_gha, _ = get_system_info()
+    in_gha, system = get_system_info()
 
-    if in_gha:
+    if in_gha or system == "Darwin":
         return False
     return True
 

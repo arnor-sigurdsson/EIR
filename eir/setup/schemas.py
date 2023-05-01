@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Union, Literal, List, Optional, Sequence, Type
 
+from eir.models.array.array_models import ArrayModelConfig
 from eir.models.fusion.fusion_identity import IdentityConfig
 from eir.models.fusion.fusion_mgmoe import MGMoEModelConfig
 from eir.models.image.image_models import ImageModelConfig
@@ -31,7 +32,11 @@ al_output_configs = Sequence["OutputConfig"]
 al_optimizers = tuple(Literal[i] for i in get_all_optimizer_names())
 
 al_feature_extractor_configs = Union[
-    OmicsModelConfig, TabularModelConfig, ImageModelConfig, SequenceModelConfig
+    OmicsModelConfig,
+    TabularModelConfig,
+    ImageModelConfig,
+    SequenceModelConfig,
+    ArrayModelConfig,
 ]
 
 al_feature_extractor_configs_classes = Union[
@@ -316,6 +321,7 @@ class InputConfig:
         "SequenceInputDataConfig",
         "ByteInputDataConfig",
         "ImageInputDataConfig",
+        "ArrayInputDataConfig",
     ]
     model_config: al_feature_extractor_configs
     pretrained_config: Union[None, "BasicPretrainedConfig"] = None
@@ -341,7 +347,7 @@ class InputDataConfig:
 
     input_source: str
     input_name: str
-    input_type: Literal["omics", "tabular", "sequence", "image", "bytes"]
+    input_type: Literal["omics", "tabular", "sequence", "image", "bytes", "array"]
     input_inner_key: Union[None, str] = None
 
 
@@ -575,6 +581,17 @@ class ImageInputDataConfig:
     stds_normalization_values: Union[None, Sequence[float]] = None
     num_channels: int = None
     mixing_subtype: Union[Literal["mixup"], Literal["cutmix"]] = "mixup"
+
+
+@dataclass
+class ArrayInputDataConfig:
+    """
+    :param mixing_subtype:
+        Which type of mixing to use on the image data given that ``mixing_alpha`` is
+        set >0.0 in the global configuration.
+    """
+
+    mixing_subtype: Union[Literal["mixup"]] = "mixup"
 
 
 @dataclass

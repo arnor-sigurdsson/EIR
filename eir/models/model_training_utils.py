@@ -11,10 +11,10 @@ from typing import (
     Sequence,
 )
 
+import matplotlib.pyplot as plt
 import torch
 from aislib.misc_utils import get_logger
 from aislib.pytorch_modules import Swish
-import matplotlib.pyplot as plt
 from ignite.engine import Engine
 from ignite.handlers.lr_finder import FastaiLRFinder
 from torch import nn
@@ -32,10 +32,12 @@ if TYPE_CHECKING:
     from eir.train import (  # noqa: F401
         Experiment,
         al_training_labels_batch,
+        Batch,
+    )
+    from eir.train_utils.step_logic import (
         al_training_labels_target,
         al_input_batch,
         al_ids,
-        Batch,
     )
     from eir.setup.output_setup import al_output_objects_as_dict
 

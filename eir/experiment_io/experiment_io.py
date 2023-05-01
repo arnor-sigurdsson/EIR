@@ -19,7 +19,8 @@ from eir.setup.output_setup import al_output_objects_as_dict
 from eir.train_utils.utils import get_run_folder
 
 if TYPE_CHECKING:
-    from eir.train import Hooks, Experiment
+    from eir.train import Experiment
+    from eir.train_utils.step_logic import Hooks
     from eir.setup.input_setup import (
         al_input_objects_as_dict,
         al_serializable_input_objects,

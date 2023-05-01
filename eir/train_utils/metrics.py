@@ -3,8 +3,8 @@ import warnings
 from copy import copy
 from dataclasses import dataclass
 from functools import partial
-from statistics import mean
 from pathlib import Path
+from statistics import mean
 from typing import (
     Dict,
     TYPE_CHECKING,
@@ -45,8 +45,8 @@ if TYPE_CHECKING:
     from eir.train import (
         al_criteria,
         Experiment,
-        al_training_labels_target,
     )  # noqa: F401
+    from eir.train_utils.step_logic import al_training_labels_target
     from eir.models.omics.omics_models import al_omics_models  # noqa: F401
     from eir.train_utils.train_handlers import HandlerConfig
     from eir.data_load.label_setup import (  # noqa: F401

@@ -1,9 +1,12 @@
 import pytest
 
-import eir.predict_modules
-from eir import predict, train
+from eir.predict_modules.predict_target_setup import _load_labels_for_predict
 from eir.setup import config
-from tests.conftest import TestDataConfig
+from eir.target_setup.target_label_setup import (
+    gather_all_ids_from_output_configs,
+    get_tabular_target_file_infos,
+)
+from tests.setup_tests.fixtures_create_data import TestDataConfig
 
 
 @pytest.mark.parametrize("create_test_data", [{"task_type": "multi"}], indirect=True)
@@ -53,17 +56,17 @@ def test_load_labels_for_predict(
     """
     test_configs = create_test_config
 
-    test_ids = predict.gather_all_ids_from_output_configs(
+    test_ids = gather_all_ids_from_output_configs(
         output_configs=test_configs.output_configs
     )
 
-    tabular_infos = train.get_tabular_target_file_infos(
+    tabular_infos = get_tabular_target_file_infos(
         output_configs=test_configs.output_configs
     )
     assert len(tabular_infos) == 1
     target_tabular_info = tabular_infos["test_output"]
 
-    df_test = eir.predict_modules.predict_target_setup._load_labels_for_predict(
+    df_test = _load_labels_for_predict(
         tabular_info=target_tabular_info, ids_to_keep=test_ids
     )
 

@@ -8,7 +8,7 @@ from tests.test_modelling.test_modelling_utils import (
 )
 
 if TYPE_CHECKING:
-    from tests.conftest import ModelTestConfig
+    from tests.setup_tests.fixtures_create_experiment import ModelTestConfig
 
 
 def get_parametrization():

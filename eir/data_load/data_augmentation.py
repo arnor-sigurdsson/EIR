@@ -20,7 +20,8 @@ from torch import nn
 from eir.data_load.data_utils import Batch, get_output_info_generator
 
 if TYPE_CHECKING:
-    from eir.train import al_training_labels_target, al_criteria, Experiment
+    from eir.train import al_criteria, Experiment
+    from eir.train_utils.step_logic import al_training_labels_target
     from eir.setup.schemas import InputConfig
 
 al_target_values = Union[torch.LongTensor, torch.Tensor]
@@ -79,6 +80,7 @@ def _get_mixing_func_map() -> Dict[str, Dict[str, Callable]]:
         "sequence": {"mixup": mixup_tensor},
         "bytes": {"mixup": mixup_tensor},
         "image": {"mixup": mixup_tensor, "cutmix": cutmix_image},
+        "array": {"mixup": mixup_tensor},
     }
 
     return mapping

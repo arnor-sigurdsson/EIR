@@ -2,10 +2,11 @@ from dataclasses import dataclass
 from typing import Dict, Sequence
 
 import pandas as pd
+from sklearn.preprocessing import StandardScaler
 
 from eir.data_load import label_setup
 from eir.data_load.label_setup import (
-    al_label_dict,
+    al_target_label_dict,
     al_label_transformers,
     TabularFileInfo,
     al_all_column_ops,
@@ -14,12 +15,15 @@ from eir.data_load.label_setup import (
 from eir.experiment_io.experiment_io import load_transformers
 from eir.predict_modules.predict_input_setup import prep_missing_con_dict
 from eir.setup.config import Configs
-from eir.train import df_to_nested_dict, get_tabular_target_file_infos
+from eir.target_setup.target_label_setup import (
+    df_to_nested_dict,
+    get_tabular_target_file_infos,
+)
 
 
 @dataclass
 class PredictTargetLabels:
-    label_dict: al_label_dict
+    label_dict: al_target_label_dict
     label_transformers: Dict[str, al_label_transformers]
 
     @property
@@ -68,7 +72,7 @@ def get_target_labels_for_predict(
         con_columns=con_columns,
         cat_columns=cat_columns,
         df_labels_test=df_labels_test,
-        label_transformers=label_transformers,
+        all_output_label_transformers=label_transformers,
     )
 
     labels = PredictTargetLabels(
@@ -99,9 +103,12 @@ def parse_labels_for_predict(
     con_columns: Sequence[str],
     cat_columns: Sequence[str],
     df_labels_test: pd.DataFrame,
-    label_transformers: Dict[str, al_label_transformers],
-) -> al_label_dict:
-    con_transformers = {k: v for k, v in label_transformers.items() if k in con_columns}
+    all_output_label_transformers: Dict[str, al_label_transformers],
+) -> al_target_label_dict:
+    con_transformers = _extract_target_con_transformers(
+        all_output_label_transformers=all_output_label_transformers,
+        con_columns=con_columns,
+    )
     train_con_column_means = prep_missing_con_dict(con_transformers=con_transformers)
 
     df_labels_test = label_setup.handle_missing_label_values_in_df(
@@ -112,8 +119,8 @@ def parse_labels_for_predict(
         name="test_df",
     )
 
-    assert len(label_transformers) > 0
-    for name, output_transformer_set in label_transformers.items():
+    assert len(all_output_label_transformers) > 0
+    for _, output_transformer_set in all_output_label_transformers.items():
         df_labels_test = transform_label_df(
             df_labels=df_labels_test, label_transformers=output_transformer_set
         )
@@ -121,6 +128,27 @@ def parse_labels_for_predict(
     test_labels_dict = df_to_nested_dict(df=df_labels_test)
 
     return test_labels_dict
+
+
+def _extract_target_con_transformers(
+    all_output_label_transformers: Dict[str, al_label_transformers],
+    con_columns: Sequence[str],
+) -> Dict[str, StandardScaler]:
+    con_transformers = {}
+
+    for output_name, output_transformer_set in all_output_label_transformers.items():
+        for target_column, transformer_object in output_transformer_set.items():
+            if target_column not in con_columns:
+                continue
+
+            assert target_column not in con_transformers
+            assert isinstance(transformer_object, StandardScaler)
+
+            con_transformers[target_column] = transformer_object
+
+    assert len(con_transformers) == len(con_columns)
+
+    return con_transformers
 
 
 def get_target_labels_for_testing(

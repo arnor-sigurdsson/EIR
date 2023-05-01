@@ -17,11 +17,11 @@ from typing import (
 import numpy as np
 import pandas as pd
 from aislib.misc_utils import get_logger
+from tqdm import tqdm
 
 from eir.data_load.data_source_modules.common_utils import add_id_to_samples
 from eir.data_load.label_setup import get_file_path_iterator
-from eir.setup.input_setup import get_sequence_split_function
-from tqdm import tqdm
+from eir.setup.input_setup_modules.setup_sequence import get_sequence_split_function
 
 if TYPE_CHECKING:
     from eir.data_load.datasets import Sample
@@ -93,24 +93,24 @@ def get_file_sample_id_iterator_basic(
 
 
 def add_sequence_data_from_csv_to_samples(
-    input_object: str,
+    input_source: str,
     samples: DefaultDict[str, "Sample"],
     ids_to_keep: Union[None, Set[str]],
     split_on: str,
     encode_func: Callable,
-    source_name: str = "CSV File Data",
+    input_name: str = "CSV File Data",
 ) -> DefaultDict[str, "Sample"]:
     logger.info(
         "Loading sequence data from CSV file %s. Note that this will "
         "load all the sequence data into memory.",
-        input_object,
+        input_source,
     )
 
     split_func = get_sequence_split_function(split_on=split_on)
     csv_sequence_iterator = get_csv_id_sequence_iterator(
-        data_source=input_object, ids_to_keep=ids_to_keep
+        data_source=input_source, ids_to_keep=ids_to_keep
     )
-    file_iterator_tqdm = tqdm(csv_sequence_iterator, desc=source_name)
+    file_iterator_tqdm = tqdm(csv_sequence_iterator, desc=input_name)
 
     for sample_id, sequence in file_iterator_tqdm:
         samples = add_id_to_samples(samples=samples, sample_id=sample_id)
@@ -118,7 +118,7 @@ def add_sequence_data_from_csv_to_samples(
         sequence_split = split_func(sequence)
         sequence_encoded = np.array(encode_func(sequence_split))
 
-        samples[sample_id].inputs[source_name] = sequence_encoded
+        samples[sample_id].inputs[input_name] = sequence_encoded
 
     return samples
 

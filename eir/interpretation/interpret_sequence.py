@@ -13,7 +13,6 @@ from captum.attr._utils.visualization import (
     format_word_importances,
     _get_color,
 )
-
 from torchtext.vocab import Vocab
 
 from eir.interpretation.interpretation_utils import (

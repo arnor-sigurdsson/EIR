@@ -18,7 +18,8 @@ from eir.predict_modules.predict_target_setup import get_target_labels_for_testi
 from eir.setup.config import Configs
 from eir.setup.input_setup import al_input_objects_as_dict
 from eir.setup.output_setup import al_output_objects_as_dict
-from eir.train import Hooks, check_dataset_and_batch_size_compatiblity
+from eir.train import check_dataset_and_batch_size_compatiblity
+from eir.train_utils.step_logic import Hooks
 
 if TYPE_CHECKING:
     from eir.predict import PredictConfig

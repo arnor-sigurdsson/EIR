@@ -3,15 +3,13 @@ from typing import Dict
 import numpy as np
 import pytest
 
-import eir.interpretation.interpret_omics
+from eir.interpretation import interpret_omics
 
 
 def test_rescale_gradients():
     input_array = np.array([[0, 0, 1], [0, 0, 2], [0, 0, 4]])
 
-    rescaled_array = eir.interpretation.interpret_omics.rescale_gradients(
-        gradients=input_array
-    )
+    rescaled_array = interpret_omics.rescale_gradients(gradients=input_array)
 
     assert (
         rescaled_array == np.array([[0, 0, 0.25], [0, 0, 0.50], [0, 0, 1.00]])
@@ -36,9 +34,7 @@ def acc_grads_inp():
 
 
 def test_get_top_gradients(acc_grads_inp: Dict[str, np.ndarray]):
-    top_snps_per_class = eir.interpretation.interpret_omics.get_snp_cols_w_top_grads(
-        acc_grads_inp, 3
-    )
+    top_snps_per_class = interpret_omics.get_snp_cols_w_top_grads(acc_grads_inp, 3)
     assert top_snps_per_class["Asia"]["top_n_idxs"] == [0, 2, 4]
     asia_grads = top_snps_per_class["Asia"]["top_n_grads"]
     assert (
@@ -53,12 +49,12 @@ def test_get_top_gradients(acc_grads_inp: Dict[str, np.ndarray]):
 
 
 def test_gather_and_rescale_snps(acc_grads_inp):
-    top_gradients_dict = eir.interpretation.interpret_omics.get_snp_cols_w_top_grads(
+    top_gradients_dict = interpret_omics.get_snp_cols_w_top_grads(
         accumulated_grads=acc_grads_inp, n=3
     )
     classes = ["Asia", "Europe"]
 
-    top_snps_dict = eir.interpretation.interpret_omics.gather_and_rescale_snps(
+    top_snps_dict = interpret_omics.gather_and_rescale_snps(
         all_gradients_dict=acc_grads_inp,
         top_gradients_dict=top_gradients_dict,
         classes=classes,

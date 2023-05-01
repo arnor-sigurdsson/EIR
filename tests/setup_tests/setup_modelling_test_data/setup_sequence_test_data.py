@@ -5,7 +5,7 @@ from typing import Sequence, Dict, TYPE_CHECKING
 
 import pandas as pd
 
-from tests.test_modelling.setup_modelling_test_data.setup_test_data_utils import (
+from tests.setup_tests.setup_modelling_test_data.setup_test_data_utils import (
     set_up_label_file_writing,
     set_up_label_line_dict,
     get_current_test_label_values,
@@ -13,7 +13,7 @@ from tests.test_modelling.setup_modelling_test_data.setup_test_data_utils import
 )
 
 if TYPE_CHECKING:
-    from tests.conftest import TestDataConfig
+    from tests.setup_tests.fixtures_create_data import TestDataConfig
 
 
 def create_test_sequence_data(

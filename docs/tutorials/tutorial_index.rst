@@ -11,6 +11,7 @@ Using EIR
     05_image_tutorial.rst
     06_raw_bytes_tutorial.rst
     07_multimodal_tutorial.rst
+    08_array_tutorial.rst
 
 Customizing EIR
 ===============

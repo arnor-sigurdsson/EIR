@@ -6,7 +6,7 @@ import pytest
 import yaml
 
 from eir.setup import config
-from tests.conftest import TestConfigInits
+from tests.setup_tests.fixtures_create_configs import TestConfigInits
 
 
 @pytest.fixture()

@@ -1,9 +1,9 @@
 from typing import Iterable, Sequence
 
-import torch
-from tqdm import tqdm
 import timm
+import torch
 from torch_optimizer import _NAME_OPTIM_MAP
+from tqdm import tqdm
 from transformers.models.auto.modeling_auto import MODEL_MAPPING_NAMES
 
 
@@ -60,8 +60,8 @@ class RunningStatistics:
 def collect_stats(
     tensor_iterable: Iterable[torch.Tensor], n_dims: int = 2
 ) -> RunningStatistics:
-    stats = RunningStatistics(n_dims)
-    for it in tqdm(tensor_iterable, desc="Gathering Image Statistics: "):
+    stats = RunningStatistics(n_dims=n_dims)
+    for it in tqdm(tensor_iterable, desc="Gathering Statistics: "):
         if hasattr(it, "data"):
             stats.update(it.data)
         else:

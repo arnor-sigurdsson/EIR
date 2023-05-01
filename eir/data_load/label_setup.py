@@ -29,6 +29,7 @@ al_train_val_dfs = Tuple[pd.DataFrame, pd.DataFrame]
 al_label_values_raw = Union[float, int]
 al_sample_labels_raw = Dict[str, al_label_values_raw]
 al_label_dict = Dict[str, al_sample_labels_raw]
+al_target_label_dict = Dict[str, al_label_dict]  # account for output name
 al_target_columns = Dict[str, List[str]]
 al_label_transformers_object = Union[StandardScaler, LabelEncoder]
 al_label_transformers = Dict[str, al_label_transformers_object]
@@ -411,7 +412,7 @@ def gather_all_ids_from_all_inputs(
     for input_config in input_configs:
         cur_source = Path(input_config.input_info.input_source)
         cur_type = input_config.input_info.input_type
-        if cur_type in ["omics", "sequence", "bytes", "image"]:
+        if cur_type in ["omics", "sequence", "bytes", "image", "array"]:
             cur_ids = gather_ids_from_data_source(data_source=cur_source)
 
         elif cur_type == "tabular":
@@ -877,19 +878,6 @@ def split_ids(
 
     assert len(train_ids) + len(valid_ids) == len(ids)
     assert set(train_ids).isdisjoint(set(valid_ids))
-
-    return train_ids, valid_ids
-
-
-def _split_ids_auto(
-    ids: Sequence[str], valid_size: Union[int, float]
-) -> Tuple[Sequence[str], Sequence[str]]:
-    seed, _ = get_seed()
-    ids_sorted = sorted(list(ids))
-
-    train_ids, valid_ids = train_test_split(
-        ids_sorted, test_size=valid_size, random_state=seed
-    )
 
     return train_ids, valid_ids
 

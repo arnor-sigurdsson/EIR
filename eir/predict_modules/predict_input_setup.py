@@ -17,11 +17,12 @@ from eir.experiment_io.experiment_io import (
 from eir.setup import schemas, input_setup
 from eir.setup.input_setup import (
     al_input_objects_as_dict,
-    SequenceInputInfo,
-    BytesInputInfo,
-    ImageInputInfo,
 )
-from eir.train import Hooks
+from eir.setup.input_setup_modules import setup_array, setup_omics, setup_tabular
+from eir.setup.input_setup_modules.setup_bytes import BytesInputInfo
+from eir.setup.input_setup_modules.setup_image import ImageInputInfo
+from eir.setup.input_setup_modules.setup_sequence import SequenceInputInfo
+from eir.train_utils.step_logic import Hooks
 
 
 @dataclass
@@ -46,7 +47,7 @@ def setup_tabular_input_for_testing(
     hooks: Union["Hooks", None],
     output_folder: str,
 ) -> PredictTabularInputInfo:
-    tabular_file_info = input_setup.get_tabular_input_file_info(
+    tabular_file_info = setup_tabular.get_tabular_input_file_info(
         input_source=input_config.input_info.input_source,
         tabular_data_type_config=input_config.input_type_info,
     )
@@ -96,11 +97,10 @@ def get_input_labels_for_predict(
     )
     loaded_fit_label_transformers = label_transformers_with_input_name[input_name]
 
-    con_transformers = {
-        k: v
-        for k, v in loaded_fit_label_transformers.items()
-        if k in tabular_file_info.con_columns
-    }
+    con_transformers = _extract_input_con_transformers(
+        loaded_fit_label_transformers=loaded_fit_label_transformers,
+        con_columns=tabular_file_info.con_columns,
+    )
     train_con_column_means = prep_missing_con_dict(con_transformers=con_transformers)
 
     df_labels_test_no_na = label_setup.handle_missing_label_values_in_df(
@@ -123,6 +123,18 @@ def get_input_labels_for_predict(
     )
 
     return labels_data_object
+
+
+def _extract_input_con_transformers(
+    loaded_fit_label_transformers, con_columns: Sequence[str]
+):
+    con_transformers = {
+        k: v for k, v in loaded_fit_label_transformers.items() if k in con_columns
+    }
+
+    assert len(con_transformers) == len(con_columns)
+
+    return con_transformers
 
 
 def set_up_inputs_for_predict(
@@ -158,13 +170,14 @@ def get_input_setup_function_map_for_predict() -> (
     Dict[str, Callable[..., input_setup.al_input_objects]]
 ):
     setup_mapping = {
-        "omics": input_setup.set_up_omics_input,
+        "omics": setup_omics.set_up_omics_input,
         "tabular": setup_tabular_input_for_testing,
         "sequence": partial(
             load_serialized_input_object, input_class=SequenceInputInfo
         ),
         "bytes": partial(load_serialized_input_object, input_class=BytesInputInfo),
         "image": partial(load_serialized_input_object, input_class=ImageInputInfo),
+        "array": setup_array.set_up_array_input,
     }
 
     return setup_mapping
