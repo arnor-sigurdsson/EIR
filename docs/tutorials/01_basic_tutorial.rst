@@ -12,6 +12,14 @@ we will be using
 to train deep learning models
 for ancestry prediction.
 
+.. note::
+    This tutorial goes into some detail about how ``EIR`` works,
+    and how to use it. If you are more interested in quickly training
+    the deep learning models for genomic prediction, the `EIR-auto-GP`_
+    project might be of use to you.
+
+.. _EIR-auto-GP: https://github.com/arnor-sigurdsson/EIR-auto-GP
+
 To start, please download `processed sample data`_
 (or process your own `.bed`, `.bim`, `.fam` files
 with e.g. `plink pipelines`_).
@@ -21,12 +29,12 @@ but the same approach can just as well be used for
 e.g. disease predictions in other cohorts
 (for example the `UK Biobank`_).
 
-Examining the sample data, we can see the following structure:
-
 .. _processed sample data: https://drive.google.com/file/d/1MELauhv7zFwxM8nonnj3iu_SmS69MuNi
 .. _plink pipelines: https://github.com/arnor-sigurdsson/plink_pipelines
 .. _Human Origins: https://www.nature.com/articles/nature13673
 .. _UK Biobank: https://www.nature.com/articles/s41586-018-0579-z
+
+Examining the sample data, we can see the following structure:
 
 
 .. code-block:: console
