@@ -13,7 +13,7 @@ from eir.models.omics.models_locally_connected import (
 )
 
 if TYPE_CHECKING:
-    from eir.setup.input_setup import DataDimensions
+    from eir.setup.input_setup_modules.common import DataDimensions
 
 al_omics_model_classes = Union[
     Type["CNNModel"],

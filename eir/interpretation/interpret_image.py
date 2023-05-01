@@ -19,7 +19,7 @@ from eir.interpretation.interpretation_utils import (
 if TYPE_CHECKING:
     from eir.train import Experiment
     from eir.interpretation.interpretation import SampleAttribution
-    from eir.setup.input_setup import ImageNormalizationStats
+    from eir.setup.input_setup_modules.setup_image import ImageNormalizationStats
 
 
 def analyze_image_input_attributions(

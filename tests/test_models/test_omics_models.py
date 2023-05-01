@@ -3,7 +3,7 @@ import pytest
 from eir.models import layers
 from eir.models.model_training_utils import trace_eir_model
 from eir.models.omics import models_cnn
-from eir.setup.input_setup import DataDimensions
+from eir.setup.input_setup_modules.common import DataDimensions
 from tests.test_models.model_testing_utils import prepare_example_batch
 
 

@@ -11,7 +11,7 @@ from torch import nn
 from eir.models.layers import FirstCNNBlock, SelfAttention, CNNResidualBlock
 
 if TYPE_CHECKING:
-    from eir.setup.input_setup import DataDimensions
+    from eir.setup.input_setup_modules.common import DataDimensions
 
 logger = get_logger(__name__)
 

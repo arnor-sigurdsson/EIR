@@ -23,7 +23,10 @@ from eir.data_load.data_source_modules import local_ops
 from eir.data_load.datasets import al_datasets
 from eir.data_load.label_setup import al_label_transformers
 from eir.setup.config import Configs
-from eir.setup.input_setup import get_image_transforms, ImageNormalizationStats
+from eir.setup.input_setup_modules.setup_image import (
+    ImageNormalizationStats,
+    get_image_transforms,
+)
 from eir.setup.output_setup import set_up_outputs_for_training
 
 if TYPE_CHECKING:

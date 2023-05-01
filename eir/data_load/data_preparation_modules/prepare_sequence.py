@@ -8,7 +8,10 @@ from eir.data_load.data_preparation_modules.common import (
     process_tensor_to_length,
 )
 from eir.data_load.data_source_modules import deeplake_ops
-from eir.setup.input_setup import get_sequence_split_function, SequenceInputInfo
+from eir.setup.input_setup_modules.setup_sequence import (
+    SequenceInputInfo,
+    get_sequence_split_function,
+)
 
 
 def sequence_load_wrapper(

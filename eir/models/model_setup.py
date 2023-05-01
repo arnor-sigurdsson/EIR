@@ -71,7 +71,8 @@ from eir.models.tabular.tabular import (
     SimpleTabularModelConfig,
 )
 from eir.setup import schemas
-from eir.setup.input_setup import al_input_objects_as_dict, DataDimensions
+from eir.setup.input_setup import al_input_objects_as_dict
+from eir.setup.input_setup_modules.common import DataDimensions
 from eir.setup.setup_utils import get_unsupported_hf_models
 from eir.train_utils.distributed import maybe_make_model_distributed
 

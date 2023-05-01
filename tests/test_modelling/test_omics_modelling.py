@@ -427,9 +427,9 @@ def _get_multi_task_output_configs(
 
 
 def _should_compile():
-    in_gha, _ = get_system_info()
+    in_gha, system = get_system_info()
 
-    if in_gha:
+    if in_gha or system == "Darwin":
         return False
     return True
 

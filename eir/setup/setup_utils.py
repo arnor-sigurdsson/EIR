@@ -60,8 +60,8 @@ class RunningStatistics:
 def collect_stats(
     tensor_iterable: Iterable[torch.Tensor], n_dims: int = 2
 ) -> RunningStatistics:
-    stats = RunningStatistics(n_dims)
-    for it in tqdm(tensor_iterable, desc="Gathering Image Statistics: "):
+    stats = RunningStatistics(n_dims=n_dims)
+    for it in tqdm(tensor_iterable, desc="Gathering Statistics: "):
         if hasattr(it, "data"):
             stats.update(it.data)
         else:

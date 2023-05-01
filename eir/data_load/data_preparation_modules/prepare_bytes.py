@@ -8,7 +8,7 @@ from eir.data_load.data_preparation_modules.common import (
     process_tensor_to_length,
 )
 from eir.data_load.data_source_modules import deeplake_ops
-from eir.setup.input_setup import BytesInputInfo
+from eir.setup.input_setup_modules.setup_bytes import BytesInputInfo
 
 
 def bytes_load_wrapper(

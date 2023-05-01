@@ -11,7 +11,7 @@ from eir.models.layers import SplitLinear, SplitMLPResidualBlock
 from eir.models.sequence.transformer_models import PositionalEmbedding
 
 if TYPE_CHECKING:
-    from eir.setup.input_setup import DataDimensions
+    from eir.setup.input_setup_modules.common import DataDimensions
 
 logger = get_logger(__name__)
 

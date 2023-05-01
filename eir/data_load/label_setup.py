@@ -881,19 +881,6 @@ def split_ids(
     return train_ids, valid_ids
 
 
-def _split_ids_auto(
-    ids: Sequence[str], valid_size: Union[int, float]
-) -> Tuple[Sequence[str], Sequence[str]]:
-    seed, _ = get_seed()
-    ids_sorted = sorted(list(ids))
-
-    train_ids, valid_ids = train_test_split(
-        ids_sorted, test_size=valid_size, random_state=seed
-    )
-
-    return train_ids, valid_ids
-
-
 def _split_ids_manual(
     ids: Sequence[str], manual_valid_ids: Sequence[str]
 ) -> Tuple[Sequence[str], Sequence[str]]:

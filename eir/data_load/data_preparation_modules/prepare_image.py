@@ -6,7 +6,7 @@ import torch
 from PIL.Image import Image, fromarray
 from eir.data_load.data_preparation_modules.common import _load_deeplake_sample
 from eir.data_load.data_source_modules import deeplake_ops
-from eir.setup.input_setup import ImageInputInfo
+from eir.setup.input_setup_modules.setup_image import ImageInputInfo
 from torchvision.datasets.folder import default_loader
 
 

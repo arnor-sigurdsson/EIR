@@ -16,6 +16,7 @@ import eir.predict_modules.predict_input_setup
 import eir.predict_modules.predict_target_setup
 import eir.setup.config
 import eir.setup.input_setup
+import eir.setup.input_setup_modules.common
 import eir.train
 from eir import predict
 from eir import train
@@ -90,7 +91,7 @@ def test_load_model(create_test_config: config.Configs, tmp_path: Path):
     test_configs = create_test_config
     gc = test_configs.global_config
 
-    data_dimension = eir.setup.input_setup.DataDimensions(
+    data_dimension = eir.setup.input_setup_modules.common.DataDimensions(
         channels=1, height=4, width=1000
     )
 
