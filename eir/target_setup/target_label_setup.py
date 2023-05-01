@@ -5,7 +5,7 @@ from typing import Dict, Sequence, Tuple, Union, Iterable
 import pandas as pd
 
 from eir.data_load.label_setup import (
-    al_label_dict,
+    al_target_label_dict,
     al_label_transformers,
     TabularFileInfo,
     al_all_column_ops,
@@ -18,8 +18,8 @@ from eir.setup import schemas
 
 @dataclass
 class MergedTargetLabels:
-    train_labels: al_label_dict
-    valid_labels: al_label_dict
+    train_labels: al_target_label_dict
+    valid_labels: al_target_label_dict
     label_transformers: Dict[str, al_label_transformers]
 
     @property

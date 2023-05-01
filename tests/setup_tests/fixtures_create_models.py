@@ -1,7 +1,7 @@
 import pytest
 import torch
-from torch import nn
 
+from eir.models import al_meta_model
 from eir.models.model_setup import get_default_model_registry_per_input_type, get_model
 from eir.setup import config, input_setup
 from eir.setup.output_setup import set_up_outputs_for_training
@@ -11,7 +11,7 @@ from eir.train_utils.optim import maybe_wrap_model_with_swa
 @pytest.fixture()
 def create_test_model(
     create_test_config: config.Configs, create_test_labels
-) -> nn.Module:
+) -> al_meta_model:
     gc = create_test_config.global_config
     target_labels = create_test_labels
 

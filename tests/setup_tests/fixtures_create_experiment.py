@@ -89,8 +89,6 @@ def prep_modelling_test_configs(
 
     train_dataset, valid_dataset = create_test_datasets
 
-    train._log_model(model=model)
-
     inputs = input_setup.set_up_inputs_for_training(
         inputs_configs=c.input_configs,
         train_ids=tuple(target_labels.train_labels.keys()),
@@ -98,6 +96,11 @@ def prep_modelling_test_configs(
         hooks=None,
     )
     run_folder = get_run_folder(output_folder=gc.output_folder)
+    train._log_model(
+        model=model,
+        structure_file=run_folder / "model_info.txt",
+    )
+
     serialize_all_input_transformers(inputs_dict=inputs, run_folder=run_folder)
     serialize_chosen_input_objects(inputs_dict=inputs, run_folder=run_folder)
 

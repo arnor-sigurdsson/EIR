@@ -233,7 +233,7 @@ def _get_predict_test_data_parametrization() -> List[Dict[str, Any]]:
                         "input_info": {"input_name": "test_tabular"},
                         "input_type_info": {
                             "input_cat_columns": ["OriginExtraCol"],
-                            "input_con_columns": [],
+                            "input_con_columns": ["ExtraTarget"],
                         },
                         "model_config": {"model_type": "tabular"},
                     },

@@ -41,7 +41,7 @@ from eir.data_load.data_source_modules.local_ops import (
     get_file_sample_id_iterator_basic,
     add_sequence_data_from_csv_to_samples,
 )
-from eir.data_load.label_setup import al_label_dict
+from eir.data_load.label_setup import al_label_dict, al_target_label_dict
 from eir.setup import config
 
 if TYPE_CHECKING:
@@ -100,7 +100,7 @@ def set_up_datasets_from_configs(
 
 
 def construct_default_dataset_kwargs_from_cl_args(
-    target_labels_dict: Union[None, al_label_dict],
+    target_labels_dict: Union[None, al_target_label_dict],
     inputs: "al_input_objects_as_dict",
     outputs: "al_output_objects_as_dict",
     test_mode: bool,
@@ -149,7 +149,7 @@ class DatasetBase(Dataset):
         inputs: "al_input_objects_as_dict",
         outputs: "al_output_objects_as_dict",
         test_mode: bool,
-        target_labels_dict: al_label_dict = None,
+        target_labels_dict: al_target_label_dict = None,
         ids_to_keep: Optional[Set[str]] = None,
     ):
         super().__init__()

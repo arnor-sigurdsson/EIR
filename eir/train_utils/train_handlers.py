@@ -798,9 +798,6 @@ def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> Non
         plot_skip_steps=ca.plot_skip_steps,
     )
 
-    with open(Path(handler_config.run_folder, "model_info.txt"), "w") as mfile:
-        mfile.write(str(handler_config.experiment.model))
-
 
 def _get_custom_handlers(handler_config: "HandlerConfig"):
     custom_handlers = handler_config.experiment.hooks.custom_handler_attachers

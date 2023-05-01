@@ -29,6 +29,7 @@ al_train_val_dfs = Tuple[pd.DataFrame, pd.DataFrame]
 al_label_values_raw = Union[float, int]
 al_sample_labels_raw = Dict[str, al_label_values_raw]
 al_label_dict = Dict[str, al_sample_labels_raw]
+al_target_label_dict = Dict[str, al_label_dict]  # account for output name
 al_target_columns = Dict[str, List[str]]
 al_label_transformers_object = Union[StandardScaler, LabelEncoder]
 al_label_transformers = Dict[str, al_label_transformers_object]

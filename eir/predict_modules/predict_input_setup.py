@@ -97,11 +97,10 @@ def get_input_labels_for_predict(
     )
     loaded_fit_label_transformers = label_transformers_with_input_name[input_name]
 
-    con_transformers = {
-        k: v
-        for k, v in loaded_fit_label_transformers.items()
-        if k in tabular_file_info.con_columns
-    }
+    con_transformers = _extract_input_con_transformers(
+        loaded_fit_label_transformers=loaded_fit_label_transformers,
+        con_columns=tabular_file_info.con_columns,
+    )
     train_con_column_means = prep_missing_con_dict(con_transformers=con_transformers)
 
     df_labels_test_no_na = label_setup.handle_missing_label_values_in_df(
@@ -124,6 +123,18 @@ def get_input_labels_for_predict(
     )
 
     return labels_data_object
+
+
+def _extract_input_con_transformers(
+    loaded_fit_label_transformers, con_columns: Sequence[str]
+):
+    con_transformers = {
+        k: v for k, v in loaded_fit_label_transformers.items() if k in con_columns
+    }
+
+    assert len(con_transformers) == len(con_columns)
+
+    return con_transformers
 
 
 def set_up_inputs_for_predict(

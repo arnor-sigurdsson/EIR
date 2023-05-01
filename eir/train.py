@@ -375,41 +375,51 @@ def get_summary_writer(run_folder: Path) -> SummaryWriter:
 
 
 def _log_model(
-    model: nn.Module, verbose: bool = False, output_file: Optional[str] = None
+    model: nn.Module,
+    structure_file: Optional[Path],
+    verbose: bool = False,
+    parameter_file: Optional[str] = None,
 ) -> None:
     no_params = sum(p.numel() for p in model.parameters())
     no_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
     model_summary = "Starting training with following model specifications:\n"
     model_summary += f"Total parameters: {format(no_params, ',.0f')}\n"
-    model_summary += f"Trainable parameters: {format(no_trainable_params, ',.0f')}\n"
+    model_summary += f"Trainable parameters: {format(no_trainable_params, ',.0f')}"
 
     logger.info(model_summary)
+
+    if structure_file:
+        with open(structure_file, "w") as structure_handle:
+            structure_handle.write(str(model))
 
     if verbose:
         layer_summary = "\nModel layers:\n"
         for name, param in model.named_parameters():
             layer_summary += (
-                f"Layer: {name},"
-                f"Shape: {list(param.size())},"
-                f"Parameters: {param.numel()},"
+                f"Layer: {name}, "
+                f"Shape: {list(param.size())}, "
+                f"Parameters: {param.numel()}, "
                 f"Trainable: {param.requires_grad}\n"
             )
         logger.info(layer_summary)
 
-    if output_file:
-        with open(output_file, "w") as f:
+    if parameter_file:
+        with open(parameter_file, "w") as f:
             f.write(model_summary)
             if verbose:
                 f.write(layer_summary)
 
 
 def run_experiment(experiment: Experiment) -> None:
-    _log_model(model=experiment.model)
-
     gc = experiment.configs.global_config
-
     run_folder = utils.get_run_folder(output_folder=gc.output_folder)
+
+    _log_model(
+        model=experiment.model,
+        structure_file=run_folder / "model_info.txt",
+    )
+
     keys_to_serialize = get_default_experiment_keys_to_serialize()
     serialize_experiment(
         experiment=experiment,
