@@ -174,6 +174,7 @@ def _get_regression_output_configs() -> Sequence[Dict]:
             "injections": {
                 "global_configs": {
                     "weighted_sampling_columns": ["Origin"],
+                    "memory_dataset": True,
                 },
                 "input_configs": [
                     {
@@ -185,6 +186,23 @@ def _get_regression_output_configs() -> Sequence[Dict]:
                                 "channel_exp_base": 3,
                                 "l1": 1e-04,
                             },
+                        },
+                    }
+                ],
+                "output_configs": _get_classification_output_configs(),
+            },
+        },
+        # Case 2: LCL
+        {
+            "injections": {
+                "global_configs": {
+                    "memory_dataset": True,
+                },
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_array"},
+                        "model_config": {
+                            "model_type": "lcl",
                         },
                     }
                 ],

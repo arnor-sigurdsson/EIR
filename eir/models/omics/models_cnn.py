@@ -62,6 +62,9 @@ class CNNModelConfig:
         input. So assuming an omics input, setting kernel_width=2 means 2 SNPs covered
         at a time.
 
+    :param kernel_height:
+        Base kernel height of the convolutions.
+
     :param first_kernel_expansion:
         Factor to extend the first kernel. This value can both be positive or negative.
         For example in the case of ``kernel_width=12``, setting
@@ -128,7 +131,7 @@ class CNNModel(nn.Module):
 
         self.conv = nn.Sequential(
             *_make_conv_layers(
-                residual_blocks=self.resblocks,
+                residual_blocks=self.residual_blocks,
                 cnn_model_configuration=self.model_config,
                 data_dimensions=self.data_dimensions,
             )
@@ -172,14 +175,14 @@ class CNNModel(nn.Module):
                 nn.init.kaiming_normal_(m.weight, a=0.5, mode="fan_out")
 
     @property
-    def resblocks(self) -> List[int]:
+    def residual_blocks(self) -> List[int]:
         if not self.model_config.layers:
             residual_blocks = find_no_cnn_resblocks_needed(
                 self.data_dimensions.width,
                 self.model_config.down_stride,
                 self.model_config.first_stride_expansion,
             )
-            logger.info(
+            logger.debug(
                 "No residual blocks specified in CL args, using input "
                 "%s based on width approximation calculation.",
                 residual_blocks,

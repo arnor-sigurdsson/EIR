@@ -6,6 +6,7 @@ from eir.models.array.array_models import (
     al_array_model_configs,
     get_array_model_class,
     get_array_model_init_kwargs,
+    al_array_model_types,
 )
 from eir.setup.input_setup_modules.common import DataDimensions
 
@@ -24,7 +25,7 @@ def get_array_model(
 def get_array_feature_extractor(
     model_init_config: al_array_model_configs,
     data_dimensions: DataDimensions,
-    model_type: str,
+    model_type: al_array_model_types,
 ):
     array_model_class = get_array_model_class(model_type=model_type)
     model_init_kwargs = get_array_model_init_kwargs(

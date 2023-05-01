@@ -1,65 +1,60 @@
 from dataclasses import dataclass
 from typing import Union, Type, Literal, Dict, Any, TYPE_CHECKING
+from functools import partial
 
 import torch
 from torch import nn
 
 from eir.models.omics.models_cnn import CNNModelConfig, CNNModel
-from eir.models.omics.omics_models import Dataclass
+from eir.models.omics.models_locally_connected import LCLModel, LCLModelConfig
 
 if TYPE_CHECKING:
     from eir.setup.input_setup_modules.common import DataDimensions
 
-al_omics_model_classes = Union[Type["CNNModel"]]
+al_array_model_types = Literal["cnn", "lcl"]
 
-al_omics_models = Union["CNNModel"]
+al_array_model_classes = Union[Type[CNNModel], Type[LCLModel]]
+al_array_models = Union[CNNModel, LCLModel]
 
-al_array_model_types = Literal["cnn"]
-
-al_array_model_configs = Union[CNNModelConfig]
+al_array_model_config_classes = Union[Type[CNNModelConfig], Type[LCLModelConfig]]
+al_array_model_configs = Union[CNNModelConfig, LCLModelConfig]
 
 al_pre_normalization = Union[None, Literal["instancenorm", "layernorm"]]
 
 
-def get_array_model_mapping() -> Dict[str, al_omics_model_classes]:
+def get_array_model_mapping() -> Dict[str, al_array_model_classes]:
     mapping = {
         "cnn": CNNModel,
+        "lcl": LCLModel,
     }
 
     return mapping
 
 
-def get_array_model_class(model_type: str) -> al_omics_model_classes:
+def get_array_model_class(model_type: al_array_model_types) -> al_array_model_classes:
     mapping = get_array_model_mapping()
     return mapping[model_type]
 
 
-def get_array_config_dataclass_mapping() -> Dict[str, Type[Dataclass]]:
+def get_array_config_dataclass_mapping() -> Dict[str, al_array_model_config_classes]:
     mapping = {
         "cnn": CNNModelConfig,
+        "lcl": LCLModelConfig,
     }
 
     return mapping
 
 
-def get_model_config_dataclass(model_type: str) -> Type[Dataclass]:
+def get_model_config_dataclass(model_type: str) -> al_array_model_config_classes:
     mapping = get_array_config_dataclass_mapping()
     return mapping[model_type]
 
 
 def get_array_model_init_kwargs(
-    model_type: str,
+    model_type: al_array_model_types,
     model_config: al_array_model_configs,
     data_dimensions: "DataDimensions",
 ) -> Dict[str, Any]:
-    """
-    See: https://github.com/python/mypy/issues/5374 for type hint issue.
-
-    Possibly split / extend this function later to account for other kwargs that just
-    model_config, to allow for more flexibility in model instantiation (not restricting
-    to just model_config object).
-    """
-
     kwargs = {}
 
     model_config_dataclass = get_model_config_dataclass(model_type=model_type)
@@ -67,6 +62,10 @@ def get_array_model_init_kwargs(
 
     kwargs["model_config"] = dataclass_instance
     kwargs["data_dimensions"] = data_dimensions
+
+    match model_type:
+        case "lcl":
+            kwargs["flatten_fn"] = partial(torch.flatten, start_dim=1)
 
     return kwargs
 

@@ -165,7 +165,8 @@ def prepare_inputs_memory(
 
             case "array":
                 array_raw_in_memory = data
-                prepared_inputs[name] = array_raw_in_memory
+                prepared_array_data = prepare_array_data(array_data=array_raw_in_memory)
+                prepared_inputs[name] = prepared_array_data
 
             case _:
                 prepared_inputs[name] = inputs[name]

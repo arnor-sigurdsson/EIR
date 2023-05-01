@@ -1,0 +1,5 @@
+eirtrain \
+--global_configs eir_tutorials/08_array_tutorial/conf/globals.yaml \
+--input_configs eir_tutorials/08_array_tutorial/conf/input_2d_cnn.yaml \
+--output_configs eir_tutorials/08_array_tutorial/conf/outputs.yaml \
+--globals.output_folder=eir_tutorials/tutorial_runs/tutorial_08_run_cnn-2d

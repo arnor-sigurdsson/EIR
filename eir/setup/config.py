@@ -30,7 +30,10 @@ import configargparse
 import yaml
 from aislib.misc_utils import get_logger
 
-from eir.models.array.array_models import ArrayModelConfig
+from eir.models.array.array_models import (
+    ArrayModelConfig,
+    get_array_config_dataclass_mapping,
+)
 from eir.models.fusion.fusion_identity import IdentityConfig
 from eir.models.fusion.fusion_mgmoe import MGMoEModelConfig
 from eir.models.image.image_models import ImageModelConfig
@@ -543,16 +546,15 @@ def set_up_config_object_init_kwargs_identity(
 
 
 def get_feature_extractor_config_type_init_callable_map() -> Dict[str, Type]:
-    mapping = get_omics_config_dataclass_mapping()
-    mapping = {
-        **mapping,
-        **{
-            "tabular": SimpleTabularModelConfig,
-            "sequence-default": BasicTransformerFeatureExtractorModelConfig,
-            "perceiver": PerceiverIOModelConfig,
-        },
+    omics_mapping = get_omics_config_dataclass_mapping()
+    array_mapping = get_array_config_dataclass_mapping()
+    other_mapping = {
+        "tabular": SimpleTabularModelConfig,
+        "sequence-default": BasicTransformerFeatureExtractorModelConfig,
+        "perceiver": PerceiverIOModelConfig,
     }
 
+    mapping = omics_mapping | array_mapping | other_mapping
     return mapping
 
 

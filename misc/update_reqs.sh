@@ -9,3 +9,5 @@ poetry export -f requirements.txt --without-hashes --with dev --output requireme
 if ! grep -F -q "-e ." requirements-dev.txt; then
   echo "-e ." >> requirements-dev.txt
 fi
+
+python docs/build_acks.py

@@ -1,6 +1,6 @@
 import argparse
-from dataclasses import _DataclassParams, dataclass
-from typing import Union, Type, Dict, Any, Protocol, Literal, TYPE_CHECKING
+from dataclasses import dataclass
+from typing import Union, Type, Dict, Any, Protocol, Literal, TYPE_CHECKING, ClassVar
 
 from eir.models.omics.models_cnn import CNNModel, CNNModelConfig
 from eir.models.omics.models_identity import IdentityModel, IdentityModelConfig
@@ -10,6 +10,7 @@ from eir.models.omics.models_locally_connected import (
     SimpleLCLModelConfig,
     LCLModel,
     LCLModelConfig,
+    flatten_h_w_fortran,
 )
 
 if TYPE_CHECKING:
@@ -35,6 +36,13 @@ al_omics_model_types = Literal[
     "linear",
 ]
 
+al_omics_model_config_classes = Union[
+    Type[CNNModelConfig],
+    Type[LinearModelConfig],
+    Type[SimpleLCLModelConfig],
+    Type[LCLModelConfig],
+    Type[IdentityModelConfig],
+]
 
 al_omics_model_configs = Union[
     CNNModelConfig,
@@ -72,17 +80,16 @@ def get_omics_model_mapping() -> Dict[str, al_omics_model_classes]:
     return mapping
 
 
-def get_omics_model_class(model_type: str) -> al_omics_model_classes:
+def get_omics_model_class(model_type: al_omics_model_types) -> al_omics_model_classes:
     mapping = get_omics_model_mapping()
     return mapping[model_type]
 
 
 class Dataclass(Protocol):
-    __dataclass_fields__: Dict
-    __dataclass_params__: _DataclassParams
+    __dataclass_fields__: ClassVar[Dict]
 
 
-def get_omics_config_dataclass_mapping() -> Dict[str, Type[Dataclass]]:
+def get_omics_config_dataclass_mapping() -> Dict[str, al_omics_model_config_classes]:
     mapping = {
         "cnn": CNNModelConfig,
         "linear": LinearModelConfig,
@@ -94,13 +101,15 @@ def get_omics_config_dataclass_mapping() -> Dict[str, Type[Dataclass]]:
     return mapping
 
 
-def get_model_config_dataclass(model_type: str) -> Type[Dataclass]:
+def get_model_config_dataclass(
+    model_type: str,
+) -> al_omics_model_config_classes:
     mapping = get_omics_config_dataclass_mapping()
     return mapping[model_type]
 
 
 def get_omics_model_init_kwargs(
-    model_type: str,
+    model_type: al_omics_model_types,
     model_config: al_omics_model_configs,
     data_dimensions: "DataDimensions",
 ) -> Dict[str, Any]:
@@ -119,6 +128,10 @@ def get_omics_model_init_kwargs(
 
     kwargs["model_config"] = dataclass_instance
     kwargs["data_dimensions"] = data_dimensions
+
+    match model_type:
+        case "genome-local-net" | "mlp-split":
+            kwargs["flatten_fn"] = flatten_h_w_fortran
 
     return kwargs
 
