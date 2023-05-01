@@ -393,7 +393,7 @@ def _meta_get_image_model_from_scratch(
 
     logger.info(
         "Model '%s' not found among pretrained/external image model names, assuming "
-        "module will be initialized from scratch using %s for initalization.",
+        "module will be initialized from scratch using %s for initialization.",
         model_type,
         model_init_config,
     )

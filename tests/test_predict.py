@@ -149,9 +149,11 @@ def _get_predict_test_data_parametrization() -> List[Dict[str, Any]]:
                 "omics",
                 "sequence",
                 "image",
+                "array",
             ),
             "manual_test_data_creator": lambda: "test_predict",
             "source": "local",
+            "extras": {"array_dims": 1},
         }
     ]
 
@@ -171,6 +173,7 @@ def _get_predict_test_data_parametrization() -> List[Dict[str, Any]]:
             ),
             "manual_test_data_creator": lambda: "test_predict",
             "source": "deeplake",
+            "extras": {"array_dims": 1},
         }
     ]
 
@@ -240,6 +243,17 @@ def _get_predict_test_data_parametrization() -> List[Dict[str, Any]]:
                             "input_con_columns": [],
                         },
                         "model_config": {"model_type": "tabular"},
+                    },
+                    {
+                        "input_info": {"input_name": "test_array"},
+                        "model_config": {
+                            "model_type": "cnn",
+                            "model_init_config": {
+                                "rb_do": 0.25,
+                                "channel_exp_base": 3,
+                                "l1": 1e-04,
+                            },
+                        },
                     },
                 ],
                 "fusion_configs": {

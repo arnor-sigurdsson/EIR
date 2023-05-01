@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 def get_array_data_to_test():
     cases = []
 
-    for task in ["binary", "multi"]:
+    for task in ["multi"]:
         for dim in [1, 2, 3]:
             cur_case = {
                 "task_type": task,

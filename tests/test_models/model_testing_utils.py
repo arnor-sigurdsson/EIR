@@ -2,7 +2,9 @@ import torch
 from torch.utils.data._utils.collate import default_collate
 
 from eir.data_load.data_utils import Batch
-from eir.data_load.datasets import impute_missing_modalities_wrapper
+from eir.data_load.data_preparation_modules.imputation import (
+    impute_missing_modalities_wrapper,
+)
 from eir.data_load.label_setup import Labels
 from eir.setup.config import Configs
 from eir.setup.input_setup import set_up_inputs_for_training

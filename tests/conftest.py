@@ -27,6 +27,7 @@ from _pytest.fixtures import SubRequest
 from aislib.misc_utils import ensure_path_exists
 from torch import nn
 from torch.utils.data import DataLoader
+from torchvision.datasets.folder import default_loader
 
 import eir.experiment_io.experiment_io
 import eir.models.omics.omics_models
@@ -207,11 +208,20 @@ def general_sequence_inject(
     return injected
 
 
-def get_test_base_global_init() -> Sequence[dict]:
+def get_test_base_global_init(
+    allow_cuda: bool = True, allow_mps: bool = False
+) -> Sequence[dict]:
+    device = "cpu"
+    if allow_cuda:
+        device = "cuda" if torch.cuda.is_available() else device
+    if allow_mps:
+        device = "mps" if torch.backends.mps.is_available() else device
+
     global_inits = [
         {
             "output_folder": "runs/test_run",
             "plot_skip_steps": 0,
+            "device": device,
             "compute_attributions": True,
             "attributions_every_sample_factor": 0,
             "attribution_background_samples": 64,
@@ -742,7 +752,7 @@ def _make_deeplake_test_dataset(
                     sample_data = np.load(str(sample_file))
                 case "image":
                     cur_name = "test_image"
-                    sample_data = datasets.default_loader(str(sample_file))
+                    sample_data = default_loader(str(sample_file))
                     sample_data = np.array(sample_data)
                 case "sequence":
                     cur_name = "test_sequence"

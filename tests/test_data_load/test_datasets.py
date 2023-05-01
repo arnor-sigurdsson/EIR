@@ -11,9 +11,15 @@ import pytest
 import torch
 from PIL import Image
 
-import eir.data_load.data_source_modules.local_ops
 from eir import train
 from eir.data_load import datasets
+from eir.data_load.data_preparation_modules import common
+from eir.data_load.data_preparation_modules import imputation
+from eir.data_load.data_preparation_modules import prepare_bytes
+from eir.data_load.data_preparation_modules import prepare_image
+from eir.data_load.data_preparation_modules import prepare_omics
+from eir.data_load.data_preparation_modules import prepare_sequence
+from eir.data_load.data_source_modules import local_ops
 from eir.data_load.datasets import al_datasets
 from eir.data_load.label_setup import al_label_transformers
 from eir.setup.config import Configs
@@ -567,7 +573,7 @@ def test_prepare_genotype_array_train_mode():
     test_array = torch.zeros((4, 100), dtype=torch.uint8).detach().numpy()
     test_array_copy = deepcopy(test_array)
 
-    prepared_array_train = datasets.prepare_one_hot_omics_data(
+    prepared_array_train = prepare_omics.prepare_one_hot_omics_data(
         genotype_array=test_array,
         na_augment_perc=1.0,
         na_augment_prob=1.0,
@@ -584,7 +590,7 @@ def test_prepare_genotype_array_test_mode():
     test_array = torch.zeros((1, 4, 100), dtype=torch.uint8).detach().numpy()
     test_array_copy = deepcopy(test_array)
 
-    prepared_array_test = datasets.prepare_one_hot_omics_data(
+    prepared_array_test = prepare_omics.prepare_one_hot_omics_data(
         genotype_array=test_array,
         na_augment_perc=1.0,
         na_augment_prob=1.0,
@@ -603,7 +609,7 @@ def test_prepare_sequence_data():
     input_config_mock = MagicMock()
     input_config_mock.computed_max_length = 64
     input_config_mock.encode_func.return_value = [0]
-    prepared_tensor = datasets.prepare_sequence_data(
+    prepared_tensor = prepare_sequence.prepare_sequence_data(
         sequence_input_object=input_config_mock,
         cur_file_content_tokenized=test_input,
         test_mode=False,
@@ -623,7 +629,7 @@ def test_prepare_bytes_data():
     input_config_mock = MagicMock()
     input_config_mock.input_config.input_type_info.max_length = 64
     input_config_mock.vocab.get.return_value = 0
-    prepared_tensor = datasets.prepare_bytes_data(
+    prepared_tensor = prepare_bytes.prepare_bytes_data(
         bytes_input_object=input_config_mock,
         bytes_data=test_input,
         test_mode=False,
@@ -652,7 +658,7 @@ def test_prepare_image_data():
     image_data = Image.fromarray(np.uint8(arr * 255))
     arr_pil = np.array(image_data)
 
-    prepared_tensor = datasets.prepare_image_data(
+    prepared_tensor = prepare_image.prepare_image_data(
         image_input_object=input_config_mock, image_data=image_data, test_mode=False
     )
 
@@ -710,7 +716,7 @@ def test_get_file_sample_id_iterator(
 
     input_data_source = input_configs[0].input_info.input_source
 
-    iterator = eir.data_load.data_source_modules.local_ops.get_file_sample_id_iterator(
+    iterator = local_ops.get_file_sample_id_iterator(
         data_source=input_data_source, ids_to_keep=None
     )
     all_ids = [i for i in iterator]
@@ -719,10 +725,8 @@ def test_get_file_sample_id_iterator(
         test_data_config.target_classes
     )
 
-    iterator_empty = (
-        eir.data_load.data_source_modules.local_ops.get_file_sample_id_iterator(
-            data_source=input_data_source, ids_to_keep=["does_not_exists"]
-        )
+    iterator_empty = local_ops.get_file_sample_id_iterator(
+        data_source=input_data_source, ids_to_keep=["does_not_exists"]
     )
     all_ids = [i for i in iterator_empty]
     assert len(all_ids) == 0
@@ -731,19 +735,19 @@ def test_get_file_sample_id_iterator(
 def test_process_tensor_to_length():
     test_tensor = torch.arange(0, 100)
 
-    test_tensor_simple_trunc = datasets.process_tensor_to_length(
+    test_tensor_simple_trunc = common.process_tensor_to_length(
         tensor=test_tensor, max_length=50, sampling_strategy_if_longer="from_start"
     )
     assert len(test_tensor_simple_trunc) == 50
     assert (test_tensor_simple_trunc == test_tensor[:50]).all()
 
-    test_tensor_unif_trunc = datasets.process_tensor_to_length(
+    test_tensor_unif_trunc = common.process_tensor_to_length(
         tensor=test_tensor, max_length=50, sampling_strategy_if_longer="uniform"
     )
     assert len(test_tensor_unif_trunc) == 50
     assert len(test_tensor_unif_trunc) == len(set(test_tensor_unif_trunc))
 
-    test_tensor_padded = datasets.process_tensor_to_length(
+    test_tensor_padded = common.process_tensor_to_length(
         tensor=test_tensor, max_length=128, sampling_strategy_if_longer="uniform"
     )
     assert len(test_tensor_padded) == 128
@@ -752,7 +756,7 @@ def test_process_tensor_to_length():
 def test_sample_sequence_uniform():
     test_tensor = torch.arange(0, 100)
 
-    sampled_tensor = datasets._sample_sequence_uniform(
+    sampled_tensor = common._sample_sequence_uniform(
         tensor=test_tensor, tensor_length=len(test_tensor), max_length=50
     )
     assert len(sampled_tensor) == 50
@@ -826,14 +830,14 @@ def test_impute_missing_modalities(
         valid_ids=valid_ids,
         hooks=None,
     )
-    impute_dtypes = datasets._get_default_impute_dtypes(inputs_objects=input_objects)
-    impute_fill_values = datasets._get_default_impute_fill_values(
+    impute_dtypes = imputation._get_default_impute_dtypes(inputs_objects=input_objects)
+    impute_fill_values = imputation._get_default_impute_fill_values(
         inputs_objects=input_objects
     )
 
     test_inputs_all_avail = {k: torch.empty(10) for k in input_objects.keys()}
 
-    no_fill = datasets.impute_missing_modalities(
+    no_fill = imputation.impute_missing_modalities(
         inputs_values=test_inputs_all_avail,
         inputs_objects=input_objects,
         fill_values=impute_fill_values,
@@ -844,7 +848,7 @@ def test_impute_missing_modalities(
     test_inputs_missing_tabular = {
         k: v for k, v in test_inputs_all_avail.items() if "tabular" not in k
     }
-    filled_tabular = datasets.impute_missing_modalities(
+    filled_tabular = imputation.impute_missing_modalities(
         inputs_values=test_inputs_missing_tabular,
         inputs_objects=input_objects,
         fill_values=impute_fill_values,
@@ -861,7 +865,7 @@ def test_impute_missing_modalities(
     test_inputs_missing_omics = {
         k: v for k, v in test_inputs_all_avail.items() if k != "test_genotype"
     }
-    with_imputed_omics = datasets.impute_missing_modalities(
+    with_imputed_omics = imputation.impute_missing_modalities(
         inputs_values=test_inputs_missing_omics,
         inputs_objects=input_objects,
         fill_values=impute_fill_values,
@@ -872,7 +876,7 @@ def test_impute_missing_modalities(
 
 
 def test_impute_single_missing_modality():
-    imputed_test_tensor = datasets.impute_single_missing_modality(
+    imputed_test_tensor = imputation.impute_single_missing_modality(
         shape=(10, 10), fill_value=0, dtype=torch.float
     )
     assert imputed_test_tensor.numel() == 100
@@ -899,11 +903,11 @@ def test_load_array_from_disk(subset_indices: Union[None, Sequence[int]]):
     test_arr[0, 50:] = 1
 
     with patch(
-        "eir.data_load.datasets.np.load",
+        "eir.data_load.data_preparation_modules.prepare_omics.np.load",
         return_value=test_arr,
         autospec=True,
     ):
-        loaded = datasets._omics_load_wrapper(
+        loaded = prepare_omics.omics_load_wrapper(
             input_source="fake",
             data_pointer=Path("fake"),
             subset_indices=subset_indices,
