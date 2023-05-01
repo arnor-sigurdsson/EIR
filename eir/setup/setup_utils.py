@@ -1,9 +1,9 @@
 from typing import Iterable, Sequence
 
-import torch
-from tqdm import tqdm
 import timm
+import torch
 from torch_optimizer import _NAME_OPTIM_MAP
+from tqdm import tqdm
 from transformers.models.auto.modeling_auto import MODEL_MAPPING_NAMES
 
 

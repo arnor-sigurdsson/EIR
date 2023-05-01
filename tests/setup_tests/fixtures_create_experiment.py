@@ -7,18 +7,18 @@ import pytest
 from torch import nn
 from torch.utils.data import DataLoader
 
-import eir.experiment_io
-import eir.setup
-
 from eir import train
 from eir.experiment_io.experiment_io import (
     serialize_all_input_transformers,
     serialize_chosen_input_objects,
+    get_default_experiment_keys_to_serialize,
+    serialize_experiment,
 )
-from eir.setup import schemas, config
+from eir.setup import schemas, config, input_setup
 from eir.setup.output_setup import set_up_outputs_for_training
 from eir.train import Experiment
 from eir.train_utils import optim, metrics
+from eir.train_utils import step_logic
 from eir.train_utils.utils import get_run_folder
 
 
@@ -91,7 +91,7 @@ def prep_modelling_test_configs(
 
     train._log_model(model=model)
 
-    inputs = eir.setup.input_setup.set_up_inputs_for_training(
+    inputs = input_setup.set_up_inputs_for_training(
         inputs_configs=c.input_configs,
         train_ids=tuple(target_labels.train_labels.keys()),
         valid_ids=tuple(target_labels.valid_labels.keys()),
@@ -101,7 +101,7 @@ def prep_modelling_test_configs(
     serialize_all_input_transformers(inputs_dict=inputs, run_folder=run_folder)
     serialize_chosen_input_objects(inputs_dict=inputs, run_folder=run_folder)
 
-    hooks = train.get_default_hooks(configs=c)
+    hooks = step_logic.get_default_hooks(configs=c)
     experiment = Experiment(
         configs=c,
         inputs=inputs,
@@ -118,17 +118,15 @@ def prep_modelling_test_configs(
         hooks=hooks,
     )
 
-    keys_to_serialize = (
-        eir.experiment_io.experiment_io.get_default_experiment_keys_to_serialize()
-    )
-    eir.experiment_io.experiment_io.serialize_experiment(
+    keys_to_serialize = get_default_experiment_keys_to_serialize()
+    serialize_experiment(
         experiment=experiment,
         run_folder=get_run_folder(gc.output_folder),
         keys_to_serialize=keys_to_serialize,
     )
 
     targets = config.get_all_tabular_targets(output_configs=c.output_configs)
-    test_config = _get_cur_modelling_test_config(
+    test_config = get_cur_modelling_test_config(
         train_loader=train_loader,
         global_config=gc,
         targets=targets,
@@ -154,7 +152,7 @@ def _patch_metrics(
     return metrics_
 
 
-def _get_cur_modelling_test_config(
+def get_cur_modelling_test_config(
     train_loader: DataLoader,
     global_config: schemas.GlobalConfig,
     targets: config.TabularTargets,

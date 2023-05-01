@@ -28,6 +28,11 @@ from eir.setup.input_setup_modules.setup_image import (
     get_image_transforms,
 )
 from eir.setup.output_setup import set_up_outputs_for_training
+from eir.target_setup.target_label_setup import (
+    gather_all_ids_from_output_configs,
+    set_up_tabular_target_labels_wrapper,
+    get_tabular_target_file_infos,
+)
 
 if TYPE_CHECKING:
     from ..setup_tests.fixtures_create_data import TestDataConfig
@@ -86,7 +91,7 @@ def test_set_up_datasets(
         test_configs=test_configs, test_cl_args=parse_test_cl_args
     )
 
-    all_array_ids = train.gather_all_ids_from_output_configs(
+    all_array_ids = gather_all_ids_from_output_configs(
         output_configs=test_configs.output_configs
     )
     # Check that corrupted arrays / labels were added successfully
@@ -96,11 +101,11 @@ def test_set_up_datasets(
         ids=all_array_ids, valid_size=test_configs.global_config.valid_size
     )
 
-    target_labels_info = train.get_tabular_target_file_infos(
+    target_labels_info = get_tabular_target_file_infos(
         output_configs=test_configs.output_configs
     )
 
-    target_labels = train.set_up_tabular_target_labels_wrapper(
+    target_labels = set_up_tabular_target_labels_wrapper(
         tabular_target_file_infos=target_labels_info,
         custom_label_ops=None,
         train_ids=train_ids,
@@ -245,18 +250,18 @@ def test_set_up_datasets_fails(
             n=dataset_fail_config.get("corrupt_labels_n", None),
         )
 
-    all_array_ids = train.gather_all_ids_from_output_configs(
+    all_array_ids = gather_all_ids_from_output_configs(
         output_configs=test_configs.output_configs
     )
     train_ids, valid_ids = train.split_ids(
         ids=all_array_ids, valid_size=test_configs.global_config.valid_size
     )
 
-    target_labels_info = train.get_tabular_target_file_infos(
+    target_labels_info = get_tabular_target_file_infos(
         output_configs=test_configs.output_configs
     )
 
-    target_labels = train.set_up_tabular_target_labels_wrapper(
+    target_labels = set_up_tabular_target_labels_wrapper(
         tabular_target_file_infos=target_labels_info,
         custom_label_ops=None,
         train_ids=train_ids,
@@ -382,18 +387,18 @@ def test_construct_dataset_init_params_from_cl_args(
 ):
     test_configs = create_test_config
 
-    all_array_ids = train.gather_all_ids_from_output_configs(
+    all_array_ids = gather_all_ids_from_output_configs(
         output_configs=test_configs.output_configs
     )
     train_ids, valid_ids = train.split_ids(
         ids=all_array_ids, valid_size=test_configs.global_config.valid_size
     )
 
-    target_labels_info = train.get_tabular_target_file_infos(
+    target_labels_info = get_tabular_target_file_infos(
         output_configs=test_configs.output_configs
     )
 
-    target_labels = train.set_up_tabular_target_labels_wrapper(
+    target_labels = set_up_tabular_target_labels_wrapper(
         tabular_target_file_infos=target_labels_info,
         custom_label_ops=None,
         train_ids=train_ids,
@@ -489,18 +494,18 @@ def test_datasets(
     train_no_samples = int(len(classes_tested) * c.n_per_class * (1 - gc.valid_size))
     valid_no_sample = int(len(classes_tested) * c.n_per_class * gc.valid_size)
 
-    all_array_ids = train.gather_all_ids_from_output_configs(
+    all_array_ids = gather_all_ids_from_output_configs(
         output_configs=test_configs.output_configs
     )
     train_ids, valid_ids = train.split_ids(
         ids=all_array_ids, valid_size=test_configs.global_config.valid_size
     )
 
-    target_labels_info = train.get_tabular_target_file_infos(
+    target_labels_info = get_tabular_target_file_infos(
         output_configs=test_configs.output_configs
     )
 
-    target_labels = train.set_up_tabular_target_labels_wrapper(
+    target_labels = set_up_tabular_target_labels_wrapper(
         tabular_target_file_infos=target_labels_info,
         custom_label_ops=None,
         train_ids=train_ids,
@@ -820,7 +825,7 @@ def test_impute_missing_modalities(
     test_experiment_config = create_test_config
     test_data_config = create_test_data
 
-    all_array_ids = train.gather_all_ids_from_output_configs(
+    all_array_ids = gather_all_ids_from_output_configs(
         output_configs=test_experiment_config.output_configs
     )
     train_ids, valid_ids = train.split_ids(

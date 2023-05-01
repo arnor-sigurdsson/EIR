@@ -12,7 +12,6 @@ from eir.setup.input_setup_modules.common import (
     get_data_dimension_from_data_source,
 )
 
-
 logger = get_logger(name=__name__)
 
 

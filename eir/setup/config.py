@@ -30,10 +30,10 @@ import configargparse
 import yaml
 from aislib.misc_utils import get_logger
 
+from eir.models.array.array_models import ArrayModelConfig
 from eir.models.fusion.fusion_identity import IdentityConfig
 from eir.models.fusion.fusion_mgmoe import MGMoEModelConfig
 from eir.models.image.image_models import ImageModelConfig
-from eir.models.array.array_models import ArrayModelConfig
 from eir.models.layers import ResidualMLPConfig
 from eir.models.omics.omics_models import (
     get_omics_config_dataclass_mapping,

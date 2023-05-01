@@ -2,10 +2,13 @@ import pandas as pd
 import pytest
 from sklearn.preprocessing import LabelEncoder
 
-import eir.predict_modules
-from eir import predict, train
+from eir.predict_modules import predict_target_setup, predict_input_setup, predict_data
 from eir.setup import config
 from eir.setup.output_setup import set_up_outputs_for_training
+from eir.target_setup.target_label_setup import (
+    gather_all_ids_from_output_configs,
+    get_tabular_target_file_infos,
+)
 from tests.setup_tests.fixtures_create_data import TestDataConfig
 from tests.test_data_load.test_datasets import check_dataset
 
@@ -66,11 +69,11 @@ def test_set_up_test_dataset(
     test_data_config = create_test_data
     test_configs = create_test_config
 
-    test_ids = predict.gather_all_ids_from_output_configs(
+    test_ids = gather_all_ids_from_output_configs(
         output_configs=test_configs.output_configs
     )
 
-    tabular_file_infos = train.get_tabular_target_file_infos(
+    tabular_file_infos = get_tabular_target_file_infos(
         output_configs=test_configs.output_configs
     )
     assert len(tabular_file_infos) == 1
@@ -82,12 +85,10 @@ def test_set_up_test_dataset(
         if not all_columns:
             raise ValueError(f"No columns specified in {tabular_file_infos}.")
 
-        df_cur_labels = (
-            eir.predict_modules.predict_target_setup._load_labels_for_predict(
-                tabular_info=tabular_info,
-                ids_to_keep=test_ids,
-                custom_label_ops=None,
-            )
+        df_cur_labels = predict_target_setup._load_labels_for_predict(
+            tabular_info=tabular_info,
+            ids_to_keep=test_ids,
+            custom_label_ops=None,
         )
         df_cur_labels["Output Name"] = output_name
 
@@ -103,16 +104,14 @@ def test_set_up_test_dataset(
 
     test_target_labels = None
     if with_target_labels:
-        test_target_labels = (
-            eir.predict_modules.predict_target_setup.parse_labels_for_predict(
-                con_columns=target_tabular_info.con_columns,
-                cat_columns=target_tabular_info.cat_columns,
-                df_labels_test=df_labels_test,
-                label_transformers=transformers,
-            )
+        test_target_labels = predict_target_setup.parse_labels_for_predict(
+            con_columns=target_tabular_info.con_columns,
+            cat_columns=target_tabular_info.cat_columns,
+            df_labels_test=df_labels_test,
+            label_transformers=transformers,
         )
 
-    test_inputs = eir.predict_modules.predict_input_setup.set_up_inputs_for_predict(
+    test_inputs = predict_input_setup.set_up_inputs_for_predict(
         test_inputs_configs=test_configs.input_configs,
         ids=test_ids,
         hooks=None,
@@ -124,7 +123,7 @@ def test_set_up_test_dataset(
         target_transformers=transformers,
     )
 
-    test_dataset = eir.predict_modules.predict_data.set_up_default_dataset(
+    test_dataset = predict_data.set_up_default_dataset(
         configs=test_configs,
         target_labels_dict=test_target_labels,
         inputs_as_dict=test_inputs,

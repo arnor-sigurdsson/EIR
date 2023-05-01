@@ -6,10 +6,10 @@ from pathlib import Path
 from typing import Type, Dict, Union, Sequence, Tuple, Any
 
 import torch
-from torch import nn
 from aislib.misc_utils import get_logger
+from torch import nn
 
-from eir.models import al_fusion_models
+from eir.models import al_meta_model
 
 logger = get_logger(name=__name__)
 
@@ -23,7 +23,7 @@ def load_model(
     state_dict_keys_to_keep: Union[None, Sequence[str]] = None,
     state_dict_key_rename: Union[None, Sequence[Tuple[str, str]]] = None,
     strict_shapes: bool = True,
-) -> Union[al_fusion_models, nn.Module]:
+) -> Union[al_meta_model, nn.Module]:
     model = model_class(**model_init_kwargs)
 
     model = _load_model_weights(

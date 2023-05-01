@@ -3,12 +3,12 @@ from pathlib import Path
 from typing import Sequence, Dict, Tuple
 
 import numpy as np
+from aislib.misc_utils import get_logger
 from timm.models.registry import _model_pretrained_cfgs
 from torchvision import transforms
 from torchvision.datasets.folder import default_loader
 from torchvision.transforms import Compose
 from torchvision.transforms.functional import to_tensor
-from aislib.misc_utils import get_logger
 
 from eir.data_load.data_source_modules.deeplake_ops import (
     is_deeplake_dataset,

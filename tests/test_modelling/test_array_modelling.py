@@ -1,8 +1,8 @@
-from typing import Dict, Sequence, TYPE_CHECKING
 from pathlib import Path
+from typing import Dict, Sequence, TYPE_CHECKING
 
-import pytest
 import numpy as np
+import pytest
 
 from eir import train
 from tests.conftest import should_skip_in_gha_macos

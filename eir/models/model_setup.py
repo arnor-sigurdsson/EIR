@@ -16,13 +16,13 @@ import torch
 from aislib.misc_utils import get_logger
 from torch import nn
 
-import eir.models.fusion.fusion
-import eir.models.meta.meta
 from eir.experiment_io.experiment_io import (
     get_run_folder_from_model_path,
     load_serialized_train_experiment,
 )
+from eir.models.fusion import fusion
 from eir.models.image.image_models import ImageWrapperModel
+from eir.models.meta import meta
 from eir.models.model_setup_modules.input_model_setup_array import (
     get_array_model,
     get_array_feature_extractor,
@@ -73,7 +73,7 @@ def get_default_meta_class(
     meta_model_type: str,
 ) -> Type[nn.Module]:
     if meta_model_type == "default":
-        return eir.models.meta.meta.MetaModel
+        return meta.MetaModel
     raise ValueError(f"Unrecognized meta model type: {meta_model_type}.")
 
 
@@ -176,7 +176,7 @@ def get_meta_model_kwargs_from_configs(
     out_feature_per_feature_extractor = _get_feature_extractors_output_dimensions(
         input_modules=input_modules
     )
-    fusion_module = eir.models.fusion.fusion.get_fusion_module(
+    fusion_module = fusion.get_fusion_module(
         model_type=fusion_config.model_type,
         model_config=fusion_config.model_config,
         modules_to_fuse=input_modules,

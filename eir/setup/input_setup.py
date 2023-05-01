@@ -38,7 +38,7 @@ from eir.setup.input_setup_modules.setup_tabular import (
 )
 
 if TYPE_CHECKING:
-    from eir.train import Hooks
+    from eir.train_utils.step_logic import Hooks
 
 logger = get_logger(__name__)
 

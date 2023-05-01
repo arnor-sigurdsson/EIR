@@ -2,9 +2,9 @@ import math
 from dataclasses import dataclass
 from typing import Union, Callable, Type, Dict, Literal, Tuple, Any
 
+from aislib.misc_utils import get_logger
 from torch import nn
 from transformers import PreTrainedModel, AutoModel, AutoConfig
-from aislib.misc_utils import get_logger
 
 from eir.models.models_base import get_output_dimensions_for_input
 from eir.models.sequence.transformer_models import (
@@ -165,7 +165,6 @@ def _get_pretrained_hf_sequence_feature_extractor_objects(
     num_chunks: int,
     pool: Union[Literal["max"], Literal["avg"], None],
 ) -> SequenceModelObjectsForWrapperModel:
-
     _warn_about_unsupported_hf_model(model_name=model_name)
 
     pretrained_model = _get_hf_pretrained_model(model_name=model_name)

@@ -11,7 +11,7 @@ from eir.models.tabular.tabular import get_unique_values_from_transformers
 from eir.setup import schemas
 
 if TYPE_CHECKING:
-    from eir.train import Hooks
+    from eir.train_utils.step_logic import Hooks
 
 
 @dataclass

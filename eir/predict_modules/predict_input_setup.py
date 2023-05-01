@@ -2,9 +2,6 @@ from dataclasses import dataclass
 from functools import partial
 from typing import Sequence, Union, Callable, Dict
 
-import eir.setup.input_setup_modules.setup_array
-import eir.setup.input_setup_modules.setup_omics
-import eir.setup.input_setup_modules.setup_tabular
 from eir.data_load import label_setup
 from eir.data_load.label_setup import (
     al_label_dict,
@@ -21,10 +18,11 @@ from eir.setup import schemas, input_setup
 from eir.setup.input_setup import (
     al_input_objects_as_dict,
 )
-from eir.setup.input_setup_modules.setup_sequence import SequenceInputInfo
-from eir.setup.input_setup_modules.setup_image import ImageInputInfo
+from eir.setup.input_setup_modules import setup_array, setup_omics, setup_tabular
 from eir.setup.input_setup_modules.setup_bytes import BytesInputInfo
-from eir.train import Hooks
+from eir.setup.input_setup_modules.setup_image import ImageInputInfo
+from eir.setup.input_setup_modules.setup_sequence import SequenceInputInfo
+from eir.train_utils.step_logic import Hooks
 
 
 @dataclass
@@ -49,11 +47,9 @@ def setup_tabular_input_for_testing(
     hooks: Union["Hooks", None],
     output_folder: str,
 ) -> PredictTabularInputInfo:
-    tabular_file_info = (
-        eir.setup.input_setup_modules.setup_tabular.get_tabular_input_file_info(
-            input_source=input_config.input_info.input_source,
-            tabular_data_type_config=input_config.input_type_info,
-        )
+    tabular_file_info = setup_tabular.get_tabular_input_file_info(
+        input_source=input_config.input_info.input_source,
+        tabular_data_type_config=input_config.input_type_info,
     )
 
     custom_ops = hooks.custom_column_label_parsing_ops if hooks else None
@@ -163,14 +159,14 @@ def get_input_setup_function_map_for_predict() -> (
     Dict[str, Callable[..., input_setup.al_input_objects]]
 ):
     setup_mapping = {
-        "omics": eir.setup.input_setup_modules.setup_omics.set_up_omics_input,
+        "omics": setup_omics.set_up_omics_input,
         "tabular": setup_tabular_input_for_testing,
         "sequence": partial(
             load_serialized_input_object, input_class=SequenceInputInfo
         ),
         "bytes": partial(load_serialized_input_object, input_class=BytesInputInfo),
         "image": partial(load_serialized_input_object, input_class=ImageInputInfo),
-        "array": eir.setup.input_setup_modules.setup_array.set_up_array_input,
+        "array": setup_array.set_up_array_input,
     }
 
     return setup_mapping

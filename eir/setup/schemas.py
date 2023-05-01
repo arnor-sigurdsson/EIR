@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Union, Literal, List, Optional, Sequence, Type
 
+from eir.models.array.array_models import ArrayModelConfig
 from eir.models.fusion.fusion_identity import IdentityConfig
 from eir.models.fusion.fusion_mgmoe import MGMoEModelConfig
 from eir.models.image.image_models import ImageModelConfig
@@ -23,7 +24,6 @@ from eir.models.tabular.tabular import (
     SimpleTabularModel,
     TabularModelConfig,
 )
-from eir.models.array.array_models import ArrayModelConfig
 from eir.setup.setup_utils import get_all_optimizer_names
 
 al_input_configs = Sequence["InputConfig"]

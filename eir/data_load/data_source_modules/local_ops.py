@@ -17,11 +17,11 @@ from typing import (
 import numpy as np
 import pandas as pd
 from aislib.misc_utils import get_logger
+from tqdm import tqdm
 
 from eir.data_load.data_source_modules.common_utils import add_id_to_samples
 from eir.data_load.label_setup import get_file_path_iterator
 from eir.setup.input_setup_modules.setup_sequence import get_sequence_split_function
-from tqdm import tqdm
 
 if TYPE_CHECKING:
     from eir.data_load.datasets import Sample

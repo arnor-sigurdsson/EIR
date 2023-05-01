@@ -1,7 +1,7 @@
+import warnings
 from functools import lru_cache
 from pathlib import Path
 from typing import DefaultDict, Union, Callable, Generator, Set, TYPE_CHECKING
-import warnings
 
 warnings.filterwarnings("ignore", message=".*newer version of deeplake.*")
 

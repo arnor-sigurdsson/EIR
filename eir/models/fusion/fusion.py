@@ -1,8 +1,8 @@
-from typing import Type, Union, Dict
 from functools import partial
+from typing import Type, Union, Dict
 
-from torch import nn
 import torch
+from torch import nn
 
 from eir.models.fusion import fusion_mgmoe, fusion_default, fusion_identity
 from eir.models.layers import ResidualMLPConfig

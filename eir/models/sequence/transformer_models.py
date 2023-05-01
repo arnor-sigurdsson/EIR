@@ -20,9 +20,8 @@ from torch.nn import TransformerEncoder, TransformerEncoderLayer
 from torch.nn.functional import pad
 from transformers import PreTrainedModel, PretrainedConfig
 
-from eir.setup.setup_utils import get_all_hf_model_names
 from eir.models.layers import _find_split_padding_needed
-
+from eir.setup.setup_utils import get_all_hf_model_names
 
 al_sequence_models = tuple(
     Literal[i]

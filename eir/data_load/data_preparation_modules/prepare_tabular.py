@@ -1,8 +1,9 @@
 from typing import DefaultDict, Union, Sequence, TYPE_CHECKING
 
+from tqdm import tqdm
+
 from eir.data_load.data_source_modules.common_utils import add_id_to_samples
 from eir.data_load.label_setup import al_label_dict
-from tqdm import tqdm
 
 if TYPE_CHECKING:
     from eir.data_load.datasets import Sample

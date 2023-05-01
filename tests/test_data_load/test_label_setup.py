@@ -10,6 +10,11 @@ from eir import train
 from eir.data_load import label_setup
 from eir.data_load.data_source_modules.csv_ops import ColumnOperation
 from eir.data_load.label_setup import merge_target_columns
+from eir.target_setup.target_label_setup import (
+    gather_all_ids_from_output_configs,
+    get_tabular_target_file_infos,
+    set_up_tabular_target_labels_wrapper,
+)
 from eir.setup.config import Configs
 
 
@@ -151,15 +156,15 @@ def test_set_up_train_and_valid_tabular_data(
     dc = create_test_data
     n_classes = len(dc.target_classes)
 
-    all_array_ids = train.gather_all_ids_from_output_configs(
+    all_array_ids = gather_all_ids_from_output_configs(
         output_configs=test_configs.output_configs
     )
     train_ids, valid_ids = train.split_ids(ids=all_array_ids, valid_size=gc.valid_size)
 
-    target_file_infos = train.get_tabular_target_file_infos(
+    target_file_infos = get_tabular_target_file_infos(
         output_configs=test_configs.output_configs
     )
-    target_labels = train.set_up_tabular_target_labels_wrapper(
+    target_labels = set_up_tabular_target_labels_wrapper(
         tabular_target_file_infos=target_file_infos,
         custom_label_ops=None,
         train_ids=train_ids,
@@ -372,7 +377,7 @@ def test_label_df_parse_wrapper(
 
     test_target_column = main_target_info.target_cat_columns[0]  # ["Origin"]
 
-    target_file_infos = train.get_tabular_target_file_infos(
+    target_file_infos = get_tabular_target_file_infos(
         output_configs=test_configs.output_configs
     )
     assert len(target_file_infos) == 1
@@ -991,7 +996,7 @@ def test_check_parsed_label_df_fail(
 def test_split_df_by_ids(create_test_data, create_test_config):
     test_configs = create_test_config
 
-    target_file_infos = train.get_tabular_target_file_infos(
+    target_file_infos = get_tabular_target_file_infos(
         output_configs=test_configs.output_configs
     )
     assert len(target_file_infos) == 1
@@ -1046,7 +1051,7 @@ def test_split_df_by_ids(create_test_data, create_test_config):
 def test_split_ids(create_test_data, create_test_config):
     test_configs = create_test_config
 
-    target_file_infos = train.get_tabular_target_file_infos(
+    target_file_infos = get_tabular_target_file_infos(
         output_configs=test_configs.output_configs
     )
     assert len(target_file_infos) == 1

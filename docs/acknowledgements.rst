@@ -62,3 +62,45 @@ and so on:
 
 - ``captum``  – PyTorch Team: Model interpretability for PyTorch
 
+- ``memory-profiler``  – Fabian Pedregosa: A module for monitoring memory usage of a python program
+
+- ``pytest``  – Holger Krekel, Bruno Oliveira, Ronny Pfannschmidt, Floris Bruynooghe, Brianna Laugher, Florian Bruhin and others: pytest: simple powerful testing with Python
+
+- ``tox`` : tox is a generic virtualenv management and test command line tool
+
+- ``flake8``  – Tarek Ziade: the modular source code checker: pep8 pyflakes and co
+
+- ``jupyter``  – Jupyter Development Team: Jupyter metapackage. Install all the Jupyter components in one go.
+
+- ``ipykernel`` : IPython Kernel for Jupyter
+
+- ``coverage``  – Ned Batchelder and 211 others: Code coverage measurement for Python
+
+- ``snakeviz`` : A web-based viewer for Python profiler output
+
+- ``pytest-cov``  – Marc Schlaich: Pytest plugin for measuring coverage.
+
+- ``pynvim``  – Thiago de Arruda: Python client to neovim
+
+- ``pre-commit``  – Anthony Sottile: A framework for managing and maintaining multi-language pre-commit hooks.
+
+- ``gpustat``  – Jongwook Choi: An utility to monitor NVIDIA GPU status and usage
+
+- ``black`` : The uncompromising code formatter.
+
+- ``Sphinx`` : Python documentation generator
+
+- ``sphinx-rtd-theme``  – Dave Snider, Read the Docs, Inc. & contributors: Read the Docs theme for Sphinx
+
+- ``sphinx-copybutton``  – Executable Book Project: Add a copy button to each of your code cells.
+
+- ``tomlkit``  – Sébastien Eustace: Style preserving TOML library
+
+- ``gdown``  – Kentaro Wada: Google Drive direct download of big files.
+
+- ``hypothesis``  – David R. MacIver and Zac Hatfield-Dodds: A library for property-based testing
+
+- ``pdf2image``  – Edouard Belval: A wrapper around the pdftoppm and pdftocairo command line tools to convert PDF to a PIL Image list.
+
+- ``vulture``  – Jendrik Seipp: Find dead code
+

@@ -24,8 +24,6 @@ from aislib.misc_utils import get_logger
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
-from eir.setup import config
-from eir.data_load.label_setup import al_label_dict
 from eir.data_load.data_preparation_modules.imputation import (
     impute_missing_modalities_wrapper,
 )
@@ -43,13 +41,15 @@ from eir.data_load.data_source_modules.local_ops import (
     get_file_sample_id_iterator_basic,
     add_sequence_data_from_csv_to_samples,
 )
+from eir.data_load.label_setup import al_label_dict
+from eir.setup import config
 
 if TYPE_CHECKING:
     from eir.setup.input_setup import (
         al_input_objects_as_dict,
     )
     from eir.setup.output_setup import al_output_objects_as_dict
-    from eir.train import MergedTargetLabels
+    from eir.target_setup.target_label_setup import MergedTargetLabels
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 

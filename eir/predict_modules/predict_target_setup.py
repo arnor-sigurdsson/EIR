@@ -14,7 +14,10 @@ from eir.data_load.label_setup import (
 from eir.experiment_io.experiment_io import load_transformers
 from eir.predict_modules.predict_input_setup import prep_missing_con_dict
 from eir.setup.config import Configs
-from eir.train import df_to_nested_dict, get_tabular_target_file_infos
+from eir.target_setup.target_label_setup import (
+    df_to_nested_dict,
+    get_tabular_target_file_infos,
+)
 
 
 @dataclass

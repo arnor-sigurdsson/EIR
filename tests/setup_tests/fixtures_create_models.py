@@ -1,10 +1,9 @@
 import pytest
-from torch import nn
 import torch
+from torch import nn
 
-import eir.setup
 from eir.models.model_setup import get_default_model_registry_per_input_type, get_model
-from eir.setup import config
+from eir.setup import config, input_setup
 from eir.setup.output_setup import set_up_outputs_for_training
 from eir.train_utils.optim import maybe_wrap_model_with_swa
 
@@ -16,7 +15,7 @@ def create_test_model(
     gc = create_test_config.global_config
     target_labels = create_test_labels
 
-    inputs_as_dict = eir.setup.input_setup.set_up_inputs_for_training(
+    inputs_as_dict = input_setup.set_up_inputs_for_training(
         inputs_configs=create_test_config.input_configs,
         train_ids=tuple(create_test_labels.train_labels.keys()),
         valid_ids=tuple(create_test_labels.valid_labels.keys()),

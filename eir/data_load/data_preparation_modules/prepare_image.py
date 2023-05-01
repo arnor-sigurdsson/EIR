@@ -4,10 +4,11 @@ from typing import Union, Optional
 import numpy as np
 import torch
 from PIL.Image import Image, fromarray
+from torchvision.datasets.folder import default_loader
+
 from eir.data_load.data_preparation_modules.common import _load_deeplake_sample
 from eir.data_load.data_source_modules import deeplake_ops
 from eir.setup.input_setup_modules.setup_image import ImageInputInfo
-from torchvision.datasets.folder import default_loader
 
 
 def prepare_image_data(

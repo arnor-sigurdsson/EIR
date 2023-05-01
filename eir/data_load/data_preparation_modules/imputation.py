@@ -1,6 +1,7 @@
 from typing import Dict, Any, Tuple
 
 import torch
+
 from eir.setup.input_setup import al_input_objects_as_dict
 from eir.setup.input_setup_modules.setup_tabular import TabularInputInfo
 

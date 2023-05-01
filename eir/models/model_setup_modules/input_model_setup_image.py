@@ -2,8 +2,8 @@ from copy import copy
 from typing import Callable, Type, Dict, Union
 
 import timm
-from torch import nn
 from aislib.misc_utils import get_logger
+from torch import nn
 
 from eir.models.image.image_models import ImageModelConfig, ImageWrapperModel
 

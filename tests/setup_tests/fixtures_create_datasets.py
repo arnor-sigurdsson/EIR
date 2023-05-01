@@ -4,9 +4,8 @@ import pytest
 import torch.utils
 from torch.utils.data import DataLoader
 
-import eir.setup
 from eir.data_load import datasets
-from eir.setup import config
+from eir.setup import config, input_setup
 from eir.setup.output_setup import set_up_outputs_for_training
 
 
@@ -19,7 +18,7 @@ def create_test_datasets(
     configs = create_test_config
     target_labels = create_test_labels
 
-    inputs = eir.setup.input_setup.set_up_inputs_for_training(
+    inputs = input_setup.set_up_inputs_for_training(
         inputs_configs=configs.input_configs,
         train_ids=tuple(target_labels.train_labels.keys()),
         valid_ids=tuple(target_labels.valid_labels.keys()),

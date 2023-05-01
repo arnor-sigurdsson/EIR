@@ -1,5 +1,4 @@
 import sys
-from contextlib import nullcontext
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
@@ -10,40 +9,23 @@ from typing import (
     Dict,
     TYPE_CHECKING,
     Callable,
-    Iterable,
     Optional,
-    Any,
-    Sequence,
 )
 
-import pandas as pd
 import torch
 from aislib.misc_utils import ensure_path_exists
 from aislib.misc_utils import get_logger
 from ignite.engine import Engine
-from torch import nn, autocast
-from torch.cuda.amp import GradScaler
-from torch.nn.utils import clip_grad_norm_
+from torch import nn
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader, WeightedRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
 from eir.data_load import data_utils
 from eir.data_load import datasets
-from eir.data_load.data_augmentation import (
-    hook_mix_loss,
-    get_mix_data_hook,
-)
-from eir.data_load.data_utils import Batch, get_train_sampler
+from eir.data_load.data_utils import get_train_sampler
 from eir.data_load.label_setup import (
-    al_all_column_ops,
-    al_label_dict,
-    al_label_transformers,
-    set_up_train_and_valid_tabular_data,
-    gather_ids_from_tabular_file,
-    gather_ids_from_data_source,
     split_ids,
-    TabularFileInfo,
     save_transformer_set,
 )
 from eir.experiment_io.experiment_io import (
@@ -52,43 +34,41 @@ from eir.experiment_io.experiment_io import (
     serialize_all_input_transformers,
     serialize_chosen_input_objects,
 )
-from eir.models import al_fusion_models
-from eir.models import model_training_utils
+from eir.models import al_meta_model
 from eir.models.model_setup import get_model, get_default_model_registry_per_input_type
 from eir.models.model_training_utils import run_lr_find
-from eir.models.tabular.tabular import (
-    get_tabular_inputs,
-)
 from eir.setup import schemas
 from eir.setup.config import (
     get_configs,
     Configs,
-    get_all_tabular_targets,
 )
 from eir.setup.input_setup import al_input_objects_as_dict, set_up_inputs_for_training
 from eir.setup.output_setup import (
     al_output_objects_as_dict,
     set_up_outputs_for_training,
 )
+from eir.target_setup.target_label_setup import (
+    set_up_tabular_target_labels_wrapper,
+    gather_all_ids_from_output_configs,
+    read_manual_ids_if_exist,
+    get_tabular_target_file_infos,
+)
 from eir.train_utils import distributed
 from eir.train_utils import utils
 from eir.train_utils.metrics import (
-    calculate_batch_metrics,
     calculate_prediction_losses,
-    aggregate_losses,
-    add_multi_task_average_metrics,
     get_average_history_filepath,
     get_default_metrics,
-    hook_add_l1_loss,
-    get_uncertainty_loss_hook,
-    add_loss_to_metrics,
 )
 from eir.train_utils.optim import (
     get_optimizer,
-    get_optimizer_backward_kwargs,
     maybe_wrap_model_with_swa,
 )
-from eir.train_utils.train_handlers import HandlerConfig
+from eir.train_utils.step_logic import (
+    al_training_labels_target,
+    get_default_hooks,
+    Hooks,
+)
 from eir.train_utils.train_handlers import configure_trainer
 from eir.train_utils.utils import (
     call_hooks_stage_iterable,
@@ -100,19 +80,7 @@ if TYPE_CHECKING:
         al_metric_record_dict,
     )
 
-# aliases
 al_criteria = Dict[str, Dict[str, Union[nn.CrossEntropyLoss, nn.MSELoss]]]
-# these are all after being collated by torch dataloaders
-# output name -> target column: value
-al_training_labels_target = Dict[str, Dict[str, torch.Tensor]]
-al_input_batch = Dict[str, Union[torch.Tensor, Dict[str, torch.Tensor]]]
-al_ids = List[str]
-
-al_dataloader_getitem_batch = Tuple[
-    al_input_batch,
-    al_training_labels_target,
-    al_ids,
-]
 
 utils.seed_everything()
 logger = get_logger(name=__name__, tqdm_compatible=True)
@@ -136,22 +104,6 @@ def main():
     run_experiment(experiment=default_experiment)
 
 
-def run_experiment(experiment: "Experiment") -> None:
-    _log_model(model=experiment.model)
-
-    gc = experiment.configs.global_config
-
-    run_folder = utils.get_run_folder(output_folder=gc.output_folder)
-    keys_to_serialize = get_default_experiment_keys_to_serialize()
-    serialize_experiment(
-        experiment=experiment,
-        run_folder=run_folder,
-        keys_to_serialize=keys_to_serialize,
-    )
-
-    train(experiment=experiment)
-
-
 @dataclass(frozen=True)
 class Experiment:
     configs: Configs
@@ -160,106 +112,25 @@ class Experiment:
     train_loader: torch.utils.data.DataLoader
     valid_loader: torch.utils.data.DataLoader
     valid_dataset: torch.utils.data.Dataset
-    model: al_fusion_models
+    model: al_meta_model
     optimizer: Optimizer
     criteria: al_criteria
     loss_function: Callable
     writer: SummaryWriter
     metrics: "al_metric_record_dict"
-    hooks: Union["Hooks", None]
-
-
-@dataclass
-class MergedTargetLabels:
-    train_labels: al_label_dict
-    valid_labels: al_label_dict
-    label_transformers: Dict[str, al_label_transformers]
-
-    @property
-    def all_labels(self):
-        return {**self.train_labels, **self.valid_labels}
-
-
-def set_up_tabular_target_labels_wrapper(
-    tabular_target_file_infos: Dict[str, TabularFileInfo],
-    custom_label_ops: al_all_column_ops,
-    train_ids: Sequence[str],
-    valid_ids: Sequence[str],
-) -> MergedTargetLabels:
-    df_labels_train = pd.DataFrame(index=train_ids)
-    df_labels_valid = pd.DataFrame(index=valid_ids)
-    label_transformers = {}
-
-    for output_name, tabular_info in tabular_target_file_infos.items():
-        cur_labels = set_up_train_and_valid_tabular_data(
-            tabular_file_info=tabular_info,
-            custom_label_ops=custom_label_ops,
-            train_ids=train_ids,
-            valid_ids=valid_ids,
-        )
-
-        df_train_cur = pd.DataFrame.from_dict(cur_labels.train_labels, orient="index")
-        df_valid_cur = pd.DataFrame.from_dict(cur_labels.valid_labels, orient="index")
-
-        df_train_cur["Output Name"] = output_name
-        df_valid_cur["Output Name"] = output_name
-
-        df_labels_train = pd.concat((df_labels_train, df_train_cur))
-        df_labels_valid = pd.concat((df_labels_valid, df_valid_cur))
-
-        cur_transformers = cur_labels.label_transformers
-        label_transformers[output_name] = cur_transformers
-
-    df_labels_train = df_labels_train.set_index("Output Name", append=True)
-    df_labels_valid = df_labels_valid.set_index("Output Name", append=True)
-
-    df_labels_train = df_labels_train.dropna(how="all")
-    df_labels_valid = df_labels_valid.dropna(how="all")
-
-    train_labels_dict = df_to_nested_dict(df=df_labels_train)
-    valid_labels_dict = df_to_nested_dict(df=df_labels_valid)
-
-    labels_data_object = MergedTargetLabels(
-        train_labels=train_labels_dict,
-        valid_labels=valid_labels_dict,
-        label_transformers=label_transformers,
-    )
-
-    return labels_data_object
-
-
-def df_to_nested_dict(df: pd.DataFrame) -> Dict:
-    """
-    The df has a 2-level multi index, like so ['ID', output_name]
-
-    We want to convert it to a nested dict like so:
-
-        {'ID': {output_name: {target_output_column: target_column_value}}}
-    """
-    index_dict = df.to_dict(orient="index")
-
-    parsed_dict = {}
-    for key_tuple, value in index_dict.items():
-        cur_id, cur_output_name = key_tuple
-
-        if cur_id not in parsed_dict:
-            parsed_dict[cur_id] = {}
-
-        parsed_dict[cur_id][cur_output_name] = value
-
-    return parsed_dict
+    hooks: Union[Hooks, None]
 
 
 def get_default_experiment(
     configs: Configs,
-    hooks: Union["Hooks", None] = None,
+    hooks: Union[Hooks, None] = None,
 ) -> "Experiment":
     run_folder = _prepare_run_folder(output_folder=configs.global_config.output_folder)
 
     all_array_ids = gather_all_ids_from_output_configs(
         output_configs=configs.output_configs
     )
-    manual_valid_ids = _read_manual_ids_if_exist(
+    manual_valid_ids = read_manual_ids_if_exist(
         manual_valid_ids_file=configs.global_config.manual_valid_ids_file
     )
 
@@ -376,56 +247,6 @@ def get_default_experiment(
     return experiment
 
 
-def gather_all_ids_from_output_configs(
-    output_configs: Sequence[schemas.OutputConfig],
-) -> Tuple[str, ...]:
-    all_ids = set()
-    for config in output_configs:
-        cur_source = Path(config.output_info.output_source)
-        if cur_source.suffix == ".csv":
-            cur_ids = gather_ids_from_tabular_file(file_path=cur_source)
-        elif cur_source.is_dir():
-            cur_ids = gather_ids_from_data_source(data_source=cur_source)
-        else:
-            raise NotImplementedError()
-        all_ids.update(cur_ids)
-
-    return tuple(all_ids)
-
-
-def _read_manual_ids_if_exist(
-    manual_valid_ids_file: Union[None, str]
-) -> Union[Sequence[str], None]:
-    if not manual_valid_ids_file:
-        return None
-
-    with open(manual_valid_ids_file, "r") as infile:
-        manual_ids = tuple(line.strip() for line in infile)
-
-    return manual_ids
-
-
-def get_tabular_target_file_infos(
-    output_configs: Iterable[schemas.OutputConfig],
-) -> Dict[str, TabularFileInfo]:
-    tabular_infos = {}
-
-    for output_config in output_configs:
-        if output_config.output_info.output_type != "tabular":
-            raise NotImplementedError()
-
-        output_name = output_config.output_info.output_name
-        tabular_info = TabularFileInfo(
-            file_path=Path(output_config.output_info.output_source),
-            con_columns=output_config.output_type_info.target_con_columns,
-            cat_columns=output_config.output_type_info.target_cat_columns,
-            parsing_chunk_size=output_config.output_type_info.label_parsing_chunk_size,
-        )
-        tabular_infos[output_name] = tabular_info
-
-    return tabular_infos
-
-
 def _prepare_run_folder(output_folder: str) -> Path:
     run_folder = utils.get_run_folder(output_folder=output_folder)
     history_file = get_average_history_filepath(
@@ -537,7 +358,7 @@ def _get_label_smoothing(
     raise ValueError(f"Unknown column type: {column_type}")
 
 
-def _calc_mse(input, target, mse_loss_func: nn.MSELoss):
+def _calc_mse(input: torch.Tensor, target: torch.Tensor, mse_loss_func: nn.MSELoss):
     return mse_loss_func(input=input.squeeze(), target=target.squeeze())
 
 
@@ -553,19 +374,72 @@ def get_summary_writer(run_folder: Path) -> SummaryWriter:
     return writer
 
 
-def _log_model(model: nn.Module) -> None:
-    """
-    TODO: Add summary of parameters
-    TODO: Add verbosity option
-    """
+def _log_model(
+    model: nn.Module, verbose: bool = False, output_file: Optional[str] = None
+) -> None:
     no_params = sum(p.numel() for p in model.parameters())
     no_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
-    logger.info(
-        "Starting training with a %s parameter model. Trainable parameters: %s.",
-        format(no_params, ",.0f"),
-        format(no_trainable_params, ",.0f"),
+    model_summary = "Starting training with following model specifications:\n"
+    model_summary += f"Total parameters: {format(no_params, ',.0f')}\n"
+    model_summary += f"Trainable parameters: {format(no_trainable_params, ',.0f')}\n"
+
+    logger.info(model_summary)
+
+    if verbose:
+        layer_summary = "\nModel layers:\n"
+        for name, param in model.named_parameters():
+            layer_summary += (
+                f"Layer: {name},"
+                f"Shape: {list(param.size())},"
+                f"Parameters: {param.numel()},"
+                f"Trainable: {param.requires_grad}\n"
+            )
+        logger.info(layer_summary)
+
+    if output_file:
+        with open(output_file, "w") as f:
+            f.write(model_summary)
+            if verbose:
+                f.write(layer_summary)
+
+
+def run_experiment(experiment: Experiment) -> None:
+    _log_model(model=experiment.model)
+
+    gc = experiment.configs.global_config
+
+    run_folder = utils.get_run_folder(output_folder=gc.output_folder)
+    keys_to_serialize = get_default_experiment_keys_to_serialize()
+    serialize_experiment(
+        experiment=experiment,
+        run_folder=run_folder,
+        keys_to_serialize=keys_to_serialize,
     )
+
+    train(experiment=experiment)
+
+
+def train(experiment: Experiment) -> None:
+    exp = experiment
+    gc = experiment.configs.global_config
+
+    trainer = get_base_trainer(experiment=experiment)
+
+    if gc.find_lr:
+        logger.info("Running LR find and exiting.")
+        run_lr_find(
+            trainer_engine=trainer,
+            train_dataloader=exp.train_loader,
+            model=exp.model,
+            optimizer=exp.optimizer,
+            output_folder=utils.get_run_folder(output_folder=gc.output_folder),
+        )
+        sys.exit(0)
+
+    trainer = configure_trainer(trainer=trainer, experiment=experiment)
+
+    trainer.run(data=exp.train_loader, max_epochs=gc.n_epochs)
 
 
 def get_base_trainer(experiment: Experiment) -> Engine:
@@ -630,506 +504,6 @@ def get_base_trainer(experiment: Experiment) -> Engine:
     trainer = Engine(process_function=step)
 
     return trainer
-
-
-def train(experiment: Experiment) -> None:
-    exp = experiment
-    gc = experiment.configs.global_config
-
-    trainer = get_base_trainer(experiment=experiment)
-
-    if gc.find_lr:
-        logger.info("Running LR find and exiting.")
-        run_lr_find(
-            trainer_engine=trainer,
-            train_dataloader=exp.train_loader,
-            model=exp.model,
-            optimizer=exp.optimizer,
-            output_folder=utils.get_run_folder(output_folder=gc.output_folder),
-        )
-        sys.exit(0)
-
-    trainer = configure_trainer(trainer=trainer, experiment=experiment)
-
-    trainer.run(data=exp.train_loader, max_epochs=gc.n_epochs)
-
-
-def get_default_hooks(configs: Configs):
-    step_func_hooks = _get_default_step_function_hooks(configs=configs)
-    hooks_object = Hooks(step_func_hooks=step_func_hooks)
-
-    return hooks_object
-
-
-@dataclass
-class Hooks:
-    al_handler_attachers = Iterable[Callable[[Engine, HandlerConfig], Engine]]
-
-    step_func_hooks: "StepFunctionHookStages"
-    custom_column_label_parsing_ops: al_all_column_ops = None
-    custom_handler_attachers: Union[None, al_handler_attachers] = None
-
-
-def _get_default_step_function_hooks(configs: Configs):
-    """
-    TODO: Add validation, inspect that outputs have correct names.
-    TODO: Refactor, split into smaller functions e.g. for L1, mixing and uncertainty.
-    """
-
-    init_kwargs = _get_default_step_function_hooks_init_kwargs(configs=configs)
-
-    step_func_hooks = StepFunctionHookStages(**init_kwargs)
-
-    return step_func_hooks
-
-
-def _get_default_step_function_hooks_init_kwargs(
-    configs: Configs,
-) -> Dict[str, Sequence[Callable]]:
-    init_kwargs = {
-        "base_prepare_batch": [hook_default_prepare_batch],
-        "post_prepare_batch": [],
-        "model_forward": [hook_default_model_forward],
-        "loss": [hook_default_per_target_loss],
-        "optimizer_backward": [hook_default_optimizer_backward],
-        "metrics": [hook_default_compute_metrics],
-    }
-
-    if configs.global_config.mixing_alpha:
-        logger.debug(
-            "Setting up hooks for mixing with with α=%.2g.",
-            configs.global_config.mixing_alpha,
-        )
-        mix_hook = get_mix_data_hook(input_configs=configs.input_configs)
-
-        init_kwargs["post_prepare_batch"].append(mix_hook)
-        init_kwargs["loss"][0] = hook_mix_loss
-
-    if _should_add_uncertainty_loss_hook(output_configs=configs.output_configs):
-        uncertainty_hook = get_uncertainty_loss_hook(
-            output_configs=configs.output_configs,
-            device=configs.global_config.device,
-        )
-        init_kwargs["loss"].append(uncertainty_hook)
-
-    init_kwargs["loss"].append(hook_default_aggregate_losses)
-
-    init_kwargs = add_l1_loss_hook_if_applicable(
-        step_function_hooks_init_kwargs=init_kwargs, configs=configs
-    )
-
-    grad_acc_steps = configs.global_config.gradient_accumulation_steps
-    if grad_acc_steps and grad_acc_steps > 1:
-        logger.debug(
-            "Adding gradient accumulation hook with steps=%d.",
-            configs.global_config.gradient_accumulation_steps,
-        )
-    init_kwargs["loss"].append(get_hook_iteration_counter())
-
-    do_amp = configs.global_config.amp
-    if do_amp:
-        logger.debug("Setting up AMP training.")
-        model_forward_with_amp_objects = [
-            get_hook_amp_objects(device=configs.global_config.device)
-        ] + init_kwargs["model_forward"]
-        init_kwargs["model_forward"] = model_forward_with_amp_objects
-
-    return init_kwargs
-
-
-def _should_add_uncertainty_loss_hook(
-    output_configs: Sequence[schemas.OutputConfig],
-) -> bool:
-    all_targets = get_all_tabular_targets(output_configs=output_configs)
-
-    more_than_one_target = len(all_targets) > 1
-
-    any_uncertainty_targets = any(
-        hasattr(c.output_type_info, "uncertainty_weighted_mt_loss")
-        and c.output_type_info.uncertainty_weighted_mt_loss
-        for c in output_configs
-    )
-    return more_than_one_target and any_uncertainty_targets
-
-
-def add_l1_loss_hook_if_applicable(
-    step_function_hooks_init_kwargs: Dict[str, Sequence[Callable]],
-    configs: Configs,
-) -> Dict[str, List[Callable]]:
-    input_l1 = any(
-        getattr(input_config.model_config.model_init_config, "l1", None)
-        for input_config in configs.input_configs
-    )
-    preds_l1 = getattr(configs.fusion_config.model_config, "l1", None)
-    if input_l1 or preds_l1:
-        logger.debug("Adding L1 loss hook.")
-        step_function_hooks_init_kwargs["loss"].append(hook_add_l1_loss)
-
-    return step_function_hooks_init_kwargs
-
-
-@dataclass
-class StepFunctionHookStages:
-    al_hook = Callable[..., Dict]
-    al_hooks = [Iterable[al_hook]]
-
-    base_prepare_batch: al_hooks
-    post_prepare_batch: al_hooks
-    model_forward: al_hooks
-    loss: al_hooks
-    optimizer_backward: al_hooks
-    metrics: al_hooks
-
-
-def hook_default_prepare_batch(
-    experiment: "Experiment",
-    loader_batch: al_dataloader_getitem_batch,
-    *args,
-    **kwargs,
-) -> Dict:
-    batch = prepare_base_batch_default(
-        loader_batch=loader_batch,
-        input_objects=experiment.inputs,
-        output_objects=experiment.outputs,
-        model=experiment.model,
-        device=experiment.configs.global_config.device,
-    )
-
-    state_updates = {"batch": batch}
-
-    return state_updates
-
-
-def prepare_base_batch_default(
-    loader_batch: al_dataloader_getitem_batch,
-    input_objects: al_input_objects_as_dict,
-    output_objects: al_output_objects_as_dict,
-    model: nn.Module,
-    device: str,
-) -> Batch:
-    inputs, target_labels, ids = loader_batch
-
-    inputs_prepared = _prepare_inputs_for_model(
-        batch_inputs=inputs, input_objects=input_objects, model=model, device=device
-    )
-
-    if target_labels:
-        target_labels = model_training_utils.parse_target_labels(
-            output_objects=output_objects,
-            device=device,
-            labels=target_labels,
-        )
-
-    batch = Batch(
-        inputs=inputs_prepared,
-        target_labels=target_labels,
-        ids=ids,
-    )
-
-    return batch
-
-
-def _prepare_inputs_for_model(
-    batch_inputs: Dict[str, Any],
-    input_objects: al_input_objects_as_dict,
-    model: nn.Module,
-    device: str,
-) -> Dict[str, torch.Tensor]:
-    inputs_prepared = {}
-    for input_name, input_object in input_objects.items():
-        input_type = input_object.input_config.input_info.input_type
-
-        if input_type in ("omics", "image", "array"):
-            cur_tensor = batch_inputs[input_name]
-            cur_tensor = cur_tensor.to(device=device)
-            cur_tensor = cur_tensor.to(dtype=torch.float32)
-
-            inputs_prepared[input_name] = cur_tensor
-
-        elif input_type == "tabular":
-            tabular_source_input = batch_inputs[input_name]
-            for tabular_name, tensor in tabular_source_input.items():
-                cur_tensor = tensor.to(device=device)
-
-                if torch.is_floating_point(input=tensor):
-                    cur_tensor = cur_tensor.to(dtype=torch.float32)
-
-                tabular_source_input[tabular_name] = cur_tensor
-
-            tabular_input_type_info = input_object.input_config.input_type_info
-            cat_columns = tabular_input_type_info.input_cat_columns
-            con_columns = tabular_input_type_info.input_con_columns
-            tabular = get_tabular_inputs(
-                input_cat_columns=cat_columns,
-                input_con_columns=con_columns,
-                tabular_model=getattr(model.input_modules, input_name),
-                tabular_input=tabular_source_input,
-                device=device,
-            )
-            inputs_prepared[input_name] = tabular
-
-        elif input_type in ("sequence", "bytes"):
-            cur_seq = batch_inputs[input_name]
-            cur_seq = cur_seq.to(device=device)
-            cur_module = getattr(model.input_modules, input_name)
-            cur_module_embedding = cur_module.embedding
-            cur_embedding = cur_module_embedding(input=cur_seq)
-            inputs_prepared[input_name] = cur_embedding
-        else:
-            raise ValueError(f"Unrecognized input type {input_name}.")
-
-    return inputs_prepared
-
-
-def hook_default_model_forward(
-    experiment: "Experiment", state: Dict, batch: "Batch", *args, **kwargs
-) -> Dict:
-    inputs = batch.inputs
-
-    context_manager = get_maybe_amp_context_manager_from_state(state=state)
-    with context_manager:
-        train_outputs = experiment.model(inputs=inputs)
-
-    state_updates = {"model_outputs": train_outputs}
-
-    return state_updates
-
-
-def get_amp_context_manager(device_type: str) -> autocast:
-    return autocast(device_type=device_type)
-
-
-def hook_default_optimizer_backward(
-    experiment: "Experiment", state: Dict, *args, **kwargs
-) -> Dict:
-    gc = experiment.configs.global_config
-    optimizer_backward_kwargs = get_optimizer_backward_kwargs(
-        optimizer_name=gc.optimizer
-    )
-
-    loss = maybe_scale_loss_with_grad_accumulation_steps(
-        loss=state["loss"], grad_acc_steps=gc.gradient_accumulation_steps
-    )
-
-    amp_scaler = state.get("amp_scaler")
-    loss = maybe_scale_loss_with_amp_scaler(
-        do_amp=gc.amp, loss=loss, amp_scaler=amp_scaler, device=gc.device
-    )
-
-    loss.backward(**optimizer_backward_kwargs)
-
-    maybe_apply_gradient_noise_to_model(
-        model=experiment.model, gradient_noise=gc.gradient_noise
-    )
-    maybe_apply_gradient_clipping_to_model(
-        model=experiment.model, gradient_clipping=gc.gradient_clipping
-    )
-
-    step_func = get_optimizer_step_func(
-        do_amp=gc.amp,
-        optimizer_step=experiment.optimizer.step,
-        amp_scaler=amp_scaler,
-        device=gc.device,
-    )
-
-    if should_perform_optimizer_step(
-        iteration=state["iteration"],
-        grad_acc_steps=gc.gradient_accumulation_steps,
-    ):
-        step_func()
-
-    if gc.amp and gc.device != "cpu":
-        amp_scaler.update()
-
-    maybe_update_model_parameters_with_swa(
-        n_iter_before_swa=gc.n_iter_before_swa,
-        model=experiment.model,
-        iteration=state["iteration"],
-        sample_interval=gc.sample_interval,
-    )
-
-    return {}
-
-
-def maybe_scale_loss_with_amp_scaler(
-    do_amp: bool, loss: torch.Tensor, amp_scaler: Optional["GradScaler"], device: str
-) -> torch.Tensor:
-    if do_amp and device != "cpu":
-        return amp_scaler.scale(loss)
-    else:
-        return loss
-
-
-def maybe_scale_loss_with_grad_accumulation_steps(
-    loss: torch.Tensor, grad_acc_steps: int
-) -> torch.Tensor:
-    if grad_acc_steps and grad_acc_steps > 1:
-        return loss / grad_acc_steps
-    else:
-        return loss
-
-
-def maybe_apply_gradient_noise_to_model(
-    model: "nn.Module", gradient_noise: float
-) -> None:
-    if gradient_noise:
-        for name, weight in model.named_parameters():
-            weight.grad = weight.grad + torch.randn_like(weight.grad) * gradient_noise
-
-
-def maybe_apply_gradient_clipping_to_model(
-    model: "nn.Module", gradient_clipping: float
-) -> None:
-    if gradient_clipping:
-        clip_grad_norm_(
-            parameters=model.parameters(),
-            max_norm=gradient_clipping,
-        )
-
-
-def get_optimizer_step_func(
-    do_amp: bool,
-    optimizer_step: Callable,
-    amp_scaler: Optional["GradScaler"],
-    device: str,
-) -> Callable:
-    if do_amp and device != "cpu":
-        return partial(amp_scaler.step, optimizer=optimizer_step)
-    else:
-        return optimizer_step
-
-
-def should_perform_optimizer_step(iteration: int, grad_acc_steps: int) -> bool:
-    if grad_acc_steps and grad_acc_steps > 1:
-        return iteration % grad_acc_steps == 0
-    else:
-        return True
-
-
-def maybe_update_model_parameters_with_swa(
-    n_iter_before_swa: Optional[int],
-    model: "nn.Module",
-    iteration: int,
-    sample_interval: int,
-) -> None:
-    should_not_be_called_ever = n_iter_before_swa is None
-    if should_not_be_called_ever:
-        return
-
-    if iteration >= n_iter_before_swa and iteration % sample_interval == 0:
-        model.update_parameters(model.module)
-
-
-def hook_default_compute_metrics(
-    experiment: "Experiment", batch: "Batch", state: Dict, *args, **kwargs
-):
-    train_batch_metrics = calculate_batch_metrics(
-        outputs_as_dict=experiment.outputs,
-        outputs=state["model_outputs"],
-        labels=batch.target_labels,
-        mode="train",
-        metric_record_dict=experiment.metrics,
-    )
-
-    train_batch_metrics_w_loss = add_loss_to_metrics(
-        outputs_as_dict=experiment.outputs,
-        losses=state["per_target_train_losses"],
-        metric_dict=train_batch_metrics,
-    )
-
-    train_batch_metrics_with_averages = add_multi_task_average_metrics(
-        batch_metrics_dict=train_batch_metrics_w_loss,
-        outputs_as_dict=experiment.outputs,
-        loss=state["loss"].item(),
-        performance_average_functions=experiment.metrics["averaging_functions"],
-    )
-
-    state_updates = {"metrics": train_batch_metrics_with_averages}
-
-    return state_updates
-
-
-def hook_default_per_target_loss(
-    experiment: "Experiment", batch: "Batch", state: Dict, *args, **kwargs
-) -> Dict:
-    context_manager = get_maybe_amp_context_manager_from_state(state=state)
-    with context_manager:
-        per_target_train_losses = experiment.loss_function(
-            inputs=state["model_outputs"], targets=batch.target_labels
-        )
-
-        state_updates = {"per_target_train_losses": per_target_train_losses}
-
-    return state_updates
-
-
-def hook_default_aggregate_losses(state: Dict, *args, **kwargs) -> Dict:
-    context_manager = get_maybe_amp_context_manager_from_state(state=state)
-    with context_manager:
-        train_loss_avg = aggregate_losses(losses_dict=state["per_target_train_losses"])
-        state_updates = {"loss": train_loss_avg}
-
-    return state_updates
-
-
-def get_maybe_amp_context_manager_from_state(
-    state: Dict,
-) -> Union[nullcontext, autocast]:
-    context_manager = state.get("amp_context_manager", nullcontext())
-    return context_manager
-
-
-def get_hook_iteration_counter() -> Callable:
-    iteration_count = 0
-
-    def _counter_iterator(do_increment: bool = True, *args, **kwargs) -> Dict[str, int]:
-        nonlocal iteration_count
-        if do_increment:
-            iteration_count += 1
-
-        state_updates = {"iteration": iteration_count}
-        return state_updates
-
-    return _counter_iterator
-
-
-def get_hook_amp_objects(device: str):
-    device_type = "cpu" if device == "cpu" else "cuda"
-
-    if device == "cpu":
-        logger.warning("Using AMP is on a CPU, speedups will most likely be minimal.")
-
-    scaler = None
-    if device != "cpu":
-        scaler = GradScaler()
-
-    amp_context_manager = get_amp_context_manager(device_type=device_type)
-
-    def _get_objects(*args, **kwargs) -> Dict[str, GradScaler]:
-        state_updates = {
-            "amp_context_manager": amp_context_manager,
-        }
-        if device != "cpu":
-            state_updates["amp_scaler"] = scaler
-
-        return state_updates
-
-    return _get_objects
-
-
-def hook_adjust_loss_for_gradient_accumulation(
-    experiment: "Experiment", state: Dict, *args, **kwargs
-) -> Dict:
-    gradient_accumulation_steps = (
-        experiment.configs.global_config.gradient_accumulation_steps
-    )
-
-    loss = state["loss"]
-    loss_adjusted = loss / gradient_accumulation_steps
-
-    state_updates = {"loss": loss_adjusted}
-
-    return state_updates
 
 
 if __name__ == "__main__":

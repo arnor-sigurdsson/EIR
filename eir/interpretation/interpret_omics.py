@@ -9,8 +9,8 @@ import pandas as pd
 from aislib.misc_utils import get_logger
 
 from eir.interpretation.interpretation_utils import get_target_class_name
-from eir.visualization import interpretation_visualization as av
 from eir.setup.input_setup_modules.setup_omics import read_subset_file, read_bim
+from eir.visualization import interpretation_visualization as av
 
 if TYPE_CHECKING:
     from eir.train import Experiment
