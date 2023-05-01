@@ -3,7 +3,7 @@ import pytest
 import eir.predict_modules
 from eir import predict, train
 from eir.setup import config
-from tests.conftest import TestDataConfig
+from tests.setup_tests.fixtures_create_data import TestDataConfig
 
 
 @pytest.mark.parametrize("create_test_data", [{"task_type": "multi"}], indirect=True)

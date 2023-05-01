@@ -6,7 +6,7 @@ import eir.predict_modules
 from eir import predict, train
 from eir.setup import config
 from eir.setup.output_setup import set_up_outputs_for_training
-from tests.conftest import TestDataConfig
+from tests.setup_tests.fixtures_create_data import TestDataConfig
 from tests.test_data_load.test_datasets import check_dataset
 
 

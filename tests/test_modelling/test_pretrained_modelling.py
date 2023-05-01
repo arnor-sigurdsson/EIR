@@ -7,13 +7,16 @@ import pytest
 from eir import train
 from eir.setup.config import get_all_tabular_targets
 from eir.setup.schemas import BasicPretrainedConfig
-from tests.conftest import _get_cur_modelling_test_config, cleanup
+from tests.setup_tests.fixtures_create_configs import cleanup
 from tests.test_modelling.test_modelling_utils import (
     check_test_performance_results,
 )
 
 if TYPE_CHECKING:
-    from tests.conftest import ModelTestConfig
+    from tests.setup_tests.fixtures_create_experiment import (
+        ModelTestConfig,
+        _get_cur_modelling_test_config,
+    )
 
 
 def _get_pre_trained_module_setup_parametrization() -> Dict:

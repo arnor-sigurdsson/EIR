@@ -19,7 +19,7 @@ from eir.train_utils.train_handlers import HandlerConfig
 
 if TYPE_CHECKING:
     from eir.train import Experiment
-    from ..conftest import ModelTestConfig
+    from ..setup_tests.fixtures_create_experiment import ModelTestConfig
 
 
 @pytest.fixture()
@@ -340,7 +340,7 @@ def test_calculate_auto_warmup_steps_adaptive(create_dummy_test_optimizer):
 
 
 @pytest.mark.parametrize("test_schedule", ["cycle", "cosine"])
-def ttest_attach_warmup_to_scheduler(test_schedule, create_dummy_test_optimizer):
+def test_attach_warmup_to_scheduler(test_schedule, create_dummy_test_optimizer):
     optimizer = create_dummy_test_optimizer
     lr_ub = lr_scheduling.get_optimizer_lr(optimizer=optimizer)
     lr_lb = 1e-5

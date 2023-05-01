@@ -59,6 +59,7 @@ tomlkit = "^0.11.1"
 gdown = "^4.2.1"
 hypothesis = "^6.14.0"
 pdf2image = "^1.16.0"
+vulture = "^2.7"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

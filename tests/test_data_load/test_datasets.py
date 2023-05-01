@@ -30,7 +30,7 @@ from eir.setup.input_setup_modules.setup_image import (
 from eir.setup.output_setup import set_up_outputs_for_training
 
 if TYPE_CHECKING:
-    from ..conftest import TestDataConfig
+    from ..setup_tests.fixtures_create_data import TestDataConfig
 
 
 @pytest.mark.parametrize(

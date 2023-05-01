@@ -23,7 +23,8 @@ from eir import train
 from eir.models.omics.models_cnn import CNNModel
 from eir.models.omics.omics_models import get_omics_model_init_kwargs
 from eir.setup import config
-from tests.conftest import ModelTestConfig, get_system_info
+from tests.conftest import get_system_info
+from tests.setup_tests.fixtures_create_experiment import ModelTestConfig
 from tests.test_predict_modules.test_predict_config import (
     setup_test_namespace_for_matched_config_test,
 )
