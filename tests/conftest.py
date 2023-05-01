@@ -5,6 +5,7 @@ from copy import copy
 from dataclasses import dataclass, field
 from pathlib import Path
 from shutil import rmtree
+import logging
 from typing import (
     Callable,
     Tuple,
@@ -857,9 +858,15 @@ def _hash_dict(dict_to_hash: dict) -> int:
 
 @pytest.fixture()
 def create_test_config(
-    create_test_config_init_base, keep_outputs: bool
+    create_test_config_init_base: Tuple[TestConfigInits, "TestDataConfig"],
+    keep_outputs: bool,
 ) -> config.Configs:
     test_init, test_data_config = copy(create_test_config_init_base)
+
+    test_configs, output_folder = build_test_output_folder(
+        test_configs=test_init, test_data_config=test_data_config
+    )
+    configure_global_eir_logging(output_folder=output_folder, log_level="DEBUG")
 
     test_global_config = config.get_global_config(
         global_configs=test_init.global_configs
@@ -888,36 +895,66 @@ def create_test_config(
         output_configs=test_output_configs,
     )
 
-    # This is done after in case tests modify output_folder
-    output_folder = (
-        test_configs.global_config.output_folder
-        + "_"
-        + "_".join(i.model_config.model_type for i in test_configs.input_configs)
-        + "_"
-        + f"{test_configs.output_configs[0].model_config.model_type}"
-        + "_"
-        + test_data_config.request_params["task_type"]
-    )
-
-    if not output_folder.startswith("runs/"):
-        output_folder = "runs/" + output_folder
-
-    test_configs.global_config.output_folder = output_folder
-
     run_folder = get_run_folder(output_folder=output_folder)
 
-    # If another test had side-effect leftovers, TODO: Enforce unique names
     if run_folder.exists():
         cleanup(run_path=run_folder)
 
     ensure_path_exists(path=run_folder, is_folder=True)
 
-    configure_global_eir_logging(output_folder=output_folder, log_level="DEBUG")
-
     yield test_configs
+
+    teardown_logger()
 
     if not keep_outputs:
         cleanup(run_path=run_folder)
+
+
+def build_test_output_folder(
+    test_configs: TestConfigInits, test_data_config: TestDataConfig
+) -> Tuple[TestConfigInits, str]:
+    """
+    This is done after in case tests modify output_folder.
+    """
+
+    test_configs_copy = copy(test_configs)
+
+    output_folder_base = test_configs_copy.global_configs[0]["output_folder"]
+    input_model_types = "_".join(
+        i["model_config"]["model_type"] for i in test_configs_copy.input_configs
+    )
+    output_model_type = test_configs_copy.output_configs[0]["model_config"].get(
+        "model_type", "default"
+    )
+    task_type = test_data_config.request_params["task_type"]
+
+    output_folder = (
+        output_folder_base
+        + "_"
+        + input_model_types
+        + "_"
+        + output_model_type
+        + "_"
+        + task_type
+    )
+
+    if not output_folder.startswith("runs/"):
+        output_folder = "runs/" + output_folder
+
+    for gc in test_configs_copy.global_configs:
+        gc["output_folder"] = output_folder
+
+    return test_configs_copy, output_folder
+
+
+def teardown_logger():
+    root_logger = logging.getLogger("")
+    for handler in root_logger.handlers:
+        match handler:
+            case logging.FileHandler():
+                if "logging_history.log" in handler.baseFilename:
+                    handler.close()
+                    root_logger.removeHandler(handler)
 
 
 def modify_test_configs(
