@@ -8,6 +8,7 @@ import torch
 
 import eir.experiment_io.experiment_io
 import eir.models.model_setup
+import eir.models.model_setup_modules.model_io
 import eir.models.omics.omics_models
 import eir.predict_modules.predict_attributions
 import eir.predict_modules.predict_config
@@ -109,7 +110,7 @@ def test_load_model(create_test_config: config.Configs, tmp_path: Path):
     model_path = tmp_path / "model.pt"
     torch.save(obj=model.state_dict(), f=model_path)
 
-    loaded_model = eir.models.model_setup.load_model(
+    loaded_model = eir.models.model_setup_modules.model_io.load_model(
         model_path=model_path,
         model_class=CNNModel,
         model_init_kwargs=cnn_init_kwargs,

@@ -33,10 +33,10 @@ from eir.experiment_io.experiment_io import (
 from eir.models import al_fusion_models
 from eir.models.model_setup import (
     get_meta_model_class_and_kwargs_from_configs,
-    load_model,
     get_default_model_registry_per_input_type,
     get_default_meta_class,
 )
+from eir.models.model_setup_modules.model_io import load_model
 from eir.models.model_training_utils import gather_pred_outputs_from_dloader
 from eir.predict_modules.predict_attributions import compute_predict_attributions
 from eir.predict_modules.predict_config import converge_train_and_predict_configs

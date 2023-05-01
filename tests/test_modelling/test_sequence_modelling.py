@@ -6,9 +6,9 @@ import pandas as pd
 import pytest
 
 from eir import train
-from eir.models.model_setup import (
-    _get_hf_sequence_feature_extractor_objects,
+from eir.models.model_setup_modules.input_model_setup_sequence import (
     _get_manual_out_features_for_external_feature_extractor,
+    _get_hf_sequence_feature_extractor_objects,
 )
 from eir.setup.setup_utils import get_all_hf_model_names
 from eir.train_utils.utils import seed_everything

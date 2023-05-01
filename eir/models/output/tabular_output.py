@@ -60,7 +60,7 @@ class TabularModelOutputConfig:
     model_type: Literal["mlp_residual"] = "mlp_residual"
 
 
-class TabularOutputModule(nn.Module):
+class ResidualTabularOutputModule(nn.Module):
     def __init__(
         self,
         model_config: TabularMLPResidualModelConfig,
