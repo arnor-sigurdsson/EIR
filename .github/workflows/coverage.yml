@@ -4,18 +4,18 @@ jobs:
 
   coverage:
     name: Coverage
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v3
     - name: Setup Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.10'
+        python-version: '3.11'
         architecture: x64
     - name: Run tests
       run: |
-        pip install tox==3.28.0
-        pip install poetry==1.4.0
+        pip install tox==4.5.1
+        pip install poetry==1.4.2
         tox -e py
     - name: Generate report
       uses: codecov/codecov-action@v3
