@@ -15,7 +15,6 @@ from eir.models.omics.models_linear import LinearModel
 from eir.setup.config import Configs
 from eir.setup.input_setup import set_up_inputs_for_training
 from eir.setup.output_setup import set_up_outputs_for_training
-from eir.target_setup.target_label_setup import MergedTargetLabels
 from eir.setup.schemas import GlobalConfig
 from eir.train_utils import optim
 
@@ -274,51 +273,3 @@ def _check_model(model_type: str, model: nn.Module):
 
     elif model_type == "linear":
         assert isinstance(model.input_modules["test_genotype"], LinearModel)
-
-
-@pytest.mark.parametrize("create_test_data", [{"task_type": "multi"}], indirect=True)
-@pytest.mark.parametrize(
-    "create_test_config_init_base",
-    [
-        {
-            "injections": {
-                "input_configs": [
-                    {
-                        "input_info": {"input_name": "test_genotype"},
-                        "model_config": {"model_type": "cnn"},
-                    },
-                ],
-                "output_configs": [
-                    {
-                        "output_info": {"output_name": "test_output"},
-                        "output_type_info": {
-                            "target_cat_columns": ["Origin"],
-                            "target_con_columns": ["Height"],
-                        },
-                    }
-                ],
-            }
-        },
-    ],
-    indirect=True,
-)
-def test_get_criteria(
-    create_test_config: Configs,
-    create_test_labels: MergedTargetLabels,
-):
-    target_labels = create_test_labels
-
-    outputs_as_dict = set_up_outputs_for_training(
-        output_configs=create_test_config.output_configs,
-        target_transformers=target_labels.label_transformers,
-    )
-
-    test_criteria = train._get_criteria(outputs_as_dict=outputs_as_dict)
-    for output_name, output_object in outputs_as_dict.items():
-        for column_name in output_object.target_columns["con"]:
-            assert test_criteria[output_name][column_name].func is train._calc_mse
-
-        for column_name in output_object.target_columns["cat"]:
-            assert isinstance(
-                test_criteria[output_name][column_name], nn.CrossEntropyLoss
-            )

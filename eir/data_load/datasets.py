@@ -258,6 +258,9 @@ class DatasetBase(Dataset):
         )
         return samples
 
+    def __len__(self):
+        return len(self.samples)
+
     def __getitem__(self, index: int):
         raise NotImplementedError()
 

@@ -18,7 +18,7 @@ from eir.predict_modules.predict_target_setup import get_target_labels_for_testi
 from eir.setup.config import Configs
 from eir.setup.input_setup import al_input_objects_as_dict
 from eir.setup.output_setup import al_output_objects_as_dict
-from eir.train import check_dataset_and_batch_size_compatiblity
+from eir.train import check_dataset_and_batch_size_compatibility
 from eir.train_utils.step_logic import Hooks
 
 if TYPE_CHECKING:
@@ -164,7 +164,7 @@ def _get_predict_background_loader(
         inputs_as_dict=background_inputs_as_dict,
     )
 
-    check_dataset_and_batch_size_compatiblity(
+    check_dataset_and_batch_size_compatibility(
         dataset=background_dataset,
         batch_size=batch_size,
         name="Test attribution background",

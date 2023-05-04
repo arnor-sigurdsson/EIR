@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Dict, Sequence, Tuple, Union, Iterable
 
 import pandas as pd
+from aislib.misc_utils import get_logger
 
 from eir.data_load.label_setup import (
     al_target_label_dict,
@@ -14,6 +15,8 @@ from eir.data_load.label_setup import (
     gather_ids_from_data_source,
 )
 from eir.setup import schemas
+
+logger = get_logger(name=__name__)
 
 
 @dataclass
@@ -129,6 +132,8 @@ def read_manual_ids_if_exist(
 def get_tabular_target_file_infos(
     output_configs: Iterable[schemas.OutputConfig],
 ) -> Dict[str, TabularFileInfo]:
+    logger.debug("Setting up target labels.")
+
     tabular_infos = {}
 
     for output_config in output_configs:

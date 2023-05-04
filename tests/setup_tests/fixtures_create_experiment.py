@@ -18,6 +18,7 @@ from eir.setup import schemas, config, input_setup
 from eir.setup.output_setup import set_up_outputs_for_training
 from eir.train import Experiment
 from eir.train_utils import optim, metrics
+from eir.train_utils.criteria import get_criteria
 from eir.train_utils import step_logic
 from eir.train_utils.utils import get_run_folder
 
@@ -25,13 +26,13 @@ from eir.train_utils.utils import get_run_folder
 def create_test_optimizer(
     global_config: schemas.GlobalConfig,
     model: nn.Module,
-    criterions,
+    criteria,
 ):
     """
     TODO: Refactor loss module construction out of this function.
     """
 
-    loss_module = train._get_loss_callable(criteria=criterions)
+    loss_module = train.get_loss_callable(criteria=criteria)
 
     optimizer = optim.get_optimizer(
         model=model, loss_callable=loss_module, global_config=global_config
@@ -73,7 +74,7 @@ def prep_modelling_test_configs(
         target_transformers=target_labels.label_transformers,
     )
 
-    criteria = train._get_criteria(outputs_as_dict=outputs_as_dict)
+    criteria = get_criteria(outputs_as_dict=outputs_as_dict)
     test_metrics = metrics.get_default_metrics(
         target_transformers=target_labels.label_transformers,
         cat_averaging_metrics=gc.cat_averaging_metrics,
@@ -84,7 +85,7 @@ def prep_modelling_test_configs(
     optimizer, loss_module = create_test_optimizer(
         global_config=gc,
         model=model,
-        criterions=criteria,
+        criteria=criteria,
     )
 
     train_dataset, valid_dataset = create_test_datasets

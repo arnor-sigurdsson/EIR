@@ -38,20 +38,17 @@ from torch.linalg import vector_norm
 from torch.utils.tensorboard import SummaryWriter
 
 from eir.data_load.data_utils import get_output_info_generator
-from eir.data_load.label_setup import al_label_transformers
 from eir.setup.schemas import OutputConfig
 
 if TYPE_CHECKING:
-    from eir.train import (
-        al_criteria,
-        Experiment,
-    )  # noqa: F401
+    from eir.train import al_criteria, Experiment  # noqa: F401
     from eir.train_utils.step_logic import al_training_labels_target
     from eir.models.omics.omics_models import al_omics_models  # noqa: F401
     from eir.train_utils.train_handlers import HandlerConfig
     from eir.data_load.label_setup import (  # noqa: F401
         al_target_columns,
         al_label_transformers_object,
+        al_label_transformers,
     )
     from eir.setup.output_setup import al_output_objects_as_dict
 
@@ -679,7 +676,7 @@ def get_metrics_dataframes(
 
 
 def get_default_metrics(
-    target_transformers: Dict[str, al_label_transformers],
+    target_transformers: Dict[str, "al_label_transformers"],
     cat_averaging_metrics: Optional[al_cat_averaging_metric_choices],
     con_averaging_metrics: Optional[al_con_averaging_metric_choices],
 ) -> "al_metric_record_dict":

@@ -370,11 +370,11 @@ def test_calc_all_mixed_losses(test_inputs, expected_output):
         permuted_indexes=torch.LongTensor([0]),
     )
 
-    test_criterions = {"test_output": {c: nn.MSELoss() for c in all_target_columns}}
+    test_criteria = {"test_output": {c: nn.MSELoss() for c in all_target_columns}}
     outputs = {"test_output": {c: test_inputs["outputs"] for c in all_target_columns}}
     all_losses = data_augmentation.calc_all_mixed_losses(
         target_columns_gen=_target_columns_gen(),
-        criteria=test_criterions,
+        criteria=test_criteria,
         outputs=outputs,
         mixed_object=mixed_object,
     )

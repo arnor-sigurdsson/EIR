@@ -56,25 +56,25 @@ def stratify_attributions_by_target_classes(
 def plot_attributions_bar(
     df_attributions: pd.DataFrame, outpath: Path, top_n: int = 20, title: str = ""
 ) -> None:
-    df_token_means = df_attributions.groupby("Input").mean()
-    df_token_top_n = df_token_means.nlargest(top_n, "Attribution")
-    df_token_top_n_sorted = df_token_top_n.sort_values(
-        by="Attribution", ascending=False
+    df_token_top_n = calculate_top_n_tokens(
+        df_attributions=df_attributions, top_n=top_n
+    )
+    df_attributions_top_n_sorted = filter_and_sort_attributions(
+        df_attributions=df_attributions, df_token_top_n=df_token_top_n
     )
 
-    df_attributions_top_n = df_attributions[
-        df_attributions["Input"].isin(df_token_top_n_sorted.index)
-    ]
-
-    df_attributions_top_n_sorted = df_attributions_top_n.sort_values(
-        by="Attribution", ascending=False
+    order = (
+        df_attributions_top_n_sorted.groupby("Input")
+        .mean()
+        .sort_values(by="Attribution", ascending=False)
+        .index
     )
 
     ax: plt.Axes = sns.barplot(
         data=df_attributions_top_n_sorted,
         x="Attribution",
         y="Input",
-        order=df_token_top_n.index,
+        order=order,
         palette="Blues_d",
         errcolor=".2",
         capsize=0.1,
@@ -91,6 +91,43 @@ def plot_attributions_bar(
     sns_figure.savefig(fname=outpath, bbox_inches="tight")
 
     plt.close("all")
+
+
+def calculate_top_n_tokens(df_attributions: pd.DataFrame, top_n: int) -> pd.DataFrame:
+    df_token_stats = calculate_token_statistics(df_attributions=df_attributions)
+
+    df_token_stats["AttributionScore"] = (
+        df_token_stats["AttributionMean"] - df_token_stats["AttributionStd"]
+    )
+
+    df_token_stats_top_n = df_token_stats.nlargest(top_n, "AttributionScore")
+    df_token_stats_top_n_sorted = df_token_stats_top_n.sort_values(
+        by="AttributionScore", ascending=False
+    )
+
+    return df_token_stats_top_n_sorted
+
+
+def calculate_token_statistics(df_attributions: pd.DataFrame) -> pd.DataFrame:
+    df_token_stats = df_attributions.groupby("Input").agg(
+        AttributionMean=("Attribution", "mean"),
+        AttributionStd=("Attribution", "std"),
+    )
+    return df_token_stats
+
+
+def filter_and_sort_attributions(
+    df_attributions: pd.DataFrame, df_token_top_n: pd.DataFrame
+) -> pd.DataFrame:
+    df_attributions_top_n = df_attributions[
+        df_attributions["Input"].isin(df_token_top_n.index)
+    ]
+
+    df_attributions_top_n_sorted = df_attributions_top_n.sort_values(
+        by="Attribution", ascending=False
+    )
+
+    return df_attributions_top_n_sorted
 
 
 def get_basic_sample_attributions_to_analyse_generator(
