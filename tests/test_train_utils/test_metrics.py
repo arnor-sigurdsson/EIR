@@ -5,7 +5,6 @@ import pytest
 import torch
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 
-from eir import train
 from eir.models.output.tabular_output import TabularMLPResidualModelConfig
 from eir.setup.output_setup import TabularOutputInfo
 from eir.setup.schemas import (
@@ -15,6 +14,7 @@ from eir.setup.schemas import (
     TabularModelOutputConfig,
 )
 from eir.train_utils import metrics
+from eir.train_utils.criteria import get_criteria
 
 
 def test_calculate_batch_metrics():
@@ -162,21 +162,21 @@ def test_calculate_losses_bad():
     # diff of 2 between each pair, RMSE expected to be 4.0
     label_values = torch.tensor([0, 1, 2, 3, 4], dtype=torch.int64)
     output_values = torch.tensor([2, 3, 4, 5, 6], dtype=torch.int64)
-    test_criterions, test_labels, test_outputs = set_up_calculate_losses_data(
+    test_criteria, test_labels, test_outputs = set_up_calculate_losses_data(
         label_values=label_values, output_values=output_values
     )
 
-    bad_pred_loss = metrics.calculate_prediction_losses(
-        criteria=test_criterions, targets=test_labels, inputs=test_outputs
+    bad_prediction_loss = metrics.calculate_prediction_losses(
+        criteria=test_criteria, targets=test_labels, inputs=test_outputs
     )
 
     expected_rmse = 4.0
-    assert bad_pred_loss["test_output"]["Height"].item() == expected_rmse
-    assert bad_pred_loss["test_output"]["BMI"].item() == expected_rmse
+    assert bad_prediction_loss["test_output"]["Height"].item() == expected_rmse
+    assert bad_prediction_loss["test_output"]["BMI"].item() == expected_rmse
 
     # check that the loss is more than upper bound (0.905) in perfect case
     perfect_upper_bound = 0.905
-    assert bad_pred_loss["test_output"]["Origin"].item() > perfect_upper_bound
+    assert bad_prediction_loss["test_output"]["Origin"].item() > perfect_upper_bound
 
 
 def set_up_calculate_losses_data(
@@ -193,7 +193,7 @@ def set_up_calculate_losses_data(
         return base_dict
 
     test_outputs_as_dict = _get_metrics_test_module_test_outputs_as_dict()
-    test_criteria = train._get_criteria(outputs_as_dict=test_outputs_as_dict)
+    test_criteria = get_criteria(outputs_as_dict=test_outputs_as_dict)
     test_labels = generate_base_dict(values=label_values)
 
     test_outputs = generate_base_dict(output_values)

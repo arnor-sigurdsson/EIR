@@ -55,7 +55,7 @@ from eir.setup.input_setup import (
 from eir.setup.output_setup import al_output_objects_as_dict
 from eir.target_setup.target_label_setup import gather_all_ids_from_output_configs
 from eir.train import (
-    check_dataset_and_batch_size_compatiblity,
+    check_dataset_and_batch_size_compatibility,
 )
 from eir.train_utils.evaluation import PerformancePlotConfig
 from eir.train_utils.metrics import (
@@ -389,7 +389,7 @@ def get_default_predict_config(
         outputs_as_dict=loaded_train_experiment.outputs,
     )
 
-    check_dataset_and_batch_size_compatiblity(
+    check_dataset_and_batch_size_compatibility(
         dataset=test_dataset,
         batch_size=configs_overloaded_for_predict.global_config.batch_size,
         name="Test",

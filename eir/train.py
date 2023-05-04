@@ -1,6 +1,5 @@
 import sys
 from dataclasses import dataclass
-from functools import partial
 from pathlib import Path
 from typing import (
     Union,
@@ -21,7 +20,6 @@ from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader, WeightedRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
-from eir.data_load import data_utils
 from eir.data_load import datasets
 from eir.data_load.data_utils import get_train_sampler
 from eir.data_load.label_setup import (
@@ -37,7 +35,6 @@ from eir.experiment_io.experiment_io import (
 from eir.models import al_meta_model
 from eir.models.model_setup import get_model, get_default_model_registry_per_input_type
 from eir.models.model_training_utils import run_lr_find
-from eir.setup import schemas
 from eir.setup.config import (
     get_configs,
     Configs,
@@ -55,8 +52,8 @@ from eir.target_setup.target_label_setup import (
 )
 from eir.train_utils import distributed
 from eir.train_utils import utils
+from eir.train_utils.criteria import get_criteria, get_loss_callable
 from eir.train_utils.metrics import (
-    calculate_prediction_losses,
     get_average_history_filepath,
     get_default_metrics,
 )
@@ -140,7 +137,6 @@ def get_default_experiment(
         manual_valid_ids=manual_valid_ids,
     )
 
-    logger.debug("Setting up target labels.")
     target_labels_info = get_tabular_target_file_infos(
         output_configs=configs.output_configs
     )
@@ -183,7 +179,7 @@ def get_default_experiment(
         train_dataset=train_dataset,
     )
 
-    train_dloader, valid_dloader = get_dataloaders(
+    train_dataloader, valid_dataloader = get_dataloaders(
         train_dataset=train_dataset,
         train_sampler=train_sampler,
         valid_dataset=valid_dataset,
@@ -208,13 +204,13 @@ def get_default_experiment(
         device=torch.device(configs.global_config.device),
     )
 
-    criteria = _get_criteria(
+    criteria = get_criteria(
         outputs_as_dict=outputs_as_dict,
     )
 
     writer = get_summary_writer(run_folder=run_folder)
 
-    loss_func = _get_loss_callable(
+    loss_func = get_loss_callable(
         criteria=criteria,
     )
 
@@ -232,8 +228,8 @@ def get_default_experiment(
         configs=configs,
         inputs=inputs_as_dict,
         outputs=outputs_as_dict,
-        train_loader=train_dloader,
-        valid_loader=valid_dloader,
+        train_loader=train_dataloader,
+        valid_loader=valid_dataloader,
         valid_dataset=valid_dataset,
         model=model,
         optimizer=optimizer,
@@ -270,14 +266,14 @@ def get_dataloaders(
     batch_size: int,
     num_workers: int = 0,
 ) -> Tuple:
-    check_dataset_and_batch_size_compatiblity(
+    check_dataset_and_batch_size_compatibility(
         dataset=train_dataset, batch_size=batch_size, name="Training"
     )
 
-    check_dataset_and_batch_size_compatiblity(
+    check_dataset_and_batch_size_compatibility(
         dataset=valid_dataset, batch_size=batch_size, name="Validation"
     )
-    train_dloader = DataLoader(
+    train_dataloader = DataLoader(
         dataset=train_dataset,
         batch_size=batch_size,
         sampler=train_sampler,
@@ -287,7 +283,7 @@ def get_dataloaders(
         drop_last=True,
     )
 
-    valid_dloader = DataLoader(
+    valid_dataloader = DataLoader(
         dataset=valid_dataset,
         batch_size=batch_size,
         shuffle=False,
@@ -296,10 +292,10 @@ def get_dataloaders(
         drop_last=False,
     )
 
-    return train_dloader, valid_dloader
+    return train_dataloader, valid_dataloader
 
 
-def check_dataset_and_batch_size_compatiblity(
+def check_dataset_and_batch_size_compatibility(
     dataset: datasets.DatasetBase, batch_size: int, name: str = ""
 ):
     if len(dataset) < batch_size:
@@ -311,60 +307,6 @@ def check_dataset_and_batch_size_compatiblity(
             f" passed to the prediction module. Future work includes making this "
             f"easier to work with."
         )
-
-
-def _get_criteria(outputs_as_dict: al_output_objects_as_dict) -> al_criteria:
-    criteria_dict = {}
-
-    def get_criterion(
-        column_type_: str, cat_label_smoothing_: float = 0.0
-    ) -> Union[nn.CrossEntropyLoss, Callable]:
-        if column_type_ == "con":
-            assert cat_label_smoothing_ == 0.0
-            return partial(_calc_mse, mse_loss_func=nn.MSELoss())
-        elif column_type_ == "cat":
-            return nn.CrossEntropyLoss(label_smoothing=cat_label_smoothing_)
-
-    target_columns_gen = data_utils.get_output_info_generator(
-        outputs_as_dict=outputs_as_dict
-    )
-
-    for output_name, column_type, column_name in target_columns_gen:
-        label_smoothing = _get_label_smoothing(
-            output_config=outputs_as_dict[output_name].output_config,
-            column_type=column_type,
-        )
-
-        criterion = get_criterion(
-            column_type_=column_type, cat_label_smoothing_=label_smoothing
-        )
-
-        if output_name not in criteria_dict:
-            criteria_dict[output_name] = {}
-        criteria_dict[output_name][column_name] = criterion
-
-    return criteria_dict
-
-
-def _get_label_smoothing(
-    output_config: schemas.OutputConfig,
-    column_type: str,
-) -> float:
-    if column_type == "con":
-        return 0.0
-    elif column_type == "cat":
-        return output_config.output_type_info.cat_label_smoothing
-
-    raise ValueError(f"Unknown column type: {column_type}")
-
-
-def _calc_mse(input: torch.Tensor, target: torch.Tensor, mse_loss_func: nn.MSELoss):
-    return mse_loss_func(input=input.squeeze(), target=target.squeeze())
-
-
-def _get_loss_callable(criteria: al_criteria):
-    single_task_loss_func = partial(calculate_prediction_losses, criteria=criteria)
-    return single_task_loss_func
 
 
 def get_summary_writer(run_folder: Path) -> SummaryWriter:
@@ -393,6 +335,7 @@ def _log_model(
         with open(structure_file, "w") as structure_handle:
             structure_handle.write(str(model))
 
+    layer_summary = ""
     if verbose:
         layer_summary = "\nModel layers:\n"
         for name, param in model.named_parameters():

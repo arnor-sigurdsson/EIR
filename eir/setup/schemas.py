@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Union, Literal, List, Optional, Sequence, Type
+from typing import Union, Literal, List, Optional, Sequence, Type, TYPE_CHECKING
 
 from eir.models.array.array_models import ArrayModelConfig
 from eir.models.fusion.fusion_identity import IdentityConfig
@@ -25,6 +25,9 @@ from eir.models.tabular.tabular import (
     TabularModelConfig,
 )
 from eir.setup.setup_utils import get_all_optimizer_names
+
+if TYPE_CHECKING:
+    from eir.train_utils.criteria import al_cat_loss_names, al_con_loss_names
 
 al_input_configs = Sequence["InputConfig"]
 al_output_configs = Sequence["OutputConfig"]
@@ -650,6 +653,8 @@ class TabularOutputTypeConfig:
     target_cat_columns: Sequence[str] = field(default_factory=list)
     target_con_columns: Sequence[str] = field(default_factory=list)
     cat_label_smoothing: float = 0.0
+    cat_loss_name: "al_cat_loss_names" = "CrossEntropyLoss"
+    con_loss_name: "al_con_loss_names" = "MSELoss"
     uncertainty_weighted_mt_loss: bool = True
 
 
