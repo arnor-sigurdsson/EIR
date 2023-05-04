@@ -26,7 +26,7 @@
 
 ---
 
-Supervised modelling on genotype, tabular, sequence, image and binary data.
+Supervised modelling on genotype, tabular, sequence, image, array and binary data.
 
 **WARNING:** This project is in alpha phase. Expect backwards incompatible changes and API changes.
 
@@ -51,7 +51,7 @@ If you are an ML/DL researcher developing new models, etc., it might not fit you
 ## Features
 
 - Train models directly from the command line through `.yaml` configuration files.
-- Training on [genotype](https://eir.readthedocs.io/en/latest/tutorials/01_basic_tutorial.html), [tabular](https://eir.readthedocs.io/en/latest/tutorials/02_tabular_tutorial.html), [sequence](https://eir.readthedocs.io/en/latest/tutorials/03_sequence_tutorial.html), [image](https://eir.readthedocs.io/en/latest/tutorials/05_image_tutorial.html) and [binary](https://eir.readthedocs.io/en/latest/tutorials/06_raw_bytes_tutorial.html) input data, with various modality-specific settings available.
+- Training on [genotype](https://eir.readthedocs.io/en/latest/tutorials/01_basic_tutorial.html), [tabular](https://eir.readthedocs.io/en/latest/tutorials/02_tabular_tutorial.html), [sequence](https://eir.readthedocs.io/en/latest/tutorials/03_sequence_tutorial.html), [image](https://eir.readthedocs.io/en/latest/tutorials/05_image_tutorial.html), [array](https://eir.readthedocs.io/en/latest/tutorials/08_array_tutorial.html) and [binary](https://eir.readthedocs.io/en/latest/tutorials/06_raw_bytes_tutorial.html) input data, with various modality-specific settings available.
 - Seamless multi-modal (e.g., combining [text + image + tabular data](https://eir.readthedocs.io/en/latest/tutorials/07_multimodal_tutorial.html), or any combination of the modalities above) training.
 - Train multiple features extractors on the same data source, e.g., [combining vanilla transformer, Longformer and a pre-trained BERT variant](https://eir.readthedocs.io/en/latest/tutorials/04_pretrained_sequence_tutorial.html) for text classification.
 - Supports continuous (i.e., regression) and categorical (i.e., classification) targets.
