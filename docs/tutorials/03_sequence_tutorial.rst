@@ -150,12 +150,10 @@ towards a Positive and Negative sentiment.
 
 .. note::
 
-    You might notice that some of the tokens in the plots above
-    have confidence intervals (CIs), while others do not. This is because
-    the attributions are computed on the validation set, and some of the tokens might
-    only appear once in the validation set,
-    for which the confidence interval cannot be computed.
-    For those that do have CIs, they represent the 95% confidence interval
+    Which tokens are included in this plot is chosen based both on the
+    average and standard deviation of the attribution. The raw values
+    are also stored, in case you want to do your own analysis.
+    The CIs represent the 95% confidence interval
     after 1,000 bootstrap samples.
 
 
@@ -280,11 +278,10 @@ we will check attributions towards the moderately active class:
 
 .. image:: tutorial_files/03_sequence_tutorial/b_Anticancer_peptides/figures/tutorial_03b_feature_importance_mod._active.png
 
-It seems that the
-Tryptophan (W) and Lysine (K) amino acids
-influences the model towards a
-moderately active prediction,
-while Methionine (M) does the opposite.
+In this case, it seems that there is a high degree of uncertainty
+in the attributions, as the confidence intervals are quite large.
+This is likely due to the fact that the dataset is quite imbalanced,
+and there are few samples of moderately active peptides in the validation set.
 
 Looking at an example
 of single moderately active sample
@@ -297,14 +294,6 @@ the moderately active class, we see:
 
 :raw-html:`<br />`
 
-
-As we can see in the token importance figure,
-L indeed seems to have a positive influence towards the moderately active properties
-of the peptide. Interestingly (but perhaps not surprisingly),
-the effect seems to depend on the context.
-In some cases,
-L seems to have a negative effect.
-We will leave further analysis to the experts!
 
 .. warning::
     Remember that this does not necessarily tell us anything about actual

@@ -32,6 +32,8 @@ Input Type Configurations
 
 .. autoclass:: eir.setup.schemas.ImageInputDataConfig
 
+.. autoclass:: eir.setup.schemas.ArrayInputDataConfig
+
 Interpretation Configurations
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -65,8 +67,8 @@ Tabular Feature Extractors
 
 .. autoclass:: eir.models.tabular.tabular.TabularModelConfig
 
-Sequence Feature Extractors
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Sequence and Binary Feature Extractors
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. autoclass:: eir.models.sequence.transformer_models.SequenceModelConfig
 
@@ -76,6 +78,12 @@ Image Feature Extractors
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. autoclass:: eir.models.image.image_models.ImageModelConfig
+
+
+Array Feature Extractors
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. autoclass:: eir.models.array.array_models.ArrayModelConfig
 
 Fusion Configurations
 ---------------------
