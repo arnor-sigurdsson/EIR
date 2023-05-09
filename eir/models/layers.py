@@ -50,6 +50,59 @@ class SEBlock(nn.Module):
         return out
 
 
+class ConvAttentionBlock(nn.Module):
+    def __init__(
+        self,
+        channels: int,
+        height: int,
+        width: int,
+        num_heads: int = 4,
+        dropout_p: float = 0.1,
+        num_layers: int = 2,
+    ):
+        super().__init__()
+        self.in_channels = channels
+        self.out_channels = channels
+        self.in_height = height
+        self.in_width = width
+
+        self.embedding_dim = height * width
+        self.num_heads = _adjust_num_heads(
+            num_heads=num_heads, embedding_dim=self.embedding_dim
+        )
+
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=self.embedding_dim,
+            nhead=self.num_heads,
+            dim_feedforward=self.embedding_dim * 4,
+            activation="gelu",
+            norm_first=True,
+            batch_first=True,
+            dropout=dropout_p,
+        )
+
+        self.encoder = nn.TransformerEncoder(
+            encoder_layer=encoder_layer, num_layers=num_layers
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        out = x.view(-1, self.in_channels, self.in_height * self.in_width)
+        out = self.encoder(out)
+        out = out.view(-1, self.in_channels, self.in_height, self.in_width)
+        return out
+
+
+def _adjust_num_heads(num_heads: int, embedding_dim: int) -> int:
+    while embedding_dim % num_heads != -0:
+        num_heads -= 1
+
+    logger.debug(
+        f"Adjusted base number of heads to {num_heads} "
+        f"according to embedding dim {embedding_dim}."
+    )
+    return num_heads
+
+
 class CNNResidualBlockBase(nn.Module):
     def __init__(
         self,
@@ -324,8 +377,6 @@ class ResidualMLPConfig:
     :param stochastic_depth_p:
         Probability of dropping input.
 
-    :param final_layer_type:
-        Which type of final layer to use to construct prediction.
     """
 
     layers: List[int] = field(default_factory=lambda: [2])

@@ -2,6 +2,8 @@ import argparse
 from dataclasses import dataclass
 from typing import Union, Type, Dict, Any, Protocol, Literal, TYPE_CHECKING, ClassVar
 
+from aislib.misc_utils import get_logger
+
 from eir.models.omics.models_cnn import CNNModel, CNNModelConfig
 from eir.models.omics.models_identity import IdentityModel, IdentityModelConfig
 from eir.models.omics.models_linear import LinearModel, LinearModelConfig
@@ -15,6 +17,8 @@ from eir.models.omics.models_locally_connected import (
 
 if TYPE_CHECKING:
     from eir.setup.input_setup_modules.common import DataDimensions
+
+logger = get_logger(name=__name__)
 
 al_omics_model_classes = Union[
     Type["CNNModel"],
@@ -122,9 +126,13 @@ def get_omics_model_init_kwargs(
     """
 
     kwargs = {}
+    base_kwargs = model_config.__dict__
+    base_kwargs = _enforce_omics_specific_settings(
+        base_kwargs=base_kwargs, model_type=model_type
+    )
 
     model_config_dataclass = get_model_config_dataclass(model_type=model_type)
-    dataclass_instance = model_config_dataclass(**model_config.__dict__)
+    dataclass_instance = model_config_dataclass(**base_kwargs)
 
     kwargs["model_config"] = dataclass_instance
     kwargs["data_dimensions"] = data_dimensions
@@ -147,3 +155,27 @@ def match_namespace_to_dataclass(
             dataclass_kwargs[field_name] = getattr(namespace, field_name)
 
     return dataclass_kwargs
+
+
+def _enforce_omics_specific_settings(
+    base_kwargs: Dict[str, Any], model_type: str
+) -> Dict[str, Any]:
+    expected = {
+        "cnn": {
+            "kernel_height": 1,
+            "first_kernel_expansion_height": 4,
+        }
+    }
+
+    if model_type not in expected:
+        return base_kwargs
+
+    for key, value in expected[model_type].items():
+        logger.info(
+            f"Overriding {key} to {value} for {model_type} in omics."
+            "If you want more control of these parameters, "
+            "it might be a good idea to use the array input functionality."
+        )
+        base_kwargs[key] = value
+
+    return base_kwargs

@@ -33,12 +33,81 @@ def create_test_util_model():
 @pytest.mark.parametrize(
     "test_input,expected",
     [
-        ({"size": 1000, "stride": 4, "first_stride_expansion": 1}, [2]),
-        ({"size": 10000, "stride": 4, "first_stride_expansion": 1}, [2, 2]),
-        ({"size": 1e6, "stride": 4, "first_stride_expansion": 1}, [2, 2, 2, 1]),
+        (
+            {
+                "size_w": 1000,
+                "stride_w": 4,
+                "first_stride_expansion_w": 1,
+                "size_h": 1000,
+                "stride_h": 4,
+                "first_stride_expansion_h": 1,
+                "cutoff": 128,
+            },
+            [2, 1],
+        ),
+        (
+            {
+                "size_w": 10000,
+                "stride_w": 4,
+                "first_stride_expansion_w": 1,
+                "size_h": 10000,
+                "stride_h": 4,
+                "first_stride_expansion_h": 1,
+                "cutoff": 128,
+            },
+            [2, 2],
+        ),
+        (
+            {
+                "size_w": 1e6,
+                "stride_w": 4,
+                "first_stride_expansion_w": 1,
+                "size_h": 1e6,
+                "stride_h": 4,
+                "first_stride_expansion_h": 1,
+                "cutoff": 128,
+            },
+            [2, 2, 2, 2],
+        ),
+        (
+            {
+                "size_w": 64,
+                "stride_w": 2,
+                "first_stride_expansion_w": 1,
+                "size_h": 64,
+                "stride_h": 2,
+                "first_stride_expansion_h": 1,
+                "cutoff": 128,
+            },
+            [2],
+        ),
+        (
+            {
+                "size_w": 128,
+                "stride_w": 2,
+                "first_stride_expansion_w": 1,
+                "size_h": 128,
+                "stride_h": 2,
+                "first_stride_expansion_h": 1,
+                "cutoff": 128,
+            },
+            [2, 1],
+        ),
+        (
+            {
+                "size_w": 32,
+                "stride_w": 2,
+                "first_stride_expansion_w": 1,
+                "size_h": 32,
+                "stride_h": 2,
+                "first_stride_expansion_h": 1,
+                "cutoff": 128,
+            },
+            [1],
+        ),
     ],
 )
-def test_find_no_resblocks_needed(test_input, expected):
+def test_find_no_residual_blocks_needed(test_input, expected):
     assert models_cnn.auto_find_no_cnn_residual_blocks_needed(**test_input) == expected
 
 

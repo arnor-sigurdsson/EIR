@@ -1,6 +1,6 @@
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import List, Tuple, TYPE_CHECKING, Union
+from typing import List, TYPE_CHECKING, Union
 
 import torch
 from aislib import pytorch_utils
@@ -8,7 +8,7 @@ from aislib.misc_utils import get_logger
 from aislib.pytorch_modules import Swish
 from torch import nn
 
-from eir.models.layers import FirstCNNBlock, CNNResidualBlock
+from eir.models.layers import FirstCNNBlock, CNNResidualBlock, ConvAttentionBlock
 
 if TYPE_CHECKING:
     from eir.setup.input_setup_modules.common import DataDimensions
@@ -71,11 +71,20 @@ class CNNModelConfig:
     :param dilation_factor_height:
         Base dilation factor of the convolutions along the height in the network.
 
+    :param cutoff:
+        If the *resulting* dimension of width * height of adding a successive block
+        is less than this value, will stop adding residual blocks to the
+         model in the automated case (i.e., if the layers argument is not specified).
+
     :param rb_do:
         Dropout in the convolutional residual blocks.
 
     :param stochastic_depth_p:
         Probability of dropping input.
+
+    :param attention_inclusion_cutoff:
+        If the dimension of width * height is less than this value, attention will be
+        included in the model across channels and width * height after that point.
 
     :param l1:
         L1 regularization to apply to the first layer.
@@ -88,23 +97,25 @@ class CNNModelConfig:
     channel_exp_base: int = 2
     first_channel_expansion: int = 1
 
-    down_stride_width: int = 4
-    first_stride_expansion_width: int = 1
-
-    down_stride_height: int = 1
-    first_stride_expansion_height: int = 1
-
     kernel_width: int = 12
     first_kernel_expansion_width: int = 1
+    down_stride_width: int = 4
+    first_stride_expansion_width: int = 1
     dilation_factor_width: int = 1
 
     kernel_height: int = 4
     first_kernel_expansion_height: int = 1
+    down_stride_height: int = 1
+    first_stride_expansion_height: int = 1
     dilation_factor_height: int = 1
+
+    cutoff: int = 32
 
     rb_do: float = 0.00
 
     stochastic_depth_p: float = 0.00
+
+    attention_inclusion_cutoff: int = 0
 
     l1: float = 0.00
 
@@ -180,9 +191,10 @@ class CNNModel(nn.Module):
 
     @property
     def residual_blocks(self) -> List[int]:
-        if not self.model_config.layers:
-            stride_w = self.model_config.down_stride_width
-            stride_h = self.model_config.down_stride_height
+        mc = self.model_config
+        if not mc.layers:
+            stride_w = mc.down_stride_width
+            stride_h = mc.down_stride_height
 
             if stride_w < 2 and stride_h < 2:
                 raise ValueError(
@@ -193,21 +205,15 @@ class CNNModel(nn.Module):
                     f"and down_stride_height: {stride_h}."
                 )
 
-            residual_blocks_w = auto_find_no_cnn_residual_blocks_needed(
-                size=self.data_dimensions.width,
-                stride=self.model_config.down_stride_width,
-                first_stride_expansion=self.model_config.first_stride_expansion_width,
+            residual_blocks = auto_find_no_cnn_residual_blocks_needed(
+                size_w=self.data_dimensions.width,
+                stride_w=mc.down_stride_width,
+                first_stride_expansion_w=mc.first_stride_expansion_width,
+                size_h=self.data_dimensions.height,
+                stride_h=mc.down_stride_height,
+                first_stride_expansion_h=mc.first_stride_expansion_height,
+                cutoff=mc.cutoff,
             )
-            residual_blocks_h = auto_find_no_cnn_residual_blocks_needed(
-                size=self.data_dimensions.height,
-                stride=self.model_config.down_stride_height,
-                first_stride_expansion=self.model_config.first_stride_expansion_height,
-            )
-
-            if sum(residual_blocks_w) > sum(residual_blocks_h):
-                residual_blocks = residual_blocks_w
-            else:
-                residual_blocks = residual_blocks_h
 
             logger.debug(
                 "No residual blocks specified in CL args, using input "
@@ -291,7 +297,7 @@ def _make_conv_layers(
 
     for layer_arch_idx, layer_arch_layers in enumerate(residual_blocks):
         for layer in range(layer_arch_layers):
-            cur_layer, cur_width, cur_height = _get_conv_residual_block(
+            cur_layer = _get_conv_residual_block(
                 conv_blocks=conv_blocks,
                 layer_arch_idx=layer_arch_idx,
                 down_stride_w=down_stride_w,
@@ -301,6 +307,20 @@ def _make_conv_layers(
             )
 
             conv_blocks.append(cur_layer)
+
+            cur_width, cur_height = pytorch_utils.calc_size_after_conv_sequence(
+                input_width=data_dimensions.width,
+                input_height=data_dimensions.height,
+                conv_sequence=nn.Sequential(*conv_blocks),
+            )
+
+            if cur_height * cur_width <= mc.attention_inclusion_cutoff:
+                cur_attention_block = ConvAttentionBlock(
+                    channels=cur_layer.out_channels,
+                    width=cur_width,
+                    height=cur_height,
+                )
+                conv_blocks.append(cur_attention_block)
 
     return conv_blocks
 
@@ -312,7 +332,7 @@ def _get_conv_residual_block(
     down_stride_h: int,
     cnn_config: CNNModelConfig,
     data_dimensions: "DataDimensions",
-) -> Tuple[CNNResidualBlock, int, int]:
+) -> CNNResidualBlock:
     mc = cnn_config
 
     cur_conv = nn.Sequential(*conv_blocks)
@@ -369,7 +389,7 @@ def _get_conv_residual_block(
         stochastic_depth_p=mc.stochastic_depth_p,
     )
 
-    return cur_layer, cur_width, cur_height
+    return cur_layer
 
 
 def _get_cur_dilation(dilation_factor: int, width: int, block_number: int):
@@ -390,12 +410,18 @@ def _get_cur_dilation(dilation_factor: int, width: int, block_number: int):
 
 
 def auto_find_no_cnn_residual_blocks_needed(
-    size: int, stride: int, first_stride_expansion: int
+    size_w: int,
+    stride_w: int,
+    first_stride_expansion_w: int,
+    size_h: int,
+    stride_h: int,
+    first_stride_expansion_h: int,
+    cutoff: int,
 ) -> List[int]:
     """
     Used in order to calculate / set up residual blocks specifications as a list
     automatically when they are not passed in as CL args, based on the minimum
-    width after the resblock convolutions.
+    size after the residual block convolutions.
 
     We have 2 residual_blocks per channel depth until we have a total of 8 blocks,
     then the rest is put in the third depth index (following resnet convention).
@@ -410,12 +436,22 @@ def auto_find_no_cnn_residual_blocks_needed(
     10 blocks --> [2, 2, 4, 2]
     """
 
-    min_size = 8 * stride
-    # account for first conv
-    cur_width = size // (stride * first_stride_expansion)
+    if (stride_w == 1 and size_w > cutoff) or (stride_h == 1 and size_h > cutoff):
+        err_dim = "width" if stride_w == 1 else "height"
+        logger.warning(
+            f"With stride=1, the {err_dim} size "
+            f"({size_w if err_dim=='width' else size_h}) "
+            f"cannot be larger than the cutoff ({cutoff}). "
+            f"This would result in an infinite loop."
+            f"Will stop when no more reduction is possible,"
+            f"despite not reaching the cutoff."
+        )
+
+    cur_size_w = size_w // (stride_w * first_stride_expansion_w)
+    cur_size_h = size_h // (stride_h * first_stride_expansion_h)
 
     residual_blocks = [0] * 4
-    while cur_width >= min_size:
+    while True:
         cur_no_blocks = sum(residual_blocks)
 
         if cur_no_blocks >= 8:
@@ -424,7 +460,21 @@ def auto_find_no_cnn_residual_blocks_needed(
             cur_index = cur_no_blocks // 2
             residual_blocks[cur_index] += 1
 
-        cur_width = cur_width // stride
+        cur_size_w_next = cur_size_w // stride_w
+        cur_size_h_next = cur_size_h // stride_h
+
+        cannot_reduce_more = (
+            cur_size_w == cur_size_w_next and cur_size_h == cur_size_h_next
+        )
+        if cur_size_w_next * cur_size_h_next < cutoff or cannot_reduce_more:
+            if cannot_reduce_more:
+                logger.warning(
+                    f"Could not reduce size more, "
+                    f"despite not reaching the cutoff ({cutoff})."
+                )
+            break
+        else:
+            cur_size_w, cur_size_h = cur_size_w_next, cur_size_h_next
 
     return [i for i in residual_blocks if i != 0]
 

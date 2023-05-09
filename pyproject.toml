@@ -35,8 +35,9 @@ sentencepiece = "^0.1.96"
 ipython = "^8.4.0"
 perceiver-pytorch = "^0.8.1"
 timm = "^0.6.12"
-deeplake = "^3.0.10"
 captum = "^0.6.0"
+aioboto3 = "^11.1.0"
+deeplake = "^3.4.1"
 
 [tool.poetry.group.dev.dependencies]
 memory-profiler = "^0.60.0"

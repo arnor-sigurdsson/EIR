@@ -58,9 +58,11 @@ and so on:
 
 - ``timm``  – Ross Wightman: (Unofficial) PyTorch Image Models
 
-- ``deeplake``  – activeloop.ai: Activeloop Deep Lake
-
 - ``captum``  – PyTorch Team: Model interpretability for PyTorch
+
+- ``aioboto3``  – Terry Cain: Async boto3 wrapper
+
+- ``deeplake``  – activeloop.ai: Activeloop Deep Lake
 
 - ``memory-profiler``  – Fabian Pedregosa: A module for monitoring memory usage of a python program
 

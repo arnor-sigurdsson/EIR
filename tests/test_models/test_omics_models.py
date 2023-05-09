@@ -19,14 +19,16 @@ def test_make_conv_layers():
     conv_layer_list = [1, 1, 1, 1]
     test_model_config = models_cnn.CNNModelConfig(
         kernel_width=5,
+        first_kernel_expansion_width=1,
+        down_stride_width=4,
+        first_stride_expansion_width=5,
+        dilation_factor_width=1,
+        kernel_height=1,
+        first_kernel_expansion_height=4,
         layers=None,
         fc_repr_dim=512,
-        down_stride_width=4,
         rb_do=0.1,
-        first_kernel_expansion_width=1,
-        first_stride_expansion_width=5,
         first_channel_expansion=1,
-        dilation_factor_width=1,
         channel_exp_base=5,
     )
     test_data_dimensions = DataDimensions(channels=1, height=4, width=int(8e5))
