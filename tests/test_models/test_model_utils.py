@@ -33,13 +33,13 @@ def create_test_util_model():
 @pytest.mark.parametrize(
     "test_input,expected",
     [
-        ({"width": 1000, "stride": 4, "first_stride_expansion": 1}, [2]),
-        ({"width": 10000, "stride": 4, "first_stride_expansion": 1}, [2, 2]),
-        ({"width": 1e6, "stride": 4, "first_stride_expansion": 1}, [2, 2, 2, 1]),
+        ({"size": 1000, "stride": 4, "first_stride_expansion": 1}, [2]),
+        ({"size": 10000, "stride": 4, "first_stride_expansion": 1}, [2, 2]),
+        ({"size": 1e6, "stride": 4, "first_stride_expansion": 1}, [2, 2, 2, 1]),
     ],
 )
 def test_find_no_resblocks_needed(test_input, expected):
-    assert models_cnn.find_no_cnn_resblocks_needed(**test_input) == expected
+    assert models_cnn.auto_find_no_cnn_residual_blocks_needed(**test_input) == expected
 
 
 def test_get_model_params(create_test_util_model):

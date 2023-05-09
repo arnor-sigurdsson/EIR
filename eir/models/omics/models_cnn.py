@@ -8,7 +8,7 @@ from aislib.misc_utils import get_logger
 from aislib.pytorch_modules import Swish
 from torch import nn
 
-from eir.models.layers import FirstCNNBlock, SelfAttention, CNNResidualBlock
+from eir.models.layers import FirstCNNBlock, CNNResidualBlock
 
 if TYPE_CHECKING:
     from eir.setup.input_setup_modules.common import DataDimensions
@@ -20,27 +20,30 @@ logger = get_logger(__name__)
 class CNNModelConfig:
     """
     Note that when using the automatic network setup, channels will get increased as
-    the input gets propagated through the network while the width gets reduced due to
-    stride.
+    the input gets propagated through the network while the width and height get
+    reduced due to stride.
 
     :param layers:
         Controls the number of layers in the model. If set to ``None``, the model will
-        automatically set up the number of layers until a certain width (stride * 8)
-        is met. Future work includes adding a parameter to control the target width.
+        automatically set up the number of layers until a certain width and height
+        (stride * 8 for width and height) are met. Future work includes adding a
+        parameter to control the target width and height.
 
     :param fc_repr_dim:
         Output dimension of the last FC layer in the network which accepts the outputs
         from the convolutional layer.
 
-    :param down_stride:
-        Down stride of the convolutional layers.
+    :param down_stride_width:
+        Down stride of the convolutional layers along the width.
 
-    :param first_stride_expansion:
-        Factor to extend the first layer stride. This value can both be positive or
-        negative. For example in the case of ``down_stride=12``, setting
-        ``first_stride_expansion=2`` means that the first layer will have a stride of
-        24, whereas other layers will have a stride of 12. When using a negative value,
-        divides the first stride by the value instead of multiplying.
+    :param first_stride_expansion_width:
+        Factor to extend the first layer stride along the width.
+
+    :param down_stride_height:
+        Down stride of the convolutional layers along the height.
+
+    :param first_stride_expansion_height:
+        Factor to extend the first layer stride along the height.
 
     :param channel_exp_base:
         Which power of 2 to use in order to set the number of channels in the network.
@@ -48,42 +51,31 @@ class CNNModelConfig:
         used.
 
     :param first_channel_expansion:
-        Factor to extend the first layer channels. This value can both be positive or
-        negative. For example in the case of ``channel_exp_base=3`` (i.e. 8 channels),
-        setting ``first_channel_expansion=2`` means that the first layer will have 16
-        channels, whereas other layers will have a channel of 8 as base.
-        When using a negative value, divides the first channel by the value instead
-        of multiplying.
+        Factor to extend the first layer channels.
 
     :param kernel_width:
-        Base kernel width of the convolutions. In case of omics,
-        differently from the LCL model configurations,
-        this number refers to the actual columns in the unflattened
-        input. So assuming an omics input, setting kernel_width=2 means 2 SNPs covered
-        at a time.
+        Base kernel width of the convolutions.
 
     :param kernel_height:
         Base kernel height of the convolutions.
 
-    :param first_kernel_expansion:
-        Factor to extend the first kernel. This value can both be positive or negative.
-        For example in the case of ``kernel_width=12``, setting
-        ``first_kernel_expansion=2`` means that the first kernel will have a width of
-        24, whereas other kernels will have a width of 12. When using a negative value,
-        divides the first kernel by the value instead of multiplying.
+    :param first_kernel_expansion_width:
+        Factor to extend the first kernel's width.
 
-    :param dilation_factor:
-        Base dilation factor of the convolutions in the network.
+    :param first_kernel_expansion_height:
+        Factor to extend the first kernel's height.
+
+    :param dilation_factor_width:
+        Base dilation factor of the convolutions along the width in the network.
+
+    :param dilation_factor_height:
+        Base dilation factor of the convolutions along the height in the network.
 
     :param rb_do:
         Dropout in the convolutional residual blocks.
 
     :param stochastic_depth_p:
         Probability of dropping input.
-
-    :param sa:
-        Whether to add a self-attention layer to the network after a width of 1024
-        has been reached.
 
     :param l1:
         L1 regularization to apply to the first layer.
@@ -93,22 +85,27 @@ class CNNModelConfig:
 
     fc_repr_dim: int = 32
 
-    down_stride: int = 4
-    first_stride_expansion: int = 1
-
     channel_exp_base: int = 2
     first_channel_expansion: int = 1
 
+    down_stride_width: int = 4
+    first_stride_expansion_width: int = 1
+
+    down_stride_height: int = 1
+    first_stride_expansion_height: int = 1
+
     kernel_width: int = 12
+    first_kernel_expansion_width: int = 1
+    dilation_factor_width: int = 1
+
     kernel_height: int = 4
-    first_kernel_expansion: int = 1
-    dilation_factor: int = 1
+    first_kernel_expansion_height: int = 1
+    dilation_factor_height: int = 1
 
     rb_do: float = 0.00
 
     stochastic_depth_p: float = 0.00
 
-    sa: bool = False
     l1: float = 0.00
 
 
@@ -137,18 +134,25 @@ class CNNModel(nn.Module):
             )
         )
 
-        self.data_size_after_conv = pytorch_utils.calc_size_after_conv_sequence(
-            self.data_dimensions.width, self.conv
+        size_func = pytorch_utils.calc_size_after_conv_sequence
+        size_after_conv_w, size_after_conv_h = size_func(
+            input_width=self.data_dimensions.width,
+            input_height=self.data_dimensions.height,
+            conv_sequence=self.conv,
         )
+        self.data_size_after_conv = size_after_conv_w * size_after_conv_h
+
         self.no_out_channels = self.conv[-1].out_channels
 
         self.fc = nn.Sequential(
             OrderedDict(
                 {
-                    "fc_1_norm_1": nn.LayerNorm(self.fc_1_in_features),
+                    "fc_1_norm_1": nn.LayerNorm(normalized_shape=self.fc_1_in_features),
                     "fc_1_act_1": Swish(),
                     "fc_1_linear_1": nn.Linear(
-                        self.fc_1_in_features, self.model_config.fc_repr_dim, bias=True
+                        in_features=self.fc_1_in_features,
+                        out_features=self.model_config.fc_repr_dim,
+                        bias=True,
                     ),
                 }
             )
@@ -172,22 +176,46 @@ class CNNModel(nn.Module):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 # Swish slope is roughly 0.5 around 0
-                nn.init.kaiming_normal_(m.weight, a=0.5, mode="fan_out")
+                nn.init.kaiming_normal_(tensor=m.weight, a=0.5, mode="fan_out")
 
     @property
     def residual_blocks(self) -> List[int]:
         if not self.model_config.layers:
-            residual_blocks = find_no_cnn_resblocks_needed(
-                self.data_dimensions.width,
-                self.model_config.down_stride,
-                self.model_config.first_stride_expansion,
+            stride_w = self.model_config.down_stride_width
+            stride_h = self.model_config.down_stride_height
+
+            if stride_w < 2 and stride_h < 2:
+                raise ValueError(
+                    "At least one of the strides must be greater than 1, "
+                    "when automatic residual block calculation is used"
+                    "for CNN model creation. Got strides: "
+                    f"down_stride_width: {stride_w} "
+                    f"and down_stride_height: {stride_h}."
+                )
+
+            residual_blocks_w = auto_find_no_cnn_residual_blocks_needed(
+                size=self.data_dimensions.width,
+                stride=self.model_config.down_stride_width,
+                first_stride_expansion=self.model_config.first_stride_expansion_width,
             )
+            residual_blocks_h = auto_find_no_cnn_residual_blocks_needed(
+                size=self.data_dimensions.height,
+                stride=self.model_config.down_stride_height,
+                first_stride_expansion=self.model_config.first_stride_expansion_height,
+            )
+
+            if sum(residual_blocks_w) > sum(residual_blocks_h):
+                residual_blocks = residual_blocks_w
+            else:
+                residual_blocks = residual_blocks_h
+
             logger.debug(
                 "No residual blocks specified in CL args, using input "
-                "%s based on width approximation calculation.",
+                "%s based on size approximation calculation.",
                 residual_blocks,
             )
             return residual_blocks
+
         return self.model_config.layers
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
@@ -222,16 +250,27 @@ def _make_conv_layers(
     """
     mc = cnn_model_configuration
 
-    down_stride_w = mc.down_stride
-
     first_conv_channels = 2**mc.channel_exp_base * mc.first_channel_expansion
-    first_conv_kernel = mc.kernel_width * mc.first_kernel_expansion
-    first_conv_stride = down_stride_w * mc.first_stride_expansion
 
-    first_kernel, first_pad = pytorch_utils.calc_conv_params_needed(
-        input_width=data_dimensions.width,
-        kernel_size=first_conv_kernel,
-        stride=first_conv_stride,
+    down_stride_w = mc.down_stride_width
+    first_conv_kernel_w = mc.kernel_width * mc.first_kernel_expansion_width
+    first_conv_stride_w = down_stride_w * mc.first_stride_expansion_width
+
+    first_kernel_w, first_pad_w = pytorch_utils.calc_conv_params_needed(
+        input_size=data_dimensions.width,
+        kernel_size=first_conv_kernel_w,
+        stride=first_conv_stride_w,
+        dilation=1,
+    )
+
+    down_stride_h = mc.down_stride_height
+    first_conv_kernel_h = mc.kernel_height * mc.first_kernel_expansion_height
+    first_conv_stride_h = mc.down_stride_height * mc.first_stride_expansion_height
+
+    first_kernel_h, first_pad_h = pytorch_utils.calc_conv_params_needed(
+        input_size=data_dimensions.height,
+        kernel_size=first_conv_kernel_h,
+        stride=first_conv_stride_h,
         dilation=1,
     )
 
@@ -239,63 +278,76 @@ def _make_conv_layers(
         FirstCNNBlock(
             in_channels=data_dimensions.channels,
             out_channels=first_conv_channels,
-            conv_1_kernel_h=data_dimensions.height,
-            conv_1_kernel_w=first_kernel,
-            conv_1_padding=first_pad,
-            down_stride_w=first_conv_stride,
-            dilation=1,
+            conv_1_kernel_h=first_kernel_h,
+            conv_1_kernel_w=first_kernel_w,
+            conv_1_padding_w=first_pad_w,
+            conv_1_padding_h=first_pad_h,
+            down_stride_w=first_conv_stride_w,
+            dilation_w=1,
+            dilation_h=1,
             rb_do=mc.rb_do,
         )
     ]
 
-    sa_added = False
     for layer_arch_idx, layer_arch_layers in enumerate(residual_blocks):
         for layer in range(layer_arch_layers):
-            cur_layer, cur_width = _get_conv_resblock(
+            cur_layer, cur_width, cur_height = _get_conv_residual_block(
                 conv_blocks=conv_blocks,
                 layer_arch_idx=layer_arch_idx,
-                down_stride=down_stride_w,
+                down_stride_w=down_stride_w,
+                down_stride_h=down_stride_h,
                 cnn_config=cnn_model_configuration,
                 data_dimensions=data_dimensions,
             )
-
-            if mc.sa and cur_width < 1024 and not sa_added:
-                attention_channels = conv_blocks[-1].out_channels
-                conv_blocks.append(SelfAttention(attention_channels))
-                sa_added = True
 
             conv_blocks.append(cur_layer)
 
     return conv_blocks
 
 
-def _get_conv_resblock(
+def _get_conv_residual_block(
     conv_blocks: List[nn.Module],
     layer_arch_idx: int,
-    down_stride: int,
+    down_stride_w: int,
+    down_stride_h: int,
     cnn_config: CNNModelConfig,
     data_dimensions: "DataDimensions",
-) -> Tuple[CNNResidualBlock, int]:
+) -> Tuple[CNNResidualBlock, int, int]:
     mc = cnn_config
 
     cur_conv = nn.Sequential(*conv_blocks)
-    cur_width = pytorch_utils.calc_size_after_conv_sequence(
-        input_width=data_dimensions.width, conv_sequence=cur_conv
+    cur_width, cur_height = pytorch_utils.calc_size_after_conv_sequence(
+        input_width=data_dimensions.width,
+        input_height=data_dimensions.height,
+        conv_sequence=cur_conv,
     )
 
-    cur_kern, cur_padd = pytorch_utils.calc_conv_params_needed(
-        input_width=cur_width,
+    cur_kernel_w, cur_padding_w = pytorch_utils.calc_conv_params_needed(
+        input_size=cur_width,
         kernel_size=mc.kernel_width,
-        stride=down_stride,
+        stride=down_stride_w,
+        dilation=1,
+    )
+
+    cur_kernel_h, cur_padding_h = pytorch_utils.calc_conv_params_needed(
+        input_size=cur_height,
+        kernel_size=mc.kernel_height,
+        stride=down_stride_h,
         dilation=1,
     )
 
     cur_block_number = (
         len([i for i in conv_blocks if isinstance(i, CNNResidualBlock)]) + 1
     )
-    cur_dilation_factor = _get_cur_dilation(
-        dilation_factor=mc.dilation_factor,
+    cur_dilation_factor_w = _get_cur_dilation(
+        dilation_factor=mc.dilation_factor_width,
         width=cur_width,
+        block_number=cur_block_number,
+    )
+
+    cur_dilation_factor_h = _get_cur_dilation(
+        dilation_factor=mc.dilation_factor_height,
+        width=cur_height,
         block_number=cur_block_number,
     )
 
@@ -305,17 +357,19 @@ def _get_conv_resblock(
     cur_layer = CNNResidualBlock(
         in_channels=cur_in_channels,
         out_channels=cur_out_channels,
-        conv_1_kernel_h=1,
-        conv_1_kernel_w=cur_kern,
-        conv_1_padding=cur_padd,
-        down_stride_w=down_stride,
-        dilation=cur_dilation_factor,
+        conv_1_kernel_w=cur_kernel_w,
+        conv_1_padding_w=cur_padding_w,
+        conv_1_kernel_h=cur_kernel_h,
+        conv_1_padding_h=cur_padding_h,
+        down_stride_w=down_stride_w,
+        dilation_w=cur_dilation_factor_w,
+        dilation_h=cur_dilation_factor_h,
         full_preact=True if len(conv_blocks) == 1 else False,
         rb_do=mc.rb_do,
         stochastic_depth_p=mc.stochastic_depth_p,
     )
 
-    return cur_layer, cur_width
+    return cur_layer, cur_width, cur_height
 
 
 def _get_cur_dilation(dilation_factor: int, width: int, block_number: int):
@@ -323,6 +377,10 @@ def _get_cur_dilation(dilation_factor: int, width: int, block_number: int):
     Note that block_number refers to the number of residual blocks (not first block
     or self attention).
     """
+
+    if width == 1:
+        return 1
+
     dilation = dilation_factor**block_number
 
     while dilation >= width:
@@ -331,15 +389,15 @@ def _get_cur_dilation(dilation_factor: int, width: int, block_number: int):
     return dilation
 
 
-def find_no_cnn_resblocks_needed(
-    width: int, stride: int, first_stride_expansion: int
+def auto_find_no_cnn_residual_blocks_needed(
+    size: int, stride: int, first_stride_expansion: int
 ) -> List[int]:
     """
     Used in order to calculate / set up residual blocks specifications as a list
     automatically when they are not passed in as CL args, based on the minimum
     width after the resblock convolutions.
 
-    We have 2 resblocks per channel depth until we have a total of 8 blocks,
+    We have 2 residual_blocks per channel depth until we have a total of 8 blocks,
     then the rest is put in the third depth index (following resnet convention).
 
     That is with a base channel depth of 32, we have these depths in the list:
@@ -354,21 +412,21 @@ def find_no_cnn_resblocks_needed(
 
     min_size = 8 * stride
     # account for first conv
-    cur_width = width // (stride * first_stride_expansion)
+    cur_width = size // (stride * first_stride_expansion)
 
-    resblocks = [0] * 4
+    residual_blocks = [0] * 4
     while cur_width >= min_size:
-        cur_no_blocks = sum(resblocks)
+        cur_no_blocks = sum(residual_blocks)
 
         if cur_no_blocks >= 8:
-            resblocks[2] += 1
+            residual_blocks[2] += 1
         else:
             cur_index = cur_no_blocks // 2
-            resblocks[cur_index] += 1
+            residual_blocks[cur_index] += 1
 
         cur_width = cur_width // stride
 
-    return [i for i in resblocks if i != 0]
+    return [i for i in residual_blocks if i != 0]
 
 
 class GeneralPositionalEmbedding(nn.Module):

@@ -35,7 +35,4 @@ def get_array_feature_extractor(
     )
     array_model = array_model_class(**model_init_kwargs)
 
-    if model_type == "cnn":
-        assert array_model.data_size_after_conv >= 8
-
     return array_model

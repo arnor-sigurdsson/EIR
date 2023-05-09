@@ -209,14 +209,14 @@ frozenlist = ">=1.1.0"
 
 [[package]]
 name = "aislib"
-version = "0.1.9a0"
+version = "0.1.12a0"
 description = ""
 category = "main"
 optional = false
 python-versions = ">=3.8,<4.0"
 files = [
-    {file = "aislib-0.1.9a0-py3-none-any.whl", hash = "sha256:867da60dde3218c381d79ea388e43e4398a3cdf4ed9a914afe2dec73751ba637"},
-    {file = "aislib-0.1.9a0.tar.gz", hash = "sha256:d38226c6d4e83c572bfbe6fa1e3515c2e793ff503bfc0b874a8104e39f7e4e13"},
+    {file = "aislib-0.1.12a0-py3-none-any.whl", hash = "sha256:c8dd43e60a69b412fdd9ff46f0413cb31aa186150c3e16d5b3fc820bbfdd0fd0"},
+    {file = "aislib-0.1.12a0.tar.gz", hash = "sha256:f5fd944360f274f7fc4a98850847bf85ef21baa151615c058f9d206f46b0f79c"},
 ]
 
 [package.dependencies]
@@ -6065,4 +6065,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11.0"
-content-hash = "fa3dd439be2e77f3b814dcf45fb4d8aba2754026640cbc9f61b4526bda2820ed"
+content-hash = "02cf00126278ae21a8447915c694eb814aa214e8ee0af20b9627235f6a64c2d7"

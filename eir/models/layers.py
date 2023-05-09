@@ -1,6 +1,6 @@
 import math
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Tuple
 
 import torch
 import torch.nn.functional as F
@@ -11,71 +11,6 @@ from torch.nn import Parameter
 from torchvision.ops.stochastic_depth import StochasticDepth
 
 logger = get_logger(__name__)
-
-
-class SelfAttention(nn.Module):
-    def __init__(self, in_channels):
-        super(SelfAttention, self).__init__()
-        self.in_channels = in_channels
-        self.reduction = max(self.in_channels // 8, 1)
-
-        self.conv_theta = nn.Conv2d(
-            in_channels=in_channels,
-            out_channels=self.reduction,
-            kernel_size=1,
-            bias=True,
-        )
-        self.conv_phi = nn.Conv2d(
-            in_channels=in_channels,
-            out_channels=self.reduction,
-            kernel_size=1,
-            bias=True,
-        )
-        self.conv_g = nn.Conv2d(
-            in_channels=in_channels,
-            out_channels=in_channels // 2,
-            kernel_size=1,
-            bias=True,
-        )
-        self.conv_o = nn.Conv2d(
-            in_channels=in_channels // 2,
-            out_channels=in_channels,
-            kernel_size=1,
-            bias=True,
-        )
-        self.pool = nn.AvgPool2d((1, 4), stride=(1, 4), padding=0)
-        self.softmax = nn.Softmax(dim=-1)
-        self.gamma = nn.Parameter(torch.zeros(1), True)
-
-    def forward(self, x):
-        _, ch, h, w = x.size()
-
-        # Theta path
-        theta = self.conv_theta(x)
-        theta = theta.view(-1, self.reduction, h * w)
-
-        # Phi path
-        phi = self.conv_phi(x)
-        phi = self.pool(phi)
-        phi = phi.view(-1, self.reduction, h * w // 4)
-
-        # Attn map
-        attn = torch.bmm(theta.permute(0, 2, 1), phi)
-        attn = self.softmax(attn)
-
-        # g path
-        g = self.conv_g(x)
-        g = self.pool(g)
-        g = g.view(-1, ch // 2, h * w // 4)
-
-        # Attn_g - o_conv
-        attn_g = torch.bmm(g, attn.permute(0, 2, 1))
-        attn_g = attn_g.view(-1, ch // 2, h, w)
-        attn_g = self.conv_o(attn_g)
-
-        # Out
-        out = x + self.gamma * attn_g
-        return out
 
 
 class SEBlock(nn.Module):
@@ -121,23 +56,32 @@ class CNNResidualBlockBase(nn.Module):
         in_channels: int,
         out_channels: int,
         rb_do: float,
-        dilation: int,
+        dilation_w: int,
+        dilation_h: int,
         conv_1_kernel_h: int = 1,
         conv_1_kernel_w: int = 12,
-        conv_1_padding: int = 4,
+        conv_1_padding_w: int = 4,
+        conv_1_padding_h: int = 4,
         down_stride_w: int = 4,
+        down_stride_h: int = 1,
         stochastic_depth_p: float = 0.0,
     ):
         super().__init__()
 
         self.in_channels = in_channels
         self.out_channels = out_channels
+
         self.conv_1_kernel_h = conv_1_kernel_h
         self.conv_1_kernel_w = conv_1_kernel_w
-        self.conv_1_padding = conv_1_padding
-        self.down_stride_w = down_stride_w
 
-        self.down_stride_h = self.conv_1_kernel_h
+        self.dilation_w = dilation_w
+        self.dilation_h = dilation_h
+
+        self.conv_1_padding_w = conv_1_padding_w
+        self.conv_1_padding_h = conv_1_padding_h
+
+        self.down_stride_w = down_stride_w
+        self.down_stride_h = down_stride_h
 
         self.stochastic_depth_p = stochastic_depth_p
 
@@ -146,36 +90,39 @@ class CNNResidualBlockBase(nn.Module):
 
         self.norm_1 = nn.GroupNorm(num_groups=1, num_channels=in_channels)
         self.conv_1 = nn.Conv2d(
-            in_channels,
-            out_channels,
-            kernel_size=(self.conv_1_kernel_h, conv_1_kernel_w),
-            stride=(self.down_stride_h, down_stride_w),
-            padding=(0, conv_1_padding),
+            in_channels=self.in_channels,
+            out_channels=self.out_channels,
+            kernel_size=(self.conv_1_kernel_h, self.conv_1_kernel_w),
+            stride=(self.down_stride_h, self.down_stride_w),
+            padding=(self.conv_1_padding_h, self.conv_1_padding_w),
             bias=True,
         )
 
-        conv_2_kernel_w = (
-            conv_1_kernel_w - 1 if conv_1_kernel_w % 2 == 0 else conv_1_kernel_w
+        conv_2_kernel_h, conv_2_padding_h = _compute_conv_2_parameters(
+            conv_1_kernel_size=conv_1_kernel_h, dilation=dilation_h
         )
-        conv_2_padding = conv_2_kernel_w // 2
+
+        conv_2_kernel_w, conv_2_padding_w = _compute_conv_2_parameters(
+            conv_1_kernel_size=conv_1_kernel_w, dilation=dilation_w
+        )
 
         self.conv_2 = nn.Conv2d(
-            out_channels,
-            out_channels,
-            kernel_size=(1, conv_2_kernel_w),
+            in_channels=self.out_channels,
+            out_channels=self.out_channels,
+            kernel_size=(conv_2_kernel_h, conv_2_kernel_w),
             stride=(1, 1),
-            padding=(0, conv_2_padding * dilation),
-            dilation=(1, dilation),
+            padding=(conv_2_padding_h * dilation_h, conv_2_padding_w * dilation_w),
+            dilation=(dilation_h, dilation_w),
             bias=True,
         )
 
         self.downsample_identity = nn.Sequential(
             nn.Conv2d(
-                in_channels,
-                out_channels,
-                kernel_size=(self.conv_1_kernel_h, conv_1_kernel_w),
-                stride=(self.down_stride_h, down_stride_w),
-                padding=(0, conv_1_padding),
+                in_channels=in_channels,
+                out_channels=out_channels,
+                kernel_size=(self.conv_1_kernel_h, self.conv_1_kernel_w),
+                stride=(self.down_stride_h, self.down_stride_w),
+                padding=(self.conv_1_padding_h, self.conv_1_padding_w),
                 bias=True,
             )
         )
@@ -184,8 +131,22 @@ class CNNResidualBlockBase(nn.Module):
 
         self.se_block = SEBlock(channels=out_channels, reduction=16)
 
-    def forward(self, x: torch.Tensor):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         raise NotImplementedError()
+
+
+def _compute_conv_2_parameters(
+    conv_1_kernel_size: int,
+    dilation: int,
+) -> Tuple[int, int]:
+    conv_2_kernel = (
+        conv_1_kernel_size - 1 if conv_1_kernel_size % 2 == 0 else conv_1_kernel_size
+    )
+
+    conv_2_padding = conv_2_kernel // 2
+    conv_2_padding = conv_2_padding * dilation
+
+    return conv_2_kernel, conv_2_padding
 
 
 class FirstCNNBlock(CNNResidualBlockBase):
