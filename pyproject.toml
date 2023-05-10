@@ -10,7 +10,7 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.11.0"
-pandas = "^1.2.0"
+pandas = "^2.0.1"
 numpy = "^1.19.2"
 torch = "^2.0.0"
 torchvision = "^0.15.1"
@@ -27,7 +27,7 @@ ConfigArgParse = "^1.2.3"
 torch-optimizer = "^0.3.0"
 adabelief-pytorch = "^0.2.0"
 dill = "^0.3.3"
-aislib = "^0.1.12a0"
+aislib = "^0.1.13a0"
 colorama = "^0.4.4"
 torchtext = "^0.15.1"
 transformers = "^4.11.3"

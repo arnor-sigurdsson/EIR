@@ -8,7 +8,7 @@ to thank the people that developed the packages this project
 directly depends on, those that developed the packages those projects depend on,
 and so on:
 
-- ``pandas``  – The Pandas Development Team: Powerful data structures for data analysis, time series, and statistics
+- ``pandas`` : Powerful data structures for data analysis, time series, and statistics
 
 - ``numpy``  – Travis E. Oliphant et al.: Fundamental package for array computing in Python
 
