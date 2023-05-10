@@ -47,6 +47,7 @@ al_feature_extractor_configs_classes = Union[
     Type[TabularModelConfig],
     Type[ImageModelConfig],
     Type[SequenceModelConfig],
+    Type[ArrayModelConfig],
 ]
 
 al_models_classes = Union[

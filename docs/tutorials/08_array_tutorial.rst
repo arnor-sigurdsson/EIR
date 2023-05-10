@@ -54,6 +54,10 @@ Here are the configurations for the 1D case:
     :language: yaml
     :caption:
 
+.. important::
+    The CNN functionality for arrays is currently experimental,
+    and might change in later versions of ``EIR``.
+
 We will be training both the CNN and LCL (locally-connected-layers) models,
 here is an example configuration for the LCL model:
 
@@ -82,6 +86,38 @@ As usual, we can run the following command to train for the CNN and LCL cases:
 
 .. literalinclude:: tutorial_files/08_array_tutorial/commands/LCL_1.txt
     :language: console
+
+For the 2D and 3D cases, here are the configurations:
+
+.. literalinclude:: tutorial_files/08_array_tutorial/input_2d_cnn.yaml
+    :language: yaml
+    :caption:
+
+.. literalinclude:: tutorial_files/08_array_tutorial/input_2d_lcl.yaml
+    :language: yaml
+    :caption:
+
+.. literalinclude:: tutorial_files/08_array_tutorial/input_3d_cnn.yaml
+    :language: yaml
+    :caption:
+
+.. literalinclude:: tutorial_files/08_array_tutorial/input_3d_lcl.yaml
+    :language: yaml
+    :caption:
+
+
+.. note::
+    For the CNN model, you might be wondering about the ``kernel_height``
+    and ``first_kernel_expansion_height`` parameters. The ``kernel_height``
+    parameter refers to the "base" kernel height that is used throughout
+    the model. In the 2D case, we are working with 4xN arrays, and
+    want the kernels in the first layer to be able to cover the entire
+    height of the array. Successive kernels will then operate on a height
+    of 1. Coming back to the parameters,
+    the ``first_kernel_expansion_height=4`` is indicating that the first
+    layer should have a kernel height of 4, and the ``kernel_height=1``
+    is indicating that the successive layers should have a kernel height of 1.
+
 
 After training, I got the following validation results:
 

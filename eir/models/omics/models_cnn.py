@@ -33,18 +33,6 @@ class CNNModelConfig:
         Output dimension of the last FC layer in the network which accepts the outputs
         from the convolutional layer.
 
-    :param down_stride_width:
-        Down stride of the convolutional layers along the width.
-
-    :param first_stride_expansion_width:
-        Factor to extend the first layer stride along the width.
-
-    :param down_stride_height:
-        Down stride of the convolutional layers along the height.
-
-    :param first_stride_expansion_height:
-        Factor to extend the first layer stride along the height.
-
     :param channel_exp_base:
         Which power of 2 to use in order to set the number of channels in the network.
         For example, setting ``channel_exp_base=3`` means that 2**3=8 channels will be
@@ -56,17 +44,29 @@ class CNNModelConfig:
     :param kernel_width:
         Base kernel width of the convolutions.
 
-    :param kernel_height:
-        Base kernel height of the convolutions.
-
     :param first_kernel_expansion_width:
         Factor to extend the first kernel's width.
+
+    :param down_stride_width:
+        Down stride of the convolutional layers along the width.
+
+    :param first_stride_expansion_width:
+        Factor to extend the first layer stride along the width.
+
+    :param dilation_factor_width:
+        Base dilation factor of the convolutions along the width in the network.
+
+    :param kernel_height:
+        Base kernel height of the convolutions.
 
     :param first_kernel_expansion_height:
         Factor to extend the first kernel's height.
 
-    :param dilation_factor_width:
-        Base dilation factor of the convolutions along the width in the network.
+    :param down_stride_height:
+        Down stride of the convolutional layers along the height.
+
+    :param first_stride_expansion_height:
+        Factor to extend the first layer stride along the height.
 
     :param dilation_factor_height:
         Base dilation factor of the convolutions along the height in the network.
@@ -74,7 +74,7 @@ class CNNModelConfig:
     :param cutoff:
         If the *resulting* dimension of width * height of adding a successive block
         is less than this value, will stop adding residual blocks to the
-         model in the automated case (i.e., if the layers argument is not specified).
+        model in the automated case (i.e., if the layers argument is not specified).
 
     :param rb_do:
         Dropout in the convolutional residual blocks.

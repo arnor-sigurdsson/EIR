@@ -25,8 +25,8 @@ def get_tutorial_08_run_cnn_1_info() -> AutoDocExperimentInfo:
     ]
 
     mapping = [
-        ("training_curve_ACC", "figures/tutorial_01_training_curve_ACC_cnn_1.pdf"),
-        ("600/confusion_matrix", "figures/tutorial_01_confusion_matrix_cnn_1.pdf"),
+        ("training_curve_ACC", "figures/tutorial_08_training_curve_ACC_cnn_1.pdf"),
+        ("600/confusion_matrix", "figures/tutorial_08_confusion_matrix_cnn_1.pdf"),
     ]
 
     data_output_path = Path(

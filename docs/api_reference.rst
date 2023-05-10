@@ -3,6 +3,10 @@
 API
 ===
 
+.. contents::
+   :local:
+   :depth: 2
+
 
 Global Configurations
 ---------------------
@@ -34,6 +38,28 @@ Input Type Configurations
 
 .. autoclass:: eir.setup.schemas.ArrayInputDataConfig
 
+Input Model Configurations
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+These configurations are used to specify the
+input feature extractor architecture, as
+well as paramters that can be common between different feature extractors.
+For a given feature extractor (specified with the `model_type` field), there
+are there are various configurations available through the `model_init_config`
+field. The documentation below contains more details about the different
+configurations available for each feature extractor.
+
+.. autoclass:: eir.models.omics.omics_models.OmicsModelConfig
+
+.. autoclass:: eir.models.tabular.tabular.TabularModelConfig
+
+.. autoclass:: eir.models.sequence.transformer_models.SequenceModelConfig
+
+.. autoclass:: eir.models.image.image_models.ImageModelConfig
+
+.. autoclass:: eir.models.array.array_models.ArrayModelConfig
+
+
 Interpretation Configurations
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -47,7 +73,6 @@ Feature Extractor Configurations
 
 The documentation below details what the parameters passed to the respective models
 (trough the `model_init_config` field in the `\-\-input_configs` `.yaml` files).
-
 
 Omics Feature Extractors
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -65,25 +90,29 @@ Omics Feature Extractors
 Tabular Feature Extractors
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. autoclass:: eir.models.tabular.tabular.TabularModelConfig
+.. autoclass:: eir.models.tabular.tabular.SimpleTabularModelConfig
 
 Sequence and Binary Feature Extractors
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-.. autoclass:: eir.models.sequence.transformer_models.SequenceModelConfig
 
 .. autoclass:: eir.models.sequence.transformer_models.BasicTransformerFeatureExtractorModelConfig
 
 Image Feature Extractors
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. autoclass:: eir.models.image.image_models.ImageModelConfig
+Please refer to `this page <https://huggingface.co/docs/timm/models>`_
+for information about the image models.
 
 
 Array Feature Extractors
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. autoclass:: eir.models.array.array_models.ArrayModelConfig
+.. autoclass:: eir.models.omics.models_cnn.CNNModelConfig
+    :noindex:
+
+.. autoclass:: eir.models.omics.models_locally_connected.LCLModelConfig
+    :noindex:
+
 
 Fusion Configurations
 ---------------------
