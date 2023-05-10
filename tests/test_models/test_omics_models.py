@@ -19,16 +19,17 @@ def test_make_conv_layers():
     conv_layer_list = [1, 1, 1, 1]
     test_model_config = models_cnn.CNNModelConfig(
         kernel_width=5,
+        first_kernel_expansion_width=1,
+        down_stride_width=4,
+        first_stride_expansion_width=5,
+        dilation_factor_width=1,
+        kernel_height=1,
+        first_kernel_expansion_height=4,
         layers=None,
         fc_repr_dim=512,
-        down_stride=4,
         rb_do=0.1,
-        first_kernel_expansion=1,
-        first_stride_expansion=5,
         first_channel_expansion=1,
-        dilation_factor=1,
         channel_exp_base=5,
-        sa=True,
     )
     test_data_dimensions = DataDimensions(channels=1, height=4, width=int(8e5))
     conv_layers = models_cnn._make_conv_layers(
@@ -37,10 +38,9 @@ def test_make_conv_layers():
         data_dimensions=test_data_dimensions,
     )
 
-    # account for first block, add +2 instead if using SA
-    assert len(conv_layers) == len(conv_layer_list) + 2
+    # +1 to account for first block
+    assert len(conv_layers) == len(conv_layer_list) + 1
     assert isinstance(conv_layers[0], layers.FirstCNNBlock)
-    assert isinstance(conv_layers[-2], layers.SelfAttention)
 
 
 @pytest.mark.parametrize(

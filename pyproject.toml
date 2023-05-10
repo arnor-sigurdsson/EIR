@@ -10,7 +10,7 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.11.0"
-pandas = "^1.2.0"
+pandas = "^2.0.1"
 numpy = "^1.19.2"
 torch = "^2.0.0"
 torchvision = "^0.15.1"
@@ -27,7 +27,7 @@ ConfigArgParse = "^1.2.3"
 torch-optimizer = "^0.3.0"
 adabelief-pytorch = "^0.2.0"
 dill = "^0.3.3"
-aislib = "^0.1.9a0"
+aislib = "^0.1.13a0"
 colorama = "^0.4.4"
 torchtext = "^0.15.1"
 transformers = "^4.11.3"
@@ -35,8 +35,9 @@ sentencepiece = "^0.1.96"
 ipython = "^8.4.0"
 perceiver-pytorch = "^0.8.1"
 timm = "^0.6.12"
-deeplake = "^3.0.10"
 captum = "^0.6.0"
+aioboto3 = "^11.1.0"
+deeplake = "^3.4.1"
 
 [tool.poetry.group.dev.dependencies]
 memory-profiler = "^0.60.0"

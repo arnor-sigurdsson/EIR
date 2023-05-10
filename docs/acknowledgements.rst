@@ -8,7 +8,7 @@ to thank the people that developed the packages this project
 directly depends on, those that developed the packages those projects depend on,
 and so on:
 
-- ``pandas``  – The Pandas Development Team: Powerful data structures for data analysis, time series, and statistics
+- ``pandas`` : Powerful data structures for data analysis, time series, and statistics
 
 - ``numpy``  – Travis E. Oliphant et al.: Fundamental package for array computing in Python
 
@@ -58,9 +58,11 @@ and so on:
 
 - ``timm``  – Ross Wightman: (Unofficial) PyTorch Image Models
 
-- ``deeplake``  – activeloop.ai: Activeloop Deep Lake
-
 - ``captum``  – PyTorch Team: Model interpretability for PyTorch
+
+- ``aioboto3``  – Terry Cain: Async boto3 wrapper
+
+- ``deeplake``  – activeloop.ai: Activeloop Deep Lake
 
 - ``memory-profiler``  – Fabian Pedregosa: A module for monitoring memory usage of a python program
 

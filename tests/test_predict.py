@@ -245,6 +245,7 @@ def _get_predict_test_data_parametrization() -> List[Dict[str, Any]]:
                                 "rb_do": 0.25,
                                 "channel_exp_base": 3,
                                 "l1": 1e-04,
+                                "kernel_height": 1,
                             },
                         },
                     },

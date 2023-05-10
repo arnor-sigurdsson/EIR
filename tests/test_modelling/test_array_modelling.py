@@ -69,6 +69,8 @@ def _get_classification_output_configs() -> Sequence[Dict]:
                                 "rb_do": 0.25,
                                 "channel_exp_base": 3,
                                 "l1": 1e-04,
+                                "kernel_height": 1,
+                                "attention_inclusion_cutoff": 256,
                             },
                         },
                     }
@@ -185,6 +187,7 @@ def _get_regression_output_configs() -> Sequence[Dict]:
                                 "rb_do": 0.25,
                                 "channel_exp_base": 3,
                                 "l1": 1e-04,
+                                "kernel_height": 1,
                             },
                         },
                     }

@@ -265,7 +265,7 @@ class GlobalConfig:
     lr_schedule: Literal["cycle", "plateau", "same", "cosine"] = "plateau"
     lr_plateau_patience: int = 10
     lr_plateau_factor: float = 0.2
-    gradient_clipping: float = 0.0
+    gradient_clipping: float = 1.0
     gradient_accumulation_steps: Union[None, int] = None
     gradient_noise: float = 0.0
     cat_averaging_metrics: Optional[Sequence[str]] = None
