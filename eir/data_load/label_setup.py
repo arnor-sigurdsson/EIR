@@ -79,6 +79,7 @@ def set_up_train_and_valid_tabular_data(
         ids_to_keep=ids_to_keep,
         custom_label_ops=custom_label_ops,
     )
+    _validate_df(df=df_labels)
 
     df_labels_train, df_labels_valid = _split_df_by_ids(
         df=df_labels, train_ids=train_ids, valid_ids=valid_ids
@@ -207,6 +208,17 @@ def get_label_parsing_wrapper(
     if label_parsing_chunk_size is None:
         return label_df_parse_wrapper
     return chunked_label_df_parse_wrapper
+
+
+def _validate_df(df: pd.DataFrame) -> None:
+    if df.index.duplicated().any():
+        duplicated_indices = df.index[df.index.duplicated()].tolist()[:10]
+        duplicated_indices_str = ", ".join(duplicated_indices)
+        raise ValueError(
+            f"Found duplicated indices in the dataframe. "
+            f"Random examples:  {duplicated_indices_str}. "
+            f"Please make sure that the indices in the ID column are unique."
+        )
 
 
 def label_df_parse_wrapper(

@@ -1026,6 +1026,34 @@ def test_split_df_by_ids(create_test_data, create_test_config):
         assert len(ids_valid) == int(expected_no_valid) == len(df_valid)
 
 
+def test_validate_df_pass():
+    df = pd.DataFrame({"A": [1, 2, 3], "B": [4, 5, 6]}, index=["a", "b", "c"])
+
+    label_setup._validate_df(df=df)
+
+
+def test_validate_df_fail():
+    df = pd.DataFrame(
+        {"A": [1, 2, 3, 4], "B": [5, 6, 7, 8]}, index=["a", "b", "b", "c"]
+    )
+
+    with pytest.raises(ValueError) as excinfo:
+        label_setup._validate_df(df)
+
+    assert "b" in str(excinfo.value)
+
+    df = pd.DataFrame(
+        {"A": [1, 2, 3, 4, 5, 6], "B": [7, 8, 9, 10, 11, 12]},
+        index=["a", "b", "b", "c", "c", "c"],
+    )
+
+    with pytest.raises(ValueError) as excinfo:
+        label_setup._validate_df(df)
+
+    assert "b" in str(excinfo.value)
+    assert "c" in str(excinfo.value)
+
+
 @pytest.mark.parametrize(
     "create_test_config_init_base",
     [
