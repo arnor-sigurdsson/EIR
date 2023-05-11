@@ -12,7 +12,7 @@ RUN add-apt-repository -y ppa:deadsnakes/ppa
 RUN apt-get install -y python3.11 python3.11-dev python3.11-distutils python3.11-venv
 
 ENV VIRTUAL_ENV=/opt/venv
-RUN python3.10 -m venv $VIRTUAL_ENV
+RUN python3.11 -m venv $VIRTUAL_ENV
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 RUN python3.11 -m pip install eir-dl
