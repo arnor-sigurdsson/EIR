@@ -34,6 +34,8 @@ Supervised modelling on genotype, tabular, sequence, image, array and binary dat
 
 `pip install eir-dl`
 
+**Important:** The latest version of EIR supports Python 3.11. Using an older version of Python will install a old version of EIR, which likely be incompatible with the current documentation and might contain bugs. Please ensure that you are installing EIR in a Python 3.11 environment.
+
 ## Usage
 
 Please refer to the [Documentation](https://eir.readthedocs.io/en/latest/index.html) for examples and information.
