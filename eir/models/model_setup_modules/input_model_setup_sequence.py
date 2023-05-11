@@ -180,7 +180,8 @@ def _get_pretrained_hf_sequence_feature_extractor_objects(
             param.requires_grad = False
 
     pretrained_embedding_dim = _pretrained_hf_model_embedding_dim(
-        embeddings=pretrained_model_embeddings
+        embeddings=pretrained_model_embeddings,
+        model_name=model_name,
     )
     known_out_features = _get_manual_out_features_for_external_feature_extractor(
         input_length=feature_extractor_max_length,
@@ -227,7 +228,8 @@ def _get_hf_sequence_feature_extractor_objects(
     pretrained_model_embeddings = feature_extractor.get_input_embeddings()
 
     pretrained_embedding_dim = _pretrained_hf_model_embedding_dim(
-        embeddings=pretrained_model_embeddings
+        embeddings=pretrained_model_embeddings,
+        model_name=model_name,
     )
     known_out_features = _get_manual_out_features_for_external_feature_extractor(
         input_length=feature_extractor_max_length,
@@ -247,7 +249,9 @@ def _get_hf_sequence_feature_extractor_objects(
     return objects_for_wrapper
 
 
-def _pretrained_hf_model_embedding_dim(embeddings: nn.Module) -> int:
+def _pretrained_hf_model_embedding_dim(
+    embeddings: nn.Module, model_name: str = ""
+) -> int:
     if hasattr(embeddings, "embedding_dim"):
         return embeddings.embedding_dim
     elif hasattr(embeddings, "dim"):
@@ -255,7 +259,7 @@ def _pretrained_hf_model_embedding_dim(embeddings: nn.Module) -> int:
     elif hasattr(embeddings, "emb_layers"):
         return embeddings.emb_layers[0].embedding_dim
 
-    raise ValueError("Could not find embedding dimension.")
+    raise ValueError(f"Could not find embedding dimension for model {model_name}.")
 
 
 def _get_hf_model(model_name: str, model_config: Dict[str, Any]) -> nn.Module:
