@@ -76,7 +76,7 @@ If you are an ML/DL researcher developing new models, etc., it might not fit you
 
 ## Citation
 
-If you use `EIR` in a scientific publication, we would appreciate if you could use the following citation:
+If you use `EIR` in a scientific publication, we would appreciate if you could use one of the following citations:
 
 ```
 @article{sigurdsson2021deep,
@@ -85,6 +85,15 @@ If you use `EIR` in a scientific publication, we would appreciate if you could u
   journal={bioRxiv},
   year={2021},
   publisher={Cold Spring Harbor Laboratory}
+}
+
+@article{sigurdsson2022improved,
+  title={Improved prediction of blood biomarkers using deep learning},
+  author={Sigurdsson, Arnor Ingi and Ravn, Kirstine and Winther, Ole and Lund, Ole and Brunak, S{\o}ren and Vilhjalmsson, Bjarni J and Rasmussen, Simon},
+  journal={medRxiv},
+  pages={2022--10},
+  year={2022},
+  publisher={Cold Spring Harbor Laboratory Press}
 }
 ```
 
