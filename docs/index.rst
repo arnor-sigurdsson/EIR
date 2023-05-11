@@ -18,17 +18,29 @@ and pre-processing required to train a model.
 Installation
 ------------
 
+Installing EIR via pip
+~~~~~~~~~~~~~~~~~~~~~~
+
 .. code-block:: console
 
     $ pip install eir-dl
 
 .. important::
-    The latest version of EIR supports
-    `Python 3.11 <https://www.python.org/downloads/>`_.
-    Using an older version of Python will install an old version of EIR,
+    The latest version of EIR supports `Python 3.11 <https://www.python.org/downloads/>`_.
+    Using an older version of Python will install an outdated version of EIR,
     which is likely to be incompatible with the current documentation
-    and may contain bugs.
-    Please make sure that you are installing EIR in a Python 3.11 environment.
+    and may contain bugs. Please make sure that you are installing EIR in a Python 3.11 environment.
+
+Installing EIR via Container Engine
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Here's an example with Docker:
+
+.. code-block:: console
+
+    $ docker build -t eir:latest https://raw.githubusercontent.com/arnor-sigurdsson/EIR/master/Dockerfile
+    $ docker run -d --name eir_container eir:latest
+    $ docker exec -it eir_container bash
 
 
 Documentation
