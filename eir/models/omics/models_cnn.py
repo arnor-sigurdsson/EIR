@@ -120,6 +120,87 @@ class CNNModelConfig:
     l1: float = 0.00
 
 
+def _validate_cnn_config(model_config: CNNModelConfig) -> None:
+    mc = model_config
+
+    if mc.down_stride_width > mc.kernel_width:
+        raise ValueError(
+            f"Down stride width {mc.down_stride_width}"
+            f" is greater than kernel width {mc.kernel_width}."
+            f"This is currently not supported."
+        )
+
+    if mc.down_stride_height > mc.kernel_height:
+        raise ValueError(
+            f"Down stride height {mc.down_stride_height} "
+            f" is greater than kernel height {mc.kernel_height}."
+            f"This is currently not supported."
+        )
+
+    first_stride_w = mc.down_stride_width * mc.first_stride_expansion_width
+    first_kernel_w = mc.kernel_width * mc.first_kernel_expansion_width
+
+    first_stride_h = mc.down_stride_height * mc.first_stride_expansion_height
+    first_kernel_h = mc.kernel_height * mc.first_kernel_expansion_height
+
+    if first_stride_w > first_kernel_w:
+        raise ValueError(
+            f"Effective down stride width {first_stride_w}"
+            f" (down stride width {mc.down_stride_width}"
+            f" times first stride expansion width {mc.first_stride_expansion_width})"
+            f" is greater than effective kernel width {first_kernel_w}"
+            f" (kernel width {mc.kernel_width}"
+            f" times first kernel expansion width {mc.first_kernel_expansion_width})."
+            f"This is currently not supported."
+        )
+
+    if first_stride_h > first_kernel_h:
+        raise ValueError(
+            f"Effective down stride height {first_stride_h} "
+            f" (down stride height {mc.down_stride_height} "
+            f"times first stride expansion height {mc.first_stride_expansion_height})"
+            f" is greater than effective kernel height {first_kernel_h}"
+            f" (kernel height {mc.kernel_height}"
+            f" times first kernel expansion height {mc.first_kernel_expansion_height})."
+            f"This is currently not supported."
+        )
+
+    positive_int_params = [
+        "fc_repr_dim",
+        "first_channel_expansion",
+        "kernel_width",
+        "first_kernel_expansion_width",
+        "down_stride_width",
+        "first_stride_expansion_width",
+        "dilation_factor_width",
+        "kernel_height",
+        "first_kernel_expansion_height",
+        "down_stride_height",
+        "first_stride_expansion_height",
+        "dilation_factor_height",
+        "cutoff",
+    ]
+    for param in positive_int_params:
+        if getattr(mc, param) <= 0:
+            raise ValueError(f"{param} must be a positive integer.")
+
+    float_params = ["rb_do", "stochastic_depth_p"]
+    for param in float_params:
+        value = getattr(mc, param)
+        if not (0 <= value <= 1):
+            raise ValueError(f"{param} must be in the range [0, 1].")
+
+    if mc.l1 < 0:
+        raise ValueError("l1 must be non-negative.")
+
+    if mc.layers is not None:
+        if not all(isinstance(layer, int) and layer > 0 for layer in mc.layers):
+            raise ValueError(
+                "layers must be a list of positive integers "
+                "(or None for automatic setup)."
+            )
+
+
 class CNNModel(nn.Module):
     def __init__(
         self,
@@ -127,6 +208,8 @@ class CNNModel(nn.Module):
         data_dimensions: "DataDimensions",
     ):
         super().__init__()
+
+        _validate_cnn_config(model_config=model_config)
 
         self.model_config = model_config
         self.data_dimensions = data_dimensions
@@ -206,12 +289,18 @@ class CNNModel(nn.Module):
                 )
 
             residual_blocks = auto_find_no_cnn_residual_blocks_needed(
-                size_w=self.data_dimensions.width,
+                input_size_w=self.data_dimensions.width,
+                kernel_w=mc.kernel_width,
+                first_kernel_expansion_w=mc.first_kernel_expansion_width,
                 stride_w=mc.down_stride_width,
                 first_stride_expansion_w=mc.first_stride_expansion_width,
-                size_h=self.data_dimensions.height,
+                dilation_w=mc.dilation_factor_width,
+                input_size_h=self.data_dimensions.height,
+                kernel_h=mc.kernel_height,
+                first_kernel_expansion_h=mc.first_kernel_expansion_height,
                 stride_h=mc.down_stride_height,
                 first_stride_expansion_h=mc.first_stride_expansion_height,
+                dilation_h=mc.dilation_factor_height,
                 cutoff=mc.cutoff,
             )
 
@@ -342,33 +431,33 @@ def _get_conv_residual_block(
         conv_sequence=cur_conv,
     )
 
+    cur_block_number = (
+        len([i for i in conv_blocks if isinstance(i, CNNResidualBlock)]) + 1
+    )
+    cur_dilation_factor_w = _get_cur_dilation(
+        dilation_factor=mc.dilation_factor_width,
+        size=cur_width,
+        block_number=cur_block_number,
+    )
+
+    cur_dilation_factor_h = _get_cur_dilation(
+        dilation_factor=mc.dilation_factor_height,
+        size=cur_height,
+        block_number=cur_block_number,
+    )
+
     cur_kernel_w, cur_padding_w = pytorch_utils.calc_conv_params_needed(
         input_size=cur_width,
         kernel_size=mc.kernel_width,
         stride=down_stride_w,
-        dilation=1,
+        dilation=cur_dilation_factor_w,
     )
 
     cur_kernel_h, cur_padding_h = pytorch_utils.calc_conv_params_needed(
         input_size=cur_height,
         kernel_size=mc.kernel_height,
         stride=down_stride_h,
-        dilation=1,
-    )
-
-    cur_block_number = (
-        len([i for i in conv_blocks if isinstance(i, CNNResidualBlock)]) + 1
-    )
-    cur_dilation_factor_w = _get_cur_dilation(
-        dilation_factor=mc.dilation_factor_width,
-        width=cur_width,
-        block_number=cur_block_number,
-    )
-
-    cur_dilation_factor_h = _get_cur_dilation(
-        dilation_factor=mc.dilation_factor_height,
-        width=cur_height,
-        block_number=cur_block_number,
+        dilation=cur_dilation_factor_h,
     )
 
     cur_in_channels = conv_blocks[-1].out_channels
@@ -392,30 +481,36 @@ def _get_conv_residual_block(
     return cur_layer
 
 
-def _get_cur_dilation(dilation_factor: int, width: int, block_number: int):
+def _get_cur_dilation(dilation_factor: int, size: int, block_number: int):
     """
     Note that block_number refers to the number of residual blocks (not first block
     or self attention).
     """
 
-    if width == 1:
+    if size == 1:
         return 1
 
     dilation = dilation_factor**block_number
 
-    while dilation >= width:
+    while dilation >= size:
         dilation = dilation // dilation_factor
 
     return dilation
 
 
 def auto_find_no_cnn_residual_blocks_needed(
-    size_w: int,
+    input_size_w: int,
+    kernel_w: int,
+    first_kernel_expansion_w: int,
     stride_w: int,
     first_stride_expansion_w: int,
-    size_h: int,
+    dilation_w: int,
+    input_size_h: int,
+    kernel_h: int,
+    first_kernel_expansion_h: int,
     stride_h: int,
     first_stride_expansion_h: int,
+    dilation_h: int,
     cutoff: int,
 ) -> List[int]:
     """
@@ -436,44 +531,107 @@ def auto_find_no_cnn_residual_blocks_needed(
     10 blocks --> [2, 2, 4, 2]
     """
 
-    if (stride_w == 1 and size_w > cutoff) or (stride_h == 1 and size_h > cutoff):
+    if (stride_w == 1 and input_size_w > cutoff) or (
+        stride_h == 1 and input_size_h > cutoff
+    ):
         err_dim = "width" if stride_w == 1 else "height"
         logger.warning(
             f"With stride=1, the {err_dim} size "
-            f"({size_w if err_dim=='width' else size_h}) "
+            f"({input_size_w if err_dim == 'width' else input_size_h}) "
             f"cannot be larger than the cutoff ({cutoff}). "
             f"This would result in an infinite loop."
             f"Will stop when no more reduction is possible,"
             f"despite not reaching the cutoff."
         )
 
-    cur_size_w = size_w // (stride_w * first_stride_expansion_w)
-    cur_size_h = size_h // (stride_h * first_stride_expansion_h)
+    k_size_w_first, padding_w_first = pytorch_utils.calc_conv_params_needed(
+        input_size=input_size_w,
+        kernel_size=kernel_w * first_kernel_expansion_w,
+        stride=stride_w * first_stride_expansion_w,
+        dilation=dilation_w,
+    )
+
+    k_size_h_first, padding_h_first = pytorch_utils.calc_conv_params_needed(
+        input_size=input_size_h,
+        kernel_size=kernel_h * first_kernel_expansion_h,
+        stride=stride_h * first_stride_expansion_h,
+        dilation=dilation_h,
+    )
+
+    cur_size_w = pytorch_utils.conv_output_formula(
+        input_size=input_size_w,
+        kernel_size=k_size_w_first,
+        stride=stride_w * first_stride_expansion_w,
+        dilation=dilation_w,
+        padding=padding_w_first,
+    )
+    cur_size_h = pytorch_utils.conv_output_formula(
+        input_size=input_size_h,
+        kernel_size=k_size_h_first,
+        stride=stride_h * first_stride_expansion_h,
+        dilation=dilation_h,
+        padding=padding_h_first,
+    )
 
     residual_blocks = [0] * 4
     while True:
-        cur_no_blocks = sum(residual_blocks)
+        cur_kernel_w, cur_padding_w = pytorch_utils.calc_conv_params_needed(
+            input_size=cur_size_w,
+            kernel_size=kernel_w,
+            stride=stride_w,
+            dilation=dilation_w,
+        )
 
-        if cur_no_blocks >= 8:
-            residual_blocks[2] += 1
-        else:
-            cur_index = cur_no_blocks // 2
-            residual_blocks[cur_index] += 1
+        cur_kernel_h, cur_padding_h = pytorch_utils.calc_conv_params_needed(
+            input_size=cur_size_h,
+            kernel_size=kernel_h,
+            stride=stride_h,
+            dilation=dilation_h,
+        )
 
-        cur_size_w_next = cur_size_w // stride_w
-        cur_size_h_next = cur_size_h // stride_h
+        cur_size_w_next = pytorch_utils.conv_output_formula(
+            input_size=cur_size_w,
+            kernel_size=cur_kernel_w,
+            stride=stride_w,
+            dilation=dilation_w,
+            padding=cur_padding_w,
+        )
+
+        cur_size_h_next = pytorch_utils.conv_output_formula(
+            input_size=cur_size_h,
+            kernel_size=cur_kernel_h,
+            stride=stride_h,
+            dilation=dilation_h,
+            padding=cur_padding_h,
+        )
 
         cannot_reduce_more = (
             cur_size_w == cur_size_w_next and cur_size_h == cur_size_h_next
         )
-        if cur_size_w_next * cur_size_h_next < cutoff or cannot_reduce_more:
+        w_kernel_larger = cur_kernel_w > cur_size_w
+        h_kernel_larger = cur_kernel_h > cur_size_h
+        kernel_too_large = w_kernel_larger or h_kernel_larger
+        if (
+            cur_size_w_next * cur_size_h_next < cutoff
+            or cannot_reduce_more
+            or kernel_too_large
+        ):
             if cannot_reduce_more:
                 logger.warning(
                     f"Could not reduce size more, "
                     f"despite not reaching the cutoff ({cutoff})."
                 )
+
             break
         else:
+            cur_no_blocks = sum(residual_blocks)
+
+            if cur_no_blocks >= 8:
+                residual_blocks[2] += 1
+            else:
+                cur_index = cur_no_blocks // 2
+                residual_blocks[cur_index] += 1
+
             cur_size_w, cur_size_h = cur_size_w_next, cur_size_h_next
 
     return [i for i in residual_blocks if i != 0]
