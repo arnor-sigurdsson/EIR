@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Union, Tuple, Dict, List, Sequence, TYPE_CHECKING
+from typing import Union, Tuple, Dict, List, Literal, Sequence, TYPE_CHECKING
 
 import numpy as np
 import pytest
@@ -15,7 +15,9 @@ if TYPE_CHECKING:
     from tests.setup_tests.fixtures_create_experiment import ModelTestConfig
 
 
-def _get_classification_output_configs() -> Sequence[Dict]:
+def _get_classification_output_configs(
+    output_type: Literal["linear", "mlp_residual"] = "mlp_residual"
+) -> Sequence[Dict]:
     output_configs = [
         {
             "output_info": {"output_name": "test_output"},
@@ -25,6 +27,12 @@ def _get_classification_output_configs() -> Sequence[Dict]:
             },
         }
     ]
+
+    if output_type == "linear":
+        output_configs[0]["model_config"] = {
+            "model_type": "linear",
+            "model_init_config": {},
+        }
 
     return output_configs
 
@@ -43,7 +51,7 @@ def _get_classification_output_configs() -> Sequence[Dict]:
 @pytest.mark.parametrize(
     "create_test_config_init_base",
     [
-        # Case 1: MLP
+        # Case 1: MLP, linear output
         {
             "injections": {
                 "global_configs": {
@@ -66,7 +74,9 @@ def _get_classification_output_configs() -> Sequence[Dict]:
                         "layers": [2],
                     }
                 },
-                "output_configs": _get_classification_output_configs(),
+                "output_configs": _get_classification_output_configs(
+                    output_type="linear"
+                ),
             },
         },
         # Case 2: CNN

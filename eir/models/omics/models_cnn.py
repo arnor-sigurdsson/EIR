@@ -19,15 +19,34 @@ logger = get_logger(__name__)
 @dataclass
 class CNNModelConfig:
     """
-    Note that when using the automatic network setup, channels will get increased as
-    the input gets propagated through the network while the width and height get
-    reduced due to stride.
 
     :param layers:
-        Controls the number of layers in the model. If set to ``None``, the model will
-        automatically set up the number of layers until a certain width and height
-        (stride * 8 for width and height) are met. Future work includes adding a
-        parameter to control the target width and height.
+        A list that controls the number of layers and channels in the model.
+        Each element in  the list represents a layer group with a
+        specified number of layers and channels.
+        Specifically, the first element in the list refers
+        to the number of layers with the  number of channels
+        exactly as specified by the `channel_exp_base` parameter.
+
+        The subsequent elements in the list correspond
+        to an increased number of channels, doubling with each step.
+        For instance, if `channel_exp_base=3` (i.e., 2**3=8 channels),
+        and the `layers` list is [5, 3, 2], the model would be constructed as follows:
+        - First case: 5 layers with 8 channels
+        - Second case: 3 layers with 16 channels (doubling from the previous case)
+        - Third case: 2 layers with 32 channels (doubling from the previous case)
+
+        The model currently supports a maximum of 4 elements in the list.
+
+        If set to `None`, the model will automatically set up
+        the number of layer groups until
+        a certain width and height (stride * 8 for both) are met.
+        In this automatic setup,
+        channels will be increased as the input gets propagated
+        through the network, while the
+        width/height get reduced due to stride.
+
+        Future work includes adding a parameter to control the target width and height.
 
     :param fc_repr_dim:
         Output dimension of the last FC layer in the network which accepts the outputs

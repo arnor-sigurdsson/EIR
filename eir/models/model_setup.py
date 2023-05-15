@@ -33,13 +33,12 @@ from eir.models.model_setup_modules.input_model_setup_omics import (
 )
 from eir.models.model_setup_modules.input_model_setup_sequence import (
     get_sequence_model,
-    _sequence_model_registry,
+    sequence_model_registry,
 )
 from eir.models.model_setup_modules.input_model_setup_tabular import get_tabular_model
 from eir.models.model_setup_modules.model_io import load_model
-from eir.models.output.tabular_output import (
-    TabularMLPResidualModelConfig,
-    ResidualTabularOutputModule,
+from eir.models.model_setup_modules.output_model_setup import (
+    get_tabular_output_module_from_model_config,
 )
 from eir.models.tabular.tabular import (
     get_unique_values_from_transformers,
@@ -52,7 +51,6 @@ from eir.train_utils.distributed import maybe_make_model_distributed
 if TYPE_CHECKING:
     from eir.setup.output_setup import (
         al_output_objects_as_dict,
-        al_num_outputs_per_target,
     )
 
 al_fusion_class_callable = Callable[[str], Type[nn.Module]]
@@ -314,7 +312,7 @@ def get_output_modules(
 
         if output_type == "tabular":
             tabular_output_module = get_tabular_output_module_from_model_config(
-                model_init_config=output_model_config.model_init_config,
+                output_model_config=output_model_config,
                 input_dimension=input_dimension,
                 num_outputs_per_target=output_object.num_outputs_per_target,
                 device=device,
@@ -341,24 +339,8 @@ def get_output_modules(
     return output_modules
 
 
-def get_tabular_output_module_from_model_config(
-    model_init_config: TabularMLPResidualModelConfig,
-    input_dimension: int,
-    num_outputs_per_target: "al_num_outputs_per_target",
-    device: str,
-) -> ResidualTabularOutputModule:
-    output_module = ResidualTabularOutputModule(
-        model_config=model_init_config,
-        input_dimension=input_dimension,
-        num_outputs_per_target=num_outputs_per_target,
-    )
-    output_module = output_module.to(device=device)
-
-    return output_module
-
-
 def get_default_model_registry_per_input_type() -> al_model_registry:
-    mapping = {"sequence": _sequence_model_registry, "image": _image_model_registry}
+    mapping = {"sequence": sequence_model_registry, "image": _image_model_registry}
 
     return mapping
 

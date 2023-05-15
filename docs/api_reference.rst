@@ -146,10 +146,12 @@ Output Type Configuration
 Output Module Configuration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. autoclass:: eir.models.output.tabular_output.TabularModelOutputConfig
+.. autoclass:: eir.models.output.output_module_setup.OutputModuleConfig
 
 The documentation below details what the parameters passed to the respective output
 output heads
 (trough the `model_init_config` field in the `\-\-output_configs` `.yaml` files).
 
-.. autoclass:: eir.models.output.tabular_output.TabularMLPResidualModelConfig
+.. autoclass:: eir.models.output.mlp_residual.ResidualMLPOutputModelConfig
+
+.. autoclass:: eir.models.output.linear.LinearOutputModelConfig

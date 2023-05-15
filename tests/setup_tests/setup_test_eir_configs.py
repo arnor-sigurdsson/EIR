@@ -94,6 +94,15 @@ def get_test_outputs_inits(
         cur_init_injected = recursive_dict_replace(
             dict_=cur_init_base, dict_to_inject=init_dict
         )
+
+        cur_model_type = cur_init_injected["model_config"].get(
+            "model_type", "mlp_residual"
+        )
+        cur_model_config = _get_test_output_model_config(
+            output_model_type=cur_model_type
+        )
+        cur_init_injected["model_config"] = cur_model_config
+
         inits.append(cur_init_injected)
 
     return inits
@@ -373,12 +382,24 @@ def get_test_base_output_inits(test_path: Path, split_to_test: bool) -> Dict:
         "output_type_info": {
             "target_cat_columns": ["Origin"],
         },
-        "model_config": {
-            "model_init_config": {
-                "layers": [1],
-                "fc_task_dim": 128,
-            }
-        },
+        "model_config": {},
     }
 
     return test_target_init_kwargs
+
+
+def _get_test_output_model_config(
+    output_model_type: Literal["mlp_residual", "linear"]
+) -> Dict:
+    base = {
+        "model_type": output_model_type,
+    }
+
+    match output_model_type:
+        case "mlp_residual":
+            base["model_init_config"] = {
+                "layers": [1],
+                "fc_task_dim": 128,
+            }
+
+    return base

@@ -7,6 +7,7 @@ import pytest
 import yaml
 from aislib.misc_utils import ensure_path_exists
 
+import eir.models.output.output_module_setup
 from eir.predict_modules.predict_config import (
     get_named_pred_dict_iterators,
     get_train_predict_matched_config_generator,
@@ -45,7 +46,7 @@ al_config_instances = Union[
     schemas.GlobalConfig,
     schemas.InputConfig,
     schemas.OutputConfig,
-    schemas.TabularModelOutputConfig,
+    eir.models.output.output_module_setup.OutputModuleConfig,
 ]
 
 

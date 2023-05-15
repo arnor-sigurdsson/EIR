@@ -14,9 +14,7 @@ from eir.models.omics.omics_models import (
     SimpleLCLModel,
     IdentityModel,
 )
-from eir.models.output.tabular_output import (
-    TabularModelOutputConfig,
-)
+from eir.models.output.output_module_setup import OutputModuleConfig
 from eir.models.sequence.transformer_models import (
     SequenceModelConfig,
 )
@@ -60,8 +58,8 @@ al_models_classes = Union[
 ]
 
 
-al_output_module_configs_classes = Union[Type[TabularModelOutputConfig]]
-al_output_module_configs = Union[TabularModelOutputConfig]
+al_output_module_configs_classes = Union[Type[OutputModuleConfig]]
+al_output_module_configs = Union[OutputModuleConfig]
 
 
 al_tokenizer_choices = (
@@ -677,4 +675,4 @@ class OutputConfig:
 
     output_info: OutputInfoConfig
     output_type_info: Union[TabularOutputTypeConfig]
-    model_config: Union[TabularModelOutputConfig]
+    model_config: Union[OutputModuleConfig]
