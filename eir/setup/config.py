@@ -42,10 +42,11 @@ from eir.models.omics.omics_models import (
     get_omics_config_dataclass_mapping,
     OmicsModelConfig,
 )
-from eir.models.output.tabular_output import (
-    TabularModelOutputConfig,
-    TabularMLPResidualModelConfig,
+from eir.models.output.linear import LinearOutputModelConfig
+from eir.models.output.mlp_residual import (
+    ResidualMLPOutputModelConfig,
 )
+from eir.models.output.output_module_setup import OutputModuleConfig
 from eir.models.sequence.transformer_models import (
     BasicTransformerFeatureExtractorModelConfig,
     PerceiverIOModelConfig,
@@ -72,7 +73,10 @@ al_output_module_config_class_getter = (
     Callable[[str], Union[schemas.al_output_module_configs_classes, Any]],
 )
 
-al_output_model_init_map = Dict[str, Union[TabularMLPResidualModelConfig, Any]]
+al_output_model_configs = Union[
+    ResidualMLPOutputModelConfig, LinearOutputModelConfig, Any
+]
+al_output_model_init_map = Dict[str, al_output_model_configs]
 
 logger = get_logger(name=__name__)
 
@@ -719,7 +723,7 @@ def get_output_module_config_class_map() -> (
     Dict[str, schemas.al_output_module_configs_classes]
 ):
     mapping = {
-        "tabular": TabularModelOutputConfig,
+        "tabular": OutputModuleConfig,
     }
 
     return mapping
@@ -772,7 +776,7 @@ def set_up_output_module_init_config(
     model_init_kwargs_base: Union[None, dict],
     model_type: str,
     output_module_init_class_map: al_output_model_init_map,
-) -> Union[TabularMLPResidualModelConfig, Any]:
+) -> al_output_model_configs:
     if not model_init_kwargs_base:
         model_init_kwargs_base = {}
 
@@ -788,7 +792,8 @@ def set_up_output_module_init_config(
 def get_output_config_type_init_callable_map() -> Dict[str, Type]:
     mapping = {
         **{
-            "mlp_residual": TabularMLPResidualModelConfig,
+            "mlp_residual": ResidualMLPOutputModelConfig,
+            "linear": LinearOutputModelConfig,
         },
     }
 

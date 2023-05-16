@@ -5,14 +5,14 @@ import pytest
 import torch
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 
-from eir.models.output.tabular_output import TabularMLPResidualModelConfig
+from eir.models.output.mlp_residual import ResidualMLPOutputModelConfig
 from eir.setup.output_setup import TabularOutputInfo
 from eir.setup.schemas import (
     OutputConfig,
     OutputInfoConfig,
     TabularOutputTypeConfig,
-    TabularModelOutputConfig,
 )
+from eir.models.output.output_module_setup import OutputModuleConfig
 from eir.train_utils import metrics
 from eir.train_utils.criteria import get_criteria
 
@@ -102,8 +102,8 @@ def _get_metrics_test_module_test_outputs_as_dict():
                     target_con_columns=["Height", "BMI"],
                     target_cat_columns=["Origin"],
                 ),
-                model_config=TabularModelOutputConfig(
-                    model_init_config=TabularMLPResidualModelConfig()
+                model_config=OutputModuleConfig(
+                    model_init_config=ResidualMLPOutputModelConfig()
                 ),
             ),
             num_outputs_per_target={},

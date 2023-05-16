@@ -331,7 +331,7 @@ def _get_perceiver_sequence_feature_extractor_objects(
     return objects_for_wrapper
 
 
-def _sequence_model_registry(model_type: str) -> Type[nn.Module]:
+def sequence_model_registry(model_type: str) -> Type[nn.Module]:
     if model_type == "sequence-default":
         return TransformerFeatureExtractor
     elif model_type == "sequence-wrapper-default":

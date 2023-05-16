@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class TabularMLPResidualModelConfig(ResidualMLPConfig):
+class ResidualMLPOutputModelConfig(ResidualMLPConfig):
 
     """
     :param layers:
@@ -47,23 +47,10 @@ class TabularMLPResidualModelConfig(ResidualMLPConfig):
     final_layer_type: Union[Literal["linear"], Literal["mlp_residual"]] = "linear"
 
 
-@dataclass
-class TabularModelOutputConfig:
-    """
-    :param model_init_config:
-          Configuration / arguments used to initialise model.
-
-    :param model_type:
-         Which type of image model to use."""
-
-    model_init_config: Union[TabularMLPResidualModelConfig]
-    model_type: Literal["mlp_residual"] = "mlp_residual"
-
-
-class ResidualTabularOutputModule(nn.Module):
+class ResidualMLPOutputModule(nn.Module):
     def __init__(
         self,
-        model_config: TabularMLPResidualModelConfig,
+        model_config: ResidualMLPOutputModelConfig,
         input_dimension: int,
         num_outputs_per_target: "al_num_outputs_per_target",
     ):
