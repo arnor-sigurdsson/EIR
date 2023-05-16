@@ -1,11 +1,16 @@
 from copy import deepcopy
+from typing import Tuple
 
 import pytest
+from hypothesis import given
+from hypothesis.strategies import integers, composite
 import torch
 from torch import nn
 
+
 from eir.models import model_training_utils
 from eir.models.omics import models_cnn
+from eir.models.omics.models_cnn import ConvParamSuggestion
 
 
 @pytest.fixture
@@ -223,3 +228,106 @@ def test_stack_list_of_output_target_dicts():
     assert (test_output["test_output"]["Target_Column_2"][0] == 0.0).all()
     assert (test_output["test_output"]["Target_Column_2"][5] == 2.0).all()
     assert (test_output["test_output"]["Target_Column_2"][10] == 4.0).all()
+
+
+def test_calc_size_after_conv_sequence():
+    class SimpleBlock(nn.Module):
+        def __init__(self):
+            super().__init__()
+
+            self.conv = nn.Conv2d(
+                in_channels=16,
+                out_channels=16,
+                kernel_size=4,
+                stride=2,
+                padding=1,
+            )
+            self.bn = nn.BatchNorm2d(16)
+            self.act = nn.ReLU(True)
+
+        def forward(self, x):
+            out = self.conv(x)
+            out = self.bn(out)
+            out = self.act(out)
+            return out
+
+    conv_seq = nn.Sequential(*[SimpleBlock()] * 3)
+    width, height = models_cnn.calc_size_after_conv_sequence(
+        input_width=224, input_height=8, conv_sequence=conv_seq
+    )
+
+    assert width == 28
+    assert height == 1
+
+    input_tensor = torch.rand(1, 16, 224, 8)
+    output_tensor = conv_seq(input_tensor)
+    assert output_tensor.shape == (1, 16, 28, 1)
+
+    conv_seq_bad = nn.Sequential(*[SimpleBlock()] * 10)
+    with pytest.raises(ValueError):
+        models_cnn.calc_size_after_conv_sequence(
+            input_width=224, input_height=8, conv_sequence=conv_seq_bad
+        )
+
+
+@pytest.mark.parametrize(
+    "test_input,expected",
+    [  # Even input and kernel
+        ((1000, 10, 4, 1), ConvParamSuggestion(10, 0, 4, 1, 1)),
+        ((1000, 10, 4, 3), ConvParamSuggestion(10, 0, 4, 3, 0)),
+        ((250, 4, 4, 1), ConvParamSuggestion(4, 0, 4, 1, 1)),
+        # # Odd input, odd kernel
+        ((1001, 11, 2, 1), ConvParamSuggestion(11, 0, 2, 1, 0)),
+        ((1001, 11, 1, 1), ConvParamSuggestion(11, 0, 1, 1, 0)),
+        ((1001, 11, 4, 2), ConvParamSuggestion(11, 0, 4, 2, 0)),
+        # Odd input, mixed kernels
+        ((1001, 11, 11, 1), ConvParamSuggestion(11, 0, 11, 1, 0)),
+        ((1001, 10, 10, 1), ConvParamSuggestion(11, 0, 10, 1, 0)),
+        ((1001, 11, 3, 2), ConvParamSuggestion(12, 0, 3, 2, 0)),
+    ],
+)
+def test_calc_conv_padding_needed_pass(test_input, expected):
+    """
+    input_width, kernel_size, stride, dilation
+    """
+    result = models_cnn.calc_conv_params_needed(*test_input)
+
+    assert result.kernel_size == expected.kernel_size
+    assert result.padding == expected.padding
+    assert result.stride == expected.stride
+    assert result.dilation == expected.dilation
+
+
+def test_calc_padding_needed_fail():
+    with pytest.raises(ValueError):
+        models_cnn.calc_conv_params_needed(-1000, 10, 4, 1)
+
+
+@composite
+def valid_test_inputs(draw):
+    input_size = draw(integers(min_value=1, max_value=10000))
+    kernel_size = draw(integers(min_value=1, max_value=min(input_size, 100)))
+    dilation = draw(
+        integers(min_value=1, max_value=min((input_size // kernel_size), 100))
+    )
+    stride = draw(integers(min_value=1, max_value=min(input_size, 100)))
+    return input_size, kernel_size, stride, dilation
+
+
+@given(valid_test_inputs())
+def test_calc_conv_params_needed_fuzzy(test_input: Tuple[int, int, int, int]) -> None:
+    solution = models_cnn.calc_conv_params_needed(*test_input)
+
+    assert solution.kernel_size >= 1
+    assert solution.stride >= 1
+    assert solution.dilation >= 1
+    assert solution.padding >= 0
+
+    expected_output_size = models_cnn.conv_output_formula(
+        input_size=test_input[0],
+        padding=solution.padding,
+        dilation=solution.dilation,
+        kernel_size=solution.kernel_size,
+        stride=solution.stride,
+    )
+    assert expected_output_size == solution.target_size

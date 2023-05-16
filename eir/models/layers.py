@@ -164,7 +164,7 @@ class CNNResidualBlockBase(nn.Module):
             out_channels=self.out_channels,
             kernel_size=(conv_2_kernel_h, conv_2_kernel_w),
             stride=(1, 1),
-            padding=(conv_2_padding_h * dilation_h, conv_2_padding_w * dilation_w),
+            padding=(conv_2_padding_h, conv_2_padding_w),
             dilation=(dilation_h, dilation_w),
             bias=True,
         )

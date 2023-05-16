@@ -1,9 +1,10 @@
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import List, TYPE_CHECKING, Union
+from typing import List, TYPE_CHECKING, Union, Tuple, Iterator
 
 import torch
-from aislib import pytorch_utils
+from sympy import Symbol
+from sympy.solvers import solve
 from aislib.misc_utils import get_logger
 from aislib.pytorch_modules import Swish
 from torch import nn
@@ -247,7 +248,7 @@ class CNNModel(nn.Module):
             )
         )
 
-        size_func = pytorch_utils.calc_size_after_conv_sequence
+        size_func = calc_size_after_conv_sequence
         size_after_conv_w, size_after_conv_h = size_func(
             input_width=self.data_dimensions.width,
             input_height=self.data_dimensions.height,
@@ -347,21 +348,6 @@ def _make_conv_layers(
     cnn_model_configuration: CNNModelConfig,
     data_dimensions: "DataDimensions",
 ) -> List[nn.Module]:
-    """
-    Used to set up the convolutional layers for the model. Based on the passed in
-    residual blocks, we want to set up the actual blocks with all the relevant
-    convolution parameters.
-
-    We start with a base channel number of 2**5 == 32.
-
-    Also inserts a self-attention layer in just before the last residual block.
-
-    :param residual_blocks: List of ints, where each int indicates number of blocks w.
-    that channel dimension.
-    :param cnn_model_configuration: Experiment hyperparameters / configuration needed
-    for the convolution setup.
-    :return: A list of ``nn.Module`` objects to be passed to ``nn.Sequential``.
-    """
     mc = cnn_model_configuration
 
     first_conv_channels = 2**mc.channel_exp_base * mc.first_channel_expansion
@@ -370,35 +356,36 @@ def _make_conv_layers(
     first_conv_kernel_w = mc.kernel_width * mc.first_kernel_expansion_width
     first_conv_stride_w = down_stride_w * mc.first_stride_expansion_width
 
-    first_kernel_w, first_pad_w = pytorch_utils.calc_conv_params_needed(
+    conv_param_suggestion_w = calc_conv_params_needed(
         input_size=data_dimensions.width,
         kernel_size=first_conv_kernel_w,
         stride=first_conv_stride_w,
-        dilation=1,
+        dilation=mc.dilation_factor_width,
     )
 
     down_stride_h = mc.down_stride_height
     first_conv_kernel_h = mc.kernel_height * mc.first_kernel_expansion_height
     first_conv_stride_h = mc.down_stride_height * mc.first_stride_expansion_height
 
-    first_kernel_h, first_pad_h = pytorch_utils.calc_conv_params_needed(
+    conv_param_suggestion_h = calc_conv_params_needed(
         input_size=data_dimensions.height,
         kernel_size=first_conv_kernel_h,
         stride=first_conv_stride_h,
-        dilation=1,
+        dilation=mc.dilation_factor_height,
     )
 
     conv_blocks = [
         FirstCNNBlock(
             in_channels=data_dimensions.channels,
             out_channels=first_conv_channels,
-            conv_1_kernel_h=first_kernel_h,
-            conv_1_kernel_w=first_kernel_w,
-            conv_1_padding_w=first_pad_w,
-            conv_1_padding_h=first_pad_h,
+            conv_1_kernel_h=conv_param_suggestion_h.kernel_size,
+            conv_1_kernel_w=conv_param_suggestion_w.kernel_size,
+            conv_1_padding_w=conv_param_suggestion_w.padding,
+            conv_1_padding_h=conv_param_suggestion_h.padding,
             down_stride_w=first_conv_stride_w,
-            dilation_w=1,
-            dilation_h=1,
+            down_stride_h=first_conv_stride_h,
+            dilation_w=conv_param_suggestion_w.dilation,
+            dilation_h=conv_param_suggestion_h.dilation,
             rb_do=mc.rb_do,
         )
     ]
@@ -416,7 +403,7 @@ def _make_conv_layers(
 
             conv_blocks.append(cur_layer)
 
-            cur_width, cur_height = pytorch_utils.calc_size_after_conv_sequence(
+            cur_width, cur_height = calc_size_after_conv_sequence(
                 input_width=data_dimensions.width,
                 input_height=data_dimensions.height,
                 conv_sequence=nn.Sequential(*conv_blocks),
@@ -444,7 +431,7 @@ def _get_conv_residual_block(
     mc = cnn_config
 
     cur_conv = nn.Sequential(*conv_blocks)
-    cur_width, cur_height = pytorch_utils.calc_size_after_conv_sequence(
+    cur_width, cur_height = calc_size_after_conv_sequence(
         input_width=data_dimensions.width,
         input_height=data_dimensions.height,
         conv_sequence=cur_conv,
@@ -453,26 +440,27 @@ def _get_conv_residual_block(
     cur_block_number = (
         len([i for i in conv_blocks if isinstance(i, CNNResidualBlock)]) + 1
     )
+
     cur_dilation_factor_w = _get_cur_dilation(
         dilation_factor=mc.dilation_factor_width,
         size=cur_width,
         block_number=cur_block_number,
+        kernel_size=mc.kernel_width,
     )
-
-    cur_dilation_factor_h = _get_cur_dilation(
-        dilation_factor=mc.dilation_factor_height,
-        size=cur_height,
-        block_number=cur_block_number,
-    )
-
-    cur_kernel_w, cur_padding_w = pytorch_utils.calc_conv_params_needed(
+    conv_param_suggestion_w = calc_conv_params_needed(
         input_size=cur_width,
         kernel_size=mc.kernel_width,
         stride=down_stride_w,
         dilation=cur_dilation_factor_w,
     )
 
-    cur_kernel_h, cur_padding_h = pytorch_utils.calc_conv_params_needed(
+    cur_dilation_factor_h = _get_cur_dilation(
+        dilation_factor=mc.dilation_factor_height,
+        size=cur_height,
+        block_number=cur_block_number,
+        kernel_size=mc.kernel_height,
+    )
+    conv_param_suggestion_h = calc_conv_params_needed(
         input_size=cur_height,
         kernel_size=mc.kernel_height,
         stride=down_stride_h,
@@ -485,13 +473,14 @@ def _get_conv_residual_block(
     cur_layer = CNNResidualBlock(
         in_channels=cur_in_channels,
         out_channels=cur_out_channels,
-        conv_1_kernel_w=cur_kernel_w,
-        conv_1_padding_w=cur_padding_w,
-        conv_1_kernel_h=cur_kernel_h,
-        conv_1_padding_h=cur_padding_h,
-        down_stride_w=down_stride_w,
-        dilation_w=cur_dilation_factor_w,
-        dilation_h=cur_dilation_factor_h,
+        conv_1_kernel_w=conv_param_suggestion_w.kernel_size,
+        conv_1_padding_w=conv_param_suggestion_w.padding,
+        down_stride_w=conv_param_suggestion_w.stride,
+        dilation_w=conv_param_suggestion_w.dilation,
+        conv_1_kernel_h=conv_param_suggestion_h.kernel_size,
+        conv_1_padding_h=conv_param_suggestion_h.padding,
+        down_stride_h=conv_param_suggestion_h.stride,
+        dilation_h=conv_param_suggestion_h.dilation,
         full_preact=True if len(conv_blocks) == 1 else False,
         rb_do=mc.rb_do,
         stochastic_depth_p=mc.stochastic_depth_p,
@@ -500,18 +489,20 @@ def _get_conv_residual_block(
     return cur_layer
 
 
-def _get_cur_dilation(dilation_factor: int, size: int, block_number: int):
+def _get_cur_dilation(
+    dilation_factor: int, size: int, block_number: int, kernel_size: int
+):
     """
-    Note that block_number refers to the number of residual blocks (not first block
-    or self attention).
+    Note that block_number refers to the number of full residual blocks
+    (excluding the first one).
     """
-
-    if size == 1:
+    if size == 1 or kernel_size == 1:
         return 1
 
     dilation = dilation_factor**block_number
 
-    while dilation >= size:
+    max_dilation = (size - 1) // (kernel_size - 1)
+    while dilation > max_dilation:
         dilation = dilation // dilation_factor
 
     return dilation
@@ -563,72 +554,71 @@ def auto_find_no_cnn_residual_blocks_needed(
             f"despite not reaching the cutoff."
         )
 
-    k_size_w_first, padding_w_first = pytorch_utils.calc_conv_params_needed(
+    conv_param_suggestion_w_first = calc_conv_params_needed(
         input_size=input_size_w,
         kernel_size=kernel_w * first_kernel_expansion_w,
         stride=stride_w * first_stride_expansion_w,
         dilation=dilation_w,
     )
 
-    k_size_h_first, padding_h_first = pytorch_utils.calc_conv_params_needed(
+    conv_param_suggestion_h_first = calc_conv_params_needed(
         input_size=input_size_h,
         kernel_size=kernel_h * first_kernel_expansion_h,
         stride=stride_h * first_stride_expansion_h,
         dilation=dilation_h,
     )
 
-    cur_size_w = pytorch_utils.conv_output_formula(
+    cur_size_w = conv_output_formula(
         input_size=input_size_w,
-        kernel_size=k_size_w_first,
+        kernel_size=conv_param_suggestion_w_first.kernel_size,
         stride=stride_w * first_stride_expansion_w,
         dilation=dilation_w,
-        padding=padding_w_first,
+        padding=conv_param_suggestion_w_first.padding,
     )
-    cur_size_h = pytorch_utils.conv_output_formula(
+    cur_size_h = conv_output_formula(
         input_size=input_size_h,
-        kernel_size=k_size_h_first,
+        kernel_size=conv_param_suggestion_h_first.kernel_size,
         stride=stride_h * first_stride_expansion_h,
         dilation=dilation_h,
-        padding=padding_h_first,
+        padding=conv_param_suggestion_h_first.padding,
     )
 
     residual_blocks = [0] * 4
     while True:
-        cur_kernel_w, cur_padding_w = pytorch_utils.calc_conv_params_needed(
+        conv_param_suggestion_w = calc_conv_params_needed(
             input_size=cur_size_w,
             kernel_size=kernel_w,
             stride=stride_w,
             dilation=dilation_w,
         )
+        cur_size_w_next = conv_output_formula(
+            input_size=cur_size_w,
+            kernel_size=conv_param_suggestion_w.kernel_size,
+            stride=conv_param_suggestion_w.stride,
+            dilation=conv_param_suggestion_w.dilation,
+            padding=conv_param_suggestion_w.padding,
+        )
 
-        cur_kernel_h, cur_padding_h = pytorch_utils.calc_conv_params_needed(
+        conv_param_suggestion_h = calc_conv_params_needed(
             input_size=cur_size_h,
             kernel_size=kernel_h,
             stride=stride_h,
             dilation=dilation_h,
         )
-
-        cur_size_w_next = pytorch_utils.conv_output_formula(
-            input_size=cur_size_w,
-            kernel_size=cur_kernel_w,
-            stride=stride_w,
-            dilation=dilation_w,
-            padding=cur_padding_w,
-        )
-
-        cur_size_h_next = pytorch_utils.conv_output_formula(
+        cur_size_h_next = conv_output_formula(
             input_size=cur_size_h,
-            kernel_size=cur_kernel_h,
-            stride=stride_h,
-            dilation=dilation_h,
-            padding=cur_padding_h,
+            kernel_size=conv_param_suggestion_h.kernel_size,
+            stride=conv_param_suggestion_h.stride,
+            dilation=conv_param_suggestion_h.dilation,
+            padding=conv_param_suggestion_h.padding,
         )
 
         cannot_reduce_more = (
             cur_size_w == cur_size_w_next and cur_size_h == cur_size_h_next
         )
-        w_kernel_larger = cur_kernel_w > cur_size_w
-        h_kernel_larger = cur_kernel_h > cur_size_h
+
+        w_kernel_larger = conv_param_suggestion_w.kernel_size > cur_size_w
+        h_kernel_larger = conv_param_suggestion_h.kernel_size > cur_size_h
         kernel_too_large = w_kernel_larger or h_kernel_larger
         if (
             cur_size_w_next * cur_size_h_next < cutoff
@@ -676,3 +666,209 @@ class GeneralPositionalEmbedding(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = x + self.embedding
         return self.dropout(x)
+
+
+def calc_size_after_conv_sequence(
+    input_width: int, input_height: int, conv_sequence: nn.Sequential
+) -> Tuple[int, int]:
+    current_width = input_width
+    current_height = input_height
+    for block_index, block in enumerate(conv_sequence):
+        conv_operations = [i for i in vars(block)["_modules"] if i.find("conv") != -1]
+
+        for operation_index, operation in enumerate(conv_operations):
+            conv_layer = vars(block)["_modules"][operation]
+
+            padded_height = current_height + 2 * conv_layer.padding[0]
+            padded_width = current_width + 2 * conv_layer.padding[1]
+            if any(
+                k > s
+                for k, s in zip(conv_layer.kernel_size, (padded_height, padded_width))
+            ):
+                raise ValueError(
+                    f"Kernel size of layer "
+                    f"{block_index}.{operation_index} ({operation}) "
+                    f"exceeds padded input size in one or more dimensions. "
+                    f"Original input size (hxw): {current_height}x{current_width} "
+                    f"(this is likely the source of the problem, especially if "
+                    f"error layer is conv_1). "
+                    f"Padded input size became (hxw): {padded_height}x{padded_width}. "
+                    f"Kernel size: {conv_layer.kernel_size}. "
+                    "Please adjust the kernel size to ensure the it "
+                    "does not exceed the padded input size for each dimension."
+                )
+
+            new_width = _calc_layer_output_size_for_axis(
+                size=current_width, layer=conv_layer, axis=1
+            )
+            new_height = _calc_layer_output_size_for_axis(
+                size=current_height, layer=conv_layer, axis=0
+            )
+
+            if int(new_width) == 0 or int(new_height) == 0:
+                kernel_size = conv_layer.kernel_size
+                stride = conv_layer.stride
+                padding = conv_layer.padding
+                dilation = conv_layer.dilation
+
+                raise ValueError(
+                    f"Calculated size after convolution sequence is 0 for layer "
+                    f"{block_index}.{operation_index} ({operation}). "
+                    f"Input size (hxw): {current_height}x{current_width}. "
+                    f"Convolution parameters: kernel size = {kernel_size}, "
+                    f"stride = {stride}, padding = {padding}, dilation = {dilation}. "
+                    "Please adjust these parameters to ensure they are appropriate "
+                    "for the input size."
+                )
+
+            current_width, current_height = new_width, new_height
+
+    return int(current_width), int(current_height)
+
+
+def _calc_layer_output_size_for_axis(size: int, layer: nn.Module, axis: int):
+    kernel_size = layer.kernel_size[axis]
+    padding = layer.padding[axis]
+    stride = layer.stride[axis]
+    dilation = layer.dilation[axis]
+
+    output_size = conv_output_formula(
+        input_size=size,
+        padding=padding,
+        dilation=dilation,
+        kernel_size=kernel_size,
+        stride=stride,
+    )
+
+    return output_size
+
+
+@dataclass()
+class ConvParamSuggestion:
+    kernel_size: int
+    target_size: int
+    stride: int
+    dilation: int
+    padding: int
+
+
+def calc_conv_params_needed(
+    input_size: int, kernel_size: int, stride: int, dilation: int
+) -> "ConvParamSuggestion":
+    if input_size < 0:
+        raise ValueError("Got negative size for input width: %d", input_size)
+
+    target_size = conv_output_formula(
+        input_size=input_size,
+        padding=0,
+        dilation=dilation,
+        kernel_size=kernel_size,
+        stride=stride,
+    )
+
+    param_suggestions = _get_conv_param_suggestion_iterator(
+        target_size=target_size,
+        kernel_size=kernel_size,
+        stride=stride,
+        dilation=dilation,
+    )
+
+    solutions = []
+
+    for s in param_suggestions:
+        padding = _solve_for_padding(
+            input_size=input_size,
+            target_size=s.target_size,
+            dilation=s.dilation,
+            stride=s.stride,
+            kernel_size=s.kernel_size,
+        )
+
+        if padding is not None:
+            assert isinstance(padding, int)
+            cur_solution = ConvParamSuggestion(
+                kernel_size=s.kernel_size,
+                target_size=s.target_size,
+                stride=s.stride,
+                dilation=s.dilation,
+                padding=padding,
+            )
+            solutions.append(cur_solution)
+
+    if len(solutions) == 0:
+        raise AssertionError(
+            f"Could not find a solution for padding with the supplied conv "
+            f"parameters: input size = {input_size}, kernel size = {kernel_size}, "
+            f"stride = {stride}, dilation = {dilation}. "
+        )
+
+    best_solution = _choose_best_solution(
+        solutions=solutions,
+        input_kernel_size=kernel_size,
+        input_stride=stride,
+        input_dilation=dilation,
+    )
+
+    return best_solution
+
+
+def _choose_best_solution(
+    solutions: List[ConvParamSuggestion],
+    input_kernel_size: int,
+    input_stride: int,
+    input_dilation: int,
+) -> ConvParamSuggestion:
+    def _calculate_distance(solution: ConvParamSuggestion) -> int:
+        kernel_size_diff = abs(solution.kernel_size - input_kernel_size)
+        stride_diff = abs(solution.stride - input_stride)
+        dilation_diff = abs(solution.dilation - input_dilation)
+        padding_diff = abs(solution.padding)
+        return kernel_size_diff + stride_diff + dilation_diff + padding_diff
+
+    sorted_solutions = sorted(solutions, key=_calculate_distance)
+
+    return sorted_solutions[0]
+
+
+def _get_conv_param_suggestion_iterator(
+    target_size: int, kernel_size: int, stride: int, dilation: int
+) -> Iterator[ConvParamSuggestion]:
+    def _get_range(base: int) -> List[int]:
+        return [sug for sug in [base, base + 1, base - 1] if sug > 0]
+
+    for k_size in _get_range(base=kernel_size):
+        for t_size in _get_range(base=target_size):
+            for s_size in _get_range(base=stride):
+                for d_size in _get_range(base=dilation):
+                    yield ConvParamSuggestion(
+                        kernel_size=k_size,
+                        target_size=t_size,
+                        stride=s_size,
+                        dilation=d_size,
+                        padding=0,
+                    )
+
+
+def conv_output_formula(
+    input_size: int, padding: int, dilation: int, kernel_size: int, stride: int
+) -> int:
+    out_size = (
+        input_size + 2 * padding - dilation * (kernel_size - 1) - 1
+    ) // stride + 1
+    return out_size
+
+
+def _solve_for_padding(
+    input_size: int, target_size: int, dilation: int, stride: int, kernel_size: int
+) -> Union[int, None]:
+    p = Symbol("p", integer=True, nonnegative=True)
+    padding = solve(
+        ((input_size + (2 * p) - dilation * (kernel_size - 1) - 1) / stride + 1)
+        - target_size,
+        p,
+    )
+
+    if len(padding) > 0:
+        return int(padding[0])
+
+    return None
