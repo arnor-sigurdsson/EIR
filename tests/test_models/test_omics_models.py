@@ -46,9 +46,9 @@ def test_make_conv_layers():
 @pytest.mark.parametrize(
     "test_input,expected",
     [
-        ({"dilation_factor": 2, "block_number": 1, "size": 1000}, 2),
-        ({"dilation_factor": 4, "block_number": 2, "size": 1000}, 16),
-        ({"dilation_factor": 5, "block_number": 5, "size": 100}, 25),
+        ({"dilation_factor": 2, "block_number": 1, "size": 1000, "kernel_size": 3}, 2),
+        ({"dilation_factor": 4, "block_number": 2, "size": 1000, "kernel_size": 3}, 16),
+        ({"dilation_factor": 5, "block_number": 5, "size": 100, "kernel_size": 3}, 25),
     ],
 )
 def test_get_cur_dilation(test_input, expected):
