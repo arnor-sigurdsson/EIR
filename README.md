@@ -74,6 +74,10 @@ If you are an ML/DL researcher developing new models, etc., it might not fit you
 - Computes and graphs various evaluation metrics (e.g., RMSE, PCC and R2 for regression tasks, accuracy, ROC-AUC, etc. for classification tasks) during training.
 - [Many more settings](https://eir.readthedocs.io/en/latest/api_reference.html) and configurations (e.g., augmentation, regularization, optimizers) available.
 
+## Related Projects
+
+- [EIR-auto-GP](https://github.com/arnor-sigurdsson/EIR-auto-GP): Automated genomic prediction (GP) using deep learning models with EIR.
+
 ## Citation
 
 If you use `EIR` in a scientific publication, we would appreciate if you could use one of the following citations:
