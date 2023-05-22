@@ -4,7 +4,7 @@ from typing import Sequence, Literal, Optional, Dict, Callable
 import torch.backends
 import torch.cuda
 
-from eir.setup.config import recursive_dict_replace
+from eir.setup.config_setup_modules.config_setup_utils import recursive_dict_replace
 
 
 def get_test_base_global_init(

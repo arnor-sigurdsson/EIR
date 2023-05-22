@@ -29,7 +29,7 @@ from eir.setup.input_setup_modules.setup_image import (
 )
 from eir.setup.input_setup_modules.setup_omics import set_up_omics_input, OmicsInputInfo
 from eir.setup.input_setup_modules.setup_sequence import (
-    SequenceInputInfo,
+    ComputedSequenceInputInfo,
     set_up_sequence_input_for_training,
 )
 from eir.setup.input_setup_modules.setup_tabular import (
@@ -45,7 +45,7 @@ logger = get_logger(__name__)
 al_input_objects = Union[
     OmicsInputInfo,
     TabularInputInfo,
-    SequenceInputInfo,
+    ComputedSequenceInputInfo,
     BytesInputInfo,
     ImageInputInfo,
     ArrayInputInfo,
@@ -53,13 +53,13 @@ al_input_objects = Union[
 al_input_objects_as_dict = Dict[str, al_input_objects]
 
 al_serializable_input_objects = Union[
-    SequenceInputInfo,
+    ComputedSequenceInputInfo,
     ImageInputInfo,
     BytesInputInfo,
 ]
 
 al_serializable_input_classes = Union[
-    Type[SequenceInputInfo],
+    Type[ComputedSequenceInputInfo],
     Type[ImageInputInfo],
     Type[BytesInputInfo],
 ]
@@ -190,7 +190,7 @@ def get_input_setup_from_pretrained_function_map(
         ),
         "sequence": partial(
             load_serialized_input_object,
-            input_class=SequenceInputInfo,
+            input_class=ComputedSequenceInputInfo,
             run_folder=run_folder,
             custom_input_name=load_module_name,
         ),

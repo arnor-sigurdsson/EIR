@@ -52,7 +52,7 @@ logger = get_logger(name=__name__)
 
 
 @dataclass
-class SequenceInputInfo:
+class ComputedSequenceInputInfo:
     input_config: schemas.InputConfig
     vocab: Vocab
     computed_max_length: int
@@ -62,7 +62,7 @@ class SequenceInputInfo:
 
 def set_up_sequence_input_for_training(
     input_config: schemas.InputConfig, *args, **kwargs
-) -> SequenceInputInfo:
+) -> ComputedSequenceInputInfo:
     sequence_input_object_func = _get_sequence_input_object_func(
         pretrained=input_config.model_config.pretrained_model
     )
@@ -82,7 +82,7 @@ def set_up_sequence_input_for_training(
         max_length_config_value=input_config.input_type_info.max_length,
         gathered_stats=gathered_stats,
     )
-    sequence_input_info = SequenceInputInfo(
+    sequence_input_info = ComputedSequenceInputInfo(
         input_config=input_config,
         vocab=vocab,
         computed_max_length=computed_max_length,

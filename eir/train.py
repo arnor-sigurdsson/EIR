@@ -24,7 +24,6 @@ from eir.data_load import datasets
 from eir.data_load.data_utils import get_train_sampler
 from eir.data_load.label_setup import (
     split_ids,
-    save_transformer_set,
 )
 from eir.experiment_io.experiment_io import (
     serialize_experiment,
@@ -33,7 +32,9 @@ from eir.experiment_io.experiment_io import (
     serialize_chosen_input_objects,
 )
 from eir.models import al_meta_model
-from eir.models.model_setup import get_model, get_default_model_registry_per_input_type
+from eir.models.model_setup import (
+    get_model,
+)
 from eir.models.model_training_utils import run_lr_find
 from eir.setup.config import (
     get_configs,
@@ -44,11 +45,13 @@ from eir.setup.output_setup import (
     al_output_objects_as_dict,
     set_up_outputs_for_training,
 )
+from eir.setup.output_setup_modules.sequence_output_setup import (
+    converge_sequence_input_and_output,
+)
 from eir.target_setup.target_label_setup import (
-    set_up_tabular_target_labels_wrapper,
     gather_all_ids_from_output_configs,
     read_manual_ids_if_exist,
-    get_tabular_target_file_infos,
+    set_up_all_targets_wrapper,
 )
 from eir.train_utils import distributed
 from eir.train_utils import utils
@@ -137,19 +140,12 @@ def get_default_experiment(
         manual_valid_ids=manual_valid_ids,
     )
 
-    target_labels_info = get_tabular_target_file_infos(
-        output_configs=configs.output_configs
-    )
-
-    custom_ops = hooks.custom_column_label_parsing_ops if hooks else None
-    target_labels = set_up_tabular_target_labels_wrapper(
-        tabular_target_file_infos=target_labels_info,
-        custom_label_ops=custom_ops,
+    target_labels = set_up_all_targets_wrapper(
         train_ids=train_ids,
         valid_ids=valid_ids,
-    )
-    save_transformer_set(
-        transformers_per_source=target_labels.label_transformers, run_folder=run_folder
+        run_folder=run_folder,
+        output_configs=configs.output_configs,
+        hooks=hooks,
     )
 
     inputs_as_dict = set_up_inputs_for_training(
@@ -164,7 +160,11 @@ def get_default_experiment(
 
     outputs_as_dict = set_up_outputs_for_training(
         output_configs=configs.output_configs,
-        target_transformers=target_labels.label_transformers,
+        input_objects=inputs_as_dict,
+        target_transformers=getattr(target_labels, "label_transformers", None),
+    )
+    inputs_as_dict = converge_sequence_input_and_output(
+        inputs=inputs_as_dict, outputs=outputs_as_dict
     )
 
     train_dataset, valid_dataset = datasets.set_up_datasets_from_configs(
@@ -187,15 +187,11 @@ def get_default_experiment(
         num_workers=configs.global_config.dataloader_workers,
     )
 
-    default_registry = get_default_model_registry_per_input_type()
-
     model = get_model(
         global_config=configs.global_config,
         inputs_as_dict=inputs_as_dict,
         fusion_config=configs.fusion_config,
         outputs_as_dict=outputs_as_dict,
-        model_registry_per_input_type=default_registry,
-        model_registry_per_output_type={},
     )
 
     model = maybe_wrap_model_with_swa(

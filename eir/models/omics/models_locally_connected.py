@@ -16,7 +16,7 @@ import torch
 from aislib.misc_utils import get_logger
 from torch import nn
 
-from eir.models.layers import SplitLinear, SplitMLPResidualBlock
+from eir.models.layers import SplitLinear, LCLResidualBlock
 from eir.models.sequence.transformer_models import PositionalEmbedding
 
 if TYPE_CHECKING:
@@ -312,7 +312,7 @@ def _generate_split_blocks_from_spec(
     s = split_parameter_spec
     block_layer_spec_copy = copy(block_layer_spec)
 
-    first_block = SplitMLPResidualBlock(
+    first_block = LCLResidualBlock(
         in_features=s.in_features,
         split_size=s.kernel_width,
         out_feature_sets=2**s.channel_exp_base,
@@ -332,7 +332,7 @@ def _generate_split_blocks_from_spec(
 
             cur_size = block_modules[-1].out_features
 
-            cur_block = SplitMLPResidualBlock(
+            cur_block = LCLResidualBlock(
                 in_features=cur_size,
                 split_size=cur_kernel_width,
                 out_feature_sets=cur_out_feature_sets,
@@ -353,7 +353,7 @@ def generate_split_resblocks_auto(split_parameter_spec: LCParameterSpec):
 
     s = split_parameter_spec
 
-    first_block = SplitMLPResidualBlock(
+    first_block = LCLResidualBlock(
         in_features=s.in_features,
         split_size=s.kernel_width,
         out_feature_sets=2**s.channel_exp_base,
@@ -387,7 +387,7 @@ def generate_split_resblocks_auto(split_parameter_spec: LCParameterSpec):
         if cur_size <= s.cutoff:
             break
 
-        cur_block = SplitMLPResidualBlock(
+        cur_block = LCLResidualBlock(
             in_features=cur_size,
             split_size=cur_kernel_width,
             out_feature_sets=cur_out_feature_sets,

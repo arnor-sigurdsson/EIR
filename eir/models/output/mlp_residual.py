@@ -17,11 +17,13 @@ from eir.models.models_base import (
 )
 
 if TYPE_CHECKING:
-    from eir.setup.output_setup import al_num_outputs_per_target
+    from eir.setup.output_setup_modules.tabular_output_setup import (
+        al_num_outputs_per_target,
+    )
 
 
 @dataclass
-class ResidualMLPOutputModelConfig(ResidualMLPConfig):
+class ResidualMLPOutputModulelConfig(ResidualMLPConfig):
 
     """
     :param layers:
@@ -50,7 +52,7 @@ class ResidualMLPOutputModelConfig(ResidualMLPConfig):
 class ResidualMLPOutputModule(nn.Module):
     def __init__(
         self,
-        model_config: ResidualMLPOutputModelConfig,
+        model_config: ResidualMLPOutputModulelConfig,
         input_dimension: int,
         num_outputs_per_target: "al_num_outputs_per_target",
     ):

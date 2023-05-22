@@ -9,7 +9,12 @@ from eir.predict_modules.predict_utils import (
     log_and_raise_missing_or_multiple_output_matches,
 )
 from eir.setup import config, schemas
-from eir.setup.config import Configs, object_to_primitives, recursive_dict_replace
+from eir.setup.config import Configs
+from eir.setup.config_setup_modules.config_setup_utils import (
+    recursive_dict_replace,
+    object_to_primitives,
+    get_yaml_to_dict_iterator,
+)
 
 al_named_dict_configs = Dict[
     Literal["global_configs", "fusion_configs", "input_configs", "output_configs"],
@@ -55,7 +60,7 @@ def get_named_pred_dict_iterators(
         if key in target_keys:
             if not value:
                 value = ()
-            cur_gen = config.get_yaml_to_dict_iterator(yaml_config_files=value)
+            cur_gen = get_yaml_to_dict_iterator(yaml_config_files=value)
             dict_of_generators[key] = tuple(cur_gen)
     return dict_of_generators
 

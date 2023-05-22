@@ -22,7 +22,6 @@ from torch.nn import Module
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 
-from eir.data_load.data_utils import get_output_info_generator
 from eir.train_utils.utils import (
     call_hooks_stage_iterable,
 )
@@ -42,10 +41,10 @@ if TYPE_CHECKING:
     from eir.setup.output_setup import al_output_objects_as_dict
 
 # Aliases
-al_dloader_gathered_preds = Tuple[
+al_dataloader_gathered_predictions = Tuple[
     Dict[str, Dict[str, torch.Tensor]], "al_training_labels_target", List[str]
 ]
-al_dloader_gathered_raw = Tuple[
+al_dataloader_gathered_raw = Tuple[
     Dict[str, torch.Tensor], "al_training_labels_target", Sequence[str]
 ]
 al_lr_find_results = Dict[str, List[Union[float, List[float]]]]
@@ -68,35 +67,39 @@ def parse_target_labels(
     device: str,
     labels: "al_training_labels_target",
 ) -> "al_training_labels_target":
-    target_columns_gen = get_output_info_generator(outputs_as_dict=output_objects)
+    labels_casted = copy(labels)
 
-    labels_casted = {}
+    for output_name, output_object in output_objects.items():
+        if output_object.output_config.output_info.output_type != "tabular":
+            continue
 
-    for output_name, column_type, column_name in target_columns_gen:
         if output_name not in labels_casted:
             labels_casted[output_name] = {}
 
-        cur_labels = labels[output_name][column_name]
+        target_columns = output_object.target_columns
+        for column_type, list_of_cols_of_this_type in target_columns.items():
+            for column_name in list_of_cols_of_this_type:
+                cur_labels = labels[output_name][column_name]
 
-        if column_type == "con":
-            labels_casted[output_name][column_name] = cur_labels.to(
-                dtype=torch.float, device=device
-            )
-        elif column_type == "cat":
-            labels_casted[output_name][column_name] = cur_labels.to(
-                dtype=torch.long, device=device
-            )
+                if column_type == "con":
+                    labels_casted[output_name][column_name] = cur_labels.to(
+                        dtype=torch.float, device=device
+                    )
+                elif column_type == "cat":
+                    labels_casted[output_name][column_name] = cur_labels.to(
+                        dtype=torch.long, device=device
+                    )
 
     return labels_casted
 
 
-def gather_pred_outputs_from_dloader(
+def gather_prediction_outputs_from_dataloader(
     data_loader: DataLoader,
     batch_prep_hook: Sequence[Callable],
     batch_prep_hook_kwargs: Dict[str, Any],
     model: Module,
     with_labels: bool = True,
-) -> al_dloader_gathered_preds:
+) -> al_dataloader_gathered_predictions:
     """
     Used to gather predictions from a dataloader, normally for evaluation – hence the
     assertion that we are in eval mode.
@@ -153,7 +156,7 @@ def gather_data_loader_samples(
     batch_prep_hook: Sequence[Callable],
     batch_prep_hook_kwargs: Dict[str, Any],
     n_samples: Union[int, None] = None,
-) -> al_dloader_gathered_raw:
+) -> al_dataloader_gathered_raw:
     all_input_batches = []
     all_label_batches = []
     ids_total = []
@@ -451,9 +454,7 @@ def plot_lr_find_results(
     plt.savefig(str(output_folder / "lr_search.pdf"))
 
 
-def trace_eir_model(
-    meta_model: nn.Module, example_inputs: Dict[str, Any]
-) -> torch.jit.TracedModule:
+def trace_eir_model(meta_model: nn.Module, example_inputs: Dict[str, Any]) -> nn.Module:
     """
     Optimally we would like to trace the whole meta_model in one go, but since torch
     currently does not like / support nested dict outputs when tracing a model,

@@ -30,9 +30,9 @@ from eir.setup.input_setup_modules.setup_image import (
 from eir.setup.output_setup import set_up_outputs_for_training
 from eir.target_setup.target_label_setup import (
     gather_all_ids_from_output_configs,
-    set_up_tabular_target_labels_wrapper,
-    get_tabular_target_file_infos,
+    set_up_all_targets_wrapper,
 )
+from eir.train_utils.utils import get_run_folder
 
 if TYPE_CHECKING:
     from ..setup_tests.fixtures_create_data import TestDataConfig
@@ -101,15 +101,14 @@ def test_set_up_datasets(
         ids=all_array_ids, valid_size=test_configs.global_config.valid_size
     )
 
-    target_labels_info = get_tabular_target_file_infos(
-        output_configs=test_configs.output_configs
-    )
+    run_folder = get_run_folder(output_folder=test_configs.global_config.output_folder)
 
-    target_labels = set_up_tabular_target_labels_wrapper(
-        tabular_target_file_infos=target_labels_info,
-        custom_label_ops=None,
+    target_labels = set_up_all_targets_wrapper(
         train_ids=train_ids,
         valid_ids=valid_ids,
+        output_configs=test_configs.output_configs,
+        run_folder=run_folder,
+        hooks=None,
     )
 
     inputs = train.set_up_inputs_for_training(
@@ -257,15 +256,14 @@ def test_set_up_datasets_fails(
         ids=all_array_ids, valid_size=test_configs.global_config.valid_size
     )
 
-    target_labels_info = get_tabular_target_file_infos(
-        output_configs=test_configs.output_configs
-    )
+    run_folder = get_run_folder(output_folder=test_configs.global_config.output_folder)
 
-    target_labels = set_up_tabular_target_labels_wrapper(
-        tabular_target_file_infos=target_labels_info,
-        custom_label_ops=None,
+    target_labels = set_up_all_targets_wrapper(
         train_ids=train_ids,
         valid_ids=valid_ids,
+        output_configs=test_configs.output_configs,
+        run_folder=run_folder,
+        hooks=None,
     )
 
     inputs = train.set_up_inputs_for_training(
@@ -394,15 +392,14 @@ def test_construct_dataset_init_params_from_cl_args(
         ids=all_array_ids, valid_size=test_configs.global_config.valid_size
     )
 
-    target_labels_info = get_tabular_target_file_infos(
-        output_configs=test_configs.output_configs
-    )
+    run_folder = get_run_folder(output_folder=test_configs.global_config.output_folder)
 
-    target_labels = set_up_tabular_target_labels_wrapper(
-        tabular_target_file_infos=target_labels_info,
-        custom_label_ops=None,
+    target_labels = set_up_all_targets_wrapper(
         train_ids=train_ids,
         valid_ids=valid_ids,
+        output_configs=test_configs.output_configs,
+        run_folder=run_folder,
+        hooks=None,
     )
 
     inputs = train.set_up_inputs_for_training(
@@ -501,15 +498,14 @@ def test_datasets(
         ids=all_array_ids, valid_size=test_configs.global_config.valid_size
     )
 
-    target_labels_info = get_tabular_target_file_infos(
-        output_configs=test_configs.output_configs
-    )
+    run_folder = get_run_folder(output_folder=test_configs.global_config.output_folder)
 
-    target_labels = set_up_tabular_target_labels_wrapper(
-        tabular_target_file_infos=target_labels_info,
-        custom_label_ops=None,
+    target_labels = set_up_all_targets_wrapper(
         train_ids=train_ids,
         valid_ids=valid_ids,
+        output_configs=test_configs.output_configs,
+        run_folder=run_folder,
+        hooks=None,
     )
 
     inputs = train.set_up_inputs_for_training(

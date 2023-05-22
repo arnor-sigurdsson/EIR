@@ -14,13 +14,20 @@ from eir.models.omics.omics_models import (
     SimpleLCLModel,
     IdentityModel,
 )
-from eir.models.output.output_module_setup import OutputModuleConfig
+from eir.models.output.output_module_setup import (
+    TabularOutputModuleConfig,
+    SequenceOutputModuleConfig,
+)
 from eir.models.sequence.transformer_models import (
     SequenceModelConfig,
 )
 from eir.models.tabular.tabular import (
     SimpleTabularModel,
     TabularModelConfig,
+)
+from eir.setup.schema_modules.output_schemas_sequence import (
+    SequenceOutputTypeConfig,
+    SequenceOutputSamplingConfig,
 )
 from eir.setup.setup_utils import get_all_optimizer_names
 
@@ -58,8 +65,8 @@ al_models_classes = Union[
 ]
 
 
-al_output_module_configs_classes = Union[Type[OutputModuleConfig]]
-al_output_module_configs = Union[OutputModuleConfig]
+al_output_module_configs_classes = Union[Type[TabularOutputModuleConfig]]
+al_output_module_configs = Union[TabularOutputModuleConfig]
 
 
 al_tokenizer_choices = (
@@ -671,8 +678,13 @@ class OutputConfig:
     :param model_config:
         Configuration for the chosen model (i.e. output module after fusion) for this
         output.
+
+    :param sampling_config:
+        Configuration for how to sample results from the output module.
     """
 
     output_info: OutputInfoConfig
-    output_type_info: Union[TabularOutputTypeConfig]
-    model_config: Union[OutputModuleConfig]
+    output_type_info: TabularOutputTypeConfig | SequenceOutputTypeConfig
+    model_config: TabularOutputModuleConfig | SequenceOutputModuleConfig
+
+    sampling_config: SequenceOutputSamplingConfig | None = None

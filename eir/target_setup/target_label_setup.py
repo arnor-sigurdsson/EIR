@@ -1,22 +1,53 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Sequence, Tuple, Union, Iterable
+from typing import Dict, Sequence, Tuple, Union, Iterable, Optional, TYPE_CHECKING
 
 import pandas as pd
+import torch
 from aislib.misc_utils import get_logger
 
 from eir.data_load.label_setup import (
     al_target_label_dict,
     al_label_transformers,
+    save_transformer_set,
     TabularFileInfo,
     al_all_column_ops,
     set_up_train_and_valid_tabular_data,
     gather_ids_from_tabular_file,
     gather_ids_from_data_source,
+    Labels,
 )
 from eir.setup import schemas
 
+if TYPE_CHECKING:
+    from eir.train import Hooks
+
+
 logger = get_logger(name=__name__)
+
+
+def set_up_all_targets_wrapper(
+    train_ids: Sequence[str],
+    valid_ids: Sequence[str],
+    run_folder: Path,
+    output_configs: Sequence[schemas.OutputConfig],
+    hooks: Optional["Hooks"],
+) -> Union["MergedTargetLabels", None]:
+    logger.info("Setting up target labels.")
+
+    custom_ops = hooks.custom_column_label_parsing_ops if hooks else None
+    supervised_target_labels = set_up_supervised_target_labels_wrapper(
+        output_configs=output_configs,
+        custom_label_ops=custom_ops,
+        train_ids=train_ids,
+        valid_ids=valid_ids,
+    )
+    save_transformer_set(
+        transformers_per_source=supervised_target_labels.label_transformers,
+        run_folder=run_folder,
+    )
+
+    return supervised_target_labels
 
 
 @dataclass
@@ -30,23 +61,43 @@ class MergedTargetLabels:
         return {**self.train_labels, **self.valid_labels}
 
 
-def set_up_tabular_target_labels_wrapper(
-    tabular_target_file_infos: Dict[str, TabularFileInfo],
+def set_up_supervised_target_labels_wrapper(
+    output_configs: Sequence[schemas.OutputConfig],
     custom_label_ops: al_all_column_ops,
     train_ids: Sequence[str],
     valid_ids: Sequence[str],
 ) -> MergedTargetLabels:
-    df_labels_train = pd.DataFrame(index=train_ids)
-    df_labels_valid = pd.DataFrame(index=valid_ids)
+    df_labels_train = pd.DataFrame(index=list(train_ids))
+    df_labels_valid = pd.DataFrame(index=list(valid_ids))
     label_transformers = {}
 
-    for output_name, tabular_info in tabular_target_file_infos.items():
-        cur_labels = set_up_train_and_valid_tabular_data(
-            tabular_file_info=tabular_info,
-            custom_label_ops=custom_label_ops,
-            train_ids=train_ids,
-            valid_ids=valid_ids,
-        )
+    tabular_target_labels_info = get_tabular_target_file_infos(
+        output_configs=output_configs
+    )
+
+    for output_config in output_configs:
+        output_name = output_config.output_info.output_name
+        output_type = output_config.output_info.output_type
+
+        match output_type:
+            case "tabular":
+                tabular_info = tabular_target_labels_info[output_name]
+                cur_labels = set_up_train_and_valid_tabular_data(
+                    tabular_file_info=tabular_info,
+                    custom_label_ops=custom_label_ops,
+                    train_ids=train_ids,
+                    valid_ids=valid_ids,
+                )
+                cur_transformers = cur_labels.label_transformers
+                label_transformers[output_name] = cur_transformers
+            case "sequence":
+                cur_labels = set_up_delayed_target_labels(
+                    train_ids=train_ids,
+                    valid_ids=valid_ids,
+                    output_name=output_name,
+                )
+            case _:
+                raise ValueError(f"Unknown output type: {output_type}")
 
         df_train_cur = pd.DataFrame.from_dict(cur_labels.train_labels, orient="index")
         df_valid_cur = pd.DataFrame.from_dict(cur_labels.valid_labels, orient="index")
@@ -56,9 +107,6 @@ def set_up_tabular_target_labels_wrapper(
 
         df_labels_train = pd.concat((df_labels_train, df_train_cur))
         df_labels_valid = pd.concat((df_labels_valid, df_valid_cur))
-
-        cur_transformers = cur_labels.label_transformers
-        label_transformers[output_name] = cur_transformers
 
     df_labels_train = df_labels_train.set_index("Output Name", append=True)
     df_labels_valid = df_labels_valid.set_index("Output Name", append=True)
@@ -76,6 +124,23 @@ def set_up_tabular_target_labels_wrapper(
     )
 
     return labels_data_object
+
+
+def set_up_delayed_target_labels(
+    train_ids: Sequence[str],
+    valid_ids: Sequence[str],
+    output_name: str,
+) -> Labels:
+    train_ids = set(train_ids)
+    valid_ids = set(valid_ids)
+    train_labels = {id_: {output_name: torch.empty(0)} for id_ in train_ids}
+    valid_labels = {id_: {output_name: torch.empty(0)} for id_ in valid_ids}
+
+    return Labels(
+        train_labels=train_labels,
+        valid_labels=valid_labels,
+        label_transformers={},
+    )
 
 
 def df_to_nested_dict(df: pd.DataFrame) -> Dict:
@@ -138,7 +203,7 @@ def get_tabular_target_file_infos(
 
     for output_config in output_configs:
         if output_config.output_info.output_type != "tabular":
-            raise NotImplementedError()
+            continue
 
         output_name = output_config.output_info.output_name
         tabular_info = TabularFileInfo(

@@ -1,15 +1,9 @@
 import argparse
-import ast
-import json
-import operator
 import types
 from argparse import Namespace
 from collections import Counter
-from collections import defaultdict
 from copy import copy
 from dataclasses import dataclass
-from functools import reduce
-from pathlib import Path
 from typing import (
     Sequence,
     Iterable,
@@ -42,18 +36,29 @@ from eir.models.omics.omics_models import (
     get_omics_config_dataclass_mapping,
     OmicsModelConfig,
 )
-from eir.models.output.linear import LinearOutputModelConfig
+from eir.models.output.linear import LinearOutputModuleConfig
 from eir.models.output.mlp_residual import (
-    ResidualMLPOutputModelConfig,
+    ResidualMLPOutputModulelConfig,
 )
-from eir.models.output.output_module_setup import OutputModuleConfig
+from eir.models.output.output_module_setup import (
+    TabularOutputModuleConfig,
+    SequenceOutputModuleConfig,
+)
+from eir.models.output.sequence.sequence_output_modules import (
+    TransformerSequenceOutputModuleConfig,
+)
 from eir.models.sequence.transformer_models import (
     BasicTransformerFeatureExtractorModelConfig,
-    PerceiverIOModelConfig,
     SequenceModelConfig,
 )
 from eir.models.tabular.tabular import TabularModelConfig, SimpleTabularModelConfig
 from eir.setup import schemas
+from eir.setup.config_setup_modules.config_setup_utils import (
+    get_yaml_iterator_with_injections,
+)
+from eir.setup.config_setup_modules.output_config_setup_sequence import (
+    get_configs_object_with_seq_output_configs,
+)
 from eir.train_utils.utils import configure_global_eir_logging
 
 al_input_types = Union[
@@ -74,7 +79,7 @@ al_output_module_config_class_getter = (
 )
 
 al_output_model_configs = Union[
-    ResidualMLPOutputModelConfig, LinearOutputModelConfig, Any
+    ResidualMLPOutputModulelConfig, LinearOutputModuleConfig, Any
 ]
 al_output_model_init_map = Dict[str, al_output_model_configs]
 
@@ -97,7 +102,7 @@ def get_configs():
 
     configure_global_eir_logging(output_folder=output_folder, log_level=log_level)
 
-    tabular_output_setup = DynamicOutputSetup(
+    dynamic_output_setup = DynamicOutputSetup(
         output_types_schema_map=get_outputs_types_schema_map(),
         output_module_config_class_getter=get_output_module_config_class,
         output_module_init_class_map=get_output_config_type_init_callable_map(),
@@ -105,10 +110,13 @@ def get_configs():
     configs = generate_aggregated_config(
         cl_args=main_cl_args,
         extra_cl_args_overload=extra_cl_args,
-        dynamic_output_setup=tabular_output_setup,
+        dynamic_output_setup=dynamic_output_setup,
+    )
+    configs_with_seq_outputs = get_configs_object_with_seq_output_configs(
+        eir_configs=configs, cl_args=main_cl_args, extra_cl_args=extra_cl_args
     )
 
-    return configs
+    return configs_with_seq_outputs
 
 
 def get_main_cl_args() -> Tuple[argparse.Namespace, List[str]]:
@@ -164,8 +172,9 @@ def get_main_parser(
     parser_.add_argument(
         "--input_configs",
         type=str,
-        nargs="+",
-        required=True,
+        nargs="*",
+        required=False,
+        default=[],
         help="Input feature extraction .yaml configurations. "
         "Each configuration represents one input.",
     )
@@ -504,10 +513,7 @@ def get_is_not_eir_model_condition(
         "bytes",
         "image",
     )
-    is_unknown_sequence_model = model_type not in (
-        "sequence-default",
-        "perceiver",
-    )
+    is_unknown_sequence_model = model_type not in ("sequence-default",)
     not_from_eir = is_possibly_external and is_unknown_sequence_model
     return not_from_eir
 
@@ -555,7 +561,6 @@ def get_feature_extractor_config_type_init_callable_map() -> Dict[str, Type]:
     other_mapping = {
         "tabular": SimpleTabularModelConfig,
         "sequence-default": BasicTransformerFeatureExtractorModelConfig,
-        "perceiver": PerceiverIOModelConfig,
     }
 
     mapping = omics_mapping | array_mapping | other_mapping
@@ -701,11 +706,12 @@ def init_output_config(
 def get_outputs_types_schema_map() -> (
     Dict[
         str,
-        Union[Type[schemas.TabularOutputTypeConfig]],
+        Type[schemas.TabularOutputTypeConfig] | Type[schemas.SequenceOutputTypeConfig],
     ]
 ):
     mapping = {
         "tabular": schemas.TabularOutputTypeConfig,
+        "sequence": schemas.SequenceOutputTypeConfig,
     }
 
     return mapping
@@ -723,7 +729,8 @@ def get_output_module_config_class_map() -> (
     Dict[str, schemas.al_output_module_configs_classes]
 ):
     mapping = {
-        "tabular": OutputModuleConfig,
+        "tabular": TabularOutputModuleConfig,
+        "sequence": SequenceOutputModuleConfig,
     }
 
     return mapping
@@ -739,7 +746,10 @@ def set_up_output_module_config(
 
     model_config_class = output_module_config_class_getter(output_type=output_type)
 
-    model_type = model_init_kwargs_base.get("model_type", None)
+    model_type = None
+    if model_init_kwargs_base:
+        model_type = model_init_kwargs_base.get("model_type", None)
+
     if not model_type:
         try:
             model_type = getattr(model_config_class, "model_type")
@@ -758,6 +768,7 @@ def set_up_output_module_config(
 
     model_type_config = set_up_output_module_init_config(
         model_init_kwargs_base=model_init_kwargs_base.get("model_init_config", {}),
+        output_type=output_type,
         model_type=model_type,
         output_module_init_class_map=output_module_init_class_map,
     )
@@ -774,6 +785,7 @@ def set_up_output_module_config(
 
 def set_up_output_module_init_config(
     model_init_kwargs_base: Union[None, dict],
+    output_type: Literal["tabular", "sequence"],
     model_type: str,
     output_module_init_class_map: al_output_model_init_map,
 ) -> al_output_model_configs:
@@ -782,18 +794,21 @@ def set_up_output_module_init_config(
 
     model_init_kwargs = copy(model_init_kwargs_base)
 
-    model_init_config_callable = output_module_init_class_map[model_type]
+    model_init_config_callable = output_module_init_class_map[output_type][model_type]
 
     model_init_config = model_init_config_callable(**model_init_kwargs)
 
     return model_init_config
 
 
-def get_output_config_type_init_callable_map() -> Dict[str, Type]:
+def get_output_config_type_init_callable_map() -> Dict[str, Dict[str, Type]]:
     mapping = {
-        **{
-            "mlp_residual": ResidualMLPOutputModelConfig,
-            "linear": LinearOutputModelConfig,
+        "tabular": {
+            "mlp_residual": ResidualMLPOutputModulelConfig,
+            "linear": LinearOutputModuleConfig,
+        },
+        "sequence": {
+            "sequence": TransformerSequenceOutputModuleConfig,
         },
     }
 
@@ -867,83 +882,3 @@ def combine_dicts(dicts: Iterable[dict]) -> dict:
         combined_dict = {**combined_dict, **dict_}
 
     return combined_dict
-
-
-def get_yaml_iterator_with_injections(
-    yaml_config_files: Iterable[str], extra_cl_args: List[str]
-) -> Generator[Dict, None, None]:
-    if not extra_cl_args:
-        yield from get_yaml_to_dict_iterator(yaml_config_files=yaml_config_files)
-        return
-
-    for yaml_config_file in yaml_config_files:
-        loaded_yaml = load_yaml_config(config_path=yaml_config_file)
-
-        yaml_file_path_object = Path(yaml_config_file)
-        for extra_arg in extra_cl_args:
-            extra_arg_parsed = extra_arg.lstrip("--")
-            target_file, str_to_inject = extra_arg_parsed.split(".", 1)
-
-            if target_file == yaml_file_path_object.stem:
-                dict_to_inject = convert_cl_str_to_dict(str_=str_to_inject)
-
-                logger.debug("Injecting %s into %s", dict_to_inject, loaded_yaml)
-                loaded_yaml = recursive_dict_replace(
-                    dict_=loaded_yaml, dict_to_inject=dict_to_inject
-                )
-
-        yield loaded_yaml
-
-
-def convert_cl_str_to_dict(str_: str) -> dict:
-    def _infinite_dict():
-        return defaultdict(_infinite_dict)
-
-    infinite_dict = _infinite_dict()
-
-    keys, final_value = str_.split("=", 1)
-    keys_split = keys.split(".")
-
-    try:
-        final_value_parsed = ast.literal_eval(final_value)
-    except (ValueError, SyntaxError):
-        final_value_parsed = final_value
-
-    inner_most_dict = reduce(operator.getitem, keys_split[:-1], infinite_dict)
-    inner_most_dict[keys_split[-1]] = final_value_parsed
-
-    dict_primitive = object_to_primitives(obj=infinite_dict)
-    return dict_primitive
-
-
-def get_yaml_to_dict_iterator(
-    yaml_config_files: Iterable[str],
-) -> Generator[Dict, None, None]:
-    for yaml_config in yaml_config_files:
-        yield load_yaml_config(config_path=yaml_config)
-
-
-def load_yaml_config(config_path: str) -> Dict[str, Any]:
-    with open(config_path, "r") as yaml_file:
-        config_as_dict = yaml.load(stream=yaml_file, Loader=yaml.FullLoader)
-
-    return config_as_dict
-
-
-def recursive_dict_replace(dict_: dict, dict_to_inject: dict) -> dict:
-    for cur_key, cur_value in dict_to_inject.items():
-        if cur_key not in dict_:
-            dict_[cur_key] = {}
-
-        old_dict_value = dict_.get(cur_key)
-        if isinstance(cur_value, Mapping):
-            assert isinstance(old_dict_value, Mapping)
-            recursive_dict_replace(old_dict_value, cur_value)
-        else:
-            dict_[cur_key] = cur_value
-
-    return dict_
-
-
-def object_to_primitives(obj):
-    return json.loads(json.dumps(obj, default=lambda o: o.__dict__))

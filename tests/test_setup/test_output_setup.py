@@ -5,8 +5,10 @@ import pytest
 
 from eir.data_load import label_setup
 from eir.setup.output_setup import (
-    set_up_num_outputs_per_target,
     get_output_name_config_iterator,
+)
+from eir.setup.output_setup_modules.tabular_output_setup import (
+    set_up_num_outputs_per_target,
 )
 
 if TYPE_CHECKING:

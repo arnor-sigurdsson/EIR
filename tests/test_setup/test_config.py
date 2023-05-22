@@ -5,6 +5,10 @@ from typing import Dict, List
 import pytest
 import yaml
 
+from eir.setup.config_setup_modules.config_setup_utils import (
+    get_yaml_iterator_with_injections,
+    convert_cl_str_to_dict,
+)
 from eir.setup import config
 from tests.setup_tests.fixtures_create_configs import TestConfigInits
 
@@ -244,7 +248,7 @@ def test_get_yaml_iterator_with_injections(create_cl_args_config_files):
 
     extra_cl_args_overload = ["--input_0.input_info.input_source=test_value"]
 
-    yaml_iter_with_injections = config.get_yaml_iterator_with_injections(
+    yaml_iter_with_injections = get_yaml_iterator_with_injections(
         yaml_config_files=input_yaml_files, extra_cl_args=extra_cl_args_overload
     )
     overloaded_config = next(yaml_iter_with_injections)
@@ -253,5 +257,5 @@ def test_get_yaml_iterator_with_injections(create_cl_args_config_files):
 
 def test_convert_cl_str_to_dict():
     test_str = "gln_input.input_info.input_source=test_value"
-    test_dict = config.convert_cl_str_to_dict(str_=test_str)
+    test_dict = convert_cl_str_to_dict(str_=test_str)
     assert test_dict == {"gln_input": {"input_info": {"input_source": "test_value"}}}

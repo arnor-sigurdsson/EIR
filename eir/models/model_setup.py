@@ -21,7 +21,7 @@ from eir.experiment_io.experiment_io import (
     load_serialized_train_experiment,
 )
 from eir.models.fusion import fusion
-from eir.models.image.image_models import ImageWrapperModel
+from eir.models.image.image_models import get_image_model_class
 from eir.models.meta import meta
 from eir.models.model_setup_modules.input_model_setup_array import (
     get_array_model,
@@ -33,13 +33,14 @@ from eir.models.model_setup_modules.input_model_setup_omics import (
 )
 from eir.models.model_setup_modules.input_model_setup_sequence import (
     get_sequence_model,
-    sequence_model_registry,
 )
 from eir.models.model_setup_modules.input_model_setup_tabular import get_tabular_model
 from eir.models.model_setup_modules.model_io import load_model
 from eir.models.model_setup_modules.output_model_setup import (
     get_tabular_output_module_from_model_config,
+    get_sequence_output_module_from_model_config,
 )
+from eir.models.sequence.sequence_models import get_sequence_model_class
 from eir.models.tabular.tabular import (
     get_unique_values_from_transformers,
 )
@@ -80,8 +81,6 @@ def get_model(
     inputs_as_dict: al_input_objects_as_dict,
     fusion_config: schemas.FusionConfig,
     outputs_as_dict: "al_output_objects_as_dict",
-    model_registry_per_input_type: al_model_registry,
-    model_registry_per_output_type: al_model_registry,
     meta_class_getter: al_fusion_class_callable = get_default_meta_class,
 ) -> Union[nn.Module, nn.DataParallel, Callable]:
     meta_class, meta_kwargs = get_meta_model_class_and_kwargs_from_configs(
@@ -89,8 +88,6 @@ def get_model(
         fusion_config=fusion_config,
         inputs_as_dict=inputs_as_dict,
         outputs_as_dict=outputs_as_dict,
-        model_registry_per_input_type=model_registry_per_input_type,
-        model_registry_per_output_type=model_registry_per_output_type,
         meta_class_getter=meta_class_getter,
     )
 
@@ -113,8 +110,6 @@ def get_model(
         input_modules=meta_kwargs["input_modules"],
         inputs_as_dict=inputs_as_dict,
         outputs_as_dict=outputs_as_dict,
-        model_registry_per_input_type=model_registry_per_input_type,
-        model_registry_per_output_type=model_registry_per_output_type,
         meta_class_getter=meta_class_getter,
     )
     meta_kwargs["input_modules"] = input_modules
@@ -137,8 +132,6 @@ def get_meta_model_class_and_kwargs_from_configs(
     fusion_config: schemas.FusionConfig,
     inputs_as_dict: al_input_objects_as_dict,
     outputs_as_dict: "al_output_objects_as_dict",
-    model_registry_per_input_type: al_model_registry,
-    model_registry_per_output_type: al_model_registry,
     meta_class_getter: Callable[[str], Type[nn.Module]] = get_default_meta_class,
 ) -> Tuple[Type[nn.Module], Dict[str, Any]]:
     meta_model_class = meta_class_getter(meta_model_type="default")
@@ -148,8 +141,6 @@ def get_meta_model_class_and_kwargs_from_configs(
         fusion_config=fusion_config,
         inputs_as_dict=inputs_as_dict,
         outputs_as_dict=outputs_as_dict,
-        model_registry_per_input_type=model_registry_per_input_type,
-        model_registry_per_output_type=model_registry_per_output_type,
     )
 
     return meta_model_class, meta_model_kwargs
@@ -160,14 +151,11 @@ def get_meta_model_kwargs_from_configs(
     fusion_config: schemas.FusionConfig,
     inputs_as_dict: al_input_objects_as_dict,
     outputs_as_dict: "al_output_objects_as_dict",
-    model_registry_per_input_type: al_model_registry,
-    model_registry_per_output_type: al_model_registry,
 ) -> Dict[str, Any]:
     kwargs = {}
     input_modules = get_input_modules(
         inputs_as_dict=inputs_as_dict,
         device=global_config.device,
-        model_registry_per_input_type=model_registry_per_input_type,
     )
     kwargs["input_modules"] = input_modules
 
@@ -187,11 +175,9 @@ def get_meta_model_kwargs_from_configs(
     )
     output_modules = get_output_modules(
         outputs_as_dict=outputs_as_dict,
-        model_registry_per_output_type=model_registry_per_output_type,
         input_dimension=fusion_module.num_out_features,
         device=global_config.device,
         in_features_per_input=in_features_per_input,
-        out_features_per_feature_extractor=out_feature_per_feature_extractor,
     )
     kwargs["output_modules"] = output_modules
 
@@ -200,7 +186,6 @@ def get_meta_model_kwargs_from_configs(
 
 def get_input_modules(
     inputs_as_dict: al_input_objects_as_dict,
-    model_registry_per_input_type: Dict[str, Callable[[str], Type[nn.Module]]],
     device: str,
 ) -> nn.ModuleDict:
     input_modules = nn.ModuleDict()
@@ -239,28 +224,12 @@ def get_input_modules(
                 )
                 input_modules[input_name] = tabular_model
 
-            case "sequence":
-                sequence_model_registry = model_registry_per_input_type["sequence"]
-
+            case "sequence" | "bytes":
                 num_tokens = len(inputs_object.vocab)
                 sequence_model = get_sequence_model(
                     sequence_model_config=inputs_object.input_config.model_config,
-                    model_registry_lookup=sequence_model_registry,
+                    model_registry_lookup=get_sequence_model_class,
                     num_tokens=num_tokens,
-                    max_length=inputs_object.computed_max_length,
-                    embedding_dim=input_model_config.embedding_dim,
-                    device=device,
-                )
-                input_modules[input_name] = sequence_model
-
-            case "bytes":
-                sequence_model_registry = model_registry_per_input_type["sequence"]
-
-                num_tokens = len(inputs_object.vocab)
-                sequence_model = get_sequence_model(
-                    sequence_model_config=inputs_object.input_config.model_config,
-                    num_tokens=num_tokens,
-                    model_registry_lookup=sequence_model_registry,
                     max_length=inputs_object.computed_max_length,
                     embedding_dim=input_model_config.embedding_dim,
                     device=device,
@@ -268,11 +237,10 @@ def get_input_modules(
                 input_modules[input_name] = sequence_model
 
             case "image":
-                image_model_registry = model_registry_per_input_type["image"]
                 image_model = get_image_model(
                     model_config=input_model_config,
                     input_channels=inputs_object.num_channels,
-                    model_registry_lookup=image_model_registry,
+                    model_registry_lookup=get_image_model_class,
                     device=device,
                 )
                 input_modules[input_name] = image_model
@@ -297,59 +265,46 @@ def get_output_modules(
     outputs_as_dict: "al_output_objects_as_dict",
     input_dimension: int,
     device: str,
-    model_registry_per_output_type: Optional[al_model_registry] = None,
     in_features_per_input: Optional[Dict[str, DataDimensions]] = None,
-    out_features_per_feature_extractor: Optional[Dict[str, int]] = None,
 ) -> nn.ModuleDict:
     output_modules = nn.ModuleDict()
-
-    if model_registry_per_output_type is None:
-        model_registry_per_output_type = {}
 
     for output_name, output_object in outputs_as_dict.items():
         output_type = output_object.output_config.output_info.output_type
         output_model_config = output_object.output_config.model_config
 
-        if output_type == "tabular":
-            tabular_output_module = get_tabular_output_module_from_model_config(
-                output_model_config=output_model_config,
-                input_dimension=input_dimension,
-                num_outputs_per_target=output_object.num_outputs_per_target,
-                device=device,
-            )
-            output_modules[output_name] = tabular_output_module
+        match output_type:
+            case "tabular":
+                tabular_output_module = get_tabular_output_module_from_model_config(
+                    output_model_config=output_model_config,
+                    input_dimension=input_dimension,
+                    num_outputs_per_target=output_object.num_outputs_per_target,
+                    device=device,
+                )
+                output_modules[output_name] = tabular_output_module
 
-        elif output_type in model_registry_per_output_type:
-            output_type_class_registry = model_registry_per_output_type[output_type]
-            output_model_type = output_model_config.model_type
-            output_type_class = output_type_class_registry(model_type=output_model_type)
+            case "sequence":
+                sequence_output_module = get_sequence_output_module_from_model_config(
+                    output_object=output_object,
+                    in_features_per_feature_extractor=in_features_per_input,
+                    device=device,
+                )
+                output_modules[output_name] = sequence_output_module
 
-            custom_output_module = output_type_class(
-                output_object=output_object,
-                output_name=output_name,
-                input_dimension=input_dimension,
-                in_features_per_feature_extractor=in_features_per_input,
-                out_features_per_feature_extractor=out_features_per_feature_extractor,
-                device=device,
-            )
-            output_modules[output_name] = custom_output_module
-        else:
-            raise NotImplementedError()
-
+            case _:
+                raise NotImplementedError(
+                    "Only tabular and sequence outputs are supported"
+                )
     return output_modules
 
 
 def get_default_model_registry_per_input_type() -> al_model_registry:
-    mapping = {"sequence": sequence_model_registry, "image": _image_model_registry}
+    mapping = {
+        "sequence": get_sequence_model_class,
+        "image": get_image_model_class,
+    }
 
     return mapping
-
-
-def _image_model_registry(model_type: str) -> Type[nn.Module]:
-    if model_type == "image-wrapper-default":
-        return ImageWrapperModel
-    else:
-        raise ValueError()
 
 
 def _get_feature_extractors_output_dimensions(
@@ -429,8 +384,6 @@ def overload_fusion_model_feature_extractors_with_pretrained(
     input_modules: nn.ModuleDict,
     inputs_as_dict: al_input_objects_as_dict,
     outputs_as_dict: "al_output_objects_as_dict",
-    model_registry_per_input_type: al_model_registry,
-    model_registry_per_output_type: al_model_registry,
     meta_class_getter: al_fusion_class_callable = get_default_meta_class,
 ) -> nn.ModuleDict:
     """
@@ -477,8 +430,6 @@ def overload_fusion_model_feature_extractors_with_pretrained(
             fusion_config=load_configs.fusion_config,
             inputs_as_dict=inputs_as_dict,
             outputs_as_dict=outputs_as_dict,
-            model_registry_per_input_type=model_registry_per_input_type,
-            model_registry_per_output_type=model_registry_per_output_type,
             meta_class_getter=meta_class_getter,
         )
 

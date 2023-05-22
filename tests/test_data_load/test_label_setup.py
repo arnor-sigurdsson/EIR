@@ -10,12 +10,12 @@ from eir import train
 from eir.data_load import label_setup
 from eir.data_load.data_source_modules.csv_ops import ColumnOperation
 from eir.data_load.label_setup import merge_target_columns
+from eir.setup.config import Configs
 from eir.target_setup.target_label_setup import (
     gather_all_ids_from_output_configs,
     get_tabular_target_file_infos,
-    set_up_tabular_target_labels_wrapper,
+    set_up_supervised_target_labels_wrapper,
 )
-from eir.setup.config import Configs
 
 
 @pytest.fixture()
@@ -161,11 +161,8 @@ def test_set_up_train_and_valid_tabular_data(
     )
     train_ids, valid_ids = train.split_ids(ids=all_array_ids, valid_size=gc.valid_size)
 
-    target_file_infos = get_tabular_target_file_infos(
-        output_configs=test_configs.output_configs
-    )
-    target_labels = set_up_tabular_target_labels_wrapper(
-        tabular_target_file_infos=target_file_infos,
+    target_labels = set_up_supervised_target_labels_wrapper(
+        output_configs=test_configs.output_configs,
         custom_label_ops=None,
         train_ids=train_ids,
         valid_ids=valid_ids,

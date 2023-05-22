@@ -10,7 +10,7 @@ from eir.data_load.data_preparation_modules.common import (
 )
 from eir.data_load.data_source_modules import deeplake_ops
 from eir.setup.input_setup_modules.setup_sequence import (
-    SequenceInputInfo,
+    ComputedSequenceInputInfo,
     get_sequence_split_function,
 )
 
@@ -53,7 +53,7 @@ def load_sequence_from_disk(sequence_file_path: Path) -> str:
 
 
 def prepare_sequence_data(
-    sequence_input_object: "SequenceInputInfo",
+    sequence_input_object: "ComputedSequenceInputInfo",
     cur_file_content_tokenized: np.ndarray,
     test_mode: bool,
 ) -> torch.Tensor:

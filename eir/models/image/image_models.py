@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Dict, Any, Literal
+from typing import Dict, Any, Literal, Type
 
 from torch import Tensor
 from torch import nn
@@ -7,6 +7,13 @@ from torch import nn
 from eir.setup.setup_utils import get_all_timm_model_names
 
 al_image_models = tuple(Literal[i] for i in get_all_timm_model_names())
+
+
+def get_image_model_class(model_type: str) -> Type["ImageWrapperModel"]:
+    if model_type == "image-wrapper-default":
+        return ImageWrapperModel
+    else:
+        raise ValueError()
 
 
 @dataclass

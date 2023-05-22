@@ -2,11 +2,9 @@ import inspect
 from typing import Tuple
 from unittest.mock import patch
 
-import pytest
 from ignite.engine import Events
 
-from eir.setup.config import Configs
-from eir.train import train, Experiment
+from eir.train import Experiment
 from eir.train_utils import train_handlers
 from tests.setup_tests.fixtures_create_experiment import ModelTestConfig
 
@@ -104,108 +102,3 @@ def test_get_early_stopping_event_kwargs():
     assert early_buffer_func(None, 2000) is True
     assert inspect.getclosurevars(early_buffer_func).nonlocals["has_checked"] is True
     assert early_buffer_func(None, 2500) is True
-
-
-@pytest.mark.parametrize("create_test_data", [{"task_type": "multi"}], indirect=True)
-@pytest.mark.parametrize(
-    "create_test_config_init_base",
-    [
-        # Case 1: Linear
-        {
-            "injections": {
-                "global_configs": {
-                    "output_folder": "test_hparam_summary_writer",
-                    "lr": 1e-03,
-                    "n_epochs": 4,
-                    "sample_interval": 100,
-                },
-                "input_configs": [
-                    {
-                        "input_info": {"input_name": "test_genotype"},
-                        "model_config": {"model_type": "linear"},
-                    },
-                ],
-                "output_configs": [
-                    {
-                        "output_info": {"output_name": "test_output"},
-                        "output_type_info": {
-                            "target_cat_columns": ["Origin"],
-                            "target_con_columns": [],
-                        },
-                    },
-                ],
-            },
-        },
-    ],
-    indirect=True,
-)
-@patch("eir.train_utils.train_handlers.SummaryWriter", autospec=True)
-def test_add_hparams_to_tensorboard(
-    patched_writer, prep_modelling_test_configs: al_prep_modelling_test_configs
-):
-    test_experiment, *_ = prep_modelling_test_configs
-    global_config = test_experiment.configs.global_config
-
-    train(experiment=test_experiment)
-
-    expected = ["lr", "batch_size"]
-    random = ["random_1", "random_2"]
-    test_hparam_keys = expected + random
-
-    train_handlers.add_hparams_to_tensorboard(
-        h_params=test_hparam_keys, experiment=test_experiment, writer=patched_writer
-    )
-    assert patched_writer.add_hparams.call_count == 1
-
-    hparam_kwarg: dict = patched_writer.add_hparams.call_args.kwargs["hparam_dict"]
-    assert set(hparam_kwarg.keys()) == set(expected)
-    assert hparam_kwarg["batch_size"] == global_config.batch_size
-    assert hparam_kwarg["lr"] == global_config.lr
-
-    metric_dict_kwarg = patched_writer.add_hparams.call_args.kwargs["metric_dict"]
-    assert metric_dict_kwarg["best_overall_performance"] > 0.8
-
-
-@pytest.mark.parametrize("create_test_data", [{"task_type": "multi"}], indirect=True)
-@pytest.mark.parametrize(
-    "create_test_config_init_base",
-    [
-        # Case 1: Linear
-        {
-            "injections": {
-                "global_configs": {"lr": 1e-03},
-                "input_configs": [
-                    {
-                        "input_info": {"input_name": "test_genotype"},
-                        "model_config": {"model_type": "linear"},
-                    },
-                ],
-                "output_configs": [
-                    {
-                        "output_info": {"output_name": "test_output"},
-                        "output_type_info": {
-                            "target_cat_columns": ["Origin"],
-                            "target_con_columns": [],
-                        },
-                    },
-                ],
-            },
-        },
-    ],
-    indirect=True,
-)
-def test_generate_hparam_dict(create_test_config: Configs):
-    test_configs = create_test_config
-
-    global_config = test_configs.global_config
-
-    expected = ["lr", "batch_size"]
-    random = ["random_1", "random_2"]
-    test_hparam_keys = expected + random
-
-    hparam_dict = train_handlers._generate_h_param_dict(
-        global_config=global_config, h_params=test_hparam_keys
-    )
-    assert set(hparam_dict.keys()) == set(expected)
-    assert hparam_dict.get("batch_size") == global_config.batch_size
-    assert hparam_dict.get("lr") == global_config.lr

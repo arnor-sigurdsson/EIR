@@ -1,7 +1,7 @@
-import math
 from dataclasses import dataclass
 from typing import Union, Callable, Type, Dict, Literal, Tuple, Any
 
+import math
 from aislib.misc_utils import get_logger
 from torch import nn
 from transformers import PreTrainedModel, AutoModel, AutoConfig
@@ -9,11 +9,9 @@ from transformers import PreTrainedModel, AutoModel, AutoConfig
 from eir.models.models_base import get_output_dimensions_for_input
 from eir.models.sequence.transformer_models import (
     TransformerFeatureExtractor,
-    PerceiverIOFeatureExtractor,
     SequenceModelConfig,
     TransformerWrapperModel,
     BasicTransformerFeatureExtractorModelConfig,
-    PerceiverIOModelConfig,
     get_embedding_dim_for_sequence_model,
 )
 from eir.setup.setup_utils import get_unsupported_hf_models
@@ -23,9 +21,7 @@ logger = get_logger(name=__name__)
 
 @dataclass
 class SequenceModelObjectsForWrapperModel:
-    feature_extractor: Union[
-        TransformerFeatureExtractor, PerceiverIOFeatureExtractor, nn.Module
-    ]
+    feature_extractor: Union[TransformerFeatureExtractor, nn.Module]
     embeddings: Union[None, nn.Module]
     embedding_dim: int
     external: bool
@@ -40,15 +36,10 @@ def get_sequence_model(
     embedding_dim: int,
     device: str,
 ) -> TransformerWrapperModel:
-    feature_extractor_max_length = max_length
-    num_chunks = 1
-    if sequence_model_config.window_size:
-        logger.info(
-            "Using sliding model for sequence input as window size was set to %d.",
-            sequence_model_config.window_size,
-        )
-        feature_extractor_max_length = sequence_model_config.window_size
-        num_chunks = math.ceil(max_length / sequence_model_config.window_size)
+    feature_extractor_max_length, num_chunks = _get_windowed_sequence_parameters(
+        max_length=max_length,
+        window_size=sequence_model_config.window_size,
+    )
 
     objects_for_wrapper = _get_sequence_feature_extractor_objects_for_wrapper_model(
         model_type=sequence_model_config.model_type,
@@ -79,14 +70,28 @@ def get_sequence_model(
     return sequence_model
 
 
+def _get_windowed_sequence_parameters(
+    max_length: int, window_size: int
+) -> Tuple[int, int]:
+    feature_extractor_max_length = max_length
+    num_chunks = 1
+    if window_size:
+        logger.info(
+            "Using sliding model for sequence input as window size was set to %d.",
+            window_size,
+        )
+        feature_extractor_max_length = window_size
+        num_chunks = math.ceil(max_length / window_size)
+
+    return feature_extractor_max_length, num_chunks
+
+
 def _get_sequence_feature_extractor_objects_for_wrapper_model(
     model_type: str,
     model_registry_lookup: Callable[[str], Type[nn.Module]],
     pretrained: bool,
     pretrained_frozen: bool,
-    model_config: Union[
-        BasicTransformerFeatureExtractorModelConfig, PerceiverIOModelConfig, Dict
-    ],
+    model_config: Union[BasicTransformerFeatureExtractorModelConfig, Dict],
     num_tokens: int,
     embedding_dim: int,
     feature_extractor_max_length: int,
@@ -101,12 +106,6 @@ def _get_sequence_feature_extractor_objects_for_wrapper_model(
             feature_extractor_max_length=feature_extractor_max_length,
             embedding_dim=embedding_dim,
             feature_extractor_class=model_class,
-        )
-    elif model_type == "perceiver":
-        objects_for_wrapper = _get_perceiver_sequence_feature_extractor_objects(
-            model_config=model_config,
-            max_length=feature_extractor_max_length,
-            num_chunks=num_chunks,
         )
     elif pretrained:
         objects_for_wrapper = _get_pretrained_hf_sequence_feature_extractor_objects(
@@ -306,38 +305,6 @@ def _get_basic_sequence_feature_extractor_objects(
     )
 
     return objects_for_wrapper
-
-
-def _get_perceiver_sequence_feature_extractor_objects(
-    model_config: PerceiverIOModelConfig,
-    max_length: int,
-    num_chunks: int,
-):
-    feature_extractor = PerceiverIOFeatureExtractor(
-        model_config=model_config,
-        max_length=max_length,
-    )
-
-    known_out_features = feature_extractor.num_out_features * num_chunks
-
-    objects_for_wrapper = SequenceModelObjectsForWrapperModel(
-        feature_extractor=feature_extractor,
-        embeddings=None,
-        embedding_dim=model_config.dim,
-        external=False,
-        known_out_features=known_out_features,
-    )
-
-    return objects_for_wrapper
-
-
-def sequence_model_registry(model_type: str) -> Type[nn.Module]:
-    if model_type == "sequence-default":
-        return TransformerFeatureExtractor
-    elif model_type == "sequence-wrapper-default":
-        return TransformerWrapperModel
-    else:
-        raise ValueError()
 
 
 def _warn_about_unsupported_hf_model(model_name: str) -> None:

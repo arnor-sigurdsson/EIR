@@ -9,7 +9,7 @@ import pytest
 from aislib.misc_utils import ensure_path_exists
 
 from eir.setup import config
-from eir.setup.config import recursive_dict_replace
+from eir.setup.config_setup_modules.config_setup_utils import recursive_dict_replace
 from eir.train_utils.utils import configure_global_eir_logging, get_run_folder
 from tests.setup_tests.fixtures_create_data import TestDataConfig
 from tests.setup_tests.setup_test_eir_configs import (

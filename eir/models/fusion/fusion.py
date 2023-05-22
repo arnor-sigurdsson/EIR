@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Type, Union, Dict
+from typing import Type, Union, Dict, Callable
 
 import torch
 from torch import nn
@@ -38,7 +38,7 @@ def _get_fusion_input_dimension(modules_to_fuse: nn.ModuleDict) -> int:
 
 def get_fusion_class(
     fusion_model_type: str,
-) -> Type[nn.Module]:
+) -> Type[nn.Module] | Callable:
     if fusion_model_type == "mgmoe":
         return fusion_mgmoe.MGMoEModel
     elif fusion_model_type == "default":

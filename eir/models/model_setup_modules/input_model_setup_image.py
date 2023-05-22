@@ -13,7 +13,7 @@ logger = get_logger(name=__name__)
 def get_image_model(
     model_config: ImageModelConfig,
     input_channels: int,
-    model_registry_lookup: Callable[[str], Type[nn.Module]],
+    model_registry_lookup: Callable[[str], Type["ImageWrapperModel"]],
     device: str,
 ) -> ImageWrapperModel:
     if model_config.model_type in timm.list_models():

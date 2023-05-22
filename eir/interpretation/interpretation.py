@@ -187,8 +187,6 @@ def attribution_analysis_wrapper(
     """
     We need to copy the model to avoid affecting the actual model during
     training (e.g. zero-ing out gradients).
-
-    TODO: Refactor this function further.
     """
 
     exp = experiment
@@ -637,7 +635,7 @@ def get_basic_consumer() -> (
 def process_attributions_for_all_modalities(
     attribution_producer: Generator["SampleAttribution", None, None],
     attribution_consumers: Dict[str, Callable],
-) -> Dict[str, Union[Sequence["SampleAttribution"], np.ndarray]]:
+) -> dict[str, Sequence["SampleAttribution"] | dict[str, np.ndarray]]:
     processed_attributions_all_modalities = {}
 
     for sample_attribution in attribution_producer:

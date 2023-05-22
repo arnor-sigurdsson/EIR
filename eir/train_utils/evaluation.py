@@ -9,11 +9,13 @@ from aislib.misc_utils import get_logger
 from ignite.engine import Engine
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
-from eir.data_load.data_utils import get_output_info_generator
 from eir.data_load.label_setup import al_label_transformers_object
 from eir.models import model_training_utils
 from eir.train_utils import metrics
 from eir.train_utils import utils
+from eir.train_utils.handlers_sequence_output import (
+    sequence_out_manual_sample_evaluation_wrapper,
+)
 from eir.visualization import visualization_funcs as vf
 
 if TYPE_CHECKING:
@@ -29,15 +31,13 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
     don't want to evaluate as a running average (i.e. do it in the step
     function), but rather run over the whole validation dataset as we do
     in this function.
-
-    TODO: Streamline with hooks.
     """
     exp = handler_config.experiment
     gc = exp.configs.global_config
     iteration = engine.state.iteration
 
     exp.model.eval()
-    gather_preds = model_training_utils.gather_pred_outputs_from_dloader
+    gather_preds = model_training_utils.gather_prediction_outputs_from_dataloader
 
     val_outputs_total, val_target_labels, val_ids_total = gather_preds(
         data_loader=exp.valid_loader,
@@ -46,7 +46,6 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
         model=exp.model,
         with_labels=True,
     )
-    exp.model.train()
 
     val_target_labels = model_training_utils.parse_target_labels(
         output_objects=exp.outputs, device=gc.device, labels=val_target_labels
@@ -86,7 +85,7 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
     )
 
     if gc.save_evaluation_sample_results:
-        save_evaluation_results_wrapper(
+        save_tabular_evaluation_results_wrapper(
             val_outputs=val_outputs_total,
             val_labels=val_target_labels,
             val_ids=val_ids_total,
@@ -94,43 +93,53 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
             experiment=handler_config.experiment,
         )
 
+        sequence_out_manual_sample_evaluation_wrapper(
+            experiment=exp, iteration=iteration
+        )
 
-def save_evaluation_results_wrapper(
-    val_outputs: Dict[str, torch.Tensor],
+    exp.model.train()
+
+
+def save_tabular_evaluation_results_wrapper(
+    val_outputs: Dict[str, Dict[str, torch.Tensor]],
     val_labels: Dict[str, Dict[str, torch.Tensor]],
     val_ids: List[str],
     iteration: int,
     experiment: "Experiment",
-):
-    target_columns_gen = get_output_info_generator(outputs_as_dict=experiment.outputs)
+) -> None:
+    for output_name, output_object in experiment.outputs.items():
+        output_type = output_object.output_config.output_info.output_type
+        if output_type != "tabular":
+            continue
 
-    for output_name, column_type, column_name in target_columns_gen:
-        cur_sample_outfolder = utils.prep_sample_outfolder(
-            output_folder=experiment.configs.global_config.output_folder,
-            column_name=column_name,
-            output_name=output_name,
-            iteration=iteration,
-        )
+        target_columns = output_object.target_columns
+        for column_type, list_of_cols_of_this_type in target_columns.items():
+            for column_name in list_of_cols_of_this_type:
+                cur_sample_output_folder = utils.prep_sample_outfolder(
+                    output_folder=experiment.configs.global_config.output_folder,
+                    column_name=column_name,
+                    output_name=output_name,
+                    iteration=iteration,
+                )
+                cur_val_outputs = val_outputs[output_name][column_name]
+                cur_val_outputs = cur_val_outputs.cpu().numpy()
 
-        cur_val_outputs = val_outputs[output_name][column_name]
-        cur_val_outputs = cur_val_outputs.cpu().numpy()
+                cur_val_labels = val_labels[output_name][column_name]
+                cur_val_labels = cur_val_labels.cpu().numpy()
+                target_transformers = output_object.target_transformers
 
-        cur_val_labels = val_labels[output_name][column_name]
-        cur_val_labels = cur_val_labels.cpu().numpy()
+                plot_config = PerformancePlotConfig(
+                    val_outputs=cur_val_outputs,
+                    val_labels=cur_val_labels,
+                    val_ids=val_ids,
+                    iteration=iteration,
+                    column_name=column_name,
+                    column_type=column_type,
+                    target_transformer=target_transformers[column_name],
+                    output_folder=cur_sample_output_folder,
+                )
 
-        target_transformers = experiment.outputs[output_name].target_transformers
-        plot_config = PerformancePlotConfig(
-            val_outputs=cur_val_outputs,
-            val_labels=cur_val_labels,
-            val_ids=val_ids,
-            iteration=iteration,
-            column_name=column_name,
-            column_type=column_type,
-            target_transformer=target_transformers[column_name],
-            output_folder=cur_sample_outfolder,
-        )
-
-        save_evaluation_results(plot_config=plot_config)
+                save_evaluation_results(plot_config=plot_config)
 
 
 @dataclass

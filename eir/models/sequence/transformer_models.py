@@ -1,5 +1,4 @@
 import inspect
-import math
 from dataclasses import dataclass
 from functools import partial
 from typing import (
@@ -12,9 +11,9 @@ from typing import (
     Callable,
 )
 
+import math
 import torch
 from aislib.misc_utils import get_logger
-from perceiver_pytorch import PerceiverIO
 from torch import nn, Tensor
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
 from torch.nn.functional import pad
@@ -24,8 +23,7 @@ from eir.models.layers import _find_split_padding_needed
 from eir.setup.setup_utils import get_all_hf_model_names
 
 al_sequence_models = tuple(
-    Literal[i]
-    for i in ["sequence-default", "perceiver"] + list(get_all_hf_model_names())
+    Literal[i] for i in ["sequence-default"] + list(get_all_hf_model_names())
 )
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
@@ -48,7 +46,7 @@ class SequenceModelConfig:
     :param position:
         Whether to encode the token position or use learnable position embeddings.
 
-    :param position_dropoput:
+    :param position_dropout:
         Dropout for the positional encoding / embedding.
 
     :param window_size:
@@ -233,7 +231,7 @@ def _get_transformer_wrapper_feature_extractor(
         dynamic_extras["padding"] = padding
 
         extractor = partial(
-            _conv_transfomer_forward,
+            _conv_transformer_forward,
             feature_extractor=feature_extractor,
             feature_extractor_forward_callable=feature_extractor_forward,
             max_length=max_length,
@@ -358,7 +356,7 @@ def _build_transformer_forward_kwargs(
     return kwargs
 
 
-def _conv_transfomer_forward(
+def _conv_transformer_forward(
     input: torch.Tensor,
     feature_extractor: "TransformerFeatureExtractor",
     feature_extractor_forward_callable: Callable[
@@ -472,47 +470,28 @@ def parse_dim_feedforward(
     return dim_feedforward
 
 
-@dataclass
-class PerceiverIOModelConfig:
-    """ """
-
-    depth: int = 2
-    dim: int = 16
-    queries_dim: int = 32
-    logits_dim: Union[int, None] = None
-    num_latents: int = 32
-    latent_dim: int = 128
-    cross_heads: int = 1
-    latent_heads: int = 8
-    cross_dim_head: int = 64
-    latent_dim_head: int = 64
-    weight_tie_layers: bool = False
-    decoder_ff: bool = False
-
-
-class PerceiverIOFeatureExtractor(nn.Module):
+class SequenceOutputTransformerFeatureExtractor(TransformerFeatureExtractor):
     def __init__(
         self,
-        model_config: PerceiverIOModelConfig,
+        model_config: BasicTransformerFeatureExtractorModelConfig,
+        embedding_dim: int,
+        num_tokens: int,
         max_length: int,
-    ) -> None:
-        super().__init__()
+    ):
+        super().__init__(
+            model_config=model_config,
+            embedding_dim=embedding_dim,
+            num_tokens=num_tokens,
+            max_length=max_length,
+        )
 
-        self.model_config = model_config
-        self.max_length = max_length
-
-        self.perceiver = PerceiverIO(**model_config.__dict__)
-
-    @property
-    def num_out_features(self) -> int:
-        mc = self.model_config
-        if mc.logits_dim:
-            return mc.logits_dim * self.max_length
-
-        return mc.latent_dim * mc.num_latents
+        mask = torch.triu(
+            torch.ones(self.max_length, self.max_length) * float("-inf"), diagonal=1
+        )
+        self.register_buffer("mask", mask)
 
     def forward(self, input: Tensor) -> Tensor:
-        out = self.perceiver(data=input)
+        out = self.transformer_encoder(input, mask=self.mask)
         return out
 
 

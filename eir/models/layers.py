@@ -1,7 +1,8 @@
-import math
 from dataclasses import dataclass, field
-from typing import List, Tuple
+from typing import List, Tuple, Literal, Sequence
 
+import math
+import numpy as np
 import torch
 import torch.nn.functional as F
 from aislib.misc_utils import get_logger
@@ -449,7 +450,7 @@ class MLPResidualBlock(nn.Module):
         return out + identity
 
 
-class SplitMLPResidualBlock(nn.Module):
+class LCLResidualBlock(nn.Module):
     def __init__(
         self,
         in_features: int,
@@ -559,3 +560,84 @@ def _calculate_num_chunks_for_equal_split_out_features(
     Ensure total out features are equal to in features.
     """
     return in_features // out_feature_sets
+
+
+def get_lcl_projection_layer(
+    input_dimension: int,
+    target_dimension: int,
+    layer_type: Literal["lcl_residual", "lcl"] = "lcl_residual",
+    kernel_width_candidates: Sequence[int] = tuple(range(1, 1024 + 1)),
+    out_feature_sets_candidates: Sequence[int] = tuple(range(1, 64 + 1)),
+) -> LCLResidualBlock:
+    layer_class = LCLResidualBlock
+    n_split_layers = 2
+    if layer_type == "lcl":
+        layer_class = SplitLinear
+        n_split_layers = 1
+
+    search_func = _find_best_lcl_kernel_width_and_out_feature_sets
+    best_split_size, best_out_feature_sets = search_func(
+        input_dimension=input_dimension,
+        target_dimension=target_dimension,
+        n_layers=n_split_layers,
+        kernel_width_candidates=kernel_width_candidates,
+        out_feature_sets_candidates=out_feature_sets_candidates,
+    )
+
+    best_layer = layer_class(
+        in_features=input_dimension,
+        split_size=best_split_size,
+        out_feature_sets=best_out_feature_sets,
+    )
+
+    return best_layer
+
+
+def _find_best_lcl_kernel_width_and_out_feature_sets(
+    input_dimension: int,
+    target_dimension: int,
+    n_layers: int,
+    kernel_width_candidates: Sequence[int] = tuple(range(1, 1024 + 1)),
+    out_feature_sets_candidates: Sequence[int] = tuple(range(1, 64 + 1)),
+) -> Tuple[int, int]:
+    best_diff = np.Inf
+    best_kernel_width = None
+    best_out_feature_sets = None
+
+    def _compute(
+        input_dimension_: int, kernel_width_: int, out_feature_sets_: int
+    ) -> float:
+        num_chunks_ = int(math.ceil(input_dimension_ / kernel_width_))
+        out_features_ = num_chunks_ * out_feature_sets_
+        return out_features_
+
+    for out_feature_sets in out_feature_sets_candidates:
+        for kernel_width in kernel_width_candidates:
+            if kernel_width > input_dimension:
+                continue
+
+            out_features = input_dimension
+            for n in range(n_layers):
+                out_features = _compute(
+                    input_dimension_=out_features,
+                    kernel_width_=kernel_width,
+                    out_feature_sets_=out_feature_sets,
+                )
+
+            if out_features < target_dimension:
+                continue
+
+            diff = abs(out_features - target_dimension)
+
+            if diff < best_diff:
+                best_diff = diff
+                best_kernel_width = kernel_width
+                best_out_feature_sets = out_feature_sets
+
+            if diff == 0:
+                break
+
+    if best_kernel_width is None:
+        raise ValueError("Could not find a suitable combination")
+
+    return best_kernel_width, best_out_feature_sets

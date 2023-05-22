@@ -1,18 +1,20 @@
 from copy import deepcopy
-from math import isclose
 
 import pytest
 import torch
+from math import isclose
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 
-from eir.models.output.mlp_residual import ResidualMLPOutputModelConfig
-from eir.setup.output_setup import TabularOutputInfo
+from eir.models.output.mlp_residual import ResidualMLPOutputModulelConfig
+from eir.models.output.output_module_setup import TabularOutputModuleConfig
+from eir.setup.output_setup_modules.tabular_output_setup import (
+    ComputedTabularOutputInfo,
+)
 from eir.setup.schemas import (
     OutputConfig,
     OutputInfoConfig,
     TabularOutputTypeConfig,
 )
-from eir.models.output.output_module_setup import OutputModuleConfig
 from eir.train_utils import metrics
 from eir.train_utils.criteria import get_criteria
 
@@ -93,7 +95,7 @@ def get_calculate_batch_metrics_data_test_kwargs():
 
 def _get_metrics_test_module_test_outputs_as_dict():
     test_outputs_as_dict = {
-        "test_output": TabularOutputInfo(
+        "test_output": ComputedTabularOutputInfo(
             output_config=OutputConfig(
                 output_info=OutputInfoConfig(
                     output_name="test_output", output_type="tabular", output_source=None
@@ -102,8 +104,8 @@ def _get_metrics_test_module_test_outputs_as_dict():
                     target_con_columns=["Height", "BMI"],
                     target_cat_columns=["Origin"],
                 ),
-                model_config=OutputModuleConfig(
-                    model_init_config=ResidualMLPOutputModelConfig()
+                model_config=TabularOutputModuleConfig(
+                    model_init_config=ResidualMLPOutputModulelConfig()
                 ),
             ),
             num_outputs_per_target={},

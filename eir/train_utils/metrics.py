@@ -307,14 +307,14 @@ def calculate_prediction_losses(
     losses_dict = {}
 
     for output_name, target_criterion_dict in criteria.items():
-        for target_column, criterion in target_criterion_dict.items():
-            cur_target_col_labels = targets[output_name][target_column]
-            cur_target_col_outputs = inputs[output_name][target_column]
+        for output_head_name, criterion in target_criterion_dict.items():
+            cur_target_col_labels = targets[output_name][output_head_name]
+            cur_target_col_outputs = inputs[output_name][output_head_name]
 
             if output_name not in losses_dict:
                 losses_dict[output_name] = {}
 
-            losses_dict[output_name][target_column] = criterion(
+            losses_dict[output_name][output_head_name] = criterion(
                 input=cur_target_col_outputs, target=cur_target_col_labels
             )
 

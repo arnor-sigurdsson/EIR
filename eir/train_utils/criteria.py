@@ -4,7 +4,6 @@ from typing import Dict, Union, Callable, Type, Literal, TYPE_CHECKING
 import torch
 from torch import nn
 
-from eir.data_load import data_utils
 from eir.setup import schemas
 from eir.train_utils.metrics import calculate_prediction_losses
 
@@ -41,30 +40,46 @@ al_losses_classes = [
 
 def get_criteria(outputs_as_dict: "al_output_objects_as_dict") -> al_criteria_dict:
     criteria_dict = {}
-    target_columns_gen = data_utils.get_output_info_generator(
-        outputs_as_dict=outputs_as_dict
-    )
 
-    for output_name, column_type, column_name in target_columns_gen:
-        output_config = outputs_as_dict[output_name].output_config
-        label_smoothing = _get_label_smoothing(
-            output_config=output_config,
-            column_type=column_type,
-        )
-
-        loss_name = _parse_loss_name(
-            output_config=output_config, column_type=column_type
-        )
-
-        criterion = get_criterion(
-            column_type_=column_type,
-            loss_name=loss_name,
-            cat_label_smoothing_=label_smoothing,
-        )
-
+    for output_name, output_object in outputs_as_dict.items():
         if output_name not in criteria_dict:
             criteria_dict[output_name] = {}
-        criteria_dict[output_name][column_name] = criterion
+
+        output_type = output_object.output_config.output_info.output_type
+        target_col_iter = output_object.target_columns.items()
+
+        match output_type:
+            case "tabular":
+                for column_type, columns_of_type in target_col_iter:
+                    for column_name in columns_of_type:
+                        label_smoothing = _get_label_smoothing(
+                            output_config=output_object.output_config,
+                            column_type=column_type,
+                        )
+
+                        loss_name = _parse_loss_name(
+                            output_config=output_object.output_config,
+                            column_type=column_type,
+                        )
+
+                        criterion = get_supervised_criterion(
+                            column_type_=column_type,
+                            loss_name=loss_name,
+                            cat_label_smoothing_=label_smoothing,
+                        )
+
+                        criteria_dict[output_name][column_name] = criterion
+
+            case "sequence":
+                pad_token = getattr(output_object.tokenizer, "pad_token", "<pad>")
+                pad_idx = output_object.vocab[pad_token]
+
+                criterion = partial(
+                    _sequence_cat_loss,
+                    cat_loss_func=nn.CrossEntropyLoss(ignore_index=pad_idx),
+                )
+
+                criteria_dict[output_name][output_name] = criterion
 
     return criteria_dict
 
@@ -86,7 +101,7 @@ def build_loss_dict() -> dict[str, list[str]]:
     return loss_dict
 
 
-def get_criterion(
+def get_supervised_criterion(
     column_type_: str, loss_name: str, cat_label_smoothing_: float = 0.0
 ) -> Union[nn.CrossEntropyLoss, Callable]:
     loss_dict = build_loss_dict()
@@ -139,3 +154,10 @@ def _calc_con_loss(input: torch.Tensor, target: torch.Tensor, loss_func: al_con_
 def get_loss_callable(criteria: al_criteria_dict):
     single_task_loss_func = partial(calculate_prediction_losses, criteria=criteria)
     return single_task_loss_func
+
+
+def _sequence_cat_loss(
+    input, target, cat_loss_func: nn.CrossEntropyLoss
+) -> torch.Tensor:
+    loss = cat_loss_func(input=input.transpose(2, 1), target=target)
+    return loss

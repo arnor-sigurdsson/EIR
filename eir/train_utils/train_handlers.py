@@ -1,4 +1,3 @@
-import atexit
 import os
 from dataclasses import dataclass
 from functools import partial
@@ -16,7 +15,6 @@ from typing import (
 )
 
 import aislib.misc_utils
-import pandas as pd
 import yaml
 from aislib.misc_utils import get_logger
 from ignite.contrib.handlers import ProgressBar
@@ -24,14 +22,11 @@ from ignite.engine import Events, Engine, events
 from ignite.handlers import ModelCheckpoint, EarlyStopping
 from ignite.metrics import RunningAverage
 from torch import nn
-from torch.utils.tensorboard import SummaryWriter
 
 from eir.data_load.data_utils import get_output_info_generator
 from eir.interpretation.interpretation import attribution_analysis_handler
-from eir.setup.config import object_to_primitives
+from eir.setup.config_setup_modules.config_setup_utils import object_to_primitives
 from eir.setup.output_setup import al_output_objects_as_dict
-from eir.setup.schemas import GlobalConfig
-from eir.train_utils import H_PARAMS
 from eir.train_utils.distributed import AttrDelegatedDistributedDataParallel
 from eir.train_utils.distributed import only_call_on_master_node
 from eir.train_utils.evaluation import validation_handler
@@ -524,26 +519,20 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
             custom_handlers=custom_handlers,
         )
 
-    log_tb_hparams_on_exit_func = partial(
-        add_hparams_to_tensorboard,
-        h_params=H_PARAMS,
-        experiment=handler_config.experiment,
-        writer=handler_config.experiment.writer,
-    )
-    atexit.register(log_tb_hparams_on_exit_func)
-
     return trainer
 
 
 def _save_yaml_configs(run_folder: Path, configs: "Configs"):
     for config_name, config_object in configs.__dict__.items():
-        cur_outpath = Path(run_folder / "configs" / config_name).with_suffix(".yaml")
-        aislib.misc_utils.ensure_path_exists(path=cur_outpath)
+        cur_output_path = Path(run_folder / "configs" / config_name).with_suffix(
+            ".yaml"
+        )
+        aislib.misc_utils.ensure_path_exists(path=cur_output_path)
 
         config_object_as_primitives = object_to_primitives(obj=config_object)
 
-        with open(str(cur_outpath), "w") as yamlfile:
-            yaml.dump(data=config_object_as_primitives, stream=yamlfile)
+        with open(str(cur_output_path), "w") as yaml_file_handle:
+            yaml.dump(data=config_object_as_primitives, stream=yaml_file_handle)
 
 
 def _add_checkpoint_handler_wrapper(
@@ -815,70 +804,3 @@ def _attach_custom_handlers(
         trainer = custom_handler_attacher(trainer, handler_config)
 
     return trainer
-
-
-def add_hparams_to_tensorboard(
-    h_params: List[str], experiment: "Experiment", writer: SummaryWriter
-) -> None:
-    logger.debug(
-        "Exiting and logging best hyperparameters for best average loss "
-        "to tensorboard."
-    )
-
-    exp = experiment
-    gc = exp.configs.global_config
-
-    run_folder = get_run_folder(output_folder=gc.output_folder)
-
-    target_generator = get_output_info_generator(outputs_as_dict=experiment.outputs)
-
-    metrics_files = get_metrics_files(
-        target_generator=target_generator,
-        run_folder=run_folder,
-        train_or_val_target_prefix="validation_",
-    )
-
-    try:
-        average_loss_file = metrics_files["average"]["average"]
-        average_loss_df = pd.read_csv(average_loss_file)
-
-    except FileNotFoundError as e:
-        logger.debug(
-            "Could not find %s at exit. Tensorboard hyper parameters not logged.",
-            e.filename,
-        )
-        return
-
-    h_param_dict = _generate_h_param_dict(global_config=gc, h_params=h_params)
-
-    min_loss = average_loss_df["loss-average"].min()
-    max_perf = average_loss_df["perf-average"].max()
-
-    writer.add_hparams(
-        hparam_dict=h_param_dict,
-        metric_dict={
-            "validation_loss-overall_min": min_loss,
-            "best_overall_performance": max_perf,
-        },
-    )
-
-
-def _generate_h_param_dict(
-    global_config: GlobalConfig, h_params: List[str]
-) -> Dict[str, Union[str, float, int]]:
-    h_param_dict = {}
-
-    for param_name in h_params:
-        if not hasattr(global_config, param_name):
-            continue
-
-        param_value = getattr(global_config, param_name)
-
-        if isinstance(param_value, (tuple, list)):
-            param_value = "_".join([str(p) for p in param_value])
-        elif param_value is None:
-            param_value = str(param_value)
-
-        h_param_dict[param_name] = param_value
-
-    return h_param_dict

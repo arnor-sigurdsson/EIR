@@ -29,7 +29,13 @@ from eir.models.tabular.tabular import get_tabular_inputs
 from eir.setup import schemas
 from eir.setup.config import Configs, get_all_tabular_targets
 from eir.setup.input_setup import al_input_objects_as_dict
+from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
 from eir.setup.output_setup import al_output_objects_as_dict
+from eir.train_utils.handlers_sequence_output import (
+    SpecialTokens,
+    pad_batch_with_bos,
+    get_special_tokens,
+)
 from eir.train_utils.metrics import (
     get_uncertainty_loss_hook,
     hook_add_l1_loss,
@@ -155,15 +161,15 @@ def _should_add_uncertainty_loss_hook(
 
 
 def add_l1_loss_hook_if_applicable(
-    step_function_hooks_init_kwargs: Dict[str, Sequence[Callable]],
+    step_function_hooks_init_kwargs: Dict[str, list[Callable]],
     configs: Configs,
 ) -> Dict[str, List[Callable]]:
     input_l1 = any(
         getattr(input_config.model_config.model_init_config, "l1", None)
         for input_config in configs.input_configs
     )
-    preds_l1 = getattr(configs.fusion_config.model_config, "l1", None)
-    if input_l1 or preds_l1:
+    fusion_l1 = getattr(configs.fusion_config.model_config, "l1", None)
+    if input_l1 or fusion_l1:
         logger.debug("Adding L1 loss hook.")
         step_function_hooks_init_kwargs["loss"].append(hook_add_l1_loss)
 
@@ -211,9 +217,20 @@ def prepare_base_batch_default(
 ) -> Batch:
     inputs, target_labels, ids = loader_batch
 
-    inputs_prepared = _prepare_inputs_for_model(
-        batch_inputs=inputs, input_objects=input_objects, model=model, device=device
+    inputs_prepared, generated_targets = _prepare_inputs_for_model(
+        batch_inputs=inputs,
+        input_objects=input_objects,
+        output_objects=output_objects,
+        model=model,
+        device=device,
     )
+
+    if not generated_targets:
+        generated_targets = {}
+    if not target_labels:
+        target_labels = {}
+
+    target_labels = {**target_labels, **generated_targets}
 
     if target_labels:
         target_labels = model_training_utils.parse_target_labels(
@@ -234,10 +251,13 @@ def prepare_base_batch_default(
 def _prepare_inputs_for_model(
     batch_inputs: Dict[str, Any],
     input_objects: al_input_objects_as_dict,
+    output_objects: al_output_objects_as_dict,
     model: nn.Module,
     device: str,
-) -> Dict[str, torch.Tensor]:
+) -> Tuple[al_input_batch, al_training_labels_target]:
     inputs_prepared = {}
+    targets_prepared = {}
+
     for input_name, input_object in input_objects.items():
         input_type = input_object.input_config.input_info.input_type
 
@@ -273,15 +293,104 @@ def _prepare_inputs_for_model(
 
             case "sequence" | "bytes":
                 cur_seq = batch_inputs[input_name]
-                cur_seq = cur_seq.to(device=device)
-                cur_module = getattr(model.input_modules, input_name)
-                cur_module_embedding = cur_module.embedding
-                cur_embedding = cur_module_embedding(input=cur_seq)
+
+                if input_name in (i for i in output_objects.keys()):
+                    cur_seq, cur_targets = _prepare_sequence_input_for_sequence_output(
+                        input_object=input_object,
+                        cur_seq=cur_seq,
+                        input_name=input_name,
+                        device=device,
+                    )
+                    targets_prepared[input_name] = cur_targets
+
+                cur_embedding = _prepare_sequence_input_base(
+                    cur_seq=cur_seq,
+                    input_name=input_name,
+                    model=model,
+                    device=device,
+                )
                 inputs_prepared[input_name] = cur_embedding
             case _:
                 raise ValueError(f"Unrecognized input type {input_name}.")
 
-    return inputs_prepared
+    return inputs_prepared, targets_prepared
+
+
+def _prepare_sequence_input_base(
+    cur_seq: torch.Tensor,
+    model: nn.Module,
+    input_name: str,
+    device: str,
+) -> torch.Tensor:
+    cur_seq = cur_seq.to(device=device)
+    cur_module = getattr(model.input_modules, input_name)
+    cur_module_embedding = cur_module.embedding
+    cur_embedding = cur_module_embedding(input=cur_seq)
+
+    return cur_embedding
+
+
+def _prepare_sequence_input_for_sequence_output(
+    input_object: ComputedSequenceInputInfo,
+    cur_seq: torch.Tensor,
+    input_name: str,
+    device: str,
+) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
+    special_tokens = get_special_tokens(
+        tokenizer=input_object.tokenizer, vocab=input_object.vocab
+    )
+
+    cur_seq, cur_target = sample_autoregressive_batch(
+        batch_tensor=cur_seq,
+        batch_size=cur_seq.shape[0],
+        special_tokens=special_tokens,
+    )
+
+    cur_seq = cur_seq.to(device=device)
+    cur_target = {input_name: cur_target.to(device=device)}
+
+    return cur_seq, cur_target
+
+
+def sample_autoregressive_batch(
+    batch_tensor: torch.Tensor,
+    batch_size: int,
+    special_tokens: SpecialTokens,
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    st = special_tokens
+
+    inputs = []
+    targets = []
+
+    batch_tensor = pad_batch_with_bos(batch_tensor=batch_tensor, bos_value=st.bos_idx)
+
+    for idx in range(batch_size):
+        cur_sample = batch_tensor[idx]
+
+        cur_sample = _switch_first_pad_with_eos(
+            sample=cur_sample, pad_value=st.pad_idx, eos_value=st.eos_idx
+        )
+
+        cur_target = cur_sample[1:]
+        cur_sample = cur_sample[:-1]
+
+        inputs.append(cur_sample)
+        targets.append(cur_target)
+
+    inputs = torch.stack(tensors=inputs)
+    target = torch.stack(tensors=targets)
+    return inputs, target
+
+
+def _switch_first_pad_with_eos(
+    sample: torch.Tensor, pad_value: int, eos_value: int
+) -> torch.Tensor:
+    first_pad_match = (sample == pad_value).nonzero(as_tuple=False)
+    if len(first_pad_match) != 0:
+        first_pad_index = first_pad_match[0]
+        sample[first_pad_index] = eos_value
+
+    return sample
 
 
 def hook_default_model_forward(

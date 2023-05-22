@@ -10,7 +10,7 @@ from aislib.misc_utils import ensure_path_exists, get_logger
 from pdf2image import convert_from_path
 
 from docs.doc_modules.data import get_data
-from eir.setup.config import load_yaml_config
+from eir.setup.config_setup_modules.config_setup_utils import load_yaml_config
 
 logger = get_logger(name=__name__)
 

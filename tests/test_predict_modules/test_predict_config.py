@@ -14,7 +14,10 @@ from eir.predict_modules.predict_config import (
     overload_train_configs_for_predict,
 )
 from eir.setup import schemas, config
-from eir.setup.config import object_to_primitives, recursive_dict_replace
+from eir.setup.config_setup_modules.config_setup_utils import (
+    recursive_dict_replace,
+    object_to_primitives,
+)
 
 
 def test_get_named_pred_dict_iterators(tmp_path: Path) -> None:
@@ -46,7 +49,7 @@ al_config_instances = Union[
     schemas.GlobalConfig,
     schemas.InputConfig,
     schemas.OutputConfig,
-    eir.models.output.output_module_setup.OutputModuleConfig,
+    eir.models.output.output_module_setup.TabularOutputModuleConfig,
 ]
 
 

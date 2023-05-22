@@ -9,7 +9,7 @@ from torch.utils.data import WeightedRandomSampler, SequentialSampler, RandomSam
 from eir import train
 from eir.data_load.data_utils import get_train_sampler
 from eir.models import MetaModel
-from eir.models.model_setup import get_default_model_registry_per_input_type, get_model
+from eir.models.model_setup import get_model
 from eir.models.omics.models_cnn import CNNModel
 from eir.models.omics.models_linear import LinearModel
 from eir.setup.config import Configs
@@ -238,8 +238,6 @@ def test_get_model(create_test_config: Configs, create_test_labels):
         hooks=None,
     )
 
-    default_registry = get_default_model_registry_per_input_type()
-
     outputs_as_dict = set_up_outputs_for_training(
         output_configs=create_test_config.output_configs,
         target_transformers=target_labels.label_transformers,
@@ -250,8 +248,6 @@ def test_get_model(create_test_config: Configs, create_test_labels):
         outputs_as_dict=outputs_as_dict,
         fusion_config=test_config.fusion_config,
         global_config=gc,
-        model_registry_per_input_type=default_registry,
-        model_registry_per_output_type={},
     )
 
     assert len(test_config.input_configs) == 1

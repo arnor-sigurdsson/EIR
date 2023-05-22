@@ -33,11 +33,10 @@ from eir.experiment_io.experiment_io import (
 from eir.models import al_meta_model
 from eir.models.model_setup import (
     get_meta_model_class_and_kwargs_from_configs,
-    get_default_model_registry_per_input_type,
     get_default_meta_class,
 )
 from eir.models.model_setup_modules.model_io import load_model
-from eir.models.model_training_utils import gather_pred_outputs_from_dloader
+from eir.models.model_training_utils import gather_prediction_outputs_from_dataloader
 from eir.predict_modules.predict_attributions import compute_predict_attributions
 from eir.predict_modules.predict_config import converge_train_and_predict_configs
 from eir.predict_modules.predict_data import set_up_default_dataset
@@ -148,7 +147,7 @@ def predict(
     predict_config: "PredictConfig",
     predict_cl_args: Namespace,
 ) -> None:
-    all_preds, all_labels, all_ids = gather_pred_outputs_from_dloader(
+    all_preds, all_labels, all_ids = gather_prediction_outputs_from_dataloader(
         data_loader=predict_config.test_dataloader,
         batch_prep_hook=predict_config.hooks.predict_stages.base_prepare_batch,
         batch_prep_hook_kwargs={"predict_config": predict_config},
@@ -401,16 +400,12 @@ def get_default_predict_config(
         num_workers=configs_overloaded_for_predict.global_config.dataloader_workers,
     )
 
-    default_model_registry = get_default_model_registry_per_input_type()
-
     func = get_meta_model_class_and_kwargs_from_configs
     fusion_model_class, fusion_model_kwargs = func(
         global_config=configs_overloaded_for_predict.global_config,
         fusion_config=configs_overloaded_for_predict.fusion_config,
         inputs_as_dict=test_inputs,
         outputs_as_dict=loaded_train_experiment.outputs,
-        model_registry_per_input_type=default_model_registry,
-        model_registry_per_output_type={},
         meta_class_getter=get_default_meta_class,
     )
 

@@ -23,7 +23,9 @@ from eir.models.layers import MLPResidualBlock
 from eir.models.sequence.transformer_models import get_hf_transformer_forward
 
 if TYPE_CHECKING:
-    from eir.setup.output_setup import al_num_outputs_per_target
+    from eir.setup.output_setup_modules.tabular_output_setup import (
+        al_num_outputs_per_target,
+    )
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 

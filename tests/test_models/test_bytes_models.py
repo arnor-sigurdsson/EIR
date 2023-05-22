@@ -47,38 +47,6 @@ from tests.test_models.model_testing_utils import prepare_example_batch
                 ],
             },
         },
-        # Case 2: Classification - Perceiver
-        {
-            "injections": {
-                "global_configs": {
-                    "output_folder": "test_classification_perceiver_bytes",
-                    "n_epochs": 12,
-                    "memory_dataset": True,
-                    "mixing_alpha": 1.0,
-                },
-                "input_configs": [
-                    {
-                        "input_info": {"input_name": "test_bytes"},
-                        "model_config": {
-                            "window_size": 64,
-                            "position": "embed",
-                            "model_type": "perceiver",
-                            "model_init_config": {"depth": 1, "dim": 32},
-                        },
-                    }
-                ],
-                "output_configs": [
-                    {
-                        "output_info": {"output_name": "test_output"},
-                        "output_type_info": {
-                            "target_cat_columns": ["Origin"],
-                            "target_con_columns": [],
-                        },
-                        "model_config": {"model_init_config": {"fc_task_dim": 32}},
-                    }
-                ],
-            },
-        },
     ],
     indirect=True,
 )
