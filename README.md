@@ -3,16 +3,16 @@
 </p>
 
 <p align="center">
-    <a href="LICENSE" alt="License">
+  <a href="LICENSE" alt="License">
         <img src="https://img.shields.io/badge/License-APGL-5B2D5B.svg" /></a>
   
-  <a href="https://www.biorxiv.org/content/10.1101/2021.06.11.447883" alt="bioRxiv">
-        <img src="https://img.shields.io/badge/Paper-bioRxiv-B5232F.svg" /></a>
+  <a href="https://github.com/arnor-sigurdsson/EIR#citation" alt="Citation">
+        <img src="https://img.shields.io/badge/Papers-View%20Here-5F9EA0.svg" /></a>
   
   <a href="https://www.python.org/downloads/" alt="Python">
         <img src="https://img.shields.io/badge/python-3.11-blue.svg" /></a>
   
-   <a href="https://pypi.org/project/eir-dl/" alt="Python">
+  <a href="https://pypi.org/project/eir-dl/" alt="Python">
         <img src="https://img.shields.io/pypi/v/eir-dl.svg" /></a>
   
   <a href="https://codecov.io/gh/arnor-sigurdsson/EIR" alt="Coverage">
@@ -83,21 +83,21 @@ If you are an ML/DL researcher developing new models, etc., it might not fit you
 If you use `EIR` in a scientific publication, we would appreciate if you could use one of the following citations:
 
 ```
-@article{sigurdsson2021deep,
-  title={Deep integrative models for large-scale human genomics},
-  author={Sigurdsson, Arnor Ingi and Westergaard, David and Winther, Ole and Lund, Ole and Brunak, S{\o}ren and Vilhjalmsson, Bjarni J and Rasmussen, Simon},
-  journal={bioRxiv},
-  year={2021},
-  publisher={Cold Spring Harbor Laboratory}
+@article{10.1093/nar/gkad373,
+    author    = {Sigurdsson, Arn{\'o}r I and Louloudis, Ioannis and Banasik, Karina and Westergaard, David and Winther, Ole and Lund, Ole and Ostrowski, Sisse Rye and Erikstrup, Christian and Pedersen, Ole Birger Vesterager and Nyegaard, Mette and DBDS Genomic Consortium and Brunak, S{\o}ren and Vilhj{\'a}lmsson, Bjarni J and Rasmussen, Simon},
+    title     = {{Deep integrative models for large-scale human genomics}},
+    journal   = {Nucleic Acids Research},
+    month     = {05},
+    year      = {2023}
 }
 
 @article{sigurdsson2022improved,
-  title={Improved prediction of blood biomarkers using deep learning},
-  author={Sigurdsson, Arnor Ingi and Ravn, Kirstine and Winther, Ole and Lund, Ole and Brunak, S{\o}ren and Vilhjalmsson, Bjarni J and Rasmussen, Simon},
-  journal={medRxiv},
-  pages={2022--10},
-  year={2022},
-  publisher={Cold Spring Harbor Laboratory Press}
+    author    = {Sigurdsson, Arnor Ingi and Ravn, Kirstine and Winther, Ole and Lund, Ole and Brunak, S{\o}ren and Vilhjalmsson, Bjarni J and Rasmussen, Simon},
+    title     = {Improved prediction of blood biomarkers using deep learning},
+    journal   = {medRxiv},
+    pages     = {2022--10},
+    year      = {2022},
+    publisher = {Cold Spring Harbor Laboratory Press}
 }
 ```
 
