@@ -176,7 +176,7 @@ def _get_predict_test_data_parametrization() -> List[Dict[str, Any]]:
 
 
 @pytest.mark.parametrize(
-    argnames="act_background_source", argvalues=["train", "predict"]
+    argnames="attribution_background_source", argvalues=["train", "predict"]
 )
 @pytest.mark.parametrize(
     argnames="create_test_data",
@@ -272,7 +272,7 @@ def _get_predict_test_data_parametrization() -> List[Dict[str, Any]]:
     indirect=True,
 )
 def test_predict(
-    act_background_source: str,
+    attribution_background_source: str,
     prep_modelling_test_configs: Tuple[train.Experiment, ModelTestConfig],
     tmp_path: Path,
 ):
@@ -292,7 +292,7 @@ def test_predict(
         "model_path": grab_best_model_path(model_test_config.run_path / "saved_models"),
         "evaluate": True,
         "output_folder": tmp_path,
-        "act_background_source": act_background_source,
+        "attribution_background_source": attribution_background_source,
     }
     all_predict_kwargs = {
         **test_predict_cl_args_files_only.__dict__,
@@ -309,7 +309,7 @@ def test_predict(
         predict_cl_args=predict_cl_args,
     )
 
-    predict.predict(predict_cl_args=predict_cl_args, predict_config=predict_config)
+    predict.predict(predict_cl_args=predict_cl_args, predict_experiment=predict_config)
 
     compute_predict_attributions(
         loaded_train_experiment=train_configs_for_testing,
@@ -335,10 +335,10 @@ def test_predict(
     assert set(target_classes).issubset(set(df_test.columns))
 
     label_columns = [i for i in df_test.columns if "True Label" in i]
-    preds = df_test.drop(label_columns, axis=1).values.argmax(axis=1)
+    predictions = df_test.drop(label_columns, axis=1).values.argmax(axis=1)
     true_labels = df_test["True Label"]
 
-    preds_accuracy = (preds == true_labels).sum() / len(true_labels)
-    assert preds_accuracy > 0.7
+    prediction_accuracy = (predictions == true_labels).sum() / len(true_labels)
+    assert prediction_accuracy > 0.7
 
     assert (tmp_path / "test_output/Origin/attributions").exists()

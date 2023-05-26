@@ -458,7 +458,7 @@ def _should_compile():
             "injections": {
                 "global_configs": {
                     "output_folder": "extra_inputs",
-                    "cat_averaging_metrics": ["mcc"],
+                    "cat_averaging_metrics": ["roc-auc-macro"],
                     "con_averaging_metrics": ["r2"],
                 },
                 "input_configs": [

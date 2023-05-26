@@ -37,9 +37,11 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
     iteration = engine.state.iteration
 
     exp.model.eval()
-    gather_preds = model_training_utils.gather_prediction_outputs_from_dataloader
+    gather_predictions_func = (
+        model_training_utils.gather_prediction_outputs_from_dataloader
+    )
 
-    val_outputs_total, val_target_labels, val_ids_total = gather_preds(
+    val_outputs_total, val_target_labels, val_ids_total = gather_predictions_func(
         data_loader=exp.valid_loader,
         batch_prep_hook=exp.hooks.step_func_hooks.base_prepare_batch,
         batch_prep_hook_kwargs={"experiment": exp},
@@ -94,7 +96,11 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
         )
 
         sequence_out_single_sample_evaluation_wrapper(
-            experiment=exp, iteration=iteration
+            input_objects=exp.inputs,
+            experiment=exp,
+            iteration=iteration,
+            auto_dataset_to_load_from=exp.valid_dataset,
+            output_folder=gc.output_folder,
         )
 
     exp.model.train()
@@ -115,7 +121,7 @@ def save_tabular_evaluation_results_wrapper(
         target_columns = output_object.target_columns
         for column_type, list_of_cols_of_this_type in target_columns.items():
             for column_name in list_of_cols_of_this_type:
-                cur_sample_output_folder = utils.prep_sample_outfolder(
+                cur_sample_output_folder = utils.prepare_sample_output_folder(
                     output_folder=experiment.configs.global_config.output_folder,
                     column_name=column_name,
                     output_name=output_name,

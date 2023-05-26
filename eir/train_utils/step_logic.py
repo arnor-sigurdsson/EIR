@@ -62,7 +62,7 @@ al_dataloader_getitem_batch = Tuple[
 logger = get_logger(name=__name__)
 
 
-def get_default_hooks(configs: Configs):
+def get_default_hooks(configs: Configs) -> "Hooks":
     step_func_hooks = _get_default_step_function_hooks(configs=configs)
     hooks_object = Hooks(step_func_hooks=step_func_hooks)
 

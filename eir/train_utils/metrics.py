@@ -758,6 +758,12 @@ def get_performance_averaging_functions(
     cat_metric_names: al_cat_averaging_metric_choices,
     con_metric_names: al_con_averaging_metric_choices,
 ) -> al_averaging_functions_dict:
+    """
+    Note that we have the mean(values) else 0.0 to account for some values not being
+    computed on the training batches, e.g. ROC-AUC, due some metrics possibly
+    raising errors if e.g. there are only negative labels in a batch.
+    """
+
     logger.info(
         "Tabular performance averaging functions across tasks set to averages "
         "of %s for categorical targets and %s for continuous targets. These "
@@ -784,7 +790,7 @@ def get_performance_averaging_functions(
 
             values.append(value)
 
-        return mean(values)
+        return mean(values) if values else 0.0
 
     def _calc_con_averaging_value(
         metric_dict: "al_step_metric_dict",
@@ -805,7 +811,7 @@ def get_performance_averaging_functions(
 
             values.append(value)
 
-        return mean(values)
+        return mean(values) if values else 0.0
 
     performance_averaging_functions = {
         "cat": partial(_calc_cat_averaging_value, metric_names=cat_metric_names),

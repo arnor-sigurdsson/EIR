@@ -156,17 +156,20 @@ def get_output_folder_and_log_level_from_cl_args(
 
 
 def get_main_parser(
-    output_nargs: Literal["+", "*"] = "+"
+    global_nargs: Literal["+", "*"] = "+", output_nargs: Literal["+", "*"] = "+"
 ) -> configargparse.ArgumentParser:
     parser_ = configargparse.ArgumentParser(
         config_file_parser_class=configargparse.YAMLConfigFileParser
     )
 
+    global_required = True if global_nargs == "+" else False
+    output_required = True if output_nargs == "+" else False
+
     parser_.add_argument(
         "--global_configs",
-        nargs="+",
+        nargs=global_nargs,
         type=str,
-        required=True,
+        required=global_required,
         help="Global .yaml configurations for the experiment.",
     )
 
@@ -193,7 +196,7 @@ def get_main_parser(
         "--output_configs",
         type=str,
         nargs=output_nargs,
-        required=True,
+        required=output_required,
         help="Output .yaml configurations.",
     )
 

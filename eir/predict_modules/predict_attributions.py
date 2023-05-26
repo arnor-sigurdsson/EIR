@@ -22,22 +22,24 @@ from eir.train import check_dataset_and_batch_size_compatibility
 from eir.train_utils.step_logic import Hooks
 
 if TYPE_CHECKING:
-    from eir.predict import PredictConfig
+    from eir.predict import PredictExperiment
 
 logger = get_logger(name=__name__)
 
 
 def compute_predict_attributions(
     loaded_train_experiment: "LoadedTrainExperiment",
-    predict_config: "PredictConfig",
+    predict_config: "PredictExperiment",
 ) -> None:
-    gc = predict_config.train_configs_overloaded.global_config
+    gc = predict_config.configs.global_config
 
-    background_source = predict_config.predict_specific_cl_args.act_background_source
+    background_source = (
+        predict_config.predict_specific_cl_args.attribution_background_source
+    )
     background_source_config = get_background_source_config(
         background_source_in_predict_cl_args=background_source,
         train_configs=loaded_train_experiment.configs,
-        predict_configs=predict_config.train_configs_overloaded,
+        predict_configs=predict_config.configs,
     )
     background_dataloader = _get_predict_background_loader(
         batch_size=gc.batch_size,
@@ -53,7 +55,7 @@ def compute_predict_attributions(
         predict_config=predict_config,
     )
 
-    attribution_outfolder_callable = partial(
+    attribution_output_folder_callable = partial(
         _get_predict_attribution_outfolder_target,
         predict_outfolder=Path(predict_config.predict_specific_cl_args.output_folder),
     )
@@ -61,7 +63,7 @@ def compute_predict_attributions(
     tabular_attribution_analysis_wrapper(
         model=predict_config.model,
         experiment=overloaded_train_experiment,
-        output_folder_target_callable=attribution_outfolder_callable,
+        output_folder_target_callable=attribution_output_folder_callable,
         dataset_to_interpret=predict_config.test_dataset,
         background_loader=background_dataloader,
     )
@@ -102,7 +104,7 @@ class LoadedTrainExperimentMixedWithPredict(LoadedTrainExperiment):
 
 def _overload_train_experiment_for_predict_attributions(
     train_config: LoadedTrainExperiment,
-    predict_config: "PredictConfig",
+    predict_config: "PredictExperiment",
 ) -> "LoadedTrainExperimentMixedWithPredict":
     """
     TODO:   Possibly set inputs=None as a field in LoadedTrainExperiment that then gets
@@ -114,7 +116,7 @@ def _overload_train_experiment_for_predict_attributions(
 
     mixed_experiment_kwargs = train_experiment_copy.__dict__
     mixed_experiment_kwargs["model"] = predict_config.model
-    mixed_experiment_kwargs["configs"] = predict_config.train_configs_overloaded
+    mixed_experiment_kwargs["configs"] = predict_config.configs
     mixed_experiment_kwargs["inputs"] = predict_config.inputs
 
     mixed_experiment = LoadedTrainExperimentMixedWithPredict(**mixed_experiment_kwargs)

@@ -1,13 +1,14 @@
-from typing import Sequence, Dict, Tuple
+from typing import Sequence, Dict, Tuple, Literal
 
 import colorama as clr
 
 
-def log_and_raise_missing_or_multiple_input_matches(
+def log_and_raise_missing_or_multiple_config_matching_general(
     train_name: str,
     train_type: str,
     matches: Sequence[Dict],
     predict_names_and_types: Sequence[Tuple[str, str]],
+    name: Literal["input", "output"],
 ) -> None:
     train_name = clr.Style.BRIGHT + clr.Fore.GREEN + train_name + clr.Style.RESET_ALL
     train_type = clr.Style.BRIGHT + clr.Fore.GREEN + train_type + clr.Style.RESET_ALL
@@ -21,27 +22,27 @@ def log_and_raise_missing_or_multiple_input_matches(
 
     if len(matches) == 0:
         msg = (
-            f"When running the predict module, no *predict* input config was found "
+            f"When running the predict module, no *predict* {name} config was found "
             f"that matches a configuration used during training. There must be "
-            f"exactly one match for each input config used during training. "
-            f"The following input configs were used during training and no match "
+            f"exactly one match for each {name} config used during training. "
+            f"The following {name} configs were used during training and no match "
             f"was found (name, type): ('{train_name}', '{train_type}'). "
-            f"The following input configs were found in the *predict* config file(s): "
+            f"The following {name} configs were found in the *predict* config file(s): "
             f"{predict_names_and_types_formatted}. "
-            f"To fix this, make sure that the input configs passed to the predict "
-            f"module match the input configs used during training."
+            f"To fix this, make sure that the {name} configs passed to the predict "
+            f"module match the {name} configs used during training."
         )
     else:
         msg = (
-            f"When running the predict module, multiple *predict* input configs were "
+            f"When running the predict module, multiple *predict* {name} configs were "
             f"found that match a configuration used during training. There must be "
-            f"exactly one match for each input config used during training. "
-            f"The following input configs were used during training and multiple "
+            f"exactly one match for each {name} config used during training. "
+            f"The following {name} configs were used during training and multiple "
             f"was found (name, type): ('{train_name}', '{train_type}'). "
-            f"The following input configs were found in the *predict* config file(s): "
+            f"The following {name} configs were found in the *predict* config file(s): "
             f"{predict_names_and_types_formatted}. "
-            f"To fix this, make sure that the input configs passed to the predict "
-            f"module match the input configs used during training."
+            f"To fix this, make sure that the {name} configs passed to the predict "
+            f"module match the {name} configs used during training."
         )
 
     msg = msg.replace(
@@ -51,7 +52,7 @@ def log_and_raise_missing_or_multiple_input_matches(
     raise ValueError(msg)
 
 
-def log_and_raise_missing_or_multiple_output_matches(
+def log_and_raise_missing_or_multiple_tabular_output_matches(
     train_name: str,
     train_type: str,
     train_cat_columns: Sequence[str],

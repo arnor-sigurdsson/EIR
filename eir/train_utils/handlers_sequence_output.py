@@ -20,6 +20,7 @@ import torch.nn.functional as F
 from PIL import Image
 from aislib.misc_utils import get_logger, ensure_path_exists
 from torch.nn.functional import pad
+from torch.utils.data import DataLoader, Dataset
 from torchtext.vocab import Vocab
 from transformers.tokenization_utils import PreTrainedTokenizerBase
 
@@ -35,17 +36,18 @@ from eir.data_load.datasets import (
 from eir.data_load.label_setup import al_label_transformers
 from eir.interpretation.interpret_image import un_normalize
 from eir.models.model_training_utils import predict_on_batch
+from eir.setup.input_setup_modules.setup_image import ImageNormalizationStats
 from eir.setup.schema_modules.output_schemas_sequence import (
     SequenceOutputSamplingConfig,
 )
 from eir.setup.schemas import OutputConfig
-from eir.setup.input_setup_modules.setup_image import ImageNormalizationStats
 from eir.train_utils import utils
 from eir.train_utils.utils import call_hooks_stage_iterable
 
 if TYPE_CHECKING:
     from eir.train_utils.step_logic import Hooks
     from eir.train import al_input_objects_as_dict, Experiment
+    from eir.predict import PredictExperiment
 
 logger = get_logger(name=__name__)
 
@@ -64,9 +66,12 @@ class SequenceOutputEvalSample:
 
 
 def sequence_out_single_sample_evaluation_wrapper(
-    experiment: "Experiment", iteration: int
-):
-    inputs = experiment.inputs
+    experiment: Union["Experiment", "PredictExperiment"],
+    input_objects: "al_input_objects_as_dict",
+    auto_dataset_to_load_from: Dataset,
+    iteration: int,
+    output_folder: str,
+) -> None:
     default_eir_hooks = experiment.hooks
 
     output_configs = experiment.configs.output_configs
@@ -75,15 +80,15 @@ def sequence_out_single_sample_evaluation_wrapper(
         return
 
     manual_samples = get_sequence_output_manual_input_samples(
-        output_configs=output_configs, input_objects=inputs
+        output_configs=output_configs, input_objects=input_objects
     )
 
-    auto_validation_generator = _get_validation_sample_iterator(
-        valid_dataset=experiment.valid_dataset
+    auto_validation_generator = get_dataset_loader_single_sample_generator(
+        dataset=auto_dataset_to_load_from
     )
     auto_samples = get_sequence_output_auto_validation_samples(
         output_configs=output_configs,
-        input_objects=inputs,
+        input_objects=input_objects,
         eval_sample_iterator=auto_validation_generator,
     )
     eval_samples = SequenceOutputEvalSamples(
@@ -102,8 +107,8 @@ def sequence_out_single_sample_evaluation_wrapper(
         if not_in_manual_samples and not_in_auto_samples:
             continue
 
-        cur_sample_output_folder = utils.prep_sample_outfolder(
-            output_folder=experiment.configs.global_config.output_folder,
+        cur_sample_output_folder = utils.prepare_sample_output_folder(
+            output_folder=output_folder,
             output_name=cur_output_name,
             column_name=cur_input_name,
             iteration=iteration,
@@ -116,6 +121,7 @@ def sequence_out_single_sample_evaluation_wrapper(
 
             for idx, (eval_type, eval_sample) in enumerate(sample_generator):
                 generated_tokens = autoregressive_sequence_generation(
+                    input_objects=input_objects,
                     eval_sample=eval_sample,
                     seq_output_name=cur_output_name,
                     experiment=experiment,
@@ -125,8 +131,8 @@ def sequence_out_single_sample_evaluation_wrapper(
 
                 generated_sample = decode_tokens(
                     tokens=generated_tokens,
-                    tokenizer=experiment.inputs[cur_input_name].tokenizer,
-                    vocab=experiment.inputs[cur_input_name].vocab,
+                    tokenizer=input_objects[cur_input_name].tokenizer,
+                    vocab=input_objects[cur_input_name].vocab,
                     split_on=config.output_type_info.split_on,
                 )
 
@@ -142,12 +148,12 @@ def sequence_out_single_sample_evaluation_wrapper(
 
                 raw_inputs = convert_model_inputs_to_raw(
                     inputs_to_model=eval_sample.inputs_to_model,
-                    input_objects=experiment.inputs,
+                    input_objects=input_objects,
                 )
 
                 _serialize_raw_inputs(
                     raw_inputs=raw_inputs,
-                    input_objects=experiment.inputs,
+                    input_objects=input_objects,
                     output_path=cur_inputs_output_path,
                 )
 
@@ -282,13 +288,11 @@ def get_sequence_output_manual_input_samples(
     return prepared_samples
 
 
-def _get_validation_sample_iterator(
-    valid_dataset: torch.utils.data.Dataset,
+def get_dataset_loader_single_sample_generator(
+    dataset: Dataset,
 ) -> Iterator[al_getitem_return]:
-    valid_loader = torch.utils.data.DataLoader(
-        dataset=valid_dataset, batch_size=1, shuffle=False
-    )
-    yield from valid_loader
+    loader = DataLoader(dataset=dataset, batch_size=1, shuffle=False)
+    yield from loader
 
 
 def get_sequence_output_auto_validation_samples(
@@ -406,6 +410,7 @@ def _get_eval_sample_generator(
 
 @torch.no_grad()
 def autoregressive_sequence_generation(
+    input_objects: "al_input_objects_as_dict",
     eval_sample: SequenceOutputEvalSample,
     seq_output_name: str,
     experiment: "Experiment",
@@ -413,7 +418,7 @@ def autoregressive_sequence_generation(
     sampling_config: SequenceOutputSamplingConfig,
 ) -> list[int]:
     output_object = experiment.outputs[seq_output_name]
-    input_object = experiment.inputs[seq_output_name]
+    input_object = input_objects[seq_output_name]
 
     _check_vocab_consistency(
         output_object_vocab=output_object.vocab, input_object_vocab=input_object.vocab
@@ -445,6 +450,7 @@ def autoregressive_sequence_generation(
         )
 
         batch = general_pre_process_prepared_inputs(
+            input_objects=input_objects,
             prepared_inputs=prepared_sample_inputs,
             target_labels=eval_sample.target_labels,
             sample_id=eval_sample.sample_id,
@@ -618,6 +624,7 @@ def general_pre_process_raw_inputs(
 
 
 def general_pre_process_prepared_inputs(
+    input_objects: "al_input_objects_as_dict",
     prepared_inputs: dict[str, Any],
     target_labels: dict[str, Any],
     sample_id: str,
@@ -629,7 +636,6 @@ def general_pre_process_prepared_inputs(
     i.e. not the sequence output specific things we define here in the train module.
     """
 
-    # inputs_final = {k: v.unsqueeze(0) for k, v in prepared_inputs.items()}
     inputs_final = prepared_inputs
 
     loader_batch = (inputs_final, target_labels, sample_id)

@@ -31,7 +31,7 @@ def get_run_folder(output_folder: str) -> Path:
     return Path(output_folder)
 
 
-def prep_sample_outfolder(
+def prepare_sample_output_folder(
     output_folder: str, output_name: str, column_name: str, iteration: int
 ) -> Path:
     sample_outfolder = (

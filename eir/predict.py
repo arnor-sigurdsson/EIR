@@ -5,24 +5,17 @@ from pathlib import Path
 from typing import (
     Union,
     Dict,
-    Sequence,
     Callable,
     Iterable,
     Literal,
 )
 
 import numpy as np
-import pandas as pd
-import torch
-from aislib.misc_utils import get_logger, ensure_path_exists
-from sklearn.preprocessing import LabelEncoder, StandardScaler
+from aislib.misc_utils import get_logger
 from torch.utils.data import DataLoader
 
-import eir.visualization.visualization_funcs as vf
 from eir.data_load import datasets, label_setup
-from eir.data_load.data_utils import get_output_info_generator
 from eir.data_load.label_setup import (
-    al_label_transformers_object,
     al_all_column_ops,
 )
 from eir.experiment_io.experiment_io import (
@@ -43,6 +36,8 @@ from eir.predict_modules.predict_data import set_up_default_dataset
 from eir.predict_modules.predict_input_setup import (
     set_up_inputs_for_predict,
 )
+from eir.predict_modules.predict_sequence_output import predict_sequence_wrapper
+from eir.predict_modules.predict_tabular_output import predict_tabular_wrapper
 from eir.predict_modules.predict_target_setup import get_target_labels_for_testing
 from eir.setup.config import (
     Configs,
@@ -56,7 +51,6 @@ from eir.target_setup.target_label_setup import gather_all_ids_from_output_confi
 from eir.train import (
     check_dataset_and_batch_size_compatibility,
 )
-from eir.train_utils.evaluation import PerformancePlotConfig
 from eir.train_utils.metrics import (
     al_metric_record_dict,
     calculate_batch_metrics,
@@ -73,11 +67,11 @@ class PredictSpecificCLArgs:
     model_path: str
     evaluate: bool
     output_folder: str
-    act_background_source: Union[Literal["train"], Literal["predict"]]
+    attribution_background_source: Union[Literal["train"], Literal["predict"]]
 
 
 def main():
-    main_parser = get_main_parser(output_nargs="*")
+    main_parser = get_main_parser(output_nargs="*", global_nargs="*")
 
     main_parser.add_argument(
         "--model_path",
@@ -96,7 +90,7 @@ def main():
     )
 
     main_parser.add_argument(
-        "--act_background_source",
+        "--attribution_background_source",
         type=str,
         help="For attribution analysis, whether to load backgrounds from the data used "
         "for training or to use the current data passed to the predict module.",
@@ -134,9 +128,12 @@ def run_predict(predict_cl_args: Namespace):
         predict_cl_args=predict_cl_args,
     )
 
-    predict(predict_config=predict_config, predict_cl_args=predict_cl_args)
+    predict(
+        predict_experiment=predict_config,
+        predict_cl_args=predict_cl_args,
+    )
 
-    if predict_config.train_configs_overloaded.global_config.compute_attributions:
+    if predict_config.configs.global_config.compute_attributions:
         compute_predict_attributions(
             loaded_train_experiment=loaded_train_experiment,
             predict_config=predict_config,
@@ -144,158 +141,41 @@ def run_predict(predict_cl_args: Namespace):
 
 
 def predict(
-    predict_config: "PredictConfig",
+    predict_experiment: "PredictExperiment",
     predict_cl_args: Namespace,
 ) -> None:
-    all_preds, all_labels, all_ids = gather_prediction_outputs_from_dataloader(
-        data_loader=predict_config.test_dataloader,
-        batch_prep_hook=predict_config.hooks.predict_stages.base_prepare_batch,
-        batch_prep_hook_kwargs={"predict_config": predict_config},
-        model=predict_config.model,
+    all_predictions, all_labels, all_ids = gather_prediction_outputs_from_dataloader(
+        data_loader=predict_experiment.test_dataloader,
+        batch_prep_hook=predict_experiment.hooks.step_func_hooks.base_prepare_batch,
+        batch_prep_hook_kwargs={"experiment": predict_experiment},
+        model=predict_experiment.model,
         with_labels=predict_cl_args.evaluate,
     )
 
     if predict_cl_args.evaluate:
         metrics = calculate_batch_metrics(
-            outputs_as_dict=predict_config.outputs,
-            outputs=all_preds,
+            outputs_as_dict=predict_experiment.outputs,
+            outputs=all_predictions,
             labels=all_labels,
             mode="val",
-            metric_record_dict=predict_config.metrics,
+            metric_record_dict=predict_experiment.metrics,
         )
         serialize_prediction_metrics(
             output_folder=Path(predict_cl_args.output_folder), metrics=metrics
         )
 
-    target_columns_gen = get_output_info_generator(
-        outputs_as_dict=predict_config.outputs
+    predict_tabular_wrapper(
+        predict_config=predict_experiment,
+        all_predictions=all_predictions,
+        all_labels=all_labels,
+        all_ids=all_ids,
+        predict_cl_args=predict_cl_args,
     )
 
-    for output_name, target_column_type, target_column_name in target_columns_gen:
-        target_preds = all_preds[output_name][target_column_name]
-        predictions = _parse_predictions(target_preds=target_preds)
-
-        target_labels = None
-        if all_labels:
-            target_labels = all_labels[output_name][target_column_name].cpu().numpy()
-
-        target_transformers = predict_config.outputs[output_name].target_transformers
-        cur_target_transformer = target_transformers[target_column_name]
-        classes = _get_target_class_names(
-            transformer=cur_target_transformer, target_column=target_column_name
-        )
-
-        output_folder = Path(
-            predict_cl_args.output_folder, output_name, target_column_name
-        )
-        ensure_path_exists(path=output_folder, is_folder=True)
-
-        df_merged_predictions = _merge_ids_predictions_and_labels(
-            ids=all_ids,
-            predictions=predictions,
-            labels=target_labels,
-            prediction_classes=classes,
-        )
-        df_predictions = _add_inverse_transformed_columns_to_predictions(
-            df=df_merged_predictions,
-            target_column_name=target_column_name,
-            target_column_type=target_column_type,
-            transformer=cur_target_transformer,
-            evaluation=predict_cl_args.evaluate,
-        )
-
-        _save_predictions(
-            df_predictions=df_predictions,
-            outfolder=output_folder,
-        )
-
-        if predict_cl_args.evaluate:
-            cur_labels = all_labels[output_name][target_column_name].cpu().numpy()
-
-            plot_config = PerformancePlotConfig(
-                val_outputs=predictions,
-                val_labels=cur_labels,
-                val_ids=all_ids,
-                iteration=0,
-                column_name=target_column_name,
-                column_type=target_column_type,
-                target_transformer=cur_target_transformer,
-                output_folder=output_folder,
-            )
-
-            vf.gen_eval_graphs(plot_config=plot_config)
-
-
-def _merge_ids_predictions_and_labels(
-    ids: Sequence[str],
-    predictions: np.ndarray,
-    labels: np.ndarray,
-    prediction_classes: Union[Sequence[str], None] = None,
-    label_column_name: str = "True Label",
-) -> pd.DataFrame:
-    df = pd.DataFrame()
-
-    df["ID"] = ids
-    df = df.set_index("ID")
-
-    df[label_column_name] = labels
-
-    if prediction_classes is None:
-        prediction_classes = [f"Score Class {i}" for i in range(predictions.shape[1])]
-
-    df[prediction_classes] = predictions
-
-    return df
-
-
-def _add_inverse_transformed_columns_to_predictions(
-    df: pd.DataFrame,
-    target_column_name: str,
-    target_column_type: str,
-    transformer: al_label_transformers_object,
-    evaluation: bool,
-) -> pd.DataFrame:
-    df_copy = df.copy()
-
-    assert target_column_type in ["con", "cat"], target_column_type
-
-    if evaluation:
-        df = _add_inverse_transformed_column(
-            df=df_copy,
-            column_name="True Label",
-            transformer=transformer,
-        )
-
-    if target_column_type == "con":
-        df = _add_inverse_transformed_column(
-            df=df,
-            column_name=target_column_name,
-            transformer=transformer,
-        )
-
-    return df
-
-
-def _add_inverse_transformed_column(
-    df: pd.DataFrame,
-    column_name: str,
-    transformer: al_label_transformers_object,
-) -> pd.DataFrame:
-    df_copy = df.copy()
-
-    tt_it = transformer.inverse_transform
-    values = df[column_name].values
-    col_name = f"{column_name} Untransformed"
-
-    match transformer:
-        case LabelEncoder():
-            df_copy.insert(loc=0, column=col_name, value=tt_it(values))
-        case StandardScaler():
-            values_parsed = tt_it(values.reshape(-1, 1)).flatten()
-            df_copy.insert(loc=0, column=col_name, value=values_parsed)
-        case _:
-            raise NotImplementedError(f"Transformer {transformer} not supported.")
-    return df_copy
+    predict_sequence_wrapper(
+        predict_experiment=predict_experiment,
+        output_folder=predict_cl_args.output_folder,
+    )
 
 
 def serialize_prediction_metrics(output_folder: Path, metrics: al_step_metric_dict):
@@ -319,8 +199,8 @@ def _convert_dict_values_to_python_objects(object_):
 
 
 @dataclass
-class PredictConfig:
-    train_configs_overloaded: Configs
+class PredictExperiment:
+    configs: Configs
     inputs: al_input_objects_as_dict
     outputs: al_output_objects_as_dict
     predict_specific_cl_args: PredictSpecificCLArgs
@@ -333,12 +213,12 @@ class PredictConfig:
 
 @dataclass
 class PredictHooks:
-    predict_stages: "PredictHookStages"
+    step_func_hooks: "PredictStepFunctionHookStages"
     custom_column_label_parsing_ops: al_all_column_ops = None
 
 
 @dataclass
-class PredictHookStages:
+class PredictStepFunctionHookStages:
     al_hook = Callable[..., Dict]
     al_hooks = [Iterable[al_hook]]
 
@@ -349,7 +229,7 @@ class PredictHookStages:
 def get_default_predict_config(
     loaded_train_experiment: "LoadedTrainExperiment",
     predict_cl_args: Namespace,
-) -> PredictConfig:
+) -> PredictExperiment:
     configs_overloaded_for_predict = converge_train_and_predict_configs(
         train_configs=loaded_train_experiment.configs, predict_cl_args=predict_cl_args
     )
@@ -387,15 +267,19 @@ def get_default_predict_config(
         inputs_as_dict=test_inputs,
         outputs_as_dict=loaded_train_experiment.outputs,
     )
+    predict_batch_size = _auto_set_test_batch_size(
+        batch_size=configs_overloaded_for_predict.global_config.batch_size,
+        test_set_size=len(test_dataset),
+    )
 
     check_dataset_and_batch_size_compatibility(
         dataset=test_dataset,
-        batch_size=configs_overloaded_for_predict.global_config.batch_size,
+        batch_size=predict_batch_size,
         name="Test",
     )
     test_dataloader = DataLoader(
         dataset=test_dataset,
-        batch_size=configs_overloaded_for_predict.global_config.batch_size,
+        batch_size=predict_batch_size,
         shuffle=False,
         num_workers=configs_overloaded_for_predict.global_config.dataloader_workers,
     )
@@ -424,8 +308,8 @@ def get_default_predict_config(
     )
 
     default_predict_hooks = _get_default_predict_hooks(train_hooks=default_train_hooks)
-    test_config = PredictConfig(
-        train_configs_overloaded=configs_overloaded_for_predict,
+    predict_experiment = PredictExperiment(
+        configs=configs_overloaded_for_predict,
         inputs=test_inputs,
         outputs=loaded_train_experiment.outputs,
         predict_specific_cl_args=predict_specific_cl_args,
@@ -435,16 +319,27 @@ def get_default_predict_config(
         hooks=default_predict_hooks,
         metrics=loaded_train_experiment.metrics,
     )
-    return test_config
+    return predict_experiment
+
+
+def _auto_set_test_batch_size(batch_size: int, test_set_size: int) -> int:
+    if test_set_size < batch_size:
+        logger.warning(
+            f"Test set size ({test_set_size}) is smaller than "
+            f"batch size ({batch_size}). "
+            f"Setting batch size to test set size."
+        )
+        batch_size = test_set_size
+    return batch_size
 
 
 def _get_default_predict_hooks(train_hooks: "Hooks") -> PredictHooks:
-    stages = PredictHookStages(
+    stages = PredictStepFunctionHookStages(
         base_prepare_batch=[_hook_default_predict_prepare_batch],
         model_forward=[train_hooks.step_func_hooks.model_forward],
     )
     predict_hooks = PredictHooks(
-        predict_stages=stages,
+        step_func_hooks=stages,
         custom_column_label_parsing_ops=train_hooks.custom_column_label_parsing_ops,
     )
 
@@ -452,17 +347,17 @@ def _get_default_predict_hooks(train_hooks: "Hooks") -> PredictHooks:
 
 
 def _hook_default_predict_prepare_batch(
-    predict_config: "PredictConfig",
+    experiment: "PredictExperiment",
     loader_batch,
     *args,
     **kwargs,
 ):
     batch = prepare_base_batch_default(
         loader_batch=loader_batch,
-        input_objects=predict_config.inputs,
-        output_objects=predict_config.outputs,
-        model=predict_config.model,
-        device=predict_config.train_configs_overloaded.global_config.device,
+        input_objects=experiment.inputs,
+        output_objects=experiment.outputs,
+        model=experiment.model,
+        device=experiment.configs.global_config.device,
     )
 
     state_updates = {"batch": batch}
@@ -483,23 +378,6 @@ def extract_predict_specific_cl_args(
     predict_specific_cl_args_object = PredictSpecificCLArgs(**dataclass_kwargs)
 
     return predict_specific_cl_args_object
-
-
-def _parse_predictions(target_preds: torch.Tensor) -> np.ndarray:
-    predictions = target_preds.cpu().numpy()
-    return predictions
-
-
-def _get_target_class_names(
-    transformer: al_label_transformers_object, target_column: str
-):
-    if isinstance(transformer, LabelEncoder):
-        return transformer.classes_
-    return [target_column]
-
-
-def _save_predictions(df_predictions: pd.DataFrame, outfolder: Path) -> None:
-    df_predictions.to_csv(path_or_buf=str(outfolder / "predictions.csv"))
 
 
 if __name__ == "__main__":

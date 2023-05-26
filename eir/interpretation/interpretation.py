@@ -60,7 +60,7 @@ from eir.models.omics.models_cnn import CNNModel
 from eir.models.omics.models_linear import LinearModel
 from eir.train_utils.evaluation import validation_handler
 from eir.train_utils.utils import (
-    prep_sample_outfolder,
+    prepare_sample_output_folder,
     validate_handler_dependencies,
     call_hooks_stage_iterable,
 )
@@ -735,7 +735,7 @@ def _prepare_eval_attribution_outfolder(
     *args,
     **kwargs,
 ):
-    sample_outfolder = prep_sample_outfolder(
+    sample_outfolder = prepare_sample_output_folder(
         output_folder=output_folder,
         column_name=column_name,
         output_name=output_name,

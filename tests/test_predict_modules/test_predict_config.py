@@ -9,7 +9,7 @@ from aislib.misc_utils import ensure_path_exists
 
 import eir.models.output.output_module_setup
 from eir.predict_modules.predict_config import (
-    get_named_pred_dict_iterators,
+    get_named_predict_dict_iterators,
     get_train_predict_matched_config_generator,
     overload_train_configs_for_predict,
 )
@@ -36,7 +36,7 @@ def test_get_named_pred_dict_iterators(tmp_path: Path) -> None:
 
     test_predict_cl_args = Namespace(**paths)
 
-    named_iterators = get_named_pred_dict_iterators(
+    named_iterators = get_named_predict_dict_iterators(
         predict_cl_args=test_predict_cl_args
     )
 
@@ -94,7 +94,7 @@ def test_get_train_predict_matched_config_generator(create_test_config, tmp_path
         do_inject_test_values=True,
     )
 
-    named_test_iterators = get_named_pred_dict_iterators(
+    named_test_iterators = get_named_predict_dict_iterators(
         predict_cl_args=test_predict_cl_args
     )
 
@@ -241,7 +241,7 @@ def test_overload_train_configs_for_predict(
         do_inject_test_values=True,
     )
 
-    named_test_iterators = get_named_pred_dict_iterators(
+    named_test_iterators = get_named_predict_dict_iterators(
         predict_cl_args=test_predict_cl_args
     )
 
