@@ -133,8 +133,8 @@ def set_up_delayed_target_labels(
 ) -> Labels:
     train_ids = set(train_ids)
     valid_ids = set(valid_ids)
-    train_labels = {id_: {output_name: torch.empty(0)} for id_ in train_ids}
-    valid_labels = {id_: {output_name: torch.empty(0)} for id_ in valid_ids}
+    train_labels = {id_: {output_name: torch.nan} for id_ in train_ids}
+    valid_labels = {id_: {output_name: torch.nan} for id_ in valid_ids}
 
     return Labels(
         train_labels=train_labels,

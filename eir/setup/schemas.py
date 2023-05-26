@@ -65,8 +65,11 @@ al_models_classes = Union[
 ]
 
 
-al_output_module_configs_classes = Union[Type[TabularOutputModuleConfig]]
-al_output_module_configs = Union[TabularOutputModuleConfig]
+al_output_module_configs_classes = (
+    Type[TabularOutputModuleConfig] | Type[SequenceOutputModuleConfig]
+)
+
+al_output_module_configs = TabularOutputModuleConfig | SequenceOutputModuleConfig
 
 
 al_tokenizer_choices = (

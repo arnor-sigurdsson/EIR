@@ -16,7 +16,7 @@ logger = get_logger(name=__name__)
 
 
 @dataclass
-class OmicsInputInfo:
+class ComputedOmicsInputInfo:
     input_config: schemas.InputConfig
     data_dimensions: "DataDimensions"
     subset_indices: Union[None, Sequence[int]]
@@ -24,7 +24,7 @@ class OmicsInputInfo:
 
 def set_up_omics_input(
     input_config: schemas.InputConfig, *args, **kwargs
-) -> OmicsInputInfo:
+) -> ComputedOmicsInputInfo:
     data_dimensions = get_data_dimension_from_data_source(
         data_source=Path(input_config.input_info.input_source),
         deeplake_inner_key=input_config.input_info.input_inner_key,
@@ -49,7 +49,7 @@ def set_up_omics_input(
             width=len(subset_indices),
         )
 
-    omics_input_info = OmicsInputInfo(
+    omics_input_info = ComputedOmicsInputInfo(
         input_config=input_config,
         data_dimensions=data_dimensions,
         subset_indices=subset_indices,

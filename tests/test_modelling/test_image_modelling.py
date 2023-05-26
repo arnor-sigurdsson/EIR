@@ -100,7 +100,9 @@ def test_image_modelling(prep_modelling_test_configs):
     )
 
     check_performance_result_wrapper(
-        outputs=experiment.outputs, run_path=test_config.run_path, thresholds=thresholds
+        outputs=experiment.outputs,
+        run_path=test_config.run_path,
+        max_thresholds=thresholds,
     )
 
 

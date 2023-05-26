@@ -25,7 +25,6 @@ def get_base_parametrization(compiled: bool = False) -> dict:
                 "n_epochs": 10,
                 "gradient_clipping": 1.0,
                 "lr": 0.001,
-                "gradient_noise": 0.01,
                 "compile_model": compiled,
             },
             "input_configs": [
@@ -79,6 +78,9 @@ def get_base_parametrization(compiled: bool = False) -> dict:
                         "target_con_columns": ["Height"],
                     },
                 },
+                {
+                    "output_info": {"output_name": "test_output_sequence"},
+                },
             ],
         },
     }
@@ -128,5 +130,6 @@ def test_multi_modal_multi_task(
     check_performance_result_wrapper(
         outputs=experiment.outputs,
         run_path=test_config.run_path,
-        thresholds=(0.80, 0.80),
+        max_thresholds=(0.80, 0.80),
+        min_thresholds=(2.0, 2.0),
     )

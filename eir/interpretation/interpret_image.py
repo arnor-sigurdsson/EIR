@@ -81,7 +81,7 @@ def analyze_image_input_attributions(
 
 def un_normalize(
     normalized_img: np.ndarray, normalization_stats: "ImageNormalizationStats"
-):
+) -> np.ndarray:
     """
     Clip because sometimes we get values like 1.0000001 which will cause some libraries
     to do =/ 255, resulting in a black image.

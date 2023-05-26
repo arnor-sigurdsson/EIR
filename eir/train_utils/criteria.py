@@ -46,10 +46,10 @@ def get_criteria(outputs_as_dict: "al_output_objects_as_dict") -> al_criteria_di
             criteria_dict[output_name] = {}
 
         output_type = output_object.output_config.output_info.output_type
-        target_col_iter = output_object.target_columns.items()
 
         match output_type:
             case "tabular":
+                target_col_iter = output_object.target_columns.items()
                 for column_type, columns_of_type in target_col_iter:
                     for column_name in columns_of_type:
                         label_smoothing = _get_label_smoothing(

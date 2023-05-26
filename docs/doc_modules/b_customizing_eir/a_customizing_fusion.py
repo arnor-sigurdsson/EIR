@@ -68,13 +68,13 @@ def modify_experiment(experiment: train.Experiment) -> train.Experiment:
 
     my_output_modules = get_output_modules(
         outputs_as_dict=experiment.outputs,
-        input_dimension=my_fusion_model.num_out_features,
+        computed_out_dimensions=my_fusion_model.num_out_features,
         device=experiment.configs.global_config.device,
     )
 
     my_model = MetaModel(
         input_modules=input_modules,
-        fusion_module=my_fusion_model,
+        fusion_modules=my_fusion_model,
         output_modules=my_output_modules,
     )
 

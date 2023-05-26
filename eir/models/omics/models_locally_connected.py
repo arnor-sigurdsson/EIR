@@ -16,7 +16,7 @@ import torch
 from aislib.misc_utils import get_logger
 from torch import nn
 
-from eir.models.layers import SplitLinear, LCLResidualBlock
+from eir.models.layers import LCL, LCLResidualBlock
 from eir.models.sequence.transformer_models import PositionalEmbedding
 
 if TYPE_CHECKING:
@@ -68,7 +68,7 @@ class SimpleLCLModel(nn.Module):
         self.flatten_fn = flatten_fn
 
         num_chunks = self.model_config.split_mlp_num_splits
-        self.fc_0 = SplitLinear(
+        self.fc_0 = LCL(
             in_features=self.fc_1_in_features,
             out_feature_sets=self.model_config.fc_repr_dim,
             num_chunks=num_chunks,
@@ -203,7 +203,7 @@ class LCLModel(nn.Module):
             base=self.model_config.channel_exp_base,
             expansion=self.model_config.first_channel_expansion,
         )
-        self.fc_0 = SplitLinear(
+        self.fc_0 = LCL(
             in_features=self.fc_1_in_features,
             out_feature_sets=2**fc_0_channel_exponent,
             split_size=fc_0_split_size,

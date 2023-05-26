@@ -62,7 +62,7 @@ def predict_on_batch(
     return val_outputs
 
 
-def parse_target_labels(
+def parse_tabular_target_labels(
     output_objects: "al_output_objects_as_dict",
     device: str,
     labels: "al_training_labels_target",
@@ -481,27 +481,34 @@ def trace_eir_model(meta_model: nn.Module, example_inputs: Dict[str, Any]) -> nn
             traced_input_modules[module_name] = traced_input_module
             feature_extractors_out[module_name] = module(module_input)
 
-        fusion_module = meta_model.fusion_module
-        traced_fusion_module = torch.jit.trace_module(
-            mod=fusion_module,
-            inputs={"forward": feature_extractors_out},
-            strict=False,
-        )
-        fused_features = fusion_module(feature_extractors_out)
+        traced_fusion_modules = nn.ModuleDict()
+        fused_features = {}
+        for fusion_name, fusion_module in meta_model.fusion_modules.items():
+            traced_fusion_module = torch.jit.trace_module(
+                mod=fusion_module,
+                inputs={"forward": feature_extractors_out},
+                strict=False,
+            )
+            traced_fusion_modules[fusion_name] = traced_fusion_module
+            fused_features[fusion_name] = fusion_module(feature_extractors_out)
 
         traced_output_modules = nn.ModuleDict()
         for output_module_name, output_module in meta_model.output_modules.items():
+            cur_fusion_target = meta_model.fusion_to_output_mapping[output_module_name]
+            corresponding_fused_features = fused_features[cur_fusion_target]
+
             traced_output_module = torch.jit.trace_module(
                 mod=output_module,
-                inputs={"forward": fused_features},
+                inputs={"forward": corresponding_fused_features},
                 strict=False,
             )
             traced_output_modules[output_module_name] = traced_output_module
 
     traced_meta_model = meta_model.__class__(
         input_modules=traced_input_modules,
-        fusion_module=traced_fusion_module,
+        fusion_modules=traced_fusion_module,
         output_modules=traced_output_modules,
+        fusion_to_output_mapping=meta_model.fusion_to_output_mapping,
     )
 
     return traced_meta_model

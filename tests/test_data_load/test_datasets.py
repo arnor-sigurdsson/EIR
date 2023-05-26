@@ -120,6 +120,7 @@ def test_set_up_datasets(
 
     outputs_as_dict = set_up_outputs_for_training(
         output_configs=create_test_config.output_configs,
+        input_objects=inputs,
         target_transformers=target_labels.label_transformers,
     )
 
@@ -275,6 +276,7 @@ def test_set_up_datasets_fails(
 
     outputs_as_dict = set_up_outputs_for_training(
         output_configs=create_test_config.output_configs,
+        input_objects=inputs,
         target_transformers=target_labels.label_transformers,
     )
 
@@ -411,6 +413,7 @@ def test_construct_dataset_init_params_from_cl_args(
 
     outputs_as_dict = set_up_outputs_for_training(
         output_configs=create_test_config.output_configs,
+        input_objects=inputs,
         target_transformers=target_labels.label_transformers,
     )
 
@@ -517,6 +520,7 @@ def test_datasets(
 
     outputs_as_dict = set_up_outputs_for_training(
         output_configs=create_test_config.output_configs,
+        input_objects=inputs,
         target_transformers=target_labels.label_transformers,
     )
 

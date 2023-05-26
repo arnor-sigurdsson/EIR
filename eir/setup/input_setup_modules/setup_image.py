@@ -44,7 +44,7 @@ def get_timm_configs() -> Dict[str, PretrainedImageModelInfo]:
 
 
 @dataclass
-class ImageInputInfo:
+class ComputedImageInputInfo:
     input_config: schemas.InputConfig
     base_transforms: Compose
     all_transforms: Compose
@@ -54,7 +54,7 @@ class ImageInputInfo:
 
 def set_up_image_input_for_training(
     input_config: schemas.InputConfig, *args, **kwargs
-) -> ImageInputInfo:
+) -> ComputedImageInputInfo:
     input_type_info = input_config.input_type_info
 
     num_channels = input_type_info.num_channels
@@ -72,7 +72,7 @@ def set_up_image_input_for_training(
         auto_augment=input_type_info.auto_augment,
     )
 
-    image_input_info = ImageInputInfo(
+    image_input_info = ComputedImageInputInfo(
         input_config=input_config,
         base_transforms=base_transforms,
         all_transforms=all_transforms,

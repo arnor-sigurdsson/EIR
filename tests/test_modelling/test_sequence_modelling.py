@@ -321,7 +321,7 @@ def test_sequence_modelling_csv(prep_modelling_test_configs):
     _sequence_test_check_wrapper(experiment=experiment, test_config=test_config)
 
 
-def _sequence_test_check_wrapper(experiment, test_config):
+def _sequence_test_check_wrapper(experiment: train.Experiment, test_config):
     output_configs = experiment.configs.output_configs
 
     thresholds = get_sequence_test_args(
@@ -342,7 +342,7 @@ def _sequence_test_check_wrapper(experiment, test_config):
             check_performance_result_wrapper(
                 outputs=experiment.outputs,
                 run_path=test_config.run_path,
-                thresholds=thresholds,
+                max_thresholds=thresholds,
             )
 
             for input_name in experiment.inputs.keys():
@@ -357,7 +357,7 @@ def _sequence_test_check_wrapper(experiment, test_config):
             check_performance_result_wrapper(
                 outputs=experiment.outputs,
                 run_path=test_config.run_path,
-                thresholds=thresholds,
+                max_thresholds=thresholds,
             )
 
 

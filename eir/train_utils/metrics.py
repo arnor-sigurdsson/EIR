@@ -477,12 +477,13 @@ def hook_add_l1_loss(
             cur_l1_loss = get_model_l1_loss(model=input_module, l1_weight=current_l1)
             l1_loss += cur_l1_loss
 
-    fus_l1 = getattr(experiment.model.fusion_module.model_config, "l1", None)
-    fus_has_l1_weights = hasattr(experiment.model, "l1_penalized_weights")
+    for fusion_module in experiment.model.fusion_modules.values():
+        fus_l1 = getattr(fusion_module.model_config, "l1", None)
+        fus_has_l1_weights = hasattr(fusion_module, "l1_penalized_weights")
 
-    if fus_l1 and fus_has_l1_weights:
-        fusion_l1_loss = get_model_l1_loss(model=experiment.model, l1_weight=fus_l1)
-        l1_loss += fusion_l1_loss
+        if fus_l1 and fus_has_l1_weights:
+            fusion_l1_loss = get_model_l1_loss(model=fusion_module, l1_weight=fus_l1)
+            l1_loss += fusion_l1_loss
 
     updated_loss = state[loss_key] + l1_loss
 
@@ -758,10 +759,11 @@ def get_performance_averaging_functions(
     con_metric_names: al_con_averaging_metric_choices,
 ) -> al_averaging_functions_dict:
     logger.info(
-        "Performance averaging functions across tasks set to averages "
+        "Tabular performance averaging functions across tasks set to averages "
         "of %s for categorical targets and %s for continuous targets. These "
         "values are used to determine overall performance, which is used to "
-        "control factors such as early stopping and LR scheduling.",
+        "control factors such as early stopping and LR scheduling. "
+        "Other output cases use 1.0-LOSS by default.",
         [i.upper() for i in cat_metric_names],
         [i.upper().replace("LOSS", "1.0-LOSS") for i in con_metric_names],
     )

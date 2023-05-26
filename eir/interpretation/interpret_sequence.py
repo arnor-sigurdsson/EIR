@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Sequence, Literal, Tuple, Dict, Iterable
 import numpy as np
 import pandas as pd
 import torch
+import torchtext.vocab
 from aislib.misc_utils import ensure_path_exists, get_logger
 from captum.attr._utils.visualization import (
     format_classname,
@@ -183,7 +184,9 @@ def extract_sample_info_for_sequence_attribution(
     return extracted_sequence_info
 
 
-def extract_raw_inputs_from_tokens(tokens: torch.Tensor, vocab) -> Sequence[str]:
+def extract_raw_inputs_from_tokens(
+    tokens: torch.Tensor, vocab: torchtext.vocab.Vocab
+) -> Sequence[str]:
     raw_inputs = vocab.lookup_tokens(tokens.squeeze().tolist())
     return raw_inputs
 

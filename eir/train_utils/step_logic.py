@@ -229,15 +229,14 @@ def prepare_base_batch_default(
         generated_targets = {}
     if not target_labels:
         target_labels = {}
-
-    target_labels = {**target_labels, **generated_targets}
-
-    if target_labels:
-        target_labels = model_training_utils.parse_target_labels(
+    else:
+        target_labels = model_training_utils.parse_tabular_target_labels(
             output_objects=output_objects,
             device=device,
             labels=target_labels,
         )
+
+    target_labels = {**target_labels, **generated_targets}
 
     batch = Batch(
         inputs=inputs_prepared,
@@ -345,8 +344,12 @@ def _prepare_sequence_input_for_sequence_output(
         batch_size=cur_seq.shape[0],
         special_tokens=special_tokens,
     )
+    assert cur_seq.shape == cur_target.shape
+    assert cur_seq.dim() == 2
+    assert cur_seq.shape[1] == input_object.computed_max_length
 
     cur_seq = cur_seq.to(device=device)
+
     cur_target = {input_name: cur_target.to(device=device)}
 
     return cur_seq, cur_target
@@ -486,6 +489,9 @@ def maybe_apply_gradient_noise_to_model(
 ) -> None:
     if gradient_noise:
         for name, weight in model.named_parameters():
+            if weight.grad is None:
+                continue
+
             weight.grad = weight.grad + torch.randn_like(weight.grad) * gradient_noise
 
 

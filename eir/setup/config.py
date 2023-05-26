@@ -112,8 +112,9 @@ def get_configs():
         extra_cl_args_overload=extra_cl_args,
         dynamic_output_setup=dynamic_output_setup,
     )
+
     configs_with_seq_outputs = get_configs_object_with_seq_output_configs(
-        eir_configs=configs, cl_args=main_cl_args, extra_cl_args=extra_cl_args
+        configs=configs,
     )
 
     return configs_with_seq_outputs
@@ -698,6 +699,7 @@ def init_output_config(
         output_info=output_info_object,
         output_type_info=output_type_info_object,
         model_config=model_config,
+        sampling_config=cfg.get("sampling_config", {}),
     )
 
     return output_config

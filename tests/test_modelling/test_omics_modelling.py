@@ -150,7 +150,7 @@ def test_classification(prep_modelling_test_configs):
         check_performance_result_wrapper(
             outputs=experiment.outputs,
             run_path=test_config.run_path,
-            thresholds=(0.8, 0.8),
+            max_thresholds=(0.8, 0.8),
         )
 
         top_row_grads_dict = {"Asia": [0] * 10, "Europe": [1] * 10, "Africa": [2] * 10}
@@ -227,7 +227,7 @@ def test_classification_subset(prep_modelling_test_configs):
         check_performance_result_wrapper(
             outputs=experiment.outputs,
             run_path=test_config.run_path,
-            thresholds=(0.7, 0.7),
+            max_thresholds=(0.7, 0.7),
         )
 
         top_row_grads_dict = {"Asia": [0] * 10, "Europe": [1] * 10, "Africa": [2] * 10}
@@ -396,7 +396,7 @@ def test_regression(prep_modelling_test_configs):
         check_performance_result_wrapper(
             outputs=experiment.outputs,
             run_path=test_config.run_path,
-            thresholds=(0.8, 0.8),
+            max_thresholds=(0.8, 0.8),
         )
 
         top_height_snp_index = 2
@@ -723,7 +723,7 @@ def test_multi_task(
             check_performance_result_wrapper(
                 outputs=experiment.outputs,
                 run_path=test_config.run_path,
-                thresholds=threshold,
+                max_thresholds=threshold,
             )
             top_row_grads_dict = {
                 "Asia": [0] * 10,
@@ -749,7 +749,7 @@ def test_multi_task(
             check_performance_result_wrapper(
                 outputs=experiment.outputs,
                 run_path=test_config.run_path,
-                thresholds=threshold,
+                max_thresholds=threshold,
             )
             top_height_snp_index = 2
             top_row_grads_dict = {"Height": [top_height_snp_index] * 10}

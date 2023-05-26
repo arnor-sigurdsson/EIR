@@ -353,7 +353,8 @@ def _get_experiment_overloaded_for_pretrained_extractor(
     pretrained_test_config = get_cur_modelling_test_config(
         train_loader=pretrained_experiment.train_loader,
         global_config=pretrained_configs.global_config,
-        targets=targets,
+        tabular_targets=targets,
+        output_configs=pretrained_experiment.configs.output_configs,
         input_names=pretrained_experiment.inputs.keys(),
     )
 
@@ -403,7 +404,8 @@ def _get_experiment_overloaded_for_pretrained_checkpoint(
     pretrained_test_config = get_cur_modelling_test_config(
         train_loader=pretrained_experiment.train_loader,
         global_config=pretrained_configs.global_config,
-        targets=targets,
+        output_configs=pretrained_experiment.configs.output_configs,
+        tabular_targets=targets,
         input_names=pretrained_experiment.inputs.keys(),
     )
 

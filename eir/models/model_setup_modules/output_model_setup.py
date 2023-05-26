@@ -18,7 +18,7 @@ from eir.setup.output_setup_modules.tabular_output_setup import (
 )
 
 if TYPE_CHECKING:
-    from eir.setup.input_setup_modules.common import DataDimensions
+    from eir.models.model_setup import FeatureExtractorInfo
 
 al_output_module_init_configs = (
     ResidualMLPOutputModulelConfig
@@ -35,7 +35,7 @@ al_output_modules = ResidualMLPOutputModule | LinearOutputModule | SequenceOutpu
 
 def get_sequence_output_module_from_model_config(
     output_object: ComputedSequenceOutputInfo,
-    in_features_per_feature_extractor: Dict[str, "DataDimensions"],
+    feature_dimensionalities_and_types: Dict[str, "FeatureExtractorInfo"],
     device: str,
 ) -> SequenceOutputModule:
     output_model_config = output_object.output_config.model_config
@@ -47,7 +47,7 @@ def get_sequence_output_module_from_model_config(
     output_module = cur_output_module_class(
         output_object=output_object,
         output_name=output_object.output_config.output_info.output_name,
-        in_features_per_feature_extractor=in_features_per_feature_extractor,
+        feature_dimensionalities_and_types=feature_dimensionalities_and_types,
     )
 
     output_module = output_module.to(device=device)

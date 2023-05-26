@@ -30,7 +30,7 @@ def set_up_outputs_for_training(
     input_objects: Optional["al_input_objects_as_dict"] = None,
     target_transformers: Optional[Dict[str, al_label_transformers]] = None,
 ) -> al_output_objects_as_dict:
-    all_inputs = set_up_outputs_general(
+    all_outputs = set_up_outputs_general(
         output_configs=output_configs,
         setup_func_getter=get_output_setup_function_for_train,
         setup_func_kwargs={
@@ -39,7 +39,7 @@ def set_up_outputs_for_training(
         },
     )
 
-    return all_inputs
+    return all_outputs
 
 
 def set_up_outputs_general(
@@ -49,7 +49,7 @@ def set_up_outputs_general(
     ],
     setup_func_kwargs: Dict[str, Any],
 ) -> al_output_objects_as_dict:
-    all_inputs = {}
+    all_outputs = {}
 
     name_config_iter = get_output_name_config_iterator(output_configs=output_configs)
 
@@ -65,9 +65,9 @@ def set_up_outputs_general(
         )
 
         set_up_output = setup_func(output_config=output_config, **setup_func_kwargs)
-        all_inputs[name] = set_up_output
+        all_outputs[name] = set_up_output
 
-    return all_inputs
+    return all_outputs
 
 
 def get_output_setup_function_for_train(

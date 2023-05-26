@@ -18,23 +18,29 @@ from eir.experiment_io.experiment_io import (
     get_run_folder_from_model_path,
 )
 from eir.setup import schemas
-from eir.setup.input_setup_modules.setup_array import set_up_array_input, ArrayInputInfo
+from eir.setup.input_setup_modules.setup_array import (
+    set_up_array_input,
+    ComputedArrayInputInfo,
+)
 from eir.setup.input_setup_modules.setup_bytes import (
     set_up_bytes_input_for_training,
-    BytesInputInfo,
+    ComputedBytesInputInfo,
 )
 from eir.setup.input_setup_modules.setup_image import (
-    ImageInputInfo,
+    ComputedImageInputInfo,
     set_up_image_input_for_training,
 )
-from eir.setup.input_setup_modules.setup_omics import set_up_omics_input, OmicsInputInfo
+from eir.setup.input_setup_modules.setup_omics import (
+    set_up_omics_input,
+    ComputedOmicsInputInfo,
+)
 from eir.setup.input_setup_modules.setup_sequence import (
     ComputedSequenceInputInfo,
     set_up_sequence_input_for_training,
 )
 from eir.setup.input_setup_modules.setup_tabular import (
     set_up_tabular_input_for_training,
-    TabularInputInfo,
+    ComputedTabularInputInfo,
 )
 
 if TYPE_CHECKING:
@@ -43,25 +49,25 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 al_input_objects = Union[
-    OmicsInputInfo,
-    TabularInputInfo,
+    ComputedOmicsInputInfo,
+    ComputedTabularInputInfo,
     ComputedSequenceInputInfo,
-    BytesInputInfo,
-    ImageInputInfo,
-    ArrayInputInfo,
+    ComputedBytesInputInfo,
+    ComputedImageInputInfo,
+    ComputedArrayInputInfo,
 ]
 al_input_objects_as_dict = Dict[str, al_input_objects]
 
 al_serializable_input_objects = Union[
     ComputedSequenceInputInfo,
-    ImageInputInfo,
-    BytesInputInfo,
+    ComputedImageInputInfo,
+    ComputedBytesInputInfo,
 ]
 
 al_serializable_input_classes = Union[
     Type[ComputedSequenceInputInfo],
-    Type[ImageInputInfo],
-    Type[BytesInputInfo],
+    Type[ComputedImageInputInfo],
+    Type[ComputedBytesInputInfo],
 ]
 
 
@@ -161,7 +167,7 @@ def set_up_tabular_input_from_pretrained(
     train_ids: Sequence[str],
     valid_ids: Sequence[str],
     hooks: Union["Hooks", None],
-) -> "TabularInputInfo":
+) -> "ComputedTabularInputInfo":
     tabular_input_object = set_up_tabular_input_for_training(
         input_config=input_config, train_ids=train_ids, valid_ids=valid_ids, hooks=hooks
     )
@@ -196,13 +202,13 @@ def get_input_setup_from_pretrained_function_map(
         ),
         "bytes": partial(
             load_serialized_input_object,
-            input_class=BytesInputInfo,
+            input_class=ComputedBytesInputInfo,
             run_folder=run_folder,
             custom_input_name=load_module_name,
         ),
         "image": partial(
             load_serialized_input_object,
-            input_class=ImageInputInfo,
+            input_class=ComputedImageInputInfo,
             run_folder=run_folder,
             custom_input_name=load_module_name,
         ),

@@ -8,11 +8,11 @@ from torchvision.datasets.folder import default_loader
 
 from eir.data_load.data_preparation_modules.common import _load_deeplake_sample
 from eir.data_load.data_source_modules import deeplake_ops
-from eir.setup.input_setup_modules.setup_image import ImageInputInfo
+from eir.setup.input_setup_modules.setup_image import ComputedImageInputInfo
 
 
 def prepare_image_data(
-    image_input_object: "ImageInputInfo", image_data: Image, test_mode: bool
+    image_input_object: "ComputedImageInputInfo", image_data: Image, test_mode: bool
 ) -> torch.Tensor:
     """
     The transforms take care of converting the image object to a copied tensor.

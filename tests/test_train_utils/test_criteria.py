@@ -7,6 +7,7 @@ import torch
 from torch import nn
 
 from eir.setup.config import Configs
+from eir.setup.input_setup import set_up_inputs_for_training
 from eir.setup.output_setup import set_up_outputs_for_training
 from eir.target_setup.target_label_setup import MergedTargetLabels
 from eir.train_utils.criteria import (
@@ -95,8 +96,16 @@ def test_get_criteria(
 ):
     target_labels = create_test_labels
 
+    inputs_as_dict = set_up_inputs_for_training(
+        inputs_configs=create_test_config.input_configs,
+        train_ids=list(target_labels.train_labels.keys()),
+        valid_ids=list(target_labels.valid_labels.keys()),
+        hooks=None,
+    )
+
     outputs_as_dict = set_up_outputs_for_training(
         output_configs=create_test_config.output_configs,
+        input_objects=inputs_as_dict,
         target_transformers=target_labels.label_transformers,
     )
 

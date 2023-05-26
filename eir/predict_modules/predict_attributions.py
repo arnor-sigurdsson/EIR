@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 
 from eir.data_load import label_setup
 from eir.experiment_io.experiment_io import LoadedTrainExperiment
-from eir.interpretation.interpretation import attribution_analysis_wrapper
+from eir.interpretation.interpretation import tabular_attribution_analysis_wrapper
 from eir.predict_modules.predict_data import set_up_default_dataset
 from eir.predict_modules.predict_input_setup import set_up_inputs_for_predict
 from eir.predict_modules.predict_target_setup import get_target_labels_for_testing
@@ -58,10 +58,10 @@ def compute_predict_attributions(
         predict_outfolder=Path(predict_config.predict_specific_cl_args.output_folder),
     )
 
-    attribution_analysis_wrapper(
+    tabular_attribution_analysis_wrapper(
         model=predict_config.model,
         experiment=overloaded_train_experiment,
-        outfolder_target_callable=attribution_outfolder_callable,
+        output_folder_target_callable=attribution_outfolder_callable,
         dataset_to_interpret=predict_config.test_dataset,
         background_loader=background_dataloader,
     )

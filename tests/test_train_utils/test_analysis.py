@@ -26,9 +26,9 @@ def test_parse_valid_classification_preds():
 
     test_ids = np.array(["Test_ID_" + str(i) for i in range(1, 11)])
 
-    df_valid_preds = evaluation._parse_valid_classification_preds(
+    df_valid_preds = evaluation._parse_valid_classification_predictions(
         val_true=test_val_true,
-        val_preds=test_val_preds,
+        val_predictions=test_val_preds,
         val_outputs=test_val_probs,
         val_classes=val_classes,
         ids=test_ids,

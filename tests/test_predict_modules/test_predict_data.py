@@ -257,6 +257,7 @@ def test_set_up_test_dataset(
 
     outputs_as_dict = set_up_outputs_for_training(
         output_configs=create_test_config.output_configs,
+        input_objects=test_inputs,
         target_transformers=transformers,
     )
 

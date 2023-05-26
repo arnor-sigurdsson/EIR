@@ -14,7 +14,7 @@ from eir.models import model_training_utils
 from eir.train_utils import metrics
 from eir.train_utils import utils
 from eir.train_utils.handlers_sequence_output import (
-    sequence_out_manual_sample_evaluation_wrapper,
+    sequence_out_single_sample_evaluation_wrapper,
 )
 from eir.visualization import visualization_funcs as vf
 
@@ -47,7 +47,7 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
         with_labels=True,
     )
 
-    val_target_labels = model_training_utils.parse_target_labels(
+    val_target_labels = model_training_utils.parse_tabular_target_labels(
         output_objects=exp.outputs, device=gc.device, labels=val_target_labels
     )
 
@@ -93,7 +93,7 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
             experiment=handler_config.experiment,
         )
 
-        sequence_out_manual_sample_evaluation_wrapper(
+        sequence_out_single_sample_evaluation_wrapper(
             experiment=exp, iteration=iteration
         )
 
@@ -163,44 +163,44 @@ def save_evaluation_results(
         "val_outputs": pc.val_outputs,
         "val_labels": pc.val_labels,
         "val_ids": pc.val_ids,
-        "outfolder": pc.output_folder,
+        "output_folder": pc.output_folder,
         "transformer": pc.target_transformer,
     }
 
     vf.gen_eval_graphs(plot_config=pc)
 
     if pc.column_type == "cat":
-        save_classification_preds(**common_args)
+        save_classification_predictions(**common_args)
     elif pc.column_type == "con":
-        scale_and_save_regression_preds(**common_args)
+        scale_and_save_regression_predictions(**common_args)
 
 
-def save_classification_preds(
+def save_classification_predictions(
     val_labels: np.ndarray,
     val_outputs: np.ndarray,
     val_ids: List[str],
     transformer: LabelEncoder,
-    outfolder: Path,
+    output_folder: Path,
 ) -> None:
-    val_preds_total = val_outputs.argmax(axis=1)
+    validation_predictions_total = val_outputs.argmax(axis=1)
 
-    df_predictions = _parse_valid_classification_preds(
+    df_predictions = _parse_valid_classification_predictions(
         val_true=val_labels,
         val_outputs=val_outputs,
         val_classes=transformer.classes_,
-        val_preds=val_preds_total,
+        val_predictions=validation_predictions_total,
         ids=np.array(val_ids),
     )
 
     df_predictions = _inverse_numerical_labels_hook(
         df=df_predictions, target_transformer=transformer
     )
-    df_predictions.to_csv(outfolder / "predictions.csv", index=False)
+    df_predictions.to_csv(output_folder / "predictions.csv", index=False)
 
 
-def _parse_valid_classification_preds(
+def _parse_valid_classification_predictions(
     val_true: np.ndarray,
-    val_preds: np.ndarray,
+    val_predictions: np.ndarray,
     val_outputs: np.ndarray,
     val_classes: Sequence[str],
     ids: np.ndarray,
@@ -214,7 +214,7 @@ def _parse_valid_classification_preds(
     column_values = [
         ids,
         val_true,
-        val_preds,
+        val_predictions,
     ]
 
     for i in range(len(prediction_classes)):
@@ -237,12 +237,12 @@ def _inverse_numerical_labels_hook(
     return df
 
 
-def scale_and_save_regression_preds(
+def scale_and_save_regression_predictions(
     val_labels: np.ndarray,
     val_outputs: np.ndarray,
     val_ids: List[str],
     transformer: StandardScaler,
-    outfolder: Path,
+    output_folder: Path,
 ) -> None:
     val_labels_2d = val_labels.reshape(-1, 1)
     val_outputs_2d = val_outputs.reshape(-1, 1)
@@ -253,4 +253,4 @@ def scale_and_save_regression_preds(
     data = np.array([val_ids, val_labels, val_outputs]).T
     df = pd.DataFrame(data=data, columns=["ID", "Actual", "Predicted"])
 
-    df.to_csv(outfolder / "regression_predictions.csv", index=["ID"])
+    df.to_csv(output_folder / "regression_predictions.csv", index=["ID"])

@@ -1,13 +1,10 @@
-from argparse import Namespace
+from dataclasses import asdict, dataclass
 from typing import Sequence, Iterable, Dict, Any, Optional, TYPE_CHECKING
 
 from aislib.misc_utils import get_logger
 
 from eir.models.sequence.transformer_models import (
     BasicTransformerFeatureExtractorModelConfig,
-)
-from eir.setup.config_setup_modules.config_setup_utils import (
-    get_yaml_iterator_with_injections,
 )
 
 if TYPE_CHECKING:
@@ -19,17 +16,15 @@ logger = get_logger(name=__name__)
 
 
 def get_configs_object_with_seq_output_configs(
-    eir_configs: "Configs", cl_args: Namespace, extra_cl_args: list[str]
+    configs: "Configs",
 ) -> "Configs":
-    seq_config_iter = get_yaml_iterator_with_injections(
-        yaml_config_files=cl_args.output_configs, extra_cl_args=extra_cl_args
-    )
+    seq_configs_iter = [asdict(i) for i in configs.output_configs]
     seq_configs = get_seq_output_configs(
-        seq_configs=seq_config_iter,
-        base_output_configs=eir_configs.output_configs,
+        seq_configs=seq_configs_iter,
+        base_output_configs=configs.output_configs,
     )
 
-    input_configs = eir_configs.input_configs
+    input_configs = configs.input_configs
     extra_input_configs = converge_sequence_output_configs_to_input_configs(
         seq_output_configs=seq_configs,
         input_configs=input_configs,
@@ -37,7 +32,7 @@ def get_configs_object_with_seq_output_configs(
     # TODO: Filter the duplicated ones where we have original *and* extra
     seq_input_configs = list(input_configs) + list(extra_input_configs)
 
-    seq_config_object_kwargs = eir_configs.__dict__
+    seq_config_object_kwargs = configs.__dict__
     seq_config_object_kwargs["output_configs"] = seq_configs
     seq_config_object_kwargs["input_configs"] = seq_input_configs
 
@@ -77,6 +72,9 @@ def init_seq_output_config(
     """
 
     seq_sampling_config_kwargs = yaml_config_as_dict.get("sampling_config", {})
+    if seq_sampling_config_kwargs is None:
+        seq_sampling_config_kwargs = {}
+
     seq_sampling_config = schemas.SequenceOutputSamplingConfig(
         **seq_sampling_config_kwargs
     )
@@ -112,7 +110,7 @@ def converge_sequence_output_configs_to_input_configs(
                 assert len(matched_input_configs) == 1
                 matched_input_config = matched_input_configs[0]
                 logger.info(
-                    "Found input config with matching name for SSL config: '%s'. "
+                    "Found input config with matching name for sequence config: '%s'. "
                     "Will overload matching keys.",
                     seq_output_config.output_info.output_name,
                 )
@@ -137,6 +135,33 @@ def _build_sequence_input_config_from_output(
         input_name=output_info.output_name,
     )
 
+    input_type_info = _build_matched_input_type_info(
+        sequence_output_config=sequence_output_config
+    )
+
+    extracted_attributes = _build_matched_sequence_model_config_kwargs(
+        sequence_output_config=sequence_output_config,
+        input_config_to_overload=input_config_to_overload,
+    )
+
+    overloaded_model_config = schemas.SequenceModelConfig(
+        model_type="eir-input-sequence-from-linked-output-default",
+        model_init_config=extracted_attributes.model_init_config,
+        **extracted_attributes.model_config_kwargs,
+    )
+    converged_input_config = schemas.InputConfig(
+        input_info=input_info,
+        input_type_info=input_type_info,
+        model_config=overloaded_model_config,
+        pretrained_config=extracted_attributes.pretrained_config,
+    )
+
+    return converged_input_config
+
+
+def _build_matched_input_type_info(
+    sequence_output_config: schemas.OutputConfig,
+) -> schemas.SequenceInputDataConfig:
     output_type_info = sequence_output_config.output_type_info
     output_type_info_kwargs = output_type_info.__dict__
 
@@ -147,36 +172,56 @@ def _build_sequence_input_config_from_output(
 
     input_type_info = schemas.SequenceInputDataConfig(**matched_kwargs)
 
-    # TODO: Extend
-    model_init_config_kwargs = (
-        sequence_output_config.model_config.model_init_config.__dict__
-    )
-    model_init_config = BasicTransformerFeatureExtractorModelConfig(
-        **model_init_config_kwargs
-    )
+    return input_type_info
 
+
+@dataclass
+class ExtractedAttributesFromOutputConfig:
+    """
+    To be used to build a matching input config.
+    """
+
+    model_config_kwargs: dict[str, Any]
+    model_init_config: BasicTransformerFeatureExtractorModelConfig
+    pretrained_config: Optional[schemas.BasicPretrainedConfig]
+
+
+def _build_matched_sequence_model_config_kwargs(
+    sequence_output_config: schemas.OutputConfig,
+    input_config_to_overload: Optional[schemas.InputConfig] = None,
+) -> ExtractedAttributesFromOutputConfig:
     if input_config_to_overload:
+        model_config_keys = _extract_model_config_keys(
+            model_config=input_config_to_overload.model_config
+        )
         model_init_config = input_config_to_overload.model_config.model_init_config
-        rest = {
-            k: v
-            for k, v in input_config_to_overload.model_config.__dict__.items()
-            if k not in {"model_type", "model_init_config"}
-        }
         pretrained_config = input_config_to_overload.pretrained_config
     else:
-        rest = {}
+        model_config_keys = _extract_model_config_keys(
+            model_config=sequence_output_config.model_config
+        )
+        model_init_config_kwargs = (
+            sequence_output_config.model_config.model_init_config.__dict__
+        )
+        model_init_config = BasicTransformerFeatureExtractorModelConfig(
+            **model_init_config_kwargs
+        )
         pretrained_config = None
 
-    overloaded_model_config = schemas.SequenceModelConfig(
-        model_type="eir-sequence-output-linked-default",
+    extracted_attributes = ExtractedAttributesFromOutputConfig(
+        model_config_kwargs=model_config_keys,
         model_init_config=model_init_config,
-        **rest,
-    )
-    converged_input_config = schemas.InputConfig(
-        input_info=input_info,
-        input_type_info=input_type_info,
-        model_config=overloaded_model_config,
         pretrained_config=pretrained_config,
     )
 
-    return converged_input_config
+    return extracted_attributes
+
+
+def _extract_model_config_keys(
+    model_config: schemas.SequenceModelConfig | schemas.SequenceOutputModuleConfig,
+    keys_to_exclude: tuple[str] = ("model_type", "model_init_config"),
+) -> dict[str, Any]:
+    extracted = {
+        k: v for k, v in model_config.__dict__.items() if k not in keys_to_exclude
+    }
+    return extracted

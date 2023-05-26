@@ -23,5 +23,29 @@ class TabularOutputModuleConfig:
 
 @dataclass
 class SequenceOutputModuleConfig:
-    model_init_config: Union[TransformerSequenceOutputModuleConfig]
+    """
+    :param model_init_config:
+          Configuration / arguments used to initialise model.
+
+    :param model_type:
+         Which type of image model to use.
+
+    :param embedding_dim:
+        Which dimension to use for the embeddings. If ``None``, will automatically set
+        this value based on the number of tokens and attention heads.
+
+    :param position:
+        Whether to encode the token position or use learnable position embeddings.
+
+    :param position_dropout:
+        Dropout for the positional encoding / embedding.
+
+    """
+
+    model_init_config: TransformerSequenceOutputModuleConfig
     model_type: Literal["sequence"] = "sequence"
+
+    embedding_dim: int = 64
+
+    position: Literal["encode", "embed"] = "encode"
+    position_dropout: float = 0.10

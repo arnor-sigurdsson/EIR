@@ -24,6 +24,7 @@ def create_test_model(
 
     outputs_as_dict = set_up_outputs_for_training(
         output_configs=create_test_config.output_configs,
+        input_objects=inputs_as_dict,
         target_transformers=target_labels.label_transformers,
     )
 

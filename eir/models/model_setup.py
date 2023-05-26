@@ -9,6 +9,7 @@ from typing import (
     Type,
     Tuple,
     Optional,
+    Literal,
     TYPE_CHECKING,
 )
 
@@ -159,29 +160,83 @@ def get_meta_model_kwargs_from_configs(
     )
     kwargs["input_modules"] = input_modules
 
-    out_feature_per_feature_extractor = _get_feature_extractors_output_dimensions(
+    out_feature_per_feature_extractor = _get_feature_extractors_num_output_dimensions(
         input_modules=input_modules
     )
-    fusion_module = fusion.get_fusion_module(
+
+    fusion_modules = fusion.get_fusion_modules(
         model_type=fusion_config.model_type,
         model_config=fusion_config.model_config,
         modules_to_fuse=input_modules,
         out_feature_per_feature_extractor=out_feature_per_feature_extractor,
     )
-    kwargs["fusion_module"] = fusion_module
+    kwargs["fusion_modules"] = fusion_modules
 
+    feature_dims_and_types = get_all_feature_extractor_dimensions_and_types(
+        inputs_as_dict=inputs_as_dict, input_modules=input_modules
+    )
+    output_modules, output_types = get_output_modules(
+        outputs_as_dict=outputs_as_dict,
+        computed_out_dimensions=fusion_modules["computed"].num_out_features,
+        device=global_config.device,
+        feature_dimensions_and_types=feature_dims_and_types,
+    )
+    fusion_to_output_mapping = _match_fusion_outputs_to_output_types(
+        output_types=output_types
+    )
+    kwargs["output_modules"] = output_modules
+    kwargs["fusion_to_output_mapping"] = fusion_to_output_mapping
+
+    return kwargs
+
+
+def _match_fusion_outputs_to_output_types(
+    output_types: dict[str, Literal["tabular", "sequence"]]
+) -> dict[str, str]:
+    output_name_to_fusion_output_type = {}
+
+    for output_name, output_type in output_types.items():
+        match output_type:
+            case "tabular":
+                output_name_to_fusion_output_type[output_name] = "computed"
+            case "sequence":
+                output_name_to_fusion_output_type[output_name] = "pass-through"
+            case _:
+                raise ValueError(f"Unknown output type '{output_type}'.")
+
+    return output_name_to_fusion_output_type
+
+
+@dataclass()
+class FeatureExtractorInfo:
+    input_dimension: Union[
+        DataDimensions, "OmicsDataDimensions", "SequenceDataDimensions"
+    ]
+    output_dimension: int
+    input_type: str
+
+
+def get_all_feature_extractor_dimensions_and_types(
+    inputs_as_dict: al_input_objects_as_dict,
+    input_modules: nn.ModuleDict,
+) -> Dict[str, FeatureExtractorInfo]:
+    input_dimensionalities_and_types = {}
+
+    out_feature_per_feature_extractor = _get_feature_extractors_num_output_dimensions(
+        input_modules=input_modules
+    )
     in_features_per_input = _get_feature_extractors_input_dimensions_per_axis(
         inputs_as_dict=inputs_as_dict, input_modules=input_modules
     )
-    output_modules = get_output_modules(
-        outputs_as_dict=outputs_as_dict,
-        input_dimension=fusion_module.num_out_features,
-        device=global_config.device,
-        in_features_per_input=in_features_per_input,
-    )
-    kwargs["output_modules"] = output_modules
 
-    return kwargs
+    for input_name, input_object in inputs_as_dict.items():
+        input_dimensionalities_and_types[input_name] = FeatureExtractorInfo(
+            input_dimension=in_features_per_input[input_name],
+            output_dimension=out_feature_per_feature_extractor[input_name],
+            input_type=input_object.input_config.input_info.input_type,
+        )
+
+    return input_dimensionalities_and_types
 
 
 def get_input_modules(
@@ -263,30 +318,33 @@ def get_input_modules(
 
 def get_output_modules(
     outputs_as_dict: "al_output_objects_as_dict",
-    input_dimension: int,
+    computed_out_dimensions: int,
     device: str,
-    in_features_per_input: Optional[Dict[str, DataDimensions]] = None,
-) -> nn.ModuleDict:
+    feature_dimensions_and_types: Optional[Dict[str, FeatureExtractorInfo]] = None,
+) -> Tuple[nn.ModuleDict, Dict[str, Literal["tabular", "sequence"]]]:
     output_modules = nn.ModuleDict()
+    output_types = {}
 
     for output_name, output_object in outputs_as_dict.items():
         output_type = output_object.output_config.output_info.output_type
         output_model_config = output_object.output_config.model_config
+        output_types[output_name] = output_type
 
         match output_type:
             case "tabular":
                 tabular_output_module = get_tabular_output_module_from_model_config(
                     output_model_config=output_model_config,
-                    input_dimension=input_dimension,
+                    input_dimension=computed_out_dimensions,
                     num_outputs_per_target=output_object.num_outputs_per_target,
                     device=device,
                 )
                 output_modules[output_name] = tabular_output_module
 
             case "sequence":
+                feat_dims = feature_dimensions_and_types
                 sequence_output_module = get_sequence_output_module_from_model_config(
                     output_object=output_object,
-                    in_features_per_feature_extractor=in_features_per_input,
+                    feature_dimensionalities_and_types=feat_dims,
                     device=device,
                 )
                 output_modules[output_name] = sequence_output_module
@@ -295,7 +353,8 @@ def get_output_modules(
                 raise NotImplementedError(
                     "Only tabular and sequence outputs are supported"
                 )
-    return output_modules
+
+    return output_modules, output_types
 
 
 def get_default_model_registry_per_input_type() -> al_model_registry:
@@ -307,7 +366,7 @@ def get_default_model_registry_per_input_type() -> al_model_registry:
     return mapping
 
 
-def _get_feature_extractors_output_dimensions(
+def _get_feature_extractors_num_output_dimensions(
     input_modules: nn.ModuleDict,
 ) -> Dict[str, int]:
     fusion_in_dims = {name: i.num_out_features for name, i in input_modules.items()}
@@ -357,7 +416,7 @@ def _get_feature_extractors_input_dimensions_per_axis(
 
             case "image":
                 fusion_in_dims[name] = DataDimensions(
-                    channels=input_type_info.num_channels,
+                    channels=input_object.num_channels,
                     height=input_type_info.size[0],
                     width=input_type_info.size[-1],
                 )

@@ -250,7 +250,7 @@ class CNNResidualBlock(CNNResidualBlockBase):
         return out
 
 
-class SplitLinear(nn.Module):
+class LCL(nn.Module):
     __constants__ = ["bias", "in_features", "out_features"]
 
     def __init__(
@@ -475,7 +475,7 @@ class LCLResidualBlock(nn.Module):
         self.stochastic_depth_p = stochastic_depth_p
 
         self.norm_1 = nn.LayerNorm(normalized_shape=in_features)
-        self.fc_1 = SplitLinear(
+        self.fc_1 = LCL(
             in_features=self.in_features,
             out_feature_sets=self.out_feature_sets,
             bias=True,
@@ -492,12 +492,12 @@ class LCLResidualBlock(nn.Module):
             split_size=self.split_size,
             reduce_both=self.reduce_both,
         )
-        self.fc_2 = SplitLinear(**fc_2_kwargs)
+        self.fc_2 = LCL(**fc_2_kwargs)
 
         if in_features == out_feature_sets:
             self.downsample_identity = lambda x: x
         else:
-            self.downsample_identity = SplitLinear(
+            self.downsample_identity = LCL(
                 in_features=self.in_features,
                 out_feature_sets=1,
                 bias=True,
@@ -562,21 +562,57 @@ def _calculate_num_chunks_for_equal_split_out_features(
     return in_features // out_feature_sets
 
 
+def get_projection_layer(
+    input_dimension: int,
+    target_dimension: int,
+) -> LCLResidualBlock | LCL | nn.Linear | nn.Identity:
+    if input_dimension == target_dimension:
+        return nn.Identity()
+
+    lcl_projection = get_lcl_projection_layer(
+        input_dimension=input_dimension,
+        target_dimension=target_dimension,
+        layer_type="lcl",
+    )
+
+    if lcl_projection is not None:
+        return lcl_projection
+
+    lcl_residual_projection = get_lcl_projection_layer(
+        input_dimension=input_dimension,
+        target_dimension=target_dimension,
+        layer_type="lcl_residual",
+    )
+
+    if lcl_residual_projection is not None:
+        return lcl_residual_projection
+
+    return nn.Linear(
+        in_features=input_dimension,
+        out_features=target_dimension,
+        bias=True,
+    )
+
+
 def get_lcl_projection_layer(
     input_dimension: int,
     target_dimension: int,
     layer_type: Literal["lcl_residual", "lcl"] = "lcl_residual",
     kernel_width_candidates: Sequence[int] = tuple(range(1, 1024 + 1)),
     out_feature_sets_candidates: Sequence[int] = tuple(range(1, 64 + 1)),
-) -> LCLResidualBlock:
-    layer_class = LCLResidualBlock
-    n_split_layers = 2
-    if layer_type == "lcl":
-        layer_class = SplitLinear
-        n_split_layers = 1
+) -> LCLResidualBlock | LCL | None:
+    match layer_type:
+        case "lcl_residual":
+            layer_class = LCLResidualBlock
+            n_split_layers = 2
+        case "lcl":
+            layer_class = LCL
+            n_split_layers = 1
+        case _:
+            raise ValueError(f"Unknown layer type: {layer_type}")
 
     search_func = _find_best_lcl_kernel_width_and_out_feature_sets
-    best_split_size, best_out_feature_sets = search_func(
+    solution = search_func(
         input_dimension=input_dimension,
         target_dimension=target_dimension,
         n_layers=n_split_layers,
@@ -584,6 +620,10 @@ def get_lcl_projection_layer(
         out_feature_sets_candidates=out_feature_sets_candidates,
     )
 
+    if solution is None:
+        return None
+
+    best_split_size, best_out_feature_sets = solution
     best_layer = layer_class(
         in_features=input_dimension,
         split_size=best_split_size,
@@ -599,14 +639,14 @@ def _find_best_lcl_kernel_width_and_out_feature_sets(
     n_layers: int,
     kernel_width_candidates: Sequence[int] = tuple(range(1, 1024 + 1)),
     out_feature_sets_candidates: Sequence[int] = tuple(range(1, 64 + 1)),
-) -> Tuple[int, int]:
+) -> Tuple[int, int] | None:
     best_diff = np.Inf
     best_kernel_width = None
     best_out_feature_sets = None
 
     def _compute(
         input_dimension_: int, kernel_width_: int, out_feature_sets_: int
-    ) -> float:
+    ) -> int:
         num_chunks_ = int(math.ceil(input_dimension_ / kernel_width_))
         out_features_ = num_chunks_ * out_feature_sets_
         return out_features_
@@ -638,6 +678,6 @@ def _find_best_lcl_kernel_width_and_out_feature_sets(
                 break
 
     if best_kernel_width is None:
-        raise ValueError("Could not find a suitable combination")
+        return None
 
     return best_kernel_width, best_out_feature_sets

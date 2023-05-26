@@ -92,7 +92,7 @@ def test_array_classification(prep_modelling_test_configs):
         check_performance_result_wrapper(
             outputs=experiment.outputs,
             run_path=test_config.run_path,
-            thresholds=(0.8, 0.8),
+            max_thresholds=(0.8, 0.8),
         )
 
         output_name = output_config.output_info.output_name
@@ -226,7 +226,7 @@ def test_array_regression(prep_modelling_test_configs):
         check_performance_result_wrapper(
             outputs=experiment.outputs,
             run_path=test_config.run_path,
-            thresholds=(0.8, 0.8),
+            max_thresholds=(0.8, 0.8),
         )
 
         output_name = output_config.output_info.output_name

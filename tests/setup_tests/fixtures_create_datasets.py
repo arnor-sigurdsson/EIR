@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, TYPE_CHECKING
 
 import pytest
 import torch.utils
@@ -8,11 +8,15 @@ from eir.data_load import datasets
 from eir.setup import config, input_setup
 from eir.setup.output_setup import set_up_outputs_for_training
 
+if TYPE_CHECKING:
+    from tests.setup_tests.fixtures_create_data import TestDataConfig
+    from tests.setup_tests.fixtures_create_labels import MergedTargetLabels
+
 
 @pytest.fixture()
 def create_test_datasets(
-    create_test_data,
-    create_test_labels,
+    create_test_data: "TestDataConfig",
+    create_test_labels: "MergedTargetLabels",
     create_test_config: config.Configs,
 ) -> Tuple[torch.utils.data.Dataset, torch.utils.data.Dataset]:
     configs = create_test_config
@@ -27,6 +31,7 @@ def create_test_datasets(
 
     outputs_as_dict = set_up_outputs_for_training(
         output_configs=create_test_config.output_configs,
+        input_objects=inputs,
         target_transformers=target_labels.label_transformers,
     )
 

@@ -26,6 +26,7 @@ def get_test_base_global_init(
             "attribution_background_samples": 64,
             "n_epochs": 12,
             "warmup_steps": 100,
+            "early_stopping_patience": 0,
             "lr": 2e-03,
             "optimizer": "adabelief",
             "lr_lb": 1e-05,
@@ -110,8 +111,9 @@ def get_test_outputs_inits(
 
 def get_output_test_init_base_func_map() -> Dict[str, Callable]:
     mapping = {
-        "test_output": get_test_base_output_inits,
-        "test_output_copy": get_test_base_output_inits,
+        "test_output": get_test_tabular_base_output_inits,
+        "test_output_copy": get_test_tabular_base_output_inits,
+        "test_output_sequence": get_test_sequence_base_output_inits,
     }
 
     return mapping
@@ -351,7 +353,7 @@ def get_test_array_input_init(
 
 
 def get_test_base_fusion_init(model_type: str) -> Sequence[dict]:
-    if model_type == "identity":
+    if model_type in ("identity", "pass-through"):
         return [{}]
     elif model_type in ("default", "mgmoe"):
         return [
@@ -365,10 +367,10 @@ def get_test_base_fusion_init(model_type: str) -> Sequence[dict]:
             }
         ]
     else:
-        raise ValueError()
+        raise ValueError("Unknown fusion model type: '%s'" % model_type)
 
 
-def get_test_base_output_inits(test_path: Path, split_to_test: bool) -> Dict:
+def get_test_tabular_base_output_inits(test_path: Path, split_to_test: bool) -> Dict:
     label_file = test_path / "labels.csv"
     if split_to_test:
         label_file = test_path / "labels_train.csv"
@@ -383,6 +385,32 @@ def get_test_base_output_inits(test_path: Path, split_to_test: bool) -> Dict:
             "target_cat_columns": ["Origin"],
         },
         "model_config": {},
+    }
+
+    return test_target_init_kwargs
+
+
+def get_test_sequence_base_output_inits(test_path: Path, split_to_test: bool) -> Dict:
+    output_source = _inject_train_source_path(
+        test_path=test_path,
+        source="local",
+        local_name="sequence",
+        split_to_test=split_to_test,
+    )
+
+    test_target_init_kwargs = {
+        "output_info": {
+            "output_name": "test_output_sequence",
+            "output_type": "sequence",
+            "output_source": str(output_source),
+        },
+        "output_type_info": {
+            "max_length": 32,
+            "split_on": "",
+            "sampling_strategy_if_longer": "uniform",
+            "min_freq": 1,
+        },
+        "model_config": {"model_type": "sequence"},
     }
 
     return test_target_init_kwargs

@@ -31,6 +31,7 @@ def prepare_example_batch(
 
     outputs_as_dict = set_up_outputs_for_training(
         output_configs=configs.output_configs,
+        input_objects=inputs_as_dict,
         target_transformers=labels.label_transformers,
     )
 

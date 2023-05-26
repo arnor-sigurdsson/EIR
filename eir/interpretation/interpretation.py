@@ -45,7 +45,7 @@ from eir.interpretation.interpret_omics import (
     get_omics_consumer,
     ParsedOmicsAttributions,
 )
-from eir.setup.schemas import InputConfig
+from eir.setup.schemas import InputConfig, OutputConfig
 from eir.interpretation.interpret_tabular import (
     analyze_tabular_input_attributions,
 )
@@ -144,7 +144,7 @@ def attribution_analysis_handler(
 
     logger.debug("Running attribution analysis.")
 
-    attribution_outfolder_callable = partial(
+    attribution_output_folder_callable = partial(
         _prepare_eval_attribution_outfolder,
         output_folder=gc.output_folder,
         iteration=iteration,
@@ -152,10 +152,10 @@ def attribution_analysis_handler(
 
     background_loader = get_background_loader(experiment=exp)
 
-    attribution_analysis_wrapper(
+    tabular_attribution_analysis_wrapper(
         model=exp.model,
         experiment=exp,
-        outfolder_target_callable=attribution_outfolder_callable,
+        output_folder_target_callable=attribution_output_folder_callable,
         dataset_to_interpret=exp.valid_dataset,
         background_loader=background_loader,
     )
@@ -177,10 +177,10 @@ def get_background_loader(experiment: "Experiment") -> torch.utils.data.DataLoad
     return background_loader
 
 
-def attribution_analysis_wrapper(
+def tabular_attribution_analysis_wrapper(
     model: nn.Module,
     experiment: Union["Experiment", "LoadedTrainExperiment"],
-    outfolder_target_callable: Callable,
+    output_folder_target_callable: Callable,
     dataset_to_interpret: al_datasets,
     background_loader: torch.utils.data.DataLoader,
 ) -> None:
@@ -197,6 +197,11 @@ def attribution_analysis_wrapper(
     target_columns_gen = get_output_info_generator(outputs_as_dict=exp.outputs)
 
     for output_name, target_column_type, target_column_name in target_columns_gen:
+        output_type = exp.outputs[output_name].output_config.output_info.output_type
+
+        if output_type != "tabular":
+            continue
+
         ao = get_attribution_object(
             experiment=exp,
             model=model_copy,
@@ -257,10 +262,14 @@ def attribution_analysis_wrapper(
             input_object = exp.inputs[input_name]
             input_type = input_object.input_config.input_info.input_type
 
-            if input_type == "bytes":
+            if _do_skip_analyzing_input(
+                input_name=input_name,
+                input_type=input_type,
+                output_configs=exp.configs.output_configs,
+            ):
                 continue
 
-            act_output_folder = outfolder_target_callable(
+            act_output_folder = output_folder_target_callable(
                 column_name=target_column_name,
                 input_name=input_name,
                 output_name=output_name,
@@ -303,6 +312,26 @@ def attribution_analysis_wrapper(
                 )
 
         ao.hook_handle.remove()
+
+
+def _do_skip_analyzing_input(
+    input_name: str, input_type: str, output_configs: Sequence[OutputConfig]
+) -> bool:
+    """
+    Second case is for when an input was generated for an output, e.g.
+    in the case of sequence outputs.
+    """
+    if input_type == "bytes":
+        return True
+
+    input_name_in_output = any(
+        input_name == output_config.output_info.output_name
+        for output_config in output_configs
+    )
+    if input_name_in_output:
+        return True
+
+    return False
 
 
 def compute_expected_value(

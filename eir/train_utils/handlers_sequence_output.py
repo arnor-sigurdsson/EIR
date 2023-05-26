@@ -1,16 +1,28 @@
-from copy import deepcopy
+import json
+from copy import deepcopy, copy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Tuple, List, Sequence, Callable, Generator, Dict, Any, TYPE_CHECKING
+from typing import (
+    Tuple,
+    Iterator,
+    Sequence,
+    Callable,
+    Union,
+    Generator,
+    Dict,
+    Any,
+    TYPE_CHECKING,
+)
 
+import numpy as np
 import torch
 import torch.nn.functional as F
+from PIL import Image
 from aislib.misc_utils import get_logger, ensure_path_exists
 from torch.nn.functional import pad
 from torchtext.vocab import Vocab
 from transformers.tokenization_utils import PreTrainedTokenizerBase
 
-from eir.data_load import datasets
 from eir.data_load.data_preparation_modules.preparation_wrappers import (
     prepare_sequence_output_manual_sample_data,
 )
@@ -18,14 +30,16 @@ from eir.data_load.data_utils import Batch
 from eir.data_load.datasets import (
     impute_missing_modalities_wrapper,
     prepare_inputs_memory,
+    al_getitem_return,
 )
+from eir.data_load.label_setup import al_label_transformers
 from eir.interpretation.interpret_image import un_normalize
-from eir.interpretation.interpret_sequence import extract_raw_inputs_from_tokens
 from eir.models.model_training_utils import predict_on_batch
 from eir.setup.schema_modules.output_schemas_sequence import (
     SequenceOutputSamplingConfig,
 )
 from eir.setup.schemas import OutputConfig
+from eir.setup.input_setup_modules.setup_image import ImageNormalizationStats
 from eir.train_utils import utils
 from eir.train_utils.utils import call_hooks_stage_iterable
 
@@ -44,13 +58,12 @@ class SequenceOutputEvalSamples:
 
 @dataclass()
 class SequenceOutputEvalSample:
-    raw_inputs: Dict[str, Any]
-    prepared_inputs: Dict[str, Any]
-
+    inputs_to_model: Dict[str, Any]
+    target_labels: Dict[str, Any]
     sample_id: str
 
 
-def sequence_out_manual_sample_evaluation_wrapper(
+def sequence_out_single_sample_evaluation_wrapper(
     experiment: "Experiment", iteration: int
 ):
     inputs = experiment.inputs
@@ -64,16 +77,23 @@ def sequence_out_manual_sample_evaluation_wrapper(
     manual_samples = get_sequence_output_manual_input_samples(
         output_configs=output_configs, input_objects=inputs
     )
-    auto_samples = get_sequence_output_auto_eval_samples(
+
+    auto_validation_generator = _get_validation_sample_iterator(
+        valid_dataset=experiment.valid_dataset
+    )
+    auto_samples = get_sequence_output_auto_validation_samples(
         output_configs=output_configs,
         input_objects=inputs,
-        eval_dataset=experiment.valid_dataset,
+        eval_sample_iterator=auto_validation_generator,
     )
     eval_samples = SequenceOutputEvalSamples(
         auto_samples=auto_samples, manual_samples=manual_samples
     )
 
     for config in output_configs:
+        if config.output_info.output_type != "sequence":
+            continue
+
         cur_input_name = config.output_info.output_name
         cur_output_name = config.output_info.output_name
 
@@ -95,7 +115,7 @@ def sequence_out_manual_sample_evaluation_wrapper(
             )
 
             for idx, (eval_type, eval_sample) in enumerate(sample_generator):
-                generated_sample, generated_tokens = autoregressive_sequence_generation(
+                generated_tokens = autoregressive_sequence_generation(
                     eval_sample=eval_sample,
                     seq_output_name=cur_output_name,
                     experiment=experiment,
@@ -103,65 +123,109 @@ def sequence_out_manual_sample_evaluation_wrapper(
                     sampling_config=config.sampling_config,
                 )
 
-                tokenizer = experiment.inputs[cur_input_name].tokenizer
-                if isinstance(tokenizer, PreTrainedTokenizerBase):
-                    generated_sample = tokenizer.decode(token_ids=generated_tokens)
+                generated_sample = decode_tokens(
+                    tokens=generated_tokens,
+                    tokenizer=experiment.inputs[cur_input_name].tokenizer,
+                    vocab=experiment.inputs[cur_input_name].vocab,
+                    split_on=config.output_type_info.split_on,
+                )
 
                 cur_output_path = (
                     cur_sample_output_folder / eval_type / f"{idx}_generated.txt"
                 )
                 ensure_path_exists(path=cur_output_path)
-
                 cur_output_path.write_text(data=generated_sample)
 
                 cur_inputs_output_path = (
                     cur_sample_output_folder / eval_type / f"{idx}_inputs"
                 )
+
+                raw_inputs = convert_model_inputs_to_raw(
+                    inputs_to_model=eval_sample.inputs_to_model,
+                    input_objects=experiment.inputs,
+                )
+
                 _serialize_raw_inputs(
-                    raw_inputs=eval_sample.raw_inputs,
+                    raw_inputs=raw_inputs,
                     input_objects=experiment.inputs,
                     output_path=cur_inputs_output_path,
                 )
 
 
-def get_sequence_output_manual_input_samples(
-    output_configs: Sequence[OutputConfig],
+def convert_model_inputs_to_raw(
+    inputs_to_model: Dict[str, torch.Tensor | dict[str, torch.Tensor]],
     input_objects: "al_input_objects_as_dict",
-) -> Dict[str, Sequence[SequenceOutputEvalSample]]:
-    prepared_samples = {}
+) -> Dict[str, str | np.ndarray]:
+    raw_inputs = {}
+    for name, data in inputs_to_model.items():
+        input_object = input_objects[name]
 
-    for config_idx, config in enumerate(output_configs):
-        if not config.sampling_config:
-            continue
+        input_type = input_object.input_config.input_info.input_type
 
-        sample_data_from_yaml = config.sampling_config.manual_inputs
-        output_name = config.output_info.output_name
+        match input_type:
+            case "tabular":
+                raw_input = convert_tabular_input_to_raw(
+                    data=data,
+                    input_transformers=input_object.labels.label_transformers,
+                )
+            case "omics" | "array" | "bytes":
+                raw_input = data.numpy().squeeze()
+            case "sequence":
+                raw_input = decode_tokens(
+                    tokens=data.numpy().squeeze().tolist(),
+                    vocab=input_object.vocab,
+                    split_on=input_object.input_config.input_type_info.split_on,
+                    tokenizer=input_object.tokenizer,
+                )
+            case "image":
+                raw_input = convert_image_input_to_raw(
+                    data=data, normalization_stats=input_object.normalization_stats
+                )
+            case _:
+                raise NotImplementedError()
 
-        prepared_samples[output_name] = []
+        raw_inputs[name] = raw_input
 
-        for idx, single_sample_inputs in enumerate(sample_data_from_yaml):
-            input_to_model = prepare_sequence_output_manual_sample_data(
-                sample_inputs=single_sample_inputs, input_objects=input_objects
-            )
+    return raw_inputs
 
-            cur_raw_inputs = convert_prepared_input_to_raw(
-                inputs=input_to_model, input_objects=input_objects
-            )
-            cur_raw_inputs_post_processed = _post_prepare_manual_inputs(
-                raw_inputs=cur_raw_inputs,
-                output_name=output_name,
-                input_objects=input_objects,
-            )
 
-            cur_eval_sample = SequenceOutputEvalSample(
-                raw_inputs=cur_raw_inputs_post_processed,
-                prepared_inputs=input_to_model,
-                sample_id=f"manual_{idx}",
-            )
+def convert_image_input_to_raw(
+    data: torch.Tensor, normalization_stats: ImageNormalizationStats
+) -> Image:
+    data = data.numpy()
+    assert data.ndim == 4, "Input should be 4D"
+    assert data.shape[0] == 1, "The batch dimension should be 1"
 
-            prepared_samples[output_name].append(cur_eval_sample)
+    cur_input = un_normalize(
+        normalized_img=data,
+        normalization_stats=normalization_stats,
+    )
 
-    return prepared_samples
+    cur_input = cur_input.squeeze(axis=0)
+    cur_input_hwc = np.moveaxis(cur_input, 0, -1)
+    raw_input_uint = (cur_input_hwc * 255).astype(np.uint8)
+    return Image.fromarray(raw_input_uint)
+
+
+def convert_tabular_input_to_raw(
+    data: Dict[str, torch.Tensor], input_transformers: al_label_transformers
+) -> Dict[str, np.ndarray]:
+    all_reversed = {}
+    for col_name, tensor_data in data.items():
+        transformer = input_transformers.get(col_name)
+        tensor_data_reshaped = tensor_data.numpy().reshape(-1, 1)
+        cur_reversed = transformer.inverse_transform(tensor_data_reshaped)
+
+        cur_reversed = cur_reversed.squeeze()
+        assert cur_reversed.ndim == 0
+
+        cur_reversed = cur_reversed.item()
+        all_reversed[col_name] = cur_reversed
+    return all_reversed
+
+
+def convert_bytes_input_to_raw(data: torch.Tensor) -> np.ndarray:
+    return data.numpy()
 
 
 def _post_prepare_manual_inputs(
@@ -187,15 +251,55 @@ def _post_prepare_manual_inputs(
     return raw_inputs_masked
 
 
-def get_sequence_output_auto_eval_samples(
+def get_sequence_output_manual_input_samples(
     output_configs: Sequence[OutputConfig],
     input_objects: "al_input_objects_as_dict",
-    eval_dataset: datasets.DatasetBase,
+) -> Dict[str, Sequence[SequenceOutputEvalSample]]:
+    prepared_samples = {}
+
+    for config_idx, config in enumerate(output_configs):
+        if not config.sampling_config:
+            continue
+
+        sample_data_from_yaml = config.sampling_config.manual_inputs
+        output_name = config.output_info.output_name
+
+        prepared_samples[output_name] = []
+
+        for idx, single_sample_inputs in enumerate(sample_data_from_yaml):
+            input_to_model = prepare_sequence_output_manual_sample_data(
+                sample_inputs=single_sample_inputs, input_objects=input_objects
+            )
+
+            cur_eval_sample = SequenceOutputEvalSample(
+                inputs_to_model=input_to_model,
+                target_labels={},
+                sample_id=f"manual_{idx}",
+            )
+
+            prepared_samples[output_name].append(cur_eval_sample)
+
+    return prepared_samples
+
+
+def _get_validation_sample_iterator(
+    valid_dataset: torch.utils.data.Dataset,
+) -> Iterator[al_getitem_return]:
+    valid_loader = torch.utils.data.DataLoader(
+        dataset=valid_dataset, batch_size=1, shuffle=False
+    )
+    yield from valid_loader
+
+
+def get_sequence_output_auto_validation_samples(
+    output_configs: Sequence[OutputConfig],
+    input_objects: "al_input_objects_as_dict",
+    eval_sample_iterator: Iterator[al_getitem_return],
 ) -> Dict[str, Sequence[SequenceOutputEvalSample]]:
     prepared_eval_samples = {}
 
     for config_idx, config in enumerate(output_configs):
-        if not config.sampling_config:
+        if not config.sampling_config or config.output_info.output_type != "sequence":
             continue
 
         output_name = config.output_info.output_name
@@ -203,93 +307,39 @@ def get_sequence_output_auto_eval_samples(
         prepared_eval_samples[output_name] = []
 
         for i in range(config.sampling_config.n_eval_inputs):
-            input_to_model, target_labels, cur_id = eval_dataset[i]
+            input_to_model, target_labels, cur_id = next(eval_sample_iterator)
 
-            if config.output_info.output_type == "sequence":
-                if isinstance(eval_dataset, datasets.DiskDataset):
-                    input_to_model = datasets.prepare_inputs_disk(
-                        inputs=input_to_model,
-                        inputs_objects=input_objects,
-                        test_mode=True,
-                    )
+            cur_inputs_masked = _mask_targets_for_auto_eval_generation(
+                inputs=input_to_model,
+                output_name=output_name,
+                input_objects=input_objects,
+            )
 
-                cur_raw_inputs = convert_prepared_input_to_raw(
-                    inputs=input_to_model, input_objects=input_objects
-                )
-                cur_raw_inputs_masked = _mask_targets_for_auto_eval_generation(
-                    raw_inputs=cur_raw_inputs,
-                    output_name=output_name,
-                    input_objects=input_objects,
-                )
-
-                cur_eval_sample = SequenceOutputEvalSample(
-                    raw_inputs=cur_raw_inputs_masked,
-                    prepared_inputs=input_to_model,
-                    sample_id=cur_id,
-                )
-            elif config.output_info.output_type in ("omics", "image"):
-                cur_eval_sample = SequenceOutputEvalSample(
-                    raw_inputs=input_to_model,
-                    prepared_inputs=input_to_model,
-                    sample_id=cur_id,
-                )
-
-            else:
-                raise NotImplementedError()
+            cur_eval_sample = SequenceOutputEvalSample(
+                inputs_to_model=cur_inputs_masked,
+                target_labels=target_labels,
+                sample_id=cur_id,
+            )
 
             prepared_eval_samples[output_name].append(cur_eval_sample)
 
     return prepared_eval_samples
 
 
-def convert_prepared_input_to_raw(
-    inputs: Dict[str, Any], input_objects: "al_input_objects_as_dict"
-) -> Dict[str, Any]:
-    raw_inputs = {}
-    for name, data in inputs.items():
-        input_object = input_objects[name]
-
-        input_type = input_object.input_config.input_info.input_type
-
-        if input_type == "omics":
-            raise NotImplementedError()
-
-        elif input_type == "sequence":
-            raw_input = extract_raw_inputs_from_tokens(
-                tokens=data, vocab=input_object.vocab
-            )
-            raw_inputs[name] = raw_input
-
-        elif input_type == "bytes":
-            raise NotImplementedError()
-
-        elif input_type == "image":
-            raw_input = un_normalize(
-                normalized_img=data,
-                normalization_stats=input_object.normalization_stats,
-            )
-            raw_inputs[name] = raw_input
-
-        elif input_type == "tabular":
-            raise NotImplementedError()
-
-    return raw_inputs
-
-
 def _mask_targets_for_auto_eval_generation(
-    raw_inputs: Dict[str, Any],
+    inputs: Dict[str, Any],
     output_name: str,
     input_objects: "al_input_objects_as_dict",
 ) -> Dict[str, Any]:
     raw_inputs_masked = {}
 
-    for input_name, raw_input in raw_inputs.items():
+    for input_name, raw_input in inputs.items():
         input_object = input_objects[input_name]
         input_info = input_object.input_config.input_info
 
         if input_name == output_name:
             if input_info.input_type == "sequence":
-                raw_inputs_masked[output_name] = []
+                raw_inputs_masked[output_name] = torch.tensor([[]], dtype=torch.long)
             else:
                 raise NotImplementedError()
 
@@ -300,26 +350,45 @@ def _mask_targets_for_auto_eval_generation(
 
 
 def _serialize_raw_inputs(
-    raw_inputs: Dict[str, Any],
+    raw_inputs: Dict[str, Union[np.ndarray, str, Image]],
     input_objects: "al_input_objects_as_dict",
     output_path: Path,
 ) -> None:
+    warned_types = set()
     for input_name, cur_input in raw_inputs.items():
         cur_input_object = input_objects[input_name]
         cur_input_type = cur_input_object.input_config.input_info.input_type
         cur_output_path = output_path / f"{input_name}"
         ensure_path_exists(path=cur_output_path)
 
-        if cur_input_type == "sequence":
-            cur_output_path = cur_output_path.with_suffix(".txt")
-            cur_split_on = cur_input_object.input_config.input_type_info.split_on
-            cur_text = cur_split_on.join(cur_input)
-            cur_output_path.write_text(data=cur_text)
-
-        else:
-            logger.warning(
-                "Not serializing input of type %s. Not yet implemented.", cur_input_type
-            )
+        match cur_input_type:
+            case "omics" | "array":
+                assert isinstance(cur_input, np.ndarray)
+                cur_output_path = cur_output_path.with_suffix(".npy")
+                np.save(str(cur_output_path), cur_input)
+            case "tabular":
+                assert isinstance(cur_input, dict)
+                cur_output_path = cur_output_path.with_suffix(".json")
+                cur_output_path.write_text(data=json.dumps(cur_input))
+            case "sequence":
+                assert isinstance(cur_input, str)
+                cur_output_path = cur_output_path.with_suffix(".txt")
+                cur_output_path.write_text(data=cur_input)
+            case "image":
+                assert isinstance(cur_input, Image.Image)
+                cur_output_path = cur_output_path.with_suffix(".png")
+                cur_input.save(cur_output_path)
+            case "bytes":
+                assert isinstance(cur_input, np.ndarray)
+                cur_output_path = cur_output_path.with_suffix(".bin")
+                cur_input.tofile(cur_output_path)
+            case _:
+                if cur_input_type not in warned_types:
+                    warned_types.add(cur_input_type)
+                    logger.warning(
+                        "Not serializing input of type %s. Not yet implemented.",
+                        cur_input_type,
+                    )
 
 
 def _get_eval_sample_generator(
@@ -342,71 +411,177 @@ def autoregressive_sequence_generation(
     experiment: "Experiment",
     default_eir_hooks: "Hooks",
     sampling_config: SequenceOutputSamplingConfig,
-) -> Tuple[str, List[int]]:
+) -> list[int]:
     output_object = experiment.outputs[seq_output_name]
     input_object = experiment.inputs[seq_output_name]
 
-    assert output_object.vocab == input_object.vocab
+    _check_vocab_consistency(
+        output_object_vocab=output_object.vocab, input_object_vocab=input_object.vocab
+    )
 
     st = get_special_tokens(
         tokenizer=output_object.tokenizer, vocab=output_object.vocab
     )
-    output_config = experiment.outputs[seq_output_name].output_config
-    split_on_string = output_config.output_type_info.split_on
 
-    raw_sample_inputs_copy = deepcopy(eval_sample.raw_inputs)
-    if len(raw_sample_inputs_copy[seq_output_name]) == 0:
-        raw_sample_inputs_copy[seq_output_name].append(st.bos_token)
+    prepared_sample_inputs = _prepare_base_input(
+        prepared_inputs=eval_sample.inputs_to_model,
+    )
 
-    generated_string = split_on_string.join(raw_sample_inputs_copy[seq_output_name])
-    generated_token_indices = []
-    for i in range(sampling_config.generated_sequence_length):
-        current_sequence = raw_sample_inputs_copy[seq_output_name]
+    generated_tokens = _extract_base_generated_tokens(
+        prepared_inputs=prepared_sample_inputs, seq_output_name=seq_output_name
+    )
 
-        assert len(current_sequence) != 0, "Must start with <bos> seed."
+    for i in range(len(generated_tokens), sampling_config.generated_sequence_length):
+        prepared_sample_inputs = _prepare_current_autoregressive_input(
+            prepared_sample_inputs=prepared_sample_inputs,
+            generated_tokens=generated_tokens,
+            seq_output_name=seq_output_name,
+            max_length=output_object.computed_max_length,
+            pad_idx=st.pad_idx,
+        )
 
-        # ABCDE -> BCDE -> [bos, C, D, E]
-        while len(current_sequence) >= output_object.computed_max_length:
-            current_sequence = current_sequence[1:]
-            current_sequence[0] = st.bos_token
-            raw_sample_inputs_copy[seq_output_name] = current_sequence
+        target_index = _compute_target_index(
+            current_generated_length=i, max_length=output_object.computed_max_length
+        )
 
-        batch = general_pre_process(
-            raw_inputs=raw_sample_inputs_copy,
+        batch = general_pre_process_prepared_inputs(
+            prepared_inputs=prepared_sample_inputs,
+            target_labels=eval_sample.target_labels,
+            sample_id=eval_sample.sample_id,
             experiment=experiment,
             custom_hooks=default_eir_hooks,
-            output_configs=experiment.configs.output_configs,
         )
 
         outputs = predict_on_batch(model=experiment.model, inputs=batch.inputs)
 
-        cur_logits = outputs[seq_output_name][seq_output_name].squeeze()
-        # cur_target_logit_index = len(current_sequence) - 1
-        cur_target_logit_index = len(current_sequence)
-        cur_position_logits = cur_logits[cur_target_logit_index]
-
-        filtered_logits = top_k_top_p_filtering(
-            logits=cur_position_logits,
-            top_k=sampling_config.top_k,
-            top_p=sampling_config.top_p,
+        next_token_index = sample_next_token_index_from_output(
+            outputs=outputs,
+            seq_output_name=seq_output_name,
+            sampling_config=sampling_config,
+            current_target_index=target_index,
         )
-        probabilities = F.softmax(input=filtered_logits, dim=-1)
-        next_token_index = torch.multinomial(input=probabilities, num_samples=1).item()
 
         if next_token_index == st.eos_idx:
             break
 
-        generated_token_indices.append(next_token_index)
+        generated_tokens.append(next_token_index)
 
-        cur_vocab = input_object.vocab
-        next_token = cur_vocab.lookup_token(index=next_token_index)
+    return generated_tokens
 
-        generated_string = generated_string + next_token + split_on_string
-        current_sequence += [next_token]
 
-        raw_sample_inputs_copy[seq_output_name] = current_sequence
+def _check_vocab_consistency(
+    output_object_vocab: Vocab, input_object_vocab: Vocab
+) -> None:
+    assert output_object_vocab.get_stoi() == input_object_vocab.get_stoi()
+    assert output_object_vocab.get_itos() == input_object_vocab.get_itos()
 
-    return generated_string.removeprefix(st.bos_token), generated_token_indices
+
+def _prepare_base_input(
+    prepared_inputs: dict[str, torch.Tensor],
+) -> dict[str, Any]:
+    prepared_sample_inputs_copy = deepcopy(prepared_inputs)
+    return prepared_sample_inputs_copy
+
+
+def _extract_base_generated_tokens(
+    prepared_inputs: Dict[str, torch.Tensor], seq_output_name: str
+) -> list[int]:
+    tensor_base = prepared_inputs[seq_output_name]
+    assert tensor_base.dim() == 2
+
+    list_base = tensor_base.squeeze().tolist()
+
+    return list_base
+
+
+def _compute_target_index(current_generated_length: int, max_length: int) -> int:
+    if current_generated_length < max_length:
+        return current_generated_length
+    else:
+        return max_length - 1
+
+
+def _prepare_current_autoregressive_input(
+    prepared_sample_inputs: dict[str, Any],
+    generated_tokens: list[int],
+    seq_output_name: str,
+    max_length: int,
+    pad_idx: int,
+) -> dict[str, Any]:
+    """
+    Assuming max_length of 5:
+
+    Truncate (from start):
+        - [A, B, C, D, E] -> [B, C, D, E]
+    Pad:
+        - [B, C, D, E] -> [B, C, D, E, pad]
+    In autoregressive batch preparation hook:
+        - [B, C, D, E, pad] -> [bos, B, C, D, E, pad] -> [bos, B, C, D, E]
+
+    So essentially the pad is a placeholder to that we need here due to how
+    the batch is later (in the batch preparation hook) prepared, namely
+    as it inserts the bos at the beginning and cuts off at the end, so in the case
+    where the sequence is already at max_length, we need to pad it to make sure
+    that the latest token is preserved.
+    """
+    current_sequence = torch.tensor(generated_tokens, dtype=torch.long)
+    current_sequence = _maybe_truncate_autoregressive_sequence(
+        current_sequence=current_sequence,
+        max_length=max_length,
+    )
+
+    assert current_sequence.dim() == 1, current_sequence.shape
+
+    pad_size = max_length - len(current_sequence)
+    assert pad_size >= 1, pad_size
+
+    current_sequence = F.pad(current_sequence, (0, pad_size), value=pad_idx)
+    current_sequence = current_sequence.unsqueeze(0)
+
+    assert current_sequence.dim() == 2, current_sequence.shape
+
+    current_inputs_copy = copy(prepared_sample_inputs)
+    current_inputs_copy[seq_output_name] = current_sequence
+
+    return current_inputs_copy
+
+
+def _maybe_truncate_autoregressive_sequence(
+    current_sequence: torch.tensor,
+    max_length: int,
+) -> torch.Tensor:
+    """
+    +1 to account for bos token being inserted and last token removed later.
+    If already at max length, we truncate from the start and leave 1 element
+    missing (+1) to allow for padding.
+    """
+    sequence_length = len(current_sequence)
+
+    if sequence_length >= max_length:
+        start = sequence_length - max_length + 1
+        current_sequence = current_sequence[start:]
+
+    return current_sequence
+
+
+def sample_next_token_index_from_output(
+    outputs: dict[str, dict[str, torch.Tensor]],
+    seq_output_name: str,
+    sampling_config: SequenceOutputSamplingConfig,
+    current_target_index: int,
+) -> int:
+    cur_logits = outputs[seq_output_name][seq_output_name].squeeze()
+    cur_position_logits = cur_logits[current_target_index]
+
+    filtered_logits = top_k_top_p_filtering(
+        logits=cur_position_logits,
+        top_k=sampling_config.top_k,
+        top_p=sampling_config.top_p,
+    )
+    probabilities = F.softmax(input=filtered_logits, dim=-1)
+    next_token_index = torch.multinomial(input=probabilities, num_samples=1).item()
+
+    return next_token_index
 
 
 def pad_batch_with_bos(batch_tensor: torch.Tensor, bos_value: int) -> torch.Tensor:
@@ -416,18 +591,10 @@ def pad_batch_with_bos(batch_tensor: torch.Tensor, bos_value: int) -> torch.Tens
     return batch_tensor
 
 
-def general_pre_process(
-    raw_inputs: dict,
+def general_pre_process_raw_inputs(
+    raw_inputs: dict[str, Any],
     experiment: "Experiment",
-    custom_hooks: "Hooks",
-    output_configs: Sequence[OutputConfig],
-) -> Batch:
-    """
-    The custom hooks here make sure we are doing basic processing,
-    i.e. not the sequence output specific things we define here in the train module.
-    """
-    exp = experiment
-
+) -> dict[str, torch.Tensor]:
     inputs_prepared_for_memory = {}
     for name, cur_input in raw_inputs.items():
         input_object = experiment.inputs[name]
@@ -438,18 +605,36 @@ def general_pre_process(
         inputs_prepared_for_memory[name] = cur_input
 
     inputs_prepared = prepare_inputs_memory(
-        inputs=inputs_prepared_for_memory, inputs_objects=exp.inputs, test_mode=True
+        inputs=inputs_prepared_for_memory,
+        inputs_objects=experiment.inputs,
+        test_mode=True,
     )
 
     inputs_final = impute_missing_modalities_wrapper(
-        inputs_values=inputs_prepared, inputs_objects=exp.inputs
+        inputs_values=inputs_prepared, inputs_objects=experiment.inputs
     )
 
-    inputs_final = {k: v.unsqueeze(0) for k, v in inputs_final.items()}
+    return inputs_final
 
-    loader_batch = (inputs_final, None, None)
 
-    batch_prep_hook_kwargs = {"experiment": exp}
+def general_pre_process_prepared_inputs(
+    prepared_inputs: dict[str, Any],
+    target_labels: dict[str, Any],
+    sample_id: str,
+    experiment: "Experiment",
+    custom_hooks: "Hooks",
+) -> Batch:
+    """
+    The custom hooks here make sure we are doing basic processing,
+    i.e. not the sequence output specific things we define here in the train module.
+    """
+
+    # inputs_final = {k: v.unsqueeze(0) for k, v in prepared_inputs.items()}
+    inputs_final = prepared_inputs
+
+    loader_batch = (inputs_final, target_labels, sample_id)
+
+    batch_prep_hook_kwargs = {"experiment": experiment}
     state = call_hooks_stage_iterable(
         hook_iterable=custom_hooks.step_func_hooks.base_prepare_batch,
         common_kwargs={"loader_batch": loader_batch, **batch_prep_hook_kwargs},
@@ -460,33 +645,6 @@ def general_pre_process(
     batch_final = Batch(inputs=batch.inputs, target_labels={}, ids=list())
 
     return batch_final
-
-
-def pad_seq_output_samples_with_bos(
-    inputs_prepared: dict,
-    ssl_configs: Sequence[OutputConfig],
-    input_objects: "al_input_objects_as_dict",
-) -> dict:
-    inputs_processed = {}
-
-    for input_name, input_value in inputs_prepared.items():
-        if input_name in (i.output_info.output_name for i in ssl_configs):
-            input_object = input_objects[input_name]
-            st = get_special_tokens(
-                tokenizer=input_object.tokenizer, vocab=input_object.vocab
-            )
-
-            cur_input = inputs_prepared[input_name]
-            shifted_right = cur_input[1:]
-
-            inputs_processed[input_name] = pad_batch_with_bos(
-                batch_tensor=shifted_right, bos_value=st.bos_idx
-            )
-
-        else:
-            inputs_processed[input_name] = input_value
-
-    return inputs_processed
 
 
 def top_k_top_p_filtering(
@@ -551,3 +709,19 @@ def get_special_tokens(tokenizer: Callable, vocab: Vocab) -> SpecialTokens:
     special_tokens = SpecialTokens(**kwargs)
 
     return special_tokens
+
+
+def decode_tokens(
+    tokens: list[int], tokenizer: Callable, vocab: Vocab, split_on: str | None
+) -> str:
+    if isinstance(tokenizer, PreTrainedTokenizerBase):
+        generated_sample = tokenizer.decode(token_ids=tokens)
+        return generated_sample
+
+    tokens_decoded = vocab.lookup_tokens(indices=tokens)
+    if split_on is not None:
+        generated_sample = split_on.join(tokens_decoded)
+    else:
+        generated_sample = "".join(tokens_decoded)
+
+    return generated_sample

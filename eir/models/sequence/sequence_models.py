@@ -15,7 +15,7 @@ def get_sequence_model_class(model_type: str) -> Type[nn.Module]:
             return TransformerFeatureExtractor
         case "sequence-wrapper-default":
             return TransformerWrapperModel
-        case "eir-sequence-output-linked-default":
+        case "eir-input-sequence-from-linked-output-default":
             return SequenceOutputTransformerFeatureExtractor
         case _:
             raise ValueError("Invalid sequence model type.")

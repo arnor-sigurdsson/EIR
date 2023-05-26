@@ -30,7 +30,7 @@ def create_test_sequence_data(
 
     sequence_outfolder = set_up_test_data_root_outpath(base_folder=sequence_outfolder)
     test_sequence_label_keywords = get_continent_keyword_map()
-    test_sequence_random_pool = tuple(_get_text_sequence_base())
+    test_sequence_random_pool = tuple(get_text_sequence_base())
 
     samples_for_csv = []
     for cls, snp_row_idx in c.target_classes.items():
@@ -151,7 +151,7 @@ def get_continent_keyword_map() -> Dict[str, Sequence[str]]:
     return map_
 
 
-def _get_text_sequence_base() -> set:
+def get_text_sequence_base() -> set:
     base = (
         "disarm explosives arsenal battles ninja houses decoded ai-controlled "
         "patriot seemingly along titled order raised mercenaries exchange disc "

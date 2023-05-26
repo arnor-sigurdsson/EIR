@@ -240,6 +240,7 @@ def test_get_model(create_test_config: Configs, create_test_labels):
 
     outputs_as_dict = set_up_outputs_for_training(
         output_configs=create_test_config.output_configs,
+        input_objects=inputs_as_dict,
         target_transformers=target_labels.label_transformers,
     )
 

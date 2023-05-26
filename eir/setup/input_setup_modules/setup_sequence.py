@@ -511,9 +511,13 @@ def yield_tokens_from_csv(
 
 
 def get_sequence_split_function(split_on: str) -> Callable[[str], List[str]]:
-    if split_on == "":
-        return lambda x: list(x)
-    return lambda x: x.split(split_on)
+    match split_on:
+        case "":
+            return lambda x: list(x)
+        case None:
+            return lambda x: x
+        case _:
+            return lambda x: x.split(split_on)
 
 
 class ReturnSavingGenerator:

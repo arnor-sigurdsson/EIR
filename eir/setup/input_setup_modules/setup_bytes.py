@@ -7,7 +7,7 @@ from eir.setup.input_setup_modules.common import get_default_sequence_specials
 
 
 @dataclass
-class BytesInputInfo:
+class ComputedBytesInputInfo:
     input_config: schemas.InputConfig
     vocab: OrderedDict
     computed_max_length: int
@@ -15,7 +15,7 @@ class BytesInputInfo:
 
 def set_up_bytes_input_for_training(
     input_config: schemas.InputConfig, add_specials: bool = True, *args, **kwargs
-) -> BytesInputInfo:
+) -> ComputedBytesInputInfo:
     specials = tuple()
     if add_specials:
         specials = get_default_sequence_specials()
@@ -24,7 +24,7 @@ def set_up_bytes_input_for_training(
         byte_encoding=input_config.input_type_info.byte_encoding, specials=specials
     )
 
-    bytes_input_info = BytesInputInfo(
+    bytes_input_info = ComputedBytesInputInfo(
         input_config=input_config,
         vocab=bytes_vocab,
         computed_max_length=input_config.input_type_info.max_length,

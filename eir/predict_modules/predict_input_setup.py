@@ -19,8 +19,8 @@ from eir.setup.input_setup import (
     al_input_objects_as_dict,
 )
 from eir.setup.input_setup_modules import setup_array, setup_omics, setup_tabular
-from eir.setup.input_setup_modules.setup_bytes import BytesInputInfo
-from eir.setup.input_setup_modules.setup_image import ImageInputInfo
+from eir.setup.input_setup_modules.setup_bytes import ComputedBytesInputInfo
+from eir.setup.input_setup_modules.setup_image import ComputedImageInputInfo
 from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
 from eir.train_utils.step_logic import Hooks
 
@@ -175,8 +175,12 @@ def get_input_setup_function_map_for_predict() -> (
         "sequence": partial(
             load_serialized_input_object, input_class=ComputedSequenceInputInfo
         ),
-        "bytes": partial(load_serialized_input_object, input_class=BytesInputInfo),
-        "image": partial(load_serialized_input_object, input_class=ImageInputInfo),
+        "bytes": partial(
+            load_serialized_input_object, input_class=ComputedBytesInputInfo
+        ),
+        "image": partial(
+            load_serialized_input_object, input_class=ComputedImageInputInfo
+        ),
         "array": setup_array.set_up_array_input,
     }
 

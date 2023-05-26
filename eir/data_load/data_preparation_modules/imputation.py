@@ -3,7 +3,7 @@ from typing import Dict, Any, Tuple
 import torch
 
 from eir.setup.input_setup import al_input_objects_as_dict
-from eir.setup.input_setup_modules.setup_tabular import TabularInputInfo
+from eir.setup.input_setup_modules.setup_tabular import ComputedTabularInputInfo
 
 
 def impute_missing_modalities_wrapper(
@@ -108,7 +108,7 @@ def _get_default_impute_fill_values(inputs_objects: "al_input_objects_as_dict"):
     return fill_values
 
 
-def _build_tabular_fill_value(input_object: "TabularInputInfo"):
+def _build_tabular_fill_value(input_object: "ComputedTabularInputInfo"):
     fill_value = {}
     transformers = input_object.labels.label_transformers
 

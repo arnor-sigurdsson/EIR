@@ -1,35 +1,30 @@
 from dataclasses import dataclass
 from pathlib import Path
-import dill
-from typing import Dict, Type, TYPE_CHECKING
+from typing import Dict, Literal, TYPE_CHECKING
 
+import dill
 import torch
-from torch import nn
 from aislib.misc_utils import get_logger
+from torch import nn
+
+from eir.models.fusion.fusion_attention import MetaSequenceProjection
 from eir.models.sequence.transformer_models import (
     BasicTransformerFeatureExtractorModelConfig,
     parse_dim_feedforward,
 )
-from eir.models.fusion.fusion_attention import MetaSequenceProjection
 
 if TYPE_CHECKING:
     from eir.setup.output_setup_modules.sequence_output_setup import (
         ComputedSequenceOutputInfo,
     )
     from eir.setup.input_setup import al_input_objects_as_dict
-    from eir.setup.input_setup_modules.common import DataDimensions
+    from eir.models.model_setup import FeatureExtractorInfo
     from eir.setup.schemas import GlobalConfig
 
 
+al_sequence_output_models = Literal["sequence"]
+
 logger = get_logger(name=__name__)
-
-
-def sequence_model_registry_output(model_type: str) -> Type[nn.Module]:
-    match model_type:
-        case "sequence" | "eir-sequence-output-linked-default":
-            return SequenceOutputModule
-        case _:
-            raise ValueError(f"Unknown model type {model_type}")
 
 
 @dataclass
@@ -44,14 +39,14 @@ class SequenceOutputModule(nn.Module):
         self,
         output_object: "ComputedSequenceOutputInfo",
         output_name: str,
-        in_features_per_feature_extractor: Dict[str, "DataDimensions"],
+        feature_dimensionalities_and_types: Dict[str, "FeatureExtractorInfo"],
         *args,
         **kwargs,
     ):
         super().__init__()
 
         self.num_tokens = len(output_object.vocab)
-        self.input_dimensions = in_features_per_feature_extractor
+        self.input_dimensions = feature_dimensionalities_and_types
         self.embedding_dim = output_object.embedding_dim
         self.max_length = output_object.computed_max_length
         self.output_name = output_name
@@ -86,14 +81,21 @@ class SequenceOutputModule(nn.Module):
         )
 
         self.match_projections = nn.ModuleDict()
-        # TODO: Add input type here
-        for input_name, out_features in in_features_per_feature_extractor.items():
+        for input_name, feature_extractor_info in self.input_dimensions.items():
             if input_name == self.output_name:
                 continue
 
+            match feature_extractor_info.input_type:
+                case "sequence":
+                    in_elements = feature_extractor_info.input_dimension.num_elements()
+                    in_embed = feature_extractor_info.input_dimension.width
+                case _:
+                    in_elements = feature_extractor_info.output_dimension
+                    in_embed = feature_extractor_info.output_dimension
+
             cur_projection = MetaSequenceProjection(
-                in_total_num_elements=out_features.num_elements(),
-                in_embedding_dim=out_features.width,
+                in_total_num_elements=in_elements,
+                in_embedding_dim=in_embed,
                 target_embedding_dim=self.embedding_dim,
                 target_max_length=self.max_length,
             )

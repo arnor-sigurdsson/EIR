@@ -15,7 +15,6 @@ if TYPE_CHECKING:
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
-# Type Aliases
 al_sample_weight_and_counts = Dict[str, Union[torch.Tensor, List[int]]]
 
 

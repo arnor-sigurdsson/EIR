@@ -96,8 +96,8 @@ def get_timm_models_to_test() -> List[str]:
     """
 
     url = (
-        "https://raw.githubusercontent.com/rwightman/pytorch-image-models/"
-        "master/results/results-imagenet.csv"
+        "https://raw.githubusercontent.com/huggingface/pytorch-image-models/"
+        "main/results/results-imagenet.csv"
     )
 
     df = pd.read_csv(filepath_or_buffer=url)
@@ -107,7 +107,9 @@ def get_timm_models_to_test() -> List[str]:
 
     models = list(df["model"])
     models_pt = [i for i in models if not i.startswith("tf")]
-    models_filtered = [i for i in models_pt if i in timm.list_models()]
+    models_name_trimmed = [i.split(".")[0] for i in models_pt]
+    models_filtered = [i for i in models_name_trimmed if i in timm.list_models()]
+    assert len(models_filtered) > 0
 
     models_manual_filtered = []
     not_allowed = {"levit", "convit"}
@@ -117,6 +119,7 @@ def get_timm_models_to_test() -> List[str]:
         else:
             models_manual_filtered.append(model_name)
 
+    assert len(models_manual_filtered) > 0
     return models_manual_filtered
 
 

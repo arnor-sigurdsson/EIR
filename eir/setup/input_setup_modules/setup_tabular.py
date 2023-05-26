@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class TabularInputInfo:
+class ComputedTabularInputInfo:
     labels: Labels
     input_config: schemas.InputConfig
     total_num_features: int
@@ -26,7 +26,7 @@ def set_up_tabular_input_for_training(
     train_ids: Sequence[str],
     valid_ids: Sequence[str],
     hooks: Union["Hooks", None],
-) -> TabularInputInfo:
+) -> ComputedTabularInputInfo:
     tabular_file_info = get_tabular_input_file_info(
         input_source=input_config.input_info.input_source,
         tabular_data_type_config=input_config.input_type_info,
@@ -46,7 +46,7 @@ def set_up_tabular_input_for_training(
         cat_columns=input_config.input_type_info.input_cat_columns,
         con_columns=input_config.input_type_info.input_con_columns,
     )
-    tabular_input_info = TabularInputInfo(
+    tabular_input_info = ComputedTabularInputInfo(
         labels=tabular_labels,
         input_config=input_config,
         total_num_features=total_num_features,

@@ -4,7 +4,7 @@ import torch
 from einops import rearrange
 from torch import nn, einsum, Tensor
 
-from eir.models.layers import get_lcl_projection_layer
+from eir.models.layers import get_lcl_projection_layer, get_projection_layer
 
 
 class MetaSequenceProjection(nn.Module):
@@ -24,7 +24,7 @@ class MetaSequenceProjection(nn.Module):
         self.target_embedding_dim = target_embedding_dim
         self.target_max_length = target_max_length
 
-        self.lcl_projection = SequenceLCLResidualProjection(
+        self.projection = SequenceProjection(
             in_features=in_total_num_elements,
             target_embedding_dim=self.target_embedding_dim,
             target_max_length=self.target_max_length,
@@ -39,7 +39,7 @@ class MetaSequenceProjection(nn.Module):
     def forward(
         self, input_tensor: torch.Tensor, target_tensor: torch.Tensor
     ) -> torch.Tensor:
-        lcl_projected = self.lcl_projection(input_tensor)
+        lcl_projected = self.projection(input_tensor)
 
         cross_attended = self.cross_attention_projection(
             x=target_tensor, context=input_tensor
@@ -48,7 +48,7 @@ class MetaSequenceProjection(nn.Module):
         return lcl_projected + cross_attended
 
 
-class SequenceLCLResidualProjection(nn.Module):
+class SequenceProjection(nn.Module):
     def __init__(
         self,
         in_features: int,
@@ -68,13 +68,12 @@ class SequenceLCLResidualProjection(nn.Module):
         projection_kwargs = {
             "input_dimension": in_features,
             "target_dimension": self.out_dim,
-            "layer_type": "lcl",
         }
 
         self.norm_1 = nn.LayerNorm(normalized_shape=in_features)
         self.act = nn.Mish()
 
-        self.projection_layer = get_lcl_projection_layer(**projection_kwargs)
+        self.projection_layer = get_projection_layer(**projection_kwargs)
 
         encoder_layer_base = nn.TransformerEncoderLayer(
             d_model=target_embedding_dim,

@@ -9,7 +9,7 @@ from eir.data_load.data_preparation_modules.common import (
     process_tensor_to_length,
 )
 from eir.data_load.data_source_modules import deeplake_ops
-from eir.setup.input_setup_modules.setup_bytes import BytesInputInfo
+from eir.setup.input_setup_modules.setup_bytes import ComputedBytesInputInfo
 
 
 def bytes_load_wrapper(
@@ -32,7 +32,9 @@ def bytes_load_wrapper(
 
 
 def prepare_bytes_data(
-    bytes_input_object: "BytesInputInfo", bytes_data: np.ndarray, test_mode: bool
+    bytes_input_object: "ComputedBytesInputInfo",
+    bytes_data: np.ndarray,
+    test_mode: bool,
 ) -> torch.Tensor:
     """
     We use clone here to copy the original data, vs. using from_numpy
