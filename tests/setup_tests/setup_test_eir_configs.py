@@ -355,7 +355,7 @@ def get_test_array_input_init(
 def get_test_base_fusion_init(model_type: str) -> Sequence[dict]:
     if model_type in ("identity", "pass-through"):
         return [{}]
-    elif model_type in ("default", "mgmoe"):
+    elif model_type in ("mlp-residual", "mgmoe"):
         return [
             {
                 "model_config": {

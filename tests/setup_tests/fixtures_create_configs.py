@@ -57,7 +57,7 @@ def create_test_config_init_base(
         extra_kwargs=create_test_data.extras,
     )
 
-    model_type = injections.get("fusion_configs", {}).get("model_type", "default")
+    model_type = injections.get("fusion_configs", {}).get("model_type", "mlp-residual")
     test_fusion_init = get_test_base_fusion_init(model_type=model_type)
 
     test_fusion_init = general_sequence_inject(

@@ -616,7 +616,7 @@ class FusionConfig:
         Fusion model configuration.
     """
 
-    model_type: Literal["default", "linear", "mgmoe"]
+    model_type: Literal["mlp-residual", "identity", "mgmoe", "pass-through"]
     model_config: Union[ResidualMLPConfig, IdentityConfig, MGMoEModelConfig]
 
 

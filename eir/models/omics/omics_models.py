@@ -35,7 +35,7 @@ al_omics_models = Union[
 al_omics_model_types = Literal[
     "cnn",
     "linear",
-    "mlp-split",
+    "lcl-simple",
     "genome-local-net",
     "linear",
 ]
@@ -76,7 +76,7 @@ def get_omics_model_mapping() -> Dict[str, al_omics_model_classes]:
     mapping = {
         "cnn": CNNModel,
         "linear": LinearModel,
-        "mlp-split": SimpleLCLModel,
+        "lcl-simple": SimpleLCLModel,
         "genome-local-net": LCLModel,
         "identity": IdentityModel,
     }
@@ -97,7 +97,7 @@ def get_omics_config_dataclass_mapping() -> Dict[str, al_omics_model_config_clas
     mapping = {
         "cnn": CNNModelConfig,
         "linear": LinearModelConfig,
-        "mlp-split": SimpleLCLModelConfig,
+        "lcl-simple": SimpleLCLModelConfig,
         "genome-local-net": LCLModelConfig,
         "identity": IdentityModelConfig,
     }
@@ -138,7 +138,7 @@ def get_omics_model_init_kwargs(
     kwargs["data_dimensions"] = data_dimensions
 
     match model_type:
-        case "genome-local-net" | "mlp-split":
+        case "genome-local-net" | "lcl-simple":
             kwargs["flatten_fn"] = flatten_h_w_fortran
 
     return kwargs

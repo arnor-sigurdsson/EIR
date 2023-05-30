@@ -185,7 +185,7 @@ def get_meta_model_kwargs_from_configs(
     output_types = _get_output_types(outputs_as_dict=outputs_as_dict)
 
     fusion_modules = fusion.get_fusion_modules(
-        model_type=fusion_config.model_type,
+        fusion_model_type=fusion_config.model_type,
         model_config=fusion_config.model_config,
         modules_to_fuse=input_modules,
         out_feature_per_feature_extractor=out_feature_per_feature_extractor,

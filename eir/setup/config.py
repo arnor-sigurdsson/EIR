@@ -627,7 +627,7 @@ def get_interpretation_config_schema_map() -> (
 def load_fusion_configs(fusion_configs: Iterable[dict]) -> schemas.FusionConfig:
     combined_config = combine_dicts(dicts=fusion_configs)
 
-    combined_config.setdefault("model_type", "default")
+    combined_config.setdefault("model_type", "mlp-residual")
     combined_config.setdefault("model_config", {})
 
     fusion_model_type = combined_config["model_type"]

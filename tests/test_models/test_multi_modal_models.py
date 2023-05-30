@@ -61,7 +61,7 @@ from tests.test_models.model_testing_utils import prepare_example_batch
                     },
                 ],
                 "fusion_configs": {
-                    "model_type": "default",
+                    "model_type": "mlp-residual",
                     "model_config": {
                         "fc_task_dim": 64,
                         "fc_do": 0.10,

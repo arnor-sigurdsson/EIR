@@ -544,7 +544,7 @@ def _should_compile():
                     {
                         "input_info": {"input_name": "test_genotype"},
                         "model_config": {
-                            "model_type": "mlp-split",
+                            "model_type": "lcl-simple",
                             "model_init_config": {
                                 "fc_repr_dim": 8,
                                 "num_lcl_chunks": 64,

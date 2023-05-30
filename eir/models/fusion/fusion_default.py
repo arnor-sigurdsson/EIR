@@ -25,7 +25,7 @@ def default_fuse_features(features: Dict[str, torch.Tensor]) -> torch.Tensor:
     return torch.cat(tuple(features.values()), dim=1)
 
 
-class FusionModule(nn.Module):
+class MLPResidualFusionModule(nn.Module):
     def __init__(
         self,
         model_config: ResidualMLPConfig,
