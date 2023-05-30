@@ -241,7 +241,7 @@ def test_get_cur_dilation(test_input, expected):
                             "model_type": "mlp-split",
                             "model_init_config": {
                                 "fc_repr_dim": 8,
-                                "split_mlp_num_splits": 64,
+                                "num_lcl_chunks": 64,
                                 "l1": 1e-03,
                             },
                         },

@@ -13,7 +13,7 @@ from eir.data_load.label_setup import al_label_transformers_object
 from eir.models import model_training_utils
 from eir.train_utils import metrics
 from eir.train_utils import utils
-from eir.train_utils.handlers_sequence_output import (
+from eir.train_utils.train_handlers_sequence_output import (
     sequence_out_single_sample_evaluation_wrapper,
 )
 from eir.visualization import visualization_funcs as vf

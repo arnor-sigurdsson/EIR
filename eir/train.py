@@ -172,6 +172,8 @@ def get_default_experiment(
         target_labels=target_labels,
         inputs_as_dict=inputs_as_dict,
         outputs_as_dict=outputs_as_dict,
+        train_ids_to_keep=train_ids,
+        valid_ids_to_keep=valid_ids,
     )
 
     train_sampler = get_train_sampler(

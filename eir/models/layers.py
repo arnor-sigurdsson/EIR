@@ -258,7 +258,7 @@ class LCL(nn.Module):
         in_features: int,
         out_feature_sets: int,
         num_chunks: int = 10,
-        split_size: int = None,
+        kernel_size: int = None,
         bias: bool = True,
     ):
         super().__init__()
@@ -266,34 +266,35 @@ class LCL(nn.Module):
         self.in_features = in_features
         self.out_feature_sets = out_feature_sets
         self.num_chunks = num_chunks
-        self.split_size = split_size
+        self.kernel_size = kernel_size
 
-        if split_size:
-            self.num_chunks = int(math.ceil(in_features / split_size))
+        if kernel_size:
+            self.num_chunks = int(math.ceil(in_features / kernel_size))
             logger.debug(
-                "%s: Setting num chunks to %d as split size of %d was passed in.",
+                "%s: Setting num chunks to %d as kernel size of %d was passed in.",
                 self.__class__,
                 self.num_chunks,
-                self.split_size,
+                self.kernel_size,
             )
         else:
-            self.split_size = int(math.ceil(self.in_features / self.num_chunks))
+            self.kernel_size = int(math.ceil(self.in_features / self.num_chunks))
             logger.debug(
-                "%s :Setting split size to %d as number of chunks of %d was passed in.",
+                "%s :Setting kernel size to %d as number of "
+                "chunks of %d was passed in.",
                 self.__class__,
-                self.split_size,
+                self.kernel_size,
                 self.num_chunks,
             )
 
         self.out_features = self.out_feature_sets * self.num_chunks
-        self.padding = _find_split_padding_needed(
+        self.padding = _find_lcl_padding_needed(
             input_size=self.in_features,
-            split_size=self.split_size,
+            kernel_size=self.kernel_size,
             num_chunks=self.num_chunks,
         )
 
         self.weight = Parameter(
-            torch.Tensor(self.out_feature_sets, self.num_chunks, self.split_size),
+            torch.Tensor(self.out_feature_sets, self.num_chunks, self.kernel_size),
             requires_grad=True,
         )
 
@@ -316,11 +317,11 @@ class LCL(nn.Module):
 
     def extra_repr(self):
         return (
-            "in_features={}, num_chunks={}, split_size={}, "
+            "in_features={}, num_chunks={}, kernel_size={}, "
             "out_feature_sets={}, out_features={}, bias={}".format(
                 self.in_features,
                 self.num_chunks,
-                self.split_size,
+                self.kernel_size,
                 self.out_feature_sets,
                 self.out_features,
                 self.bias is not None,
@@ -331,22 +332,22 @@ class LCL(nn.Module):
         input_padded = F.pad(input=input, pad=[0, self.padding, 0, 0])
 
         input_reshaped = input_padded.reshape(
-            input.shape[0], 1, self.num_chunks, self.split_size
+            input.shape[0], 1, self.num_chunks, self.kernel_size
         )
 
-        out = calc_split_input(input=input_reshaped, weight=self.weight, bias=self.bias)
+        out = calc_lcl_forward(input=input_reshaped, weight=self.weight, bias=self.bias)
         return out
 
 
-def _find_split_padding_needed(input_size: int, split_size: int, num_chunks: int):
-    return num_chunks * split_size - input_size
+def _find_lcl_padding_needed(input_size: int, kernel_size: int, num_chunks: int):
+    return num_chunks * kernel_size - input_size
 
 
-def calc_split_input(input: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor):
+def calc_lcl_forward(input: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor):
     """
     n: num samples
     c: num chunks (height)
-    s: split size (width)
+    s: kernel size (width)
     o: output sets
     """
 
@@ -455,7 +456,7 @@ class LCLResidualBlock(nn.Module):
         self,
         in_features: int,
         out_feature_sets: int,
-        split_size: int,
+        kernel_size: int,
         dropout_p: float = 0.0,
         stochastic_depth_p: float = 0.0,
         full_preactivation: bool = False,
@@ -465,7 +466,7 @@ class LCLResidualBlock(nn.Module):
         super().__init__()
 
         self.in_features = in_features
-        self.split_size = split_size
+        self.kernel_size = kernel_size
         self.out_feature_sets = out_feature_sets
 
         self.dropout_p = dropout_p
@@ -479,17 +480,17 @@ class LCLResidualBlock(nn.Module):
             in_features=self.in_features,
             out_feature_sets=self.out_feature_sets,
             bias=True,
-            split_size=self.split_size,
+            kernel_size=self.kernel_size,
         )
 
         self.act_1 = Swish()
         self.do = nn.Dropout(p=dropout_p)
 
-        fc_2_kwargs = _get_split_fc_2_kwargs(
+        fc_2_kwargs = _get_lcl_2_kwargs(
             in_features=self.fc_1.out_features,
             out_feature_sets=self.out_feature_sets,
             bias=True,
-            split_size=self.split_size,
+            kernel_size=self.kernel_size,
             reduce_both=self.reduce_both,
         )
         self.fc_2 = LCL(**fc_2_kwargs)
@@ -528,12 +529,12 @@ class LCLResidualBlock(nn.Module):
         return out + identity
 
 
-def _get_split_fc_2_kwargs(
+def _get_lcl_2_kwargs(
     in_features: int,
     out_feature_sets: int,
     bias: bool,
     reduce_both: bool,
-    split_size: int,
+    kernel_size: int,
 ):
     common_kwargs = {
         "in_features": in_features,
@@ -542,9 +543,9 @@ def _get_split_fc_2_kwargs(
     }
 
     if reduce_both:
-        common_kwargs["split_size"] = split_size
+        common_kwargs["kernel_size"] = kernel_size
     else:
-        num_chunks = _calculate_num_chunks_for_equal_split_out_features(
+        num_chunks = _calculate_num_chunks_for_equal_lcl_out_features(
             in_features=in_features, out_feature_sets=out_feature_sets
         )
         common_kwargs["num_chunks"] = num_chunks
@@ -552,7 +553,7 @@ def _get_split_fc_2_kwargs(
     return common_kwargs
 
 
-def _calculate_num_chunks_for_equal_split_out_features(
+def _calculate_num_chunks_for_equal_lcl_out_features(
     in_features: int,
     out_feature_sets: int,
 ) -> int:
@@ -604,10 +605,10 @@ def get_lcl_projection_layer(
     match layer_type:
         case "lcl_residual":
             layer_class = LCLResidualBlock
-            n_split_layers = 2
+            n_lcl_layers = 2
         case "lcl":
             layer_class = LCL
-            n_split_layers = 1
+            n_lcl_layers = 1
         case _:
             raise ValueError(f"Unknown layer type: {layer_type}")
 
@@ -615,7 +616,7 @@ def get_lcl_projection_layer(
     solution = search_func(
         input_dimension=input_dimension,
         target_dimension=target_dimension,
-        n_layers=n_split_layers,
+        n_layers=n_lcl_layers,
         kernel_width_candidates=kernel_width_candidates,
         out_feature_sets_candidates=out_feature_sets_candidates,
     )
@@ -623,10 +624,10 @@ def get_lcl_projection_layer(
     if solution is None:
         return None
 
-    best_split_size, best_out_feature_sets = solution
+    best_kernel_size, best_out_feature_sets = solution
     best_layer = layer_class(
         in_features=input_dimension,
-        split_size=best_split_size,
+        kernel_size=best_kernel_size,
         out_feature_sets=best_out_feature_sets,
     )
 

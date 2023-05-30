@@ -1,5 +1,3 @@
-from functools import partial
-from pathlib import Path
 from typing import (
     Dict,
     Union,
@@ -13,8 +11,6 @@ from typing import (
 from aislib.misc_utils import get_logger
 
 from eir.experiment_io.experiment_io import (
-    load_serialized_input_object,
-    load_transformers,
     get_run_folder_from_model_path,
 )
 from eir.setup import schemas
@@ -33,6 +29,9 @@ from eir.setup.input_setup_modules.setup_image import (
 from eir.setup.input_setup_modules.setup_omics import (
     set_up_omics_input,
     ComputedOmicsInputInfo,
+)
+from eir.setup.input_setup_modules.setup_pretrained import (
+    get_input_setup_from_pretrained_function_map,
 )
 from eir.setup.input_setup_modules.setup_sequence import (
     ComputedSequenceInputInfo,
@@ -159,60 +158,3 @@ def get_input_setup_function_map() -> Dict[str, Callable[..., al_input_objects]]
     }
 
     return setup_mapping
-
-
-def set_up_tabular_input_from_pretrained(
-    input_config: schemas.InputConfig,
-    custom_input_name: str,
-    train_ids: Sequence[str],
-    valid_ids: Sequence[str],
-    hooks: Union["Hooks", None],
-) -> "ComputedTabularInputInfo":
-    tabular_input_object = set_up_tabular_input_for_training(
-        input_config=input_config, train_ids=train_ids, valid_ids=valid_ids, hooks=hooks
-    )
-
-    pretrained_run_folder = get_run_folder_from_model_path(
-        model_path=input_config.pretrained_config.model_path
-    )
-
-    loaded_transformers = load_transformers(
-        run_folder=pretrained_run_folder, transformers_to_load=None
-    )
-    loaded_transformers_input = loaded_transformers[custom_input_name]
-
-    tabular_input_object.labels.label_transformers = loaded_transformers_input
-
-    return tabular_input_object
-
-
-def get_input_setup_from_pretrained_function_map(
-    run_folder: Path, load_module_name: str
-) -> Dict[str, Callable]:
-    pretrained_setup_mapping = {
-        "omics": set_up_omics_input,
-        "tabular": partial(
-            set_up_tabular_input_from_pretrained, custom_input_name=load_module_name
-        ),
-        "sequence": partial(
-            load_serialized_input_object,
-            input_class=ComputedSequenceInputInfo,
-            run_folder=run_folder,
-            custom_input_name=load_module_name,
-        ),
-        "bytes": partial(
-            load_serialized_input_object,
-            input_class=ComputedBytesInputInfo,
-            run_folder=run_folder,
-            custom_input_name=load_module_name,
-        ),
-        "image": partial(
-            load_serialized_input_object,
-            input_class=ComputedImageInputInfo,
-            run_folder=run_folder,
-            custom_input_name=load_module_name,
-        ),
-        "array": set_up_array_input,
-    }
-
-    return pretrained_setup_mapping

@@ -249,7 +249,7 @@ def _add_specials_to_hf_tokenizer(
         if special_token_name not in hf_tokenizer_copy.special_tokens_map:
             specials_tokens_to_add[special_token_name] = special_token
 
-    hf_tokenizer_copy.add_special_tokens(specials_tokens_to_add)
+    hf_tokenizer_copy.add_special_tokens(special_tokens_dict=specials_tokens_to_add)
     logger.debug("Special tokens %s added to %s.", specials_tokens_to_add, hf_tokenizer)
 
     return hf_tokenizer_copy

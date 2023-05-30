@@ -326,7 +326,7 @@ def test_get_model_l1_loss(get_l1_test_model):
                             "model_type": "mlp-split",
                             "model_init_config": {
                                 "fc_repr_dim": 8,
-                                "split_mlp_num_splits": 64,
+                                "num_lcl_chunks": 64,
                                 "l1": 1e-03,
                             },
                         },

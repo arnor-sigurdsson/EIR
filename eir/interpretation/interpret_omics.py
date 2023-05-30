@@ -1,8 +1,7 @@
-from collections import defaultdict
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Tuple, Callable, Union, TYPE_CHECKING, Sequence
+from typing import Dict, List, Tuple, Callable, Union, TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -193,45 +192,6 @@ def _add_absolute_summed_snp_gradients_to_df(
     return df_snp_grads_copy
 
 
-def parse_single_omics_attributions(
-    experiment: "Experiment",
-    omics_input_name: str,
-    output_name: str,
-    target_column_name: str,
-    column_type: str,
-    attributions: Sequence["SampleAttribution"],
-) -> Tuple[Dict, Dict]:
-    exp = experiment
-    output_object = exp.outputs[output_name]
-    target_transformer = output_object.target_transformers[target_column_name]
-
-    acc_acts = defaultdict(list)
-    acc_acts_masked = defaultdict(list)
-
-    for sample_attribution in attributions:
-        sample_inputs = sample_attribution.sample_info.inputs
-        sample_target_labels = sample_attribution.sample_info.target_labels
-        sample_acts = sample_attribution.sample_attributions[omics_input_name]
-
-        # we want to keep the original sample for masking
-        inputs_omics = sample_inputs[omics_input_name]
-        single_sample_copy = deepcopy(inputs_omics).cpu().numpy().squeeze()
-
-        cur_label_name = get_target_class_name(
-            sample_label=sample_target_labels[output_name][target_column_name],
-            target_transformer=target_transformer,
-            column_type=column_type,
-            target_column_name=target_column_name,
-        )
-
-        acc_acts[cur_label_name].append(sample_acts.squeeze())
-
-        single_acts_masked = single_sample_copy * sample_acts
-        acc_acts_masked[cur_label_name].append(single_acts_masked.squeeze())
-
-    return acc_acts, acc_acts_masked
-
-
 def rescale_gradients(gradients: np.ndarray) -> np.ndarray:
     gradients_resc = gradients - gradients.min()
     gradients_resc = gradients_resc / (gradients.max() - gradients.min())
@@ -288,33 +248,6 @@ def get_snp_cols_w_top_grads(
             )
 
     return top_snps_per_class
-
-
-def infer_snp_file_path(data_source: Path):
-    if not data_source:
-        raise ValueError(
-            "'data_source' variable must be set with 'infer'" " as snp_file parameter."
-        )
-
-    snp_size = data_source.parts[3]
-    ind_size = data_source.parts[4]
-    assert snp_size.startswith("full") or int(snp_size.split("_")[0])
-    assert ind_size.startswith("full") or int(ind_size.split("_")[0])
-
-    inferred_snp_string = f"parsed_files/{ind_size}/{snp_size}/data_final.snp"
-    inferred_snp_file = Path(data_source).parents[2] / inferred_snp_string
-
-    logger.info(
-        "SNP file path not passed in as CL argument, will try inferred path: %s",
-        inferred_snp_file,
-    )
-
-    if not inferred_snp_file.exists():
-        raise FileNotFoundError(
-            f"Could not find {inferred_snp_file} when inferring" f"about it's location."
-        )
-
-    return inferred_snp_file
 
 
 def gather_and_rescale_snps(

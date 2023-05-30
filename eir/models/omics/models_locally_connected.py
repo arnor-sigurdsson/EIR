@@ -39,9 +39,9 @@ class SimpleLCLModelConfig:
     :param fc_repr_dim:
         Controls the number of output sets in the first and only split layer. Analogous
         to channels in CNNs.
-    :param split_mlp_num_splits:
+    :param num_lcl_chunks:
         Controls the number of splits applied to the input. E.g. with a input with of
-        800, using ``split_mlp_num_splits=100`` will result in a kernel width of 8,
+        800, using ``num_lcl_chunks=100`` will result in a kernel width of 8,
         meaning 8 elements in the flattened input. If using a SNP inputs with a one-hot
         encoding of 4 possible values, this will result in 8/2 = 2 SNPs per locally
         connected area.
@@ -50,7 +50,7 @@ class SimpleLCLModelConfig:
     """
 
     fc_repr_dim: int = 12
-    split_mlp_num_splits: int = 64
+    num_lcl_chunks: int = 64
     l1: float = 0.00
 
 
@@ -67,7 +67,7 @@ class SimpleLCLModel(nn.Module):
         self.data_dimensions = data_dimensions
         self.flatten_fn = flatten_fn
 
-        num_chunks = self.model_config.split_mlp_num_splits
+        num_chunks = self.model_config.num_lcl_chunks
         self.fc_0 = LCL(
             in_features=self.fc_1_in_features,
             out_feature_sets=self.model_config.fc_repr_dim,
@@ -116,7 +116,7 @@ class LCLModelConfig:
         With of the locally connected kernels. Note that this refers to the flattened
         input, meaning that if we have a one-hot encoding of 4 values (e.g. SNPs), 12
         refers to 12/4 = 3 SNPs per locally connected window. Can be set to ``None`` if
-        the ``split_mlp_num_splits`` parameter is set, which means that the kernel width
+        the ``num_lcl_chunks`` parameter is set, which means that the kernel width
         will be set automatically according to
 
     :param first_kernel_expansion:
@@ -136,9 +136,9 @@ class LCLModelConfig:
         to other layers in the network. Works analogously to the
         ``first_kernel_expansion`` parameter.
 
-    :param split_mlp_num_splits:
+    :param num_lcl_chunks:
         Controls the number of splits applied to the input. E.g. with a input width of
-        800, using ``split_mlp_num_splits=100`` will result in a kernel width of 8,
+        800, using ``num_lcl_chunks=100`` will result in a kernel width of 8,
         meaning 8 elements in the flattened input. If using a SNP inputs with a one-hot
         encoding of 4 possible values, this will result in 8/2 = 2 SNPs per locally
         connected area.
@@ -172,7 +172,7 @@ class LCLModelConfig:
     channel_exp_base: int = 2
     first_channel_expansion: int = 1
 
-    split_mlp_num_splits: Union[None, int] = None
+    num_lcl_chunks: Union[None, int] = None
 
     rb_do: float = 0.10
     stochastic_depth_p: float = 0.00
@@ -195,7 +195,7 @@ class LCLModel(nn.Module):
         self.data_dimensions = data_dimensions
         self.flatten_fn = flatten_fn
 
-        fc_0_split_size = calc_value_after_expansion(
+        fc_0_kernel_size = calc_value_after_expansion(
             base=self.model_config.kernel_width,
             expansion=self.model_config.first_kernel_expansion,
         )
@@ -206,11 +206,11 @@ class LCLModel(nn.Module):
         self.fc_0 = LCL(
             in_features=self.fc_1_in_features,
             out_feature_sets=2**fc_0_channel_exponent,
-            split_size=fc_0_split_size,
+            kernel_size=fc_0_kernel_size,
             bias=True,
         )
 
-        split_parameter_spec = LCParameterSpec(
+        lcl_parameter_spec = LCParameterSpec(
             in_features=self.fc_0.out_features,
             kernel_width=self.model_config.kernel_width,
             channel_exp_base=self.model_config.channel_exp_base,
@@ -219,8 +219,8 @@ class LCLModel(nn.Module):
             stochastic_depth_p=self.model_config.stochastic_depth_p,
             attention_inclusion_cutoff=self.model_config.attention_inclusion_cutoff,
         )
-        self.split_blocks = _get_split_blocks(
-            split_parameter_spec=split_parameter_spec,
+        self.lcl_blocks = _get_lcl_blocks(
+            lcl_spec=lcl_parameter_spec,
             block_layer_spec=self.model_config.layers,
         )
 
@@ -236,7 +236,7 @@ class LCLModel(nn.Module):
 
     @property
     def num_out_features(self) -> int:
-        return self.split_blocks[-1].out_features
+        return self.lcl_blocks[-1].out_features
 
     def _init_weights(self):
         pass
@@ -245,7 +245,7 @@ class LCLModel(nn.Module):
         out = self.flatten_fn(x=input)
 
         out = self.fc_0(out)
-        out = self.split_blocks(out)
+        out = self.lcl_blocks(out)
 
         return out
 
@@ -281,40 +281,40 @@ class LCParameterSpec:
     attention_inclusion_cutoff: Optional[int] = None
 
 
-def _get_split_blocks(
-    split_parameter_spec: LCParameterSpec,
+def _get_lcl_blocks(
+    lcl_spec: LCParameterSpec,
     block_layer_spec: Union[None, Sequence[int]],
 ) -> nn.Sequential:
-    factory = _get_split_block_factory(block_layer_spec=block_layer_spec)
+    factory = _get_lcl_block_factory(block_layer_spec=block_layer_spec)
 
-    blocks = factory(split_parameter_spec)
+    blocks = factory(lcl_spec)
 
     return blocks
 
 
-def _get_split_block_factory(
+def _get_lcl_block_factory(
     block_layer_spec: Sequence[int],
 ) -> Callable[[LCParameterSpec], nn.Sequential]:
     if not block_layer_spec:
-        return generate_split_resblocks_auto
+        return generate_lcl_residual_blocks_auto
 
     auto_factory = partial(
-        _generate_split_blocks_from_spec, block_layer_spec=block_layer_spec
+        _generate_lcl_blocks_from_spec, block_layer_spec=block_layer_spec
     )
 
     return auto_factory
 
 
-def _generate_split_blocks_from_spec(
-    split_parameter_spec: LCParameterSpec,
+def _generate_lcl_blocks_from_spec(
+    lcl_parameter_spec: LCParameterSpec,
     block_layer_spec: List[int],
 ) -> nn.Sequential:
-    s = split_parameter_spec
+    s = lcl_parameter_spec
     block_layer_spec_copy = copy(block_layer_spec)
 
     first_block = LCLResidualBlock(
         in_features=s.in_features,
-        split_size=s.kernel_width,
+        kernel_size=s.kernel_width,
         out_feature_sets=2**s.channel_exp_base,
         dropout_p=s.dropout_p,
         full_preactivation=True,
@@ -334,7 +334,7 @@ def _generate_split_blocks_from_spec(
 
             cur_block = LCLResidualBlock(
                 in_features=cur_size,
-                split_size=cur_kernel_width,
+                kernel_size=cur_kernel_width,
                 out_feature_sets=cur_out_feature_sets,
                 dropout_p=s.dropout_p,
                 stochastic_depth_p=s.stochastic_depth_p,
@@ -345,17 +345,17 @@ def _generate_split_blocks_from_spec(
     return nn.Sequential(*block_modules)
 
 
-def generate_split_resblocks_auto(split_parameter_spec: LCParameterSpec):
+def generate_lcl_residual_blocks_auto(lcl_parameter_spec: LCParameterSpec):
     """
     TODO:   Create some over-engineered abstraction for this and
-            ``_generate_split_blocks_from_spec`` if feeling bored.
+            ``_generate_lcl_blocks_from_spec`` if feeling bored.
     """
 
-    s = split_parameter_spec
+    s = lcl_parameter_spec
 
     first_block = LCLResidualBlock(
         in_features=s.in_features,
-        split_size=s.kernel_width,
+        kernel_size=s.kernel_width,
         out_feature_sets=2**s.channel_exp_base,
         dropout_p=s.dropout_p,
         full_preactivation=True,
@@ -389,7 +389,7 @@ def generate_split_resblocks_auto(split_parameter_spec: LCParameterSpec):
 
         cur_block = LCLResidualBlock(
             in_features=cur_size,
-            split_size=cur_kernel_width,
+            kernel_size=cur_kernel_width,
             out_feature_sets=cur_out_feature_sets,
             dropout_p=s.dropout_p,
             stochastic_depth_p=s.stochastic_depth_p,

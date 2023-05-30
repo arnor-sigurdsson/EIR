@@ -12,6 +12,8 @@ from eir.predict_modules.predict_config import (
     get_named_predict_dict_iterators,
     get_train_predict_matched_config_generator,
     overload_train_configs_for_predict,
+    _get_maybe_patched_null_sequence_output_source_for_generation,
+    _check_matching_general_output_configs,
 )
 from eir.setup import schemas, config
 from eir.setup.config_setup_modules.config_setup_utils import (
@@ -20,7 +22,7 @@ from eir.setup.config_setup_modules.config_setup_utils import (
 )
 
 
-def test_get_named_pred_dict_iterators(tmp_path: Path) -> None:
+def test_get_named_predict_dict_iterators(tmp_path: Path) -> None:
     keys = {"global_configs", "input_configs", "fusion_configs", "output_configs"}
     paths = {}
 
@@ -258,3 +260,45 @@ def test_overload_train_configs_for_predict(
     #       further.
     for input_config in overloaded_train_config.input_configs:
         assert input_config.input_info.input_source == "predict_input_source_overloaded"
+
+
+def test_get_maybe_patched_null_sequence_output_source_for_generation():
+    output_config = {
+        "output_info": {
+            "output_type": "sequence",
+            "output_source": None,
+            "output_name": "test_output",
+        }
+    }
+
+    output_configs = _get_maybe_patched_null_sequence_output_source_for_generation(
+        predict_dict_iterator=[output_config]
+    )
+    for output_config in output_configs:
+        output_path = Path(output_config["output_info"]["output_source"])
+        assert output_path.is_dir()
+        assert len([i for i in output_path.iterdir() if i.is_file() == 1])
+
+
+class MockOutputInfo:
+    output_name = "output_name"
+    output_type = "output_type"
+
+
+class MockTrainConfig:
+    output_info = MockOutputInfo()
+
+
+def test_check_matching_general_output_configs():
+    train_config = MockTrainConfig()
+    predict_output_config_dict = {
+        "output_info": {
+            "output_name": train_config.output_info.output_name,
+            "output_type": train_config.output_info.output_type,
+        }
+    }
+    matches = _check_matching_general_output_configs(
+        train_config=train_config, predict_dict_iterator=[predict_output_config_dict]
+    )
+    assert len(matches) == 1
+    assert matches == predict_output_config_dict

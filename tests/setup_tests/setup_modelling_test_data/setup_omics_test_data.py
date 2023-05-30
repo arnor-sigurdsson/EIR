@@ -61,7 +61,7 @@ def _create_and_save_test_array_omics(
 ):
     c = test_data_config
 
-    base_array, snp_idxs_candidates = _set_up_base_test_array(n_snps=c.n_snps)
+    base_array, snp_idxs_candidates = _set_up_base_test_omics_array(n_snps=c.n_snps)
 
     cur_test_array, snps_this_sample = _create_test_array(
         base_array=base_array,
@@ -74,7 +74,7 @@ def _create_and_save_test_array_omics(
     return snps_this_sample
 
 
-def _set_up_base_test_array(n_snps: int) -> Tuple[np.ndarray, np.ndarray]:
+def _set_up_base_test_omics_array(n_snps: int) -> Tuple[np.ndarray, np.ndarray]:
     # create random one hot array
     base_array = np.eye(4)[np.random.choice(4, n_snps)].T
     # set up 10 candidates

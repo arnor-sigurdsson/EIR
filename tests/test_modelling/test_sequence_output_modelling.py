@@ -62,7 +62,19 @@ seed_everything(seed=0)
                 },
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output_sequence"},
+                        "output_info": {
+                            "output_name": "test_output_sequence",
+                        },
+                        "sampling_config": {
+                            "manual_inputs": [
+                                {
+                                    "test_output_sequence": "arctic_",
+                                },
+                                {
+                                    "test_output_sequence": "lyn",
+                                },
+                            ],
+                        },
                     }
                 ],
             },

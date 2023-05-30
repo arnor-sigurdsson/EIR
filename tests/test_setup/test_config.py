@@ -1,15 +1,20 @@
+import argparse
+import os
+import tempfile
 from argparse import Namespace
+from copy import copy
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Mapping, Any
 
 import pytest
 import yaml
+from hypothesis import given, strategies
 
+from eir.setup import config
 from eir.setup.config_setup_modules.config_setup_utils import (
     get_yaml_iterator_with_injections,
     convert_cl_str_to_dict,
 )
-from eir.setup import config
 from tests.setup_tests.fixtures_create_configs import TestConfigInits
 
 
@@ -259,3 +264,66 @@ def test_convert_cl_str_to_dict():
     test_str = "gln_input.input_info.input_source=test_value"
     test_dict = convert_cl_str_to_dict(str_=test_str)
     assert test_dict == {"gln_input": {"input_info": {"input_source": "test_value"}}}
+
+
+def test_get_output_folder_and_log_level_from_cl_args():
+    temp_dir = tempfile.TemporaryDirectory()
+    temp_file = tempfile.NamedTemporaryFile(delete=False, dir=temp_dir.name)
+    test_config = {
+        "output_folder": "expected_output_folder",
+        "log_level": "expected_log_level",
+    }
+    with open(temp_file.name, "w") as f:
+        yaml.safe_dump(test_config, f)
+
+    main_cl_args = argparse.Namespace(global_configs=[temp_file.name])
+    extra_cl_args: List[str] = []
+
+    output_folder, log_level = config.get_output_folder_and_log_level_from_cl_args(
+        main_cl_args=main_cl_args,
+        extra_cl_args=extra_cl_args,
+    )
+
+    assert output_folder == test_config["output_folder"]
+    assert log_level == test_config["log_level"]
+
+    extra_cl_args = ["output_folder=new_output_folder"]
+    output_folder, log_level = config.get_output_folder_and_log_level_from_cl_args(
+        main_cl_args=main_cl_args,
+        extra_cl_args=extra_cl_args,
+    )
+
+    assert output_folder == "new_output_folder"
+    assert log_level == test_config["log_level"]
+
+    test_config = {"log_level": "expected_log_level", "output_folder": None}
+    with open(temp_file.name, "w") as f:
+        yaml.safe_dump(test_config, f)
+
+    with pytest.raises(ValueError, match="Output folder not found in global configs."):
+        config.get_output_folder_and_log_level_from_cl_args(
+            main_cl_args=main_cl_args,
+            extra_cl_args=[],
+        )
+
+    os.unlink(temp_file.name)
+    temp_dir.cleanup()
+
+
+@given(
+    strategies.dictionaries(strategies.text(), strategies.integers()),
+    strategies.integers(),
+)
+def test_recursive_search(dict_: Mapping, target: Any):
+    paths_and_values = list(
+        config._recursive_search(
+            dict_=dict_,
+            target=target,
+        )
+    )
+
+    for path, value in paths_and_values:
+        dict_copy = copy(dict_)
+        for key in path:
+            dict_copy = dict_copy[key]
+        assert dict_copy == target

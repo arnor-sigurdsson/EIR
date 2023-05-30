@@ -4,8 +4,9 @@ from typing import Dict, Literal, TYPE_CHECKING
 
 import dill
 import torch
-from aislib.misc_utils import get_logger
 from torch import nn
+from torch.nn import functional as F
+from aislib.misc_utils import get_logger
 
 from eir.models.fusion.fusion_attention import MetaSequenceProjection
 from eir.models.sequence.transformer_models import (
@@ -19,8 +20,6 @@ if TYPE_CHECKING:
     )
     from eir.setup.input_setup import al_input_objects_as_dict
     from eir.models.model_setup import FeatureExtractorInfo
-    from eir.setup.schemas import GlobalConfig
-
 
 al_sequence_output_models = Literal["sequence"]
 
@@ -130,7 +129,7 @@ def _find_nearest_multiple(base: int, target: int) -> int:
 def overload_embeddings_with_pretrained(
     model: nn.Module,
     inputs: "al_input_objects_as_dict",
-    global_config: "GlobalConfig",
+    pretrained_checkpoint: str,
 ) -> nn.Module:
     """
     Vocab: From serialized input object
@@ -149,8 +148,6 @@ def overload_embeddings_with_pretrained(
     First, let's just assume the global case.
     """
 
-    pretrained_checkpoint = global_config.pretrained_checkpoint
-
     if not pretrained_checkpoint:
         return model
 
@@ -165,12 +162,16 @@ def overload_embeddings_with_pretrained(
     for serialized_input in serialized_inputs.iterdir():
         input_name = serialized_input.stem
         with open(serialized_input, "rb") as f:
-            input_object = dill.load(f)
+            input_object = dill.load(file=f)
         input_objects_loaded[input_name] = input_object
 
-    loaded_state_dict = torch.load(pretrained_checkpoint)
+    loaded_state_dict = torch.load(f=pretrained_checkpoint)
 
     for input_name, input_object in inputs.items():
+        input_type = input_object.input_config.input_info.input_type
+        if input_type != "sequence":
+            continue
+
         cur_vocab = input_object.vocab.get_stoi()
         prev_input_object_vocab = input_objects_loaded[input_name].vocab.get_stoi()
 
@@ -178,13 +179,35 @@ def overload_embeddings_with_pretrained(
         prev_embeddings = loaded_state_dict[prev_emb_key]
 
         cur_embedding = model.input_modules[input_name].embedding.weight
+        cur_embedding_copy = cur_embedding.clone().detach()
 
         for token, idx in cur_vocab.items():
             if token not in prev_input_object_vocab:
                 continue
-            prev_idx = prev_input_object_vocab[token]
-            cur_embedding[idx] = prev_embeddings[prev_idx]
 
+            prev_idx = prev_input_object_vocab[token]
+            prev_emb = prev_embeddings[prev_idx]
+
+            cur_emb = cur_embedding_copy[idx]
+
+            if prev_emb.shape != cur_emb.shape:
+                logger.warning(
+                    f"Shape mismatch for token {token} in input {input_name}."
+                    f"Applying average pooling to match dimensions."
+                )
+                prev_emb = prev_emb.view(1, 1, -1)
+                prev_emb = F.adaptive_avg_pool1d(
+                    input=prev_emb,
+                    output_size=cur_emb.shape[0],
+                )
+                prev_emb = prev_emb.view(-1)
+
+            cur_embedding_copy[idx] = prev_emb
+
+        model.input_modules[input_name].embedding.weight = nn.Parameter(
+            data=cur_embedding_copy,
+            requires_grad=True,
+        )
         logger.info(f"Overloaded embeddings for {input_name}.")
 
     return model

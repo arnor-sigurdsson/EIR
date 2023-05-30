@@ -5,6 +5,7 @@ from typing import (
     Callable,
     Dict,
     Any,
+    Protocol,
     Sequence,
     Type,
     Tuple,
@@ -40,6 +41,9 @@ from eir.models.model_setup_modules.model_io import load_model
 from eir.models.model_setup_modules.output_model_setup import (
     get_tabular_output_module_from_model_config,
     get_sequence_output_module_from_model_config,
+)
+from eir.models.output.sequence.sequence_output_modules import (
+    overload_embeddings_with_pretrained,
 )
 from eir.models.sequence.sequence_models import get_sequence_model_class
 from eir.models.tabular.tabular import (
@@ -105,6 +109,13 @@ def get_model(
             test_mode=False,
             strict_shapes=global_config.strict_pretrained_loading,
         )
+
+        loaded_meta_model = overload_embeddings_with_pretrained(
+            model=loaded_meta_model,
+            inputs=inputs_as_dict,
+            pretrained_checkpoint=global_config.pretrained_checkpoint,
+        )
+
         return loaded_meta_model
 
     input_modules = overload_fusion_model_feature_extractors_with_pretrained(
@@ -128,12 +139,20 @@ def get_model(
     return meta_model
 
 
+class MetaClassGetterCallable(Protocol):
+    def __call__(
+        self,
+        meta_model_type: str,
+    ) -> Type[nn.Module]:
+        ...
+
+
 def get_meta_model_class_and_kwargs_from_configs(
     global_config: schemas.GlobalConfig,
     fusion_config: schemas.FusionConfig,
     inputs_as_dict: al_input_objects_as_dict,
     outputs_as_dict: "al_output_objects_as_dict",
-    meta_class_getter: Callable[[str], Type[nn.Module]] = get_default_meta_class,
+    meta_class_getter: MetaClassGetterCallable = get_default_meta_class,
 ) -> Tuple[Type[nn.Module], Dict[str, Any]]:
     meta_model_class = meta_class_getter(meta_model_type="default")
 
@@ -163,22 +182,25 @@ def get_meta_model_kwargs_from_configs(
     out_feature_per_feature_extractor = _get_feature_extractors_num_output_dimensions(
         input_modules=input_modules
     )
+    output_types = _get_output_types(outputs_as_dict=outputs_as_dict)
 
     fusion_modules = fusion.get_fusion_modules(
         model_type=fusion_config.model_type,
         model_config=fusion_config.model_config,
         modules_to_fuse=input_modules,
         out_feature_per_feature_extractor=out_feature_per_feature_extractor,
+        output_types=output_types,
     )
     kwargs["fusion_modules"] = fusion_modules
 
+    computed_out_dimension = _get_maybe_computed_out_dims(fusion_modules=fusion_modules)
     feature_dims_and_types = get_all_feature_extractor_dimensions_and_types(
         inputs_as_dict=inputs_as_dict, input_modules=input_modules
     )
     output_modules, output_types = get_output_modules(
         outputs_as_dict=outputs_as_dict,
-        computed_out_dimensions=fusion_modules["computed"].num_out_features,
         device=global_config.device,
+        computed_out_dimensions=computed_out_dimension,
         feature_dimensions_and_types=feature_dims_and_types,
     )
     fusion_to_output_mapping = _match_fusion_outputs_to_output_types(
@@ -188,6 +210,25 @@ def get_meta_model_kwargs_from_configs(
     kwargs["fusion_to_output_mapping"] = fusion_to_output_mapping
 
     return kwargs
+
+
+def _get_output_types(
+    outputs_as_dict: "al_output_objects_as_dict",
+) -> dict[str, Literal["tabular", "sequence"]]:
+    outputs_to_types_mapping = {}
+
+    for output_name, output_object in outputs_as_dict.items():
+        output_type = output_object.output_config.output_info.output_type
+        outputs_to_types_mapping[output_name] = output_type
+
+    return outputs_to_types_mapping
+
+
+def _get_maybe_computed_out_dims(fusion_modules: nn.ModuleDict) -> Optional[int]:
+    if "computed" in fusion_modules:
+        return fusion_modules["computed"].num_out_features
+
+    return None
 
 
 def _match_fusion_outputs_to_output_types(
@@ -318,8 +359,8 @@ def get_input_modules(
 
 def get_output_modules(
     outputs_as_dict: "al_output_objects_as_dict",
-    computed_out_dimensions: int,
     device: str,
+    computed_out_dimensions: Optional[int] = None,
     feature_dimensions_and_types: Optional[Dict[str, FeatureExtractorInfo]] = None,
 ) -> Tuple[nn.ModuleDict, Dict[str, Literal["tabular", "sequence"]]]:
     output_modules = nn.ModuleDict()
@@ -332,6 +373,7 @@ def get_output_modules(
 
         match output_type:
             case "tabular":
+                assert computed_out_dimensions is not None
                 tabular_output_module = get_tabular_output_module_from_model_config(
                     output_model_config=output_model_config,
                     input_dimension=computed_out_dimensions,
@@ -342,6 +384,7 @@ def get_output_modules(
 
             case "sequence":
                 feat_dims = feature_dimensions_and_types
+                assert feat_dims is not None
                 sequence_output_module = get_sequence_output_module_from_model_config(
                     output_object=output_object,
                     feature_dimensionalities_and_types=feat_dims,
@@ -443,7 +486,7 @@ def overload_fusion_model_feature_extractors_with_pretrained(
     input_modules: nn.ModuleDict,
     inputs_as_dict: al_input_objects_as_dict,
     outputs_as_dict: "al_output_objects_as_dict",
-    meta_class_getter: al_fusion_class_callable = get_default_meta_class,
+    meta_class_getter: MetaClassGetterCallable = get_default_meta_class,
 ) -> nn.ModuleDict:
     """
     Note that `inputs_as_dict` here are coming from the current experiment, arguably

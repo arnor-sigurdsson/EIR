@@ -532,36 +532,6 @@ class SampleAttribution:
     raw_inputs: Dict
 
 
-def accumulate_all_attributions(
-    data_producer: Iterable["Batch"],
-    act_func: Callable,
-    target_column_name: str,
-    output_name: str,
-) -> Sequence["SampleAttribution"]:
-    all_attributions = []
-
-    for batch, raw_inputs in data_producer:
-        sample_target_labels = batch.target_labels
-
-        sample_all_modalities_attributions = act_func(
-            inputs=batch.inputs,
-            sample_label=sample_target_labels[output_name][target_column_name],
-        )
-
-        if sample_all_modalities_attributions is None:
-            continue
-
-        batch_on_cpu = _convert_all_batch_tensors_to_cpu(batch=batch)
-        cur_sample_attribution_info = SampleAttribution(
-            sample_info=batch_on_cpu,
-            sample_attributions=sample_all_modalities_attributions,
-            raw_inputs=raw_inputs,
-        )
-        all_attributions.append(cur_sample_attribution_info)
-
-    return all_attributions
-
-
 def get_attribution_consumers(
     input_names_and_types: Dict[str, str],
     target_transformer: "al_label_transformers_object",

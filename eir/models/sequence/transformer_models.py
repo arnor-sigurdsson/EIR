@@ -19,7 +19,7 @@ from torch.nn import TransformerEncoder, TransformerEncoderLayer
 from torch.nn.functional import pad
 from transformers import PreTrainedModel, PretrainedConfig
 
-from eir.models.layers import _find_split_padding_needed
+from eir.models.layers import _find_lcl_padding_needed
 from eir.setup.setup_utils import get_all_hf_model_names
 
 al_sequence_models = tuple(
@@ -223,9 +223,9 @@ def _get_transformer_wrapper_feature_extractor(
             max_length,
         )
 
-        padding = _find_split_padding_needed(
+        padding = _find_lcl_padding_needed(
             input_size=max_length,
-            split_size=window_size,
+            kernel_size=window_size,
             num_chunks=num_chunks,
         )
         dynamic_extras["padding"] = padding
@@ -422,21 +422,21 @@ class TransformerFeatureExtractor(nn.Module):
         self.max_length = max_length
 
         dim_feed_forward = parse_dim_feedforward(
-            dim_feedforward=model_config.dim_feedforward,
+            dim_feedforward=self.model_config.dim_feedforward,
             embedding_dim=self.embedding_dim,
         )
 
         encoder_layer_base = TransformerEncoderLayer(
             d_model=self.embedding_dim,
-            nhead=model_config.num_heads,
+            nhead=self.model_config.num_heads,
             dim_feedforward=dim_feed_forward,
-            dropout=model_config.dropout,
+            dropout=self.model_config.dropout,
             activation="gelu",
             batch_first=True,
             norm_first=True,
         )
         self.transformer_encoder = TransformerEncoder(
-            encoder_layer=encoder_layer_base, num_layers=model_config.num_layers
+            encoder_layer=encoder_layer_base, num_layers=self.model_config.num_layers
         )
 
     @property

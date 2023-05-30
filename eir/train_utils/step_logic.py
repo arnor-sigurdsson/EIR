@@ -19,6 +19,7 @@ from aislib.misc_utils import get_logger
 from ignite.engine import Engine
 from torch import nn, autocast
 from torch.cuda.amp import GradScaler
+from torch.nn.functional import pad
 from torch.nn.utils import clip_grad_norm_
 
 from eir.data_load.data_augmentation import get_mix_data_hook, hook_mix_loss
@@ -31,11 +32,6 @@ from eir.setup.config import Configs, get_all_tabular_targets
 from eir.setup.input_setup import al_input_objects_as_dict
 from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
 from eir.setup.output_setup import al_output_objects_as_dict
-from eir.train_utils.handlers_sequence_output import (
-    SpecialTokens,
-    pad_batch_with_bos,
-    get_special_tokens,
-)
 from eir.train_utils.metrics import (
     get_uncertainty_loss_hook,
     hook_add_l1_loss,
@@ -46,6 +42,10 @@ from eir.train_utils.metrics import (
 )
 from eir.train_utils.optim import get_optimizer_backward_kwargs
 from eir.train_utils.train_handlers import HandlerConfig
+from eir.train_utils.train_handlers_sequence_output import (
+    SpecialTokens,
+    get_special_tokens,
+)
 
 if TYPE_CHECKING:
     from eir.train import Experiment
@@ -648,3 +648,10 @@ def hook_adjust_loss_for_gradient_accumulation(
     state_updates = {"loss": loss_adjusted}
 
     return state_updates
+
+
+def pad_batch_with_bos(batch_tensor: torch.Tensor, bos_value: int) -> torch.Tensor:
+    left_padding = 1
+    batch_tensor = pad(input=batch_tensor, pad=[left_padding, 0], value=bos_value)
+
+    return batch_tensor

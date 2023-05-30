@@ -19,13 +19,28 @@ import torch
 import torch.nn.functional as F
 from PIL import Image
 from aislib.misc_utils import get_logger, ensure_path_exists
-from torch.nn.functional import pad
 from torch.utils.data import DataLoader, Dataset
 from torchtext.vocab import Vocab
 from transformers.tokenization_utils import PreTrainedTokenizerBase
 
-from eir.data_load.data_preparation_modules.preparation_wrappers import (
-    prepare_sequence_output_manual_sample_data,
+from eir.data_load.data_preparation_modules.prepare_array import (
+    array_load_wrapper,
+    prepare_array_data,
+)
+from eir.data_load.data_preparation_modules.prepare_bytes import (
+    bytes_load_wrapper,
+    prepare_bytes_data,
+)
+from eir.data_load.data_preparation_modules.prepare_image import (
+    image_load_wrapper,
+    prepare_image_data,
+)
+from eir.data_load.data_preparation_modules.prepare_omics import (
+    omics_load_wrapper,
+    prepare_one_hot_omics_data,
+)
+from eir.data_load.data_preparation_modules.prepare_sequence import (
+    prepare_sequence_data,
 )
 from eir.data_load.data_utils import Batch
 from eir.data_load.datasets import (
@@ -33,10 +48,14 @@ from eir.data_load.datasets import (
     prepare_inputs_memory,
     al_getitem_return,
 )
-from eir.data_load.label_setup import al_label_transformers
+from eir.data_load.label_setup import (
+    al_label_transformers,
+    _streamline_values_for_transformers,
+)
 from eir.interpretation.interpret_image import un_normalize
 from eir.models.model_training_utils import predict_on_batch
 from eir.setup.input_setup_modules.setup_image import ImageNormalizationStats
+from eir.setup.input_setup_modules.setup_sequence import get_sequence_split_function
 from eir.setup.schema_modules.output_schemas_sequence import (
     SequenceOutputSamplingConfig,
 )
@@ -218,8 +237,10 @@ def convert_tabular_input_to_raw(
 ) -> Dict[str, np.ndarray]:
     all_reversed = {}
     for col_name, tensor_data in data.items():
-        transformer = input_transformers.get(col_name)
+        transformer = input_transformers[col_name]
         tensor_data_reshaped = tensor_data.numpy().reshape(-1, 1)
+        assert tensor_data_reshaped.shape[0] > 0, "Empty tensor"
+
         cur_reversed = transformer.inverse_transform(tensor_data_reshaped)
 
         cur_reversed = cur_reversed.squeeze()
@@ -228,33 +249,6 @@ def convert_tabular_input_to_raw(
         cur_reversed = cur_reversed.item()
         all_reversed[col_name] = cur_reversed
     return all_reversed
-
-
-def convert_bytes_input_to_raw(data: torch.Tensor) -> np.ndarray:
-    return data.numpy()
-
-
-def _post_prepare_manual_inputs(
-    raw_inputs: Dict[str, Any],
-    output_name: str,
-    input_objects: "al_input_objects_as_dict",
-) -> Dict[str, Any]:
-    raw_inputs_masked = {}
-
-    for input_name, raw_input in raw_inputs.items():
-        input_object = input_objects[input_name]
-        input_info = input_object.input_config.input_info
-
-        if input_name == output_name:
-            if input_info.input_type == "sequence":
-                raw_inputs_masked[output_name] = [i for i in raw_input if i != "<pad>"]
-            else:
-                raise NotImplementedError()
-
-        else:
-            raw_inputs_masked[input_name] = raw_input
-
-    return raw_inputs_masked
 
 
 def get_sequence_output_manual_input_samples(
@@ -273,12 +267,18 @@ def get_sequence_output_manual_input_samples(
         prepared_samples[output_name] = []
 
         for idx, single_sample_inputs in enumerate(sample_data_from_yaml):
-            input_to_model = prepare_sequence_output_manual_sample_data(
+            prepared_inputs = prepare_sequence_output_manual_sample_data(
                 sample_inputs=single_sample_inputs, input_objects=input_objects
             )
 
+            final_inputs = _post_prepare_manual_inputs(
+                prepared_inputs=prepared_inputs,
+                output_name=output_name,
+                input_objects=input_objects,
+            )
+
             cur_eval_sample = SequenceOutputEvalSample(
-                inputs_to_model=input_to_model,
+                inputs_to_model=final_inputs,
                 target_labels={},
                 sample_id=f"manual_{idx}",
             )
@@ -301,6 +301,7 @@ def get_sequence_output_auto_validation_samples(
     eval_sample_iterator: Iterator[al_getitem_return],
 ) -> Dict[str, Sequence[SequenceOutputEvalSample]]:
     prepared_eval_samples = {}
+    input_types = _extract_input_types(input_objects=input_objects)
 
     for config_idx, config in enumerate(output_configs):
         if not config.sampling_config or config.output_info.output_type != "sequence":
@@ -316,7 +317,7 @@ def get_sequence_output_auto_validation_samples(
             cur_inputs_masked = _mask_targets_for_auto_eval_generation(
                 inputs=input_to_model,
                 output_name=output_name,
-                input_objects=input_objects,
+                input_types=input_types,
             )
 
             cur_eval_sample = SequenceOutputEvalSample(
@@ -333,16 +334,13 @@ def get_sequence_output_auto_validation_samples(
 def _mask_targets_for_auto_eval_generation(
     inputs: Dict[str, Any],
     output_name: str,
-    input_objects: "al_input_objects_as_dict",
+    input_types: Dict[str, str],
 ) -> Dict[str, Any]:
     raw_inputs_masked = {}
 
     for input_name, raw_input in inputs.items():
-        input_object = input_objects[input_name]
-        input_info = input_object.input_config.input_info
-
         if input_name == output_name:
-            if input_info.input_type == "sequence":
+            if input_types[input_name] == "sequence":
                 raw_inputs_masked[output_name] = torch.tensor([[]], dtype=torch.long)
             else:
                 raise NotImplementedError()
@@ -351,6 +349,13 @@ def _mask_targets_for_auto_eval_generation(
             raw_inputs_masked[input_name] = raw_input
 
     return raw_inputs_masked
+
+
+def _extract_input_types(input_objects: "al_input_objects_as_dict") -> dict[str, str]:
+    input_types = {}
+    for input_name, input_object in input_objects.items():
+        input_types[input_name] = input_object.input_config.input_info.input_type
+    return input_types
 
 
 def _serialize_raw_inputs(
@@ -450,7 +455,6 @@ def autoregressive_sequence_generation(
         )
 
         batch = general_pre_process_prepared_inputs(
-            input_objects=input_objects,
             prepared_inputs=prepared_sample_inputs,
             target_labels=eval_sample.target_labels,
             sample_id=eval_sample.sample_id,
@@ -493,7 +497,7 @@ def _extract_base_generated_tokens(
     prepared_inputs: Dict[str, torch.Tensor], seq_output_name: str
 ) -> list[int]:
     tensor_base = prepared_inputs[seq_output_name]
-    assert tensor_base.dim() == 2
+    assert tensor_base.dim() == 2, tensor_base.dim()
 
     list_base = tensor_base.squeeze().tolist()
 
@@ -513,7 +517,7 @@ def _prepare_current_autoregressive_input(
     seq_output_name: str,
     max_length: int,
     pad_idx: int,
-) -> dict[str, Any]:
+) -> dict[str, torch.Tensor]:
     """
     Assuming max_length of 5:
 
@@ -590,11 +594,30 @@ def sample_next_token_index_from_output(
     return next_token_index
 
 
-def pad_batch_with_bos(batch_tensor: torch.Tensor, bos_value: int) -> torch.Tensor:
-    left_padding = 1
-    batch_tensor = pad(input=batch_tensor, pad=[left_padding, 0], value=bos_value)
+def top_k_top_p_filtering(
+    logits: torch.Tensor,
+    top_k: int = 0,
+    top_p: float = 0.0,
+    filter_value: float = -float("Inf"),
+) -> torch.Tensor:
+    assert logits.dim() == 1
+    top_k = min(top_k, logits.size(-1))
+    if top_k > 0:
+        indices_to_remove = logits < torch.topk(logits, top_k)[0][..., -1, None]
+        logits[indices_to_remove] = filter_value
 
-    return batch_tensor
+    if top_p > 0.0:
+        sorted_logits, sorted_indices = torch.sort(logits, descending=True)
+        cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
+
+        sorted_indices_to_remove = cumulative_probs > top_p
+        sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
+        sorted_indices_to_remove[..., 0] = 0
+
+        indices_to_remove = sorted_indices[sorted_indices_to_remove]
+        logits[indices_to_remove] = filter_value
+
+    return logits
 
 
 def general_pre_process_raw_inputs(
@@ -624,7 +647,6 @@ def general_pre_process_raw_inputs(
 
 
 def general_pre_process_prepared_inputs(
-    input_objects: "al_input_objects_as_dict",
     prepared_inputs: dict[str, Any],
     target_labels: dict[str, Any],
     sample_id: str,
@@ -651,32 +673,6 @@ def general_pre_process_prepared_inputs(
     batch_final = Batch(inputs=batch.inputs, target_labels={}, ids=list())
 
     return batch_final
-
-
-def top_k_top_p_filtering(
-    logits: torch.Tensor,
-    top_k: int = 0,
-    top_p: float = 0.0,
-    filter_value: float = -float("Inf"),
-) -> torch.Tensor:
-    assert logits.dim() == 1
-    top_k = min(top_k, logits.size(-1))
-    if top_k > 0:
-        indices_to_remove = logits < torch.topk(logits, top_k)[0][..., -1, None]
-        logits[indices_to_remove] = filter_value
-
-    if top_p > 0.0:
-        sorted_logits, sorted_indices = torch.sort(logits, descending=True)
-        cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
-
-        sorted_indices_to_remove = cumulative_probs > top_p
-        sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
-        sorted_indices_to_remove[..., 0] = 0
-
-        indices_to_remove = sorted_indices[sorted_indices_to_remove]
-        logits[indices_to_remove] = filter_value
-
-    return logits
 
 
 @dataclass
@@ -731,3 +727,153 @@ def decode_tokens(
         generated_sample = "".join(tokens_decoded)
 
     return generated_sample
+
+
+def prepare_sequence_output_manual_sample_data(
+    sample_inputs: Dict[str, Any], input_objects: "al_input_objects_as_dict"
+) -> Dict[str, Any]:
+    """
+    omics: File (np.array) on disk.
+    sequence: Written in yaml file.
+    bytes: File (any) on disk.
+    image: File (PIL readable) on disk.
+    tabular: Written in yaml file.
+    array: File (np.array) on disk.
+    """
+
+    prepared_inputs = {}
+    for name, data in sample_inputs.items():
+        input_object = input_objects[name]
+        input_info = input_object.input_config.input_info
+        input_type = input_info.input_type
+        input_type_info = input_object.input_config.input_type_info
+
+        match input_type:
+            case "omics":
+                array_raw = omics_load_wrapper(
+                    data_pointer=data,
+                    input_source=input_info.input_source,
+                    subset_indices=input_type_info.subset_snps_file,
+                    deeplake_inner_key=input_info.input_inner_key,
+                )
+
+                array_prepared = prepare_one_hot_omics_data(
+                    genotype_array=array_raw,
+                    na_augment_perc=input_type_info.na_augment_perc,
+                    na_augment_prob=input_type_info.na_augment_prob,
+                    test_mode=True,
+                )
+                prepared_inputs[name] = array_prepared
+
+            case "sequence":
+                split_func = get_sequence_split_function(
+                    split_on=input_type_info.split_on
+                )
+                sequence_split = split_func(data)
+                sequence_tokenized = input_object.encode_func(sequence_split)
+                sequence_array = np.array(sequence_tokenized)
+
+                prepared_sequence = prepare_sequence_data(
+                    sequence_input_object=input_object,
+                    cur_file_content_tokenized=sequence_array,
+                    test_mode=True,
+                )
+
+                prepared_inputs[name] = prepared_sequence
+
+            case "bytes":
+                bytes_data = bytes_load_wrapper(
+                    input_source=input_info.input_source,
+                    data_pointer=data,
+                    dtype=input_type_info.byte_encoding,
+                    deeplake_inner_key=input_info.input_inner_key,
+                )
+                prepared_bytes_input = prepare_bytes_data(
+                    bytes_input_object=input_object,
+                    bytes_data=bytes_data,
+                    test_mode=True,
+                )
+
+                prepared_inputs[name] = prepared_bytes_input
+
+            case "image":
+                image_data = image_load_wrapper(
+                    data_pointer=data,
+                    input_source=input_info.input_source,
+                    deeplake_inner_key=input_info.input_inner_key,
+                )
+                prepared_image_data = prepare_image_data(
+                    image_input_object=input_object,
+                    image_data=image_data,
+                    test_mode=True,
+                )
+                prepared_inputs[name] = prepared_image_data
+
+            case "tabular":
+                transformers = input_object.labels.label_transformers
+                tabular_data = _streamline_tabular_data_for_transformers(
+                    tabular_input=data, transformers=transformers
+                )
+                prepared_inputs[name] = tabular_data
+
+            case "array":
+                array_data = array_load_wrapper(
+                    input_source=input_info.input_source,
+                    data_pointer=data,
+                    deeplake_inner_key=input_info.input_inner_key,
+                )
+                prepared_array_data = prepare_array_data(array_data=array_data)
+                prepared_inputs[name] = prepared_array_data
+
+            case _:
+                raise ValueError(f"Unknown input type '{input_type}'")
+
+    return prepared_inputs
+
+
+def _streamline_tabular_data_for_transformers(
+    tabular_input: dict[str, np.ndarray], transformers: al_label_transformers
+) -> dict[str, np.ndarray]:
+    parsed_output = {}
+    for name, value in tabular_input.items():
+        cur_transformer = transformers[name]
+        value_np = np.array(value)
+        value_streamlined = _streamline_values_for_transformers(
+            transformer=cur_transformer, values=value_np
+        )
+        value_transformed = cur_transformer.transform(value_streamlined)
+        parsed_output[name] = value_transformed
+    return parsed_output
+
+
+def _post_prepare_manual_inputs(
+    prepared_inputs: Dict[str, Any],
+    output_name: str,
+    input_objects: "al_input_objects_as_dict",
+) -> Dict[str, torch.Tensor]:
+    prepared_inputs_masked = {}
+
+    for input_name, prepared_input in prepared_inputs.items():
+        input_object = input_objects[input_name]
+        input_info = input_object.input_config.input_info
+
+        specials = get_special_tokens(
+            tokenizer=input_object.tokenizer, vocab=input_object.vocab
+        )
+        pad_idx = specials.pad_idx
+
+        if input_name == output_name:
+            if input_info.input_type == "sequence":
+                prepared_inputs_masked[output_name] = torch.tensor(
+                    [i for i in prepared_input if i != pad_idx], dtype=torch.long
+                )
+            else:
+                raise NotImplementedError()
+
+        else:
+            prepared_inputs_masked[input_name] = prepared_input
+
+    prepared_inputs_batched = {
+        k: v.unsqueeze(0) for k, v in prepared_inputs_masked.items()
+    }
+    return prepared_inputs_batched

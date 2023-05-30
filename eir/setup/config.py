@@ -534,7 +534,7 @@ def get_feature_extractor_config_type_setup_hook(input_type: None) -> None:
     ...
 
 
-def get_feature_extractor_config_type_setup_hook(input_type):
+def get_feature_extractor_config_type_setup_hook(input_type: str):
     model_config_setup_map = get_model_config_type_setup_hook_map()
 
     return model_config_setup_map.get(input_type, None)
@@ -818,16 +818,6 @@ def get_output_config_type_init_callable_map() -> Dict[str, Dict[str, Type]]:
     }
 
     return mapping
-
-
-def load_configs_general(config_dict_iterable: Iterable[dict], cls: Type):
-    config_objects = []
-
-    for config_dict in config_dict_iterable:
-        config_object = cls(**config_dict)
-        config_objects.append(config_object)
-
-    return config_objects
 
 
 @dataclass

@@ -29,6 +29,7 @@ seed_everything(seed=0)
                     "n_epochs": 12,
                     "memory_dataset": True,
                     "mixing_alpha": 0.1,
+                    "early_stopping_patience": 5,
                     "attribution_background_samples": 8,
                 },
                 "input_configs": [

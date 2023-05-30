@@ -76,7 +76,7 @@ def create_test_data(request, tmp_path_factory, parse_test_cl_args) -> "TestData
     if "array" in test_data_config.modalities and not arrays_path.exists():
         array_sample_folder = create_test_array_data_and_labels(
             test_data_config=test_data_config,
-            array_outfolder=arrays_path,
+            array_output_folder=arrays_path,
         )
         if drop_random_samples:
             _delete_random_files_from_folder(folder=array_sample_folder, n_to_drop=50)

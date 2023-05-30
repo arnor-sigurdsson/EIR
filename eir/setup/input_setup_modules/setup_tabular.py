@@ -7,6 +7,10 @@ from eir.data_load.label_setup import (
     set_up_train_and_valid_tabular_data,
     TabularFileInfo,
 )
+from eir.experiment_io.experiment_io import (
+    get_run_folder_from_model_path,
+    load_transformers,
+)
 from eir.models.tabular.tabular import get_unique_values_from_transformers
 from eir.setup import schemas
 
@@ -82,3 +86,28 @@ def get_tabular_num_features(
     total_num_features = cat_num_features + len(con_columns)
 
     return total_num_features
+
+
+def set_up_tabular_input_from_pretrained(
+    input_config: schemas.InputConfig,
+    custom_input_name: str,
+    train_ids: Sequence[str],
+    valid_ids: Sequence[str],
+    hooks: Union["Hooks", None],
+) -> "ComputedTabularInputInfo":
+    tabular_input_object = set_up_tabular_input_for_training(
+        input_config=input_config, train_ids=train_ids, valid_ids=valid_ids, hooks=hooks
+    )
+
+    pretrained_run_folder = get_run_folder_from_model_path(
+        model_path=input_config.pretrained_config.model_path
+    )
+
+    loaded_transformers = load_transformers(
+        run_folder=pretrained_run_folder, transformers_to_load=None
+    )
+    loaded_transformers_input = loaded_transformers[custom_input_name]
+
+    tabular_input_object.labels.label_transformers = loaded_transformers_input
+
+    return tabular_input_object

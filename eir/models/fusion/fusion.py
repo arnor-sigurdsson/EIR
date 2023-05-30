@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Type, Union, Dict, Callable, NewType
+from typing import Type, Union, Dict, Callable, NewType, Literal
 
 import torch
 from torch import nn
@@ -24,25 +24,28 @@ def get_fusion_modules(
     ],
     modules_to_fuse: nn.ModuleDict,
     out_feature_per_feature_extractor: Dict[str, int],
+    output_types: dict[str, Literal["tabular", "sequence"]],
 ) -> nn.ModuleDict:
     fusion_modules = nn.ModuleDict()
 
     fusion_in_dim = _get_fusion_input_dimension(modules_to_fuse=modules_to_fuse)
-    fusion_class = get_fusion_class(fusion_model_type=model_type)
-    computing_fusion_module = fusion_class(
-        model_config=model_config,
-        fusion_in_dim=fusion_in_dim,
-        out_feature_per_feature_extractor=out_feature_per_feature_extractor,
-    )
 
-    pass_through_fusion_module = fusion_identity.IdentityFusionModel(
-        model_config=model_config,
-        fusion_in_dim=fusion_in_dim,
-        fusion_callable=pass_through_fuse,
-    )
+    if any(i for i in output_types.values() if i == "tabular"):
+        fusion_class = get_fusion_class(fusion_model_type=model_type)
+        computing_fusion_module = fusion_class(
+            model_config=model_config,
+            fusion_in_dim=fusion_in_dim,
+            out_feature_per_feature_extractor=out_feature_per_feature_extractor,
+        )
+        fusion_modules["computed"] = computing_fusion_module
 
-    fusion_modules["computed"] = computing_fusion_module
-    fusion_modules["pass-through"] = pass_through_fusion_module
+    if any(i for i in output_types.values() if i == "sequence"):
+        pass_through_fusion_module = fusion_identity.IdentityFusionModel(
+            model_config=model_config,
+            fusion_in_dim=fusion_in_dim,
+            fusion_callable=pass_through_fuse,
+        )
+        fusion_modules["pass-through"] = pass_through_fusion_module
 
     return fusion_modules
 
