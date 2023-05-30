@@ -22,7 +22,7 @@ jobs:
       - name: Run tests with Python ${{ matrix.python-version }} on ${{ matrix.os }}
         run: |
           pip install tox==4.5.1
-          pip install poetry==1.4.2
+          pip install poetry==1.5.0
           tox -e py
 
   getrelease:
@@ -70,7 +70,7 @@ jobs:
         with:
           python-version: '3.11'
           architecture: x64
-      - run: pip install poetry==1.4.2
+      - run: pip install poetry==1.5.0
       - run: poetry build
       - run: poetry publish --username=__token__ --password=${{ secrets.PYPI_TOKEN }}
 

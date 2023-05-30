@@ -86,12 +86,11 @@ class SequenceOutputModule(nn.Module):
 
             match feature_extractor_info.input_type:
                 case "sequence":
-                    in_elements = feature_extractor_info.input_dimension.num_elements()
                     in_embed = feature_extractor_info.input_dimension.width
                 case _:
-                    in_elements = feature_extractor_info.output_dimension
                     in_embed = feature_extractor_info.output_dimension
 
+            in_elements = feature_extractor_info.output_dimension
             cur_projection = MetaSequenceProjection(
                 in_total_num_elements=in_elements,
                 in_embedding_dim=in_embed,

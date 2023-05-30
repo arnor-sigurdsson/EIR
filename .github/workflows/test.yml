@@ -17,5 +17,5 @@ jobs:
       - name: Run tests with Python ${{ matrix.python-version }} on ${{ matrix.os }}
         run: |
           pip install tox==4.5.1
-          pip install poetry==1.4.2
+          pip install poetry==1.5.0
           tox -e py

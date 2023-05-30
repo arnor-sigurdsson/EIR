@@ -265,6 +265,9 @@ def _get_predict_test_data_parametrization() -> List[Dict[str, Any]]:
                             "target_con_columns": [],
                         },
                     },
+                    {
+                        "output_info": {"output_name": "test_output_sequence"},
+                    },
                 ],
             },
         },
@@ -316,7 +319,33 @@ def test_predict(
         predict_config=predict_config,
     )
 
-    origin_predictions_path = tmp_path / "test_output" / "Origin" / "predictions.csv"
+    _check_tabular_predict_results(
+        tmp_path_=tmp_path,
+        base_experiment=experiment,
+        train_configs_for_testing=train_configs_for_testing,
+    )
+
+    _check_sequence_predict_results(tmp_path=tmp_path, expected_n_samples=10)
+
+
+def _check_sequence_predict_results(tmp_path: Path, expected_n_samples: int) -> None:
+    sequence_predictions_path = (
+        tmp_path / "results/test_output_sequence/test_output_sequence/samples/0/auto"
+    )
+    assert sequence_predictions_path.exists()
+
+    found_files = list(
+        i for i in sequence_predictions_path.iterdir() if i.suffix == ".txt"
+    )
+    assert len(found_files) == expected_n_samples
+
+
+def _check_tabular_predict_results(
+    tmp_path_: Path,
+    base_experiment: train.Experiment,
+    train_configs_for_testing: predict.LoadedTrainExperiment,
+) -> None:
+    origin_predictions_path = tmp_path_ / "test_output" / "Origin" / "predictions.csv"
     df_test = pd.read_csv(origin_predictions_path, index_col="ID")
 
     tabular_infos = get_tabular_target_file_infos(
@@ -328,7 +357,7 @@ def test_predict(
     assert len(target_tabular_info.cat_columns) == 1
     target_column = target_tabular_info.cat_columns[0]
 
-    output = experiment.outputs["test_output"]
+    output = base_experiment.outputs["test_output"]
     target_classes = sorted(output.target_transformers[target_column].classes_)
 
     # check that columns in predictions.csv are in correct sorted order
@@ -341,4 +370,4 @@ def test_predict(
     prediction_accuracy = (predictions == true_labels).sum() / len(true_labels)
     assert prediction_accuracy > 0.7
 
-    assert (tmp_path / "test_output/Origin/attributions").exists()
+    assert (tmp_path_ / "test_output/Origin/attributions").exists()

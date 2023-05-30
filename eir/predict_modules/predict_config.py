@@ -264,22 +264,21 @@ def _get_maybe_patched_null_sequence_output_source_for_generation(
     predict_dict_iterator: Iterable[dict],
 ) -> Iterable[dict]:
     for output_config in predict_dict_iterator:
-        assert output_config["output_info"]["output_type"] == "sequence"
+        if output_config["output_info"]["output_type"] == "sequence":
+            if output_config["output_info"]["output_source"] is None:
+                output_name = output_config["output_info"]["output_name"]
 
-        if output_config["output_info"]["output_source"] is None:
-            output_name = output_config["output_info"]["output_name"]
+                logger.info(
+                    f"Got 'None' as output source for sequence output: {output_name}. "
+                    f"Patching output source to a temporary directory "
+                    f"for generation."
+                )
 
-            logger.info(
-                f"Got 'None' as output source for sequence output: {output_name}. "
-                f"Patching output source to a temporary directory "
-                f"for generation."
-            )
+                tmp_dir = tempfile.mkdtemp()
+                tmp_file = Path(tmp_dir) / f"{output_name}_seed_file.txt"
+                tmp_file.touch()
 
-            tmp_dir = tempfile.mkdtemp()
-            tmp_file = Path(tmp_dir) / f"{output_name}_seed_file.txt"
-            tmp_file.touch()
-
-            output_config["output_info"]["output_source"] = str(tmp_dir)
+                output_config["output_info"]["output_source"] = str(tmp_dir)
 
         yield output_config
 

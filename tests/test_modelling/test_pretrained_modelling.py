@@ -78,6 +78,9 @@ def _get_pre_trained_module_setup_parametrization() -> Dict:
                         "target_con_columns": ["Height"],
                     },
                 },
+                {
+                    "output_info": {"output_name": "test_output_sequence"},
+                },
             ],
         },
     }
@@ -242,6 +245,9 @@ def _add_new_feature_extractor_to_experiment(
                             "target_con_columns": ["Height"],
                         },
                     },
+                    {
+                        "output_info": {"output_name": "test_output_sequence"},
+                    },
                 ],
             },
         }
@@ -307,35 +313,20 @@ def _get_experiment_overloaded_for_pretrained_extractor(
     rename_pretrained_inputs: bool,
     skip_pretrained_keys: Sequence[str] = tuple(),
 ) -> Tuple[train.Experiment, "ModelTestConfig"]:
-    input_configs = deepcopy(experiment.configs.input_configs)
-    pretrained_configs = deepcopy(experiment.configs)
-    saved_model_path = next((test_config.run_path / "saved_models").iterdir())
+    pretrained_configs = _get_input_configs_with_pretrained_modifications(
+        run_path=test_config.run_path,
+        pretrained_configs=experiment.configs,
+        skip_pretrained_keys=skip_pretrained_keys,
+        rename_pretrained_inputs=rename_pretrained_inputs,
+    )
 
-    input_configs_with_pretrained = []
-    for cur_input_config in input_configs:
-        cur_name = cur_input_config.input_info.input_name
+    pretrained_configs = _get_output_configs_with_pretrained_modifications(
+        pretrained_configs=pretrained_configs,
+        rename_pretrained_inputs=rename_pretrained_inputs,
+    )
 
-        if cur_name in skip_pretrained_keys:
-            continue
-
-        cur_pretrained_config = BasicPretrainedConfig(
-            model_path=str(saved_model_path), load_module_name=cur_name
-        )
-        cur_input_config.pretrained_config = cur_pretrained_config
-
-        # Check that the names can differ
-        if rename_pretrained_inputs:
-            cur_input_config.input_info.input_name = cur_name + "_pretrained_module"
-
-        input_configs_with_pretrained.append(cur_input_config)
-
-    pretrained_configs.input_configs = input_configs_with_pretrained
-
-    pretrained_configs.global_config.n_epochs = 6
-    pretrained_configs.global_config.sample_interval = 200
-    pretrained_configs.global_config.checkpoint_interval = 200
-    pretrained_configs.global_config.output_folder = (
-        pretrained_configs.global_config.output_folder + "_with_pretrained"
+    pretrained_configs = _get_pretrained_config_with_modified_globals(
+        pretrained_configs=pretrained_configs
     )
 
     run_path = Path(f"{pretrained_configs.global_config.output_folder}/")
@@ -359,6 +350,88 @@ def _get_experiment_overloaded_for_pretrained_extractor(
     )
 
     return pretrained_experiment, pretrained_test_config
+
+
+def _get_input_configs_with_pretrained_modifications(
+    pretrained_configs: train.Configs,
+    run_path: Path,
+    rename_pretrained_inputs: bool,
+    skip_pretrained_keys: Sequence[str] = tuple(),
+) -> train.Configs:
+    """
+    `rename_pretrained_inputs`:
+        To check that we can use the `load_module_name` argument, where we have
+        a different name for the input module in the pretrained model than in the
+        current model.
+    """
+    pretrained_configs = deepcopy(pretrained_configs)
+    input_configs = pretrained_configs.input_configs
+    saved_model_path = next((run_path / "saved_models").iterdir())
+
+    input_configs_with_pretrained = []
+    for cur_input_config in input_configs:
+        cur_name = cur_input_config.input_info.input_name
+
+        if cur_name in skip_pretrained_keys:
+            continue
+
+        cur_pretrained_config = BasicPretrainedConfig(
+            model_path=str(saved_model_path), load_module_name=cur_name
+        )
+        cur_input_config.pretrained_config = cur_pretrained_config
+
+        # Check that the names can differ
+        if rename_pretrained_inputs:
+            cur_input_config.input_info.input_name = cur_name + "_pretrained_module"
+
+        input_configs_with_pretrained.append(cur_input_config)
+
+    pretrained_configs.input_configs = input_configs_with_pretrained
+
+    return pretrained_configs
+
+
+def _get_output_configs_with_pretrained_modifications(
+    pretrained_configs: train.Configs,
+    rename_pretrained_inputs: bool,
+) -> train.Configs:
+    """
+    This is needed because we are modifying the configs from a previous experiment
+    directly, and we need to make sure that the output configs are also modified
+    when because the assumption os that the input-output configs are in sync.
+    """
+    pretrained_configs = deepcopy(pretrained_configs)
+    output_configs = pretrained_configs.output_configs
+
+    output_configs_with_pretrained = []
+    for output_config in output_configs:
+        if output_config.output_info.output_type != "sequence":
+            continue
+
+        cur_name = output_config.output_info.output_name
+        if rename_pretrained_inputs:
+            output_config.output_info.output_name = cur_name + "_pretrained_module"
+
+        output_configs_with_pretrained.append(output_config)
+
+    pretrained_configs.output_configs = output_configs_with_pretrained
+
+    return pretrained_configs
+
+
+def _get_pretrained_config_with_modified_globals(
+    pretrained_configs: train.Configs,
+) -> train.Configs:
+    pretrained_configs = deepcopy(pretrained_configs)
+
+    pretrained_configs.global_config.n_epochs = 6
+    pretrained_configs.global_config.sample_interval = 200
+    pretrained_configs.global_config.checkpoint_interval = 200
+    pretrained_configs.global_config.output_folder = (
+        pretrained_configs.global_config.output_folder + "_with_pretrained"
+    )
+
+    return pretrained_configs
 
 
 def _get_experiment_overloaded_for_pretrained_checkpoint(

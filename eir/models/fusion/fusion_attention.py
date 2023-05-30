@@ -39,13 +39,15 @@ class MetaSequenceProjection(nn.Module):
     def forward(
         self, input_tensor: torch.Tensor, target_tensor: torch.Tensor
     ) -> torch.Tensor:
-        lcl_projected = self.projection(input_tensor)
+        projected = self.projection(input_tensor)
 
         cross_attended = self.cross_attention_projection(
             x=target_tensor, context=input_tensor
         )
 
-        return lcl_projected + cross_attended
+        out = projected + cross_attended
+
+        return out
 
 
 class SequenceProjection(nn.Module):

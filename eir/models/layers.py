@@ -570,15 +570,6 @@ def get_projection_layer(
     if input_dimension == target_dimension:
         return nn.Identity()
 
-    lcl_projection = get_lcl_projection_layer(
-        input_dimension=input_dimension,
-        target_dimension=target_dimension,
-        layer_type="lcl",
-    )
-
-    if lcl_projection is not None:
-        return lcl_projection
-
     lcl_residual_projection = get_lcl_projection_layer(
         input_dimension=input_dimension,
         target_dimension=target_dimension,
@@ -587,6 +578,15 @@ def get_projection_layer(
 
     if lcl_residual_projection is not None:
         return lcl_residual_projection
+
+    lcl_projection = get_lcl_projection_layer(
+        input_dimension=input_dimension,
+        target_dimension=target_dimension,
+        layer_type="lcl",
+    )
+
+    if lcl_projection is not None:
+        return lcl_projection
 
     return nn.Linear(
         in_features=input_dimension,
