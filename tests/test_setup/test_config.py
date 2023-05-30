@@ -76,14 +76,8 @@ def test_generate_aggregated_config_basic(
 ):
     test_cl_args = Namespace(**create_cl_args_config_files)
 
-    tabular_output_setup = config.DynamicOutputSetup(
-        output_types_schema_map=config.get_outputs_types_schema_map(),
-        output_module_config_class_getter=config.get_output_module_config_class,
-        output_module_init_class_map=config.get_output_config_type_init_callable_map(),
-    )
-
     aggregated_config = config.generate_aggregated_config(
-        cl_args=test_cl_args, dynamic_output_setup=tabular_output_setup
+        cl_args=test_cl_args,
     )
     assert aggregated_config.global_config.output_folder == "runs/test_run"
 
@@ -145,15 +139,9 @@ def test_generate_aggregated_config_fail(
 
     test_cl_args = Namespace(**create_cl_args_config_files)
 
-    tabular_output_setup = config.DynamicOutputSetup(
-        output_types_schema_map=config.get_outputs_types_schema_map(),
-        output_module_config_class_getter=config.get_output_module_config_class,
-        output_module_init_class_map=config.get_output_config_type_init_callable_map(),
-    )
-
     with pytest.raises(ValueError):
         config.generate_aggregated_config(
-            cl_args=test_cl_args, dynamic_output_setup=tabular_output_setup
+            cl_args=test_cl_args,
         )
 
 
@@ -194,15 +182,8 @@ def test_generate_aggregated_config_fail(
 def test_generate_aggregated_config_with_overload(create_cl_args_config_files):
     test_cl_args = Namespace(**create_cl_args_config_files)
 
-    tabular_output_setup = config.DynamicOutputSetup(
-        output_types_schema_map=config.get_outputs_types_schema_map(),
-        output_module_config_class_getter=config.get_output_module_config_class,
-        output_module_init_class_map=config.get_output_config_type_init_callable_map(),
-    )
-
     aggregated_config = config.generate_aggregated_config(
         cl_args=test_cl_args,
-        dynamic_output_setup=tabular_output_setup,
         extra_cl_args_overload=["--input_0.input_info.input_source=test_value"],
     )
     assert aggregated_config.global_config.output_folder == "runs/test_run"

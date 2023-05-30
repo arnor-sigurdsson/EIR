@@ -407,15 +407,8 @@ def overload_train_configs_for_predict(
         [main_overloaded_kwargs.get("fusion_config")]
     )
 
-    tabular_output_setup = config.DynamicOutputSetup(
-        output_types_schema_map=config.get_outputs_types_schema_map(),
-        output_module_config_class_getter=config.get_output_module_config_class,
-        output_module_init_class_map=config.get_output_config_type_init_callable_map(),
-    )
-
     output_configs_overloaded = config.load_output_configs(
         output_configs=main_overloaded_kwargs.get("output_configs"),
-        dynamic_output_setup=tabular_output_setup,
     )
 
     train_configs_overloaded = config.Configs(

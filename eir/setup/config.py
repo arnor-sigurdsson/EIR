@@ -15,7 +15,6 @@ from typing import (
     Type,
     Any,
     Callable,
-    overload,
     Generator,
     Mapping,
 )
@@ -86,13 +85,6 @@ al_output_model_init_map = Dict[str, al_output_model_configs]
 logger = get_logger(name=__name__)
 
 
-@dataclass
-class DynamicOutputSetup:
-    output_types_schema_map: al_output_types_schema_map
-    output_module_config_class_getter: al_output_module_config_class_getter
-    output_module_init_class_map: al_output_model_init_map
-
-
 def get_configs():
     main_cl_args, extra_cl_args = get_main_cl_args()
 
@@ -102,15 +94,9 @@ def get_configs():
 
     configure_global_eir_logging(output_folder=output_folder, log_level=log_level)
 
-    dynamic_output_setup = DynamicOutputSetup(
-        output_types_schema_map=get_outputs_types_schema_map(),
-        output_module_config_class_getter=get_output_module_config_class,
-        output_module_init_class_map=get_output_config_type_init_callable_map(),
-    )
     configs = generate_aggregated_config(
         cl_args=main_cl_args,
         extra_cl_args_overload=extra_cl_args,
-        dynamic_output_setup=dynamic_output_setup,
     )
 
     configs_with_seq_outputs = get_configs_object_with_seq_output_configs(
@@ -229,7 +215,6 @@ class Configs:
 
 def generate_aggregated_config(
     cl_args: Union[argparse.Namespace, types.SimpleNamespace],
-    dynamic_output_setup: DynamicOutputSetup,
     extra_cl_args_overload: Union[List[str], None] = None,
     strict: bool = True,
 ) -> Configs:
@@ -254,10 +239,7 @@ def generate_aggregated_config(
         yaml_config_files=cl_args.output_configs,
         extra_cl_args=extra_cl_args_overload,
     )
-    output_configs = load_output_configs(
-        output_configs=output_config_iter,
-        dynamic_output_setup=dynamic_output_setup,
-    )
+    output_configs = load_output_configs(output_configs=output_config_iter)
 
     if strict:
         _check_input_and_output_config_names(
@@ -328,7 +310,9 @@ def init_input_config(yaml_config_as_dict: Dict[str, Any]) -> schemas.InputConfi
 
     input_schema_map = get_inputs_schema_map()
     input_type_info_class = input_schema_map[input_info_object.input_type]
-    input_type_info_object = input_type_info_class(**cfg.get("input_type_info", {}))
+    input_type_info_kwargs = cfg.get("input_type_info", {})
+    input_type_info_object = input_type_info_class(**input_type_info_kwargs)
+
     _validate_input_type_info_object(
         input_type_info_object=input_type_info_object,
         input_source=input_info_object.input_source,
@@ -430,7 +414,7 @@ def set_up_input_feature_extractor_config(
     model_type_init_config = set_up_feature_extractor_init_config(
         input_info_object=input_info_object,
         input_type_info_object=input_type_info_object,
-        model_init_kwargs_base=model_init_kwargs_base.get("model_init_config", {}),
+        model_init_kwargs=model_init_kwargs_base.get("model_init_config", {}),
         model_type=model_type,
     )
 
@@ -473,7 +457,7 @@ def get_input_feature_extractor_config_init_class_map() -> (
 def set_up_feature_extractor_init_config(
     input_info_object: schemas.InputDataConfig,
     input_type_info_object: al_input_types,
-    model_init_kwargs_base: Union[None, dict],
+    model_init_kwargs: Union[None, dict],
     model_type: str,
 ) -> Dict:
     if getattr(input_type_info_object, "pretrained_model", None):
@@ -484,22 +468,10 @@ def set_up_feature_extractor_init_config(
         model_type=model_type,
     )
     if not_from_eir:
-        return model_init_kwargs_base
+        return model_init_kwargs
 
-    if not model_init_kwargs_base:
-        model_init_kwargs_base = {}
-
-    model_init_kwargs = copy(model_init_kwargs_base)
-
-    model_config_type_setup_hook = get_feature_extractor_config_type_setup_hook(
-        input_type=input_info_object.input_type
-    )
-    if model_config_type_setup_hook:
-        model_init_kwargs = model_config_type_setup_hook(
-            init_kwargs=model_init_kwargs,
-            input_info_object=input_info_object,
-            input_type_info_object=input_type_info_object,
-        )
+    if not model_init_kwargs:
+        model_init_kwargs = {}
 
     model_config_map = get_feature_extractor_config_type_init_callable_map()
     model_config_callable = model_config_map[model_type]
@@ -520,43 +492,6 @@ def get_is_not_eir_model_condition(
     is_unknown_sequence_model = model_type not in ("sequence-default",)
     not_from_eir = is_possibly_external and is_unknown_sequence_model
     return not_from_eir
-
-
-@overload
-def get_feature_extractor_config_type_setup_hook(
-    input_type: str,
-) -> Callable[[dict, schemas.InputDataConfig, al_input_types], dict]:
-    ...
-
-
-@overload
-def get_feature_extractor_config_type_setup_hook(input_type: None) -> None:
-    ...
-
-
-def get_feature_extractor_config_type_setup_hook(input_type: str):
-    model_config_setup_map = get_model_config_type_setup_hook_map()
-
-    return model_config_setup_map.get(input_type, None)
-
-
-def get_model_config_type_setup_hook_map():
-    mapping = {
-        "omics": set_up_config_object_init_kwargs_identity,
-        "tabular": set_up_config_object_init_kwargs_identity,
-        "sequence": set_up_config_object_init_kwargs_identity,
-        "bytes": set_up_config_object_init_kwargs_identity,
-        "image": set_up_config_object_init_kwargs_identity,
-        "array": set_up_config_object_init_kwargs_identity,
-    }
-
-    return mapping
-
-
-def set_up_config_object_init_kwargs_identity(
-    init_kwargs: dict, *args, **kwargs
-) -> dict:
-    return init_kwargs
 
 
 def get_feature_extractor_config_type_init_callable_map() -> Dict[str, Type]:
@@ -607,7 +542,7 @@ def set_up_interpretation_config(
 
 def get_interpretation_config_class(
     input_type: str,
-) -> Union[None, schemas.BasicInterpretationConfig]:
+) -> Union[None, Type[schemas.BasicInterpretationConfig]]:
     mapping = get_interpretation_config_schema_map()
 
     return mapping.get(input_type, None)
@@ -650,14 +585,12 @@ def load_fusion_configs(fusion_configs: Iterable[dict]) -> schemas.FusionConfig:
 
 def load_output_configs(
     output_configs: Iterable[dict],
-    dynamic_output_setup: DynamicOutputSetup,
 ) -> Sequence[schemas.OutputConfig]:
     output_config_objects = []
 
     for config_dict in output_configs:
         config_object = init_output_config(
             yaml_config_as_dict=config_dict,
-            dynamic_output_setup=dynamic_output_setup,
         )
         output_config_objects.append(config_object)
 
@@ -680,22 +613,22 @@ def _check_output_config_names(output_configs: Iterable[schemas.OutputConfig]) -
 
 def init_output_config(
     yaml_config_as_dict: Dict[str, Any],
-    dynamic_output_setup: DynamicOutputSetup,
 ) -> schemas.OutputConfig:
     cfg = yaml_config_as_dict
-    ds = dynamic_output_setup
 
     output_info_object = schemas.OutputInfoConfig(**cfg["output_info"])
 
-    output_schema_map = ds.output_types_schema_map
+    output_schema_map = get_outputs_types_schema_map()
     output_type_info_class = output_schema_map[output_info_object.output_type]
-    output_type_info_object = output_type_info_class(**cfg.get("output_type_info", {}))
+
+    output_type_info_class_init_kwargs = cfg.get("output_type_info", {})
+    output_type_info_object = output_type_info_class(
+        **output_type_info_class_init_kwargs
+    )
 
     model_config = set_up_output_module_config(
         output_info_object=output_info_object,
         model_init_kwargs_base=cfg.get("model_config", {}),
-        output_module_config_class_getter=ds.output_module_config_class_getter,
-        output_module_init_class_map=ds.output_module_init_class_map,
     )
 
     output_config = schemas.OutputConfig(
@@ -744,12 +677,10 @@ def get_output_module_config_class_map() -> (
 def set_up_output_module_config(
     output_info_object: schemas.OutputInfoConfig,
     model_init_kwargs_base: Union[None, dict],
-    output_module_config_class_getter: al_output_module_config_class_getter,
-    output_module_init_class_map: al_output_model_init_map,
 ) -> schemas.al_output_module_configs:
     output_type = output_info_object.output_type
 
-    model_config_class = output_module_config_class_getter(output_type=output_type)
+    model_config_class = get_output_module_config_class(output_type=output_type)
 
     model_type = None
     if model_init_kwargs_base:
@@ -770,6 +701,8 @@ def set_up_output_module_config(
             "attempting to grab default value.",
             output_info_object.output_name,
         )
+
+    output_module_init_class_map = get_output_config_type_init_callable_map()
 
     model_type_config = set_up_output_module_init_config(
         model_init_kwargs_base=model_init_kwargs_base.get("model_init_config", {}),

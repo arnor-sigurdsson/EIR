@@ -114,15 +114,8 @@ def create_test_config(
         fusion_configs=test_init.fusion_configs
     )
 
-    dynamic_output_setup = config.DynamicOutputSetup(
-        output_types_schema_map=config.get_outputs_types_schema_map(),
-        output_module_config_class_getter=config.get_output_module_config_class,
-        output_module_init_class_map=config.get_output_config_type_init_callable_map(),
-    )
-
     test_output_configs = config.load_output_configs(
         output_configs=test_init.output_configs,
-        dynamic_output_setup=dynamic_output_setup,
     )
 
     test_configs = config.Configs(
