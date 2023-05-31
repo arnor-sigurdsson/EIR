@@ -49,3 +49,5 @@ class SequenceOutputModuleConfig:
 
     position: Literal["encode", "embed"] = "encode"
     position_dropout: float = 0.10
+
+    projection_layer_type: Literal["auto", "lcl", "lcl_residual", "linear"] = "auto"

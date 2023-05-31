@@ -190,15 +190,21 @@ def _build_matched_sequence_model_config_kwargs(
     sequence_output_config: schemas.OutputConfig,
     input_config_to_overload: Optional[schemas.InputConfig] = None,
 ) -> ExtractedAttributesFromOutputConfig:
+    sequence_keys_to_exclude = (
+        _get_keys_to_exclude_from_output_input_sequence_overloading()
+    )
+
     if input_config_to_overload:
-        model_config_keys = _extract_model_config_keys(
-            model_config=input_config_to_overload.model_config
+        model_config_kwargs = _extract_model_config_kwargs(
+            model_config=input_config_to_overload.model_config,
+            keys_to_exclude=sequence_keys_to_exclude,
         )
         model_init_config = input_config_to_overload.model_config.model_init_config
         pretrained_config = input_config_to_overload.pretrained_config
     else:
-        model_config_keys = _extract_model_config_keys(
-            model_config=sequence_output_config.model_config
+        model_config_kwargs = _extract_model_config_kwargs(
+            model_config=sequence_output_config.model_config,
+            keys_to_exclude=sequence_keys_to_exclude,
         )
         model_init_config_kwargs = (
             sequence_output_config.model_config.model_init_config.__dict__
@@ -209,7 +215,7 @@ def _build_matched_sequence_model_config_kwargs(
         pretrained_config = None
 
     extracted_attributes = ExtractedAttributesFromOutputConfig(
-        model_config_kwargs=model_config_keys,
+        model_config_kwargs=model_config_kwargs,
         model_init_config=model_init_config,
         pretrained_config=pretrained_config,
     )
@@ -217,9 +223,21 @@ def _build_matched_sequence_model_config_kwargs(
     return extracted_attributes
 
 
-def _extract_model_config_keys(
+def _get_keys_to_exclude_from_output_input_sequence_overloading() -> tuple[str, ...]:
+    """
+    These keys are either exclusive to the output configuration, or possibly
+    overloaded by the input configuration.
+    """
+    return (
+        "model_type",
+        "model_init_config",
+        "projection_layer_type",
+    )
+
+
+def _extract_model_config_kwargs(
     model_config: schemas.SequenceModelConfig | schemas.SequenceOutputModuleConfig,
-    keys_to_exclude: tuple[str] = ("model_type", "model_init_config"),
+    keys_to_exclude: tuple[str],
 ) -> dict[str, Any]:
     extracted = {
         k: v for k, v in model_config.__dict__.items() if k not in keys_to_exclude

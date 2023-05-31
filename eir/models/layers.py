@@ -566,33 +566,61 @@ def _calculate_num_chunks_for_equal_lcl_out_features(
 def get_projection_layer(
     input_dimension: int,
     target_dimension: int,
+    projection_layer_type: Literal["auto", "lcl", "lcl_residual", "linear"] = "auto",
 ) -> LCLResidualBlock | LCL | nn.Linear | nn.Identity:
-    if input_dimension == target_dimension:
-        return nn.Identity()
+    if projection_layer_type == "auto":
+        if input_dimension == target_dimension:
+            return nn.Identity()
 
-    lcl_residual_projection = get_lcl_projection_layer(
-        input_dimension=input_dimension,
-        target_dimension=target_dimension,
-        layer_type="lcl_residual",
-    )
+        lcl_residual_projection = get_lcl_projection_layer(
+            input_dimension=input_dimension,
+            target_dimension=target_dimension,
+            layer_type="lcl_residual",
+        )
 
-    if lcl_residual_projection is not None:
-        return lcl_residual_projection
+        if lcl_residual_projection is not None:
+            return lcl_residual_projection
 
-    lcl_projection = get_lcl_projection_layer(
-        input_dimension=input_dimension,
-        target_dimension=target_dimension,
-        layer_type="lcl",
-    )
+        lcl_projection = get_lcl_projection_layer(
+            input_dimension=input_dimension,
+            target_dimension=target_dimension,
+            layer_type="lcl",
+        )
 
-    if lcl_projection is not None:
-        return lcl_projection
+        if lcl_projection is not None:
+            return lcl_projection
 
-    return nn.Linear(
-        in_features=input_dimension,
-        out_features=target_dimension,
-        bias=True,
-    )
+        return nn.Linear(
+            in_features=input_dimension,
+            out_features=target_dimension,
+            bias=True,
+        )
+
+    elif projection_layer_type == "lcl_residual":
+        return get_lcl_projection_layer(
+            input_dimension=input_dimension,
+            target_dimension=target_dimension,
+            layer_type="lcl_residual",
+        )
+
+    elif projection_layer_type == "lcl":
+        return get_lcl_projection_layer(
+            input_dimension=input_dimension,
+            target_dimension=target_dimension,
+            layer_type="lcl",
+        )
+
+    elif projection_layer_type == "linear":
+        if input_dimension == target_dimension:
+            return nn.Identity()
+        else:
+            return nn.Linear(
+                in_features=input_dimension,
+                out_features=target_dimension,
+                bias=True,
+            )
+    else:
+        raise ValueError(f"Invalid projection_layer_type: {projection_layer_type}")
 
 
 def get_lcl_projection_layer(

@@ -56,7 +56,7 @@ and so on:
 
 - ``perceiver-pytorch``  – Phil Wang: Perceiver - Pytorch
 
-- ``timm``  – Ross Wightman: (Unofficial) PyTorch Image Models
+- ``timm``  – Ross Wightman: PyTorch Image Models
 
 - ``captum``  – PyTorch Team: Model interpretability for PyTorch
 
@@ -76,7 +76,7 @@ and so on:
 
 - ``ipykernel`` : IPython Kernel for Jupyter
 
-- ``coverage``  – Ned Batchelder and 211 others: Code coverage measurement for Python
+- ``coverage``  – Ned Batchelder and 213 others: Code coverage measurement for Python
 
 - ``snakeviz`` : A web-based viewer for Python profiler output
 

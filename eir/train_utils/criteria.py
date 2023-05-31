@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Dict, Union, Callable, Type, Literal, TYPE_CHECKING
+from typing import Dict, Union, Callable, Type, TYPE_CHECKING
 
 import torch
 from torch import nn
@@ -9,19 +9,12 @@ from eir.train_utils.metrics import calculate_prediction_losses
 
 if TYPE_CHECKING:
     from eir.setup.output_setup import al_output_objects_as_dict
+    from eir.setup.schemas import al_cat_loss_names, al_con_loss_names
 
-al_cat_loss_names = Literal["CrossEntropyLoss"]
-al_con_loss_names = Literal[
-    "MSELoss",
-    "L1Loss",
-    "SmoothL1Loss",
-    "PoissonNLLLoss",
-    "GaussianNLLLoss",
-]
 
 al_cat_losses = nn.CrossEntropyLoss
 al_con_losses = (
-    nn.MSELoss | nn.L1Loss | nn.SmoothL1Loss | nn.PoissonNLLLoss | nn.GaussianNLLLoss
+    nn.MSELoss | nn.L1Loss | nn.SmoothL1Loss | nn.PoissonNLLLoss | nn.HuberLoss
 )
 
 al_criteria = al_con_losses | al_cat_losses
@@ -34,7 +27,7 @@ al_losses_classes = [
     Type[nn.L1Loss],
     Type[nn.SmoothL1Loss],
     Type[nn.PoissonNLLLoss],
-    Type[nn.GaussianNLLLoss],
+    Type[nn.HuberLoss],
 ]
 
 
@@ -94,7 +87,7 @@ def build_loss_dict() -> dict[str, list[str]]:
             "L1Loss",
             "SmoothL1Loss",
             "PoissonNLLLoss",
-            "GaussianNLLLoss",
+            "HuberLoss",
         ],
     }
 
@@ -124,7 +117,7 @@ def get_supervised_criterion(
 
 def _parse_loss_name(
     output_config: schemas.OutputConfig, column_type: str
-) -> al_cat_loss_names | al_con_loss_names:
+) -> Union["al_cat_loss_names", "al_con_loss_names"]:
     match column_type:
         case "cat":
             return output_config.output_type_info.cat_loss_name
@@ -148,7 +141,11 @@ def _get_label_smoothing(
 
 
 def _calc_con_loss(input: torch.Tensor, target: torch.Tensor, loss_func: al_con_losses):
-    return loss_func(input=input.squeeze(), target=target.squeeze())
+    match loss_func:
+        case nn.PoissonNLLLoss:
+            return loss_func(log_input=input.squeeze(), target=target.squeeze())
+        case _:
+            return loss_func(input=input.squeeze(), target=target.squeeze())
 
 
 def get_loss_callable(criteria: al_criteria_dict):

@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Tuple, TYPE_CHECKING
+from typing import Tuple, TYPE_CHECKING, Optional
 
 import pandas as pd
 
@@ -12,29 +12,32 @@ def check_performance_result_wrapper(
     run_path: Path,
     max_thresholds: Tuple[float, float],
     min_thresholds: Tuple[float, float] = (1.5, 1.0),
+    cat_metric: Optional[str] = "mcc",
+    con_metric: Optional[str] = "r2",
 ) -> None:
     for output_name, output_object in outputs.items():
         if output_object.output_config.output_info.output_type == "tabular":
             cat_target_columns = output_object.target_columns["cat"]
             con_target_columns = output_object.target_columns["con"]
 
-            for cat_target_column in cat_target_columns:
-                check_test_performance_results(
-                    run_path=run_path,
-                    target_column=cat_target_column,
-                    output_name=output_name,
-                    metric="mcc",
-                    thresholds=max_thresholds,
-                )
-
-            for con_target_column in con_target_columns:
-                check_test_performance_results(
-                    run_path=run_path,
-                    output_name=output_name,
-                    target_column=con_target_column,
-                    metric="r2",
-                    thresholds=max_thresholds,
-                )
+            if cat_metric is not None:
+                for cat_target_column in cat_target_columns:
+                    check_test_performance_results(
+                        run_path=run_path,
+                        target_column=cat_target_column,
+                        output_name=output_name,
+                        metric=cat_metric,
+                        thresholds=max_thresholds,
+                    )
+            if con_metric is not None:
+                for con_target_column in con_target_columns:
+                    check_test_performance_results(
+                        run_path=run_path,
+                        output_name=output_name,
+                        target_column=con_target_column,
+                        metric=con_metric,
+                        thresholds=max_thresholds,
+                    )
 
         elif output_object.output_config.output_info.output_type == "sequence":
             check_test_performance_results(

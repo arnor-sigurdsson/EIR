@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Union, Literal, List, Optional, Sequence, Type, TYPE_CHECKING
+from typing import Union, Literal, List, Optional, Sequence, Type
 
 from eir.models.array.array_models import ArrayModelConfig
 from eir.models.fusion.fusion_identity import IdentityConfig
@@ -30,9 +30,6 @@ from eir.setup.schema_modules.output_schemas_sequence import (
     SequenceOutputSamplingConfig,
 )
 from eir.setup.setup_utils import get_all_optimizer_names
-
-if TYPE_CHECKING:
-    from eir.train_utils.criteria import al_cat_loss_names, al_con_loss_names
 
 al_input_configs = Sequence["InputConfig"]
 al_output_configs = Sequence["OutputConfig"]
@@ -86,6 +83,15 @@ al_tokenizer_choices = (
 )
 
 al_max_sequence_length = Union[int, Literal["max", "average"]]
+
+al_cat_loss_names = Literal["CrossEntropyLoss"]
+al_con_loss_names = Literal[
+    "MSELoss",
+    "L1Loss",
+    "SmoothL1Loss",
+    "PoissonNLLLoss",
+    "HuberLoss",
+]
 
 
 @dataclass
@@ -662,8 +668,8 @@ class TabularOutputTypeConfig:
     target_cat_columns: Sequence[str] = field(default_factory=list)
     target_con_columns: Sequence[str] = field(default_factory=list)
     cat_label_smoothing: float = 0.0
-    cat_loss_name: "al_cat_loss_names" = "CrossEntropyLoss"
-    con_loss_name: "al_con_loss_names" = "MSELoss"
+    cat_loss_name: al_cat_loss_names = "CrossEntropyLoss"
+    con_loss_name: al_con_loss_names = "MSELoss"
     uncertainty_weighted_mt_loss: bool = True
 
 

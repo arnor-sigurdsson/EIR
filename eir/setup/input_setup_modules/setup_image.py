@@ -1,10 +1,10 @@
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, fields, asdict
 from pathlib import Path
 from typing import Sequence, Dict, Tuple
 
 import numpy as np
 from aislib.misc_utils import get_logger
-from timm.models.registry import _model_pretrained_cfgs
+from timm.models._registry import _model_pretrained_cfgs
 from torchvision import transforms
 from torchvision.datasets.folder import default_loader
 from torchvision.transforms import Compose
@@ -36,8 +36,10 @@ class PretrainedImageModelInfo:
 def get_timm_configs() -> Dict[str, PretrainedImageModelInfo]:
     default_configs = {}
     field_names = {i.name for i in fields(PretrainedImageModelInfo)}
-    for name, dict_ in _model_pretrained_cfgs.items():
-        common = {k: v for k, v in dict_.items() if k in field_names}
+    for name, pretrained_config in _model_pretrained_cfgs.items():
+        config_dict = asdict(pretrained_config)
+        common = {k: v for k, v in config_dict.items() if k in field_names}
+
         default_configs[name] = PretrainedImageModelInfo(**common)
 
     return default_configs

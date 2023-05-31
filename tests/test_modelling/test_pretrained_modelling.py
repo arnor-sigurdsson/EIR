@@ -13,7 +13,7 @@ from tests.setup_tests.fixtures_create_experiment import (
     get_cur_modelling_test_config,
 )
 from tests.test_modelling.test_modelling_utils import (
-    check_test_performance_results,
+    check_performance_result_wrapper,
 )
 
 if TYPE_CHECKING:
@@ -274,17 +274,13 @@ def test_pre_training_and_loading(
     # Note we skip checking R2 for now as we patch the metrics in conftest.py
     # to check for both training and validation, but for now we will make do with
     # checking only the MCC for this
-    for output_name, output_object in experiment.outputs.items():
-        cat_target_columns = output_object.target_columns["cat"]
-
-        for cat_target_column in cat_target_columns:
-            check_test_performance_results(
-                run_path=test_config.run_path,
-                target_column=cat_target_column,
-                output_name=output_name,
-                metric="mcc",
-                thresholds=(0.85, 0.85),
-            )
+    check_performance_result_wrapper(
+        outputs=experiment.outputs,
+        run_path=test_config.run_path,
+        max_thresholds=(0.5, 0.5),
+        min_thresholds=(3.0, 3.0),
+        con_metric="pcc",
+    )
 
     (
         pretrained_checkpoint_experiment,
@@ -295,17 +291,13 @@ def test_pre_training_and_loading(
 
     train.train(experiment=pretrained_checkpoint_experiment)
 
-    for output_name, output_object in pretrained_checkpoint_experiment.outputs.items():
-        cat_target_columns = output_object.target_columns["cat"]
-
-        for cat_target_column in cat_target_columns:
-            check_test_performance_results(
-                run_path=pretrained_checkpoint_test_config.run_path,
-                target_column=cat_target_column,
-                output_name=output_name,
-                metric="mcc",
-                thresholds=(0.85, 0.85),
-            )
+    check_performance_result_wrapper(
+        outputs=pretrained_checkpoint_experiment.outputs,
+        run_path=pretrained_checkpoint_test_config.run_path,
+        max_thresholds=(0.85, 0.85),
+        min_thresholds=(1.5, 1.5),
+        con_metric="pcc",
+    )
 
 
 def _get_experiment_overloaded_for_pretrained_extractor(

@@ -1,10 +1,12 @@
-from typing import Optional, Any
+from typing import Optional, Any, Literal
 
 import torch
 from einops import rearrange
 from torch import nn, einsum, Tensor
 
-from eir.models.layers import get_lcl_projection_layer, get_projection_layer
+from eir.models.layers import get_projection_layer
+
+al_projection_layer_types = Literal["auto", "lcl", "lcl_residual", "linear"]
 
 
 class MetaSequenceProjection(nn.Module):
@@ -14,6 +16,7 @@ class MetaSequenceProjection(nn.Module):
         in_embedding_dim: int,
         target_embedding_dim: int,
         target_max_length: int,
+        projection_layer_type: al_projection_layer_types = "auto",
         *args,
         **kwargs,
     ):
@@ -28,6 +31,7 @@ class MetaSequenceProjection(nn.Module):
             in_features=in_total_num_elements,
             target_embedding_dim=self.target_embedding_dim,
             target_max_length=self.target_max_length,
+            projection_layer_type=projection_layer_type,
         )
 
         self.cross_attention_projection = SequenceResidualCrossAttentionProjection(
@@ -36,16 +40,24 @@ class MetaSequenceProjection(nn.Module):
             target_max_length=self.target_max_length,
         )
 
+        self.scaling_factors = nn.Parameter(torch.ones(3))
+
     def forward(
         self, input_tensor: torch.Tensor, target_tensor: torch.Tensor
     ) -> torch.Tensor:
+        weights = torch.softmax(self.scaling_factors, dim=0)
+
         projected = self.projection(input_tensor)
+        projected = projected * weights[0]
 
         cross_attended = self.cross_attention_projection(
             x=target_tensor, context=input_tensor
         )
+        cross_attended = cross_attended * weights[1]
 
-        out = projected + cross_attended
+        identity = target_tensor * weights[2]
+
+        out = projected + cross_attended + identity
 
         return out
 
@@ -56,6 +68,7 @@ class SequenceProjection(nn.Module):
         in_features: int,
         target_embedding_dim: int,
         target_max_length: int,
+        projection_layer_type: al_projection_layer_types = "auto",
         *args,
         **kwargs,
     ):
@@ -70,6 +83,7 @@ class SequenceProjection(nn.Module):
         projection_kwargs = {
             "input_dimension": in_features,
             "target_dimension": self.out_dim,
+            "projection_layer_type": projection_layer_type,
         }
 
         self.norm_1 = nn.LayerNorm(normalized_shape=in_features)
@@ -93,7 +107,7 @@ class SequenceProjection(nn.Module):
 
         self.downsample_identity = nn.Identity()
         if self.in_features != self.out_dim:
-            self.downsample_identity = get_lcl_projection_layer(**projection_kwargs)
+            self.downsample_identity = get_projection_layer(**projection_kwargs)
 
     def forward(self, input: Tensor) -> Tensor:
         input_flat = input.flatten(1)

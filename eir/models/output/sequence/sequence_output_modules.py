@@ -4,9 +4,9 @@ from typing import Dict, Literal, TYPE_CHECKING
 
 import dill
 import torch
+from aislib.misc_utils import get_logger
 from torch import nn
 from torch.nn import functional as F
-from aislib.misc_utils import get_logger
 
 from eir.models.fusion.fusion_attention import MetaSequenceProjection
 from eir.models.sequence.transformer_models import (
@@ -49,20 +49,19 @@ class SequenceOutputModule(nn.Module):
         self.embedding_dim = output_object.embedding_dim
         self.max_length = output_object.computed_max_length
         self.output_name = output_name
-        self.output_model_config = (
-            output_object.output_config.model_config.model_init_config
-        )
+        self.output_model_config = output_object.output_config.model_config
+        self.output_model_init_config = self.output_model_config.model_init_config
 
         dim_feed_forward = parse_dim_feedforward(
-            dim_feedforward=self.output_model_config.dim_feedforward,
+            dim_feedforward=self.output_model_init_config.dim_feedforward,
             embedding_dim=self.embedding_dim,
         )
 
         transformer_output_layer_base = nn.TransformerEncoderLayer(
             d_model=self.embedding_dim,
-            nhead=self.output_model_config.num_heads,
+            nhead=self.output_model_init_config.num_heads,
             dim_feedforward=dim_feed_forward,
-            dropout=self.output_model_config.dropout,
+            dropout=self.output_model_init_config.dropout,
             activation="gelu",
             batch_first=True,
             norm_first=True,
@@ -76,7 +75,7 @@ class SequenceOutputModule(nn.Module):
 
         self.output_transformer = nn.TransformerEncoder(
             encoder_layer=transformer_output_layer_base,
-            num_layers=self.output_model_config.num_layers,
+            num_layers=self.output_model_init_config.num_layers,
         )
 
         self.match_projections = nn.ModuleDict()
@@ -96,6 +95,7 @@ class SequenceOutputModule(nn.Module):
                 in_embedding_dim=in_embed,
                 target_embedding_dim=self.embedding_dim,
                 target_max_length=self.max_length,
+                projection_layer_type=self.output_model_config.projection_layer_type,
             )
 
             self.match_projections[input_name] = cur_projection
