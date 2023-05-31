@@ -6,9 +6,9 @@ from docs.doc_modules.utils import get_saved_model_path
 
 
 def get_tutorial_01_run_1_gln_info() -> AutoDocExperimentInfo:
-    base_path = "docs/tutorials/tutorial_files/01_basic_tutorial"
+    base_path = "docs/tutorials/tutorial_files/a_using_eir/01_basic_tutorial"
 
-    conf_output_path = "eir_tutorials/01_basic_tutorial/conf"
+    conf_output_path = "eir_tutorials/a_using_eir/01_basic_tutorial/conf"
 
     command = [
         "eirtrain",
@@ -26,7 +26,7 @@ def get_tutorial_01_run_1_gln_info() -> AutoDocExperimentInfo:
     ]
 
     data_output_path = Path(
-        "eir_tutorials/01_basic_tutorial/data/processed_sample_data.zip"
+        "eir_tutorials/a_using_eir/01_basic_tutorial/data/processed_sample_data.zip"
     )
 
     get_data_folder = (
@@ -52,7 +52,7 @@ def get_tutorial_01_run_1_gln_info() -> AutoDocExperimentInfo:
         {
             "command": [
                 "tree",
-                "eir_tutorials/01_basic_tutorial/",
+                "eir_tutorials/a_using_eir/01_basic_tutorial/",
                 "-L",
                 "3",
                 "-I",
@@ -107,9 +107,9 @@ def get_tutorial_01_run_1_gln_info() -> AutoDocExperimentInfo:
 
 
 def get_tutorial_01_run_2_gln_info() -> AutoDocExperimentInfo:
-    base_path = "docs/tutorials/tutorial_files/01_basic_tutorial"
+    base_path = "docs/tutorials/tutorial_files/a_using_eir/01_basic_tutorial"
 
-    conf_output_path = "eir_tutorials/01_basic_tutorial/conf"
+    conf_output_path = "eir_tutorials/a_using_eir/01_basic_tutorial/conf"
 
     command = [
         "eirtrain",
@@ -151,9 +151,9 @@ def get_tutorial_01_run_2_gln_predict_info() -> AutoDocExperimentInfo:
     We are abusing the `make_tutorial_data` here a bit by switching to the predict
     code, but we'll allow it for now.
     """
-    base_path = "docs/tutorials/tutorial_files/01_basic_tutorial"
+    base_path = "docs/tutorials/tutorial_files/a_using_eir/01_basic_tutorial"
 
-    conf_output_path = "eir_tutorials/01_basic_tutorial/conf"
+    conf_output_path = "eir_tutorials/a_using_eir/01_basic_tutorial/conf"
 
     run_1_output_path = "eir_tutorials/tutorial_runs/tutorial_01_run"
 

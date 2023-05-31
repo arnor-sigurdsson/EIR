@@ -25,7 +25,7 @@ A - Data
 
 After downloading the data, the folder structure should look like this:
 
-.. literalinclude:: tutorial_files/08_array_tutorial/commands/tutorial_folder.txt
+.. literalinclude::eir_tutorials/a_using_eir/08_array_tutorial/commands/tutorial_folder.txt
     :language: console
 
 Besides the configurations, there are 3 folders there storing the genotype arrays,
@@ -42,15 +42,15 @@ B - Training
 
 Here are the configurations for the 1D case:
 
-.. literalinclude:: tutorial_files/08_array_tutorial/globals.yaml
+.. literalinclude::eir_tutorials/a_using_eir/08_array_tutorial/globals.yaml
     :language: yaml
     :caption:
 
-.. literalinclude:: tutorial_files/08_array_tutorial/input_1d_cnn.yaml
+.. literalinclude::eir_tutorials/a_using_eir/08_array_tutorial/input_1d_cnn.yaml
     :language: yaml
     :caption:
 
-.. literalinclude:: tutorial_files/08_array_tutorial/outputs.yaml
+.. literalinclude::eir_tutorials/a_using_eir/08_array_tutorial/outputs.yaml
     :language: yaml
     :caption:
 
@@ -61,7 +61,7 @@ Here are the configurations for the 1D case:
 We will be training both the CNN and LCL (locally-connected-layers) models,
 here is an example configuration for the LCL model:
 
-.. literalinclude:: tutorial_files/08_array_tutorial/input_1d_lcl.yaml
+.. literalinclude::eir_tutorials/a_using_eir/08_array_tutorial/input_1d_lcl.yaml
     :language: yaml
     :caption:
 
@@ -81,27 +81,27 @@ here is an example configuration for the LCL model:
 
 As usual, we can run the following command to train for the CNN and LCL cases:
 
-.. literalinclude:: tutorial_files/08_array_tutorial/commands/CNN_1.txt
+.. literalinclude::eir_tutorials/a_using_eir/08_array_tutorial/commands/CNN_1.txt
     :language: console
 
-.. literalinclude:: tutorial_files/08_array_tutorial/commands/LCL_1.txt
+.. literalinclude::eir_tutorials/a_using_eir/08_array_tutorial/commands/LCL_1.txt
     :language: console
 
 For the 2D and 3D cases, here are the configurations:
 
-.. literalinclude:: tutorial_files/08_array_tutorial/input_2d_cnn.yaml
+.. literalinclude::eir_tutorials/a_using_eir/08_array_tutorial/input_2d_cnn.yaml
     :language: yaml
     :caption:
 
-.. literalinclude:: tutorial_files/08_array_tutorial/input_2d_lcl.yaml
+.. literalinclude::eir_tutorials/a_using_eir/08_array_tutorial/input_2d_lcl.yaml
     :language: yaml
     :caption:
 
-.. literalinclude:: tutorial_files/08_array_tutorial/input_3d_cnn.yaml
+.. literalinclude::eir_tutorials/a_using_eir/08_array_tutorial/input_3d_cnn.yaml
     :language: yaml
     :caption:
 
-.. literalinclude:: tutorial_files/08_array_tutorial/input_3d_lcl.yaml
+.. literalinclude::eir_tutorials/a_using_eir/08_array_tutorial/input_3d_lcl.yaml
     :language: yaml
     :caption:
 
@@ -121,7 +121,7 @@ For the 2D and 3D cases, here are the configurations:
 
 After training, I got the following validation results:
 
-.. image:: tutorial_files/08_array_tutorial/figures/val_comparison.png
+.. image::eir_tutorials/a_using_eir/08_array_tutorial/figures/val_comparison.png
     :width: 100%
     :align: center
 

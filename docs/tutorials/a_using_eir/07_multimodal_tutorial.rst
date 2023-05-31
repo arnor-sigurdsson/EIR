@@ -47,7 +47,7 @@ After downloading the data, the folder structure should look like this
 (note that we will create the configuration files ourselves
 in the tutorial as we go along):
 
-.. literalinclude:: tutorial_files/07_multimodal_tutorial/commands/tutorial_folder.txt
+.. literalinclude::eir_tutorials/a_using_eir/07_multimodal_tutorial/commands/tutorial_folder.txt
     :language: console
 
 We are in for a relatively long tutorial, so I'll try to keep it
@@ -63,29 +63,29 @@ Note that here the tabular data has
 been transposed, for visual purposes.
 
 .. raw:: html
-    :file: tutorial_files/07_multimodal_tutorial/commands/tabular_preview.html
+    :file:eir_tutorials/a_using_eir/07_multimodal_tutorial/commands/tabular_preview.html
 
 Here are the configurations files for the tabular data:
 
-.. literalinclude:: tutorial_files/07_multimodal_tutorial/07_globals.yaml
+.. literalinclude::eir_tutorials/a_using_eir/07_multimodal_tutorial/07_globals.yaml
     :language: yaml
     :caption:
 
-.. literalinclude:: tutorial_files/07_multimodal_tutorial/07_input_tabular.yaml
+.. literalinclude::eir_tutorials/a_using_eir/07_multimodal_tutorial/07_input_tabular.yaml
     :language: yaml
     :caption:
 
-.. literalinclude:: tutorial_files/07_multimodal_tutorial/07_fusion.yaml
+.. literalinclude::eir_tutorials/a_using_eir/07_multimodal_tutorial/07_fusion.yaml
     :language: yaml
     :caption:
 
-.. literalinclude:: tutorial_files/07_multimodal_tutorial/07_output.yaml
+.. literalinclude::eir_tutorials/a_using_eir/07_multimodal_tutorial/07_output.yaml
     :language: yaml
     :caption:
 
 As usual, we can run the following command to train:
 
-.. literalinclude:: tutorial_files/07_multimodal_tutorial/commands/MULTIMODAL_1_TABULAR.txt
+.. literalinclude::eir_tutorials/a_using_eir/07_multimodal_tutorial/commands/MULTIMODAL_1_TABULAR.txt
     :language: console
 
 .. note::
@@ -95,7 +95,7 @@ As usual, we can run the following command to train:
 
 When training, I got the following training curve:
 
-.. image:: tutorial_files/07_multimodal_tutorial/figures/07_multimodal_training_curve_MCC_tabular.png
+.. image::eir_tutorials/a_using_eir/07_multimodal_tutorial/figures/07_multimodal_training_curve_MCC_tabular.png
 
 Now, since we set the ``--compute_attributions=true`` parameter,
 we can have a look at the attributions (notice in the global
@@ -107,7 +107,7 @@ Specifically, we check the file under ``samples/4000/attributions/``
 in the ``results`` folder. First, we can have a look at the
 feature importance for the tabular data.
 
-.. image:: tutorial_files/07_multimodal_tutorial/figures/tutorial_07a_feature_importance_D.png
+.. image::eir_tutorials/a_using_eir/07_multimodal_tutorial/figures/tutorial_07a_feature_importance_D.png
 
 Here we can see that ``Breed1`` is the feature that most strongly influenced
 the model's prediction. In the ``attributions`` folder, we can also
@@ -116,7 +116,7 @@ Here, we will look at how the ``Breed1`` input values influence the model
 towards the class "D: 100+ Days", meaning the pet was adopted
 after 100 days:
 
-.. image:: tutorial_files/07_multimodal_tutorial/figures/tutorial_07a_breed_importance_D.png
+.. image::eir_tutorials/a_using_eir/07_multimodal_tutorial/figures/tutorial_07a_breed_importance_D.png
 
 So from this it seems that, unfortunately, mixed breed pets
 are less likely to be adopted
@@ -147,24 +147,24 @@ which are stored in a CSV file.
 
 First, let's take a look at an example from the text data:
 
-.. literalinclude:: tutorial_files/07_multimodal_tutorial/commands/description_preview.txt
+.. literalinclude::eir_tutorials/a_using_eir/07_multimodal_tutorial/commands/description_preview.txt
     :language: console
 
 So to train on both tabular and text data, we will need to
 specify a configuration for the text data as well:
 
-.. literalinclude:: tutorial_files/07_multimodal_tutorial/07_input_description.yaml
+.. literalinclude::eir_tutorials/a_using_eir/07_multimodal_tutorial/07_input_description.yaml
     :language: yaml
 
 Then to train, we simply include that configuration file
 under the ``--input_configs`` parameter:
 
-.. literalinclude:: tutorial_files/07_multimodal_tutorial/commands/MULTIMODAL_2_TABULAR_DESCRIPTION.txt
+.. literalinclude::eir_tutorials/a_using_eir/07_multimodal_tutorial/commands/MULTIMODAL_2_TABULAR_DESCRIPTION.txt
     :language: console
 
 Now, when training, we get the following training curve:
 
-.. image:: tutorial_files/07_multimodal_tutorial/figures/07_multimodal_training_curve_MCC_tabular_description.png
+.. image::eir_tutorials/a_using_eir/07_multimodal_tutorial/figures/07_multimodal_training_curve_MCC_tabular_description.png
 
 So here we can see that the model seems to perform slightly better
 when trained on both tabular and text data. We also start to see
@@ -180,12 +180,12 @@ folder, where each image is stored in a separate file.
 
 As before, let's have a quick look at an example image:
 
-.. image:: tutorial_files/07_multimodal_tutorial/commands/image_preview.jpg
+.. image::eir_tutorials/a_using_eir/07_multimodal_tutorial/commands/image_preview.jpg
 
 
 Configuration file for the image data:
 
-.. literalinclude:: tutorial_files/07_multimodal_tutorial/07_input_image.yaml
+.. literalinclude::eir_tutorials/a_using_eir/07_multimodal_tutorial/07_input_image.yaml
     :language: yaml
 
 .. note::
@@ -200,7 +200,7 @@ Configuration file for the image data:
 
 And then we can train the model on all three types of data:
 
-.. literalinclude:: tutorial_files/07_multimodal_tutorial/commands/MULTIMODAL_3_TABULAR_DESCRIPTION_IMAGE.txt
+.. literalinclude::eir_tutorials/a_using_eir/07_multimodal_tutorial/commands/MULTIMODAL_3_TABULAR_DESCRIPTION_IMAGE.txt
     :language: console
 
 .. note::
@@ -212,7 +212,7 @@ And then we can train the model on all three types of data:
 
 When training, we get the following training curve:
 
-.. image:: tutorial_files/07_multimodal_tutorial/figures/07_multimodal_training_curve_MCC_tabular_description_image.png
+.. image::eir_tutorials/a_using_eir/07_multimodal_tutorial/figures/07_multimodal_training_curve_MCC_tabular_description_image.png
 
 So in this case, including the image data does not seem to
 improve the performance of the model further compared to the
@@ -240,17 +240,17 @@ but the idea is more to showcase some functionalities of the framework.
 
 Here is the configuration file for the pre-trained text feature extractor:
 
-.. literalinclude:: tutorial_files/07_multimodal_tutorial/07_apx-a_input_description_pretrained.yaml
+.. literalinclude::eir_tutorials/a_using_eir/07_multimodal_tutorial/07_apx-a_input_description_pretrained.yaml
     :language: yaml
 
 The command:
 
-.. literalinclude:: tutorial_files/07_multimodal_tutorial/commands/MULTIMODAL_APX-1_TABULAR_DESCRIPTION_IMAGE_PRETRAINED.txt
+.. literalinclude::eir_tutorials/a_using_eir/07_multimodal_tutorial/commands/MULTIMODAL_APX-1_TABULAR_DESCRIPTION_IMAGE_PRETRAINED.txt
     :language: console
 
 The training curve:
 
-.. image:: tutorial_files/07_multimodal_tutorial/figures/07_multimodal_training_curve_MCC_tabular_description_pretrained.png
+.. image::eir_tutorials/a_using_eir/07_multimodal_tutorial/figures/07_multimodal_training_curve_MCC_tabular_description_pretrained.png
 
 So it seems that the pre-trained text feature extractor does not
 help, and likely we are even overfitting a bit more!
@@ -263,10 +263,10 @@ adoption speed, but also the pet's age and number of pets in the
 image. For this, we have to modify the tabular input and output
 configurations:
 
-.. literalinclude:: tutorial_files/07_multimodal_tutorial/07_apx-b_mt_input_tabular.yaml
+.. literalinclude::eir_tutorials/a_using_eir/07_multimodal_tutorial/07_apx-b_mt_input_tabular.yaml
     :language: yaml
 
-.. literalinclude:: tutorial_files/07_multimodal_tutorial/07_apx-b_mt_output.yaml
+.. literalinclude::eir_tutorials/a_using_eir/07_multimodal_tutorial/07_apx-b_mt_output.yaml
     :language: yaml
 
 Note that we have moved the features that we want to predict
@@ -274,12 +274,12 @@ from the input configuration to the output configuration.
 
 The command:
 
-.. literalinclude:: tutorial_files/07_multimodal_tutorial/commands/MULTIMODAL_APX-2_TABULAR_DESCRIPTION_IMAGE_PRETRAINED_MT.txt
+.. literalinclude::eir_tutorials/a_using_eir/07_multimodal_tutorial/commands/MULTIMODAL_APX-2_TABULAR_DESCRIPTION_IMAGE_PRETRAINED_MT.txt
     :language: console
 
 First we can have a look at the average performance:
 
-.. image:: tutorial_files/07_multimodal_tutorial/figures/07_multimodal_training_curve_perf-average_tabular_description_multi_task.png
+.. image::eir_tutorials/a_using_eir/07_multimodal_tutorial/figures/07_multimodal_training_curve_perf-average_tabular_description_multi_task.png
 
 .. note::
     The average performance by default is the average of the
@@ -293,20 +293,20 @@ see that the model seems to be able to learn to predict the
 
 The training curves for the adoption speed, age and quantity:
 
-.. image:: tutorial_files/07_multimodal_tutorial/figures/07_multimodal_training_curve_MCC_tabular_description_multi_task.png
+.. image::eir_tutorials/a_using_eir/07_multimodal_tutorial/figures/07_multimodal_training_curve_MCC_tabular_description_multi_task.png
 
-.. image:: tutorial_files/07_multimodal_tutorial/figures/07_multimodal_training_curve_R2_tabular_description_multi_task_Age.png
+.. image::eir_tutorials/a_using_eir/07_multimodal_tutorial/figures/07_multimodal_training_curve_R2_tabular_description_multi_task_Age.png
 
-.. image:: tutorial_files/07_multimodal_tutorial/figures/07_multimodal_training_curve_R2_tabular_description_multi_task_Quantity.png
+.. image::eir_tutorials/a_using_eir/07_multimodal_tutorial/figures/07_multimodal_training_curve_R2_tabular_description_multi_task_Quantity.png
 
 
 Finally, we can also look at the regression predictions
 by checking the ``samples`` folder for the ``Age`` and ``Quantity``
 targets. Here are a couple of examples:
 
-.. image:: tutorial_files/07_multimodal_tutorial/figures/regression_predictions_age.png
+.. image::eir_tutorials/a_using_eir/07_multimodal_tutorial/figures/regression_predictions_age.png
 
-.. image:: tutorial_files/07_multimodal_tutorial/figures/regression_predictions_quantity.png
+.. image::eir_tutorials/a_using_eir/07_multimodal_tutorial/figures/regression_predictions_quantity.png
 
 
 So in the case of quantity, it is expected that the model

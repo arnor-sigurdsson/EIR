@@ -37,7 +37,7 @@ from eir.models.input.omics.omics_models import (
 )
 from eir.models.output.linear import LinearOutputModuleConfig
 from eir.models.output.mlp_residual import (
-    ResidualMLPOutputModulelConfig,
+    ResidualMLPOutputModuleConfig,
 )
 from eir.models.output.output_module_setup import (
     TabularOutputModuleConfig,
@@ -81,7 +81,7 @@ al_output_module_config_class_getter = (
 )
 
 al_output_model_configs = Union[
-    ResidualMLPOutputModulelConfig, LinearOutputModuleConfig, Any
+    ResidualMLPOutputModuleConfig, LinearOutputModuleConfig, Any
 ]
 al_output_model_init_map = Dict[str, al_output_model_configs]
 
@@ -745,7 +745,7 @@ def set_up_output_module_init_config(
 def get_output_config_type_init_callable_map() -> Dict[str, Dict[str, Type]]:
     mapping = {
         "tabular": {
-            "mlp_residual": ResidualMLPOutputModulelConfig,
+            "mlp_residual": ResidualMLPOutputModuleConfig,
             "linear": LinearOutputModuleConfig,
         },
         "sequence": {

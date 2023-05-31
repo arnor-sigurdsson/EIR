@@ -42,7 +42,7 @@ but we will make them during this tutorial,
 alternatively you can download them
 from the project repository):
 
-.. literalinclude:: tutorial_files/04_pretrained_sequence_tutorial/commands/tutorial_folder.txt
+.. literalinclude::eir_tutorials/a_using_eir/04_pretrained_sequence_tutorial/commands/tutorial_folder.txt
     :language: console
 
 
@@ -53,7 +53,7 @@ just to establish a baseline.
 
 As always, configurations first!
 
-.. literalinclude:: tutorial_files/04_pretrained_sequence_tutorial/04_imdb_globals.yaml
+.. literalinclude::eir_tutorials/a_using_eir/04_pretrained_sequence_tutorial/04_imdb_globals.yaml
     :language: yaml
     :caption:
 
@@ -77,23 +77,23 @@ As always, configurations first!
     (genotype, tabular, sequence, images, binary data)
     when set in the global configuration.
 
-.. literalinclude:: tutorial_files/04_pretrained_sequence_tutorial/04_imdb_input.yaml
+.. literalinclude::eir_tutorials/a_using_eir/04_pretrained_sequence_tutorial/04_imdb_input.yaml
     :language: yaml
     :caption:
 
-.. literalinclude:: tutorial_files/04_pretrained_sequence_tutorial/04_imdb_output.yaml
+.. literalinclude::eir_tutorials/a_using_eir/04_pretrained_sequence_tutorial/04_imdb_output.yaml
     :language: yaml
     :caption:
 
 
 As before, we do our training with the following command:
 
-.. literalinclude:: tutorial_files/04_pretrained_sequence_tutorial/commands/SEQUENCE_IMDB_1_TRANSFORMER.txt
+.. literalinclude::eir_tutorials/a_using_eir/04_pretrained_sequence_tutorial/commands/SEQUENCE_IMDB_1_TRANSFORMER.txt
     :language: console
 
 Checking the accuracy, we see:
 
-.. image:: tutorial_files/04_pretrained_sequence_tutorial/figures/04_imdb_training_curve_ACC_transformer_1.png
+.. image::eir_tutorials/a_using_eir/04_pretrained_sequence_tutorial/figures/04_imdb_training_curve_ACC_transformer_1.png
 
 A little better than what
 we saw in the :ref:`03-sequence-tutorial`,
@@ -120,19 +120,19 @@ of the ``input_type_info`` field when training sequence models.
 Now, let's try training one such model, using a window size of 64 and
 increasing the maximum sequence length to 512:
 
-.. literalinclude:: tutorial_files/04_pretrained_sequence_tutorial/04_imdb_input_windowed.yaml
+.. literalinclude::eir_tutorials/a_using_eir/04_pretrained_sequence_tutorial/04_imdb_input_windowed.yaml
     :language: yaml
     :caption:
 
 To train, we just swap out the input configuration from the command above:
 
-.. literalinclude:: tutorial_files/04_pretrained_sequence_tutorial/commands/SEQUENCE_IMDB_2_LOCAL.txt
+.. literalinclude::eir_tutorials/a_using_eir/04_pretrained_sequence_tutorial/commands/SEQUENCE_IMDB_2_LOCAL.txt
     :language: yaml
     :caption:
 
 Training this model gave the following training curve:
 
-.. image:: tutorial_files/04_pretrained_sequence_tutorial/figures/04_imdb_training_curve_ACC_local_transformer_1.png
+.. image::eir_tutorials/a_using_eir/04_pretrained_sequence_tutorial/figures/04_imdb_training_curve_ACC_local_transformer_1.png
 
 Indeed, increasing the sequence length does seem to help,
 and using a window size of 64 seems to work fairly well.
@@ -165,7 +165,7 @@ To use the Longformer model, we use the following configuration,
 notice that in the model configuration
 we are now passing in flags *specifically* to the LongFormer model:
 
-.. literalinclude:: tutorial_files/04_pretrained_sequence_tutorial/04_imdb_input_longformer.yaml
+.. literalinclude::eir_tutorials/a_using_eir/04_pretrained_sequence_tutorial/04_imdb_input_longformer.yaml
     :language: yaml
     :caption:
 
@@ -177,12 +177,12 @@ we are now passing in flags *specifically* to the LongFormer model:
 
 We train with the following command:
 
-.. literalinclude:: tutorial_files/04_pretrained_sequence_tutorial/commands/SEQUENCE_IMDB_3_LONGFORMER.txt
+.. literalinclude::eir_tutorials/a_using_eir/04_pretrained_sequence_tutorial/commands/SEQUENCE_IMDB_3_LONGFORMER.txt
     :language: console
 
 And get the following training curve:
 
-.. image:: tutorial_files/04_pretrained_sequence_tutorial/figures/04_imdb_training_curve_ACC_longformer_1.png
+.. image::eir_tutorials/a_using_eir/04_pretrained_sequence_tutorial/figures/04_imdb_training_curve_ACC_longformer_1.png
 
 Indeed, we see an improvement
 on the validation set
@@ -211,7 +211,7 @@ little BERT model called `Tiny BERT <https://arxiv.org/abs/1908.08962>`__.
 The approach is almost the same
 as we saw above with the Longformer, here is the configuration:
 
-.. literalinclude:: tutorial_files/04_pretrained_sequence_tutorial/04_imdb_input_tiny-bert.yaml
+.. literalinclude::eir_tutorials/a_using_eir/04_pretrained_sequence_tutorial/04_imdb_input_tiny-bert.yaml
     :language: yaml
     :caption:
 
@@ -236,12 +236,12 @@ so here it helps to have a powerful computer.
 We run this as always with:
 
 
-.. literalinclude:: tutorial_files/04_pretrained_sequence_tutorial/commands/SEQUENCE_IMDB_4_TINY_BERT.txt
+.. literalinclude::eir_tutorials/a_using_eir/04_pretrained_sequence_tutorial/commands/SEQUENCE_IMDB_4_TINY_BERT.txt
     :language: console
 
 The training curve looks like so:
 
-.. image:: tutorial_files/04_pretrained_sequence_tutorial/figures/04_imdb_training_curve_ACC_tiny_bert_1.png
+.. image::eir_tutorials/a_using_eir/04_pretrained_sequence_tutorial/figures/04_imdb_training_curve_ACC_tiny_bert_1.png
 
 The pre-trained model performs quite similarly to our other long context models.
 However, notice how quickly it reached it top validation performance compared to the
@@ -271,12 +271,12 @@ In this case,
 we will freeze the weights of the
 pretrained Tiny BERT part of our model.
 
-.. literalinclude:: tutorial_files/04_pretrained_sequence_tutorial/commands/SEQUENCE_IMDB_5_COMBINED.txt
+.. literalinclude::eir_tutorials/a_using_eir/04_pretrained_sequence_tutorial/commands/SEQUENCE_IMDB_5_COMBINED.txt
     :language: console
 
 And our performance:
 
-.. image:: tutorial_files/04_pretrained_sequence_tutorial/figures/04_imdb_training_curve_ACC_combined_1.png
+.. image::eir_tutorials/a_using_eir/04_pretrained_sequence_tutorial/figures/04_imdb_training_curve_ACC_combined_1.png
 
 So in this case, we do not see a
 huge improvement when combining our models.

@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Union, Literal
 
 from eir.models.output.linear import LinearOutputModuleConfig
-from eir.models.output.mlp_residual import ResidualMLPOutputModulelConfig
+from eir.models.output.mlp_residual import ResidualMLPOutputModuleConfig
 from eir.models.output.sequence.sequence_output_modules import (
     TransformerSequenceOutputModuleConfig,
 )
@@ -17,7 +17,7 @@ class TabularOutputModuleConfig:
     :param model_type:
          Which type of image model to use."""
 
-    model_init_config: Union[ResidualMLPOutputModulelConfig, LinearOutputModuleConfig]
+    model_init_config: Union[ResidualMLPOutputModuleConfig, LinearOutputModuleConfig]
     model_type: Literal["mlp_residual", "linear"] = "mlp_residual"
 
 

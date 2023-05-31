@@ -9,9 +9,9 @@ from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_
 
 
 def get_tutorial_08_run_cnn_1_info() -> AutoDocExperimentInfo:
-    base_path = "docs/tutorials/tutorial_files/08_array_tutorial"
+    base_path = "docs/tutorials/tutorial_files/a_using_eir/08_array_tutorial"
 
-    conf_output_path = "eir_tutorials/08_array_tutorial/conf"
+    conf_output_path = "eir_tutorials/a_using_eir/08_array_tutorial/conf"
 
     command = [
         "eirtrain",
@@ -30,7 +30,7 @@ def get_tutorial_08_run_cnn_1_info() -> AutoDocExperimentInfo:
     ]
 
     data_output_path = Path(
-        "eir_tutorials/08_array_tutorial/data/processed_sample_data.zip"
+        "eir_tutorials/a_using_eir/08_array_tutorial/data/processed_sample_data.zip"
     )
 
     get_data_folder = (
@@ -46,7 +46,7 @@ def get_tutorial_08_run_cnn_1_info() -> AutoDocExperimentInfo:
         {
             "command": [
                 "tree",
-                "eir_tutorials/08_array_tutorial/",
+                "eir_tutorials/a_using_eir/08_array_tutorial/",
                 "-L",
                 "3",
                 "-I",
@@ -75,9 +75,9 @@ def get_tutorial_08_run_cnn_1_info() -> AutoDocExperimentInfo:
 
 
 def get_tutorial_08_run_cnn_2_info() -> AutoDocExperimentInfo:
-    base_path = "docs/tutorials/tutorial_files/08_array_tutorial"
+    base_path = "docs/tutorials/tutorial_files/a_using_eir/08_array_tutorial"
 
-    conf_output_path = "eir_tutorials/08_array_tutorial/conf"
+    conf_output_path = "eir_tutorials/a_using_eir/08_array_tutorial/conf"
 
     command = [
         "eirtrain",
@@ -96,7 +96,7 @@ def get_tutorial_08_run_cnn_2_info() -> AutoDocExperimentInfo:
     ]
 
     data_output_path = Path(
-        "eir_tutorials/08_array_tutorial/data/processed_sample_data.zip"
+        "eir_tutorials/a_using_eir/08_array_tutorial/data/processed_sample_data.zip"
     )
 
     ade = AutoDocExperimentInfo(
@@ -114,9 +114,9 @@ def get_tutorial_08_run_cnn_2_info() -> AutoDocExperimentInfo:
 
 
 def get_tutorial_08_run_cnn_3_info() -> AutoDocExperimentInfo:
-    base_path = "docs/tutorials/tutorial_files/08_array_tutorial"
+    base_path = "docs/tutorials/tutorial_files/a_using_eir/08_array_tutorial"
 
-    conf_output_path = "eir_tutorials/08_array_tutorial/conf"
+    conf_output_path = "eir_tutorials/a_using_eir/08_array_tutorial/conf"
 
     command = [
         "eirtrain",
@@ -135,7 +135,7 @@ def get_tutorial_08_run_cnn_3_info() -> AutoDocExperimentInfo:
     ]
 
     data_output_path = Path(
-        "eir_tutorials/08_array_tutorial/data/processed_sample_data.zip"
+        "eir_tutorials/a_using_eir/08_array_tutorial/data/processed_sample_data.zip"
     )
 
     ade = AutoDocExperimentInfo(
@@ -153,9 +153,9 @@ def get_tutorial_08_run_cnn_3_info() -> AutoDocExperimentInfo:
 
 
 def get_tutorial_08_run_lcl_1_info() -> AutoDocExperimentInfo:
-    base_path = "docs/tutorials/tutorial_files/08_array_tutorial"
+    base_path = "docs/tutorials/tutorial_files/a_using_eir/08_array_tutorial"
 
-    conf_output_path = "eir_tutorials/08_array_tutorial/conf"
+    conf_output_path = "eir_tutorials/a_using_eir/08_array_tutorial/conf"
 
     command = [
         "eirtrain",
@@ -174,7 +174,7 @@ def get_tutorial_08_run_lcl_1_info() -> AutoDocExperimentInfo:
     ]
 
     data_output_path = Path(
-        "eir_tutorials/08_array_tutorial/data/processed_sample_data.zip"
+        "eir_tutorials/a_using_eir/08_array_tutorial/data/processed_sample_data.zip"
     )
 
     ade = AutoDocExperimentInfo(
@@ -192,9 +192,9 @@ def get_tutorial_08_run_lcl_1_info() -> AutoDocExperimentInfo:
 
 
 def get_tutorial_08_run_lcl_2_info() -> AutoDocExperimentInfo:
-    base_path = "docs/tutorials/tutorial_files/08_array_tutorial"
+    base_path = "docs/tutorials/tutorial_files/a_using_eir/08_array_tutorial"
 
-    conf_output_path = "eir_tutorials/08_array_tutorial/conf"
+    conf_output_path = "eir_tutorials/a_using_eir/08_array_tutorial/conf"
 
     command = [
         "eirtrain",
@@ -213,7 +213,7 @@ def get_tutorial_08_run_lcl_2_info() -> AutoDocExperimentInfo:
     ]
 
     data_output_path = Path(
-        "eir_tutorials/08_array_tutorial/data/processed_sample_data.zip"
+        "eir_tutorials/a_using_eir/08_array_tutorial/data/processed_sample_data.zip"
     )
 
     ade = AutoDocExperimentInfo(
@@ -231,9 +231,9 @@ def get_tutorial_08_run_lcl_2_info() -> AutoDocExperimentInfo:
 
 
 def get_tutorial_08_run_lcl_3_info() -> AutoDocExperimentInfo:
-    base_path = "docs/tutorials/tutorial_files/08_array_tutorial"
+    base_path = "docs/tutorials/tutorial_files/a_using_eir/08_array_tutorial"
 
-    conf_output_path = "eir_tutorials/08_array_tutorial/conf"
+    conf_output_path = "eir_tutorials/a_using_eir/08_array_tutorial/conf"
 
     command = [
         "eirtrain",
@@ -252,7 +252,7 @@ def get_tutorial_08_run_lcl_3_info() -> AutoDocExperimentInfo:
     ]
 
     data_output_path = Path(
-        "eir_tutorials/08_array_tutorial/data/processed_sample_data.zip"
+        "eir_tutorials/a_using_eir/08_array_tutorial/data/processed_sample_data.zip"
     )
 
     make_comparison_plot = (

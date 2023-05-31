@@ -2,7 +2,7 @@ from typing import Type, Dict, TYPE_CHECKING
 
 from eir.models.output.linear import LinearOutputModuleConfig, LinearOutputModule
 from eir.models.output.mlp_residual import (
-    ResidualMLPOutputModulelConfig,
+    ResidualMLPOutputModuleConfig,
     ResidualMLPOutputModule,
 )
 from eir.models.output.output_module_setup import (
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from eir.models.model_setup_modules.meta_setup import FeatureExtractorInfo
 
 al_output_module_init_configs = (
-    ResidualMLPOutputModulelConfig
+    ResidualMLPOutputModuleConfig
     | LinearOutputModuleConfig
     | SequenceOutputModuleConfig
 )

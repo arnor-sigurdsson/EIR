@@ -41,7 +41,7 @@ To start with,
 we can use the following configurations for
 the global, input, target and predictor parts respectively:
 
-.. literalinclude:: tutorial_files/02_tabular_tutorial/02_poker_hands_globals.yaml
+.. literalinclude::eir_tutorials/a_using_eir/02_tabular_tutorial/02_poker_hands_globals.yaml
     :language: yaml
     :caption:
 
@@ -54,15 +54,15 @@ the global, input, target and predictor parts respectively:
     Be aware that currently the framework does not handle having a mismatch in which
     classes are present in the training and validation sets.
 
-.. literalinclude:: tutorial_files/02_tabular_tutorial/02_poker_hands_input.yaml
+.. literalinclude::eir_tutorials/a_using_eir/02_tabular_tutorial/02_poker_hands_input.yaml
     :language: yaml
     :caption:
 
-.. literalinclude:: tutorial_files/02_tabular_tutorial/02_poker_hands_fusion.yaml
+.. literalinclude::eir_tutorials/a_using_eir/02_tabular_tutorial/02_poker_hands_fusion.yaml
     :language: yaml
     :caption:
 
-.. literalinclude:: tutorial_files/02_tabular_tutorial/02_poker_hands_output.yaml
+.. literalinclude::eir_tutorials/a_using_eir/02_tabular_tutorial/02_poker_hands_output.yaml
     :language: yaml
     :caption:
 
@@ -70,7 +70,7 @@ So, after setting up,
 our folder structure should look
 something like this:
 
-.. literalinclude:: tutorial_files/02_tabular_tutorial/commands/tutorial_folder.txt
+.. literalinclude::eir_tutorials/a_using_eir/02_tabular_tutorial/commands/tutorial_folder.txt
     :language: console
 
 
@@ -84,24 +84,24 @@ to the framework
 (fully running this should take around 10 minutes,
 so now is a good time to stretch your legs or grab a cup of coffee!):
 
-.. literalinclude:: tutorial_files/02_tabular_tutorial/commands/TABULAR_1.txt
+.. literalinclude::eir_tutorials/a_using_eir/02_tabular_tutorial/commands/TABULAR_1.txt
     :language: console
 
 We can examine how our model did with respect to accuracy
 by checking the `training_curve_ACC.png` file:
 
-.. image:: tutorial_files/02_tabular_tutorial/figures/02_poker_hands_training_curve_ACC_tabular_1.png
+.. image::eir_tutorials/a_using_eir/02_tabular_tutorial/figures/02_poker_hands_training_curve_ACC_tabular_1.png
 
 However,
 we do know that the data is very imbalanced,
 so a better idea might be checking the MCC:
 
-.. image:: tutorial_files/02_tabular_tutorial/figures/02_poker_hands_training_curve_MCC_tabular_1.png
+.. image::eir_tutorials/a_using_eir/02_tabular_tutorial/figures/02_poker_hands_training_curve_MCC_tabular_1.png
 
 Both look fairly good, but how are we really doing? Let's check the confusion matrix
 for our predictions at iteration 15000:
 
-.. image:: tutorial_files/02_tabular_tutorial/figures/02_poker_hands_confusion_matrix_tabular_1.png
+.. image::eir_tutorials/a_using_eir/02_tabular_tutorial/figures/02_poker_hands_confusion_matrix_tabular_1.png
 
 So there it is – we are performing quite well for classes 0-3,
 but (perhaps as expected), we perform very poorly on the rare classes.
@@ -115,7 +115,7 @@ To test, we can run the following command
 (note that you will have to add the path to your saved model for the ``--model_path``
 parameter below).
 
-.. literalinclude:: tutorial_files/02_tabular_tutorial/commands/TABULAR_1_PREDICT.txt
+.. literalinclude::eir_tutorials/a_using_eir/02_tabular_tutorial/commands/TABULAR_1_PREDICT.txt
     :language: console
 
 
@@ -137,7 +137,7 @@ can be quite useful,
 as it contains the performance of
 our model on the test set.
 
-.. literalinclude:: tutorial_files/02_tabular_tutorial/tutorial_data/calculated_metrics_test.json
+.. literalinclude::eir_tutorials/a_using_eir/02_tabular_tutorial/tutorial_data/calculated_metrics_test.json
     :language: json
     :caption: calculated_metrics.json
 

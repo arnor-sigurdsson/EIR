@@ -49,15 +49,15 @@ are there are various configurations available through the `model_init_config`
 field. The documentation below contains more details about the different
 configurations available for each feature extractor.
 
-.. autoclass:: eir.models.omics.omics_models.OmicsModelConfig
+.. autoclass:: eir.models.input.omics.omics_models.OmicsModelConfig
 
-.. autoclass:: eir.models.tabular.tabular.TabularModelConfig
+.. autoclass:: eir.models.input.tabular.tabular.TabularModelConfig
 
-.. autoclass:: eir.models.sequence.transformer_models.SequenceModelConfig
+.. autoclass:: eir.models.input.sequence.transformer_models.SequenceModelConfig
 
-.. autoclass:: eir.models.image.image_models.ImageModelConfig
+.. autoclass:: eir.models.input.image.image_models.ImageModelConfig
 
-.. autoclass:: eir.models.array.array_models.ArrayModelConfig
+.. autoclass:: eir.models.input.array.array_models.ArrayModelConfig
 
 
 Interpretation Configurations
@@ -77,25 +77,25 @@ The documentation below details what the parameters passed to the respective mod
 Omics Feature Extractors
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. autoclass:: eir.models.omics.models_cnn.CNNModelConfig
+.. autoclass:: eir.models.input.omics.models_cnn.CNNModelConfig
 
-.. autoclass:: eir.models.omics.models_identity.IdentityModelConfig
+.. autoclass:: eir.models.input.omics.models_identity.IdentityModelConfig
 
-.. autoclass:: eir.models.omics.models_locally_connected.SimpleLCLModelConfig
+.. autoclass:: eir.models.input.omics.models_locally_connected.SimpleLCLModelConfig
 
-.. autoclass:: eir.models.omics.models_locally_connected.LCLModelConfig
+.. autoclass:: eir.models.input.omics.models_locally_connected.LCLModelConfig
 
-.. autoclass:: eir.models.omics.models_linear.LinearModelConfig
+.. autoclass:: eir.models.input.omics.models_linear.LinearModelConfig
 
 Tabular Feature Extractors
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. autoclass:: eir.models.tabular.tabular.SimpleTabularModelConfig
+.. autoclass:: eir.models.input.tabular.tabular.SimpleTabularModelConfig
 
 Sequence and Binary Feature Extractors
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. autoclass:: eir.models.sequence.transformer_models.BasicTransformerFeatureExtractorModelConfig
+.. autoclass:: eir.models.input.sequence.transformer_models.BasicTransformerFeatureExtractorModelConfig
 
 Image Feature Extractors
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -107,10 +107,10 @@ for information about the image models.
 Array Feature Extractors
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. autoclass:: eir.models.omics.models_cnn.CNNModelConfig
+.. autoclass:: eir.models.input.omics.models_cnn.CNNModelConfig
     :noindex:
 
-.. autoclass:: eir.models.omics.models_locally_connected.LCLModelConfig
+.. autoclass:: eir.models.input.omics.models_locally_connected.LCLModelConfig
     :noindex:
 
 
@@ -146,12 +146,14 @@ Output Type Configuration
 Output Module Configuration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. autoclass:: eir.models.output.output_module_setup.OutputModuleConfig
+.. autoclass:: eir.models.output.output_module_setup.TabularOutputModuleConfig
+
+.. autoclass:: eir.models.output.output_module_setup.SequenceOutputModuleConfig
 
 The documentation below details what the parameters passed to the respective output
 output heads
 (trough the `model_init_config` field in the `\-\-output_configs` `.yaml` files).
 
-.. autoclass:: eir.models.output.mlp_residual.ResidualMLPOutputModelConfig
+.. autoclass:: eir.models.output.mlp_residual.ResidualMLPOutputModuleConfig
 
-.. autoclass:: eir.models.output.linear.LinearOutputModelConfig
+.. autoclass:: eir.models.output.linear.LinearOutputModuleConfig

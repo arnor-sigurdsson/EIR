@@ -5,7 +5,7 @@ import torch
 from math import isclose
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 
-from eir.models.output.mlp_residual import ResidualMLPOutputModulelConfig
+from eir.models.output.mlp_residual import ResidualMLPOutputModuleConfig
 from eir.models.output.output_module_setup import TabularOutputModuleConfig
 from eir.setup.output_setup_modules.tabular_output_setup import (
     ComputedTabularOutputInfo,
@@ -105,7 +105,7 @@ def _get_metrics_test_module_test_outputs_as_dict():
                     target_cat_columns=["Origin"],
                 ),
                 model_config=TabularOutputModuleConfig(
-                    model_init_config=ResidualMLPOutputModulelConfig()
+                    model_init_config=ResidualMLPOutputModuleConfig()
                 ),
             ),
             num_outputs_per_target={},

@@ -5,7 +5,7 @@ from torch import nn
 
 from eir import train
 from eir.models.meta.meta import MetaModel
-from eir.models.model_setup import get_output_modules
+from eir.models.model_setup_modules.meta_setup import get_output_modules
 from eir.setup.config import get_configs
 from eir.train_utils import step_logic
 from eir.train_utils.utils import configure_global_eir_logging

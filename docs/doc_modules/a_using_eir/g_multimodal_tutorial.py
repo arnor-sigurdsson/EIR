@@ -7,9 +7,9 @@ from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_
 
 
 def get_07_multimodal_run_1_tabular_info() -> AutoDocExperimentInfo:
-    base_path = "docs/tutorials/tutorial_files/07_multimodal_tutorial/"
+    base_path = "docs/tutorials/tutorial_files/a_using_eir/07_multimodal_tutorial/"
 
-    conf_output_path = "eir_tutorials/07_multimodal_tutorial/conf"
+    conf_output_path = "eir_tutorials/a_using_eir/07_multimodal_tutorial/conf"
     output_folder = "eir_tutorials/tutorial_runs/tutorial_07a_multimodal_tabular"
 
     command = [
@@ -42,14 +42,16 @@ def get_07_multimodal_run_1_tabular_info() -> AutoDocExperimentInfo:
         ),
     ]
 
-    data_output_path = Path("eir_tutorials/07_multimodal_tutorial/pet_adoption.zip")
+    data_output_path = Path(
+        "eir_tutorials/a_using_eir/07_multimodal_tutorial/pet_adoption.zip"
+    )
 
     get_tutorial_folder = (
         run_capture_and_save,
         {
             "command": [
                 "tree",
-                "eir_tutorials/07_multimodal_tutorial/",
+                "eir_tutorials/a_using_eir/07_multimodal_tutorial/",
                 "-L",
                 "2",
                 "-I",
@@ -63,7 +65,9 @@ def get_07_multimodal_run_1_tabular_info() -> AutoDocExperimentInfo:
     tabular_preview = (
         _show_tabular_csv_example,
         {
-            "input_path": Path("eir_tutorials/07_multimodal_tutorial/data/tabular.csv"),
+            "input_path": Path(
+                "eir_tutorials/a_using_eir/07_multimodal_tutorial/data/tabular.csv"
+            ),
             "output_path": Path(base_path) / "commands/tabular_preview.html",
         },
     )
@@ -72,7 +76,7 @@ def get_07_multimodal_run_1_tabular_info() -> AutoDocExperimentInfo:
         _show_text_description_example,
         {
             "input_path": Path(
-                "eir_tutorials/07_multimodal_tutorial/data/descriptions.csv"
+                "eir_tutorials/a_using_eir/07_multimodal_tutorial/data/descriptions.csv"
             ),
             "output_path": Path(base_path) / "commands/description_preview.txt",
         },
@@ -81,7 +85,9 @@ def get_07_multimodal_run_1_tabular_info() -> AutoDocExperimentInfo:
     image_preview = (
         _show_image_example,
         {
-            "input_path": Path("eir_tutorials/07_multimodal_tutorial/data/images"),
+            "input_path": Path(
+                "eir_tutorials/a_using_eir/07_multimodal_tutorial/data/images"
+            ),
             "output_path": Path(base_path) / "commands/image_preview.jpg",
         },
     )
@@ -131,9 +137,9 @@ def _show_image_example(input_path: Path, output_path: Path) -> None:
 
 
 def get_07_multimodal_run_2_tabular_description_info() -> AutoDocExperimentInfo:
-    base_path = "docs/tutorials/tutorial_files/07_multimodal_tutorial/"
+    base_path = "docs/tutorials/tutorial_files/a_using_eir/07_multimodal_tutorial/"
 
-    conf_output_path = "eir_tutorials/07_multimodal_tutorial/conf"
+    conf_output_path = "eir_tutorials/a_using_eir/07_multimodal_tutorial/conf"
     output_folder = (
         "eir_tutorials/tutorial_runs/tutorial_07b_multimodal_tabular_description"
     )
@@ -159,7 +165,9 @@ def get_07_multimodal_run_2_tabular_description_info() -> AutoDocExperimentInfo:
         ),
     ]
 
-    data_output_path = Path("eir_tutorials/07_multimodal_tutorial/pet_adoption.zip")
+    data_output_path = Path(
+        "eir_tutorials/a_using_eir/07_multimodal_tutorial/pet_adoption.zip"
+    )
 
     ade = AutoDocExperimentInfo(
         name="MULTIMODAL_2_TABULAR_DESCRIPTION",
@@ -175,9 +183,9 @@ def get_07_multimodal_run_2_tabular_description_info() -> AutoDocExperimentInfo:
 
 
 def get_07_multimodal_run_3_tabular_description_image_info() -> AutoDocExperimentInfo:
-    base_path = "docs/tutorials/tutorial_files/07_multimodal_tutorial/"
+    base_path = "docs/tutorials/tutorial_files/a_using_eir/07_multimodal_tutorial/"
 
-    conf_output_path = "eir_tutorials/07_multimodal_tutorial/conf"
+    conf_output_path = "eir_tutorials/a_using_eir/07_multimodal_tutorial/conf"
     output_folder = (
         "eir_tutorials/tutorial_runs/tutorial_07c_multimodal_tabular_description_image"
     )
@@ -206,7 +214,9 @@ def get_07_multimodal_run_3_tabular_description_image_info() -> AutoDocExperimen
         ),
     ]
 
-    data_output_path = Path("eir_tutorials/07_multimodal_tutorial/pet_adoption.zip")
+    data_output_path = Path(
+        "eir_tutorials/a_using_eir/07_multimodal_tutorial/pet_adoption.zip"
+    )
 
     ade = AutoDocExperimentInfo(
         name="MULTIMODAL_3_TABULAR_DESCRIPTION_IMAGE",
@@ -222,9 +232,9 @@ def get_07_multimodal_run_3_tabular_description_image_info() -> AutoDocExperimen
 
 
 def get_07_mm_apx_run_1_tab_desc_pre_info() -> AutoDocExperimentInfo:
-    base_path = "docs/tutorials/tutorial_files/07_multimodal_tutorial/"
+    base_path = "docs/tutorials/tutorial_files/a_using_eir/07_multimodal_tutorial/"
 
-    conf_output_path = "eir_tutorials/07_multimodal_tutorial/conf"
+    conf_output_path = "eir_tutorials/a_using_eir/07_multimodal_tutorial/conf"
     output_folder = (
         "eir_tutorials/tutorial_runs/tutorial_07-apx-a_multimodal_tabular_"
         "description_pretrained"
@@ -256,7 +266,9 @@ def get_07_mm_apx_run_1_tab_desc_pre_info() -> AutoDocExperimentInfo:
         ),
     ]
 
-    data_output_path = Path("eir_tutorials/07_multimodal_tutorial/pet_adoption.zip")
+    data_output_path = Path(
+        "eir_tutorials/a_using_eir/07_multimodal_tutorial/pet_adoption.zip"
+    )
 
     ade = AutoDocExperimentInfo(
         name="MULTIMODAL_APX-1_TABULAR_DESCRIPTION_IMAGE_PRETRAINED",
@@ -272,9 +284,9 @@ def get_07_mm_apx_run_1_tab_desc_pre_info() -> AutoDocExperimentInfo:
 
 
 def get_07_mm_apx_run_2_tab_desc_mt_info() -> AutoDocExperimentInfo:
-    base_path = "docs/tutorials/tutorial_files/07_multimodal_tutorial/"
+    base_path = "docs/tutorials/tutorial_files/a_using_eir/07_multimodal_tutorial/"
 
-    conf_output_path = "eir_tutorials/07_multimodal_tutorial/conf"
+    conf_output_path = "eir_tutorials/a_using_eir/07_multimodal_tutorial/conf"
     output_folder = (
         "eir_tutorials/tutorial_runs/tutorial_07-apx-b_multimodal_tabular_"
         "description_multi_task"
@@ -331,7 +343,9 @@ def get_07_mm_apx_run_2_tab_desc_mt_info() -> AutoDocExperimentInfo:
         ),
     ]
 
-    data_output_path = Path("eir_tutorials/07_multimodal_tutorial/pet_adoption.zip")
+    data_output_path = Path(
+        "eir_tutorials/a_using_eir/07_multimodal_tutorial/pet_adoption.zip"
+    )
 
     ade = AutoDocExperimentInfo(
         name="MULTIMODAL_APX-2_TABULAR_DESCRIPTION_IMAGE_PRETRAINED_MT",

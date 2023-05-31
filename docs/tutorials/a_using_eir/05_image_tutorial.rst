@@ -33,7 +33,7 @@ to go over the sequence tutorial
 A - Baseline
 ------------
 
-.. literalinclude:: tutorial_files/05_image_tutorial/commands/tutorial_folder.txt
+.. literalinclude::eir_tutorials/a_using_eir/05_image_tutorial/commands/tutorial_folder.txt
     :language: console
 
 Looking at the data
@@ -44,10 +44,10 @@ and all kinds of other food:
 
 |pic1| |pic2|
 
-.. |pic1| image:: tutorial_files/05_image_tutorial/figures/hot_dog.jpg
+.. |pic1| image::eir_tutorials/a_using_eir/05_image_tutorial/figures/hot_dog.jpg
    :width: 45%
 
-.. |pic2| image:: tutorial_files/05_image_tutorial/figures/not_hot_dog.jpg
+.. |pic2| image::eir_tutorials/a_using_eir/05_image_tutorial/figures/not_hot_dog.jpg
    :width: 45%
 
 I did not know drinking coffee/cacao
@@ -65,22 +65,22 @@ those used in this tutorial and many more!
 
 To the configuration!
 
-.. literalinclude:: tutorial_files/05_image_tutorial/globals.yaml
+.. literalinclude::eir_tutorials/a_using_eir/05_image_tutorial/globals.yaml
     :language: yaml
     :caption:
 
-.. literalinclude:: tutorial_files/05_image_tutorial/inputs.yaml
+.. literalinclude::eir_tutorials/a_using_eir/05_image_tutorial/inputs.yaml
     :language: yaml
     :caption:
 
-.. literalinclude:: tutorial_files/05_image_tutorial/output.yaml
+.. literalinclude::eir_tutorials/a_using_eir/05_image_tutorial/output.yaml
     :language: yaml
     :caption:
 
 
 As usually, we do our training with the following command:
 
-.. literalinclude:: tutorial_files/05_image_tutorial/commands/IMAGE_1_RESNET.txt
+.. literalinclude::eir_tutorials/a_using_eir/05_image_tutorial/commands/IMAGE_1_RESNET.txt
     :language: console
 
 .. note::
@@ -92,7 +92,7 @@ As usually, we do our training with the following command:
 
 Now for the results, we see the following:
 
-.. image:: tutorial_files/05_image_tutorial/figures/05_image_training_curve_ACC_resnet_1.png
+.. image::eir_tutorials/a_using_eir/05_image_tutorial/figures/05_image_training_curve_ACC_resnet_1.png
 
 That looks *kind of* ok, but far from great. Our validation performance is all over the place
 (a contributing factor could be that our validation set here is very small),
@@ -111,19 +111,19 @@ and see whether that helps our performance.
 
 Now our input configuration looks like this:
 
-.. literalinclude:: tutorial_files/05_image_tutorial/inputs_resnet18.yaml
+.. literalinclude::eir_tutorials/a_using_eir/05_image_tutorial/inputs_resnet18.yaml
     :language: yaml
     :caption:
 
 To train, we run:
 
-.. literalinclude:: tutorial_files/05_image_tutorial/commands/IMAGE_2_PRETRAINED_RESNET.txt
+.. literalinclude::eir_tutorials/a_using_eir/05_image_tutorial/commands/IMAGE_2_PRETRAINED_RESNET.txt
     :language: console
 
 
 Looking at our performance, we see:
 
-.. image:: tutorial_files/05_image_tutorial/figures/05_image_training_curve_ACC_resnet_pretrained_1.png
+.. image::eir_tutorials/a_using_eir/05_image_tutorial/figures/05_image_training_curve_ACC_resnet_pretrained_1.png
 
 Definitely better!
 One factor here could be that
@@ -137,7 +137,7 @@ when deciding something is *not* a hot dog.
 we set the ``compute_attributions`` value to ``True``
 in the global configuration):
 
-.. image:: tutorial_files/05_image_tutorial/figures/pretrained_resnet_not_hot_dog_attributions.png
+.. image::eir_tutorials/a_using_eir/05_image_tutorial/figures/pretrained_resnet_not_hot_dog_attributions.png
 
 That is not a hot dog alright, and our model seems to agree.
 
@@ -153,7 +153,7 @@ feature extractor, but feed it 224 pixel images.
 
 The configuration for the EfficientNet part looks like this:
 
-.. literalinclude:: tutorial_files/05_image_tutorial/inputs_efficientnet_b0.yaml
+.. literalinclude::eir_tutorials/a_using_eir/05_image_tutorial/inputs_efficientnet_b0.yaml
     :language: yaml
     :caption:
 
@@ -161,7 +161,7 @@ Training as usual,
 notice that we are now passing in both input configurations
 to the ``--input_configs`` flag.
 
-.. literalinclude:: tutorial_files/05_image_tutorial/commands/IMAGE_3_PRETRAINED_EFFICIENTNET.txt
+.. literalinclude::eir_tutorials/a_using_eir/05_image_tutorial/commands/IMAGE_3_PRETRAINED_EFFICIENTNET.txt
     :language: console
 
 
@@ -178,7 +178,7 @@ to the ``--input_configs`` flag.
 The training and validation curves I got look like so
 (I got a bit impatient and stopped the run early):
 
-.. image:: tutorial_files/05_image_tutorial/figures/05_image_training_curve_ACC_combined_pretrained_1.png
+.. image::eir_tutorials/a_using_eir/05_image_tutorial/figures/05_image_training_curve_ACC_combined_pretrained_1.png
 
 Definitely looks more stable,
 and better performance than before.
@@ -193,11 +193,11 @@ focus on for an example image.
 
 First the ResNet18 feature extractor:
 
-.. image:: tutorial_files/05_image_tutorial/figures/pretrained_combined_resnet_not_hot_dog_attributions.png
+.. image::eir_tutorials/a_using_eir/05_image_tutorial/figures/pretrained_combined_resnet_not_hot_dog_attributions.png
 
 And then the EfficientNet-B0 feature extractor:
 
-.. image:: tutorial_files/05_image_tutorial/figures/pretrained_combined_efficientnet_not_hot_dog_attributions.png
+.. image::eir_tutorials/a_using_eir/05_image_tutorial/figures/pretrained_combined_efficientnet_not_hot_dog_attributions.png
 
 While it's definitely more clear
 to the human eye in the ResNet18 case,

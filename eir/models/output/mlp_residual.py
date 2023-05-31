@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class ResidualMLPOutputModulelConfig(ResidualMLPConfig):
+class ResidualMLPOutputModuleConfig(ResidualMLPConfig):
 
     """
     :param layers:
@@ -52,7 +52,7 @@ class ResidualMLPOutputModulelConfig(ResidualMLPConfig):
 class ResidualMLPOutputModule(nn.Module):
     def __init__(
         self,
-        model_config: ResidualMLPOutputModulelConfig,
+        model_config: ResidualMLPOutputModuleConfig,
         input_dimension: int,
         num_outputs_per_target: "al_num_outputs_per_target",
     ):

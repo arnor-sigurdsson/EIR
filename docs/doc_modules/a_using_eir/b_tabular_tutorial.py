@@ -6,9 +6,9 @@ from docs.doc_modules.utils import get_saved_model_path
 
 
 def get_02_poker_hands_run_1_tabular_info() -> AutoDocExperimentInfo:
-    base_path = "docs/tutorials/tutorial_files/02_tabular_tutorial"
+    base_path = "docs/tutorials/tutorial_files/a_using_eir/02_tabular_tutorial"
 
-    conf_output_path = "eir_tutorials/02_tabular_tutorial/conf"
+    conf_output_path = "eir_tutorials/a_using_eir/02_tabular_tutorial/conf"
 
     command = [
         "eirtrain",
@@ -38,7 +38,7 @@ def get_02_poker_hands_run_1_tabular_info() -> AutoDocExperimentInfo:
     ]
 
     data_output_path = Path(
-        "eir_tutorials/02_tabular_tutorial/data/poker_hands_data.zip"
+        "eir_tutorials/a_using_eir/02_tabular_tutorial/data/poker_hands_data.zip"
     )
 
     get_tutorial_folder = (
@@ -46,7 +46,7 @@ def get_02_poker_hands_run_1_tabular_info() -> AutoDocExperimentInfo:
         {
             "command": [
                 "tree",
-                "eir_tutorials/02_tabular_tutorial/",
+                "eir_tutorials/a_using_eir/02_tabular_tutorial/",
                 "-I",
                 "*test*.yaml|*.zip",
                 "--noreport",
@@ -74,9 +74,9 @@ def get_02_poker_hands_run_1_predict_info() -> AutoDocExperimentInfo:
     We are abusing the `make_tutorial_data` here a bit by switching to the predict
     code, but we'll allow it for now.
     """
-    base_path = "docs/tutorials/tutorial_files/02_tabular_tutorial"
+    base_path = "docs/tutorials/tutorial_files/a_using_eir/02_tabular_tutorial"
 
-    conf_output_path = "eir_tutorials/02_tabular_tutorial/conf"
+    conf_output_path = "eir_tutorials/a_using_eir/02_tabular_tutorial/conf"
 
     run_1_output_path = "eir_tutorials/tutorial_runs/tutorial_02_run/"
 
@@ -98,7 +98,7 @@ def get_02_poker_hands_run_1_predict_info() -> AutoDocExperimentInfo:
     ]
 
     data_output_path = Path(
-        "eir_tutorials/02_tabular_tutorial/data/poker_hands_data.zip"
+        "eir_tutorials/a_using_eir/02_tabular_tutorial/data/poker_hands_data.zip"
     )
 
     mapping = [
