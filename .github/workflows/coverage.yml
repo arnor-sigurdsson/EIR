@@ -14,8 +14,8 @@ jobs:
         architecture: x64
     - name: Run tests
       run: |
-        pip install tox==4.5.1
-        pip install poetry==1.5.0
+        pip install tox==4.5.2
+        pip install poetry==1.5.1
         tox -e py
     - name: Generate report
       uses: codecov/codecov-action@v3
