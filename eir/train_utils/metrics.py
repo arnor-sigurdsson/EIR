@@ -43,7 +43,7 @@ from eir.setup.schemas import OutputConfig
 if TYPE_CHECKING:
     from eir.train import al_criteria, Experiment  # noqa: F401
     from eir.train_utils.step_logic import al_training_labels_target
-    from eir.models.omics.omics_models import al_omics_models  # noqa: F401
+    from eir.models.input.omics.omics_models import al_omics_models  # noqa: F401
     from eir.train_utils.train_handlers import HandlerConfig
     from eir.data_load.label_setup import (  # noqa: F401
         al_target_columns,

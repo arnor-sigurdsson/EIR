@@ -2,7 +2,7 @@ from typing import Type
 
 from torch import nn
 
-from eir.models.sequence.transformer_models import (
+from eir.models.input.sequence.transformer_models import (
     TransformerFeatureExtractor,
     TransformerWrapperModel,
     SequenceOutputTransformerFeatureExtractor,

@@ -11,7 +11,7 @@ from eir.experiment_io.experiment_io import (
     get_run_folder_from_model_path,
     load_transformers,
 )
-from eir.models.tabular.tabular import get_unique_values_from_transformers
+from eir.models.input.tabular.tabular import get_unique_values_from_transformers
 from eir.setup import schemas
 
 if TYPE_CHECKING:

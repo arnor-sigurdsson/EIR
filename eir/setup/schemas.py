@@ -1,12 +1,12 @@
 from dataclasses import dataclass, field
 from typing import Union, Literal, List, Optional, Sequence, Type
 
-from eir.models.array.array_models import ArrayModelConfig
+from eir.models.input.array.array_models import ArrayModelConfig
 from eir.models.fusion.fusion_identity import IdentityConfig
 from eir.models.fusion.fusion_mgmoe import MGMoEModelConfig
-from eir.models.image.image_models import ImageModelConfig
+from eir.models.input.image.image_models import ImageModelConfig
 from eir.models.layers import ResidualMLPConfig
-from eir.models.omics.omics_models import (
+from eir.models.input.omics.omics_models import (
     OmicsModelConfig,
     LinearModel,
     CNNModel,
@@ -18,10 +18,10 @@ from eir.models.output.output_module_setup import (
     TabularOutputModuleConfig,
     SequenceOutputModuleConfig,
 )
-from eir.models.sequence.transformer_models import (
+from eir.models.input.sequence.transformer_models import (
     SequenceModelConfig,
 )
-from eir.models.tabular.tabular import (
+from eir.models.input.tabular.tabular import (
     SimpleTabularModel,
     TabularModelConfig,
 )

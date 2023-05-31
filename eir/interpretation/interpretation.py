@@ -56,8 +56,7 @@ from eir.interpretation.interpret_array import (
     get_array_sum_consumer,
 )
 from eir.models.model_training_utils import gather_data_loader_samples
-from eir.models.omics.models_cnn import CNNModel
-from eir.models.omics.models_linear import LinearModel
+from eir.models.input.omics.omics_models import CNNModel, LinearModel
 from eir.train_utils.evaluation import validation_handler
 from eir.train_utils.utils import (
     prepare_sample_output_folder,

@@ -18,7 +18,7 @@ from eir.setup.output_setup_modules.tabular_output_setup import (
 )
 
 if TYPE_CHECKING:
-    from eir.models.model_setup import FeatureExtractorInfo
+    from eir.models.model_setup_modules.meta_setup import FeatureExtractorInfo
 
 al_output_module_init_configs = (
     ResidualMLPOutputModulelConfig

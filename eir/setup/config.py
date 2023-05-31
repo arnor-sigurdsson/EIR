@@ -23,15 +23,15 @@ import configargparse
 import yaml
 from aislib.misc_utils import get_logger
 
-from eir.models.array.array_models import (
+from eir.models.input.array.array_models import (
     ArrayModelConfig,
     get_array_config_dataclass_mapping,
 )
 from eir.models.fusion.fusion_identity import IdentityConfig
 from eir.models.fusion.fusion_mgmoe import MGMoEModelConfig
-from eir.models.image.image_models import ImageModelConfig
+from eir.models.input.image.image_models import ImageModelConfig
 from eir.models.layers import ResidualMLPConfig
-from eir.models.omics.omics_models import (
+from eir.models.input.omics.omics_models import (
     get_omics_config_dataclass_mapping,
     OmicsModelConfig,
 )
@@ -46,11 +46,14 @@ from eir.models.output.output_module_setup import (
 from eir.models.output.sequence.sequence_output_modules import (
     TransformerSequenceOutputModuleConfig,
 )
-from eir.models.sequence.transformer_models import (
+from eir.models.input.sequence.transformer_models import (
     BasicTransformerFeatureExtractorModelConfig,
     SequenceModelConfig,
 )
-from eir.models.tabular.tabular import TabularModelConfig, SimpleTabularModelConfig
+from eir.models.input.tabular.tabular import (
+    TabularModelConfig,
+    SimpleTabularModelConfig,
+)
 from eir.setup import schemas
 from eir.setup.config_setup_modules.config_setup_utils import (
     get_yaml_iterator_with_injections,

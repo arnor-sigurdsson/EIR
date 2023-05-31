@@ -1,4 +1,4 @@
-from eir.models.omics.omics_models import (
+from eir.models.input.omics.omics_models import (
     al_omics_model_configs,
     get_omics_model_class,
     al_omics_model_types,

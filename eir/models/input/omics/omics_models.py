@@ -4,10 +4,10 @@ from typing import Union, Type, Dict, Any, Protocol, Literal, TYPE_CHECKING, Cla
 
 from aislib.misc_utils import get_logger
 
-from eir.models.omics.models_cnn import CNNModel, CNNModelConfig
-from eir.models.omics.models_identity import IdentityModel, IdentityModelConfig
-from eir.models.omics.models_linear import LinearModel, LinearModelConfig
-from eir.models.omics.models_locally_connected import (
+from eir.models.input.omics.models_cnn import CNNModel, CNNModelConfig
+from eir.models.input.omics.models_identity import IdentityModel, IdentityModelConfig
+from eir.models.input.omics.models_linear import LinearModel, LinearModelConfig
+from eir.models.input.omics.models_locally_connected import (
     SimpleLCLModel,
     SimpleLCLModelConfig,
     LCLModel,

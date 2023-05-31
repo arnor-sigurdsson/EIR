@@ -17,7 +17,7 @@ from aislib.misc_utils import get_logger
 from torch import nn
 
 from eir.models.layers import LCL, LCLResidualBlock
-from eir.models.sequence.transformer_models import PositionalEmbedding
+from eir.models.input.sequence.transformer_models import PositionalEmbedding
 
 if TYPE_CHECKING:
     from eir.setup.input_setup_modules.common import DataDimensions

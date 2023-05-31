@@ -7,7 +7,7 @@ from torch import nn
 from transformers import PreTrainedModel, AutoModel, AutoConfig
 
 from eir.models.models_base import get_output_dimensions_for_input
-from eir.models.sequence.transformer_models import (
+from eir.models.input.sequence.transformer_models import (
     TransformerFeatureExtractor,
     SequenceModelConfig,
     TransformerWrapperModel,

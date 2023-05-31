@@ -26,7 +26,7 @@ from eir.data_load.data_augmentation import get_mix_data_hook, hook_mix_loss
 from eir.data_load.data_utils import Batch
 from eir.data_load.label_setup import al_all_column_ops
 from eir.models import model_training_utils
-from eir.models.tabular.tabular import get_tabular_inputs
+from eir.models.input.tabular.tabular import get_tabular_inputs
 from eir.setup import schemas
 from eir.setup.config import Configs, get_all_tabular_targets
 from eir.setup.input_setup import al_input_objects_as_dict

@@ -1,6 +1,9 @@
 from typing import Sequence, Dict, Set
 
-from eir.models.tabular.tabular import SimpleTabularModelConfig, SimpleTabularModel
+from eir.models.input.tabular.tabular import (
+    SimpleTabularModelConfig,
+    SimpleTabularModel,
+)
 
 
 def get_tabular_model(

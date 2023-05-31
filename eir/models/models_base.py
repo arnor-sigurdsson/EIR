@@ -20,7 +20,7 @@ from torch import nn
 from transformers import PreTrainedModel
 
 from eir.models.layers import MLPResidualBlock
-from eir.models.sequence.transformer_models import get_hf_transformer_forward
+from eir.models.input.sequence.transformer_models import get_hf_transformer_forward
 
 if TYPE_CHECKING:
     from eir.setup.output_setup_modules.tabular_output_setup import (
@@ -194,12 +194,6 @@ def _get_mlp_basic_final_spec(
     )
 
     return spec
-
-
-def compose_spec_creation_and_initalization(spec_func, **spec_kwargs):
-    spec = spec_func(**spec_kwargs)
-    module = initialize_modules_from_spec(spec=spec)
-    return module
 
 
 def initialize_modules_from_spec(

@@ -9,7 +9,7 @@ from torch import nn
 from torch.nn import functional as F
 
 from eir.models.fusion.fusion_attention import MetaSequenceProjection
-from eir.models.sequence.transformer_models import (
+from eir.models.input.sequence.transformer_models import (
     BasicTransformerFeatureExtractorModelConfig,
     parse_dim_feedforward,
 )
@@ -19,7 +19,7 @@ if TYPE_CHECKING:
         ComputedSequenceOutputInfo,
     )
     from eir.setup.input_setup import al_input_objects_as_dict
-    from eir.models.model_setup import FeatureExtractorInfo
+    from eir.models.model_setup_modules.meta_setup import FeatureExtractorInfo
 
 al_sequence_output_models = Literal["sequence"]
 

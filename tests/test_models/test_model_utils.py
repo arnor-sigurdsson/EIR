@@ -9,8 +9,8 @@ from torch import nn
 
 
 from eir.models import model_training_utils
-from eir.models.omics import models_cnn
-from eir.models.omics.models_cnn import ConvParamSuggestion
+from eir.models.input.omics import models_cnn
+from eir.models.input.omics.models_cnn import ConvParamSuggestion
 
 
 @pytest.fixture

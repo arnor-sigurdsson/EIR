@@ -3,7 +3,7 @@ from typing import Sequence, Iterable, Dict, Any, Optional, TYPE_CHECKING
 
 from aislib.misc_utils import get_logger
 
-from eir.models.sequence.transformer_models import (
+from eir.models.input.sequence.transformer_models import (
     BasicTransformerFeatureExtractorModelConfig,
 )
 

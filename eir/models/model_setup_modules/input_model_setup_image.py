@@ -5,7 +5,7 @@ import timm
 from aislib.misc_utils import get_logger
 from torch import nn
 
-from eir.models.image.image_models import ImageModelConfig, ImageWrapperModel
+from eir.models.input.image.image_models import ImageModelConfig, ImageWrapperModel
 
 logger = get_logger(name=__name__)
 

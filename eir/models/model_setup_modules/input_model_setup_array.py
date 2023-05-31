@@ -1,6 +1,6 @@
 from torch import nn
 
-from eir.models.array.array_models import (
+from eir.models.input.array.array_models import (
     ArrayModelConfig,
     ArrayWrapperModel,
     al_array_model_configs,

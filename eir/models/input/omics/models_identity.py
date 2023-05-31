@@ -4,7 +4,7 @@ from typing import Callable, TYPE_CHECKING, Literal
 import torch
 from torch import nn
 
-from eir.models.omics.models_locally_connected import flatten_h_w_fortran
+from eir.models.input.omics.models_locally_connected import flatten_h_w_fortran
 
 if TYPE_CHECKING:
     from eir.setup.input_setup_modules.common import DataDimensions

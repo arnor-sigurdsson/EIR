@@ -5,8 +5,8 @@ from functools import partial
 import torch
 from torch import nn
 
-from eir.models.omics.models_cnn import CNNModelConfig, CNNModel
-from eir.models.omics.models_locally_connected import LCLModel, LCLModelConfig
+from eir.models.input.omics.models_cnn import CNNModelConfig, CNNModel
+from eir.models.input.omics.models_locally_connected import LCLModel, LCLModelConfig
 
 if TYPE_CHECKING:
     from eir.setup.input_setup_modules.common import DataDimensions

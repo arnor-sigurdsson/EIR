@@ -10,8 +10,8 @@ from eir import predict
 from eir import train
 from eir.experiment_io.experiment_io import load_serialized_train_experiment
 from eir.models.model_setup_modules.model_io import load_model
-from eir.models.omics.models_cnn import CNNModel
-from eir.models.omics.omics_models import get_omics_model_init_kwargs
+from eir.models.input.omics.models_cnn import CNNModel
+from eir.models.input.omics.omics_models import get_omics_model_init_kwargs
 from eir.predict_modules.predict_attributions import compute_predict_attributions
 from eir.setup import config
 from eir.setup.input_setup_modules.common import DataDimensions
