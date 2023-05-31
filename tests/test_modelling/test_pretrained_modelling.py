@@ -64,6 +64,7 @@ def _get_pre_trained_module_setup_parametrization() -> Dict:
                 },
             ],
             "fusion_configs": {
+                "model_type": "mlp-residual",
                 "model_config": {
                     "fc_task_dim": 128,
                     "fc_do": 0.10,
@@ -406,13 +407,14 @@ def _get_output_configs_with_pretrained_modifications(
     output_configs_with_pretrained = []
     for output_config in output_configs:
         if output_config.output_info.output_type != "sequence":
-            continue
+            output_configs_with_pretrained.append(output_config)
 
-        cur_name = output_config.output_info.output_name
-        if rename_pretrained_inputs:
-            output_config.output_info.output_name = cur_name + "_pretrained_module"
+        else:
+            cur_name = output_config.output_info.output_name
+            if rename_pretrained_inputs:
+                output_config.output_info.output_name = cur_name + "_pretrained_module"
 
-        output_configs_with_pretrained.append(output_config)
+            output_configs_with_pretrained.append(output_config)
 
     pretrained_configs.output_configs = output_configs_with_pretrained
 
