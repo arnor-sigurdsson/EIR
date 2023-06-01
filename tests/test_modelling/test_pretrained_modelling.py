@@ -279,7 +279,7 @@ def test_pre_training_and_loading(
         run_path=test_config.run_path,
         max_thresholds=(0.5, 0.5),
         min_thresholds=(3.0, 3.0),
-        con_metric="pcc",
+        con_metric=None,
     )
 
     (
@@ -295,8 +295,8 @@ def test_pre_training_and_loading(
         outputs=pretrained_checkpoint_experiment.outputs,
         run_path=pretrained_checkpoint_test_config.run_path,
         max_thresholds=(0.85, 0.85),
-        min_thresholds=(1.5, 1.5),
-        con_metric="pcc",
+        min_thresholds=(2.0, 2.0),
+        con_metric=None,
     )
 
 

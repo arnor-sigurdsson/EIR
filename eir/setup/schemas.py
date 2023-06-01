@@ -1,11 +1,10 @@
 from dataclasses import dataclass, field
-from typing import Union, Literal, List, Optional, Sequence, Type
+from typing import Union, Literal, Optional, Sequence, Type
 
-from eir.models.input.array.array_models import ArrayModelConfig
 from eir.models.fusion.fusion_identity import IdentityConfig
 from eir.models.fusion.fusion_mgmoe import MGMoEModelConfig
+from eir.models.input.array.array_models import ArrayModelConfig
 from eir.models.input.image.image_models import ImageModelConfig
-from eir.models.layers import ResidualMLPConfig
 from eir.models.input.omics.omics_models import (
     OmicsModelConfig,
     LinearModel,
@@ -14,16 +13,17 @@ from eir.models.input.omics.omics_models import (
     SimpleLCLModel,
     IdentityModel,
 )
-from eir.models.output.output_module_setup import (
-    TabularOutputModuleConfig,
-    SequenceOutputModuleConfig,
-)
 from eir.models.input.sequence.transformer_models import (
     SequenceModelConfig,
 )
 from eir.models.input.tabular.tabular import (
     SimpleTabularModel,
     TabularModelConfig,
+)
+from eir.models.layers import ResidualMLPConfig
+from eir.models.output.output_module_setup import (
+    TabularOutputModuleConfig,
+    SequenceOutputModuleConfig,
 )
 from eir.setup.schema_modules.output_schemas_sequence import (
     SequenceOutputTypeConfig,
@@ -109,7 +109,7 @@ class GlobalConfig:
         Size of batches during training.
 
     :param valid_size:
-        Size if the validaton set, if float then uses a percentage. If int,
+        Size if the validation set, if float then uses a percentage. If int,
         then raw counts.
 
     :param manual_valid_ids_file:
@@ -117,10 +117,15 @@ class GlobalConfig:
         be one ID per line in the file.
 
     :param dataloader_workers:
-        Number of workers for multi-process training and validation data loading.
+        Number of workers for multiprocess training and validation data loading.
 
     :param device:
-        Device to run the training on (e.g. 'cuda:0' / 'cpu').
+        Device to run the training on (e.g. 'cuda:0' / 'cpu' / 'mps').
+        'mps' is currently experimental, and might not work for all models.
+
+    :param n_iter_before_swa:
+        Number of iterations to run before activating Stochastic Weight Averaging
+        (SWA).
 
     :param amp:
         Whether to use Automatic Mixed Precision. Currently only supported when
@@ -298,7 +303,6 @@ class GlobalConfig:
     checkpoint_interval: Union[None, int] = None
     n_saved_models: int = 1
     compute_attributions: bool = False
-    attribution_target_classes: Union[None, List[str]] = None
     max_attributions_per_class: Union[None, int] = None
     attributions_every_sample_factor: int = 1
     attribution_background_samples: int = 256

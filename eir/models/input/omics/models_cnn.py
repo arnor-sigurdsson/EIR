@@ -390,6 +390,19 @@ def _make_conv_layers(
         )
     ]
 
+    first_width, first_height = calc_size_after_conv_sequence(
+        input_width=data_dimensions.width,
+        input_height=data_dimensions.height,
+        conv_sequence=nn.Sequential(*conv_blocks),
+    )
+    if first_width * first_height <= mc.attention_inclusion_cutoff:
+        cur_attention_block = ConvAttentionBlock(
+            channels=conv_blocks[-1].out_channels,
+            width=first_width,
+            height=first_height,
+        )
+        conv_blocks.append(cur_attention_block)
+
     for layer_arch_idx, layer_arch_layers in enumerate(residual_blocks):
         for layer in range(layer_arch_layers):
             cur_layer = _get_conv_residual_block(
@@ -818,12 +831,27 @@ def _choose_best_solution(
     input_stride: int,
     input_dilation: int,
 ) -> ConvParamSuggestion:
-    def _calculate_distance(solution: ConvParamSuggestion) -> int:
+    def _calculate_distance(
+        solution: ConvParamSuggestion,
+    ) -> Tuple[int, Tuple[int, ...]]:
+        """
+        We have the second returned value as a tuple so that if >1 solutions
+        have the same distance, we get a consistent ordering.
+        """
         kernel_size_diff = abs(solution.kernel_size - input_kernel_size)
         stride_diff = abs(solution.stride - input_stride)
         dilation_diff = abs(solution.dilation - input_dilation)
         padding_diff = abs(solution.padding)
-        return kernel_size_diff + stride_diff + dilation_diff + padding_diff
+        distance = kernel_size_diff + stride_diff + dilation_diff + padding_diff
+        values_tuple = (
+            solution.kernel_size,
+            solution.stride,
+            solution.dilation,
+            solution.padding,
+            solution.target_size,
+        )
+
+        return distance, values_tuple
 
     sorted_solutions = sorted(solutions, key=_calculate_distance)
 

@@ -142,7 +142,7 @@ def _get_label_smoothing(
 
 def _calc_con_loss(input: torch.Tensor, target: torch.Tensor, loss_func: al_con_losses):
     match loss_func:
-        case nn.PoissonNLLLoss:
+        case nn.PoissonNLLLoss():
             return loss_func(log_input=input.squeeze(), target=target.squeeze())
         case _:
             return loss_func(input=input.squeeze(), target=target.squeeze())

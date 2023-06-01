@@ -767,8 +767,8 @@ def get_performance_averaging_functions(
     logger.info(
         "Tabular performance averaging functions across tasks set to averages "
         "of %s for categorical targets and %s for continuous targets. These "
-        "values are used to determine overall performance, which is used to "
-        "control factors such as early stopping and LR scheduling. "
+        "values are used to determine overall performance (using the validation set), "
+        "which is used to control factors such as early stopping and LR scheduling. "
         "Other output cases use 1.0-LOSS by default.",
         [i.upper() for i in cat_metric_names],
         [i.upper().replace("LOSS", "1.0-LOSS") for i in con_metric_names],

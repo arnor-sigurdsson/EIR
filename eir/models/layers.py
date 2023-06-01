@@ -577,7 +577,6 @@ def get_projection_layer(
             target_dimension=target_dimension,
             layer_type="lcl_residual",
         )
-
         if lcl_residual_projection is not None:
             return lcl_residual_projection
 
@@ -586,7 +585,6 @@ def get_projection_layer(
             target_dimension=target_dimension,
             layer_type="lcl",
         )
-
         if lcl_projection is not None:
             return lcl_projection
 
@@ -597,18 +595,36 @@ def get_projection_layer(
         )
 
     elif projection_layer_type == "lcl_residual":
-        return get_lcl_projection_layer(
+        layer = get_lcl_projection_layer(
             input_dimension=input_dimension,
             target_dimension=target_dimension,
             layer_type="lcl_residual",
         )
+        if layer is None:
+            raise ValueError(
+                f"Cannot create lcl_residual projection layer for "
+                f"input_dimension={input_dimension} and "
+                f"target_dimension={target_dimension} for projection. "
+                f"Try using projection_layer_type='auto'."
+            )
+        else:
+            return layer
 
     elif projection_layer_type == "lcl":
-        return get_lcl_projection_layer(
+        layer = get_lcl_projection_layer(
             input_dimension=input_dimension,
             target_dimension=target_dimension,
             layer_type="lcl",
         )
+        if layer is None:
+            raise ValueError(
+                f"Cannot create lcl projection layer for "
+                f"input_dimension={input_dimension} and "
+                f"target_dimension={target_dimension} for projection. "
+                f"Try using projection_layer_type='auto'."
+            )
+        else:
+            return layer
 
     elif projection_layer_type == "linear":
         if input_dimension == target_dimension:
@@ -705,6 +721,9 @@ def _find_best_lcl_kernel_width_and_out_feature_sets(
 
             if diff == 0:
                 break
+
+    if best_diff != 0:
+        return None
 
     if best_kernel_width is None:
         return None

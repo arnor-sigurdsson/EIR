@@ -6,7 +6,7 @@ import torch
 from eir.models.model_training_utils import trace_eir_model
 from eir.setup.setup_utils import get_all_hf_model_names
 from tests.conftest import should_skip_in_gha
-from tests.test_modelling.test_sequence_modelling import (
+from tests.test_modelling.test_tabular_modelling.test_sequence_modelling import (
     _get_common_model_config_overload,
     _parse_model_specific_config_values,
 )

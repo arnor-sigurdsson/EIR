@@ -775,7 +775,6 @@ def _get_interpretation_data_producer(
     target_classes_numerical = _get_numerical_target_classes(
         target_transformer=target_transformer,
         column_type=column_type,
-        attribution_target_classes=gc.attribution_target_classes,
     )
 
     attributions_data_loader = _get_attributions_dataloader(
@@ -891,12 +890,8 @@ def _subsample_dataset(dataset: al_datasets, indices: Sequence[int]):
 def _get_numerical_target_classes(
     target_transformer,
     column_type: str,
-    attribution_target_classes: Union[Sequence[str], None],
 ):
     if column_type == "con":
         return [None]
-
-    if attribution_target_classes:
-        return target_transformer.transform(attribution_target_classes)
 
     return target_transformer.transform(target_transformer.classes_)
