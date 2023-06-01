@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Union, Literal, Optional, Sequence, Type
+from typing import Union, Literal, Optional, Sequence, Type, TYPE_CHECKING
 
 from eir.models.fusion.fusion_identity import IdentityConfig
 from eir.models.fusion.fusion_mgmoe import MGMoEModelConfig
@@ -30,6 +30,12 @@ from eir.setup.schema_modules.output_schemas_sequence import (
     SequenceOutputSamplingConfig,
 )
 from eir.setup.setup_utils import get_all_optimizer_names
+
+if TYPE_CHECKING:
+    from eir.train_utils.metrics import (
+        al_cat_averaging_metric_choices,
+        al_con_averaging_metric_choices,
+    )
 
 al_input_configs = Sequence["InputConfig"]
 al_output_configs = Sequence["OutputConfig"]
@@ -288,8 +294,8 @@ class GlobalConfig:
     gradient_clipping: float = 1.0
     gradient_accumulation_steps: Union[None, int] = None
     gradient_noise: float = 0.0
-    cat_averaging_metrics: Optional[Sequence[str]] = None
-    con_averaging_metrics: Optional[Sequence[str]] = None
+    cat_averaging_metrics: Optional["al_cat_averaging_metric_choices"] = None
+    con_averaging_metrics: Optional["al_con_averaging_metric_choices"] = None
     early_stopping_patience: int = 10
     early_stopping_buffer: Union[None, int] = None
     warmup_steps: Union[Literal["auto"], int] = "auto"

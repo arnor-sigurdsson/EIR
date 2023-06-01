@@ -16,14 +16,14 @@ logger = get_logger(name=__name__)
 
 def load_model(
     model_path: Path,
-    model_class: Type[nn.Module],
+    model_class: Type[al_meta_model],
     model_init_kwargs: Dict,
     device: str,
     test_mode: bool,
     state_dict_keys_to_keep: Union[None, Sequence[str]] = None,
     state_dict_key_rename: Union[None, Sequence[Tuple[str, str]]] = None,
     strict_shapes: bool = True,
-) -> Union[al_meta_model, nn.Module]:
+) -> al_meta_model:
     model = model_class(**model_init_kwargs)
 
     model = _load_model_weights(
@@ -48,7 +48,7 @@ def _load_model_weights(
     state_dict_keys_to_keep: Union[None, Sequence[str]] = None,
     state_dict_key_rename: Union[None, Sequence[Tuple[str, str]]] = None,
     strict_shapes: bool = True,
-) -> nn.Module:
+) -> al_meta_model:
     loaded_weights_state_dict = torch.load(model_state_dict_path, map_location=device)
 
     if state_dict_keys_to_keep:

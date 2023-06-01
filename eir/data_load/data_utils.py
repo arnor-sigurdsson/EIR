@@ -55,7 +55,7 @@ def get_train_sampler(columns_to_sample: None, train_dataset: "DatasetBase") -> 
 
 @overload
 def get_train_sampler(
-    columns_to_sample: List[str], train_dataset: "DatasetBase"
+    columns_to_sample: Sequence[str], train_dataset: "DatasetBase"
 ) -> Union[WeightedRandomSampler, DistributedSampler]:
     ...
 

@@ -1,6 +1,5 @@
 from pathlib import Path
 from typing import (
-    Union,
     Callable,
     Dict,
     Type,
@@ -11,6 +10,7 @@ import torch
 from aislib.misc_utils import get_logger
 from torch import nn
 
+from eir.models import al_meta_model
 from eir.models.model_setup_modules.meta_setup import (
     get_default_meta_class,
     get_meta_model_class_and_kwargs_from_configs,
@@ -43,7 +43,7 @@ def get_model(
     fusion_config: schemas.FusionConfig,
     outputs_as_dict: "al_output_objects_as_dict",
     meta_class_getter: al_fusion_class_callable = get_default_meta_class,
-) -> Union[nn.Module, nn.DataParallel, Callable]:
+) -> al_meta_model:
     meta_class, meta_kwargs = get_meta_model_class_and_kwargs_from_configs(
         global_config=global_config,
         fusion_config=fusion_config,

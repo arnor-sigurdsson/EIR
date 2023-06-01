@@ -2,7 +2,7 @@ import reprlib
 from collections import defaultdict
 from functools import partial
 from inspect import signature
-from typing import Callable, List, Type, Dict, TYPE_CHECKING, Optional, Union
+from typing import Callable, List, Type, Dict, TYPE_CHECKING, Optional
 
 import torch
 from adabelief_pytorch import AdaBelief
@@ -19,6 +19,7 @@ from eir.setup.setup_utils import get_base_optimizer_names
 
 if TYPE_CHECKING:
     from eir.setup.schemas import GlobalConfig
+    from eir.models import al_meta_model
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -134,8 +135,8 @@ class AttrDelegatedSWAWrapper(torch.optim.swa_utils.AveragedModel):
 
 
 def maybe_wrap_model_with_swa(
-    n_iter_before_swa: Optional[int], model: nn.Module, device: torch.device
-) -> Union[nn.Module, AttrDelegatedSWAWrapper]:
+    n_iter_before_swa: Optional[int], model: al_meta_model, device: torch.device
+) -> al_meta_model:
     if n_iter_before_swa is None:
         return model
 

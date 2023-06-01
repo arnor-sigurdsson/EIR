@@ -32,7 +32,7 @@ def set_up_all_targets_wrapper(
     run_folder: Path,
     output_configs: Sequence[schemas.OutputConfig],
     hooks: Optional["Hooks"],
-) -> Union["MergedTargetLabels", None]:
+) -> "MergedTargetLabels":
     logger.info("Setting up target labels.")
 
     custom_ops = hooks.custom_column_label_parsing_ops if hooks else None

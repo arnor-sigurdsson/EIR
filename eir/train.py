@@ -5,7 +5,6 @@ from typing import (
     Union,
     Tuple,
     List,
-    Dict,
     TYPE_CHECKING,
     Callable,
     Optional,
@@ -17,7 +16,7 @@ from aislib.misc_utils import get_logger
 from ignite.engine import Engine
 from torch import nn
 from torch.optim.optimizer import Optimizer
-from torch.utils.data import DataLoader, WeightedRandomSampler
+from torch.utils.data import DataLoader, WeightedRandomSampler, DistributedSampler
 from torch.utils.tensorboard import SummaryWriter
 
 from eir.data_load import datasets
@@ -55,7 +54,7 @@ from eir.target_setup.target_label_setup import (
 )
 from eir.train_utils import distributed
 from eir.train_utils import utils
-from eir.train_utils.criteria import get_criteria, get_loss_callable
+from eir.train_utils.criteria import get_criteria, get_loss_callable, al_criteria_dict
 from eir.train_utils.metrics import (
     get_average_history_filepath,
     get_default_metrics,
@@ -80,7 +79,6 @@ if TYPE_CHECKING:
         al_metric_record_dict,
     )
 
-al_criteria = Dict[str, Dict[str, Union[nn.CrossEntropyLoss, nn.MSELoss]]]
 
 utils.seed_everything()
 logger = get_logger(name=__name__, tqdm_compatible=True)
@@ -114,16 +112,16 @@ class Experiment:
     valid_dataset: torch.utils.data.Dataset
     model: al_meta_model
     optimizer: Optimizer
-    criteria: al_criteria
+    criteria: al_criteria_dict
     loss_function: Callable
     writer: SummaryWriter
     metrics: "al_metric_record_dict"
-    hooks: Union[Hooks, None]
+    hooks: Hooks
 
 
 def get_default_experiment(
     configs: Configs,
-    hooks: Union[Hooks, None] = None,
+    hooks: Hooks,
 ) -> "Experiment":
     run_folder = _prepare_run_folder(output_folder=configs.global_config.output_folder)
 
@@ -259,7 +257,7 @@ def _prepare_run_folder(output_folder: str) -> Path:
 
 def get_dataloaders(
     train_dataset: datasets.DatasetBase,
-    train_sampler: Union[None, WeightedRandomSampler],
+    train_sampler: Union[None, WeightedRandomSampler, DistributedSampler],
     valid_dataset: datasets.DatasetBase,
     batch_size: int,
     num_workers: int = 0,

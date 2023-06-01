@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     )
     from eir.setup.input_setup import al_input_objects_as_dict
     from eir.models.model_setup_modules.meta_setup import FeatureExtractorInfo
+    from eir.models import al_meta_model
 
 al_sequence_output_models = Literal["sequence"]
 
@@ -129,7 +130,7 @@ def overload_embeddings_with_pretrained(
     model: nn.Module,
     inputs: "al_input_objects_as_dict",
     pretrained_checkpoint: str,
-) -> nn.Module:
+) -> al_meta_model:
     """
     Vocab: From serialized input object
     Embeddings: From loaded model

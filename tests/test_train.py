@@ -76,7 +76,8 @@ def test_get_default_experiment(
 ):
     test_configs = create_test_config
 
-    default_experiment = train.get_default_experiment(configs=test_configs, hooks=None)
+    hooks = train.get_default_hooks(configs=test_configs)
+    default_experiment = train.get_default_experiment(configs=test_configs, hooks=hooks)
     assert default_experiment.configs == test_configs
 
     assert default_experiment.hooks is None
