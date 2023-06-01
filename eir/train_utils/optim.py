@@ -19,7 +19,7 @@ from eir.setup.setup_utils import get_base_optimizer_names
 
 if TYPE_CHECKING:
     from eir.setup.schemas import GlobalConfig
-    from eir.models import al_meta_model
+    from eir.models.model_setup_modules.meta_setup import al_meta_model
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 

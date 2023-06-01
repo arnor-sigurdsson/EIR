@@ -9,7 +9,7 @@ import torch
 from aislib.misc_utils import get_logger
 from torch import nn
 
-from eir.models import al_meta_model
+from eir.models.model_setup_modules.meta_setup import al_meta_model
 
 logger = get_logger(name=__name__)
 

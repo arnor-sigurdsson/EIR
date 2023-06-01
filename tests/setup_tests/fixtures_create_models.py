@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from eir.models import al_meta_model
+from eir.models.model_setup_modules.meta_setup import al_meta_model
 from eir.models.model_setup import get_model
 from eir.setup import config, input_setup
 from eir.setup.output_setup import set_up_outputs_for_training

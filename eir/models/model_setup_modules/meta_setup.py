@@ -35,6 +35,12 @@ from eir.setup import schemas
 from eir.setup.input_setup import al_input_objects_as_dict
 from eir.setup.input_setup_modules.common import DataDimensions
 from eir.setup.output_setup import al_output_objects_as_dict
+from eir.train_utils.distributed import AttrDelegatedDistributedDataParallel
+from eir.train_utils.optim import AttrDelegatedSWAWrapper
+
+al_meta_model = Union[
+    meta.MetaModel, AttrDelegatedDistributedDataParallel, AttrDelegatedSWAWrapper
+]
 
 
 @dataclass
@@ -61,7 +67,7 @@ class OmicsDataDimensions(DataDimensions):
 
 def get_default_meta_class(
     meta_model_type: str,
-) -> Type[nn.Module]:
+) -> Type[al_meta_model]:
     if meta_model_type == "default":
         return meta.MetaModel
     raise ValueError(f"Unrecognized meta model type: {meta_model_type}.")
@@ -71,7 +77,7 @@ class MetaClassGetterCallable(Protocol):
     def __call__(
         self,
         meta_model_type: str,
-    ) -> Type[nn.Module]:
+    ) -> Type[al_meta_model]:
         ...
 
 
@@ -81,7 +87,7 @@ def get_meta_model_class_and_kwargs_from_configs(
     inputs_as_dict: al_input_objects_as_dict,
     outputs_as_dict: "al_output_objects_as_dict",
     meta_class_getter: MetaClassGetterCallable = get_default_meta_class,
-) -> Tuple[Type[nn.Module], Dict[str, Any]]:
+) -> Tuple[Type[al_meta_model], Dict[str, Any]]:
     meta_model_class = meta_class_getter(meta_model_type="default")
 
     meta_model_kwargs = get_meta_model_kwargs_from_configs(

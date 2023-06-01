@@ -30,7 +30,7 @@ from eir.experiment_io.experiment_io import (
     serialize_all_input_transformers,
     serialize_chosen_input_objects,
 )
-from eir.models import al_meta_model
+from eir.models.model_setup_modules.meta_setup import al_meta_model
 from eir.models.model_setup import (
     get_model,
 )

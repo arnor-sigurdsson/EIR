@@ -45,7 +45,7 @@ def get_run_folder_from_model_path(model_path: str) -> Path:
 @dataclass
 class LoadedTrainExperiment:
     configs: Configs
-    hooks: Union["Hooks", None]
+    hooks: "Hooks"
     metrics: "al_metric_record_dict"
     outputs: al_output_objects_as_dict
 

@@ -10,10 +10,10 @@ import torch
 from aislib.misc_utils import get_logger
 from torch import nn
 
-from eir.models import al_meta_model
 from eir.models.model_setup_modules.meta_setup import (
     get_default_meta_class,
     get_meta_model_class_and_kwargs_from_configs,
+    al_meta_model,
 )
 from eir.models.model_setup_modules.model_io import load_model
 from eir.models.model_setup_modules.pretrained_setup import (

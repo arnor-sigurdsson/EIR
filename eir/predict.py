@@ -6,7 +6,7 @@ from typing import (
     Union,
     Dict,
     Callable,
-    Iterable,
+    Sequence,
     Literal,
 )
 
@@ -23,10 +23,10 @@ from eir.experiment_io.experiment_io import (
     LoadedTrainExperiment,
     load_serialized_train_experiment,
 )
-from eir.models import al_meta_model
 from eir.models.model_setup_modules.meta_setup import (
     get_default_meta_class,
     get_meta_model_class_and_kwargs_from_configs,
+    al_meta_model,
 )
 from eir.models.model_setup_modules.model_io import load_model
 from eir.models.model_training_utils import gather_prediction_outputs_from_dataloader
@@ -60,6 +60,9 @@ from eir.train_utils.step_logic import Hooks, prepare_base_batch_default
 from eir.train_utils.utils import set_log_level_for_eir_loggers
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
+
+al_predict_hook = Callable[..., Dict]
+al_predict_hooks = Sequence[al_predict_hook]
 
 
 @dataclass()
@@ -204,7 +207,7 @@ class PredictExperiment:
     inputs: al_input_objects_as_dict
     outputs: al_output_objects_as_dict
     predict_specific_cl_args: PredictSpecificCLArgs
-    test_dataset: datasets.DiskDataset
+    test_dataset: datasets.DiskDataset | datasets.MemoryDataset
     test_dataloader: DataLoader
     model: al_meta_model
     hooks: "PredictHooks"
@@ -219,11 +222,8 @@ class PredictHooks:
 
 @dataclass
 class PredictStepFunctionHookStages:
-    al_hook = Callable[..., Dict]
-    al_hooks = [Iterable[al_hook]]
-
-    base_prepare_batch: al_hooks
-    model_forward: al_hooks
+    base_prepare_batch: al_predict_hooks
+    model_forward: al_predict_hooks
 
 
 def get_default_predict_config(
