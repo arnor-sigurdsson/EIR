@@ -13,9 +13,8 @@ from eir.setup.input_setup_modules.setup_sequence import (
     ComputedSequenceInputInfo,
     get_sequence_split_function,
 )
-
 from eir.setup.schemas import (
-    ByteInputDataConfig,
+    SequenceInputDataConfig,
 )
 
 
@@ -71,7 +70,7 @@ def prepare_sequence_data(
 
     sio = sequence_input_object
     input_type_info = sio.input_config.input_type_info
-    assert isinstance(input_type_info, ByteInputDataConfig)
+    assert isinstance(input_type_info, SequenceInputDataConfig)
 
     cur_tokens_as_tensor = torch.LongTensor(cur_file_content_tokenized).detach().clone()
 

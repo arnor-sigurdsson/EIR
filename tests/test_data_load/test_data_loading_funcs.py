@@ -264,5 +264,5 @@ def test_aggregate_column_sampling_weights_auto(test_labels):
     hair_counts = test_all_label_weights_and_counts["HairColor"]["label_counts"]
     expected_samples_per_epoch = int(mean([mean(origin_counts), mean(hair_counts)]))
 
-    assert (test_weights == expected_weights).all()
+    assert np.allclose(test_weights, expected_weights, rtol=1e-5, atol=1e-8)
     assert test_samples_per_epoch == expected_samples_per_epoch

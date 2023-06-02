@@ -2,10 +2,9 @@ from dataclasses import dataclass
 from functools import partial
 from typing import (
     TYPE_CHECKING,
-    Union,
+    Any,
     Dict,
-    Callable,
-    Sequence,
+    Protocol,
     Tuple,
     Iterable,
     Generator,
@@ -15,24 +14,17 @@ import numpy as np
 import torch
 from aislib.misc_utils import get_logger
 from timm.data.mixup import rand_bbox
-from torch import nn
 
 from eir.data_load.data_utils import Batch, get_output_info_generator
 
 if TYPE_CHECKING:
-    from eir.train import al_criteria, Experiment
+    from eir.train import al_criteria_dict, Experiment
     from eir.train_utils.step_logic import al_training_labels_target
     from eir.setup.schemas import InputConfig
+    from eir.train_utils.criteria import al_losses
 
-al_target_values = Union[torch.LongTensor, torch.Tensor]
-al_int_tensors = Union[
-    torch.ByteTensor,
-    torch.CharTensor,
-    torch.ShortTensor,
-    torch.IntTensor,
-    torch.LongTensor,
-    torch.BoolTensor,
-]
+al_target_values = torch.LongTensor | torch.Tensor
+
 
 logger = get_logger(name=__name__)
 
@@ -42,7 +34,7 @@ class MixingObject:
     targets: "al_training_labels_target"
     targets_permuted: "al_training_labels_target"
     lambda_: float
-    permuted_indexes: al_int_tensors
+    permuted_indexes: torch.Tensor
 
 
 def get_mix_data_hook(input_configs: Iterable["InputConfig"]):
@@ -69,7 +61,17 @@ def get_mix_data_hook(input_configs: Iterable["InputConfig"]):
     return bound_hook
 
 
-def _get_mixing_func_map() -> Dict[str, Dict[str, Callable]]:
+class MixingCallable(Protocol):
+    def __call__(
+        self,
+        tensor: torch.Tensor,
+        lambda_: float,
+        random_batch_indices_to_mix: torch.Tensor,
+    ) -> torch.Tensor:
+        ...
+
+
+def _get_mixing_func_map() -> Dict[str, Dict[str, MixingCallable]]:
     mapping = {
         "omics": {
             "cutmix-uniform": uniform_cutmix_omics_input,
@@ -89,8 +91,8 @@ def _get_mixing_func_map() -> Dict[str, Dict[str, Callable]]:
 def cutmix_image(
     tensor: torch.Tensor,
     lambda_: float,
-    random_batch_indices_to_mix: Sequence[al_int_tensors],
-):
+    random_batch_indices_to_mix: torch.Tensor,
+) -> torch.Tensor:
     image_shape = tensor[0].shape
     y_bottom, y_top, x_bottom, x_top = rand_bbox(img_shape=image_shape, lam=lambda_)
 
@@ -107,10 +109,10 @@ def cutmix_image(
 def hook_default_mix_data(
     experiment: "Experiment",
     state: Dict,
-    mixing_funcs: Dict[str, Callable],
+    mixing_funcs: Dict[str, MixingCallable],
     *args,
     **kwargs,
-) -> Dict:
+) -> dict[str, Any]:
     gc = experiment.configs.global_config
 
     batch = state["batch"]
@@ -127,7 +129,7 @@ def hook_default_mix_data(
     mixed_inputs = {}
 
     for input_name, input_data in batch.inputs.items():
-        cur_mixing_func = mixing_funcs.get(input_name)
+        cur_mixing_func = mixing_funcs[input_name]
         mixed_input_batch = cur_mixing_func(
             tensor=input_data,
             lambda_=mixing_info.lambda_,
@@ -199,14 +201,14 @@ def hook_mix_loss(experiment: "Experiment", state: Dict, *args, **kwargs) -> Dic
     return state_updates
 
 
-def get_random_batch_indices_to_mix(batch_size: int) -> al_int_tensors:
+def get_random_batch_indices_to_mix(batch_size: int) -> torch.Tensor:
     return torch.randperm(batch_size).to(dtype=torch.long)
 
 
 def mixup_tensor(
     tensor: torch.Tensor,
     lambda_: float,
-    random_batch_indices_to_mix: Sequence[al_int_tensors],
+    random_batch_indices_to_mix: torch.Tensor,
 ) -> torch.Tensor:
     mixed_tensor = (
         lambda_ * tensor + (1.0 - lambda_) * tensor[random_batch_indices_to_mix, :]
@@ -261,17 +263,17 @@ def get_uniform_cutmix_indices(input_length: int, lambda_: float) -> torch.Tenso
     mixin_coefficient = 1.0 - lambda_
     num_snps_to_mix = int(round(input_length * mixin_coefficient))
     random_to_mix = np.random.choice(input_length, num_snps_to_mix, replace=False)
-    random_to_mix = torch.tensor(random_to_mix, dtype=torch.long)
+    random_to_mix_tensor = torch.tensor(random_to_mix, dtype=torch.long)
 
-    return random_to_mix
+    return random_to_mix_tensor
 
 
 def mixup_all_targets(
     targets: "al_training_labels_target",
-    random_index_for_mixing: al_int_tensors,
+    random_index_for_mixing: torch.Tensor,
     target_columns_gen: Generator[Tuple[str, str, str], None, None],
 ) -> "al_training_labels_target":
-    targets_permuted = {}
+    targets_permuted: "al_training_labels_target" = {}
 
     for output_name, target_type, target_name in target_columns_gen:
         if output_name not in targets_permuted:
@@ -297,12 +299,14 @@ def mixup_targets(
 
 
 def calc_all_mixed_losses(
-    target_columns_gen: Generator[Tuple[str, str, str], None, None],
-    criteria: "al_criteria",
-    outputs: Dict[str, Dict[str, torch.Tensor]],
+    target_columns_gen: Generator[tuple[str, str, str], None, None],
+    criteria: "al_criteria_dict",
+    outputs: dict[str, dict[str, torch.Tensor]],
     mixed_object: MixingObject,
-):
-    losses = {output_name: {} for output_name in outputs.keys()}
+) -> dict[str, dict[str, torch.Tensor]]:
+    losses: dict[str, dict[str, torch.Tensor]] = {
+        output_name: {} for output_name in outputs.keys()
+    }
 
     for output_name, target_type, target_name in target_columns_gen:
         cur_loss = calc_mixed_loss(
@@ -318,7 +322,7 @@ def calc_all_mixed_losses(
 
 
 def calc_mixed_loss(
-    criterion: Union[nn.CrossEntropyLoss, nn.MSELoss],
+    criterion: "al_losses",
     outputs: torch.Tensor,
     targets: torch.Tensor,
     targets_permuted: torch.Tensor,

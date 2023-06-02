@@ -21,14 +21,24 @@ al_criteria = al_con_losses | al_cat_losses
 
 al_criteria_dict = Dict[str, Dict[str, al_criteria]]
 
-al_losses_classes = [
-    Type[nn.CrossEntropyLoss],
-    Type[nn.MSELoss],
-    Type[nn.L1Loss],
-    Type[nn.SmoothL1Loss],
-    Type[nn.PoissonNLLLoss],
-    Type[nn.HuberLoss],
-]
+al_losses = (
+    nn.CrossEntropyLoss
+    | nn.MSELoss
+    | nn.L1Loss
+    | nn.SmoothL1Loss
+    | nn.PoissonNLLLoss
+    | nn.HuberLoss
+)
+
+
+al_losses_classes = (
+    Type[nn.CrossEntropyLoss]
+    | Type[nn.MSELoss]
+    | Type[nn.L1Loss]
+    | Type[nn.SmoothL1Loss]
+    | Type[nn.PoissonNLLLoss]
+    | Type[nn.HuberLoss]
+)
 
 
 def get_criteria(outputs_as_dict: "al_output_objects_as_dict") -> al_criteria_dict:

@@ -36,7 +36,8 @@ def get_file_sample_id_iterator(
     def _id_from_filename(file: Path) -> str:
         return file.stem
 
-    def _filter_ids_callable(item, sample_id):
+    def _filter_ids_callable(item: Path, sample_id: str) -> bool:
+        assert ids_to_keep is not None
         if sample_id in ids_to_keep:
             return True
         return False
@@ -61,14 +62,17 @@ def get_file_sample_id_iterator(
 
 
 def _get_sample_id_data_iterator(
-    base_iterator: Iterable[str], id_callable: Callable
-) -> Generator[Tuple[Any, str], None, None]:
+    base_iterator: Iterable[Path], id_callable: Callable[[Path], str]
+) -> Generator[Tuple[Path, str], None, None]:
     for item in base_iterator:
         sample_id = id_callable(item)
         yield item, sample_id
 
 
-def _get_filter_iterator(base_iterator, filter_callable) -> Generator[Any, None, None]:
+def _get_filter_iterator(
+    base_iterator: Iterable[Tuple[Path, str]],
+    filter_callable: Callable[[Path, str], bool],
+) -> Generator[Any, None, None]:
     for item in base_iterator:
         if filter_callable(*item):
             yield item
@@ -77,7 +81,7 @@ def _get_filter_iterator(base_iterator, filter_callable) -> Generator[Any, None,
 def get_file_sample_id_iterator_basic(
     data_source: str,
     ids_to_keep: Union[None, Set[str]],
-) -> Generator[Tuple[Any, str], None, None]:
+) -> Generator[Tuple[str, Path], None, None]:
     base_file_iterator = get_file_path_iterator(
         data_source=Path(data_source), validate=False
     )

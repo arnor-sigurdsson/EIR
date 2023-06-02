@@ -1,4 +1,4 @@
-from typing import DefaultDict, Union, Sequence, TYPE_CHECKING
+from typing import DefaultDict, Union, TYPE_CHECKING, Optional
 
 from tqdm import tqdm
 
@@ -12,10 +12,10 @@ if TYPE_CHECKING:
 def add_tabular_data_to_samples(
     tabular_dict: al_label_dict,
     samples: DefaultDict[str, "Sample"],
-    ids_to_keep: Union[None, Sequence[str]],
+    ids_to_keep: Optional[set[str]],
     source_name: str = "Tabular Data",
 ) -> DefaultDict[str, "Sample"]:
-    def _get_tabular_iterator(ids_to_keep_: Union[None, Sequence[str]]):
+    def _get_tabular_iterator(ids_to_keep_: Union[None, set[str]]):
         for sample_id_, tabular_inputs_ in tabular_dict.items():
             if ids_to_keep_ and sample_id_ not in ids_to_keep_:
                 continue

@@ -71,7 +71,7 @@ def impute_missing_modalities(
                     num_channels = input_object.num_channels
                     shape = (num_channels, *size)
 
-                case ComputedTabularInputInfo():
+                case ComputedTabularInputInfo() | ComputedPredictTabularInputInfo():
                     assert input_type == "tabular"
                     inputs_values[input_name] = fill_value
                     continue

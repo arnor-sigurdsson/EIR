@@ -48,7 +48,7 @@ def prepare_bytes_data(
     """
     bio = bytes_input_object
     input_type_info = bio.input_config.input_type_info
-    assert isinstance(input_type_info, ByteInputDataConfig)
+    assert isinstance(input_type_info, ByteInputDataConfig), input_type_info
 
     sampling_strategy = input_type_info.sampling_strategy_if_longer
     if test_mode:

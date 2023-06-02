@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from functools import wraps
-from typing import Tuple, Any, Union, Callable, Dict
+from typing import Tuple, Any, Union, Callable, Dict, Protocol, Optional
 
 import pandas as pd
 from pandas import DataFrame
@@ -19,9 +19,18 @@ class ColumnOperation:
     column_dtypes: Union[Dict[str, Any], None] = None
 
 
-def streamline_df(
-    df_func: Callable[[pd.DataFrame, Any], pd.DataFrame]
-) -> Callable[[Any], pd.DataFrame]:
+class DataFrameFunctionProtocol(Protocol):
+    def __call__(
+        self,
+        *args: Any,
+        df: pd.DataFrame,
+        column_name: Optional[str] = None,
+        **kwargs: Any
+    ) -> pd.DataFrame:
+        ...
+
+
+def streamline_df(df_func: DataFrameFunctionProtocol) -> Callable[[Any], pd.DataFrame]:
     @wraps(df_func)
     def wrapper(*args, df=None, column_name=None, **kwargs) -> pd.DataFrame:
         df = df_func(*args, df=df, column_name=column_name, **kwargs)
@@ -32,7 +41,9 @@ def streamline_df(
 
 
 @streamline_df
-def placeholder_func(df, column_name):
+def placeholder_func(
+    *args, df: pd.DataFrame, column_name: Optional[str] = None, **kwargs
+) -> pd.DataFrame:
     """
     Dummy function that we can pass to streamline_df so we still get it's functionality.
     """

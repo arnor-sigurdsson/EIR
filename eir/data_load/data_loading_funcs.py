@@ -1,6 +1,6 @@
 from collections import Counter
 from statistics import mean
-from typing import TYPE_CHECKING, List, Tuple, Union, Dict, Iterable, Optional
+from typing import TYPE_CHECKING, List, Tuple, Dict, Iterable, Optional, Sequence
 
 import torch
 from aislib.misc_utils import get_logger
@@ -15,12 +15,12 @@ if TYPE_CHECKING:
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
-al_sample_weight_and_counts = Dict[str, Union[torch.Tensor, List[int]]]
+al_sample_weight_and_counts = Dict[str, torch.Tensor]
 
 
 def get_weighted_random_sampler(
     samples: Iterable["Sample"], columns_to_sample: List[str]
-):
+) -> WeightedRandomSampler:
     """
     Labels spec:
 
@@ -154,7 +154,7 @@ def _get_column_label_weights_and_counts(
 
 def _aggregate_column_sampling_weights(
     all_target_columns_weights_and_counts: Dict[str, al_sample_weight_and_counts]
-) -> Tuple[torch.Tensor, int]:
+) -> Tuple[Sequence[float], int]:
     """
     We sum up the normalized weights for each target column to create the final sampling
     weights.
@@ -177,4 +177,6 @@ def _aggregate_column_sampling_weights(
     )
     samples_per_epoch = min(len(all_weights_summed), samples_per_epoch)
 
-    return all_weights_summed, samples_per_epoch
+    all_weights_summed_list = all_weights_summed.tolist()
+
+    return all_weights_summed_list, samples_per_epoch
