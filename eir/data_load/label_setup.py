@@ -84,8 +84,8 @@ def set_up_train_and_valid_tabular_data(
     df_labels_train, df_labels_valid = _split_df_by_ids(
         df=df_labels, train_ids=train_ids, valid_ids=valid_ids
     )
-    _pre_check_label_df(df=df_labels_train, name="Training DataFrame")
-    _pre_check_label_df(df=df_labels_valid, name="Validation DataFrame")
+    pre_check_label_df(df=df_labels_train, name="Training DataFrame")
+    pre_check_label_df(df=df_labels_valid, name="Validation DataFrame")
 
     df_labels_train, df_labels_valid, label_transformers = _process_train_and_label_dfs(
         tabular_info=tabular_file_info,
@@ -591,12 +591,12 @@ def _load_label_df(
     )
 
     df_labels = df_labels.set_index("ID")
-    _pre_check_label_df(df=df_labels, name=str(label_fpath))
+    pre_check_label_df(df=df_labels, name=str(label_fpath))
 
     return df_labels
 
 
-def _pre_check_label_df(df: pd.DataFrame, name: str) -> None:
+def pre_check_label_df(df: pd.DataFrame, name: str) -> None:
     for column in df.columns:
         if df[column].isnull().all():
             raise ValueError(

@@ -8,8 +8,8 @@ from torch.utils.data import WeightedRandomSampler, SequentialSampler, RandomSam
 
 from eir import train
 from eir.data_load.data_utils import get_train_sampler
-from eir.models import MetaModel
 from eir.models.model_setup import get_model
+from eir.models.meta.meta import MetaModel
 from eir.models.input.omics.omics_models import CNNModel, LinearModel
 from eir.setup.config import Configs
 from eir.setup.input_setup import set_up_inputs_for_training
@@ -79,8 +79,6 @@ def test_get_default_experiment(
     hooks = train.get_default_hooks(configs=test_configs)
     default_experiment = train.get_default_experiment(configs=test_configs, hooks=hooks)
     assert default_experiment.configs == test_configs
-
-    assert default_experiment.hooks is None
 
     assert len(default_experiment.criteria) == 1
     assert isinstance(

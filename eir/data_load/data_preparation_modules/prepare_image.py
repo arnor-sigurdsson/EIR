@@ -35,6 +35,7 @@ def image_load_wrapper(
 ) -> Image:
     if deeplake_ops.is_deeplake_dataset(data_source=input_source):
         assert deeplake_inner_key is not None
+        assert isinstance(data_pointer, int)
         image_data = _load_deeplake_sample(
             data_pointer=data_pointer,
             input_source=input_source,
@@ -42,6 +43,7 @@ def image_load_wrapper(
         )
         pil_image = fromarray(obj=np.uint8(image_data * 255))
     else:
+        assert isinstance(data_pointer, Path)
         pil_image = default_loader(path=str(data_pointer))
 
     return pil_image

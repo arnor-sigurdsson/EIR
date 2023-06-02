@@ -14,6 +14,10 @@ from eir.setup.input_setup_modules.setup_sequence import (
     get_sequence_split_function,
 )
 
+from eir.setup.schemas import (
+    ByteInputDataConfig,
+)
+
 
 def sequence_load_wrapper(
     data_pointer: Union[Path, int, np.ndarray],
@@ -29,6 +33,7 @@ def sequence_load_wrapper(
     split_func = get_sequence_split_function(split_on=split_on)
     if deeplake_ops.is_deeplake_dataset(data_source=input_source):
         assert deeplake_inner_key is not None
+        assert isinstance(data_pointer, int)
         text_as_np_array = _load_deeplake_sample(
             data_pointer=data_pointer,
             input_source=input_source,
@@ -36,8 +41,10 @@ def sequence_load_wrapper(
         )
         content = text_as_np_array[0]
     elif input_source.endswith(".csv"):
+        assert isinstance(data_pointer, np.ndarray)
         return data_pointer
     else:
+        assert isinstance(data_pointer, Path)
         content = load_sequence_from_disk(sequence_file_path=data_pointer)
 
     file_content_split = split_func(content)
@@ -63,10 +70,12 @@ def prepare_sequence_data(
     """
 
     sio = sequence_input_object
+    input_type_info = sio.input_config.input_type_info
+    assert isinstance(input_type_info, ByteInputDataConfig)
 
     cur_tokens_as_tensor = torch.LongTensor(cur_file_content_tokenized).detach().clone()
 
-    sampling_strategy = sio.input_config.input_type_info.sampling_strategy_if_longer
+    sampling_strategy = input_type_info.sampling_strategy_if_longer
     if test_mode:
         sampling_strategy = "from_start"
 

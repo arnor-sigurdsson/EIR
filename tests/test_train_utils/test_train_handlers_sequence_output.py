@@ -341,7 +341,7 @@ def _generate_manual_sample_test_data(tmp_path) -> dict[str, Any]:
     omics_array = omics_array.astype(np.uint8)
     omics_file_path = tmp_path / "omics.npy"
     np.save(str(omics_file_path), omics_array)
-    sample_inputs["test_genotype"] = str(omics_file_path)
+    sample_inputs["test_genotype"] = Path(omics_file_path)
 
     # 2. Sequence
     sequence_data = "hello world"
@@ -352,14 +352,14 @@ def _generate_manual_sample_test_data(tmp_path) -> dict[str, Any]:
     byte_data_file_path = tmp_path / "byte_data.bin"
     with byte_data_file_path.open("wb") as f:
         f.write(byte_data)
-    sample_inputs["test_bytes"] = str(byte_data_file_path)
+    sample_inputs["test_bytes"] = Path(byte_data_file_path)
 
     # 4. Image
     image_base = np.zeros((16, 16), dtype=np.uint8)
     img = Image.fromarray(image_base)
     image_file_path = tmp_path / "image.png"
     img.save(image_file_path)
-    sample_inputs["test_image"] = str(image_file_path)
+    sample_inputs["test_image"] = Path(image_file_path)
 
     # 5. Tabular
     tabular_data = {
@@ -372,7 +372,7 @@ def _generate_manual_sample_test_data(tmp_path) -> dict[str, Any]:
     array_data, _ = _set_up_base_test_array(dims=1, class_integer=0)
     array_file_path = tmp_path / "array.npy"
     np.save(array_file_path, array_data)
-    sample_inputs["test_array"] = str(array_file_path)
+    sample_inputs["test_array"] = Path(array_file_path)
 
     return sample_inputs
 

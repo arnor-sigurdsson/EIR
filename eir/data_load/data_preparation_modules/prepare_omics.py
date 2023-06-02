@@ -17,12 +17,14 @@ def omics_load_wrapper(
 ) -> np.ndarray:
     if deeplake_ops.is_deeplake_dataset(data_source=input_source):
         assert deeplake_inner_key is not None
+        assert isinstance(data_pointer, int)
         genotype_array_raw = _load_deeplake_sample(
             data_pointer=data_pointer,
             input_source=input_source,
             inner_key=deeplake_inner_key,
         )
     else:
+        assert isinstance(data_pointer, Path)
         genotype_array_raw = np.load(str(data_pointer))
 
     if subset_indices is not None:
@@ -38,7 +40,7 @@ def prepare_one_hot_omics_data(
     na_augment_perc: float,
     na_augment_prob: float,
     test_mode: bool,
-) -> torch.BoolTensor:
+) -> torch.Tensor:
     """
     We use clone here to copy the original data, vs. using from_numpy
     which shares memory, causing us to modify the original data.
@@ -53,4 +55,5 @@ def prepare_one_hot_omics_data(
             probability=na_augment_prob,
         )
 
+    assert tensor_bool.dtype == torch.bool
     return tensor_bool

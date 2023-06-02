@@ -2,7 +2,7 @@ import reprlib
 from collections import defaultdict
 from functools import partial
 from inspect import signature
-from typing import Callable, List, Type, Dict, TYPE_CHECKING, Optional
+from typing import Callable, List, Type, Dict, TYPE_CHECKING, Optional, Any
 
 import torch
 from adabelief_pytorch import AdaBelief
@@ -101,7 +101,7 @@ def get_base_optimizers_dict() -> Dict[str, Type[Optimizer]]:
 
 def _get_constructor_arguments(
     params: List, global_config: "GlobalConfig", optimizer_class: Type[Optimizer]
-):
+) -> dict[str, Any]:
     base = {"params": params, "lr": global_config.lr, "weight_decay": global_config.wd}
     all_extras = {
         "betas": (global_config.b1, global_config.b2),
@@ -113,13 +113,13 @@ def _get_constructor_arguments(
     return {**base, **common_extras}
 
 
-def get_optimizer_backward_kwargs(optimizer_name: str) -> Dict:
+def get_optimizer_backward_kwargs(optimizer_name: str) -> dict[str, Any]:
     if optimizer_name == "adahessian":
         return {"create_graph": True}
     return {}
 
 
-def get_optimizer_defaults(optimizer: Optimizer) -> Dict:
+def get_optimizer_defaults(optimizer: Optimizer) -> dict:
     return optimizer.defaults
 
 
@@ -135,8 +135,8 @@ class AttrDelegatedSWAWrapper(torch.optim.swa_utils.AveragedModel):
 
 
 def maybe_wrap_model_with_swa(
-    n_iter_before_swa: Optional[int], model: al_meta_model, device: torch.device
-) -> al_meta_model:
+    n_iter_before_swa: Optional[int], model: "al_meta_model", device: torch.device
+) -> "al_meta_model":
     if n_iter_before_swa is None:
         return model
 

@@ -15,7 +15,7 @@ def add_tabular_data_to_samples(
     ids_to_keep: Union[None, Sequence[str]],
     source_name: str = "Tabular Data",
 ) -> DefaultDict[str, "Sample"]:
-    def _get_tabular_iterator(ids_to_keep_: Union[None, set]):
+    def _get_tabular_iterator(ids_to_keep_: Union[None, Sequence[str]]):
         for sample_id_, tabular_inputs_ in tabular_dict.items():
             if ids_to_keep_ and sample_id_ not in ids_to_keep_:
                 continue
