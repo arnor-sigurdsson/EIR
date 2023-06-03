@@ -27,9 +27,9 @@ from eir.data_load.label_setup import (
 from eir.experiment_io.experiment_io import (
     serialize_experiment,
     get_default_experiment_keys_to_serialize,
-    serialize_all_input_transformers,
     serialize_chosen_input_objects,
 )
+from eir.setup.input_setup_modules.setup_tabular import serialize_all_input_transformers
 from eir.models.model_setup_modules.meta_setup import al_meta_model
 from eir.models.model_setup import (
     get_model,

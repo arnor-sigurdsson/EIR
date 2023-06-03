@@ -6,6 +6,7 @@ from eir.data_load.label_setup import (
     Labels,
     set_up_train_and_valid_tabular_data,
     TabularFileInfo,
+    save_transformer_set,
 )
 from eir.experiment_io.experiment_io import (
     get_run_folder_from_model_path,
@@ -16,6 +17,7 @@ from eir.setup import schemas
 
 if TYPE_CHECKING:
     from eir.train_utils.step_logic import Hooks
+    from eir.setup.input_setup import al_input_objects_as_dict
 
 
 @dataclass
@@ -111,3 +113,16 @@ def set_up_tabular_input_from_pretrained(
     tabular_input_object.labels.label_transformers = loaded_transformers_input
 
     return tabular_input_object
+
+
+def serialize_all_input_transformers(
+    inputs_dict: "al_input_objects_as_dict", run_folder: Path
+):
+    for input_name, input_object in inputs_dict.items():
+        match input_object:
+            case ComputedTabularInputInfo(labels, _, _):
+                transformers_per_source = {input_name: labels.label_transformers}
+                save_transformer_set(
+                    transformers_per_source=transformers_per_source,
+                    run_folder=run_folder,
+                )

@@ -2,7 +2,7 @@ from copy import copy
 from dataclasses import dataclass, fields
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Union, TYPE_CHECKING, Iterable, Sequence, Dict
+from typing import Union, TYPE_CHECKING, Iterable, Dict, Optional
 
 import dill
 import joblib
@@ -11,7 +11,7 @@ from aislib.misc_utils import get_logger, ensure_path_exists
 from eir.data_load import label_setup
 from eir.data_load.label_setup import (
     al_label_transformers,
-    save_transformer_set,
+    al_label_transformers_object,
 )
 from eir.setup import schemas
 from eir.setup.config import Configs
@@ -125,6 +125,7 @@ def load_serialized_input_object(
 ) -> "al_serializable_input_objects":
     assert output_folder or run_folder
     if not run_folder:
+        assert output_folder is not None
         run_folder = get_run_folder(output_folder=output_folder)
 
     input_name = input_config.input_info.input_name
@@ -210,18 +211,6 @@ def _check_current_and_loaded_input_config_compatibility(
             )
 
 
-def serialize_all_input_transformers(
-    inputs_dict: "al_input_objects_as_dict", run_folder: Path
-):
-    for input_name, input_ in inputs_dict.items():
-        input_type = input_.input_config.input_info.input_type
-        if input_type == "tabular":
-            save_transformer_set(
-                transformers_per_source={input_name: input_.labels.label_transformers},
-                run_folder=run_folder,
-            )
-
-
 def serialize_chosen_input_objects(
     inputs_dict: "al_input_objects_as_dict", run_folder: Path
 ):
@@ -232,48 +221,62 @@ def serialize_chosen_input_objects(
         any_match = any(i for i in targets_to_serialize if input_type == i)
 
         if any_match:
-            outpath = get_input_serialization_path(
+            output_path = get_input_serialization_path(
                 run_folder=run_folder,
                 input_type=input_type,
                 input_name=input_name,
             )
-            ensure_path_exists(path=outpath, is_folder=False)
-            with open(outpath, "wb") as outfile:
+            ensure_path_exists(path=output_path, is_folder=False)
+            with open(output_path, "wb") as outfile:
                 dill.dump(obj=input_, file=outfile)
 
 
+def get_transformer_sources(run_folder: Path) -> Dict[str, list[str]]:
+    transformers_to_load = {}
+    transformer_sources = run_folder / "serializations/transformers"
+    for transformer_source in transformer_sources.iterdir():
+        transformers_to_load[transformer_source.stem] = [
+            i.stem for i in transformer_source.iterdir()
+        ]
+    return transformers_to_load
+
+
+def load_transformer(
+    run_folder: Path,
+    source_name: str,
+    transformer_name: str,
+) -> al_label_transformers_object:
+    target_transformer_path = label_setup.get_transformer_path(
+        run_path=run_folder,
+        transformer_name=transformer_name,
+        source_name=source_name,
+    )
+    return joblib.load(filename=target_transformer_path)
+
+
 def load_transformers(
-    transformers_to_load: Union[Dict[str, Sequence[str]], None],
-    output_folder: Union[str, None] = None,
-    run_folder: Union[None, Path] = None,
+    transformers_to_load: Optional[Dict[str, list[str]]] = None,
+    output_folder: Optional[str] = None,
+    run_folder: Optional[Path] = None,
 ) -> Dict[str, al_label_transformers]:
-    assert run_folder or output_folder
+    if not run_folder and not output_folder:
+        raise ValueError("Either 'run_folder' or 'output_folder' must be provided.")
 
     if not run_folder:
+        assert output_folder is not None
         run_folder = get_run_folder(output_folder=output_folder)
 
     if not transformers_to_load:
-        transformers_to_load = {}
-        transformer_sources = run_folder / "serializations/transformers"
-        for transformer_source in transformer_sources.iterdir():
-            transformers_to_load[transformer_source.stem] = [
-                i.stem for i in transformer_source.iterdir()
-            ]
+        transformers_to_load = get_transformer_sources(run_folder=run_folder)
 
-    loaded_transformers = {}
-
+    loaded_transformers: Dict[str, al_label_transformers] = {}
     for source_name, source_transformers_to_load in transformers_to_load.items():
         loaded_transformers[source_name] = {}
-
         for transformer_name in source_transformers_to_load:
-            target_transformer_path = label_setup.get_transformer_path(
-                run_path=run_folder,
-                transformer_name=transformer_name,
+            loaded_transformers[source_name][transformer_name] = load_transformer(
+                run_folder=run_folder,
                 source_name=source_name,
+                transformer_name=transformer_name,
             )
-            target_transformer_object = joblib.load(filename=target_transformer_path)
-            loaded_transformers[source_name][
-                transformer_name
-            ] = target_transformer_object
 
     return loaded_transformers

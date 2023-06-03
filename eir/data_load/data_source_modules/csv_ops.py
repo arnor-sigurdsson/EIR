@@ -3,20 +3,6 @@ from functools import wraps
 from typing import Tuple, Any, Union, Callable, Dict, Protocol, Optional
 
 import pandas as pd
-from pandas import DataFrame
-
-
-@dataclass
-class ColumnOperation:
-    """
-    function: Function to apply on the label dataframe.
-    """
-
-    function: Callable[[DataFrame, str], DataFrame]
-    function_args: Dict[str, Any]
-    extra_columns_deps: Union[Tuple[str, ...], None] = ()
-    only_apply_if_target: bool = False
-    column_dtypes: Union[Dict[str, Any], None] = None
 
 
 class DataFrameFunctionProtocol(Protocol):
@@ -28,6 +14,19 @@ class DataFrameFunctionProtocol(Protocol):
         **kwargs: Any
     ) -> pd.DataFrame:
         ...
+
+
+@dataclass
+class ColumnOperation:
+    """
+    function: Function to apply on the label dataframe.
+    """
+
+    function: DataFrameFunctionProtocol
+    function_args: Dict[str, Any]
+    extra_columns_deps: Union[Tuple[str, ...], None] = ()
+    only_apply_if_target: bool = False
+    column_dtypes: Union[Dict[str, Any], None] = None
 
 
 def streamline_df(df_func: DataFrameFunctionProtocol) -> Callable[[Any], pd.DataFrame]:

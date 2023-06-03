@@ -9,11 +9,11 @@ from torch.utils.data import DataLoader
 
 from eir import train
 from eir.experiment_io.experiment_io import (
-    serialize_all_input_transformers,
     serialize_chosen_input_objects,
     get_default_experiment_keys_to_serialize,
     serialize_experiment,
 )
+from eir.setup.input_setup_modules.setup_tabular import serialize_all_input_transformers
 from eir.setup import schemas, config, input_setup
 from eir.setup.output_setup import set_up_outputs_for_training
 from eir.train import Experiment, converge_sequence_input_and_output

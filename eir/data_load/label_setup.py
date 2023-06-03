@@ -1,7 +1,18 @@
 import reprlib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Tuple, Dict, Union, List, Callable, Any, Sequence, Iterator
+from typing import (
+    Tuple,
+    Dict,
+    Union,
+    List,
+    Literal,
+    Any,
+    Sequence,
+    Generator,
+    Protocol,
+    Optional,
+)
 
 import joblib
 import numpy as np
@@ -30,7 +41,7 @@ al_label_values_raw = Union[float, int]
 al_sample_labels_raw = Dict[str, al_label_values_raw]
 al_label_dict = Dict[str, al_sample_labels_raw]
 al_target_label_dict = Dict[str, al_label_dict]  # account for output name
-al_target_columns = Dict[str, List[str]]
+al_target_columns = Dict[Literal["con", "cat"], list[str]]
 al_label_transformers_object = Union[StandardScaler, LabelEncoder]
 al_label_transformers = Dict[str, al_label_transformers_object]
 al_pd_dtypes = Union[np.ndarray, pd.CategoricalDtype]
@@ -202,9 +213,19 @@ def transform_label_df(
     return df_labels_copy
 
 
+class LabelDFParseWrapperProtocol(Protocol):
+    def __call__(
+        self,
+        label_file_tabular_info: TabularFileInfo,
+        ids_to_keep: Union[None, Sequence[str]],
+        custom_label_ops: al_all_column_ops = None,
+    ) -> pd.DataFrame:
+        ...
+
+
 def get_label_parsing_wrapper(
     label_parsing_chunk_size: Union[None, int]
-) -> Callable[[TabularFileInfo, Sequence[str], al_all_column_ops], pd.DataFrame]:
+) -> LabelDFParseWrapperProtocol:
     if label_parsing_chunk_size is None:
         return label_df_parse_wrapper
     return chunked_label_df_parse_wrapper
@@ -309,6 +330,7 @@ def chunked_label_df_parse_wrapper(
         column_ops=column_ops,
     )
 
+    assert isinstance(label_file_tabular_info.parsing_chunk_size, int)
     chunk_generator = _get_label_df_chunk_generator(
         chunk_size=label_file_tabular_info.parsing_chunk_size,
         label_fpath=label_file_tabular_info.file_path,
@@ -363,13 +385,14 @@ def _get_label_df_chunk_generator(
     label_fpath: Path,
     columns: Sequence[str],
     custom_label_ops: al_all_column_ops,
-    dtypes: Dict[str, Any] = None,
+    dtypes: Optional[Dict[str, Any]] = None,
 ) -> pd.DataFrame:
     """
     We accept only loading the available columns at this point because the passed
     in columns might be forward referenced, meaning that they might be created
     by the custom library.
     """
+    assert isinstance(chunk_size, int)
 
     dtypes = _ensure_id_str_dtype(dtypes=dtypes)
 
@@ -465,7 +488,9 @@ def gather_ids_from_tabular_file(file_path: Path):
     return all_ids
 
 
-def get_file_path_iterator(data_source: Path, validate: bool = True) -> Iterator[Path]:
+def get_file_path_iterator(
+    data_source: Path, validate: bool = True
+) -> Generator[Path, None, None]:
     def _file_iterator(file_path: Path):
         with open(str(file_path), "r") as infile:
             for line in infile:
@@ -542,9 +567,11 @@ def _get_extra_columns(
     """
 
     extra_columns = {}
+
+    assert all_column_ops is not None
     for column_name in label_columns + ["base", "post"]:
         if column_name in all_column_ops:
-            cur_column_operations_sequence = all_column_ops.get(column_name)
+            cur_column_operations_sequence = all_column_ops[column_name]
 
             for cur_column_operation_object in cur_column_operations_sequence:
                 cur_extra_columns = cur_column_operation_object.extra_columns_deps
@@ -552,6 +579,9 @@ def _get_extra_columns(
 
                 if cur_column_dtypes is None:
                     cur_column_dtypes = {}
+
+                if cur_extra_columns is None:
+                    continue
 
                 for cur_extra_column in cur_extra_columns:
                     cur_dtype = cur_column_dtypes.get(cur_extra_column, None)
@@ -651,7 +681,7 @@ def _get_currently_available_columns(
 
 
 def _filter_ids_from_label_df(
-    df_labels: pd.DataFrame, ids_to_keep: Union[None, Tuple[str, ...]] = None
+    df_labels: pd.DataFrame, ids_to_keep: Union[None, Sequence[str]] = None
 ) -> pd.DataFrame:
     if not ids_to_keep:
         return df_labels
@@ -710,6 +740,9 @@ def _apply_column_operations_to_df(
     :return: Parsed dataframe.
     """
 
+    if operations_dict is None:
+        return df
+
     for operation_name, operation_sequences in operations_dict.items():
         if len(df) == 0:
             return df
@@ -730,7 +763,7 @@ def _apply_column_operations_to_df(
         return df
 
     if "post" in operations_dict.keys():
-        post_operations = operations_dict.get("post")
+        post_operations = operations_dict["post"]
 
         df = _apply_operation_sequence(
             df=df,
@@ -950,7 +983,7 @@ def _process_train_and_label_dfs(
         include_missing=include_missing,
     )
 
-    label_columns = {
+    label_columns: al_target_columns = {
         "con": list(tabular_info.con_columns),
         "cat": list(tabular_info.cat_columns),
     }
@@ -989,12 +1022,15 @@ def handle_missing_label_values_in_df(
         include_missing=include_missing,
     )
 
-    df_filled_final = _fill_continuous_nans(
-        df=df_filled_cat,
-        column_names=con_label_columns,
-        name=name,
-        con_means_dict=con_manual_values,
-    )
+    if con_manual_values is None:
+        df_filled_final = df_filled_cat
+    else:
+        df_filled_final = _fill_continuous_nans(
+            df=df_filled_cat,
+            column_names=con_label_columns,
+            name=name,
+            con_means_dict=con_manual_values,
+        )
 
     return df_filled_final
 
@@ -1073,10 +1109,10 @@ def merge_target_columns(
     if len(target_con_columns + target_cat_columns) == 0:
         raise ValueError("Expected at least 1 label column")
 
-    all_target_columns = {"con": [], "cat": []}
-
-    [all_target_columns["con"].append(i) for i in target_con_columns]
-    [all_target_columns["cat"].append(i) for i in target_cat_columns]
+    all_target_columns: al_target_columns = {
+        "con": target_con_columns,
+        "cat": target_cat_columns,
+    }
 
     assert len(all_target_columns) > 0
 
