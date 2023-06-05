@@ -1,7 +1,7 @@
 import random
 from collections import defaultdict
 from pathlib import Path
-from typing import TYPE_CHECKING, Sequence, Dict, Generator
+from typing import TYPE_CHECKING, Sequence, Generator, DefaultDict, Any
 
 import pandas as pd
 import seaborn as sns
@@ -36,7 +36,7 @@ def stratify_attributions_by_target_classes(
     output_name: str,
     target_column: str,
     column_type: str,
-) -> Dict[str, Sequence["SampleAttribution"]]:
+) -> DefaultDict[Any, list["SampleAttribution"]]:
     all_attributions_target_class_stratified = defaultdict(list)
 
     for sample in all_attributions:
@@ -132,7 +132,7 @@ def filter_and_sort_attributions(
 
 def get_basic_sample_attributions_to_analyse_generator(
     interpretation_config: schemas.BasicInterpretationConfig,
-    all_attributions: Sequence["SampleAttribution"],
+    all_attributions: list["SampleAttribution"],
 ) -> Generator["SampleAttribution", None, None]:
     strategy = interpretation_config.interpretation_sampling_strategy
     n_samples = interpretation_config.num_samples_to_interpret

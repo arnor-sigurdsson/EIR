@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -34,7 +34,7 @@ def analyze_image_input_attributions(
     output_name: str,
     target_column_type: str,
     attribution_outfolder: Path,
-    all_attributions: Sequence["SampleAttribution"],
+    all_attributions: list["SampleAttribution"],
 ) -> None:
     exp = experiment
 

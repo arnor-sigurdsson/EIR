@@ -51,7 +51,7 @@ def analyze_sequence_input_attributions(
     target_column_name: str,
     target_column_type: str,
     attribution_outfolder: Path,
-    all_attributions: Sequence["SampleAttribution"],
+    all_attributions: list["SampleAttribution"],
     expected_target_classes_attributions: np.ndarray,
 ) -> None:
     exp = experiment
@@ -169,7 +169,7 @@ def extract_sample_info_for_sequence_attribution(
     target_column_type: str,
     input_name: str,
     vocab: Vocab,
-    expected_target_classes_attributions: Sequence[float],
+    expected_target_classes_attributions: np.ndarray,
 ) -> SequenceAttributionSampleInfo:
     attributions = sample_attribution_object.sample_attributions[input_name]
 
@@ -205,7 +205,7 @@ def _parse_out_sequence_expected_value(
     sample_target_labels: Dict[str, Dict[str, torch.Tensor]],
     output_name: str,
     target_column_name: str,
-    expected_values: Sequence[float],
+    expected_values: np.ndarray,
     target_column_type: str,
 ) -> float:
     if target_column_type == "con":
