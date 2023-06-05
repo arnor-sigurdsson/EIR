@@ -15,6 +15,11 @@ from eir.interpretation.interpretation_utils import (
     get_target_class_name,
     get_basic_sample_attributions_to_analyse_generator,
 )
+from eir.setup.input_setup_modules.setup_image import ComputedImageInputInfo
+from eir.setup.output_setup_modules.tabular_output_setup import (
+    ComputedTabularOutputInfo,
+)
+from eir.setup.schemas import BasicInterpretationConfig
 
 if TYPE_CHECKING:
     from eir.train import Experiment
@@ -34,10 +39,15 @@ def analyze_image_input_attributions(
     exp = experiment
 
     output_object = exp.outputs[output_name]
+    assert isinstance(output_object, ComputedTabularOutputInfo)
+
     target_transformer = output_object.target_transformers[target_column_name]
 
     input_object = exp.inputs[input_name]
+    assert isinstance(input_object, ComputedImageInputInfo)
+
     interpretation_config = input_object.input_config.interpretation_config
+    assert isinstance(interpretation_config, BasicInterpretationConfig)
 
     samples_to_act_analyze_gen = get_basic_sample_attributions_to_analyse_generator(
         interpretation_config=interpretation_config, all_attributions=all_attributions

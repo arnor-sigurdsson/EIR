@@ -1,4 +1,6 @@
 from typing import Dict, Sequence
+import warnings
+
 
 import pytest
 import torch
@@ -179,7 +181,9 @@ def test_external_sequence_models(
         model(inputs=example_batch.inputs)
         if model_name in get_models_to_skip_test_trace():
             return
-        trace_eir_model(meta_model=model, example_inputs=example_batch.inputs)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=torch.jit.TracerWarning)
+            trace_eir_model(meta_model=model, example_inputs=example_batch.inputs)
 
 
 def get_models_to_skip_test_trace() -> Sequence[str]:

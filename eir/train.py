@@ -29,17 +29,17 @@ from eir.experiment_io.experiment_io import (
     get_default_experiment_keys_to_serialize,
     serialize_chosen_input_objects,
 )
-from eir.setup.input_setup_modules.setup_tabular import serialize_all_input_transformers
-from eir.models.model_setup_modules.meta_setup import al_meta_model
 from eir.models.model_setup import (
     get_model,
 )
+from eir.models.model_setup_modules.meta_setup import al_meta_model
 from eir.models.model_training_utils import run_lr_find
 from eir.setup.config import (
     get_configs,
     Configs,
 )
 from eir.setup.input_setup import al_input_objects_as_dict, set_up_inputs_for_training
+from eir.setup.input_setup_modules.setup_tabular import serialize_all_input_transformers
 from eir.setup.output_setup import (
     al_output_objects_as_dict,
     set_up_outputs_for_training,
@@ -109,7 +109,7 @@ class Experiment:
     outputs: al_output_objects_as_dict
     train_loader: torch.utils.data.DataLoader
     valid_loader: torch.utils.data.DataLoader
-    valid_dataset: torch.utils.data.Dataset
+    valid_dataset: datasets.al_datasets
     model: al_meta_model
     optimizer: Optimizer
     criteria: al_criteria_dict

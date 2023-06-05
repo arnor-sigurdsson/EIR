@@ -208,27 +208,27 @@ def _get_predict_test_data_parametrization() -> List[Dict[str, Any]]:
                     {
                         "input_info": {"input_name": "test_sequence"},
                     },
-                    # {
-                    #     "input_info": {"input_name": "test_sequence_albert"},
-                    #     "model_config": {
-                    #         "window_size": 16,
-                    #         "position": "embed",
-                    #         "model_type": "albert",
-                    #         "model_init_config": {
-                    #             "num_hidden_layers": 2,
-                    #             "num_attention_heads": 4,
-                    #             "embedding_size": 12,
-                    #             "hidden_size": 16,
-                    #             "intermediate_size": 32,
-                    #         },
-                    #     },
-                    # },
+                    {
+                        "input_info": {"input_name": "test_sequence_albert"},
+                        "model_config": {
+                            "window_size": 16,
+                            "position": "embed",
+                            "model_type": "albert",
+                            "model_init_config": {
+                                "num_hidden_layers": 2,
+                                "num_attention_heads": 4,
+                                "embedding_size": 12,
+                                "hidden_size": 16,
+                                "intermediate_size": 32,
+                            },
+                        },
+                    },
                     {
                         "input_info": {"input_name": "test_bytes"},
                     },
-                    # {
-                    #     "input_info": {"input_name": "test_image"},
-                    # },
+                    {
+                        "input_info": {"input_name": "test_image"},
+                    },
                     {
                         "input_info": {"input_name": "test_tabular"},
                         "input_type_info": {

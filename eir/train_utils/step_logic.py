@@ -611,7 +611,7 @@ def get_hook_iteration_counter() -> Callable:
     return _counter_iterator
 
 
-def get_hook_amp_objects(device: str):
+def get_hook_amp_objects(device: str) -> Callable[..., Dict[str, Any]]:
     device_type = "cpu" if device == "cpu" else "cuda"
 
     if device == "cpu":
@@ -633,21 +633,6 @@ def get_hook_amp_objects(device: str):
         return state_updates
 
     return _get_objects
-
-
-def hook_adjust_loss_for_gradient_accumulation(
-    experiment: "Experiment", state: Dict, *args, **kwargs
-) -> Dict:
-    gradient_accumulation_steps = (
-        experiment.configs.global_config.gradient_accumulation_steps
-    )
-
-    loss = state["loss"]
-    loss_adjusted = loss / gradient_accumulation_steps
-
-    state_updates = {"loss": loss_adjusted}
-
-    return state_updates
 
 
 def pad_batch_with_bos(batch_tensor: torch.Tensor, bos_value: int) -> torch.Tensor:

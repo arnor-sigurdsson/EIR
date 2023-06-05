@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import torch
 from aislib.misc_utils import get_logger, ensure_path_exists
 from sklearn.preprocessing import LabelEncoder
 
@@ -14,6 +13,15 @@ from eir.interpretation.interpretation_utils import (
     stratify_attributions_by_target_classes,
     plot_attributions_bar,
 )
+from eir.models.input.tabular.tabular import SimpleTabularModel
+from eir.predict_modules.predict_tabular_input_setup import (
+    ComputedPredictTabularInputInfo,
+)
+from eir.setup.input_setup_modules.setup_tabular import ComputedTabularInputInfo
+from eir.setup.output_setup_modules.tabular_output_setup import (
+    ComputedTabularOutputInfo,
+)
+from eir.setup.schemas import TabularInputDataConfig
 
 if TYPE_CHECKING:
     from eir.train import Experiment
@@ -33,12 +41,19 @@ def analyze_tabular_input_attributions(
     all_attributions: Sequence["SampleAttribution"],
 ):
     exp = experiment
+    input_object = exp.inputs[input_name]
+    assert isinstance(
+        input_object, (ComputedTabularInputInfo, ComputedPredictTabularInputInfo)
+    )
 
-    tabular_type_info_config = exp.inputs[input_name].input_config.input_type_info
+    tabular_type_info_config = input_object.input_config.input_type_info
+    assert isinstance(tabular_type_info_config, TabularInputDataConfig)
+
     cat_columns = tabular_type_info_config.input_cat_columns
     con_columns = tabular_type_info_config.input_con_columns
 
     tabular_model = experiment.model.input_modules[input_name]
+    assert isinstance(tabular_model, SimpleTabularModel)
     attribution_tensor_slices = set_up_tabular_tensor_slices(
         cat_input_columns=cat_columns,
         con_input_columns=con_columns,
@@ -59,9 +74,10 @@ def analyze_tabular_input_attributions(
     )
     df_attributions.to_csv(attribution_outfolder / "feature_importances.csv")
 
-    target_transformer = exp.outputs[output_name].target_transformers[
-        target_column_name
-    ]
+    output_object = exp.outputs[output_name]
+    assert isinstance(output_object, ComputedTabularOutputInfo)
+    target_transformer = output_object.target_transformers[target_column_name]
+
     all_attributions_class_stratified = stratify_attributions_by_target_classes(
         all_attributions=all_attributions,
         target_transformer=target_transformer,
@@ -69,6 +85,7 @@ def analyze_tabular_input_attributions(
         target_column=target_column_name,
         column_type=target_column_type,
     )
+
     for class_name, class_attributions in all_attributions_class_stratified.items():
         cur_class_outfolder = attribution_outfolder / class_name
         ensure_path_exists(path=cur_class_outfolder, is_folder=True)
@@ -145,7 +162,7 @@ def analyze_tabular_input_attributions(
 def set_up_tabular_tensor_slices(
     cat_input_columns: Sequence[str],
     con_input_columns: Sequence[str],
-    embedding_module: torch.nn.Module,
+    embedding_module: SimpleTabularModel,
 ) -> Dict[str, slice]:
     """
     TODO: Probably better to pass in Dict[column_name, nn.Embedding]
@@ -195,7 +212,9 @@ def parse_tabular_attributions_for_feature_importance(
     Note we need to use abs here to get the absolute feature importance, before
     we sum so different signs don't cancel each other out.
     """
-    column_attributions = {column: [] for column in attribution_tensor_slices.keys()}
+    column_attributions: Dict[str, List[float]] = {
+        column: [] for column in attribution_tensor_slices.keys()
+    }
 
     for sample_attribution in all_attributions:
         sample_acts = sample_attribution.sample_attributions[input_name].squeeze(0)

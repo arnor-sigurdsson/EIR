@@ -1,4 +1,5 @@
 from typing import Dict, Sequence, List
+import warnings
 
 import pandas as pd
 import pytest
@@ -82,7 +83,9 @@ def test_internal_image_models(
     model = create_test_model
 
     example_batch = prepare_example_batch(
-        configs=create_test_config, labels=create_test_labels, model=model
+        configs=create_test_config,
+        labels=create_test_labels,
+        model=model,
     )
 
     model.eval()
@@ -197,4 +200,6 @@ def test_external_image_models(
 
     model.eval()
     with torch.no_grad():
-        _ = trace_eir_model(meta_model=model, example_inputs=example_batch.inputs)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=torch.jit.TracerWarning)
+            trace_eir_model(meta_model=model, example_inputs=example_batch.inputs)

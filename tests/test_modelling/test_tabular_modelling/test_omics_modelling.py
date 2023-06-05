@@ -1,4 +1,5 @@
 from pathlib import Path
+import pickle
 from typing import Union, Tuple, Dict, List, Literal, Sequence, TYPE_CHECKING
 
 import numpy as np
@@ -823,10 +824,8 @@ def _check_identified_snps(
     :return:
     """
 
-    top_grads_array = np.load(str(array_path), allow_pickle=True)
-
-    # get dict from array
-    top_grads_dict: dict = top_grads_array[()]
+    with open(str(array_path), "rb") as f:
+        top_grads_dict = pickle.load(file=f)
 
     classes_acts_success = []
     for cls in top_grads_dict.keys():

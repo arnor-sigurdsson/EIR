@@ -9,14 +9,18 @@ from functools import partial
 from typing import (
     Union,
     Dict,
+    Any,
     TYPE_CHECKING,
     Sequence,
+    DefaultDict,
+    Iterator,
     Iterable,
-    Any,
+    Literal,
     Tuple,
     Generator,
     Protocol,
     Callable,
+    Optional,
 )
 
 # Filter warnings from attribution calculation
@@ -43,9 +47,12 @@ from eir.data_load.datasets import al_datasets
 from eir.interpretation.interpret_omics import (
     analyze_omics_input_attributions,
     get_omics_consumer,
-    ParsedOmicsAttributions,
+    OmicsConsumerCallable,
 )
 from eir.setup.schemas import InputConfig, OutputConfig
+from eir.setup.output_setup_modules.tabular_output_setup import (
+    ComputedTabularOutputInfo,
+)
 from eir.interpretation.interpret_tabular import (
     analyze_tabular_input_attributions,
 )
@@ -54,6 +61,7 @@ from eir.interpretation.interpret_image import analyze_image_input_attributions
 from eir.interpretation.interpret_array import (
     analyze_array_input_attributions,
     get_array_sum_consumer,
+    ArrayConsumerCallable,
 )
 from eir.models.model_training_utils import gather_data_loader_samples
 from eir.models.input.omics.omics_models import CNNModel, LinearModel
@@ -67,8 +75,10 @@ from eir.train_utils.utils import (
 if TYPE_CHECKING:
     from eir.train_utils.train_handlers import HandlerConfig
     from eir.train import Experiment
-    from eir.experiment_io.experiment_io import LoadedTrainExperiment
     from eir.data_load.label_setup import al_label_transformers_object
+    from eir.models.model_setup_modules.meta_setup import al_meta_model
+    from eir.predict import PredictExperiment
+    from eir.setup.input_setup import al_input_objects_as_dict
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -107,7 +117,7 @@ class WrapperModelForAttribution(nn.Module):
 
 
 @contextmanager
-def suppress_stdout_and_stderr() -> None:
+def suppress_stdout_and_stderr() -> Iterator[None]:
     with open(os.devnull, "w") as devnull:
         old_stdout = sys.stdout
         sys.stdout = devnull
@@ -177,8 +187,8 @@ def get_background_loader(experiment: "Experiment") -> torch.utils.data.DataLoad
 
 
 def tabular_attribution_analysis_wrapper(
-    model: nn.Module,
-    experiment: Union["Experiment", "LoadedTrainExperiment"],
+    model: "al_meta_model",
+    experiment: Union["Experiment", "PredictExperiment"],
     output_folder_target_callable: Callable,
     dataset_to_interpret: al_datasets,
     background_loader: torch.utils.data.DataLoader,
@@ -239,12 +249,14 @@ def tabular_attribution_analysis_wrapper(
             target_column_name=target_column_name,
         )
 
-        input_names_and_types = {
-            i: exp.inputs[i].input_config.input_info.input_type
-            for i in ao.input_names_ordered
-        }
+        input_names_and_types = _extract_input_names_and_types(
+            input_objects=exp.inputs, input_names_ordered=ao.input_names_ordered
+        )
+
         output_object = exp.outputs[output_name]
+        assert isinstance(output_object, ComputedTabularOutputInfo)
         target_transformer = output_object.target_transformers[target_column_name]
+
         act_consumers = get_attribution_consumers(
             input_names_and_types=input_names_and_types,
             target_transformer=target_transformer,
@@ -305,12 +317,26 @@ def tabular_attribution_analysis_wrapper(
                 )
 
             elif input_type == "array":
+                cur_array_attributions = all_attributions[input_name]
+                assert isinstance(cur_array_attributions, dict)
                 analyze_array_input_attributions(
                     attribution_outfolder=act_output_folder,
-                    all_attributions=all_attributions[input_name],
+                    all_attributions=cur_array_attributions,
                 )
 
         ao.hook_handle.remove()
+
+
+def _extract_input_names_and_types(
+    input_objects: "al_input_objects_as_dict",
+    input_names_ordered: Sequence[str],
+) -> dict[str, Literal["tabular", "omics", "sequence", "bytes", "image", "array"]]:
+    input_names_and_types = {
+        i: input_objects[i].input_config.input_info.input_type
+        for i in input_names_ordered
+    }
+
+    return input_names_and_types
 
 
 def _do_skip_analyzing_input(
@@ -345,14 +371,14 @@ def compute_expected_value(
 class AttributionObject:
     explainer: al_explainers
     hook_handle: RemovableHandle
-    input_names_ordered: tuple[str]
+    input_names_ordered: tuple[str, ...]
     baselines: Dict[str, torch.Tensor]
-    baseline_values_ordered: tuple[torch.Tensor]
+    baseline_values_ordered: tuple[torch.Tensor, ...]
 
 
 def get_attribution_object(
-    experiment: "Experiment",
-    model: nn.Module,
+    experiment: Union["Experiment", "PredictExperiment"],
+    model: "al_meta_model",
     column_name: str,
     output_name: str,
     background_loader: DataLoader,
@@ -404,9 +430,9 @@ def get_attribution_object(
 class AttributionCallable(Protocol):
     def __call__(
         self,
+        *args,
         inputs: Dict[str, torch.Tensor],
         sample_label: torch.Tensor,
-        *args,
         **kwargs,
     ) -> list[np.ndarray]:
         ...
@@ -414,11 +440,11 @@ class AttributionCallable(Protocol):
 
 def get_attribution(
     attribution_callable: AttributionCallable,
-    inputs: Dict[str, torch.Tensor],
-    input_names: Sequence[torch.Tensor],
+    inputs: dict[str, torch.Tensor],
+    input_names: Sequence[str],
     *args,
     **kwargs,
-) -> Union[Dict[str, torch.Tensor], None]:
+) -> Optional[dict[str, np.ndarray]]:
     input_attributions = attribution_callable(inputs=inputs, *args, **kwargs)
 
     if input_attributions is None:
@@ -449,7 +475,10 @@ def get_oom_adaptive_attribution_callable(
     )
 
     def calculate_attributions_adaptive(
-        inputs: Dict[str, torch.Tensor], sample_label: torch.Tensor
+        *args,
+        inputs: Dict[str, torch.Tensor],
+        sample_label: torch.Tensor,
+        **kwargs,
     ) -> list[np.ndarray]:
         nonlocal has_successfully_run
         nonlocal internal_batch_size
@@ -481,7 +510,7 @@ def get_oom_adaptive_attribution_callable(
 
                     return res
 
-                except OutOfMemoryError as e:
+                except OutOfMemoryError as e:  # type: ignore
                     if internal_batch_size == 1:
                         raise e
 
@@ -501,46 +530,30 @@ def get_oom_adaptive_attribution_callable(
     return calculate_attributions_adaptive
 
 
-def get_attribution_callable(
-    explainer: al_explainers,
-    column_type: str,
-    baseline_values: tuple[torch.Tensor, ...],
-    baseline_names_ordered: tuple[str, ...],
-    batch_size: int,
-) -> Callable[
-    [al_explainers, Dict[str, torch.Tensor], torch.Tensor, str],
-    Union[None, np.ndarray],
-]:
-    n_steps = min(batch_size, 128)
-
-    act_func_partial = partial(
-        get_attributions,
-        explainer=explainer,
-        column_type=column_type,
-        baselines=baseline_values,
-        baseline_names_ordered=baseline_names_ordered,
-        n_steps=n_steps,
-    )
-    return act_func_partial
-
-
 @dataclass
 class SampleAttribution:
-    sample_info: "Batch"
+    sample_info: Batch
     sample_attributions: Dict[str, np.ndarray]
     raw_inputs: Dict
 
 
 def get_attribution_consumers(
-    input_names_and_types: Dict[str, str],
+    input_names_and_types: dict[
+        str, Literal["tabular", "omics", "sequence", "bytes", "image", "array"]
+    ],
     target_transformer: "al_label_transformers_object",
     output_name: str,
     target_column: str,
     column_type: str,
-) -> Dict[str, Callable[[Union["SampleAttribution", None]], Any]]:
+) -> Dict[
+    str, Union["BasicConsumerCallable", OmicsConsumerCallable, ArrayConsumerCallable]
+]:
     consumers_dict = {}
 
     for input_name, input_type in input_names_and_types.items():
+        if input_type == "bytes":
+            continue
+
         consumer = _get_consumer_from_input_type(
             input_type=input_type,
             input_name=input_name,
@@ -555,6 +568,14 @@ def get_attribution_consumers(
     return consumers_dict
 
 
+class BasicConsumerCallable(Protocol):
+    def __call__(
+        self,
+        attribution: Optional["SampleAttribution"],
+    ) -> Optional[Sequence["SampleAttribution"]]:
+        ...
+
+
 def _get_consumer_from_input_type(
     target_transformer: "al_label_transformers_object",
     input_type: str,
@@ -562,10 +583,7 @@ def _get_consumer_from_input_type(
     output_name: str,
     target_column: str,
     column_type: str,
-) -> Callable[
-    [Union["SampleAttribution", None]],
-    Union[Sequence["SampleAttribution"], ParsedOmicsAttributions],
-]:
+) -> BasicConsumerCallable | OmicsConsumerCallable | ArrayConsumerCallable:
     if input_type in ("sequence", "tabular", "image"):
         return get_basic_consumer()
 
@@ -586,10 +604,12 @@ def _get_consumer_from_input_type(
             target_column=target_column,
             column_type=column_type,
         )
+    else:
+        raise ValueError(f"Unsupported input type {input_type}.")
 
 
 def get_sample_attribution_producer(
-    data_producer: Iterable["Batch"],
+    data_producer: Generator[tuple[Batch, dict[str, Any]], None, None],
     act_func: Callable,
     target_column_name: str,
     output_name: str,
@@ -614,18 +634,17 @@ def get_sample_attribution_producer(
         yield cur_sample_attribution_info
 
 
-def get_basic_consumer() -> (
-    Callable[[Union["SampleAttribution", None]], Sequence["SampleAttribution"]]
-):
-    results = []
+def get_basic_consumer() -> BasicConsumerCallable:
+    results: list["SampleAttribution"] = []
 
     def _consumer(
-        attribution: Union["SampleAttribution", None]
-    ) -> Sequence["SampleAttribution"]:
+        attribution: Optional["SampleAttribution"],
+    ) -> Optional[Sequence["SampleAttribution"]]:
         if attribution is None:
             return results
 
         results.append(attribution)
+        return None
 
     return _consumer
 
@@ -677,20 +696,15 @@ def _convert_all_batch_tensors_to_cpu(batch: Batch) -> Batch:
 
     If needed later maybe we can use some fancy recursion here, but this works for now.
     """
-    new_batch_kwargs = {}
 
     new_inputs = {k: v.cpu() for k, v in batch.inputs.items()}
 
-    new_target_labels = {}
-    for output_name, output_object in batch.target_labels.items():
-        target_labels_on_cpu = {k: v.cpu() for k, v in output_object.items()}
+    new_target_labels: Dict[str, Dict[str, torch.Tensor]] = {}
+    for output_name, target_labels in batch.target_labels.items():
+        target_labels_on_cpu = {k: v.cpu() for k, v in target_labels.items()}
         new_target_labels[output_name] = target_labels_on_cpu
 
-    new_batch_kwargs["inputs"] = new_inputs
-    new_batch_kwargs["target_labels"] = new_target_labels
-    new_batch_kwargs["ids"] = batch.ids
-
-    new_batch = Batch(**new_batch_kwargs)
+    new_batch = Batch(inputs=new_inputs, target_labels=new_target_labels, ids=batch.ids)
 
     return new_batch
 
@@ -719,7 +733,7 @@ def _prepare_eval_attribution_outfolder(
 def _grab_single_target_from_model_output_hook(
     self: Union[CNNModel, LinearModel],
     input_: torch.Tensor,
-    output: Dict[str, torch.Tensor],
+    output: dict[str, dict[str, torch.Tensor]],
     output_target_column: str,
     output_name: str,
 ) -> torch.Tensor:
@@ -762,14 +776,16 @@ def get_attributions(
 
 
 def _get_interpretation_data_producer(
-    experiment: "Experiment",
+    experiment: Union["Experiment", "PredictExperiment"],
     column_name: str,
     column_type: str,
     output_name: str,
     dataset: al_datasets,
-) -> Generator["Batch", None, None]:
-    cur_output = experiment.outputs[output_name]
-    target_transformer = cur_output.target_transformers[column_name]
+) -> Generator[Tuple[Batch, dict[str, Any]], None, None]:
+    output_object = experiment.outputs[output_name]
+    assert isinstance(output_object, ComputedTabularOutputInfo)
+
+    target_transformer = output_object.target_transformers[column_name]
     gc = experiment.configs.global_config
 
     target_classes_numerical = _get_numerical_target_classes(
@@ -816,16 +832,14 @@ def _detach_all_inputs(tensor_inputs: Dict[str, torch.Tensor]):
 
 def _get_attributions_dataloader(
     dataset: al_datasets,
-    max_attributions_per_class: int,
+    max_attributions_per_class: Optional[int],
     output_name: str,
     target_column: str,
     column_type: str,
     target_classes_numerical: Sequence[int],
 ) -> DataLoader:
-    common_args = {"batch_size": 1, "shuffle": False}
-
     if max_attributions_per_class is None:
-        data_loader = DataLoader(dataset=dataset, **common_args)
+        data_loader = DataLoader(dataset=dataset, batch_size=1, shuffle=False)
         return data_loader
 
     indices_func = _get_categorical_sample_indices_for_attributions
@@ -840,7 +854,7 @@ def _get_attributions_dataloader(
         target_classes_numerical=target_classes_numerical,
     )
     subset_dataset = _subsample_dataset(dataset=dataset, indices=subset_indices)
-    data_loader = DataLoader(dataset=subset_dataset, **common_args)
+    data_loader = DataLoader(dataset=subset_dataset, batch_size=1, shuffle=False)
     return data_loader
 
 
@@ -851,7 +865,7 @@ def _get_categorical_sample_indices_for_attributions(
     target_column: str,
     target_classes_numerical: Sequence[int],
 ) -> Tuple[int, ...]:
-    acc_label_counts = defaultdict(lambda: 0)
+    acc_label_counts: DefaultDict[int | float, int] = defaultdict(lambda: 0)
     acc_label_limit = max_attributions_per_class
     indices = []
 

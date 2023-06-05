@@ -22,6 +22,11 @@ from eir.interpretation.interpretation_utils import (
     plot_attributions_bar,
     get_basic_sample_attributions_to_analyse_generator,
 )
+from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
+from eir.setup.output_setup_modules.tabular_output_setup import (
+    ComputedTabularOutputInfo,
+)
+from eir.setup.schemas import BasicInterpretationConfig
 
 if TYPE_CHECKING:
     from eir.train import Experiment
@@ -33,7 +38,7 @@ logger = get_logger(name=__name__)
 @dataclass()
 class SequenceVisualizationDataRecord:
     sample_id: str
-    token_attributions: Sequence[float]
+    token_attributions: np.ndarray
     label_name: str
     attribution_score: float
     raw_input_tokens: Sequence[str]
@@ -47,20 +52,25 @@ def analyze_sequence_input_attributions(
     target_column_type: str,
     attribution_outfolder: Path,
     all_attributions: Sequence["SampleAttribution"],
-    expected_target_classes_attributions: Sequence[float],
+    expected_target_classes_attributions: np.ndarray,
 ) -> None:
     exp = experiment
 
     output_object = exp.outputs[output_name]
+    assert isinstance(output_object, ComputedTabularOutputInfo)
     target_transformer = output_object.target_transformers[target_column_name]
 
     input_object = exp.inputs[input_name]
+    assert isinstance(input_object, ComputedSequenceInputInfo)
+    vocab = input_object.vocab
+
     interpretation_config = input_object.input_config.interpretation_config
+    assert isinstance(interpretation_config, BasicInterpretationConfig)
 
     samples_to_act_analyze_gen = get_basic_sample_attributions_to_analyse_generator(
         interpretation_config=interpretation_config, all_attributions=all_attributions
     )
-    vocab = exp.inputs[input_name].vocab
+
     viz_records = []
 
     for sample_attribution in samples_to_act_analyze_gen:
@@ -203,6 +213,7 @@ def _parse_out_sequence_expected_value(
         return expected_values[0]
 
     cur_base_values_index = sample_target_labels[output_name][target_column_name].item()
+    assert isinstance(cur_base_values_index, int)
     cur_sample_expected_value = expected_values[cur_base_values_index]
 
     return cur_sample_expected_value

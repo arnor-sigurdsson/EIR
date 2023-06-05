@@ -35,17 +35,17 @@ def acc_grads_inp():
 
 def test_get_top_gradients(acc_grads_inp: Dict[str, np.ndarray]):
     top_snps_per_class = interpret_omics.get_snp_cols_w_top_grads(acc_grads_inp, 3)
-    assert top_snps_per_class["Asia"]["top_n_idxs"] == [0, 2, 4]
-    asia_grads = top_snps_per_class["Asia"]["top_n_grads"]
-    assert (
-        asia_grads == np.array([[0.5, 0, 0], [0, 1.0, 0], [0, 0, 2.0], [0, 0, 0]])
-    ).all()
+    assert top_snps_per_class["Asia"]["top_n_idxs"].tolist() == [0, 2, 4]
 
-    assert top_snps_per_class["Europe"]["top_n_idxs"] == [1, 3, 5]
+    asia_grads = top_snps_per_class["Asia"]["top_n_grads"]
+    asia_expected = np.array([[0.5, 0, 0], [0, 1.0, 0], [0, 0, 2.0], [0, 0, 0]])
+    assert (asia_grads == asia_expected).all()
+
+    assert top_snps_per_class["Europe"]["top_n_idxs"].tolist() == [1, 3, 5]
+
     eur_grads = top_snps_per_class["Europe"]["top_n_grads"]
-    assert (
-        eur_grads == np.array([[1.5, 0, 0], [0, 2.0, 0], [0, 0, 3.0], [0, 0, 0]])
-    ).all()
+    eur_expected = np.array([[1.5, 0, 0], [0, 2.0, 0], [0, 0, 3.0], [0, 0, 0]])
+    assert (eur_grads == eur_expected).all()
 
 
 def test_gather_and_rescale_snps(acc_grads_inp):
