@@ -16,14 +16,14 @@ logger = get_logger(name=__name__)
 
 def load_model(
     model_path: Path,
-    model_class: Type[al_meta_model],
+    model_class: Type[al_meta_model] | Type[nn.Module],
     model_init_kwargs: Dict,
     device: str,
     test_mode: bool,
     state_dict_keys_to_keep: Union[None, Sequence[str]] = None,
     state_dict_key_rename: Union[None, Sequence[Tuple[str, str]]] = None,
     strict_shapes: bool = True,
-) -> al_meta_model:
+) -> al_meta_model | nn.Module:
     model = model_class(**model_init_kwargs)
 
     model = _load_model_weights(

@@ -26,7 +26,7 @@ def test_make_conv_layers():
         kernel_height=1,
         first_kernel_expansion_height=4,
         layers=None,
-        fc_repr_dim=512,
+        num_output_features=512,
         rb_do=0.1,
         first_channel_expansion=1,
         channel_exp_base=5,

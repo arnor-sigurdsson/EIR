@@ -269,8 +269,8 @@ def get_input_modules(
             case "image":
                 image_model = get_image_model(
                     model_config=input_model_config,
-                    input_channels=inputs_object.num_channels,
                     model_registry_lookup=get_image_model_class,
+                    data_dimensions=inputs_object.data_dimensions,
                     device=device,
                 )
                 input_modules[input_name] = image_model

@@ -4,6 +4,7 @@ from typing import Dict, Any, Literal, Type
 from torch import Tensor
 from torch import nn
 
+from eir.models.input.omics.models_cnn import CNNModelConfig
 from eir.setup.setup_utils import get_all_timm_model_names
 
 al_image_models = tuple(Literal[i] for i in get_all_timm_model_names())
@@ -39,7 +40,7 @@ class ImageModelConfig:
     """
 
     model_type: al_image_models
-    model_init_config: Dict[str, Any]
+    model_init_config: CNNModelConfig | Dict[str, Any]
 
     num_output_features: int = 256
 

@@ -16,6 +16,7 @@ from eir.data_load.data_source_modules.deeplake_ops import (
     get_deeplake_input_source_iterable,
 )
 from eir.setup import schemas
+from eir.setup.input_setup_modules.common import DataDimensions
 from eir.setup.setup_utils import collect_stats
 
 logger = get_logger(name=__name__)
@@ -52,6 +53,7 @@ class ComputedImageInputInfo:
     all_transforms: Compose
     normalization_stats: "ImageNormalizationStats"
     num_channels: int
+    data_dimensions: "DataDimensions"
 
 
 def set_up_image_input_for_training(
@@ -74,12 +76,19 @@ def set_up_image_input_for_training(
         auto_augment=input_type_info.auto_augment,
     )
 
+    data_dimension = DataDimensions(
+        channels=num_channels,
+        height=input_config.input_type_info.size[0],
+        width=input_config.input_type_info.size[-1],
+    )
+
     image_input_info = ComputedImageInputInfo(
         input_config=input_config,
         base_transforms=base_transforms,
         all_transforms=all_transforms,
         normalization_stats=normalization_stats,
         num_channels=num_channels,
+        data_dimensions=data_dimension,
     )
 
     return image_input_info

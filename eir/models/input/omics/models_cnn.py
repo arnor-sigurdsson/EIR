@@ -49,7 +49,7 @@ class CNNModelConfig:
 
         Future work includes adding a parameter to control the target width and height.
 
-    :param fc_repr_dim:
+    :param num_output_features:
         Output dimension of the last FC layer in the network which accepts the outputs
         from the convolutional layer.
 
@@ -112,7 +112,7 @@ class CNNModelConfig:
 
     layers: Union[None, List[int]] = None
 
-    fc_repr_dim: int = 32
+    num_output_features: int = 32
 
     channel_exp_base: int = 2
     first_channel_expansion: int = 1
@@ -146,7 +146,7 @@ def _validate_cnn_config(model_config: CNNModelConfig) -> None:
     if mc.down_stride_width > mc.kernel_width:
         raise ValueError(
             f"Down stride width {mc.down_stride_width}"
-            f" is greater than kernel width {mc.kernel_width}."
+            f" is greater than kernel width {mc.kernel_width}. "
             f"This is currently not supported."
         )
 
@@ -186,7 +186,7 @@ def _validate_cnn_config(model_config: CNNModelConfig) -> None:
         )
 
     positive_int_params = [
-        "fc_repr_dim",
+        "num_output_features",
         "first_channel_expansion",
         "kernel_width",
         "first_kernel_expansion_width",
@@ -265,7 +265,7 @@ class CNNModel(nn.Module):
                     "fc_1_act_1": Swish(),
                     "fc_1_linear_1": nn.Linear(
                         in_features=self.fc_1_in_features,
-                        out_features=self.model_config.fc_repr_dim,
+                        out_features=self.model_config.num_output_features,
                         bias=True,
                     ),
                 }
@@ -284,7 +284,7 @@ class CNNModel(nn.Module):
 
     @property
     def num_out_features(self) -> int:
-        return self.model_config.fc_repr_dim
+        return self.model_config.num_output_features
 
     def _init_weights(self):
         for m in self.modules():
@@ -514,7 +514,7 @@ def _get_cur_dilation(
 
     dilation = dilation_factor**block_number
 
-    max_dilation = (size - 1) // (kernel_size - 1)
+    max_dilation = max(1, (size - 1) // (kernel_size - 1))
     while dilation > max_dilation:
         dilation = dilation // dilation_factor
 
