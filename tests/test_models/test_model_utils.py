@@ -8,6 +8,7 @@ import torch
 from torch import nn
 
 
+from eir.train import train
 from eir.models import model_training_utils
 from eir.models.input.omics import models_cnn
 from eir.models.input.omics.models_cnn import ConvParamSuggestion
@@ -164,7 +165,8 @@ def test_get_model_params(create_test_util_model):
     assert len(model_params) == 10
 
     for param_group in model_params:
-        if param_group["params"].shape[0] == 1:
+        cur_params: nn.Parameter = param_group["params"]
+        if cur_params.shape[0] == 1:
             assert param_group["weight_decay"] == 0.00
         else:
             assert param_group["weight_decay"] == 0.05
@@ -331,3 +333,48 @@ def test_calc_conv_params_needed_fuzzy(test_input: Tuple[int, int, int, int]) ->
         stride=solution.stride,
     )
     assert expected_output_size == solution.target_size
+
+
+@pytest.mark.parametrize(
+    "create_test_data",
+    [
+        {"task_type": "binary"},
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize(
+    "create_test_config_init_base",
+    [
+        {
+            "injections": {
+                "global_configs": {"lr": 1e-03, "find_lr": True},
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "model_config": {"model_type": "identity"},
+                    },
+                ],
+                "fusion_configs": {
+                    "model_type": "identity",
+                },
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin"],
+                            "target_con_columns": [],
+                        },
+                    },
+                ],
+            },
+        },
+    ],
+    indirect=True,
+)
+def test_lr_find(prep_modelling_test_configs) -> None:
+    experiment, test_config = prep_modelling_test_configs
+
+    train(experiment=experiment)
+
+    run_path = test_config.run_path
+    assert (run_path / "lr_search.pdf").exists()

@@ -9,7 +9,7 @@ from torch.nn.parallel import DistributedDataParallel
 
 if TYPE_CHECKING:
     from eir.setup.config import Configs
-    from eir.models.meta.meta import MetaModel
+    from eir.models.model_setup_modules.meta_setup import al_meta_model
 
 logger = get_logger(name=__name__)
 
@@ -38,7 +38,7 @@ def maybe_initialize_distributed_environment(
     return configs_copy, local_rank
 
 
-def maybe_make_model_distributed(device: str, model: "MetaModel"):
+def maybe_make_model_distributed(device: str, model: "al_meta_model"):
     if not in_distributed_env():
         return model
 

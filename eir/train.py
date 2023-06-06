@@ -1,4 +1,3 @@
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import (
@@ -384,7 +383,7 @@ def train(experiment: Experiment) -> None:
             optimizer=exp.optimizer,
             output_folder=utils.get_run_folder(output_folder=gc.output_folder),
         )
-        sys.exit(0)
+        return
 
     trainer = configure_trainer(trainer=trainer, experiment=experiment)
 

@@ -182,7 +182,7 @@ def test_get_cur_dilation(test_input, expected):
                             "model_init_config": {
                                 "channel_exp_base": 5,
                                 "rb_do": 0.15,
-                                "fc_repr_dim": 64,
+                                "num_output_features": 64,
                                 "l1": 1e-03,
                             },
                         },

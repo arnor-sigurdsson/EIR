@@ -51,7 +51,7 @@ if TYPE_CHECKING:
     from eir.train import Experiment
 
 al_training_labels_target = Dict[str, Dict[str, torch.Tensor]]
-al_input_batch = Dict[str, Union[torch.Tensor, Dict[str, torch.Tensor]]]
+al_input_batch = Dict[str, torch.Tensor]
 al_ids = List[str]
 al_dataloader_getitem_batch = Tuple[
     al_input_batch,

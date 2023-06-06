@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List, Tuple, Literal, Sequence
+from typing import List, Tuple, Literal, Sequence, Optional, Type
 
 import math
 import numpy as np
@@ -258,23 +258,23 @@ class LCL(nn.Module):
         in_features: int,
         out_feature_sets: int,
         num_chunks: int = 10,
-        kernel_size: int = None,
-        bias: bool = True,
+        kernel_size: Optional[int] = None,
+        bias: Optional[bool] = True,
     ):
         super().__init__()
 
         self.in_features = in_features
         self.out_feature_sets = out_feature_sets
         self.num_chunks = num_chunks
-        self.kernel_size = kernel_size
 
         if kernel_size:
+            self.kernel_size = kernel_size
             self.num_chunks = int(math.ceil(in_features / kernel_size))
             logger.debug(
                 "%s: Setting num chunks to %d as kernel size of %d was passed in.",
                 self.__class__,
                 self.num_chunks,
-                self.kernel_size,
+                kernel_size,
             )
         else:
             self.kernel_size = int(math.ceil(self.in_features / self.num_chunks))
@@ -286,7 +286,10 @@ class LCL(nn.Module):
                 self.num_chunks,
             )
 
+        assert self.kernel_size is not None
+
         self.out_features = self.out_feature_sets * self.num_chunks
+
         self.padding = _find_lcl_padding_needed(
             input_size=self.in_features,
             kernel_size=self.kernel_size,
@@ -398,7 +401,6 @@ class MLPResidualBlock(nn.Module):
         out_features: int,
         dropout_p: float = 0.0,
         full_preactivation: bool = False,
-        zero_init_last_bn: bool = False,
         stochastic_depth_p: float = 0.0,
     ):
         super().__init__()
@@ -407,7 +409,6 @@ class MLPResidualBlock(nn.Module):
         self.out_features = out_features
         self.dropout_p = dropout_p
         self.full_preactivation = full_preactivation
-        self.zero_init_last_bn = zero_init_last_bn
         self.stochastic_depth_p = stochastic_depth_p
 
         self.norm_1 = nn.LayerNorm(normalized_shape=in_features)
@@ -430,9 +431,6 @@ class MLPResidualBlock(nn.Module):
             )
 
         self.stochastic_depth = StochasticDepth(p=self.stochastic_depth_p, mode="batch")
-
-        if self.zero_init_last_bn:
-            nn.init.zeros_(self.norm_2.weight)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         out = self.norm_1(x)
@@ -460,7 +458,6 @@ class LCLResidualBlock(nn.Module):
         dropout_p: float = 0.0,
         stochastic_depth_p: float = 0.0,
         full_preactivation: bool = False,
-        zero_init_last_bn: bool = False,
         reduce_both: bool = True,
     ):
         super().__init__()
@@ -471,7 +468,6 @@ class LCLResidualBlock(nn.Module):
 
         self.dropout_p = dropout_p
         self.full_preactivation = full_preactivation
-        self.zero_init_last_bn = zero_init_last_bn
         self.reduce_both = reduce_both
         self.stochastic_depth_p = stochastic_depth_p
 
@@ -508,9 +504,6 @@ class LCLResidualBlock(nn.Module):
         self.stochastic_depth = StochasticDepth(p=stochastic_depth_p, mode="batch")
 
         self.out_features = self.fc_2.out_features
-
-        if self.zero_init_last_bn:
-            nn.init.zeros_(self.norm_2.weight)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         out = self.norm_1(x)
@@ -646,6 +639,7 @@ def get_lcl_projection_layer(
     kernel_width_candidates: Sequence[int] = tuple(range(1, 1024 + 1)),
     out_feature_sets_candidates: Sequence[int] = tuple(range(1, 64 + 1)),
 ) -> LCLResidualBlock | LCL | None:
+    layer_class: Type[LCLResidualBlock] | Type[LCL]
     match layer_type:
         case "lcl_residual":
             layer_class = LCLResidualBlock
@@ -727,5 +721,8 @@ def _find_best_lcl_kernel_width_and_out_feature_sets(
 
     if best_kernel_width is None:
         return None
+
+    assert best_kernel_width is not None
+    assert best_out_feature_sets is not None
 
     return best_kernel_width, best_out_feature_sets

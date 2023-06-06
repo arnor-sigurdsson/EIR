@@ -14,7 +14,7 @@ class MetaModel(nn.Module):
     def __init__(
         self,
         input_modules: al_dict_with_modules,
-        fusion_modules: Dict[str, Callable[[al_fused_features], al_fused_features]],
+        fusion_modules: dict[str, Callable[[al_fused_features], al_fused_features]],
         output_modules: al_dict_with_modules,
         fusion_to_output_mapping: Dict[str, Literal["computed", "pass-through"]],
     ):

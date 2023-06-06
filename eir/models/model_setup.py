@@ -14,6 +14,7 @@ from eir.models.model_setup_modules.meta_setup import (
     get_default_meta_class,
     get_meta_model_class_and_kwargs_from_configs,
     al_meta_model,
+    MetaClassGetterCallable,
 )
 from eir.models.model_setup_modules.model_io import load_model
 from eir.models.model_setup_modules.pretrained_setup import (
@@ -31,7 +32,6 @@ if TYPE_CHECKING:
         al_output_objects_as_dict,
     )
 
-al_fusion_class_callable = Callable[[str], Type[nn.Module]]
 al_model_registry = Dict[str, Callable[[str], Type[nn.Module]]]
 
 logger = get_logger(name=__name__)
@@ -42,8 +42,8 @@ def get_model(
     inputs_as_dict: al_input_objects_as_dict,
     fusion_config: schemas.FusionConfig,
     outputs_as_dict: "al_output_objects_as_dict",
-    meta_class_getter: al_fusion_class_callable = get_default_meta_class,
-) -> al_meta_model:
+    meta_class_getter: MetaClassGetterCallable = get_default_meta_class,
+) -> al_meta_model | Callable:
     meta_class, meta_kwargs = get_meta_model_class_and_kwargs_from_configs(
         global_config=global_config,
         fusion_config=fusion_config,
@@ -83,13 +83,17 @@ def get_model(
     meta_kwargs["input_modules"] = input_modules
 
     meta_model = meta_class(**meta_kwargs)
-    meta_model = meta_model.to(device=global_config.device)
+    device = torch.device(device=global_config.device)
+    meta_model = meta_model.to(device=device)
 
     meta_model = maybe_make_model_distributed(
         device=global_config.device, model=meta_model
     )
 
+    compiled_model: Callable
     if global_config.compile_model:
-        meta_model = torch.compile(model=meta_model)
+        compiled_model = torch.compile(model=meta_model)
+    else:
+        compiled_model = meta_model
 
-    return meta_model
+    return compiled_model

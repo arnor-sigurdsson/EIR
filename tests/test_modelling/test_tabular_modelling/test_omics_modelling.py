@@ -499,7 +499,7 @@ def _should_compile():
                             "model_init_config": {
                                 "channel_exp_base": 5,
                                 "rb_do": 0.10,
-                                "fc_repr_dim": 256,
+                                "num_output_features": 256,
                                 "l1": 2e-05,
                                 "stochastic_depth_p": 0.1,
                             },

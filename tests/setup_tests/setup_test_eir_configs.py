@@ -317,10 +317,6 @@ def get_test_image_input_init(
             "freeze_pretrained_model": False,
             "model_init_config": {
                 "layers": [2],
-                "kernel_width": 2,
-                "kernel_height": 2,
-                "down_stride_width": 2,
-                "down_stride_height": 2,
             },
         },
     }

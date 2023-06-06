@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 import timm
 import torch
-from timm.models.registry import get_pretrained_cfg_value
+from timm.models import get_pretrained_cfg_value
 
 from eir.models.model_training_utils import trace_eir_model
 from tests.conftest import should_skip_in_gha

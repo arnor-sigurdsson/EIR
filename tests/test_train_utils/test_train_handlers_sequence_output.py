@@ -416,6 +416,15 @@ def _generate_manual_sample_test_data(tmp_path) -> dict[str, Any]:
                     },
                     {
                         "input_info": {"input_name": "test_image"},
+                        "model_config": {
+                            "model_init_config": {
+                                "layers": [2],
+                                "kernel_width": 2,
+                                "kernel_height": 2,
+                                "down_stride_width": 2,
+                                "down_stride_height": 2,
+                            },
+                        },
                     },
                     {
                         "input_info": {"input_name": "test_tabular"},

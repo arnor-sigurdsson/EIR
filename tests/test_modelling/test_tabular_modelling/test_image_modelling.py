@@ -35,6 +35,15 @@ seed_everything(seed=0)
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_image"},
+                        "model_config": {
+                            "model_init_config": {
+                                "layers": [2],
+                                "kernel_width": 2,
+                                "kernel_height": 2,
+                                "down_stride_width": 2,
+                                "down_stride_height": 2,
+                            },
+                        },
                         "input_type_info": {
                             "size": [16],
                         },
