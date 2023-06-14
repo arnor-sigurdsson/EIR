@@ -4,6 +4,7 @@ from functools import partial
 from typing import (
     Union,
     Literal,
+    Optional,
     Type,
     Tuple,
     Dict,
@@ -22,7 +23,7 @@ from transformers import PreTrainedModel, PretrainedConfig
 from eir.models.layers import _find_lcl_padding_needed
 from eir.setup.setup_utils import get_all_hf_model_names
 
-al_sequence_models = tuple(
+al_sequence_models = tuple(  # type: ignore
     Literal[i] for i in ["sequence-default"] + list(get_all_hf_model_names())
 )
 
@@ -73,7 +74,7 @@ class SequenceModelConfig:
 
     model_init_config: Union["BasicTransformerFeatureExtractorModelConfig", Dict]
 
-    model_type: al_sequence_models = "sequence-default"
+    model_type: al_sequence_models = "sequence-default"  # type: ignore
 
     embedding_dim: int = 64
 
@@ -96,7 +97,7 @@ class TransformerWrapperModel(nn.Module):
         max_length: int,
         external_feature_extractor: bool,
         device: str,
-        embeddings: nn.Embedding = None,
+        embeddings: Optional[nn.Embedding] = None,
         pre_computed_num_out_features: int = 0,
     ) -> None:
         super().__init__()
@@ -381,6 +382,7 @@ def _conv_transformer_forward(
         else:
             aggregated_out = torch.cat((aggregated_out, cur_out), dim=1)
 
+    assert aggregated_out is not None
     return aggregated_out
 
 
@@ -524,10 +526,12 @@ class PositionalEncoding(nn.Module):
         div_term = torch.exp(
             torch.arange(0, embedding_dim, 2) * (-math.log(10000.0) / embedding_dim)
         )
-        pe = torch.zeros(1, max_length, embedding_dim)
+        pe: torch.Tensor = torch.zeros(1, max_length, embedding_dim)
         pe[0, :, 0::2] = torch.sin(position * div_term)
         pe[0, :, 1::2] = torch.cos(position * div_term)
         self.register_buffer("pe", pe)
+
+        self.pe: Tensor
 
     def forward(self, x: Tensor) -> Tensor:
         x = x + self.pe[:, : self.max_length, :]
@@ -546,13 +550,16 @@ class PositionalEmbedding(nn.Module):
         self.dropout = nn.Dropout(p=dropout)
         self.max_length = max_length
 
-        init_func = torch.randn
         if zero_init:
-            init_func = torch.zeros
-
-        self.embedding = torch.nn.Parameter(
-            data=init_func(1, max_length, embedding_dim), requires_grad=True
-        )
+            self.embedding = torch.nn.Parameter(
+                data=torch.zeros(1, max_length, embedding_dim),
+                requires_grad=True,
+            )
+        else:
+            self.embedding = torch.nn.Parameter(
+                data=torch.randn(1, max_length, embedding_dim),
+                requires_grad=True,
+            )
 
     def forward(self, x: Tensor) -> Tensor:
         x = x + self.embedding[:, : self.max_length, :]

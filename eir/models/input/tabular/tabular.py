@@ -14,8 +14,8 @@ if TYPE_CHECKING:
     from eir.data_load.label_setup import al_label_dict
 
 # Aliases
-al_tabular_input = Dict[str, Union[List[str], torch.Tensor]]
-al_unique_embed_vals = Dict[str, Set[str]]
+al_tabular_input = Dict[str, List[str] | torch.Tensor]
+al_unique_embed_vals = Dict[str, Set[int]]
 al_emb_lookup_dict = Dict[str, Dict[str, Dict[int, int]]]
 
 
@@ -56,7 +56,7 @@ class SimpleTabularModel(nn.Module):
         model_init_config: SimpleTabularModelConfig,
         cat_columns: Sequence[str],
         con_columns: Sequence[str],
-        unique_label_values_per_column: Dict[str, Set[str]],
+        unique_label_values_per_column: al_unique_embed_vals,
         device: str,
     ):
         """
@@ -93,7 +93,7 @@ class SimpleTabularModel(nn.Module):
 
         self.input_dim = emb_total_dim + con_total_dim
 
-        self.layer = nn.Identity()
+        self.layer: nn.Identity | nn.Linear = nn.Identity()
         if model_init_config.fc_layer:
             self.layer = nn.Linear(
                 in_features=self.input_dim, out_features=self.input_dim, bias=True
@@ -123,7 +123,7 @@ class SimpleTabularModel(nn.Module):
 def set_up_embedding_dict(
     unique_label_values: al_unique_embed_vals,
 ) -> al_emb_lookup_dict:
-    emb_lookup_dict = {}
+    emb_lookup_dict: al_emb_lookup_dict = {}
 
     for emb_col, emb_uniq_values in unique_label_values.items():
         sorted_unique_values = sorted(emb_uniq_values)
@@ -193,7 +193,7 @@ def get_tabular_inputs(
 
 def get_embeddings_from_labels(
     categorical_columns: Sequence[str],
-    labels: Dict[str, Sequence[torch.Tensor]],
+    labels: "al_tabular_input",
     model: SimpleTabularModel,
 ) -> torch.Tensor:
     """
@@ -208,24 +208,26 @@ def get_embeddings_from_labels(
     if labels is None:
         raise ValueError("No extra labels found for when looking up embeddings.")
 
-    extra_embeddings = []
+    extra_embeddings: list[torch.Tensor] = []
     for col_key in categorical_columns:
+        cur_labels = labels[col_key]
+        assert isinstance(cur_labels, torch.Tensor)
         cur_embedding = lookup_embeddings(
             model=model,
             embedding_col=col_key,
-            labels=labels[col_key],
+            labels=cur_labels,
         )
         extra_embeddings.append(cur_embedding)
 
-    extra_embeddings = torch.cat(extra_embeddings, dim=1)
+    extra_embeddings_stacked = torch.cat(extra_embeddings, dim=1)
 
-    return extra_embeddings
+    return extra_embeddings_stacked
 
 
 def lookup_embeddings(
     model: SimpleTabularModel,
     embedding_col: str,
-    labels: Sequence[torch.Tensor],
+    labels: torch.Tensor,
 ) -> torch.Tensor:
     """
     This produces a batch of embeddings, with dimensions N x embed_dim.
@@ -240,7 +242,9 @@ def lookup_embeddings(
 def get_unique_embed_values(
     labels_dict: "al_label_dict", embedding_cols: Sequence[str]
 ) -> al_unique_embed_vals:
-    unique_embeddings_dict = OrderedDict((i, set()) for i in sorted(embedding_cols))
+    unique_embeddings_dict: al_unique_embed_vals = OrderedDict(
+        (i, set()) for i in sorted(embedding_cols)
+    )
 
     for sample_labels in labels_dict.values():
         for key, value in sample_labels.items():
@@ -252,16 +256,18 @@ def get_unique_embed_values(
 
 
 def get_extra_continuous_inputs_from_labels(
-    labels: Dict[str, torch.Tensor], continuous_columns: Iterable[str]
+    labels: "al_tabular_input", continuous_columns: Iterable[str]
 ) -> torch.Tensor:
-    extra_continuous = []
+    extra_continuous: list[torch.Tensor] = []
     for col in continuous_columns:
-        cur_con_labels = labels[col].unsqueeze(1).to(dtype=torch.float)
+        cur_labels = labels[col]
+        assert isinstance(cur_labels, torch.Tensor)
+        cur_con_labels = cur_labels.unsqueeze(1).to(dtype=torch.float)
         extra_continuous.append(cur_con_labels)
 
-    extra_continuous = torch.cat(extra_continuous, dim=1)
+    extra_continuous_stacked = torch.cat(extra_continuous, dim=1)
 
-    return extra_continuous
+    return extra_continuous_stacked
 
 
 @overload
@@ -286,9 +292,9 @@ def set_up_and_save_embeddings_dict(embedding_columns, labels_dict, run_folder):
         embedding_dict = get_embedding_dict(
             labels_dict=labels_dict, embedding_cols=embedding_columns
         )
-        outpath = run_folder / "extra_inputs" / "embeddings.save"
-        ensure_path_exists(path=outpath)
-        joblib.dump(value=embedding_dict, filename=outpath)
+        output_path = run_folder / "extra_inputs" / "embeddings.save"
+        ensure_path_exists(path=output_path)
+        joblib.dump(value=embedding_dict, filename=output_path)
         return embedding_dict
 
     return None
@@ -301,27 +307,31 @@ def get_embedding_dict(
     Simple wrapper function to call other embedding functions to create embedding
     dictionary.
     """
-    unique_embs = get_unique_embed_values(
-        labels_dict=labels_dict, embedding_cols=embedding_cols
+    unique_embeddings = get_unique_embed_values(
+        labels_dict=labels_dict,
+        embedding_cols=embedding_cols,
     )
-    emb_lookup_dict = set_up_embedding_dict(unique_label_values=unique_embs)
+    embedding_lookup_dict = set_up_embedding_dict(
+        unique_label_values=unique_embeddings,
+    )
 
-    return emb_lookup_dict
+    return embedding_lookup_dict
 
 
 def get_unique_values_from_transformers(
     transformers: Dict[str, Union[LabelEncoder, StandardScaler]],
-    keys_to_use: Union[str, Iterable[str]],
-) -> Dict[str, Any]:
-    out = {}
+    keys_to_use: Union[str, list[str]],
+) -> Dict[str, Set[Any]]:
+    out: dict[str, Any] = {}
 
     if not keys_to_use:
         return out
 
     if keys_to_use == "all":
-        iterable = transformers.keys()
+        iterable = set(transformers.keys())
     else:
-        iterable = keys_to_use
+        assert isinstance(keys_to_use, list)
+        iterable = set(keys_to_use)
 
     for k in iterable:
         out[k] = set(transformers[k].classes_)
