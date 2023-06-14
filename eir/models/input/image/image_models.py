@@ -5,9 +5,6 @@ from torch import Tensor
 from torch import nn
 
 from eir.models.input.omics.models_cnn import CNNModelConfig
-from eir.setup.setup_utils import get_all_timm_model_names
-
-al_image_models = tuple(Literal[i] for i in get_all_timm_model_names())
 
 
 def get_image_model_class(model_type: str) -> Type["ImageWrapperModel"]:
@@ -39,7 +36,7 @@ class ImageModelConfig:
           Whether to freeze the pretrained model weights.
     """
 
-    model_type: al_image_models
+    model_type: Literal["cnn"] | str
     model_init_config: CNNModelConfig | Dict[str, Any]
 
     num_output_features: int = 256

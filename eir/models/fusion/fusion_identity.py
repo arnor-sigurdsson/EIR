@@ -1,10 +1,14 @@
 import dataclasses
-from typing import Dict
+from typing import Dict, Callable
 
 import torch
 from torch import nn
 
-from eir.models.fusion.fusion_default import al_features, default_fuse_features
+from eir.models.fusion.fusion_default import default_fuse_features
+
+al_identity_features = Callable[
+    [Dict[str, torch.Tensor]], torch.Tensor | Dict[str, torch.Tensor]
+]
 
 
 @dataclasses.dataclass
@@ -17,7 +21,7 @@ class IdentityFusionModel(nn.Module):
         self,
         model_config: IdentityConfig,
         fusion_in_dim: int,
-        fusion_callable: al_features = default_fuse_features,
+        fusion_callable: al_identity_features = default_fuse_features,
         **kwargs,
     ):
         super().__init__()
@@ -35,7 +39,9 @@ class IdentityFusionModel(nn.Module):
     def num_out_features(self) -> int:
         return self.fusion_in_dim
 
-    def forward(self, inputs: Dict[str, torch.Tensor]) -> torch.Tensor:
+    def forward(
+        self, inputs: Dict[str, torch.Tensor]
+    ) -> torch.Tensor | Dict[str, torch.Tensor]:
         fused_features = self.fusion_callable(inputs)
 
         return fused_features

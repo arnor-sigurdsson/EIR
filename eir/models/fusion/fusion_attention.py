@@ -4,7 +4,7 @@ import torch
 from einops import rearrange
 from torch import nn, einsum, Tensor
 
-from eir.models.layers import get_projection_layer
+from eir.models.layers import get_projection_layer, LCL, LCLResidualBlock
 
 al_projection_layer_types = Literal["auto", "lcl", "lcl_residual", "linear"]
 
@@ -77,19 +77,18 @@ class SequenceProjection(nn.Module):
         self.in_features = in_features
         self.target_embedding_dim = target_embedding_dim
         self.target_max_length = target_max_length
+        self.projection_layer_type = projection_layer_type
 
         self.out_dim = self.target_max_length * self.target_embedding_dim
-
-        projection_kwargs = {
-            "input_dimension": in_features,
-            "target_dimension": self.out_dim,
-            "projection_layer_type": projection_layer_type,
-        }
 
         self.norm_1 = nn.LayerNorm(normalized_shape=in_features)
         self.act = nn.Mish()
 
-        self.projection_layer = get_projection_layer(**projection_kwargs)
+        self.projection_layer = get_projection_layer(
+            input_dimension=in_features,
+            target_dimension=self.out_dim,
+            projection_layer_type=self.projection_layer_type,
+        )
 
         encoder_layer_base = nn.TransformerEncoderLayer(
             d_model=target_embedding_dim,
@@ -105,9 +104,15 @@ class SequenceProjection(nn.Module):
             encoder_layer=encoder_layer_base, num_layers=1
         )
 
-        self.downsample_identity = nn.Identity()
+        self.downsample_identity: nn.Linear | nn.Identity | LCL | LCLResidualBlock = (
+            nn.Identity()
+        )
         if self.in_features != self.out_dim:
-            self.downsample_identity = get_projection_layer(**projection_kwargs)
+            self.downsample_identity = get_projection_layer(
+                input_dimension=in_features,
+                target_dimension=self.out_dim,
+                projection_layer_type=self.projection_layer_type,
+            )
 
     def forward(self, input: Tensor) -> Tensor:
         input_flat = input.flatten(1)
@@ -228,9 +233,9 @@ class UniDirectionalCrossAttention(nn.Module):
     def __init__(
         self,
         dim: int,
+        context_dim: int,
         heads: int = 8,
         dim_head: int = 64,
-        context_dim: Optional[int] = None,
         dropout: float = 0.0,
         talking_heads: bool = False,
         pre_norm: bool = False,
@@ -250,27 +255,53 @@ class UniDirectionalCrossAttention(nn.Module):
         self.scale = dim_head**-0.5
         inner_dim = dim_head * heads
 
-        self.dropout = nn.Dropout(dropout)
+        self.dropout = nn.Dropout(p=dropout)
 
-        self.to_qk = nn.Linear(dim, inner_dim, bias=False)
-        self.context_to_qk = nn.Linear(context_dim, inner_dim, bias=False)
+        self.to_qk = nn.Linear(
+            in_features=dim,
+            out_features=inner_dim,
+            bias=False,
+        )
+        self.context_to_qk = nn.Linear(
+            in_features=context_dim,
+            out_features=inner_dim,
+            bias=False,
+        )
 
-        self.to_v = nn.Linear(dim, inner_dim, bias=False)
-        self.context_to_v = nn.Linear(context_dim, inner_dim, bias=False)
+        self.to_v = nn.Linear(
+            in_features=dim,
+            out_features=inner_dim,
+            bias=False,
+        )
+        self.context_to_v = nn.Linear(
+            in_features=context_dim,
+            out_features=inner_dim,
+            bias=False,
+        )
 
-        self.to_out = nn.Linear(inner_dim, dim)
+        self.to_out = nn.Linear(
+            in_features=inner_dim,
+            out_features=dim,
+        )
 
         self.talking_heads = (
-            nn.Conv2d(heads, heads, 1, bias=False) if talking_heads else nn.Identity()
+            nn.Conv2d(
+                in_channels=heads,
+                out_channels=heads,
+                kernel_size=1,
+                bias=False,
+            )
+            if talking_heads
+            else nn.Identity()
         )
 
     def forward(
         self,
-        x,
-        context,
-        mask=None,
-        context_mask=None,
-        rel_pos_bias=None,
+        x: torch.Tensor,
+        context: torch.Tensor,
+        mask: Optional[torch.Tensor] = None,
+        context_mask: Optional[torch.Tensor] = None,
+        rel_pos_bias: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         _, i, j, h, device = (
             x.shape[0],
@@ -297,18 +328,18 @@ class UniDirectionalCrossAttention(nn.Module):
         sim = einsum("b h i d, b h j d -> b h i j", qk, context_qk) * self.scale
 
         # relative positional bias, if supplied
-        if exists(rel_pos_bias):
+        if exists(val=rel_pos_bias):
             sim = sim + rel_pos_bias
 
         # causal mask
-        if exists(mask) or exists(context_mask):
+        if exists(val=mask) or exists(val=context_mask):
             i, j = sim.shape[-2:]
             mask = torch.ones(i, j, device=device, dtype=torch.bool).triu(j - i + 1)
             mask_value = -torch.finfo(sim.dtype).max
             sim = sim.masked_fill(mask, mask_value)
 
         # get attention along sequence length, using shared similarity matrix
-        attn = stable_softmax(sim, dim=-1)
+        attn = stable_softmax(t=sim, dim=-1)
 
         attn = self.dropout(attn)
 

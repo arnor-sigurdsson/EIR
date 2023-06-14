@@ -1,4 +1,4 @@
-from typing import Callable, Dict, Union, TYPE_CHECKING
+from typing import Callable, Dict, TYPE_CHECKING
 
 import torch
 from aislib.misc_utils import get_logger
@@ -13,9 +13,7 @@ from eir.models.models_base import (
 if TYPE_CHECKING:
     pass
 
-al_features = Callable[
-    [Dict[str, torch.Tensor]], Union[torch.Tensor, Dict[str, torch.Tensor]]
-]
+al_features = Callable[[Dict[str, torch.Tensor]], torch.Tensor]
 
 
 logger = get_logger(__name__)

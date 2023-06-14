@@ -1,6 +1,6 @@
 from dataclasses import dataclass
-from typing import Union, Type, Literal, Dict, Any, TYPE_CHECKING
 from functools import partial
+from typing import Union, Type, Literal, Dict, TYPE_CHECKING, Optional, Callable
 
 import torch
 from torch import nn
@@ -13,13 +13,13 @@ if TYPE_CHECKING:
 
 al_array_model_types = Literal["cnn", "lcl"]
 
-al_array_model_classes = Union[Type[CNNModel], Type[LCLModel]]
-al_array_models = Union[CNNModel, LCLModel]
+al_array_model_classes = Type[CNNModel] | Type[LCLModel]
+al_array_models = CNNModel | LCLModel
 
-al_array_model_config_classes = Union[Type[CNNModelConfig], Type[LCLModelConfig]]
-al_array_model_configs = Union[CNNModelConfig, LCLModelConfig]
+al_array_model_config_classes = Type[CNNModelConfig] | Type[LCLModelConfig]
+al_array_model_configs = CNNModelConfig | LCLModelConfig
 
-al_pre_normalization = Union[None, Literal["instancenorm", "layernorm"]]
+al_pre_normalization = Optional[Literal["instancenorm", "layernorm"]]
 
 
 def get_array_model_mapping() -> Dict[str, al_array_model_classes]:
@@ -54,8 +54,28 @@ def get_array_model_init_kwargs(
     model_type: al_array_model_types,
     model_config: al_array_model_configs,
     data_dimensions: "DataDimensions",
-) -> Dict[str, Any]:
-    kwargs = {}
+) -> dict[
+    str,
+    Union[
+        "DataDimensions",
+        al_array_model_configs,
+        Callable[
+            [torch.Tensor],
+            torch.Tensor,
+        ],
+    ],
+]:
+    kwargs: dict[
+        str,
+        Union[
+            "DataDimensions",
+            al_array_model_configs,
+            Callable[
+                [torch.Tensor],
+                torch.Tensor,
+            ],
+        ],
+    ] = {}
 
     model_config_dataclass = get_model_config_dataclass(model_type=model_type)
     dataclass_instance = model_config_dataclass(**model_config.__dict__)
@@ -89,7 +109,7 @@ class ArrayModelConfig:
 class ArrayWrapperModel(nn.Module):
     def __init__(
         self,
-        feature_extractor: nn.Module,
+        feature_extractor: al_array_models,
         normalization: al_pre_normalization,
     ):
         super().__init__()
@@ -114,7 +134,8 @@ class ArrayWrapperModel(nn.Module):
 
 
 def get_pre_normalization_layer(
-    normalization: al_pre_normalization, data_dimensions: "DataDimensions"
+    normalization: al_pre_normalization,
+    data_dimensions: "DataDimensions",
 ) -> Union[nn.InstanceNorm2d, nn.LayerNorm, nn.Identity]:
     channels = data_dimensions.channels
     height = data_dimensions.height
