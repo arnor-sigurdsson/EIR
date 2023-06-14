@@ -166,7 +166,7 @@ class LCLModelConfig:
 
     layers: Union[None, List[int]] = None
 
-    kernel_width: Union[None, int] = 16
+    kernel_width: int = 16
     first_kernel_expansion: int = -2
 
     channel_exp_base: int = 2
@@ -283,7 +283,7 @@ class LCParameterSpec:
 
 def _get_lcl_blocks(
     lcl_spec: LCParameterSpec,
-    block_layer_spec: Union[None, Sequence[int]],
+    block_layer_spec: Optional[Sequence[int]],
 ) -> nn.Sequential:
     factory = _get_lcl_block_factory(block_layer_spec=block_layer_spec)
 
@@ -293,7 +293,7 @@ def _get_lcl_blocks(
 
 
 def _get_lcl_block_factory(
-    block_layer_spec: Sequence[int],
+    block_layer_spec: Optional[Sequence[int]],
 ) -> Callable[[LCParameterSpec], nn.Sequential]:
     if not block_layer_spec:
         return generate_lcl_residual_blocks_auto
@@ -361,6 +361,7 @@ def generate_lcl_residual_blocks_auto(lcl_parameter_spec: LCParameterSpec):
         full_preactivation=True,
     )
 
+    block_modules: list[LCLResidualBlock | LCLAttentionBlock]
     block_modules = [first_block]
 
     if _do_add_attention(

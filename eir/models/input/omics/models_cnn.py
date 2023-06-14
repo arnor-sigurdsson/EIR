@@ -331,7 +331,8 @@ class CNNModel(nn.Module):
             )
             return residual_blocks
 
-        return self.model_config.layers
+        assert isinstance(mc.layers, list)
+        return mc.layers
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
         out = self.pos_representation(input)
@@ -374,6 +375,7 @@ def _make_conv_layers(
         dilation=mc.dilation_factor_height,
     )
 
+    conv_blocks: list[FirstCNNBlock | CNNResidualBlock | ConvAttentionBlock | nn.Module]
     conv_blocks = [
         FirstCNNBlock(
             in_channels=data_dimensions.channels,
@@ -396,8 +398,10 @@ def _make_conv_layers(
         conv_sequence=nn.Sequential(*conv_blocks),
     )
     if first_width * first_height <= mc.attention_inclusion_cutoff:
+        last_block = conv_blocks[-1]
+        assert isinstance(last_block, CNNResidualBlock)
         cur_attention_block = ConvAttentionBlock(
-            channels=conv_blocks[-1].out_channels,
+            channels=last_block.out_channels,
             width=first_width,
             height=first_height,
         )
@@ -739,9 +743,12 @@ def calc_size_after_conv_sequence(
     return int(current_width), int(current_height)
 
 
-def _calc_layer_output_size_for_axis(size: int, layer: nn.Module, axis: int):
+def _calc_layer_output_size_for_axis(
+    size: int, layer: nn.Conv1d | nn.Conv2d | nn.Conv3d, axis: int
+):
     kernel_size = layer.kernel_size[axis]
     padding = layer.padding[axis]
+    assert isinstance(padding, int)
     stride = layer.stride[axis]
     dilation = layer.dilation[axis]
 

@@ -13,6 +13,7 @@ from eir.models.input.omics.models_locally_connected import (
     LCLModel,
     LCLModelConfig,
     flatten_h_w_fortran,
+    FlattenFunc,
 )
 
 if TYPE_CHECKING:
@@ -116,7 +117,7 @@ def get_omics_model_init_kwargs(
     model_type: al_omics_model_types,
     model_config: al_omics_model_configs,
     data_dimensions: "DataDimensions",
-) -> Dict[str, Any]:
+) -> dict[str, Union["DataDimensions", al_omics_model_configs | FlattenFunc]]:
     """
     See: https://github.com/python/mypy/issues/5374 for type hint issue.
 
@@ -125,7 +126,9 @@ def get_omics_model_init_kwargs(
     to just model_config object).
     """
 
-    kwargs = {}
+    kwargs: dict[
+        str, Union["DataDimensions", al_omics_model_configs | FlattenFunc]
+    ] = {}
     base_kwargs = model_config.__dict__
     base_kwargs = _enforce_omics_specific_settings(
         base_kwargs=base_kwargs, model_type=model_type
