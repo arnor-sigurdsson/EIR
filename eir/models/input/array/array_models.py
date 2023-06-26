@@ -1,12 +1,23 @@
 from dataclasses import dataclass
 from functools import partial
-from typing import Union, Type, Literal, Dict, TYPE_CHECKING, Optional, Callable
+from typing import (
+    Union,
+    Type,
+    Literal,
+    Dict,
+    TYPE_CHECKING,
+    Optional,
+)
 
 import torch
 from torch import nn
 
 from eir.models.input.omics.models_cnn import CNNModelConfig, CNNModel
-from eir.models.input.omics.models_locally_connected import LCLModel, LCLModelConfig
+from eir.models.input.omics.models_locally_connected import (
+    LCLModel,
+    LCLModelConfig,
+    FlattenFunc,
+)
 
 if TYPE_CHECKING:
     from eir.setup.input_setup_modules.common import DataDimensions
@@ -20,6 +31,10 @@ al_array_model_config_classes = Type[CNNModelConfig] | Type[LCLModelConfig]
 al_array_model_configs = CNNModelConfig | LCLModelConfig
 
 al_pre_normalization = Optional[Literal["instancenorm", "layernorm"]]
+
+al_array_model_init_kwargs = dict[
+    str, Union["DataDimensions", CNNModelConfig, LCLModelConfig, FlattenFunc]
+]
 
 
 def get_array_model_mapping() -> Dict[str, al_array_model_classes]:
@@ -54,37 +69,20 @@ def get_array_model_init_kwargs(
     model_type: al_array_model_types,
     model_config: al_array_model_configs,
     data_dimensions: "DataDimensions",
-) -> dict[
-    str,
-    Union[
-        "DataDimensions",
-        al_array_model_configs,
-        Callable[
-            [torch.Tensor],
-            torch.Tensor,
-        ],
-    ],
-]:
+) -> dict[str, Union["DataDimensions", CNNModelConfig, LCLModelConfig, FlattenFunc]]:
     kwargs: dict[
-        str,
-        Union[
-            "DataDimensions",
-            al_array_model_configs,
-            Callable[
-                [torch.Tensor],
-                torch.Tensor,
-            ],
-        ],
+        str, Union["DataDimensions", CNNModelConfig, LCLModelConfig, FlattenFunc]
     ] = {}
 
     model_config_dataclass = get_model_config_dataclass(model_type=model_type)
-    dataclass_instance = model_config_dataclass(**model_config.__dict__)
+    model_config_dataclass_instance = model_config_dataclass(**model_config.__dict__)
 
-    kwargs["model_config"] = dataclass_instance
+    kwargs["model_config"] = model_config_dataclass_instance
     kwargs["data_dimensions"] = data_dimensions
 
     match model_type:
         case "lcl":
+            assert isinstance(model_config, LCLModelConfig)
             kwargs["flatten_fn"] = partial(torch.flatten, start_dim=1)
 
     return kwargs

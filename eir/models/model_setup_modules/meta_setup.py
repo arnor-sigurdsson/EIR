@@ -12,6 +12,20 @@ from typing import (
 
 from torch import nn
 
+from eir.setup.input_setup_modules.setup_array import ComputedArrayInputInfo
+from eir.setup.input_setup_modules.setup_bytes import ComputedBytesInputInfo
+from eir.setup.input_setup_modules.setup_image import ComputedImageInputInfo
+from eir.setup.input_setup_modules.setup_omics import ComputedOmicsInputInfo
+from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
+from eir.setup.input_setup_modules.setup_tabular import ComputedTabularInputInfo
+from eir.setup.schemas import (
+    ImageInputDataConfig,
+    TabularInputDataConfig,
+)
+from eir.predict_modules.predict_tabular_input_setup import (
+    ComputedPredictTabularInputInfo,
+)
+
 from eir.models.fusion import fusion
 from eir.models.input.image.image_models import get_image_model_class
 from eir.models.input.sequence.sequence_models import get_sequence_model_class
@@ -106,7 +120,7 @@ def get_meta_model_kwargs_from_configs(
     inputs_as_dict: al_input_objects_as_dict,
     outputs_as_dict: "al_output_objects_as_dict",
 ) -> Dict[str, Any]:
-    kwargs = {}
+    kwargs: dict[str, Any] = {}
     input_modules = get_input_modules(
         inputs_as_dict=inputs_as_dict,
         device=global_config.device,
@@ -149,7 +163,7 @@ def get_meta_model_kwargs_from_configs(
 def _get_output_types(
     outputs_as_dict: "al_output_objects_as_dict",
 ) -> dict[str, Literal["tabular", "sequence"]]:
-    outputs_to_types_mapping = {}
+    outputs_to_types_mapping: dict[str, Literal["tabular", "sequence"]] = {}
 
     for output_name, output_object in outputs_as_dict.items():
         output_type = output_object.output_config.output_info.output_type
@@ -221,22 +235,21 @@ def get_input_modules(
     input_modules = nn.ModuleDict()
 
     for input_name, inputs_object in inputs_as_dict.items():
-        input_type = inputs_object.input_config.input_info.input_type
-        input_type_info = inputs_object.input_config.input_type_info
         input_model_config = inputs_object.input_config.model_config
 
-        match input_type:
-            case "omics":
+        match inputs_object:
+            case ComputedOmicsInputInfo():
                 cur_omics_model = get_omics_model_from_model_config(
                     model_type=input_model_config.model_type,
                     model_init_config=input_model_config.model_init_config,
                     data_dimensions=inputs_object.data_dimensions,
                 )
-
                 input_modules[input_name] = cur_omics_model
 
-            case "tabular":
+            case ComputedTabularInputInfo() | ComputedPredictTabularInputInfo():
                 transformers = inputs_object.labels.label_transformers
+                input_type_info = inputs_object.input_config.input_type_info
+                assert isinstance(input_type_info, TabularInputDataConfig)
                 cat_columns = input_type_info.input_cat_columns
                 con_columns = input_type_info.input_con_columns
 
@@ -244,7 +257,6 @@ def get_input_modules(
                     transformers=transformers,
                     keys_to_use=cat_columns,
                 )
-
                 tabular_model = get_tabular_model(
                     model_init_config=input_model_config.model_init_config,
                     cat_columns=cat_columns,
@@ -254,7 +266,7 @@ def get_input_modules(
                 )
                 input_modules[input_name] = tabular_model
 
-            case "sequence" | "bytes":
+            case ComputedSequenceInputInfo() | ComputedBytesInputInfo():
                 num_tokens = len(inputs_object.vocab)
                 sequence_model = get_sequence_model(
                     sequence_model_config=inputs_object.input_config.model_config,
@@ -266,7 +278,7 @@ def get_input_modules(
                 )
                 input_modules[input_name] = sequence_model
 
-            case "image":
+            case ComputedImageInputInfo():
                 image_model = get_image_model(
                     model_config=input_model_config,
                     model_registry_lookup=get_image_model_class,
@@ -275,7 +287,7 @@ def get_input_modules(
                 )
                 input_modules[input_name] = image_model
 
-            case "array":
+            case ComputedArrayInputInfo():
                 array_feature_extractor = get_array_feature_extractor(
                     model_type=input_model_config.model_type,
                     model_init_config=input_model_config.model_init_config,
@@ -285,8 +297,10 @@ def get_input_modules(
                     array_feature_extractor=array_feature_extractor,
                     model_config=input_model_config,
                 )
-
                 input_modules[input_name] = cur_array_model
+
+            case _:
+                raise ValueError(f"Unrecognized input type for object {inputs_object}")
 
     return input_modules
 
@@ -358,38 +372,41 @@ def _get_feature_extractors_input_dimensions_per_axis(
     fusion_in_dims = {}
 
     for name, input_object in inputs_as_dict.items():
-        input_type = input_object.input_config.input_info.input_type
-        input_type_info = input_object.input_config.input_type_info
         input_model_config = input_object.input_config.model_config
 
-        match input_type:
-            case "sequence" | "bytes":
+        match input_object:
+            case ComputedSequenceInputInfo() | ComputedBytesInputInfo():
                 fusion_in_dims[name] = SequenceDataDimensions(
                     channels=1,
                     height=input_object.computed_max_length,
                     width=input_model_config.embedding_dim,
                 )
 
-            case "image":
+            case ComputedImageInputInfo():
+                input_type_info = input_object.input_config.input_type_info
+                assert isinstance(input_type_info, ImageInputDataConfig)
                 fusion_in_dims[name] = DataDimensions(
                     channels=input_object.num_channels,
                     height=input_type_info.size[0],
                     width=input_type_info.size[-1],
                 )
-            case "tabular":
+
+            case ComputedTabularInputInfo() | ComputedPredictTabularInputInfo():
                 fusion_in_dims[name] = DataDimensions(
                     channels=1,
                     height=1,
                     width=input_modules[name].input_dim,
                 )
-            case "omics":
+
+            case ComputedOmicsInputInfo():
                 fusion_in_dims[name] = OmicsDataDimensions(
                     **input_object.data_dimensions.__dict__
                 )
-            case "array":
+
+            case ComputedArrayInputInfo():
                 fusion_in_dims[name] = input_object.data_dimensions
 
             case _:
-                raise ValueError(f"Unknown input type {input_type}.")
+                raise ValueError(f"Unrecognized input object {input_object}.")
 
     return fusion_in_dims

@@ -399,7 +399,7 @@ def _make_conv_layers(
     )
     if first_width * first_height <= mc.attention_inclusion_cutoff:
         last_block = conv_blocks[-1]
-        assert isinstance(last_block, CNNResidualBlock)
+        assert isinstance(last_block, (CNNResidualBlock, FirstCNNBlock))
         cur_attention_block = ConvAttentionBlock(
             channels=last_block.out_channels,
             width=first_width,

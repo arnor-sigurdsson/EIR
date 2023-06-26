@@ -1,6 +1,4 @@
-from typing import Type
-
-from torch import nn
+from typing import Type, Protocol
 
 from eir.models.input.sequence.transformer_models import (
     TransformerFeatureExtractor,
@@ -9,12 +7,25 @@ from eir.models.input.sequence.transformer_models import (
 )
 
 
-def get_sequence_model_class(model_type: str) -> Type[nn.Module]:
+class SequenceModelClassGetterFunction(Protocol):
+    def __call__(
+        self, model_type: str
+    ) -> (
+        Type[TransformerFeatureExtractor]
+        | Type[TransformerWrapperModel]
+        | Type[SequenceOutputTransformerFeatureExtractor]
+    ):
+        ...
+
+
+def get_sequence_model_class(
+    model_type: str,
+) -> (
+    Type[TransformerFeatureExtractor] | Type[SequenceOutputTransformerFeatureExtractor]
+):
     match model_type:
         case "sequence-default":
             return TransformerFeatureExtractor
-        case "sequence-wrapper-default":
-            return TransformerWrapperModel
         case "eir-input-sequence-from-linked-output-default":
             return SequenceOutputTransformerFeatureExtractor
         case _:

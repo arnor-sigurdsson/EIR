@@ -1,12 +1,14 @@
+from collections import abc
 from dataclasses import dataclass
-from typing import Union, Callable, Type, Dict, Literal, Tuple, Any
+from typing import Union, Callable, Dict, Literal, Tuple, Any, Optional
 
 import math
+import torch
 from aislib.misc_utils import get_logger
 from torch import nn
 from transformers import PreTrainedModel, AutoModel, AutoConfig
 
-from eir.models.models_base import get_output_dimensions_for_input
+from eir.models.input.sequence.sequence_models import SequenceModelClassGetterFunction
 from eir.models.input.sequence.transformer_models import (
     TransformerFeatureExtractor,
     SequenceModelConfig,
@@ -14,6 +16,7 @@ from eir.models.input.sequence.transformer_models import (
     BasicTransformerFeatureExtractorModelConfig,
     get_embedding_dim_for_sequence_model,
 )
+from eir.models.models_base import get_output_dimensions_for_input
 from eir.setup.setup_utils import get_unsupported_hf_models
 
 logger = get_logger(name=__name__)
@@ -22,7 +25,7 @@ logger = get_logger(name=__name__)
 @dataclass
 class SequenceModelObjectsForWrapperModel:
     feature_extractor: Union[TransformerFeatureExtractor, nn.Module]
-    embeddings: Union[None, nn.Module]
+    embeddings: Optional[nn.Embedding]
     embedding_dim: int
     external: bool
     known_out_features: Union[None, int]
@@ -30,7 +33,7 @@ class SequenceModelObjectsForWrapperModel:
 
 def get_sequence_model(
     sequence_model_config: SequenceModelConfig,
-    model_registry_lookup: Callable[[str], Type[nn.Module]],
+    model_registry_lookup: SequenceModelClassGetterFunction,
     num_tokens: int,
     max_length: int,
     embedding_dim: int,
@@ -54,8 +57,8 @@ def get_sequence_model(
         pool=sequence_model_config.pool,
     )
 
-    wrapper_model_class = model_registry_lookup(model_type="sequence-wrapper-default")
-    sequence_model = wrapper_model_class(
+    device_torch = torch.device(device)
+    sequence_model = TransformerWrapperModel(
         feature_extractor=objects_for_wrapper.feature_extractor,
         external_feature_extractor=objects_for_wrapper.external,
         model_config=sequence_model_config,
@@ -65,7 +68,7 @@ def get_sequence_model(
         embeddings=objects_for_wrapper.embeddings,
         device=device,
         pre_computed_num_out_features=objects_for_wrapper.known_out_features,
-    ).to(device=device)
+    ).to(device=device_torch)
 
     return sequence_model
 
@@ -88,10 +91,10 @@ def _get_windowed_sequence_parameters(
 
 def _get_sequence_feature_extractor_objects_for_wrapper_model(
     model_type: str,
-    model_registry_lookup: Callable[[str], Type[nn.Module]],
+    model_registry_lookup: SequenceModelClassGetterFunction,
     pretrained: bool,
     pretrained_frozen: bool,
-    model_config: Union[BasicTransformerFeatureExtractorModelConfig, Dict],
+    model_config: Union[BasicTransformerFeatureExtractorModelConfig, dict],
     num_tokens: int,
     embedding_dim: int,
     feature_extractor_max_length: int,
@@ -100,6 +103,7 @@ def _get_sequence_feature_extractor_objects_for_wrapper_model(
 ) -> SequenceModelObjectsForWrapperModel:
     if "sequence-default" in model_type or model_type.startswith("eir-"):
         model_class = model_registry_lookup(model_type=model_type)
+        assert isinstance(model_config, BasicTransformerFeatureExtractorModelConfig)
         objects_for_wrapper = _get_basic_sequence_feature_extractor_objects(
             model_config=model_config,
             num_tokens=num_tokens,
@@ -108,6 +112,7 @@ def _get_sequence_feature_extractor_objects_for_wrapper_model(
             feature_extractor_class=model_class,
         )
     elif pretrained:
+        assert isinstance(model_config, dict)
         objects_for_wrapper = _get_pretrained_hf_sequence_feature_extractor_objects(
             model_name=model_type,
             frozen=pretrained_frozen,
@@ -117,6 +122,7 @@ def _get_sequence_feature_extractor_objects_for_wrapper_model(
             pool=pool,
         )
     else:
+        assert isinstance(model_config, dict)
         objects_for_wrapper = _get_hf_sequence_feature_extractor_objects(
             model_name=model_type,
             model_config=model_config,
@@ -252,16 +258,21 @@ def _pretrained_hf_model_embedding_dim(
     embeddings: nn.Module, model_name: str = ""
 ) -> int:
     if hasattr(embeddings, "embedding_dim"):
-        return embeddings.embedding_dim
+        emb_dim = embeddings.embedding_dim
     elif hasattr(embeddings, "dim"):
-        return embeddings.dim
+        emb_dim = embeddings.dim
     elif hasattr(embeddings, "emb_layers"):
-        return embeddings.emb_layers[0].embedding_dim
+        layers = embeddings.emb_layers
+        assert isinstance(layers, (abc.Sequence, nn.ModuleList))
+        emb_dim = layers[0].embedding_dim
+    else:
+        raise ValueError(f"Could not find embedding dimension for model {model_name}.")
 
-    raise ValueError(f"Could not find embedding dimension for model {model_name}.")
+    assert isinstance(emb_dim, int)
+    return emb_dim
 
 
-def _get_hf_model(model_name: str, model_config: Dict[str, Any]) -> nn.Module:
+def _get_hf_model(model_name: str, model_config: Dict[str, Any]) -> PreTrainedModel:
     config = AutoConfig.for_model(model_type=model_name, **model_config)
     model = AutoModel.from_config(config=config)
     logger.info(

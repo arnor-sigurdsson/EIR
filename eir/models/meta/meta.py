@@ -1,21 +1,25 @@
-from typing import Dict, Callable, Literal
+from typing import Dict, Callable, Literal, NewType
 
 import torch
 from torch import nn
 
 from eir.models.fusion.fusion import al_fused_features
 
-al_dict_with_modules = (
-    dict[str, Callable[[torch.Tensor], dict[str, torch.Tensor]]] | nn.ModuleDict
-)
+FeatureExtractorOutType = NewType("FeatureExtractorOutType", torch.Tensor)
+
+al_input_modules = dict[str, Callable[[torch.Tensor], FeatureExtractorOutType]]
+al_fusion_modules = dict[
+    str, Callable[[dict[str, FeatureExtractorOutType]], al_fused_features]
+]
+al_output_modules = dict[str, Callable[[al_fused_features], dict[str, torch.Tensor]]]
 
 
 class MetaModel(nn.Module):
     def __init__(
         self,
-        input_modules: al_dict_with_modules,
-        fusion_modules: dict[str, Callable[[al_fused_features], al_fused_features]],
-        output_modules: al_dict_with_modules,
+        input_modules: al_input_modules,
+        fusion_modules: al_fusion_modules,
+        output_modules: al_output_modules,
         fusion_to_output_mapping: Dict[str, Literal["computed", "pass-through"]],
     ):
         super().__init__()

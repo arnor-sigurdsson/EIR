@@ -1,11 +1,15 @@
 from copy import copy
-from typing import Callable, Type, Dict, Union, Any
+from typing import Dict, Union, Any
 
 import timm
 from aislib.misc_utils import get_logger
 from torch import nn
 
-from eir.models.input.image.image_models import ImageModelConfig, ImageWrapperModel
+from eir.models.input.image.image_models import (
+    ImageModelConfig,
+    ImageWrapperModel,
+    ImageModelClassGetterFunction,
+)
 from eir.models.input.omics.models_cnn import CNNModel, CNNModelConfig
 from eir.setup.input_setup_modules.common import DataDimensions
 
@@ -15,7 +19,7 @@ logger = get_logger(name=__name__)
 def get_image_model(
     model_config: ImageModelConfig,
     data_dimensions: DataDimensions,
-    model_registry_lookup: Callable[[str], Type["ImageWrapperModel"]],
+    model_registry_lookup: ImageModelClassGetterFunction,
     device: str,
 ) -> ImageWrapperModel:
     input_channels = data_dimensions.channels
@@ -37,6 +41,7 @@ def get_image_model(
         )
 
     else:
+        assert isinstance(model_config.model_init_config, dict)
         feature_extractor = _meta_get_image_model_from_scratch(
             model_type=model_config.model_type,
             model_init_config=model_config.model_init_config,
@@ -58,6 +63,7 @@ def get_image_model(
 
 def _parse_init_kwargs(model_config: ImageModelConfig) -> Dict[str, Any]:
     init_kwargs = copy(model_config.model_init_config)
+    assert isinstance(init_kwargs, dict)
 
     model_config_out_features = getattr(model_config, "num_output_features")
     init_kwargs_out_features = init_kwargs.get("num_output_features")
@@ -75,7 +81,7 @@ def _parse_init_kwargs(model_config: ImageModelConfig) -> Dict[str, Any]:
 
 
 def _meta_get_image_model_from_scratch(
-    model_type: str, model_init_config: Dict, num_output_features: Union[None, int]
+    model_type: str, model_init_config: dict, num_output_features: Union[None, int]
 ) -> nn.Module:
     """
     A kind of ridiculous way to initialize modules from scratch that are found in timm,

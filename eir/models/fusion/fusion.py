@@ -8,11 +8,11 @@ from aislib.misc_utils import get_logger
 from eir.models.fusion import fusion_mgmoe, fusion_default, fusion_identity
 from eir.models.layers import ResidualMLPConfig
 
+al_fusion_model = Literal["pass-through", "mlp-residual", "identity", "mgmoe"]
+
 ComputedType = NewType("ComputedType", torch.Tensor)
 PassThroughType = NewType("PassThroughType", Dict[str, torch.Tensor])
-
-al_fusion_model = Literal["pass-through", "mlp-residual", "identity", "mgmoe"]
-al_fused_features = Dict[str, ComputedType | PassThroughType]
+al_fused_features = dict[str, ComputedType | PassThroughType]
 
 logger = get_logger(name=__name__)
 

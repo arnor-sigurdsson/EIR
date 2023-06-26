@@ -1,10 +1,15 @@
 from dataclasses import dataclass
-from typing import Dict, Any, Literal, Type
+from typing import Dict, Any, Literal, Type, Protocol
 
 from torch import Tensor
 from torch import nn
 
 from eir.models.input.omics.models_cnn import CNNModelConfig
+
+
+class ImageModelClassGetterFunction(Protocol):
+    def __call__(self, model_type: str) -> Type["ImageWrapperModel"]:
+        ...
 
 
 def get_image_model_class(model_type: str) -> Type["ImageWrapperModel"]:

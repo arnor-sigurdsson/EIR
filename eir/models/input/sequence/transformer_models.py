@@ -98,7 +98,7 @@ class TransformerWrapperModel(nn.Module):
         external_feature_extractor: bool,
         device: str,
         embeddings: Optional[nn.Embedding] = None,
-        pre_computed_num_out_features: int = 0,
+        pre_computed_num_out_features: Optional[int] = None,
     ) -> None:
         super().__init__()
         self.model_config = model_config
