@@ -41,10 +41,10 @@ from eir.models.output.mlp_residual import (
 )
 from eir.models.output.output_module_setup import (
     TabularOutputModuleConfig,
-    SequenceOutputModuleConfig,
 )
 from eir.models.output.sequence.sequence_output_modules import (
     TransformerSequenceOutputModuleConfig,
+    SequenceOutputModuleConfig,
 )
 from eir.models.input.sequence.transformer_models import (
     BasicTransformerFeatureExtractorModelConfig,

@@ -319,8 +319,8 @@ def get_embedding_dict(
 
 
 def get_unique_values_from_transformers(
-    transformers: Dict[str, Union[LabelEncoder, StandardScaler]],
-    keys_to_use: Union[str, list[str]],
+    transformers: Dict[str, LabelEncoder | StandardScaler],
+    keys_to_use: str | list[str],
 ) -> Dict[str, Set[Any]]:
     out: dict[str, Any] = {}
 

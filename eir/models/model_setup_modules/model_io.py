@@ -1,13 +1,12 @@
 import reprlib
-import typing
 from collections import OrderedDict
 from copy import deepcopy
 from pathlib import Path
-from typing import Type, Dict, Union, Sequence, Tuple, Any
 
 import torch
+import typing
 from aislib.misc_utils import get_logger
-from torch import nn
+from typing import Type, Dict, Union, Sequence, Tuple, Any
 
 from eir.models.model_setup_modules.meta_setup import al_meta_model
 
@@ -16,14 +15,14 @@ logger = get_logger(name=__name__)
 
 def load_model(
     model_path: Path,
-    model_class: Type[al_meta_model] | Type[nn.Module],
+    model_class: Type[al_meta_model],
     model_init_kwargs: Dict,
     device: str,
     test_mode: bool,
     state_dict_keys_to_keep: Union[None, Sequence[str]] = None,
     state_dict_key_rename: Union[None, Sequence[Tuple[str, str]]] = None,
     strict_shapes: bool = True,
-) -> al_meta_model | nn.Module:
+) -> al_meta_model:
     model = model_class(**model_init_kwargs)
 
     model = _load_model_weights(
@@ -42,7 +41,7 @@ def load_model(
 
 
 def _load_model_weights(
-    model: nn.Module,
+    model: al_meta_model,
     model_state_dict_path: Path,
     device: str,
     state_dict_keys_to_keep: Union[None, Sequence[str]] = None,
@@ -107,7 +106,8 @@ def _load_model_weights(
             repr_object.repr(incompatible_keys.unexpected_keys),
         )
 
-    model = model.to(device=device)
+    torch_device = torch.device(device)
+    model = model.to(device=torch_device)
 
     return model
 

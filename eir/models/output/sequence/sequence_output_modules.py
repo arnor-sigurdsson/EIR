@@ -12,6 +12,7 @@ from eir.models.fusion.fusion_attention import MetaSequenceProjection
 from eir.models.input.sequence.transformer_models import (
     BasicTransformerFeatureExtractorModelConfig,
     parse_dim_feedforward,
+    TransformerWrapperModel,
 )
 
 if TYPE_CHECKING:
@@ -36,6 +37,38 @@ class TransformerSequenceOutputModuleConfig(
     pass
 
 
+@dataclass
+class SequenceOutputModuleConfig:
+    """
+    :param model_init_config:
+          Configuration / arguments used to initialise model.
+
+    :param model_type:
+         Which type of image model to use.
+
+    :param embedding_dim:
+        Which dimension to use for the embeddings. If ``None``, will automatically set
+        this value based on the number of tokens and attention heads.
+
+    :param position:
+        Whether to encode the token position or use learnable position embeddings.
+
+    :param position_dropout:
+        Dropout for the positional encoding / embedding.
+
+    """
+
+    model_init_config: TransformerSequenceOutputModuleConfig
+    model_type: Literal["sequence"] = "sequence"
+
+    embedding_dim: int = 64
+
+    position: Literal["encode", "embed"] = "encode"
+    position_dropout: float = 0.10
+
+    projection_layer_type: Literal["auto", "lcl", "lcl_residual", "linear"] = "auto"
+
+
 class SequenceOutputModule(nn.Module):
     def __init__(
         self,
@@ -53,7 +86,11 @@ class SequenceOutputModule(nn.Module):
         self.max_length = output_object.computed_max_length
         self.output_name = output_name
         self.output_model_config = output_object.output_config.model_config
+        assert isinstance(self.output_model_config, SequenceOutputModuleConfig)
         self.output_model_init_config = self.output_model_config.model_init_config
+        assert isinstance(
+            self.output_model_init_config, TransformerSequenceOutputModuleConfig
+        )
 
         dim_feed_forward = parse_dim_feedforward(
             dim_feedforward=self.output_model_init_config.dim_feedforward,
@@ -129,7 +166,7 @@ def _find_nearest_multiple(base: int, target: int) -> int:
 
 
 def overload_embeddings_with_pretrained(
-    model: nn.Module,
+    model: "al_meta_model",
     inputs: "al_input_objects_as_dict",
     pretrained_checkpoint: str,
 ) -> "al_meta_model":
@@ -180,7 +217,10 @@ def overload_embeddings_with_pretrained(
         prev_emb_key = f"input_modules.{input_name}.embedding.weight"
         prev_embeddings = loaded_state_dict[prev_emb_key]
 
-        cur_embedding = model.input_modules[input_name].embedding.weight
+        cur_input_module = model.input_modules[input_name]
+        assert isinstance(cur_input_module, TransformerWrapperModel)
+
+        cur_embedding = cur_input_module.embedding.weight
         cur_embedding_copy = cur_embedding.clone().detach()
 
         for token, idx in cur_vocab.items():
@@ -206,7 +246,7 @@ def overload_embeddings_with_pretrained(
 
             cur_embedding_copy[idx] = prev_emb
 
-        model.input_modules[input_name].embedding.weight = nn.Parameter(
+        cur_input_module.embedding.weight = nn.Parameter(
             data=cur_embedding_copy,
             requires_grad=True,
         )

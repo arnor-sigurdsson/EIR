@@ -11,6 +11,7 @@ from typing import (
     Callable,
     Any,
     Sequence,
+    cast,
 )
 
 import matplotlib.pyplot as plt
@@ -24,7 +25,7 @@ from torch.nn import Module
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 
-from eir.models.meta.meta import MetaModel
+from eir.models.meta.meta import MetaModel, al_input_modules, al_output_modules
 from eir.setup.output_setup import (
     ComputedTabularOutputInfo,
 )
@@ -542,9 +543,9 @@ def trace_eir_model(
             traced_output_modules[output_module_name] = traced_output_module
 
     traced_meta_model = meta_model.__class__(
-        input_modules=traced_input_modules,
+        input_modules=cast(al_input_modules, traced_input_modules),
         fusion_modules=traced_fusion_module,
-        output_modules=traced_output_modules,
+        output_modules=cast(al_output_modules, traced_output_modules),
         fusion_to_output_mapping=meta_model.fusion_to_output_mapping,
     )
 

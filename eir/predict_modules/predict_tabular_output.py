@@ -34,7 +34,7 @@ def predict_tabular_wrapper(
             continue
 
         target_predictions = all_predictions[output_name][target_column_name]
-        predictions = _parse_predictions(target_preds=target_predictions)
+        predictions = _parse_predictions(target_predictions=target_predictions)
 
         target_labels = None
         if all_labels:
@@ -67,7 +67,7 @@ def predict_tabular_wrapper(
 
         _save_predictions(
             df_predictions=df_predictions,
-            outfolder=output_folder,
+            output_folder=output_folder,
         )
 
         if predict_cl_args.evaluate:
@@ -159,8 +159,8 @@ def _add_inverse_transformed_column(
     return df_copy
 
 
-def _parse_predictions(target_preds: torch.Tensor) -> np.ndarray:
-    predictions = target_preds.cpu().numpy()
+def _parse_predictions(target_predictions: torch.Tensor) -> np.ndarray:
+    predictions = target_predictions.cpu().numpy()
     return predictions
 
 
@@ -172,5 +172,5 @@ def _get_target_class_names(
     return [target_column]
 
 
-def _save_predictions(df_predictions: pd.DataFrame, outfolder: Path) -> None:
-    df_predictions.to_csv(path_or_buf=str(outfolder / "predictions.csv"))
+def _save_predictions(df_predictions: pd.DataFrame, output_folder: Path) -> None:
+    df_predictions.to_csv(path_or_buf=str(output_folder / "predictions.csv"))

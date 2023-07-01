@@ -1,8 +1,7 @@
 from pathlib import Path
-from typing import Sequence, Tuple, Union
 
-from torch import nn
 from aislib.misc_utils import get_logger
+from typing import Sequence, Tuple, Union, TYPE_CHECKING
 
 from eir.experiment_io.experiment_io import (
     get_run_folder_from_model_path,
@@ -18,15 +17,18 @@ from eir.setup import schemas
 from eir.setup.input_setup import al_input_objects_as_dict
 from eir.setup.output_setup import al_output_objects_as_dict
 
+if TYPE_CHECKING:
+    from eir.models.meta.meta import al_input_modules
+
 logger = get_logger(name=__name__)
 
 
 def overload_fusion_model_feature_extractors_with_pretrained(
-    input_modules: nn.ModuleDict,
+    input_modules: "al_input_modules",
     inputs_as_dict: al_input_objects_as_dict,
     outputs_as_dict: "al_output_objects_as_dict",
     meta_class_getter: MetaClassGetterCallable = get_default_meta_class,
-) -> nn.ModuleDict:
+) -> "al_input_modules":
     """
     Note that `inputs_as_dict` here are coming from the current experiment, arguably
     it would be more robust / better to have them loaded from the pretrained experiment,

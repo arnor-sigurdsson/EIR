@@ -117,7 +117,7 @@ def get_default_tabular_output_final_layers(
     num_outputs_per_target: "al_num_outputs_per_target",
     task_names: Union[None, Sequence[str]],
     final_layer_type: Union[Literal["linear"], Literal["mlp_residual"]],
-) -> Sequence[nn.Module]:
+) -> Sequence[nn.ModuleDict]:
     final_layers = []
     if final_layer_type == "linear":
         if task_names is None:

@@ -68,7 +68,7 @@ def create_multi_task_blocks_with_first_adaptor_block(
     block_constructor: Callable,
     block_constructor_kwargs: dict,
     first_layer_kwargs_overload: dict,
-):
+) -> nn.ModuleDict:
     adaptor_block = construct_multi_branches(
         branch_names=branch_names,
         branch_factory=construct_blocks,
@@ -92,7 +92,7 @@ def create_multi_task_blocks_with_first_adaptor_block(
         },
     )
 
-    merged_blocks = merge_module_dicts((adaptor_block, blocks))
+    merged_blocks = merge_module_dicts(module_dicts=(adaptor_block, blocks))
 
     return merged_blocks
 

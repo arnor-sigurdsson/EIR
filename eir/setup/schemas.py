@@ -23,6 +23,8 @@ from eir.models.input.tabular.tabular import (
 from eir.models.layers import ResidualMLPConfig
 from eir.models.output.output_module_setup import (
     TabularOutputModuleConfig,
+)
+from eir.models.output.sequence.sequence_output_modules import (
     SequenceOutputModuleConfig,
 )
 from eir.setup.schema_modules.output_schemas_sequence import (
@@ -651,7 +653,7 @@ class OutputInfoConfig:
 
     output_source: Union[str, None]
     output_name: str
-    output_type: Literal["tabular"]
+    output_type: Literal["tabular", "sequence"]
 
 
 @dataclass

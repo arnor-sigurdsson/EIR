@@ -374,12 +374,14 @@ def _get_early_stopping_event_filter_kwargs(
     return {"event_filter": _early_stopping_event_filter}
 
 
-def _get_latest_validation_value_score_function(run_folder: Path, column: str):
+def _get_latest_validation_value_score_function(
+    run_folder: Path, column: str
+) -> Callable[[Engine], float]:
     eval_history_fpath = get_average_history_filepath(
         run_folder=run_folder, train_or_val_target_prefix="validation_"
     )
 
-    def scoring_function(engine):
+    def scoring_function(engine: Engine) -> float:
         eval_df = read_metrics_history_file(eval_history_fpath)
         latest_val_loss = eval_df[column].iloc[-1]
         return latest_val_loss

@@ -1,4 +1,6 @@
 from dataclasses import dataclass
+
+from torch import nn
 from typing import (
     Type,
     Tuple,
@@ -8,22 +10,7 @@ from typing import (
     Optional,
     Protocol,
     Union,
-)
-
-from torch import nn
-
-from eir.setup.input_setup_modules.setup_array import ComputedArrayInputInfo
-from eir.setup.input_setup_modules.setup_bytes import ComputedBytesInputInfo
-from eir.setup.input_setup_modules.setup_image import ComputedImageInputInfo
-from eir.setup.input_setup_modules.setup_omics import ComputedOmicsInputInfo
-from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
-from eir.setup.input_setup_modules.setup_tabular import ComputedTabularInputInfo
-from eir.setup.schemas import (
-    ImageInputDataConfig,
-    TabularInputDataConfig,
-)
-from eir.predict_modules.predict_tabular_input_setup import (
-    ComputedPredictTabularInputInfo,
+    cast,
 )
 
 from eir.models.fusion import fusion
@@ -31,6 +18,7 @@ from eir.models.input.image.image_models import get_image_model_class
 from eir.models.input.sequence.sequence_models import get_sequence_model_class
 from eir.models.input.tabular.tabular import get_unique_values_from_transformers
 from eir.models.meta import meta
+from eir.models.meta.meta import al_input_modules
 from eir.models.model_setup_modules.input_model_setup_array import (
     get_array_feature_extractor,
     get_array_model,
@@ -40,15 +28,40 @@ from eir.models.model_setup_modules.input_model_setup_omics import (
     get_omics_model_from_model_config,
 )
 from eir.models.model_setup_modules.input_model_setup_sequence import get_sequence_model
-from eir.models.model_setup_modules.input_model_setup_tabular import get_tabular_model
+from eir.models.model_setup_modules.input_model_setup_tabular import (
+    get_tabular_model,
+    SimpleTabularModel,
+)
 from eir.models.model_setup_modules.output_model_setup import (
     get_tabular_output_module_from_model_config,
     get_sequence_output_module_from_model_config,
 )
+from eir.models.output.sequence.sequence_output_modules import (
+    SequenceOutputModuleConfig,
+)
+from eir.predict_modules.predict_tabular_input_setup import (
+    ComputedPredictTabularInputInfo,
+)
 from eir.setup import schemas
 from eir.setup.input_setup import al_input_objects_as_dict
 from eir.setup.input_setup_modules.common import DataDimensions
+from eir.setup.input_setup_modules.setup_array import ComputedArrayInputInfo
+from eir.setup.input_setup_modules.setup_bytes import ComputedBytesInputInfo
+from eir.setup.input_setup_modules.setup_image import ComputedImageInputInfo
+from eir.setup.input_setup_modules.setup_omics import ComputedOmicsInputInfo
+from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
+from eir.setup.input_setup_modules.setup_tabular import ComputedTabularInputInfo
 from eir.setup.output_setup import al_output_objects_as_dict
+from eir.setup.output_setup_modules.sequence_output_setup import (
+    ComputedSequenceOutputInfo,
+)
+from eir.setup.output_setup_modules.tabular_output_setup import (
+    ComputedTabularOutputInfo,
+)
+from eir.setup.schemas import (
+    ImageInputDataConfig,
+    TabularInputDataConfig,
+)
 from eir.train_utils.distributed import AttrDelegatedDistributedDataParallel
 from eir.train_utils.optim import AttrDelegatedSWAWrapper
 
@@ -207,7 +220,7 @@ class FeatureExtractorInfo:
 
 def get_all_feature_extractor_dimensions_and_types(
     inputs_as_dict: al_input_objects_as_dict,
-    input_modules: nn.ModuleDict,
+    input_modules: al_input_modules,
 ) -> Dict[str, FeatureExtractorInfo]:
     input_dimensionalities_and_types = {}
 
@@ -231,7 +244,7 @@ def get_all_feature_extractor_dimensions_and_types(
 def get_input_modules(
     inputs_as_dict: al_input_objects_as_dict,
     device: str,
-) -> nn.ModuleDict:
+) -> al_input_modules:
     input_modules = nn.ModuleDict()
 
     for input_name, inputs_object in inputs_as_dict.items():
@@ -239,6 +252,7 @@ def get_input_modules(
 
         match inputs_object:
             case ComputedOmicsInputInfo():
+                assert isinstance(input_model_config, schemas.OmicsModelConfig)
                 cur_omics_model = get_omics_model_from_model_config(
                     model_type=input_model_config.model_type,
                     model_init_config=input_model_config.model_init_config,
@@ -250,13 +264,15 @@ def get_input_modules(
                 transformers = inputs_object.labels.label_transformers
                 input_type_info = inputs_object.input_config.input_type_info
                 assert isinstance(input_type_info, TabularInputDataConfig)
-                cat_columns = input_type_info.input_cat_columns
-                con_columns = input_type_info.input_con_columns
+                cat_columns = list(input_type_info.input_cat_columns)
+                con_columns = list(input_type_info.input_con_columns)
 
                 unique_tabular_values = get_unique_values_from_transformers(
                     transformers=transformers,
                     keys_to_use=cat_columns,
                 )
+
+                assert isinstance(input_model_config, schemas.TabularModelConfig)
                 tabular_model = get_tabular_model(
                     model_init_config=input_model_config.model_init_config,
                     cat_columns=cat_columns,
@@ -267,9 +283,10 @@ def get_input_modules(
                 input_modules[input_name] = tabular_model
 
             case ComputedSequenceInputInfo() | ComputedBytesInputInfo():
+                assert isinstance(input_model_config, schemas.SequenceModelConfig)
                 num_tokens = len(inputs_object.vocab)
                 sequence_model = get_sequence_model(
-                    sequence_model_config=inputs_object.input_config.model_config,
+                    sequence_model_config=input_model_config,
                     model_registry_lookup=get_sequence_model_class,
                     num_tokens=num_tokens,
                     max_length=inputs_object.computed_max_length,
@@ -279,6 +296,7 @@ def get_input_modules(
                 input_modules[input_name] = sequence_model
 
             case ComputedImageInputInfo():
+                assert isinstance(input_model_config, schemas.ImageModelConfig)
                 image_model = get_image_model(
                     model_config=input_model_config,
                     model_registry_lookup=get_image_model_class,
@@ -288,6 +306,7 @@ def get_input_modules(
                 input_modules[input_name] = image_model
 
             case ComputedArrayInputInfo():
+                assert isinstance(input_model_config, schemas.ArrayModelConfig)
                 array_feature_extractor = get_array_feature_extractor(
                     model_type=input_model_config.model_type,
                     model_init_config=input_model_config.model_init_config,
@@ -302,7 +321,7 @@ def get_input_modules(
             case _:
                 raise ValueError(f"Unrecognized input type for object {inputs_object}")
 
-    return input_modules
+    return cast(al_input_modules, input_modules)
 
 
 def get_output_modules(
@@ -319,9 +338,12 @@ def get_output_modules(
         output_model_config = output_object.output_config.model_config
         output_types[output_name] = output_type
 
-        match output_type:
-            case "tabular":
+        match output_object:
+            case ComputedTabularOutputInfo():
                 assert computed_out_dimensions is not None
+                assert isinstance(
+                    output_model_config, schemas.TabularOutputModuleConfig
+                )
                 tabular_output_module = get_tabular_output_module_from_model_config(
                     output_model_config=output_model_config,
                     input_dimension=computed_out_dimensions,
@@ -330,7 +352,8 @@ def get_output_modules(
                 )
                 output_modules[output_name] = tabular_output_module
 
-            case "sequence":
+            case ComputedSequenceOutputInfo():
+                assert isinstance(output_model_config, SequenceOutputModuleConfig)
                 feat_dims = feature_dimensions_and_types
                 assert feat_dims is not None
                 sequence_output_module = get_sequence_output_module_from_model_config(
@@ -349,7 +372,7 @@ def get_output_modules(
 
 
 def _get_feature_extractors_num_output_dimensions(
-    input_modules: nn.ModuleDict,
+    input_modules: al_input_modules,
 ) -> Dict[str, int]:
     fusion_in_dims = {name: i.num_out_features for name, i in input_modules.items()}
     return fusion_in_dims
@@ -367,15 +390,16 @@ al_data_dimensions = Dict[
 
 def _get_feature_extractors_input_dimensions_per_axis(
     inputs_as_dict: al_input_objects_as_dict,
-    input_modules: nn.ModuleDict,
+    input_modules: al_input_modules,
 ) -> al_data_dimensions:
-    fusion_in_dims = {}
+    fusion_in_dims: al_data_dimensions = {}
 
     for name, input_object in inputs_as_dict.items():
         input_model_config = input_object.input_config.model_config
 
         match input_object:
             case ComputedSequenceInputInfo() | ComputedBytesInputInfo():
+                assert isinstance(input_model_config, schemas.SequenceModelConfig)
                 fusion_in_dims[name] = SequenceDataDimensions(
                     channels=1,
                     height=input_object.computed_max_length,
@@ -392,10 +416,12 @@ def _get_feature_extractors_input_dimensions_per_axis(
                 )
 
             case ComputedTabularInputInfo() | ComputedPredictTabularInputInfo():
+                input_model = input_modules[name]
+                assert isinstance(input_model, SimpleTabularModel)
                 fusion_in_dims[name] = DataDimensions(
                     channels=1,
                     height=1,
-                    width=input_modules[name].input_dim,
+                    width=input_model.input_dim,
                 )
 
             case ComputedOmicsInputInfo():

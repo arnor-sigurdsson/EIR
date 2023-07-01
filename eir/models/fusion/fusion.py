@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Type, Union, Dict, Callable, NewType, Literal
+from typing import Type, Union, Dict, Callable, NewType, Literal, TYPE_CHECKING
 
 import torch
 from torch import nn
@@ -14,6 +14,9 @@ ComputedType = NewType("ComputedType", torch.Tensor)
 PassThroughType = NewType("PassThroughType", Dict[str, torch.Tensor])
 al_fused_features = dict[str, ComputedType | PassThroughType]
 
+if TYPE_CHECKING:
+    from eir.models.meta.meta import al_input_modules
+
 logger = get_logger(name=__name__)
 
 
@@ -26,7 +29,7 @@ def get_fusion_modules(
     model_config: Union[
         ResidualMLPConfig, fusion_identity.IdentityConfig, fusion_mgmoe.MGMoEModelConfig
     ],
-    modules_to_fuse: nn.ModuleDict,
+    modules_to_fuse: "al_input_modules",
     out_feature_per_feature_extractor: Dict[str, int],
     output_types: dict[str, Literal["tabular", "sequence"]],
 ) -> nn.ModuleDict:
@@ -85,7 +88,7 @@ def _check_fusion_modules(
         )
 
 
-def _get_fusion_input_dimension(modules_to_fuse: nn.ModuleDict) -> int:
+def _get_fusion_input_dimension(modules_to_fuse: "al_input_modules") -> int:
     fusion_in_dim = sum(i.num_out_features for i in modules_to_fuse.values())
     return fusion_in_dim
 

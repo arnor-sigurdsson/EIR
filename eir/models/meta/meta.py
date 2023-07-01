@@ -1,17 +1,34 @@
-from typing import Dict, Callable, Literal, NewType
-
 import torch
 from torch import nn
+from typing import Dict, Literal, NewType, Protocol, MutableMapping
 
 from eir.models.fusion.fusion import al_fused_features
 
 FeatureExtractorOutType = NewType("FeatureExtractorOutType", torch.Tensor)
 
-al_input_modules = dict[str, Callable[[torch.Tensor], FeatureExtractorOutType]]
-al_fusion_modules = dict[
-    str, Callable[[dict[str, FeatureExtractorOutType]], al_fused_features]
-]
-al_output_modules = dict[str, Callable[[al_fused_features], dict[str, torch.Tensor]]]
+
+class FeatureExtractorProtocol(Protocol):
+    @property
+    def num_out_features(self) -> int:
+        ...
+
+    def __call__(self, input: torch.Tensor) -> FeatureExtractorOutType:
+        ...
+
+
+class FusionModuleProtocol(Protocol):
+    def __call__(self, input: Dict[str, FeatureExtractorOutType]) -> al_fused_features:
+        ...
+
+
+class OutputModuleProtocol(Protocol):
+    def __call__(self, input: al_fused_features) -> Dict[str, torch.Tensor]:
+        ...
+
+
+al_input_modules = MutableMapping[str, FeatureExtractorProtocol]
+al_fusion_modules = MutableMapping[str, FusionModuleProtocol]
+al_output_modules = MutableMapping[str, OutputModuleProtocol]
 
 
 class MetaModel(nn.Module):

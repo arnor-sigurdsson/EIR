@@ -258,5 +258,6 @@ def scale_and_save_regression_predictions(
 
     data = np.array([val_ids, val_labels, val_outputs]).T
     df = pd.DataFrame(data=data, columns=["ID", "Actual", "Predicted"])
+    df = df.set_index("ID")
 
-    df.to_csv(output_folder / "regression_predictions.csv", index=["ID"])
+    df.to_csv(output_folder / "regression_predictions.csv", index=True)

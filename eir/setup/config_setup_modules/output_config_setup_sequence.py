@@ -3,6 +3,7 @@ from typing import Sequence, Iterable, Dict, Any, Optional, TYPE_CHECKING
 
 from aislib.misc_utils import get_logger
 
+import eir.models.output.sequence.sequence_output_modules
 from eir.models.input.sequence.transformer_models import (
     BasicTransformerFeatureExtractorModelConfig,
 )
@@ -236,7 +237,8 @@ def _get_keys_to_exclude_from_output_input_sequence_overloading() -> tuple[str, 
 
 
 def _extract_model_config_kwargs(
-    model_config: schemas.SequenceModelConfig | schemas.SequenceOutputModuleConfig,
+    model_config: schemas.SequenceModelConfig
+    | eir.models.output.sequence.sequence_output_modules.SequenceOutputModuleConfig,
     keys_to_exclude: tuple[str],
 ) -> dict[str, Any]:
     extracted = {
