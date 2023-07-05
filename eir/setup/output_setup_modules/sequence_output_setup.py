@@ -6,7 +6,10 @@ from aislib.misc_utils import get_logger
 from torchtext.vocab import Vocab
 
 from eir.setup.input_setup_modules import setup_sequence
-from eir.setup.schemas import InputConfig, OutputConfig
+from eir.setup.schemas import InputConfig, OutputConfig, SequenceOutputTypeConfig
+from eir.models.input.sequence.transformer_models import (
+    SequenceModelConfig,
+)
 
 if TYPE_CHECKING:
     from eir.setup.output_setup import al_output_objects_as_dict
@@ -33,9 +36,11 @@ def set_up_sequence_output(
 ) -> ComputedSequenceOutputInfo:
     output_name = output_config.output_info.output_name
     matching_seq_auto_set_up_input_object = input_objects[output_name]
-    embedding_dim = (
-        matching_seq_auto_set_up_input_object.input_config.model_config.embedding_dim
-    )
+
+    model_config = matching_seq_auto_set_up_input_object.input_config.model_config
+    assert isinstance(model_config, SequenceModelConfig)
+
+    embedding_dim = model_config.embedding_dim
     matching_input_config = matching_seq_auto_set_up_input_object.input_config
 
     sequence_input_object_func = get_sequence_input_objects_from_output
@@ -44,16 +49,19 @@ def set_up_sequence_output(
         output_config=output_config, matching_input_config=matching_input_config
     )
 
+    output_type_info = output_config.output_type_info
+    assert isinstance(output_type_info, SequenceOutputTypeConfig)
+
     gathered_stats = setup_sequence.possibly_gather_all_stats_from_input(
         prev_gathered_stats=gathered_stats,
         input_source=output_config.output_info.output_source,
-        vocab_file=output_config.output_type_info.vocab_file,
-        split_on=output_config.output_type_info.split_on,
-        max_length=output_config.output_type_info.max_length,
+        vocab_file=output_type_info.vocab_file,
+        split_on=output_type_info.split_on,
+        max_length=output_type_info.max_length,
     )
 
     computed_max_length = setup_sequence.get_max_length(
-        max_length_config_value=output_config.output_type_info.max_length,
+        max_length_config_value=output_type_info.max_length,
         gathered_stats=gathered_stats,
     )
 
@@ -74,12 +82,15 @@ def get_sequence_input_objects_from_output(
 ) -> setup_sequence.al_sequence_input_objects_basic:
     gathered_stats = setup_sequence.GatheredSequenceStats()
 
-    vocab_file = output_config.output_type_info.vocab_file
+    output_type_info = output_config.output_type_info
+    assert isinstance(output_type_info, SequenceOutputTypeConfig)
+
+    vocab_file = output_type_info.vocab_file
     vocab_iter = setup_sequence.get_vocab_iterator(
         input_source=output_config.output_info.output_source,
-        split_on=output_config.output_type_info.split_on,
+        split_on=output_type_info.split_on,
         gathered_stats=gathered_stats,
-        vocab_file=output_config.output_type_info.vocab_file,
+        vocab_file=output_type_info.vocab_file,
     )
     tokenizer = setup_sequence.get_tokenizer(
         input_config=matching_input_config,
@@ -88,7 +99,7 @@ def get_sequence_input_objects_from_output(
         vocab_iterator=vocab_iter, tokenizer=tokenizer
     )
 
-    min_freq = output_config.output_type_info.min_freq
+    min_freq = output_type_info.min_freq
     if vocab_file:
         logger.info(
             "Minimum word/token frequency will be set to 0 as vocabulary is loaded "
@@ -127,9 +138,15 @@ def converge_sequence_input_and_output(
 
         logger.info(f"Converging input and output for {output_name}.")
 
-        inputs_copy[output_name].computed_max_length = output_object.computed_max_length
-        inputs_copy[output_name].vocab = output_object.vocab
-        inputs_copy[output_name].tokenizer = output_object.tokenizer
-        inputs_copy[output_name].encode_func = output_object.encode_func
+        cur_input = inputs_copy[output_name]
+        assert isinstance(cur_input, setup_sequence.ComputedSequenceInputInfo)
+        assert isinstance(output_object, ComputedSequenceOutputInfo)
+
+        cur_input.computed_max_length = output_object.computed_max_length
+        cur_input.vocab = output_object.vocab
+        cur_input.tokenizer = output_object.tokenizer
+        cur_input.encode_func = output_object.encode_func
+
+        inputs_copy[output_name] = cur_input
 
     return inputs_copy

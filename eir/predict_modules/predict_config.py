@@ -53,7 +53,7 @@ def _should_patch_predict_cl_args_for_generation():
 
 def get_named_predict_dict_iterators(
     predict_cl_args: Namespace,
-) -> al_named_dict_configs:
+) -> dict[str, tuple[dict, ...]]:
     target_keys = {
         "global_configs",
         "fusion_configs",
@@ -73,7 +73,7 @@ def get_named_predict_dict_iterators(
 
 def get_train_predict_matched_config_generator(
     train_configs: Configs,
-    named_dict_iterators: al_named_dict_configs,
+    named_dict_iterators: dict[str, tuple[dict, ...]],
 ) -> Generator[Tuple[str, Dict, Dict], None, None]:
     train_keys = set(train_configs.__dict__.keys())
 
@@ -139,7 +139,7 @@ def get_train_predict_matched_config_generator(
 def _predict_input_config_should_not_exist_yet(
     predict_argument_name: str,
     output_configs: Sequence[schemas.OutputConfig],
-    cur_config: schemas.InputConfig | schemas.OutputConfig,
+    cur_config: schemas.InputConfig,
 ) -> bool:
     """
     There is strict matching functionality for input and output configs for
@@ -176,24 +176,36 @@ def _find_output_configs_matching_input(
     return matching_output_configs
 
 
-class SequenceMatchingFunction(Protocol):
+class InputSequenceMatchingFunction(Protocol):
     def __call__(
         self,
-        train_config: schemas.InputConfig | schemas.OutputConfig,
+        train_config: schemas.InputConfig,
+        predict_dict_iterator: Iterable[dict],
+    ) -> dict:
+        ...
+
+
+class OutputSequenceMatchingFunction(Protocol):
+    def __call__(
+        self,
+        train_config: schemas.OutputConfig,
         predict_dict_iterator: Iterable[dict],
     ) -> dict:
         ...
 
 
 def get_config_sequence_matching_func(
-    name: Literal["input_configs", "output_configs"]
-) -> SequenceMatchingFunction:
+    name: str,
+) -> InputSequenceMatchingFunction | OutputSequenceMatchingFunction:
     assert name in ("input_configs", "output_configs")
 
     def _input_configs(
         train_config: schemas.InputConfig,
         predict_dict_iterator: Iterable[dict],
     ) -> dict:
+        if not isinstance(train_config, schemas.InputConfig):
+            raise TypeError("Expected InputConfig for _input_configs")
+
         matches = []
         predict_names_and_types = []
 
@@ -230,6 +242,9 @@ def get_config_sequence_matching_func(
         train_config: schemas.OutputConfig,
         predict_dict_iterator: Iterable[dict],
     ) -> dict:
+        if not isinstance(train_config, schemas.OutputConfig):
+            raise TypeError("Expected OutputConfig for _output_configs")
+
         match train_config.output_info.output_type:
             case "tabular":
                 match = _check_matching_tabular_output_configs(
@@ -329,8 +344,11 @@ def _check_matching_tabular_output_configs(
     output_name = train_config.output_info.output_name
     output_type = train_config.output_info.output_type
 
-    train_cat_columns = train_config.output_type_info.target_cat_columns
-    train_con_columns = train_config.output_type_info.target_con_columns
+    output_type_info = train_config.output_type_info
+    assert isinstance(output_type_info, schemas.TabularOutputTypeConfig)
+
+    train_cat_columns = output_type_info.target_cat_columns
+    train_con_columns = output_type_info.target_con_columns
 
     for predict_output_config_dict in predict_dict_iterator:
         predict_output_info = predict_output_config_dict["output_info"]
@@ -374,7 +392,7 @@ def _check_matching_tabular_output_configs(
 def overload_train_configs_for_predict(
     matched_dict_iterator: Generator[Tuple[str, Dict, Dict], None, None],
 ) -> Configs:
-    main_overloaded_kwargs = {}
+    main_overloaded_kwargs: dict = {}
 
     for name, train_config_dict, predict_config_dict_to_inject in matched_dict_iterator:
         _maybe_warn_about_output_folder_overload_from_predict(
@@ -390,25 +408,26 @@ def overload_train_configs_for_predict(
             main_overloaded_kwargs[name] = overloaded_dict
         elif name in ("input_configs", "output_configs"):
             main_overloaded_kwargs.setdefault(name, [])
-            main_overloaded_kwargs.get(name).append(overloaded_dict)
+            main_overloaded_kwargs.get(name, []).append(overloaded_dict)
 
+    global_configs: list[dict] = [main_overloaded_kwargs.get("global_config", {})]
     global_config_overloaded = config.get_global_config(
-        global_configs=[main_overloaded_kwargs.get("global_config")]
+        global_configs=global_configs,
     )
 
     if main_overloaded_kwargs.get("input_configs"):
         input_configs_overloaded = config.get_input_configs(
-            input_configs=main_overloaded_kwargs.get("input_configs")
+            input_configs=main_overloaded_kwargs.get("input_configs", [])
         )
     else:
         input_configs_overloaded = []
 
     fusion_config_overloaded = config.load_fusion_configs(
-        [main_overloaded_kwargs.get("fusion_config")]
+        [main_overloaded_kwargs.get("fusion_config", {})]
     )
 
     output_configs_overloaded = config.load_output_configs(
-        output_configs=main_overloaded_kwargs.get("output_configs"),
+        output_configs=main_overloaded_kwargs.get("output_configs", []),
     )
 
     train_configs_overloaded = config.Configs(

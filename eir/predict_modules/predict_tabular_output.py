@@ -1,16 +1,18 @@
 from argparse import Namespace
 from pathlib import Path
-from typing import Sequence, Union, TYPE_CHECKING
+from typing import Optional, Sequence, Union, TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
-
 import torch
 from aislib.misc_utils import ensure_path_exists
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
 from eir.data_load.data_utils import get_output_info_generator
 from eir.data_load.label_setup import al_label_transformers_object
+from eir.setup.output_setup_modules.tabular_output_setup import (
+    ComputedTabularOutputInfo,
+)
 from eir.train_utils.evaluation import PerformancePlotConfig
 from eir.visualization import visualization_funcs as vf
 
@@ -36,11 +38,10 @@ def predict_tabular_wrapper(
         target_predictions = all_predictions[output_name][target_column_name]
         predictions = _parse_predictions(target_predictions=target_predictions)
 
-        target_labels = None
-        if all_labels:
-            target_labels = all_labels[output_name][target_column_name].cpu().numpy()
+        cur_output_object = predict_config.outputs[output_name]
+        assert isinstance(cur_output_object, ComputedTabularOutputInfo)
 
-        target_transformers = predict_config.outputs[output_name].target_transformers
+        target_transformers = cur_output_object.target_transformers
         cur_target_transformer = target_transformers[target_column_name]
         classes = _get_target_class_names(
             transformer=cur_target_transformer, target_column=target_column_name
@@ -51,12 +52,17 @@ def predict_tabular_wrapper(
         )
         ensure_path_exists(path=output_folder, is_folder=True)
 
+        target_labels = None
+        if all_labels:
+            target_labels = all_labels[output_name][target_column_name].cpu().numpy()
+
         df_merged_predictions = _merge_ids_predictions_and_labels(
             ids=all_ids,
             predictions=predictions,
             labels=target_labels,
             prediction_classes=classes,
         )
+
         df_predictions = _add_inverse_transformed_columns_to_predictions(
             df=df_merged_predictions,
             target_column_name=target_column_name,
@@ -90,7 +96,7 @@ def predict_tabular_wrapper(
 def _merge_ids_predictions_and_labels(
     ids: Sequence[str],
     predictions: np.ndarray,
-    labels: np.ndarray,
+    labels: Optional[np.ndarray],
     prediction_classes: Union[Sequence[str], None] = None,
     label_column_name: str = "True Label",
 ) -> pd.DataFrame:
@@ -99,7 +105,8 @@ def _merge_ids_predictions_and_labels(
     df["ID"] = ids
     df = df.set_index("ID")
 
-    df[label_column_name] = labels
+    if labels is not None:
+        df[label_column_name] = labels
 
     if prediction_classes is None:
         prediction_classes = [f"Score Class {i}" for i in range(predictions.shape[1])]

@@ -1,12 +1,13 @@
 from copy import copy
 from functools import partial
 from typing import Callable
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, create_autospec
 
 import pytest
 import torch
 from torch import nn
 
+from eir.setup.schemas import TabularOutputTypeConfig, OutputConfig
 from eir.setup.config import Configs
 from eir.setup.input_setup import set_up_inputs_for_training
 from eir.setup.output_setup import set_up_outputs_for_training
@@ -135,7 +136,8 @@ def test_build_loss_dict():
 
 
 def test_parse_loss_name():
-    output_config = MagicMock()
+    output_config = create_autospec(spec=OutputConfig)
+    output_config.output_type_info = create_autospec(spec=TabularOutputTypeConfig)
     output_config.output_type_info.cat_loss_name = "CrossEntropyLoss"
     output_config.output_type_info.con_loss_name = "MSELoss"
     column_type = "cat"
@@ -151,7 +153,8 @@ def test_parse_loss_name():
 
 
 def test_get_label_smoothing():
-    output_config = MagicMock()
+    output_config = create_autospec(spec=OutputConfig)
+    output_config.output_type_info = create_autospec(spec=TabularOutputTypeConfig)
     output_config.output_type_info.cat_label_smoothing = 0.1
     assert _get_label_smoothing(output_config=output_config, column_type="cat") == 0.1
     assert _get_label_smoothing(output_config=output_config, column_type="con") == 0.0

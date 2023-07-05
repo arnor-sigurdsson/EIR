@@ -17,7 +17,7 @@ class DataDimensions:
     channels: int
     height: int
     width: int
-    extra_dims: tuple = tuple()
+    extra_dims: tuple[int, ...] = tuple()
 
     def num_elements(self) -> int:
         base = self.channels * self.height * self.width
@@ -47,7 +47,7 @@ def get_data_dimension_from_data_source(
         path = next(iterator)
         shape = np.load(file=path).shape
 
-    extra_dims = tuple()
+    extra_dims: tuple[int, ...] = tuple()
     if len(shape) == 1:
         channels, height, width = 1, 1, shape[0]
     elif len(shape) == 2:

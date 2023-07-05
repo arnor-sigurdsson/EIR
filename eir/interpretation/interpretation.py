@@ -78,6 +78,9 @@ if TYPE_CHECKING:
     from eir.data_load.label_setup import al_label_transformers_object
     from eir.models.model_setup_modules.meta_setup import al_meta_model
     from eir.predict import PredictExperiment
+    from eir.predict_modules.predict_attributions import (
+        LoadedTrainExperimentMixedWithPredict,
+    )
     from eir.setup.input_setup import al_input_objects_as_dict
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
@@ -188,7 +191,9 @@ def get_background_loader(experiment: "Experiment") -> torch.utils.data.DataLoad
 
 def tabular_attribution_analysis_wrapper(
     model: "al_meta_model",
-    experiment: Union["Experiment", "PredictExperiment"],
+    experiment: Union[
+        "Experiment", "PredictExperiment", "LoadedTrainExperimentMixedWithPredict"
+    ],
     output_folder_target_callable: Callable,
     dataset_to_interpret: al_datasets,
     background_loader: torch.utils.data.DataLoader,
@@ -377,7 +382,9 @@ class AttributionObject:
 
 
 def get_attribution_object(
-    experiment: Union["Experiment", "PredictExperiment"],
+    experiment: Union[
+        "Experiment", "PredictExperiment", "LoadedTrainExperimentMixedWithPredict"
+    ],
     model: "al_meta_model",
     column_name: str,
     output_name: str,
@@ -776,7 +783,9 @@ def get_attributions(
 
 
 def _get_interpretation_data_producer(
-    experiment: Union["Experiment", "PredictExperiment"],
+    experiment: Union[
+        "Experiment", "PredictExperiment", "LoadedTrainExperimentMixedWithPredict"
+    ],
     column_name: str,
     column_type: str,
     output_name: str,

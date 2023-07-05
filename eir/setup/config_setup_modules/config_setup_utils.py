@@ -4,16 +4,24 @@ import operator
 from collections import defaultdict
 from functools import reduce
 from pathlib import Path
-from typing import Iterable, List, Generator, Dict, Any, Mapping
+from typing import (
+    Iterable,
+    Optional,
+    Generator,
+    Dict,
+    Any,
+    DefaultDict,
+    MutableMapping,
+)
 import yaml
-
 from aislib.misc_utils import get_logger
+
 
 logger = get_logger(name=__name__)
 
 
 def get_yaml_iterator_with_injections(
-    yaml_config_files: Iterable[str], extra_cl_args: List[str]
+    yaml_config_files: Iterable[str], extra_cl_args: Optional[list[str]]
 ) -> Generator[Dict, None, None]:
     if not extra_cl_args:
         yield from get_yaml_to_dict_iterator(yaml_config_files=yaml_config_files)
@@ -39,7 +47,7 @@ def get_yaml_iterator_with_injections(
 
 
 def convert_cl_str_to_dict(str_: str) -> dict:
-    def _infinite_dict():
+    def _infinite_dict() -> DefaultDict:
         return defaultdict(_infinite_dict)
 
     infinite_dict = _infinite_dict()
@@ -61,7 +69,7 @@ def convert_cl_str_to_dict(str_: str) -> dict:
 
 def get_yaml_to_dict_iterator(
     yaml_config_files: Iterable[str],
-) -> Generator[Dict, None, None]:
+) -> Generator[dict, None, None]:
     for yaml_config in yaml_config_files:
         yield load_yaml_config(config_path=yaml_config)
 
@@ -73,19 +81,21 @@ def load_yaml_config(config_path: str) -> Dict[str, Any]:
     return config_as_dict
 
 
-def recursive_dict_replace(dict_: dict, dict_to_inject: dict) -> dict:
+def recursive_dict_replace(
+    dict_: MutableMapping, dict_to_inject: MutableMapping
+) -> dict:
     for cur_key, cur_value in dict_to_inject.items():
         if cur_key not in dict_:
             dict_[cur_key] = {}
 
         old_dict_value = dict_.get(cur_key)
-        if isinstance(cur_value, Mapping):
-            assert isinstance(old_dict_value, Mapping)
+        if isinstance(cur_value, MutableMapping):
+            assert isinstance(old_dict_value, MutableMapping)
             recursive_dict_replace(old_dict_value, cur_value)
         else:
             dict_[cur_key] = cur_value
 
-    return dict_
+    return dict(dict_)
 
 
 def object_to_primitives(obj):

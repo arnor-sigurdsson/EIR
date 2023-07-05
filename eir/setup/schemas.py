@@ -301,7 +301,7 @@ class GlobalConfig:
     early_stopping_patience: int = 10
     early_stopping_buffer: Union[None, int] = None
     warmup_steps: Union[Literal["auto"], int] = "auto"
-    optimizer: al_optimizers = "adam"
+    optimizer: al_optimizers = "adam"  # type: ignore
     b1: float = 0.9
     b2: float = 0.999
     wd: float = 1e-04
@@ -492,7 +492,7 @@ class SequenceInputDataConfig:
     sampling_strategy_if_longer: Literal["from_start", "uniform"] = "uniform"
     min_freq: int = 10
     split_on: str = " "
-    tokenizer: al_tokenizer_choices = None
+    tokenizer: al_tokenizer_choices = None  # type: ignore
     tokenizer_language: Union[str, None] = None
     mixing_subtype: Literal["mixup"] = "mixup"
 
@@ -565,7 +565,7 @@ class ByteInputDataConfig:
         set >0.0 in the global configuration.
     """
 
-    max_length: al_max_sequence_length = "average"
+    max_length: int = 256
     byte_encoding: Literal["uint8"] = "uint8"
     sampling_strategy_if_longer: Literal["from_start", "uniform"] = "uniform"
     mixing_subtype: Literal["mixup"] = "mixup"
@@ -609,7 +609,7 @@ class ImageInputDataConfig:
     size: Sequence[int] = (64,)
     mean_normalization_values: Union[None, Sequence[float]] = None
     stds_normalization_values: Union[None, Sequence[float]] = None
-    num_channels: int = None
+    num_channels: Optional[int] = None
     mixing_subtype: Union[Literal["mixup"], Literal["cutmix"]] = "mixup"
 
 
@@ -651,7 +651,7 @@ class OutputInfoConfig:
         Type of the output.
     """
 
-    output_source: Union[str, None]
+    output_source: str
     output_name: str
     output_type: Literal["tabular", "sequence"]
 

@@ -72,7 +72,7 @@ al_input_types = Union[
 
 al_output_types = Union[schemas.TabularOutputTypeConfig]
 
-al_output_types_schema_map = Dict[
+al_output_types_schema_map = dict[
     str, Union[Type[schemas.TabularOutputTypeConfig], Type]
 ]
 
@@ -80,10 +80,18 @@ al_output_module_config_class_getter = (
     Callable[[str], Union[schemas.al_output_module_configs_classes, Any]],
 )
 
-al_output_model_configs = Union[
-    ResidualMLPOutputModuleConfig, LinearOutputModuleConfig, Any
-]
-al_output_model_init_map = Dict[str, al_output_model_configs]
+al_output_model_config_classes = (
+    Type[ResidualMLPOutputModuleConfig]
+    | Type[LinearOutputModuleConfig]
+    | Type[TransformerSequenceOutputModuleConfig]
+)
+
+al_output_model_configs = (
+    ResidualMLPOutputModuleConfig
+    | LinearOutputModuleConfig
+    | TransformerSequenceOutputModuleConfig
+)
+al_output_model_init_map = dict[str, dict[str, al_output_model_config_classes]]
 
 logger = get_logger(name=__name__)
 
@@ -391,7 +399,7 @@ def _validate_input_type_info_object(
 def set_up_input_feature_extractor_config(
     input_info_object: schemas.InputDataConfig,
     input_type_info_object: al_input_types,
-    model_init_kwargs_base: Union[None, dict],
+    model_init_kwargs_base: dict,
 ) -> schemas.al_feature_extractor_configs:
     input_type = input_info_object.input_type
 
@@ -439,7 +447,7 @@ def get_input_feature_extractor_config_class(
 ) -> schemas.al_feature_extractor_configs_classes:
     model_config_setup_map = get_input_feature_extractor_config_init_class_map()
 
-    return model_config_setup_map.get(input_type)
+    return model_config_setup_map[input_type]
 
 
 def get_input_feature_extractor_config_init_class_map() -> (
@@ -460,7 +468,7 @@ def get_input_feature_extractor_config_init_class_map() -> (
 def set_up_feature_extractor_init_config(
     input_info_object: schemas.InputDataConfig,
     input_type_info_object: al_input_types,
-    model_init_kwargs: Union[None, dict],
+    model_init_kwargs: dict,
     model_type: str,
 ) -> Dict:
     if getattr(input_type_info_object, "pretrained_model", None):
@@ -570,17 +578,19 @@ def load_fusion_configs(fusion_configs: Iterable[dict]) -> schemas.FusionConfig:
 
     fusion_model_type = combined_config["model_type"]
 
-    model_dataclass_config_class = ResidualMLPConfig
+    model_dataclass_config_class: Type[ResidualMLPConfig] | Type[
+        MGMoEModelConfig
+    ] | Type[IdentityConfig] = ResidualMLPConfig
     if fusion_model_type == "mgmoe":
         model_dataclass_config_class = MGMoEModelConfig
     elif fusion_model_type == "linear":
         model_dataclass_config_class = IdentityConfig
 
     fusion_config_kwargs = combined_config["model_config"]
-    fusion_config = model_dataclass_config_class(**fusion_config_kwargs)
+    fusion_model_config = model_dataclass_config_class(**fusion_config_kwargs)
 
     fusion_config = schemas.FusionConfig(
-        model_type=combined_config["model_type"], model_config=fusion_config
+        model_type=combined_config["model_type"], model_config=fusion_model_config
     )
 
     return fusion_config
@@ -663,7 +673,7 @@ def get_output_module_config_class(
 ) -> schemas.al_output_module_configs_classes:
     model_config_setup_map = get_output_module_config_class_map()
 
-    return model_config_setup_map.get(output_type)
+    return model_config_setup_map[output_type]
 
 
 def get_output_module_config_class_map() -> (
@@ -679,7 +689,7 @@ def get_output_module_config_class_map() -> (
 
 def set_up_output_module_config(
     output_info_object: schemas.OutputInfoConfig,
-    model_init_kwargs_base: Union[None, dict],
+    model_init_kwargs_base: dict,
 ) -> schemas.al_output_module_configs:
     output_type = output_info_object.output_type
 
@@ -742,8 +752,8 @@ def set_up_output_module_init_config(
     return model_init_config
 
 
-def get_output_config_type_init_callable_map() -> Dict[str, Dict[str, Type]]:
-    mapping = {
+def get_output_config_type_init_callable_map() -> al_output_model_init_map:
+    mapping: al_output_model_init_map = {
         "tabular": {
             "mlp_residual": ResidualMLPOutputModuleConfig,
             "linear": LinearOutputModuleConfig,
@@ -778,8 +788,10 @@ def get_all_tabular_targets(
             continue
 
         output_name = output_config.output_info.output_name
-        con_targets[output_name] = output_config.output_type_info.target_con_columns
-        cat_targets[output_name] = output_config.output_type_info.target_cat_columns
+        output_type_info = output_config.output_type_info
+        assert isinstance(output_type_info, schemas.TabularOutputTypeConfig)
+        con_targets[output_name] = output_type_info.target_con_columns
+        cat_targets[output_name] = output_type_info.target_cat_columns
 
     targets = TabularTargets(con_targets=con_targets, cat_targets=cat_targets)
     return targets
@@ -807,7 +819,7 @@ def _check_input_and_output_config_names(
 
 
 def combine_dicts(dicts: Iterable[dict]) -> dict:
-    combined_dict = {}
+    combined_dict: dict = {}
 
     for dict_ in dicts:
         combined_dict = {**combined_dict, **dict_}

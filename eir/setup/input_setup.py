@@ -1,8 +1,10 @@
 from typing import (
     Dict,
+    Optional,
     Union,
     Sequence,
     Callable,
+    Protocol,
     Type,
     TYPE_CHECKING,
     Any,
@@ -70,10 +72,25 @@ al_serializable_input_classes = Union[
 ]
 
 
+class InputSetupFunction(Protocol):
+    def __call__(
+        self,
+        input_config: schemas.InputConfig,
+        hooks: Optional["Hooks"],
+        **kwargs,
+    ) -> al_input_objects:
+        ...
+
+
+class InputSetupGetterFunction(Protocol):
+    def __call__(self, input_config: schemas.InputConfig) -> InputSetupFunction:
+        ...
+
+
 def set_up_inputs_general(
     inputs_configs: schemas.al_input_configs,
-    hooks: Union["Hooks", None],
-    setup_func_getter: Callable[[schemas.InputConfig], Callable[..., al_input_objects]],
+    hooks: Optional["Hooks"],
+    setup_func_getter: InputSetupGetterFunction,
     setup_func_kwargs: Dict[str, Any],
 ) -> al_input_objects_as_dict:
     all_inputs = {}
@@ -147,8 +164,8 @@ def get_input_setup_function_for_train(
     return from_scratch_mapping[input_type]
 
 
-def get_input_setup_function_map() -> Dict[str, Callable[..., al_input_objects]]:
-    setup_mapping = {
+def get_input_setup_function_map() -> dict[str, Callable[..., al_input_objects]]:
+    setup_mapping: dict[str, Callable[..., al_input_objects]] = {
         "omics": set_up_omics_input,
         "tabular": set_up_tabular_input_for_training,
         "sequence": set_up_sequence_input_for_training,

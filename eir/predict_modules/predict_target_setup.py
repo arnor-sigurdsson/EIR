@@ -37,10 +37,10 @@ def get_target_labels_for_predict(
     custom_column_label_parsing_ops: al_all_column_ops,
     ids: Sequence[str],
 ) -> PredictTargetLabels:
-    df_labels_test = pd.DataFrame(index=ids)
+    df_labels_test = pd.DataFrame(index=list(ids))
     label_transformers = {}
-    con_columns = []
-    cat_columns = []
+    con_columns: list[str] = []
+    cat_columns: list[str] = []
 
     for output_name, tabular_info in tabular_file_infos.items():
         all_columns = list(tabular_info.cat_columns) + list(tabular_info.con_columns)
@@ -161,13 +161,13 @@ def get_target_labels_for_testing(
             update the parameters slightly.
     """
 
-    target_infos = get_tabular_target_file_infos(
+    target_files_info = get_tabular_target_file_infos(
         output_configs=configs_overloaded_for_predict.output_configs
     )
 
     target_labels = get_target_labels_for_predict(
         output_folder=configs_overloaded_for_predict.global_config.output_folder,
-        tabular_file_infos=target_infos,
+        tabular_file_infos=target_files_info,
         custom_column_label_parsing_ops=custom_column_label_parsing_ops,
         ids=ids,
     )

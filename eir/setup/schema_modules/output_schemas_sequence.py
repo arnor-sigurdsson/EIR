@@ -15,7 +15,7 @@ class SequenceOutputTypeConfig:
     sampling_strategy_if_longer: Literal["from_start", "uniform"] = "uniform"
     min_freq: int = 10
     split_on: str = " "
-    tokenizer: "al_tokenizer_choices" = None
+    tokenizer: "al_tokenizer_choices" = None  # type: ignore
     tokenizer_language: Union[str, None] = None
 
     sequence_operation: al_sequence_operations = "autoregressive"

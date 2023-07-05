@@ -6,6 +6,13 @@ from torch import nn
 
 from eir.setup import schemas
 from eir.train_utils.metrics import calculate_prediction_losses
+from eir.setup.output_setup_modules.tabular_output_setup import (
+    ComputedTabularOutputInfo,
+)
+from eir.setup.output_setup_modules.sequence_output_setup import (
+    ComputedSequenceOutputInfo,
+)
+
 
 if TYPE_CHECKING:
     from eir.setup.output_setup import al_output_objects_as_dict
@@ -17,7 +24,7 @@ al_con_losses = (
     nn.MSELoss | nn.L1Loss | nn.SmoothL1Loss | nn.PoissonNLLLoss | nn.HuberLoss
 )
 
-al_criteria = al_con_losses | al_cat_losses
+al_criteria = al_con_losses | al_cat_losses | Callable
 
 al_criteria_dict = Dict[str, Dict[str, al_criteria]]
 
@@ -42,16 +49,14 @@ al_losses_classes = (
 
 
 def get_criteria(outputs_as_dict: "al_output_objects_as_dict") -> al_criteria_dict:
-    criteria_dict = {}
+    criteria_dict: al_criteria_dict = {}
 
     for output_name, output_object in outputs_as_dict.items():
         if output_name not in criteria_dict:
             criteria_dict[output_name] = {}
 
-        output_type = output_object.output_config.output_info.output_type
-
-        match output_type:
-            case "tabular":
+        match output_object:
+            case ComputedTabularOutputInfo():
                 target_col_iter = output_object.target_columns.items()
                 for column_type, columns_of_type in target_col_iter:
                     for column_name in columns_of_type:
@@ -73,7 +78,7 @@ def get_criteria(outputs_as_dict: "al_output_objects_as_dict") -> al_criteria_di
 
                         criteria_dict[output_name][column_name] = criterion
 
-            case "sequence":
+            case ComputedSequenceOutputInfo():
                 pad_token = getattr(output_object.tokenizer, "pad_token", "<pad>")
                 pad_idx = output_object.vocab[pad_token]
 
@@ -124,15 +129,19 @@ def get_supervised_criterion(
             loss_module = getattr(nn, loss_name)
             return loss_module()
 
+    raise ValueError()
+
 
 def _parse_loss_name(
     output_config: schemas.OutputConfig, column_type: str
 ) -> Union["al_cat_loss_names", "al_con_loss_names"]:
+    output_type_info = output_config.output_type_info
+    assert isinstance(output_type_info, schemas.TabularOutputTypeConfig)
     match column_type:
         case "cat":
-            return output_config.output_type_info.cat_loss_name
+            return output_type_info.cat_loss_name
         case "con":
-            return output_config.output_type_info.con_loss_name
+            return output_type_info.con_loss_name
         case _:
             raise ValueError(f"Unknown column type: {column_type}")
 
@@ -141,11 +150,13 @@ def _get_label_smoothing(
     output_config: schemas.OutputConfig,
     column_type: str,
 ) -> float:
+    output_type_info = output_config.output_type_info
+    assert isinstance(output_type_info, schemas.TabularOutputTypeConfig)
     match column_type:
         case "con":
             return 0.0
         case "cat":
-            return output_config.output_type_info.cat_label_smoothing
+            return output_type_info.cat_label_smoothing
         case _:
             raise ValueError(f"Unknown column type: {column_type}")
 

@@ -1,14 +1,17 @@
 from functools import partial
-from typing import Type, Union, Dict, Callable, NewType, Literal, TYPE_CHECKING
+from typing import Type, Dict, Callable, NewType, Literal, TYPE_CHECKING
 
 import torch
-from torch import nn
 from aislib.misc_utils import get_logger
+from torch import nn
 
 from eir.models.fusion import fusion_mgmoe, fusion_default, fusion_identity
 from eir.models.layers import ResidualMLPConfig
 
 al_fusion_model = Literal["pass-through", "mlp-residual", "identity", "mgmoe"]
+al_fusion_model_configs = (
+    ResidualMLPConfig | fusion_identity.IdentityConfig | fusion_mgmoe.MGMoEModelConfig
+)
 
 ComputedType = NewType("ComputedType", torch.Tensor)
 PassThroughType = NewType("PassThroughType", Dict[str, torch.Tensor])
@@ -26,9 +29,7 @@ def pass_through_fuse(features: Dict[str, torch.Tensor]) -> Dict[str, torch.Tens
 
 def get_fusion_modules(
     fusion_model_type: str,
-    model_config: Union[
-        ResidualMLPConfig, fusion_identity.IdentityConfig, fusion_mgmoe.MGMoEModelConfig
-    ],
+    model_config: al_fusion_model_configs,
     modules_to_fuse: "al_input_modules",
     out_feature_per_feature_extractor: Dict[str, int],
     output_types: dict[str, Literal["tabular", "sequence"]],

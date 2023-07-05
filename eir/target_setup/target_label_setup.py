@@ -131,10 +131,10 @@ def set_up_delayed_target_labels(
     valid_ids: Sequence[str],
     output_name: str,
 ) -> Labels:
-    train_ids = set(train_ids)
-    valid_ids = set(valid_ids)
-    train_labels = {id_: {output_name: torch.nan} for id_ in train_ids}
-    valid_labels = {id_: {output_name: torch.nan} for id_ in valid_ids}
+    train_ids_set = set(train_ids)
+    valid_ids_set = set(valid_ids)
+    train_labels = {id_: {output_name: torch.nan} for id_ in train_ids_set}
+    valid_labels = {id_: {output_name: torch.nan} for id_ in valid_ids_set}
 
     return Labels(
         train_labels=train_labels,
@@ -143,7 +143,7 @@ def set_up_delayed_target_labels(
     )
 
 
-def df_to_nested_dict(df: pd.DataFrame) -> Dict:
+def df_to_nested_dict(df: pd.DataFrame) -> dict[str, dict[str, dict[str, float | int]]]:
     """
     The df has a 2-level multi index, like so ['ID', output_name]
 
@@ -153,7 +153,7 @@ def df_to_nested_dict(df: pd.DataFrame) -> Dict:
     """
     index_dict = df.to_dict(orient="index")
 
-    parsed_dict = {}
+    parsed_dict: dict[str, dict[str, dict[str, float | int]]] = {}
     for key_tuple, value in index_dict.items():
         cur_id, cur_output_name = key_tuple
 
@@ -199,19 +199,22 @@ def get_tabular_target_file_infos(
 ) -> Dict[str, TabularFileInfo]:
     logger.debug("Setting up target labels.")
 
-    tabular_infos = {}
+    tabular_files_info = {}
 
     for output_config in output_configs:
         if output_config.output_info.output_type != "tabular":
             continue
 
         output_name = output_config.output_info.output_name
+        output_type_info = output_config.output_type_info
+        assert isinstance(output_type_info, schemas.TabularOutputTypeConfig)
+
         tabular_info = TabularFileInfo(
             file_path=Path(output_config.output_info.output_source),
-            con_columns=output_config.output_type_info.target_con_columns,
-            cat_columns=output_config.output_type_info.target_cat_columns,
-            parsing_chunk_size=output_config.output_type_info.label_parsing_chunk_size,
+            con_columns=output_type_info.target_con_columns,
+            cat_columns=output_type_info.target_cat_columns,
+            parsing_chunk_size=output_type_info.label_parsing_chunk_size,
         )
-        tabular_infos[output_name] = tabular_info
+        tabular_files_info[output_name] = tabular_info
 
-    return tabular_infos
+    return tabular_files_info

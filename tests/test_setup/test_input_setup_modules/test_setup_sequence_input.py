@@ -352,7 +352,9 @@ def test_sync_hf_and_pytorch_vocab():
 @mock.patch(f"{_get_mock_target()}._sync_hf_and_pytorch_vocab")
 def test_get_sequence_input_objects_from_pretrained(sync_vocab_mock, tokenizer_mock):
     input_config = mock.create_autospec(spec=schemas.InputConfig)
-    input_config.input_type_info = mock.Mock()
+    input_config.input_type_info = mock.create_autospec(
+        spec=schemas.SequenceInputDataConfig
+    )
     input_config.input_type_info.vocab_file = None
 
     input_config.model_config = mock.Mock()

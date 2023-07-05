@@ -27,10 +27,20 @@ from eir.data_load.data_utils import Batch
 from eir.data_load.label_setup import al_all_column_ops
 from eir.models import model_training_utils
 from eir.models.input.tabular.tabular import get_tabular_inputs
+from eir.predict_modules.predict_tabular_input_setup import (
+    ComputedPredictTabularInputInfo,
+)
+from eir.train_utils.optim import AttrDelegatedSWAWrapper
+from eir.models.model_setup_modules.meta_setup import al_meta_model
 from eir.setup import schemas
 from eir.setup.config import Configs, get_all_tabular_targets
 from eir.setup.input_setup import al_input_objects_as_dict
+from eir.setup.input_setup_modules.setup_array import ComputedArrayInputInfo
+from eir.setup.input_setup_modules.setup_bytes import ComputedBytesInputInfo
+from eir.setup.input_setup_modules.setup_image import ComputedImageInputInfo
+from eir.setup.input_setup_modules.setup_omics import ComputedOmicsInputInfo
 from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
+from eir.setup.input_setup_modules.setup_tabular import ComputedTabularInputInfo
 from eir.setup.output_setup import al_output_objects_as_dict
 from eir.train_utils.metrics import (
     get_uncertainty_loss_hook,
@@ -93,8 +103,8 @@ def _get_default_step_function_hooks(configs: Configs):
 
 def _get_default_step_function_hooks_init_kwargs(
     configs: Configs,
-) -> Dict[str, Sequence[Callable]]:
-    init_kwargs = {
+) -> Dict[str, list[Callable]]:
+    init_kwargs: dict[str, list[Callable]] = {
         "base_prepare_batch": [hook_default_prepare_batch],
         "post_prepare_batch": [],
         "model_forward": [hook_default_model_forward],
@@ -178,8 +188,8 @@ def add_l1_loss_hook_if_applicable(
 
 @dataclass
 class StepFunctionHookStages:
-    al_hook = Callable[..., Dict]
-    al_hooks = [Iterable[al_hook]]
+    al_hook = Callable[..., dict]
+    al_hooks = Iterable[al_hook]
 
     base_prepare_batch: al_hooks
     post_prepare_batch: al_hooks
@@ -258,17 +268,19 @@ def _prepare_inputs_for_model(
     targets_prepared = {}
 
     for input_name, input_object in input_objects.items():
-        input_type = input_object.input_config.input_info.input_type
-
-        match input_type:
-            case "omics" | "image" | "array":
+        match input_object:
+            case (
+                ComputedOmicsInputInfo()
+                | ComputedImageInputInfo()
+                | ComputedArrayInputInfo()
+            ):
                 cur_tensor = batch_inputs[input_name]
                 cur_tensor = cur_tensor.to(device=device)
                 cur_tensor = cur_tensor.to(dtype=torch.float32)
 
                 inputs_prepared[input_name] = cur_tensor
 
-            case "tabular":
+            case ComputedTabularInputInfo() | ComputedPredictTabularInputInfo():
                 tabular_source_input = batch_inputs[input_name]
                 for tabular_name, tensor in tabular_source_input.items():
                     cur_tensor = tensor.to(device=device)
@@ -279,6 +291,9 @@ def _prepare_inputs_for_model(
                     tabular_source_input[tabular_name] = cur_tensor
 
                 tabular_input_type_info = input_object.input_config.input_type_info
+                assert isinstance(
+                    tabular_input_type_info, schemas.TabularInputDataConfig
+                )
                 cat_columns = tabular_input_type_info.input_cat_columns
                 con_columns = tabular_input_type_info.input_con_columns
                 tabular = get_tabular_inputs(
@@ -290,7 +305,7 @@ def _prepare_inputs_for_model(
                 )
                 inputs_prepared[input_name] = tabular
 
-            case "sequence" | "bytes":
+            case ComputedSequenceInputInfo():
                 cur_seq = batch_inputs[input_name]
 
                 if input_name in (i for i in output_objects.keys()):
@@ -309,6 +324,18 @@ def _prepare_inputs_for_model(
                     device=device,
                 )
                 inputs_prepared[input_name] = cur_embedding
+
+            case ComputedBytesInputInfo():
+                cur_seq = batch_inputs[input_name]
+
+                cur_embedding = _prepare_sequence_input_base(
+                    cur_seq=cur_seq,
+                    input_name=input_name,
+                    model=model,
+                    device=device,
+                )
+                inputs_prepared[input_name] = cur_embedding
+
             case _:
                 raise ValueError(f"Unrecognized input type {input_name}.")
 
@@ -335,6 +362,7 @@ def _prepare_sequence_input_for_sequence_output(
     input_name: str,
     device: str,
 ) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
+    assert input_object.tokenizer is not None
     special_tokens = get_special_tokens(
         tokenizer=input_object.tokenizer, vocab=input_object.vocab
     )
@@ -350,9 +378,9 @@ def _prepare_sequence_input_for_sequence_output(
 
     cur_seq = cur_seq.to(device=device)
 
-    cur_target = {input_name: cur_target.to(device=device)}
+    cur_target_dict = {input_name: cur_target.to(device=device)}
 
-    return cur_seq, cur_target
+    return cur_seq, cur_target_dict
 
 
 def sample_autoregressive_batch(
@@ -380,9 +408,9 @@ def sample_autoregressive_batch(
         inputs.append(cur_sample)
         targets.append(cur_target)
 
-    inputs = torch.stack(tensors=inputs)
-    target = torch.stack(tensors=targets)
-    return inputs, target
+    inputs_tensor = torch.stack(tensors=inputs)
+    target_tensor = torch.stack(tensors=targets)
+    return inputs_tensor, target_tensor
 
 
 def _switch_first_pad_with_eos(
@@ -454,6 +482,7 @@ def hook_default_optimizer_backward(
         step_func()
 
     if gc.amp and gc.device != "cpu":
+        assert amp_scaler is not None
         amp_scaler.update()
 
     maybe_update_model_parameters_with_swa(
@@ -470,13 +499,14 @@ def maybe_scale_loss_with_amp_scaler(
     do_amp: bool, loss: torch.Tensor, amp_scaler: Optional["GradScaler"], device: str
 ) -> torch.Tensor:
     if do_amp and device != "cpu":
+        assert amp_scaler is not None
         return amp_scaler.scale(loss)
     else:
         return loss
 
 
 def maybe_scale_loss_with_grad_accumulation_steps(
-    loss: torch.Tensor, grad_acc_steps: int
+    loss: torch.Tensor, grad_acc_steps: Optional[int]
 ) -> torch.Tensor:
     if grad_acc_steps and grad_acc_steps > 1:
         return loss / grad_acc_steps
@@ -512,12 +542,15 @@ def get_optimizer_step_func(
     device: str,
 ) -> Callable:
     if do_amp and device != "cpu":
+        assert amp_scaler is not None
         return partial(amp_scaler.step, optimizer=optimizer_step)
     else:
         return optimizer_step
 
 
-def should_perform_optimizer_step(iteration: int, grad_acc_steps: int) -> bool:
+def should_perform_optimizer_step(
+    iteration: int, grad_acc_steps: Optional[int]
+) -> bool:
     if grad_acc_steps and grad_acc_steps > 1:
         return iteration % grad_acc_steps == 0
     else:
@@ -526,7 +559,7 @@ def should_perform_optimizer_step(iteration: int, grad_acc_steps: int) -> bool:
 
 def maybe_update_model_parameters_with_swa(
     n_iter_before_swa: Optional[int],
-    model: "nn.Module",
+    model: al_meta_model,
     iteration: int,
     sample_interval: int,
 ) -> None:
@@ -534,6 +567,8 @@ def maybe_update_model_parameters_with_swa(
     if should_not_be_called_ever:
         return
 
+    assert isinstance(model, AttrDelegatedSWAWrapper)
+    assert n_iter_before_swa is not None
     if iteration >= n_iter_before_swa and iteration % sample_interval == 0:
         model.update_parameters(model.module)
 
@@ -555,11 +590,13 @@ def hook_default_compute_metrics(
         metric_dict=train_batch_metrics,
     )
 
+    averaging_functions = experiment.metrics["averaging_functions"]
+    assert isinstance(averaging_functions, dict)
     train_batch_metrics_with_averages = add_multi_task_average_metrics(
         batch_metrics_dict=train_batch_metrics_w_loss,
         outputs_as_dict=experiment.outputs,
         loss=state["loss"].item(),
-        performance_average_functions=experiment.metrics["averaging_functions"],
+        performance_average_functions=averaging_functions,
     )
 
     state_updates = {"metrics": train_batch_metrics_with_averages}
@@ -623,11 +660,12 @@ def get_hook_amp_objects(device: str) -> Callable[..., Dict[str, Any]]:
 
     amp_context_manager = get_amp_context_manager(device_type=device_type)
 
-    def _get_objects(*args, **kwargs) -> Dict[str, GradScaler]:
-        state_updates = {
+    def _get_objects(*args, **kwargs) -> dict[str, GradScaler | autocast]:
+        state_updates: dict[str, autocast | GradScaler] = {
             "amp_context_manager": amp_context_manager,
         }
         if device != "cpu":
+            assert scaler is not None
             state_updates["amp_scaler"] = scaler
 
         return state_updates

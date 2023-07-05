@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from typing import Dict, Literal, NewType, Protocol, MutableMapping
 
-from eir.models.fusion.fusion import al_fused_features
+from eir.models.fusion.fusion import al_fused_features, al_fusion_model_configs
 
 FeatureExtractorOutType = NewType("FeatureExtractorOutType", torch.Tensor)
 
@@ -16,7 +16,22 @@ class FeatureExtractorProtocol(Protocol):
         ...
 
 
+class FeatureExtractorProtocolWithL1(Protocol):
+    @property
+    def num_out_features(self) -> int:
+        ...
+
+    @property
+    def l1_penalized_weights(self) -> torch.Tensor:
+        ...
+
+    def __call__(self, input: torch.Tensor) -> FeatureExtractorOutType:
+        ...
+
+
 class FusionModuleProtocol(Protocol):
+    model_config: al_fusion_model_configs
+
     def __call__(self, input: Dict[str, FeatureExtractorOutType]) -> al_fused_features:
         ...
 
@@ -26,7 +41,9 @@ class OutputModuleProtocol(Protocol):
         ...
 
 
-al_input_modules = MutableMapping[str, FeatureExtractorProtocol]
+al_input_modules = MutableMapping[
+    str, FeatureExtractorProtocolWithL1 | FeatureExtractorProtocol
+]
 al_fusion_modules = MutableMapping[str, FusionModuleProtocol]
 al_output_modules = MutableMapping[str, OutputModuleProtocol]
 

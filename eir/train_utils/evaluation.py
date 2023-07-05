@@ -16,6 +16,9 @@ from eir.train_utils import utils
 from eir.train_utils.train_handlers_sequence_output import (
     sequence_out_single_sample_evaluation_wrapper,
 )
+from eir.setup.output_setup import (
+    ComputedTabularOutputInfo,
+)
 from eir.visualization import visualization_funcs as vf
 
 if TYPE_CHECKING:
@@ -118,6 +121,7 @@ def save_tabular_evaluation_results_wrapper(
         if output_type != "tabular":
             continue
 
+        assert isinstance(output_object, ComputedTabularOutputInfo)
         target_columns = output_object.target_columns
         for column_type, list_of_cols_of_this_type in target_columns.items():
             for column_name in list_of_cols_of_this_type:
@@ -128,15 +132,15 @@ def save_tabular_evaluation_results_wrapper(
                     iteration=iteration,
                 )
                 cur_val_outputs = val_outputs[output_name][column_name]
-                cur_val_outputs = cur_val_outputs.cpu().numpy()
+                cur_val_outputs_np = cur_val_outputs.cpu().numpy()
 
                 cur_val_labels = val_labels[output_name][column_name]
-                cur_val_labels = cur_val_labels.cpu().numpy()
+                cur_val_labels_np = cur_val_labels.cpu().numpy()
                 target_transformers = output_object.target_transformers
 
                 plot_config = PerformancePlotConfig(
-                    val_outputs=cur_val_outputs,
-                    val_labels=cur_val_labels,
+                    val_outputs=cur_val_outputs_np,
+                    val_labels=cur_val_labels_np,
                     val_ids=val_ids,
                     iteration=iteration,
                     column_name=column_name,

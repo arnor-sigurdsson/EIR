@@ -3,7 +3,17 @@ from collections import OrderedDict
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Sequence, List, Union, Optional, Iterator, Generator, Tuple
+from typing import (
+    Callable,
+    Sequence,
+    List,
+    Union,
+    Optional,
+    Iterator,
+    Generator,
+    Tuple,
+    Protocol,
+)
 
 import pandas as pd
 from aislib.misc_utils import get_logger
@@ -32,6 +42,7 @@ from eir.data_load.data_source_modules.deeplake_ops import (
 from eir.setup import schemas
 from eir.setup.input_setup_modules.common import get_default_sequence_specials
 from eir.setup.schemas import al_tokenizer_choices
+from eir.models.input.sequence.transformer_models import SequenceModelConfig
 
 al_hf_tokenizer_inputs = Union[TextInput, PreTokenizedInput, EncodedInput]
 al_sequence_input_objects_basic = Tuple[
@@ -44,7 +55,7 @@ al_sequence_input_objects_hf = Tuple[
     Vocab,
     "GatheredSequenceStats",
     PreTrainedTokenizer,
-    Callable[[al_hf_tokenizer_inputs], Sequence[int]],
+    Callable[[al_hf_tokenizer_inputs], List[int]],
 ]
 
 
@@ -63,23 +74,29 @@ class ComputedSequenceInputInfo:
 def set_up_sequence_input_for_training(
     input_config: schemas.InputConfig, *args, **kwargs
 ) -> ComputedSequenceInputInfo:
+    model_config = input_config.model_config
+    assert isinstance(model_config, SequenceModelConfig)
+
     sequence_input_object_func = _get_sequence_input_object_func(
-        pretrained=input_config.model_config.pretrained_model
+        pretrained=model_config.pretrained_model
     )
     vocab, gathered_stats, tokenizer, encode_callable = sequence_input_object_func(
         input_config=input_config
     )
 
+    input_type_info = input_config.input_type_info
+    assert isinstance(input_type_info, schemas.SequenceInputDataConfig)
+
     gathered_stats = possibly_gather_all_stats_from_input(
         prev_gathered_stats=gathered_stats,
         input_source=input_config.input_info.input_source,
-        vocab_file=input_config.input_type_info.vocab_file,
-        split_on=input_config.input_type_info.split_on,
-        max_length=input_config.input_type_info.max_length,
+        vocab_file=input_type_info.vocab_file,
+        split_on=input_type_info.split_on,
+        max_length=input_type_info.max_length,
     )
 
     computed_max_length = get_max_length(
-        max_length_config_value=input_config.input_type_info.max_length,
+        max_length_config_value=input_type_info.max_length,
         gathered_stats=gathered_stats,
     )
     sequence_input_info = ComputedSequenceInputInfo(
@@ -93,12 +110,23 @@ def set_up_sequence_input_for_training(
     return sequence_input_info
 
 
+class ImageInputObjectGetterFunctionBasic(Protocol):
+    def __call__(
+        self, input_config: schemas.InputConfig
+    ) -> al_sequence_input_objects_basic:
+        ...
+
+
+class ImageInputObjectGetterFunctionHF(Protocol):
+    def __call__(
+        self, input_config: schemas.InputConfig
+    ) -> al_sequence_input_objects_hf:
+        ...
+
+
 def _get_sequence_input_object_func(
     pretrained: bool,
-) -> Callable[
-    [schemas.InputConfig],
-    Union[al_sequence_input_objects_basic, al_sequence_input_objects_hf],
-]:
+) -> ImageInputObjectGetterFunctionBasic | ImageInputObjectGetterFunctionHF:
     if pretrained:
         return get_sequence_input_objects_from_pretrained
     else:
@@ -109,24 +137,25 @@ def get_sequence_input_objects_from_input(
     input_config: schemas.InputConfig,
 ) -> al_sequence_input_objects_basic:
     gathered_stats = GatheredSequenceStats()
+    input_type_info = input_config.input_type_info
+    assert isinstance(input_type_info, schemas.SequenceInputDataConfig)
 
-    vocab_file = input_config.input_type_info.vocab_file
+    vocab_file = input_type_info.vocab_file
 
     tokenizer = get_tokenizer(input_config=input_config)
 
-    vocab_iter_kwargs = dict(
+    vocab_iter = get_vocab_iterator(
         input_source=input_config.input_info.input_source,
-        split_on=input_config.input_type_info.split_on,
+        split_on=input_type_info.split_on,
         gathered_stats=gathered_stats,
-        vocab_file=input_config.input_type_info.vocab_file,
+        vocab_file=input_type_info.vocab_file,
         deeplake_inner_key=input_config.input_info.input_inner_key,
     )
-    vocab_iter = get_vocab_iterator(**vocab_iter_kwargs)
     tokenized_vocab_iter = get_tokenized_vocab_iterator(
         vocab_iterator=vocab_iter, tokenizer=tokenizer
     )
 
-    min_freq = input_config.input_type_info.min_freq
+    min_freq = input_type_info.min_freq
     if vocab_file:
         logger.info(
             "Minimum word/token frequency will be set to 0 as vocabulary is loaded "
@@ -151,26 +180,27 @@ def get_sequence_input_objects_from_input(
 
 def get_tokenizer(
     input_config: schemas.InputConfig,
-) -> Callable[[Sequence[str]], Sequence[str]]:
-    tokenizer_name = input_config.input_type_info.tokenizer
+) -> Callable[[Sequence[str]], List[str]]:
+    input_type_info = input_config.input_type_info
+    assert isinstance(input_type_info, schemas.SequenceInputDataConfig)
+    tokenizer_name = input_type_info.tokenizer
 
     if tokenizer_name == "bpe":
-        vocab_iter_kwargs = dict(
+        vocab_iter = get_vocab_iterator(
             input_source=input_config.input_info.input_source,
-            split_on=input_config.input_type_info.split_on,
+            split_on=input_type_info.split_on,
             gathered_stats=GatheredSequenceStats(),
-            vocab_file=input_config.input_type_info.vocab_file,
+            vocab_file=input_type_info.vocab_file,
             deeplake_inner_key=input_config.input_info.input_inner_key,
         )
-        vocab_iter = get_vocab_iterator(**vocab_iter_kwargs)
 
-        vocab_file = input_config.input_type_info.vocab_file
+        vocab_file = input_type_info.vocab_file
         tokenizer = get_bpe_tokenizer(vocab_iterator=vocab_iter, vocab_file=vocab_file)
 
     else:
         tokenizer = get_basic_tokenizer(
             tokenizer_name=tokenizer_name,
-            tokenizer_language=input_config.input_type_info.tokenizer_language,
+            tokenizer_language=input_type_info.tokenizer_language,
         )
 
     return tokenizer
@@ -194,7 +224,9 @@ def _get_default_specials_map() -> dict:
 def get_sequence_input_objects_from_pretrained(
     input_config: schemas.InputConfig,
 ) -> al_sequence_input_objects_hf:
-    vocab_file = input_config.input_type_info.vocab_file
+    input_type_info = input_config.input_type_info
+    assert isinstance(input_type_info, schemas.SequenceInputDataConfig)
+    vocab_file = input_type_info.vocab_file
     if vocab_file:
         raise ValueError(
             "Using a vocabulary file not supported when using pre-trained models as "
@@ -295,7 +327,7 @@ def _get_bpe_tokenizer_object(
 
 
 def get_basic_tokenizer(
-    tokenizer_name: al_tokenizer_choices,
+    tokenizer_name: al_tokenizer_choices,  # type: ignore
     tokenizer_language: Optional[str],
 ) -> Callable[[Sequence[str]], Sequence[str]]:
     if not tokenizer_name:
@@ -335,8 +367,9 @@ def get_pytorch_tokenizer_encode_func(
 
 
 def _validate_tokenizer_args(
-    tokenizer_name: al_tokenizer_choices, tokenizer_language: Union[str, None]
-):
+    tokenizer_name: al_tokenizer_choices,  # type: ignore
+    tokenizer_language: Union[str, None],
+) -> None:
     tokenizer_language_passed = tokenizer_language is not None
     tokenizer_does_not_support_language = tokenizer_name not in (
         "spacy",
@@ -354,7 +387,7 @@ def _validate_tokenizer_args(
 
 def get_tokenized_vocab_iterator(
     vocab_iterator: Iterator[Sequence[str]],
-    tokenizer: Callable[[Sequence[str]], Sequence[str]],
+    tokenizer: Callable[[Sequence[str]], List[str]],
 ) -> Generator[List[str], None, None]:
     for list_of_words in vocab_iterator:
         yield tokenizer(list_of_words)
@@ -531,7 +564,7 @@ class ReturnSavingGenerator:
 def possibly_gather_all_stats_from_input(
     prev_gathered_stats: GatheredSequenceStats,
     input_source: str,
-    vocab_file: str,
+    vocab_file: Optional[str],
     split_on: str,
     max_length: schemas.al_max_sequence_length,
 ) -> GatheredSequenceStats:

@@ -39,9 +39,12 @@ def setup_tabular_input_for_testing(
     hooks: "Hooks",
     output_folder: str,
 ) -> ComputedPredictTabularInputInfo:
+    input_type_info = input_config.input_type_info
+    assert isinstance(input_type_info, schemas.TabularInputDataConfig)
+
     tabular_file_info = setup_tabular.get_tabular_input_file_info(
         input_source=input_config.input_info.input_source,
-        tabular_data_type_config=input_config.input_type_info,
+        tabular_data_type_config=input_type_info,
     )
 
     custom_ops = hooks.custom_column_label_parsing_ops if hooks else None

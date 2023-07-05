@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, Mock, patch, ANY, call
+from unittest.mock import MagicMock, Mock, patch, ANY, call, create_autospec
 
 import pytest
 import torch
@@ -6,6 +6,7 @@ from torch import nn
 from torch.cuda.amp import GradScaler
 
 from eir.train_utils import step_logic
+from eir.train_utils.optim import AttrDelegatedSWAWrapper
 
 
 @pytest.mark.parametrize(
@@ -208,7 +209,7 @@ def test_get_optimizer_step_func():
 
 
 def test_maybe_update_model_parameters_with_swa_basics():
-    model = MagicMock()
+    model = create_autospec(spec=AttrDelegatedSWAWrapper, instance=True)
     model.module = MagicMock()
 
     n_iter_before_swa = 10
@@ -248,7 +249,7 @@ def test_maybe_update_model_parameters_with_swa_basics():
 
 
 def test_maybe_update_model_parameters_with_swa_multiple_iterations():
-    model = MagicMock()
+    model = create_autospec(spec=AttrDelegatedSWAWrapper, instance=True)
     model.module = MagicMock()
 
     n_iter_before_swa = 10

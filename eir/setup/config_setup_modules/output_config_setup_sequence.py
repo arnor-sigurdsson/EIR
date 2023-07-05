@@ -2,10 +2,13 @@ from dataclasses import asdict, dataclass
 from typing import Sequence, Iterable, Dict, Any, Optional, TYPE_CHECKING
 
 from aislib.misc_utils import get_logger
-
 import eir.models.output.sequence.sequence_output_modules
 from eir.models.input.sequence.transformer_models import (
     BasicTransformerFeatureExtractorModelConfig,
+    SequenceModelConfig,
+)
+from eir.models.output.sequence.sequence_output_modules import (
+    SequenceOutputModuleConfig,
 )
 
 if TYPE_CHECKING:
@@ -196,25 +199,34 @@ def _build_matched_sequence_model_config_kwargs(
     )
 
     if input_config_to_overload:
+        input_model_config = input_config_to_overload.model_config
+        assert isinstance(
+            input_model_config, (SequenceModelConfig, SequenceOutputModuleConfig)
+        )
+
         model_config_kwargs = _extract_model_config_kwargs(
-            model_config=input_config_to_overload.model_config,
+            model_config=input_model_config,
             keys_to_exclude=sequence_keys_to_exclude,
         )
-        model_init_config = input_config_to_overload.model_config.model_init_config
+        model_init_config = input_model_config.model_init_config
         pretrained_config = input_config_to_overload.pretrained_config
     else:
+        output_model_config = sequence_output_config.model_config
+        assert isinstance(
+            output_model_config, (SequenceModelConfig, SequenceOutputModuleConfig)
+        )
+
         model_config_kwargs = _extract_model_config_kwargs(
-            model_config=sequence_output_config.model_config,
+            model_config=output_model_config,
             keys_to_exclude=sequence_keys_to_exclude,
         )
-        model_init_config_kwargs = (
-            sequence_output_config.model_config.model_init_config.__dict__
-        )
+        model_init_config_kwargs = output_model_config.model_init_config.__dict__
         model_init_config = BasicTransformerFeatureExtractorModelConfig(
             **model_init_config_kwargs
         )
         pretrained_config = None
 
+    assert isinstance(model_init_config, BasicTransformerFeatureExtractorModelConfig)
     extracted_attributes = ExtractedAttributesFromOutputConfig(
         model_config_kwargs=model_config_kwargs,
         model_init_config=model_init_config,
@@ -239,7 +251,7 @@ def _get_keys_to_exclude_from_output_input_sequence_overloading() -> tuple[str, 
 def _extract_model_config_kwargs(
     model_config: schemas.SequenceModelConfig
     | eir.models.output.sequence.sequence_output_modules.SequenceOutputModuleConfig,
-    keys_to_exclude: tuple[str],
+    keys_to_exclude: tuple[str, ...],
 ) -> dict[str, Any]:
     extracted = {
         k: v for k, v in model_config.__dict__.items() if k not in keys_to_exclude

@@ -35,9 +35,12 @@ def set_up_tabular_output(
         target_transformers=cur_target_transformers
     )
 
+    output_type_info = output_config.output_type_info
+    assert isinstance(output_type_info, schemas.TabularOutputTypeConfig)
+
     target_columns = merge_target_columns(
-        target_con_columns=list(output_config.output_type_info.target_con_columns),
-        target_cat_columns=list(output_config.output_type_info.target_cat_columns),
+        target_con_columns=list(output_type_info.target_con_columns),
+        target_cat_columns=list(output_type_info.target_cat_columns),
     )
 
     tabular_output_info = ComputedTabularOutputInfo(

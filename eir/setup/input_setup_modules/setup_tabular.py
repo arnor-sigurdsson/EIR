@@ -33,9 +33,12 @@ def set_up_tabular_input_for_training(
     valid_ids: Sequence[str],
     hooks: Union["Hooks", None],
 ) -> ComputedTabularInputInfo:
+    input_type_info = input_config.input_type_info
+    assert isinstance(input_type_info, schemas.TabularInputDataConfig)
+
     tabular_file_info = get_tabular_input_file_info(
         input_source=input_config.input_info.input_source,
-        tabular_data_type_config=input_config.input_type_info,
+        tabular_data_type_config=input_type_info,
     )
 
     custom_ops = hooks.custom_column_label_parsing_ops if hooks else None
@@ -49,8 +52,8 @@ def set_up_tabular_input_for_training(
 
     total_num_features = get_tabular_num_features(
         label_transformers=tabular_labels.label_transformers,
-        cat_columns=input_config.input_type_info.input_cat_columns,
-        con_columns=input_config.input_type_info.input_con_columns,
+        cat_columns=list(input_type_info.input_cat_columns),
+        con_columns=list(input_type_info.input_con_columns),
     )
     tabular_input_info = ComputedTabularInputInfo(
         labels=tabular_labels,
@@ -76,7 +79,7 @@ def get_tabular_input_file_info(
 
 
 def get_tabular_num_features(
-    label_transformers: Dict, cat_columns: Sequence[str], con_columns: Sequence[str]
+    label_transformers: Dict, cat_columns: list[str], con_columns: list[str]
 ) -> int:
     unique_cat_values = get_unique_values_from_transformers(
         transformers=label_transformers,
@@ -101,8 +104,10 @@ def set_up_tabular_input_from_pretrained(
         input_config=input_config, train_ids=train_ids, valid_ids=valid_ids, hooks=hooks
     )
 
+    pretrained_config = input_config.pretrained_config
+    assert pretrained_config is not None
     pretrained_run_folder = get_run_folder_from_model_path(
-        model_path=input_config.pretrained_config.model_path
+        model_path=pretrained_config.model_path
     )
 
     loaded_transformers = load_transformers(

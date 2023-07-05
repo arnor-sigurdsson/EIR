@@ -1,6 +1,14 @@
-from math import isclose
 from pathlib import Path
-from typing import Tuple, Union, Dict, TYPE_CHECKING, overload
+from typing import (
+    Tuple,
+    Union,
+    cast,
+    Dict,
+    TYPE_CHECKING,
+    Callable,
+    Literal,
+    Optional,
+)
 
 import numpy as np
 from aislib.misc_utils import get_logger
@@ -10,6 +18,7 @@ from ignite.contrib.handlers import (
     create_lr_scheduler_with_warmup,
 )
 from ignite.engine import Engine, Events
+from math import isclose
 from matplotlib import pyplot as plt
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim.optimizer import Optimizer
@@ -32,7 +41,7 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 @validate_handler_dependencies([validation_handler])
 def attach_lr_scheduler(
     engine: Engine,
-    lr_scheduler: Union[ConcatScheduler, CosineAnnealingScheduler, ReduceLROnPlateau],
+    lr_scheduler: Callable,
     experiment: "Experiment",
 ) -> None:
     """
@@ -95,7 +104,7 @@ def _get_reduce_lr_on_plateau_step_params(
 
 def set_up_lr_scheduler(
     handler_config: "HandlerConfig",
-) -> Union[ConcatScheduler, CosineAnnealingScheduler, ReduceLROnPlateau]:
+) -> Callable:
     exp = handler_config.experiment
     gc = exp.configs.global_config
 
@@ -125,6 +134,7 @@ def set_up_lr_scheduler(
 
         cycle_iter_size = _get_cycle_iter_size(warmup_steps_=warmup_steps)
 
+        lr_scheduler: CosineAnnealingScheduler | ConcatScheduler | ReduceLROnPlateau
         lr_scheduler, lr_scheduler_args = _get_cosine_lr_scheduler(
             optimizer=exp.optimizer,
             lr_upper_bound=lr_upper_bound,
@@ -175,7 +185,7 @@ def set_up_lr_scheduler(
     else:
         raise ValueError()
 
-    return lr_scheduler
+    return cast(Callable, lr_scheduler)
 
 
 def _get_cosine_lr_scheduler(
@@ -190,34 +200,39 @@ def _get_cosine_lr_scheduler(
     we need to pass the arguments too.
     """
 
+    cycle_mult = 1.0
+    start_value_mult = 1.0
+
+    if schedule == "cycle":
+        cycle_mult = 2.0
+        start_value_mult = 1.0
+
+    lr_scheduler = CosineAnnealingScheduler(
+        optimizer=optimizer,
+        param_name="lr",
+        start_value=lr_upper_bound,
+        end_value=lr_lower_bound,
+        cycle_size=cycle_iter_size,
+        cycle_mult=cycle_mult,
+        start_value_mult=start_value_mult,
+    )
+
     cosine_scheduler_kwargs = {
         "optimizer": optimizer,
         "param_name": "lr",
         "start_value": lr_upper_bound,
         "end_value": lr_lower_bound,
         "cycle_size": cycle_iter_size,
+        "cycle_mult": cycle_mult,
+        "start_value_mult": start_value_mult,
     }
-
-    if schedule == "cycle":
-        cosine_scheduler_kwargs["cycle_mult"] = 2
-        cosine_scheduler_kwargs["start_value_mult"] = 1
-
-    lr_scheduler = CosineAnnealingScheduler(**cosine_scheduler_kwargs)
 
     return lr_scheduler, cosine_scheduler_kwargs
 
 
-@overload
-def _get_warmup_steps_from_cla(warmup_steps_arg: None, optimizer: Optimizer) -> None:
-    ...
-
-
-@overload
-def _get_warmup_steps_from_cla(warmup_steps_arg: str, optimizer: Optimizer) -> int:
-    ...
-
-
-def _get_warmup_steps_from_cla(warmup_steps_arg, optimizer):
+def _get_warmup_steps_from_cla(
+    warmup_steps_arg: Optional[Literal["auto"] | int], optimizer: Optimizer
+) -> int:
     if warmup_steps_arg is None:
         return 0
     elif warmup_steps_arg == "auto":
@@ -247,7 +262,7 @@ def _calculate_auto_warmup_steps(optimizer: Optimizer) -> int:
 def _plot_lr_schedule(
     lr_scheduler: Union[ConcatScheduler, CosineAnnealingScheduler],
     num_events: int,
-    lr_scheduler_args: Dict,
+    lr_scheduler_args: dict,
     output_folder: Path,
 ):
     simulated_vals = np.array(
@@ -347,6 +362,8 @@ def _step_reduce_on_plateau_scheduler(
             reduce_on_plateau_scheduler.step(metrics=latest_val_performance)
 
             # See comment in set_up_lr_scheduler for +1 explanation
+            assert cur_bad_steps is not None
+            assert reduce_on_plateau_scheduler.num_bad_epochs is not None
             streamlined_patience = reduce_on_plateau_scheduler.patience + 1
             _log_plateu_bad_step(
                 iteration=iteration,

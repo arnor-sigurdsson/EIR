@@ -2,7 +2,16 @@ import reprlib
 from collections import defaultdict
 from functools import partial
 from inspect import signature
-from typing import Callable, List, Type, Dict, TYPE_CHECKING, Optional, Any
+from typing import (
+    Callable,
+    List,
+    Type,
+    Dict,
+    TYPE_CHECKING,
+    Optional,
+    Any,
+    MutableMapping,
+)
 
 import torch
 from adabelief_pytorch import AdaBelief
@@ -71,14 +80,18 @@ def _get_optimizer_class(optimizer_name: str) -> Type[Optimizer]:
     return optimizer_class
 
 
-def _create_optimizer_class_getter(optimizer_name: str) -> Dict[str, Type[Optimizer]]:
+def _create_optimizer_class_getter(
+    optimizer_name: str,
+) -> MutableMapping[str, Type[Optimizer]]:
     """
     We use an interface with the external optimizer library as a default factory,
     meaning that if we cannot find an optimizer in our base optimizer, we check if
     they exist in the external library.
     """
     default_factory = partial(_get_external_optimizers, optimizer_name)
-    optimizer_getter = defaultdict(default_factory)
+    optimizer_getter: MutableMapping[str, Type[Optimizer]] = defaultdict(
+        default_factory
+    )
 
     base_optimizers = get_base_optimizers_dict()
     optimizer_getter.update(base_optimizers)

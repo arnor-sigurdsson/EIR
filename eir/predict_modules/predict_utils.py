@@ -1,4 +1,4 @@
-from typing import Sequence, Dict, Tuple, Literal
+from typing import Sequence, Dict, Tuple
 
 import colorama as clr
 
@@ -8,8 +8,9 @@ def log_and_raise_missing_or_multiple_config_matching_general(
     train_type: str,
     matches: Sequence[Dict],
     predict_names_and_types: Sequence[Tuple[str, str]],
-    name: Literal["input", "output"],
+    name: str,
 ) -> None:
+    assert name in ("input", "output")
     train_name = clr.Style.BRIGHT + clr.Fore.GREEN + train_name + clr.Style.RESET_ALL
     train_type = clr.Style.BRIGHT + clr.Fore.GREEN + train_type + clr.Style.RESET_ALL
 

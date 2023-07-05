@@ -33,14 +33,14 @@ from eir.train_utils.utils import get_seed
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 # Type Aliases
-al_all_column_ops = Union[None, Dict[str, Tuple[ColumnOperation, ...]]]
+al_all_column_ops = Optional[Dict[str, Tuple[ColumnOperation, ...]]]
 al_train_val_dfs = Tuple[pd.DataFrame, pd.DataFrame]
 
 # e.g. 'Asia' or '5' for categorical or 1.511 for continuous
 al_label_values_raw = Union[float, int]
 al_sample_labels_raw = Dict[str, al_label_values_raw]
 al_label_dict = Dict[str, al_sample_labels_raw]
-al_target_label_dict = Dict[str, al_label_dict]  # account for output name
+al_target_label_dict = dict[str, al_label_dict]  # account for output name
 al_target_columns = Dict[Literal["con", "cat"], list[str]]
 al_label_transformers_object = Union[StandardScaler, LabelEncoder]
 al_label_transformers = Dict[str, al_label_transformers_object]

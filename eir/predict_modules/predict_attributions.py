@@ -56,8 +56,10 @@ def compute_predict_attributions(
     )
 
     attribution_output_folder_callable = partial(
-        _get_predict_attribution_outfolder_target,
-        predict_outfolder=Path(predict_config.predict_specific_cl_args.output_folder),
+        _get_predict_attribution_output_folder_target,
+        predict_output_folder=Path(
+            predict_config.predict_specific_cl_args.output_folder
+        ),
     )
 
     tabular_attribution_analysis_wrapper(
@@ -147,9 +149,13 @@ def _get_predict_background_loader(
         k=num_attribution_background_samples,
     )
 
+    custom_ops = None
+    if loaded_hooks is not None:
+        custom_ops = loaded_hooks.custom_column_label_parsing_ops
+
     target_labels = get_target_labels_for_testing(
         configs_overloaded_for_predict=configs,
-        custom_column_label_parsing_ops=loaded_hooks.custom_column_label_parsing_ops,
+        custom_column_label_parsing_ops=custom_ops,
         ids=background_ids_sampled,
     )
 
@@ -181,12 +187,12 @@ def _get_predict_background_loader(
     return background_loader
 
 
-def _get_predict_attribution_outfolder_target(
-    predict_outfolder: Path, output_name: str, column_name: str, input_name: str
+def _get_predict_attribution_output_folder_target(
+    predict_output_folder: Path, output_name: str, column_name: str, input_name: str
 ) -> Path:
-    attribution_outfolder = (
-        predict_outfolder / output_name / column_name / "attributions" / input_name
+    attribution_output_folder = (
+        predict_output_folder / output_name / column_name / "attributions" / input_name
     )
-    ensure_path_exists(path=attribution_outfolder, is_folder=True)
+    ensure_path_exists(path=attribution_output_folder, is_folder=True)
 
-    return attribution_outfolder
+    return attribution_output_folder

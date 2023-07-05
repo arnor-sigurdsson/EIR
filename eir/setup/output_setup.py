@@ -1,4 +1,4 @@
-from typing import Dict, Union, Callable, Any, Optional, TYPE_CHECKING
+from typing import Dict, Callable, Any, Optional, TYPE_CHECKING, Protocol
 
 from aislib.misc_utils import get_logger
 
@@ -42,11 +42,23 @@ def set_up_outputs_for_training(
     return all_outputs
 
 
+class OutputSetupFunction(Protocol):
+    def __call__(
+        self,
+        input_config: schemas.OutputConfig,
+        **kwargs,
+    ) -> al_output_objects:
+        ...
+
+
+class OutputSetupGetterFunction(Protocol):
+    def __call__(self, output_config: schemas.OutputConfig) -> OutputSetupFunction:
+        ...
+
+
 def set_up_outputs_general(
     output_configs: schemas.al_output_configs,
-    setup_func_getter: Callable[
-        [Union[schemas.OutputConfig, Any]], Callable[..., al_output_objects]
-    ],
+    setup_func_getter: OutputSetupGetterFunction,
     setup_func_kwargs: Dict[str, Any],
 ) -> al_output_objects_as_dict:
     all_outputs = {}
@@ -80,8 +92,8 @@ def get_output_setup_function_for_train(
     return mapping[output_type]
 
 
-def get_output_setup_function_map() -> Dict[str, Callable[..., al_output_objects]]:
-    setup_mapping = {
+def get_output_setup_function_map() -> dict[str, Callable[..., al_output_objects]]:
+    setup_mapping: dict[str, Callable[..., al_output_objects]] = {
         "tabular": set_up_tabular_output,
         "sequence": set_up_sequence_output,
     }

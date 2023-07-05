@@ -11,9 +11,11 @@ from typing import (
     List,
     Tuple,
     Optional,
+    cast,
     Literal,
     Callable,
     Union,
+    Protocol,
     Generator,
     Sequence,
 )
@@ -38,10 +40,10 @@ from torch.linalg import vector_norm
 from torch.utils.tensorboard import SummaryWriter
 
 from eir.data_load.data_utils import get_output_info_generator
-from eir.setup.schemas import OutputConfig
+from eir.setup.schemas import OutputConfig, TabularOutputTypeConfig
 
 if TYPE_CHECKING:
-    from eir.train import al_criteria, Experiment  # noqa: F401
+    from eir.train import al_criteria_dict, Experiment  # noqa: F401
     from eir.train_utils.step_logic import al_training_labels_target
     from eir.models.input.omics.omics_models import al_omics_models  # noqa: F401
     from eir.train_utils.train_handlers import HandlerConfig
@@ -51,15 +53,37 @@ if TYPE_CHECKING:
         al_label_transformers,
     )
     from eir.setup.output_setup import al_output_objects_as_dict
+    from eir.models.meta.meta import FeatureExtractorProtocolWithL1
 
 # aliases
 # output_name -> target_name -> metric name: value
 al_step_metric_dict = Dict[str, Dict[str, Dict[str, float]]]
+
+
+class MetricFunctionProtocol(Protocol):
+    def __call__(
+        self,
+        outputs: np.ndarray,
+        labels: np.ndarray,
+        column_name: str,
+        output_name: str,
+    ) -> float:
+        ...
+
+
+class AverageMetricFunctionProtocol(Protocol):
+    def __call__(
+        self,
+        metric_dict: al_step_metric_dict,
+        output_name: str,
+        column_name: str,
+    ) -> float:
+        ...
+
+
+al_averaging_functions_dict = Dict[str, AverageMetricFunctionProtocol]
 al_metric_record_dict = Dict[
-    str, Union[Tuple["MetricRecord", ...], "al_averaging_functions_dict"]
-]
-al_averaging_functions_dict = Dict[
-    str, Callable[["al_step_metric_dict", str, str], float]
+    str, Tuple["MetricRecord", ...] | "al_averaging_functions_dict"
 ]
 
 al_cat_averaging_metric_choices = list[
@@ -73,7 +97,7 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 @dataclass()
 class MetricRecord:
     name: str
-    function: Callable
+    function: MetricFunctionProtocol
     only_val: bool = False
     minimize_goal: bool = False
 
@@ -89,10 +113,10 @@ def calculate_batch_metrics(
 
     target_columns_gen = get_output_info_generator(outputs_as_dict=outputs_as_dict)
 
-    master_metric_dict = {}
+    master_metric_dict: al_step_metric_dict = {}
 
     for output_name, output_target_type, target_name in target_columns_gen:
-        cur_metric_dict = {}
+        cur_metric_dict: dict[str, float] = {}
 
         if output_name not in master_metric_dict:
             master_metric_dict[output_name] = {}
@@ -106,13 +130,15 @@ def calculate_batch_metrics(
             assert cur_output_type == "tabular"
 
             al_record = Tuple[MetricRecord, ...]
-            cur_metric_records: al_record = metric_record_dict[output_target_type]
+            cur_record = metric_record_dict[output_target_type]
+            assert isinstance(cur_record, tuple)
+            cur_metric_records: al_record = cur_record
 
             cur_outputs = outputs[output_name][target_name]
-            cur_outputs = cur_outputs.detach().cpu().to(dtype=torch.float32).numpy()
+            cur_outputs_np = cur_outputs.detach().cpu().to(dtype=torch.float32).numpy()
 
             cur_labels = labels[output_name][target_name]
-            cur_labels = cur_labels.cpu().to(dtype=torch.float32).numpy()
+            cur_labels_np = cur_labels.cpu().to(dtype=torch.float32).numpy()
 
             for metric_record in cur_metric_records:
                 if metric_record.only_val and mode == "train":
@@ -120,8 +146,8 @@ def calculate_batch_metrics(
 
                 cur_key = f"{output_name}_{target_name}_{metric_record.name}"
                 cur_metric_dict[cur_key] = metric_record.function(
-                    outputs=cur_outputs,
-                    labels=cur_labels,
+                    outputs=cur_outputs_np,
+                    labels=cur_labels_np,
                     column_name=target_name,
                     output_name=output_name,
                 )
@@ -153,7 +179,7 @@ def add_multi_task_average_metrics(
     batch_metrics_dict: al_step_metric_dict,
     outputs_as_dict: "al_output_objects_as_dict",
     loss: float,
-    performance_average_functions: Dict[str, Callable[[al_step_metric_dict], float]],
+    performance_average_functions: "al_averaging_functions_dict",
 ) -> al_step_metric_dict:
     average_performance = average_performances_across_tasks(
         metric_dict=batch_metrics_dict,
@@ -173,23 +199,18 @@ def add_multi_task_average_metrics(
 def average_performances_across_tasks(
     metric_dict: al_step_metric_dict,
     outputs_as_dict: "al_output_objects_as_dict",
-    performance_calculation_functions: Dict[
-        str, Callable[[al_step_metric_dict], float]
-    ],
+    performance_calculation_functions: "al_averaging_functions_dict",
 ) -> float:
     target_columns_gen = get_output_info_generator(outputs_as_dict)
 
     all_metrics = []
 
     for output_name, column_type, column_name in target_columns_gen:
-        cur_metric_func = performance_calculation_functions.get(column_type)
+        cur_metric_func = performance_calculation_functions[column_type]
 
-        metric_func_args = {
-            "metric_dict": metric_dict,
-            "output_name": output_name,
-            "column_name": column_name,
-        }
-        cur_value = cur_metric_func(**metric_func_args)
+        cur_value = cur_metric_func(
+            metric_dict=metric_dict, output_name=output_name, column_name=column_name
+        )
         all_metrics.append(cur_value)
 
         all_metrics.append(cur_value)
@@ -200,18 +221,16 @@ def average_performances_across_tasks(
 
 
 def calc_mcc(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
-    pred = np.argmax(a=outputs, axis=1)
+    prediction = np.argmax(a=outputs, axis=1)
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=RuntimeWarning)
-        mcc = matthews_corrcoef(labels, pred)
+        mcc = matthews_corrcoef(labels, prediction)
 
     return mcc
 
 
-def calc_roc_auc_ovo(
-    outputs: np.ndarray, labels: np.ndarray, average: str = "macro", *args, **kwargs
-) -> float:
+def calc_roc_auc_ovo(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
     """
     TODO:   In rare scenarios, we might run into the issue of not having all labels
             represented in the labels array (i.e. labels were in train, but not in
@@ -221,7 +240,7 @@ def calc_roc_auc_ovo(
             returned from label_binarize are all 0.
     """
 
-    assert average in ["micro", "macro"]
+    average = "macro"
 
     if outputs.shape[1] > 2:
         outputs = softmax(x=outputs, axis=1)
@@ -235,9 +254,9 @@ def calc_roc_auc_ovo(
 
 
 def calc_average_precision(
-    outputs: np.ndarray, labels: np.ndarray, average: str = "macro", *args, **kwargs
+    outputs: np.ndarray, labels: np.ndarray, *args, **kwargs
 ) -> float:
-    assert average in ["micro", "macro"]
+    average = "macro"
 
     if outputs.shape[1] > 2:
         labels = label_binarize(y=labels, classes=sorted(np.unique(labels)))
@@ -289,22 +308,22 @@ def calc_rmse(
     outputs_2d = outputs.reshape(-1, 1)
 
     labels = cur_target_transformer.inverse_transform(labels_2d).squeeze()
-    preds = cur_target_transformer.inverse_transform(outputs_2d).squeeze()
+    predictions = cur_target_transformer.inverse_transform(outputs_2d).squeeze()
 
-    rmse = np.sqrt(mean_squared_error(y_true=labels, y_pred=preds))
+    rmse = np.sqrt(mean_squared_error(y_true=labels, y_pred=predictions))
     return rmse
 
 
 def calculate_prediction_losses(
-    criteria: "al_criteria",
-    inputs: Dict[str, Dict[str, torch.Tensor]],
-    targets: Dict[str, Dict[str, torch.Tensor]],
-) -> Dict[str, Dict[str, torch.Tensor]]:
+    criteria: "al_criteria_dict",
+    inputs: dict[str, dict[str, torch.Tensor]],
+    targets: dict[str, dict[str, torch.Tensor]],
+) -> dict[str, dict[str, torch.Tensor]]:
     """
     Inputs here refers to the input to the loss functions, which is the output
     from the actual models.
     """
-    losses_dict = {}
+    losses_dict: dict[str, dict[str, torch.Tensor]] = {}
 
     for output_name, target_criterion_dict in criteria.items():
         for output_head_name, criterion in target_criterion_dict.items():
@@ -333,20 +352,22 @@ def aggregate_losses(losses_dict: Dict[str, Dict[str, torch.Tensor]]) -> torch.T
 def get_uncertainty_loss_hook(
     output_configs: Sequence[OutputConfig],
     device: str,
-):
+) -> Callable:
     uncertainty_loss_modules = {}
     for output_config in output_configs:
         if output_config.output_info.output_type != "tabular":
             continue
 
-        if not output_config.output_type_info.uncertainty_weighted_mt_loss:
+        output_type_info = output_config.output_type_info
+        assert isinstance(output_type_info, TabularOutputTypeConfig)
+
+        if not output_type_info.uncertainty_weighted_mt_loss:
             continue
 
         logger.info(
             f"Adding uncertainty loss for {output_config.output_info.output_name}."
         )
 
-        output_type_info = output_config.output_type_info
         cur_target_cat_columns = list(output_type_info.target_cat_columns)
         cur_target_con_columns = list(output_type_info.target_con_columns)
         loss_module = UncertaintyMultiTaskLoss(
@@ -412,8 +433,8 @@ class UncertaintyMultiTaskLoss(nn.Module):
     @staticmethod
     def _construct_params(
         cur_target_columns: List[str], device: str
-    ) -> Dict[str, nn.Parameter]:
-        param_dict = {}
+    ) -> dict[str, torch.Tensor]:
+        param_dict: dict[str, torch.Tensor] = {}
         for column_name in cur_target_columns:
             cur_param = nn.Parameter(torch.zeros(1), requires_grad=True).to(
                 device=device
@@ -454,8 +475,6 @@ def hook_add_l1_loss(
 ) -> Dict:
     """
     TODO: Do the validation outside of the actual hook.
-    TODO: Use a combined iterator here for the fusion module and modules_to_fuse.
-    TODO: Convert all fusion modules to have their own L1 penalized weights.
     """
     model_configs = experiment.inputs
 
@@ -474,16 +493,11 @@ def hook_add_l1_loss(
             )
 
         if has_l1_weights and current_l1:
-            cur_l1_loss = get_model_l1_loss(model=input_module, l1_weight=current_l1)
+            input_module_with_l1 = cast("FeatureExtractorProtocolWithL1", input_module)
+            cur_l1_loss = get_model_l1_loss(
+                model=input_module_with_l1, l1_weight=current_l1
+            )
             l1_loss += cur_l1_loss
-
-    for fusion_module in experiment.model.fusion_modules.values():
-        fus_l1 = getattr(fusion_module.model_config, "l1", None)
-        fus_has_l1_weights = hasattr(fusion_module, "l1_penalized_weights")
-
-        if fus_l1 and fus_has_l1_weights:
-            fusion_l1_loss = get_model_l1_loss(model=fusion_module, l1_weight=fus_l1)
-            l1_loss += fusion_l1_loss
 
     updated_loss = state[loss_key] + l1_loss
 
@@ -492,7 +506,9 @@ def hook_add_l1_loss(
     return state_updates
 
 
-def get_model_l1_loss(model: nn.Module, l1_weight: float) -> torch.Tensor:
+def get_model_l1_loss(
+    model: "FeatureExtractorProtocolWithL1", l1_weight: float
+) -> torch.Tensor:
     l1_loss = calc_l1_loss(
         weight_tensor=model.l1_penalized_weights, l1_weight=l1_weight
     )
@@ -565,10 +581,10 @@ def get_metrics_files(
     target_generator: Generator[Tuple[str, str, str], None, None],
     run_folder: Path,
     train_or_val_target_prefix: str,
-) -> Dict[str, Dict[str, Path]]:
+) -> dict[str, dict[str, Path]]:
     assert train_or_val_target_prefix in ["validation_", "train_"]
 
-    path_dict = {}
+    path_dict: dict[str, dict[str, Path]] = {}
     for output_name, column_type, target_column in target_generator:
         if output_name not in path_dict:
             path_dict[output_name] = {}
@@ -678,8 +694,8 @@ def get_metrics_dataframes(
 
 def get_default_metrics(
     target_transformers: Dict[str, "al_label_transformers"],
-    cat_averaging_metrics: Optional[al_cat_averaging_metric_choices],
-    con_averaging_metrics: Optional[al_con_averaging_metric_choices],
+    cat_averaging_metrics: list[str],
+    con_averaging_metrics: list[str],
 ) -> "al_metric_record_dict":
     mcc = MetricRecord(name="mcc", function=calc_mcc)
     acc = MetricRecord(name="acc", function=calc_acc)
@@ -702,9 +718,12 @@ def get_default_metrics(
         cat_averaging_metrics=cat_averaging_metrics,
         con_averaging_metrics=con_averaging_metrics,
     )
-    averaging_functions = get_performance_averaging_functions(**avg_metrics)
+    averaging_functions = get_performance_averaging_functions(
+        cat_metric_names=avg_metrics["cat_metric_names"],
+        con_metric_names=avg_metrics["con_metric_names"],
+    )
 
-    default_metrics = {
+    default_metrics: al_metric_record_dict = {
         "cat": (mcc, acc, roc_auc_macro, ap_macro),
         "con": (rmse, r2, pcc),
         "averaging_functions": averaging_functions,
@@ -713,8 +732,8 @@ def get_default_metrics(
 
 
 def parse_averaging_metrics(
-    cat_averaging_metrics: Optional[al_cat_averaging_metric_choices],
-    con_averaging_metrics: Optional[al_con_averaging_metric_choices],
+    cat_averaging_metrics: Optional[list[str]],
+    con_averaging_metrics: Optional[list[str]],
 ) -> Dict[str, list[str]]:
     base = _get_default_averaging_metrics()
 
@@ -755,8 +774,8 @@ def _get_default_averaging_metrics() -> Dict[str, list[str]]:
 
 
 def get_performance_averaging_functions(
-    cat_metric_names: al_cat_averaging_metric_choices,
-    con_metric_names: al_con_averaging_metric_choices,
+    cat_metric_names: list[str],
+    con_metric_names: list[str],
 ) -> al_averaging_functions_dict:
     """
     Note that we have the mean(values) else 0.0 to account for some values not being
@@ -813,7 +832,7 @@ def get_performance_averaging_functions(
 
         return mean(values) if values else 0.0
 
-    performance_averaging_functions = {
+    performance_averaging_functions: al_averaging_functions_dict = {
         "cat": partial(_calc_cat_averaging_value, metric_names=cat_metric_names),
         "con": partial(_calc_con_averaging_value, metric_names=con_metric_names),
         "general": partial(_calc_con_averaging_value, metric_names=["loss"]),
