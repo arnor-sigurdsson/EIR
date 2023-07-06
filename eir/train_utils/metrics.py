@@ -40,7 +40,11 @@ from torch.linalg import vector_norm
 from torch.utils.tensorboard import SummaryWriter
 
 from eir.data_load.data_utils import get_output_info_generator
-from eir.setup.schemas import OutputConfig, TabularOutputTypeConfig
+from eir.setup.schemas import (
+    OutputConfig,
+    TabularOutputTypeConfig,
+)
+
 
 if TYPE_CHECKING:
     from eir.train import al_criteria_dict, Experiment  # noqa: F401
@@ -86,10 +90,10 @@ al_metric_record_dict = Dict[
     str, Tuple["MetricRecord", ...] | "al_averaging_functions_dict"
 ]
 
-al_cat_averaging_metric_choices = list[
+al_cat_averaging_metric_choices = Sequence[
     Literal["mcc", "acc", "roc-auc-macro", "ap-macro"]
 ]
-al_con_averaging_metric_choices = list[Literal["r2", "pcc", "loss"]]
+al_con_averaging_metric_choices = Sequence[Literal["r2", "pcc", "loss"]]
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -694,8 +698,8 @@ def get_metrics_dataframes(
 
 def get_default_metrics(
     target_transformers: Dict[str, "al_label_transformers"],
-    cat_averaging_metrics: list[str],
-    con_averaging_metrics: list[str],
+    cat_averaging_metrics: Optional[al_cat_averaging_metric_choices],
+    con_averaging_metrics: Optional[al_con_averaging_metric_choices],
 ) -> "al_metric_record_dict":
     mcc = MetricRecord(name="mcc", function=calc_mcc)
     acc = MetricRecord(name="acc", function=calc_acc)
@@ -732,9 +736,9 @@ def get_default_metrics(
 
 
 def parse_averaging_metrics(
-    cat_averaging_metrics: Optional[list[str]],
-    con_averaging_metrics: Optional[list[str]],
-) -> Dict[str, list[str]]:
+    cat_averaging_metrics: Optional[al_cat_averaging_metric_choices],
+    con_averaging_metrics: Optional[al_con_averaging_metric_choices],
+) -> Dict[str, Sequence[str]]:
     base = _get_default_averaging_metrics()
 
     if cat_averaging_metrics:
@@ -756,7 +760,7 @@ def parse_averaging_metrics(
 
 
 def _validate_metrics(
-    passed_in_metrics: list[str], expected_metrics: list[str], target_type: str
+    passed_in_metrics: Sequence[str], expected_metrics: Sequence[str], target_type: str
 ) -> None:
     for metric in passed_in_metrics:
         if metric not in expected_metrics:
@@ -766,7 +770,7 @@ def _validate_metrics(
             )
 
 
-def _get_default_averaging_metrics() -> Dict[str, list[str]]:
+def _get_default_averaging_metrics() -> Dict[str, Sequence[str]]:
     return {
         "cat_metric_names": ["mcc", "roc-auc-macro", "ap-macro"],
         "con_metric_names": ["loss", "pcc", "r2"],
@@ -774,8 +778,8 @@ def _get_default_averaging_metrics() -> Dict[str, list[str]]:
 
 
 def get_performance_averaging_functions(
-    cat_metric_names: list[str],
-    con_metric_names: list[str],
+    cat_metric_names: Sequence[str],
+    con_metric_names: Sequence[str],
 ) -> al_averaging_functions_dict:
     """
     Note that we have the mean(values) else 0.0 to account for some values not being

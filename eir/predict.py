@@ -4,9 +4,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import (
     Union,
-    Dict,
     Callable,
-    Sequence,
+    Iterable,
     Literal,
 )
 
@@ -61,8 +60,8 @@ from eir.train_utils.utils import set_log_level_for_eir_loggers
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
-al_predict_hook = Callable[..., Dict]
-al_predict_hooks = Sequence[al_predict_hook]
+al_predict_hook = Callable[..., dict]
+al_predict_hooks = Iterable[al_predict_hook]
 
 
 @dataclass()
@@ -336,7 +335,7 @@ def _auto_set_test_batch_size(batch_size: int, test_set_size: int) -> int:
 def _get_default_predict_hooks(train_hooks: "Hooks") -> PredictHooks:
     stages = PredictStepFunctionHookStages(
         base_prepare_batch=[_hook_default_predict_prepare_batch],
-        model_forward=[train_hooks.step_func_hooks.model_forward],
+        model_forward=train_hooks.step_func_hooks.model_forward,
     )
     predict_hooks = PredictHooks(
         step_func_hooks=stages,

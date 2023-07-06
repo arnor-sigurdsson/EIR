@@ -155,14 +155,14 @@ def _add_inverse_transformed_column(
     values = df[column_name].values
     col_name = f"{column_name} Untransformed"
 
-    match transformer:
-        case LabelEncoder():
-            df_copy.insert(loc=0, column=col_name, value=tt_it(values))
-        case StandardScaler():
-            values_parsed = tt_it(values.reshape(-1, 1)).flatten()
-            df_copy.insert(loc=0, column=col_name, value=values_parsed)
-        case _:
-            raise NotImplementedError(f"Transformer {transformer} not supported.")
+    if isinstance(transformer, LabelEncoder):
+        df_copy.insert(loc=0, column=col_name, value=tt_it(values))
+    elif isinstance(transformer, StandardScaler):
+        values_parsed = tt_it(values.reshape(-1, 1)).flatten()
+        df_copy.insert(loc=0, column=col_name, value=values_parsed)
+    else:
+        raise NotImplementedError(f"Transformer {transformer} not supported.")
+
     return df_copy
 
 

@@ -73,11 +73,13 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
         metric_dict=eval_metrics_dict,
     )
 
+    averaging_functions = exp.metrics["averaging_functions"]
+    assert isinstance(averaging_functions, dict)
     eval_metrics_dict_w_avgs = metrics.add_multi_task_average_metrics(
         batch_metrics_dict=eval_metrics_dict_w_loss,
         outputs_as_dict=exp.outputs,
         loss=val_loss_avg.item(),
-        performance_average_functions=exp.metrics["averaging_functions"],
+        performance_average_functions=averaging_functions,
     )
 
     write_eval_header = True if iteration == gc.sample_interval else False

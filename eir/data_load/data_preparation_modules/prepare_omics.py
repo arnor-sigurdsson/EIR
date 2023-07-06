@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Union, Sequence, Optional
+from typing import Union, Optional
 
 import numpy as np
 import torch
@@ -12,7 +12,7 @@ from eir.data_load.data_source_modules import deeplake_ops
 def omics_load_wrapper(
     data_pointer: Union[Path, int],
     input_source: str,
-    subset_indices: Union[Sequence[int], None],
+    subset_indices: Optional[np.ndarray],
     deeplake_inner_key: Optional[str] = None,
 ) -> np.ndarray:
     if deeplake_ops.is_deeplake_dataset(data_source=input_source):

@@ -1,6 +1,6 @@
 from pathlib import Path
 from textwrap import wrap
-from typing import List, Callable, Union, Tuple, TYPE_CHECKING, Dict, Literal
+from typing import List, Callable, Union, Tuple, TYPE_CHECKING, Dict, Literal, Optional
 
 import matplotlib
 import numpy as np
@@ -128,7 +128,7 @@ def _parse_metrics_colname(column_name: str) -> str:
 
 
 def _get_validation_extreme_value_and_iter(
-    extreme_index_func: Union[np.argmax, np.argmin], validation_values: pd.Series
+    extreme_index_func: Callable, validation_values: pd.Series
 ) -> Tuple[int, float]:
     extreme_index: int = extreme_index_func(validation_values)
     extreme_value: float = validation_values[extreme_index]
@@ -182,7 +182,7 @@ def gen_eval_graphs(plot_config: "PerformancePlotConfig"):
 
 
 def select_performance_curve_funcs(
-    column_type: str, n_classes: int = None
+    column_type: str, n_classes: Optional[int] = None
 ) -> List[Callable]:
     if column_type == "cat":
         if not n_classes or n_classes < 2:
@@ -198,6 +198,8 @@ def select_performance_curve_funcs(
             return [generate_multi_class_roc_curve, generate_multi_class_pr_curve]
     elif column_type == "con":
         return [generate_regression_prediction_plot]
+
+    raise ValueError(f"Unknown column type {column_type}.")
 
 
 def generate_regression_prediction_plot(
@@ -345,21 +347,23 @@ def generate_multi_class_roc_curve(
     *args,
     **kwargs,
 ):
-    fpr = dict()
-    tpr = dict()
-    roc_auc = dict()
+    fpr: dict[int | str, np.ndarray] = dict()
+    tpr: dict[int | str, np.ndarray] = dict()
+    roc_auc: dict[int, float] = dict()
 
     unique_classes = sorted(transformer.classes_)
     n_classes = len(unique_classes)
     assert len(np.unique(y_true)) == n_classes
 
-    y_true_bin = label_binarize(y_true, classes=range(n_classes))
+    y_true_bin = label_binarize(y=y_true, classes=range(n_classes))
 
     for i in range(n_classes):
-        fpr[i], tpr[i], _ = roc_curve(y_true_bin[:, i], y_outp[:, i])
-        roc_auc[i] = auc(fpr[i], tpr[i])
+        fpr[i], tpr[i], _ = roc_curve(y_true=y_true_bin[:, i], y_score=y_outp[:, i])
+        roc_auc[i] = auc(x=fpr[i], y=tpr[i])
 
-    fpr["micro"], tpr["micro"], _ = roc_curve(y_true_bin.ravel(), y_outp.ravel())
+    fpr["micro"], tpr["micro"], _ = roc_curve(
+        y_true=y_true_bin.ravel(), y_score=y_outp.ravel()
+    )
 
     all_fpr = np.unique(np.concatenate([fpr[i] for i in range(n_classes)]))
 
@@ -422,8 +426,8 @@ def generate_multi_class_pr_curve(
     *args,
     **kwargs,
 ):
-    precision = dict()
-    recall = dict()
+    precision: dict[int | str, np.ndarray] = dict()
+    recall: dict[int | str, np.ndarray] = dict()
 
     unique_classes = sorted(transformer.classes_)
     n_classes = len(unique_classes)

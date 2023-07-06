@@ -4,6 +4,7 @@ from enum import Enum
 from pathlib import Path
 from typing import (
     List,
+    Iterable,
     Tuple,
     Union,
     Dict,
@@ -116,7 +117,7 @@ def parse_tabular_target_labels(
 
 def gather_prediction_outputs_from_dataloader(
     data_loader: DataLoader,
-    batch_prep_hook: Sequence[Callable],
+    batch_prep_hook: Iterable[Callable],
     batch_prep_hook_kwargs: Dict[str, Any],
     model: Module,
     with_labels: bool = True,
@@ -175,7 +176,7 @@ def gather_prediction_outputs_from_dataloader(
 
 def gather_data_loader_samples(
     data_loader: DataLoader,
-    batch_prep_hook: Sequence[Callable],
+    batch_prep_hook: Iterable[Callable],
     batch_prep_hook_kwargs: Dict[str, Any],
     n_samples: Union[int, None] = None,
 ) -> al_dataloader_gathered_raw:

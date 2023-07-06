@@ -148,7 +148,9 @@ class AttrDelegatedSWAWrapper(torch.optim.swa_utils.AveragedModel):
 
 
 def maybe_wrap_model_with_swa(
-    n_iter_before_swa: Optional[int], model: "al_meta_model", device: torch.device
+    n_iter_before_swa: Optional[int],
+    model: "al_meta_model",
+    device: torch.device,
 ) -> "al_meta_model":
     if n_iter_before_swa is None:
         return model

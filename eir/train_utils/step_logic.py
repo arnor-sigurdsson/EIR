@@ -88,7 +88,7 @@ class Hooks:
     custom_handler_attachers: Union[None, al_handler_attachers] = None
 
 
-def _get_default_step_function_hooks(configs: Configs):
+def _get_default_step_function_hooks(configs: Configs) -> "StepFunctionHookStages":
     """
     TODO: Add validation, inspect that outputs have correct names.
     TODO: Refactor, split into smaller functions e.g. for L1, mixing and uncertainty.

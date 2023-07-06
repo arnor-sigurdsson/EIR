@@ -43,9 +43,13 @@ from eir.setup.input_setup_modules.setup_tabular import (
     set_up_tabular_input_for_training,
     ComputedTabularInputInfo,
 )
+from eir.predict_modules.predict_tabular_input_setup import (
+    ComputedPredictTabularInputInfo,
+)
 
 if TYPE_CHECKING:
     from eir.train_utils.step_logic import Hooks
+
 
 logger = get_logger(__name__)
 
@@ -56,6 +60,7 @@ al_input_objects = Union[
     ComputedBytesInputInfo,
     ComputedImageInputInfo,
     ComputedArrayInputInfo,
+    ComputedPredictTabularInputInfo,
 ]
 al_input_objects_as_dict = Dict[str, al_input_objects]
 

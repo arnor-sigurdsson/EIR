@@ -35,6 +35,7 @@ al_losses = (
     | nn.SmoothL1Loss
     | nn.PoissonNLLLoss
     | nn.HuberLoss
+    | Callable
 )
 
 

@@ -1,8 +1,10 @@
-from functools import reduce
 from pathlib import Path
-from typing import TYPE_CHECKING
+from itertools import chain
+from typing import List, Tuple, Union, Optional, TYPE_CHECKING
 
 import matplotlib
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 import numpy as np
 import pandas as pd
 
@@ -70,7 +72,7 @@ def plot_top_gradients(
     df_snps: pd.DataFrame,
     output_folder: Path,
     fname: str = "top_snps.pdf",
-    custom_ylabel: str = None,
+    custom_ylabel: Optional[str] = None,
 ):
     n_cls = len(top_gradients_dict.keys())
     classes = sorted(list(top_gradients_dict.keys()))
@@ -169,21 +171,64 @@ def _get_manhattan_axis_and_figure(
     df: pd.DataFrame,
     chr_column_name: str,
     attribution_column_name: str,
-    color=None,
-    figure_size=(12, 6),
-    ar=90,
-    gwas_sign_line=False,
-    gwasp=5e-08,
-    dotsize=8,
-    valpha=1,
-    axxlabel=None,
-    axylabel=None,
-    axlabelfontsize=9,
-    axlabelfontname="Arial",
-):
-    """Adapted from https://github.com/reneshbedre/bioinfokit#manhatten-plot."""
+    colors: Optional[Union[Tuple[str, str], List[str]]] = None,
+    figure_size: Tuple[int, int] = (12, 6),
+    axis_rotation: int = 90,
+    gwas_significant_line: bool = False,
+    gwas_p_value: float = 5e-08,
+    dot_size: int = 8,
+    alpha_value: int = 1,
+    axis_label_x: Optional[str] = None,
+    axis_label_y: Optional[str] = None,
+    axis_label_font_size: int = 9,
+    axis_label_font_name: str = "Arial",
+) -> Tuple[Axes, Figure]:
+    """Adapted from https://github.com/reneshbedre/bioinfokit#manhattan-plot."""
 
-    _x, _y = "Chromosome", r"Attribution"
+    available_colors = _get_available_colors()
+
+    df["tpval"] = df[attribution_column_name]
+    df["ind"] = range(len(df))
+
+    color_list = get_colors_list(
+        df=df,
+        chr_column_name=chr_column_name,
+        colors=colors,
+        available_colors=available_colors,
+    )
+
+    x_labels, x_ticks, fig, ax = initialize_plot(
+        df=df,
+        chr_column_name=chr_column_name,
+        color_list=color_list,
+        figure_size=figure_size,
+        dot_size=dot_size,
+        alpha_value=alpha_value,
+    )
+
+    if gwas_significant_line:
+        ax.axhline(
+            y=-np.log10(gwas_p_value),
+            linestyle="--",
+            color="#7d7d7d",
+            linewidth=1,
+        )
+
+    finalize_plot(
+        ax=ax,
+        x_labels=x_labels,
+        x_ticks=x_ticks,
+        axis_rotation=axis_rotation,
+        axis_label_x=axis_label_x,
+        axis_label_y=axis_label_y,
+        axis_label_font_size=axis_label_font_size,
+        axis_label_font_name=axis_label_font_name,
+    )
+
+    return ax, fig
+
+
+def _get_available_colors() -> Tuple[str, ...]:
     colors = (
         "#a7414a",
         "#282726",
@@ -226,61 +271,97 @@ def _get_manhattan_axis_and_figure(
         "#0a3200",
         "#8c271e",
     )
+    return colors
 
-    df["tpval"] = df[attribution_column_name]
 
-    df["ind"] = range(len(df))
-
-    if color is not None and len(color) == 2:
-        color_1 = int(df[chr_column_name].nunique() / 2) * [color[0]]
-        color_2 = int(df[chr_column_name].nunique() / 2) * [color[1]]
-        if df[chr_column_name].nunique() % 2 == 0:
-            color_list = list(reduce(lambda x, y: x + y, zip(color_1, color_2)))
-        elif df[chr_column_name].nunique() % 2 == 1:
-            color_list = list(reduce(lambda x, y: x + y, zip(color_1, color_2)))
-            color_list.append(color[0])
-    elif color is not None and len(color) == df[chr_column_name].nunique():
-        color_list = color
-    elif color is None:
-        # select colors randomly from the list based in number of chr
-        color_list = colors[: df[chr_column_name].nunique()]
+def get_colors_list(
+    df: pd.DataFrame,
+    chr_column_name: str,
+    colors: Optional[Union[Tuple[str, str], List[str]]],
+    available_colors: Tuple[str, ...],
+) -> List[str]:
+    if colors is not None and len(colors) == 2:
+        assert isinstance(colors, tuple)
+        return get_two_colors_list(
+            df=df, chr_column_name=chr_column_name, colors=colors
+        )
+    elif colors is not None and len(colors) == df[chr_column_name].nunique():
+        assert isinstance(colors, list)
+        return colors
+    elif colors is None:
+        return list(available_colors[: df[chr_column_name].nunique()])
     else:
         raise ValueError("Error in color argument.")
 
-    xlabels = []
-    xticks = []
+
+def get_two_colors_list(
+    df: pd.DataFrame, chr_column_name: str, colors: Tuple[str, str]
+) -> List[str]:
+    color_1 = int(df[chr_column_name].nunique() / 2) * [colors[0]]
+    color_2 = int(df[chr_column_name].nunique() / 2) * [colors[1]]
+
+    if df[chr_column_name].nunique() % 2 == 0:
+        color_list = list(chain(*zip(color_1, color_2)))
+    elif df[chr_column_name].nunique() % 2 == 1:
+        color_list = list(chain(*zip(color_1, color_2)))
+        color_list.append(colors[0])
+    else:
+        raise ValueError("Error in color argument.")
+
+    return color_list
+
+
+def initialize_plot(
+    df: pd.DataFrame,
+    chr_column_name: str,
+    color_list: List[str],
+    figure_size: Tuple[int, int],
+    dot_size: int,
+    alpha_value: int,
+) -> Tuple[List[str], List[int], Figure, Axes]:
+    x_labels = []
+    x_ticks = []
     fig, ax = plt.subplots(figsize=figure_size)
-    i = 0
-    for label, df1 in df.groupby(chr_column_name):
+
+    for i, (label, df1) in enumerate(df.groupby(chr_column_name)):
         df1.plot(
             kind="scatter",
             x="ind",
             y="tpval",
             color=color_list[i],
-            s=dotsize,
-            alpha=valpha,
+            s=dot_size,
+            alpha=alpha_value,
             ax=ax,
         )
         df1_max_ind = df1["ind"].iloc[-1]
         df1_min_ind = df1["ind"].iloc[0]
-        xlabels.append(label)
-        xticks.append((df1_max_ind - (df1_max_ind - df1_min_ind) / 2))
-        i += 1
+        x_labels.append(label)
+        x_ticks.append((df1_max_ind - (df1_max_ind - df1_min_ind) / 2))
 
-    # add GWAS significant line
-    if gwas_sign_line is True:
-        ax.axhline(y=-np.log10(gwasp), linestyle="--", color="#7d7d7d", linewidth=1)
+    return x_labels, x_ticks, fig, ax
 
+
+def finalize_plot(
+    ax: Axes,
+    x_labels: List[str],
+    x_ticks: List[int],
+    axis_rotation: int,
+    axis_label_x: Optional[str],
+    axis_label_y: Optional[str],
+    axis_label_font_size: int,
+    axis_label_font_name: str,
+) -> None:
     ax.margins(x=0)
     ax.margins(y=0)
-    ax.set_xticks(xticks)
-    ax.set_xticklabels(xlabels, rotation=ar)
-
-    if axxlabel:
-        _x = axxlabel
-    if axylabel:
-        _y = axylabel
-    ax.set_xlabel(_x, fontsize=axlabelfontsize, fontname=axlabelfontname)
-    ax.set_ylabel(_y, fontsize=axlabelfontsize, fontname=axlabelfontname)
-
-    return ax, fig
+    ax.set_xticks(x_ticks)
+    ax.set_xticklabels(x_labels, rotation=axis_rotation)
+    ax.set_xlabel(
+        axis_label_x or "Chromosome",
+        fontsize=axis_label_font_size,
+        fontname=axis_label_font_name,
+    )
+    ax.set_ylabel(
+        axis_label_y or r"Attribution",
+        fontsize=axis_label_font_size,
+        fontname=axis_label_font_name,
+    )

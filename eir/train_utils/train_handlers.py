@@ -6,11 +6,11 @@ from typing import (
     List,
     Callable,
     Union,
+    Optional,
     Tuple,
     TYPE_CHECKING,
     Dict,
     overload,
-    Literal,
     Iterator,
 )
 
@@ -18,7 +18,7 @@ import aislib.misc_utils
 import yaml
 from aislib.misc_utils import get_logger
 from ignite.contrib.handlers import ProgressBar
-from ignite.engine import Events, Engine, events
+from ignite.engine import Events, Engine, events, CallableEventWithFilter, EventsList
 from ignite.handlers import ModelCheckpoint, EarlyStopping
 from ignite.metrics import RunningAverage
 from torch import nn
@@ -55,7 +55,7 @@ if TYPE_CHECKING:
 
 # Aliases
 al_handler = Callable[[Engine, "HandlerConfig"], None]
-al_event = Union[Events, Tuple[Events, Events]]
+al_event = EventsList | CallableEventWithFilter
 al_handler_and_event = Tuple[al_handler, al_event]
 al_sample_interval_handlers = Tuple[al_handler_and_event, ...]
 
@@ -169,7 +169,7 @@ def _get_validation_handler_and_event(
     early_stopping_patience: int,
     validation_handler_callable: Callable,
 ) -> al_handler_and_event:
-    validation_event = Events.ITERATION_COMPLETED(every=sample_interval_base)
+    validation_event: al_event = Events.ITERATION_COMPLETED(every=sample_interval_base)
 
     do_run_when_training_complete = _do_run_completed_handler(
         iter_per_epoch=iter_per_epoch,
@@ -193,7 +193,7 @@ def _get_attribution_handler_and_event(
     attribution_handler_callable = attribution_analysis_handler
 
     if attributions_every_sample_factor == 0:
-        attribution_event = Events.COMPLETED
+        attribution_event: al_event = Events.COMPLETED
         logger.debug("Attributions will be computed at run end.")
 
         return attribution_handler_callable, attribution_event
@@ -241,9 +241,12 @@ def _get_monitoring_metrics(
     """
     target_columns_gen = get_output_info_generator(outputs_as_dict=outputs_as_dict)
 
-    loss_average_metrics = tuple(["average", "average", "loss-average"])
-    perf_average_metrics = tuple(["average", "average", "perf-average"])
-    monitoring_metrics = [loss_average_metrics, perf_average_metrics]
+    loss_average_metrics: tuple[str, str, str] = ("average", "average", "loss-average")
+    perf_average_metrics: tuple[str, str, str] = ("average", "average", "perf-average")
+    monitoring_metrics: list[tuple[str, str, str]] = [
+        loss_average_metrics,
+        perf_average_metrics,
+    ]
 
     def _parse_target_metrics(
         output_name_: str, metric_name: str, column_name_: str
@@ -256,8 +259,10 @@ def _get_monitoring_metrics(
             cur_output_type = cur_output_object.output_config.output_info.output_type
             assert cur_output_type == "tabular"
 
-            al_record = Tuple[MetricRecord, ...]
-            cur_metric_records: al_record = metric_record_dict[output_target_type]
+            al_record = tuple[MetricRecord, ...]
+            cur_record = metric_record_dict[output_target_type]
+            assert isinstance(cur_record, tuple)
+            cur_metric_records: al_record = cur_record
 
             for metric in cur_metric_records:
                 if not metric.only_val:
@@ -266,7 +271,11 @@ def _get_monitoring_metrics(
                         column_name_=column_name,
                         metric_name=metric.name,
                     )
-                    cur_tuple = tuple([output_name, column_name, parsed_metric])
+                    cur_tuple: tuple[str, str, str] = (
+                        output_name,
+                        column_name,
+                        parsed_metric,
+                    )
                     monitoring_metrics.append(cur_tuple)
 
         # manually add loss record as it's not in metric records, but from criteria
@@ -297,6 +306,7 @@ def _attach_early_stopping_handler(trainer: Engine, handler_config: "HandlerConf
         sample_interval=gc.sample_interval,
     )
 
+    assert isinstance(early_stopping_event_kwargs, dict)
     trainer.add_event_handler(
         event_name=Events.ITERATION_COMPLETED(
             **early_stopping_event_kwargs,
@@ -329,14 +339,14 @@ def _get_early_stopping_handler(
 @overload
 def _get_early_stopping_event_filter_kwargs(
     early_stopping_iteration_buffer: None, sample_interval: int
-) -> Dict[Literal["every"], int]:
+) -> dict[str, int]:
     ...
 
 
 @overload
 def _get_early_stopping_event_filter_kwargs(
     early_stopping_iteration_buffer: int, sample_interval: int
-) -> Dict[Literal["event_filter"], Callable[[Engine, int], bool]]:
+) -> dict[str, Callable[[Engine, int], bool]]:
     ...
 
 
@@ -569,6 +579,9 @@ def _add_checkpoint_handler_wrapper(
             run_folder=run_folder, column=score_name
         )
 
+    assert n_to_save is not None
+    assert checkpoint_score_function is not None
+    assert score_name is not None
     checkpoint_handler = _get_checkpoint_handler(
         run_folder=run_folder,
         output_folder=output_folder,
@@ -600,7 +613,7 @@ def _get_metric_writing_funcs(
         train_or_val_target_prefix="train_",
     )
 
-    writer_funcs = {}
+    writer_funcs: Dict[str, Dict[str, Callable]] = {}
     for output_name, target_name_file_dict in metrics_files.items():
         writer_funcs[output_name] = {}
 
@@ -616,8 +629,8 @@ def _get_checkpoint_handler(
     run_folder: Path,
     output_folder: Path,
     n_to_save: int,
-    score_function: Callable = None,
-    score_name: str = None,
+    score_function: Optional[Callable] = None,
+    score_name: Optional[str] = None,
 ) -> ModelCheckpoint:
     def _default_global_step_transform(engine: Engine, event_name: str) -> int:
         return engine.state.iteration
@@ -680,8 +693,14 @@ def _write_training_metrics_handler(
 
     is_first_iteration = True if iteration == 1 else False
 
+    engine_output = engine.state.output
+    engine_metrics_dict = engine.state.metrics
+    assert isinstance(engine_output, dict)
+    assert isinstance(engine_metrics_dict, dict)
+
     running_average_metrics = _unflatten_engine_metrics_dict(
-        step_base=engine.state.output, engine_metrics_dict=engine.state.metrics
+        step_base=engine_output,
+        engine_metrics_dict=engine_metrics_dict,
     )
     persist_metrics(
         handler_config=handler_config,
@@ -700,7 +719,7 @@ def _unflatten_engine_metrics_dict(
     We need this to streamline the 1D dictionary that comes from engine.state.metrics.
     """
 
-    nested_dict = {}
+    nested_dict: "al_step_metric_dict" = {}
 
     for output_name, output_metric_dict in step_base.items():
         nested_dict[output_name] = {}

@@ -18,7 +18,7 @@ from eir.setup.input_setup_modules.setup_tabular import (
 def get_input_setup_from_pretrained_function_map(
     run_folder: Path, load_module_name: str
 ) -> Dict[str, Callable]:
-    pretrained_setup_mapping = {
+    pretrained_setup_mapping: Dict[str, Callable] = {
         "omics": set_up_omics_input,
         "tabular": partial(
             set_up_tabular_input_from_pretrained, custom_input_name=load_module_name

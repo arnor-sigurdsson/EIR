@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import (
     Callable,
     Dict,
+    cast,
     Type,
     TYPE_CHECKING,
 )
@@ -43,7 +44,7 @@ def get_model(
     fusion_config: schemas.FusionConfig,
     outputs_as_dict: "al_output_objects_as_dict",
     meta_class_getter: MetaClassGetterCallable = get_default_meta_class,
-) -> al_meta_model | Callable:
+) -> al_meta_model:
     meta_class, meta_kwargs = get_meta_model_class_and_kwargs_from_configs(
         global_config=global_config,
         fusion_config=fusion_config,
@@ -90,9 +91,9 @@ def get_model(
         device=global_config.device, model=meta_model
     )
 
-    compiled_model: Callable
+    compiled_model: al_meta_model
     if global_config.compile_model:
-        compiled_model = torch.compile(model=meta_model)
+        compiled_model = cast(al_meta_model, torch.compile(model=meta_model))
     else:
         compiled_model = meta_model
 

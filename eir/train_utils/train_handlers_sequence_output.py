@@ -59,22 +59,44 @@ from eir.setup.input_setup_modules.setup_sequence import get_sequence_split_func
 from eir.setup.schema_modules.output_schemas_sequence import (
     SequenceOutputSamplingConfig,
 )
-from eir.setup.schemas import OutputConfig
+from eir.setup.output_setup_modules.sequence_output_setup import (
+    ComputedSequenceOutputInfo,
+)
+from eir.setup.schemas import (
+    OutputConfig,
+    SequenceOutputTypeConfig,
+    SequenceInputDataConfig,
+    OmicsInputDataConfig,
+    ArrayInputDataConfig,
+    ByteInputDataConfig,
+    TabularInputDataConfig,
+    ImageInputDataConfig,
+)
 from eir.train_utils import utils
 from eir.train_utils.utils import call_hooks_stage_iterable
+from eir.setup.input_setup_modules.setup_array import ComputedArrayInputInfo
+from eir.setup.input_setup_modules.setup_tabular import ComputedTabularInputInfo
+from eir.setup.input_setup_modules.setup_bytes import ComputedBytesInputInfo
+from eir.setup.input_setup_modules.setup_image import ComputedImageInputInfo
+from eir.setup.input_setup_modules.setup_omics import ComputedOmicsInputInfo
+from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
+from eir.predict_modules.predict_tabular_input_setup import (
+    ComputedPredictTabularInputInfo,
+)
+
 
 if TYPE_CHECKING:
     from eir.train_utils.step_logic import Hooks
     from eir.train import al_input_objects_as_dict, Experiment
-    from eir.predict import PredictExperiment
+    from eir.predict import PredictExperiment, PredictHooks
 
 logger = get_logger(name=__name__)
 
 
 @dataclass
 class SequenceOutputEvalSamples:
-    auto_samples: Dict[str, Sequence["SequenceOutputEvalSample"]]
-    manual_samples: Dict[str, Sequence["SequenceOutputEvalSample"]]
+    auto_samples: Dict[str, list["SequenceOutputEvalSample"]]
+    manual_samples: Dict[str, list["SequenceOutputEvalSample"]]
 
 
 @dataclass()
@@ -133,7 +155,12 @@ def sequence_out_single_sample_evaluation_wrapper(
             iteration=iteration,
         )
 
-        if config.output_type_info.sequence_operation == "autoregressive":
+        output_type_info = config.output_type_info
+        assert isinstance(output_type_info, SequenceOutputTypeConfig)
+
+        assert config.sampling_config is not None
+
+        if output_type_info.sequence_operation == "autoregressive":
             sample_generator = _get_eval_sample_generator(
                 eval_samples=eval_samples, output_name=cur_output_name
             )
@@ -148,11 +175,15 @@ def sequence_out_single_sample_evaluation_wrapper(
                     sampling_config=config.sampling_config,
                 )
 
+                cur_input_object = input_objects[cur_input_name]
+                assert isinstance(cur_input_object, ComputedSequenceInputInfo)
+                assert cur_input_object.tokenizer is not None
+
                 generated_sample = decode_tokens(
                     tokens=generated_tokens,
-                    tokenizer=input_objects[cur_input_name].tokenizer,
-                    vocab=input_objects[cur_input_name].vocab,
-                    split_on=config.output_type_info.split_on,
+                    tokenizer=cur_input_object.tokenizer,
+                    vocab=cur_input_object.vocab,
+                    split_on=output_type_info.split_on,
                 )
 
                 cur_output_path = (
@@ -180,36 +211,50 @@ def sequence_out_single_sample_evaluation_wrapper(
 def convert_model_inputs_to_raw(
     inputs_to_model: Dict[str, torch.Tensor | dict[str, torch.Tensor]],
     input_objects: "al_input_objects_as_dict",
-) -> Dict[str, str | np.ndarray]:
+) -> Dict[str, str | np.ndarray | dict[str, np.ndarray]]:
     raw_inputs = {}
-    for name, data in inputs_to_model.items():
-        input_object = input_objects[name]
+    for input_name, data in inputs_to_model.items():
+        input_object = input_objects[input_name]
 
-        input_type = input_object.input_config.input_info.input_type
-
-        match input_type:
-            case "tabular":
+        raw_input: str | np.ndarray | dict[str, np.ndarray]
+        match input_object:
+            case ComputedTabularInputInfo() | ComputedPredictTabularInputInfo():
+                assert isinstance(data, dict)
                 raw_input = convert_tabular_input_to_raw(
                     data=data,
                     input_transformers=input_object.labels.label_transformers,
                 )
-            case "omics" | "array" | "bytes":
+
+            case (
+                ComputedOmicsInputInfo()
+                | ComputedArrayInputInfo()
+                | ComputedBytesInputInfo()
+            ):
+                assert isinstance(data, torch.Tensor)
                 raw_input = data.numpy().squeeze()
-            case "sequence":
+
+            case ComputedSequenceInputInfo():
+                assert isinstance(data, torch.Tensor)
+                input_type_info = input_object.input_config.input_type_info
+                assert isinstance(input_type_info, SequenceInputDataConfig)
+                assert input_object.tokenizer is not None
                 raw_input = decode_tokens(
                     tokens=data.numpy().squeeze().tolist(),
                     vocab=input_object.vocab,
-                    split_on=input_object.input_config.input_type_info.split_on,
+                    split_on=input_type_info.split_on,
                     tokenizer=input_object.tokenizer,
                 )
-            case "image":
+
+            case ComputedImageInputInfo():
+                assert isinstance(data, torch.Tensor)
                 raw_input = convert_image_input_to_raw(
                     data=data, normalization_stats=input_object.normalization_stats
                 )
+
             case _:
                 raise NotImplementedError()
 
-        raw_inputs[name] = raw_input
+        raw_inputs[input_name] = raw_input
 
     return raw_inputs
 
@@ -217,12 +262,12 @@ def convert_model_inputs_to_raw(
 def convert_image_input_to_raw(
     data: torch.Tensor, normalization_stats: ImageNormalizationStats
 ) -> Image:
-    data = data.numpy()
-    assert data.ndim == 4, "Input should be 4D"
-    assert data.shape[0] == 1, "The batch dimension should be 1"
+    data_np: np.ndarray = data.numpy()
+    assert data_np.ndim == 4, "Input should be 4D"
+    assert data_np.shape[0] == 1, "The batch dimension should be 1"
 
     cur_input = un_normalize(
-        normalized_img=data,
+        normalized_img=data_np,
         normalization_stats=normalization_stats,
     )
 
@@ -254,8 +299,8 @@ def convert_tabular_input_to_raw(
 def get_sequence_output_manual_input_samples(
     output_configs: Sequence[OutputConfig],
     input_objects: "al_input_objects_as_dict",
-) -> Dict[str, Sequence[SequenceOutputEvalSample]]:
-    prepared_samples = {}
+) -> Dict[str, list[SequenceOutputEvalSample]]:
+    prepared_samples: dict[str, list[SequenceOutputEvalSample]] = {}
 
     for config_idx, config in enumerate(output_configs):
         if not config.sampling_config:
@@ -271,7 +316,7 @@ def get_sequence_output_manual_input_samples(
                 sample_inputs=single_sample_inputs, input_objects=input_objects
             )
 
-            final_inputs = _post_prepare_manual_inputs(
+            final_inputs = _post_prepare_manual_sequence_inputs(
                 prepared_inputs=prepared_inputs,
                 output_name=output_name,
                 input_objects=input_objects,
@@ -299,8 +344,8 @@ def get_sequence_output_auto_validation_samples(
     output_configs: Sequence[OutputConfig],
     input_objects: "al_input_objects_as_dict",
     eval_sample_iterator: Iterator[al_getitem_return],
-) -> Dict[str, Sequence[SequenceOutputEvalSample]]:
-    prepared_eval_samples = {}
+) -> Dict[str, list[SequenceOutputEvalSample]]:
+    prepared_eval_samples: dict[str, list[SequenceOutputEvalSample]] = {}
     input_types = _extract_input_types(input_objects=input_objects)
 
     for config_idx, config in enumerate(output_configs):
@@ -352,7 +397,7 @@ def _mask_targets_for_auto_eval_generation(
 
 
 def _extract_input_types(input_objects: "al_input_objects_as_dict") -> dict[str, str]:
-    input_types = {}
+    input_types: dict[str, str] = {}
     for input_name, input_object in input_objects.items():
         input_types[input_name] = input_object.input_config.input_info.input_type
     return input_types
@@ -363,7 +408,7 @@ def _serialize_raw_inputs(
     input_objects: "al_input_objects_as_dict",
     output_path: Path,
 ) -> None:
-    warned_types = set()
+    warned_types: set[str] = set()
     for input_name, cur_input in raw_inputs.items():
         cur_input_object = input_objects[input_name]
         cur_input_type = cur_input_object.input_config.input_info.input_type
@@ -418,17 +463,21 @@ def autoregressive_sequence_generation(
     input_objects: "al_input_objects_as_dict",
     eval_sample: SequenceOutputEvalSample,
     seq_output_name: str,
-    experiment: "Experiment",
-    default_eir_hooks: "Hooks",
+    experiment: Union["Experiment", "PredictExperiment"],
+    default_eir_hooks: Union["Hooks", "PredictHooks"],
     sampling_config: SequenceOutputSamplingConfig,
 ) -> list[int]:
     output_object = experiment.outputs[seq_output_name]
     input_object = input_objects[seq_output_name]
 
+    assert isinstance(output_object, ComputedSequenceOutputInfo)
+    assert isinstance(input_object, ComputedSequenceInputInfo)
+
     _check_vocab_consistency(
         output_object_vocab=output_object.vocab, input_object_vocab=input_object.vocab
     )
 
+    assert output_object.tokenizer is not None
     st = get_special_tokens(
         tokenizer=output_object.tokenizer, vocab=output_object.vocab
     )
@@ -557,7 +606,7 @@ def _prepare_current_autoregressive_input(
 
 
 def _maybe_truncate_autoregressive_sequence(
-    current_sequence: torch.tensor,
+    current_sequence: torch.Tensor,
     max_length: int,
 ) -> torch.Tensor:
     """
@@ -591,7 +640,7 @@ def sample_next_token_index_from_output(
     probabilities = F.softmax(input=filtered_logits, dim=-1)
     next_token_index = torch.multinomial(input=probabilities, num_samples=1).item()
 
-    return next_token_index
+    return int(next_token_index)
 
 
 def top_k_top_p_filtering(
@@ -629,6 +678,7 @@ def general_pre_process_raw_inputs(
         input_object = experiment.inputs[name]
 
         if input_object.input_config.input_info.input_type == "sequence":
+            assert isinstance(input_object, ComputedSequenceInputInfo)
             cur_input = input_object.encode_func(cur_input)
 
         inputs_prepared_for_memory[name] = cur_input
@@ -650,8 +700,8 @@ def general_pre_process_prepared_inputs(
     prepared_inputs: dict[str, Any],
     target_labels: dict[str, Any],
     sample_id: str,
-    experiment: "Experiment",
-    custom_hooks: "Hooks",
+    experiment: Union["Experiment", "PredictExperiment"],
+    custom_hooks: Union["Hooks", "PredictHooks"],
 ) -> Batch:
     """
     The custom hooks here make sure we are doing basic processing,
@@ -698,17 +748,30 @@ def get_special_tokens(tokenizer: Callable, vocab: Vocab) -> SpecialTokens:
         ("eos_token", "<eos>"),
         ("unk_token", "<unk>"),
     )
-    kwargs = {}
+
+    token_values = {}
+    index_values = {}
 
     for key, default in keys_and_defaults:
         cur_token = getattr(tokenizer, key, default)
-        kwargs[key] = cur_token
+        token_values[key] = cur_token
 
         cur_index = vocab[cur_token]
         idx_kwarg_key = key.replace("_token", "_idx")
-        kwargs[idx_kwarg_key] = cur_index
+        index_values[idx_kwarg_key] = cur_index
 
-    special_tokens = SpecialTokens(**kwargs)
+    special_tokens = SpecialTokens(
+        mask_idx=index_values["mask_idx"],
+        pad_idx=index_values["pad_idx"],
+        eos_idx=index_values["eos_idx"],
+        bos_idx=index_values["bos_idx"],
+        unk_idx=index_values["unk_idx"],
+        mask_token=token_values["mask_token"],
+        pad_token=token_values["pad_token"],
+        eos_token=token_values["eos_token"],
+        bos_token=token_values["bos_token"],
+        unk_token=token_values["unk_token"],
+    )
 
     return special_tokens
 
@@ -731,29 +794,20 @@ def decode_tokens(
 
 def prepare_sequence_output_manual_sample_data(
     sample_inputs: Dict[str, Any], input_objects: "al_input_objects_as_dict"
-) -> Dict[str, Any]:
-    """
-    omics: File (np.array) on disk.
-    sequence: Written in yaml file.
-    bytes: File (any) on disk.
-    image: File (PIL readable) on disk.
-    tabular: Written in yaml file.
-    array: File (np.array) on disk.
-    """
-
-    prepared_inputs = {}
+) -> dict[str, torch.Tensor | dict[str, np.ndarray]]:
+    prepared_inputs: dict[str, torch.Tensor | dict[str, np.ndarray]] = {}
     for name, data in sample_inputs.items():
         input_object = input_objects[name]
         input_info = input_object.input_config.input_info
-        input_type = input_info.input_type
         input_type_info = input_object.input_config.input_type_info
 
-        match input_type:
-            case "omics":
+        match input_object:
+            case ComputedOmicsInputInfo():
+                assert isinstance(input_type_info, OmicsInputDataConfig)
                 array_raw = omics_load_wrapper(
                     data_pointer=data,
                     input_source=input_info.input_source,
-                    subset_indices=input_type_info.subset_snps_file,
+                    subset_indices=input_object.subset_indices,
                     deeplake_inner_key=input_info.input_inner_key,
                 )
 
@@ -765,7 +819,8 @@ def prepare_sequence_output_manual_sample_data(
                 )
                 prepared_inputs[name] = array_prepared
 
-            case "sequence":
+            case ComputedSequenceInputInfo():
+                assert isinstance(input_type_info, SequenceInputDataConfig)
                 split_func = get_sequence_split_function(
                     split_on=input_type_info.split_on
                 )
@@ -781,7 +836,8 @@ def prepare_sequence_output_manual_sample_data(
 
                 prepared_inputs[name] = prepared_sequence
 
-            case "bytes":
+            case ComputedBytesInputInfo():
+                assert isinstance(input_type_info, ByteInputDataConfig)
                 bytes_data = bytes_load_wrapper(
                     input_source=input_info.input_source,
                     data_pointer=data,
@@ -796,7 +852,8 @@ def prepare_sequence_output_manual_sample_data(
 
                 prepared_inputs[name] = prepared_bytes_input
 
-            case "image":
+            case ComputedImageInputInfo():
+                assert isinstance(input_type_info, ImageInputDataConfig)
                 image_data = image_load_wrapper(
                     data_pointer=data,
                     input_source=input_info.input_source,
@@ -809,14 +866,16 @@ def prepare_sequence_output_manual_sample_data(
                 )
                 prepared_inputs[name] = prepared_image_data
 
-            case "tabular":
+            case ComputedTabularInputInfo() | ComputedPredictTabularInputInfo():
+                assert isinstance(input_type_info, TabularInputDataConfig)
                 transformers = input_object.labels.label_transformers
                 tabular_data = _streamline_tabular_data_for_transformers(
                     tabular_input=data, transformers=transformers
                 )
                 prepared_inputs[name] = tabular_data
 
-            case "array":
+            case ComputedArrayInputInfo():
+                assert isinstance(input_type_info, ArrayInputDataConfig)
                 array_data = array_load_wrapper(
                     input_source=input_info.input_source,
                     data_pointer=data,
@@ -826,7 +885,9 @@ def prepare_sequence_output_manual_sample_data(
                 prepared_inputs[name] = prepared_array_data
 
             case _:
-                raise ValueError(f"Unknown input type '{input_type}'")
+                raise ValueError(
+                    f"Unknown input type '{input_object.__class__.__name__}'"
+                )
 
     return prepared_inputs
 
@@ -846,7 +907,7 @@ def _streamline_tabular_data_for_transformers(
     return parsed_output
 
 
-def _post_prepare_manual_inputs(
+def _post_prepare_manual_sequence_inputs(
     prepared_inputs: Dict[str, Any],
     output_name: str,
     input_objects: "al_input_objects_as_dict",
@@ -856,6 +917,9 @@ def _post_prepare_manual_inputs(
     for input_name, prepared_input in prepared_inputs.items():
         input_object = input_objects[input_name]
         input_info = input_object.input_config.input_info
+
+        assert isinstance(input_object, ComputedSequenceInputInfo)
+        assert input_object.tokenizer is not None
 
         specials = get_special_tokens(
             tokenizer=input_object.tokenizer, vocab=input_object.vocab

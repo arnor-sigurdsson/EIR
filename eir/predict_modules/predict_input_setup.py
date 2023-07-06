@@ -50,7 +50,7 @@ def get_input_setup_function_for_predict(
 def get_input_setup_function_map_for_predict() -> (
     Dict[str, Callable[..., input_setup.al_input_objects]]
 ):
-    setup_mapping = {
+    setup_mapping: Dict[str, Callable[..., input_setup.al_input_objects]] = {
         "omics": setup_omics.set_up_omics_input,
         "tabular": setup_tabular_input_for_testing,
         "sequence": partial(
