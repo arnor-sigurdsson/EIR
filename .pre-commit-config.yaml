@@ -10,7 +10,11 @@ repos:
     hooks:
       - id: check-added-large-files
         args: ['--maxkb=1024']
-
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.4.1
+    hooks:
+      - id: mypy
+        args: ['--config-file=mypy.ini']
   - repo: local
     hooks:
       - id: flake8
