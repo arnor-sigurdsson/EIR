@@ -30,7 +30,7 @@ and so on:
 
 - ``seaborn`` : Statistical data visualization
 
-- ``joblib``  – Gael Varoquaux: Lightweight pipelining with Python functions
+- ``joblib`` : Lightweight pipelining with Python functions
 
 - ``tensorboard``  – Google Inc.: TensorBoard lets you watch Tensors Flow
 
@@ -107,4 +107,6 @@ and so on:
 - ``vulture``  – Jendrik Seipp: Find dead code
 
 - ``mypy``  – Jukka Lehtosalo: Optional static typing for Python
+
+- ``types-pyyaml`` : Typing stubs for PyYAML
 

@@ -176,7 +176,10 @@ def gather_all_ids_from_output_configs(
         elif cur_source.is_dir():
             cur_ids = gather_ids_from_data_source(data_source=cur_source)
         else:
-            raise NotImplementedError()
+            raise NotImplementedError(
+                "Only csv and directory data sources are supported."
+                f"Got: {cur_source}"
+            )
         all_ids.update(cur_ids)
 
     return tuple(all_ids)

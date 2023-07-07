@@ -69,21 +69,21 @@ def _check_fusion_modules(
 
     if output_set == {"sequence"} and fusion_model_type != "pass-through":
         raise ValueError(
-            "When using only sequence outputs, only pass-through is supported."
+            "When using only sequence outputs, only pass-through is supported. "
             f"Got {fusion_model_type}. To use pass-through, "
             f"set fusion_model_type to 'pass-through'."
         )
     elif output_set == {"sequence", "tabular"} and fusion_model_type != "pass-through":
         logger.warning(
             "Note: When using both sequence and tabular outputs, "
-            f"the fusion model type {fusion_model_type} is only applied to"
-            "the tabular outputs. The fusion for sequence outputs are handled"
+            f"the fusion model type {fusion_model_type} is only applied to "
+            "the tabular outputs. The fusion for sequence outputs are handled "
             "by the sequence output module itself, and the feature representations "
             "from the input modules are passed through directly to the output module."
         )
     elif output_set == {"tabular"} and fusion_model_type == "pass-through":
         raise ValueError(
-            "When using only tabular outputs, pass-through is not supported."
+            "When using only tabular outputs, pass-through is not supported. "
             f"Got {fusion_model_type}. Kindly set the fusion_model_type "
             "to 'mlp-residual' 'mgmoe', or 'identity'."
         )
