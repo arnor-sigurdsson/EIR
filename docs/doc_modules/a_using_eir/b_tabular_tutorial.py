@@ -78,7 +78,7 @@ def get_02_poker_hands_run_1_predict_info() -> AutoDocExperimentInfo:
 
     conf_output_path = "eir_tutorials/a_using_eir/02_tabular_tutorial/conf"
 
-    run_1_output_path = "eir_tutorials/tutorial_runs/tutorial_02_run/"
+    run_1_output_path = "eir_tutorials/tutorial_runs/a_using_eir/tutorial_02_run/"
 
     command = [
         "eirpredict",
@@ -125,7 +125,7 @@ def get_02_poker_hands_run_1_predict_info() -> AutoDocExperimentInfo:
 
 
 def _get_model_path_for_predict() -> str:
-    run_1_output_path = "eir_tutorials/tutorial_runs/tutorial_02_run"
+    run_1_output_path = "eir_tutorials/tutorial_runs/a_using_eir/tutorial_02_run"
     model_path = get_saved_model_path(run_folder=Path(run_1_output_path))
 
     return model_path

@@ -60,7 +60,7 @@ we will use ``.yaml`` configurations.
 Running ``eirtrain --help``,
 we can see the configurations needed:
 
-.. literalinclude::eir_tutorials/a_using_eir/01_basic_tutorial/commands/eirtrain_help.txt
+.. literalinclude:: ../tutorial_files/a_using_eir/01_basic_tutorial/commands/eirtrain_help.txt
     :language: console
     :lines: 2-
 
@@ -83,18 +83,18 @@ the only one we really need to fill in now is
 so we have the following ``tutorial_01_globals.yaml`` file:
 
 
-.. literalinclude::eir_tutorials/a_using_eir/01_basic_tutorial/tutorial_01_globals.yaml
+.. literalinclude:: ../tutorial_files/a_using_eir/01_basic_tutorial/tutorial_01_globals.yaml
     :language: yaml
-    :caption:
+    :caption: tutorial_01_globals.yaml
 
 
 We also need to tell the framework where to load **inputs** from,
 and some information about the input, for that we use an input ``.yaml`` configuration
 called ``tutorial_01_inputs.yaml``:
 
-.. literalinclude::eir_tutorials/a_using_eir/01_basic_tutorial/tutorial_01_input.yaml
+.. literalinclude:: ../tutorial_files/a_using_eir/01_basic_tutorial/tutorial_01_input.yaml
     :language: yaml
-    :caption:
+    :caption: tutorial_01_input.yaml
 
 Above we can see that the input needs 3 fields: ``input_info``, ``input_type_info`` and
 ``model_config``.
@@ -111,9 +111,9 @@ do, head over to the :ref:`api-reference` reference.
 Finally, we need to specify what **outputs** to predict during training. For that we
 will use the ``tutorial_01_outputs.yaml`` file with the following content:
 
-.. literalinclude::eir_tutorials/a_using_eir/01_basic_tutorial/tutorial_01_outputs.yaml
+.. literalinclude:: ../tutorial_files/a_using_eir/01_basic_tutorial/tutorial_01_outputs.yaml
     :language: yaml
-    :caption:
+    :caption: tutorial_01_outputs.yaml
 
 .. note::
     You might notice that we have not written any fusion config so far.
@@ -125,7 +125,7 @@ will use the ``tutorial_01_outputs.yaml`` file with the following content:
 
 With all this, we should have our project directory looking something like this:
 
-.. literalinclude::eir_tutorials/a_using_eir/01_basic_tutorial/commands/tutorial_folder.txt
+.. literalinclude:: ../tutorial_files/a_using_eir/01_basic_tutorial/commands/tutorial_folder.txt
     :language: console
 
 B - Training
@@ -137,11 +137,11 @@ Training a GLN model
 Now that we have our configurations set up,
 training is simply passing them to the framework, like so:
 
-.. literalinclude::eir_tutorials/a_using_eir/01_basic_tutorial/commands/GLN_1.txt
+.. literalinclude:: ../tutorial_files/a_using_eir/01_basic_tutorial/commands/GLN_1.txt
     :language: console
 
 This will generate a folder in the current directory called ``eir_tutorials``,
-and ``eir_tutorials/tutorial_runs/tutorial_01_run``
+and ``eir_tutorials/tutorial_runs/a_using_eir/tutorial_01_run``
 (note that the inner run name comes from the value in
 ``global_config`` we set before)
 will contain the results from our experiment.
@@ -156,7 +156,7 @@ will contain the results from our experiment.
 Examining the directory, we see the following structure
 (some files have been excluded here for brevity):
 
-.. literalinclude::eir_tutorials/a_using_eir/01_basic_tutorial/commands/experiment_01_folder.txt
+.. literalinclude:: ../tutorial_files/a_using_eir/01_basic_tutorial/commands/experiment_01_folder.txt
     :language: console
 
 In the results folder for a given output,
@@ -168,13 +168,13 @@ in the global config.
 We can examine how our model did with respect to accuracy (let's assume our targets are
 fairly balanced in this case) by checking the `training_curve_ACC.png` file:
 
-.. image::eir_tutorials/a_using_eir/01_basic_tutorial/figures/tutorial_01_training_curve_ACC_gln_1.png
+.. image:: ../tutorial_files/a_using_eir/01_basic_tutorial/figures/tutorial_01_training_curve_ACC_gln_1.png
 
 Examining the actual predictions and how they matched the target labels,
 we can look at the confusion matrix in one of the evaluation folders of
 ``results/Origin/samples``. When I ran this, I got the following at iteration 600:
 
-.. image::eir_tutorials/a_using_eir/01_basic_tutorial/figures/tutorial_01_confusion_matrix_gln_1.png
+.. image:: ../tutorial_files/a_using_eir/01_basic_tutorial/figures/tutorial_01_confusion_matrix_gln_1.png
 
 In the training curve above,
 we can see that our model barely got going before the run finished!
@@ -187,7 +187,7 @@ setting a new run name,
 increasing the number of epochs and
 changing the learning rate:
 
-.. literalinclude::eir_tutorials/a_using_eir/01_basic_tutorial/commands/GLN_2.txt
+.. literalinclude:: ../tutorial_files/a_using_eir/01_basic_tutorial/commands/GLN_2.txt
     :language: console
 
 .. note::
@@ -195,7 +195,7 @@ changing the learning rate:
 
 Looking at the training curve from that run, we can see we did a bit better:
 
-.. image::eir_tutorials/a_using_eir/01_basic_tutorial/figures/tutorial_01_training_curve_ACC_gln_2.png
+.. image:: ../tutorial_files/a_using_eir/01_basic_tutorial/figures/tutorial_01_training_curve_ACC_gln_2.png
 
 We also notice that there is a gap
 between the training and evaluation performances,
@@ -213,7 +213,7 @@ To predict on external samples, we run ``eirpredict``.
 As we can see when running ``eirpredict --help``, it looks quite
 similar to ``eirtrain``:
 
-.. literalinclude::eir_tutorials/a_using_eir/01_basic_tutorial/commands/eirpredict_help.txt
+.. literalinclude:: ../tutorial_files/a_using_eir/01_basic_tutorial/commands/eirpredict_help.txt
     :language: console
     :lines: 2-
 
@@ -243,7 +243,7 @@ To test, we can run the following command
 (note that you will have to add the path to your saved model for the ``--model_path``
 parameter below).
 
-.. literalinclude::eir_tutorials/a_using_eir/01_basic_tutorial/commands/GLN_1_PREDICT.txt
+.. literalinclude:: ../tutorial_files/a_using_eir/01_basic_tutorial/commands/GLN_1_PREDICT.txt
     :language: console
 
 This will generate a file called

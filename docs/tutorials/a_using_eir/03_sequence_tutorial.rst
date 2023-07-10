@@ -64,9 +64,9 @@ if we train a model to do the same.
 As in previous tutorials,
 we will start by defining our configurations.
 
-.. literalinclude::eir_tutorials/a_using_eir/03_sequence_tutorial/a_IMDB/03a_imdb_globals.yaml
+.. literalinclude:: ../tutorial_files/a_using_eir/03_sequence_tutorial/a_IMDB/03a_imdb_globals.yaml
     :language: yaml
-    :caption:
+    :caption: 03a_imdb_globals.yaml
 
 .. note::
 
@@ -76,13 +76,13 @@ we will start by defining our configurations.
     so we can interpret/explain how our inputs influence the model outputs. For more
     information, check out the :ref:`api-reference` reference.
 
-.. literalinclude::eir_tutorials/a_using_eir/03_sequence_tutorial/a_IMDB/03a_imdb_input.yaml
+.. literalinclude:: ../tutorial_files/a_using_eir/03_sequence_tutorial/a_IMDB/03a_imdb_input.yaml
     :language: yaml
-    :caption:
+    :caption: 03a_imdb_input.yaml
 
-.. literalinclude::eir_tutorials/a_using_eir/03_sequence_tutorial/a_IMDB/03a_imdb_output.yaml
+.. literalinclude:: ../tutorial_files/a_using_eir/03_sequence_tutorial/a_IMDB/03a_imdb_output.yaml
     :language: yaml
-    :caption:
+    :caption: 03a_imdb_output.yaml
 
 .. tip::
 
@@ -91,18 +91,18 @@ we will start by defining our configurations.
 
 Now with the configurations set up, our folder structure should look like this:
 
-.. literalinclude::eir_tutorials/a_using_eir/03_sequence_tutorial/a_IMDB/commands/tutorial_folder.txt
+.. literalinclude:: ../tutorial_files/a_using_eir/03_sequence_tutorial/a_IMDB/commands/tutorial_folder.txt
     :language: console
-    :caption:
+    :caption: Folder structure after setting up the configurations.
 
 A2 - IMDB Training
 ^^^^^^^^^^^^^^^^^^
 
 As before, we can train a model using ``eirtrain``:
 
-.. literalinclude::eir_tutorials/a_using_eir/03_sequence_tutorial/a_IMDB/commands/SEQUENCE_IMDB_1.txt
+.. literalinclude:: ../tutorial_files/a_using_eir/03_sequence_tutorial/a_IMDB/commands/SEQUENCE_IMDB_1.txt
     :language: console
-    :caption:
+    :caption: Training a model to predict sentiment from IMDB reviews.
 
 This took around 20 minutes to run on my laptop,
 so this is a good chance to take a nap
@@ -110,7 +110,7 @@ or do something else for a while!
 
 Looking at the accuracy, I got the following training/validation results:
 
-.. image::eir_tutorials/a_using_eir/03_sequence_tutorial/a_IMDB/figures/03a_imdb_training_curve_ACC_transformer_1.png
+.. image:: ../tutorial_files/a_using_eir/03_sequence_tutorial/a_IMDB/figures/03a_imdb_training_curve_ACC_transformer_1.png
 
 Perhaps not great, but not too bad either!
 Especially since we are using a relatively short sequence length.
@@ -144,9 +144,9 @@ let's have a look at
 the words that had the biggest influence
 towards a Positive and Negative sentiment.
 
-.. image::eir_tutorials/a_using_eir/03_sequence_tutorial/a_IMDB/figures/tutorial_03a_feature_importance_Positive.png
+.. image:: ../tutorial_files/a_using_eir/03_sequence_tutorial/a_IMDB/figures/tutorial_03a_feature_importance_Positive.png
 
-.. image::eir_tutorials/a_using_eir/03_sequence_tutorial/a_IMDB/figures/tutorial_03a_feature_importance_Negative.png
+.. image:: ../tutorial_files/a_using_eir/03_sequence_tutorial/a_IMDB/figures/tutorial_03a_feature_importance_Negative.png
 
 .. note::
 
@@ -166,7 +166,7 @@ for 10 single samples,
 here is one such example, where we look at the attributions towards a positive sentiment.
 
 .. raw:: html
-   :file:eir_tutorials/a_using_eir/03_sequence_tutorial/a_IMDB/figures/tutorial_03a_single_samples_example.html
+   :file: ../tutorial_files/a_using_eir/03_sequence_tutorial/a_IMDB/figures/tutorial_03a_single_samples_example.html
 
 :raw-html:`<br />`
 
@@ -215,9 +215,9 @@ as it is quite imbalanced w.r.t. target labels,
 as you will see momentarily.
 
 
-.. literalinclude::eir_tutorials/a_using_eir/03_sequence_tutorial/b_Anticancer_peptides/03b_peptides_globals.yaml
+.. literalinclude:: ../tutorial_files/a_using_eir/03_sequence_tutorial/b_Anticancer_peptides/03b_peptides_globals.yaml
     :language: yaml
-    :caption:
+    :caption: 03b_peptides_globals.yaml
 
 .. note::
 
@@ -233,13 +233,13 @@ is slightly different.
 For example, as we are not dealing with natural language,
 we do not split on whitespace anymore, but rather on "".
 
-.. literalinclude::eir_tutorials/a_using_eir/03_sequence_tutorial/b_Anticancer_peptides/03b_peptides_input.yaml
+.. literalinclude:: ../tutorial_files/a_using_eir/03_sequence_tutorial/b_Anticancer_peptides/03b_peptides_input.yaml
     :language: yaml
-    :caption:
+    :caption: 03b_peptides_input.yaml
 
-.. literalinclude::eir_tutorials/a_using_eir/03_sequence_tutorial/b_Anticancer_peptides/03b_peptides_output.yaml
+.. literalinclude:: ../tutorial_files/a_using_eir/03_sequence_tutorial/b_Anticancer_peptides/03b_peptides_output.yaml
     :language: yaml
-    :caption:
+    :caption: 03b_peptides_output.yaml
 
 
 B1 - Anticancer Peptides Training
@@ -248,23 +248,23 @@ B1 - Anticancer Peptides Training
 For the peptide data,
 the folder structure should look something like this:
 
-.. literalinclude::eir_tutorials/a_using_eir/03_sequence_tutorial/b_Anticancer_peptides/commands/tutorial_folder.txt
+.. literalinclude:: ../tutorial_files/a_using_eir/03_sequence_tutorial/b_Anticancer_peptides/commands/tutorial_folder.txt
     :language: console
 
 
 As before, we run:
 
-.. literalinclude::eir_tutorials/a_using_eir/03_sequence_tutorial/b_Anticancer_peptides/commands/SEQUENCE_PEPTIDES_1.txt
+.. literalinclude:: ../tutorial_files/a_using_eir/03_sequence_tutorial/b_Anticancer_peptides/commands/SEQUENCE_PEPTIDES_1.txt
     :language: console
 
 
 As the data is imbalanced, we will look at the MCC training curve:
 
-.. image::eir_tutorials/a_using_eir/03_sequence_tutorial/b_Anticancer_peptides/figures/03b_peptides_training_curve_MCC_transformer_1.png
+.. image:: ../tutorial_files/a_using_eir/03_sequence_tutorial/b_Anticancer_peptides/figures/03b_peptides_training_curve_MCC_transformer_1.png
 
 Checking the confusion matrix at iteration 2000, we see:
 
-.. image::eir_tutorials/a_using_eir/03_sequence_tutorial/b_Anticancer_peptides/figures/03b_peptides_confusion_matrix_1.png
+.. image:: ../tutorial_files/a_using_eir/03_sequence_tutorial/b_Anticancer_peptides/figures/03b_peptides_confusion_matrix_1.png
     :width: 800
 
 Looking at the training curve,
@@ -276,7 +276,7 @@ but for now we will keep going!
 As before, let's have a look at the attributions. In this case
 we will check attributions towards the moderately active class:
 
-.. image::eir_tutorials/a_using_eir/03_sequence_tutorial/b_Anticancer_peptides/figures/tutorial_03b_feature_importance_mod._active.png
+.. image:: ../tutorial_files/a_using_eir/03_sequence_tutorial/b_Anticancer_peptides/figures/tutorial_03b_feature_importance_mod._active.png
 
 In this case, it seems that there is a high degree of uncertainty
 in the attributions, as the confidence intervals are quite large.
@@ -290,7 +290,7 @@ towards a prediction of
 the moderately active class, we see:
 
 .. raw:: html
-   :file:eir_tutorials/a_using_eir/03_sequence_tutorial/b_Anticancer_peptides/figures/tutorial_03b_single_samples.html
+   :file: ../tutorial_files/a_using_eir/03_sequence_tutorial/b_Anticancer_peptides/figures/tutorial_03b_single_samples.html
 
 :raw-html:`<br />`
 

@@ -74,7 +74,7 @@ def get_05_hot_dog_run_2_resnet_pretrained_info() -> AutoDocExperimentInfo:
         "--output_configs",
         f"{conf_output_path}/output.yaml",
         "--globals.output_folder=eir_tutorials/tutorial_runs"
-        "/tutorial_05_is_it_a_hot_dog_pretrained_resnet",
+        "/a_using_eir/tutorial_05_is_it_a_hot_dog_pretrained_resnet",
     ]
 
     mapping = [
@@ -121,7 +121,7 @@ def get_05_hot_dog_run_2_combined_pretrained_info() -> AutoDocExperimentInfo:
         "--output_configs",
         f"{conf_output_path}/output.yaml",
         "--globals.output_folder=eir_tutorials/tutorial_runs"
-        "/tutorial_05_is_it_a_hot_dog_pretrained_combined",
+        "/a_using_eir/tutorial_05_is_it_a_hot_dog_pretrained_combined",
     ]
 
     mapping = [

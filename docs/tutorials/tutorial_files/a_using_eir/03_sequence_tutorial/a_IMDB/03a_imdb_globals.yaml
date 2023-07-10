@@ -1,4 +1,4 @@
-output_folder: eir_tutorials/tutorial_runs/tutorial_03_imdb_run
+output_folder: eir_tutorials/tutorial_runs/a_using_eir/tutorial_03_imdb_run
 valid_size: 0.10
 n_saved_models: 1
 checkpoint_interval: 500

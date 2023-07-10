@@ -1,16 +1,16 @@
-09:07:01 - DEBUG - eir.train_utils.utils - Global random seed set to 0.
-usage: eirpredict [-h] --global_configs GLOBAL_CONFIGS [GLOBAL_CONFIGS ...]
-                  --input_configs INPUT_CONFIGS [INPUT_CONFIGS ...]
-                  [--fusion_configs [FUSION_CONFIGS ...]] --output_configs
-                  [OUTPUT_CONFIGS ...] --model_path MODEL_PATH [--evaluate]
-                  --output_folder OUTPUT_FOLDER
-                  [--act_background_source {train,predict}]
+07:35:53 - INFO - eir.train_utils.utils - Global random seed set to 0.
+usage: eirpredict [-h] [--global_configs [GLOBAL_CONFIGS ...]]
+                  [--input_configs [INPUT_CONFIGS ...]]
+                  [--fusion_configs [FUSION_CONFIGS ...]]
+                  [--output_configs [OUTPUT_CONFIGS ...]] --model_path
+                  MODEL_PATH [--evaluate] --output_folder OUTPUT_FOLDER
+                  [--attribution_background_source {train,predict}]
 
 options:
   -h, --help            show this help message and exit
-  --global_configs GLOBAL_CONFIGS [GLOBAL_CONFIGS ...]
+  --global_configs [GLOBAL_CONFIGS ...]
                         Global .yaml configurations for the experiment.
-  --input_configs INPUT_CONFIGS [INPUT_CONFIGS ...]
+  --input_configs [INPUT_CONFIGS ...]
                         Input feature extraction .yaml configurations. Each
                         configuration represents one input.
   --fusion_configs [FUSION_CONFIGS ...]
@@ -22,7 +22,7 @@ options:
   --evaluate
   --output_folder OUTPUT_FOLDER
                         Where to save prediction results.
-  --act_background_source {train,predict}
+  --attribution_background_source {train,predict}
                         For attribution analysis, whether to load backgrounds
                         from the data used for training or to use the current
                         data passed to the predict module.

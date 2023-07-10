@@ -1,4 +1,4 @@
-eir_tutorials/01_basic_tutorial/
+eir_tutorials/a_using_eir/01_basic_tutorial/
 ├── conf
 │   ├── tutorial_01_globals.yaml
 │   ├── tutorial_01_input.yaml

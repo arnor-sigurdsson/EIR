@@ -67,7 +67,7 @@ def get_tutorial_01_run_1_gln_info() -> AutoDocExperimentInfo:
         {
             "command": [
                 "tree",
-                "eir_tutorials/tutorial_runs/tutorial_01_run/",
+                "eir_tutorials/tutorial_runs/a_using_eir/tutorial_01_run/",
                 "-I",
                 "tensorboard_logs|serializations|transformers|*.yaml|*.pt|*.log",
                 "--noreport",
@@ -120,7 +120,7 @@ def get_tutorial_01_run_2_gln_info() -> AutoDocExperimentInfo:
         "--output_configs",
         f"{conf_output_path}/tutorial_01_outputs.yaml",
         "--tutorial_01_globals.output_folder=eir_tutorials/tutorial_runs"
-        "/tutorial_01_run_lr=0.002_epochs=20",
+        "/a_using_eir/tutorial_01_run_lr-0.002_epochs-20",
         "--tutorial_01_globals.lr=0.002",
         "--tutorial_01_globals.n_epochs=20",
     ]
@@ -155,7 +155,7 @@ def get_tutorial_01_run_2_gln_predict_info() -> AutoDocExperimentInfo:
 
     conf_output_path = "eir_tutorials/a_using_eir/01_basic_tutorial/conf"
 
-    run_1_output_path = "eir_tutorials/tutorial_runs/tutorial_01_run"
+    run_1_output_path = "eir_tutorials/tutorial_runs/a_using_eir/tutorial_01_run"
 
     command = [
         "eirpredict",
@@ -200,7 +200,7 @@ def get_tutorial_01_run_2_gln_predict_info() -> AutoDocExperimentInfo:
 
 
 def _get_model_path_for_predict() -> str:
-    run_1_output_path = "eir_tutorials/tutorial_runs/tutorial_01_run"
+    run_1_output_path = "eir_tutorials/tutorial_runs/a_using_eir/tutorial_01_run"
     model_path = get_saved_model_path(run_folder=Path(run_1_output_path))
 
     return model_path

@@ -21,7 +21,8 @@ def get_tutorial_08_run_cnn_1_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/input_1d_cnn.yaml",
         "--output_configs",
         f"{conf_output_path}/outputs.yaml",
-        "--globals.output_folder=eir_tutorials/tutorial_runs/tutorial_08_run_cnn-1d",
+        "--globals.output_folder=eir_tutorials/tutorial_runs/"
+        "a_using_eir/tutorial_08_run_cnn-1d",
     ]
 
     mapping = [
@@ -87,7 +88,8 @@ def get_tutorial_08_run_cnn_2_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/input_2d_cnn.yaml",
         "--output_configs",
         f"{conf_output_path}/outputs.yaml",
-        "--globals.output_folder=eir_tutorials/tutorial_runs/tutorial_08_run_cnn-2d",
+        "--globals.output_folder=eir_tutorials/tutorial_runs/"
+        "a_using_eir/tutorial_08_run_cnn-2d",
     ]
 
     mapping = [
@@ -126,7 +128,8 @@ def get_tutorial_08_run_cnn_3_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/input_3d_cnn.yaml",
         "--output_configs",
         f"{conf_output_path}/outputs.yaml",
-        "--globals.output_folder=eir_tutorials/tutorial_runs/tutorial_08_run_cnn-3d",
+        "--globals.output_folder=eir_tutorials/tutorial_runs/"
+        "a_using_eir/tutorial_08_run_cnn-3d",
     ]
 
     mapping = [
@@ -165,7 +168,8 @@ def get_tutorial_08_run_lcl_1_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/input_1d_lcl.yaml",
         "--output_configs",
         f"{conf_output_path}/outputs.yaml",
-        "--globals.output_folder=eir_tutorials/tutorial_runs/tutorial_08_run_lcl-1d",
+        "--globals.output_folder=eir_tutorials/tutorial_runs/"
+        "a_using_eir/tutorial_08_run_lcl-1d",
     ]
 
     mapping = [
@@ -204,7 +208,8 @@ def get_tutorial_08_run_lcl_2_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/input_2d_lcl.yaml",
         "--output_configs",
         f"{conf_output_path}/outputs.yaml",
-        "--globals.output_folder=eir_tutorials/tutorial_runs/tutorial_08_run_lcl-2d",
+        "--globals.output_folder=eir_tutorials/tutorial_runs/"
+        "a_using_eir/tutorial_08_run_lcl-2d",
     ]
 
     mapping = [
@@ -243,7 +248,8 @@ def get_tutorial_08_run_lcl_3_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/input_3d_lcl.yaml",
         "--output_configs",
         f"{conf_output_path}/outputs.yaml",
-        "--globals.output_folder=eir_tutorials/tutorial_runs/tutorial_08_run_lcl-3d",
+        "--globals.output_folder=eir_tutorials/tutorial_runs/"
+        "a_using_eir/tutorial_08_run_lcl-3d",
     ]
 
     mapping = [
@@ -258,7 +264,7 @@ def get_tutorial_08_run_lcl_3_info() -> AutoDocExperimentInfo:
     make_comparison_plot = (
         _plot_performance,
         {
-            "base_dir": Path("eir_tutorials/tutorial_runs/"),
+            "base_dir": Path("eir_tutorials/tutorial_runs/a_using_eir/"),
             "output_path": Path(base_path, "figures", "val_comparison.png"),
         },
     )

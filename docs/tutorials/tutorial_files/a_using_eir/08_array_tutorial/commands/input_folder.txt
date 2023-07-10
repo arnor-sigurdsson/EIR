@@ -1,4 +1,4 @@
-eir_tutorials/08_array_tutorial/data
+eir_tutorials/a_using_eir/08_array_tutorial/data
 ├── processed_sample_data
 │   ├── arrays_1d
 │   ├── arrays_2d

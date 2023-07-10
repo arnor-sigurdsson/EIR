@@ -50,6 +50,9 @@ from eir.setup.input_setup_modules.setup_tabular import ComputedTabularInputInfo
 from eir.setup.schemas import (
     SequenceInputDataConfig,
 )
+from eir.predict_modules.predict_tabular_input_setup import (
+    ComputedPredictTabularInputInfo,
+)
 
 if TYPE_CHECKING:
     from eir.setup.output_setup import al_output_objects_as_dict
@@ -198,7 +201,6 @@ class DatasetBase(Dataset):
         ids_to_keep = initialize_ids_to_keep(
             target_labels_dict=self.target_labels_dict, ids_to_keep=self.ids_to_keep
         )
-
         if self.target_labels_dict:
             samples = _add_target_labels_to_samples(
                 target_labels_dict=self.target_labels_dict, samples=samples
@@ -289,7 +291,7 @@ def add_data_to_samples(
         input_inner_key = input_info.input_inner_key
 
         match input_object:
-            case ComputedTabularInputInfo():
+            case ComputedTabularInputInfo() | ComputedPredictTabularInputInfo():
                 samples = add_tabular_data_to_samples(
                     tabular_dict=input_object.labels.all_labels,
                     samples=samples,

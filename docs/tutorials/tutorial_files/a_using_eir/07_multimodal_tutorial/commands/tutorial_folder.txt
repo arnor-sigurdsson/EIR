@@ -1,4 +1,4 @@
-eir_tutorials/07_multimodal_tutorial/
+eir_tutorials/a_using_eir/07_multimodal_tutorial/
 ├── conf
 │   ├── 07_apx-a_input_description_pretrained.yaml
 │   ├── 07_apx-b_mt_input_tabular.yaml

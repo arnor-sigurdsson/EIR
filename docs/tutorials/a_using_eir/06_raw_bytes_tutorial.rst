@@ -27,7 +27,7 @@ A - Local Transformer
 
 After downloading the data, the folder structure should look like this:
 
-.. literalinclude::eir_tutorials/a_using_eir/06_raw_bytes_tutorial/commands/tutorial_folder.txt
+.. literalinclude:: ../tutorial_files/a_using_eir/06_raw_bytes_tutorial/commands/tutorial_folder.txt
     :language: console
 
 We will use the
@@ -38,17 +38,17 @@ If you have done the previous tutorials
 you might be used to this, but the configurations
 are here:
 
-.. literalinclude::eir_tutorials/a_using_eir/06_raw_bytes_tutorial/globals.yaml
+.. literalinclude:: ../tutorial_files/a_using_eir/06_raw_bytes_tutorial/globals.yaml
     :language: yaml
-    :caption:
+    :caption: globals.yaml
 
-.. literalinclude::eir_tutorials/a_using_eir/06_raw_bytes_tutorial/input.yaml
+.. literalinclude:: ../tutorial_files/a_using_eir/06_raw_bytes_tutorial/input.yaml
     :language: yaml
-    :caption:
+    :caption: input.yaml
 
-.. literalinclude::eir_tutorials/a_using_eir/06_raw_bytes_tutorial/output.yaml
+.. literalinclude:: ../tutorial_files/a_using_eir/06_raw_bytes_tutorial/output.yaml
     :language: yaml
-    :caption:
+    :caption: output.yaml
 
 .. note::
     The model we are training here is relatively
@@ -60,15 +60,15 @@ are here:
 
 As usual, we can run the following command to train:
 
-.. literalinclude::eir_tutorials/a_using_eir/06_raw_bytes_tutorial/commands/SEQUENCE_BINARY_IMDB_1.txt
+.. literalinclude:: ../tutorial_files/a_using_eir/06_raw_bytes_tutorial/commands/SEQUENCE_BINARY_IMDB_1.txt
     :language: console
 
 
 When training, I got the following training curves:
 
-.. image::eir_tutorials/a_using_eir/06_raw_bytes_tutorial/figures/06_training_curve_ACC_transformer_1.png
+.. image:: ../tutorial_files/a_using_eir/06_raw_bytes_tutorial/figures/06_training_curve_ACC_transformer_1.png
 
-.. image::eir_tutorials/a_using_eir/06_raw_bytes_tutorial/figures/06_training_curve_MCC_transformer_1.png
+.. image:: ../tutorial_files/a_using_eir/06_raw_bytes_tutorial/figures/06_training_curve_MCC_transformer_1.png
 
 Not so great, but not a complete failure either!
 When comparing with our

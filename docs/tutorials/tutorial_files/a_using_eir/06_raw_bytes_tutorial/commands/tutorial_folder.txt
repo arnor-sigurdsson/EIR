@@ -1,13 +1,11 @@
-eir_tutorials/06_raw_bytes_tutorial/
+eir_tutorials/a_using_eir/06_raw_bytes_tutorial/
 ├── conf
 │   ├── globals.yaml
 │   ├── input.yaml
-│   ├── output.yaml
-│   ├── predictor.yaml
-│   └── target.yaml
+│   └── output.yaml
 └── data
     └── IMDB
-        ├── conf
-        ├── imdb_labels.csv
         ├── IMDB_Reviews
-        └── imdb.vocab
+        ├── conf
+        ├── imdb.vocab
+        └── imdb_labels.csv

@@ -1,5 +1,5 @@
 eirtrain \
---global_configs eir_tutorials/08_array_tutorial/conf/globals.yaml \
---input_configs eir_tutorials/08_array_tutorial/conf/input_1d_lcl.yaml \
---output_configs eir_tutorials/08_array_tutorial/conf/outputs.yaml \
---globals.output_folder=eir_tutorials/tutorial_runs/tutorial_08_run_lcl-1d
+--global_configs eir_tutorials/a_using_eir/08_array_tutorial/conf/globals.yaml \
+--input_configs eir_tutorials/a_using_eir/08_array_tutorial/conf/input_1d_lcl.yaml \
+--output_configs eir_tutorials/a_using_eir/08_array_tutorial/conf/outputs.yaml \
+--globals.output_folder=eir_tutorials/tutorial_runs/a_using_eir/tutorial_08_run_lcl-1d

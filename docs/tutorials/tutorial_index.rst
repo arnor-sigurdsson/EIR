@@ -1,5 +1,5 @@
-Using EIR
-=========
+Using EIR - Supervised Learning
+===============================
 
 .. toctree::
     :maxdepth: 2
@@ -12,6 +12,15 @@ Using EIR
     a_using_eir/06_raw_bytes_tutorial.rst
     a_using_eir/07_multimodal_tutorial.rst
     a_using_eir/08_array_tutorial.rst
+
+
+Sequence Generation
+===================
+
+.. toctree::
+    :maxdepth: 2
+
+    c_sequence_output/01_sequence_generation.rst
 
 Customizing EIR
 ===============

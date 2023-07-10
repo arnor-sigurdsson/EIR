@@ -2,6 +2,7 @@ import json
 from copy import deepcopy, copy
 from dataclasses import dataclass
 from pathlib import Path
+from itertools import cycle
 from typing import (
     Tuple,
     Iterator,
@@ -334,9 +335,12 @@ def get_sequence_output_manual_input_samples(
 
 
 def get_dataset_loader_single_sample_generator(
-    dataset: Dataset,
+    dataset: Dataset, infinite: bool = True
 ) -> Iterator[al_getitem_return]:
-    loader = DataLoader(dataset=dataset, batch_size=1, shuffle=False)
+    loader = DataLoader(dataset=dataset, batch_size=1, shuffle=True)
+    if infinite:
+        yield from cycle(loader)
+
     yield from loader
 
 

@@ -10,7 +10,9 @@ def get_07_multimodal_run_1_tabular_info() -> AutoDocExperimentInfo:
     base_path = "docs/tutorials/tutorial_files/a_using_eir/07_multimodal_tutorial/"
 
     conf_output_path = "eir_tutorials/a_using_eir/07_multimodal_tutorial/conf"
-    output_folder = "eir_tutorials/tutorial_runs/tutorial_07a_multimodal_tabular"
+    output_folder = (
+        "eir_tutorials/tutorial_runs/a_using_eir/tutorial_07a_multimodal_tabular"
+    )
 
     command = [
         "eirtrain",
@@ -141,7 +143,8 @@ def get_07_multimodal_run_2_tabular_description_info() -> AutoDocExperimentInfo:
 
     conf_output_path = "eir_tutorials/a_using_eir/07_multimodal_tutorial/conf"
     output_folder = (
-        "eir_tutorials/tutorial_runs/tutorial_07b_multimodal_tabular_description"
+        "eir_tutorials/tutorial_runs/a_using_eir/"
+        "tutorial_07b_multimodal_tabular_description"
     )
 
     command = [
@@ -187,7 +190,8 @@ def get_07_multimodal_run_3_tabular_description_image_info() -> AutoDocExperimen
 
     conf_output_path = "eir_tutorials/a_using_eir/07_multimodal_tutorial/conf"
     output_folder = (
-        "eir_tutorials/tutorial_runs/tutorial_07c_multimodal_tabular_description_image"
+        "eir_tutorials/tutorial_runs/a_using_eir/"
+        "tutorial_07c_multimodal_tabular_description_image"
     )
 
     command = [
@@ -203,8 +207,6 @@ def get_07_multimodal_run_3_tabular_description_image_info() -> AutoDocExperimen
         "--output_configs",
         f"{conf_output_path}/07_output.yaml",
         f"--07_globals.output_folder={output_folder}",
-        "--07_globals.device='cuda:0'",
-        "--07_globals.dataloader_workers=4",
     ]
 
     mapping = [
@@ -236,7 +238,7 @@ def get_07_mm_apx_run_1_tab_desc_pre_info() -> AutoDocExperimentInfo:
 
     conf_output_path = "eir_tutorials/a_using_eir/07_multimodal_tutorial/conf"
     output_folder = (
-        "eir_tutorials/tutorial_runs/tutorial_07-apx-a_multimodal_tabular_"
+        "eir_tutorials/tutorial_runs/a_using_eir/tutorial_07-apx-a_multimodal_tabular_"
         "description_pretrained"
     )
 
@@ -254,8 +256,6 @@ def get_07_mm_apx_run_1_tab_desc_pre_info() -> AutoDocExperimentInfo:
         "--output_configs",
         f"{conf_output_path}/07_output.yaml",
         f"--07_globals.output_folder={output_folder}",
-        "--07_globals.device='cuda:0'",
-        "--07_globals.dataloader_workers=4",
     ]
 
     mapping = [
@@ -288,7 +288,7 @@ def get_07_mm_apx_run_2_tab_desc_mt_info() -> AutoDocExperimentInfo:
 
     conf_output_path = "eir_tutorials/a_using_eir/07_multimodal_tutorial/conf"
     output_folder = (
-        "eir_tutorials/tutorial_runs/tutorial_07-apx-b_multimodal_tabular_"
+        "eir_tutorials/tutorial_runs/a_using_eir/tutorial_07-apx-b_multimodal_tabular_"
         "description_multi_task"
     )
 
@@ -306,8 +306,6 @@ def get_07_mm_apx_run_2_tab_desc_mt_info() -> AutoDocExperimentInfo:
         "--output_configs",
         f"{conf_output_path}/07_apx-b_mt_output.yaml",
         f"--07_globals.output_folder={output_folder}",
-        "--07_globals.device='cuda:0'",
-        "--07_globals.dataloader_workers=4",
     ]
 
     mapping = [

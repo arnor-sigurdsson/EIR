@@ -37,7 +37,7 @@ import torch
 from torch.cuda import OutOfMemoryError
 from aislib.misc_utils import get_logger, ensure_path_exists
 from ignite.engine import Engine
-from captum.attr import IntegratedGradients, NoiseTunnel
+from captum.attr import NoiseTunnel
 from torch import nn
 from torch.utils.data import DataLoader, Subset
 from torch.utils.hooks import RemovableHandle
@@ -63,6 +63,7 @@ from eir.interpretation.interpret_array import (
     get_array_sum_consumer,
     ArrayConsumerCallable,
 )
+from eir.interpretation.interpretation_utils import MyIntegratedGradients
 from eir.models.model_training_utils import gather_data_loader_samples
 from eir.models.input.omics.omics_models import CNNModel, LinearModel
 from eir.train_utils.evaluation import validation_handler
@@ -86,7 +87,7 @@ if TYPE_CHECKING:
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 # Type aliases
-al_explainers = Union[IntegratedGradients, NoiseTunnel]
+al_explainers = Union[MyIntegratedGradients, NoiseTunnel]
 
 
 class WrapperModelForAttribution(nn.Module):
@@ -421,7 +422,7 @@ def get_attribution_object(
         wrapped_model=model,
         input_names=input_names,
     )
-    explainer = IntegratedGradients(forward_func=wrapped_model)
+    explainer = MyIntegratedGradients(forward_func=wrapped_model)
 
     attribution_object = AttributionObject(
         explainer=explainer,
@@ -473,14 +474,6 @@ def get_oom_adaptive_attribution_callable(
     internal_batch_size = None
     has_successfully_run = False
 
-    base_kwargs = dict(
-        explainer=explainer,
-        column_type=column_type,
-        baselines=baseline_values,
-        baseline_names_ordered=baseline_names_ordered,
-        n_steps=n_steps,
-    )
-
     def calculate_attributions_adaptive(
         *args,
         inputs: Dict[str, torch.Tensor],
@@ -495,7 +488,11 @@ def get_oom_adaptive_attribution_callable(
                 inputs=inputs,
                 sample_label=sample_label,
                 internal_batch_size=internal_batch_size,
-                **base_kwargs,
+                explainer=explainer,
+                column_type=column_type,
+                baselines=baseline_values,
+                baseline_names_ordered=baseline_names_ordered,
+                n_steps=n_steps,
             )
         else:
             while True:
@@ -504,7 +501,11 @@ def get_oom_adaptive_attribution_callable(
                         inputs=inputs,
                         sample_label=sample_label,
                         internal_batch_size=internal_batch_size,
-                        **base_kwargs,
+                        explainer=explainer,
+                        column_type=column_type,
+                        baselines=baseline_values,
+                        baseline_names_ordered=baseline_names_ordered,
+                        n_steps=n_steps,
                     )
                     has_successfully_run = True
 

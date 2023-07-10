@@ -1,5 +1,5 @@
 eirtrain \
---global_configs eir_tutorials/04_pretrained_sequence_tutorial/conf/04_imdb_globals.yaml \
---input_configs eir_tutorials/04_pretrained_sequence_tutorial/conf/04_imdb_input_longformer.yaml \
---output_configs eir_tutorials/04_pretrained_sequence_tutorial/conf/04_imdb_output.yaml \
---04_imdb_globals.output_folder=eir_tutorials/tutorial_runs/tutorial_04_imdb_run_longformer
+--global_configs eir_tutorials/a_using_eir/04_pretrained_sequence_tutorial/conf/04_imdb_globals.yaml \
+--input_configs eir_tutorials/a_using_eir/04_pretrained_sequence_tutorial/conf/04_imdb_input_longformer.yaml \
+--output_configs eir_tutorials/a_using_eir/04_pretrained_sequence_tutorial/conf/04_imdb_output.yaml \
+--04_imdb_globals.output_folder=eir_tutorials/tutorial_runs/a_using_eir/tutorial_04_imdb_run_longformer

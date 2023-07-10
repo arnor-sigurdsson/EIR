@@ -1,10 +1,10 @@
 input_info:
-  input_source: eir_tutorials/01_basic_tutorial/data/processed_sample_data/arrays
+  input_source: eir_tutorials/a_using_eir/01_basic_tutorial/data/processed_sample_data/arrays
   input_name: genotype
   input_type: omics
 
 input_type_info:
-  snp_file: eir_tutorials/01_basic_tutorial/data/processed_sample_data/data_final_gen.bim
+  snp_file: eir_tutorials/a_using_eir/01_basic_tutorial/data/processed_sample_data/data_final_gen.bim
 
 model_config:
   model_type: genome-local-net

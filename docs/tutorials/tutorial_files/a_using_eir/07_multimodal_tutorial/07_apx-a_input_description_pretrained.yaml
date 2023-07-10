@@ -1,5 +1,5 @@
 input_info:
-  input_source: eir_tutorials/07_multimodal_tutorial/data/descriptions.csv
+  input_source: eir_tutorials/a_using_eir/07_multimodal_tutorial/data/descriptions.csv
   input_name: pet_descriptions_pretrained
   input_type: sequence
 

@@ -1,4 +1,4 @@
-eir_tutorials/03_sequence_tutorial/
+eir_tutorials/a_using_eir/03_sequence_tutorial/
 ├── a_IMDB
 │   └── conf
 │       ├── 03a_imdb_globals.yaml

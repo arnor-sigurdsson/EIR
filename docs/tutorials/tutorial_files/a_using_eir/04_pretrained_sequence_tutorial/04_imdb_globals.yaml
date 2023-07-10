@@ -1,10 +1,11 @@
-output_folder: eir_tutorials/tutorial_runs/tutorial_04_imdb_run
+output_folder: eir_tutorials/tutorial_runs/a_using_eir/tutorial_04_imdb_run
 valid_size: 0.10
 n_saved_models: 1
 checkpoint_interval: 500
 sample_interval: 500
+early_stopping_patience: 5
 memory_dataset: true
 n_epochs: 25
 mixing_alpha: 0.2
-device: "cuda:0"
-dataloader_workers: 4
+device: "mps"
+dataloader_workers: 0

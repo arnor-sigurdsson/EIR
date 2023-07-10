@@ -1,4 +1,4 @@
-eir_tutorials/03_sequence_tutorial/
+eir_tutorials/a_using_eir/03_sequence_tutorial/
 ├── b_Anticancer_peptides
 │   └── conf
 │       ├── 03b_peptides_globals.yaml

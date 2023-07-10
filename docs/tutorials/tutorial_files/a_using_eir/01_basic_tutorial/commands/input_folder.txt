@@ -1,4 +1,4 @@
-eir_tutorials/01_basic_tutorial/data
+eir_tutorials/a_using_eir/01_basic_tutorial/data
 ├── processed_sample_data
 │   ├── arrays
 │   ├── data_final_gen.bim

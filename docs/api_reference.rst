@@ -143,12 +143,14 @@ Output Type Configuration
 
 .. autoclass:: eir.setup.schemas.TabularOutputTypeConfig
 
+.. autoclass:: eir.setup.schema_modules.output_schemas_sequence.SequenceOutputTypeConfig
+
 Output Module Configuration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. autoclass:: eir.models.output.output_module_setup.TabularOutputModuleConfig
 
-.. autoclass:: eir.models.output.output_module_setup.SequenceOutputModuleConfig
+.. autoclass:: eir.models.output.sequence.sequence_output_modules.SequenceOutputModuleConfig
 
 The documentation below details what the parameters passed to the respective output
 output heads
@@ -157,3 +159,9 @@ output heads
 .. autoclass:: eir.models.output.mlp_residual.ResidualMLPOutputModuleConfig
 
 .. autoclass:: eir.models.output.linear.LinearOutputModuleConfig
+
+Output Sampling Configuration
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. autoclass:: eir.setup.schema_modules.output_schemas_sequence.SequenceOutputSamplingConfig
+

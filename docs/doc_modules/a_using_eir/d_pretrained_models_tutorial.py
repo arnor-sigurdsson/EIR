@@ -78,7 +78,7 @@ def get_04_imdb_run_2_local_transformer_info() -> AutoDocExperimentInfo:
         "--output_configs",
         f"{conf_output_path}/04_imdb_output.yaml",
         "--04_imdb_globals.output_folder=eir_tutorials/tutorial_runs"
-        "/tutorial_04_imdb_run_local",
+        "/a_using_eir/tutorial_04_imdb_run_local",
     ]
 
     mapping = [
@@ -122,7 +122,7 @@ def get_04_imdb_run_3_longformer_info() -> AutoDocExperimentInfo:
         "--output_configs",
         f"{conf_output_path}/04_imdb_output.yaml",
         "--04_imdb_globals.output_folder=eir_tutorials/tutorial_runs"
-        "/tutorial_04_imdb_run_longformer",
+        "/a_using_eir/tutorial_04_imdb_run_longformer",
     ]
 
     mapping = [
@@ -166,7 +166,7 @@ def get_04_imdb_run_4_tiny_bert_info() -> AutoDocExperimentInfo:
         "--output_configs",
         f"{conf_output_path}/04_imdb_output.yaml",
         "--04_imdb_globals.output_folder=eir_tutorials/tutorial_runs"
-        "/tutorial_04_imdb_run_tiny-bert",
+        "/a_using_eir/tutorial_04_imdb_run_tiny-bert",
     ]
 
     mapping = [
@@ -212,7 +212,7 @@ def get_04_imdb_run_5_combined_info() -> AutoDocExperimentInfo:
         "--output_configs",
         f"{conf_output_path}/04_imdb_output.yaml",
         "--04_imdb_globals.output_folder=eir_tutorials/tutorial_runs"
-        "/tutorial_04_imdb_run_combined",
+        "/a_using_eir/tutorial_04_imdb_run_combined",
     ]
 
     mapping = [

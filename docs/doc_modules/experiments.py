@@ -1,8 +1,8 @@
+import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from shutil import copy2
-import re
 from typing import List, Sequence, Tuple, Callable, Dict
 
 from PIL.Image import Image
@@ -94,6 +94,9 @@ def find_and_copy_files(
     matched_patterns = {}
 
     for path in run_folder.rglob("*"):
+        if path.name == ".DS_Store":
+            continue
+
         for pattern, target in patterns:
             if re.match(pattern=pattern, string=str(path)) or pattern in str(path):
                 output_destination = output_folder / target

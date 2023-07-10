@@ -80,6 +80,7 @@ def analyze_image_input_attributions(
             signs=["all", "absolute_value"],
             show_colorbar=True,
             cmap=cmap,
+            use_pyplot=False,
         )
 
         name = f"image_{sample_attribution.sample_info.ids[0]}_{cur_label_name}.pdf"

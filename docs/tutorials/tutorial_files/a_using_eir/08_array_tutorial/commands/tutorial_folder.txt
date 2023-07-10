@@ -1,4 +1,4 @@
-eir_tutorials/08_array_tutorial/
+eir_tutorials/a_using_eir/08_array_tutorial/
 ├── conf
 │   ├── globals.yaml
 │   ├── input_1d_cnn.yaml

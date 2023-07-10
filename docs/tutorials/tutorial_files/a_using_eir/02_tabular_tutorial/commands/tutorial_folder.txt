@@ -1,4 +1,4 @@
-eir_tutorials/02_tabular_tutorial/
+eir_tutorials/a_using_eir/02_tabular_tutorial/
 ├── conf
 │   ├── 02_poker_hands_fusion.yaml
 │   ├── 02_poker_hands_globals.yaml

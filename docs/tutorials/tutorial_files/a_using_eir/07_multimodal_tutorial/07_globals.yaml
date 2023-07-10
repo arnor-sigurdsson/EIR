@@ -1,12 +1,14 @@
-output_folder: eir_tutorials/tutorial_runs/tutorial_07_multimodal_run
+output_folder: eir_tutorials/tutorial_runs/a_using_eir/tutorial_07_multimodal_run
 valid_size: 0.10
+memory_dataset: true
 checkpoint_interval: 200
 sample_interval: 200
 n_epochs: 25
+device: "cpu"
 lr: 5.0e-04
 optimizer: adamw
 gradient_clipping: 1.0
-early_stopping_patience: 10
+early_stopping_patience: 5
 early_stopping_buffer: 2000
 compute_attributions: false
 attributions_every_sample_factor: 10

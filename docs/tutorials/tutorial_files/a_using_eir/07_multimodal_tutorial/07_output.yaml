@@ -1,5 +1,5 @@
 output_info:
-  output_source: eir_tutorials/07_multimodal_tutorial/data/tabular.csv
+  output_source: eir_tutorials/a_using_eir/07_multimodal_tutorial/data/tabular.csv
   output_name: pet_adoption
   output_type: tabular
 

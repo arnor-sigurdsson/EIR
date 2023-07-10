@@ -36,6 +36,6 @@ def test_prepare_sequence_data():
     )
 
     assert (test_input == test_input_copy).all()
-    assert prepared_tensor.numpy() != test_input
+    assert prepared_tensor.numpy().shape != test_input.shape
     assert len(prepared_tensor) == 64
     assert len(test_input) == 100
