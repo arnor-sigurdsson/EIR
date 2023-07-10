@@ -1,7 +1,7 @@
 from dataclasses import asdict, dataclass
 from typing import Sequence, Iterable, Dict, Any, Optional, TYPE_CHECKING
 
-from aislib.misc_utils import get_logger
+from eir.utils.logging import get_logger
 import eir.models.output.sequence.sequence_output_modules
 from eir.models.input.sequence.transformer_models import (
     BasicTransformerFeatureExtractorModelConfig,

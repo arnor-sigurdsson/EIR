@@ -10,7 +10,7 @@ from typing import (
 )
 
 import numpy as np
-from aislib.misc_utils import get_logger
+from eir.utils.logging import get_logger
 from torch.utils.data import DataLoader
 
 from eir.data_load import datasets, label_setup

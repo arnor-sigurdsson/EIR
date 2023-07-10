@@ -16,7 +16,7 @@ from typing import (
 )
 
 import pandas as pd
-from aislib.misc_utils import get_logger
+from eir.utils.logging import get_logger
 from tokenizers import Tokenizer
 from tokenizers.models import BPE
 from tokenizers.trainers import BpeTrainer

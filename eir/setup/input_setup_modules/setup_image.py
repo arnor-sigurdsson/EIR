@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Sequence, Dict, Tuple, Optional
 
 import numpy as np
-from aislib.misc_utils import get_logger
+from eir.utils.logging import get_logger
 from timm.models._registry import _model_pretrained_cfgs
 from torchvision import transforms
 from torchvision.datasets.folder import default_loader

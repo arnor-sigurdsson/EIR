@@ -16,7 +16,7 @@ from typing import (
 
 import numpy as np
 import pandas as pd
-from aislib.misc_utils import get_logger
+from eir.utils.logging import get_logger
 from tqdm import tqdm
 
 from eir.data_load.data_source_modules.common_utils import add_id_to_samples

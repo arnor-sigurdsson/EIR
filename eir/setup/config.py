@@ -21,7 +21,7 @@ from typing import (
 
 import configargparse
 import yaml
-from aislib.misc_utils import get_logger
+from eir.utils.logging import get_logger
 
 from eir.models.input.array.array_models import (
     ArrayModelConfig,

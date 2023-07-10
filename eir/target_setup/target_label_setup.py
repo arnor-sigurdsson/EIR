@@ -4,7 +4,7 @@ from typing import Dict, Sequence, Tuple, Union, Iterable, Optional, TYPE_CHECKI
 
 import pandas as pd
 import torch
-from aislib.misc_utils import get_logger
+from eir.utils.logging import get_logger
 
 from eir.data_load.label_setup import (
     al_target_label_dict,

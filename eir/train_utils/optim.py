@@ -15,7 +15,7 @@ from typing import (
 
 import torch
 from adabelief_pytorch import AdaBelief
-from aislib.misc_utils import get_logger
+from eir.utils.logging import get_logger
 from aislib.pytorch_modules import AdaHessian
 from torch import nn
 from torch.optim import SGD, Adam

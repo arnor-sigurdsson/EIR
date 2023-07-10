@@ -2,7 +2,7 @@ from copy import copy
 from typing import Dict, Union, Any
 
 import timm
-from aislib.misc_utils import get_logger
+from eir.utils.logging import get_logger
 from torch import nn
 
 from eir.models.input.image.image_models import (

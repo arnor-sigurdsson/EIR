@@ -12,7 +12,7 @@ from typing import (
 
 import numpy as np
 import torch
-from aislib.misc_utils import get_logger
+from eir.utils.logging import get_logger
 from timm.data.mixup import rand_bbox
 
 from eir.data_load.data_utils import Batch, get_output_info_generator

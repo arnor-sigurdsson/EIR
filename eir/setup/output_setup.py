@@ -1,6 +1,6 @@
 from typing import Dict, Callable, Any, Optional, TYPE_CHECKING, Protocol
 
-from aislib.misc_utils import get_logger
+from eir.utils.logging import get_logger
 
 from eir.data_load.label_setup import (
     al_label_transformers,

@@ -10,7 +10,7 @@ from typing import (
     Any,
 )
 
-from aislib.misc_utils import get_logger
+from eir.utils.logging import get_logger
 
 from eir.experiment_io.experiment_io import (
     get_run_folder_from_model_path,

@@ -3,7 +3,7 @@ from statistics import mean
 from typing import TYPE_CHECKING, List, Tuple, Dict, Iterable, Optional, Sequence
 
 import torch
-from aislib.misc_utils import get_logger
+from eir.utils.logging import get_logger
 from torch.utils.data import WeightedRandomSampler
 
 if TYPE_CHECKING:

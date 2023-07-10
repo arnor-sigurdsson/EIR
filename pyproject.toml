@@ -38,6 +38,7 @@ timm = "^0.9.2"
 captum = "^0.6.0"
 aioboto3 = "^11.1.0"
 deeplake = "^3.4.1"
+termcolor = "^2.3.0"
 
 [tool.poetry.group.dev.dependencies]
 memory-profiler = "^0.60.0"

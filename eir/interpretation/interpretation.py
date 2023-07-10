@@ -35,7 +35,8 @@ warnings.filterwarnings(
 import numpy as np
 import torch
 from torch.cuda import OutOfMemoryError
-from aislib.misc_utils import get_logger, ensure_path_exists
+from aislib.misc_utils import ensure_path_exists
+from eir.utils.logging import get_logger
 from ignite.engine import Engine
 from captum.attr import NoiseTunnel
 from torch import nn

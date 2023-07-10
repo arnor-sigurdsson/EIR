@@ -15,7 +15,7 @@ from typing import (
 
 import numpy as np
 import torch
-from aislib.misc_utils import get_logger, ensure_path_exists
+from aislib.misc_utils import ensure_path_exists
 from ignite.engine import Engine
 
 from eir.train_utils.distributed import (
@@ -23,6 +23,7 @@ from eir.train_utils.distributed import (
     in_master_node,
     in_distributed_env,
 )
+from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 

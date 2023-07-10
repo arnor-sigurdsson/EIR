@@ -6,7 +6,8 @@ from typing import Union, TYPE_CHECKING, Iterable, Dict, Optional
 
 import dill
 import joblib
-from aislib.misc_utils import get_logger, ensure_path_exists
+from aislib.misc_utils import ensure_path_exists
+from eir.utils.logging import get_logger
 
 from eir.data_load import label_setup
 from eir.data_load.label_setup import (

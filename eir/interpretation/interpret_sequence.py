@@ -8,7 +8,8 @@ import numpy as np
 import pandas as pd
 import torch
 import torchtext.vocab
-from aislib.misc_utils import ensure_path_exists, get_logger
+from aislib.misc_utils import ensure_path_exists
+from eir.utils.logging import get_logger
 from captum.attr._utils.visualization import (
     format_classname,
     format_word_importances,

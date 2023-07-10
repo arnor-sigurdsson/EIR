@@ -6,7 +6,8 @@ from shutil import copy2
 from typing import List, Sequence, Tuple, Callable, Dict
 
 from PIL.Image import Image
-from aislib.misc_utils import ensure_path_exists, get_logger
+from aislib.misc_utils import ensure_path_exists
+from eir.utils.logging import get_logger
 from pdf2image import convert_from_path
 
 from docs.doc_modules.data import get_data

@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Dict
 
 from sklearn.preprocessing import StandardScaler
-from aislib.misc_utils import get_logger
+from eir.utils.logging import get_logger
 
 from eir.data_load.label_setup import (
     al_target_columns,

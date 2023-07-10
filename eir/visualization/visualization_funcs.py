@@ -21,7 +21,7 @@ import matplotlib.cm as cm
 from matplotlib.ticker import MaxNLocator
 import seaborn as sns
 
-from aislib.misc_utils import get_logger
+from eir.utils.logging import get_logger
 
 from eir.train_utils import metrics
 

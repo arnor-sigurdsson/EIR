@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from aislib.misc_utils import get_logger
+from eir.utils.logging import get_logger
 from typing import Sequence, Tuple, Union, TYPE_CHECKING
 
 from eir.experiment_io.experiment_io import (

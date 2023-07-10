@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 from typing import Generator, Tuple, Dict, Literal, Iterable, Protocol, Sequence
 
-from aislib.misc_utils import get_logger
+from eir.utils.logging import get_logger
 
 from eir.predict_modules.predict_utils import (
     log_and_raise_missing_or_multiple_config_matching_general,

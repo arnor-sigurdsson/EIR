@@ -15,7 +15,7 @@ from typing import (
 )
 
 import torch
-from aislib.misc_utils import get_logger
+from eir.utils.logging import get_logger
 from torch import nn
 from transformers import PreTrainedModel
 

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import torch
 import typing
-from aislib.misc_utils import get_logger
+from eir.utils.logging import get_logger
 from typing import Type, Dict, Union, Sequence, Tuple, Any
 
 from eir.models.model_setup_modules.meta_setup import al_meta_model

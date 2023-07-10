@@ -16,7 +16,7 @@ from typing import (
 
 import aislib.misc_utils
 import yaml
-from aislib.misc_utils import get_logger
+from eir.utils.logging import get_logger
 from ignite.contrib.handlers import ProgressBar
 from ignite.engine import Events, Engine, events, CallableEventWithFilter, EventsList
 from ignite.handlers import ModelCheckpoint, EarlyStopping

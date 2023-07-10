@@ -11,7 +11,7 @@ from typing import (
 
 import torch
 from aislib.misc_utils import ensure_path_exists
-from aislib.misc_utils import get_logger
+from eir.utils.logging import get_logger
 from ignite.engine import Engine
 from torch import nn
 from torch.optim.optimizer import Optimizer

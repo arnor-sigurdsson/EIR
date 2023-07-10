@@ -12,7 +12,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 
-from aislib.misc_utils import get_logger, ensure_path_exists
+from aislib.misc_utils import ensure_path_exists
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from eir.interpretation.interpret_omics import (

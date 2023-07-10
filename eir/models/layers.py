@@ -5,7 +5,7 @@ import math
 import numpy as np
 import torch
 import torch.nn.functional as F
-from aislib.misc_utils import get_logger
+from eir.utils.logging import get_logger
 from aislib.pytorch_modules import Swish
 from torch import nn
 from torch.nn import Parameter

@@ -14,7 +14,8 @@ from typing import (
 
 import numpy as np
 import pandas as pd
-from aislib.misc_utils import get_logger, ensure_path_exists
+from aislib.misc_utils import ensure_path_exists
+from eir.utils.logging import get_logger
 
 from eir.interpretation.interpretation_utils import get_target_class_name
 from eir.setup.input_setup_modules.setup_omics import (

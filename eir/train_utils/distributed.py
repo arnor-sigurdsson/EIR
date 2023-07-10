@@ -3,7 +3,7 @@ from copy import copy
 from functools import wraps
 from typing import Callable, Any, TYPE_CHECKING, Tuple, Union, Optional
 
-from aislib.misc_utils import get_logger
+from eir.utils.logging import get_logger
 from torch import distributed as dist
 from torch.nn.parallel import DistributedDataParallel
 

@@ -14,8 +14,7 @@ from typing import (
     MutableMapping,
 )
 import yaml
-from aislib.misc_utils import get_logger
-
+from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__)
 

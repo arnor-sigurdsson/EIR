@@ -2,7 +2,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import Sequence, Callable, Union, List, TYPE_CHECKING
 
-from aislib.misc_utils import get_logger
+from eir.utils.logging import get_logger
 from torchtext.vocab import Vocab
 
 from eir.setup.input_setup_modules import setup_sequence

@@ -17,7 +17,7 @@ from typing import (
 
 import matplotlib.pyplot as plt
 import torch
-from aislib.misc_utils import get_logger
+from eir.utils.logging import get_logger
 from aislib.pytorch_modules import Swish
 from ignite.engine import Engine
 from ignite.handlers.lr_finder import FastaiLRFinder

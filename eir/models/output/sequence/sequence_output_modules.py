@@ -4,7 +4,7 @@ from typing import Dict, Literal, TYPE_CHECKING
 
 import dill
 import torch
-from aislib.misc_utils import get_logger
+from eir.utils.logging import get_logger
 from torch import nn
 from torch.nn import functional as F
 

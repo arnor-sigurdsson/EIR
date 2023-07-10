@@ -23,7 +23,8 @@ from typing import (
 import numpy as np
 import pandas as pd
 import torch
-from aislib.misc_utils import ensure_path_exists, get_logger
+from aislib.misc_utils import ensure_path_exists
+from eir.utils.logging import get_logger
 from scipy.special import softmax
 from scipy.stats import pearsonr
 from sklearn.metrics import (

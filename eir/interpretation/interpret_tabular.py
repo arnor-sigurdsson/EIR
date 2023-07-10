@@ -5,7 +5,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from aislib.misc_utils import get_logger, ensure_path_exists
+from aislib.misc_utils import ensure_path_exists
+from eir.utils.logging import get_logger
 from sklearn.preprocessing import LabelEncoder
 
 from eir.experiment_io.experiment_io import load_transformers

@@ -2,7 +2,7 @@ import argparse
 from dataclasses import dataclass
 from typing import Union, Type, Dict, Any, Protocol, Literal, TYPE_CHECKING, ClassVar
 
-from aislib.misc_utils import get_logger
+from eir.utils.logging import get_logger
 
 from eir.models.input.omics.models_cnn import CNNModel, CNNModelConfig
 from eir.models.input.omics.models_identity import IdentityModel, IdentityModelConfig

@@ -14,7 +14,7 @@ from typing import (
 
 import math
 import torch
-from aislib.misc_utils import get_logger
+from eir.utils.logging import get_logger
 from torch import nn, Tensor
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
 from torch.nn.functional import pad

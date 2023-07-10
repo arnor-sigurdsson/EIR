@@ -5,7 +5,7 @@ from typing import List, Dict, TYPE_CHECKING, Sequence
 import numpy as np
 import pandas as pd
 import torch
-from aislib.misc_utils import get_logger
+from eir.utils.logging import get_logger
 from ignite.engine import Engine
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 

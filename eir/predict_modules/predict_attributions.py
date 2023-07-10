@@ -5,7 +5,8 @@ from pathlib import Path
 from random import sample
 from typing import Literal, Union, TYPE_CHECKING
 
-from aislib.misc_utils import ensure_path_exists, get_logger
+from aislib.misc_utils import ensure_path_exists
+from eir.utils.logging import get_logger
 from torch import nn
 from torch.utils.data import DataLoader
 

@@ -19,7 +19,8 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from PIL import Image
-from aislib.misc_utils import get_logger, ensure_path_exists
+from aislib.misc_utils import ensure_path_exists
+from eir.utils.logging import get_logger
 from torch.utils.data import DataLoader, Dataset
 from torchtext.vocab import Vocab
 from transformers.tokenization_utils import PreTrainedTokenizerBase

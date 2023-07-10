@@ -1,7 +1,7 @@
 from typing import Callable, Dict, TYPE_CHECKING
 
 import torch
-from aislib.misc_utils import get_logger
+from eir.utils.logging import get_logger
 from torch import nn
 
 from eir.models.layers import MLPResidualBlock, ResidualMLPConfig

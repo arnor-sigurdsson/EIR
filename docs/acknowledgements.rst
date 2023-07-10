@@ -64,6 +64,8 @@ and so on:
 
 - ``deeplake``  – activeloop.ai: Activeloop Deep Lake
 
+- ``termcolor`` : ANSI color formatting for output in terminal
+
 - ``memory-profiler``  – Fabian Pedregosa: A module for monitoring memory usage of a python program
 
 - ``pytest``  – Holger Krekel, Bruno Oliveira, Ronny Pfannschmidt, Floris Bruynooghe, Brianna Laugher, Florian Bruhin and others: pytest: simple powerful testing with Python

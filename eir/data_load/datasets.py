@@ -21,7 +21,7 @@ from typing import (
 )
 
 import torch
-from aislib.misc_utils import get_logger
+from eir.utils.logging import get_logger
 from torch.utils.data import Dataset
 from tqdm import tqdm
 

@@ -5,7 +5,7 @@ from typing import List, TYPE_CHECKING, Union, Tuple, Iterator
 import torch
 from sympy import Symbol
 from sympy.solvers import solve
-from aislib.misc_utils import get_logger
+from eir.utils.logging import get_logger
 from aislib.pytorch_modules import Swish
 from torch import nn
 

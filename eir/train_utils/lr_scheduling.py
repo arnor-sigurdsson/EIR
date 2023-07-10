@@ -11,7 +11,7 @@ from typing import (
 )
 
 import numpy as np
-from aislib.misc_utils import get_logger
+from eir.utils.logging import get_logger
 from ignite.contrib.handlers import (
     ConcatScheduler,
     CosineAnnealingScheduler,
