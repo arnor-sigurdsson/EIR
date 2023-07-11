@@ -6,17 +6,16 @@ from pathlib import Path
 from typing import (
     Callable,
     Sequence,
-    List,
     Union,
     Optional,
     Iterator,
+    overload,
     Generator,
     Tuple,
     Protocol,
 )
 
 import pandas as pd
-from eir.utils.logging import get_logger
 from tokenizers import Tokenizer
 from tokenizers.models import BPE
 from tokenizers.trainers import BpeTrainer
@@ -39,24 +38,45 @@ from eir.data_load.data_source_modules.deeplake_ops import (
     load_deeplake_dataset,
     get_deeplake_input_source_iterable,
 )
+from eir.models.input.sequence.transformer_models import SequenceModelConfig
 from eir.setup import schemas
 from eir.setup.input_setup_modules.common import get_default_sequence_specials
 from eir.setup.schemas import al_tokenizer_choices
-from eir.models.input.sequence.transformer_models import SequenceModelConfig
+from eir.utils.logging import get_logger
+
+
+class TokenizerProtocolRaw(Protocol):
+    def __call__(self, raw_input: str) -> Sequence[str]:
+        ...
+
+
+class TokenizerProtocolPreSplit(Protocol):
+    def __call__(self, raw_input_split: Sequence[str]) -> Sequence[str]:
+        ...
+
+
+class EncodeFuncProtocol(Protocol):
+    def __call__(self, raw_input: Sequence[str] | str) -> Sequence[int]:
+        ...
+
 
 al_hf_tokenizer_inputs = Union[TextInput, PreTokenizedInput, EncodedInput]
 al_sequence_input_objects_basic = Tuple[
     Vocab,
     "GatheredSequenceStats",
-    Callable[[Sequence[str]], Sequence[str]],
-    Callable[[Sequence[str]], List[int]],
+    TokenizerProtocolPreSplit | TokenizerProtocolRaw,
+    EncodeFuncProtocol,
 ]
+al_hf_encode_func = Callable[[al_hf_tokenizer_inputs], Sequence[int]]
 al_sequence_input_objects_hf = Tuple[
     Vocab,
     "GatheredSequenceStats",
     PreTrainedTokenizer,
-    Callable[[al_hf_tokenizer_inputs], List[int]],
+    al_hf_encode_func,
 ]
+
+al_tokenizers = TokenizerProtocolRaw | TokenizerProtocolPreSplit
+al_encode_funcs = EncodeFuncProtocol | al_hf_encode_func
 
 
 logger = get_logger(name=__name__)
@@ -67,8 +87,8 @@ class ComputedSequenceInputInfo:
     input_config: schemas.InputConfig
     vocab: Vocab
     computed_max_length: int
-    encode_func: Callable[[Sequence[str]], List[int]]
-    tokenizer: Union[Callable, None] = None
+    encode_func: al_encode_funcs
+    tokenizer: Optional[al_tokenizers]
 
 
 def set_up_sequence_input_for_training(
@@ -110,14 +130,14 @@ def set_up_sequence_input_for_training(
     return sequence_input_info
 
 
-class ImageInputObjectGetterFunctionBasic(Protocol):
+class SequenceInputObjectGetterFunctionBasic(Protocol):
     def __call__(
         self, input_config: schemas.InputConfig
     ) -> al_sequence_input_objects_basic:
         ...
 
 
-class ImageInputObjectGetterFunctionHF(Protocol):
+class SequenceInputObjectGetterFunctionHF(Protocol):
     def __call__(
         self, input_config: schemas.InputConfig
     ) -> al_sequence_input_objects_hf:
@@ -126,7 +146,7 @@ class ImageInputObjectGetterFunctionHF(Protocol):
 
 def _get_sequence_input_object_func(
     pretrained: bool,
-) -> ImageInputObjectGetterFunctionBasic | ImageInputObjectGetterFunctionHF:
+) -> SequenceInputObjectGetterFunctionBasic | SequenceInputObjectGetterFunctionHF:
     if pretrained:
         return get_sequence_input_objects_from_pretrained
     else:
@@ -142,6 +162,7 @@ def get_sequence_input_objects_from_input(
 
     vocab_file = input_type_info.vocab_file
 
+    tokenizer: TokenizerProtocolRaw | TokenizerProtocolPreSplit
     tokenizer = get_tokenizer(input_config=input_config)
 
     vocab_iter = get_vocab_iterator(
@@ -171,8 +192,10 @@ def get_sequence_input_objects_from_input(
     )
     vocab.set_default_index(vocab["<unk>"])
 
-    encode_func = get_pytorch_tokenizer_encode_func(
-        pytorch_tokenizer=tokenizer, pytorch_vocab=vocab
+    encode_func: EncodeFuncProtocol
+    encode_func = get_tokenizer_encode_func(
+        tokenizer=tokenizer,
+        pytorch_vocab=vocab,
     )
 
     return vocab, gathered_stats, tokenizer, encode_func
@@ -180,11 +203,12 @@ def get_sequence_input_objects_from_input(
 
 def get_tokenizer(
     input_config: schemas.InputConfig,
-) -> Callable[[Sequence[str]], List[str]]:
+) -> TokenizerProtocolPreSplit | TokenizerProtocolRaw:
     input_type_info = input_config.input_type_info
     assert isinstance(input_type_info, schemas.SequenceInputDataConfig)
     tokenizer_name = input_type_info.tokenizer
 
+    tokenizer: TokenizerProtocolPreSplit | TokenizerProtocolRaw
     if tokenizer_name == "bpe":
         vocab_iter = get_vocab_iterator(
             input_source=input_config.input_info.input_source,
@@ -195,7 +219,12 @@ def get_tokenizer(
         )
 
         vocab_file = input_type_info.vocab_file
-        tokenizer = get_bpe_tokenizer(vocab_iterator=vocab_iter, vocab_file=vocab_file)
+        tokenizer = get_bpe_tokenizer(
+            vocab_iterator=vocab_iter,
+            vocab_file=vocab_file,
+            vocab_size=input_type_info.adaptive_tokenizer_max_vocab_size,
+            split_on=input_type_info.split_on,
+        )
 
     else:
         tokenizer = get_basic_tokenizer(
@@ -237,7 +266,9 @@ def get_sequence_input_objects_from_pretrained(
     hf_model_name = input_config.model_config.model_type
     hf_tokenizer = _get_hf_tokenizer(hf_model_name=hf_model_name)
 
-    def _passthrough_hf_encode(raw_input_split: al_hf_tokenizer_inputs) -> List[int]:
+    def _passthrough_hf_encode(
+        raw_input_split: al_hf_tokenizer_inputs,
+    ) -> Sequence[int]:
         return hf_tokenizer.encode(text=raw_input_split, is_split_into_words=True)
 
     vocab = _sync_hf_and_pytorch_vocab(hf_tokenizer=hf_tokenizer)
@@ -287,20 +318,43 @@ def _add_specials_to_hf_tokenizer(
     return hf_tokenizer_copy
 
 
-def get_bpe_tokenizer(vocab_iterator: Optional[Iterator], vocab_file: Optional[str]):
+def get_bpe_tokenizer(
+    vocab_iterator: Optional[Iterator],
+    vocab_file: Optional[str],
+    vocab_size: Optional[int],
+    split_on: Optional[str],
+) -> TokenizerProtocolRaw | TokenizerProtocolPreSplit:
     tokenizer = _get_bpe_tokenizer_object(
-        vocab_iterator=vocab_iterator, vocab_file=vocab_file
+        vocab_iterator=vocab_iterator,
+        vocab_file=vocab_file,
+        vocab_size=vocab_size,
     )
 
-    def _tokenize(raw_input_split: Sequence[str]) -> Sequence[str]:
-        return tokenizer.encode(raw_input_split, is_pretokenized=True).tokens
+    def _tokenize_raw(raw_input: str) -> Sequence[str]:
+        tokens = tokenizer.encode(
+            sequence=raw_input,
+            is_pretokenized=False,
+        ).tokens
+        return tokens
 
-    return _tokenize
+    def _tokenize_pre_split(raw_input_split: Sequence[str]) -> Sequence[str]:
+        tokens = tokenizer.encode(
+            sequence=raw_input_split,
+            is_pretokenized=True,
+        ).tokens
+        return tokens
+
+    if split_on is None:
+        return _tokenize_raw
+    else:
+        return _tokenize_pre_split
 
 
 def _get_bpe_tokenizer_object(
-    vocab_iterator: Optional[Iterator], vocab_file: Optional[str]
-):
+    vocab_iterator: Optional[Iterator],
+    vocab_file: Optional[str],
+    vocab_size: Optional[int],
+) -> Tokenizer:
     if vocab_file:
         logger.info("Loading BPE vocabulary from file %s.", vocab_file)
 
@@ -319,7 +373,15 @@ def _get_bpe_tokenizer_object(
         tokenizer = Tokenizer(model=BPE(unk_token="<unk>"))
 
         special_tokens = get_default_sequence_specials()
-        trainer = BpeTrainer(special_tokens=special_tokens)
+        if vocab_size is not None:
+            trainer = BpeTrainer(
+                special_tokens=special_tokens,
+                vocab_size=vocab_size,
+            )
+        else:
+            trainer = BpeTrainer(
+                special_tokens=special_tokens,
+            )
 
         tokenizer.train_from_iterator(iterator=vocab_iterator, trainer=trainer)
 
@@ -329,11 +391,14 @@ def _get_bpe_tokenizer_object(
 def get_basic_tokenizer(
     tokenizer_name: al_tokenizer_choices,  # type: ignore
     tokenizer_language: Optional[str],
-) -> Callable[[Sequence[str]], Sequence[str]]:
-    if not tokenizer_name:
-        return lambda x: x
+) -> TokenizerProtocolPreSplit:
+    def _identity(raw_input_split: Sequence[str]) -> Sequence[str]:
+        return raw_input_split
 
-    _validate_tokenizer_args(
+    if not tokenizer_name:
+        return _identity
+
+    _validate_pytorch_tokenizer_args(
         tokenizer_name=tokenizer_name, tokenizer_language=tokenizer_language
     )
     logger.debug(
@@ -344,29 +409,17 @@ def get_basic_tokenizer(
     )
 
     def _join_and_tokenize(raw_input_split: Sequence[str]) -> Sequence[str]:
+        """
+        " ".join(...) since the PyTorch tokenizers operate on a single string.
+        Can be optimized later by not splitting the input in the first place.
+        """
         input_joined = " ".join(raw_input_split)
         return tokenizer(input_joined)
 
     return _join_and_tokenize
 
 
-def get_pytorch_tokenizer_encode_func(
-    pytorch_tokenizer: Callable[[Sequence[str]], Sequence[str]],
-    pytorch_vocab: Vocab,
-) -> Callable[[Sequence[str]], List[int]]:
-    """
-    TODO: Possibly deprecate using torchtext and just switch completely to HF.
-    """
-
-    def _encode_func(raw_input_split: Sequence[str]) -> List[int]:
-        input_tokenized = pytorch_tokenizer(raw_input_split)
-        input_as_ids = pytorch_vocab(input_tokenized)
-        return input_as_ids
-
-    return _encode_func
-
-
-def _validate_tokenizer_args(
+def _validate_pytorch_tokenizer_args(
     tokenizer_name: al_tokenizer_choices,  # type: ignore
     tokenizer_language: Union[str, None],
 ) -> None:
@@ -385,17 +438,48 @@ def _validate_tokenizer_args(
         )
 
 
+def get_tokenizer_encode_func(
+    tokenizer: TokenizerProtocolRaw | TokenizerProtocolPreSplit,
+    pytorch_vocab: Vocab,
+) -> EncodeFuncProtocol:
+    @overload
+    def _encode_func(raw_input: str) -> Sequence[int]:
+        ...
+
+    @overload
+    def _encode_func(raw_input: Sequence[str]) -> Sequence[int]:
+        ...
+
+    def _encode_func(raw_input):
+        input_tokenized = tokenizer(raw_input)
+        input_as_ids = pytorch_vocab(input_tokenized)
+        return input_as_ids
+
+    return _encode_func
+
+
 def get_tokenized_vocab_iterator(
-    vocab_iterator: Iterator[Sequence[str]],
-    tokenizer: Callable[[Sequence[str]], List[str]],
-) -> Generator[List[str], None, None]:
+    vocab_iterator: Iterator[Sequence[str] | str],
+    tokenizer: TokenizerProtocolRaw | TokenizerProtocolPreSplit,
+) -> Generator[Sequence[str], None, None]:
+    @overload
+    def _do_tokenize(list_of_words_: str) -> Sequence[str]:
+        ...
+
+    @overload
+    def _do_tokenize(list_of_words_: Sequence[str]) -> Sequence[str]:
+        ...
+
+    def _do_tokenize(list_of_words_):
+        return tokenizer(list_of_words_)
+
     for list_of_words in vocab_iterator:
-        yield tokenizer(list_of_words)
+        yield _do_tokenize(list_of_words_=list_of_words)
 
 
 def get_vocab_iterator(
     input_source: str,
-    split_on: str,
+    split_on: Optional[str],
     gathered_stats: "GatheredSequenceStats",
     vocab_file: Union[str, None] = None,
     deeplake_inner_key: Optional[str] = None,
@@ -435,7 +519,7 @@ class GatheredSequenceStats:
 
 def yield_tokens_from_source(
     data_source: str,
-    split_on: str,
+    split_on: Optional[str],
     gathered_stats: GatheredSequenceStats,
     deeplake_inner_key: Optional[str] = None,
 ):
@@ -468,7 +552,7 @@ def yield_tokens_from_source(
 
 def yield_tokens_from_deeplake_dataset(
     data_source: Path,
-    split_on: str,
+    split_on: Optional[str],
     gathered_stats: GatheredSequenceStats,
     inner_key: str,
 ) -> Generator[Sequence[str], None, None]:
@@ -493,7 +577,7 @@ def yield_tokens_from_deeplake_dataset(
 
 
 def yield_tokens_from_file(
-    file_path: str, split_on: str, gathered_stats: GatheredSequenceStats
+    file_path: str, split_on: Optional[str], gathered_stats: GatheredSequenceStats
 ):
     gathered_stats.total_files += 1
 
@@ -513,7 +597,7 @@ def yield_tokens_from_file(
 
 
 def yield_tokens_from_csv(
-    file_path: str, split_on: str, gathered_stats: GatheredSequenceStats
+    file_path: str, split_on: Optional[str], gathered_stats: GatheredSequenceStats
 ) -> Generator[Sequence[str], None, None]:
     split_func = get_sequence_split_function(split_on=split_on)
 
@@ -543,7 +627,9 @@ def yield_tokens_from_csv(
         yield cur_line
 
 
-def get_sequence_split_function(split_on: str) -> Callable[[str], List[str]]:
+def get_sequence_split_function(
+    split_on: Optional[str],
+) -> Callable[[str], list[str] | str]:
     match split_on:
         case "":
             return lambda x: list(x)
@@ -565,7 +651,7 @@ def possibly_gather_all_stats_from_input(
     prev_gathered_stats: GatheredSequenceStats,
     input_source: str,
     vocab_file: Optional[str],
-    split_on: str,
+    split_on: Optional[str],
     max_length: schemas.al_max_sequence_length,
 ) -> GatheredSequenceStats:
     """

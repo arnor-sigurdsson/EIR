@@ -99,6 +99,77 @@ def test_sequence_output_modelling(
     _sequence_output_test_check_wrapper(experiment=experiment, test_config=test_config)
 
 
+@pytest.mark.skipif(condition=should_skip_in_gha_macos(), reason="In GHA.")
+@pytest.mark.parametrize(
+    "create_test_data",
+    [
+        {
+            "task_type": "multi",
+            "modalities": ("sequence",),
+            "extras": {"sequence_csv_source": True},
+            "split_to_test": True,
+        },
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize(
+    "create_test_config_init_base",
+    [
+        {
+            "injections": {
+                "global_configs": {
+                    "output_folder": "test_generation",
+                    "n_epochs": 15,
+                    "memory_dataset": True,
+                },
+                "input_configs": [],
+                "fusion_configs": {
+                    "model_type": "pass-through",
+                },
+                "output_configs": [
+                    {
+                        "output_info": {
+                            "output_name": "test_output_sequence",
+                        },
+                        "output_type_info": {
+                            "split_on": None,
+                            "tokenizer": "bpe",
+                            "adaptive_tokenizer_max_vocab_size": 128,
+                        },
+                        "sampling_config": {
+                            "manual_inputs": [
+                                {
+                                    "test_output_sequence": "arctic_",
+                                },
+                                {
+                                    "test_output_sequence": "lyn",
+                                },
+                            ],
+                        },
+                    }
+                ],
+            },
+        },
+    ],
+    indirect=True,
+)
+def test_sequence_output_modelling_bpe(
+    prep_modelling_test_configs: "al_modelling_test_configs",
+) -> None:
+    experiment, test_config = prep_modelling_test_configs
+
+    train.train(experiment=experiment)
+
+    check_performance_result_wrapper(
+        outputs=experiment.outputs,
+        run_path=test_config.run_path,
+        max_thresholds=(0.5, 0.5),
+        min_thresholds=(2.5, 2.5),
+    )
+
+    _sequence_output_test_check_wrapper(experiment=experiment, test_config=test_config)
+
+
 def _sequence_output_test_check_wrapper(
     experiment: train.Experiment, test_config: "ModelTestConfig"
 ) -> None:

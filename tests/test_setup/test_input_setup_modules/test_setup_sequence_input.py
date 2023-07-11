@@ -130,7 +130,10 @@ def test_get_bpe_tokenizer(tmp_path: Path):
         gathered_stats=setup_sequence.GatheredSequenceStats(),
     )
     bpe_tokenizer_from_scratch = setup_sequence.get_bpe_tokenizer(
-        vocab_iterator=vocab_iter_test_training, vocab_file=None
+        vocab_iterator=vocab_iter_test_training,
+        vocab_file=None,
+        vocab_size=None,
+        split_on=" ",
     )
     known_sequence = "cat dog mouse".split()
     known_sequence_tokenized = bpe_tokenizer_from_scratch(known_sequence)
@@ -160,13 +163,18 @@ def test_get_bpe_tokenizer(tmp_path: Path):
         gathered_stats=setup_sequence.GatheredSequenceStats(),
     )
     bpe_tokenizer_object = setup_sequence._get_bpe_tokenizer_object(
-        vocab_iterator=vocab_iter_test_saving, vocab_file=None
+        vocab_iterator=vocab_iter_test_saving,
+        vocab_file=None,
+        vocab_size=None,
     )
     saved_bpe_path = tmp_path / "test_bpe.json"
     bpe_tokenizer_object.save(str(saved_bpe_path))
 
     bpe_tokenizer_from_pretrained = setup_sequence.get_bpe_tokenizer(
-        vocab_iterator=None, vocab_file=str(saved_bpe_path)
+        vocab_iterator=None,
+        vocab_file=str(saved_bpe_path),
+        vocab_size=None,
+        split_on=" ",
     )
     known_sequence_tokenized_pretrained = bpe_tokenizer_from_pretrained(known_sequence)
     assert known_sequence_tokenized_pretrained == ["cat", "dog", "mouse"]

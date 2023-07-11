@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Literal, Union, Sequence, Dict, TYPE_CHECKING
+from typing import Literal, Union, Sequence, Dict, TYPE_CHECKING, Optional
 
 
 if TYPE_CHECKING:
@@ -49,6 +49,10 @@ class SequenceOutputTypeConfig:
     :param tokenizer_language:
         Which language rules the tokenizer should apply when tokenizing the raw data.
 
+    :param adaptive_tokenizer_max_vocab_size:
+        If using an adaptive tokenizer ("bpe"), this parameter controls the maximum
+        size of the vocabulary.
+
     :param sequence_operation:
         Which operation to perform on the sequence. Currently only ``autoregressive``
         is supported, which means that the model will be trained to predict the next
@@ -59,9 +63,10 @@ class SequenceOutputTypeConfig:
     max_length: "al_max_sequence_length" = "average"
     sampling_strategy_if_longer: Literal["from_start", "uniform"] = "uniform"
     min_freq: int = 10
-    split_on: str = " "
+    split_on: Optional[str] = " "
     tokenizer: "al_tokenizer_choices" = None  # type: ignore
     tokenizer_language: Union[str, None] = None
+    adaptive_tokenizer_max_vocab_size: Optional[int] = None
 
     sequence_operation: al_sequence_operations = "autoregressive"
 

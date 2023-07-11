@@ -482,6 +482,10 @@ class SequenceInputDataConfig:
     :param tokenizer_language:
         Which language rules the tokenizer should apply when tokenizing the raw data.
 
+    :param adaptive_tokenizer_max_vocab_size:
+        If using an adaptive tokenizer ("bpe"), this parameter controls the maximum
+        size of the vocabulary.
+
     :param mixing_subtype:
         Which type of mixing to use on the sequence data given that ``mixing_alpha`` is
         set >0.0 in the global configuration.
@@ -491,9 +495,10 @@ class SequenceInputDataConfig:
     max_length: al_max_sequence_length = "average"
     sampling_strategy_if_longer: Literal["from_start", "uniform"] = "uniform"
     min_freq: int = 10
-    split_on: str = " "
+    split_on: Optional[str] = " "
     tokenizer: al_tokenizer_choices = None  # type: ignore
     tokenizer_language: Union[str, None] = None
+    adaptive_tokenizer_max_vocab_size: Optional[int] = None
     mixing_subtype: Literal["mixup"] = "mixup"
 
 

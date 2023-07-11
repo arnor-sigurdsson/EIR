@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Union, Callable, Sequence, List, Optional
+from typing import Union, Sequence, Optional
 
 import numpy as np
 import torch
@@ -12,6 +12,7 @@ from eir.data_load.data_source_modules import deeplake_ops
 from eir.setup.input_setup_modules.setup_sequence import (
     ComputedSequenceInputInfo,
     get_sequence_split_function,
+    al_encode_funcs,
 )
 from eir.setup.schemas import (
     SequenceInputDataConfig,
@@ -21,8 +22,8 @@ from eir.setup.schemas import (
 def sequence_load_wrapper(
     data_pointer: Union[Path, int, np.ndarray],
     input_source: str,
-    split_on: str,
-    encode_func: Callable[[Sequence[str]], List[int]],
+    split_on: Optional[str],
+    encode_func: al_encode_funcs,
     deeplake_inner_key: Optional[str] = None,
 ) -> np.ndarray:
     """
@@ -79,7 +80,10 @@ def prepare_sequence_data(
         sampling_strategy = "from_start"
 
     padding_token = getattr(sio.tokenizer, "pad_token", "<pad>")
-    padding_value = sio.encode_func([padding_token])[0]
+    padding_token_parsed = parse_padding_token_encode_func_input(
+        split_on=input_type_info.split_on, padding_token=padding_token
+    )
+    padding_value = sio.encode_func(padding_token_parsed)[0]
     cur_tokens_padded = process_tensor_to_length(
         tensor=cur_tokens_as_tensor,
         max_length=sio.computed_max_length,
@@ -88,3 +92,16 @@ def prepare_sequence_data(
     )
 
     return cur_tokens_padded
+
+
+def parse_padding_token_encode_func_input(
+    split_on: Optional[str], padding_token: str
+) -> Sequence[str] | str:
+    parsed_token: Sequence[str] | str
+
+    if split_on is None:
+        parsed_token = padding_token
+    else:
+        parsed_token = [padding_token]
+
+    return parsed_token

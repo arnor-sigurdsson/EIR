@@ -100,7 +100,7 @@ def add_sequence_data_from_csv_to_samples(
     input_source: str,
     samples: DefaultDict[str, "Sample"],
     ids_to_keep: Union[None, Set[str]],
-    split_on: str,
+    split_on: Optional[str],
     encode_func: Callable,
     input_name: str = "CSV File Data",
 ) -> DefaultDict[str, "Sample"]:

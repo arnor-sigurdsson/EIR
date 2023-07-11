@@ -1,15 +1,15 @@
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import Sequence, Callable, Union, List, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
-from eir.utils.logging import get_logger
 from torchtext.vocab import Vocab
 
-from eir.setup.input_setup_modules import setup_sequence
-from eir.setup.schemas import InputConfig, OutputConfig, SequenceOutputTypeConfig
 from eir.models.input.sequence.transformer_models import (
     SequenceModelConfig,
 )
+from eir.setup.input_setup_modules import setup_sequence
+from eir.setup.schemas import InputConfig, OutputConfig, SequenceOutputTypeConfig
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from eir.setup.output_setup import al_output_objects_as_dict
@@ -24,8 +24,8 @@ class ComputedSequenceOutputInfo:
     vocab: Vocab
     embedding_dim: int
     computed_max_length: int
-    encode_func: Callable[[Sequence[str]], List[int]]
-    tokenizer: Union[Callable, None] = None
+    encode_func: setup_sequence.al_encode_funcs
+    tokenizer: Optional[setup_sequence.al_tokenizers]
 
 
 def set_up_sequence_output(
@@ -115,8 +115,8 @@ def get_sequence_input_objects_from_output(
     )
     vocab.set_default_index(vocab["<unk>"])
 
-    encode_func = setup_sequence.get_pytorch_tokenizer_encode_func(
-        pytorch_tokenizer=tokenizer, pytorch_vocab=vocab
+    encode_func = setup_sequence.get_tokenizer_encode_func(
+        tokenizer=tokenizer, pytorch_vocab=vocab
     )
 
     return vocab, gathered_stats, tokenizer, encode_func

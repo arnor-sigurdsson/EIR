@@ -241,7 +241,7 @@ def convert_model_inputs_to_raw(
                 assert isinstance(input_type_info, SequenceInputDataConfig)
                 assert input_object.tokenizer is not None
                 raw_input = decode_tokens(
-                    tokens=data.numpy().squeeze().tolist(),
+                    tokens=data.numpy().squeeze(0).tolist(),
                     vocab=input_object.vocab,
                     split_on=input_type_info.split_on,
                     tokenizer=input_object.tokenizer,
@@ -553,7 +553,8 @@ def _extract_base_generated_tokens(
     tensor_base = prepared_inputs[seq_output_name]
     assert tensor_base.dim() == 2, tensor_base.dim()
 
-    list_base = tensor_base.squeeze().tolist()
+    list_base = tensor_base.squeeze(0).tolist()
+    assert isinstance(list_base, list)
 
     return list_base
 
