@@ -3,15 +3,15 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from shutil import copy2
-from typing import List, Sequence, Tuple, Callable, Dict
+from typing import Callable, Dict, List, Sequence, Tuple
 
-from PIL.Image import Image
 from aislib.misc_utils import ensure_path_exists
-from eir.utils.logging import get_logger
 from pdf2image import convert_from_path
+from PIL.Image import Image
 
 from docs.doc_modules.data import get_data
 from eir.setup.config_setup_modules.config_setup_utils import load_yaml_config
+from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__)
 

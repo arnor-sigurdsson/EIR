@@ -1,10 +1,8 @@
+import tempfile
 from argparse import Namespace
 from copy import deepcopy
 from pathlib import Path
-import tempfile
-from typing import Generator, Tuple, Dict, Literal, Iterable, Protocol, Sequence
-
-from eir.utils.logging import get_logger
+from typing import Dict, Generator, Iterable, Literal, Protocol, Sequence, Tuple
 
 from eir.predict_modules.predict_utils import (
     log_and_raise_missing_or_multiple_config_matching_general,
@@ -13,10 +11,11 @@ from eir.predict_modules.predict_utils import (
 from eir.setup import config, schemas
 from eir.setup.config import Configs
 from eir.setup.config_setup_modules.config_setup_utils import (
-    recursive_dict_replace,
-    object_to_primitives,
     get_yaml_to_dict_iterator,
+    object_to_primitives,
+    recursive_dict_replace,
 )
+from eir.utils.logging import get_logger
 
 al_named_dict_configs = Dict[
     Literal["global_configs", "fusion_configs", "input_configs", "output_configs"],

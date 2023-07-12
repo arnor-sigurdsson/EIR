@@ -1,12 +1,12 @@
 from dataclasses import dataclass
-from typing import Sequence, Dict, TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, Sequence
 
 from eir.data_load import label_setup
 from eir.data_load.label_setup import (
-    al_label_dict,
-    al_label_transformers,
     TabularFileInfo,
     al_all_column_ops,
+    al_label_dict,
+    al_label_transformers,
     transform_label_df,
 )
 from eir.experiment_io.experiment_io import load_transformers

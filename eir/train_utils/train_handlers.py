@@ -3,23 +3,22 @@ from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 from typing import (
-    List,
+    TYPE_CHECKING,
     Callable,
-    Union,
+    Dict,
+    Iterator,
+    List,
     Optional,
     Tuple,
-    TYPE_CHECKING,
-    Dict,
+    Union,
     overload,
-    Iterator,
 )
 
 import aislib.misc_utils
 import yaml
-from eir.utils.logging import get_logger
 from ignite.contrib.handlers import ProgressBar
-from ignite.engine import Events, Engine, events, CallableEventWithFilter, EventsList
-from ignite.handlers import ModelCheckpoint, EarlyStopping
+from ignite.engine import CallableEventWithFilter, Engine, Events, EventsList, events
+from ignite.handlers import EarlyStopping, ModelCheckpoint
 from ignite.metrics import RunningAverage
 from torch import nn
 
@@ -27,31 +26,31 @@ from eir.data_load.data_utils import get_output_info_generator
 from eir.interpretation.interpretation import attribution_analysis_handler
 from eir.setup.config_setup_modules.config_setup_utils import object_to_primitives
 from eir.setup.output_setup import al_output_objects_as_dict
-from eir.train_utils.distributed import AttrDelegatedDistributedDataParallel
-from eir.train_utils.distributed import only_call_on_master_node
-from eir.train_utils.evaluation import validation_handler
-from eir.train_utils.lr_scheduling import (
-    set_up_lr_scheduler,
-    attach_lr_scheduler,
+from eir.train_utils.distributed import (
+    AttrDelegatedDistributedDataParallel,
+    only_call_on_master_node,
 )
+from eir.train_utils.evaluation import validation_handler
+from eir.train_utils.lr_scheduling import attach_lr_scheduler, set_up_lr_scheduler
 from eir.train_utils.metrics import (
-    get_metrics_dataframes,
-    persist_metrics,
-    get_metrics_files,
-    al_metric_record_dict,
     MetricRecord,
-    read_metrics_history_file,
+    al_metric_record_dict,
     get_average_history_filepath,
     get_buffered_metrics_writer,
+    get_metrics_dataframes,
+    get_metrics_files,
+    persist_metrics,
+    read_metrics_history_file,
 )
 from eir.train_utils.optim import AttrDelegatedSWAWrapper
 from eir.train_utils.utils import get_run_folder, validate_handler_dependencies
+from eir.utils.logging import get_logger
 from eir.visualization import visualization_funcs as vf
 
 if TYPE_CHECKING:
+    from eir.setup.config import Configs
     from eir.train import Experiment
     from eir.train_utils.metrics import al_step_metric_dict
-    from eir.setup.config import Configs
 
 # Aliases
 al_handler = Callable[[Engine, "HandlerConfig"], None]

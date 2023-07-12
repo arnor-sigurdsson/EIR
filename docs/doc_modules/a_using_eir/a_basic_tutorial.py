@@ -1,6 +1,6 @@
-from pathlib import Path
 import textwrap
-from typing import Sequence, List
+from pathlib import Path
+from typing import List, Sequence
 
 import pandas as pd
 

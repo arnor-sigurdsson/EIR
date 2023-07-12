@@ -1,7 +1,7 @@
 from argparse import Namespace
 from copy import deepcopy
 from pathlib import Path
-from typing import Union, Sequence, Mapping
+from typing import Mapping, Sequence, Union
 
 import pytest
 import yaml
@@ -9,16 +9,16 @@ from aislib.misc_utils import ensure_path_exists
 
 import eir.models.output.output_module_setup
 from eir.predict_modules.predict_config import (
+    _check_matching_general_output_configs,
+    _get_maybe_patched_null_sequence_output_source_for_generation,
     get_named_predict_dict_iterators,
     get_train_predict_matched_config_generator,
     overload_train_configs_for_predict,
-    _get_maybe_patched_null_sequence_output_source_for_generation,
-    _check_matching_general_output_configs,
 )
-from eir.setup import schemas, config
+from eir.setup import config, schemas
 from eir.setup.config_setup_modules.config_setup_utils import (
-    recursive_dict_replace,
     object_to_primitives,
+    recursive_dict_replace,
 )
 
 

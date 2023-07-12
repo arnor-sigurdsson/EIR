@@ -1,15 +1,13 @@
-from typing import Type, Dict, TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, Type
 
 import torch
 
-from eir.models.output.linear import LinearOutputModuleConfig, LinearOutputModule
+from eir.models.output.linear import LinearOutputModule, LinearOutputModuleConfig
 from eir.models.output.mlp_residual import (
-    ResidualMLPOutputModuleConfig,
     ResidualMLPOutputModule,
+    ResidualMLPOutputModuleConfig,
 )
-from eir.models.output.output_module_setup import (
-    TabularOutputModuleConfig,
-)
+from eir.models.output.output_module_setup import TabularOutputModuleConfig
 from eir.models.output.sequence.sequence_output_modules import (
     SequenceOutputModule,
     SequenceOutputModuleConfig,

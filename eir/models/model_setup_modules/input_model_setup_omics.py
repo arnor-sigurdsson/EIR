@@ -1,8 +1,8 @@
 from eir.models.input.omics.omics_models import (
     al_omics_model_configs,
-    get_omics_model_class,
     al_omics_model_types,
     al_omics_models,
+    get_omics_model_class,
     get_omics_model_init_kwargs,
 )
 from eir.setup.input_setup_modules.common import DataDimensions

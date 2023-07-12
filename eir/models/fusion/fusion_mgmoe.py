@@ -1,20 +1,17 @@
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from typing import Dict, Sequence, TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, Sequence
 
 import torch
 from torch import nn
 
-from eir.models.fusion.fusion_default import (
-    al_features,
-    default_fuse_features,
-)
+from eir.models.fusion.fusion_default import al_features, default_fuse_features
 from eir.models.layers import MLPResidualBlock
 from eir.models.models_base import (
-    construct_multi_branches,
-    initialize_modules_from_spec,
-    create_multi_task_blocks_with_first_adaptor_block,
     calculate_module_dict_outputs,
+    construct_multi_branches,
+    create_multi_task_blocks_with_first_adaptor_block,
+    initialize_modules_from_spec,
 )
 
 if TYPE_CHECKING:

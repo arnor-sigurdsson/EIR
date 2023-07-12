@@ -1,17 +1,17 @@
-from copy import deepcopy, copy
+from copy import copy, deepcopy
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import (
-    List,
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
     Iterable,
+    List,
+    Sequence,
     Tuple,
     Union,
-    Dict,
-    TYPE_CHECKING,
-    Callable,
-    Any,
-    Sequence,
 )
 
 import matplotlib.pyplot as plt
@@ -24,28 +24,20 @@ from torch.nn import Module
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 
-from eir.setup.output_setup import (
-    ComputedTabularOutputInfo,
-)
-from eir.train_utils.utils import (
-    call_hooks_stage_iterable,
-)
+from eir.setup.output_setup import ComputedTabularOutputInfo
+from eir.train_utils.utils import call_hooks_stage_iterable
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     # noinspection PyUnresolvedReferences
-    from eir.train import (  # noqa: F401
-        Experiment,
-    )
-    from eir.train_utils.step_logic import (
-        al_training_labels_target,
-        al_input_batch,
-        al_ids,
-    )
-    from eir.setup.output_setup import (
-        al_output_objects_as_dict,
-    )
     from eir.models.model_setup_modules.meta_setup import al_meta_model
+    from eir.setup.output_setup import al_output_objects_as_dict
+    from eir.train import Experiment  # noqa: F401
+    from eir.train_utils.step_logic import (
+        al_ids,
+        al_input_batch,
+        al_training_labels_target,
+    )
 
 # Aliases
 al_dataloader_gathered_predictions = Tuple[

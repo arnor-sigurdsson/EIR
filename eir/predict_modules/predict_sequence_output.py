@@ -1,6 +1,4 @@
-from typing import (
-    TYPE_CHECKING,
-)
+from typing import TYPE_CHECKING
 
 from eir.train_utils.train_handlers_sequence_output import (
     sequence_out_single_sample_evaluation_wrapper,

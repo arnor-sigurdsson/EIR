@@ -1,4 +1,4 @@
-from typing import Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, Tuple
 
 import pytest
 import torch.utils

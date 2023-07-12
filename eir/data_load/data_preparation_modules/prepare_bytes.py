@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Union, Optional
+from typing import Optional, Union
 
 import numpy as np
 import torch
@@ -10,10 +10,7 @@ from eir.data_load.data_preparation_modules.common import (
 )
 from eir.data_load.data_source_modules import deeplake_ops
 from eir.setup.input_setup_modules.setup_bytes import ComputedBytesInputInfo
-
-from eir.setup.schemas import (
-    ByteInputDataConfig,
-)
+from eir.setup.schemas import ByteInputDataConfig
 
 
 def bytes_load_wrapper(

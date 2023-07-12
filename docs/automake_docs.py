@@ -3,17 +3,17 @@ from typing import Iterable
 
 from docs.doc_modules.a_using_eir import (
     a_basic_tutorial,
-    e_image_tutorial,
     b_tabular_tutorial,
     c_sequence_tutorial,
     d_pretrained_models_tutorial,
+    e_image_tutorial,
     f_binary_tutorial,
     g_multimodal_tutorial,
     h_array_tutorial,
 )
 from docs.doc_modules.b_customizing_eir import a_customizing_fusion_tutorial
 from docs.doc_modules.c_sequence_outputs import a_sequence_generation
-from docs.doc_modules.experiments import make_tutorial_data, AutoDocExperimentInfo
+from docs.doc_modules.experiments import AutoDocExperimentInfo, make_tutorial_data
 
 
 def _get_a_using_eir_experiments() -> Iterable[AutoDocExperimentInfo]:

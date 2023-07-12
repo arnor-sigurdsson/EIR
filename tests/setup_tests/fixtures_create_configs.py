@@ -16,9 +16,9 @@ from eir.setup.config_setup_modules.output_config_setup_sequence import (
 from eir.train_utils.utils import configure_global_eir_logging, get_run_folder
 from tests.setup_tests.fixtures_create_data import TestDataConfig
 from tests.setup_tests.setup_test_eir_configs import (
+    get_test_base_fusion_init,
     get_test_base_global_init,
     get_test_inputs_inits,
-    get_test_base_fusion_init,
     get_test_outputs_inits,
 )
 

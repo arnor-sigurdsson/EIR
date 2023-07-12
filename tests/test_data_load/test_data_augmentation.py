@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 import torch
 from hypothesis import given, settings
-from hypothesis.strategies import lists, integers, floats
+from hypothesis.strategies import floats, integers, lists
 from torch import nn
 from torch.nn import functional as F
 

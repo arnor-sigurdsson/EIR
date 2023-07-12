@@ -1,7 +1,5 @@
 from pathlib import Path
-
-from eir.utils.logging import get_logger
-from typing import Sequence, Tuple, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Sequence, Tuple, Union
 
 from eir.experiment_io.experiment_io import (
     get_run_folder_from_model_path,
@@ -16,6 +14,7 @@ from eir.models.model_setup_modules.model_io import load_model
 from eir.setup import schemas
 from eir.setup.input_setup import al_input_objects_as_dict
 from eir.setup.output_setup import al_output_objects_as_dict
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from eir.models.meta.meta import al_input_modules

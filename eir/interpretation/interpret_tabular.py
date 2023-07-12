@@ -1,18 +1,17 @@
 from pathlib import Path
-from typing import Dict, Sequence, TYPE_CHECKING, List
+from typing import TYPE_CHECKING, Dict, List, Sequence
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
 from aislib.misc_utils import ensure_path_exists
-from eir.utils.logging import get_logger
 from sklearn.preprocessing import LabelEncoder
 
 from eir.experiment_io.experiment_io import load_transformers
 from eir.interpretation.interpretation_utils import (
-    stratify_attributions_by_target_classes,
     plot_attributions_bar,
+    stratify_attributions_by_target_classes,
 )
 from eir.models.input.tabular.tabular import SimpleTabularModel
 from eir.predict_modules.predict_tabular_input_setup import (
@@ -23,10 +22,11 @@ from eir.setup.output_setup_modules.tabular_output_setup import (
     ComputedTabularOutputInfo,
 )
 from eir.setup.schemas import TabularInputDataConfig
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
-    from eir.train import Experiment
     from eir.interpretation.interpretation import SampleAttribution
+    from eir.train import Experiment
 
 
 logger = get_logger(__name__)

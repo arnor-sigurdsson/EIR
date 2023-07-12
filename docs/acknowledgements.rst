@@ -114,3 +114,5 @@ and so on:
 
 - ``types-pyyaml`` : Typing stubs for PyYAML
 
+- ``isort``  – Timothy Crosley: A Python utility / library to sort Python imports.
+

@@ -1,27 +1,18 @@
 import inspect
+import math
 from dataclasses import dataclass
 from functools import partial
-from typing import (
-    Union,
-    Literal,
-    Optional,
-    Type,
-    Tuple,
-    Dict,
-    Sequence,
-    Callable,
-)
+from typing import Callable, Dict, Literal, Optional, Sequence, Tuple, Type, Union
 
-import math
 import torch
-from eir.utils.logging import get_logger
-from torch import nn, Tensor
+from torch import Tensor, nn
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
 from torch.nn.functional import pad
-from transformers import PreTrainedModel, PretrainedConfig
+from transformers import PretrainedConfig, PreTrainedModel
 
 from eir.models.layers import _find_lcl_padding_needed
 from eir.setup.setup_utils import get_all_hf_model_names
+from eir.utils.logging import get_logger
 
 al_sequence_models = tuple(  # type: ignore
     Literal[i] for i in ["sequence-default"] + list(get_all_hf_model_names())

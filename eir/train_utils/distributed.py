@@ -1,15 +1,16 @@
 import os
 from copy import copy
 from functools import wraps
-from typing import Callable, Any, TYPE_CHECKING, Tuple, Union, Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional, Tuple, Union
 
-from eir.utils.logging import get_logger
 from torch import distributed as dist
 from torch.nn.parallel import DistributedDataParallel
 
+from eir.utils.logging import get_logger
+
 if TYPE_CHECKING:
-    from eir.setup.config import Configs
     from eir.models.model_setup_modules.meta_setup import al_meta_model
+    from eir.setup.config import Configs
 
 logger = get_logger(name=__name__)
 

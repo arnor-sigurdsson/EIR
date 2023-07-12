@@ -1,12 +1,12 @@
 from pathlib import Path
-from typing import Tuple, List, TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Tuple
 
 import numpy as np
 
 from tests.setup_tests.setup_modelling_test_data.setup_targets_test_data import (
+    get_current_test_label_values,
     set_up_label_file_writing,
     set_up_label_line_dict,
-    get_current_test_label_values,
 )
 from tests.setup_tests.setup_modelling_test_data.setup_test_data_utils import (
     set_up_test_data_root_outpath,

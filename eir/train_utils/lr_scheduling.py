@@ -1,24 +1,14 @@
+from math import isclose
 from pathlib import Path
-from typing import (
-    Tuple,
-    Union,
-    cast,
-    Dict,
-    TYPE_CHECKING,
-    Callable,
-    Literal,
-    Optional,
-)
+from typing import TYPE_CHECKING, Callable, Dict, Literal, Optional, Tuple, Union, cast
 
 import numpy as np
-from eir.utils.logging import get_logger
 from ignite.contrib.handlers import (
     ConcatScheduler,
     CosineAnnealingScheduler,
     create_lr_scheduler_with_warmup,
 )
 from ignite.engine import Engine, Events
-from math import isclose
 from matplotlib import pyplot as plt
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim.optimizer import Optimizer
@@ -26,14 +16,15 @@ from torch.optim.optimizer import Optimizer
 from eir.setup.schemas import GlobalConfig
 from eir.train_utils.evaluation import validation_handler
 from eir.train_utils.metrics import (
-    read_metrics_history_file,
     get_average_history_filepath,
+    read_metrics_history_file,
 )
 from eir.train_utils.utils import get_run_folder, validate_handler_dependencies
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
-    from eir.train_utils.train_handlers import HandlerConfig
     from eir.train import Experiment
+    from eir.train_utils.train_handlers import HandlerConfig
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 

@@ -4,10 +4,10 @@ from eir.models.input.array.array_models import (
     ArrayModelConfig,
     ArrayWrapperModel,
     al_array_model_configs,
-    get_array_model_class,
-    get_array_model_init_kwargs,
     al_array_model_types,
     al_array_models,
+    get_array_model_class,
+    get_array_model_init_kwargs,
 )
 from eir.setup.input_setup_modules.common import DataDimensions
 

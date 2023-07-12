@@ -1,6 +1,6 @@
 from copy import deepcopy
 from pathlib import Path
-from typing import Tuple, Sequence, TYPE_CHECKING, Dict
+from typing import TYPE_CHECKING, Dict, Sequence, Tuple
 
 import pytest
 
@@ -9,17 +9,11 @@ from eir.setup.config import get_all_tabular_targets
 from eir.setup.schemas import BasicPretrainedConfig
 from eir.train_utils.step_logic import get_default_hooks
 from tests.setup_tests.fixtures_create_configs import cleanup
-from tests.setup_tests.fixtures_create_experiment import (
-    get_cur_modelling_test_config,
-)
-from tests.test_modelling.test_modelling_utils import (
-    check_performance_result_wrapper,
-)
+from tests.setup_tests.fixtures_create_experiment import get_cur_modelling_test_config
+from tests.test_modelling.test_modelling_utils import check_performance_result_wrapper
 
 if TYPE_CHECKING:
-    from tests.setup_tests.fixtures_create_experiment import (
-        ModelTestConfig,
-    )
+    from tests.setup_tests.fixtures_create_experiment import ModelTestConfig
 
 
 def _get_pre_trained_module_setup_parametrization() -> Dict:

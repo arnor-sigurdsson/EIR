@@ -1,27 +1,27 @@
 from pathlib import Path
 from typing import (
-    Union,
-    Sequence,
-    Generator,
-    Tuple,
+    TYPE_CHECKING,
     Any,
-    Iterable,
     Callable,
     DefaultDict,
-    Optional,
-    Set,
+    Generator,
+    Iterable,
     Iterator,
-    TYPE_CHECKING,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Union,
 )
 
 import numpy as np
 import pandas as pd
-from eir.utils.logging import get_logger
 from tqdm import tqdm
 
 from eir.data_load.data_source_modules.common_utils import add_id_to_samples
 from eir.data_load.label_setup import get_file_path_iterator
 from eir.setup.input_setup_modules.setup_sequence import get_sequence_split_function
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from eir.data_load.datasets import Sample

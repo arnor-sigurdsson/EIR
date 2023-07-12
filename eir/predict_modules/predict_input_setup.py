@@ -1,16 +1,12 @@
 from functools import partial
-from typing import Sequence, Union, Callable, Dict
+from typing import Callable, Dict, Sequence, Union
 
-from eir.experiment_io.experiment_io import (
-    load_serialized_input_object,
-)
+from eir.experiment_io.experiment_io import load_serialized_input_object
 from eir.predict_modules.predict_tabular_input_setup import (
     setup_tabular_input_for_testing,
 )
-from eir.setup import schemas, input_setup
-from eir.setup.input_setup import (
-    al_input_objects_as_dict,
-)
+from eir.setup import input_setup, schemas
+from eir.setup.input_setup import al_input_objects_as_dict
 from eir.setup.input_setup_modules import setup_array, setup_omics
 from eir.setup.input_setup_modules.setup_bytes import ComputedBytesInputInfo
 from eir.setup.input_setup_modules.setup_image import ComputedImageInputInfo

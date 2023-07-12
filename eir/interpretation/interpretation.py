@@ -7,20 +7,20 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import partial
 from typing import (
-    Union,
-    Dict,
-    Any,
     TYPE_CHECKING,
-    Sequence,
-    DefaultDict,
-    Iterator,
-    Iterable,
-    Literal,
-    Tuple,
-    Generator,
-    Protocol,
+    Any,
     Callable,
+    DefaultDict,
+    Dict,
+    Generator,
+    Iterable,
+    Iterator,
+    Literal,
     Optional,
+    Protocol,
+    Sequence,
+    Tuple,
+    Union,
 )
 
 # Filter warnings from attribution calculation
@@ -34,49 +34,45 @@ warnings.filterwarnings(
 
 import numpy as np
 import torch
-from torch.cuda import OutOfMemoryError
 from aislib.misc_utils import ensure_path_exists
-from eir.utils.logging import get_logger
-from ignite.engine import Engine
 from captum.attr import NoiseTunnel
+from ignite.engine import Engine
 from torch import nn
+from torch.cuda import OutOfMemoryError
 from torch.utils.data import DataLoader, Subset
 from torch.utils.hooks import RemovableHandle
 
-from eir.data_load.data_utils import get_output_info_generator, Batch
+from eir.data_load.data_utils import Batch, get_output_info_generator
 from eir.data_load.datasets import al_datasets
+from eir.interpretation.interpret_array import (
+    ArrayConsumerCallable,
+    analyze_array_input_attributions,
+    get_array_sum_consumer,
+)
+from eir.interpretation.interpret_image import analyze_image_input_attributions
 from eir.interpretation.interpret_omics import (
+    OmicsConsumerCallable,
     analyze_omics_input_attributions,
     get_omics_consumer,
-    OmicsConsumerCallable,
 )
-from eir.setup.schemas import InputConfig, OutputConfig
+from eir.interpretation.interpret_sequence import analyze_sequence_input_attributions
+from eir.interpretation.interpret_tabular import analyze_tabular_input_attributions
+from eir.interpretation.interpretation_utils import MyIntegratedGradients
+from eir.models.input.omics.omics_models import CNNModel, LinearModel
+from eir.models.model_training_utils import gather_data_loader_samples
 from eir.setup.output_setup_modules.tabular_output_setup import (
     ComputedTabularOutputInfo,
 )
-from eir.interpretation.interpret_tabular import (
-    analyze_tabular_input_attributions,
-)
-from eir.interpretation.interpret_sequence import analyze_sequence_input_attributions
-from eir.interpretation.interpret_image import analyze_image_input_attributions
-from eir.interpretation.interpret_array import (
-    analyze_array_input_attributions,
-    get_array_sum_consumer,
-    ArrayConsumerCallable,
-)
-from eir.interpretation.interpretation_utils import MyIntegratedGradients
-from eir.models.model_training_utils import gather_data_loader_samples
-from eir.models.input.omics.omics_models import CNNModel, LinearModel
+from eir.setup.schemas import InputConfig, OutputConfig
 from eir.train_utils.evaluation import validation_handler
 from eir.train_utils.utils import (
+    call_hooks_stage_iterable,
     prepare_sample_output_folder,
     validate_handler_dependencies,
-    call_hooks_stage_iterable,
 )
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
-    from eir.train_utils.train_handlers import HandlerConfig
-    from eir.train import Experiment
     from eir.data_load.label_setup import al_label_transformers_object
     from eir.models.model_setup_modules.meta_setup import al_meta_model
     from eir.predict import PredictExperiment
@@ -84,6 +80,8 @@ if TYPE_CHECKING:
         LoadedTrainExperimentMixedWithPredict,
     )
     from eir.setup.input_setup import al_input_objects_as_dict
+    from eir.train import Experiment
+    from eir.train_utils.train_handlers import HandlerConfig
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 

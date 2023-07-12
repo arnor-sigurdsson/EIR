@@ -1,6 +1,6 @@
 import numpy as np
-import torch
 import pytest
+import torch
 
 from eir.data_load.data_preparation_modules.prepare_array import prepare_array_data
 

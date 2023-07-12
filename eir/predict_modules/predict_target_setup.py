@@ -6,10 +6,10 @@ from sklearn.preprocessing import StandardScaler
 
 from eir.data_load import label_setup
 from eir.data_load.label_setup import (
-    al_target_label_dict,
-    al_label_transformers,
     TabularFileInfo,
     al_all_column_ops,
+    al_label_transformers,
+    al_target_label_dict,
     transform_label_df,
 )
 from eir.experiment_io.experiment_io import load_transformers

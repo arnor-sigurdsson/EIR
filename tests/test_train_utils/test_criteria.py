@@ -7,17 +7,17 @@ import pytest
 import torch
 from torch import nn
 
-from eir.setup.schemas import TabularOutputTypeConfig, OutputConfig
 from eir.setup.config import Configs
 from eir.setup.input_setup import set_up_inputs_for_training
 from eir.setup.output_setup import set_up_outputs_for_training
+from eir.setup.schemas import OutputConfig, TabularOutputTypeConfig
 from eir.target_setup.target_label_setup import MergedTargetLabels
 from eir.train_utils.criteria import (
-    get_criteria,
     _calc_con_loss,
-    build_loss_dict,
-    _parse_loss_name,
     _get_label_smoothing,
+    _parse_loss_name,
+    build_loss_dict,
+    get_criteria,
     get_loss_callable,
     get_supervised_criterion,
 )

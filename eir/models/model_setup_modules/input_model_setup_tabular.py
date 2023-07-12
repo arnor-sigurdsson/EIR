@@ -1,8 +1,8 @@
-from typing import Sequence, Dict
+from typing import Dict, Sequence
 
 from eir.models.input.tabular.tabular import (
-    SimpleTabularModelConfig,
     SimpleTabularModel,
+    SimpleTabularModelConfig,
 )
 
 

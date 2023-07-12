@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Tuple, TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Tuple
 
 import pandas as pd
 

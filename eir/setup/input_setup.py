@@ -1,36 +1,35 @@
 from typing import (
-    Dict,
-    Optional,
-    Union,
-    Sequence,
-    Callable,
-    Protocol,
-    Type,
     TYPE_CHECKING,
     Any,
+    Callable,
+    Dict,
+    Optional,
+    Protocol,
+    Sequence,
+    Type,
+    Union,
 )
 
-from eir.utils.logging import get_logger
-
-from eir.experiment_io.experiment_io import (
-    get_run_folder_from_model_path,
+from eir.experiment_io.experiment_io import get_run_folder_from_model_path
+from eir.predict_modules.predict_tabular_input_setup import (
+    ComputedPredictTabularInputInfo,
 )
 from eir.setup import schemas
 from eir.setup.input_setup_modules.setup_array import (
-    set_up_array_input,
     ComputedArrayInputInfo,
+    set_up_array_input,
 )
 from eir.setup.input_setup_modules.setup_bytes import (
-    set_up_bytes_input_for_training,
     ComputedBytesInputInfo,
+    set_up_bytes_input_for_training,
 )
 from eir.setup.input_setup_modules.setup_image import (
     ComputedImageInputInfo,
     set_up_image_input_for_training,
 )
 from eir.setup.input_setup_modules.setup_omics import (
-    set_up_omics_input,
     ComputedOmicsInputInfo,
+    set_up_omics_input,
 )
 from eir.setup.input_setup_modules.setup_pretrained import (
     get_input_setup_from_pretrained_function_map,
@@ -40,12 +39,10 @@ from eir.setup.input_setup_modules.setup_sequence import (
     set_up_sequence_input_for_training,
 )
 from eir.setup.input_setup_modules.setup_tabular import (
-    set_up_tabular_input_for_training,
     ComputedTabularInputInfo,
+    set_up_tabular_input_for_training,
 )
-from eir.predict_modules.predict_tabular_input_setup import (
-    ComputedPredictTabularInputInfo,
-)
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from eir.train_utils.step_logic import Hooks

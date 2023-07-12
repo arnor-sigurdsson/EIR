@@ -1,16 +1,14 @@
-from pathlib import Path
 import pickle
-from typing import Union, Tuple, Dict, List, Literal, Sequence, TYPE_CHECKING
+from pathlib import Path
+from typing import TYPE_CHECKING, Dict, List, Literal, Sequence, Tuple, Union
 
 import numpy as np
 import pytest
 
 from eir import train
 from eir.setup.config import Configs
-from tests.conftest import should_skip_in_gha_macos, get_system_info
-from tests.test_modelling.test_modelling_utils import (
-    check_performance_result_wrapper,
-)
+from tests.conftest import get_system_info, should_skip_in_gha_macos
+from tests.test_modelling.test_modelling_utils import check_performance_result_wrapper
 
 if TYPE_CHECKING:
     from tests.setup_tests.fixtures_create_experiment import ModelTestConfig

@@ -2,25 +2,24 @@ import reprlib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import (
-    Tuple,
+    Any,
     Dict,
-    Union,
+    Generator,
     List,
     Literal,
-    Any,
-    Sequence,
-    Generator,
-    Protocol,
     Optional,
+    Protocol,
+    Sequence,
+    Tuple,
+    Union,
 )
 
 import joblib
 import numpy as np
 import pandas as pd
 from aislib.misc_utils import ensure_path_exists
-from eir.utils.logging import get_logger
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.preprocessing import LabelEncoder, StandardScaler
 from tqdm import tqdm
 
 from eir.data_load.data_source_modules.csv_ops import ColumnOperation
@@ -30,6 +29,7 @@ from eir.data_load.data_source_modules.deeplake_ops import (
 )
 from eir.setup.schemas import InputConfig
 from eir.train_utils.utils import get_seed
+from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 

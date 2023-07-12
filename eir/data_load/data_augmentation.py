@@ -1,27 +1,19 @@
 from dataclasses import dataclass
 from functools import partial
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Dict,
-    Protocol,
-    Tuple,
-    Iterable,
-    Generator,
-)
+from typing import TYPE_CHECKING, Any, Dict, Generator, Iterable, Protocol, Tuple
 
 import numpy as np
 import torch
-from eir.utils.logging import get_logger
 from timm.data.mixup import rand_bbox
 
 from eir.data_load.data_utils import Batch, get_output_info_generator
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
-    from eir.train import al_criteria_dict, Experiment
-    from eir.train_utils.step_logic import al_training_labels_target
     from eir.setup.schemas import InputConfig
+    from eir.train import Experiment, al_criteria_dict
     from eir.train_utils.criteria import al_losses
+    from eir.train_utils.step_logic import al_training_labels_target
 
 al_target_values = torch.LongTensor | torch.Tensor
 

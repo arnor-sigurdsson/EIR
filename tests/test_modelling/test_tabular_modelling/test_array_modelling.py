@@ -1,14 +1,12 @@
 from pathlib import Path
-from typing import Dict, Sequence, TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, Sequence
 
 import numpy as np
 import pytest
 
 from eir import train
 from tests.conftest import should_skip_in_gha_macos
-from tests.test_modelling.test_modelling_utils import (
-    check_performance_result_wrapper,
-)
+from tests.test_modelling.test_modelling_utils import check_performance_result_wrapper
 
 if TYPE_CHECKING:
     pass

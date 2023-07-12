@@ -5,15 +5,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from aislib.misc_utils import ensure_path_exists
-from captum.attr._utils.visualization import (
-    visualize_image_attr_multiple,
-)
+from captum.attr._utils.visualization import visualize_image_attr_multiple
 from matplotlib.colors import LinearSegmentedColormap
 from torchvision.transforms import Normalize
 
 from eir.interpretation.interpretation_utils import (
-    get_target_class_name,
     get_basic_sample_attributions_to_analyse_generator,
+    get_target_class_name,
 )
 from eir.setup.input_setup_modules.setup_image import ComputedImageInputInfo
 from eir.setup.output_setup_modules.tabular_output_setup import (
@@ -22,9 +20,9 @@ from eir.setup.output_setup_modules.tabular_output_setup import (
 from eir.setup.schemas import BasicInterpretationConfig
 
 if TYPE_CHECKING:
-    from eir.train import Experiment
     from eir.interpretation.interpretation import SampleAttribution
     from eir.setup.input_setup_modules.setup_image import ImageNormalizationStats
+    from eir.train import Experiment
 
 
 def analyze_image_input_attributions(

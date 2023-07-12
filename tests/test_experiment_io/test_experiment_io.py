@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 from joblib import dump
-from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.preprocessing import LabelEncoder, StandardScaler
 
 from eir.experiment_io.experiment_io import (
     get_transformer_sources,

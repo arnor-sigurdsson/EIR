@@ -1,12 +1,12 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Sequence, Union, Dict, TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, Sequence, Union
 
 from eir.data_load.label_setup import (
     Labels,
-    set_up_train_and_valid_tabular_data,
     TabularFileInfo,
     save_transformer_set,
+    set_up_train_and_valid_tabular_data,
 )
 from eir.experiment_io.experiment_io import (
     get_run_folder_from_model_path,
@@ -16,8 +16,8 @@ from eir.models.input.tabular.tabular import get_unique_values_from_transformers
 from eir.setup import schemas
 
 if TYPE_CHECKING:
-    from eir.train_utils.step_logic import Hooks
     from eir.setup.input_setup import al_input_objects_as_dict
+    from eir.train_utils.step_logic import Hooks
 
 
 @dataclass

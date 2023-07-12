@@ -1,11 +1,10 @@
 from copy import deepcopy
 from pathlib import Path
-from typing import Union, Sequence
+from typing import Sequence, Union
 from unittest.mock import patch
 
 import numpy as np
 import pytest
-
 import torch
 
 from eir.data_load.data_preparation_modules import prepare_omics

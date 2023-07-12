@@ -3,10 +3,9 @@ from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 from random import sample
-from typing import Literal, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, Union
 
 from aislib.misc_utils import ensure_path_exists
-from eir.utils.logging import get_logger
 from torch import nn
 from torch.utils.data import DataLoader
 
@@ -21,6 +20,7 @@ from eir.setup.input_setup import al_input_objects_as_dict
 from eir.setup.output_setup import al_output_objects_as_dict
 from eir.train import check_dataset_and_batch_size_compatibility
 from eir.train_utils.step_logic import Hooks
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from eir.predict import PredictExperiment

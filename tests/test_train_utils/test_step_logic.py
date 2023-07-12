@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, Mock, patch, ANY, call, create_autospec
+from unittest.mock import ANY, MagicMock, Mock, call, create_autospec, patch
 
 import pytest
 import torch

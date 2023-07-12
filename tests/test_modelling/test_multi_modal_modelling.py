@@ -1,11 +1,9 @@
-from typing import Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, Tuple
 
 import pytest
 
 from eir import train
-from tests.test_modelling.test_modelling_utils import (
-    check_performance_result_wrapper,
-)
+from tests.test_modelling.test_modelling_utils import check_performance_result_wrapper
 
 if TYPE_CHECKING:
     from tests.setup_tests.fixtures_create_experiment import ModelTestConfig

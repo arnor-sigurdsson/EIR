@@ -1,9 +1,9 @@
 from pathlib import Path
 from typing import Sequence
 
+import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-import matplotlib.pyplot as plt
 
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
 

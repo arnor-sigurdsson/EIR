@@ -1,11 +1,11 @@
 from typing import Tuple
 
+import numpy as np
 import pandas as pd
 import pytest
 from sklearn.preprocessing import LabelEncoder, StandardScaler
-import numpy as np
 
-from eir.predict_modules import predict_target_setup, predict_input_setup, predict_data
+from eir.predict_modules import predict_data, predict_input_setup, predict_target_setup
 from eir.setup import config
 from eir.setup.output_setup import set_up_outputs_for_training
 from eir.target_setup.target_label_setup import (

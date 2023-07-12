@@ -1,26 +1,26 @@
 from collections import OrderedDict
 from copy import deepcopy
 from typing import (
-    Optional,
-    Tuple,
-    Dict,
-    Type,
-    Callable,
-    Iterable,
-    Any,
-    Sequence,
-    Union,
-    Literal,
     TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    Literal,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    Union,
 )
 
 import torch
-from eir.utils.logging import get_logger
 from torch import nn
 from transformers import PreTrainedModel
 
 from eir.models.input.sequence.transformer_models import get_hf_transformer_forward
 from eir.models.layers import MLPResidualBlock
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from eir.setup.output_setup_modules.tabular_output_setup import (

@@ -4,24 +4,23 @@ from copy import copy
 from dataclasses import dataclass
 from pathlib import Path
 from typing import (
-    List,
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    DefaultDict,
     Dict,
-    Union,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Set,
     Tuple,
     Type,
-    Callable,
-    Sequence,
-    Optional,
-    Set,
-    Iterable,
-    Mapping,
-    DefaultDict,
-    Any,
-    TYPE_CHECKING,
+    Union,
 )
 
 import torch
-from eir.utils.logging import get_logger
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
@@ -29,9 +28,9 @@ from eir.data_load.data_preparation_modules.imputation import (
     impute_missing_modalities_wrapper,
 )
 from eir.data_load.data_preparation_modules.preparation_wrappers import (
+    get_data_loading_hooks,
     prepare_inputs_disk,
     prepare_inputs_memory,
-    get_data_loading_hooks,
 )
 from eir.data_load.data_preparation_modules.prepare_tabular import (
     add_tabular_data_to_samples,
@@ -39,20 +38,19 @@ from eir.data_load.data_preparation_modules.prepare_tabular import (
 from eir.data_load.data_source_modules import deeplake_ops
 from eir.data_load.data_source_modules.common_utils import add_id_to_samples
 from eir.data_load.data_source_modules.local_ops import (
-    get_file_sample_id_iterator_basic,
     add_sequence_data_from_csv_to_samples,
+    get_file_sample_id_iterator_basic,
 )
 from eir.data_load.label_setup import al_target_label_dict
+from eir.predict_modules.predict_tabular_input_setup import (
+    ComputedPredictTabularInputInfo,
+)
 from eir.setup import config
 from eir.setup.input_setup import al_input_objects_as_dict
 from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
 from eir.setup.input_setup_modules.setup_tabular import ComputedTabularInputInfo
-from eir.setup.schemas import (
-    SequenceInputDataConfig,
-)
-from eir.predict_modules.predict_tabular_input_setup import (
-    ComputedPredictTabularInputInfo,
-)
+from eir.setup.schemas import SequenceInputDataConfig
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from eir.setup.output_setup import al_output_objects_as_dict

@@ -5,14 +5,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import (
     Callable,
-    Sequence,
-    Union,
-    Optional,
-    Iterator,
-    overload,
     Generator,
-    Tuple,
+    Iterator,
+    Optional,
     Protocol,
+    Sequence,
+    Tuple,
+    Union,
+    overload,
 )
 
 import pandas as pd
@@ -20,23 +20,20 @@ from tokenizers import Tokenizer
 from tokenizers.models import BPE
 from tokenizers.trainers import BpeTrainer
 from torchtext.data import get_tokenizer as get_pytorch_tokenizer
-from torchtext.vocab import (
-    Vocab,
-    build_vocab_from_iterator,
-    vocab as pytorch_vocab_builder,
-)
+from torchtext.vocab import Vocab, build_vocab_from_iterator
+from torchtext.vocab import vocab as pytorch_vocab_builder
 from tqdm import tqdm
-from transformers import PreTrainedTokenizer, AutoTokenizer
+from transformers import AutoTokenizer, PreTrainedTokenizer
 from transformers.tokenization_utils_base import (
-    TextInput,
-    PreTokenizedInput,
     EncodedInput,
+    PreTokenizedInput,
+    TextInput,
 )
 
 from eir.data_load.data_source_modules.deeplake_ops import (
+    get_deeplake_input_source_iterable,
     is_deeplake_dataset,
     load_deeplake_dataset,
-    get_deeplake_input_source_iterable,
 )
 from eir.models.input.sequence.transformer_models import SequenceModelConfig
 from eir.setup import schemas

@@ -2,61 +2,45 @@ import json
 from argparse import Namespace
 from dataclasses import dataclass
 from pathlib import Path
-from typing import (
-    Union,
-    Callable,
-    Iterable,
-    Literal,
-)
+from typing import Callable, Iterable, Literal, Union
 
 import numpy as np
-from eir.utils.logging import get_logger
 from torch.utils.data import DataLoader
 
 from eir.data_load import datasets, label_setup
-from eir.data_load.label_setup import (
-    al_all_column_ops,
-)
+from eir.data_load.label_setup import al_all_column_ops
 from eir.experiment_io.experiment_io import (
-    get_run_folder_from_model_path,
     LoadedTrainExperiment,
+    get_run_folder_from_model_path,
     load_serialized_train_experiment,
 )
 from eir.models.model_setup_modules.meta_setup import (
+    al_meta_model,
     get_default_meta_class,
     get_meta_model_class_and_kwargs_from_configs,
-    al_meta_model,
 )
 from eir.models.model_setup_modules.model_io import load_model
 from eir.models.model_training_utils import gather_prediction_outputs_from_dataloader
 from eir.predict_modules.predict_attributions import compute_predict_attributions
 from eir.predict_modules.predict_config import converge_train_and_predict_configs
 from eir.predict_modules.predict_data import set_up_default_dataset
-from eir.predict_modules.predict_input_setup import (
-    set_up_inputs_for_predict,
-)
+from eir.predict_modules.predict_input_setup import set_up_inputs_for_predict
 from eir.predict_modules.predict_sequence_output import predict_sequence_wrapper
 from eir.predict_modules.predict_tabular_output import predict_tabular_wrapper
 from eir.predict_modules.predict_target_setup import get_target_labels_for_testing
-from eir.setup.config import (
-    Configs,
-    get_main_parser,
-)
-from eir.setup.input_setup import (
-    al_input_objects_as_dict,
-)
+from eir.setup.config import Configs, get_main_parser
+from eir.setup.input_setup import al_input_objects_as_dict
 from eir.setup.output_setup import al_output_objects_as_dict
 from eir.target_setup.target_label_setup import gather_all_ids_from_output_configs
-from eir.train import (
-    check_dataset_and_batch_size_compatibility,
-)
+from eir.train import check_dataset_and_batch_size_compatibility
 from eir.train_utils.metrics import (
     al_metric_record_dict,
-    calculate_batch_metrics,
     al_step_metric_dict,
+    calculate_batch_metrics,
 )
 from eir.train_utils.step_logic import Hooks, prepare_base_batch_default
 from eir.train_utils.utils import set_log_level_for_eir_loggers
+from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 

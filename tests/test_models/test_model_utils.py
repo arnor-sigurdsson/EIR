@@ -2,16 +2,15 @@ from copy import deepcopy
 from typing import Tuple
 
 import pytest
-from hypothesis import given
-from hypothesis.strategies import integers, composite
 import torch
+from hypothesis import given
+from hypothesis.strategies import composite, integers
 from torch import nn
 
-
-from eir.train import train
 from eir.models import model_training_utils
 from eir.models.input.omics import models_cnn
 from eir.models.input.omics.models_cnn import ConvParamSuggestion
+from eir.train import train
 
 
 @pytest.fixture

@@ -1,8 +1,7 @@
 from dataclasses import dataclass
-from typing import Dict, Any, Literal, Type, Protocol
+from typing import Any, Dict, Literal, Protocol, Type
 
-from torch import Tensor
-from torch import nn
+from torch import Tensor, nn
 
 from eir.models.input.omics.models_cnn import CNNModelConfig
 

@@ -1,7 +1,7 @@
 import typing
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Literal, Sequence, Hashable, Dict
+from typing import Dict, Hashable, Literal, Sequence
 
 from eir.setup import schemas
 from eir.setup.input_setup_modules.common import get_default_sequence_specials

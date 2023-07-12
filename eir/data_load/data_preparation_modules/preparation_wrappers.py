@@ -1,9 +1,9 @@
 from functools import partial, update_wrapper
-from typing import Dict, Any, Callable
+from typing import Any, Callable, Dict
 
 import numpy as np
-from PIL.Image import Image
 import torch
+from PIL.Image import Image
 
 from eir.data_load.data_preparation_modules.prepare_array import (
     array_load_wrapper,
@@ -22,8 +22,8 @@ from eir.data_load.data_preparation_modules.prepare_omics import (
     prepare_one_hot_omics_data,
 )
 from eir.data_load.data_preparation_modules.prepare_sequence import (
-    sequence_load_wrapper,
     prepare_sequence_data,
+    sequence_load_wrapper,
 )
 from eir.setup.input_setup import al_input_objects_as_dict
 from eir.setup.input_setup_modules.setup_array import ComputedArrayInputInfo
@@ -32,8 +32,8 @@ from eir.setup.input_setup_modules.setup_image import ComputedImageInputInfo
 from eir.setup.input_setup_modules.setup_omics import ComputedOmicsInputInfo
 from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
 from eir.setup.schemas import (
-    OmicsInputDataConfig,
     ByteInputDataConfig,
+    OmicsInputDataConfig,
     SequenceInputDataConfig,
 )
 

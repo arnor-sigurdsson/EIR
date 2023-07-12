@@ -1,4 +1,4 @@
-from typing import Dict, Sequence, List
+from typing import Dict, List, Sequence
 
 import pandas as pd
 import pytest

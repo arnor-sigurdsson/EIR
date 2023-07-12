@@ -1,6 +1,6 @@
 from argparse import Namespace
 from pathlib import Path
-from typing import Optional, Sequence, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional, Sequence, Union
 
 import numpy as np
 import pandas as pd

@@ -1,7 +1,6 @@
 from dataclasses import asdict, dataclass
-from typing import Sequence, Iterable, Dict, Any, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Sequence
 
-from eir.utils.logging import get_logger
 import eir.models.output.sequence.sequence_output_modules
 from eir.models.input.sequence.transformer_models import (
     BasicTransformerFeatureExtractorModelConfig,
@@ -10,6 +9,7 @@ from eir.models.input.sequence.transformer_models import (
 from eir.models.output.sequence.sequence_output_modules import (
     SequenceOutputModuleConfig,
 )
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from eir.setup.config import Configs

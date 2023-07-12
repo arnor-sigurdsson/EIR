@@ -2,11 +2,11 @@ from typing import Literal
 
 import pytest
 import torch
-from torch import nn
 from hypothesis import given
 from hypothesis.strategies import integers, sampled_from
+from torch import nn
 
-from eir.models.layers import get_projection_layer, LCLResidualBlock, LCL
+from eir.models.layers import LCL, LCLResidualBlock, get_projection_layer
 
 
 def test_get_projection_layer():

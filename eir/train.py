@@ -1,42 +1,27 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import (
-    Union,
-    Tuple,
-    List,
-    TYPE_CHECKING,
-    Callable,
-    Optional,
-)
+from typing import TYPE_CHECKING, Callable, List, Optional, Tuple, Union
 
 import torch
 from aislib.misc_utils import ensure_path_exists
-from eir.utils.logging import get_logger
 from ignite.engine import Engine
 from torch import nn
 from torch.optim.optimizer import Optimizer
-from torch.utils.data import DataLoader, WeightedRandomSampler, DistributedSampler
+from torch.utils.data import DataLoader, DistributedSampler, WeightedRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
 from eir.data_load import datasets
 from eir.data_load.data_utils import get_train_sampler
-from eir.data_load.label_setup import (
-    split_ids,
-)
+from eir.data_load.label_setup import split_ids
 from eir.experiment_io.experiment_io import (
-    serialize_experiment,
     get_default_experiment_keys_to_serialize,
     serialize_chosen_input_objects,
+    serialize_experiment,
 )
-from eir.models.model_setup import (
-    get_model,
-)
+from eir.models.model_setup import get_model
 from eir.models.model_setup_modules.meta_setup import al_meta_model
 from eir.models.model_training_utils import run_lr_find
-from eir.setup.config import (
-    get_configs,
-    Configs,
-)
+from eir.setup.config import Configs, get_configs
 from eir.setup.input_setup import al_input_objects_as_dict, set_up_inputs_for_training
 from eir.setup.input_setup_modules.setup_tabular import serialize_all_input_transformers
 from eir.setup.output_setup import (
@@ -51,32 +36,21 @@ from eir.target_setup.target_label_setup import (
     read_manual_ids_if_exist,
     set_up_all_targets_wrapper,
 )
-from eir.train_utils import distributed
-from eir.train_utils import utils
-from eir.train_utils.criteria import get_criteria, get_loss_callable, al_criteria_dict
-from eir.train_utils.metrics import (
-    get_average_history_filepath,
-    get_default_metrics,
-)
-from eir.train_utils.optim import (
-    get_optimizer,
-    maybe_wrap_model_with_swa,
-)
+from eir.train_utils import distributed, utils
+from eir.train_utils.criteria import al_criteria_dict, get_criteria, get_loss_callable
+from eir.train_utils.metrics import get_average_history_filepath, get_default_metrics
+from eir.train_utils.optim import get_optimizer, maybe_wrap_model_with_swa
 from eir.train_utils.step_logic import (
+    Hooks,
     al_training_labels_target,
     get_default_hooks,
-    Hooks,
 )
 from eir.train_utils.train_handlers import configure_trainer
-from eir.train_utils.utils import (
-    call_hooks_stage_iterable,
-)
+from eir.train_utils.utils import call_hooks_stage_iterable
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
-    from eir.train_utils.metrics import (
-        al_step_metric_dict,
-        al_metric_record_dict,
-    )
+    from eir.train_utils.metrics import al_metric_record_dict, al_step_metric_dict
 
 
 utils.seed_everything()

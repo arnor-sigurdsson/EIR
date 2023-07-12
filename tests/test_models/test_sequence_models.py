@@ -1,6 +1,5 @@
-from typing import Dict, Sequence
 import warnings
-
+from typing import Dict, Sequence
 
 import pytest
 import torch

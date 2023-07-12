@@ -2,12 +2,11 @@ from copy import copy
 from dataclasses import dataclass, fields
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Union, TYPE_CHECKING, Iterable, Dict, Optional
+from typing import TYPE_CHECKING, Dict, Iterable, Optional, Union
 
 import dill
 import joblib
 from aislib.misc_utils import ensure_path_exists
-from eir.utils.logging import get_logger
 
 from eir.data_load import label_setup
 from eir.data_load.label_setup import (
@@ -18,16 +17,17 @@ from eir.setup import schemas
 from eir.setup.config import Configs
 from eir.setup.output_setup import al_output_objects_as_dict
 from eir.train_utils.utils import get_run_folder
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
-    from eir.train import Experiment
-    from eir.train_utils.step_logic import Hooks
     from eir.setup.input_setup import (
         al_input_objects_as_dict,
-        al_serializable_input_objects,
         al_serializable_input_classes,
+        al_serializable_input_objects,
     )
+    from eir.train import Experiment
     from eir.train_utils.metrics import al_metric_record_dict
+    from eir.train_utils.step_logic import Hooks
 
 
 logger = get_logger(name=__name__, tqdm_compatible=True)

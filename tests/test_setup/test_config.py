@@ -4,7 +4,7 @@ import tempfile
 from argparse import Namespace
 from copy import copy
 from pathlib import Path
-from typing import Dict, List, Mapping, Any
+from typing import Any, Dict, List, Mapping
 
 import pytest
 import yaml
@@ -12,8 +12,8 @@ from hypothesis import given, strategies
 
 from eir.setup import config
 from eir.setup.config_setup_modules.config_setup_utils import (
-    get_yaml_iterator_with_injections,
     convert_cl_str_to_dict,
+    get_yaml_iterator_with_injections,
 )
 from tests.setup_tests.fixtures_create_configs import TestConfigInits
 

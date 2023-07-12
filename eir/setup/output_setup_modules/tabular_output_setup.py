@@ -2,14 +2,14 @@ from dataclasses import dataclass
 from typing import Dict
 
 from sklearn.preprocessing import StandardScaler
-from eir.utils.logging import get_logger
 
 from eir.data_load.label_setup import (
-    al_target_columns,
     al_label_transformers,
+    al_target_columns,
     merge_target_columns,
 )
 from eir.setup import schemas
+from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__)
 

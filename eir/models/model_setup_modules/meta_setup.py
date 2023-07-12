@@ -1,17 +1,7 @@
 from dataclasses import dataclass
+from typing import Any, Dict, Literal, Optional, Protocol, Tuple, Type, Union, cast
 
 from torch import nn
-from typing import (
-    Type,
-    Tuple,
-    Dict,
-    Any,
-    Literal,
-    Optional,
-    Protocol,
-    Union,
-    cast,
-)
 
 from eir.models.fusion import fusion
 from eir.models.input.image.image_models import get_image_model_class
@@ -29,12 +19,12 @@ from eir.models.model_setup_modules.input_model_setup_omics import (
 )
 from eir.models.model_setup_modules.input_model_setup_sequence import get_sequence_model
 from eir.models.model_setup_modules.input_model_setup_tabular import (
-    get_tabular_model,
     SimpleTabularModel,
+    get_tabular_model,
 )
 from eir.models.model_setup_modules.output_model_setup import (
-    get_tabular_output_module_from_model_config,
     get_sequence_output_module_from_model_config,
+    get_tabular_output_module_from_model_config,
 )
 from eir.models.output.sequence.sequence_output_modules import (
     SequenceOutputModuleConfig,
@@ -58,10 +48,7 @@ from eir.setup.output_setup_modules.sequence_output_setup import (
 from eir.setup.output_setup_modules.tabular_output_setup import (
     ComputedTabularOutputInfo,
 )
-from eir.setup.schemas import (
-    ImageInputDataConfig,
-    TabularInputDataConfig,
-)
+from eir.setup.schemas import ImageInputDataConfig, TabularInputDataConfig
 from eir.train_utils.distributed import AttrDelegatedDistributedDataParallel
 from eir.train_utils.optim import AttrDelegatedSWAWrapper
 

@@ -1,9 +1,9 @@
-from typing import Type, Protocol
+from typing import Protocol, Type
 
 from eir.models.input.sequence.transformer_models import (
+    SequenceOutputTransformerFeatureExtractor,
     TransformerFeatureExtractor,
     TransformerWrapperModel,
-    SequenceOutputTransformerFeatureExtractor,
 )
 
 

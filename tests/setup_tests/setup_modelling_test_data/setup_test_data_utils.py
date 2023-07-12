@@ -1,6 +1,6 @@
 from pathlib import Path
 from random import shuffle
-from typing import Tuple, Sequence, Iterable, Union, Dict, Callable, Optional
+from typing import Callable, Dict, Iterable, Optional, Sequence, Tuple, Union
 
 import pandas as pd
 

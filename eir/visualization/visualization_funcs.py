@@ -1,29 +1,28 @@
 from pathlib import Path
 from textwrap import wrap
-from typing import List, Callable, Union, Tuple, TYPE_CHECKING, Dict, Literal, Optional
+from typing import TYPE_CHECKING, Callable, Dict, List, Literal, Optional, Tuple, Union
 
 import matplotlib
 import numpy as np
 import pandas as pd
 from sklearn.metrics import (
-    roc_curve,
     auc,
-    precision_recall_curve,
     average_precision_score,
     confusion_matrix,
+    precision_recall_curve,
+    roc_curve,
 )
-from sklearn.preprocessing import label_binarize, LabelEncoder, StandardScaler
+from sklearn.preprocessing import LabelEncoder, StandardScaler, label_binarize
 from sklearn.utils.multiclass import unique_labels
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import matplotlib.cm as cm
-from matplotlib.ticker import MaxNLocator
+import matplotlib.pyplot as plt
 import seaborn as sns
-
-from eir.utils.logging import get_logger
+from matplotlib.ticker import MaxNLocator
 
 from eir.train_utils import metrics
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from eir.train_utils.evaluation import PerformancePlotConfig

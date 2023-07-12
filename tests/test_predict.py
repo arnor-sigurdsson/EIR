@@ -1,17 +1,16 @@
 from argparse import Namespace
 from pathlib import Path
-from typing import Tuple, List, Dict, Any
+from typing import Any, Dict, List, Tuple
 
 import pandas as pd
 import pytest
 import torch
 
-from eir import predict
-from eir import train
+from eir import predict, train
 from eir.experiment_io.experiment_io import load_serialized_train_experiment
-from eir.models.model_setup_modules.model_io import load_model
 from eir.models.input.omics.models_cnn import CNNModel
 from eir.models.input.omics.omics_models import get_omics_model_init_kwargs
+from eir.models.model_setup_modules.model_io import load_model
 from eir.predict_modules.predict_attributions import compute_predict_attributions
 from eir.setup import config
 from eir.setup.input_setup_modules.common import DataDimensions

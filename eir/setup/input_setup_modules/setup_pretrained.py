@@ -1,10 +1,8 @@
 from functools import partial
 from pathlib import Path
-from typing import Dict, Callable
+from typing import Callable, Dict
 
-from eir.experiment_io.experiment_io import (
-    load_serialized_input_object,
-)
+from eir.experiment_io.experiment_io import load_serialized_input_object
 from eir.setup.input_setup_modules.setup_array import set_up_array_input
 from eir.setup.input_setup_modules.setup_bytes import ComputedBytesInputInfo
 from eir.setup.input_setup_modules.setup_image import ComputedImageInputInfo

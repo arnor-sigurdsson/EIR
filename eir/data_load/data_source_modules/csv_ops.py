@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from functools import wraps
-from typing import Tuple, Any, Union, Callable, Dict, Protocol, Optional
+from typing import Any, Callable, Dict, Optional, Protocol, Tuple, Union
 
 import pandas as pd
 

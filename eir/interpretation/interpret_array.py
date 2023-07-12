@@ -4,9 +4,7 @@ from typing import TYPE_CHECKING, Optional, Protocol
 import numpy as np
 
 from eir.data_load.label_setup import al_label_transformers_object
-from eir.interpretation.interpretation_utils import (
-    get_target_class_name,
-)
+from eir.interpretation.interpretation_utils import get_target_class_name
 
 if TYPE_CHECKING:
     from eir.interpretation.interpretation import SampleAttribution

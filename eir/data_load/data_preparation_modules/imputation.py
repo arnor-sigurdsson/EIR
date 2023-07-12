@@ -1,7 +1,10 @@
-from typing import Dict, Any, Tuple, Union
+from typing import Any, Dict, Tuple, Union
 
 import torch
 
+from eir.predict_modules.predict_tabular_input_setup import (
+    ComputedPredictTabularInputInfo,
+)
 from eir.setup.input_setup import al_input_objects_as_dict
 from eir.setup.input_setup_modules.setup_array import ComputedArrayInputInfo
 from eir.setup.input_setup_modules.setup_bytes import ComputedBytesInputInfo
@@ -9,13 +12,7 @@ from eir.setup.input_setup_modules.setup_image import ComputedImageInputInfo
 from eir.setup.input_setup_modules.setup_omics import ComputedOmicsInputInfo
 from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
 from eir.setup.input_setup_modules.setup_tabular import ComputedTabularInputInfo
-from eir.setup.schemas import (
-    ImageInputDataConfig,
-    TabularInputDataConfig,
-)
-from eir.predict_modules.predict_tabular_input_setup import (
-    ComputedPredictTabularInputInfo,
-)
+from eir.setup.schemas import ImageInputDataConfig, TabularInputDataConfig
 
 al_fill_values = dict[str, bool | int | float | dict[str, int | float]]
 

@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Sequence, Literal, Optional, Dict, Callable
+from typing import Callable, Dict, Literal, Optional, Sequence
 
 import torch.backends
 import torch.cuda

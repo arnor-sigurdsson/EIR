@@ -6,34 +6,33 @@ from functools import partial
 from pathlib import Path
 from statistics import mean
 from typing import (
-    Dict,
     TYPE_CHECKING,
-    List,
-    Tuple,
-    Optional,
-    cast,
-    Literal,
     Callable,
-    Union,
-    Protocol,
+    Dict,
     Generator,
+    List,
+    Literal,
+    Optional,
+    Protocol,
     Sequence,
+    Tuple,
+    Union,
+    cast,
 )
 
 import numpy as np
 import pandas as pd
 import torch
 from aislib.misc_utils import ensure_path_exists
-from eir.utils.logging import get_logger
 from scipy.special import softmax
 from scipy.stats import pearsonr
 from sklearn.metrics import (
-    matthews_corrcoef,
-    r2_score,
-    mean_squared_error,
-    roc_auc_score,
-    average_precision_score,
     accuracy_score,
+    average_precision_score,
+    matthews_corrcoef,
+    mean_squared_error,
+    r2_score,
+    roc_auc_score,
 )
 from sklearn.preprocessing import StandardScaler, label_binarize
 from torch import nn
@@ -41,24 +40,21 @@ from torch.linalg import vector_norm
 from torch.utils.tensorboard import SummaryWriter
 
 from eir.data_load.data_utils import get_output_info_generator
-from eir.setup.schemas import (
-    OutputConfig,
-    TabularOutputTypeConfig,
-)
-
+from eir.setup.schemas import OutputConfig, TabularOutputTypeConfig
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
-    from eir.train import al_criteria_dict, Experiment  # noqa: F401
-    from eir.train_utils.step_logic import al_training_labels_target
-    from eir.models.input.omics.omics_models import al_omics_models  # noqa: F401
-    from eir.train_utils.train_handlers import HandlerConfig
     from eir.data_load.label_setup import (  # noqa: F401
-        al_target_columns,
-        al_label_transformers_object,
         al_label_transformers,
+        al_label_transformers_object,
+        al_target_columns,
     )
-    from eir.setup.output_setup import al_output_objects_as_dict
+    from eir.models.input.omics.omics_models import al_omics_models  # noqa: F401
     from eir.models.meta.meta import FeatureExtractorProtocolWithL1
+    from eir.setup.output_setup import al_output_objects_as_dict
+    from eir.train import Experiment, al_criteria_dict  # noqa: F401
+    from eir.train_utils.step_logic import al_training_labels_target
+    from eir.train_utils.train_handlers import HandlerConfig
 
 # aliases
 # output_name -> target_name -> metric name: value

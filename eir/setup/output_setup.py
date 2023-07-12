@@ -1,19 +1,16 @@
-from typing import Dict, Callable, Any, Optional, TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Protocol
 
-from eir.utils.logging import get_logger
-
-from eir.data_load.label_setup import (
-    al_label_transformers,
-)
+from eir.data_load.label_setup import al_label_transformers
 from eir.setup import schemas
 from eir.setup.output_setup_modules.sequence_output_setup import (
-    set_up_sequence_output,
     ComputedSequenceOutputInfo,
+    set_up_sequence_output,
 )
 from eir.setup.output_setup_modules.tabular_output_setup import (
-    set_up_tabular_output,
     ComputedTabularOutputInfo,
+    set_up_tabular_output,
 )
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from eir.setup.input_setup import al_input_objects_as_dict

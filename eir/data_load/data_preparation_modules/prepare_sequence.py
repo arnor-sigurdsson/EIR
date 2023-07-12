@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Union, Sequence, Optional
+from typing import Optional, Sequence, Union
 
 import numpy as np
 import torch
@@ -11,12 +11,10 @@ from eir.data_load.data_preparation_modules.common import (
 from eir.data_load.data_source_modules import deeplake_ops
 from eir.setup.input_setup_modules.setup_sequence import (
     ComputedSequenceInputInfo,
-    get_sequence_split_function,
     al_encode_funcs,
+    get_sequence_split_function,
 )
-from eir.setup.schemas import (
-    SequenceInputDataConfig,
-)
+from eir.setup.schemas import SequenceInputDataConfig
 
 
 def sequence_load_wrapper(

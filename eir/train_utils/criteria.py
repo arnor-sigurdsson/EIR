@@ -1,18 +1,17 @@
 from functools import partial
-from typing import Dict, Union, Callable, Type, TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable, Dict, Type, Union
 
 import torch
 from torch import nn
 
 from eir.setup import schemas
-from eir.train_utils.metrics import calculate_prediction_losses
-from eir.setup.output_setup_modules.tabular_output_setup import (
-    ComputedTabularOutputInfo,
-)
 from eir.setup.output_setup_modules.sequence_output_setup import (
     ComputedSequenceOutputInfo,
 )
-
+from eir.setup.output_setup_modules.tabular_output_setup import (
+    ComputedTabularOutputInfo,
+)
+from eir.train_utils.metrics import calculate_prediction_losses
 
 if TYPE_CHECKING:
     from eir.setup.output_setup import al_output_objects_as_dict

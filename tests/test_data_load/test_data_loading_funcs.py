@@ -6,7 +6,7 @@ from typing import List
 import numpy as np
 import pytest
 from hypothesis import given, settings
-from hypothesis.strategies import lists, integers
+from hypothesis.strategies import integers, lists
 
 from eir.data_load import data_loading_funcs
 from eir.data_load.datasets import Sample

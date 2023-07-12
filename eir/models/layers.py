@@ -1,15 +1,16 @@
-from dataclasses import dataclass, field
-from typing import List, Tuple, Literal, Sequence, Optional, Type
-
 import math
+from dataclasses import dataclass, field
+from typing import List, Literal, Optional, Sequence, Tuple, Type
+
 import numpy as np
 import torch
 import torch.nn.functional as F
-from eir.utils.logging import get_logger
 from aislib.pytorch_modules import Swish
 from torch import nn
 from torch.nn import Parameter
 from torchvision.ops.stochastic_depth import StochasticDepth
+
+from eir.utils.logging import get_logger
 
 logger = get_logger(__name__)
 

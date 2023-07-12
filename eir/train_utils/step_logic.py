@@ -2,22 +2,21 @@ from contextlib import nullcontext
 from dataclasses import dataclass
 from functools import partial
 from typing import (
-    Dict,
-    Union,
-    List,
-    Tuple,
-    Iterable,
-    Callable,
-    Sequence,
-    Any,
-    Optional,
     TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
 )
 
 import torch
-from eir.utils.logging import get_logger
 from ignite.engine import Engine
-from torch import nn, autocast
+from torch import autocast, nn
 from torch.cuda.amp import GradScaler
 from torch.nn.functional import pad
 from torch.nn.utils import clip_grad_norm_
@@ -27,11 +26,10 @@ from eir.data_load.data_utils import Batch
 from eir.data_load.label_setup import al_all_column_ops
 from eir.models import model_training_utils
 from eir.models.input.tabular.tabular import get_tabular_inputs
+from eir.models.model_setup_modules.meta_setup import al_meta_model
 from eir.predict_modules.predict_tabular_input_setup import (
     ComputedPredictTabularInputInfo,
 )
-from eir.train_utils.optim import AttrDelegatedSWAWrapper
-from eir.models.model_setup_modules.meta_setup import al_meta_model
 from eir.setup import schemas
 from eir.setup.config import Configs, get_all_tabular_targets
 from eir.setup.input_setup import al_input_objects_as_dict
@@ -43,19 +41,20 @@ from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputIn
 from eir.setup.input_setup_modules.setup_tabular import ComputedTabularInputInfo
 from eir.setup.output_setup import al_output_objects_as_dict
 from eir.train_utils.metrics import (
-    get_uncertainty_loss_hook,
-    hook_add_l1_loss,
-    calculate_batch_metrics,
     add_loss_to_metrics,
     add_multi_task_average_metrics,
     aggregate_losses,
+    calculate_batch_metrics,
+    get_uncertainty_loss_hook,
+    hook_add_l1_loss,
 )
-from eir.train_utils.optim import get_optimizer_backward_kwargs
+from eir.train_utils.optim import AttrDelegatedSWAWrapper, get_optimizer_backward_kwargs
 from eir.train_utils.train_handlers import HandlerConfig
 from eir.train_utils.train_handlers_sequence_output import (
     SpecialTokens,
     get_special_tokens,
 )
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from eir.train import Experiment

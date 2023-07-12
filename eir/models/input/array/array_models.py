@@ -1,22 +1,15 @@
 from dataclasses import dataclass
 from functools import partial
-from typing import (
-    Union,
-    Type,
-    Literal,
-    Dict,
-    TYPE_CHECKING,
-    Optional,
-)
+from typing import TYPE_CHECKING, Dict, Literal, Optional, Type, Union
 
 import torch
 from torch import nn
 
-from eir.models.input.omics.models_cnn import CNNModelConfig, CNNModel
+from eir.models.input.omics.models_cnn import CNNModel, CNNModelConfig
 from eir.models.input.omics.models_locally_connected import (
+    FlattenFunc,
     LCLModel,
     LCLModelConfig,
-    FlattenFunc,
 )
 
 if TYPE_CHECKING:

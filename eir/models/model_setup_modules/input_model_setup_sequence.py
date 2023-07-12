@@ -1,23 +1,23 @@
+import math
 from collections import abc
 from dataclasses import dataclass
-from typing import Union, Callable, Dict, Literal, Tuple, Any, Optional
+from typing import Any, Callable, Dict, Literal, Optional, Tuple, Union
 
-import math
 import torch
-from eir.utils.logging import get_logger
 from torch import nn
-from transformers import PreTrainedModel, AutoModel, AutoConfig
+from transformers import AutoConfig, AutoModel, PreTrainedModel
 
 from eir.models.input.sequence.sequence_models import SequenceModelClassGetterFunction
 from eir.models.input.sequence.transformer_models import (
-    TransformerFeatureExtractor,
-    SequenceModelConfig,
-    TransformerWrapperModel,
     BasicTransformerFeatureExtractorModelConfig,
+    SequenceModelConfig,
+    TransformerFeatureExtractor,
+    TransformerWrapperModel,
     get_embedding_dim_for_sequence_model,
 )
 from eir.models.models_base import get_output_dimensions_for_input
 from eir.setup.setup_utils import get_unsupported_hf_models
+from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__)
 

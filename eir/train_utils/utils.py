@@ -3,15 +3,7 @@ import os
 import random
 from functools import wraps
 from pathlib import Path
-from typing import (
-    Dict,
-    Sequence,
-    Callable,
-    Iterable,
-    Union,
-    Any,
-    Tuple,
-)
+from typing import Any, Callable, Dict, Iterable, Sequence, Tuple, Union
 
 import numpy as np
 import torch
@@ -19,9 +11,9 @@ from aislib.misc_utils import ensure_path_exists
 from ignite.engine import Engine
 
 from eir.train_utils.distributed import (
-    only_call_on_master_node,
-    in_master_node,
     in_distributed_env,
+    in_master_node,
+    only_call_on_master_node,
 )
 from eir.utils.logging import get_logger
 

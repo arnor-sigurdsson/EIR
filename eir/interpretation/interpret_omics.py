@@ -2,34 +2,26 @@ import pickle
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import (
-    Dict,
-    List,
-    Tuple,
-    Callable,
-    TYPE_CHECKING,
-    Optional,
-    Protocol,
-)
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Protocol, Tuple
 
 import numpy as np
 import pandas as pd
 from aislib.misc_utils import ensure_path_exists
-from eir.utils.logging import get_logger
 
 from eir.interpretation.interpretation_utils import get_target_class_name
 from eir.setup.input_setup_modules.setup_omics import (
-    read_subset_file,
-    read_bim,
     ComputedOmicsInputInfo,
+    read_bim,
+    read_subset_file,
 )
 from eir.setup.schemas import OmicsInputDataConfig
+from eir.utils.logging import get_logger
 from eir.visualization import interpretation_visualization as av
 
 if TYPE_CHECKING:
-    from eir.train import Experiment
-    from eir.interpretation.interpretation import SampleAttribution
     from eir.data_load.label_setup import al_label_transformers_object
+    from eir.interpretation.interpretation import SampleAttribution
+    from eir.train import Experiment
 
 al_gradients_dict = Dict[str, List[np.ndarray]]
 al_top_gradients_dict = Dict[str, Dict[str, np.ndarray]]

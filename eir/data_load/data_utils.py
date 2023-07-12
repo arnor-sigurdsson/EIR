@@ -1,24 +1,24 @@
 from dataclasses import dataclass
 from typing import (
-    Tuple,
-    Dict,
-    List,
-    overload,
     TYPE_CHECKING,
-    Union,
+    Dict,
     Generator,
+    List,
     Sequence,
+    Tuple,
+    Union,
+    overload,
 )
 
 import torch
-from torch.utils.data import WeightedRandomSampler, DistributedSampler
+from torch.utils.data import DistributedSampler, WeightedRandomSampler
 
 from eir.data_load.data_loading_funcs import get_weighted_random_sampler
-from eir.setup.output_setup_modules.tabular_output_setup import (
-    ComputedTabularOutputInfo,
-)
 from eir.setup.output_setup_modules.sequence_output_setup import (
     ComputedSequenceOutputInfo,
+)
+from eir.setup.output_setup_modules.tabular_output_setup import (
+    ComputedTabularOutputInfo,
 )
 from eir.train_utils.distributed import in_distributed_env
 

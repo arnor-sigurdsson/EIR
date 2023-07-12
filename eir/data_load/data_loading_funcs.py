@@ -1,16 +1,14 @@
 from collections import Counter
 from statistics import mean
-from typing import TYPE_CHECKING, List, Tuple, Dict, Iterable, Optional, Sequence
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import torch
-from eir.utils.logging import get_logger
 from torch.utils.data import WeightedRandomSampler
 
+from eir.utils.logging import get_logger
+
 if TYPE_CHECKING:
-    from eir.data_load.datasets import (  # noqa: F401
-        DatasetBase,
-        Sample,
-    )
+    from eir.data_load.datasets import DatasetBase, Sample  # noqa: F401
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 

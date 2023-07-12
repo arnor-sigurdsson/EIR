@@ -1,9 +1,8 @@
-from dataclasses import dataclass, fields, asdict
+from dataclasses import asdict, dataclass, fields
 from pathlib import Path
-from typing import Sequence, Dict, Tuple, Optional
+from typing import Dict, Optional, Sequence, Tuple
 
 import numpy as np
-from eir.utils.logging import get_logger
 from timm.models._registry import _model_pretrained_cfgs
 from torchvision import transforms
 from torchvision.datasets.folder import default_loader
@@ -11,14 +10,15 @@ from torchvision.transforms import Compose
 from torchvision.transforms.functional import to_tensor
 
 from eir.data_load.data_source_modules.deeplake_ops import (
+    get_deeplake_input_source_iterable,
     is_deeplake_dataset,
     load_deeplake_dataset,
-    get_deeplake_input_source_iterable,
 )
 from eir.models.input.image.image_models import ImageModelConfig
 from eir.setup import schemas
 from eir.setup.input_setup_modules.common import DataDimensions
 from eir.setup.setup_utils import collect_stats
+from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__)
 

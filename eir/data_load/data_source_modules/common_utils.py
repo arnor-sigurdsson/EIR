@@ -1,4 +1,4 @@
-from typing import DefaultDict, TYPE_CHECKING
+from typing import TYPE_CHECKING, DefaultDict
 
 if TYPE_CHECKING:
     from eir.data_load.datasets import Sample

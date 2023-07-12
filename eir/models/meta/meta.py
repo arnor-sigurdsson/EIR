@@ -1,6 +1,7 @@
+from typing import Dict, Literal, MutableMapping, NewType, Protocol
+
 import torch
 from torch import nn
-from typing import Dict, Literal, NewType, Protocol, MutableMapping
 
 from eir.models.fusion.fusion import al_fused_features, al_fusion_model_configs
 

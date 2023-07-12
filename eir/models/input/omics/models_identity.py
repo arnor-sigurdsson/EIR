@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Callable, TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Callable, Literal
 
 import torch
 from torch import nn

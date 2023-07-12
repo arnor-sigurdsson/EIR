@@ -1,20 +1,16 @@
 from copy import deepcopy
+from math import isclose
 
 import pytest
 import torch
-from math import isclose
-from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.preprocessing import LabelEncoder, StandardScaler
 
 from eir.models.output.mlp_residual import ResidualMLPOutputModuleConfig
 from eir.models.output.output_module_setup import TabularOutputModuleConfig
 from eir.setup.output_setup_modules.tabular_output_setup import (
     ComputedTabularOutputInfo,
 )
-from eir.setup.schemas import (
-    OutputConfig,
-    OutputInfoConfig,
-    TabularOutputTypeConfig,
-)
+from eir.setup.schemas import OutputConfig, OutputInfoConfig, TabularOutputTypeConfig
 from eir.train_utils import metrics
 from eir.train_utils.criteria import get_criteria
 

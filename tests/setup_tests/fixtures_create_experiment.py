@@ -1,7 +1,7 @@
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Tuple, Iterable, Sequence
+from typing import Dict, Iterable, Sequence, Tuple
 
 import pytest
 from torch import nn
@@ -9,17 +9,16 @@ from torch.utils.data import DataLoader
 
 from eir import train
 from eir.experiment_io.experiment_io import (
-    serialize_chosen_input_objects,
     get_default_experiment_keys_to_serialize,
+    serialize_chosen_input_objects,
     serialize_experiment,
 )
+from eir.setup import config, input_setup, schemas
 from eir.setup.input_setup_modules.setup_tabular import serialize_all_input_transformers
-from eir.setup import schemas, config, input_setup
 from eir.setup.output_setup import set_up_outputs_for_training
 from eir.train import Experiment, converge_sequence_input_and_output
-from eir.train_utils import optim, metrics
+from eir.train_utils import metrics, optim, step_logic
 from eir.train_utils.criteria import get_criteria
-from eir.train_utils import step_logic
 from eir.train_utils.utils import get_run_folder
 
 al_modelling_test_configs = tuple[Experiment, "ModelTestConfig"]

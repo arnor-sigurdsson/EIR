@@ -1,24 +1,24 @@
-from pathlib import Path
 from itertools import chain
-from typing import List, Tuple, Union, Optional, TYPE_CHECKING
+from pathlib import Path
+from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 
 import matplotlib
-from matplotlib.axes import Axes
-from matplotlib.figure import Figure
 import numpy as np
 import pandas as pd
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from aislib.misc_utils import ensure_path_exists
 from matplotlib import gridspec
 
-from aislib.misc_utils import ensure_path_exists
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from eir.interpretation.interpret_omics import (
-        al_top_gradients_dict,
         al_scaled_grads_dict,
+        al_top_gradients_dict,
     )
 
 logger = get_logger(name=__name__, tqdm_compatible=True)

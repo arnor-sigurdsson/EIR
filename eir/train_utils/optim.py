@@ -3,19 +3,18 @@ from collections import defaultdict
 from functools import partial
 from inspect import signature
 from typing import (
-    Callable,
-    List,
-    Type,
-    Dict,
     TYPE_CHECKING,
-    Optional,
     Any,
+    Callable,
+    Dict,
+    List,
     MutableMapping,
+    Optional,
+    Type,
 )
 
 import torch
 from adabelief_pytorch import AdaBelief
-from eir.utils.logging import get_logger
 from aislib.pytorch_modules import AdaHessian
 from torch import nn
 from torch.optim import SGD, Adam
@@ -25,10 +24,11 @@ from torch_optimizer import get as get_custom_opt
 
 from eir.models.model_training_utils import add_wd_to_model_params
 from eir.setup.setup_utils import get_base_optimizer_names
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
-    from eir.setup.schemas import GlobalConfig
     from eir.models.model_setup_modules.meta_setup import al_meta_model
+    from eir.setup.schemas import GlobalConfig
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 

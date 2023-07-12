@@ -5,12 +5,12 @@ from typing import Sequence
 from unittest import mock
 
 import pytest
-from torchtext.vocab import Vocab
 from aislib.misc_utils import ensure_path_exists
+from torchtext.vocab import Vocab
 from transformers import PreTrainedTokenizer
 
-from eir.setup.input_setup_modules import setup_sequence
 from eir.setup import schemas
+from eir.setup.input_setup_modules import setup_sequence
 
 
 def _get_mock_target():

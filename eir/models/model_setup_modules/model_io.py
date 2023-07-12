@@ -1,14 +1,14 @@
 import reprlib
+import typing
 from collections import OrderedDict
 from copy import deepcopy
 from pathlib import Path
+from typing import Any, Dict, Sequence, Tuple, Type, Union
 
 import torch
-import typing
-from eir.utils.logging import get_logger
-from typing import Type, Dict, Union, Sequence, Tuple, Any
 
 from eir.models.model_setup_modules.meta_setup import al_meta_model
+from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__)
 

@@ -1,15 +1,15 @@
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import List, TYPE_CHECKING, Union, Tuple, Iterator
+from typing import TYPE_CHECKING, Iterator, List, Tuple, Union
 
 import torch
+from aislib.pytorch_modules import Swish
 from sympy import Symbol
 from sympy.solvers import solve
-from eir.utils.logging import get_logger
-from aislib.pytorch_modules import Swish
 from torch import nn
 
-from eir.models.layers import FirstCNNBlock, CNNResidualBlock, ConvAttentionBlock
+from eir.models.layers import CNNResidualBlock, ConvAttentionBlock, FirstCNNBlock
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from eir.setup.input_setup_modules.common import DataDimensions

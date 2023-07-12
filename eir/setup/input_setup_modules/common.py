@@ -1,13 +1,13 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Tuple, Optional, List
+from typing import List, Optional, Tuple
 
 import numpy as np
 
 from eir.data_load.data_source_modules.deeplake_ops import (
+    get_deeplake_input_source_iterable,
     is_deeplake_dataset,
     load_deeplake_dataset,
-    get_deeplake_input_source_iterable,
 )
 from eir.data_load.label_setup import get_file_path_iterator
 

@@ -1,6 +1,6 @@
 from copy import deepcopy
 from pathlib import Path
-from typing import Tuple, Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Tuple
 from unittest.mock import create_autospec
 
 import numpy as np
@@ -13,19 +13,19 @@ from transformers import PreTrainedTokenizerBase
 
 from eir.train_utils.train_handlers_sequence_output import (
     ImageNormalizationStats,
-    convert_image_input_to_raw,
-    convert_tabular_input_to_raw,
-    _extract_base_generated_tokens,
+    SequenceOutputEvalSample,
+    SequenceOutputSamplingConfig,
     _compute_target_index,
+    _extract_base_generated_tokens,
     _mask_targets_for_auto_eval_generation,
     _prepare_current_autoregressive_input,
-    sample_next_token_index_from_output,
-    top_k_top_p_filtering,
-    SequenceOutputSamplingConfig,
+    autoregressive_sequence_generation,
+    convert_image_input_to_raw,
+    convert_tabular_input_to_raw,
     decode_tokens,
     prepare_sequence_output_manual_sample_data,
-    SequenceOutputEvalSample,
-    autoregressive_sequence_generation,
+    sample_next_token_index_from_output,
+    top_k_top_p_filtering,
 )
 from tests.setup_tests.setup_modelling_test_data.setup_array_test_data import (
     _set_up_base_test_array,
@@ -35,8 +35,8 @@ from tests.setup_tests.setup_modelling_test_data.setup_omics_test_data import (
 )
 
 if TYPE_CHECKING:
-    from tests.setup_tests.fixtures_create_experiment import ModelTestConfig
     from eir.train import Experiment
+    from tests.setup_tests.fixtures_create_experiment import ModelTestConfig
 
 
 def test_convert_image_input_to_raw():

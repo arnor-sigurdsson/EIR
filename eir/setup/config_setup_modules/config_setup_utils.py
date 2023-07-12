@@ -4,16 +4,10 @@ import operator
 from collections import defaultdict
 from functools import reduce
 from pathlib import Path
-from typing import (
-    Iterable,
-    Optional,
-    Generator,
-    Dict,
-    Any,
-    DefaultDict,
-    MutableMapping,
-)
+from typing import Any, DefaultDict, Dict, Generator, Iterable, MutableMapping, Optional
+
 import yaml
+
 from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__)

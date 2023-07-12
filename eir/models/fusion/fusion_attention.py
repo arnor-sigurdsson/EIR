@@ -1,10 +1,10 @@
-from typing import Optional, Any, Literal
+from typing import Any, Literal, Optional
 
 import torch
 from einops import rearrange
-from torch import nn, einsum, Tensor
+from torch import Tensor, einsum, nn
 
-from eir.models.layers import get_projection_layer, LCL, LCLResidualBlock
+from eir.models.layers import LCL, LCLResidualBlock, get_projection_layer
 
 al_projection_layer_types = Literal["auto", "lcl", "lcl_residual", "linear"]
 

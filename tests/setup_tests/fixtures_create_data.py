@@ -2,7 +2,7 @@ import json
 import random
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Callable, Sequence, Union, Literal, Any
+from typing import Any, Callable, Dict, Literal, Sequence, Union
 
 import deeplake
 import numpy as np
@@ -24,8 +24,8 @@ from tests.setup_tests.setup_modelling_test_data.setup_sequence_test_data import
     create_test_sequence_data,
 )
 from tests.setup_tests.setup_modelling_test_data.setup_test_data_utils import (
-    set_up_test_data_root_outpath,
     common_split_test_data_wrapper,
+    set_up_test_data_root_outpath,
 )
 
 

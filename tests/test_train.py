@@ -4,13 +4,13 @@ import pytest
 from torch import nn
 from torch.optim import SGD
 from torch.optim.adamw import AdamW
-from torch.utils.data import WeightedRandomSampler, SequentialSampler, RandomSampler
+from torch.utils.data import RandomSampler, SequentialSampler, WeightedRandomSampler
 
 from eir import train
 from eir.data_load.data_utils import get_train_sampler
-from eir.models.model_setup import get_model
-from eir.models.meta.meta import MetaModel
 from eir.models.input.omics.omics_models import CNNModel, LinearModel
+from eir.models.meta.meta import MetaModel
+from eir.models.model_setup import get_model
 from eir.setup.config import Configs
 from eir.setup.input_setup import set_up_inputs_for_training
 from eir.setup.output_setup import set_up_outputs_for_training

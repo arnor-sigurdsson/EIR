@@ -3,13 +3,13 @@ from collections import defaultdict
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
-    Sequence,
-    Generator,
-    DefaultDict,
     Any,
+    DefaultDict,
+    Generator,
+    List,
+    Sequence,
     Tuple,
     Union,
-    List,
 )
 
 import pandas as pd
@@ -20,16 +20,12 @@ from captum._utils.common import (
     _expand_target,
     _format_additional_forward_args,
 )
-from captum._utils.typing import (
-    TargetType,
-)
+from captum._utils.typing import TargetType
 from captum.attr import IntegratedGradients
 from captum.attr._utils.approximation_methods import approximation_parameters
-from captum.attr._utils.common import (
-    _reshape_and_sum,
-)
-from torch import Tensor
+from captum.attr._utils.common import _reshape_and_sum
 from matplotlib import pyplot as plt
+from torch import Tensor
 
 from eir.setup import schemas
 

@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Sequence, List
+from typing import List, Sequence
 
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
 from docs.doc_modules.utils import get_saved_model_path

@@ -1,26 +1,25 @@
 import json
-from copy import deepcopy, copy
+from copy import copy, deepcopy
 from dataclasses import dataclass
-from pathlib import Path
 from itertools import cycle
+from pathlib import Path
 from typing import (
-    Tuple,
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Generator,
     Iterator,
     Sequence,
-    Callable,
+    Tuple,
     Union,
-    Generator,
-    Dict,
-    Any,
-    TYPE_CHECKING,
 )
 
 import numpy as np
 import torch
 import torch.nn.functional as F
-from PIL import Image
 from aislib.misc_utils import ensure_path_exists
-from eir.utils.logging import get_logger
+from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 from torchtext.vocab import Vocab
 from transformers.tokenization_utils import PreTrainedTokenizerBase
@@ -46,51 +45,55 @@ from eir.data_load.data_preparation_modules.prepare_sequence import (
 )
 from eir.data_load.data_utils import Batch
 from eir.data_load.datasets import (
+    al_getitem_return,
     impute_missing_modalities_wrapper,
     prepare_inputs_memory,
-    al_getitem_return,
 )
 from eir.data_load.label_setup import (
-    al_label_transformers,
     _streamline_values_for_transformers,
+    al_label_transformers,
 )
 from eir.interpretation.interpret_image import un_normalize
 from eir.models.model_training_utils import predict_on_batch
-from eir.setup.input_setup_modules.setup_image import ImageNormalizationStats
-from eir.setup.input_setup_modules.setup_sequence import get_sequence_split_function
-from eir.setup.schema_modules.output_schemas_sequence import (
-    SequenceOutputSamplingConfig,
-)
-from eir.setup.output_setup_modules.sequence_output_setup import (
-    ComputedSequenceOutputInfo,
-)
-from eir.setup.schemas import (
-    OutputConfig,
-    SequenceOutputTypeConfig,
-    SequenceInputDataConfig,
-    OmicsInputDataConfig,
-    ArrayInputDataConfig,
-    ByteInputDataConfig,
-    TabularInputDataConfig,
-    ImageInputDataConfig,
-)
-from eir.train_utils import utils
-from eir.train_utils.utils import call_hooks_stage_iterable
-from eir.setup.input_setup_modules.setup_array import ComputedArrayInputInfo
-from eir.setup.input_setup_modules.setup_tabular import ComputedTabularInputInfo
-from eir.setup.input_setup_modules.setup_bytes import ComputedBytesInputInfo
-from eir.setup.input_setup_modules.setup_image import ComputedImageInputInfo
-from eir.setup.input_setup_modules.setup_omics import ComputedOmicsInputInfo
-from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
 from eir.predict_modules.predict_tabular_input_setup import (
     ComputedPredictTabularInputInfo,
 )
-
+from eir.setup.input_setup_modules.setup_array import ComputedArrayInputInfo
+from eir.setup.input_setup_modules.setup_bytes import ComputedBytesInputInfo
+from eir.setup.input_setup_modules.setup_image import (
+    ComputedImageInputInfo,
+    ImageNormalizationStats,
+)
+from eir.setup.input_setup_modules.setup_omics import ComputedOmicsInputInfo
+from eir.setup.input_setup_modules.setup_sequence import (
+    ComputedSequenceInputInfo,
+    get_sequence_split_function,
+)
+from eir.setup.input_setup_modules.setup_tabular import ComputedTabularInputInfo
+from eir.setup.output_setup_modules.sequence_output_setup import (
+    ComputedSequenceOutputInfo,
+)
+from eir.setup.schema_modules.output_schemas_sequence import (
+    SequenceOutputSamplingConfig,
+)
+from eir.setup.schemas import (
+    ArrayInputDataConfig,
+    ByteInputDataConfig,
+    ImageInputDataConfig,
+    OmicsInputDataConfig,
+    OutputConfig,
+    SequenceInputDataConfig,
+    SequenceOutputTypeConfig,
+    TabularInputDataConfig,
+)
+from eir.train_utils import utils
+from eir.train_utils.utils import call_hooks_stage_iterable
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
-    from eir.train_utils.step_logic import Hooks
-    from eir.train import al_input_objects_as_dict, Experiment
     from eir.predict import PredictExperiment, PredictHooks
+    from eir.train import Experiment, al_input_objects_as_dict
+    from eir.train_utils.step_logic import Hooks
 
 logger = get_logger(name=__name__)
 

@@ -1,20 +1,19 @@
 import argparse
 from dataclasses import dataclass
-from typing import Union, Type, Dict, Any, Protocol, Literal, TYPE_CHECKING, ClassVar
-
-from eir.utils.logging import get_logger
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, Literal, Protocol, Type, Union
 
 from eir.models.input.omics.models_cnn import CNNModel, CNNModelConfig
 from eir.models.input.omics.models_identity import IdentityModel, IdentityModelConfig
 from eir.models.input.omics.models_linear import LinearModel, LinearModelConfig
 from eir.models.input.omics.models_locally_connected import (
-    SimpleLCLModel,
-    SimpleLCLModelConfig,
+    FlattenFunc,
     LCLModel,
     LCLModelConfig,
+    SimpleLCLModel,
+    SimpleLCLModelConfig,
     flatten_h_w_fortran,
-    FlattenFunc,
 )
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from eir.setup.input_setup_modules.common import DataDimensions

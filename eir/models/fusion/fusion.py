@@ -1,12 +1,12 @@
 from functools import partial
-from typing import Type, Dict, Callable, NewType, Literal, TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable, Dict, Literal, NewType, Type
 
 import torch
-from eir.utils.logging import get_logger
 from torch import nn
 
-from eir.models.fusion import fusion_mgmoe, fusion_default, fusion_identity
+from eir.models.fusion import fusion_default, fusion_identity, fusion_mgmoe
 from eir.models.layers import ResidualMLPConfig
+from eir.utils.logging import get_logger
 
 al_fusion_model = Literal["pass-through", "mlp-residual", "identity", "mgmoe"]
 al_fusion_model_configs = (

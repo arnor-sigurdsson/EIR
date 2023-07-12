@@ -1,9 +1,9 @@
-from typing import Sequence, List
+from typing import List, Sequence
 
 import numpy as np
 import torch
 from hypothesis import given, settings
-from hypothesis.strategies import integers, lists, floats
+from hypothesis.strategies import floats, integers, lists
 
 from eir.data_load.data_utils import Batch
 from eir.interpretation import interpret_tabular as it

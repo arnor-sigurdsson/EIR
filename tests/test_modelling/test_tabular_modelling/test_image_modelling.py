@@ -4,9 +4,7 @@ import pytest
 
 from eir import train
 from eir.train_utils.utils import seed_everything
-from tests.test_modelling.test_modelling_utils import (
-    check_performance_result_wrapper,
-)
+from tests.test_modelling.test_modelling_utils import check_performance_result_wrapper
 
 seed_everything(seed=0)
 

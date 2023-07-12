@@ -1,4 +1,4 @@
-from typing import DefaultDict, Union, TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, DefaultDict, Optional, Union
 
 from tqdm import tqdm
 

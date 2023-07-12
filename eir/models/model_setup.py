@@ -1,21 +1,14 @@
 from pathlib import Path
-from typing import (
-    Callable,
-    Dict,
-    cast,
-    Type,
-    TYPE_CHECKING,
-)
+from typing import TYPE_CHECKING, Callable, Dict, Type, cast
 
 import torch
-from eir.utils.logging import get_logger
 from torch import nn
 
 from eir.models.model_setup_modules.meta_setup import (
+    MetaClassGetterCallable,
+    al_meta_model,
     get_default_meta_class,
     get_meta_model_class_and_kwargs_from_configs,
-    al_meta_model,
-    MetaClassGetterCallable,
 )
 from eir.models.model_setup_modules.model_io import load_model
 from eir.models.model_setup_modules.pretrained_setup import (
@@ -27,11 +20,10 @@ from eir.models.output.sequence.sequence_output_modules import (
 from eir.setup import schemas
 from eir.setup.input_setup import al_input_objects_as_dict
 from eir.train_utils.distributed import maybe_make_model_distributed
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
-    from eir.setup.output_setup import (
-        al_output_objects_as_dict,
-    )
+    from eir.setup.output_setup import al_output_objects_as_dict
 
 al_model_registry = Dict[str, Callable[[str], Type[nn.Module]]]
 

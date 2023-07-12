@@ -4,16 +4,14 @@ from typing import TYPE_CHECKING, Optional
 
 from torchtext.vocab import Vocab
 
-from eir.models.input.sequence.transformer_models import (
-    SequenceModelConfig,
-)
+from eir.models.input.sequence.transformer_models import SequenceModelConfig
 from eir.setup.input_setup_modules import setup_sequence
 from eir.setup.schemas import InputConfig, OutputConfig, SequenceOutputTypeConfig
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
-    from eir.setup.output_setup import al_output_objects_as_dict
     from eir.setup.input_setup import al_input_objects_as_dict
+    from eir.setup.output_setup import al_output_objects_as_dict
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 

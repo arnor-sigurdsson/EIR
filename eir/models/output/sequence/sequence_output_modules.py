@@ -1,28 +1,28 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Literal, TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, Literal
 
 import dill
 import torch
-from eir.utils.logging import get_logger
 from torch import nn
 from torch.nn import functional as F
 
 from eir.models.fusion.fusion_attention import MetaSequenceProjection
 from eir.models.input.sequence.transformer_models import (
     BasicTransformerFeatureExtractorModelConfig,
-    parse_dim_feedforward,
     TransformerWrapperModel,
+    parse_dim_feedforward,
 )
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
-    from eir.setup.output_setup_modules.sequence_output_setup import (
-        ComputedSequenceOutputInfo,
-    )
-    from eir.setup.input_setup import al_input_objects_as_dict
     from eir.models.model_setup_modules.meta_setup import (
         FeatureExtractorInfo,
         al_meta_model,
+    )
+    from eir.setup.input_setup import al_input_objects_as_dict
+    from eir.setup.output_setup_modules.sequence_output_setup import (
+        ComputedSequenceOutputInfo,
     )
 
 al_sequence_output_models = Literal["sequence"]

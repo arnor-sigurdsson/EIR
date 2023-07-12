@@ -65,6 +65,7 @@ pdf2image = "^1.16.0"
 vulture = "^2.7"
 mypy = "^1.4.1"
 types-pyyaml = "^6.0.12.10"
+isort = "^5.12.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
@@ -73,3 +74,6 @@ build-backend = "poetry.core.masonry.api"
 [tool.poetry.scripts]
 eirtrain = "eir.train:main"
 eirpredict = "eir.predict:main"
+
+[tool.isort]
+profile = "black"

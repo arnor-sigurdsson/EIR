@@ -4,13 +4,13 @@ from typing import List, Optional
 
 import numpy as np
 import pandas as pd
-from eir.utils.logging import get_logger
 
 from eir.setup import schemas
 from eir.setup.input_setup_modules.common import (
     DataDimensions,
     get_data_dimension_from_data_source,
 )
+from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__)
 

@@ -5,54 +5,49 @@ from collections import Counter
 from copy import copy
 from dataclasses import dataclass
 from typing import (
-    Sequence,
-    Iterable,
-    Dict,
-    List,
-    Literal,
-    Union,
-    Tuple,
-    Type,
     Any,
     Callable,
+    Dict,
     Generator,
+    Iterable,
+    List,
+    Literal,
     Mapping,
+    Sequence,
+    Tuple,
+    Type,
+    Union,
 )
 
 import configargparse
 import yaml
-from eir.utils.logging import get_logger
 
+from eir.models.fusion.fusion_identity import IdentityConfig
+from eir.models.fusion.fusion_mgmoe import MGMoEModelConfig
 from eir.models.input.array.array_models import (
     ArrayModelConfig,
     get_array_config_dataclass_mapping,
 )
-from eir.models.fusion.fusion_identity import IdentityConfig
-from eir.models.fusion.fusion_mgmoe import MGMoEModelConfig
 from eir.models.input.image.image_models import ImageModelConfig
-from eir.models.layers import ResidualMLPConfig
 from eir.models.input.omics.omics_models import (
-    get_omics_config_dataclass_mapping,
     OmicsModelConfig,
-)
-from eir.models.output.linear import LinearOutputModuleConfig
-from eir.models.output.mlp_residual import (
-    ResidualMLPOutputModuleConfig,
-)
-from eir.models.output.output_module_setup import (
-    TabularOutputModuleConfig,
-)
-from eir.models.output.sequence.sequence_output_modules import (
-    TransformerSequenceOutputModuleConfig,
-    SequenceOutputModuleConfig,
+    get_omics_config_dataclass_mapping,
 )
 from eir.models.input.sequence.transformer_models import (
     BasicTransformerFeatureExtractorModelConfig,
     SequenceModelConfig,
 )
 from eir.models.input.tabular.tabular import (
-    TabularModelConfig,
     SimpleTabularModelConfig,
+    TabularModelConfig,
+)
+from eir.models.layers import ResidualMLPConfig
+from eir.models.output.linear import LinearOutputModuleConfig
+from eir.models.output.mlp_residual import ResidualMLPOutputModuleConfig
+from eir.models.output.output_module_setup import TabularOutputModuleConfig
+from eir.models.output.sequence.sequence_output_modules import (
+    SequenceOutputModuleConfig,
+    TransformerSequenceOutputModuleConfig,
 )
 from eir.setup import schemas
 from eir.setup.config_setup_modules.config_setup_utils import (
@@ -62,6 +57,7 @@ from eir.setup.config_setup_modules.output_config_setup_sequence import (
     get_configs_object_with_seq_output_configs,
 )
 from eir.train_utils.utils import configure_global_eir_logging
+from eir.utils.logging import get_logger
 
 al_input_types = Union[
     schemas.OmicsInputDataConfig,

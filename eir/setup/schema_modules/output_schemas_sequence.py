@@ -1,6 +1,5 @@
 from dataclasses import dataclass
-from typing import Literal, Union, Sequence, Dict, TYPE_CHECKING, Optional
-
+from typing import TYPE_CHECKING, Dict, Literal, Optional, Sequence, Union
 
 if TYPE_CHECKING:
     from eir.setup.schemas import al_max_sequence_length, al_tokenizer_choices

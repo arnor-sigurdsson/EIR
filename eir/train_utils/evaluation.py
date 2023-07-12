@@ -1,29 +1,26 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Dict, TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING, Dict, List, Sequence
 
 import numpy as np
 import pandas as pd
 import torch
-from eir.utils.logging import get_logger
 from ignite.engine import Engine
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
 from eir.data_load.label_setup import al_label_transformers_object
 from eir.models import model_training_utils
-from eir.train_utils import metrics
-from eir.train_utils import utils
+from eir.setup.output_setup import ComputedTabularOutputInfo
+from eir.train_utils import metrics, utils
 from eir.train_utils.train_handlers_sequence_output import (
     sequence_out_single_sample_evaluation_wrapper,
 )
-from eir.setup.output_setup import (
-    ComputedTabularOutputInfo,
-)
+from eir.utils.logging import get_logger
 from eir.visualization import visualization_funcs as vf
 
 if TYPE_CHECKING:
-    from eir.train_utils.train_handlers import HandlerConfig
     from eir.train import Experiment
+    from eir.train_utils.train_handlers import HandlerConfig
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 

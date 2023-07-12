@@ -2,36 +2,36 @@ from collections import defaultdict
 from copy import copy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Sequence, Literal, Tuple, Dict, Iterable
+from typing import TYPE_CHECKING, Dict, Iterable, Literal, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
 import torch
 import torchtext.vocab
 from aislib.misc_utils import ensure_path_exists
-from eir.utils.logging import get_logger
 from captum.attr._utils.visualization import (
+    _get_color,
     format_classname,
     format_word_importances,
-    _get_color,
 )
 from torchtext.vocab import Vocab
 
 from eir.interpretation.interpretation_utils import (
-    get_target_class_name,
-    stratify_attributions_by_target_classes,
-    plot_attributions_bar,
     get_basic_sample_attributions_to_analyse_generator,
+    get_target_class_name,
+    plot_attributions_bar,
+    stratify_attributions_by_target_classes,
 )
 from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
 from eir.setup.output_setup_modules.tabular_output_setup import (
     ComputedTabularOutputInfo,
 )
 from eir.setup.schemas import BasicInterpretationConfig
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
-    from eir.train import Experiment
     from eir.interpretation.interpretation import SampleAttribution
+    from eir.train import Experiment
 
 logger = get_logger(name=__name__)
 

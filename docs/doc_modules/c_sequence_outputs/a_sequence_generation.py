@@ -3,8 +3,8 @@ from typing import Sequence
 
 from aislib.misc_utils import ensure_path_exists
 
-from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
 from docs.doc_modules.c_sequence_outputs.utils import get_content_root
+from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
 from docs.doc_modules.utils import get_saved_model_path
 
 CONTENT_ROOT = CR = get_content_root()

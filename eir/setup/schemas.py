@@ -1,35 +1,28 @@
 from dataclasses import dataclass, field
-from typing import Union, Literal, Optional, Sequence, Type, TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, Optional, Sequence, Type, Union
 
 from eir.models.fusion.fusion_identity import IdentityConfig
 from eir.models.fusion.fusion_mgmoe import MGMoEModelConfig
 from eir.models.input.array.array_models import ArrayModelConfig
 from eir.models.input.image.image_models import ImageModelConfig
 from eir.models.input.omics.omics_models import (
-    OmicsModelConfig,
-    LinearModel,
     CNNModel,
-    LCLModel,
-    SimpleLCLModel,
     IdentityModel,
+    LCLModel,
+    LinearModel,
+    OmicsModelConfig,
+    SimpleLCLModel,
 )
-from eir.models.input.sequence.transformer_models import (
-    SequenceModelConfig,
-)
-from eir.models.input.tabular.tabular import (
-    SimpleTabularModel,
-    TabularModelConfig,
-)
+from eir.models.input.sequence.transformer_models import SequenceModelConfig
+from eir.models.input.tabular.tabular import SimpleTabularModel, TabularModelConfig
 from eir.models.layers import ResidualMLPConfig
-from eir.models.output.output_module_setup import (
-    TabularOutputModuleConfig,
-)
+from eir.models.output.output_module_setup import TabularOutputModuleConfig
 from eir.models.output.sequence.sequence_output_modules import (
     SequenceOutputModuleConfig,
 )
 from eir.setup.schema_modules.output_schemas_sequence import (
-    SequenceOutputTypeConfig,
     SequenceOutputSamplingConfig,
+    SequenceOutputTypeConfig,
 )
 from eir.setup.setup_utils import get_all_optimizer_names
 

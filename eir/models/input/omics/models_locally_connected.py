@@ -2,22 +2,22 @@ from copy import copy
 from dataclasses import dataclass
 from functools import partial
 from typing import (
-    List,
-    Callable,
-    Sequence,
     TYPE_CHECKING,
-    Union,
+    Callable,
+    List,
     Literal,
     Optional,
     Protocol,
+    Sequence,
+    Union,
 )
 
 import torch
-from eir.utils.logging import get_logger
 from torch import nn
 
-from eir.models.layers import LCL, LCLResidualBlock
 from eir.models.input.sequence.transformer_models import PositionalEmbedding
+from eir.models.layers import LCL, LCLResidualBlock
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from eir.setup.input_setup_modules.common import DataDimensions

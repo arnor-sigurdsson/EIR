@@ -1,23 +1,23 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Sequence, Tuple, Union, Iterable, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, Iterable, Optional, Sequence, Tuple, Union
 
 import pandas as pd
 import torch
-from eir.utils.logging import get_logger
 
 from eir.data_load.label_setup import (
-    al_target_label_dict,
-    al_label_transformers,
-    save_transformer_set,
+    Labels,
     TabularFileInfo,
     al_all_column_ops,
-    set_up_train_and_valid_tabular_data,
-    gather_ids_from_tabular_file,
+    al_label_transformers,
+    al_target_label_dict,
     gather_ids_from_data_source,
-    Labels,
+    gather_ids_from_tabular_file,
+    save_transformer_set,
+    set_up_train_and_valid_tabular_data,
 )
 from eir.setup import schemas
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from eir.train import Hooks

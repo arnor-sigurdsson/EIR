@@ -1,14 +1,14 @@
-from typing import Callable, Dict, TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable, Dict
 
 import torch
-from eir.utils.logging import get_logger
 from torch import nn
 
 from eir.models.layers import MLPResidualBlock, ResidualMLPConfig
 from eir.models.models_base import (
-    create_multi_task_blocks_with_first_adaptor_block,
     calculate_module_dict_outputs,
+    create_multi_task_blocks_with_first_adaptor_block,
 )
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     pass
