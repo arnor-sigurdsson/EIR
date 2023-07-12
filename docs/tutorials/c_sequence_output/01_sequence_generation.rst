@@ -184,6 +184,58 @@ And here are the manually generated sequences with our custom prompts:
 While our generated reviews are far from realistic, they do show that
 the model is learning to generate sequences that are somewhat meaningful.
 
+E - Sequence Generation with BPE Tokenization
+---------------------------------------------
+Now that we have seen how to do sequence generation with a character-level
+model, let's see how we can do it with a token-level model. This time,
+we will use the IMDB dataset,
+but with an implementation of BPE (Byte Pair Encoding) tokenization.
+
+BPE, as detailed in this [paper](https://arxiv.org/abs/1508.07909v5),
+is a sub-word tokenization method that progressively learns the
+most common sequences of characters (or bytes)
+to form an efficient set of tokens.
+
+As we'll see, using BPE tokenization allows us to generate longer sequences than with the character model.
+
+To use it, a couple of changes are needed in the output configuration:
+
+.. literalinclude:: ../tutorial_files/c_sequence_output/01_sequence_generation/output_bpe.yaml
+    :language: yaml
+    :caption: output_bpe.yaml
+    :emphasize-lines: 8-10
+
+Since the tokenizer can operate on the raw text, we set ``split_on`` to ``null``,
+and we can also control the maximum vocabulary size with
+``adaptive_tokenizer_max_vocab_size`` parameter.
+
+Here is the training curve I got for this model:
+
+.. image:: ../tutorial_files/c_sequence_output/01_sequence_generation/figures/training_curve_LOSS_transformer_1_bpe.png
+    :width: 100%
+    :align: center
+
+Here are the auto-generated and manually generated sequences at iteration 500:
+
+.. literalinclude:: ../tutorial_files/c_sequence_output/01_sequence_generation/figures/auto_generated_iter_500_bpe.txt
+    :language: console
+    :caption: Auto-generated sequence at iteration 500
+
+.. literalinclude:: ../tutorial_files/c_sequence_output/01_sequence_generation/figures/manual_generated_iter_500_bpe.txt
+    :language: console
+    :caption: Manually sequence at iteration 500 with custom prompt
+
+And as before, at iteration 9500, we can see that the model is starting to
+generate more meaningful sequences:
+
+.. literalinclude:: ../tutorial_files/c_sequence_output/01_sequence_generation/figures/auto_generated_iter_9500_bpe.txt
+    :language: console
+    :caption: Auto-generated sequence at iteration 9500
+
+.. literalinclude:: ../tutorial_files/c_sequence_output/01_sequence_generation/figures/manual_generated_iter_9500_bpe.txt
+    :language: console
+    :caption: Manually sequence at iteration 9500 with custom prompt
+
 Hopefully this tutorial has given you a good overview of how to use
 the sequence generation functionality in ``EIR``. Thank you for reading!
 

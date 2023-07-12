@@ -3,6 +3,7 @@ eir_tutorials/c_sequence_output/01_sequence_generation
 │   ├── fusion.yaml
 │   ├── globals.yaml
 │   ├── output.yaml
+│   ├── output_bpe.yaml
 │   └── output_test.yaml
 └── data
     └── IMDB

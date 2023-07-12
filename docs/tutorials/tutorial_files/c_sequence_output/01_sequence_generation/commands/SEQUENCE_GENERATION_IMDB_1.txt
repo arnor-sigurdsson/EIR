@@ -1,4 +1,5 @@
 eirtrain \
 --global_configs eir_tutorials/c_sequence_output/01_sequence_generation/conf/globals.yaml \
 --fusion_configs eir_tutorials/c_sequence_output/01_sequence_generation/conf/fusion.yaml \
---output_configs eir_tutorials/c_sequence_output/01_sequence_generation/conf/output.yaml
+--output_configs eir_tutorials/c_sequence_output/01_sequence_generation/conf/output_bpe.yaml \
+--globals.output_folder=eir_tutorials/tutorial_runs/c_sequence_output/01_sequence_generation_bpe

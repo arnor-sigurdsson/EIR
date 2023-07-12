@@ -139,6 +139,62 @@ def get_sequence_gen_01_imdb_generation_predict() -> AutoDocExperimentInfo:
     return ade
 
 
+def get_sequence_gen_02_imdb_generation_bpe() -> AutoDocExperimentInfo:
+    base_path = f"docs/tutorials/tutorial_files/{CR}/{TN}"
+
+    conf_output_path = f"eir_tutorials/{CR}/{TN}/conf"
+
+    command = [
+        "eirtrain",
+        "--global_configs",
+        f"{conf_output_path}/globals.yaml",
+        "--fusion_configs",
+        f"{conf_output_path}/fusion.yaml",
+        "--output_configs",
+        f"{conf_output_path}/output_bpe.yaml",
+        "--globals.output_folder=eir_tutorials/tutorial_runs"
+        "/c_sequence_output/01_sequence_generation_bpe",
+    ]
+
+    mapping = [
+        (
+            "training_curve_LOSS",
+            "figures/training_curve_LOSS_transformer_1_bpe.pdf",
+        ),
+        (
+            "samples/500/auto/0_generated.txt",
+            "figures/auto_generated_iter_500_bpe.txt",
+        ),
+        (
+            "samples/500/manual/1_generated.txt",
+            "figures/manual_generated_iter_500_bpe.txt",
+        ),
+        (
+            "samples/9500/auto/0_generated.txt",
+            "figures/auto_generated_iter_9500_bpe.txt",
+        ),
+        (
+            "samples/9500/manual/1_generated.txt",
+            "figures/manual_generated_iter_9500_bpe.txt",
+        ),
+    ]
+
+    data_output_path = Path(f"eir_tutorials/{CR}/{TN}/data/imdb.zip")
+
+    ade = AutoDocExperimentInfo(
+        name="SEQUENCE_GENERATION_IMDB_1",
+        data_url="https://drive.google.com/file/d/1u6bkIr9sECkU9z3Veutjn8cx6Mu3GP3Z",
+        data_output_path=data_output_path,
+        conf_output_path=Path(conf_output_path),
+        base_path=Path(base_path),
+        command=command,
+        files_to_copy_mapping=mapping,
+        post_run_functions=(),
+    )
+
+    return ade
+
+
 def _get_model_path_for_predict() -> str:
     run_1_output_path = f"eir_tutorials/tutorial_runs/{CR}/{TN}"
     model_path = get_saved_model_path(run_folder=Path(run_1_output_path))
@@ -155,8 +211,10 @@ def _add_model_path_to_command(command: list[str]) -> list[str]:
 def get_experiments() -> Sequence[AutoDocExperimentInfo]:
     exp_1 = get_sequence_gen_01_imdb_generation()
     exp_2 = get_sequence_gen_01_imdb_generation_predict()
+    exp_3 = get_sequence_gen_02_imdb_generation_bpe()
 
     return [
         exp_1,
         exp_2,
+        exp_3,
     ]
