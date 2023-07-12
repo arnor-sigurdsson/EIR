@@ -1,0 +1,18 @@
+output_folder: "FILL"
+sample_interval: 500
+checkpoint_interval: 500
+batch_size: "FILL"
+lr: 0.0002
+lr_plateau_patience: 5
+gradient_clipping: 1.0
+valid_size: "FILL"
+n_epochs: 50
+dataloader_workers: "FILL"
+device: "FILL"
+early_stopping_buffer: 2000
+early_stopping_patience: 10
+mixing_alpha: 0.2
+optimizer: "adabelief"
+weighted_sampling_columns: # for categorical targets, remove if only doing regression
+  - "all"
+log_level: "debug"

@@ -249,10 +249,26 @@ parameter below).
 This will generate a file called
 ``calculated_metrics.json`` in the supplied ``output_folder`` as well
 as a folder for each output (in this case called ``ancestry_output``
-containing the actual predictions and plots.
+containing the actual predictions and plots. Of course the metrics are quite nonsensical
+here, as we are predicting on the same data we trained on.
 
-D - Applying to your own data
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+One of the files generated are the actual predictions,
+found in the ``predictions.csv`` file:
+
+.. raw:: html
+   :file: ../tutorial_files/a_using_eir/01_basic_tutorial/csv_preview.html
+
+The ``True Label Untransformed`` column contains the actual labels, as they were
+in the raw data. The ``True Label`` column contains the labels after they have been
+numerically encoded / normalized in ``EIR``. For example above, we can see that the
+first rows have the ``True Label`` of ``5``,
+which untransformed represents ``Sub-Saharan
+African`` ancestry. The other columns represent the raw network outputs
+for each of the classes. Indeed, we can see that the highest value is in the
+``Sub-Saharan African`` column, which is the predicted class.
+
+D - Applying to your own data (e.g. UKBB)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Thank you for reading this far! Hopefully this tutorial introduced you well enough to
 the framework so you can apply it to your own data. For that, you will have to process
@@ -260,3 +276,29 @@ it first (see: `plink pipelines`_). Then you will have to set the relevant paths
 inputs (e.g. ``input_source``, ``snp_file``) and outputs
 (e.g. ``output_source``, ``target_cat_columns`` or ``target_con_columns``
 if you have continuous targets).
+
+When moving to large scale data such as the UK Biobank, the configurations we used
+on the ancestry toy data in this tutorial will likely not be sufficient. For example,
+the learning rate is likely too high. For this, here are some baseline configurations
+that we have found to work well as a starting point:
+
+.. literalinclude:: ../tutorial_files/a_using_eir/01_basic_tutorial/large_scale_globals.yaml
+    :language: yaml
+    :caption: globals.yaml
+
+.. literalinclude:: ../tutorial_files/a_using_eir/01_basic_tutorial/large_scale_input_gln.yaml
+    :language: yaml
+    :caption: input_genotype.yaml
+
+.. literalinclude:: ../tutorial_files/a_using_eir/01_basic_tutorial/large_scale_input_tabular.yaml
+    :language: yaml
+    :caption: input_tabular.yaml
+
+.. literalinclude:: ../tutorial_files/a_using_eir/01_basic_tutorial/large_scale_fusion.yaml
+    :language: yaml
+    :caption: fusion.yaml
+
+.. literalinclude:: ../tutorial_files/a_using_eir/01_basic_tutorial/large_scale_output.yaml
+    :language: yaml
+    :caption: output.yaml
+

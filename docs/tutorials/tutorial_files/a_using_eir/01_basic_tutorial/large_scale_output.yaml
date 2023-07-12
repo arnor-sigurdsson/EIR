@@ -1,0 +1,20 @@
+output_info:
+  output_name: "FILL"
+  output_source: "FILL"
+  output_type: "tabular"
+output_type_info:
+  target_con_columns: 
+    - "FILL"
+  target_cat_columns: 
+    - "FILL"
+model_config:
+  model_type: "mlp_residual"
+  model_init_config:
+    rb_do: 0.2
+    fc_do: 0.2
+    fc_task_dim: 512
+    layers: 
+      - 2
+    stochastic_depth_p: 0.2
+    final_layer_type: "linear"
+

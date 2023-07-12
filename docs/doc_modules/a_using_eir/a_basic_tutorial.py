@@ -1,5 +1,8 @@
 from pathlib import Path
+import textwrap
 from typing import Sequence, List
+
+import pandas as pd
 
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
 from docs.doc_modules.utils import get_saved_model_path
@@ -181,7 +184,19 @@ def get_tutorial_01_run_2_gln_predict_info() -> AutoDocExperimentInfo:
             "calculated_metrics",
             "tutorial_data/calculated_metrics_test.json",
         ),
+        (
+            "Origin/predictions.csv",
+            "tutorial_data/predictions_test.csv",
+        ),
     ]
+
+    csv_preview_func = (
+        csv_preview,
+        {
+            "run_path": Path(run_1_output_path),
+            "output_path": Path(base_path, "csv_preview.html"),
+        },
+    )
 
     ade = AutoDocExperimentInfo(
         name="GLN_1_PREDICT",
@@ -192,7 +207,7 @@ def get_tutorial_01_run_2_gln_predict_info() -> AutoDocExperimentInfo:
         command=command,
         files_to_copy_mapping=mapping,
         pre_run_command_modifications=(_add_model_path_to_command,),
-        post_run_functions=(),
+        post_run_functions=(csv_preview_func,),
         force_run_command=True,
     )
 
@@ -210,6 +225,21 @@ def _add_model_path_to_command(command: List[str]) -> List[str]:
     model_path = _get_model_path_for_predict()
     command = [x.replace("FILL_MODEL", model_path) for x in command]
     return command
+
+
+def csv_preview(run_path: Path, output_path: Path) -> None:
+    csv_path = run_path / "ancestry_output/Origin/predictions.csv"
+    assert csv_path.exists()
+
+    df = pd.read_csv(csv_path)
+    df = df.round(2)
+    df.columns = ["<br>".join(textwrap.wrap(name, width=20)) for name in df.columns]
+
+    preview = df.head(5).to_html(index=False, escape=False)
+
+    with open(output_path, "w") as f:
+        f.write(preview)
+        f.write("<br>")
 
 
 def get_experiments() -> Sequence[AutoDocExperimentInfo]:
