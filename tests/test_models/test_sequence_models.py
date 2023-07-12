@@ -5,7 +5,7 @@ import warnings
 import pytest
 import torch
 
-from eir.models.model_training_utils import trace_eir_model
+from eir.models.model_training_utils import check_eir_model
 from eir.setup.setup_utils import get_all_hf_model_names
 from tests.conftest import should_skip_in_gha
 from tests.test_modelling.test_tabular_modelling.test_sequence_modelling import (
@@ -92,7 +92,7 @@ def test_internal_sequence_models(
     )
 
     model.eval()
-    _ = trace_eir_model(meta_model=model, example_inputs=example_batch.inputs)
+    check_eir_model(meta_model=model, example_inputs=example_batch.inputs)
 
 
 def get_test_external_sequence_models_parametrization() -> Sequence[Dict]:
@@ -183,7 +183,7 @@ def test_external_sequence_models(
             return
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=torch.jit.TracerWarning)
-            trace_eir_model(meta_model=model, example_inputs=example_batch.inputs)
+            check_eir_model(meta_model=model, example_inputs=example_batch.inputs)
 
 
 def get_models_to_skip_test_trace() -> Sequence[str]:

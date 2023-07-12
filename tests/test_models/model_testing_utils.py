@@ -13,7 +13,7 @@ from eir.train_utils.step_logic import prepare_base_batch_default
 
 
 def prepare_example_batch(
-    configs: Configs, labels: Labels, model: torch.nn.Module
+    configs: Configs, labels: Labels, model: torch.nn.Module, batch_size: int = 2
 ) -> Batch:
     inputs_as_dict = set_up_inputs_for_training(
         inputs_configs=configs.input_configs,
@@ -27,7 +27,8 @@ def prepare_example_batch(
     )
 
     loader_batch = (imputed_inputs, {}, list())
-    loader_batch_collated = default_collate([loader_batch])
+    batch_as_list = [loader_batch] * batch_size
+    loader_batch_collated = default_collate(batch_as_list)
 
     outputs_as_dict = set_up_outputs_for_training(
         output_configs=configs.output_configs,

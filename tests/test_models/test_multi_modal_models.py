@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from eir.models.model_training_utils import trace_eir_model
+from eir.models.model_training_utils import check_eir_model
 from tests.test_models.model_testing_utils import prepare_example_batch
 
 
@@ -106,4 +106,4 @@ def test_multi_modal_multi_task(
 
     model.eval()
     with torch.no_grad():
-        _ = trace_eir_model(meta_model=model, example_inputs=example_batch.inputs)
+        check_eir_model(meta_model=model, example_inputs=example_batch.inputs)

@@ -12,12 +12,10 @@ from typing import (
     Callable,
     Any,
     Sequence,
-    cast,
 )
 
 import matplotlib.pyplot as plt
 import torch
-from eir.utils.logging import get_logger
 from aislib.pytorch_modules import Swish
 from ignite.engine import Engine
 from ignite.handlers.lr_finder import FastaiLRFinder
@@ -26,13 +24,13 @@ from torch.nn import Module
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 
-from eir.models.meta.meta import MetaModel, al_input_modules, al_output_modules
 from eir.setup.output_setup import (
     ComputedTabularOutputInfo,
 )
 from eir.train_utils.utils import (
     call_hooks_stage_iterable,
 )
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     # noinspection PyUnresolvedReferences
@@ -488,66 +486,8 @@ def plot_lr_find_results(
     plt.savefig(str(output_folder / "lr_search.pdf"))
 
 
-def trace_eir_model(
+def check_eir_model(
     meta_model: "al_meta_model", example_inputs: Dict[str, Any]
-) -> nn.Module:
-    """
-    Optimally we would like to trace the whole meta_model in one go, but since torch
-    currently does not like / support nested dict outputs when tracing a model,
-    we'll opt for tracing the individual modules like below for now (assuming it's
-    better than nothing).
-    """
-
-    if not isinstance(meta_model, MetaModel):
-        raise ValueError("Tracing is only supported for MetaModel instances")
-
-    meta_model.eval()
-
-    for name, module in meta_model.named_modules():
-        if hasattr(module, "script_submodules_for_tracing"):
-            module.script_submodules_for_tracing()
-
-    with torch.no_grad():
-        traced_input_modules = nn.ModuleDict()
-        feature_extractors_out = {}
-        for module_name, module_input in example_inputs.items():
-            module = meta_model.input_modules[module_name]
-            traced_input_module = torch.jit.trace_module(
-                mod=module,
-                inputs={"forward": module_input},
-                strict=False,
-            )
-            traced_input_modules[module_name] = traced_input_module
-            feature_extractors_out[module_name] = module(module_input)
-
-        traced_fusion_modules = nn.ModuleDict()
-        fused_features = {}
-        for fusion_name, fusion_module in meta_model.fusion_modules.items():
-            traced_fusion_module = torch.jit.trace_module(
-                mod=fusion_module,
-                inputs={"forward": feature_extractors_out},
-                strict=False,
-            )
-            traced_fusion_modules[fusion_name] = traced_fusion_module
-            fused_features[fusion_name] = fusion_module(feature_extractors_out)
-
-        traced_output_modules = nn.ModuleDict()
-        for output_module_name, output_module in meta_model.output_modules.items():
-            cur_fusion_target = meta_model.fusion_to_output_mapping[output_module_name]
-            corresponding_fused_features = fused_features[cur_fusion_target]
-
-            traced_output_module = torch.jit.trace_module(
-                mod=output_module,
-                inputs={"forward": corresponding_fused_features},
-                strict=False,
-            )
-            traced_output_modules[output_module_name] = traced_output_module
-
-    traced_meta_model = meta_model.__class__(
-        input_modules=cast(al_input_modules, traced_input_modules),
-        fusion_modules=traced_fusion_module,
-        output_modules=cast(al_output_modules, traced_output_modules),
-        fusion_to_output_mapping=meta_model.fusion_to_output_mapping,
-    )
-
-    return traced_meta_model
+) -> None:
+    with torch.inference_mode():
+        meta_model(inputs=example_inputs)
