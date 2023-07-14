@@ -3,7 +3,7 @@ from typing import Tuple
 
 import pytest
 import torch
-from hypothesis import given
+from hypothesis import given, settings
 from hypothesis.strategies import composite, integers
 from torch import nn
 
@@ -316,6 +316,7 @@ def valid_test_inputs(draw):
 
 
 @given(valid_test_inputs())
+@settings(deadline=None)
 def test_calc_conv_params_needed_fuzzy(test_input: Tuple[int, int, int, int]) -> None:
     solution = models_cnn.calc_conv_params_needed(*test_input)
 

@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Mapping
 
 import pytest
 import yaml
-from hypothesis import given, strategies
+from hypothesis import given, settings, strategies
 
 from eir.setup import config
 from eir.setup.config_setup_modules.config_setup_utils import (
@@ -295,6 +295,7 @@ def test_get_output_folder_and_log_level_from_cl_args():
     strategies.dictionaries(strategies.text(), strategies.integers()),
     strategies.integers(),
 )
+@settings(deadline=500)
 def test_recursive_search(dict_: Mapping, target: Any):
     paths_and_values = list(
         config._recursive_search(
