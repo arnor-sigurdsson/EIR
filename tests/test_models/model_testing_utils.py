@@ -28,7 +28,7 @@ def prepare_example_batch(
 
     loader_batch = (imputed_inputs, {}, list())
     batch_as_list = [loader_batch] * batch_size
-    loader_batch_collated = default_collate(batch_as_list)
+    loader_batch_collated = default_collate(batch=batch_as_list)
 
     outputs_as_dict = set_up_outputs_for_training(
         output_configs=configs.output_configs,

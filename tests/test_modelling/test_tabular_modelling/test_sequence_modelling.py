@@ -1,4 +1,3 @@
-from copy import copy
 from pathlib import Path
 from typing import Dict, Iterable, Sequence, Tuple
 
@@ -6,11 +5,6 @@ import pandas as pd
 import pytest
 
 from eir import train
-from eir.models.model_setup_modules.input_model_setup_sequence import (
-    _get_hf_sequence_feature_extractor_objects,
-    _get_manual_out_features_for_external_feature_extractor,
-)
-from eir.setup.setup_utils import get_all_hf_model_names
 from eir.train_utils.utils import seed_everything
 from tests.conftest import should_skip_in_gha, should_skip_in_gha_macos
 from tests.setup_tests.setup_modelling_test_data.setup_sequence_test_data import (
@@ -439,77 +433,3 @@ def _check_sequence_attributions(
     if fail_fast:
         assert success, (matching, top_tokens)
     return success
-
-
-@pytest.mark.skipif(condition=should_skip_in_gha(), reason="In GHA.")
-@pytest.mark.parametrize(
-    "model_name",
-    get_all_hf_model_names(),
-)
-def test_external_nlp_feature_extractor_forward(model_name: str):
-    model_config = _get_common_model_config_overload()
-    model_config_parsed = _parse_model_specific_config_values(
-        model_config=model_config, model_name=model_name
-    )
-    sequence_length = 64
-
-    feature_extractor_objects = _get_hf_sequence_feature_extractor_objects(
-        model_name=model_name,
-        model_config=model_config_parsed,
-        feature_extractor_max_length=sequence_length,
-        num_chunks=1,
-        pool=None,
-    )
-    _get_manual_out_features_for_external_feature_extractor(
-        input_length=sequence_length,
-        embedding_dim=feature_extractor_objects.embedding_dim,
-        num_chunks=1,
-        feature_extractor=feature_extractor_objects.feature_extractor,
-        pool=None,
-    )
-
-
-def _get_common_model_config_overload() -> dict:
-    n_heads = 4
-    n_layers = 2
-    embedding_dim = 16
-
-    config = {
-        "num_hidden_layers": n_layers,
-        "attention_types": [[["global"], 1]],
-        "encoder_layers": n_layers,
-        "num_encoder_layers": n_layers,
-        "decoder_layers": n_layers,
-        "num_decoder_layers": n_layers,
-        "block_sizes": [2],
-        "attention_head_size": 4,
-        "embedding_size": embedding_dim,
-        "rotary_dim": n_heads,
-        "d_embed": embedding_dim,
-        "hidden_size": n_heads * 4,
-        "num_attention_heads": n_heads,
-        "encoder_attention_heads": n_heads,
-        "decoder_attention_heads": n_heads,
-        "num_heads": n_heads,
-        "intermediate_size": 32,
-        "d_model": 16,
-        "pad_token_id": 0,
-        "attention_window": 16,
-        "axial_pos_embds_dim": (4, 12),
-        "axial_pos_shape": (8, 8),
-    }
-
-    assert config["hidden_size"] % n_heads == 0
-
-    return config
-
-
-def _parse_model_specific_config_values(model_config: dict, model_name: str) -> dict:
-    mc = copy(model_config)
-
-    if model_name == "prophetnet":
-        mc.pop("num_hidden_layers")
-    elif model_name == "xlm-prophetnet":
-        mc.pop("num_hidden_layers")
-
-    return mc

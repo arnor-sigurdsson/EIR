@@ -249,7 +249,10 @@ def calc_roc_auc_ovo(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -
         outputs = outputs[:, 1]
 
     roc_auc = roc_auc_score(
-        y_true=labels, y_score=outputs, average=average, multi_class="ovo"
+        y_true=labels,
+        y_score=outputs,
+        average=average,
+        multi_class="ovo",
     )
     return roc_auc
 
@@ -265,7 +268,9 @@ def calc_average_precision(
         outputs = outputs[:, 1]
 
     average_precision = average_precision_score(
-        y_true=labels, y_score=outputs, average=average
+        y_true=labels,
+        y_score=outputs,
+        average=average,
     )
 
     return average_precision

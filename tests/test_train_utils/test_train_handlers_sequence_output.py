@@ -298,10 +298,16 @@ def test_decode_tokens_with_pretrained_tokenizer(tokens, decoded_tokens):
     split_on = None
 
     result = decode_tokens(
-        tokens=tokens, tokenizer=mock_tokenizer, vocab=vocab, split_on=split_on
+        tokens=tokens,
+        tokenizer=mock_tokenizer,
+        vocab=vocab,
+        split_on=split_on,
     )
 
-    mock_tokenizer.decode.assert_called_once_with(token_ids=tokens)
+    mock_tokenizer.decode.assert_called_once_with(
+        token_ids=tokens,
+        skip_special_tokens=True,
+    )
     assert result == " ".join(decoded_tokens)
 
 

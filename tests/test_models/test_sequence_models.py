@@ -1,16 +1,15 @@
-import warnings
+import copy
 from typing import Dict, Sequence
 
 import pytest
-import torch
 
+from eir.models.model_setup_modules.input_model_setup_sequence import (
+    _get_hf_sequence_feature_extractor_objects,
+    _get_manual_out_features_for_external_feature_extractor,
+)
 from eir.models.model_training_utils import check_eir_model
 from eir.setup.setup_utils import get_all_hf_model_names
 from tests.conftest import should_skip_in_gha
-from tests.test_modelling.test_tabular_modelling.test_sequence_modelling import (
-    _get_common_model_config_overload,
-    _parse_model_specific_config_values,
-)
 from tests.test_models.model_testing_utils import prepare_example_batch
 
 
@@ -94,6 +93,52 @@ def test_internal_sequence_models(
     check_eir_model(meta_model=model, example_inputs=example_batch.inputs)
 
 
+def _get_common_model_config_overload() -> dict:
+    n_heads = 4
+    n_layers = 2
+    embedding_dim = 16
+
+    config = {
+        "num_hidden_layers": n_layers,
+        "attention_types": [[["global"], 1]],
+        "encoder_layers": n_layers,
+        "num_encoder_layers": n_layers,
+        "decoder_layers": n_layers,
+        "num_decoder_layers": n_layers,
+        "block_sizes": [2],
+        "attention_head_size": 4,
+        "embedding_size": embedding_dim,
+        "rotary_dim": n_heads,
+        "d_embed": embedding_dim,
+        "hidden_size": n_heads * 4,
+        "num_attention_heads": n_heads,
+        "encoder_attention_heads": n_heads,
+        "decoder_attention_heads": n_heads,
+        "num_heads": n_heads,
+        "intermediate_size": 32,
+        "d_model": 16,
+        "pad_token_id": 0,
+        "attention_window": 16,
+        "axial_pos_embds_dim": (4, 12),
+        "axial_pos_shape": (8, 8),
+    }
+
+    assert config["hidden_size"] % n_heads == 0
+
+    return config
+
+
+def _parse_model_specific_config_values(model_config: dict, model_name: str) -> dict:
+    mc = copy.copy(model_config)
+
+    if model_name == "prophetnet":
+        mc.pop("num_hidden_layers")
+    elif model_name == "xlm-prophetnet":
+        mc.pop("num_hidden_layers")
+
+    return mc
+
+
 def get_test_external_sequence_models_parametrization() -> Sequence[Dict]:
     """
     Some models seem to fail tracing or a bit troublesome to configure, skip for now.
@@ -108,7 +153,7 @@ def get_test_external_sequence_models_parametrization() -> Sequence[Dict]:
         else:
             all_models_filtered.append(model)
 
-    all_parametrizations = []
+    all_parameterizations = []
 
     for model_type in all_models_filtered:
         model_init_config = _get_common_model_config_overload()
@@ -143,9 +188,9 @@ def get_test_external_sequence_models_parametrization() -> Sequence[Dict]:
                 ],
             }
         }
-        all_parametrizations.append(cur_params)
+        all_parameterizations.append(cur_params)
 
-    return all_parametrizations
+    return all_parameterizations
 
 
 @pytest.mark.skipif(condition=should_skip_in_gha(), reason="In GHA.")
@@ -161,30 +206,54 @@ def get_test_external_sequence_models_parametrization() -> Sequence[Dict]:
     get_test_external_sequence_models_parametrization(),
     indirect=True,
 )
-def test_external_sequence_models(
+def test_external_sequence_models_forward(
     parse_test_cl_args,
     create_test_data,
     create_test_config,
     create_test_model,
     create_test_labels,
 ):
+    """
+    Note that some models, e.g. T5, T5-long and Switch Transformer
+    seem to dislike batch size >1 when num_decoder_layers are >0.
+    Possibly a configuration issue or bug in the model.
+    """
     model = create_test_model
 
     example_batch = prepare_example_batch(
-        configs=create_test_config, labels=create_test_labels, model=model
+        configs=create_test_config,
+        labels=create_test_labels,
+        model=model,
+        batch_size=1,
     )
 
     model.eval()
-    model_name = create_test_config.input_configs[0].model_config.model_type
-    with torch.no_grad():
-        model(inputs=example_batch.inputs)
-        if model_name in get_models_to_skip_test_trace():
-            return
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", category=torch.jit.TracerWarning)
-            check_eir_model(meta_model=model, example_inputs=example_batch.inputs)
+    check_eir_model(meta_model=model, example_inputs=example_batch.inputs)
 
 
-def get_models_to_skip_test_trace() -> Sequence[str]:
-    """Skip randomly failing models."""
-    return ["git"]
+@pytest.mark.skipif(condition=should_skip_in_gha(), reason="In GHA.")
+@pytest.mark.parametrize(
+    "model_name",
+    get_all_hf_model_names(),
+)
+def test_external_nlp_feature_extractor_setup(model_name: str):
+    model_config = _get_common_model_config_overload()
+    model_config_parsed = _parse_model_specific_config_values(
+        model_config=model_config, model_name=model_name
+    )
+    sequence_length = 64
+
+    feature_extractor_objects = _get_hf_sequence_feature_extractor_objects(
+        model_name=model_name,
+        model_config=model_config_parsed,
+        feature_extractor_max_length=sequence_length,
+        num_chunks=1,
+        pool=None,
+    )
+    _get_manual_out_features_for_external_feature_extractor(
+        input_length=sequence_length,
+        embedding_dim=feature_extractor_objects.embedding_dim,
+        num_chunks=1,
+        feature_extractor=feature_extractor_objects.feature_extractor,
+        pool=None,
+    )

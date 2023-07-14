@@ -1,0 +1,13 @@
+input_info:
+  input_source: eir_tutorials/c_sequence_output/03_image_captioning/data/image_captioning/images
+  input_name: image_captioning
+  input_type: image
+
+input_type_info:
+  size:
+    - 64
+  auto_augment: true
+
+model_config:
+  model_type: "resnet18"
+  pretrained_model: True

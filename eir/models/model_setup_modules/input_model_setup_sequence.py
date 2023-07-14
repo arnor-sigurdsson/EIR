@@ -112,7 +112,7 @@ def _get_sequence_feature_extractor_objects_for_wrapper_model(
             feature_extractor_class=model_class,
         )
     elif pretrained:
-        assert isinstance(model_config, dict)
+        assert isinstance(model_config, dict), model_config
         objects_for_wrapper = _get_pretrained_hf_sequence_feature_extractor_objects(
             model_name=model_type,
             frozen=pretrained_frozen,
@@ -122,7 +122,7 @@ def _get_sequence_feature_extractor_objects_for_wrapper_model(
             pool=pool,
         )
     else:
-        assert isinstance(model_config, dict)
+        assert isinstance(model_config, dict), model_config
         objects_for_wrapper = _get_hf_sequence_feature_extractor_objects(
             model_name=model_type,
             model_config=model_config,

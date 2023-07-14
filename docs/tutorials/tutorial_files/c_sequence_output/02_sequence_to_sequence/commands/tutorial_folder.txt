@@ -1,0 +1,10 @@
+eir_tutorials/c_sequence_output/02_sequence_to_sequence
+├── conf
+│   ├── fusion.yaml
+│   ├── globals.yaml
+│   ├── input_spanish.yaml
+│   └── output.yaml
+└── data
+    └── eng-spanish
+        ├── english.csv
+        └── spanish.csv

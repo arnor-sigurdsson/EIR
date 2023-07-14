@@ -23,7 +23,7 @@ def get_image_model(
     device: str,
 ) -> ImageWrapperModel:
     input_channels = data_dimensions.channels
-    if model_config.model_type in timm.list_models():
+    if model_config.model_type in _get_all_timm_models():
         feature_extractor = timm.create_model(
             model_name=model_config.model_type,
             pretrained=model_config.pretrained_model,
@@ -59,6 +59,17 @@ def get_image_model(
             param.requires_grad = False
 
     return model
+
+
+def _get_all_timm_models() -> list[str]:
+    base_models = timm.list_models()
+    pretrained_models = timm.list_models(pretrained=True)
+
+    all_models = base_models + pretrained_models
+    all_models = list(set(all_models))
+    all_models.sort()
+
+    return all_models
 
 
 def _parse_init_kwargs(model_config: ImageModelConfig) -> Dict[str, Any]:

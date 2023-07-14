@@ -1,0 +1,5 @@
+eirtrain \
+--global_configs eir_tutorials/c_sequence_output/03_image_captioning/conf/globals.yaml \
+--input_configs eir_tutorials/c_sequence_output/03_image_captioning/conf/inputs_resnet18.yaml \
+--fusion_configs eir_tutorials/c_sequence_output/03_image_captioning/conf/fusion.yaml \
+--output_configs eir_tutorials/c_sequence_output/03_image_captioning/conf/output.yaml

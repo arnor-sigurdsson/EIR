@@ -3,8 +3,8 @@
 .. role:: raw-html(raw)
     :format: html
 
-01 – Sequence Generation
-========================
+01 – Sequence Generation: Generating Movie Reviews
+==================================================
 
 In this tutorial,
 we will look into the built-in support in `EIR` for sequence generation tasks
@@ -37,7 +37,7 @@ To download the data,
 
 After downloading the data,
 the folder structure should look like this
-(we will look and the configs in a bit):
+(we will look at the configs in a bit):
 
 .. literalinclude:: ../tutorial_files/c_sequence_output/01_sequence_generation/commands/tutorial_folder.txt
     :language: console

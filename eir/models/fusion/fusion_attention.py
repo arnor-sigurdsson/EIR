@@ -82,7 +82,7 @@ class SequenceProjection(nn.Module):
         self.out_dim = self.target_max_length * self.target_embedding_dim
 
         self.norm_1 = nn.LayerNorm(normalized_shape=in_features)
-        self.act = nn.Mish()
+        self.act = nn.GELU()
 
         self.projection_layer = get_projection_layer(
             input_dimension=in_features,
@@ -159,7 +159,7 @@ class SequenceResidualCrossAttentionProjection(nn.Module):
             pre_norm=False,
         )
 
-        self.act = nn.Mish()
+        self.act = nn.GELU()
         self.norm_1_target = nn.LayerNorm(normalized_shape=target_embedding_dim)
         self.norm_1_context = nn.LayerNorm(normalized_shape=in_embedding_dim)
 

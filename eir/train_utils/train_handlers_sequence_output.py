@@ -190,6 +190,14 @@ def sequence_out_single_sample_evaluation_wrapper(
                     vocab=cur_input_object.vocab,
                     split_on=output_type_info.split_on,
                 )
+                special_tokens = get_special_tokens(
+                    tokenizer=cur_input_object.tokenizer,
+                    vocab=cur_input_object.vocab,
+                )
+                generated_sample = _remove_special_tokens_from_string(
+                    string=generated_sample,
+                    special_tokens=special_tokens,
+                )
 
                 cur_output_path = (
                     cur_sample_output_folder / eval_type / f"{idx}_generated.txt"
@@ -211,6 +219,17 @@ def sequence_out_single_sample_evaluation_wrapper(
                     input_objects=input_objects,
                     output_path=cur_inputs_output_path,
                 )
+
+
+def _remove_special_tokens_from_string(
+    string: str, special_tokens: "SpecialTokens"
+) -> str:
+    token_names = ["mask_token", "pad_token", "eos_token", "bos_token", "unk_token"]
+    for token in token_names:
+        assert hasattr(special_tokens, token)
+        token_value = getattr(special_tokens, token)
+        string = string.replace(token_value, "")
+    return string
 
 
 def convert_model_inputs_to_raw(
@@ -248,6 +267,13 @@ def convert_model_inputs_to_raw(
                     vocab=input_object.vocab,
                     split_on=input_type_info.split_on,
                     tokenizer=input_object.tokenizer,
+                )
+                special_tokens = get_special_tokens(
+                    tokenizer=input_object.tokenizer, vocab=input_object.vocab
+                )
+                raw_input = _remove_special_tokens_from_string(
+                    string=raw_input,
+                    special_tokens=special_tokens,
                 )
 
             case ComputedImageInputInfo():
@@ -789,7 +815,10 @@ def decode_tokens(
     tokens: list[int], tokenizer: Callable, vocab: Vocab, split_on: str | None
 ) -> str:
     if isinstance(tokenizer, PreTrainedTokenizerBase):
-        generated_sample = tokenizer.decode(token_ids=tokens)
+        generated_sample = tokenizer.decode(
+            token_ids=tokens,
+            skip_special_tokens=True,
+        )
         return generated_sample
 
     tokens_decoded = vocab.lookup_tokens(indices=tokens)
