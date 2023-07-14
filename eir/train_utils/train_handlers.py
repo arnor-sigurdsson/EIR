@@ -89,12 +89,12 @@ def configure_trainer(
         monitoring_metrics=monitoring_metrics,
     )
 
+    train_monitoring_metrics = _parse_metrics_for_train_running_average(
+        monitoring_metrics=monitoring_metrics
+    )
     _call_and_undo_ignite_local_rank_side_effects(
         func=_attach_running_average_metrics,
-        kwargs={"engine": trainer, "monitoring_metrics": monitoring_metrics},
-    )
-    _attach_running_average_metrics(
-        engine=trainer, monitoring_metrics=monitoring_metrics
+        kwargs={"engine": trainer, "monitoring_metrics": train_monitoring_metrics},
     )
 
     _maybe_attach_progress_bar(trainer=trainer, do_not_attach=gc.no_pbar)
@@ -396,6 +396,27 @@ def _get_latest_validation_value_score_function(
         return latest_val_loss
 
     return scoring_function
+
+
+def _parse_metrics_for_train_running_average(
+    monitoring_metrics: List[Tuple[str, str, str]]
+) -> List[Tuple[str, str, str]]:
+    """
+    We skip computing performance averages on training batches,
+    as some metrics (e.g. ROC-AUC, R2) can be undefined (e.g. batch with only
+    positive or negative labels) or fluctuate a lot (e.g. R2).
+    """
+    to_skip = ("perf-average",)
+
+    parsed_metrics: List[Tuple[str, str, str]] = []
+
+    for output_name, column_name, metric_name in monitoring_metrics:
+        if metric_name in to_skip:
+            continue
+
+        parsed_metrics.append((output_name, column_name, metric_name))
+
+    return parsed_metrics
 
 
 def _attach_running_average_metrics(

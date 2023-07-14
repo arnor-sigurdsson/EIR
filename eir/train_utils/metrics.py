@@ -180,19 +180,23 @@ def add_multi_task_average_metrics(
     batch_metrics_dict: al_step_metric_dict,
     outputs_as_dict: "al_output_objects_as_dict",
     loss: float,
-    performance_average_functions: "al_averaging_functions_dict",
+    performance_average_functions: Optional["al_averaging_functions_dict"],
 ) -> al_step_metric_dict:
-    average_performance = average_performances_across_tasks(
-        metric_dict=batch_metrics_dict,
-        outputs_as_dict=outputs_as_dict,
-        performance_calculation_functions=performance_average_functions,
-    )
-    batch_metrics_dict["average"] = {
+    average = {
         "average": {
             "loss-average": loss,
-            "perf-average": average_performance,
         }
     }
+
+    if performance_average_functions is not None:
+        average_performance = average_performances_across_tasks(
+            metric_dict=batch_metrics_dict,
+            outputs_as_dict=outputs_as_dict,
+            performance_calculation_functions=performance_average_functions,
+        )
+        average["average"]["perf-average"] = average_performance
+
+    batch_metrics_dict["average"] = average
 
     return batch_metrics_dict
 
@@ -202,7 +206,9 @@ def average_performances_across_tasks(
     outputs_as_dict: "al_output_objects_as_dict",
     performance_calculation_functions: "al_averaging_functions_dict",
 ) -> float:
-    target_columns_gen = get_output_info_generator(outputs_as_dict)
+    target_columns_gen = get_output_info_generator(
+        outputs_as_dict=outputs_as_dict,
+    )
 
     all_metrics = []
 
@@ -790,7 +796,7 @@ def get_performance_averaging_functions(
     """
 
     logger.info(
-        "Tabular performance averaging functions across tasks set to averages "
+        "Tabular output performance averaging functions across tasks set to averages "
         "of %s for categorical targets and %s for continuous targets. These "
         "values are used to determine overall performance (using the validation set), "
         "which is used to control factors such as early stopping and LR scheduling. "

@@ -63,7 +63,7 @@ Note that here the tabular data has
 been transposed, for visual purposes.
 
 .. raw:: html
-    :file: ../eir_tutorials/a_using_eir/07_multimodal_tutorial/commands/tabular_preview.html
+    :file: ../tutorial_files/a_using_eir/07_multimodal_tutorial/commands/tabular_preview.html
 
 Here are the configurations files for the tabular data:
 

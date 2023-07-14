@@ -588,13 +588,11 @@ def hook_default_compute_metrics(
         metric_dict=train_batch_metrics,
     )
 
-    averaging_functions = experiment.metrics["averaging_functions"]
-    assert isinstance(averaging_functions, dict)
     train_batch_metrics_with_averages = add_multi_task_average_metrics(
         batch_metrics_dict=train_batch_metrics_w_loss,
         outputs_as_dict=experiment.outputs,
         loss=state["loss"].item(),
-        performance_average_functions=averaging_functions,
+        performance_average_functions=None,
     )
 
     state_updates = {"metrics": train_batch_metrics_with_averages}
