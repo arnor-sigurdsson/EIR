@@ -66,6 +66,7 @@ vulture = "^2.7"
 mypy = "^1.4.1"
 types-pyyaml = "^6.0.12.10"
 isort = "^5.12.0"
+pytest-split = "^0.8.1"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
