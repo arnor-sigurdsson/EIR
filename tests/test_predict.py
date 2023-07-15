@@ -162,6 +162,7 @@ def _get_predict_test_data_parametrization() -> List[Dict[str, Any]]:
                 "omics",
                 "sequence",
                 "image",
+                "array",
             ),
             "manual_test_data_creator": lambda: "test_predict",
             "source": "deeplake",
