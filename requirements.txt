@@ -132,6 +132,6 @@ wheel==0.40.0 ; python_full_version >= "3.11.0" and python_full_version < "4.0.0
 wrapt==1.15.0 ; python_full_version >= "3.11.0" and python_version < "4.0"
 xarray==2023.6.0 ; python_full_version >= "3.11.0" and python_version < "4.0"
 yarl==1.9.2 ; python_full_version >= "3.11.0" and python_version < "4.0"
-zipp==3.16.1 ; python_full_version >= "3.11.0" and python_version < "4.0"
+zipp==3.16.2 ; python_full_version >= "3.11.0" and python_version < "4.0"
 zstandard==0.21.0 ; python_full_version >= "3.11.0" and python_version < "4.0"
 -e .

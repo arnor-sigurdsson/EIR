@@ -1,7 +1,7 @@
 .. _api-reference:
 
-API
-===
+Configuration API
+=================
 
 .. contents::
    :local:
@@ -101,6 +101,7 @@ Image Feature Extractors
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
 Please refer to `this page <https://huggingface.co/docs/timm/models>`_
+and `this page <https://huggingface.co/timm>`_
 for information about the image models.
 
 

@@ -15,10 +15,10 @@ html_theme_options = {
 copyright = f"{datetime.now().year}, {author}"
 html_theme = "sphinx_rtd_theme"
 extensions = [
+    "sphinx.ext.napoleon",
     "sphinx_copybutton",
     "sphinx.ext.autodoc",
     "sphinx.ext.coverage",
-    "sphinx.ext.napoleon",
 ]
 copybutton_prompt_text = r">>> |\.\.\. |\$ |In \[\d*\]: | {2,5}\.\.\.: | {5,8}: "
 copybutton_prompt_is_regexp = True

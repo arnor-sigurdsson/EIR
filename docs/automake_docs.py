@@ -11,6 +11,7 @@ from docs.doc_modules.a_using_eir import (
     g_multimodal_tutorial,
     h_array_tutorial,
 )
+from docs.doc_modules.api import generate_hf_sequence_info, generate_timm_api_info
 from docs.doc_modules.b_customizing_eir import a_customizing_fusion_tutorial
 from docs.doc_modules.c_sequence_outputs import (
     a_sequence_generation,
@@ -76,3 +77,6 @@ if __name__ == "__main__":
     )
     for experiment in experiment_iter:
         make_tutorial_data(auto_doc_experiment_info=experiment)
+
+    generate_timm_api_info.run_all()
+    generate_hf_sequence_info.run_all()
