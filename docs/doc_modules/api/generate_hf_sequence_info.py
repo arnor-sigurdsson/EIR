@@ -1,4 +1,5 @@
 import inspect
+import json
 import re
 from pathlib import Path
 from typing import List
@@ -9,6 +10,7 @@ from transformers import AutoConfig, PretrainedConfig
 from eir.setup.setup_utils import get_all_hf_model_names
 
 UPDATE_HF_DOCS = False
+CACHE_FILE = "docs/source/_static/sequence_model_overview_cache.json"
 
 
 def run_all():
@@ -71,6 +73,19 @@ def _get_configurable_models_header() -> str:
     return header
 
 
+def load_cache() -> dict:
+    if Path(CACHE_FILE).exists() and not UPDATE_HF_DOCS:
+        with open(CACHE_FILE, "r") as f:
+            return json.load(f)
+    else:
+        return {}
+
+
+def save_cache(cache: dict):
+    with open(CACHE_FILE, "w") as f:
+        json.dump(cache, f)
+
+
 def retrieve_configurable_models(
     model_name_list: List[str],
 ) -> list[tuple[str, str]]:
@@ -80,8 +95,7 @@ def retrieve_configurable_models(
         config = AutoConfig.for_model(model_type=model_name)
         if isinstance(config, PretrainedConfig):
             docstring = inspect.getdoc(config.__class__)
-            if UPDATE_HF_DOCS:
-                docstring = _add_overview(docstring=docstring, model_type=model_name)
+            docstring = _add_overview(docstring=docstring, model_type=model_name)
 
             docstring = markdown_to_rst(md_string=docstring)
             docstring = trim_docstring(docstring=docstring)
@@ -168,6 +182,10 @@ def generate_configurable_model_rst_string(models: list[tuple[str, str]]) -> str
 
 
 def get_model_overview(model_name: str) -> str:
+    cache = load_cache()
+    if model_name in cache and not UPDATE_HF_DOCS:
+        return cache[model_name]
+
     url = (
         f"https://raw.githubusercontent.com/huggingface/transformers/main/docs/"
         f"source/en/model_doc/{model_name}.md"
@@ -184,5 +202,8 @@ def get_model_overview(model_name: str) -> str:
     next_section = content.find("## ", 11)
     if next_section != -1:
         content = content[:next_section]
+
+    cache[model_name] = content
+    save_cache(cache=cache)
 
     return content
