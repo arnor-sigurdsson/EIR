@@ -146,12 +146,14 @@ def calculate_batch_metrics(
                     continue
 
                 cur_key = f"{output_name}_{target_name}_{metric_record.name}"
-                cur_metric_dict[cur_key] = metric_record.function(
+                cur_value = metric_record.function(
                     outputs=cur_outputs_np,
                     labels=cur_labels_np,
                     column_name=target_name,
                     output_name=output_name,
                 )
+
+                cur_metric_dict[cur_key] = cur_value
 
             master_metric_dict[output_name][target_name] = cur_metric_dict
         else:
@@ -319,10 +321,14 @@ def calc_rmse(
     labels_2d = labels.reshape(-1, 1)
     outputs_2d = outputs.reshape(-1, 1)
 
-    labels = cur_target_transformer.inverse_transform(labels_2d).squeeze()
-    predictions = cur_target_transformer.inverse_transform(outputs_2d).squeeze()
+    labels = cur_target_transformer.inverse_transform(X=labels_2d).squeeze()
+    predictions = cur_target_transformer.inverse_transform(X=outputs_2d).squeeze()
 
-    rmse = np.sqrt(mean_squared_error(y_true=labels, y_pred=predictions))
+    if np.shape(labels):
+        rmse = np.sqrt(mean_squared_error(y_true=labels, y_pred=predictions))
+    else:
+        rmse = np.sqrt((labels - predictions) ** 2)
+
     return rmse
 
 

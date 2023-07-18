@@ -1,8 +1,10 @@
 from copy import deepcopy
 from math import isclose
 
+import numpy as np
 import pytest
 import torch
+from sklearn.metrics import mean_squared_error
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
 from eir.models.output.mlp_residual import ResidualMLPOutputModuleConfig
@@ -127,11 +129,67 @@ def _get_add_loss_to_metrics_kwargs(outputs_as_dict):
     return {"losses": losses, "outputs_as_dict": outputs_as_dict}
 
 
+def test_calc_rmse_multiple_samples():
+    outputs = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+    labels = np.array([1.1, 2.2, 3.3, 4.4, 5.5])
+    scaler = StandardScaler()
+    scaler.fit(labels.reshape(-1, 1))
+    target_transformers = {"output1": {"column1": scaler}}
+
+    rmse = metrics.calc_rmse(
+        outputs=outputs,
+        labels=labels,
+        target_transformers=target_transformers,
+        output_name="output1",
+        column_name="column1",
+    )
+    labels_transformed = scaler.inverse_transform(labels.reshape(-1, 1)).squeeze()
+    outputs_transformed = scaler.inverse_transform(outputs.reshape(-1, 1)).squeeze()
+    expected_rmse = np.sqrt(mean_squared_error(labels_transformed, outputs_transformed))
+
+    assert np.isclose(rmse, expected_rmse)
+
+
+def test_calc_rmse_single_sample():
+    outputs = np.array([1.0])
+    labels = np.array([1.1])
+    scaler = StandardScaler()
+    scaler.fit(labels.reshape(-1, 1))
+    target_transformers = {"output1": {"column1": scaler}}
+
+    rmse = metrics.calc_rmse(
+        outputs=outputs,
+        labels=labels,
+        target_transformers=target_transformers,
+        output_name="output1",
+        column_name="column1",
+    )
+    expected_rmse = np.abs(labels[0] - outputs[0])
+
+    assert np.isclose(rmse, expected_rmse)
+
+
+def test_calc_rmse_no_samples():
+    outputs = np.array([])
+    labels = np.array([])
+    scaler = StandardScaler()
+    target_transformers = {"output1": {"column1": scaler}}
+
+    with pytest.raises(ValueError):
+        metrics.calc_rmse(
+            outputs=outputs,
+            labels=labels,
+            target_transformers=target_transformers,
+            output_name="output1",
+            column_name="column1",
+        )
+
+
 def test_calculate_losses_good():
     """
     Note that CrossEntropy applies LogSoftmax() before calculating the NLLLoss().
 
-    We expect the the CrossEntropyLosses to be around 0.9048
+    We expect the CrossEntropyLosses to be around 0.9048
 
         >>> loss = torch.nn.CrossEntropyLoss()
         >>> input_ = torch.zeros(1, 5)
