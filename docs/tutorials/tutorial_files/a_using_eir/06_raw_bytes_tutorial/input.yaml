@@ -1,0 +1,19 @@
+input_info:
+  input_source: eir_tutorials/a_using_eir/03_sequence_tutorial/data/IMDB/IMDB_Reviews
+  input_name: imdb_reviews_bytes_base_transformer
+  input_type: bytes
+
+input_type_info:
+        sampling_strategy_if_longer: "uniform"
+        max_length: 1024
+
+model_config:
+        model_type: sequence-default
+        window_size: 128
+        embedding_dim: 64
+        pool: avg
+        position: "embed"
+        model_init_config:
+          num_layers: 4
+          num_heads: 8
+

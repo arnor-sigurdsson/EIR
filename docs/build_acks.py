@@ -1,6 +1,5 @@
 from importlib import metadata
 
-
 BASE = """
 Acknowledgements
 ================

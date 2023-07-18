@@ -1,19 +1,25 @@
 from dataclasses import dataclass
 from typing import (
-    Tuple,
-    Dict,
-    List,
-    overload,
     TYPE_CHECKING,
-    Union,
+    Dict,
     Generator,
+    List,
     Sequence,
+    Tuple,
+    Union,
+    overload,
 )
 
 import torch
-from torch.utils.data import WeightedRandomSampler, DistributedSampler
+from torch.utils.data import DistributedSampler, WeightedRandomSampler
 
 from eir.data_load.data_loading_funcs import get_weighted_random_sampler
+from eir.setup.output_setup_modules.sequence_output_setup import (
+    ComputedSequenceOutputInfo,
+)
+from eir.setup.output_setup_modules.tabular_output_setup import (
+    ComputedTabularOutputInfo,
+)
 from eir.train_utils.distributed import in_distributed_env
 
 if TYPE_CHECKING:
@@ -24,21 +30,17 @@ if TYPE_CHECKING:
 def get_output_info_generator(
     outputs_as_dict: "al_output_objects_as_dict",
 ) -> Generator[Tuple[str, str, str], None, None]:
-    """
-    Here we are returning roughly the following structure:
-
-    (output name, output type specific info, target for current output)
-    """
-
     for output_name, output_object in outputs_as_dict.items():
-        if output_object.output_config.output_info.output_type != "tabular":
-            yield output_name, "general", output_name
-
-        elif output_object.output_config.output_info.output_type == "tabular":
-            target_columns = output_object.target_columns
-            for column_type, list_of_cols_of_this_type in target_columns.items():
-                for cur_column in list_of_cols_of_this_type:
-                    yield output_name, column_type, cur_column
+        match output_object:
+            case ComputedTabularOutputInfo():
+                target_columns = output_object.target_columns
+                for column_type, list_of_cols_of_this_type in target_columns.items():
+                    for cur_column in list_of_cols_of_this_type:
+                        yield output_name, column_type, cur_column
+            case ComputedSequenceOutputInfo():
+                yield output_name, "general", output_name
+            case _:
+                raise TypeError(f"Unknown output object: {output_object}")
 
 
 @dataclass(frozen=True)
@@ -55,7 +57,7 @@ def get_train_sampler(columns_to_sample: None, train_dataset: "DatasetBase") -> 
 
 @overload
 def get_train_sampler(
-    columns_to_sample: List[str], train_dataset: "DatasetBase"
+    columns_to_sample: Sequence[str], train_dataset: "DatasetBase"
 ) -> Union[WeightedRandomSampler, DistributedSampler]:
     ...
 
@@ -115,13 +117,20 @@ def get_train_sampler(columns_to_sample, train_dataset):
 
 
 def _gather_all_loaded_columns(outputs: "al_output_objects_as_dict") -> Sequence[str]:
-    loaded_cat_columns = []
-    loaded_con_columns = []
+    loaded_cat_columns: list[str] = []
+    loaded_con_columns: list[str] = []
 
     for output_name, output_object in outputs.items():
-        cur_target_columns = output_object.target_columns
-        loaded_cat_columns += cur_target_columns["cat"]
-        loaded_con_columns += cur_target_columns["con"]
-    loaded_target_columns = loaded_cat_columns + loaded_cat_columns
+        match output_object:
+            case ComputedTabularOutputInfo():
+                cur_target_columns = output_object.target_columns
+                loaded_cat_columns += cur_target_columns.get("cat", [])
+                loaded_con_columns += cur_target_columns.get("con", [])
+            case ComputedSequenceOutputInfo():
+                pass
+            case _:
+                raise TypeError(f"Unknown output object: {output_object}")
+
+    loaded_target_columns = loaded_cat_columns + loaded_con_columns
 
     return loaded_target_columns

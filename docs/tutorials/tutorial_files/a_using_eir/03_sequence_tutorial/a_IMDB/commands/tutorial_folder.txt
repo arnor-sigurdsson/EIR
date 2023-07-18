@@ -1,0 +1,12 @@
+eir_tutorials/a_using_eir/03_sequence_tutorial/
+├── a_IMDB
+│   └── conf
+│       ├── 03a_imdb_globals.yaml
+│       ├── 03a_imdb_input.yaml
+│       └── 03a_imdb_output.yaml
+└── data
+    └── IMDB
+        ├── IMDB_Reviews
+        ├── conf
+        ├── imdb.vocab
+        └── imdb_labels.csv

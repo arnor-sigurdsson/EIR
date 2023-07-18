@@ -1,22 +1,24 @@
-from dataclasses import dataclass, fields
+from dataclasses import asdict, dataclass, fields
 from pathlib import Path
-from typing import Sequence, Dict, Tuple
+from typing import Dict, Optional, Sequence, Tuple
 
 import numpy as np
-from aislib.misc_utils import get_logger
-from timm.models.registry import _model_pretrained_cfgs
+from timm.models._registry import _model_pretrained_cfgs
 from torchvision import transforms
 from torchvision.datasets.folder import default_loader
 from torchvision.transforms import Compose
 from torchvision.transforms.functional import to_tensor
 
 from eir.data_load.data_source_modules.deeplake_ops import (
+    get_deeplake_input_source_iterable,
     is_deeplake_dataset,
     load_deeplake_dataset,
-    get_deeplake_input_source_iterable,
 )
+from eir.models.input.image.image_models import ImageModelConfig
 from eir.setup import schemas
+from eir.setup.input_setup_modules.common import DataDimensions
 from eir.setup.setup_utils import collect_stats
+from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__)
 
@@ -36,26 +38,30 @@ class PretrainedImageModelInfo:
 def get_timm_configs() -> Dict[str, PretrainedImageModelInfo]:
     default_configs = {}
     field_names = {i.name for i in fields(PretrainedImageModelInfo)}
-    for name, dict_ in _model_pretrained_cfgs.items():
-        common = {k: v for k, v in dict_.items() if k in field_names}
+    for name, pretrained_config in _model_pretrained_cfgs.items():
+        config_dict = asdict(pretrained_config)
+        common = {k: v for k, v in config_dict.items() if k in field_names}
+
         default_configs[name] = PretrainedImageModelInfo(**common)
 
     return default_configs
 
 
 @dataclass
-class ImageInputInfo:
+class ComputedImageInputInfo:
     input_config: schemas.InputConfig
     base_transforms: Compose
     all_transforms: Compose
     normalization_stats: "ImageNormalizationStats"
     num_channels: int
+    data_dimensions: "DataDimensions"
 
 
 def set_up_image_input_for_training(
     input_config: schemas.InputConfig, *args, **kwargs
-) -> ImageInputInfo:
+) -> ComputedImageInputInfo:
     input_type_info = input_config.input_type_info
+    assert isinstance(input_type_info, schemas.ImageInputDataConfig)
 
     num_channels = input_type_info.num_channels
     if not num_channels:
@@ -67,24 +73,32 @@ def set_up_image_input_for_training(
     normalization_stats = get_image_normalization_values(input_config=input_config)
 
     base_transforms, all_transforms = get_image_transforms(
-        target_size=input_config.input_type_info.size,
+        target_size=input_type_info.size,
         normalization_stats=normalization_stats,
         auto_augment=input_type_info.auto_augment,
     )
 
-    image_input_info = ImageInputInfo(
+    data_dimension = DataDimensions(
+        channels=num_channels,
+        height=input_type_info.size[0],
+        width=input_type_info.size[-1],
+    )
+
+    image_input_info = ComputedImageInputInfo(
         input_config=input_config,
         base_transforms=base_transforms,
         all_transforms=all_transforms,
         normalization_stats=normalization_stats,
         num_channels=num_channels,
+        data_dimensions=data_dimension,
     )
 
     return image_input_info
 
 
-def infer_num_channels(data_source: str, deeplake_inner_key: str) -> int:
+def infer_num_channels(data_source: str, deeplake_inner_key: Optional[str]) -> int:
     if is_deeplake_dataset(data_source=data_source):
+        assert deeplake_inner_key is not None
         deeplake_ds = load_deeplake_dataset(data_source=data_source)
         deeplake_iter = get_deeplake_input_source_iterable(
             deeplake_dataset=deeplake_ds, inner_key=deeplake_inner_key
@@ -125,6 +139,7 @@ def get_image_normalization_values(
     input_config: schemas.InputConfig,
 ) -> ImageNormalizationStats:
     input_type_info = input_config.input_type_info
+    assert isinstance(input_type_info, schemas.ImageInputDataConfig)
 
     pretrained_model_configs = get_timm_configs()
 
@@ -132,6 +147,7 @@ def get_image_normalization_values(
     stds = input_type_info.stds_normalization_values
 
     model_config = input_config.model_config
+    assert isinstance(model_config, ImageModelConfig)
 
     if model_config.pretrained_model:
         cur_config = pretrained_model_configs[model_config.model_type]
@@ -183,6 +199,7 @@ def get_image_normalization_values(
 
             if is_deeplake_dataset(data_source=input_source):
                 deeplake_ds = load_deeplake_dataset(data_source=input_source)
+                assert deeplake_inner_key is not None
                 image_iter = get_deeplake_input_source_iterable(
                     deeplake_dataset=deeplake_ds, inner_key=deeplake_inner_key
                 )
@@ -203,6 +220,8 @@ def get_image_normalization_values(
                 input_source,
             )
 
+    assert means is not None
+    assert stds is not None
     stats = ImageNormalizationStats(channel_means=means, channel_stds=stds)
 
     return stats

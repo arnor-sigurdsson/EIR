@@ -1,0 +1,14 @@
+input_info:
+  input_source: eir_tutorials/a_using_eir/07_multimodal_tutorial/data/images
+  input_name: cute_pet_images
+  input_type: image
+
+input_type_info:
+  mixing_subtype: "cutmix"
+  size:
+    - 128
+
+model_config:
+  model_type: "resnet18"
+  pretrained_model: True
+  freeze_pretrained_model: True

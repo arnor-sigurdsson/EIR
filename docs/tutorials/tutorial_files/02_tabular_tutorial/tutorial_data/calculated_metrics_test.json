@@ -1,1 +1,0 @@
-{"poker_prediction": {"CLASS": {"poker_prediction_CLASS_mcc": 0.9814827500761766, "poker_prediction_CLASS_acc": 0.9895189895189895, "poker_prediction_CLASS_roc-auc-macro": 0.9314450607195385, "poker_prediction_CLASS_ap-macro": 0.580891120936392}}}

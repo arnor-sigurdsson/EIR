@@ -1,0 +1,16 @@
+input_info:
+  input_source: eir_tutorials/c_sequence_output/02_sequence_to_sequence.rst/data/eng-spanish/spanish.csv
+  input_name: spanish
+  input_type: sequence
+
+input_type_info:
+  max_length: 32
+  split_on: null
+  tokenizer: "bpe"
+  adaptive_tokenizer_max_vocab_size: 1024
+  sampling_strategy_if_longer: "uniform"
+  min_freq: 1
+
+sampling_config:
+  generated_sequence_length: 64
+  n_eval_inputs: 10

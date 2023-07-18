@@ -1,5 +1,5 @@
-from typing import Sequence
 from pathlib import Path
+from typing import Sequence
 
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
 
@@ -28,7 +28,7 @@ def get_tutorial_01_run_1_fusion_info() -> AutoDocExperimentInfo:
     ]
 
     data_output_path = Path(
-        "eir_tutorials/01_basic_tutorial/data/processed_sample_data.zip"
+        "eir_tutorials/a_using_eir/01_basic_tutorial/data/processed_sample_data.zip"
     )
 
     get_tutorial_folder = (
@@ -36,7 +36,7 @@ def get_tutorial_01_run_1_fusion_info() -> AutoDocExperimentInfo:
         {
             "command": [
                 "tree",
-                "eir_tutorials/01_basic_tutorial/",
+                "eir_tutorials/a_using_eir/01_basic_tutorial/",
                 "-L",
                 "3",
                 "-I",

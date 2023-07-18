@@ -1,13 +1,13 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Tuple, Optional, List
+from typing import List, Optional, Tuple
 
 import numpy as np
 
 from eir.data_load.data_source_modules.deeplake_ops import (
+    get_deeplake_input_source_iterable,
     is_deeplake_dataset,
     load_deeplake_dataset,
-    get_deeplake_input_source_iterable,
 )
 from eir.data_load.label_setup import get_file_path_iterator
 
@@ -17,7 +17,7 @@ class DataDimensions:
     channels: int
     height: int
     width: int
-    extra_dims: tuple = tuple()
+    extra_dims: tuple[int, ...] = tuple()
 
     def num_elements(self) -> int:
         base = self.channels * self.height * self.width
@@ -47,7 +47,7 @@ def get_data_dimension_from_data_source(
         path = next(iterator)
         shape = np.load(file=path).shape
 
-    extra_dims = tuple()
+    extra_dims: tuple[int, ...] = tuple()
     if len(shape) == 1:
         channels, height, width = 1, 1, shape[0]
     elif len(shape) == 2:

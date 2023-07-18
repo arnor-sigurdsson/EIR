@@ -1,12 +1,12 @@
-from typing import Dict, Sequence, List
+from typing import Dict, List, Sequence
 
 import pandas as pd
 import pytest
 import timm
 import torch
-from timm.models.registry import get_pretrained_cfg_value
+from timm.models import get_pretrained_cfg_value
 
-from eir.models.model_training_utils import trace_eir_model
+from eir.models.model_training_utils import check_eir_model
 from tests.conftest import should_skip_in_gha
 from tests.test_models.model_testing_utils import prepare_example_batch
 
@@ -82,12 +82,14 @@ def test_internal_image_models(
     model = create_test_model
 
     example_batch = prepare_example_batch(
-        configs=create_test_config, labels=create_test_labels, model=model
+        configs=create_test_config,
+        labels=create_test_labels,
+        model=model,
     )
 
     model.eval()
     with torch.no_grad():
-        _ = trace_eir_model(meta_model=model, example_inputs=example_batch.inputs)
+        check_eir_model(meta_model=model, example_inputs=example_batch.inputs)
 
 
 def get_timm_models_to_test() -> List[str]:
@@ -96,8 +98,8 @@ def get_timm_models_to_test() -> List[str]:
     """
 
     url = (
-        "https://raw.githubusercontent.com/rwightman/pytorch-image-models/"
-        "master/results/results-imagenet.csv"
+        "https://raw.githubusercontent.com/huggingface/pytorch-image-models/"
+        "main/results/results-imagenet.csv"
     )
 
     df = pd.read_csv(filepath_or_buffer=url)
@@ -107,7 +109,9 @@ def get_timm_models_to_test() -> List[str]:
 
     models = list(df["model"])
     models_pt = [i for i in models if not i.startswith("tf")]
-    models_filtered = [i for i in models_pt if i in timm.list_models()]
+    models_name_trimmed = [i.split(".")[0] for i in models_pt]
+    models_filtered = [i for i in models_name_trimmed if i in timm.list_models()]
+    assert len(models_filtered) > 0
 
     models_manual_filtered = []
     not_allowed = {"levit", "convit"}
@@ -117,6 +121,7 @@ def get_timm_models_to_test() -> List[str]:
         else:
             models_manual_filtered.append(model_name)
 
+    assert len(models_manual_filtered) > 0
     return models_manual_filtered
 
 
@@ -189,9 +194,10 @@ def test_external_image_models(
     model = create_test_model
 
     example_batch = prepare_example_batch(
-        configs=create_test_config, labels=create_test_labels, model=model
+        configs=create_test_config,
+        labels=create_test_labels,
+        model=model,
     )
 
     model.eval()
-    with torch.no_grad():
-        _ = trace_eir_model(meta_model=model, example_inputs=example_batch.inputs)
+    check_eir_model(meta_model=model, example_inputs=example_batch.inputs)

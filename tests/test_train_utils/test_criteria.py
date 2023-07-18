@@ -1,21 +1,25 @@
-from typing import Callable
-from unittest.mock import MagicMock
 from copy import copy
+from functools import partial
+from typing import Callable
+from unittest.mock import MagicMock, create_autospec
 
 import pytest
 import torch
 from torch import nn
 
 from eir.setup.config import Configs
+from eir.setup.input_setup import set_up_inputs_for_training
 from eir.setup.output_setup import set_up_outputs_for_training
+from eir.setup.schemas import OutputConfig, TabularOutputTypeConfig
 from eir.target_setup.target_label_setup import MergedTargetLabels
 from eir.train_utils.criteria import (
-    get_criteria,
     _calc_con_loss,
-    build_loss_dict,
-    _parse_loss_name,
     _get_label_smoothing,
+    _parse_loss_name,
+    build_loss_dict,
+    get_criteria,
     get_loss_callable,
+    get_supervised_criterion,
 )
 
 
@@ -47,7 +51,6 @@ def _get_criteria_parametrization():
         "L1Loss",
         "SmoothL1Loss",
         "PoissonNLLLoss",
-        "GaussianNLLLoss",
     ]:
         cur_case = copy(base)
         cur_output_configs = _get_output_configs(
@@ -95,8 +98,16 @@ def test_get_criteria(
 ):
     target_labels = create_test_labels
 
+    inputs_as_dict = set_up_inputs_for_training(
+        inputs_configs=create_test_config.input_configs,
+        train_ids=list(target_labels.train_labels.keys()),
+        valid_ids=list(target_labels.valid_labels.keys()),
+        hooks=None,
+    )
+
     outputs_as_dict = set_up_outputs_for_training(
         output_configs=create_test_config.output_configs,
+        input_objects=inputs_as_dict,
         target_transformers=target_labels.label_transformers,
     )
 
@@ -125,7 +136,8 @@ def test_build_loss_dict():
 
 
 def test_parse_loss_name():
-    output_config = MagicMock()
+    output_config = create_autospec(spec=OutputConfig)
+    output_config.output_type_info = create_autospec(spec=TabularOutputTypeConfig)
     output_config.output_type_info.cat_loss_name = "CrossEntropyLoss"
     output_config.output_type_info.con_loss_name = "MSELoss"
     column_type = "cat"
@@ -141,7 +153,8 @@ def test_parse_loss_name():
 
 
 def test_get_label_smoothing():
-    output_config = MagicMock()
+    output_config = create_autospec(spec=OutputConfig)
+    output_config.output_type_info = create_autospec(spec=TabularOutputTypeConfig)
     output_config.output_type_info.cat_label_smoothing = 0.1
     assert _get_label_smoothing(output_config=output_config, column_type="cat") == 0.1
     assert _get_label_smoothing(output_config=output_config, column_type="con") == 0.0
@@ -150,11 +163,51 @@ def test_get_label_smoothing():
         _get_label_smoothing(output_config=output_config, column_type="unknown")
 
 
-def test_calc_con_loss():
+@pytest.mark.parametrize(
+    "column_type, loss_name, cat_label_smoothing, expected_type",
+    [
+        ("con", "MSELoss", 0.0, partial),
+        ("con", "L1Loss", 0.0, partial),
+        ("con", "SmoothL1Loss", 0.0, partial),
+        ("con", "PoissonNLLLoss", 0.0, partial),
+        ("con", "HuberLoss", 0.0, partial),
+        ("cat", "CrossEntropyLoss", 0.0, nn.CrossEntropyLoss),
+    ],
+)
+def test_get_supervised_criterion(
+    column_type, loss_name, cat_label_smoothing, expected_type
+):
+    result = get_supervised_criterion(
+        column_type_=column_type,
+        loss_name=loss_name,
+        cat_label_smoothing_=cat_label_smoothing,
+    )
+    assert isinstance(result, expected_type)
+
+    with pytest.raises(AssertionError):
+        get_supervised_criterion(
+            column_type_=column_type,
+            loss_name="NonExistentLoss",
+            cat_label_smoothing_=cat_label_smoothing,
+        )
+
+
+@pytest.mark.parametrize(
+    "loss_func",
+    [
+        nn.MSELoss(),
+        nn.L1Loss(),
+        nn.SmoothL1Loss(),
+        nn.PoissonNLLLoss(),
+        nn.HuberLoss(),
+    ],
+)
+def test_calc_con_loss(loss_func):
     input_tensor = torch.randn(10, 1)
     target = torch.randn(10, 1)
-    loss_func = nn.MSELoss()
+
     loss = _calc_con_loss(input=input_tensor, target=target, loss_func=loss_func)
+
     assert isinstance(loss, torch.Tensor)
     assert loss.shape == torch.Size([])
 

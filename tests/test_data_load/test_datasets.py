@@ -1,38 +1,24 @@
 import csv
 from copy import deepcopy
 from pathlib import Path
-from typing import List, TYPE_CHECKING, Dict, Union, Any, Sequence
-from unittest.mock import MagicMock, patch
+from typing import TYPE_CHECKING, Dict, List, Union
 from uuid import uuid4
 
 import numpy as np
 import pandas as pd
 import pytest
-import torch
-from PIL import Image
 
 from eir import train
 from eir.data_load import datasets
-from eir.data_load.data_preparation_modules import common
-from eir.data_load.data_preparation_modules import imputation
-from eir.data_load.data_preparation_modules import prepare_bytes
-from eir.data_load.data_preparation_modules import prepare_image
-from eir.data_load.data_preparation_modules import prepare_omics
-from eir.data_load.data_preparation_modules import prepare_sequence
-from eir.data_load.data_source_modules import local_ops
 from eir.data_load.datasets import al_datasets
 from eir.data_load.label_setup import al_label_transformers
 from eir.setup.config import Configs
-from eir.setup.input_setup_modules.setup_image import (
-    ImageNormalizationStats,
-    get_image_transforms,
-)
 from eir.setup.output_setup import set_up_outputs_for_training
 from eir.target_setup.target_label_setup import (
     gather_all_ids_from_output_configs,
-    set_up_tabular_target_labels_wrapper,
-    get_tabular_target_file_infos,
+    set_up_all_targets_wrapper,
 )
+from eir.train_utils.utils import get_run_folder
 
 if TYPE_CHECKING:
     from ..setup_tests.fixtures_create_data import TestDataConfig
@@ -101,15 +87,14 @@ def test_set_up_datasets(
         ids=all_array_ids, valid_size=test_configs.global_config.valid_size
     )
 
-    target_labels_info = get_tabular_target_file_infos(
-        output_configs=test_configs.output_configs
-    )
+    run_folder = get_run_folder(output_folder=test_configs.global_config.output_folder)
 
-    target_labels = set_up_tabular_target_labels_wrapper(
-        tabular_target_file_infos=target_labels_info,
-        custom_label_ops=None,
+    target_labels = set_up_all_targets_wrapper(
         train_ids=train_ids,
         valid_ids=valid_ids,
+        output_configs=test_configs.output_configs,
+        run_folder=run_folder,
+        hooks=None,
     )
 
     inputs = train.set_up_inputs_for_training(
@@ -121,6 +106,7 @@ def test_set_up_datasets(
 
     outputs_as_dict = set_up_outputs_for_training(
         output_configs=create_test_config.output_configs,
+        input_objects=inputs,
         target_transformers=target_labels.label_transformers,
     )
 
@@ -257,15 +243,14 @@ def test_set_up_datasets_fails(
         ids=all_array_ids, valid_size=test_configs.global_config.valid_size
     )
 
-    target_labels_info = get_tabular_target_file_infos(
-        output_configs=test_configs.output_configs
-    )
+    run_folder = get_run_folder(output_folder=test_configs.global_config.output_folder)
 
-    target_labels = set_up_tabular_target_labels_wrapper(
-        tabular_target_file_infos=target_labels_info,
-        custom_label_ops=None,
+    target_labels = set_up_all_targets_wrapper(
         train_ids=train_ids,
         valid_ids=valid_ids,
+        output_configs=test_configs.output_configs,
+        run_folder=run_folder,
+        hooks=None,
     )
 
     inputs = train.set_up_inputs_for_training(
@@ -277,6 +262,7 @@ def test_set_up_datasets_fails(
 
     outputs_as_dict = set_up_outputs_for_training(
         output_configs=create_test_config.output_configs,
+        input_objects=inputs,
         target_transformers=target_labels.label_transformers,
     )
 
@@ -394,15 +380,14 @@ def test_construct_dataset_init_params_from_cl_args(
         ids=all_array_ids, valid_size=test_configs.global_config.valid_size
     )
 
-    target_labels_info = get_tabular_target_file_infos(
-        output_configs=test_configs.output_configs
-    )
+    run_folder = get_run_folder(output_folder=test_configs.global_config.output_folder)
 
-    target_labels = set_up_tabular_target_labels_wrapper(
-        tabular_target_file_infos=target_labels_info,
-        custom_label_ops=None,
+    target_labels = set_up_all_targets_wrapper(
         train_ids=train_ids,
         valid_ids=valid_ids,
+        output_configs=test_configs.output_configs,
+        run_folder=run_folder,
+        hooks=None,
     )
 
     inputs = train.set_up_inputs_for_training(
@@ -414,6 +399,7 @@ def test_construct_dataset_init_params_from_cl_args(
 
     outputs_as_dict = set_up_outputs_for_training(
         output_configs=create_test_config.output_configs,
+        input_objects=inputs,
         target_transformers=target_labels.label_transformers,
     )
 
@@ -501,15 +487,14 @@ def test_datasets(
         ids=all_array_ids, valid_size=test_configs.global_config.valid_size
     )
 
-    target_labels_info = get_tabular_target_file_infos(
-        output_configs=test_configs.output_configs
-    )
+    run_folder = get_run_folder(output_folder=test_configs.global_config.output_folder)
 
-    target_labels = set_up_tabular_target_labels_wrapper(
-        tabular_target_file_infos=target_labels_info,
-        custom_label_ops=None,
+    target_labels = set_up_all_targets_wrapper(
         train_ids=train_ids,
         valid_ids=valid_ids,
+        output_configs=test_configs.output_configs,
+        run_folder=run_folder,
+        hooks=None,
     )
 
     inputs = train.set_up_inputs_for_training(
@@ -521,6 +506,7 @@ def test_datasets(
 
     outputs_as_dict = set_up_outputs_for_training(
         output_configs=create_test_config.output_configs,
+        input_objects=inputs,
         target_transformers=target_labels.label_transformers,
     )
 
@@ -575,354 +561,3 @@ def check_dataset(
     assert (test_genotype.sum(1) == 1).all()
 
     assert test_id == dataset.samples[0].sample_id
-
-
-def test_prepare_genotype_array_train_mode():
-    test_array = torch.zeros((4, 100), dtype=torch.uint8).detach().numpy()
-    test_array_copy = deepcopy(test_array)
-
-    prepared_array_train = prepare_omics.prepare_one_hot_omics_data(
-        genotype_array=test_array,
-        na_augment_perc=1.0,
-        na_augment_prob=1.0,
-        test_mode=False,
-    )
-
-    assert prepared_array_train != test_array
-    assert (test_array_copy == test_array).all()
-
-    assert (prepared_array_train[:, -1, :] == 1).all()
-
-
-def test_prepare_genotype_array_test_mode():
-    test_array = torch.zeros((1, 4, 100), dtype=torch.uint8).detach().numpy()
-    test_array_copy = deepcopy(test_array)
-
-    prepared_array_test = prepare_omics.prepare_one_hot_omics_data(
-        genotype_array=test_array,
-        na_augment_perc=1.0,
-        na_augment_prob=1.0,
-        test_mode=True,
-    )
-    assert prepared_array_test != test_array
-    assert (test_array_copy == test_array).all()
-
-    assert prepared_array_test.sum().item() == 0
-
-
-def test_prepare_sequence_data():
-    test_input = np.array([i for i in range(100)])
-    test_input_copy = deepcopy(test_input)
-
-    input_config_mock = MagicMock()
-    input_config_mock.computed_max_length = 64
-    input_config_mock.encode_func.return_value = [0]
-    prepared_tensor = prepare_sequence.prepare_sequence_data(
-        sequence_input_object=input_config_mock,
-        cur_file_content_tokenized=test_input,
-        test_mode=False,
-    )
-
-    assert (test_input == test_input_copy).all()
-    assert prepared_tensor != test_input
-
-    assert len(prepared_tensor) == 64
-    assert len(test_input) == 100
-
-
-def test_prepare_bytes_data():
-    test_input = np.array([i for i in range(100)])
-    test_input_copy = deepcopy(test_input)
-
-    input_config_mock = MagicMock()
-    input_config_mock.input_config.input_type_info.max_length = 64
-    input_config_mock.vocab.get.return_value = 0
-    prepared_tensor = prepare_bytes.prepare_bytes_data(
-        bytes_input_object=input_config_mock,
-        bytes_data=test_input,
-        test_mode=False,
-    )
-
-    assert (test_input == test_input_copy).all()
-    assert prepared_tensor != test_input
-
-    assert len(prepared_tensor) == 64
-    assert len(test_input) == 100
-
-
-def test_prepare_image_data():
-    normalization_stats = ImageNormalizationStats(channel_means=[0], channel_stds=[0.1])
-    base_transforms, all_transforms = get_image_transforms(
-        target_size=(32, 32),
-        normalization_stats=normalization_stats,
-        auto_augment=False,
-    )
-
-    input_config_mock = MagicMock()
-    input_config_mock.base_transforms = base_transforms
-    input_config_mock.all_transforms = all_transforms
-
-    arr = np.random.rand(64, 64)
-    image_data = Image.fromarray(np.uint8(arr * 255))
-    arr_pil = np.array(image_data)
-
-    prepared_tensor = prepare_image.prepare_image_data(
-        image_input_object=input_config_mock, image_data=image_data, test_mode=False
-    )
-
-    assert (arr != image_data).any()
-    assert arr_pil.shape == (64, 64)
-    assert arr.shape == (64, 64)
-
-    assert prepared_tensor.shape == (1, 32, 32)
-
-
-@pytest.mark.parametrize(
-    "create_test_data",
-    [
-        {
-            "task_type": "binary",
-        },
-    ],
-    indirect=True,
-)
-@pytest.mark.parametrize(
-    "create_test_config_init_base",
-    [
-        {
-            "injections": {
-                "input_configs": [
-                    {
-                        "input_info": {"input_name": "test_genotype"},
-                        "model_config": {"model_type": "linear"},
-                    }
-                ],
-                "output_configs": [
-                    {
-                        "output_info": {"output_name": "test_output"},
-                        "output_type_info": {
-                            "target_cat_columns": ["Origin"],
-                            "target_con_columns": [],
-                        },
-                    },
-                ],
-            },
-        }
-    ],
-    indirect=True,
-)
-def test_get_file_sample_id_iterator(
-    create_test_config: Configs,
-    create_test_data: "TestDataConfig",
-    parse_test_cl_args: Dict[str, Any],
-):
-    test_experiment_config = create_test_config
-    test_data_config = create_test_data
-
-    input_configs = test_experiment_config.input_configs
-    assert len(input_configs) == 1
-
-    input_data_source = input_configs[0].input_info.input_source
-
-    iterator = local_ops.get_file_sample_id_iterator(
-        data_source=input_data_source, ids_to_keep=None
-    )
-    all_ids = [i for i in iterator]
-
-    assert len(all_ids) == test_data_config.n_per_class * len(
-        test_data_config.target_classes
-    )
-
-    iterator_empty = local_ops.get_file_sample_id_iterator(
-        data_source=input_data_source, ids_to_keep=["does_not_exists"]
-    )
-    all_ids = [i for i in iterator_empty]
-    assert len(all_ids) == 0
-
-
-def test_process_tensor_to_length():
-    test_tensor = torch.arange(0, 100)
-
-    test_tensor_simple_trunc = common.process_tensor_to_length(
-        tensor=test_tensor, max_length=50, sampling_strategy_if_longer="from_start"
-    )
-    assert len(test_tensor_simple_trunc) == 50
-    assert (test_tensor_simple_trunc == test_tensor[:50]).all()
-
-    test_tensor_unif_trunc = common.process_tensor_to_length(
-        tensor=test_tensor, max_length=50, sampling_strategy_if_longer="uniform"
-    )
-    assert len(test_tensor_unif_trunc) == 50
-    assert len(test_tensor_unif_trunc) == len(set(test_tensor_unif_trunc))
-
-    test_tensor_padded = common.process_tensor_to_length(
-        tensor=test_tensor, max_length=128, sampling_strategy_if_longer="uniform"
-    )
-    assert len(test_tensor_padded) == 128
-
-
-def test_sample_sequence_uniform():
-    test_tensor = torch.arange(0, 100)
-
-    sampled_tensor = common._sample_sequence_uniform(
-        tensor=test_tensor, tensor_length=len(test_tensor), max_length=50
-    )
-    assert len(sampled_tensor) == 50
-    assert len(sampled_tensor) == len(set(sampled_tensor))
-
-
-@pytest.mark.parametrize(
-    "create_test_data",
-    [
-        {"task_type": "binary", "modalities": ["omics", "sequence"]},
-    ],
-    indirect=True,
-)
-@pytest.mark.parametrize(
-    "create_test_config_init_base",
-    [
-        {
-            "injections": {
-                "input_configs": [
-                    {
-                        "input_info": {"input_name": "test_genotype"},
-                        "model_config": {
-                            "model_type": "cnn",
-                            "model_init_config": {"l1": 1e-04},
-                        },
-                    },
-                    {
-                        "input_info": {"input_name": "test_sequence"},
-                    },
-                    {
-                        "input_info": {"input_name": "test_tabular"},
-                        "input_type_info": {
-                            "input_cat_columns": ["OriginExtraCol"],
-                            "input_con_columns": ["ExtraTarget"],
-                        },
-                        "model_config": {"model_type": "tabular"},
-                    },
-                ],
-                "output_configs": [
-                    {
-                        "output_info": {"output_name": "test_output"},
-                        "output_type_info": {
-                            "target_cat_columns": ["Origin"],
-                            "target_con_columns": [],
-                        },
-                    },
-                ],
-            },
-        }
-    ],
-    indirect=True,
-)
-def test_impute_missing_modalities(
-    create_test_config: Configs,
-    create_test_data: "TestDataConfig",
-    parse_test_cl_args: Dict[str, Any],
-):
-    test_experiment_config = create_test_config
-    test_data_config = create_test_data
-
-    all_array_ids = gather_all_ids_from_output_configs(
-        output_configs=test_experiment_config.output_configs
-    )
-    train_ids, valid_ids = train.split_ids(
-        ids=all_array_ids, valid_size=test_experiment_config.global_config.valid_size
-    )
-
-    input_objects = train.set_up_inputs_for_training(
-        inputs_configs=test_experiment_config.input_configs,
-        train_ids=train_ids,
-        valid_ids=valid_ids,
-        hooks=None,
-    )
-    impute_dtypes = imputation._get_default_impute_dtypes(inputs_objects=input_objects)
-    impute_fill_values = imputation._get_default_impute_fill_values(
-        inputs_objects=input_objects
-    )
-
-    test_inputs_all_avail = {k: torch.empty(10) for k in input_objects.keys()}
-
-    no_fill = imputation.impute_missing_modalities(
-        inputs_values=test_inputs_all_avail,
-        inputs_objects=input_objects,
-        fill_values=impute_fill_values,
-        dtypes=impute_dtypes,
-    )
-    assert no_fill == test_inputs_all_avail
-
-    test_inputs_missing_tabular = {
-        k: v for k, v in test_inputs_all_avail.items() if "tabular" not in k
-    }
-    filled_tabular = imputation.impute_missing_modalities(
-        inputs_values=test_inputs_missing_tabular,
-        inputs_objects=input_objects,
-        fill_values=impute_fill_values,
-        dtypes=impute_dtypes,
-    )
-
-    transformers = input_objects["test_tabular"].labels.label_transformers
-    origin_extra_label_encoder = transformers["OriginExtraCol"]
-    na_transformer_index = origin_extra_label_encoder.transform(["NA"]).item()
-    filled_na_value = filled_tabular["test_tabular"]["OriginExtraCol"]
-    assert na_transformer_index == filled_na_value
-    assert filled_tabular["test_tabular"]["ExtraTarget"] == 0.0
-
-    test_inputs_missing_omics = {
-        k: v for k, v in test_inputs_all_avail.items() if k != "test_genotype"
-    }
-    with_imputed_omics = imputation.impute_missing_modalities(
-        inputs_values=test_inputs_missing_omics,
-        inputs_objects=input_objects,
-        fill_values=impute_fill_values,
-        dtypes=impute_dtypes,
-    )
-    assert len(with_imputed_omics) == 3
-    assert with_imputed_omics["test_genotype"].numel() == test_data_config.n_snps * 4
-
-
-def test_impute_single_missing_modality():
-    imputed_test_tensor = imputation.impute_single_missing_modality(
-        shape=(10, 10), fill_value=0, dtype=torch.float
-    )
-    assert imputed_test_tensor.numel() == 100
-    assert len(imputed_test_tensor.shape) == 2
-    assert imputed_test_tensor.shape[0] == 10
-    assert imputed_test_tensor.shape[1] == 10
-
-    assert (imputed_test_tensor == 0.0).all()
-
-
-@pytest.mark.parametrize(
-    "subset_indices",
-    [
-        None,
-        range(10),
-        range(0, 50, 2),
-        range(50, 100),
-        range(0, 100, 2),
-    ],
-)
-def test_load_array_from_disk(subset_indices: Union[None, Sequence[int]]):
-    test_arr = np.zeros((4, 100))
-    test_arr[-1, :50] = 1
-    test_arr[0, 50:] = 1
-
-    with patch(
-        "eir.data_load.data_preparation_modules.prepare_omics.np.load",
-        return_value=test_arr,
-        autospec=True,
-    ):
-        loaded = prepare_omics.omics_load_wrapper(
-            input_source="fake",
-            data_pointer=Path("fake"),
-            subset_indices=subset_indices,
-        )
-
-    expected = test_arr
-    if subset_indices is not None:
-        expected = test_arr[:, subset_indices]
-
-    assert (loaded == expected).all()

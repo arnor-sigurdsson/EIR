@@ -5,9 +5,9 @@ from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_
 
 
 def get_06_imdb_binary_run_1_transformer_info() -> AutoDocExperimentInfo:
-    base_path = "docs/tutorials/tutorial_files/06_raw_bytes_tutorial/"
+    base_path = "docs/tutorials/tutorial_files/a_using_eir/06_raw_bytes_tutorial/"
 
-    conf_output_path = "eir_tutorials/06_raw_bytes_tutorial/conf"
+    conf_output_path = "eir_tutorials/a_using_eir/06_raw_bytes_tutorial/conf"
 
     command = [
         "eirtrain",
@@ -30,14 +30,16 @@ def get_06_imdb_binary_run_1_transformer_info() -> AutoDocExperimentInfo:
         ),
     ]
 
-    data_output_path = Path("eir_tutorials/06_raw_bytes_tutorial/data/imdb.zip")
+    data_output_path = Path(
+        "eir_tutorials/a_using_eir/06_raw_bytes_tutorial/data/imdb.zip"
+    )
 
     get_tutorial_folder = (
         run_capture_and_save,
         {
             "command": [
                 "tree",
-                "eir_tutorials/06_raw_bytes_tutorial/",
+                "eir_tutorials/a_using_eir/06_raw_bytes_tutorial/",
                 "-L",
                 "3",
                 "-I",

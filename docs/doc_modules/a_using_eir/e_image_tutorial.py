@@ -5,9 +5,9 @@ from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_
 
 
 def get_05_hot_dog_run_1_resnet_info() -> AutoDocExperimentInfo:
-    base_path = "docs/tutorials/tutorial_files/05_image_tutorial/"
+    base_path = "docs/tutorials/tutorial_files/a_using_eir/05_image_tutorial/"
 
-    conf_output_path = "eir_tutorials/05_image_tutorial/conf"
+    conf_output_path = "eir_tutorials/a_using_eir/05_image_tutorial/conf"
 
     command = [
         "eirtrain",
@@ -26,14 +26,16 @@ def get_05_hot_dog_run_1_resnet_info() -> AutoDocExperimentInfo:
         ),
     ]
 
-    data_output_path = Path("eir_tutorials/05_image_tutorial/data/hot_dog.zip")
+    data_output_path = Path(
+        "eir_tutorials/a_using_eir/05_image_tutorial/data/hot_dog.zip"
+    )
 
     get_tutorial_folder = (
         run_capture_and_save,
         {
             "command": [
                 "tree",
-                "eir_tutorials/05_image_tutorial/",
+                "eir_tutorials/a_using_eir/05_image_tutorial/",
                 "-L",
                 "3",
                 "-I",
@@ -59,9 +61,9 @@ def get_05_hot_dog_run_1_resnet_info() -> AutoDocExperimentInfo:
 
 
 def get_05_hot_dog_run_2_resnet_pretrained_info() -> AutoDocExperimentInfo:
-    base_path = "docs/tutorials/tutorial_files/05_image_tutorial/"
+    base_path = "docs/tutorials/tutorial_files/a_using_eir/05_image_tutorial/"
 
-    conf_output_path = "eir_tutorials/05_image_tutorial/conf"
+    conf_output_path = "eir_tutorials/a_using_eir/05_image_tutorial/conf"
 
     command = [
         "eirtrain",
@@ -72,7 +74,7 @@ def get_05_hot_dog_run_2_resnet_pretrained_info() -> AutoDocExperimentInfo:
         "--output_configs",
         f"{conf_output_path}/output.yaml",
         "--globals.output_folder=eir_tutorials/tutorial_runs"
-        "/tutorial_05_is_it_a_hot_dog_pretrained_resnet",
+        "/a_using_eir/tutorial_05_is_it_a_hot_dog_pretrained_resnet",
     ]
 
     mapping = [
@@ -86,7 +88,9 @@ def get_05_hot_dog_run_2_resnet_pretrained_info() -> AutoDocExperimentInfo:
         ),
     ]
 
-    data_output_path = Path("eir_tutorials/05_image_tutorial/data/hot_dog.zip")
+    data_output_path = Path(
+        "eir_tutorials/a_using_eir/05_image_tutorial/data/hot_dog.zip"
+    )
 
     ade = AutoDocExperimentInfo(
         name="IMAGE_2_PRETRAINED_RESNET",
@@ -103,9 +107,9 @@ def get_05_hot_dog_run_2_resnet_pretrained_info() -> AutoDocExperimentInfo:
 
 
 def get_05_hot_dog_run_2_combined_pretrained_info() -> AutoDocExperimentInfo:
-    base_path = "docs/tutorials/tutorial_files/05_image_tutorial/"
+    base_path = "docs/tutorials/tutorial_files/a_using_eir/05_image_tutorial/"
 
-    conf_output_path = "eir_tutorials/05_image_tutorial/conf"
+    conf_output_path = "eir_tutorials/a_using_eir/05_image_tutorial/conf"
 
     command = [
         "eirtrain",
@@ -117,7 +121,7 @@ def get_05_hot_dog_run_2_combined_pretrained_info() -> AutoDocExperimentInfo:
         "--output_configs",
         f"{conf_output_path}/output.yaml",
         "--globals.output_folder=eir_tutorials/tutorial_runs"
-        "/tutorial_05_is_it_a_hot_dog_pretrained_combined",
+        "/a_using_eir/tutorial_05_is_it_a_hot_dog_pretrained_combined",
     ]
 
     mapping = [
@@ -135,7 +139,9 @@ def get_05_hot_dog_run_2_combined_pretrained_info() -> AutoDocExperimentInfo:
         ),
     ]
 
-    data_output_path = Path("eir_tutorials/05_image_tutorial/data/hot_dog.zip")
+    data_output_path = Path(
+        "eir_tutorials/a_using_eir/05_image_tutorial/data/hot_dog.zip"
+    )
 
     ade = AutoDocExperimentInfo(
         name="IMAGE_3_PRETRAINED_EFFICIENTNET",

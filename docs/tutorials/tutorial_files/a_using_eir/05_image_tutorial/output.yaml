@@ -1,0 +1,8 @@
+output_info:
+        output_source: eir_tutorials/a_using_eir/05_image_tutorial/data/hot_dog_not_hot_dog/labels.csv
+        output_name: hot_dog_output
+        output_type: tabular
+
+output_type_info:
+        target_cat_columns:
+                - CLASS

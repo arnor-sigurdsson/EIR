@@ -1,5 +1,5 @@
-from pathlib import Path
 import zipfile
+from pathlib import Path
 
 import gdown
 from aislib.misc_utils import ensure_path_exists

@@ -1,0 +1,13 @@
+input_info:
+  input_source: "FILL"
+  input_name: "tabular_input"
+  input_type: "tabular"
+input_type_info:
+  input_cat_columns: 
+    - "FILL"
+  input_con_columns: 
+    - "FILL"
+model_config:
+  model_type: "tabular"
+  model_init_config:
+    fc_layer: true

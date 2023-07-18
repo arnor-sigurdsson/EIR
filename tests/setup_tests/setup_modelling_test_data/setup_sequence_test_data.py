@@ -1,14 +1,16 @@
 import random
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Sequence, Dict, TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, Sequence
 
 import pandas as pd
 
-from tests.setup_tests.setup_modelling_test_data.setup_test_data_utils import (
+from tests.setup_tests.setup_modelling_test_data.setup_targets_test_data import (
+    get_current_test_label_values,
     set_up_label_file_writing,
     set_up_label_line_dict,
-    get_current_test_label_values,
+)
+from tests.setup_tests.setup_modelling_test_data.setup_test_data_utils import (
     set_up_test_data_root_outpath,
 )
 
@@ -28,7 +30,7 @@ def create_test_sequence_data(
 
     sequence_outfolder = set_up_test_data_root_outpath(base_folder=sequence_outfolder)
     test_sequence_label_keywords = get_continent_keyword_map()
-    test_sequence_random_pool = tuple(_get_text_sequence_base())
+    test_sequence_random_pool = tuple(get_text_sequence_base())
 
     samples_for_csv = []
     for cls, snp_row_idx in c.target_classes.items():
@@ -149,7 +151,7 @@ def get_continent_keyword_map() -> Dict[str, Sequence[str]]:
     return map_
 
 
-def _get_text_sequence_base() -> set:
+def get_text_sequence_base() -> set:
     base = (
         "disarm explosives arsenal battles ninja houses decoded ai-controlled "
         "patriot seemingly along titled order raised mercenaries exchange disc "

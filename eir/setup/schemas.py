@@ -1,31 +1,36 @@
 from dataclasses import dataclass, field
-from typing import Union, Literal, List, Optional, Sequence, Type, TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, Optional, Sequence, Type, Union
 
-from eir.models.array.array_models import ArrayModelConfig
 from eir.models.fusion.fusion_identity import IdentityConfig
 from eir.models.fusion.fusion_mgmoe import MGMoEModelConfig
-from eir.models.image.image_models import ImageModelConfig
-from eir.models.layers import ResidualMLPConfig
-from eir.models.omics.omics_models import (
-    OmicsModelConfig,
-    LinearModel,
+from eir.models.input.array.array_models import ArrayModelConfig
+from eir.models.input.image.image_models import ImageModelConfig
+from eir.models.input.omics.omics_models import (
     CNNModel,
-    LCLModel,
-    SimpleLCLModel,
     IdentityModel,
+    LCLModel,
+    LinearModel,
+    OmicsModelConfig,
+    SimpleLCLModel,
 )
-from eir.models.output.output_module_setup import OutputModuleConfig
-from eir.models.sequence.transformer_models import (
-    SequenceModelConfig,
+from eir.models.input.sequence.transformer_models import SequenceModelConfig
+from eir.models.input.tabular.tabular import SimpleTabularModel, TabularModelConfig
+from eir.models.layers import ResidualMLPConfig
+from eir.models.output.output_module_setup import TabularOutputModuleConfig
+from eir.models.output.sequence.sequence_output_modules import (
+    SequenceOutputModuleConfig,
 )
-from eir.models.tabular.tabular import (
-    SimpleTabularModel,
-    TabularModelConfig,
+from eir.setup.schema_modules.output_schemas_sequence import (
+    SequenceOutputSamplingConfig,
+    SequenceOutputTypeConfig,
 )
 from eir.setup.setup_utils import get_all_optimizer_names
 
 if TYPE_CHECKING:
-    from eir.train_utils.criteria import al_cat_loss_names, al_con_loss_names
+    from eir.train_utils.metrics import (
+        al_cat_averaging_metric_choices,
+        al_con_averaging_metric_choices,
+    )
 
 al_input_configs = Sequence["InputConfig"]
 al_output_configs = Sequence["OutputConfig"]
@@ -58,8 +63,11 @@ al_models_classes = Union[
 ]
 
 
-al_output_module_configs_classes = Union[Type[OutputModuleConfig]]
-al_output_module_configs = Union[OutputModuleConfig]
+al_output_module_configs_classes = (
+    Type[TabularOutputModuleConfig] | Type[SequenceOutputModuleConfig]
+)
+
+al_output_module_configs = TabularOutputModuleConfig | SequenceOutputModuleConfig
 
 
 al_tokenizer_choices = (
@@ -77,6 +85,15 @@ al_tokenizer_choices = (
 
 al_max_sequence_length = Union[int, Literal["max", "average"]]
 
+al_cat_loss_names = Literal["CrossEntropyLoss"]
+al_con_loss_names = Literal[
+    "MSELoss",
+    "L1Loss",
+    "SmoothL1Loss",
+    "PoissonNLLLoss",
+    "HuberLoss",
+]
+
 
 @dataclass
 class GlobalConfig:
@@ -93,7 +110,7 @@ class GlobalConfig:
         Size of batches during training.
 
     :param valid_size:
-        Size if the validaton set, if float then uses a percentage. If int,
+        Size if the validation set, if float then uses a percentage. If int,
         then raw counts.
 
     :param manual_valid_ids_file:
@@ -101,10 +118,15 @@ class GlobalConfig:
         be one ID per line in the file.
 
     :param dataloader_workers:
-        Number of workers for multi-process training and validation data loading.
+        Number of workers for multiprocess training and validation data loading.
 
     :param device:
-        Device to run the training on (e.g. 'cuda:0' / 'cpu').
+        Device to run the training on (e.g. 'cuda:0' / 'cpu' / 'mps').
+        'mps' is currently experimental, and might not work for all models.
+
+    :param n_iter_before_swa:
+        Number of iterations to run before activating Stochastic Weight Averaging
+        (SWA).
 
     :param amp:
         Whether to use Automatic Mixed Precision. Currently only supported when
@@ -267,12 +289,12 @@ class GlobalConfig:
     gradient_clipping: float = 1.0
     gradient_accumulation_steps: Union[None, int] = None
     gradient_noise: float = 0.0
-    cat_averaging_metrics: Optional[Sequence[str]] = None
-    con_averaging_metrics: Optional[Sequence[str]] = None
+    cat_averaging_metrics: Optional["al_cat_averaging_metric_choices"] = None
+    con_averaging_metrics: Optional["al_con_averaging_metric_choices"] = None
     early_stopping_patience: int = 10
     early_stopping_buffer: Union[None, int] = None
     warmup_steps: Union[Literal["auto"], int] = "auto"
-    optimizer: al_optimizers = "adam"
+    optimizer: al_optimizers = "adam"  # type: ignore
     b1: float = 0.9
     b2: float = 0.999
     wd: float = 1e-04
@@ -282,7 +304,6 @@ class GlobalConfig:
     checkpoint_interval: Union[None, int] = None
     n_saved_models: int = 1
     compute_attributions: bool = False
-    attribution_target_classes: Union[None, List[str]] = None
     max_attributions_per_class: Union[None, int] = None
     attributions_every_sample_factor: int = 1
     attribution_background_samples: int = 256
@@ -454,6 +475,10 @@ class SequenceInputDataConfig:
     :param tokenizer_language:
         Which language rules the tokenizer should apply when tokenizing the raw data.
 
+    :param adaptive_tokenizer_max_vocab_size:
+        If using an adaptive tokenizer ("bpe"), this parameter controls the maximum
+        size of the vocabulary.
+
     :param mixing_subtype:
         Which type of mixing to use on the sequence data given that ``mixing_alpha`` is
         set >0.0 in the global configuration.
@@ -463,9 +488,10 @@ class SequenceInputDataConfig:
     max_length: al_max_sequence_length = "average"
     sampling_strategy_if_longer: Literal["from_start", "uniform"] = "uniform"
     min_freq: int = 10
-    split_on: str = " "
-    tokenizer: al_tokenizer_choices = None
+    split_on: Optional[str] = " "
+    tokenizer: al_tokenizer_choices = None  # type: ignore
     tokenizer_language: Union[str, None] = None
+    adaptive_tokenizer_max_vocab_size: Optional[int] = None
     mixing_subtype: Literal["mixup"] = "mixup"
 
 
@@ -537,7 +563,7 @@ class ByteInputDataConfig:
         set >0.0 in the global configuration.
     """
 
-    max_length: al_max_sequence_length = "average"
+    max_length: int = 256
     byte_encoding: Literal["uint8"] = "uint8"
     sampling_strategy_if_longer: Literal["from_start", "uniform"] = "uniform"
     mixing_subtype: Literal["mixup"] = "mixup"
@@ -581,7 +607,7 @@ class ImageInputDataConfig:
     size: Sequence[int] = (64,)
     mean_normalization_values: Union[None, Sequence[float]] = None
     stds_normalization_values: Union[None, Sequence[float]] = None
-    num_channels: int = None
+    num_channels: Optional[int] = None
     mixing_subtype: Union[Literal["mixup"], Literal["cutmix"]] = "mixup"
 
 
@@ -606,7 +632,7 @@ class FusionConfig:
         Fusion model configuration.
     """
 
-    model_type: Literal["default", "linear", "mgmoe"]
+    model_type: Literal["mlp-residual", "identity", "mgmoe", "pass-through"]
     model_config: Union[ResidualMLPConfig, IdentityConfig, MGMoEModelConfig]
 
 
@@ -623,9 +649,9 @@ class OutputInfoConfig:
         Type of the output.
     """
 
-    output_source: Union[str, None]
+    output_source: str
     output_name: str
-    output_type: Literal["tabular"]
+    output_type: Literal["tabular", "sequence"]
 
 
 @dataclass
@@ -652,8 +678,8 @@ class TabularOutputTypeConfig:
     target_cat_columns: Sequence[str] = field(default_factory=list)
     target_con_columns: Sequence[str] = field(default_factory=list)
     cat_label_smoothing: float = 0.0
-    cat_loss_name: "al_cat_loss_names" = "CrossEntropyLoss"
-    con_loss_name: "al_con_loss_names" = "MSELoss"
+    cat_loss_name: al_cat_loss_names = "CrossEntropyLoss"
+    con_loss_name: al_con_loss_names = "MSELoss"
     uncertainty_weighted_mt_loss: bool = True
 
 
@@ -671,8 +697,13 @@ class OutputConfig:
     :param model_config:
         Configuration for the chosen model (i.e. output module after fusion) for this
         output.
+
+    :param sampling_config:
+        Configuration for how to sample results from the output module.
     """
 
     output_info: OutputInfoConfig
-    output_type_info: Union[TabularOutputTypeConfig]
-    model_config: Union[OutputModuleConfig]
+    output_type_info: TabularOutputTypeConfig | SequenceOutputTypeConfig
+    model_config: TabularOutputModuleConfig | SequenceOutputModuleConfig
+
+    sampling_config: SequenceOutputSamplingConfig | None = None

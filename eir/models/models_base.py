@@ -1,29 +1,31 @@
 from collections import OrderedDict
 from copy import deepcopy
 from typing import (
-    List,
-    Tuple,
-    Dict,
-    Type,
-    Callable,
-    Iterable,
-    Any,
-    Sequence,
-    Union,
-    Literal,
     TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    Literal,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    Union,
 )
 
 import torch
-from aislib.misc_utils import get_logger
 from torch import nn
 from transformers import PreTrainedModel
 
+from eir.models.input.sequence.transformer_models import get_hf_transformer_forward
 from eir.models.layers import MLPResidualBlock
-from eir.models.sequence.transformer_models import get_hf_transformer_forward
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
-    from eir.setup.output_setup import al_num_outputs_per_target
+    from eir.setup.output_setup_modules.tabular_output_setup import (
+        al_num_outputs_per_target,
+    )
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -64,9 +66,9 @@ def create_multi_task_blocks_with_first_adaptor_block(
     num_blocks: int,
     branch_names: Sequence[str],
     block_constructor: Callable,
-    block_constructor_kwargs: Dict,
-    first_layer_kwargs_overload: Dict,
-):
+    block_constructor_kwargs: dict,
+    first_layer_kwargs_overload: dict,
+) -> nn.ModuleDict:
     adaptor_block = construct_multi_branches(
         branch_names=branch_names,
         branch_factory=construct_blocks,
@@ -90,12 +92,12 @@ def create_multi_task_blocks_with_first_adaptor_block(
         },
     )
 
-    merged_blocks = merge_module_dicts((adaptor_block, blocks))
+    merged_blocks = merge_module_dicts(module_dicts=(adaptor_block, blocks))
 
     return merged_blocks
 
 
-def assert_module_dict_uniqueness(module_dict: Dict[str, nn.Sequential]):
+def assert_module_dict_uniqueness(module_dict: nn.ModuleDict):
     """
     We have this function as a safeguard to help us catch if we are reusing modules
     when they should not be (i.e. if splitting into multiple branches with same layers,
@@ -115,9 +117,9 @@ def assert_module_dict_uniqueness(module_dict: Dict[str, nn.Sequential]):
 
 def construct_multi_branches(
     branch_names: Iterable[str],
-    branch_factory: Callable[[Any], nn.Sequential],
-    branch_factory_kwargs,
-    extra_hooks: List[Callable] = (),
+    branch_factory: Callable[..., nn.Sequential],
+    branch_factory_kwargs: dict[str, Any],
+    extra_hooks: Sequence[Callable] = (),
 ) -> nn.ModuleDict:
     branched_module_dict = nn.ModuleDict()
     for name in branch_names:
@@ -128,7 +130,7 @@ def construct_multi_branches(
     for hook in extra_hooks:
         branched_module_dict = hook(branched_module_dict)
 
-    assert_module_dict_uniqueness(branched_module_dict)
+    assert_module_dict_uniqueness(module_dict=branched_module_dict)
     return branched_module_dict
 
 
@@ -136,23 +138,30 @@ def get_final_layer(
     in_features: int,
     num_outputs_per_target: "al_num_outputs_per_target",
     layer_type: Union[Literal["linear"], Literal["mlp_residual"]] = "linear",
-    layer_type_specific_kwargs: Union[None, Dict] = None,
+    layer_type_specific_kwargs: Optional[Dict] = None,
 ) -> nn.ModuleDict:
     final_module_dict = nn.ModuleDict()
 
     if layer_type_specific_kwargs is None:
         layer_type_specific_kwargs = {}
 
-    spec_func = _get_mlp_basic_final_spec
-    if layer_type == "mlp_residual":
-        spec_func = _get_mlp_residual_final_spec
-
     for task, num_outputs in num_outputs_per_target.items():
-        spec_init_kwargs = spec_func(
-            in_features=in_features,
-            num_outputs=num_outputs,
-            **layer_type_specific_kwargs,
-        )
+        if layer_type == "mlp_residual":
+            spec_init_kwargs = _get_mlp_residual_final_spec(
+                in_features=in_features,
+                num_outputs=num_outputs,
+                dropout_p=layer_type_specific_kwargs.get("dropout_p", 0.0),
+                stochastic_depth_p=layer_type_specific_kwargs.get(
+                    "stochastic_depth_p", 0.0
+                ),
+            )
+        else:
+            spec_init_kwargs = _get_mlp_basic_final_spec(
+                in_features=in_features,
+                num_outputs=num_outputs,
+                bias=layer_type_specific_kwargs.get("bias", True),
+            )
+
         cur_spec = OrderedDict({"final": spec_init_kwargs})
         cur_module = initialize_modules_from_spec(spec=cur_spec)
         final_module_dict[task] = cur_module
@@ -180,7 +189,9 @@ def _get_mlp_residual_final_spec(
 
 
 def _get_mlp_basic_final_spec(
-    in_features: int, num_outputs: int, bias: bool = True
+    in_features: int,
+    num_outputs: int,
+    bias: bool = True,
 ) -> Tuple[Type[nn.Module], Dict[str, Any]]:
     spec = (
         nn.Linear,
@@ -194,14 +205,8 @@ def _get_mlp_basic_final_spec(
     return spec
 
 
-def compose_spec_creation_and_initalization(spec_func, **spec_kwargs):
-    spec = spec_func(**spec_kwargs)
-    module = initialize_modules_from_spec(spec=spec)
-    return module
-
-
 def initialize_modules_from_spec(
-    spec: "OrderedDict[str, Tuple[nn.Module, Dict]]",
+    spec: "OrderedDict[str, Tuple[Type[nn.Module], Dict]]",
 ) -> nn.Sequential:
     module_dict = OrderedDict()
     for name, recipe in spec.items():
@@ -215,7 +220,7 @@ def initialize_modules_from_spec(
     return nn.Sequential(module_dict)
 
 
-def initialize_module(module: nn.Module, module_args: Dict) -> nn.Module:
+def initialize_module(module: Type[nn.Module], module_args: Dict) -> nn.Module:
     return module(**module_args)
 
 
@@ -235,7 +240,8 @@ def get_output_dimensions_for_input(
     pool: Union[Literal["max"], Literal["avg"], None],
     hf_model: bool = False,
 ) -> torch.LongTensor:
-    module_copy = deepcopy(module).to(device="cpu")
+    cpu_device = torch.device("cpu")
+    module_copy = deepcopy(module).to(device=cpu_device)
 
     with torch.no_grad():
         test_input = torch.randn(*input_shape)

@@ -1,66 +1,60 @@
-import atexit
 import os
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 from typing import (
-    List,
-    Callable,
-    Union,
-    Tuple,
     TYPE_CHECKING,
+    Callable,
     Dict,
-    overload,
-    Literal,
     Iterator,
+    List,
+    Optional,
+    Tuple,
+    Union,
+    overload,
 )
 
 import aislib.misc_utils
-import pandas as pd
 import yaml
-from aislib.misc_utils import get_logger
 from ignite.contrib.handlers import ProgressBar
-from ignite.engine import Events, Engine, events
-from ignite.handlers import ModelCheckpoint, EarlyStopping
+from ignite.engine import CallableEventWithFilter, Engine, Events, EventsList, events
+from ignite.handlers import EarlyStopping, ModelCheckpoint
 from ignite.metrics import RunningAverage
 from torch import nn
-from torch.utils.tensorboard import SummaryWriter
 
 from eir.data_load.data_utils import get_output_info_generator
 from eir.interpretation.interpretation import attribution_analysis_handler
-from eir.setup.config import object_to_primitives
+from eir.setup.config_setup_modules.config_setup_utils import object_to_primitives
 from eir.setup.output_setup import al_output_objects_as_dict
-from eir.setup.schemas import GlobalConfig
-from eir.train_utils import H_PARAMS
-from eir.train_utils.distributed import AttrDelegatedDistributedDataParallel
-from eir.train_utils.distributed import only_call_on_master_node
-from eir.train_utils.evaluation import validation_handler
-from eir.train_utils.lr_scheduling import (
-    set_up_lr_scheduler,
-    attach_lr_scheduler,
+from eir.train_utils.distributed import (
+    AttrDelegatedDistributedDataParallel,
+    only_call_on_master_node,
 )
+from eir.train_utils.evaluation import validation_handler
+from eir.train_utils.lr_scheduling import attach_lr_scheduler, set_up_lr_scheduler
 from eir.train_utils.metrics import (
-    get_metrics_dataframes,
-    persist_metrics,
-    get_metrics_files,
-    al_metric_record_dict,
     MetricRecord,
-    read_metrics_history_file,
+    al_metric_record_dict,
     get_average_history_filepath,
     get_buffered_metrics_writer,
+    get_metrics_dataframes,
+    get_metrics_files,
+    persist_metrics,
+    read_metrics_history_file,
 )
 from eir.train_utils.optim import AttrDelegatedSWAWrapper
 from eir.train_utils.utils import get_run_folder, validate_handler_dependencies
+from eir.utils.logging import get_logger
 from eir.visualization import visualization_funcs as vf
 
 if TYPE_CHECKING:
+    from eir.setup.config import Configs
     from eir.train import Experiment
     from eir.train_utils.metrics import al_step_metric_dict
-    from eir.setup.config import Configs
 
 # Aliases
 al_handler = Callable[[Engine, "HandlerConfig"], None]
-al_event = Union[Events, Tuple[Events, Events]]
+al_event = EventsList | CallableEventWithFilter
 al_handler_and_event = Tuple[al_handler, al_event]
 al_sample_interval_handlers = Tuple[al_handler_and_event, ...]
 
@@ -95,12 +89,12 @@ def configure_trainer(
         monitoring_metrics=monitoring_metrics,
     )
 
+    train_monitoring_metrics = _parse_metrics_for_train_running_average(
+        monitoring_metrics=monitoring_metrics
+    )
     _call_and_undo_ignite_local_rank_side_effects(
         func=_attach_running_average_metrics,
-        kwargs={"engine": trainer, "monitoring_metrics": monitoring_metrics},
-    )
-    _attach_running_average_metrics(
-        engine=trainer, monitoring_metrics=monitoring_metrics
+        kwargs={"engine": trainer, "monitoring_metrics": train_monitoring_metrics},
     )
 
     _maybe_attach_progress_bar(trainer=trainer, do_not_attach=gc.no_pbar)
@@ -174,7 +168,7 @@ def _get_validation_handler_and_event(
     early_stopping_patience: int,
     validation_handler_callable: Callable,
 ) -> al_handler_and_event:
-    validation_event = Events.ITERATION_COMPLETED(every=sample_interval_base)
+    validation_event: al_event = Events.ITERATION_COMPLETED(every=sample_interval_base)
 
     do_run_when_training_complete = _do_run_completed_handler(
         iter_per_epoch=iter_per_epoch,
@@ -198,7 +192,7 @@ def _get_attribution_handler_and_event(
     attribution_handler_callable = attribution_analysis_handler
 
     if attributions_every_sample_factor == 0:
-        attribution_event = Events.COMPLETED
+        attribution_event: al_event = Events.COMPLETED
         logger.debug("Attributions will be computed at run end.")
 
         return attribution_handler_callable, attribution_event
@@ -246,9 +240,12 @@ def _get_monitoring_metrics(
     """
     target_columns_gen = get_output_info_generator(outputs_as_dict=outputs_as_dict)
 
-    loss_average_metrics = tuple(["average", "average", "loss-average"])
-    perf_average_metrics = tuple(["average", "average", "perf-average"])
-    monitoring_metrics = [loss_average_metrics, perf_average_metrics]
+    loss_average_metrics: tuple[str, str, str] = ("average", "average", "loss-average")
+    perf_average_metrics: tuple[str, str, str] = ("average", "average", "perf-average")
+    monitoring_metrics: list[tuple[str, str, str]] = [
+        loss_average_metrics,
+        perf_average_metrics,
+    ]
 
     def _parse_target_metrics(
         output_name_: str, metric_name: str, column_name_: str
@@ -261,8 +258,10 @@ def _get_monitoring_metrics(
             cur_output_type = cur_output_object.output_config.output_info.output_type
             assert cur_output_type == "tabular"
 
-            al_record = Tuple[MetricRecord, ...]
-            cur_metric_records: al_record = metric_record_dict[output_target_type]
+            al_record = tuple[MetricRecord, ...]
+            cur_record = metric_record_dict[output_target_type]
+            assert isinstance(cur_record, tuple)
+            cur_metric_records: al_record = cur_record
 
             for metric in cur_metric_records:
                 if not metric.only_val:
@@ -271,7 +270,11 @@ def _get_monitoring_metrics(
                         column_name_=column_name,
                         metric_name=metric.name,
                     )
-                    cur_tuple = tuple([output_name, column_name, parsed_metric])
+                    cur_tuple: tuple[str, str, str] = (
+                        output_name,
+                        column_name,
+                        parsed_metric,
+                    )
                     monitoring_metrics.append(cur_tuple)
 
         # manually add loss record as it's not in metric records, but from criteria
@@ -302,6 +305,7 @@ def _attach_early_stopping_handler(trainer: Engine, handler_config: "HandlerConf
         sample_interval=gc.sample_interval,
     )
 
+    assert isinstance(early_stopping_event_kwargs, dict)
     trainer.add_event_handler(
         event_name=Events.ITERATION_COMPLETED(
             **early_stopping_event_kwargs,
@@ -334,14 +338,14 @@ def _get_early_stopping_handler(
 @overload
 def _get_early_stopping_event_filter_kwargs(
     early_stopping_iteration_buffer: None, sample_interval: int
-) -> Dict[Literal["every"], int]:
+) -> dict[str, int]:
     ...
 
 
 @overload
 def _get_early_stopping_event_filter_kwargs(
     early_stopping_iteration_buffer: int, sample_interval: int
-) -> Dict[Literal["event_filter"], Callable[[Engine, int], bool]]:
+) -> dict[str, Callable[[Engine, int], bool]]:
     ...
 
 
@@ -379,17 +383,40 @@ def _get_early_stopping_event_filter_kwargs(
     return {"event_filter": _early_stopping_event_filter}
 
 
-def _get_latest_validation_value_score_function(run_folder: Path, column: str):
+def _get_latest_validation_value_score_function(
+    run_folder: Path, column: str
+) -> Callable[[Engine], float]:
     eval_history_fpath = get_average_history_filepath(
         run_folder=run_folder, train_or_val_target_prefix="validation_"
     )
 
-    def scoring_function(engine):
+    def scoring_function(engine: Engine) -> float:
         eval_df = read_metrics_history_file(eval_history_fpath)
         latest_val_loss = eval_df[column].iloc[-1]
         return latest_val_loss
 
     return scoring_function
+
+
+def _parse_metrics_for_train_running_average(
+    monitoring_metrics: List[Tuple[str, str, str]]
+) -> List[Tuple[str, str, str]]:
+    """
+    We skip computing performance averages on training batches,
+    as some metrics (e.g. ROC-AUC, R2) can be undefined (e.g. batch with only
+    positive or negative labels) or fluctuate a lot (e.g. R2).
+    """
+    to_skip = ("perf-average",)
+
+    parsed_metrics: List[Tuple[str, str, str]] = []
+
+    for output_name, column_name, metric_name in monitoring_metrics:
+        if metric_name in to_skip:
+            continue
+
+        parsed_metrics.append((output_name, column_name, metric_name))
+
+    return parsed_metrics
 
 
 def _attach_running_average_metrics(
@@ -524,26 +551,20 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
             custom_handlers=custom_handlers,
         )
 
-    log_tb_hparams_on_exit_func = partial(
-        add_hparams_to_tensorboard,
-        h_params=H_PARAMS,
-        experiment=handler_config.experiment,
-        writer=handler_config.experiment.writer,
-    )
-    atexit.register(log_tb_hparams_on_exit_func)
-
     return trainer
 
 
 def _save_yaml_configs(run_folder: Path, configs: "Configs"):
     for config_name, config_object in configs.__dict__.items():
-        cur_outpath = Path(run_folder / "configs" / config_name).with_suffix(".yaml")
-        aislib.misc_utils.ensure_path_exists(path=cur_outpath)
+        cur_output_path = Path(run_folder / "configs" / config_name).with_suffix(
+            ".yaml"
+        )
+        aislib.misc_utils.ensure_path_exists(path=cur_output_path)
 
         config_object_as_primitives = object_to_primitives(obj=config_object)
 
-        with open(str(cur_outpath), "w") as yamlfile:
-            yaml.dump(data=config_object_as_primitives, stream=yamlfile)
+        with open(str(cur_output_path), "w") as yaml_file_handle:
+            yaml.dump(data=config_object_as_primitives, stream=yaml_file_handle)
 
 
 def _add_checkpoint_handler_wrapper(
@@ -578,6 +599,9 @@ def _add_checkpoint_handler_wrapper(
             run_folder=run_folder, column=score_name
         )
 
+    assert n_to_save is not None
+    assert checkpoint_score_function is not None
+    assert score_name is not None
     checkpoint_handler = _get_checkpoint_handler(
         run_folder=run_folder,
         output_folder=output_folder,
@@ -609,7 +633,7 @@ def _get_metric_writing_funcs(
         train_or_val_target_prefix="train_",
     )
 
-    writer_funcs = {}
+    writer_funcs: Dict[str, Dict[str, Callable]] = {}
     for output_name, target_name_file_dict in metrics_files.items():
         writer_funcs[output_name] = {}
 
@@ -625,8 +649,8 @@ def _get_checkpoint_handler(
     run_folder: Path,
     output_folder: Path,
     n_to_save: int,
-    score_function: Callable = None,
-    score_name: str = None,
+    score_function: Optional[Callable] = None,
+    score_name: Optional[str] = None,
 ) -> ModelCheckpoint:
     def _default_global_step_transform(engine: Engine, event_name: str) -> int:
         return engine.state.iteration
@@ -689,8 +713,14 @@ def _write_training_metrics_handler(
 
     is_first_iteration = True if iteration == 1 else False
 
+    engine_output = engine.state.output
+    engine_metrics_dict = engine.state.metrics
+    assert isinstance(engine_output, dict)
+    assert isinstance(engine_metrics_dict, dict)
+
     running_average_metrics = _unflatten_engine_metrics_dict(
-        step_base=engine.state.output, engine_metrics_dict=engine.state.metrics
+        step_base=engine_output,
+        engine_metrics_dict=engine_metrics_dict,
     )
     persist_metrics(
         handler_config=handler_config,
@@ -709,7 +739,7 @@ def _unflatten_engine_metrics_dict(
     We need this to streamline the 1D dictionary that comes from engine.state.metrics.
     """
 
-    nested_dict = {}
+    nested_dict: "al_step_metric_dict" = {}
 
     for output_name, output_metric_dict in step_base.items():
         nested_dict[output_name] = {}
@@ -815,70 +845,3 @@ def _attach_custom_handlers(
         trainer = custom_handler_attacher(trainer, handler_config)
 
     return trainer
-
-
-def add_hparams_to_tensorboard(
-    h_params: List[str], experiment: "Experiment", writer: SummaryWriter
-) -> None:
-    logger.debug(
-        "Exiting and logging best hyperparameters for best average loss "
-        "to tensorboard."
-    )
-
-    exp = experiment
-    gc = exp.configs.global_config
-
-    run_folder = get_run_folder(output_folder=gc.output_folder)
-
-    target_generator = get_output_info_generator(outputs_as_dict=experiment.outputs)
-
-    metrics_files = get_metrics_files(
-        target_generator=target_generator,
-        run_folder=run_folder,
-        train_or_val_target_prefix="validation_",
-    )
-
-    try:
-        average_loss_file = metrics_files["average"]["average"]
-        average_loss_df = pd.read_csv(average_loss_file)
-
-    except FileNotFoundError as e:
-        logger.debug(
-            "Could not find %s at exit. Tensorboard hyper parameters not logged.",
-            e.filename,
-        )
-        return
-
-    h_param_dict = _generate_h_param_dict(global_config=gc, h_params=h_params)
-
-    min_loss = average_loss_df["loss-average"].min()
-    max_perf = average_loss_df["perf-average"].max()
-
-    writer.add_hparams(
-        hparam_dict=h_param_dict,
-        metric_dict={
-            "validation_loss-overall_min": min_loss,
-            "best_overall_performance": max_perf,
-        },
-    )
-
-
-def _generate_h_param_dict(
-    global_config: GlobalConfig, h_params: List[str]
-) -> Dict[str, Union[str, float, int]]:
-    h_param_dict = {}
-
-    for param_name in h_params:
-        if not hasattr(global_config, param_name):
-            continue
-
-        param_value = getattr(global_config, param_name)
-
-        if isinstance(param_value, (tuple, list)):
-            param_value = "_".join([str(p) for p in param_value])
-        elif param_value is None:
-            param_value = str(param_value)
-
-        h_param_dict[param_name] = param_value
-
-    return h_param_dict

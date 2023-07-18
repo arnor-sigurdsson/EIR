@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Union, Optional
+from typing import Optional, Union
 
 import numpy as np
 import torch
@@ -8,11 +8,11 @@ from torchvision.datasets.folder import default_loader
 
 from eir.data_load.data_preparation_modules.common import _load_deeplake_sample
 from eir.data_load.data_source_modules import deeplake_ops
-from eir.setup.input_setup_modules.setup_image import ImageInputInfo
+from eir.setup.input_setup_modules.setup_image import ComputedImageInputInfo
 
 
 def prepare_image_data(
-    image_input_object: "ImageInputInfo", image_data: Image, test_mode: bool
+    image_input_object: "ComputedImageInputInfo", image_data: Image, test_mode: bool
 ) -> torch.Tensor:
     """
     The transforms take care of converting the image object to a copied tensor.
@@ -35,6 +35,7 @@ def image_load_wrapper(
 ) -> Image:
     if deeplake_ops.is_deeplake_dataset(data_source=input_source):
         assert deeplake_inner_key is not None
+        assert isinstance(data_pointer, int)
         image_data = _load_deeplake_sample(
             data_pointer=data_pointer,
             input_source=input_source,
@@ -42,6 +43,7 @@ def image_load_wrapper(
         )
         pil_image = fromarray(obj=np.uint8(image_data * 255))
     else:
+        assert isinstance(data_pointer, Path)
         pil_image = default_loader(path=str(data_pointer))
 
     return pil_image

@@ -1,7 +1,7 @@
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Tuple, Iterable
+from typing import Dict, Iterable, Sequence, Tuple
 
 import pytest
 from torch import nn
@@ -9,18 +9,19 @@ from torch.utils.data import DataLoader
 
 from eir import train
 from eir.experiment_io.experiment_io import (
-    serialize_all_input_transformers,
-    serialize_chosen_input_objects,
     get_default_experiment_keys_to_serialize,
+    serialize_chosen_input_objects,
     serialize_experiment,
 )
-from eir.setup import schemas, config, input_setup
+from eir.setup import config, input_setup, schemas
+from eir.setup.input_setup_modules.setup_tabular import serialize_all_input_transformers
 from eir.setup.output_setup import set_up_outputs_for_training
-from eir.train import Experiment
-from eir.train_utils import optim, metrics
+from eir.train import Experiment, converge_sequence_input_and_output
+from eir.train_utils import metrics, optim, step_logic
 from eir.train_utils.criteria import get_criteria
-from eir.train_utils import step_logic
 from eir.train_utils.utils import get_run_folder
+
+al_modelling_test_configs = tuple[Experiment, "ModelTestConfig"]
 
 
 def create_test_optimizer(
@@ -69,12 +70,6 @@ def prep_modelling_test_configs(
 
     model = create_test_model
 
-    outputs_as_dict = set_up_outputs_for_training(
-        output_configs=create_test_config.output_configs,
-        target_transformers=target_labels.label_transformers,
-    )
-
-    criteria = get_criteria(outputs_as_dict=outputs_as_dict)
     test_metrics = metrics.get_default_metrics(
         target_transformers=target_labels.label_transformers,
         cat_averaging_metrics=gc.cat_averaging_metrics,
@@ -82,33 +77,45 @@ def prep_modelling_test_configs(
     )
     test_metrics = _patch_metrics(metrics_=test_metrics)
 
+    train_dataset, valid_dataset = create_test_datasets
+
+    inputs_as_dict = input_setup.set_up_inputs_for_training(
+        inputs_configs=c.input_configs,
+        train_ids=tuple(target_labels.train_labels.keys()),
+        valid_ids=tuple(target_labels.valid_labels.keys()),
+        hooks=None,
+    )
+
+    outputs_as_dict = set_up_outputs_for_training(
+        output_configs=create_test_config.output_configs,
+        input_objects=inputs_as_dict,
+        target_transformers=target_labels.label_transformers,
+    )
+    inputs_as_dict = converge_sequence_input_and_output(
+        inputs=inputs_as_dict, outputs=outputs_as_dict
+    )
+
+    criteria = get_criteria(outputs_as_dict=outputs_as_dict)
+
     optimizer, loss_module = create_test_optimizer(
         global_config=gc,
         model=model,
         criteria=criteria,
     )
 
-    train_dataset, valid_dataset = create_test_datasets
-
-    inputs = input_setup.set_up_inputs_for_training(
-        inputs_configs=c.input_configs,
-        train_ids=tuple(target_labels.train_labels.keys()),
-        valid_ids=tuple(target_labels.valid_labels.keys()),
-        hooks=None,
-    )
     run_folder = get_run_folder(output_folder=gc.output_folder)
     train._log_model(
         model=model,
         structure_file=run_folder / "model_info.txt",
     )
 
-    serialize_all_input_transformers(inputs_dict=inputs, run_folder=run_folder)
-    serialize_chosen_input_objects(inputs_dict=inputs, run_folder=run_folder)
+    serialize_all_input_transformers(inputs_dict=inputs_as_dict, run_folder=run_folder)
+    serialize_chosen_input_objects(inputs_dict=inputs_as_dict, run_folder=run_folder)
 
     hooks = step_logic.get_default_hooks(configs=c)
     experiment = Experiment(
         configs=c,
-        inputs=inputs,
+        inputs=inputs_as_dict,
         outputs=outputs_as_dict,
         train_loader=train_loader,
         valid_loader=valid_loader,
@@ -133,8 +140,9 @@ def prep_modelling_test_configs(
     test_config = get_cur_modelling_test_config(
         train_loader=train_loader,
         global_config=gc,
-        targets=targets,
-        input_names=inputs.keys(),
+        tabular_targets=targets,
+        output_configs=c.output_configs,
+        input_names=inputs_as_dict.keys(),
     )
 
     return experiment, test_config
@@ -159,23 +167,39 @@ def _patch_metrics(
 def get_cur_modelling_test_config(
     train_loader: DataLoader,
     global_config: schemas.GlobalConfig,
-    targets: config.TabularTargets,
+    tabular_targets: config.TabularTargets,
+    output_configs: Sequence[schemas.OutputConfig],
     input_names: Iterable[str],
 ) -> ModelTestConfig:
     last_iter = len(train_loader) * global_config.n_epochs
+
+    last_valid_iter = last_iter
+    if global_config.early_stopping_patience:
+        last_valid_iter -= last_valid_iter % global_config.sample_interval
+
     run_path = Path(f"{global_config.output_folder}/")
 
     last_sample_folders = _get_all_last_sample_folders(
-        targets=targets, run_path=run_path, iteration=last_iter
+        output_configs=output_configs,
+        tabular_targets=tabular_targets,
+        run_path=run_path,
+        iteration=last_valid_iter,
+    )
+
+    last_act_folders = _get_all_last_sample_folders(
+        output_configs=output_configs,
+        tabular_targets=tabular_targets,
+        run_path=run_path,
+        iteration=last_iter,
     )
 
     all_attribution_paths = _get_all_attribution_paths(
-        last_sample_folder_per_target_in_each_output=last_sample_folders,
+        last_sample_folder_per_target_in_each_output=last_act_folders,
         input_names=input_names,
     )
 
     test_config = ModelTestConfig(
-        iteration=last_iter,
+        iteration=last_valid_iter,
         run_path=run_path,
         last_sample_folders=last_sample_folders,
         attributions_paths=all_attribution_paths,
@@ -210,47 +234,65 @@ def _get_all_attribution_paths(
 
 
 def _get_all_last_sample_folders(
-    targets: config.TabularTargets, run_path: Path, iteration: int
+    output_configs: Sequence[schemas.OutputConfig],
+    tabular_targets: config.TabularTargets,
+    run_path: Path,
+    iteration: int,
 ) -> Dict[str, Dict[str, Path]]:
     """
     output_name -> target_name: path
     """
     sample_folders = {}
 
-    for output_name in targets.con_targets:
+    for output_name in tabular_targets.con_targets:
         if output_name not in sample_folders:
             sample_folders[output_name] = {}
 
-        cur_con_columns = targets.con_targets[output_name]
+        cur_con_columns = tabular_targets.con_targets[output_name]
         for con_column_name in cur_con_columns:
             sample_folders[output_name][con_column_name] = _get_test_sample_folder(
                 run_path=run_path,
                 iteration=iteration,
                 output_name=output_name,
-                column_name=con_column_name,
+                output_head_name=con_column_name,
             )
 
-    for output_name in targets.cat_targets:
+    for output_name in tabular_targets.cat_targets:
         if output_name not in sample_folders:
             sample_folders[output_name] = {}
 
-        cur_cat_columns = targets.cat_targets[output_name]
+        cur_cat_columns = tabular_targets.cat_targets[output_name]
         for cat_column_name in cur_cat_columns:
             sample_folders[output_name][cat_column_name] = _get_test_sample_folder(
                 run_path=run_path,
                 iteration=iteration,
                 output_name=output_name,
-                column_name=cat_column_name,
+                output_head_name=cat_column_name,
             )
+
+    for config_ in output_configs:
+        if config_.output_info.output_type == "tabular":
+            continue
+
+        output_name = config_.output_info.output_name
+        if output_name not in sample_folders:
+            sample_folders[output_name] = {}
+
+        sample_folders[output_name][output_name] = _get_test_sample_folder(
+            run_path=run_path,
+            iteration=iteration,
+            output_name=output_name,
+            output_head_name=output_name,
+        )
 
     return sample_folders
 
 
 def _get_test_sample_folder(
-    run_path: Path, iteration: int, output_name: str, column_name: str
+    run_path: Path, iteration: int, output_name: str, output_head_name: str
 ) -> Path:
     sample_folder = (
-        run_path / f"results/{output_name}/{column_name}/samples/{iteration}"
+        run_path / f"results/{output_name}/{output_head_name}/samples/{iteration}"
     )
 
     return sample_folder

@@ -1,7 +1,9 @@
-from functools import partial
-from typing import Dict, Any, Mapping, Callable
+from functools import partial, update_wrapper
+from typing import Any, Callable, Dict
 
+import numpy as np
 import torch
+from PIL.Image import Image
 
 from eir.data_load.data_preparation_modules.prepare_array import (
     array_load_wrapper,
@@ -20,10 +22,20 @@ from eir.data_load.data_preparation_modules.prepare_omics import (
     prepare_one_hot_omics_data,
 )
 from eir.data_load.data_preparation_modules.prepare_sequence import (
-    sequence_load_wrapper,
     prepare_sequence_data,
+    sequence_load_wrapper,
 )
 from eir.setup.input_setup import al_input_objects_as_dict
+from eir.setup.input_setup_modules.setup_array import ComputedArrayInputInfo
+from eir.setup.input_setup_modules.setup_bytes import ComputedBytesInputInfo
+from eir.setup.input_setup_modules.setup_image import ComputedImageInputInfo
+from eir.setup.input_setup_modules.setup_omics import ComputedOmicsInputInfo
+from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
+from eir.setup.schemas import (
+    ByteInputDataConfig,
+    OmicsInputDataConfig,
+    SequenceInputDataConfig,
+)
 
 
 def prepare_inputs_disk(
@@ -33,29 +45,30 @@ def prepare_inputs_disk(
 
     for input_name, data_pointer in inputs.items():
         input_object = inputs_objects[input_name]
-
         input_source = input_object.input_config.input_info.input_source
         deeplake_inner_key = input_object.input_config.input_info.input_inner_key
-        input_type_info = input_object.input_config.input_type_info
-        input_type = input_object.input_config.input_info.input_type
 
-        match input_type:
-            case "omics":
+        match input_object:
+            case ComputedOmicsInputInfo():
                 array_raw = omics_load_wrapper(
                     input_source=input_source,
                     data_pointer=data_pointer,
                     deeplake_inner_key=deeplake_inner_key,
                     subset_indices=input_object.subset_indices,
                 )
-                array_prepared = prepare_one_hot_omics_data(
+
+                input_type_info = input_object.input_config.input_type_info
+                assert isinstance(input_type_info, OmicsInputDataConfig)
+                input_prepared = prepare_one_hot_omics_data(
                     genotype_array=array_raw,
                     na_augment_perc=input_type_info.na_augment_perc,
                     na_augment_prob=input_type_info.na_augment_prob,
                     test_mode=test_mode,
                 )
-                prepared_inputs[input_name] = array_prepared
 
-            case "sequence":
+            case ComputedSequenceInputInfo():
+                input_type_info = input_object.input_config.input_type_info
+                assert isinstance(input_type_info, SequenceInputDataConfig)
                 sequence_tokenized = sequence_load_wrapper(
                     data_pointer=data_pointer,
                     input_source=input_source,
@@ -63,52 +76,51 @@ def prepare_inputs_disk(
                     split_on=input_type_info.split_on,
                     encode_func=input_object.encode_func,
                 )
-                prepared_sequence_inputs = prepare_sequence_data(
-                    sequence_input_object=inputs_objects[input_name],
+                input_prepared = prepare_sequence_data(
+                    sequence_input_object=input_object,
                     cur_file_content_tokenized=sequence_tokenized,
                     test_mode=test_mode,
                 )
-                prepared_inputs[input_name] = prepared_sequence_inputs
 
-            case "bytes":
+            case ComputedBytesInputInfo():
+                input_type_info = input_object.input_config.input_type_info
+                assert isinstance(input_type_info, ByteInputDataConfig)
                 bytes_data = bytes_load_wrapper(
                     data_pointer=data_pointer,
                     dtype=input_type_info.byte_encoding,
                     input_source=input_source,
                     deeplake_inner_key=deeplake_inner_key,
                 )
-                prepared_bytes_input = prepare_bytes_data(
-                    bytes_input_object=inputs_objects[input_name],
+                input_prepared = prepare_bytes_data(
+                    bytes_input_object=input_object,
                     bytes_data=bytes_data,
                     test_mode=test_mode,
                 )
-                prepared_inputs[input_name] = prepared_bytes_input
 
-            case "image":
+            case ComputedImageInputInfo():
                 image_data = image_load_wrapper(
                     input_source=input_source,
                     data_pointer=data_pointer,
                     deeplake_inner_key=deeplake_inner_key,
                 )
-
-                prepared_image_data = prepare_image_data(
-                    image_input_object=inputs_objects[input_name],
+                input_prepared = prepare_image_data(
+                    image_input_object=input_object,
                     image_data=image_data,
                     test_mode=test_mode,
                 )
-                prepared_inputs[input_name] = prepared_image_data
 
-            case "array":
+            case ComputedArrayInputInfo():
                 array_data = array_load_wrapper(
                     input_source=input_source,
                     data_pointer=data_pointer,
                     deeplake_inner_key=deeplake_inner_key,
                 )
-                prepared_array_data = prepare_array_data(array_data=array_data)
-                prepared_inputs[input_name] = prepared_array_data
+                input_prepared = prepare_array_data(array_data=array_data)
 
             case _:
-                prepared_inputs[input_name] = inputs[input_name]
+                input_prepared = inputs[input_name]
+
+        prepared_inputs[input_name] = input_prepared
 
     return prepared_inputs
 
@@ -121,106 +133,111 @@ def prepare_inputs_memory(
     for name, data in inputs.items():
         input_object = inputs_objects[name]
 
-        input_type_info = input_object.input_config.input_type_info
-        input_type = input_object.input_config.input_info.input_type
-
-        match input_type:
-            case "omics":
-                array_raw_in_memory = data
-                array_prepared = prepare_one_hot_omics_data(
-                    genotype_array=array_raw_in_memory,
+        match input_object:
+            case ComputedOmicsInputInfo():
+                input_type_info = input_object.input_config.input_type_info
+                assert isinstance(input_type_info, OmicsInputDataConfig)
+                input_prepared = prepare_one_hot_omics_data(
+                    genotype_array=data,
                     na_augment_perc=input_type_info.na_augment_perc,
                     na_augment_prob=input_type_info.na_augment_prob,
                     test_mode=test_mode,
                 )
-                prepared_inputs[name] = array_prepared
 
-            case "sequence":
-                sequence_raw_in_memory = data
-                prepared_sequence_inputs = prepare_sequence_data(
-                    sequence_input_object=inputs_objects[name],
-                    cur_file_content_tokenized=sequence_raw_in_memory,
-                    test_mode=test_mode,
-                )
-                prepared_inputs[name] = prepared_sequence_inputs
-
-            case "bytes":
-                bytes_raw_in_memory = data
-                prepared_bytes_input = prepare_bytes_data(
-                    bytes_input_object=inputs_objects[name],
-                    bytes_data=bytes_raw_in_memory,
+            case ComputedSequenceInputInfo():
+                input_type_info = input_object.input_config.input_type_info
+                assert isinstance(input_type_info, SequenceInputDataConfig)
+                input_prepared = prepare_sequence_data(
+                    sequence_input_object=input_object,
+                    cur_file_content_tokenized=data,
                     test_mode=test_mode,
                 )
 
-                prepared_inputs[name] = prepared_bytes_input
-
-            case "image":
-                image_raw_in_memory = data
-                prepared_image_data = prepare_image_data(
-                    image_input_object=inputs_objects[name],
-                    image_data=image_raw_in_memory,
+            case ComputedBytesInputInfo():
+                input_type_info = input_object.input_config.input_type_info
+                assert isinstance(input_type_info, ByteInputDataConfig)
+                input_prepared = prepare_bytes_data(
+                    bytes_input_object=input_object,
+                    bytes_data=data,
                     test_mode=test_mode,
                 )
-                prepared_inputs[name] = prepared_image_data
 
-            case "array":
-                array_raw_in_memory = data
-                prepared_array_data = prepare_array_data(array_data=array_raw_in_memory)
-                prepared_inputs[name] = prepared_array_data
+            case ComputedImageInputInfo():
+                input_prepared = prepare_image_data(
+                    image_input_object=input_object,
+                    image_data=data,
+                    test_mode=test_mode,
+                )
+
+            case ComputedArrayInputInfo():
+                input_prepared = prepare_array_data(array_data=data)
 
             case _:
-                prepared_inputs[name] = inputs[name]
+                input_prepared = inputs[name]
+
+        prepared_inputs[name] = input_prepared
 
     return prepared_inputs
 
 
+def typed_partial_for_hook(
+    func: Callable[..., Any], *args: Any, **kwargs: Any
+) -> Callable[..., np.ndarray | Image]:
+    """
+    Just to make mypy happy.
+    """
+    partial_func = partial(func, *args, **kwargs)
+    return update_wrapper(partial_func, func)
+
+
 def get_data_loading_hooks(
     inputs: al_input_objects_as_dict,
-) -> Mapping[str, Callable[..., torch.Tensor]]:
+) -> dict[str, Callable[..., np.ndarray | Image]]:
     mapping = {}
 
     for input_name, input_object in inputs.items():
-        input_type = input_object.input_config.input_info.input_type
-        input_source = input_object.input_config.input_info.input_source
-        inner_key = input_object.input_config.input_info.input_inner_key
+        common_kwargs = {
+            "input_source": input_object.input_config.input_info.input_source,
+            "deeplake_inner_key": input_object.input_config.input_info.input_inner_key,
+        }
 
-        match input_type:
-            case "omics":
-                mapping[input_name] = partial(
+        match input_object:
+            case ComputedOmicsInputInfo():
+                mapping[input_name] = typed_partial_for_hook(
                     omics_load_wrapper,
-                    input_source=input_source,
-                    deeplake_inner_key=inner_key,
-                    subset_indices=inputs[input_name].subset_indices,
+                    **common_kwargs,
+                    subset_indices=input_object.subset_indices,
                 )
 
-            case "image":
-                mapping[input_name] = partial(
+            case ComputedImageInputInfo():
+                mapping[input_name] = typed_partial_for_hook(
                     image_load_wrapper,
-                    input_source=input_source,
-                    deeplake_inner_key=inner_key,
+                    **common_kwargs,
                 )
 
-            case "sequence":
-                mapping[input_name] = partial(
+            case ComputedSequenceInputInfo():
+                input_type_info = input_object.input_config.input_type_info
+                assert isinstance(input_type_info, SequenceInputDataConfig)
+                mapping[input_name] = typed_partial_for_hook(
                     sequence_load_wrapper,
-                    input_source=input_source,
-                    deeplake_inner_key=inner_key,
-                    split_on=input_object.input_config.input_type_info.split_on,
-                    encode_func=inputs[input_name].encode_func,
+                    **common_kwargs,
+                    split_on=input_type_info.split_on,
+                    encode_func=input_object.encode_func,
                 )
 
-            case "bytes":
-                mapping[input_name] = partial(
+            case ComputedBytesInputInfo():
+                input_type_info = input_object.input_config.input_type_info
+                assert isinstance(input_type_info, ByteInputDataConfig)
+                mapping[input_name] = typed_partial_for_hook(
                     bytes_load_wrapper,
-                    dtype=input_object.input_config.input_type_info.byte_encoding,
-                    input_source=input_source,
+                    **common_kwargs,
+                    dtype=input_type_info.byte_encoding,
                 )
 
-            case "array":
-                mapping[input_name] = partial(
+            case ComputedArrayInputInfo():
+                mapping[input_name] = typed_partial_for_hook(
                     array_load_wrapper,
-                    input_source=input_source,
-                    deeplake_inner_key=inner_key,
+                    **common_kwargs,
                 )
 
     return mapping

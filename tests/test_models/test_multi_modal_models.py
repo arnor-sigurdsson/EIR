@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from eir.models.model_training_utils import trace_eir_model
+from eir.models.model_training_utils import check_eir_model
 from tests.test_models.model_testing_utils import prepare_example_batch
 
 
@@ -47,6 +47,15 @@ from tests.test_models.model_testing_utils import prepare_example_batch
                     },
                     {
                         "input_info": {"input_name": "test_image"},
+                        "model_config": {
+                            "model_init_config": {
+                                "layers": [2],
+                                "kernel_width": 2,
+                                "kernel_height": 2,
+                                "down_stride_width": 2,
+                                "down_stride_height": 2,
+                            },
+                        },
                     },
                     {
                         "input_info": {"input_name": "test_tabular"},
@@ -61,7 +70,7 @@ from tests.test_models.model_testing_utils import prepare_example_batch
                     },
                 ],
                 "fusion_configs": {
-                    "model_type": "default",
+                    "model_type": "mlp-residual",
                     "model_config": {
                         "fc_task_dim": 64,
                         "fc_do": 0.10,
@@ -97,4 +106,4 @@ def test_multi_modal_multi_task(
 
     model.eval()
     with torch.no_grad():
-        _ = trace_eir_model(meta_model=model, example_inputs=example_batch.inputs)
+        check_eir_model(meta_model=model, example_inputs=example_batch.inputs)

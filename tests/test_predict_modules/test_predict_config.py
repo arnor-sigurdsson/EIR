@@ -1,7 +1,7 @@
 from argparse import Namespace
 from copy import deepcopy
 from pathlib import Path
-from typing import Union, Sequence, Mapping
+from typing import Mapping, Sequence, Union
 
 import pytest
 import yaml
@@ -9,15 +9,20 @@ from aislib.misc_utils import ensure_path_exists
 
 import eir.models.output.output_module_setup
 from eir.predict_modules.predict_config import (
-    get_named_pred_dict_iterators,
+    _check_matching_general_output_configs,
+    _get_maybe_patched_null_sequence_output_source_for_generation,
+    get_named_predict_dict_iterators,
     get_train_predict_matched_config_generator,
     overload_train_configs_for_predict,
 )
-from eir.setup import schemas, config
-from eir.setup.config import object_to_primitives, recursive_dict_replace
+from eir.setup import config, schemas
+from eir.setup.config_setup_modules.config_setup_utils import (
+    object_to_primitives,
+    recursive_dict_replace,
+)
 
 
-def test_get_named_pred_dict_iterators(tmp_path: Path) -> None:
+def test_get_named_predict_dict_iterators(tmp_path: Path) -> None:
     keys = {"global_configs", "input_configs", "fusion_configs", "output_configs"}
     paths = {}
 
@@ -33,7 +38,7 @@ def test_get_named_pred_dict_iterators(tmp_path: Path) -> None:
 
     test_predict_cl_args = Namespace(**paths)
 
-    named_iterators = get_named_pred_dict_iterators(
+    named_iterators = get_named_predict_dict_iterators(
         predict_cl_args=test_predict_cl_args
     )
 
@@ -46,7 +51,7 @@ al_config_instances = Union[
     schemas.GlobalConfig,
     schemas.InputConfig,
     schemas.OutputConfig,
-    eir.models.output.output_module_setup.OutputModuleConfig,
+    eir.models.output.output_module_setup.TabularOutputModuleConfig,
 ]
 
 
@@ -91,7 +96,7 @@ def test_get_train_predict_matched_config_generator(create_test_config, tmp_path
         do_inject_test_values=True,
     )
 
-    named_test_iterators = get_named_pred_dict_iterators(
+    named_test_iterators = get_named_predict_dict_iterators(
         predict_cl_args=test_predict_cl_args
     )
 
@@ -238,7 +243,7 @@ def test_overload_train_configs_for_predict(
         do_inject_test_values=True,
     )
 
-    named_test_iterators = get_named_pred_dict_iterators(
+    named_test_iterators = get_named_predict_dict_iterators(
         predict_cl_args=test_predict_cl_args
     )
 
@@ -255,3 +260,45 @@ def test_overload_train_configs_for_predict(
     #       further.
     for input_config in overloaded_train_config.input_configs:
         assert input_config.input_info.input_source == "predict_input_source_overloaded"
+
+
+def test_get_maybe_patched_null_sequence_output_source_for_generation():
+    output_config = {
+        "output_info": {
+            "output_type": "sequence",
+            "output_source": None,
+            "output_name": "test_output",
+        }
+    }
+
+    output_configs = _get_maybe_patched_null_sequence_output_source_for_generation(
+        predict_dict_iterator=[output_config]
+    )
+    for output_config in output_configs:
+        output_path = Path(output_config["output_info"]["output_source"])
+        assert output_path.is_dir()
+        assert len([i for i in output_path.iterdir() if i.is_file() == 1])
+
+
+class MockOutputInfo:
+    output_name = "output_name"
+    output_type = "output_type"
+
+
+class MockTrainConfig:
+    output_info = MockOutputInfo()
+
+
+def test_check_matching_general_output_configs():
+    train_config = MockTrainConfig()
+    predict_output_config_dict = {
+        "output_info": {
+            "output_name": train_config.output_info.output_name,
+            "output_type": train_config.output_info.output_type,
+        }
+    }
+    matches = _check_matching_general_output_configs(
+        train_config=train_config, predict_dict_iterator=[predict_output_config_dict]
+    )
+    assert len(matches) == 1
+    assert matches == predict_output_config_dict

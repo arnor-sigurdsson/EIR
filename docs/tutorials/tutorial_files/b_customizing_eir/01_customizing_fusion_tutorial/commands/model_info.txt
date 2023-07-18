@@ -1,25 +1,27 @@
 MetaModel(
   (input_modules): ModuleDict(
     (genotype): LCLModel(
-      (fc_0): SplitLinear(in_features=4000, num_chunks=500, split_size=8, out_feature_sets=4, out_features=2000, bias=True)
-      (split_blocks): Sequential(
-        (0): SplitMLPResidualBlock(
+      (fc_0): LCL(in_features=4000, num_chunks=500, kernel_size=8, out_feature_sets=4, out_features=2000, bias=True)
+      (lcl_blocks): Sequential(
+        (0): LCLResidualBlock(
           (norm_1): LayerNorm((2000,), eps=1e-05, elementwise_affine=True)
-          (fc_1): SplitLinear(in_features=2000, num_chunks=125, split_size=16, out_feature_sets=4, out_features=500, bias=True)
+          (fc_1): LCL(in_features=2000, num_chunks=125, kernel_size=16, out_feature_sets=4, out_features=500, bias=True)
           (act_1): Swish(num_parameters=1)
           (do): Dropout(p=0.1, inplace=False)
-          (fc_2): SplitLinear(in_features=500, num_chunks=32, split_size=16, out_feature_sets=4, out_features=128, bias=True)
-          (downsample_identity): SplitLinear(in_features=2000, num_chunks=128, split_size=16, out_feature_sets=1, out_features=128, bias=True)
+          (fc_2): LCL(in_features=500, num_chunks=32, kernel_size=16, out_feature_sets=4, out_features=128, bias=True)
+          (downsample_identity): LCL(in_features=2000, num_chunks=128, kernel_size=16, out_feature_sets=1, out_features=128, bias=True)
           (stochastic_depth): StochasticDepth(p=0.0, mode=batch)
         )
       )
     )
   )
-  (fusion_module): MyLSTMFusionModule(
-    (fusion): LSTM(128, 128, batch_first=True)
+  (fusion_modules): ModuleDict(
+    (computed): MyLSTMFusionModule(
+      (fusion): LSTM(128, 128, batch_first=True)
+    )
   )
   (output_modules): ModuleDict(
-    (ancestry_output): TabularOutputModule(
+    (ancestry_output): ResidualMLPOutputModule(
       (multi_task_branches): ModuleDict(
         (Origin): Sequential(
           (0): Sequential(

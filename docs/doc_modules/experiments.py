@@ -1,16 +1,17 @@
+import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from shutil import copy2
-import re
-from typing import List, Sequence, Tuple, Callable, Dict
+from typing import Callable, Dict, List, Sequence, Tuple
 
-from PIL.Image import Image
-from aislib.misc_utils import ensure_path_exists, get_logger
+from aislib.misc_utils import ensure_path_exists
 from pdf2image import convert_from_path
+from PIL.Image import Image
 
 from docs.doc_modules.data import get_data
-from eir.setup.config import load_yaml_config
+from eir.setup.config_setup_modules.config_setup_utils import load_yaml_config
+from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__)
 
@@ -94,6 +95,9 @@ def find_and_copy_files(
     matched_patterns = {}
 
     for path in run_folder.rglob("*"):
+        if path.name == ".DS_Store":
+            continue
+
         for pattern, target in patterns:
             if re.match(pattern=pattern, string=str(path)) or pattern in str(path):
                 output_destination = output_folder / target

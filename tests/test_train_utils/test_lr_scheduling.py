@@ -1,5 +1,5 @@
 from math import isclose
-from typing import Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, Tuple
 from unittest.mock import patch
 
 import pytest
@@ -10,7 +10,7 @@ from ignite.contrib.handlers import (
     ParamGroupScheduler,
 )
 from ignite.engine import Engine, State
-from torch.optim import Adam, SGD
+from torch.optim import SGD, Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from eir.train_utils import lr_scheduling
@@ -19,6 +19,7 @@ from eir.train_utils.train_handlers import HandlerConfig
 
 if TYPE_CHECKING:
     from eir.train import Experiment
+
     from ..setup_tests.fixtures_create_experiment import ModelTestConfig
 
 

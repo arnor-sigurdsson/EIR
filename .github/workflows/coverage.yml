@@ -2,8 +2,11 @@ name: Coverage
 on: [push, pull_request]
 jobs:
 
-  coverage:
-    name: Coverage
+  test:
+    strategy:
+      matrix:
+        group: [1, 2, 3, 4, 5]
+    name: Test group ${{ matrix.group }}
     runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v3
@@ -12,13 +15,14 @@ jobs:
       with:
         python-version: '3.11'
         architecture: x64
-    - name: Run tests
+    - name: Install and Run Tox
+      env:
+        PYTEST_GROUP: ${{ matrix.group }}
       run: |
-        pip install tox==4.5.1
-        pip install poetry==1.4.2
-        tox -e py
-    - name: Generate report
+        pip install tox==4.6.4
+        pip install poetry==1.5.1
+        tox -e py_partial
+    - name: Publish coverage to Codecov
       uses: codecov/codecov-action@v3
       with:
         fail_ci_if_error: true
-

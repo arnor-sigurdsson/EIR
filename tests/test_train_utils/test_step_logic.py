@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, Mock, patch, ANY, call
+from unittest.mock import ANY, MagicMock, Mock, call, create_autospec, patch
 
 import pytest
 import torch
@@ -6,6 +6,7 @@ from torch import nn
 from torch.cuda.amp import GradScaler
 
 from eir.train_utils import step_logic
+from eir.train_utils.optim import AttrDelegatedSWAWrapper
 
 
 @pytest.mark.parametrize(
@@ -46,7 +47,9 @@ from eir.train_utils import step_logic
         # With gradient accumulation
         {
             "injections": {
-                "global_configs": {"gradient_accumulation_steps": 4},
+                "global_configs": {
+                    "gradient_accumulation_steps": 4,
+                },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
@@ -206,7 +209,7 @@ def test_get_optimizer_step_func():
 
 
 def test_maybe_update_model_parameters_with_swa_basics():
-    model = MagicMock()
+    model = create_autospec(spec=AttrDelegatedSWAWrapper, instance=True)
     model.module = MagicMock()
 
     n_iter_before_swa = 10
@@ -246,7 +249,7 @@ def test_maybe_update_model_parameters_with_swa_basics():
 
 
 def test_maybe_update_model_parameters_with_swa_multiple_iterations():
-    model = MagicMock()
+    model = create_autospec(spec=AttrDelegatedSWAWrapper, instance=True)
     model.module = MagicMock()
 
     n_iter_before_swa = 10
@@ -288,3 +291,19 @@ def test_should_perform_optimizer_step(
         iteration=iteration, grad_acc_steps=grad_acc_steps
     )
     assert result == expected
+
+
+def test_get_hook_amp_objects():
+    device_type = "cuda"
+    with patch("eir.train_utils.step_logic.GradScaler") as mock_grad_scaler:
+        result_func = step_logic.get_hook_amp_objects(device=device_type)
+        assert callable(result_func)
+
+        result = result_func()
+        assert isinstance(result, dict)
+        assert "amp_context_manager" in result
+
+        assert isinstance(result["amp_context_manager"], step_logic.autocast)
+        if device_type != "cpu":
+            assert "amp_scaler" in result
+            mock_grad_scaler.assert_called_once()

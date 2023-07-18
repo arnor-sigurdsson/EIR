@@ -1,0 +1,14 @@
+output_folder: eir_tutorials/tutorial_runs/a_using_eir/tutorial_05_is_it_a_hot_dog
+valid_size: 0.10
+device: "mps"
+batch_size: 32
+n_saved_models: 1
+dataloader_workers: 0
+checkpoint_interval: 100
+sample_interval: 100
+n_epochs: 200
+memory_dataset: True
+max_attributions_per_class: 10
+compute_attributions: True
+mixing_alpha: 0.5
+plot_skip_steps: 0

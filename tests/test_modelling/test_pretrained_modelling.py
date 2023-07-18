@@ -1,6 +1,6 @@
 from copy import deepcopy
 from pathlib import Path
-from typing import Tuple, Sequence, TYPE_CHECKING, Dict
+from typing import TYPE_CHECKING, Dict, Sequence, Tuple
 
 import pytest
 
@@ -9,17 +9,11 @@ from eir.setup.config import get_all_tabular_targets
 from eir.setup.schemas import BasicPretrainedConfig
 from eir.train_utils.step_logic import get_default_hooks
 from tests.setup_tests.fixtures_create_configs import cleanup
-from tests.setup_tests.fixtures_create_experiment import (
-    get_cur_modelling_test_config,
-)
-from tests.test_modelling.test_modelling_utils import (
-    check_test_performance_results,
-)
+from tests.setup_tests.fixtures_create_experiment import get_cur_modelling_test_config
+from tests.test_modelling.test_modelling_utils import check_performance_result_wrapper
 
 if TYPE_CHECKING:
-    from tests.setup_tests.fixtures_create_experiment import (
-        ModelTestConfig,
-    )
+    from tests.setup_tests.fixtures_create_experiment import ModelTestConfig
 
 
 def _get_pre_trained_module_setup_parametrization() -> Dict:
@@ -50,6 +44,15 @@ def _get_pre_trained_module_setup_parametrization() -> Dict:
                 },
                 {
                     "input_info": {"input_name": "test_image"},
+                    "model_config": {
+                        "model_init_config": {
+                            "layers": [2],
+                            "kernel_width": 2,
+                            "kernel_height": 2,
+                            "down_stride_width": 2,
+                            "down_stride_height": 2,
+                        },
+                    },
                 },
                 {
                     "input_info": {"input_name": "test_tabular"},
@@ -64,6 +67,7 @@ def _get_pre_trained_module_setup_parametrization() -> Dict:
                 },
             ],
             "fusion_configs": {
+                "model_type": "mlp-residual",
                 "model_config": {
                     "fc_task_dim": 128,
                     "fc_do": 0.10,
@@ -77,6 +81,9 @@ def _get_pre_trained_module_setup_parametrization() -> Dict:
                         "target_cat_columns": ["Origin"],
                         "target_con_columns": ["Height"],
                     },
+                },
+                {
+                    "output_info": {"output_name": "test_output_sequence"},
                 },
             ],
         },
@@ -214,6 +221,15 @@ def _add_new_feature_extractor_to_experiment(
                     },
                     {
                         "input_info": {"input_name": "test_image"},
+                        "model_config": {
+                            "model_init_config": {
+                                "layers": [2],
+                                "kernel_width": 2,
+                                "kernel_height": 2,
+                                "down_stride_width": 2,
+                                "down_stride_height": 2,
+                            },
+                        },
                     },
                     {
                         "input_info": {"input_name": "test_tabular"},
@@ -242,6 +258,9 @@ def _add_new_feature_extractor_to_experiment(
                             "target_con_columns": ["Height"],
                         },
                     },
+                    {
+                        "output_info": {"output_name": "test_output_sequence"},
+                    },
                 ],
             },
         }
@@ -267,17 +286,13 @@ def test_pre_training_and_loading(
     # Note we skip checking R2 for now as we patch the metrics in conftest.py
     # to check for both training and validation, but for now we will make do with
     # checking only the MCC for this
-    for output_name, output_object in experiment.outputs.items():
-        cat_target_columns = output_object.target_columns["cat"]
-
-        for cat_target_column in cat_target_columns:
-            check_test_performance_results(
-                run_path=test_config.run_path,
-                target_column=cat_target_column,
-                output_name=output_name,
-                metric="mcc",
-                thresholds=(0.85, 0.85),
-            )
+    check_performance_result_wrapper(
+        outputs=experiment.outputs,
+        run_path=test_config.run_path,
+        max_thresholds=(0.5, 0.5),
+        min_thresholds=(3.0, 3.0),
+        con_metric=None,
+    )
 
     (
         pretrained_checkpoint_experiment,
@@ -288,17 +303,13 @@ def test_pre_training_and_loading(
 
     train.train(experiment=pretrained_checkpoint_experiment)
 
-    for output_name, output_object in pretrained_checkpoint_experiment.outputs.items():
-        cat_target_columns = output_object.target_columns["cat"]
-
-        for cat_target_column in cat_target_columns:
-            check_test_performance_results(
-                run_path=pretrained_checkpoint_test_config.run_path,
-                target_column=cat_target_column,
-                output_name=output_name,
-                metric="mcc",
-                thresholds=(0.85, 0.85),
-            )
+    check_performance_result_wrapper(
+        outputs=pretrained_checkpoint_experiment.outputs,
+        run_path=pretrained_checkpoint_test_config.run_path,
+        max_thresholds=(0.85, 0.85),
+        min_thresholds=(2.0, 2.0),
+        con_metric=None,
+    )
 
 
 def _get_experiment_overloaded_for_pretrained_extractor(
@@ -307,9 +318,60 @@ def _get_experiment_overloaded_for_pretrained_extractor(
     rename_pretrained_inputs: bool,
     skip_pretrained_keys: Sequence[str] = tuple(),
 ) -> Tuple[train.Experiment, "ModelTestConfig"]:
-    input_configs = deepcopy(experiment.configs.input_configs)
-    pretrained_configs = deepcopy(experiment.configs)
-    saved_model_path = next((test_config.run_path / "saved_models").iterdir())
+    pretrained_configs = _get_input_configs_with_pretrained_modifications(
+        run_path=test_config.run_path,
+        pretrained_configs=experiment.configs,
+        skip_pretrained_keys=skip_pretrained_keys,
+        rename_pretrained_inputs=rename_pretrained_inputs,
+    )
+
+    pretrained_configs = _get_output_configs_with_pretrained_modifications(
+        pretrained_configs=pretrained_configs,
+        rename_pretrained_inputs=rename_pretrained_inputs,
+    )
+
+    pretrained_configs = _get_pretrained_config_with_modified_globals(
+        pretrained_configs=pretrained_configs
+    )
+
+    run_path = Path(f"{pretrained_configs.global_config.output_folder}/")
+    if run_path.exists():
+        cleanup(run_path=run_path)
+
+    default_hooks = get_default_hooks(configs=pretrained_configs)
+    pretrained_experiment = train.get_default_experiment(
+        configs=pretrained_configs, hooks=default_hooks
+    )
+
+    targets = get_all_tabular_targets(
+        output_configs=pretrained_experiment.configs.output_configs
+    )
+    pretrained_test_config = get_cur_modelling_test_config(
+        train_loader=pretrained_experiment.train_loader,
+        global_config=pretrained_configs.global_config,
+        tabular_targets=targets,
+        output_configs=pretrained_experiment.configs.output_configs,
+        input_names=pretrained_experiment.inputs.keys(),
+    )
+
+    return pretrained_experiment, pretrained_test_config
+
+
+def _get_input_configs_with_pretrained_modifications(
+    pretrained_configs: train.Configs,
+    run_path: Path,
+    rename_pretrained_inputs: bool,
+    skip_pretrained_keys: Sequence[str] = tuple(),
+) -> train.Configs:
+    """
+    `rename_pretrained_inputs`:
+        To check that we can use the `load_module_name` argument, where we have
+        a different name for the input module in the pretrained model than in the
+        current model.
+    """
+    pretrained_configs = deepcopy(pretrained_configs)
+    input_configs = pretrained_configs.input_configs
+    saved_model_path = next((run_path / "saved_models").iterdir())
 
     input_configs_with_pretrained = []
     for cur_input_config in input_configs:
@@ -331,6 +393,43 @@ def _get_experiment_overloaded_for_pretrained_extractor(
 
     pretrained_configs.input_configs = input_configs_with_pretrained
 
+    return pretrained_configs
+
+
+def _get_output_configs_with_pretrained_modifications(
+    pretrained_configs: train.Configs,
+    rename_pretrained_inputs: bool,
+) -> train.Configs:
+    """
+    This is needed because we are modifying the configs from a previous experiment
+    directly, and we need to make sure that the output configs are also modified
+    when because the assumption os that the input-output configs are in sync.
+    """
+    pretrained_configs = deepcopy(pretrained_configs)
+    output_configs = pretrained_configs.output_configs
+
+    output_configs_with_pretrained = []
+    for output_config in output_configs:
+        if output_config.output_info.output_type != "sequence":
+            output_configs_with_pretrained.append(output_config)
+
+        else:
+            cur_name = output_config.output_info.output_name
+            if rename_pretrained_inputs:
+                output_config.output_info.output_name = cur_name + "_pretrained_module"
+
+            output_configs_with_pretrained.append(output_config)
+
+    pretrained_configs.output_configs = output_configs_with_pretrained
+
+    return pretrained_configs
+
+
+def _get_pretrained_config_with_modified_globals(
+    pretrained_configs: train.Configs,
+) -> train.Configs:
+    pretrained_configs = deepcopy(pretrained_configs)
+
     pretrained_configs.global_config.n_epochs = 6
     pretrained_configs.global_config.sample_interval = 200
     pretrained_configs.global_config.checkpoint_interval = 200
@@ -338,26 +437,7 @@ def _get_experiment_overloaded_for_pretrained_extractor(
         pretrained_configs.global_config.output_folder + "_with_pretrained"
     )
 
-    run_path = Path(f"{pretrained_configs.global_config.output_folder}/")
-    if run_path.exists():
-        cleanup(run_path=run_path)
-
-    default_hooks = get_default_hooks(configs=pretrained_configs)
-    pretrained_experiment = train.get_default_experiment(
-        configs=pretrained_configs, hooks=default_hooks
-    )
-
-    targets = get_all_tabular_targets(
-        output_configs=pretrained_experiment.configs.output_configs
-    )
-    pretrained_test_config = get_cur_modelling_test_config(
-        train_loader=pretrained_experiment.train_loader,
-        global_config=pretrained_configs.global_config,
-        targets=targets,
-        input_names=pretrained_experiment.inputs.keys(),
-    )
-
-    return pretrained_experiment, pretrained_test_config
+    return pretrained_configs
 
 
 def _get_experiment_overloaded_for_pretrained_checkpoint(
@@ -403,7 +483,8 @@ def _get_experiment_overloaded_for_pretrained_checkpoint(
     pretrained_test_config = get_cur_modelling_test_config(
         train_loader=pretrained_experiment.train_loader,
         global_config=pretrained_configs.global_config,
-        targets=targets,
+        output_configs=pretrained_experiment.configs.output_configs,
+        tabular_targets=targets,
         input_names=pretrained_experiment.inputs.keys(),
     )
 

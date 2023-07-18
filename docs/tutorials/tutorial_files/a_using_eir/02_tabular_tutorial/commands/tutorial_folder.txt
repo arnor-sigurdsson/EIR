@@ -1,0 +1,11 @@
+eir_tutorials/a_using_eir/02_tabular_tutorial/
+├── conf
+│   ├── 02_poker_hands_fusion.yaml
+│   ├── 02_poker_hands_globals.yaml
+│   ├── 02_poker_hands_input.yaml
+│   └── 02_poker_hands_output.yaml
+└── data
+    └── poker_hands_data
+        ├── poker_hands_test.csv
+        ├── poker_hands_train.csv
+        └── pre_split_valid_ids.txt

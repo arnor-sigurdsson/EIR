@@ -1,30 +1,30 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Union, Sequence, List
+from typing import List, Optional
 
 import numpy as np
 import pandas as pd
-from aislib.misc_utils import get_logger
 
 from eir.setup import schemas
 from eir.setup.input_setup_modules.common import (
     DataDimensions,
     get_data_dimension_from_data_source,
 )
+from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__)
 
 
 @dataclass
-class OmicsInputInfo:
+class ComputedOmicsInputInfo:
     input_config: schemas.InputConfig
     data_dimensions: "DataDimensions"
-    subset_indices: Union[None, Sequence[int]]
+    subset_indices: Optional[np.ndarray]
 
 
 def set_up_omics_input(
     input_config: schemas.InputConfig, *args, **kwargs
-) -> OmicsInputInfo:
+) -> ComputedOmicsInputInfo:
     data_dimensions = get_data_dimension_from_data_source(
         data_source=Path(input_config.input_info.input_source),
         deeplake_inner_key=input_config.input_info.input_inner_key,
@@ -32,7 +32,10 @@ def set_up_omics_input(
 
     subset_indices = None
     input_type_info = input_config.input_type_info
+    assert isinstance(input_type_info, schemas.OmicsInputDataConfig)
+
     if input_type_info.subset_snps_file:
+        assert input_type_info.snp_file is not None
         df_bim = read_bim(bim_file_path=input_type_info.snp_file)
         snps_to_subset = read_subset_file(
             subset_snp_file_path=input_type_info.subset_snps_file
@@ -49,7 +52,7 @@ def set_up_omics_input(
             width=len(subset_indices),
         )
 
-    omics_input_info = OmicsInputInfo(
+    omics_input_info = ComputedOmicsInputInfo(
         input_config=input_config,
         data_dimensions=data_dimensions,
         subset_indices=subset_indices,

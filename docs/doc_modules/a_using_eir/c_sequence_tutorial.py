@@ -5,9 +5,9 @@ from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_
 
 
 def get_03_imdb_run_1_transformer_info() -> AutoDocExperimentInfo:
-    base_path = "docs/tutorials/tutorial_files/03_sequence_tutorial/a_IMDB"
+    base_path = "docs/tutorials/tutorial_files/a_using_eir/03_sequence_tutorial/a_IMDB"
 
-    conf_output_path = "eir_tutorials/03_sequence_tutorial/a_IMDB/conf"
+    conf_output_path = "eir_tutorials/a_using_eir/03_sequence_tutorial/a_IMDB/conf"
 
     command = [
         "eirtrain",
@@ -38,14 +38,16 @@ def get_03_imdb_run_1_transformer_info() -> AutoDocExperimentInfo:
         ),
     ]
 
-    data_output_path = Path("eir_tutorials/03_sequence_tutorial/data/imdb.zip")
+    data_output_path = Path(
+        "eir_tutorials/a_using_eir/03_sequence_tutorial/data/imdb.zip"
+    )
 
     get_tutorial_folder = (
         run_capture_and_save,
         {
             "command": [
                 "tree",
-                "eir_tutorials/03_sequence_tutorial/",
+                "eir_tutorials/a_using_eir/03_sequence_tutorial/",
                 "-L",
                 "3",
                 "-I",
@@ -72,10 +74,13 @@ def get_03_imdb_run_1_transformer_info() -> AutoDocExperimentInfo:
 
 def get_03_peptides_run_1_transformer_info() -> AutoDocExperimentInfo:
     base_path = (
-        "docs/tutorials/tutorial_files/03_sequence_tutorial/b_Anticancer_peptides"
+        "docs/tutorials/tutorial_files/"
+        "a_using_eir/03_sequence_tutorial/b_Anticancer_peptides"
     )
 
-    conf_output_path = "eir_tutorials/03_sequence_tutorial/b_Anticancer_peptides/conf"
+    conf_output_path = (
+        "eir_tutorials/a_using_eir/03_sequence_tutorial/b_Anticancer_peptides/conf"
+    )
 
     command = [
         "eirtrain",
@@ -108,7 +113,7 @@ def get_03_peptides_run_1_transformer_info() -> AutoDocExperimentInfo:
     ]
 
     data_output_path = Path(
-        "eir_tutorials/03_sequence_tutorial/data/Anticancer_Peptides.zip"
+        "eir_tutorials/a_using_eir/03_sequence_tutorial/data/Anticancer_Peptides.zip"
     )
 
     get_tutorial_folder = (
@@ -116,7 +121,7 @@ def get_03_peptides_run_1_transformer_info() -> AutoDocExperimentInfo:
         {
             "command": [
                 "tree",
-                "eir_tutorials/03_sequence_tutorial/",
+                "eir_tutorials/a_using_eir/03_sequence_tutorial/",
                 "-L",
                 "3",
                 "-I",

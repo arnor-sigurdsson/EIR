@@ -1,21 +1,27 @@
-from collections import defaultdict
+import pickle
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Tuple, Callable, Union, TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Protocol, Tuple
 
 import numpy as np
 import pandas as pd
-from aislib.misc_utils import get_logger
+from aislib.misc_utils import ensure_path_exists
 
 from eir.interpretation.interpretation_utils import get_target_class_name
-from eir.setup.input_setup_modules.setup_omics import read_subset_file, read_bim
+from eir.setup.input_setup_modules.setup_omics import (
+    ComputedOmicsInputInfo,
+    read_bim,
+    read_subset_file,
+)
+from eir.setup.schemas import OmicsInputDataConfig
+from eir.utils.logging import get_logger
 from eir.visualization import interpretation_visualization as av
 
 if TYPE_CHECKING:
-    from eir.train import Experiment
-    from eir.interpretation.interpretation import SampleAttribution
     from eir.data_load.label_setup import al_label_transformers_object
+    from eir.interpretation.interpretation import SampleAttribution
+    from eir.train import Experiment
 
 al_gradients_dict = Dict[str, List[np.ndarray]]
 al_top_gradients_dict = Dict[str, Dict[str, np.ndarray]]
@@ -31,21 +37,28 @@ class ParsedOmicsAttributions:
     accumulated_acts_masked: Dict[str, np.ndarray]
 
 
+class OmicsConsumerCallable(Protocol):
+    def __call__(
+        self,
+        attribution: Optional["SampleAttribution"],
+    ) -> Optional[ParsedOmicsAttributions]:
+        ...
+
+
 def get_omics_consumer(
     target_transformer: "al_label_transformers_object",
     input_name: str,
     output_name: str,
     target_column: str,
     column_type: str,
-) -> Callable[[Union["SampleAttribution", None]], ParsedOmicsAttributions]:
-    acc_acts = {}
-    acc_acts_masked = {}
-
-    n_samples = {}
+) -> OmicsConsumerCallable:
+    acc_acts: dict[str, np.ndarray] = {}
+    acc_acts_masked: dict[str, np.ndarray] = {}
+    n_samples: dict[str, int] = {}
 
     def _consumer(
-        attribution: Union["SampleAttribution", None]
-    ) -> ParsedOmicsAttributions:
+        attribution: Optional["SampleAttribution"],
+    ) -> Optional[ParsedOmicsAttributions]:
         nonlocal n_samples
 
         if attribution is None:
@@ -88,6 +101,8 @@ def get_omics_consumer(
             acc_acts_masked[cur_label_name] += single_acts_masked
             n_samples[cur_label_name] += 1
 
+        return None
+
     return _consumer
 
 
@@ -109,7 +124,13 @@ def analyze_omics_input_attributions(
         accumulated_grads=acc_acts, abs_grads=abs_grads
     )
 
-    omics_data_type_config = exp.inputs[input_name].input_config.input_type_info
+    input_object = exp.inputs[input_name]
+    assert isinstance(input_object, ComputedOmicsInputInfo)
+
+    omics_data_type_config = input_object.input_config.input_type_info
+    assert isinstance(omics_data_type_config, OmicsInputDataConfig)
+
+    assert omics_data_type_config.snp_file is not None
     cur_snp_path = Path(omics_data_type_config.snp_file)
     df_snps = read_bim(bim_file_path=str(cur_snp_path))
 
@@ -132,7 +153,11 @@ def analyze_omics_input_attributions(
         output_folder=attribution_outfolder,
     )
 
-    np.save(file=str(attribution_outfolder / "top_acts.npy"), arr=top_gradients_dict)
+    _save_omics_grads(
+        sample_output_folder=attribution_outfolder,
+        file_name="top_acts.npy",
+        grads_dict=top_gradients_dict,
+    )
 
     save_masked_grads(
         acc_grads_times_inp=acc_acts_masked,
@@ -193,45 +218,6 @@ def _add_absolute_summed_snp_gradients_to_df(
     return df_snp_grads_copy
 
 
-def parse_single_omics_attributions(
-    experiment: "Experiment",
-    omics_input_name: str,
-    output_name: str,
-    target_column_name: str,
-    column_type: str,
-    attributions: Sequence["SampleAttribution"],
-) -> Tuple[Dict, Dict]:
-    exp = experiment
-    output_object = exp.outputs[output_name]
-    target_transformer = output_object.target_transformers[target_column_name]
-
-    acc_acts = defaultdict(list)
-    acc_acts_masked = defaultdict(list)
-
-    for sample_attribution in attributions:
-        sample_inputs = sample_attribution.sample_info.inputs
-        sample_target_labels = sample_attribution.sample_info.target_labels
-        sample_acts = sample_attribution.sample_attributions[omics_input_name]
-
-        # we want to keep the original sample for masking
-        inputs_omics = sample_inputs[omics_input_name]
-        single_sample_copy = deepcopy(inputs_omics).cpu().numpy().squeeze()
-
-        cur_label_name = get_target_class_name(
-            sample_label=sample_target_labels[output_name][target_column_name],
-            target_transformer=target_transformer,
-            column_type=column_type,
-            target_column_name=target_column_name,
-        )
-
-        acc_acts[cur_label_name].append(sample_acts.squeeze())
-
-        single_acts_masked = single_sample_copy * sample_acts
-        acc_acts_masked[cur_label_name].append(single_acts_masked.squeeze())
-
-    return acc_acts, acc_acts_masked
-
-
 def rescale_gradients(gradients: np.ndarray) -> np.ndarray:
     gradients_resc = gradients - gradients.min()
     gradients_resc = gradients_resc / (gradients.max() - gradients.min())
@@ -241,9 +227,9 @@ def rescale_gradients(gradients: np.ndarray) -> np.ndarray:
 def get_snp_cols_w_top_grads(
     accumulated_grads: Dict[str, np.ndarray],
     n: int = 10,
-    custom_indexes_dict: dict = None,
+    custom_indexes_dict: Optional[dict[str, np.ndarray]] = None,
     abs_grads: bool = False,
-) -> Dict[str, Dict[str, np.array]]:
+) -> Dict[str, Dict[str, np.ndarray]]:
     """
     `accumulated_grads` specs:
 
@@ -258,7 +244,7 @@ def get_snp_cols_w_top_grads(
 
     We use those indexes to grab the top SNPs and grads per class.
     """
-    top_snps_per_class = {}
+    top_snps_per_class: Dict[str, Dict[str, np.ndarray]] = {}
 
     for cls, grads in accumulated_grads.items():
         if grads is not None:
@@ -271,14 +257,15 @@ def get_snp_cols_w_top_grads(
                 sum_snp_values = grads.sum(0)
 
                 top_n_idxs = sorted(np.argpartition(sum_snp_values, -n)[-n:])
+                top_n_idxs_np: np.ndarray = np.array(top_n_idxs)
 
-                top_snps_per_class[cls]["top_n_idxs"] = top_n_idxs
-                top_snps_per_class[cls]["top_n_grads"] = grads[:, top_n_idxs]
+                top_snps_per_class[cls]["top_n_idxs"] = top_n_idxs_np
+                top_snps_per_class[cls]["top_n_grads"] = grads[:, top_n_idxs_np]
 
             else:
-                top_n_idxs = custom_indexes_dict[cls]
-                top_snps_per_class[cls]["top_n_idxs"] = top_n_idxs
-                top_snps_per_class[cls]["top_n_grads"] = grads[:, top_n_idxs]
+                top_n_idxs_np = custom_indexes_dict[cls]
+                top_snps_per_class[cls]["top_n_idxs"] = top_n_idxs_np
+                top_snps_per_class[cls]["top_n_grads"] = grads[:, top_n_idxs_np]
         else:
             logger.warning(
                 "No gradients aggregated for class %s due to no "
@@ -288,33 +275,6 @@ def get_snp_cols_w_top_grads(
             )
 
     return top_snps_per_class
-
-
-def infer_snp_file_path(data_source: Path):
-    if not data_source:
-        raise ValueError(
-            "'data_source' variable must be set with 'infer'" " as snp_file parameter."
-        )
-
-    snp_size = data_source.parts[3]
-    ind_size = data_source.parts[4]
-    assert snp_size.startswith("full") or int(snp_size.split("_")[0])
-    assert ind_size.startswith("full") or int(ind_size.split("_")[0])
-
-    inferred_snp_string = f"parsed_files/{ind_size}/{snp_size}/data_final.snp"
-    inferred_snp_file = Path(data_source).parents[2] / inferred_snp_string
-
-    logger.info(
-        "SNP file path not passed in as CL argument, will try inferred path: %s",
-        inferred_snp_file,
-    )
-
-    if not inferred_snp_file.exists():
-        raise FileNotFoundError(
-            f"Could not find {inferred_snp_file} when inferring" f"about it's location."
-        )
-
-    return inferred_snp_file
 
 
 def gather_and_rescale_snps(
@@ -361,7 +321,7 @@ def gather_and_rescale_snps(
     by the top grads for a given country), and rescale them (so we have
     column-wise rescaling).
     """
-    top_snps_dict = {}
+    top_snps_dict: al_scaled_grads_dict = {}
 
     for col_name_ in classes:
         cls_top_idxs_ = top_gradients_dict[col_name_]["top_n_idxs"]
@@ -375,13 +335,14 @@ def gather_and_rescale_snps(
 
             cur_top_snps_all_labels.append(cur_row_indexed_grads)
 
-        cur_top_snps_all_labels = np.array(cur_top_snps_all_labels)
-        cur_top_snps_all_labels_rscl = rescale_gradients(
-            gradients=cur_top_snps_all_labels
+        cur_top_snps_all_labels_np = np.array(cur_top_snps_all_labels)
+        cur_top_snps_all_labels_rescaled = rescale_gradients(
+            gradients=cur_top_snps_all_labels_np
         )
 
         for list_idx, row_name_ in enumerate(classes):
-            top_snps_dict[col_name_][row_name_] = cur_top_snps_all_labels_rscl[list_idx]
+            cur_rescaled = cur_top_snps_all_labels_rescaled[list_idx]
+            top_snps_dict[col_name_][row_name_] = cur_rescaled
 
     return top_snps_dict
 
@@ -411,7 +372,11 @@ def save_masked_grads(
         fname="top_snps_masked.pdf",
     )
 
-    np.save(str(sample_outfolder / "top_acts_masked.npy"), top_grads_msk_inputs)
+    _save_omics_grads(
+        sample_output_folder=sample_outfolder,
+        file_name="top_acts_masked.npy",
+        grads_dict=top_grads_msk_inputs,
+    )
 
 
 def index_masked_grads(
@@ -427,3 +392,15 @@ def index_masked_grads(
     )
 
     return top_gradients_dict_masked_inputs
+
+
+def _save_omics_grads(
+    sample_output_folder: Path,
+    file_name: str,
+    grads_dict: dict[str, dict[str, np.ndarray]],
+) -> None:
+    output_path = sample_output_folder / file_name
+    ensure_path_exists(path=output_path)
+
+    with open(output_path, "wb") as f:
+        pickle.dump(obj=grads_dict, file=f)

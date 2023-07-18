@@ -1,25 +1,28 @@
 from pathlib import Path
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from aislib.misc_utils import ensure_path_exists
-from captum.attr._utils.visualization import (
-    visualize_image_attr_multiple,
-)
+from captum.attr._utils.visualization import visualize_image_attr_multiple
 from matplotlib.colors import LinearSegmentedColormap
 from torchvision.transforms import Normalize
 
 from eir.interpretation.interpretation_utils import (
-    get_target_class_name,
     get_basic_sample_attributions_to_analyse_generator,
+    get_target_class_name,
 )
+from eir.setup.input_setup_modules.setup_image import ComputedImageInputInfo
+from eir.setup.output_setup_modules.tabular_output_setup import (
+    ComputedTabularOutputInfo,
+)
+from eir.setup.schemas import BasicInterpretationConfig
 
 if TYPE_CHECKING:
-    from eir.train import Experiment
     from eir.interpretation.interpretation import SampleAttribution
     from eir.setup.input_setup_modules.setup_image import ImageNormalizationStats
+    from eir.train import Experiment
 
 
 def analyze_image_input_attributions(
@@ -29,15 +32,20 @@ def analyze_image_input_attributions(
     output_name: str,
     target_column_type: str,
     attribution_outfolder: Path,
-    all_attributions: Sequence["SampleAttribution"],
+    all_attributions: list["SampleAttribution"],
 ) -> None:
     exp = experiment
 
     output_object = exp.outputs[output_name]
+    assert isinstance(output_object, ComputedTabularOutputInfo)
+
     target_transformer = output_object.target_transformers[target_column_name]
 
     input_object = exp.inputs[input_name]
+    assert isinstance(input_object, ComputedImageInputInfo)
+
     interpretation_config = input_object.input_config.interpretation_config
+    assert isinstance(interpretation_config, BasicInterpretationConfig)
 
     samples_to_act_analyze_gen = get_basic_sample_attributions_to_analyse_generator(
         interpretation_config=interpretation_config, all_attributions=all_attributions
@@ -70,6 +78,7 @@ def analyze_image_input_attributions(
             signs=["all", "absolute_value"],
             show_colorbar=True,
             cmap=cmap,
+            use_pyplot=False,
         )
 
         name = f"image_{sample_attribution.sample_info.ids[0]}_{cur_label_name}.pdf"
@@ -81,7 +90,7 @@ def analyze_image_input_attributions(
 
 def un_normalize(
     normalized_img: np.ndarray, normalization_stats: "ImageNormalizationStats"
-):
+) -> np.ndarray:
     """
     Clip because sometimes we get values like 1.0000001 which will cause some libraries
     to do =/ 255, resulting in a black image.

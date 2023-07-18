@@ -3,27 +3,26 @@ import typing
 from collections import OrderedDict
 from copy import deepcopy
 from pathlib import Path
-from typing import Type, Dict, Union, Sequence, Tuple, Any
+from typing import Any, Dict, Sequence, Tuple, Type, Union
 
 import torch
-from aislib.misc_utils import get_logger
-from torch import nn
 
-from eir.models import al_meta_model
+from eir.models.model_setup_modules.meta_setup import al_meta_model
+from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__)
 
 
 def load_model(
     model_path: Path,
-    model_class: Type[nn.Module],
+    model_class: Type[al_meta_model],
     model_init_kwargs: Dict,
     device: str,
     test_mode: bool,
     state_dict_keys_to_keep: Union[None, Sequence[str]] = None,
     state_dict_key_rename: Union[None, Sequence[Tuple[str, str]]] = None,
     strict_shapes: bool = True,
-) -> Union[al_meta_model, nn.Module]:
+) -> al_meta_model:
     model = model_class(**model_init_kwargs)
 
     model = _load_model_weights(
@@ -42,13 +41,13 @@ def load_model(
 
 
 def _load_model_weights(
-    model: nn.Module,
+    model: al_meta_model,
     model_state_dict_path: Path,
     device: str,
     state_dict_keys_to_keep: Union[None, Sequence[str]] = None,
     state_dict_key_rename: Union[None, Sequence[Tuple[str, str]]] = None,
     strict_shapes: bool = True,
-) -> nn.Module:
+) -> al_meta_model:
     loaded_weights_state_dict = torch.load(model_state_dict_path, map_location=device)
 
     if state_dict_keys_to_keep:
@@ -107,7 +106,8 @@ def _load_model_weights(
             repr_object.repr(incompatible_keys.unexpected_keys),
         )
 
-    model = model.to(device=device)
+    torch_device = torch.device(device)
+    model = model.to(device=torch_device)
 
     return model
 

@@ -9,13 +9,16 @@ import pytest
 from aislib.misc_utils import ensure_path_exists
 
 from eir.setup import config
-from eir.setup.config import recursive_dict_replace
+from eir.setup.config_setup_modules.config_setup_utils import recursive_dict_replace
+from eir.setup.config_setup_modules.output_config_setup_sequence import (
+    get_configs_object_with_seq_output_configs,
+)
 from eir.train_utils.utils import configure_global_eir_logging, get_run_folder
 from tests.setup_tests.fixtures_create_data import TestDataConfig
 from tests.setup_tests.setup_test_eir_configs import (
+    get_test_base_fusion_init,
     get_test_base_global_init,
     get_test_inputs_inits,
-    get_test_base_fusion_init,
     get_test_outputs_inits,
 )
 
@@ -54,7 +57,7 @@ def create_test_config_init_base(
         extra_kwargs=create_test_data.extras,
     )
 
-    model_type = injections.get("fusion_configs", {}).get("model_type", "default")
+    model_type = injections.get("fusion_configs", {}).get("model_type", "mlp-residual")
     test_fusion_init = get_test_base_fusion_init(model_type=model_type)
 
     test_fusion_init = general_sequence_inject(
@@ -111,15 +114,8 @@ def create_test_config(
         fusion_configs=test_init.fusion_configs
     )
 
-    tabular_output_setup = config.DynamicOutputSetup(
-        output_types_schema_map=config.get_outputs_types_schema_map(),
-        output_module_config_class_getter=config.get_output_module_config_class,
-        output_module_init_class_map=config.get_output_config_type_init_callable_map(),
-    )
-
     test_output_configs = config.load_output_configs(
         output_configs=test_init.output_configs,
-        dynamic_output_setup=tabular_output_setup,
     )
 
     test_configs = config.Configs(
@@ -127,6 +123,10 @@ def create_test_config(
         input_configs=test_input_configs,
         fusion_config=test_fusion_configs,
         output_configs=test_output_configs,
+    )
+
+    test_configs = get_configs_object_with_seq_output_configs(
+        configs=test_configs,
     )
 
     run_folder = get_run_folder(output_folder=output_folder)

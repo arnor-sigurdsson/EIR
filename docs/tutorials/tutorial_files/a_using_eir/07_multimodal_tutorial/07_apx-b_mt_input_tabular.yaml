@@ -1,0 +1,31 @@
+input_info:
+  input_source: eir_tutorials/a_using_eir/07_multimodal_tutorial/data/tabular.csv
+  input_name: pets_tabular
+  input_type: tabular
+
+input_type_info:
+  input_cat_columns:
+          - Type
+          - Breed1
+          - Breed2
+          - Gender
+          - Color1
+          - Color2
+          - Color3
+          - MaturitySize
+          - State
+          - FurLength
+          - Vaccinated
+          - Dewormed
+          - Sterilized
+          - Health
+          - Fee
+
+  input_con_columns:
+          - VideoAmt
+          - PhotoAmt
+
+model_config:
+  model_type: tabular
+
+

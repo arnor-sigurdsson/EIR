@@ -1,8 +1,8 @@
 import pytest
 
 from eir.models import layers
-from eir.models.model_training_utils import trace_eir_model
-from eir.models.omics import models_cnn
+from eir.models.input.omics import models_cnn
+from eir.models.model_training_utils import check_eir_model
 from eir.setup.input_setup_modules.common import DataDimensions
 from tests.test_models.model_testing_utils import prepare_example_batch
 
@@ -26,7 +26,7 @@ def test_make_conv_layers():
         kernel_height=1,
         first_kernel_expansion_height=4,
         layers=None,
-        fc_repr_dim=512,
+        num_output_features=512,
         rb_do=0.1,
         first_channel_expansion=1,
         channel_exp_base=5,
@@ -182,7 +182,7 @@ def test_get_cur_dilation(test_input, expected):
                             "model_init_config": {
                                 "channel_exp_base": 5,
                                 "rb_do": 0.15,
-                                "fc_repr_dim": 64,
+                                "num_output_features": 64,
                                 "l1": 1e-03,
                             },
                         },
@@ -238,10 +238,10 @@ def test_get_cur_dilation(test_input, expected):
                     {
                         "input_info": {"input_name": "test_genotype"},
                         "model_config": {
-                            "model_type": "mlp-split",
+                            "model_type": "lcl-simple",
                             "model_init_config": {
                                 "fc_repr_dim": 8,
-                                "split_mlp_num_splits": 64,
+                                "num_lcl_chunks": 64,
                                 "l1": 1e-03,
                             },
                         },
@@ -430,4 +430,4 @@ def test_omics_models(
     )
 
     model.eval()
-    _ = trace_eir_model(meta_model=model, example_inputs=example_batch.inputs)
+    check_eir_model(meta_model=model, example_inputs=example_batch.inputs)

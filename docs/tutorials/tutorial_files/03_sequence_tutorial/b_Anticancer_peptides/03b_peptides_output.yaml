@@ -1,8 +1,0 @@
-output_info:
-  output_source: eir_tutorials/03_sequence_tutorial/data/Anticancer_Peptides/breast_cancer_labels.csv
-  output_name: peptides_output
-  output_type: tabular
-
-output_type_info:
-  target_cat_columns:
-    - class

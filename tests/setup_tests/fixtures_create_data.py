@@ -2,7 +2,7 @@ import json
 import random
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Callable, Sequence, Union, Literal, Any
+from typing import Any, Callable, Dict, Literal, Sequence, Union
 
 import deeplake
 import numpy as np
@@ -24,8 +24,8 @@ from tests.setup_tests.setup_modelling_test_data.setup_sequence_test_data import
     create_test_sequence_data,
 )
 from tests.setup_tests.setup_modelling_test_data.setup_test_data_utils import (
-    set_up_test_data_root_outpath,
     common_split_test_data_wrapper,
+    set_up_test_data_root_outpath,
 )
 
 
@@ -76,7 +76,7 @@ def create_test_data(request, tmp_path_factory, parse_test_cl_args) -> "TestData
     if "array" in test_data_config.modalities and not arrays_path.exists():
         array_sample_folder = create_test_array_data_and_labels(
             test_data_config=test_data_config,
-            array_outfolder=arrays_path,
+            array_output_folder=arrays_path,
         )
         if drop_random_samples:
             _delete_random_files_from_folder(folder=array_sample_folder, n_to_drop=50)

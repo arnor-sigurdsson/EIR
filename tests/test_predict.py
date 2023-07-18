@@ -1,17 +1,16 @@
 from argparse import Namespace
 from pathlib import Path
-from typing import Tuple, List, Dict, Any
+from typing import Any, Dict, List, Tuple
 
 import pandas as pd
 import pytest
 import torch
 
-from eir import predict
-from eir import train
+from eir import predict, train
 from eir.experiment_io.experiment_io import load_serialized_train_experiment
+from eir.models.input.omics.models_cnn import CNNModel
+from eir.models.input.omics.omics_models import get_omics_model_init_kwargs
 from eir.models.model_setup_modules.model_io import load_model
-from eir.models.omics.models_cnn import CNNModel
-from eir.models.omics.omics_models import get_omics_model_init_kwargs
 from eir.predict_modules.predict_attributions import compute_predict_attributions
 from eir.setup import config
 from eir.setup.input_setup_modules.common import DataDimensions
@@ -163,6 +162,7 @@ def _get_predict_test_data_parametrization() -> List[Dict[str, Any]]:
                 "omics",
                 "sequence",
                 "image",
+                "array",
             ),
             "manual_test_data_creator": lambda: "test_predict",
             "source": "deeplake",
@@ -176,7 +176,7 @@ def _get_predict_test_data_parametrization() -> List[Dict[str, Any]]:
 
 
 @pytest.mark.parametrize(
-    argnames="act_background_source", argvalues=["train", "predict"]
+    argnames="attribution_background_source", argvalues=["train", "predict"]
 )
 @pytest.mark.parametrize(
     argnames="create_test_data",
@@ -228,6 +228,15 @@ def _get_predict_test_data_parametrization() -> List[Dict[str, Any]]:
                     },
                     {
                         "input_info": {"input_name": "test_image"},
+                        "model_config": {
+                            "model_init_config": {
+                                "layers": [2],
+                                "kernel_width": 2,
+                                "kernel_height": 2,
+                                "down_stride_width": 2,
+                                "down_stride_height": 2,
+                            },
+                        },
                     },
                     {
                         "input_info": {"input_name": "test_tabular"},
@@ -265,6 +274,9 @@ def _get_predict_test_data_parametrization() -> List[Dict[str, Any]]:
                             "target_con_columns": [],
                         },
                     },
+                    {
+                        "output_info": {"output_name": "test_output_sequence"},
+                    },
                 ],
             },
         },
@@ -272,7 +284,7 @@ def _get_predict_test_data_parametrization() -> List[Dict[str, Any]]:
     indirect=True,
 )
 def test_predict(
-    act_background_source: str,
+    attribution_background_source: str,
     prep_modelling_test_configs: Tuple[train.Experiment, ModelTestConfig],
     tmp_path: Path,
 ):
@@ -292,7 +304,7 @@ def test_predict(
         "model_path": grab_best_model_path(model_test_config.run_path / "saved_models"),
         "evaluate": True,
         "output_folder": tmp_path,
-        "act_background_source": act_background_source,
+        "attribution_background_source": attribution_background_source,
     }
     all_predict_kwargs = {
         **test_predict_cl_args_files_only.__dict__,
@@ -309,14 +321,40 @@ def test_predict(
         predict_cl_args=predict_cl_args,
     )
 
-    predict.predict(predict_cl_args=predict_cl_args, predict_config=predict_config)
+    predict.predict(predict_cl_args=predict_cl_args, predict_experiment=predict_config)
 
     compute_predict_attributions(
         loaded_train_experiment=train_configs_for_testing,
         predict_config=predict_config,
     )
 
-    origin_predictions_path = tmp_path / "test_output" / "Origin" / "predictions.csv"
+    _check_tabular_predict_results(
+        tmp_path_=tmp_path,
+        base_experiment=experiment,
+        train_configs_for_testing=train_configs_for_testing,
+    )
+
+    _check_sequence_predict_results(tmp_path=tmp_path, expected_n_samples=10)
+
+
+def _check_sequence_predict_results(tmp_path: Path, expected_n_samples: int) -> None:
+    sequence_predictions_path = (
+        tmp_path / "results/test_output_sequence/test_output_sequence/samples/0/auto"
+    )
+    assert sequence_predictions_path.exists()
+
+    found_files = list(
+        i for i in sequence_predictions_path.iterdir() if i.suffix == ".txt"
+    )
+    assert len(found_files) == expected_n_samples
+
+
+def _check_tabular_predict_results(
+    tmp_path_: Path,
+    base_experiment: train.Experiment,
+    train_configs_for_testing: predict.LoadedTrainExperiment,
+) -> None:
+    origin_predictions_path = tmp_path_ / "test_output" / "Origin" / "predictions.csv"
     df_test = pd.read_csv(origin_predictions_path, index_col="ID")
 
     tabular_infos = get_tabular_target_file_infos(
@@ -328,17 +366,17 @@ def test_predict(
     assert len(target_tabular_info.cat_columns) == 1
     target_column = target_tabular_info.cat_columns[0]
 
-    output = experiment.outputs["test_output"]
+    output = base_experiment.outputs["test_output"]
     target_classes = sorted(output.target_transformers[target_column].classes_)
 
     # check that columns in predictions.csv are in correct sorted order
     assert set(target_classes).issubset(set(df_test.columns))
 
     label_columns = [i for i in df_test.columns if "True Label" in i]
-    preds = df_test.drop(label_columns, axis=1).values.argmax(axis=1)
+    predictions = df_test.drop(label_columns, axis=1).values.argmax(axis=1)
     true_labels = df_test["True Label"]
 
-    preds_accuracy = (preds == true_labels).sum() / len(true_labels)
-    assert preds_accuracy > 0.7
+    prediction_accuracy = (predictions == true_labels).sum() / len(true_labels)
+    assert prediction_accuracy > 0.7
 
-    assert (tmp_path / "test_output/Origin/attributions").exists()
+    assert (tmp_path_ / "test_output/Origin/attributions").exists()

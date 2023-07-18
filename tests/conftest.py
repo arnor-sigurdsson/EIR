@@ -1,15 +1,9 @@
-from typing import (
-    Tuple,
-    Dict,
-    Any,
-)
+from typing import Any, Dict, Tuple
 
 import pandas as pd
 import pytest
 
-from eir.train_utils.utils import (
-    seed_everything,
-)
+from eir.train_utils.utils import seed_everything
 
 pytest_plugins = [
     "tests.setup_tests.fixtures_create_data",

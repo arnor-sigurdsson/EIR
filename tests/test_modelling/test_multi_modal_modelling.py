@@ -1,11 +1,9 @@
-from typing import Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, Tuple
 
 import pytest
 
 from eir import train
-from tests.test_modelling.test_modelling_utils import (
-    check_performance_result_wrapper,
-)
+from tests.test_modelling.test_modelling_utils import check_performance_result_wrapper
 
 if TYPE_CHECKING:
     from tests.setup_tests.fixtures_create_experiment import ModelTestConfig
@@ -25,7 +23,6 @@ def get_base_parametrization(compiled: bool = False) -> dict:
                 "n_epochs": 10,
                 "gradient_clipping": 1.0,
                 "lr": 0.001,
-                "gradient_noise": 0.01,
                 "compile_model": compiled,
             },
             "input_configs": [
@@ -44,6 +41,15 @@ def get_base_parametrization(compiled: bool = False) -> dict:
                 },
                 {
                     "input_info": {"input_name": "test_image"},
+                    "model_config": {
+                        "model_init_config": {
+                            "layers": [2],
+                            "kernel_width": 2,
+                            "kernel_height": 2,
+                            "down_stride_width": 2,
+                            "down_stride_height": 2,
+                        },
+                    },
                 },
                 {
                     "input_info": {"input_name": "test_tabular"},
@@ -78,6 +84,9 @@ def get_base_parametrization(compiled: bool = False) -> dict:
                         "target_cat_columns": ["Origin"],
                         "target_con_columns": ["Height"],
                     },
+                },
+                {
+                    "output_info": {"output_name": "test_output_sequence"},
                 },
             ],
         },
@@ -128,5 +137,6 @@ def test_multi_modal_multi_task(
     check_performance_result_wrapper(
         outputs=experiment.outputs,
         run_path=test_config.run_path,
-        thresholds=(0.80, 0.80),
+        max_thresholds=(0.80, 0.80),
+        min_thresholds=(2.0, 2.0),
     )

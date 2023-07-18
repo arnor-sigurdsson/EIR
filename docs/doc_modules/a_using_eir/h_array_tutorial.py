@@ -1,17 +1,17 @@
 from pathlib import Path
 from typing import Sequence
 
+import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-import matplotlib.pyplot as plt
 
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
 
 
 def get_tutorial_08_run_cnn_1_info() -> AutoDocExperimentInfo:
-    base_path = "docs/tutorials/tutorial_files/08_array_tutorial"
+    base_path = "docs/tutorials/tutorial_files/a_using_eir/08_array_tutorial"
 
-    conf_output_path = "eir_tutorials/08_array_tutorial/conf"
+    conf_output_path = "eir_tutorials/a_using_eir/08_array_tutorial/conf"
 
     command = [
         "eirtrain",
@@ -21,7 +21,8 @@ def get_tutorial_08_run_cnn_1_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/input_1d_cnn.yaml",
         "--output_configs",
         f"{conf_output_path}/outputs.yaml",
-        "--globals.output_folder=eir_tutorials/tutorial_runs/tutorial_08_run_cnn-1d",
+        "--globals.output_folder=eir_tutorials/tutorial_runs/"
+        "a_using_eir/tutorial_08_run_cnn-1d",
     ]
 
     mapping = [
@@ -30,7 +31,7 @@ def get_tutorial_08_run_cnn_1_info() -> AutoDocExperimentInfo:
     ]
 
     data_output_path = Path(
-        "eir_tutorials/08_array_tutorial/data/processed_sample_data.zip"
+        "eir_tutorials/a_using_eir/08_array_tutorial/data/processed_sample_data.zip"
     )
 
     get_data_folder = (
@@ -46,7 +47,7 @@ def get_tutorial_08_run_cnn_1_info() -> AutoDocExperimentInfo:
         {
             "command": [
                 "tree",
-                "eir_tutorials/08_array_tutorial/",
+                "eir_tutorials/a_using_eir/08_array_tutorial/",
                 "-L",
                 "3",
                 "-I",
@@ -75,9 +76,9 @@ def get_tutorial_08_run_cnn_1_info() -> AutoDocExperimentInfo:
 
 
 def get_tutorial_08_run_cnn_2_info() -> AutoDocExperimentInfo:
-    base_path = "docs/tutorials/tutorial_files/08_array_tutorial"
+    base_path = "docs/tutorials/tutorial_files/a_using_eir/08_array_tutorial"
 
-    conf_output_path = "eir_tutorials/08_array_tutorial/conf"
+    conf_output_path = "eir_tutorials/a_using_eir/08_array_tutorial/conf"
 
     command = [
         "eirtrain",
@@ -87,7 +88,8 @@ def get_tutorial_08_run_cnn_2_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/input_2d_cnn.yaml",
         "--output_configs",
         f"{conf_output_path}/outputs.yaml",
-        "--globals.output_folder=eir_tutorials/tutorial_runs/tutorial_08_run_cnn-2d",
+        "--globals.output_folder=eir_tutorials/tutorial_runs/"
+        "a_using_eir/tutorial_08_run_cnn-2d",
     ]
 
     mapping = [
@@ -96,7 +98,7 @@ def get_tutorial_08_run_cnn_2_info() -> AutoDocExperimentInfo:
     ]
 
     data_output_path = Path(
-        "eir_tutorials/08_array_tutorial/data/processed_sample_data.zip"
+        "eir_tutorials/a_using_eir/08_array_tutorial/data/processed_sample_data.zip"
     )
 
     ade = AutoDocExperimentInfo(
@@ -114,9 +116,9 @@ def get_tutorial_08_run_cnn_2_info() -> AutoDocExperimentInfo:
 
 
 def get_tutorial_08_run_cnn_3_info() -> AutoDocExperimentInfo:
-    base_path = "docs/tutorials/tutorial_files/08_array_tutorial"
+    base_path = "docs/tutorials/tutorial_files/a_using_eir/08_array_tutorial"
 
-    conf_output_path = "eir_tutorials/08_array_tutorial/conf"
+    conf_output_path = "eir_tutorials/a_using_eir/08_array_tutorial/conf"
 
     command = [
         "eirtrain",
@@ -126,7 +128,8 @@ def get_tutorial_08_run_cnn_3_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/input_3d_cnn.yaml",
         "--output_configs",
         f"{conf_output_path}/outputs.yaml",
-        "--globals.output_folder=eir_tutorials/tutorial_runs/tutorial_08_run_cnn-3d",
+        "--globals.output_folder=eir_tutorials/tutorial_runs/"
+        "a_using_eir/tutorial_08_run_cnn-3d",
     ]
 
     mapping = [
@@ -135,7 +138,7 @@ def get_tutorial_08_run_cnn_3_info() -> AutoDocExperimentInfo:
     ]
 
     data_output_path = Path(
-        "eir_tutorials/08_array_tutorial/data/processed_sample_data.zip"
+        "eir_tutorials/a_using_eir/08_array_tutorial/data/processed_sample_data.zip"
     )
 
     ade = AutoDocExperimentInfo(
@@ -153,9 +156,9 @@ def get_tutorial_08_run_cnn_3_info() -> AutoDocExperimentInfo:
 
 
 def get_tutorial_08_run_lcl_1_info() -> AutoDocExperimentInfo:
-    base_path = "docs/tutorials/tutorial_files/08_array_tutorial"
+    base_path = "docs/tutorials/tutorial_files/a_using_eir/08_array_tutorial"
 
-    conf_output_path = "eir_tutorials/08_array_tutorial/conf"
+    conf_output_path = "eir_tutorials/a_using_eir/08_array_tutorial/conf"
 
     command = [
         "eirtrain",
@@ -165,7 +168,8 @@ def get_tutorial_08_run_lcl_1_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/input_1d_lcl.yaml",
         "--output_configs",
         f"{conf_output_path}/outputs.yaml",
-        "--globals.output_folder=eir_tutorials/tutorial_runs/tutorial_08_run_lcl-1d",
+        "--globals.output_folder=eir_tutorials/tutorial_runs/"
+        "a_using_eir/tutorial_08_run_lcl-1d",
     ]
 
     mapping = [
@@ -174,7 +178,7 @@ def get_tutorial_08_run_lcl_1_info() -> AutoDocExperimentInfo:
     ]
 
     data_output_path = Path(
-        "eir_tutorials/08_array_tutorial/data/processed_sample_data.zip"
+        "eir_tutorials/a_using_eir/08_array_tutorial/data/processed_sample_data.zip"
     )
 
     ade = AutoDocExperimentInfo(
@@ -192,9 +196,9 @@ def get_tutorial_08_run_lcl_1_info() -> AutoDocExperimentInfo:
 
 
 def get_tutorial_08_run_lcl_2_info() -> AutoDocExperimentInfo:
-    base_path = "docs/tutorials/tutorial_files/08_array_tutorial"
+    base_path = "docs/tutorials/tutorial_files/a_using_eir/08_array_tutorial"
 
-    conf_output_path = "eir_tutorials/08_array_tutorial/conf"
+    conf_output_path = "eir_tutorials/a_using_eir/08_array_tutorial/conf"
 
     command = [
         "eirtrain",
@@ -204,7 +208,8 @@ def get_tutorial_08_run_lcl_2_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/input_2d_lcl.yaml",
         "--output_configs",
         f"{conf_output_path}/outputs.yaml",
-        "--globals.output_folder=eir_tutorials/tutorial_runs/tutorial_08_run_lcl-2d",
+        "--globals.output_folder=eir_tutorials/tutorial_runs/"
+        "a_using_eir/tutorial_08_run_lcl-2d",
     ]
 
     mapping = [
@@ -213,7 +218,7 @@ def get_tutorial_08_run_lcl_2_info() -> AutoDocExperimentInfo:
     ]
 
     data_output_path = Path(
-        "eir_tutorials/08_array_tutorial/data/processed_sample_data.zip"
+        "eir_tutorials/a_using_eir/08_array_tutorial/data/processed_sample_data.zip"
     )
 
     ade = AutoDocExperimentInfo(
@@ -231,9 +236,9 @@ def get_tutorial_08_run_lcl_2_info() -> AutoDocExperimentInfo:
 
 
 def get_tutorial_08_run_lcl_3_info() -> AutoDocExperimentInfo:
-    base_path = "docs/tutorials/tutorial_files/08_array_tutorial"
+    base_path = "docs/tutorials/tutorial_files/a_using_eir/08_array_tutorial"
 
-    conf_output_path = "eir_tutorials/08_array_tutorial/conf"
+    conf_output_path = "eir_tutorials/a_using_eir/08_array_tutorial/conf"
 
     command = [
         "eirtrain",
@@ -243,7 +248,8 @@ def get_tutorial_08_run_lcl_3_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/input_3d_lcl.yaml",
         "--output_configs",
         f"{conf_output_path}/outputs.yaml",
-        "--globals.output_folder=eir_tutorials/tutorial_runs/tutorial_08_run_lcl-3d",
+        "--globals.output_folder=eir_tutorials/tutorial_runs/"
+        "a_using_eir/tutorial_08_run_lcl-3d",
     ]
 
     mapping = [
@@ -252,13 +258,13 @@ def get_tutorial_08_run_lcl_3_info() -> AutoDocExperimentInfo:
     ]
 
     data_output_path = Path(
-        "eir_tutorials/08_array_tutorial/data/processed_sample_data.zip"
+        "eir_tutorials/a_using_eir/08_array_tutorial/data/processed_sample_data.zip"
     )
 
     make_comparison_plot = (
         _plot_performance,
         {
-            "base_dir": Path("eir_tutorials/tutorial_runs/"),
+            "base_dir": Path("eir_tutorials/tutorial_runs/a_using_eir/"),
             "output_path": Path(base_path, "figures", "val_comparison.png"),
         },
     )

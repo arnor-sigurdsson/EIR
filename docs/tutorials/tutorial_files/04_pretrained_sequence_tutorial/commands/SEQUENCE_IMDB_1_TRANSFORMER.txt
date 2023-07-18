@@ -1,4 +1,0 @@
-eirtrain \
---global_configs eir_tutorials/04_pretrained_sequence_tutorial/conf/04_imdb_globals.yaml \
---input_configs eir_tutorials/04_pretrained_sequence_tutorial/conf/04_imdb_input.yaml \
---output_configs eir_tutorials/04_pretrained_sequence_tutorial/conf/04_imdb_output.yaml

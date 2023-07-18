@@ -1,17 +1,28 @@
-Using EIR
-=========
+Using EIR - Supervised Learning
+===============================
 
 .. toctree::
     :maxdepth: 2
 
-    01_basic_tutorial.rst
-    02_tabular_tutorial.rst
-    03_sequence_tutorial.rst
-    04_pretrained_sequence_tutorial.rst
-    05_image_tutorial.rst
-    06_raw_bytes_tutorial.rst
-    07_multimodal_tutorial.rst
-    08_array_tutorial.rst
+    a_using_eir/01_basic_tutorial.rst
+    a_using_eir/02_tabular_tutorial.rst
+    a_using_eir/03_sequence_tutorial.rst
+    a_using_eir/04_pretrained_sequence_tutorial.rst
+    a_using_eir/05_image_tutorial.rst
+    a_using_eir/06_raw_bytes_tutorial.rst
+    a_using_eir/07_multimodal_tutorial.rst
+    a_using_eir/08_array_tutorial.rst
+
+
+Sequence Generation
+===================
+
+.. toctree::
+    :maxdepth: 2
+
+    c_sequence_output/01_sequence_generation.rst
+    c_sequence_output/02_sequence_to_sequence.rst
+    c_sequence_output/03_image_to_sequence.rst
 
 Customizing EIR
 ===============

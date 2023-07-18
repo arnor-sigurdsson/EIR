@@ -1,0 +1,4 @@
+eirtrain \
+--global_configs eir_tutorials/a_using_eir/03_sequence_tutorial/b_Anticancer_peptides/conf/03b_peptides_globals.yaml \
+--input_configs eir_tutorials/a_using_eir/03_sequence_tutorial/b_Anticancer_peptides/conf/03b_peptides_input.yaml \
+--output_configs eir_tutorials/a_using_eir/03_sequence_tutorial/b_Anticancer_peptides/conf/03b_peptides_output.yaml

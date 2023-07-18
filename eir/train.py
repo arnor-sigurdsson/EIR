@@ -1,83 +1,57 @@
-import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import (
-    Union,
-    Tuple,
-    List,
-    Dict,
-    TYPE_CHECKING,
-    Callable,
-    Optional,
-)
+from typing import TYPE_CHECKING, Callable, List, Optional, Tuple, Union
 
 import torch
 from aislib.misc_utils import ensure_path_exists
-from aislib.misc_utils import get_logger
 from ignite.engine import Engine
 from torch import nn
 from torch.optim.optimizer import Optimizer
-from torch.utils.data import DataLoader, WeightedRandomSampler
+from torch.utils.data import DataLoader, DistributedSampler, WeightedRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
 from eir.data_load import datasets
 from eir.data_load.data_utils import get_train_sampler
-from eir.data_load.label_setup import (
-    split_ids,
-    save_transformer_set,
-)
+from eir.data_load.label_setup import split_ids
 from eir.experiment_io.experiment_io import (
-    serialize_experiment,
     get_default_experiment_keys_to_serialize,
-    serialize_all_input_transformers,
     serialize_chosen_input_objects,
+    serialize_experiment,
 )
-from eir.models import al_meta_model
-from eir.models.model_setup import get_model, get_default_model_registry_per_input_type
+from eir.models.model_setup import get_model
+from eir.models.model_setup_modules.meta_setup import al_meta_model
 from eir.models.model_training_utils import run_lr_find
-from eir.setup.config import (
-    get_configs,
-    Configs,
-)
+from eir.setup.config import Configs, get_configs
 from eir.setup.input_setup import al_input_objects_as_dict, set_up_inputs_for_training
+from eir.setup.input_setup_modules.setup_tabular import serialize_all_input_transformers
 from eir.setup.output_setup import (
     al_output_objects_as_dict,
     set_up_outputs_for_training,
 )
+from eir.setup.output_setup_modules.sequence_output_setup import (
+    converge_sequence_input_and_output,
+)
 from eir.target_setup.target_label_setup import (
-    set_up_tabular_target_labels_wrapper,
     gather_all_ids_from_output_configs,
     read_manual_ids_if_exist,
-    get_tabular_target_file_infos,
+    set_up_all_targets_wrapper,
 )
-from eir.train_utils import distributed
-from eir.train_utils import utils
-from eir.train_utils.criteria import get_criteria, get_loss_callable
-from eir.train_utils.metrics import (
-    get_average_history_filepath,
-    get_default_metrics,
-)
-from eir.train_utils.optim import (
-    get_optimizer,
-    maybe_wrap_model_with_swa,
-)
+from eir.train_utils import distributed, utils
+from eir.train_utils.criteria import al_criteria_dict, get_criteria, get_loss_callable
+from eir.train_utils.metrics import get_average_history_filepath, get_default_metrics
+from eir.train_utils.optim import get_optimizer, maybe_wrap_model_with_swa
 from eir.train_utils.step_logic import (
+    Hooks,
     al_training_labels_target,
     get_default_hooks,
-    Hooks,
 )
 from eir.train_utils.train_handlers import configure_trainer
-from eir.train_utils.utils import (
-    call_hooks_stage_iterable,
-)
+from eir.train_utils.utils import call_hooks_stage_iterable
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
-    from eir.train_utils.metrics import (
-        al_step_metric_dict,
-        al_metric_record_dict,
-    )
+    from eir.train_utils.metrics import al_metric_record_dict, al_step_metric_dict
 
-al_criteria = Dict[str, Dict[str, Union[nn.CrossEntropyLoss, nn.MSELoss]]]
 
 utils.seed_everything()
 logger = get_logger(name=__name__, tqdm_compatible=True)
@@ -108,19 +82,19 @@ class Experiment:
     outputs: al_output_objects_as_dict
     train_loader: torch.utils.data.DataLoader
     valid_loader: torch.utils.data.DataLoader
-    valid_dataset: torch.utils.data.Dataset
+    valid_dataset: datasets.al_datasets
     model: al_meta_model
     optimizer: Optimizer
-    criteria: al_criteria
+    criteria: al_criteria_dict
     loss_function: Callable
     writer: SummaryWriter
     metrics: "al_metric_record_dict"
-    hooks: Union[Hooks, None]
+    hooks: Hooks
 
 
 def get_default_experiment(
     configs: Configs,
-    hooks: Union[Hooks, None] = None,
+    hooks: Hooks,
 ) -> "Experiment":
     run_folder = _prepare_run_folder(output_folder=configs.global_config.output_folder)
 
@@ -137,19 +111,12 @@ def get_default_experiment(
         manual_valid_ids=manual_valid_ids,
     )
 
-    target_labels_info = get_tabular_target_file_infos(
-        output_configs=configs.output_configs
-    )
-
-    custom_ops = hooks.custom_column_label_parsing_ops if hooks else None
-    target_labels = set_up_tabular_target_labels_wrapper(
-        tabular_target_file_infos=target_labels_info,
-        custom_label_ops=custom_ops,
+    target_labels = set_up_all_targets_wrapper(
         train_ids=train_ids,
         valid_ids=valid_ids,
-    )
-    save_transformer_set(
-        transformers_per_source=target_labels.label_transformers, run_folder=run_folder
+        run_folder=run_folder,
+        output_configs=configs.output_configs,
+        hooks=hooks,
     )
 
     inputs_as_dict = set_up_inputs_for_training(
@@ -164,7 +131,11 @@ def get_default_experiment(
 
     outputs_as_dict = set_up_outputs_for_training(
         output_configs=configs.output_configs,
-        target_transformers=target_labels.label_transformers,
+        input_objects=inputs_as_dict,
+        target_transformers=getattr(target_labels, "label_transformers", None),
+    )
+    inputs_as_dict = converge_sequence_input_and_output(
+        inputs=inputs_as_dict, outputs=outputs_as_dict
     )
 
     train_dataset, valid_dataset = datasets.set_up_datasets_from_configs(
@@ -172,6 +143,8 @@ def get_default_experiment(
         target_labels=target_labels,
         inputs_as_dict=inputs_as_dict,
         outputs_as_dict=outputs_as_dict,
+        train_ids_to_keep=train_ids,
+        valid_ids_to_keep=valid_ids,
     )
 
     train_sampler = get_train_sampler(
@@ -187,15 +160,11 @@ def get_default_experiment(
         num_workers=configs.global_config.dataloader_workers,
     )
 
-    default_registry = get_default_model_registry_per_input_type()
-
     model = get_model(
         global_config=configs.global_config,
         inputs_as_dict=inputs_as_dict,
         fusion_config=configs.fusion_config,
         outputs_as_dict=outputs_as_dict,
-        model_registry_per_input_type=default_registry,
-        model_registry_per_output_type={},
     )
 
     model = maybe_wrap_model_with_swa(
@@ -261,7 +230,7 @@ def _prepare_run_folder(output_folder: str) -> Path:
 
 def get_dataloaders(
     train_dataset: datasets.DatasetBase,
-    train_sampler: Union[None, WeightedRandomSampler],
+    train_sampler: Union[None, WeightedRandomSampler, DistributedSampler],
     valid_dataset: datasets.DatasetBase,
     batch_size: int,
     num_workers: int = 0,
@@ -388,7 +357,7 @@ def train(experiment: Experiment) -> None:
             optimizer=exp.optimizer,
             output_folder=utils.get_run_folder(output_folder=gc.output_folder),
         )
-        sys.exit(0)
+        return
 
     trainer = configure_trainer(trainer=trainer, experiment=experiment)
 

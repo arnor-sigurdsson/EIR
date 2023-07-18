@@ -13,20 +13,20 @@ class RunningStatistics:
     """
 
     def __init__(self, n_dims: int = 2):
-        self.n_dims = n_dims
-        self.n = 0
-        self.sum = 0
+        self.n_dims: int = n_dims
+        self.n: int = 0
+        self.sum: torch.Tensor = torch.empty(0)
 
-        self.shape = None
-        self.num_var = None
+        self.shape: torch.Size = torch.Size()
+        self.num_var: torch.Tensor = torch.empty(0)
 
     def update(self, data: torch.Tensor):
         data = data.view(*list(data.shape[: -self.n_dims]) + [-1])
 
         with torch.no_grad():
-            new_n = data.shape[-1]
-            new_var = data.var(-1)
-            new_sum = data.sum(-1)
+            new_n: int = data.shape[-1]
+            new_var: torch.Tensor = data.var(-1)
+            new_sum: torch.Tensor = data.sum(-1)
 
             if self.n == 0:
                 self.n = new_n
@@ -79,9 +79,9 @@ def get_all_optimizer_names() -> Sequence[str]:
     external_optimizers = set(_NAME_OPTIM_MAP.keys())
     base_optimizers = get_base_optimizer_names()
     all_optimizers = set.union(base_optimizers, external_optimizers)
-    all_optimizers = sorted(list(all_optimizers))
+    all_optimizers_list = sorted(list(all_optimizers))
 
-    return all_optimizers
+    return all_optimizers_list
 
 
 def get_all_timm_model_names() -> Sequence[str]:
@@ -105,6 +105,7 @@ def get_unsupported_hf_models() -> dict:
         "audio-spectrogram-transformer": "Not strictly sequence model.",
         "align": "Not strictly sequence model.",
         "altclip": "Not strictly sequence model.",
+        "autoformer": "Not strictly sequence model.",
         "beit": "Not strictly sequence model.",
         "bit": "Not strictly sequence model.",
         "blip": "Not strictly sequence model.",
@@ -114,7 +115,7 @@ def get_unsupported_hf_models() -> dict:
         "clap": "Not strictly sequence model.",
         "clip": "Not strictly sequence model.",
         "clipseg": "Not strictly sequence model.",
-        "chinese_clip": "Not strictly sequence model.",
+        "chinese_clip": "Not strictlyasequence model.",
         "conditional_detr": "Not strictly sequence model.",
         "convbert": "HF error.",
         "convnext": "Not strictly sequence model..",
@@ -164,6 +165,7 @@ def get_unsupported_hf_models() -> dict:
         "mobilenet_v1": "Not strictly sequence model.",
         "mobilenet_v2": "Not strictly sequence model.",
         "mobilevit": "Not strictly sequence model.",
+        "mobilevitv2": "Not strictly sequence model.",
         "mt5": "Not implemented in EIR for feature extraction yet.",
         "oneformer": "Not strictly sequence model.",
         "owlvit": "Not strictly sequence model.",
@@ -177,6 +179,7 @@ def get_unsupported_hf_models() -> dict:
         "sew-d": "Not strictly sequence model.",
         "speech_to_text": "Not strictly sequence model.",
         "speecht5": "Not strictly sequence model.",
+        "swiftformer": "Not strictly sequence model.",
         "swin": "Not strictly sequence model.",
         "swinv2": "Not strictly sequence model.",
         "swin2sr": "Not strictly sequence model.",
@@ -184,6 +187,7 @@ def get_unsupported_hf_models() -> dict:
         "tapas": "TapasModel requires the torch-scatter library.",
         "time_series_transformer": "Not strictly sequence model.",
         "timesformer": "Not strictly sequence model.",
+        "timm_backbone": "Not strictly sequence model.",
         "trajectory_transformer": "Not strictly sequence model.",
         "tvlt": "Not strictly sequence model.",
         "perceiver": "Not strictly sequence model.",

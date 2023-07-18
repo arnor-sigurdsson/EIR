@@ -3,16 +3,22 @@ from typing import Iterable
 
 from docs.doc_modules.a_using_eir import (
     a_basic_tutorial,
-    e_image_tutorial,
     b_tabular_tutorial,
     c_sequence_tutorial,
     d_pretrained_models_tutorial,
+    e_image_tutorial,
     f_binary_tutorial,
     g_multimodal_tutorial,
     h_array_tutorial,
 )
+from docs.doc_modules.api import generate_hf_sequence_info, generate_timm_api_info
 from docs.doc_modules.b_customizing_eir import a_customizing_fusion_tutorial
-from docs.doc_modules.experiments import make_tutorial_data, AutoDocExperimentInfo
+from docs.doc_modules.c_sequence_outputs import (
+    a_sequence_generation,
+    b_sequence_to_sequence,
+    c_image_captioning,
+)
+from docs.doc_modules.experiments import AutoDocExperimentInfo, make_tutorial_data
 
 
 def _get_a_using_eir_experiments() -> Iterable[AutoDocExperimentInfo]:
@@ -45,12 +51,32 @@ def _get_b_customizing_eir_experiments() -> Iterable[AutoDocExperimentInfo]:
     )
 
 
+def _get_c_sequence_outputs_experiments() -> Iterable[AutoDocExperimentInfo]:
+    a_experiments = a_sequence_generation.get_experiments()
+    b_experiments = b_sequence_to_sequence.get_experiments()
+    c_experiments = c_image_captioning.get_experiments()
+
+    return chain(
+        a_experiments,
+        b_experiments,
+        c_experiments,
+    )
+
+
 if __name__ == "__main__":
     a_using_eir_experiments = _get_a_using_eir_experiments()
+    c_sequence_outputs_experiments = _get_c_sequence_outputs_experiments()
     b_customizing_eir_experiments = _get_b_customizing_eir_experiments()
 
     experiment_iter = chain.from_iterable(
-        [a_using_eir_experiments, b_customizing_eir_experiments]
+        [
+            a_using_eir_experiments,
+            c_sequence_outputs_experiments,
+            b_customizing_eir_experiments,
+        ]
     )
     for experiment in experiment_iter:
         make_tutorial_data(auto_doc_experiment_info=experiment)
+
+    generate_timm_api_info.run_all()
+    generate_hf_sequence_info.run_all()

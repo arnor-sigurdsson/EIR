@@ -1,0 +1,20 @@
+input_info:
+  input_source: eir_tutorials/a_using_eir/02_tabular_tutorial/data/poker_hands_data/poker_hands_train.csv
+  input_name: poker_hands
+  input_type: tabular
+
+input_type_info:
+  input_cat_columns:
+          - S1
+          - C1
+          - S2
+          - C2
+          - S3
+          - C3
+          - S4
+          - C4
+          - S5
+          - C5
+
+model_config:
+  model_type: tabular

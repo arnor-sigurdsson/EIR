@@ -1,0 +1,11 @@
+output_folder: eir_tutorials/tutorial_runs/c_sequence_output/03_image_captioning
+valid_size: 500
+n_saved_models: 1
+checkpoint_interval: 500
+sample_interval: 500
+memory_dataset: false
+n_epochs: 3
+batch_size: 64
+lr: 0.0005
+optimizer: "adabelief"
+device: "mps"

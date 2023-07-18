@@ -1,4 +1,0 @@
-eirtrain \
---global_configs eir_tutorials/03_sequence_tutorial/a_IMDB/conf/03a_imdb_globals.yaml \
---input_configs eir_tutorials/03_sequence_tutorial/a_IMDB/conf/03a_imdb_input.yaml \
---output_configs eir_tutorials/03_sequence_tutorial/a_IMDB/conf/03a_imdb_output.yaml

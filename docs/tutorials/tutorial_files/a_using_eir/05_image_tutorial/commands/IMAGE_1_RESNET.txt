@@ -1,0 +1,4 @@
+eirtrain \
+--global_configs eir_tutorials/a_using_eir/05_image_tutorial/conf/globals.yaml \
+--input_configs eir_tutorials/a_using_eir/05_image_tutorial/conf/inputs.yaml \
+--output_configs eir_tutorials/a_using_eir/05_image_tutorial/conf/output.yaml

@@ -1,7 +1,7 @@
 import argparse
 import sys
 from contextlib import contextmanager
-from typing import Callable
+from typing import Callable, Generator
 
 from eir import __version__
 from eir.predict import main as main_predict
@@ -9,7 +9,7 @@ from eir.train import main as main_train
 
 
 @contextmanager
-def patch_sys_args(patched_args) -> None:
+def patch_sys_args(patched_args: list[str]) -> Generator[None, None, None]:
     old_args = sys.argv
     try:
         sys.argv = patched_args

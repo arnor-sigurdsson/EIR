@@ -4,8 +4,8 @@ import torch
 from torch import nn
 
 from eir import train
-from eir.models.meta.meta import MetaModel
-from eir.models.model_setup import get_output_modules
+from eir.models.meta.meta import FeatureExtractorProtocol, MetaModel, al_fused_features
+from eir.models.model_setup_modules.meta_setup import get_output_modules
 from eir.setup.config import get_configs
 from eir.train_utils import step_logic
 from eir.train_utils.utils import configure_global_eir_logging
@@ -49,7 +49,7 @@ class MyLSTMFusionModule(nn.Module):
     def num_out_features(self) -> int:
         return self.out_dim
 
-    def forward(self, inputs: Dict[str, torch.Tensor]) -> torch.Tensor:
+    def forward(self, inputs: Dict[str, FeatureExtractorProtocol]) -> al_fused_features:
         features = torch.cat(tuple(inputs.values()), dim=1)
         assert features.shape[1] == self.fusion_in_dim
 
@@ -64,18 +64,20 @@ def modify_experiment(experiment: train.Experiment) -> train.Experiment:
     input_modules = experiment.model.input_modules
     fusion_in_dim = sum(i.num_out_features for i in input_modules.values())
 
-    my_fusion_model = MyLSTMFusionModule(fusion_in_dim=fusion_in_dim, out_dim=128)
+    my_fusion_module = MyLSTMFusionModule(fusion_in_dim=fusion_in_dim, out_dim=128)
+    my_fusion_modules = nn.ModuleDict({"computed": my_fusion_module})
 
-    my_output_modules = get_output_modules(
+    my_output_modules, _ = get_output_modules(
         outputs_as_dict=experiment.outputs,
-        input_dimension=my_fusion_model.num_out_features,
+        computed_out_dimensions=my_fusion_module.num_out_features,
         device=experiment.configs.global_config.device,
     )
 
     my_model = MetaModel(
         input_modules=input_modules,
-        fusion_module=my_fusion_model,
+        fusion_modules=my_fusion_modules,
         output_modules=my_output_modules,
+        fusion_to_output_mapping={"ancestry_output": "computed"},
     )
 
     my_optimizer = torch.optim.Adam(

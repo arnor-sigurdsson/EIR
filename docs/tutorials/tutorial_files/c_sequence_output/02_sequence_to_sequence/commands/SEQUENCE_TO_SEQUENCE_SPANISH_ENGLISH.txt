@@ -1,0 +1,5 @@
+eirtrain \
+--global_configs eir_tutorials/c_sequence_output/02_sequence_to_sequence/conf/globals.yaml \
+--input_configs eir_tutorials/c_sequence_output/02_sequence_to_sequence/conf/input_spanish.yaml \
+--fusion_configs eir_tutorials/c_sequence_output/02_sequence_to_sequence/conf/fusion.yaml \
+--output_configs eir_tutorials/c_sequence_output/02_sequence_to_sequence/conf/output.yaml

@@ -1,0 +1,11 @@
+output_folder: eir_tutorials/tutorial_runs/c_sequence_output/02_seq_to_seq
+valid_size: 500
+n_saved_models: 1
+checkpoint_interval: 500
+sample_interval: 500
+memory_dataset: true
+n_epochs: 25
+batch_size: 256
+lr: 0.0005
+optimizer: "adabelief"
+device: "mps"

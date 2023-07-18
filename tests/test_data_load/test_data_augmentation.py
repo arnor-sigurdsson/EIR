@@ -6,13 +6,13 @@ import numpy as np
 import pytest
 import torch
 from hypothesis import given, settings
-from hypothesis.strategies import lists, integers, floats
+from hypothesis.strategies import floats, integers, lists
 from torch import nn
 from torch.nn import functional as F
 
 from eir.data_load import data_augmentation
 from tests.setup_tests.setup_modelling_test_data.setup_omics_test_data import (
-    _set_up_base_test_array,
+    _set_up_base_test_omics_array,
 )
 
 
@@ -105,7 +105,7 @@ def test_block_cutmix_omics_input(patched_indices: List[int]) -> None:
     """
     test_arrays = []
     for i in range(2):
-        test_array, *_ = _set_up_base_test_array(n_snps=1000)
+        test_array, *_ = _set_up_base_test_omics_array(n_snps=1000)
         test_array = torch.tensor(test_array).unsqueeze(0)
         test_arrays.append(test_array)
 
@@ -185,7 +185,7 @@ def test_uniform_cutmix_omics_input(patched_indices: List[int]):
     """
     test_arrays = []
     for i in range(2):
-        test_array, *_ = _set_up_base_test_array(n_snps=1000)
+        test_array, *_ = _set_up_base_test_omics_array(n_snps=1000)
         test_array = torch.tensor(test_array).unsqueeze(0)
         test_arrays.append(test_array)
 

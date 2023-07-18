@@ -1,0 +1,5 @@
+eirtrain \
+--global_configs eir_tutorials/a_using_eir/02_tabular_tutorial/conf/02_poker_hands_globals.yaml \
+--input_configs eir_tutorials/a_using_eir/02_tabular_tutorial/conf/02_poker_hands_input.yaml \
+--fusion_configs eir_tutorials/a_using_eir/02_tabular_tutorial/conf/02_poker_hands_fusion.yaml \
+--output_configs eir_tutorials/a_using_eir/02_tabular_tutorial/conf/02_poker_hands_output.yaml

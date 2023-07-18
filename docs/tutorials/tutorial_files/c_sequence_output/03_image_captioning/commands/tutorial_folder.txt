@@ -1,0 +1,11 @@
+eir_tutorials/c_sequence_output/03_image_captioning
+├── conf
+│   ├── fusion.yaml
+│   ├── globals.yaml
+│   ├── inputs_resnet18.yaml
+│   └── output.yaml
+└── data
+    └── image_captioning
+        ├── captions.csv
+        ├── conf
+        └── images

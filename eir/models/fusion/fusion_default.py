@@ -1,21 +1,19 @@
-from typing import Callable, Dict, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable, Dict
 
 import torch
-from aislib.misc_utils import get_logger
 from torch import nn
 
 from eir.models.layers import MLPResidualBlock, ResidualMLPConfig
 from eir.models.models_base import (
-    create_multi_task_blocks_with_first_adaptor_block,
     calculate_module_dict_outputs,
+    create_multi_task_blocks_with_first_adaptor_block,
 )
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     pass
 
-al_features = Callable[
-    [Dict[str, torch.Tensor]], Union[torch.Tensor, Dict[str, torch.Tensor]]
-]
+al_features = Callable[[Dict[str, torch.Tensor]], torch.Tensor]
 
 
 logger = get_logger(__name__)
@@ -25,7 +23,7 @@ def default_fuse_features(features: Dict[str, torch.Tensor]) -> torch.Tensor:
     return torch.cat(tuple(features.values()), dim=1)
 
 
-class FusionModule(nn.Module):
+class MLPResidualFusionModule(nn.Module):
     def __init__(
         self,
         model_config: ResidualMLPConfig,

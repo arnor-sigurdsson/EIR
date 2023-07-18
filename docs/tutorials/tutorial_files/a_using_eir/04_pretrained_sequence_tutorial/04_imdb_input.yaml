@@ -1,0 +1,22 @@
+input_info:
+  input_source: eir_tutorials/a_using_eir/04_pretrained_sequence_tutorial/data/IMDB/IMDB_Reviews
+  input_name: imdb_reviews
+  input_type: sequence
+
+input_type_info:
+        sampling_strategy_if_longer: "uniform"
+        max_length: 128
+        split_on: " "
+        min_freq: 10
+        tokenizer: "basic_english"
+        tokenizer_language: "en"
+
+model_config:
+        model_type: sequence-default
+        embedding_dim: 32
+        position: embed
+        pool: avg
+        model_init_config:
+          num_heads: 2
+          dropout: 0.2
+

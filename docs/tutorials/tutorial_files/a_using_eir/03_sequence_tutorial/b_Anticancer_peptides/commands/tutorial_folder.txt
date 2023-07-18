@@ -1,0 +1,10 @@
+eir_tutorials/a_using_eir/03_sequence_tutorial/
+├── b_Anticancer_peptides
+│   └── conf
+│       ├── 03b_peptides_globals.yaml
+│       ├── 03b_peptides_input.yaml
+│       └── 03b_peptides_output.yaml
+└── data
+    └── Anticancer_Peptides
+        ├── breast_cancer_labels.csv
+        └── breast_cancer_train

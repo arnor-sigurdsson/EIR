@@ -3,26 +3,19 @@ import os
 import random
 from functools import wraps
 from pathlib import Path
-from typing import (
-    Dict,
-    Sequence,
-    Callable,
-    Iterable,
-    Union,
-    Any,
-    Tuple,
-)
+from typing import Any, Callable, Dict, Iterable, Sequence, Tuple, Union
 
 import numpy as np
 import torch
-from aislib.misc_utils import get_logger, ensure_path_exists
+from aislib.misc_utils import ensure_path_exists
 from ignite.engine import Engine
 
 from eir.train_utils.distributed import (
-    only_call_on_master_node,
-    in_master_node,
     in_distributed_env,
+    in_master_node,
+    only_call_on_master_node,
 )
+from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -31,7 +24,7 @@ def get_run_folder(output_folder: str) -> Path:
     return Path(output_folder)
 
 
-def prep_sample_outfolder(
+def prepare_sample_output_folder(
     output_folder: str, output_name: str, column_name: str, iteration: int
 ) -> Path:
     sample_outfolder = (

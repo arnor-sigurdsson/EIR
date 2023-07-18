@@ -30,7 +30,7 @@ and so on:
 
 - ``seaborn`` : Statistical data visualization
 
-- ``joblib``  – Gael Varoquaux: Lightweight pipelining with Python functions
+- ``joblib`` : Lightweight pipelining with Python functions
 
 - ``tensorboard``  – Google Inc.: TensorBoard lets you watch Tensors Flow
 
@@ -56,13 +56,17 @@ and so on:
 
 - ``perceiver-pytorch``  – Phil Wang: Perceiver - Pytorch
 
-- ``timm``  – Ross Wightman: (Unofficial) PyTorch Image Models
+- ``timm``  – Ross Wightman: PyTorch Image Models
 
 - ``captum``  – PyTorch Team: Model interpretability for PyTorch
 
 - ``aioboto3``  – Terry Cain: Async boto3 wrapper
 
 - ``deeplake``  – activeloop.ai: Activeloop Deep Lake
+
+- ``termcolor`` : ANSI color formatting for output in terminal
+
+- ``tokenizers``  – Anthony MOI: Fast and Customizable Tokenizers
 
 - ``memory-profiler``  – Fabian Pedregosa: A module for monitoring memory usage of a python program
 
@@ -76,7 +80,7 @@ and so on:
 
 - ``ipykernel`` : IPython Kernel for Jupyter
 
-- ``coverage``  – Ned Batchelder and 211 others: Code coverage measurement for Python
+- ``coverage``  – Ned Batchelder and 213 others: Code coverage measurement for Python
 
 - ``snakeviz`` : A web-based viewer for Python profiler output
 
@@ -105,4 +109,12 @@ and so on:
 - ``pdf2image``  – Edouard Belval: A wrapper around the pdftoppm and pdftocairo command line tools to convert PDF to a PIL Image list.
 
 - ``vulture``  – Jendrik Seipp: Find dead code
+
+- ``mypy``  – Jukka Lehtosalo: Optional static typing for Python
+
+- ``types-pyyaml`` : Typing stubs for PyYAML
+
+- ``isort``  – Timothy Crosley: A Python utility / library to sort Python imports.
+
+- ``pytest-split``  – Jerry Pussinen: Pytest plugin which splits the test suite to equally sized sub suites based on test execution time.
 

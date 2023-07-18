@@ -1,12 +1,10 @@
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Union
+from typing import TYPE_CHECKING, Optional, Protocol
 
 import numpy as np
 
 from eir.data_load.label_setup import al_label_transformers_object
-from eir.interpretation.interpretation_utils import (
-    get_target_class_name,
-)
+from eir.interpretation.interpretation_utils import get_target_class_name
 
 if TYPE_CHECKING:
     from eir.interpretation.interpretation import SampleAttribution
@@ -24,17 +22,27 @@ def analyze_array_input_attributions(
         )
 
 
+class ArrayConsumerCallable(Protocol):
+    def __call__(
+        self,
+        attribution: Optional["SampleAttribution"],
+    ) -> Optional[dict[str, np.ndarray]]:
+        ...
+
+
 def get_array_sum_consumer(
     target_transformer: "al_label_transformers_object",
     input_name: str,
     output_name: str,
     target_column: str,
     column_type: str,
-) -> Callable[[Union["SampleAttribution", None]], np.ndarray]:
-    results = {}
-    n_samples = {}
+) -> ArrayConsumerCallable:
+    results: dict[str, np.ndarray] = {}
+    n_samples: dict[str, int] = {}
 
-    def _consumer(attribution: Union["SampleAttribution", None]) -> np.ndarray:
+    def _consumer(
+        attribution: Optional["SampleAttribution"],
+    ) -> Optional[dict[str, np.ndarray]]:
         nonlocal results
         nonlocal n_samples
 
@@ -59,5 +67,7 @@ def get_array_sum_consumer(
         else:
             results[cur_label_name] += sample_acts
             n_samples[cur_label_name] += 1
+
+        return None
 
     return _consumer

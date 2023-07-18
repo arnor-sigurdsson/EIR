@@ -2,11 +2,19 @@ import reprlib
 from collections import defaultdict
 from functools import partial
 from inspect import signature
-from typing import Callable, List, Type, Dict, TYPE_CHECKING, Optional, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    List,
+    MutableMapping,
+    Optional,
+    Type,
+)
 
 import torch
 from adabelief_pytorch import AdaBelief
-from aislib.misc_utils import get_logger
 from aislib.pytorch_modules import AdaHessian
 from torch import nn
 from torch.optim import SGD, Adam
@@ -16,8 +24,10 @@ from torch_optimizer import get as get_custom_opt
 
 from eir.models.model_training_utils import add_wd_to_model_params
 from eir.setup.setup_utils import get_base_optimizer_names
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
+    from eir.models.model_setup_modules.meta_setup import al_meta_model
     from eir.setup.schemas import GlobalConfig
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
@@ -70,14 +80,18 @@ def _get_optimizer_class(optimizer_name: str) -> Type[Optimizer]:
     return optimizer_class
 
 
-def _create_optimizer_class_getter(optimizer_name: str) -> Dict[str, Type[Optimizer]]:
+def _create_optimizer_class_getter(
+    optimizer_name: str,
+) -> MutableMapping[str, Type[Optimizer]]:
     """
     We use an interface with the external optimizer library as a default factory,
     meaning that if we cannot find an optimizer in our base optimizer, we check if
     they exist in the external library.
     """
     default_factory = partial(_get_external_optimizers, optimizer_name)
-    optimizer_getter = defaultdict(default_factory)
+    optimizer_getter: MutableMapping[str, Type[Optimizer]] = defaultdict(
+        default_factory
+    )
 
     base_optimizers = get_base_optimizers_dict()
     optimizer_getter.update(base_optimizers)
@@ -100,7 +114,7 @@ def get_base_optimizers_dict() -> Dict[str, Type[Optimizer]]:
 
 def _get_constructor_arguments(
     params: List, global_config: "GlobalConfig", optimizer_class: Type[Optimizer]
-):
+) -> dict[str, Any]:
     base = {"params": params, "lr": global_config.lr, "weight_decay": global_config.wd}
     all_extras = {
         "betas": (global_config.b1, global_config.b2),
@@ -112,13 +126,13 @@ def _get_constructor_arguments(
     return {**base, **common_extras}
 
 
-def get_optimizer_backward_kwargs(optimizer_name: str) -> Dict:
+def get_optimizer_backward_kwargs(optimizer_name: str) -> dict[str, Any]:
     if optimizer_name == "adahessian":
         return {"create_graph": True}
     return {}
 
 
-def get_optimizer_defaults(optimizer: Optimizer) -> Dict:
+def get_optimizer_defaults(optimizer: Optimizer) -> dict:
     return optimizer.defaults
 
 
@@ -134,8 +148,10 @@ class AttrDelegatedSWAWrapper(torch.optim.swa_utils.AveragedModel):
 
 
 def maybe_wrap_model_with_swa(
-    n_iter_before_swa: Optional[int], model: nn.Module, device: torch.device
-) -> Union[nn.Module, AttrDelegatedSWAWrapper]:
+    n_iter_before_swa: Optional[int],
+    model: "al_meta_model",
+    device: torch.device,
+) -> "al_meta_model":
     if n_iter_before_swa is None:
         return model
 

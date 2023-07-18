@@ -1,18 +1,18 @@
 from copy import deepcopy
 from math import isclose
 
+import numpy as np
 import pytest
 import torch
-from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.metrics import mean_squared_error
+from sklearn.preprocessing import LabelEncoder, StandardScaler
 
-from eir.models.output.mlp_residual import ResidualMLPOutputModelConfig
-from eir.setup.output_setup import TabularOutputInfo
-from eir.setup.schemas import (
-    OutputConfig,
-    OutputInfoConfig,
-    TabularOutputTypeConfig,
+from eir.models.output.mlp_residual import ResidualMLPOutputModuleConfig
+from eir.models.output.output_module_setup import TabularOutputModuleConfig
+from eir.setup.output_setup_modules.tabular_output_setup import (
+    ComputedTabularOutputInfo,
 )
-from eir.models.output.output_module_setup import OutputModuleConfig
+from eir.setup.schemas import OutputConfig, OutputInfoConfig, TabularOutputTypeConfig
 from eir.train_utils import metrics
 from eir.train_utils.criteria import get_criteria
 
@@ -93,7 +93,7 @@ def get_calculate_batch_metrics_data_test_kwargs():
 
 def _get_metrics_test_module_test_outputs_as_dict():
     test_outputs_as_dict = {
-        "test_output": TabularOutputInfo(
+        "test_output": ComputedTabularOutputInfo(
             output_config=OutputConfig(
                 output_info=OutputInfoConfig(
                     output_name="test_output", output_type="tabular", output_source=None
@@ -102,8 +102,8 @@ def _get_metrics_test_module_test_outputs_as_dict():
                     target_con_columns=["Height", "BMI"],
                     target_cat_columns=["Origin"],
                 ),
-                model_config=OutputModuleConfig(
-                    model_init_config=ResidualMLPOutputModelConfig()
+                model_config=TabularOutputModuleConfig(
+                    model_init_config=ResidualMLPOutputModuleConfig()
                 ),
             ),
             num_outputs_per_target={},
@@ -129,11 +129,67 @@ def _get_add_loss_to_metrics_kwargs(outputs_as_dict):
     return {"losses": losses, "outputs_as_dict": outputs_as_dict}
 
 
+def test_calc_rmse_multiple_samples():
+    outputs = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+    labels = np.array([1.1, 2.2, 3.3, 4.4, 5.5])
+    scaler = StandardScaler()
+    scaler.fit(labels.reshape(-1, 1))
+    target_transformers = {"output1": {"column1": scaler}}
+
+    rmse = metrics.calc_rmse(
+        outputs=outputs,
+        labels=labels,
+        target_transformers=target_transformers,
+        output_name="output1",
+        column_name="column1",
+    )
+    labels_transformed = scaler.inverse_transform(labels.reshape(-1, 1)).squeeze()
+    outputs_transformed = scaler.inverse_transform(outputs.reshape(-1, 1)).squeeze()
+    expected_rmse = np.sqrt(mean_squared_error(labels_transformed, outputs_transformed))
+
+    assert np.isclose(rmse, expected_rmse)
+
+
+def test_calc_rmse_single_sample():
+    outputs = np.array([1.0])
+    labels = np.array([1.1])
+    scaler = StandardScaler()
+    scaler.fit(labels.reshape(-1, 1))
+    target_transformers = {"output1": {"column1": scaler}}
+
+    rmse = metrics.calc_rmse(
+        outputs=outputs,
+        labels=labels,
+        target_transformers=target_transformers,
+        output_name="output1",
+        column_name="column1",
+    )
+    expected_rmse = np.abs(labels[0] - outputs[0])
+
+    assert np.isclose(rmse, expected_rmse)
+
+
+def test_calc_rmse_no_samples():
+    outputs = np.array([])
+    labels = np.array([])
+    scaler = StandardScaler()
+    target_transformers = {"output1": {"column1": scaler}}
+
+    with pytest.raises(ValueError):
+        metrics.calc_rmse(
+            outputs=outputs,
+            labels=labels,
+            target_transformers=target_transformers,
+            output_name="output1",
+            column_name="column1",
+        )
+
+
 def test_calculate_losses_good():
     """
     Note that CrossEntropy applies LogSoftmax() before calculating the NLLLoss().
 
-    We expect the the CrossEntropyLosses to be around 0.9048
+    We expect the CrossEntropyLosses to be around 0.9048
 
         >>> loss = torch.nn.CrossEntropyLoss()
         >>> input_ = torch.zeros(1, 5)
@@ -321,10 +377,10 @@ def test_get_model_l1_loss(get_l1_test_model):
                     {
                         "input_info": {"input_name": "test_genotype"},
                         "model_config": {
-                            "model_type": "mlp-split",
+                            "model_type": "lcl-simple",
                             "model_init_config": {
                                 "fc_repr_dim": 8,
-                                "split_mlp_num_splits": 64,
+                                "num_lcl_chunks": 64,
                                 "l1": 1e-03,
                             },
                         },

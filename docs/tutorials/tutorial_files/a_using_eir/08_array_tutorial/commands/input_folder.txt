@@ -1,0 +1,7 @@
+eir_tutorials/a_using_eir/08_array_tutorial/data
+├── processed_sample_data
+│   ├── arrays_1d
+│   ├── arrays_2d
+│   ├── arrays_3d
+│   └── human_origins_labels.csv
+└── processed_sample_data.zip

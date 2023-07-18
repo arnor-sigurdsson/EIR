@@ -1,0 +1,22 @@
+input_info:
+  input_source: eir_tutorials/a_using_eir/03_sequence_tutorial/data/Anticancer_Peptides/breast_cancer_train
+  input_name: peptide_sequences
+  input_type: sequence
+
+input_type_info:
+        max_length: "max"
+        split_on: ""
+        min_freq: 1
+
+model_config:
+        model_type: sequence-default
+        position: embed
+        embedding_dim: 32
+        pool: avg
+        model_init_config:
+          num_heads: 8
+          dropout: 0.2
+
+interpretation_config:
+  num_samples_to_interpret: 30
+  interpretation_sampling_strategy: random_sample

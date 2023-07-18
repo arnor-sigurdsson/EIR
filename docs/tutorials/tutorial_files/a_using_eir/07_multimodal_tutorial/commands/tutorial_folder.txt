@@ -1,0 +1,15 @@
+eir_tutorials/a_using_eir/07_multimodal_tutorial/
+├── conf
+│   ├── 07_apx-a_input_description_pretrained.yaml
+│   ├── 07_apx-b_mt_input_tabular.yaml
+│   ├── 07_apx-b_mt_output.yaml
+│   ├── 07_fusion.yaml
+│   ├── 07_globals.yaml
+│   ├── 07_input_description.yaml
+│   ├── 07_input_image.yaml
+│   ├── 07_input_tabular.yaml
+│   └── 07_output.yaml
+└── data
+    ├── descriptions.csv
+    ├── images
+    └── tabular.csv

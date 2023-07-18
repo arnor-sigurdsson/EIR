@@ -1,0 +1,11 @@
+eir_tutorials/a_using_eir/05_image_tutorial/
+├── conf
+│   ├── globals.yaml
+│   ├── inputs.yaml
+│   ├── inputs_efficientnet_b0.yaml
+│   ├── inputs_resnet18.yaml
+│   └── output.yaml
+└── data
+    └── hot_dog_not_hot_dog
+        ├── food_images
+        └── labels.csv

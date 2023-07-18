@@ -1,15 +1,16 @@
 import os
 from copy import copy
 from functools import wraps
-from typing import Callable, Any, TYPE_CHECKING, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Optional, Tuple, Union
 
-from aislib.misc_utils import get_logger
 from torch import distributed as dist
 from torch.nn.parallel import DistributedDataParallel
 
+from eir.utils.logging import get_logger
+
 if TYPE_CHECKING:
+    from eir.models.model_setup_modules.meta_setup import al_meta_model
     from eir.setup.config import Configs
-    from eir.models.model_setup import al_fusion_models
 
 logger = get_logger(name=__name__)
 
@@ -38,13 +39,18 @@ def maybe_initialize_distributed_environment(
     return configs_copy, local_rank
 
 
-def maybe_make_model_distributed(device: str, model: "al_fusion_models"):
+def maybe_make_model_distributed(
+    device: str, model: "al_meta_model"
+) -> "al_meta_model":
     if not in_distributed_env():
         return model
 
     local_rank = int(os.environ["LOCAL_RANK"])
 
-    ddp_kwargs = {"device_ids": None, "output_device": None}
+    ddp_kwargs: dict[str, Optional[int] | Optional[list[int]]] = {
+        "device_ids": None,
+        "output_device": None,
+    }
     if "cuda" in device:
         ddp_kwargs = {"device_ids": [local_rank], "output_device": local_rank}
 

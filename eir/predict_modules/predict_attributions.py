@@ -3,15 +3,15 @@ from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 from random import sample
-from typing import Literal, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, Union
 
-from aislib.misc_utils import ensure_path_exists, get_logger
+from aislib.misc_utils import ensure_path_exists
 from torch import nn
 from torch.utils.data import DataLoader
 
 from eir.data_load import label_setup
 from eir.experiment_io.experiment_io import LoadedTrainExperiment
-from eir.interpretation.interpretation import attribution_analysis_wrapper
+from eir.interpretation.interpretation import tabular_attribution_analysis_wrapper
 from eir.predict_modules.predict_data import set_up_default_dataset
 from eir.predict_modules.predict_input_setup import set_up_inputs_for_predict
 from eir.predict_modules.predict_target_setup import get_target_labels_for_testing
@@ -20,24 +20,27 @@ from eir.setup.input_setup import al_input_objects_as_dict
 from eir.setup.output_setup import al_output_objects_as_dict
 from eir.train import check_dataset_and_batch_size_compatibility
 from eir.train_utils.step_logic import Hooks
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
-    from eir.predict import PredictConfig
+    from eir.predict import PredictExperiment
 
 logger = get_logger(name=__name__)
 
 
 def compute_predict_attributions(
     loaded_train_experiment: "LoadedTrainExperiment",
-    predict_config: "PredictConfig",
+    predict_config: "PredictExperiment",
 ) -> None:
-    gc = predict_config.train_configs_overloaded.global_config
+    gc = predict_config.configs.global_config
 
-    background_source = predict_config.predict_specific_cl_args.act_background_source
+    background_source = (
+        predict_config.predict_specific_cl_args.attribution_background_source
+    )
     background_source_config = get_background_source_config(
         background_source_in_predict_cl_args=background_source,
         train_configs=loaded_train_experiment.configs,
-        predict_configs=predict_config.train_configs_overloaded,
+        predict_configs=predict_config.configs,
     )
     background_dataloader = _get_predict_background_loader(
         batch_size=gc.batch_size,
@@ -53,15 +56,17 @@ def compute_predict_attributions(
         predict_config=predict_config,
     )
 
-    attribution_outfolder_callable = partial(
-        _get_predict_attribution_outfolder_target,
-        predict_outfolder=Path(predict_config.predict_specific_cl_args.output_folder),
+    attribution_output_folder_callable = partial(
+        _get_predict_attribution_output_folder_target,
+        predict_output_folder=Path(
+            predict_config.predict_specific_cl_args.output_folder
+        ),
     )
 
-    attribution_analysis_wrapper(
+    tabular_attribution_analysis_wrapper(
         model=predict_config.model,
         experiment=overloaded_train_experiment,
-        outfolder_target_callable=attribution_outfolder_callable,
+        output_folder_target_callable=attribution_output_folder_callable,
         dataset_to_interpret=predict_config.test_dataset,
         background_loader=background_dataloader,
     )
@@ -102,7 +107,7 @@ class LoadedTrainExperimentMixedWithPredict(LoadedTrainExperiment):
 
 def _overload_train_experiment_for_predict_attributions(
     train_config: LoadedTrainExperiment,
-    predict_config: "PredictConfig",
+    predict_config: "PredictExperiment",
 ) -> "LoadedTrainExperimentMixedWithPredict":
     """
     TODO:   Possibly set inputs=None as a field in LoadedTrainExperiment that then gets
@@ -114,7 +119,7 @@ def _overload_train_experiment_for_predict_attributions(
 
     mixed_experiment_kwargs = train_experiment_copy.__dict__
     mixed_experiment_kwargs["model"] = predict_config.model
-    mixed_experiment_kwargs["configs"] = predict_config.train_configs_overloaded
+    mixed_experiment_kwargs["configs"] = predict_config.configs
     mixed_experiment_kwargs["inputs"] = predict_config.inputs
 
     mixed_experiment = LoadedTrainExperimentMixedWithPredict(**mixed_experiment_kwargs)
@@ -145,9 +150,13 @@ def _get_predict_background_loader(
         k=num_attribution_background_samples,
     )
 
+    custom_ops = None
+    if loaded_hooks is not None:
+        custom_ops = loaded_hooks.custom_column_label_parsing_ops
+
     target_labels = get_target_labels_for_testing(
         configs_overloaded_for_predict=configs,
-        custom_column_label_parsing_ops=loaded_hooks.custom_column_label_parsing_ops,
+        custom_column_label_parsing_ops=custom_ops,
         ids=background_ids_sampled,
     )
 
@@ -179,12 +188,12 @@ def _get_predict_background_loader(
     return background_loader
 
 
-def _get_predict_attribution_outfolder_target(
-    predict_outfolder: Path, output_name: str, column_name: str, input_name: str
+def _get_predict_attribution_output_folder_target(
+    predict_output_folder: Path, output_name: str, column_name: str, input_name: str
 ) -> Path:
-    attribution_outfolder = (
-        predict_outfolder / output_name / column_name / "attributions" / input_name
+    attribution_output_folder = (
+        predict_output_folder / output_name / column_name / "attributions" / input_name
     )
-    ensure_path_exists(path=attribution_outfolder, is_folder=True)
+    ensure_path_exists(path=attribution_output_folder, is_folder=True)
 
-    return attribution_outfolder
+    return attribution_output_folder

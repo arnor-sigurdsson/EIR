@@ -1,14 +1,17 @@
+import textwrap
 from pathlib import Path
-from typing import Sequence, List
+from typing import List, Sequence
+
+import pandas as pd
 
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
 from docs.doc_modules.utils import get_saved_model_path
 
 
 def get_tutorial_01_run_1_gln_info() -> AutoDocExperimentInfo:
-    base_path = "docs/tutorials/tutorial_files/01_basic_tutorial"
+    base_path = "docs/tutorials/tutorial_files/a_using_eir/01_basic_tutorial"
 
-    conf_output_path = "eir_tutorials/01_basic_tutorial/conf"
+    conf_output_path = "eir_tutorials/a_using_eir/01_basic_tutorial/conf"
 
     command = [
         "eirtrain",
@@ -26,7 +29,7 @@ def get_tutorial_01_run_1_gln_info() -> AutoDocExperimentInfo:
     ]
 
     data_output_path = Path(
-        "eir_tutorials/01_basic_tutorial/data/processed_sample_data.zip"
+        "eir_tutorials/a_using_eir/01_basic_tutorial/data/processed_sample_data.zip"
     )
 
     get_data_folder = (
@@ -52,7 +55,7 @@ def get_tutorial_01_run_1_gln_info() -> AutoDocExperimentInfo:
         {
             "command": [
                 "tree",
-                "eir_tutorials/01_basic_tutorial/",
+                "eir_tutorials/a_using_eir/01_basic_tutorial/",
                 "-L",
                 "3",
                 "-I",
@@ -67,7 +70,7 @@ def get_tutorial_01_run_1_gln_info() -> AutoDocExperimentInfo:
         {
             "command": [
                 "tree",
-                "eir_tutorials/tutorial_runs/tutorial_01_run/",
+                "eir_tutorials/tutorial_runs/a_using_eir/tutorial_01_run/",
                 "-I",
                 "tensorboard_logs|serializations|transformers|*.yaml|*.pt|*.log",
                 "--noreport",
@@ -107,9 +110,9 @@ def get_tutorial_01_run_1_gln_info() -> AutoDocExperimentInfo:
 
 
 def get_tutorial_01_run_2_gln_info() -> AutoDocExperimentInfo:
-    base_path = "docs/tutorials/tutorial_files/01_basic_tutorial"
+    base_path = "docs/tutorials/tutorial_files/a_using_eir/01_basic_tutorial"
 
-    conf_output_path = "eir_tutorials/01_basic_tutorial/conf"
+    conf_output_path = "eir_tutorials/a_using_eir/01_basic_tutorial/conf"
 
     command = [
         "eirtrain",
@@ -120,7 +123,7 @@ def get_tutorial_01_run_2_gln_info() -> AutoDocExperimentInfo:
         "--output_configs",
         f"{conf_output_path}/tutorial_01_outputs.yaml",
         "--tutorial_01_globals.output_folder=eir_tutorials/tutorial_runs"
-        "/tutorial_01_run_lr=0.002_epochs=20",
+        "/a_using_eir/tutorial_01_run_lr-0.002_epochs-20",
         "--tutorial_01_globals.lr=0.002",
         "--tutorial_01_globals.n_epochs=20",
     ]
@@ -151,11 +154,11 @@ def get_tutorial_01_run_2_gln_predict_info() -> AutoDocExperimentInfo:
     We are abusing the `make_tutorial_data` here a bit by switching to the predict
     code, but we'll allow it for now.
     """
-    base_path = "docs/tutorials/tutorial_files/01_basic_tutorial"
+    base_path = "docs/tutorials/tutorial_files/a_using_eir/01_basic_tutorial"
 
-    conf_output_path = "eir_tutorials/01_basic_tutorial/conf"
+    conf_output_path = "eir_tutorials/a_using_eir/01_basic_tutorial/conf"
 
-    run_1_output_path = "eir_tutorials/tutorial_runs/tutorial_01_run"
+    run_1_output_path = "eir_tutorials/tutorial_runs/a_using_eir/tutorial_01_run"
 
     command = [
         "eirpredict",
@@ -181,7 +184,19 @@ def get_tutorial_01_run_2_gln_predict_info() -> AutoDocExperimentInfo:
             "calculated_metrics",
             "tutorial_data/calculated_metrics_test.json",
         ),
+        (
+            "Origin/predictions.csv",
+            "tutorial_data/predictions_test.csv",
+        ),
     ]
+
+    csv_preview_func = (
+        csv_preview,
+        {
+            "run_path": Path(run_1_output_path),
+            "output_path": Path(base_path, "csv_preview.html"),
+        },
+    )
 
     ade = AutoDocExperimentInfo(
         name="GLN_1_PREDICT",
@@ -192,7 +207,7 @@ def get_tutorial_01_run_2_gln_predict_info() -> AutoDocExperimentInfo:
         command=command,
         files_to_copy_mapping=mapping,
         pre_run_command_modifications=(_add_model_path_to_command,),
-        post_run_functions=(),
+        post_run_functions=(csv_preview_func,),
         force_run_command=True,
     )
 
@@ -200,7 +215,7 @@ def get_tutorial_01_run_2_gln_predict_info() -> AutoDocExperimentInfo:
 
 
 def _get_model_path_for_predict() -> str:
-    run_1_output_path = "eir_tutorials/tutorial_runs/tutorial_01_run"
+    run_1_output_path = "eir_tutorials/tutorial_runs/a_using_eir/tutorial_01_run"
     model_path = get_saved_model_path(run_folder=Path(run_1_output_path))
 
     return model_path
@@ -210,6 +225,21 @@ def _add_model_path_to_command(command: List[str]) -> List[str]:
     model_path = _get_model_path_for_predict()
     command = [x.replace("FILL_MODEL", model_path) for x in command]
     return command
+
+
+def csv_preview(run_path: Path, output_path: Path) -> None:
+    csv_path = run_path / "ancestry_output/Origin/predictions.csv"
+    assert csv_path.exists()
+
+    df = pd.read_csv(csv_path)
+    df = df.round(2)
+    df.columns = ["<br>".join(textwrap.wrap(name, width=20)) for name in df.columns]
+
+    preview = df.head(5).to_html(index=False, escape=False)
+
+    with open(output_path, "w") as f:
+        f.write(preview)
+        f.write("<br>")
 
 
 def get_experiments() -> Sequence[AutoDocExperimentInfo]:

@@ -1,12 +1,14 @@
 from pathlib import Path
-from typing import Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, Tuple
 
 import numpy as np
 
-from tests.setup_tests.setup_modelling_test_data.setup_test_data_utils import (
+from tests.setup_tests.setup_modelling_test_data.setup_targets_test_data import (
+    get_current_test_label_values,
     set_up_label_file_writing,
     set_up_label_line_dict,
-    get_current_test_label_values,
+)
+from tests.setup_tests.setup_modelling_test_data.setup_test_data_utils import (
     set_up_test_data_root_outpath,
 )
 
@@ -15,7 +17,7 @@ if TYPE_CHECKING:
 
 
 def create_test_array_data_and_labels(
-    test_data_config: "TestDataConfig", array_outfolder: Path
+    test_data_config: "TestDataConfig", array_output_folder: Path
 ) -> Path:
     c = test_data_config
 
@@ -24,11 +26,11 @@ def create_test_array_data_and_labels(
         base_path=c.scoped_tmp_path, fieldnames=fieldnames, extra_name="_arrays"
     )
 
-    array_outfolder = set_up_test_data_root_outpath(base_folder=array_outfolder)
+    array_output_folder = set_up_test_data_root_outpath(base_folder=array_output_folder)
 
     for cls, cls_integer in c.target_classes.items():
         for sample_idx in range(c.n_per_class):
-            sample_output_path = array_outfolder / f"{sample_idx}_{cls}"
+            sample_output_path = array_output_folder / f"{sample_idx}_{cls}"
 
             num_active_elements_in_sample = _create_and_save_test_array(
                 test_data_config=c,
@@ -50,7 +52,7 @@ def create_test_array_data_and_labels(
 
     label_file_handle.close()
 
-    return array_outfolder
+    return array_output_folder
 
 
 def _create_and_save_test_array(

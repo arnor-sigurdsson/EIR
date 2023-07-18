@@ -1,0 +1,5 @@
+model_config:
+  layers:
+  - 2
+  rb_do: 0.25
+model_type: mlp-residual

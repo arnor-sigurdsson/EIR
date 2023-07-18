@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Union, Optional
+from typing import Optional, Union
 
 import numpy as np
 import torch
@@ -15,12 +15,14 @@ def array_load_wrapper(
 ) -> np.ndarray:
     if deeplake_ops.is_deeplake_dataset(data_source=input_source):
         assert deeplake_inner_key is not None
+        assert isinstance(data_pointer, int)
         array_data = _load_deeplake_sample(
             data_pointer=data_pointer,
             input_source=input_source,
             inner_key=deeplake_inner_key,
         )
     else:
+        assert isinstance(data_pointer, Path)
         array_data = np.load(str(data_pointer))
 
     return array_data

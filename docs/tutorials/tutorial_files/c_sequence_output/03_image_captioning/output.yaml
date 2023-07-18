@@ -1,0 +1,16 @@
+output_info:
+  output_source: eir_tutorials/c_sequence_output/03_image_captioning/data/image_captioning/captions.csv
+  output_name: captions
+  output_type: sequence
+
+output_type_info:
+  max_length: 32
+  split_on: null
+  tokenizer: "bpe"
+  adaptive_tokenizer_max_vocab_size: 1024
+  sampling_strategy_if_longer: "uniform"
+  min_freq: 1
+
+sampling_config:
+  generated_sequence_length: 64
+  n_eval_inputs: 10

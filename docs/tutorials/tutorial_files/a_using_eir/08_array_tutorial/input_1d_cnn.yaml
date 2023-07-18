@@ -1,0 +1,10 @@
+input_info:
+  input_source: eir_tutorials/a_using_eir/08_array_tutorial/data/processed_sample_data/arrays_1d
+  input_name: genotype_as_array
+  input_type: array
+
+model_config:
+  model_type: cnn
+  model_init_config:
+    kernel_height: 1
+    kernel_width: 4

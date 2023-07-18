@@ -1,6 +1,9 @@
-from typing import Sequence, Dict, Set
+from typing import Dict, Sequence
 
-from eir.models.tabular.tabular import SimpleTabularModelConfig, SimpleTabularModel
+from eir.models.input.tabular.tabular import (
+    SimpleTabularModel,
+    SimpleTabularModelConfig,
+)
 
 
 def get_tabular_model(
@@ -8,7 +11,7 @@ def get_tabular_model(
     cat_columns: Sequence[str],
     con_columns: Sequence[str],
     device: str,
-    unique_label_values: Dict[str, Set[str]],
+    unique_label_values: Dict[str, set[int]],
 ) -> SimpleTabularModel:
     tabular_model = SimpleTabularModel(
         model_init_config=model_init_config,

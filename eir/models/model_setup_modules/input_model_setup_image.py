@@ -1,36 +1,54 @@
 from copy import copy
-from typing import Callable, Type, Dict, Union
+from typing import Any, Dict, Union
 
 import timm
-from aislib.misc_utils import get_logger
 from torch import nn
 
-from eir.models.image.image_models import ImageModelConfig, ImageWrapperModel
+from eir.models.input.image.image_models import (
+    ImageModelClassGetterFunction,
+    ImageModelConfig,
+    ImageWrapperModel,
+)
+from eir.models.input.omics.models_cnn import CNNModel, CNNModelConfig
+from eir.setup.input_setup_modules.common import DataDimensions
+from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__)
 
 
 def get_image_model(
     model_config: ImageModelConfig,
-    input_channels: int,
-    model_registry_lookup: Callable[[str], Type[nn.Module]],
+    data_dimensions: DataDimensions,
+    model_registry_lookup: ImageModelClassGetterFunction,
     device: str,
 ) -> ImageWrapperModel:
-    if model_config.model_type in timm.list_models():
+    input_channels = data_dimensions.channels
+    if model_config.model_type in _get_all_timm_models():
         feature_extractor = timm.create_model(
             model_name=model_config.model_type,
             pretrained=model_config.pretrained_model,
             num_classes=model_config.num_output_features,
             in_chans=input_channels,
-        ).to(device=device)
+        )
+
+    elif model_config.model_type == "cnn":
+        init_kwargs = _parse_init_kwargs(model_config=model_config)
+        cnn_model_config = CNNModelConfig(**init_kwargs)
+
+        feature_extractor = CNNModel(
+            model_config=cnn_model_config,
+            data_dimensions=data_dimensions,
+        )
 
     else:
+        assert isinstance(model_config.model_init_config, dict)
         feature_extractor = _meta_get_image_model_from_scratch(
             model_type=model_config.model_type,
             model_init_config=model_config.model_init_config,
             num_output_features=model_config.num_output_features,
-        ).to(device=device)
+        )
 
+    feature_extractor = feature_extractor.to(device=device)
     wrapper_model_class = model_registry_lookup(model_type="image-wrapper-default")
     model = wrapper_model_class(
         feature_extractor=feature_extractor, model_config=model_config
@@ -43,8 +61,38 @@ def get_image_model(
     return model
 
 
+def _get_all_timm_models() -> list[str]:
+    base_models = timm.list_models()
+    pretrained_models = timm.list_models(pretrained=True)
+
+    all_models = base_models + pretrained_models
+    all_models = list(set(all_models))
+    all_models.sort()
+
+    return all_models
+
+
+def _parse_init_kwargs(model_config: ImageModelConfig) -> Dict[str, Any]:
+    init_kwargs = copy(model_config.model_init_config)
+    assert isinstance(init_kwargs, dict)
+
+    model_config_out_features = getattr(model_config, "num_output_features")
+    init_kwargs_out_features = init_kwargs.get("num_output_features")
+    if model_config_out_features:
+        if model_config_out_features != init_kwargs_out_features:
+            logger.warning(
+                "num_output_features specified in model_config "
+                "and model_init_config differ. "
+                "Using value from model_config."
+            )
+
+            init_kwargs["num_output_features"] = model_config.num_output_features
+
+    return init_kwargs
+
+
 def _meta_get_image_model_from_scratch(
-    model_type: str, model_init_config: Dict, num_output_features: Union[None, int]
+    model_type: str, model_init_config: dict, num_output_features: Union[None, int]
 ) -> nn.Module:
     """
     A kind of ridiculous way to initialize modules from scratch that are found in timm,

@@ -1,6 +1,6 @@
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Sequence, Union, Literal, Dict, TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, Literal, Sequence, Union
 
 import torch
 from aislib.pytorch_modules import Swish
@@ -8,20 +8,22 @@ from torch import nn
 
 from eir.models.layers import MLPResidualBlock, ResidualMLPConfig
 from eir.models.models_base import (
-    create_multi_task_blocks_with_first_adaptor_block,
-    merge_module_dicts,
     calculate_module_dict_outputs,
     construct_multi_branches,
-    initialize_modules_from_spec,
+    create_multi_task_blocks_with_first_adaptor_block,
     get_final_layer,
+    initialize_modules_from_spec,
+    merge_module_dicts,
 )
 
 if TYPE_CHECKING:
-    from eir.setup.output_setup import al_num_outputs_per_target
+    from eir.setup.output_setup_modules.tabular_output_setup import (
+        al_num_outputs_per_target,
+    )
 
 
 @dataclass
-class ResidualMLPOutputModelConfig(ResidualMLPConfig):
+class ResidualMLPOutputModuleConfig(ResidualMLPConfig):
 
     """
     :param layers:
@@ -50,7 +52,7 @@ class ResidualMLPOutputModelConfig(ResidualMLPConfig):
 class ResidualMLPOutputModule(nn.Module):
     def __init__(
         self,
-        model_config: ResidualMLPOutputModelConfig,
+        model_config: ResidualMLPOutputModuleConfig,
         input_dimension: int,
         num_outputs_per_target: "al_num_outputs_per_target",
     ):
@@ -115,7 +117,7 @@ def get_default_tabular_output_final_layers(
     num_outputs_per_target: "al_num_outputs_per_target",
     task_names: Union[None, Sequence[str]],
     final_layer_type: Union[Literal["linear"], Literal["mlp_residual"]],
-) -> Sequence[nn.Module]:
+) -> Sequence[nn.ModuleDict]:
     final_layers = []
     if final_layer_type == "linear":
         if task_names is None:

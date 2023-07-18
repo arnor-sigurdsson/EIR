@@ -6,31 +6,33 @@ from functools import partial
 from pathlib import Path
 from statistics import mean
 from typing import (
-    Dict,
     TYPE_CHECKING,
-    List,
-    Tuple,
-    Optional,
-    Literal,
     Callable,
-    Union,
+    Dict,
     Generator,
+    List,
+    Literal,
+    Optional,
+    Protocol,
     Sequence,
+    Tuple,
+    Union,
+    cast,
 )
 
 import numpy as np
 import pandas as pd
 import torch
-from aislib.misc_utils import ensure_path_exists, get_logger
+from aislib.misc_utils import ensure_path_exists
 from scipy.special import softmax
 from scipy.stats import pearsonr
 from sklearn.metrics import (
-    matthews_corrcoef,
-    r2_score,
-    mean_squared_error,
-    roc_auc_score,
-    average_precision_score,
     accuracy_score,
+    average_precision_score,
+    matthews_corrcoef,
+    mean_squared_error,
+    r2_score,
+    roc_auc_score,
 )
 from sklearn.preprocessing import StandardScaler, label_binarize
 from torch import nn
@@ -38,34 +40,57 @@ from torch.linalg import vector_norm
 from torch.utils.tensorboard import SummaryWriter
 
 from eir.data_load.data_utils import get_output_info_generator
-from eir.setup.schemas import OutputConfig
+from eir.setup.schemas import OutputConfig, TabularOutputTypeConfig
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
-    from eir.train import al_criteria, Experiment  # noqa: F401
-    from eir.train_utils.step_logic import al_training_labels_target
-    from eir.models.omics.omics_models import al_omics_models  # noqa: F401
-    from eir.train_utils.train_handlers import HandlerConfig
     from eir.data_load.label_setup import (  # noqa: F401
-        al_target_columns,
-        al_label_transformers_object,
         al_label_transformers,
+        al_label_transformers_object,
+        al_target_columns,
     )
+    from eir.models.input.omics.omics_models import al_omics_models  # noqa: F401
+    from eir.models.meta.meta import FeatureExtractorProtocolWithL1
     from eir.setup.output_setup import al_output_objects_as_dict
+    from eir.train import Experiment, al_criteria_dict  # noqa: F401
+    from eir.train_utils.step_logic import al_training_labels_target
+    from eir.train_utils.train_handlers import HandlerConfig
 
 # aliases
 # output_name -> target_name -> metric name: value
 al_step_metric_dict = Dict[str, Dict[str, Dict[str, float]]]
+
+
+class MetricFunctionProtocol(Protocol):
+    def __call__(
+        self,
+        outputs: np.ndarray,
+        labels: np.ndarray,
+        column_name: str,
+        output_name: str,
+    ) -> float:
+        ...
+
+
+class AverageMetricFunctionProtocol(Protocol):
+    def __call__(
+        self,
+        metric_dict: al_step_metric_dict,
+        output_name: str,
+        column_name: str,
+    ) -> float:
+        ...
+
+
+al_averaging_functions_dict = Dict[str, AverageMetricFunctionProtocol]
 al_metric_record_dict = Dict[
-    str, Union[Tuple["MetricRecord", ...], "al_averaging_functions_dict"]
-]
-al_averaging_functions_dict = Dict[
-    str, Callable[["al_step_metric_dict", str, str], float]
+    str, Tuple["MetricRecord", ...] | "al_averaging_functions_dict"
 ]
 
-al_cat_averaging_metric_choices = list[
+al_cat_averaging_metric_choices = Sequence[
     Literal["mcc", "acc", "roc-auc-macro", "ap-macro"]
 ]
-al_con_averaging_metric_choices = list[Literal["r2", "pcc", "loss"]]
+al_con_averaging_metric_choices = Sequence[Literal["r2", "pcc", "loss"]]
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -73,7 +98,7 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 @dataclass()
 class MetricRecord:
     name: str
-    function: Callable
+    function: MetricFunctionProtocol
     only_val: bool = False
     minimize_goal: bool = False
 
@@ -89,10 +114,10 @@ def calculate_batch_metrics(
 
     target_columns_gen = get_output_info_generator(outputs_as_dict=outputs_as_dict)
 
-    master_metric_dict = {}
+    master_metric_dict: al_step_metric_dict = {}
 
     for output_name, output_target_type, target_name in target_columns_gen:
-        cur_metric_dict = {}
+        cur_metric_dict: dict[str, float] = {}
 
         if output_name not in master_metric_dict:
             master_metric_dict[output_name] = {}
@@ -106,25 +131,29 @@ def calculate_batch_metrics(
             assert cur_output_type == "tabular"
 
             al_record = Tuple[MetricRecord, ...]
-            cur_metric_records: al_record = metric_record_dict[output_target_type]
+            cur_record = metric_record_dict[output_target_type]
+            assert isinstance(cur_record, tuple)
+            cur_metric_records: al_record = cur_record
 
             cur_outputs = outputs[output_name][target_name]
-            cur_outputs = cur_outputs.detach().cpu().to(dtype=torch.float32).numpy()
+            cur_outputs_np = cur_outputs.detach().cpu().to(dtype=torch.float32).numpy()
 
             cur_labels = labels[output_name][target_name]
-            cur_labels = cur_labels.cpu().to(dtype=torch.float32).numpy()
+            cur_labels_np = cur_labels.cpu().to(dtype=torch.float32).numpy()
 
             for metric_record in cur_metric_records:
                 if metric_record.only_val and mode == "train":
                     continue
 
                 cur_key = f"{output_name}_{target_name}_{metric_record.name}"
-                cur_metric_dict[cur_key] = metric_record.function(
-                    outputs=cur_outputs,
-                    labels=cur_labels,
+                cur_value = metric_record.function(
+                    outputs=cur_outputs_np,
+                    labels=cur_labels_np,
                     column_name=target_name,
                     output_name=output_name,
                 )
+
+                cur_metric_dict[cur_key] = cur_value
 
             master_metric_dict[output_name][target_name] = cur_metric_dict
         else:
@@ -153,19 +182,23 @@ def add_multi_task_average_metrics(
     batch_metrics_dict: al_step_metric_dict,
     outputs_as_dict: "al_output_objects_as_dict",
     loss: float,
-    performance_average_functions: Dict[str, Callable[[al_step_metric_dict], float]],
+    performance_average_functions: Optional["al_averaging_functions_dict"],
 ) -> al_step_metric_dict:
-    average_performance = average_performances_across_tasks(
-        metric_dict=batch_metrics_dict,
-        outputs_as_dict=outputs_as_dict,
-        performance_calculation_functions=performance_average_functions,
-    )
-    batch_metrics_dict["average"] = {
+    average = {
         "average": {
             "loss-average": loss,
-            "perf-average": average_performance,
         }
     }
+
+    if performance_average_functions is not None:
+        average_performance = average_performances_across_tasks(
+            metric_dict=batch_metrics_dict,
+            outputs_as_dict=outputs_as_dict,
+            performance_calculation_functions=performance_average_functions,
+        )
+        average["average"]["perf-average"] = average_performance
+
+    batch_metrics_dict["average"] = average
 
     return batch_metrics_dict
 
@@ -173,23 +206,20 @@ def add_multi_task_average_metrics(
 def average_performances_across_tasks(
     metric_dict: al_step_metric_dict,
     outputs_as_dict: "al_output_objects_as_dict",
-    performance_calculation_functions: Dict[
-        str, Callable[[al_step_metric_dict], float]
-    ],
+    performance_calculation_functions: "al_averaging_functions_dict",
 ) -> float:
-    target_columns_gen = get_output_info_generator(outputs_as_dict)
+    target_columns_gen = get_output_info_generator(
+        outputs_as_dict=outputs_as_dict,
+    )
 
     all_metrics = []
 
     for output_name, column_type, column_name in target_columns_gen:
-        cur_metric_func = performance_calculation_functions.get(column_type)
+        cur_metric_func = performance_calculation_functions[column_type]
 
-        metric_func_args = {
-            "metric_dict": metric_dict,
-            "output_name": output_name,
-            "column_name": column_name,
-        }
-        cur_value = cur_metric_func(**metric_func_args)
+        cur_value = cur_metric_func(
+            metric_dict=metric_dict, output_name=output_name, column_name=column_name
+        )
         all_metrics.append(cur_value)
 
         all_metrics.append(cur_value)
@@ -200,18 +230,16 @@ def average_performances_across_tasks(
 
 
 def calc_mcc(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
-    pred = np.argmax(a=outputs, axis=1)
+    prediction = np.argmax(a=outputs, axis=1)
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=RuntimeWarning)
-        mcc = matthews_corrcoef(labels, pred)
+        mcc = matthews_corrcoef(labels, prediction)
 
     return mcc
 
 
-def calc_roc_auc_ovo(
-    outputs: np.ndarray, labels: np.ndarray, average: str = "macro", *args, **kwargs
-) -> float:
+def calc_roc_auc_ovo(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
     """
     TODO:   In rare scenarios, we might run into the issue of not having all labels
             represented in the labels array (i.e. labels were in train, but not in
@@ -221,7 +249,7 @@ def calc_roc_auc_ovo(
             returned from label_binarize are all 0.
     """
 
-    assert average in ["micro", "macro"]
+    average = "macro"
 
     if outputs.shape[1] > 2:
         outputs = softmax(x=outputs, axis=1)
@@ -229,15 +257,18 @@ def calc_roc_auc_ovo(
         outputs = outputs[:, 1]
 
     roc_auc = roc_auc_score(
-        y_true=labels, y_score=outputs, average=average, multi_class="ovo"
+        y_true=labels,
+        y_score=outputs,
+        average=average,
+        multi_class="ovo",
     )
     return roc_auc
 
 
 def calc_average_precision(
-    outputs: np.ndarray, labels: np.ndarray, average: str = "macro", *args, **kwargs
+    outputs: np.ndarray, labels: np.ndarray, *args, **kwargs
 ) -> float:
-    assert average in ["micro", "macro"]
+    average = "macro"
 
     if outputs.shape[1] > 2:
         labels = label_binarize(y=labels, classes=sorted(np.unique(labels)))
@@ -245,7 +276,9 @@ def calc_average_precision(
         outputs = outputs[:, 1]
 
     average_precision = average_precision_score(
-        y_true=labels, y_score=outputs, average=average
+        y_true=labels,
+        y_score=outputs,
+        average=average,
     )
 
     return average_precision
@@ -288,33 +321,37 @@ def calc_rmse(
     labels_2d = labels.reshape(-1, 1)
     outputs_2d = outputs.reshape(-1, 1)
 
-    labels = cur_target_transformer.inverse_transform(labels_2d).squeeze()
-    preds = cur_target_transformer.inverse_transform(outputs_2d).squeeze()
+    labels = cur_target_transformer.inverse_transform(X=labels_2d).squeeze()
+    predictions = cur_target_transformer.inverse_transform(X=outputs_2d).squeeze()
 
-    rmse = np.sqrt(mean_squared_error(y_true=labels, y_pred=preds))
+    if np.shape(labels):
+        rmse = np.sqrt(mean_squared_error(y_true=labels, y_pred=predictions))
+    else:
+        rmse = np.sqrt((labels - predictions) ** 2)
+
     return rmse
 
 
 def calculate_prediction_losses(
-    criteria: "al_criteria",
-    inputs: Dict[str, Dict[str, torch.Tensor]],
-    targets: Dict[str, Dict[str, torch.Tensor]],
-) -> Dict[str, Dict[str, torch.Tensor]]:
+    criteria: "al_criteria_dict",
+    inputs: dict[str, dict[str, torch.Tensor]],
+    targets: dict[str, dict[str, torch.Tensor]],
+) -> dict[str, dict[str, torch.Tensor]]:
     """
     Inputs here refers to the input to the loss functions, which is the output
     from the actual models.
     """
-    losses_dict = {}
+    losses_dict: dict[str, dict[str, torch.Tensor]] = {}
 
     for output_name, target_criterion_dict in criteria.items():
-        for target_column, criterion in target_criterion_dict.items():
-            cur_target_col_labels = targets[output_name][target_column]
-            cur_target_col_outputs = inputs[output_name][target_column]
+        for output_head_name, criterion in target_criterion_dict.items():
+            cur_target_col_labels = targets[output_name][output_head_name]
+            cur_target_col_outputs = inputs[output_name][output_head_name]
 
             if output_name not in losses_dict:
                 losses_dict[output_name] = {}
 
-            losses_dict[output_name][target_column] = criterion(
+            losses_dict[output_name][output_head_name] = criterion(
                 input=cur_target_col_outputs, target=cur_target_col_labels
             )
 
@@ -333,20 +370,22 @@ def aggregate_losses(losses_dict: Dict[str, Dict[str, torch.Tensor]]) -> torch.T
 def get_uncertainty_loss_hook(
     output_configs: Sequence[OutputConfig],
     device: str,
-):
+) -> Callable:
     uncertainty_loss_modules = {}
     for output_config in output_configs:
         if output_config.output_info.output_type != "tabular":
             continue
 
-        if not output_config.output_type_info.uncertainty_weighted_mt_loss:
+        output_type_info = output_config.output_type_info
+        assert isinstance(output_type_info, TabularOutputTypeConfig)
+
+        if not output_type_info.uncertainty_weighted_mt_loss:
             continue
 
         logger.info(
             f"Adding uncertainty loss for {output_config.output_info.output_name}."
         )
 
-        output_type_info = output_config.output_type_info
         cur_target_cat_columns = list(output_type_info.target_cat_columns)
         cur_target_con_columns = list(output_type_info.target_con_columns)
         loss_module = UncertaintyMultiTaskLoss(
@@ -412,8 +451,8 @@ class UncertaintyMultiTaskLoss(nn.Module):
     @staticmethod
     def _construct_params(
         cur_target_columns: List[str], device: str
-    ) -> Dict[str, nn.Parameter]:
-        param_dict = {}
+    ) -> dict[str, torch.Tensor]:
+        param_dict: dict[str, torch.Tensor] = {}
         for column_name in cur_target_columns:
             cur_param = nn.Parameter(torch.zeros(1), requires_grad=True).to(
                 device=device
@@ -454,8 +493,6 @@ def hook_add_l1_loss(
 ) -> Dict:
     """
     TODO: Do the validation outside of the actual hook.
-    TODO: Use a combined iterator here for the fusion module and modules_to_fuse.
-    TODO: Convert all fusion modules to have their own L1 penalized weights.
     """
     model_configs = experiment.inputs
 
@@ -474,15 +511,11 @@ def hook_add_l1_loss(
             )
 
         if has_l1_weights and current_l1:
-            cur_l1_loss = get_model_l1_loss(model=input_module, l1_weight=current_l1)
+            input_module_with_l1 = cast("FeatureExtractorProtocolWithL1", input_module)
+            cur_l1_loss = get_model_l1_loss(
+                model=input_module_with_l1, l1_weight=current_l1
+            )
             l1_loss += cur_l1_loss
-
-    fus_l1 = getattr(experiment.model.fusion_module.model_config, "l1", None)
-    fus_has_l1_weights = hasattr(experiment.model, "l1_penalized_weights")
-
-    if fus_l1 and fus_has_l1_weights:
-        fusion_l1_loss = get_model_l1_loss(model=experiment.model, l1_weight=fus_l1)
-        l1_loss += fusion_l1_loss
 
     updated_loss = state[loss_key] + l1_loss
 
@@ -491,7 +524,9 @@ def hook_add_l1_loss(
     return state_updates
 
 
-def get_model_l1_loss(model: nn.Module, l1_weight: float) -> torch.Tensor:
+def get_model_l1_loss(
+    model: "FeatureExtractorProtocolWithL1", l1_weight: float
+) -> torch.Tensor:
     l1_loss = calc_l1_loss(
         weight_tensor=model.l1_penalized_weights, l1_weight=l1_weight
     )
@@ -564,10 +599,10 @@ def get_metrics_files(
     target_generator: Generator[Tuple[str, str, str], None, None],
     run_folder: Path,
     train_or_val_target_prefix: str,
-) -> Dict[str, Dict[str, Path]]:
+) -> dict[str, dict[str, Path]]:
     assert train_or_val_target_prefix in ["validation_", "train_"]
 
-    path_dict = {}
+    path_dict: dict[str, dict[str, Path]] = {}
     for output_name, column_type, target_column in target_generator:
         if output_name not in path_dict:
             path_dict[output_name] = {}
@@ -701,9 +736,12 @@ def get_default_metrics(
         cat_averaging_metrics=cat_averaging_metrics,
         con_averaging_metrics=con_averaging_metrics,
     )
-    averaging_functions = get_performance_averaging_functions(**avg_metrics)
+    averaging_functions = get_performance_averaging_functions(
+        cat_metric_names=avg_metrics["cat_metric_names"],
+        con_metric_names=avg_metrics["con_metric_names"],
+    )
 
-    default_metrics = {
+    default_metrics: al_metric_record_dict = {
         "cat": (mcc, acc, roc_auc_macro, ap_macro),
         "con": (rmse, r2, pcc),
         "averaging_functions": averaging_functions,
@@ -714,7 +752,7 @@ def get_default_metrics(
 def parse_averaging_metrics(
     cat_averaging_metrics: Optional[al_cat_averaging_metric_choices],
     con_averaging_metrics: Optional[al_con_averaging_metric_choices],
-) -> Dict[str, list[str]]:
+) -> Dict[str, Sequence[str]]:
     base = _get_default_averaging_metrics()
 
     if cat_averaging_metrics:
@@ -736,7 +774,7 @@ def parse_averaging_metrics(
 
 
 def _validate_metrics(
-    passed_in_metrics: list[str], expected_metrics: list[str], target_type: str
+    passed_in_metrics: Sequence[str], expected_metrics: Sequence[str], target_type: str
 ) -> None:
     for metric in passed_in_metrics:
         if metric not in expected_metrics:
@@ -746,7 +784,7 @@ def _validate_metrics(
             )
 
 
-def _get_default_averaging_metrics() -> Dict[str, list[str]]:
+def _get_default_averaging_metrics() -> Dict[str, Sequence[str]]:
     return {
         "cat_metric_names": ["mcc", "roc-auc-macro", "ap-macro"],
         "con_metric_names": ["loss", "pcc", "r2"],
@@ -754,14 +792,21 @@ def _get_default_averaging_metrics() -> Dict[str, list[str]]:
 
 
 def get_performance_averaging_functions(
-    cat_metric_names: al_cat_averaging_metric_choices,
-    con_metric_names: al_con_averaging_metric_choices,
+    cat_metric_names: Sequence[str],
+    con_metric_names: Sequence[str],
 ) -> al_averaging_functions_dict:
+    """
+    Note that we have the mean(values) else 0.0 to account for some values not being
+    computed on the training batches, e.g. ROC-AUC, due some metrics possibly
+    raising errors if e.g. there are only negative labels in a batch.
+    """
+
     logger.info(
-        "Performance averaging functions across tasks set to averages "
+        "Tabular output performance averaging functions across tasks set to averages "
         "of %s for categorical targets and %s for continuous targets. These "
-        "values are used to determine overall performance, which is used to "
-        "control factors such as early stopping and LR scheduling.",
+        "values are used to determine overall performance (using the validation set), "
+        "which is used to control factors such as early stopping and LR scheduling. "
+        "Other output cases use 1.0-LOSS by default.",
         [i.upper() for i in cat_metric_names],
         [i.upper().replace("LOSS", "1.0-LOSS") for i in con_metric_names],
     )
@@ -782,7 +827,7 @@ def get_performance_averaging_functions(
 
             values.append(value)
 
-        return mean(values)
+        return mean(values) if values else 0.0
 
     def _calc_con_averaging_value(
         metric_dict: "al_step_metric_dict",
@@ -803,9 +848,9 @@ def get_performance_averaging_functions(
 
             values.append(value)
 
-        return mean(values)
+        return mean(values) if values else 0.0
 
-    performance_averaging_functions = {
+    performance_averaging_functions: al_averaging_functions_dict = {
         "cat": partial(_calc_cat_averaging_value, metric_names=cat_metric_names),
         "con": partial(_calc_con_averaging_value, metric_names=con_metric_names),
         "general": partial(_calc_con_averaging_value, metric_names=["loss"]),

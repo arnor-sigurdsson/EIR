@@ -1,14 +1,16 @@
 import math
 from dataclasses import dataclass, field
-from typing import List, Tuple
+from typing import List, Literal, Optional, Sequence, Tuple, Type
 
+import numpy as np
 import torch
 import torch.nn.functional as F
-from aislib.misc_utils import get_logger
 from aislib.pytorch_modules import Swish
 from torch import nn
 from torch.nn import Parameter
 from torchvision.ops.stochastic_depth import StochasticDepth
+
+from eir.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -249,7 +251,7 @@ class CNNResidualBlock(CNNResidualBlockBase):
         return out
 
 
-class SplitLinear(nn.Module):
+class LCL(nn.Module):
     __constants__ = ["bias", "in_features", "out_features"]
 
     def __init__(
@@ -257,42 +259,46 @@ class SplitLinear(nn.Module):
         in_features: int,
         out_feature_sets: int,
         num_chunks: int = 10,
-        split_size: int = None,
-        bias: bool = True,
+        kernel_size: Optional[int] = None,
+        bias: Optional[bool] = True,
     ):
         super().__init__()
 
         self.in_features = in_features
         self.out_feature_sets = out_feature_sets
         self.num_chunks = num_chunks
-        self.split_size = split_size
 
-        if split_size:
-            self.num_chunks = int(math.ceil(in_features / split_size))
+        if kernel_size:
+            self.kernel_size = kernel_size
+            self.num_chunks = int(math.ceil(in_features / kernel_size))
             logger.debug(
-                "%s: Setting num chunks to %d as split size of %d was passed in.",
+                "%s: Setting num chunks to %d as kernel size of %d was passed in.",
                 self.__class__,
                 self.num_chunks,
-                self.split_size,
+                kernel_size,
             )
         else:
-            self.split_size = int(math.ceil(self.in_features / self.num_chunks))
+            self.kernel_size = int(math.ceil(self.in_features / self.num_chunks))
             logger.debug(
-                "%s :Setting split size to %d as number of chunks of %d was passed in.",
+                "%s :Setting kernel size to %d as number of "
+                "chunks of %d was passed in.",
                 self.__class__,
-                self.split_size,
+                self.kernel_size,
                 self.num_chunks,
             )
 
+        assert self.kernel_size is not None
+
         self.out_features = self.out_feature_sets * self.num_chunks
-        self.padding = _find_split_padding_needed(
+
+        self.padding = _find_lcl_padding_needed(
             input_size=self.in_features,
-            split_size=self.split_size,
+            kernel_size=self.kernel_size,
             num_chunks=self.num_chunks,
         )
 
         self.weight = Parameter(
-            torch.Tensor(self.out_feature_sets, self.num_chunks, self.split_size),
+            torch.Tensor(self.out_feature_sets, self.num_chunks, self.kernel_size),
             requires_grad=True,
         )
 
@@ -315,11 +321,11 @@ class SplitLinear(nn.Module):
 
     def extra_repr(self):
         return (
-            "in_features={}, num_chunks={}, split_size={}, "
+            "in_features={}, num_chunks={}, kernel_size={}, "
             "out_feature_sets={}, out_features={}, bias={}".format(
                 self.in_features,
                 self.num_chunks,
-                self.split_size,
+                self.kernel_size,
                 self.out_feature_sets,
                 self.out_features,
                 self.bias is not None,
@@ -330,22 +336,22 @@ class SplitLinear(nn.Module):
         input_padded = F.pad(input=input, pad=[0, self.padding, 0, 0])
 
         input_reshaped = input_padded.reshape(
-            input.shape[0], 1, self.num_chunks, self.split_size
+            input.shape[0], 1, self.num_chunks, self.kernel_size
         )
 
-        out = calc_split_input(input=input_reshaped, weight=self.weight, bias=self.bias)
+        out = calc_lcl_forward(input=input_reshaped, weight=self.weight, bias=self.bias)
         return out
 
 
-def _find_split_padding_needed(input_size: int, split_size: int, num_chunks: int):
-    return num_chunks * split_size - input_size
+def _find_lcl_padding_needed(input_size: int, kernel_size: int, num_chunks: int):
+    return num_chunks * kernel_size - input_size
 
 
-def calc_split_input(input: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor):
+def calc_lcl_forward(input: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor):
     """
     n: num samples
     c: num chunks (height)
-    s: split size (width)
+    s: kernel size (width)
     o: output sets
     """
 
@@ -396,7 +402,6 @@ class MLPResidualBlock(nn.Module):
         out_features: int,
         dropout_p: float = 0.0,
         full_preactivation: bool = False,
-        zero_init_last_bn: bool = False,
         stochastic_depth_p: float = 0.0,
     ):
         super().__init__()
@@ -405,7 +410,6 @@ class MLPResidualBlock(nn.Module):
         self.out_features = out_features
         self.dropout_p = dropout_p
         self.full_preactivation = full_preactivation
-        self.zero_init_last_bn = zero_init_last_bn
         self.stochastic_depth_p = stochastic_depth_p
 
         self.norm_1 = nn.LayerNorm(normalized_shape=in_features)
@@ -429,9 +433,6 @@ class MLPResidualBlock(nn.Module):
 
         self.stochastic_depth = StochasticDepth(p=self.stochastic_depth_p, mode="batch")
 
-        if self.zero_init_last_bn:
-            nn.init.zeros_(self.norm_2.weight)
-
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         out = self.norm_1(x)
 
@@ -449,54 +450,52 @@ class MLPResidualBlock(nn.Module):
         return out + identity
 
 
-class SplitMLPResidualBlock(nn.Module):
+class LCLResidualBlock(nn.Module):
     def __init__(
         self,
         in_features: int,
         out_feature_sets: int,
-        split_size: int,
+        kernel_size: int,
         dropout_p: float = 0.0,
         stochastic_depth_p: float = 0.0,
         full_preactivation: bool = False,
-        zero_init_last_bn: bool = False,
         reduce_both: bool = True,
     ):
         super().__init__()
 
         self.in_features = in_features
-        self.split_size = split_size
+        self.kernel_size = kernel_size
         self.out_feature_sets = out_feature_sets
 
         self.dropout_p = dropout_p
         self.full_preactivation = full_preactivation
-        self.zero_init_last_bn = zero_init_last_bn
         self.reduce_both = reduce_both
         self.stochastic_depth_p = stochastic_depth_p
 
         self.norm_1 = nn.LayerNorm(normalized_shape=in_features)
-        self.fc_1 = SplitLinear(
+        self.fc_1 = LCL(
             in_features=self.in_features,
             out_feature_sets=self.out_feature_sets,
             bias=True,
-            split_size=self.split_size,
+            kernel_size=self.kernel_size,
         )
 
         self.act_1 = Swish()
         self.do = nn.Dropout(p=dropout_p)
 
-        fc_2_kwargs = _get_split_fc_2_kwargs(
+        fc_2_kwargs = _get_lcl_2_kwargs(
             in_features=self.fc_1.out_features,
             out_feature_sets=self.out_feature_sets,
             bias=True,
-            split_size=self.split_size,
+            kernel_size=self.kernel_size,
             reduce_both=self.reduce_both,
         )
-        self.fc_2 = SplitLinear(**fc_2_kwargs)
+        self.fc_2 = LCL(**fc_2_kwargs)
 
         if in_features == out_feature_sets:
             self.downsample_identity = lambda x: x
         else:
-            self.downsample_identity = SplitLinear(
+            self.downsample_identity = LCL(
                 in_features=self.in_features,
                 out_feature_sets=1,
                 bias=True,
@@ -507,9 +506,6 @@ class SplitMLPResidualBlock(nn.Module):
 
         self.out_features = self.fc_2.out_features
 
-        if self.zero_init_last_bn:
-            nn.init.zeros_(self.norm_2.weight)
-
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         out = self.norm_1(x)
 
@@ -527,12 +523,12 @@ class SplitMLPResidualBlock(nn.Module):
         return out + identity
 
 
-def _get_split_fc_2_kwargs(
+def _get_lcl_2_kwargs(
     in_features: int,
     out_feature_sets: int,
     bias: bool,
     reduce_both: bool,
-    split_size: int,
+    kernel_size: int,
 ):
     common_kwargs = {
         "in_features": in_features,
@@ -541,9 +537,9 @@ def _get_split_fc_2_kwargs(
     }
 
     if reduce_both:
-        common_kwargs["split_size"] = split_size
+        common_kwargs["kernel_size"] = kernel_size
     else:
-        num_chunks = _calculate_num_chunks_for_equal_split_out_features(
+        num_chunks = _calculate_num_chunks_for_equal_lcl_out_features(
             in_features=in_features, out_feature_sets=out_feature_sets
         )
         common_kwargs["num_chunks"] = num_chunks
@@ -551,7 +547,7 @@ def _get_split_fc_2_kwargs(
     return common_kwargs
 
 
-def _calculate_num_chunks_for_equal_split_out_features(
+def _calculate_num_chunks_for_equal_lcl_out_features(
     in_features: int,
     out_feature_sets: int,
 ) -> int:
@@ -559,3 +555,175 @@ def _calculate_num_chunks_for_equal_split_out_features(
     Ensure total out features are equal to in features.
     """
     return in_features // out_feature_sets
+
+
+def get_projection_layer(
+    input_dimension: int,
+    target_dimension: int,
+    projection_layer_type: Literal["auto", "lcl", "lcl_residual", "linear"] = "auto",
+) -> LCLResidualBlock | LCL | nn.Linear | nn.Identity:
+    if projection_layer_type == "auto":
+        if input_dimension == target_dimension:
+            return nn.Identity()
+
+        lcl_residual_projection = get_lcl_projection_layer(
+            input_dimension=input_dimension,
+            target_dimension=target_dimension,
+            layer_type="lcl_residual",
+        )
+        if lcl_residual_projection is not None:
+            return lcl_residual_projection
+
+        lcl_projection = get_lcl_projection_layer(
+            input_dimension=input_dimension,
+            target_dimension=target_dimension,
+            layer_type="lcl",
+        )
+        if lcl_projection is not None:
+            return lcl_projection
+
+        return nn.Linear(
+            in_features=input_dimension,
+            out_features=target_dimension,
+            bias=True,
+        )
+
+    elif projection_layer_type == "lcl_residual":
+        layer = get_lcl_projection_layer(
+            input_dimension=input_dimension,
+            target_dimension=target_dimension,
+            layer_type="lcl_residual",
+        )
+        if layer is None:
+            raise ValueError(
+                f"Cannot create lcl_residual projection layer for "
+                f"input_dimension={input_dimension} and "
+                f"target_dimension={target_dimension} for projection. "
+                f"Try using projection_layer_type='auto'."
+            )
+        else:
+            return layer
+
+    elif projection_layer_type == "lcl":
+        layer = get_lcl_projection_layer(
+            input_dimension=input_dimension,
+            target_dimension=target_dimension,
+            layer_type="lcl",
+        )
+        if layer is None:
+            raise ValueError(
+                f"Cannot create lcl projection layer for "
+                f"input_dimension={input_dimension} and "
+                f"target_dimension={target_dimension} for projection. "
+                f"Try using projection_layer_type='auto'."
+            )
+        else:
+            return layer
+
+    elif projection_layer_type == "linear":
+        if input_dimension == target_dimension:
+            return nn.Identity()
+        else:
+            return nn.Linear(
+                in_features=input_dimension,
+                out_features=target_dimension,
+                bias=True,
+            )
+    else:
+        raise ValueError(f"Invalid projection_layer_type: {projection_layer_type}")
+
+
+def get_lcl_projection_layer(
+    input_dimension: int,
+    target_dimension: int,
+    layer_type: Literal["lcl_residual", "lcl"] = "lcl_residual",
+    kernel_width_candidates: Sequence[int] = tuple(range(1, 1024 + 1)),
+    out_feature_sets_candidates: Sequence[int] = tuple(range(1, 64 + 1)),
+) -> LCLResidualBlock | LCL | None:
+    layer_class: Type[LCLResidualBlock] | Type[LCL]
+    match layer_type:
+        case "lcl_residual":
+            layer_class = LCLResidualBlock
+            n_lcl_layers = 2
+        case "lcl":
+            layer_class = LCL
+            n_lcl_layers = 1
+        case _:
+            raise ValueError(f"Unknown layer type: {layer_type}")
+
+    search_func = _find_best_lcl_kernel_width_and_out_feature_sets
+    solution = search_func(
+        input_dimension=input_dimension,
+        target_dimension=target_dimension,
+        n_layers=n_lcl_layers,
+        kernel_width_candidates=kernel_width_candidates,
+        out_feature_sets_candidates=out_feature_sets_candidates,
+    )
+
+    if solution is None:
+        return None
+
+    best_kernel_size, best_out_feature_sets = solution
+    best_layer = layer_class(
+        in_features=input_dimension,
+        kernel_size=best_kernel_size,
+        out_feature_sets=best_out_feature_sets,
+    )
+
+    return best_layer
+
+
+def _find_best_lcl_kernel_width_and_out_feature_sets(
+    input_dimension: int,
+    target_dimension: int,
+    n_layers: int,
+    kernel_width_candidates: Sequence[int] = tuple(range(1, 1024 + 1)),
+    out_feature_sets_candidates: Sequence[int] = tuple(range(1, 64 + 1)),
+) -> Tuple[int, int] | None:
+    best_diff = np.Inf
+    best_kernel_width = None
+    best_out_feature_sets = None
+
+    def _compute(
+        input_dimension_: int, kernel_width_: int, out_feature_sets_: int
+    ) -> int:
+        num_chunks_ = int(math.ceil(input_dimension_ / kernel_width_))
+        out_features_ = num_chunks_ * out_feature_sets_
+        return out_features_
+
+    for out_feature_sets in out_feature_sets_candidates:
+        for kernel_width in kernel_width_candidates:
+            if kernel_width > input_dimension:
+                continue
+
+            out_features = input_dimension
+            for n in range(n_layers):
+                out_features = _compute(
+                    input_dimension_=out_features,
+                    kernel_width_=kernel_width,
+                    out_feature_sets_=out_feature_sets,
+                )
+
+            if out_features < target_dimension:
+                continue
+
+            diff = abs(out_features - target_dimension)
+
+            if diff < best_diff:
+                best_diff = diff
+                best_kernel_width = kernel_width
+                best_out_feature_sets = out_feature_sets
+
+            if diff == 0:
+                break
+
+    if best_diff != 0:
+        return None
+
+    if best_kernel_width is None:
+        return None
+
+    assert best_kernel_width is not None
+    assert best_out_feature_sets is not None
+
+    return best_kernel_width, best_out_feature_sets
