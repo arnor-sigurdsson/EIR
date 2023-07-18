@@ -1,7 +1,7 @@
 Image Models
 ============
 
-This page contains the list of external image models that can be used with EIR.
+This page contains the list of external image models that can be used with EIR, coming from the great `timm <https://huggingface.co/docs/timm>`__ library.
 
 There are 3 ways to use these models:
 

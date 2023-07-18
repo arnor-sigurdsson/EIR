@@ -1,7 +1,7 @@
 Sequence Models
 ===============
 
-This page contains the list of external sequence models that can be used with EIR.
+This page contains the list of external sequence models that can be used with EIR, coming from the excellent `Transformers <https://huggingface.co/docs/transformers/index>`__ library.
 
 There are 3 ways to use these models:
 
@@ -18,11 +18,21 @@ The following models can be configured and trained from scratch.
 
 The model type is specified in the ``model_type`` field of the configuration, while the model specific configuration is specified in the ``model_init_config`` field.
 
-For example, the ``BERT`` architecture includes the ``num_attention_heads`` and ``num_hidden_layers`` parameters, and can be configured as follows:
+For example, the ``LongFormer`` architecture includes the ``num_attention_heads`` and ``num_hidden_layers`` parameters, and can be configured as follows:
 
-.. literalinclude:: ../tutorials/tutorial_files/a_using_eir/05_sequence_tutorial/inputs.yaml
+.. literalinclude:: ../tutorials/tutorial_files/a_using_eir/04_pretrained_sequence_tutorial/04_imdb_input_longformer.yaml
     :language: yaml
     :caption: input_configurable_sequence_model.yaml
+
+**Pretrained Models**
+
+We can also fine-tune or train a specific architecture from scratch. For example, a ``tiny-bert`` model like so:
+
+.. literalinclude:: ../tutorials/tutorial_files/a_using_eir/04_pretrained_sequence_tutorial/04_imdb_input_tiny-bert.yaml
+    :language: yaml
+    :caption: input_pre_trained_sequence_model.yaml
+
+Below is a list of the configurable models that can be used with EIR.
 
 .. class:: transformers.models.albert.configuration_albert.AlbertConfig(vocab_size=30000, embedding_size=128, hidden_size=4096, num_hidden_layers=12, num_hidden_groups=1, num_attention_heads=64, intermediate_size=16384, inner_group_num=1, hidden_act='gelu_new', hidden_dropout_prob=0, attention_probs_dropout_prob=0, max_position_embeddings=512, type_vocab_size=2, initializer_range=0.02, layer_norm_eps=1e-12, classifier_dropout_prob=0.1, position_embedding_type='absolute', pad_token_id=0, bos_token_id=2, eos_token_id=3, **kwargs)
 

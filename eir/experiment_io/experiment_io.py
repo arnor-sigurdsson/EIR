@@ -236,9 +236,8 @@ def get_transformer_sources(run_folder: Path) -> Dict[str, list[str]]:
     transformers_to_load = {}
     transformer_sources = run_folder / "serializations/transformers"
     for transformer_source in transformer_sources.iterdir():
-        transformers_to_load[transformer_source.stem] = [
-            i.stem for i in transformer_source.iterdir()
-        ]
+        names = sorted([i.stem for i in transformer_source.iterdir()])
+        transformers_to_load[transformer_source.stem] = names
     return transformers_to_load
 
 

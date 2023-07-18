@@ -23,6 +23,7 @@ def run_all():
     models = retrieve_configurable_models(model_name_list=list(model_names))
 
     configurable_models_header = _get_configurable_models_header()
+    pretrained_models_header = _get_pretrained_models_header()
     configurable_models_rst_string = generate_configurable_model_rst_string(
         models=models
     )
@@ -30,6 +31,7 @@ def run_all():
     with open(output_file, "w") as f:
         f.write(header)
         f.write(configurable_models_header)
+        f.write(pretrained_models_header)
         f.write(configurable_models_rst_string)
 
 
@@ -38,7 +40,9 @@ def get_header() -> str:
         "Sequence Models\n"
         "===============\n\n"
         "This page contains the list of external sequence models that can "
-        "be used with EIR.\n\n"
+        "be used with EIR, coming from the excellent "
+        "`Transformers <https://huggingface.co/docs/transformers/index>`__"
+        " library.\n\n"
         "There are 3 ways to use these models:\n\n"
         "- Configure and train specific architectures (e.g. BERT with chosen "
         "number of layers) from scratch.\n"
@@ -60,16 +64,30 @@ def _get_configurable_models_header() -> str:
         "The model type is specified in the ``model_type`` field of the "
         "configuration, while the model specific configuration is specified "
         "in the ``model_init_config`` field.\n\n"
-        "For example, the ``BERT`` architecture includes the "
+        "For example, the ``LongFormer`` architecture includes the "
         "``num_attention_heads`` and "
         "``num_hidden_layers`` parameters, and can be configured as follows:\n\n"
         ".. literalinclude:: ../tutorials/tutorial_files/a_using_eir/"
-        "05_sequence_tutorial/"
-        "inputs.yaml"
+        "04_pretrained_sequence_tutorial/"
+        "04_imdb_input_longformer.yaml"
         "\n    :language: yaml"
         "\n    :caption: input_configurable_sequence_model.yaml\n\n"
     )
+    return header
 
+
+def _get_pretrained_models_header() -> str:
+    header = (
+        "**Pretrained Models**\n\n"
+        "We can also fine-tune or train a specific architecture from scratch. "
+        "For example, a ``tiny-bert`` model like so:\n\n"
+        ".. literalinclude:: ../tutorials/tutorial_files/a_using_eir/"
+        "04_pretrained_sequence_tutorial/"
+        "04_imdb_input_tiny-bert.yaml"
+        "\n    :language: yaml"
+        "\n    :caption: input_pre_trained_sequence_model.yaml\n\n"
+        "Below is a list of the configurable models that can be used with EIR.\n\n"
+    )
     return header
 
 

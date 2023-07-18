@@ -28,7 +28,8 @@ def get_header() -> str:
         "Image Models\n"
         "============\n\n"
         "This page contains the list of external image models that can "
-        "be used with EIR.\n\n"
+        "be used with EIR, coming from the great "
+        "`timm <https://huggingface.co/docs/timm>`__ library.\n\n"
         "There are 3 ways to use these models:\n\n"
         "- Configure and train specific architectures (e.g. ResNet with chosen "
         "number of layers) from scratch.\n"
@@ -104,6 +105,3 @@ def generate_configurable_model_rst_string(
         rst_string += "   :exclude-members: forward\n\n"
 
     return rst_string
-
-
-run_all()
