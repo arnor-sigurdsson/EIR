@@ -37,6 +37,7 @@ def run_all():
 
 def get_header() -> str:
     header = (
+        ".. _external-sequence-models:\n\n"
         "Sequence Models\n"
         "===============\n\n"
         "This page contains the list of external sequence models that can "

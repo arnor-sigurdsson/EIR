@@ -11,12 +11,7 @@ from torch.nn.functional import pad
 from transformers import PretrainedConfig, PreTrainedModel
 
 from eir.models.layers import _find_lcl_padding_needed
-from eir.setup.setup_utils import get_all_hf_model_names
 from eir.utils.logging import get_logger
-
-al_sequence_models = tuple(  # type: ignore
-    Literal[i] for i in ["sequence-default"] + list(get_all_hf_model_names())
-)
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -65,7 +60,7 @@ class SequenceModelConfig:
 
     model_init_config: Union["BasicTransformerFeatureExtractorModelConfig", Dict]
 
-    model_type: al_sequence_models = "sequence-default"  # type: ignore
+    model_type: Literal["sequence-default"] | str = "sequence-default"
 
     embedding_dim: int = 64
 
@@ -439,13 +434,6 @@ class TransformerFeatureExtractor(nn.Module):
     def forward(self, input: Tensor) -> Tensor:
         out = self.transformer_encoder(input)
         return out
-
-
-def next_power_of_2(x: int) -> int:
-    if x == 0:
-        return 1
-
-    return 2 ** math.ceil(math.log2(x))
 
 
 def parse_dim_feedforward(

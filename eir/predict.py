@@ -11,6 +11,7 @@ from eir.data_load import datasets, label_setup
 from eir.data_load.label_setup import al_all_column_ops
 from eir.experiment_io.experiment_io import (
     LoadedTrainExperiment,
+    check_version,
     get_run_folder_from_model_path,
     load_serialized_train_experiment,
 )
@@ -87,6 +88,8 @@ def main():
     predict_cl_args = main_parser.parse_args()
 
     _verify_predict_cl_args(predict_cl_args=predict_cl_args)
+    run_folder = get_run_folder_from_model_path(model_path=predict_cl_args.model_path)
+    check_version(run_folder=run_folder)
 
     run_predict(predict_cl_args=predict_cl_args)
 
@@ -109,7 +112,7 @@ def run_predict(predict_cl_args: Namespace):
         log_level=loaded_train_experiment.configs.global_config.log_level
     )
 
-    predict_config = get_default_predict_config(
+    predict_config = get_default_predict_experiment(
         loaded_train_experiment=loaded_train_experiment,
         predict_cl_args=predict_cl_args,
     )
@@ -209,7 +212,7 @@ class PredictStepFunctionHookStages:
     model_forward: al_predict_hooks
 
 
-def get_default_predict_config(
+def get_default_predict_experiment(
     loaded_train_experiment: "LoadedTrainExperiment",
     predict_cl_args: Namespace,
 ) -> PredictExperiment:
@@ -302,6 +305,7 @@ def get_default_predict_config(
         hooks=default_predict_hooks,
         metrics=loaded_train_experiment.metrics,
     )
+
     return predict_experiment
 
 

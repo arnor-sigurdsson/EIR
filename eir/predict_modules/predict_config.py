@@ -4,6 +4,9 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Dict, Generator, Iterable, Literal, Protocol, Sequence, Tuple
 
+from eir.predict_modules.predict_config_validation import (
+    validate_predict_configs_and_args,
+)
 from eir.predict_modules.predict_utils import (
     log_and_raise_missing_or_multiple_config_matching_general,
     log_and_raise_missing_or_multiple_tabular_output_matches,
@@ -42,12 +45,11 @@ def converge_train_and_predict_configs(
     predict_configs_overloaded = overload_train_configs_for_predict(
         matched_dict_iterator=matched_dict_iterator
     )
+    validate_predict_configs_and_args(
+        predict_configs=predict_configs_overloaded, predict_cl_args=predict_cl_args
+    )
 
     return predict_configs_overloaded
-
-
-def _should_patch_predict_cl_args_for_generation():
-    pass
 
 
 def get_named_predict_dict_iterators(

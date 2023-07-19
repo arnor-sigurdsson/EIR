@@ -1,3 +1,5 @@
+.. _external-sequence-models:
+
 Sequence Models
 ===============
 

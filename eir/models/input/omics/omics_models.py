@@ -1,4 +1,3 @@
-import argparse
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, Literal, Protocol, Type, Union
 
@@ -144,19 +143,6 @@ def get_omics_model_init_kwargs(
             kwargs["flatten_fn"] = flatten_h_w_fortran
 
     return kwargs
-
-
-def match_namespace_to_dataclass(
-    namespace: argparse.Namespace, data_class: Type[Dataclass]
-) -> Dict[str, Any]:
-    dataclass_kwargs = {}
-    field_names = data_class.__dataclass_fields__.keys()
-
-    for field_name in field_names:
-        if hasattr(namespace, field_name):
-            dataclass_kwargs[field_name] = getattr(namespace, field_name)
-
-    return dataclass_kwargs
 
 
 def _enforce_omics_specific_settings(

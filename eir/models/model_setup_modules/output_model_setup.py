@@ -104,14 +104,3 @@ def get_tabular_output_module_from_model_config(
     output_module = output_module.to(device=torch_device)
 
     return output_module
-
-
-def _get_supervised_output_module_type_class_map() -> (
-    dict[str, al_tabular_module_classes]
-):
-    mapping = {
-        "mlp_residual": ResidualMLPOutputModule,
-        "linear": LinearOutputModule,
-    }
-
-    return mapping

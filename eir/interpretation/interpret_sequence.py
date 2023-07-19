@@ -2,7 +2,7 @@ from collections import defaultdict
 from copy import copy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, Iterable, Literal, Sequence, Tuple
+from typing import TYPE_CHECKING, Dict, Iterable, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
@@ -275,18 +275,6 @@ def _truncate_attributions_and_raw_inputs(
 def save_html(out_path: Path, html_string: str) -> None:
     with open(out_path, "w", encoding="utf-8") as outfile:
         outfile.write(html_string)
-
-
-def get_label_transformer_mapping(
-    transformer, order: Literal["int-to-string", "string-to-int"]
-) -> dict:
-    values = transformer.classes_, transformer.transform(transformer.classes_)
-    if order == "int-to-string":
-        values = transformer.transform(transformer.classes_), transformer.classes_
-
-    mapping = dict(zip(*values))
-
-    return mapping
 
 
 def get_sequence_token_importance(

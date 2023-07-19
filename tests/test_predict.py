@@ -316,7 +316,7 @@ def test_predict(
         run_folder=model_test_config.run_path
     )
 
-    predict_config = predict.get_default_predict_config(
+    predict_config = predict.get_default_predict_experiment(
         loaded_train_experiment=train_configs_for_testing,
         predict_cl_args=predict_cl_args,
     )

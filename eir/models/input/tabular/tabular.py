@@ -1,6 +1,5 @@
 from collections import OrderedDict
 from dataclasses import dataclass
-from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -11,12 +10,9 @@ from typing import (
     Sequence,
     Set,
     Union,
-    overload,
 )
 
-import joblib
 import torch
-from aislib.misc_utils import ensure_path_exists
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from torch import nn
 
@@ -278,36 +274,6 @@ def get_extra_continuous_inputs_from_labels(
     extra_continuous_stacked = torch.cat(extra_continuous, dim=1)
 
     return extra_continuous_stacked
-
-
-@overload
-def set_up_and_save_embeddings_dict(
-    embedding_columns: None, labels_dict: "al_label_dict", run_folder: Path
-) -> None:
-    ...
-
-
-@overload
-def set_up_and_save_embeddings_dict(
-    embedding_columns: List[str], labels_dict: "al_label_dict", run_folder: Path
-) -> al_emb_lookup_dict:
-    ...
-
-
-def set_up_and_save_embeddings_dict(embedding_columns, labels_dict, run_folder):
-    """
-    We need to save it for test time models to be able to load.
-    """
-    if embedding_columns:
-        embedding_dict = get_embedding_dict(
-            labels_dict=labels_dict, embedding_cols=embedding_columns
-        )
-        output_path = run_folder / "extra_inputs" / "embeddings.save"
-        ensure_path_exists(path=output_path)
-        joblib.dump(value=embedding_dict, filename=output_path)
-        return embedding_dict
-
-    return None
 
 
 def get_embedding_dict(

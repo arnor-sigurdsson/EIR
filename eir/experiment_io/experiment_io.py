@@ -8,6 +8,7 @@ import dill
 import joblib
 from aislib.misc_utils import ensure_path_exists
 
+from eir import __version__
 from eir.data_load import label_setup
 from eir.data_load.label_setup import (
     al_label_transformers,
@@ -52,6 +53,8 @@ class LoadedTrainExperiment:
 
 
 def load_serialized_train_experiment(run_folder: Path) -> LoadedTrainExperiment:
+    check_version(run_folder=run_folder)
+
     train_config_path = get_train_experiment_serialization_path(run_folder=run_folder)
     with open(train_config_path, "rb") as infile:
         train_config = dill.load(file=infile)
@@ -129,6 +132,7 @@ def load_serialized_input_object(
         assert output_folder is not None
         run_folder = get_run_folder(output_folder=output_folder)
 
+    check_version(run_folder=run_folder)
     input_name = input_config.input_info.input_name
     input_type = input_config.input_info.input_type
 
@@ -280,3 +284,24 @@ def load_transformers(
             )
 
     return loaded_transformers
+
+
+def check_version(run_folder: Path) -> None:
+    version_file = run_folder / "meta/eir_version.txt"
+    if not version_file.exists():
+        return
+
+    cur_version = __version__
+    with open(version_file, "r") as f:
+        loaded_version = f.read().strip()
+
+    if cur_version != loaded_version:
+        logger.warning(
+            f"The version of EIR used to train this model is {loaded_version}, "
+            f"while the current version is {cur_version}. "
+            f"This may cause unexpected behavior."
+        )
+
+
+def get_version_file(run_folder: Path) -> Path:
+    return run_folder / "meta/eir_version.txt"

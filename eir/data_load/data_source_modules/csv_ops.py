@@ -37,13 +37,3 @@ def streamline_df(df_func: DataFrameFunctionProtocol) -> Callable[[Any], pd.Data
         return df
 
     return wrapper
-
-
-@streamline_df
-def placeholder_func(
-    *args, df: pd.DataFrame, column_name: Optional[str] = None, **kwargs
-) -> pd.DataFrame:
-    """
-    Dummy function that we can pass to streamline_df so we still get it's functionality.
-    """
-    return df
