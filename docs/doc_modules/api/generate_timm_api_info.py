@@ -25,6 +25,7 @@ def run_all():
 
 def get_header() -> str:
     header = (
+        ".. _external-image-models:\n\n"
         "Image Models\n"
         "============\n\n"
         "This page contains the list of external image models that can "

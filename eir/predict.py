@@ -109,7 +109,7 @@ def run_predict(predict_cl_args: Namespace):
         log_level=loaded_train_experiment.configs.global_config.log_level
     )
 
-    predict_config = get_default_predict_config(
+    predict_config = get_default_predict_experiment(
         loaded_train_experiment=loaded_train_experiment,
         predict_cl_args=predict_cl_args,
     )
@@ -209,7 +209,7 @@ class PredictStepFunctionHookStages:
     model_forward: al_predict_hooks
 
 
-def get_default_predict_config(
+def get_default_predict_experiment(
     loaded_train_experiment: "LoadedTrainExperiment",
     predict_cl_args: Namespace,
 ) -> PredictExperiment:
@@ -302,6 +302,7 @@ def get_default_predict_config(
         hooks=default_predict_hooks,
         metrics=loaded_train_experiment.metrics,
     )
+
     return predict_experiment
 
 

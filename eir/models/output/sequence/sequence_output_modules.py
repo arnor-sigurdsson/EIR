@@ -161,10 +161,6 @@ class SequenceOutputModule(nn.Module):
         return {self.output_name: out}
 
 
-def _find_nearest_multiple(base: int, target: int) -> int:
-    return base * round(target / base)
-
-
 def overload_embeddings_with_pretrained(
     model: "al_meta_model",
     inputs: "al_input_objects_as_dict",

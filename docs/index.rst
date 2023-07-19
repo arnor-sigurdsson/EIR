@@ -1,14 +1,16 @@
 EIR
 ===
 
-``EIR`` is a framework
-for supervised training
-of deep learning models
-on genotype, tabular, sequence, image, array and binary data.
+``EIR`` is a framework for supervised modelling
+and sequence generation
+on genotype, tabular, sequence, image, array, and binary data.
 It is designed to provide
 a high-level, yet modular API
 that reduces the amount of boilerplate code
 and pre-processing required to train a model.
+
+.. warning::
+    This project is in alpha phase. Expect backwards incompatible changes and API changes.
 
 .. figure:: source/_static/img/EIR_data_supported.png
    :width: 85%
@@ -41,7 +43,6 @@ Here's an example with Docker:
     $ docker build -t eir:latest https://raw.githubusercontent.com/arnor-sigurdsson/EIR/master/Dockerfile
     $ docker run -d --name eir_container eir:latest
     $ docker exec -it eir_container bash
-
 
 Documentation
 -------------

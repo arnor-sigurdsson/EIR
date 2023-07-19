@@ -1,3 +1,5 @@
+.. _external-image-models:
+
 Image Models
 ============
 

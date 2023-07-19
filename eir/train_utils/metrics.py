@@ -538,16 +538,6 @@ def calc_l1_loss(weight_tensor: torch.Tensor, l1_weight: float):
     return l1_loss
 
 
-def add_extra_losses(total_loss: torch.Tensor, extra_loss_functions: List[Callable]):
-    """
-    TODO: Possibly add inputs and labels as arguments here if needed later.
-    """
-    for loss_func in extra_loss_functions:
-        total_loss += loss_func()
-
-    return total_loss
-
-
 def persist_metrics(
     handler_config: "HandlerConfig",
     metrics_dict: "al_step_metric_dict",

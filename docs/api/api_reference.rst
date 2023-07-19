@@ -55,7 +55,13 @@ configurations available for each feature extractor.
 
 .. autoclass:: eir.models.input.sequence.transformer_models.SequenceModelConfig
 
+See :ref:`external-sequence-models` for more details about available
+external sequence models.
+
 .. autoclass:: eir.models.input.image.image_models.ImageModelConfig
+
+See :ref:`external-image-models` for more details about available
+external image models.
 
 .. autoclass:: eir.models.input.array.array_models.ArrayModelConfig
 
@@ -95,15 +101,28 @@ Tabular Feature Extractors
 Sequence and Binary Feature Extractors
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+**Built-in Sequence Feature Extractors**
+
 .. autoclass:: eir.models.input.sequence.transformer_models.BasicTransformerFeatureExtractorModelConfig
+
+**External Sequence Feature Extractors**
+
+Please refer to :ref:`external-sequence-models` for more details about
+the external image models.
+
 
 Image Feature Extractors
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-Please refer to `this page <https://huggingface.co/docs/timm/models>`_
-and `this page <https://huggingface.co/timm>`_
-for information about the image models.
+**Built-in Image Feature Extractors**
 
+.. autoclass:: eir.models.input.omics.models_cnn.CNNModelConfig
+    :noindex:
+
+**External Image Feature Extractors**
+
+Please refer to :ref:`external-image-models` for more details about
+the external image models.
 
 Array Feature Extractors
 ^^^^^^^^^^^^^^^^^^^^^^^^

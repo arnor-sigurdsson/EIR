@@ -456,12 +456,6 @@ def get_lr_range_results(
         )
 
 
-def _parse_out_lr_find_multiple_param_groups_suggestion(
-    lr_finder_suggestion: List[float],
-) -> float:
-    return lr_finder_suggestion[0]
-
-
 def plot_lr_find_results(
     lr_values: list[float],
     loss_values: list[float],

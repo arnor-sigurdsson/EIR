@@ -68,6 +68,8 @@ and so on:
 
 - ``tokenizers``  – Anthony MOI: Fast and Customizable Tokenizers
 
+- ``pyarrow`` : Python library for Apache Arrow
+
 - ``memory-profiler``  – Fabian Pedregosa: A module for monitoring memory usage of a python program
 
 - ``pytest``  – Holger Krekel, Bruno Oliveira, Ronny Pfannschmidt, Floris Bruynooghe, Brianna Laugher, Florian Bruhin and others: pytest: simple powerful testing with Python

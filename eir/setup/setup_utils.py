@@ -1,6 +1,5 @@
 from typing import Iterable, Sequence
 
-import timm
 import torch
 from torch_optimizer import _NAME_OPTIM_MAP
 from tqdm import tqdm
@@ -82,15 +81,6 @@ def get_all_optimizer_names() -> Sequence[str]:
     all_optimizers_list = sorted(list(all_optimizers))
 
     return all_optimizers_list
-
-
-def get_all_timm_model_names() -> Sequence[str]:
-    pretrained_names = {i for i in timm.list_models() if not i.startswith("tf")}
-    other_model_classes = {i for i in dir(timm.models) if "Net" in i}
-    all_models = set.union(pretrained_names, other_model_classes)
-    all_models_list = sorted(list(all_models))
-
-    return all_models_list
 
 
 def get_all_hf_model_names() -> Sequence[str]:

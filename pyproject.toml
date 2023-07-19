@@ -40,6 +40,7 @@ aioboto3 = "^11.1.0"
 deeplake = "^3.4.1"
 termcolor = "^2.3.0"
 tokenizers = "^0.13.3"
+pyarrow = "^12.0.1"
 
 [tool.poetry.group.dev.dependencies]
 memory-profiler = "^0.60.0"

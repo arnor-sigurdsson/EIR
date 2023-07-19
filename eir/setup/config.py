@@ -56,6 +56,7 @@ from eir.setup.config_setup_modules.config_setup_utils import (
 from eir.setup.config_setup_modules.output_config_setup_sequence import (
     get_configs_object_with_seq_output_configs,
 )
+from eir.setup.config_validation import validate_train_configs
 from eir.train_utils.utils import configure_global_eir_logging
 from eir.utils.logging import get_logger
 
@@ -109,6 +110,7 @@ def get_configs():
     configs_with_seq_outputs = get_configs_object_with_seq_output_configs(
         configs=configs,
     )
+    validate_train_configs(configs=configs)
 
     return configs_with_seq_outputs
 
