@@ -128,7 +128,6 @@ def create_test_config(
     test_configs = get_configs_object_with_seq_output_configs(
         configs=test_configs,
     )
-    config.validate_train_configs(configs=test_configs)
 
     run_folder = get_run_folder(output_folder=output_folder)
 

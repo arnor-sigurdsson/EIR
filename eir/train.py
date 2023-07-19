@@ -10,11 +10,13 @@ from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader, DistributedSampler, WeightedRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
+from eir import __version__
 from eir.data_load import datasets
 from eir.data_load.data_utils import get_train_sampler
 from eir.data_load.label_setup import split_ids
 from eir.experiment_io.experiment_io import (
     get_default_experiment_keys_to_serialize,
+    get_version_file,
     serialize_chosen_input_objects,
     serialize_experiment,
 )
@@ -323,6 +325,14 @@ def _log_model(
                 f.write(layer_summary)
 
 
+def _log_eir_version_info(outfile: Path) -> None:
+    eir_version_info = f"{__version__}\n"
+
+    ensure_path_exists(path=outfile)
+    with open(outfile, "w") as f:
+        f.write(eir_version_info)
+
+
 def run_experiment(experiment: Experiment) -> None:
     gc = experiment.configs.global_config
     run_folder = utils.get_run_folder(output_folder=gc.output_folder)
@@ -331,6 +341,7 @@ def run_experiment(experiment: Experiment) -> None:
         model=experiment.model,
         structure_file=run_folder / "model_info.txt",
     )
+    _log_eir_version_info(outfile=get_version_file(run_folder=run_folder))
 
     keys_to_serialize = get_default_experiment_keys_to_serialize()
     serialize_experiment(
