@@ -7,6 +7,7 @@ from typing import Callable, Iterable, Literal, Union
 import numpy as np
 from torch.utils.data import DataLoader
 
+from eir import train
 from eir.data_load import datasets, label_setup
 from eir.data_load.label_setup import al_all_column_ops
 from eir.experiment_io.experiment_io import (
@@ -21,7 +22,7 @@ from eir.models.model_setup_modules.meta_setup import (
     get_meta_model_class_and_kwargs_from_configs,
 )
 from eir.models.model_setup_modules.model_io import load_model
-from eir.models.model_training_utils import gather_prediction_outputs_from_dataloader
+from eir.models.model_training_utils import get_prediction_outputs_generator
 from eir.predict_modules.predict_attributions import compute_predict_attributions
 from eir.predict_modules.predict_config import converge_train_and_predict_configs
 from eir.predict_modules.predict_data import set_up_default_dataset
@@ -34,11 +35,8 @@ from eir.setup.input_setup import al_input_objects_as_dict
 from eir.setup.output_setup import al_output_objects_as_dict
 from eir.target_setup.target_label_setup import gather_all_ids_from_output_configs
 from eir.train import check_dataset_and_batch_size_compatibility
-from eir.train_utils.metrics import (
-    al_metric_record_dict,
-    al_step_metric_dict,
-    calculate_batch_metrics,
-)
+from eir.train_utils.evaluation import run_split_evaluation
+from eir.train_utils.metrics import al_metric_record_dict, al_step_metric_dict
 from eir.train_utils.step_logic import Hooks, prepare_base_batch_default
 from eir.train_utils.utils import set_log_level_for_eir_loggers
 from eir.utils.logging import get_logger
@@ -133,7 +131,7 @@ def predict(
     predict_experiment: "PredictExperiment",
     predict_cl_args: Namespace,
 ) -> None:
-    all_predictions, all_labels, all_ids = gather_prediction_outputs_from_dataloader(
+    output_generator = get_prediction_outputs_generator(
         data_loader=predict_experiment.test_dataloader,
         batch_prep_hook=predict_experiment.hooks.step_func_hooks.base_prepare_batch,
         batch_prep_hook_kwargs={"experiment": predict_experiment},
@@ -141,23 +139,29 @@ def predict(
         with_labels=predict_cl_args.evaluate,
     )
 
+    criteria = train.get_criteria(outputs_as_dict=predict_experiment.outputs)
+    loss_func = train.get_loss_callable(criteria=criteria)
+
+    predict_results = run_split_evaluation(
+        output_generator=output_generator,
+        output_objects=predict_experiment.outputs,
+        experiment_metrics=predict_experiment.metrics,
+        loss_function=loss_func,
+        device=predict_experiment.configs.global_config.device,
+        with_labels=predict_cl_args.evaluate,
+    )
+
     if predict_cl_args.evaluate:
-        metrics = calculate_batch_metrics(
-            outputs_as_dict=predict_experiment.outputs,
-            outputs=all_predictions,
-            labels=all_labels,
-            mode="val",
-            metric_record_dict=predict_experiment.metrics,
-        )
         serialize_prediction_metrics(
-            output_folder=Path(predict_cl_args.output_folder), metrics=metrics
+            output_folder=Path(predict_cl_args.output_folder),
+            metrics=predict_results.metrics_with_averages,
         )
 
     predict_tabular_wrapper(
         predict_config=predict_experiment,
-        all_predictions=all_predictions,
-        all_labels=all_labels,
-        all_ids=all_ids,
+        all_predictions=predict_results.gathered_outputs,
+        all_labels=predict_results.gathered_labels,
+        all_ids=predict_results.ids,
         predict_cl_args=predict_cl_args,
     )
 

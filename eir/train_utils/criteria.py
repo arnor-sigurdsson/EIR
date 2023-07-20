@@ -169,7 +169,7 @@ def _calc_con_loss(input: torch.Tensor, target: torch.Tensor, loss_func: al_con_
             return loss_func(input=input.squeeze(), target=target.squeeze())
 
 
-def get_loss_callable(criteria: al_criteria_dict):
+def get_loss_callable(criteria: al_criteria_dict) -> Callable:
     single_task_loss_func = partial(calculate_prediction_losses, criteria=criteria)
     return single_task_loss_func
 
