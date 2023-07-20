@@ -52,6 +52,7 @@ def get_calculate_batch_metrics_data_test_kwargs():
     outputs = {
         "test_output": {
             "Origin": torch.tensor([[1, 0, 0], [0, 1, 0], [0, 0, 1]]),
+            "HairColor": torch.tensor([[1, 0, 0], [0, 1, 0], [0, 0, 1]]),
             "BMI": torch.tensor([1.0, 2.0, 3.0]).unsqueeze(1),
             "Height": torch.tensor([1.0, 2.0, 3.0]).unsqueeze(1),
         }
@@ -60,6 +61,7 @@ def get_calculate_batch_metrics_data_test_kwargs():
     labels = {
         "test_output": {
             "Origin": torch.tensor([0, 1, 2]),
+            "HairColor": torch.tensor([0, 1, 2]),
             "BMI": torch.tensor([1.0, 2.0, 3.0]).unsqueeze(1),
             "Height": torch.tensor([-1.0, -2.0, -3.0]).unsqueeze(1),
         }
@@ -68,6 +70,7 @@ def get_calculate_batch_metrics_data_test_kwargs():
     target_transformers = {
         "test_output": {
             "Origin": LabelEncoder().fit([1, 2, 3]),
+            "HairColor": LabelEncoder().fit([1, 2, 3]),
             "BMI": StandardScaler().fit(standard_scaler_fit_arr),
             "Height": StandardScaler().fit(standard_scaler_fit_arr),
         }
@@ -96,11 +99,13 @@ def _get_metrics_test_module_test_outputs_as_dict():
         "test_output": ComputedTabularOutputInfo(
             output_config=OutputConfig(
                 output_info=OutputInfoConfig(
-                    output_name="test_output", output_type="tabular", output_source=None
+                    output_name="test_output",
+                    output_type="tabular",
+                    output_source="None",
                 ),
                 output_type_info=TabularOutputTypeConfig(
                     target_con_columns=["Height", "BMI"],
-                    target_cat_columns=["Origin"],
+                    target_cat_columns=["Origin", "HairColor"],
                 ),
                 model_config=TabularOutputModuleConfig(
                     model_init_config=ResidualMLPOutputModuleConfig()
@@ -109,7 +114,7 @@ def _get_metrics_test_module_test_outputs_as_dict():
             num_outputs_per_target={},
             target_columns={
                 "con": ["Height", "BMI"],
-                "cat": ["Origin"],
+                "cat": ["Origin", "HairColor"],
             },
             target_transformers={},
         )
@@ -121,6 +126,7 @@ def _get_add_loss_to_metrics_kwargs(outputs_as_dict):
     losses = {
         "test_output": {
             "Origin": torch.tensor(0.0),
+            "HairColor": torch.tensor(0.0),
             "BMI": torch.tensor(0.0),
             "Height": torch.tensor(1.0),
         }

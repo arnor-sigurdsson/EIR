@@ -7,6 +7,7 @@ from typing import (
     Any,
     Callable,
     Dict,
+    Generator,
     Iterable,
     List,
     Sequence,
@@ -105,26 +106,13 @@ def parse_tabular_target_labels(
     return labels_casted
 
 
-def gather_prediction_outputs_from_dataloader(
+def get_prediction_outputs_generator(
     data_loader: DataLoader,
     batch_prep_hook: Iterable[Callable],
     batch_prep_hook_kwargs: Dict[str, Any],
     model: Module,
     with_labels: bool = True,
-) -> al_dataloader_gathered_predictions:
-    """
-    Used to gather predictions from a dataloader, normally for evaluation – hence the
-    assertion that we are in eval mode.
-
-    Why the deepcopy when appending labels? See:
-    https://github.com/pytorch/pytorch/issues/973#issuecomment-459398189
-
-    TODO: Use hook model forward here.
-    """
-    all_output_batches = []
-    all_label_batches = []
-    ids_total = []
-
+) -> Generator[al_dataloader_gathered_predictions, None, None,]:
     assert not model.training
     for loader_batch in data_loader:
         state = call_hooks_stage_iterable(
@@ -140,28 +128,10 @@ def gather_prediction_outputs_from_dataloader(
 
         outputs = predict_on_batch(model=model, inputs=inputs)
 
-        all_output_batches.append(outputs)
+        target_labels_copy = deepcopy(target_labels) if with_labels else None
+        ids_copy = deepcopy(ids)
 
-        ids_total += [i for i in deepcopy(ids)]
-
-        if with_labels:
-            all_label_batches.append(deepcopy(target_labels))
-
-        del inputs
-        del target_labels
-        del ids
-
-    all_label_batches_stacked = {}
-    if with_labels:
-        all_label_batches_stacked = _stack_list_of_output_target_dicts(
-            list_of_target_batch_dicts=all_label_batches
-        )
-
-    all_output_batches_stacked = _stack_list_of_output_target_dicts(
-        list_of_target_batch_dicts=all_output_batches
-    )
-
-    return all_output_batches_stacked, all_label_batches_stacked, ids_total
+        yield outputs, target_labels_copy, ids_copy
 
 
 def gather_data_loader_samples(
@@ -198,7 +168,7 @@ def gather_data_loader_samples(
     all_input_batches_stacked = _stack_list_of_batch_dicts(
         list_of_batch_dicts=all_input_batches
     )
-    all_target_label_batches_stacked = _stack_list_of_output_target_dicts(
+    all_target_label_batches_stacked = stack_list_of_output_target_dicts(
         list_of_target_batch_dicts=all_label_batches
     )
 
@@ -226,7 +196,7 @@ def gather_data_loader_samples(
     return inputs_final, target_labels_final, ids_total
 
 
-def _stack_list_of_output_target_dicts(
+def stack_list_of_output_target_dicts(
     list_of_target_batch_dicts: List["al_training_labels_target"],
 ) -> "al_training_labels_target":
     """

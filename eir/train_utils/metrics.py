@@ -341,18 +341,19 @@ def calculate_prediction_losses(
     Inputs here refers to the input to the loss functions, which is the output
     from the actual models.
     """
+
     losses_dict: dict[str, dict[str, torch.Tensor]] = {}
 
-    for output_name, target_criterion_dict in criteria.items():
-        for output_head_name, criterion in target_criterion_dict.items():
+    for output_name, target_dict in inputs.items():
+        for output_head_name, input_tensor in target_dict.items():
             cur_target_col_labels = targets[output_name][output_head_name]
-            cur_target_col_outputs = inputs[output_name][output_head_name]
+            criterion = criteria[output_name][output_head_name]
 
             if output_name not in losses_dict:
                 losses_dict[output_name] = {}
 
             losses_dict[output_name][output_head_name] = criterion(
-                input=cur_target_col_outputs, target=cur_target_col_labels
+                input=input_tensor, target=cur_target_col_labels
             )
 
     return losses_dict
