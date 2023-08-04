@@ -207,14 +207,23 @@ def _get_predict_test_data_parametrization() -> List[Dict[str, Any]]:
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"subset_snps_file": "auto"},
+                        "input_type_info": {
+                            "subset_snps_file": "auto",
+                            "modality_dropout_rate": 0.05,
+                        },
                         "model_config": {"model_type": "genome-local-net"},
                     },
                     {
                         "input_info": {"input_name": "test_sequence"},
+                        "input_type_info": {
+                            "modality_dropout_rate": 0.05,
+                        },
                     },
                     {
                         "input_info": {"input_name": "test_sequence_albert"},
+                        "input_type_info": {
+                            "modality_dropout_rate": 0.05,
+                        },
                         "model_config": {
                             "window_size": 16,
                             "position": "embed",
@@ -230,9 +239,15 @@ def _get_predict_test_data_parametrization() -> List[Dict[str, Any]]:
                     },
                     {
                         "input_info": {"input_name": "test_bytes"},
+                        "input_type_info": {
+                            "modality_dropout_rate": 0.05,
+                        },
                     },
                     {
                         "input_info": {"input_name": "test_image"},
+                        "input_type_info": {
+                            "modality_dropout_rate": 0.05,
+                        },
                         "model_config": {
                             "model_init_config": {
                                 "layers": [2],
@@ -248,11 +263,15 @@ def _get_predict_test_data_parametrization() -> List[Dict[str, Any]]:
                         "input_type_info": {
                             "input_cat_columns": ["OriginExtraCol"],
                             "input_con_columns": ["ExtraTarget"],
+                            "modality_dropout_rate": 0.05,
                         },
                         "model_config": {"model_type": "tabular"},
                     },
                     {
                         "input_info": {"input_name": "test_array"},
+                        "input_type_info": {
+                            "modality_dropout_rate": 0.05,
+                        },
                         "model_config": {
                             "model_type": "cnn",
                             "model_init_config": {
