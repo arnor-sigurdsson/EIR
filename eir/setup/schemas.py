@@ -36,6 +36,15 @@ if TYPE_CHECKING:
 al_input_configs = Sequence["InputConfig"]
 al_output_configs = Sequence["OutputConfig"]
 
+al_input_type_info = Union[
+    "OmicsInputDataConfig",
+    "TabularInputDataConfig",
+    "SequenceInputDataConfig",
+    "ByteInputDataConfig",
+    "ImageInputDataConfig",
+    "ArrayInputDataConfig",
+]
+
 al_optimizers = tuple(Literal[i] for i in get_all_optimizer_names())
 
 al_feature_extractor_configs = Union[
@@ -402,6 +411,10 @@ class OmicsInputDataConfig:
     :param mixing_subtype:
         Which type of mixing to use on the omics data given that ``mixing_alpha`` is
         set >0.0 in the global configuration.
+
+    :param modality_dropout_rate:
+        Dropout rate to apply to the modality, e.g. 0.2 means that 20% of the time,
+        this modality will be dropped out during training.
     """
 
     snp_file: Optional[str] = None
@@ -410,6 +423,7 @@ class OmicsInputDataConfig:
     na_augment_prob: float = 0.8
     omics_format: Literal["one-hot"] = "one-hot"
     mixing_subtype: Union[Literal["mixup", "cutmix-block", "cutmix-uniform"]] = "mixup"
+    modality_dropout_rate: float = 0.0
 
 
 @dataclass
@@ -430,12 +444,17 @@ class TabularInputDataConfig:
     :param mixing_subtype:
         Which type of mixing to use on the tabular data given that ``mixing_alpha`` is
         set >0.0 in the global configuration.
+
+    :param modality_dropout_rate:
+        Dropout rate to apply to the modality, e.g. 0.2 means that 20% of the time,
+        this modality will be dropped out during training.
     """
 
     input_cat_columns: Sequence[str] = field(default_factory=list)
     input_con_columns: Sequence[str] = field(default_factory=list)
     label_parsing_chunk_size: Union[None, int] = None
     mixing_subtype: Literal["mixup"] = "mixup"
+    modality_dropout_rate: float = 0.0
 
 
 @dataclass
@@ -486,6 +505,10 @@ class SequenceInputDataConfig:
     :param mixing_subtype:
         Which type of mixing to use on the sequence data given that ``mixing_alpha`` is
         set >0.0 in the global configuration.
+
+    :param modality_dropout_rate:
+        Dropout rate to apply to the modality, e.g. 0.2 means that 20% of the time,
+        this modality will be dropped out during training.
     """
 
     vocab_file: Union[None, str] = None
@@ -497,6 +520,7 @@ class SequenceInputDataConfig:
     tokenizer_language: Union[str, None] = None
     adaptive_tokenizer_max_vocab_size: Optional[int] = None
     mixing_subtype: Literal["mixup"] = "mixup"
+    modality_dropout_rate: float = 0.0
 
 
 @dataclass
@@ -565,12 +589,17 @@ class ByteInputDataConfig:
     :param mixing_subtype:
         Which type of mixing to use on the bytes data given that ``mixing_alpha`` is
         set >0.0 in the global configuration.
+
+    :param modality_dropout_rate:
+        Dropout rate to apply to the modality, e.g. 0.2 means that 20% of the time,
+        this modality will be dropped out during training.
     """
 
     max_length: int = 256
     byte_encoding: Literal["uint8"] = "uint8"
     sampling_strategy_if_longer: Literal["from_start", "uniform"] = "uniform"
     mixing_subtype: Literal["mixup"] = "mixup"
+    modality_dropout_rate: float = 0.0
 
 
 @dataclass
@@ -605,6 +634,10 @@ class ImageInputDataConfig:
     :param mixing_subtype:
         Which type of mixing to use on the image data given that ``mixing_alpha`` is
         set >0.0 in the global configuration.
+
+    :param modality_dropout_rate:
+        Dropout rate to apply to the modality, e.g. 0.2 means that 20% of the time,
+        this modality will be dropped out during training.
     """
 
     auto_augment: bool = True
@@ -613,6 +646,7 @@ class ImageInputDataConfig:
     stds_normalization_values: Union[None, Sequence[float]] = None
     num_channels: Optional[int] = None
     mixing_subtype: Union[Literal["mixup"], Literal["cutmix"]] = "mixup"
+    modality_dropout_rate: float = 0.0
 
 
 @dataclass
@@ -621,9 +655,14 @@ class ArrayInputDataConfig:
     :param mixing_subtype:
         Which type of mixing to use on the image data given that ``mixing_alpha`` is
         set >0.0 in the global configuration.
+
+    :param modality_dropout_rate:
+        Dropout rate to apply to the modality, e.g. 0.2 means that 20% of the time,
+        this modality will be dropped out during training.
     """
 
     mixing_subtype: Union[Literal["mixup"]] = "mixup"
+    modality_dropout_rate: float = 0.0
 
 
 @dataclass

@@ -35,6 +35,7 @@ from eir.setup.schemas import (
     ByteInputDataConfig,
     OmicsInputDataConfig,
     SequenceInputDataConfig,
+    al_input_type_info,
 )
 
 
@@ -46,7 +47,17 @@ def prepare_inputs_disk(
     for input_name, data_pointer in inputs.items():
         input_object = inputs_objects[input_name]
         input_source = input_object.input_config.input_info.input_source
+        input_type_info = input_object.input_config.input_type_info
         deeplake_inner_key = input_object.input_config.input_info.input_inner_key
+
+        drop_rate = _get_modality_drop_rate(input_type_info=input_type_info)
+        should_skip = _should_skip_modality(
+            modality_dropout_rate=drop_rate,
+            test_mode=test_mode,
+        )
+
+        if should_skip:
+            continue
 
         match input_object:
             case ComputedOmicsInputInfo():
@@ -125,6 +136,19 @@ def prepare_inputs_disk(
     return prepared_inputs
 
 
+def _get_modality_drop_rate(input_type_info: al_input_type_info) -> float:
+    drop_rate = getattr(input_type_info, "modality_dropout_rate", 0.0)
+    return drop_rate
+
+
+def _should_skip_modality(modality_dropout_rate: float, test_mode: bool) -> bool:
+    if test_mode or modality_dropout_rate == 0.0:
+        return False
+
+    should_skip = torch.rand(1) < modality_dropout_rate
+    return bool(should_skip)
+
+
 def prepare_inputs_memory(
     inputs: Dict[str, Any], inputs_objects: "al_input_objects_as_dict", test_mode: bool
 ) -> Dict[str, torch.Tensor]:
@@ -132,6 +156,16 @@ def prepare_inputs_memory(
 
     for name, data in inputs.items():
         input_object = inputs_objects[name]
+        input_type_info = input_object.input_config.input_type_info
+
+        drop_rate = _get_modality_drop_rate(input_type_info=input_type_info)
+        should_skip = _should_skip_modality(
+            modality_dropout_rate=drop_rate,
+            test_mode=test_mode,
+        )
+
+        if should_skip:
+            continue
 
         match input_object:
             case ComputedOmicsInputInfo():

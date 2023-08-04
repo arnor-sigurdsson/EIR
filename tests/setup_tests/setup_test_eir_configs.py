@@ -181,6 +181,7 @@ def get_test_omics_input_init(
             "na_augment_perc": 0.10,
             "na_augment_prob": 0.80,
             "snp_file": str(test_path / "test_snps.bim"),
+            "modality_dropout_rate": 0.05,
         },
         "model_config": {"model_type": "genome-local-net"},
     }
@@ -205,7 +206,9 @@ def get_test_tabular_input_init(
             "input_name": "test_tabular",
             "input_type": "tabular",
         },
-        "input_type_info": {},
+        "input_type_info": {
+            "modality_dropout_rate": 0.05,
+        },
         "model_config": {"model_type": "tabular"},
     }
 
@@ -244,6 +247,7 @@ def get_test_sequence_input_init(
         "input_type_info": {
             "max_length": "max",
             "tokenizer_language": "en",
+            "modality_dropout_rate": 0.05,
         },
         "model_config": {
             "model_type": "sequence-default",
@@ -274,6 +278,7 @@ def get_test_bytes_input_init(
         },
         "input_type_info": {
             "max_length": 128,
+            "modality_dropout_rate": 0.05,
         },
         "model_config": {
             "model_type": "sequence-default",
@@ -309,6 +314,7 @@ def get_test_image_input_init(
         "input_type_info": {
             "auto_augment": False,
             "size": (16,),
+            "modality_dropout_rate": 0.05,
         },
         "model_config": {
             "model_type": "cnn",
@@ -344,6 +350,9 @@ def get_test_array_input_init(
             "input_name": "test_array",
             "input_type": "array",
             "input_inner_key": "test_array",
+        },
+        "input_type_info": {
+            "modality_dropout_rate": 0.05,
         },
         "model_config": {"model_type": "cnn"},
     }
