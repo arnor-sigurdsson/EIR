@@ -15,7 +15,13 @@ from eir.setup.output_setup import (
     ComputedTabularOutputInfo,
     al_output_objects_as_dict,
 )
+from eir.setup.schemas import GlobalConfig
 from eir.train_utils import metrics, utils
+from eir.train_utils.latent_analysis import (
+    LatentHookOutput,
+    latent_analysis_wrapper,
+    register_latent_hook,
+)
 from eir.train_utils.train_handlers_sequence_output import (
     sequence_out_single_sample_evaluation_wrapper,
 )
@@ -43,6 +49,8 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
 
     exp.model.eval()
 
+    hook_finalizers = register_pre_evaluation_hooks(model=exp.model, global_config=gc)
+
     output_generator = model_training_utils.get_prediction_outputs_generator(
         data_loader=exp.valid_loader,
         batch_prep_hook=exp.hooks.step_func_hooks.base_prepare_batch,
@@ -57,6 +65,17 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
         loss_function=exp.loss_function,
         device=gc.device,
         with_labels=True,
+    )
+
+    hook_outputs = deregister_pre_evaluation_hooks(
+        hook_finalizers=hook_finalizers,
+        evaluation_results=evaluation_results,
+    )
+
+    run_all_eval_hook_analysis(
+        hook_outputs=hook_outputs,
+        run_folder=handler_config.run_folder,
+        iteration=iteration,
     )
 
     write_eval_header = True if iteration == gc.sample_interval else False
@@ -86,6 +105,49 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
         )
 
     exp.model.train()
+
+
+def run_all_eval_hook_analysis(
+    hook_outputs: dict[str, LatentHookOutput],
+    run_folder: Path,
+    iteration: int | str,
+) -> None:
+    for hook_name, hook_output in hook_outputs.items():
+        match hook_output:
+            case LatentHookOutput():
+                latent_analysis_wrapper(
+                    latent_outputs=hook_output,
+                    run_folder=run_folder,
+                    iteration=iteration,
+                )
+            case _:
+                raise NotImplementedError()
+
+
+def register_pre_evaluation_hooks(
+    model: torch.nn.Module,
+    global_config: GlobalConfig,
+) -> dict[str, Callable]:
+    model_hook_finalizers: dict[str, Callable] = {}
+
+    if global_config.latent_sampling is not None:
+        for layer_path in global_config.latent_sampling.layers_to_sample:
+            model_hook_finalizers[f"latent_{layer_path}"] = register_latent_hook(
+                model=model, layer_path=layer_path
+            )
+
+    return model_hook_finalizers
+
+
+def deregister_pre_evaluation_hooks(
+    hook_finalizers: dict[str, Callable],
+    evaluation_results: "EvaluationResults",
+) -> dict[str, LatentHookOutput]:
+    hook_outputs = {}
+    for hook_name, hook_finalizer in hook_finalizers.items():
+        hook_outputs[hook_name] = hook_finalizer(evaluation_results=evaluation_results)
+
+    return hook_outputs
 
 
 @dataclass()

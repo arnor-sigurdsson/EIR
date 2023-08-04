@@ -198,6 +198,11 @@ def _get_predict_test_data_parametrization() -> List[Dict[str, Any]]:
                     "attribution_background_samples": 128,
                     "compute_attributions": False,
                     "batch_size": 64,
+                    "latent_sampling": {
+                        "layers_to_sample": [
+                            "fusion_modules.computed.fusion_modules.fusion.0.0.fc_1",
+                        ]
+                    },
                 },
                 "input_configs": [
                     {
