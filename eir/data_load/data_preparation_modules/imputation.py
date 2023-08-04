@@ -115,7 +115,7 @@ def _get_default_impute_fill_values(
                 | ComputedImageInputInfo()
                 | ComputedArrayInputInfo()
             ):
-                fill_values[input_name] = 0
+                fill_values[input_name] = 0.0
             case _:
                 raise ValueError(
                     f"Unrecognized input type"

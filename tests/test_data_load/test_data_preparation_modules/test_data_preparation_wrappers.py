@@ -1,5 +1,9 @@
 import numpy as np
+import torch
 
+from eir.data_load.data_preparation_modules.preparation_wrappers import (
+    _should_skip_modality,
+)
 from eir.train_utils.train_handlers_sequence_output import (
     _streamline_tabular_data_for_transformers,
 )
@@ -34,3 +38,16 @@ def test_streamline_tabular_data_for_transformers():
         assert isinstance(value, np.ndarray)
         expected = transformers[name].transform(tabular_input[name])
         assert np.array_equal(value, expected)
+
+
+def test_modality_skip_when_test_mode() -> None:
+    assert not _should_skip_modality(modality_dropout_rate=0.5, test_mode=True)
+
+
+def test_modality_skip_when_modality_dropout_rate_zero() -> None:
+    assert not _should_skip_modality(modality_dropout_rate=0.0, test_mode=False)
+
+
+def test_modality_skip_when_test_mode_false_modality_dropout_rate_non_zero() -> None:
+    torch.manual_seed(0)
+    assert _should_skip_modality(modality_dropout_rate=1.0, test_mode=False)

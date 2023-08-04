@@ -205,7 +205,6 @@ def get_test_tabular_input_init(
             "input_name": "test_tabular",
             "input_type": "tabular",
         },
-        "input_type_info": {},
         "model_config": {"model_type": "tabular"},
     }
 
