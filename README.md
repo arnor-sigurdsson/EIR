@@ -66,12 +66,12 @@ If you are an ML/DL researcher developing new models, etc., it might not fit you
 
 - **General**
   - Train models directly from the command line through `.yaml` configuration files.
-  - Training on [genotype](https://eir.readthedocs.io/en/latest/tutorials/01_basic_tutorial.html), [tabular](https://eir.readthedocs.io/en/latest/tutorials/02_tabular_tutorial.html), [sequence](https://eir.readthedocs.io/en/latest/tutorials/03_sequence_tutorial.html), [image](https://eir.readthedocs.io/en/latest/tutorials/05_image_tutorial.html), [array](https://eir.readthedocs.io/en/latest/tutorials/08_array_tutorial.html) and [binary](https://eir.readthedocs.io/en/latest/tutorials/06_raw_bytes_tutorial.html) input data, with various modality-specific settings available.
-  - Seamless multi-modal (e.g., combining [text + image + tabular data](https://eir.readthedocs.io/en/latest/tutorials/07_multimodal_tutorial.html), or any combination of the modalities above) training.
-  - Train multiple features extractors on the same data source, e.g., [combining vanilla transformer, Longformer and a pre-trained BERT variant](https://eir.readthedocs.io/en/latest/tutorials/04_pretrained_sequence_tutorial.html) for text classification.
+  - Training on [genotype](https://eir.readthedocs.io/en/latest/tutorials/a_using_eir/01_basic_tutorial.html), [tabular](https://eir.readthedocs.io/en/latest/tutorials/a_using_eir/02_tabular_tutorial.html), [sequence](https://eir.readthedocs.io/en/latest/tutorials/a_using_eir/03_sequence_tutorial.html), [image](https://eir.readthedocs.io/en/latest/tutorials/a_using_eir/05_image_tutorial.html), [array](https://eir.readthedocs.io/en/latest/tutorials/a_using_eir/08_array_tutorial.html) and [binary](https://eir.readthedocs.io/en/latest/tutorials/a_using_eir/06_raw_bytes_tutorial.html) input data, with various modality-specific settings available.
+  - Seamless multi-modal (e.g., combining [text + image + tabular data](https://eir.readthedocs.io/en/latest/tutorials/a_using_eir/07_multimodal_tutorial.html), or any combination of the modalities above) training.
+  - Train multiple features extractors on the same data source, e.g., [combining vanilla transformer, Longformer and a pre-trained BERT variant](https://eir.readthedocs.io/en/latest/tutorials/a_using_eir/04_pretrained_sequence_tutorial.html) for text classification.
 - **Supervised Learning**
   - Supports continuous (i.e., regression) and categorical (i.e., classification) targets.
-  - [Multi-task / multi-label](https://eir.readthedocs.io/en/latest/tutorials/07_multimodal_tutorial.html#appendix-b-multi-modal-multi-task-learning) prediction supported out-of-the-box.
+  - [Multi-task / multi-label](https://eir.readthedocs.io/en/latest/tutorials/a_using_eir/07_multimodal_tutorial.html#appendix-b-multi-modal-multi-task-learning) prediction supported out-of-the-box.
   - Model explainability for genotype, tabular, sequence, image and array data built in.
   - Computes and graphs various evaluation metrics (e.g., RMSE, PCC and R2 for regression tasks, accuracy, ROC-AUC, etc. for classification tasks) during training.
 - **Sequence generation**
