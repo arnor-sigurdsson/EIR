@@ -40,7 +40,7 @@ and so on:
 
 - ``adabelief-pytorch``  – Juntang Zhuang: PyTorch implementation of AdaBelief Optimizer
 
-- ``dill``  – Mike McKerns: serialize all of python
+- ``dill``  – Mike McKerns: serialize all of Python
 
 - ``aislib``  – Arnor Sigurdsson: 
 
