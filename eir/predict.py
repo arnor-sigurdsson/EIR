@@ -35,7 +35,12 @@ from eir.setup.input_setup import al_input_objects_as_dict
 from eir.setup.output_setup import al_output_objects_as_dict
 from eir.target_setup.target_label_setup import gather_all_ids_from_output_configs
 from eir.train import check_dataset_and_batch_size_compatibility
-from eir.train_utils.evaluation import run_split_evaluation
+from eir.train_utils.evaluation import (
+    deregister_pre_evaluation_hooks,
+    register_pre_evaluation_hooks,
+    run_all_eval_hook_analysis,
+    run_split_evaluation,
+)
 from eir.train_utils.metrics import al_metric_record_dict, al_step_metric_dict
 from eir.train_utils.step_logic import Hooks, prepare_base_batch_default
 from eir.train_utils.utils import set_log_level_for_eir_loggers
@@ -110,20 +115,20 @@ def run_predict(predict_cl_args: Namespace):
         log_level=loaded_train_experiment.configs.global_config.log_level
     )
 
-    predict_config = get_default_predict_experiment(
+    predict_experiment = get_default_predict_experiment(
         loaded_train_experiment=loaded_train_experiment,
         predict_cl_args=predict_cl_args,
     )
 
     predict(
-        predict_experiment=predict_config,
+        predict_experiment=predict_experiment,
         predict_cl_args=predict_cl_args,
     )
 
-    if predict_config.configs.global_config.compute_attributions:
+    if predict_experiment.configs.global_config.compute_attributions:
         compute_predict_attributions(
             loaded_train_experiment=loaded_train_experiment,
-            predict_config=predict_config,
+            predict_config=predict_experiment,
         )
 
 
@@ -131,6 +136,11 @@ def predict(
     predict_experiment: "PredictExperiment",
     predict_cl_args: Namespace,
 ) -> None:
+    hook_finalizers = register_pre_evaluation_hooks(
+        model=predict_experiment.model,
+        global_config=predict_experiment.configs.global_config,
+    )
+
     output_generator = get_prediction_outputs_generator(
         data_loader=predict_experiment.test_dataloader,
         batch_prep_hook=predict_experiment.hooks.step_func_hooks.base_prepare_batch,
@@ -149,6 +159,17 @@ def predict(
         loss_function=loss_func,
         device=predict_experiment.configs.global_config.device,
         with_labels=predict_cl_args.evaluate,
+    )
+
+    hook_outputs = deregister_pre_evaluation_hooks(
+        hook_finalizers=hook_finalizers,
+        evaluation_results=predict_results,
+    )
+
+    run_all_eval_hook_analysis(
+        hook_outputs=hook_outputs,
+        run_folder=predict_cl_args.output_folder,
+        iteration="predict",
     )
 
     if predict_cl_args.evaluate:

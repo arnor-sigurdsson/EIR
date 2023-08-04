@@ -57,6 +57,7 @@ from eir.setup.config_setup_modules.output_config_setup_sequence import (
     get_configs_object_with_seq_output_configs,
 )
 from eir.setup.config_validation import validate_train_configs
+from eir.setup.schema_modules.latent_analysis_schemas import LatentSamplingConfig
 from eir.train_utils.utils import configure_global_eir_logging
 from eir.utils.logging import get_logger
 
@@ -267,6 +268,9 @@ def generate_aggregated_config(
 
 def get_global_config(global_configs: Iterable[dict]) -> schemas.GlobalConfig:
     combined_config = combine_dicts(dicts=global_configs)
+    combined_config = _maybe_add_latent_sampling_to_combined_config(
+        combined_config=combined_config
+    )
 
     combined_config_namespace = Namespace(**combined_config)
 
@@ -275,6 +279,17 @@ def get_global_config(global_configs: Iterable[dict]) -> schemas.GlobalConfig:
     global_config_object_mod = modify_global_config(global_config=global_config_object)
 
     return global_config_object_mod
+
+
+def _maybe_add_latent_sampling_to_combined_config(combined_config: dict) -> dict:
+    if "latent_sampling" in combined_config and isinstance(
+        combined_config["latent_sampling"], dict
+    ):
+        combined_config["latent_sampling"] = LatentSamplingConfig(
+            **combined_config["latent_sampling"]
+        )
+
+    return combined_config
 
 
 def modify_global_config(global_config: schemas.GlobalConfig) -> schemas.GlobalConfig:

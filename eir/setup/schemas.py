@@ -20,6 +20,7 @@ from eir.models.output.output_module_setup import TabularOutputModuleConfig
 from eir.models.output.sequence.sequence_output_modules import (
     SequenceOutputModuleConfig,
 )
+from eir.setup.schema_modules.latent_analysis_schemas import LatentSamplingConfig
 from eir.setup.schema_modules.output_schemas_sequence import (
     SequenceOutputSamplingConfig,
     SequenceOutputTypeConfig,
@@ -267,6 +268,8 @@ class GlobalConfig:
         Whether to enforce that the loaded pretrained model exactly the same
         architecture as the current model. If False, will only load the layers
         that match between the two models.
+
+    :param latent_sampling: Configuration to use for latent sampling.
     """
 
     output_folder: str
@@ -314,6 +317,7 @@ class GlobalConfig:
     plot_skip_steps: int = 200
     pretrained_checkpoint: Union[None, str] = None
     strict_pretrained_loading: bool = True
+    latent_sampling: Optional[LatentSamplingConfig] = None
 
 
 @dataclass
