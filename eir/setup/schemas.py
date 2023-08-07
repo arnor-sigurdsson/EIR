@@ -659,10 +659,16 @@ class ArrayInputDataConfig:
     :param modality_dropout_rate:
         Dropout rate to apply to the modality, e.g. 0.2 means that 20% of the time,
         this modality will be dropped out during training.
+
+    :param normalization:
+        Which type of normalization to apply to the array data. If ``element``, will
+        normalize each element in the array independently. If ``channel``, will
+        normalize each channel in the array independently.
     """
 
     mixing_subtype: Union[Literal["mixup"]] = "mixup"
     modality_dropout_rate: float = 0.0
+    normalization: Optional[Literal["element", "channel"]] = "element"
 
 
 @dataclass
