@@ -1,12 +1,16 @@
-from typing import Iterable, Sequence
+from typing import Iterable, Sequence, Type, Union
 
 import torch
 from torch_optimizer import _NAME_OPTIM_MAP
 from tqdm import tqdm
 from transformers.models.auto.modeling_auto import MODEL_MAPPING_NAMES
 
+al_collector_classes = Union[
+    Type["ChannelBasedRunningStatistics"], Type["ElementBasedRunningStatistics"]
+]
 
-class RunningStatistics:
+
+class ChannelBasedRunningStatistics:
     """
     Adapted from https://gist.github.com/thomasbrandon/ad5b1218fc573c10ea4e1f0c63658469.
     """
@@ -44,27 +48,76 @@ class RunningStatistics:
                 self.n += new_n
 
     @property
-    def mean(self):
-        return self.sum / self.n if self.n > 0 else None
+    def mean(self) -> torch.Tensor:
+        return self.sum / self.n
 
     @property
-    def var(self):
-        return self.num_var / self.n if self.n > 0 else None
+    def var(self) -> torch.Tensor:
+        return self.num_var / self.n
 
     @property
-    def std(self):
-        return self.var.sqrt() if self.n > 0 else None
+    def std(self) -> torch.Tensor:
+        return self.var.sqrt()
+
+
+class ElementBasedRunningStatistics:
+    def __init__(self, shape: tuple):
+        self.shape = shape
+        self.n = 0
+        self._mean = torch.zeros(shape)
+        self._ssdm = torch.zeros(shape)
+
+    def update(self, x: torch.Tensor):
+        self.n += 1
+        delta = x - self._mean
+        self._mean += delta / self.n
+        delta2 = x - self._mean
+        self._ssdm += delta * delta2
+
+    @property
+    def mean(self) -> torch.Tensor:
+        return self._mean
+
+    @property
+    def var(self) -> torch.Tensor:
+        return self._ssdm / (self.n - 1) if self.n > 1 else torch.square(self._mean)
+
+    @property
+    def std(self) -> torch.Tensor:
+        return torch.sqrt(self.var)
 
 
 def collect_stats(
-    tensor_iterable: Iterable[torch.Tensor], n_dims: int = 2
-) -> RunningStatistics:
-    stats = RunningStatistics(n_dims=n_dims)
+    tensor_iterable: Iterable[torch.Tensor],
+    collector_class: al_collector_classes,
+    shape: tuple,
+) -> ChannelBasedRunningStatistics | ElementBasedRunningStatistics:
+    stats = set_up_collector_instance(collector_class=collector_class, shape=shape)
+
     for it in tqdm(tensor_iterable, desc="Gathering Statistics: "):
         if hasattr(it, "data"):
             stats.update(it.data)
         else:
             stats.update(it)
+    return stats
+
+
+def set_up_collector_instance(
+    collector_class: al_collector_classes,
+    shape: tuple,
+) -> ChannelBasedRunningStatistics | ElementBasedRunningStatistics:
+    stats: ChannelBasedRunningStatistics | ElementBasedRunningStatistics
+    if collector_class is ChannelBasedRunningStatistics:
+        n_dims = len(shape) - 1
+        stats = ChannelBasedRunningStatistics(n_dims=n_dims)
+    elif collector_class is ElementBasedRunningStatistics:
+        stats = ElementBasedRunningStatistics(shape=shape)
+    else:
+        raise ValueError(
+            f"collector_class must be either ChannelBasedRunningStatistics or "
+            f"ElementBasedRunningStatistics, "
+            f"got {collector_class}."
+        )
     return stats
 
 

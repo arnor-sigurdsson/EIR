@@ -6,6 +6,7 @@ import torch
 
 from eir.data_load.data_preparation_modules.common import _load_deeplake_sample
 from eir.data_load.data_source_modules import deeplake_ops
+from eir.setup.input_setup_modules.setup_array import ArrayNormalizationStats
 
 
 def array_load_wrapper(
@@ -28,7 +29,9 @@ def array_load_wrapper(
     return array_data
 
 
-def prepare_array_data(array_data: np.ndarray) -> torch.Tensor:
+def prepare_array_data(
+    array_data: np.ndarray, normalization_stats: Optional[ArrayNormalizationStats]
+) -> torch.Tensor:
     """Enforce 3 dimensions for now."""
 
     tensor = torch.from_numpy(array_data).float()
@@ -46,4 +49,32 @@ def prepare_array_data(array_data: np.ndarray) -> torch.Tensor:
                 f"1, 2, or 3 are supported."
             )
 
+    tensor = normalize_array(array=tensor, normalization_stats=normalization_stats)
+
     return tensor
+
+
+def normalize_array(
+    array: torch.Tensor,
+    normalization_stats: Optional[ArrayNormalizationStats],
+    epsilon: float = 1e-10,
+) -> torch.Tensor:
+    if normalization_stats is None:
+        return array
+
+    stds = normalization_stats.stds
+    array = (array - normalization_stats.means) / (stds + epsilon)
+
+    return array
+
+
+def un_normalize_array(
+    array: torch.Tensor, normalization_stats: Optional[ArrayNormalizationStats]
+) -> torch.Tensor:
+    if normalization_stats is None:
+        return array
+
+    stds = normalization_stats.stds
+    array = array * stds + normalization_stats.means
+
+    return array

@@ -126,7 +126,10 @@ def prepare_inputs_disk(
                     data_pointer=data_pointer,
                     deeplake_inner_key=deeplake_inner_key,
                 )
-                input_prepared = prepare_array_data(array_data=array_data)
+                input_prepared = prepare_array_data(
+                    array_data=array_data,
+                    normalization_stats=input_object.normalization_stats,
+                )
 
             case _:
                 input_prepared = inputs[input_name]
@@ -204,7 +207,10 @@ def prepare_inputs_memory(
                 )
 
             case ComputedArrayInputInfo():
-                input_prepared = prepare_array_data(array_data=data)
+                input_prepared = prepare_array_data(
+                    array_data=data,
+                    normalization_stats=input_object.normalization_stats,
+                )
 
             case _:
                 input_prepared = inputs[name]

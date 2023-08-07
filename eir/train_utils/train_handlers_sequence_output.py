@@ -919,7 +919,10 @@ def prepare_sequence_output_manual_sample_data(
                     data_pointer=data,
                     deeplake_inner_key=input_info.input_inner_key,
                 )
-                prepared_array_data = prepare_array_data(array_data=array_data)
+                prepared_array_data = prepare_array_data(
+                    array_data=array_data,
+                    normalization_stats=input_object.normalization_stats,
+                )
                 prepared_inputs[name] = prepared_array_data
 
             case _:

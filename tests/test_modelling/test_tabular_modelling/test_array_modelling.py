@@ -61,6 +61,9 @@ def _get_classification_output_configs() -> Sequence[Dict]:
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_array"},
+                        "input_type_info": {
+                            "normalization": "element",
+                        },
                         "model_config": {
                             "model_type": "cnn",
                             "model_init_config": {
@@ -179,6 +182,9 @@ def _get_regression_output_configs() -> Sequence[Dict]:
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_array"},
+                        "input_type_info": {
+                            "normalization": "channel",
+                        },
                         "model_config": {
                             "model_type": "cnn",
                             "model_init_config": {
@@ -190,7 +196,7 @@ def _get_regression_output_configs() -> Sequence[Dict]:
                         },
                     }
                 ],
-                "output_configs": _get_classification_output_configs(),
+                "output_configs": _get_regression_output_configs(),
             },
         },
         # Case 2: LCL
@@ -202,12 +208,15 @@ def _get_regression_output_configs() -> Sequence[Dict]:
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_array"},
+                        "input_type_info": {
+                            "normalization": None,
+                        },
                         "model_config": {
                             "model_type": "lcl",
                         },
                     }
                 ],
-                "output_configs": _get_classification_output_configs(),
+                "output_configs": _get_regression_output_configs(),
             },
         },
     ],

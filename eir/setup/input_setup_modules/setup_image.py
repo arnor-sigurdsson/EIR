@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Dict, Optional, Sequence, Tuple
 
 import numpy as np
+import torch
 from timm.models._registry import _model_pretrained_cfgs
 from torchvision import transforms
 from torchvision.datasets.folder import default_loader
@@ -17,7 +18,7 @@ from eir.data_load.data_source_modules.deeplake_ops import (
 from eir.models.input.image.image_models import ImageModelConfig
 from eir.setup import schemas
 from eir.setup.input_setup_modules.common import DataDimensions
-from eir.setup.setup_utils import collect_stats
+from eir.setup.setup_utils import ChannelBasedRunningStatistics, collect_stats
 from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__)
@@ -70,18 +71,20 @@ def set_up_image_input_for_training(
             deeplake_inner_key=input_config.input_info.input_inner_key,
         )
 
-    normalization_stats = get_image_normalization_values(input_config=input_config)
+    data_dimension = DataDimensions(
+        channels=num_channels,
+        height=input_type_info.size[0],
+        width=input_type_info.size[-1],
+    )
+
+    normalization_stats = get_image_normalization_values(
+        input_config=input_config, data_dimensions=data_dimension
+    )
 
     base_transforms, all_transforms = get_image_transforms(
         target_size=input_type_info.size,
         normalization_stats=normalization_stats,
         auto_augment=input_type_info.auto_augment,
-    )
-
-    data_dimension = DataDimensions(
-        channels=num_channels,
-        height=input_type_info.size[0],
-        width=input_type_info.size[-1],
     )
 
     image_input_info = ComputedImageInputInfo(
@@ -131,17 +134,21 @@ def infer_num_channels(data_source: str, deeplake_inner_key: Optional[str]) -> i
 
 @dataclass
 class ImageNormalizationStats:
-    channel_means: Sequence[float]
-    channel_stds: Sequence[float]
+    channel_means: torch.Tensor
+    channel_stds: torch.Tensor
 
 
 def get_image_normalization_values(
     input_config: schemas.InputConfig,
+    data_dimensions: DataDimensions,
 ) -> ImageNormalizationStats:
     input_type_info = input_config.input_type_info
     assert isinstance(input_type_info, schemas.ImageInputDataConfig)
 
     pretrained_model_configs = get_timm_configs()
+
+    means: Optional[torch.Tensor | Sequence[float]]
+    stds: Optional[torch.Tensor | Sequence[float]]
 
     means = input_type_info.mean_normalization_values
     stds = input_type_info.stds_normalization_values
@@ -209,7 +216,11 @@ def get_image_normalization_values(
                 image_iterator = (default_loader(str(f)) for f in file_iterator)
                 tensor_iterator = (to_tensor(i) for i in image_iterator)
 
-            gathered_stats = collect_stats(tensor_iterable=tensor_iterator)
+            gathered_stats = collect_stats(
+                tensor_iterable=tensor_iterator,
+                collector_class=ChannelBasedRunningStatistics,
+                shape=data_dimensions.full_shape(),
+            )
             means = gathered_stats.mean
             stds = gathered_stats.std
             logger.info(
@@ -222,7 +233,14 @@ def get_image_normalization_values(
 
     assert means is not None
     assert stds is not None
-    stats = ImageNormalizationStats(channel_means=means, channel_stds=stds)
+
+    means_tensor = torch.tensor(means)
+    stds_tensor = torch.tensor(stds)
+
+    stats = ImageNormalizationStats(
+        channel_means=means_tensor,
+        channel_stds=stds_tensor,
+    )
 
     return stats
 
