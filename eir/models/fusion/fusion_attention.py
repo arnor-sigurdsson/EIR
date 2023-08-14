@@ -4,7 +4,8 @@ import torch
 from einops import rearrange
 from torch import Tensor, einsum, nn
 
-from eir.models.layers import LCL, LCLResidualBlock, get_projection_layer
+from eir.models.layers.lcl_layers import LCL, LCLResidualBlock
+from eir.models.layers.projection_layers import get_projection_layer
 
 al_projection_layer_types = Literal["auto", "lcl", "lcl_residual", "linear"]
 

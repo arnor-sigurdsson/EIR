@@ -5,7 +5,7 @@ import torch
 from torch import nn
 
 from eir.models.fusion import fusion_default, fusion_identity, fusion_mgmoe
-from eir.models.layers import ResidualMLPConfig
+from eir.models.layers.mlp_layers import ResidualMLPConfig
 from eir.utils.logging import get_logger
 
 al_fusion_model = Literal["pass-through", "mlp-residual", "identity", "mgmoe"]

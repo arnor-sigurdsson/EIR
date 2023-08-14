@@ -10,7 +10,7 @@ from eir.models.input.array.array_models import (
     al_array_models,
     al_pre_normalization,
 )
-from eir.models.layers import get_projection_layer
+from eir.models.layers.projection_layers import get_projection_layer
 
 if TYPE_CHECKING:
     from eir.setup.input_setup_modules.common import DataDimensions

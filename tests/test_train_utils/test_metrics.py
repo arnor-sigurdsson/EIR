@@ -8,7 +8,7 @@ from sklearn.metrics import mean_squared_error
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
 from eir.models.output.mlp_residual import ResidualMLPOutputModuleConfig
-from eir.models.output.output_module_setup import TabularOutputModuleConfig
+from eir.models.output.tabular.tabular_output_modules import TabularOutputModuleConfig
 from eir.setup.output_setup_modules.tabular_output_setup import (
     ComputedTabularOutputInfo,
 )

@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Dict
 import torch
 from torch import nn
 
-from eir.models.models_base import calculate_module_dict_outputs
+from eir.models.models_utils import calculate_module_dict_outputs
 
 if TYPE_CHECKING:
     from eir.setup.output_setup_modules.tabular_output_setup import (

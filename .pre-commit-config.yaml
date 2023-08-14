@@ -38,12 +38,6 @@ repos:
         types: [ python ]
         stages: [ push ]
 
-      - id: update-reqs
-        name: Update requirements.txt
-        entry: ./misc/update_reqs.sh
-        language: system
-        stages: [ commit ]
-
       - id: check-versions
         name: Check project versions
         entry: python ./misc/check_versions.py

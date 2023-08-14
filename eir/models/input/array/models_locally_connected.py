@@ -16,7 +16,7 @@ import torch
 from torch import nn
 
 from eir.models.input.sequence.transformer_models import PositionalEmbedding
-from eir.models.layers import LCL, LCLResidualBlock
+from eir.models.layers.lcl_layers import LCL, LCLResidualBlock
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:

@@ -6,7 +6,8 @@ from hypothesis import given, settings
 from hypothesis.strategies import integers, sampled_from
 from torch import nn
 
-from eir.models.layers import LCL, LCLResidualBlock, get_projection_layer
+from eir.models.layers.lcl_layers import LCL, LCLResidualBlock
+from eir.models.layers.projection_layers import get_projection_layer
 
 
 def test_get_projection_layer():

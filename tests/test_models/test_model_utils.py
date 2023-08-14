@@ -8,8 +8,8 @@ from hypothesis.strategies import composite, integers
 from torch import nn
 
 from eir.models import model_training_utils
-from eir.models.input.omics import models_cnn
-from eir.models.input.omics.models_cnn import ConvParamSuggestion
+from eir.models.input.array import models_cnn
+from eir.models.input.array.models_cnn import ConvParamSuggestion
 from eir.train import train
 
 

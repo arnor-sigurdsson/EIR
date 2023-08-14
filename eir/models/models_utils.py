@@ -19,7 +19,7 @@ from torch import nn
 from transformers import PreTrainedModel
 
 from eir.models.input.sequence.transformer_models import get_hf_transformer_forward
-from eir.models.layers import MLPResidualBlock
+from eir.models.layers.mlp_layers import MLPResidualBlock
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:

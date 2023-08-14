@@ -7,7 +7,6 @@ import pytest
 import yaml
 from aislib.misc_utils import ensure_path_exists
 
-import eir.models.output.output_module_setup
 from eir.predict_modules.predict_config import (
     _check_matching_general_output_configs,
     _get_maybe_patched_null_sequence_output_source_for_generation,
@@ -20,6 +19,13 @@ from eir.setup.config_setup_modules.config_setup_utils import (
     object_to_primitives,
     recursive_dict_replace,
 )
+
+al_config_instances = Union[
+    schemas.GlobalConfig,
+    schemas.InputConfig,
+    schemas.OutputConfig,
+    schemas.TabularOutputModuleConfig,
+]
 
 
 def test_get_named_predict_dict_iterators(tmp_path: Path) -> None:
@@ -45,14 +51,6 @@ def test_get_named_predict_dict_iterators(tmp_path: Path) -> None:
     for key, key_iter in named_iterators.items():
         for dict_ in key_iter:
             assert dict_ == {f"key_{key}": f"value_{key}"}
-
-
-al_config_instances = Union[
-    schemas.GlobalConfig,
-    schemas.InputConfig,
-    schemas.OutputConfig,
-    eir.models.output.output_module_setup.TabularOutputModuleConfig,
-]
 
 
 @pytest.mark.parametrize(

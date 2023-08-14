@@ -42,15 +42,15 @@ from eir.models.input.tabular.tabular import (
     SimpleTabularModelConfig,
     TabularModelConfig,
 )
-from eir.models.layers import ResidualMLPConfig
+from eir.models.layers.mlp_layers import ResidualMLPConfig
 from eir.models.output.array.array_output_modules import ArrayOutputModuleConfig
 from eir.models.output.linear import LinearOutputModuleConfig
 from eir.models.output.mlp_residual import ResidualMLPOutputModuleConfig
-from eir.models.output.output_module_setup import TabularOutputModuleConfig
 from eir.models.output.sequence.sequence_output_modules import (
     SequenceOutputModuleConfig,
     TransformerSequenceOutputModuleConfig,
 )
+from eir.models.output.tabular.tabular_output_modules import TabularOutputModuleConfig
 from eir.setup import schemas
 from eir.setup.config_setup_modules.config_setup_utils import (
     get_yaml_iterator_with_injections,

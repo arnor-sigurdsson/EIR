@@ -15,12 +15,12 @@ from eir.models.input.omics.omics_models import (
 )
 from eir.models.input.sequence.transformer_models import SequenceModelConfig
 from eir.models.input.tabular.tabular import SimpleTabularModel, TabularModelConfig
-from eir.models.layers import ResidualMLPConfig
+from eir.models.layers.mlp_layers import ResidualMLPConfig
 from eir.models.output.array.array_output_modules import ArrayOutputModuleConfig
-from eir.models.output.output_module_setup import TabularOutputModuleConfig
 from eir.models.output.sequence.sequence_output_modules import (
     SequenceOutputModuleConfig,
 )
+from eir.models.output.tabular.tabular_output_modules import TabularOutputModuleConfig
 from eir.setup.schema_modules.latent_analysis_schemas import LatentSamplingConfig
 from eir.setup.schema_modules.output_schemas_array import (
     ArrayOutputSamplingConfig,

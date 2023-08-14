@@ -1,10 +1,10 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, Literal, Protocol, Type, Union
 
-from eir.models.input.omics.models_cnn import CNNModel, CNNModelConfig
-from eir.models.input.omics.models_identity import IdentityModel, IdentityModelConfig
-from eir.models.input.omics.models_linear import LinearModel, LinearModelConfig
-from eir.models.input.omics.models_locally_connected import (
+from eir.models.input.array.models_cnn import CNNModel, CNNModelConfig
+from eir.models.input.array.models_identity import IdentityModel, IdentityModelConfig
+from eir.models.input.array.models_linear import LinearModel, LinearModelConfig
+from eir.models.input.array.models_locally_connected import (
     FlattenFunc,
     LCLModel,
     LCLModelConfig,

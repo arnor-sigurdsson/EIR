@@ -4,12 +4,12 @@ from typing import Any, Dict, Union
 import timm
 from torch import nn
 
+from eir.models.input.array.models_cnn import CNNModel, CNNModelConfig
 from eir.models.input.image.image_models import (
     ImageModelClassGetterFunction,
     ImageModelConfig,
     ImageWrapperModel,
 )
-from eir.models.input.omics.models_cnn import CNNModel, CNNModelConfig
 from eir.setup.input_setup_modules.common import DataDimensions
 from eir.utils.logging import get_logger
 

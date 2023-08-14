@@ -8,7 +8,11 @@ from sympy import Symbol
 from sympy.solvers import solve
 from torch import nn
 
-from eir.models.layers import CNNResidualBlock, ConvAttentionBlock, FirstCNNBlock
+from eir.models.layers.cnn_layers import (
+    CNNResidualBlock,
+    ConvAttentionBlock,
+    FirstCNNBlock,
+)
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:

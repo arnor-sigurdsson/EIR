@@ -6,8 +6,8 @@ import torch
 from aislib.pytorch_modules import Swish
 from torch import nn
 
-from eir.models.layers import MLPResidualBlock, ResidualMLPConfig
-from eir.models.models_base import (
+from eir.models.layers.mlp_layers import MLPResidualBlock, ResidualMLPConfig
+from eir.models.models_utils import (
     calculate_module_dict_outputs,
     construct_multi_branches,
     create_multi_task_blocks_with_first_adaptor_block,

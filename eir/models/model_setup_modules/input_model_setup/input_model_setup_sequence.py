@@ -15,7 +15,7 @@ from eir.models.input.sequence.transformer_models import (
     TransformerWrapperModel,
     get_embedding_dim_for_sequence_model,
 )
-from eir.models.models_base import get_output_dimensions_for_input
+from eir.models.models_utils import get_output_dimensions_for_input
 from eir.setup.setup_utils import get_unsupported_hf_models
 from eir.utils.logging import get_logger
 

@@ -9,16 +9,20 @@ from eir.models.input.sequence.sequence_models import get_sequence_model_class
 from eir.models.input.tabular.tabular import get_unique_values_from_transformers
 from eir.models.meta import meta
 from eir.models.meta.meta import al_input_modules
-from eir.models.model_setup_modules.input_model_setup_array import (
+from eir.models.model_setup_modules.input_model_setup.input_model_setup_array import (
     get_array_feature_extractor,
     get_array_model,
 )
-from eir.models.model_setup_modules.input_model_setup_image import get_image_model
-from eir.models.model_setup_modules.input_model_setup_omics import (
+from eir.models.model_setup_modules.input_model_setup.input_model_setup_image import (
+    get_image_model,
+)
+from eir.models.model_setup_modules.input_model_setup.input_model_setup_omics import (
     get_omics_model_from_model_config,
 )
-from eir.models.model_setup_modules.input_model_setup_sequence import get_sequence_model
-from eir.models.model_setup_modules.input_model_setup_tabular import (
+from eir.models.model_setup_modules.input_model_setup.input_model_setup_sequence import (  # noqa
+    get_sequence_model,
+)
+from eir.models.model_setup_modules.input_model_setup.input_model_setup_tabular import (
     SimpleTabularModel,
     get_tabular_model,
 )

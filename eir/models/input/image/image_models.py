@@ -3,7 +3,7 @@ from typing import Any, Dict, Literal, Protocol, Type
 
 from torch import Tensor, nn
 
-from eir.models.input.omics.models_cnn import CNNModelConfig
+from eir.models.input.array.models_cnn import CNNModelConfig
 
 
 class ImageModelClassGetterFunction(Protocol):
