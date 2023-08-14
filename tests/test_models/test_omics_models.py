@@ -1,7 +1,7 @@
 import pytest
 
-from eir.models import layers
 from eir.models.input.array import models_cnn
+from eir.models.layers.cnn_layers import FirstCNNBlock
 from eir.models.model_training_utils import check_eir_model
 from eir.setup.input_setup_modules.common import DataDimensions
 from tests.test_models.model_testing_utils import prepare_example_batch
@@ -40,7 +40,7 @@ def test_make_conv_layers():
 
     # +1 to account for first block
     assert len(conv_layers) == len(conv_layer_list) + 1
-    assert isinstance(conv_layers[0], layers.FirstCNNBlock)
+    assert isinstance(conv_layers[0], FirstCNNBlock)
 
 
 @pytest.mark.parametrize(
