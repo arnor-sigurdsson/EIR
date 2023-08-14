@@ -11,19 +11,23 @@ from sklearn.preprocessing import LabelEncoder, StandardScaler
 from eir.data_load.label_setup import al_label_transformers_object
 from eir.models import model_training_utils
 from eir.setup.output_setup import (
+    ComputedArrayOutputInfo,
     ComputedSequenceOutputInfo,
     ComputedTabularOutputInfo,
     al_output_objects_as_dict,
 )
 from eir.setup.schemas import GlobalConfig
 from eir.train_utils import metrics, utils
+from eir.train_utils.evaluation_handlers.train_handlers_array_output import (
+    array_out_single_sample_evaluation_wrapper,
+)
+from eir.train_utils.evaluation_handlers.train_handlers_sequence_output import (
+    sequence_out_single_sample_evaluation_wrapper,
+)
 from eir.train_utils.latent_analysis import (
     LatentHookOutput,
     latent_analysis_wrapper,
     register_latent_hook,
-)
-from eir.train_utils.train_handlers_sequence_output import (
-    sequence_out_single_sample_evaluation_wrapper,
 )
 from eir.utils.logging import get_logger
 from eir.visualization import visualization_funcs as vf
@@ -97,6 +101,14 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
         )
 
         sequence_out_single_sample_evaluation_wrapper(
+            input_objects=exp.inputs,
+            experiment=exp,
+            iteration=iteration,
+            auto_dataset_to_load_from=exp.valid_dataset,
+            output_folder=gc.output_folder,
+        )
+
+        array_out_single_sample_evaluation_wrapper(
             input_objects=exp.inputs,
             experiment=exp,
             iteration=iteration,
@@ -365,7 +377,7 @@ def get_split_outputs_map(output_objects: al_output_objects_as_dict) -> dict[str
         match output_object:
             case ComputedTabularOutputInfo():
                 mapping[output_name] = "gather"
-            case ComputedSequenceOutputInfo():
+            case ComputedSequenceOutputInfo() | ComputedArrayOutputInfo():
                 mapping[output_name] = "compute"
             case _:
                 raise ValueError(f"Unknown output type: {type(output_object)}")

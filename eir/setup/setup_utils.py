@@ -15,37 +15,37 @@ class ChannelBasedRunningStatistics:
     Adapted from https://gist.github.com/thomasbrandon/ad5b1218fc573c10ea4e1f0c63658469.
     """
 
-    def __init__(self, n_dims: int = 2):
-        self.n_dims: int = n_dims
+    def __init__(self, final_n_dims: int = 2):
+        self.final_n_dims: int = final_n_dims
         self.n: int = 0
         self.sum: torch.Tensor = torch.empty(0)
 
         self.shape: torch.Size = torch.Size()
         self.num_var: torch.Tensor = torch.empty(0)
 
+    @torch.no_grad()
     def update(self, data: torch.Tensor):
-        data = data.view(*list(data.shape[: -self.n_dims]) + [-1])
+        data = data.reshape(*list(data.shape[: -self.final_n_dims]) + [-1])
 
-        with torch.no_grad():
-            new_n: int = data.shape[-1]
-            new_var: torch.Tensor = data.var(-1)
-            new_sum: torch.Tensor = data.sum(-1)
+        new_n: int = data.shape[-1]
+        new_var: torch.Tensor = data.var(-1)
+        new_sum: torch.Tensor = data.sum(-1)
 
-            if self.n == 0:
-                self.n = new_n
-                self.shape = data.shape[:-1]
-                self.sum = new_sum
-                self.num_var = new_var.mul_(new_n)
+        if self.n == 0:
+            self.n = new_n
+            self.shape = data.shape[:-1]
+            self.sum = new_sum
+            self.num_var = new_var.mul_(new_n)
 
-            else:
-                ratio = self.n / new_n
-                t = (self.sum / ratio).sub_(new_sum).pow_(2)
+        else:
+            ratio = self.n / new_n
+            t = (self.sum / ratio).sub_(new_sum).pow_(2)
 
-                self.num_var.add_(other=new_var, alpha=new_n)
-                self.num_var.add_(other=t, alpha=ratio / (self.n + new_n))
+            self.num_var.add_(other=new_var, alpha=new_n)
+            self.num_var.add_(other=t, alpha=ratio / (self.n + new_n))
 
-                self.sum += new_sum
-                self.n += new_n
+            self.sum += new_sum
+            self.n += new_n
 
     @property
     def mean(self) -> torch.Tensor:
@@ -67,6 +67,7 @@ class ElementBasedRunningStatistics:
         self._mean = torch.zeros(shape)
         self._ssdm = torch.zeros(shape)
 
+    @torch.no_grad()
     def update(self, x: torch.Tensor):
         self.n += 1
         delta = x - self._mean
@@ -108,8 +109,8 @@ def set_up_collector_instance(
 ) -> ChannelBasedRunningStatistics | ElementBasedRunningStatistics:
     stats: ChannelBasedRunningStatistics | ElementBasedRunningStatistics
     if collector_class is ChannelBasedRunningStatistics:
-        n_dims = len(shape) - 1
-        stats = ChannelBasedRunningStatistics(n_dims=n_dims)
+        final_n_dims = len(shape) - 1
+        stats = ChannelBasedRunningStatistics(final_n_dims=final_n_dims)
     elif collector_class is ElementBasedRunningStatistics:
         stats = ElementBasedRunningStatistics(shape=shape)
     else:

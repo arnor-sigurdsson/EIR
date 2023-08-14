@@ -18,6 +18,7 @@ from eir.setup.config_setup_modules.config_setup_utils import (
     object_to_primitives,
     recursive_dict_replace,
 )
+from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
 from eir.utils.logging import get_logger
 
 al_named_dict_configs = Dict[
@@ -263,6 +264,12 @@ def get_config_sequence_matching_func(
                     predict_dict_iterator=predict_dict_iterator,
                 )
 
+            case "array":
+                match = _check_matching_general_output_configs(
+                    train_config=train_config,
+                    predict_dict_iterator=predict_dict_iterator,
+                )
+
             case _:
                 raise NotImplementedError(
                     f"Output type '{train_config.output_info.output_type}' "
@@ -346,7 +353,7 @@ def _check_matching_tabular_output_configs(
     output_type = train_config.output_info.output_type
 
     output_type_info = train_config.output_type_info
-    assert isinstance(output_type_info, schemas.TabularOutputTypeConfig)
+    assert isinstance(output_type_info, TabularOutputTypeConfig)
 
     train_cat_columns = output_type_info.target_cat_columns
     train_con_columns = output_type_info.target_con_columns

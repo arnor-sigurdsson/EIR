@@ -1,21 +1,18 @@
 from typing import TYPE_CHECKING
 
-from eir.train_utils.train_handlers_sequence_output import (
-    sequence_out_single_sample_evaluation_wrapper,
+from eir.train_utils.evaluation_handlers.train_handlers_array_output import (
+    array_out_single_sample_evaluation_wrapper,
 )
-
-if TYPE_CHECKING:
-    pass
 
 if TYPE_CHECKING:
     from eir.predict import PredictExperiment
 
 
-def predict_sequence_wrapper(
+def predict_array_wrapper(
     predict_experiment: "PredictExperiment",
     output_folder: str,
 ) -> None:
-    sequence_out_single_sample_evaluation_wrapper(
+    array_out_single_sample_evaluation_wrapper(
         experiment=predict_experiment,
         iteration=0,
         input_objects=predict_experiment.inputs,

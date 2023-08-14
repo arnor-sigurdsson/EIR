@@ -12,7 +12,8 @@ from eir.models.output.output_module_setup import TabularOutputModuleConfig
 from eir.setup.output_setup_modules.tabular_output_setup import (
     ComputedTabularOutputInfo,
 )
-from eir.setup.schemas import OutputConfig, OutputInfoConfig, TabularOutputTypeConfig
+from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
+from eir.setup.schemas import OutputConfig, OutputInfoConfig
 from eir.train_utils import metrics
 from eir.train_utils.criteria import get_criteria
 

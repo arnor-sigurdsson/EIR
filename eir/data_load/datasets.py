@@ -27,10 +27,15 @@ from tqdm import tqdm
 from eir.data_load.data_preparation_modules.imputation import (
     impute_missing_modalities_wrapper,
 )
-from eir.data_load.data_preparation_modules.preparation_wrappers import (
-    get_data_loading_hooks,
+from eir.data_load.data_preparation_modules.input_preparation_wrappers import (
+    get_input_data_loading_hooks,
     prepare_inputs_disk,
     prepare_inputs_memory,
+)
+from eir.data_load.data_preparation_modules.output_preparation_wrappers import (
+    get_output_data_loading_hooks,
+    prepare_outputs_disk,
+    prepare_outputs_memory,
 )
 from eir.data_load.data_preparation_modules.prepare_tabular import (
     add_tabular_data_to_samples,
@@ -62,7 +67,7 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 al_datasets = Union["MemoryDataset", "DiskDataset"]
 al_dataset_types = Type[al_datasets]
 # embeddings --> remain str, cat targets --> int, con extra/target --> float
-al_sample_label_dict_target = Dict[str, Dict[str, Union[int, float]]]
+al_sample_label_dict_target = Dict[str, Dict[str, Union[int, float, torch.Tensor]]]
 al_inputs = Union[Dict[str, torch.Tensor], Dict[str, Any]]
 al_getitem_return = Tuple[Dict[str, torch.Tensor], al_sample_label_dict_target, str]
 
@@ -173,7 +178,9 @@ class DatasetBase(Dataset):
             raise ValueError("Please specify label column name.")
 
     def set_up_samples(
-        self, data_loading_hooks: Optional[Mapping[str, Callable]] = None
+        self,
+        input_data_loading_hooks: Optional[Mapping[str, Callable]] = None,
+        output_data_loading_hooks: Optional[Mapping[str, Callable]] = None,
     ) -> List[Sample]:
         """
         We do an extra filtering step at the end to account for the situation where
@@ -191,24 +198,30 @@ class DatasetBase(Dataset):
         mode_str = "evaluation/test" if self.test_mode else "train"
         logger.debug("Setting up dataset in %s mode.", mode_str)
 
-        if data_loading_hooks is None:
-            data_loading_hooks = defaultdict(lambda: _identity)
+        if not output_data_loading_hooks:
+            output_data_loading_hooks = defaultdict(lambda: _identity)
 
         samples: DefaultDict[str, Sample] = defaultdict(_default_sample_factory)
 
-        ids_to_keep = initialize_ids_to_keep(
-            target_labels_dict=self.target_labels_dict, ids_to_keep=self.ids_to_keep
-        )
         if self.target_labels_dict:
             samples = _add_target_labels_to_samples(
-                target_labels_dict=self.target_labels_dict, samples=samples
+                target_labels_dict=self.target_labels_dict,
+                samples=samples,
+                output_data_loading_hooks=output_data_loading_hooks,
             )
 
+        if not input_data_loading_hooks:
+            input_data_loading_hooks = defaultdict(lambda: _identity)
+
+        ids_to_keep = initialize_ids_to_keep(
+            target_labels_dict=self.target_labels_dict,
+            ids_to_keep=self.ids_to_keep,
+        )
         samples = add_data_to_samples(
             inputs=self.inputs,
             samples=samples,
             ids_to_keep=ids_to_keep,
-            data_loading_hooks=data_loading_hooks,
+            data_loading_hooks=input_data_loading_hooks,
         )
 
         samples_list = filter_samples(
@@ -374,13 +387,22 @@ def _log_missing_samples_between_modalities(
 
 
 def _add_target_labels_to_samples(
-    target_labels_dict: al_target_label_dict, samples: DefaultDict[str, Sample]
+    target_labels_dict: al_target_label_dict,
+    samples: DefaultDict[str, Sample],
+    output_data_loading_hooks: Mapping[str, Callable],
 ) -> DefaultDict[str, Sample]:
     target_label_iterator = tqdm(target_labels_dict.items(), desc="Target Labels")
 
-    for sample_id, sample_target_labels in target_label_iterator:
+    for sample_id, sample_target_labels_dict in target_label_iterator:
         add_id_to_samples(samples=samples, sample_id=sample_id)
-        samples[sample_id].target_labels = sample_target_labels
+
+        target_labels_loaded = {}
+        for output_name, output_target_labels in sample_target_labels_dict.items():
+            cur_hook = output_data_loading_hooks[output_name]
+            cur_target_labels = cur_hook(output_target_labels)
+            target_labels_loaded[output_name] = cur_target_labels
+
+        samples[sample_id].target_labels = target_labels_loaded
 
     return samples
 
@@ -464,8 +486,14 @@ class DiskDataset(DatasetBase):
         )
 
         target_labels = sample.target_labels
+
+        targets_prepared = prepare_outputs_disk(
+            outputs=target_labels,
+            output_objects=self.outputs,
+        )
+
         sample_id = sample.sample_id
-        return inputs_final, target_labels, sample_id
+        return inputs_final, targets_prepared, sample_id
 
     def __len__(self):
         return len(self.samples)
@@ -478,9 +506,12 @@ class MemoryDataset(DatasetBase):
         if self.target_labels_dict:
             self.init_label_attributes()
 
-        data_loading_hooks = get_data_loading_hooks(inputs=self.inputs)
+        input_data_loading_hooks = get_input_data_loading_hooks(inputs=self.inputs)
+        output_data_loading_hooks = get_output_data_loading_hooks(outputs=self.outputs)
+
         self.samples: list[Sample] = self.set_up_samples(
-            data_loading_hooks=data_loading_hooks
+            input_data_loading_hooks=input_data_loading_hooks,
+            output_data_loading_hooks=output_data_loading_hooks,
         )
         self.check_samples()
 
@@ -500,9 +531,15 @@ class MemoryDataset(DatasetBase):
         )
 
         target_labels = sample.target_labels
+
+        targets_prepared = prepare_outputs_memory(
+            outputs=target_labels,
+            output_objects=self.outputs,
+        )
+
         sample_id = sample.sample_id
 
-        return inputs_final, target_labels, sample_id
+        return inputs_final, targets_prepared, sample_id
 
     def __len__(self):
         return len(self.samples)

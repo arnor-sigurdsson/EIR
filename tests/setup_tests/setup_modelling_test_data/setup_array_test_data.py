@@ -91,6 +91,6 @@ def _set_up_base_test_array(
         base_array = np.tile(base_array, reps=(4, 1))
 
     elif dims == 3:
-        base_array = np.tile(base_array, reps=(4, 2, 1))
+        base_array = np.tile(base_array, reps=(2, 4, 1))
 
     return base_array, elements_active

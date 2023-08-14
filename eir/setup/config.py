@@ -30,6 +30,7 @@ from eir.models.input.array.array_models import (
 )
 from eir.models.input.image.image_models import ImageModelConfig
 from eir.models.input.omics.omics_models import (
+    LCLModelConfig,
     OmicsModelConfig,
     get_omics_config_dataclass_mapping,
 )
@@ -42,6 +43,7 @@ from eir.models.input.tabular.tabular import (
     TabularModelConfig,
 )
 from eir.models.layers import ResidualMLPConfig
+from eir.models.output.array.array_output_modules import ArrayOutputModuleConfig
 from eir.models.output.linear import LinearOutputModuleConfig
 from eir.models.output.mlp_residual import ResidualMLPOutputModuleConfig
 from eir.models.output.output_module_setup import TabularOutputModuleConfig
@@ -58,6 +60,7 @@ from eir.setup.config_setup_modules.output_config_setup_sequence import (
 )
 from eir.setup.config_validation import validate_train_configs
 from eir.setup.schema_modules.latent_analysis_schemas import LatentSamplingConfig
+from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
 from eir.train_utils.utils import configure_global_eir_logging
 from eir.utils.logging import get_logger
 
@@ -68,10 +71,13 @@ al_input_types = Union[
     schemas.ByteInputDataConfig,
 ]
 
-al_output_types = Union[schemas.TabularOutputTypeConfig]
 
 al_output_types_schema_map = dict[
-    str, Union[Type[schemas.TabularOutputTypeConfig], Type]
+    str,
+    Union[
+        Type[TabularOutputTypeConfig],
+        Type,
+    ],
 ]
 
 al_output_module_config_class_getter = (
@@ -82,12 +88,14 @@ al_output_model_config_classes = (
     Type[ResidualMLPOutputModuleConfig]
     | Type[LinearOutputModuleConfig]
     | Type[TransformerSequenceOutputModuleConfig]
+    | Type[LCLModelConfig]
 )
 
 al_output_model_configs = (
     ResidualMLPOutputModuleConfig
     | LinearOutputModuleConfig
     | TransformerSequenceOutputModuleConfig
+    | LCLModelConfig
 )
 al_output_model_init_map = dict[str, dict[str, al_output_model_config_classes]]
 
@@ -657,25 +665,54 @@ def init_output_config(
         model_init_kwargs_base=cfg.get("model_config", {}),
     )
 
+    sampling_config = _set_up_basic_sampling_config(
+        output_type_config=output_type_info_object,
+        sampling_config=cfg.get("sampling_config", {}),
+    )
+
     output_config = schemas.OutputConfig(
         output_info=output_info_object,
         output_type_info=output_type_info_object,
         model_config=model_config,
-        sampling_config=cfg.get("sampling_config", {}),
+        sampling_config=sampling_config,
     )
 
     return output_config
 
 
+def _set_up_basic_sampling_config(
+    output_type_config: schemas.al_output_type_configs, sampling_config: dict
+) -> dict | schemas.ArrayOutputSamplingConfig:
+    """
+    Note that the sequence sampling config currently has it's own logic
+    in output_config_setup_sequence.py.
+    """
+    sampling_config_object: dict | schemas.ArrayOutputSamplingConfig
+    match output_type_config:
+        case schemas.ArrayOutputTypeConfig():
+            sampling_config_object = schemas.ArrayOutputSamplingConfig(
+                **sampling_config
+            )
+        case schemas.TabularOutputTypeConfig() | schemas.SequenceOutputTypeConfig():
+            sampling_config_object = sampling_config
+        case _:
+            raise ValueError(f"Unknown output type config '{output_type_config}'.")
+
+    return sampling_config_object
+
+
 def get_outputs_types_schema_map() -> (
     Dict[
         str,
-        Type[schemas.TabularOutputTypeConfig] | Type[schemas.SequenceOutputTypeConfig],
+        Type[schemas.TabularOutputTypeConfig]
+        | Type[schemas.SequenceOutputTypeConfig]
+        | Type[schemas.ArrayOutputTypeConfig],
     ]
 ):
     mapping = {
         "tabular": schemas.TabularOutputTypeConfig,
         "sequence": schemas.SequenceOutputTypeConfig,
+        "array": schemas.ArrayOutputTypeConfig,
     }
 
     return mapping
@@ -695,6 +732,7 @@ def get_output_module_config_class_map() -> (
     mapping = {
         "tabular": TabularOutputModuleConfig,
         "sequence": SequenceOutputModuleConfig,
+        "array": ArrayOutputModuleConfig,
     }
 
     return mapping
@@ -774,6 +812,9 @@ def get_output_config_type_init_callable_map() -> al_output_model_init_map:
         "sequence": {
             "sequence": TransformerSequenceOutputModuleConfig,
         },
+        "array": {
+            "lcl": LCLModelConfig,
+        },
     }
 
     return mapping
@@ -802,7 +843,7 @@ def get_all_tabular_targets(
 
         output_name = output_config.output_info.output_name
         output_type_info = output_config.output_type_info
-        assert isinstance(output_type_info, schemas.TabularOutputTypeConfig)
+        assert isinstance(output_type_info, TabularOutputTypeConfig)
         con_targets[output_name] = output_type_info.target_con_columns
         cat_targets[output_name] = output_type_info.target_cat_columns
 

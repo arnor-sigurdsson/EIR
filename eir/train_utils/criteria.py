@@ -5,18 +5,22 @@ import torch
 from torch import nn
 
 from eir.setup import schemas
+from eir.setup.output_setup_modules.array_output_setup import ComputedArrayOutputInfo
 from eir.setup.output_setup_modules.sequence_output_setup import (
     ComputedSequenceOutputInfo,
 )
 from eir.setup.output_setup_modules.tabular_output_setup import (
     ComputedTabularOutputInfo,
 )
+from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
 from eir.train_utils.metrics import calculate_prediction_losses
 
 if TYPE_CHECKING:
     from eir.setup.output_setup import al_output_objects_as_dict
-    from eir.setup.schemas import al_cat_loss_names, al_con_loss_names
-
+    from eir.setup.schema_modules.output_schemas_tabular import (
+        al_cat_loss_names,
+        al_con_loss_names,
+    )
 
 al_cat_losses = nn.CrossEntropyLoss
 al_con_losses = (
@@ -89,6 +93,10 @@ def get_criteria(outputs_as_dict: "al_output_objects_as_dict") -> al_criteria_di
 
                 criteria_dict[output_name][output_name] = criterion
 
+            case ComputedArrayOutputInfo():
+                criterion = partial(_calc_con_loss, loss_func=nn.MSELoss())
+                criteria_dict[output_name][output_name] = criterion
+
     return criteria_dict
 
 
@@ -136,7 +144,7 @@ def _parse_loss_name(
     output_config: schemas.OutputConfig, column_type: str
 ) -> Union["al_cat_loss_names", "al_con_loss_names"]:
     output_type_info = output_config.output_type_info
-    assert isinstance(output_type_info, schemas.TabularOutputTypeConfig)
+    assert isinstance(output_type_info, TabularOutputTypeConfig)
     match column_type:
         case "cat":
             return output_type_info.cat_loss_name
@@ -151,7 +159,7 @@ def _get_label_smoothing(
     column_type: str,
 ) -> float:
     output_type_info = output_config.output_type_info
-    assert isinstance(output_type_info, schemas.TabularOutputTypeConfig)
+    assert isinstance(output_type_info, TabularOutputTypeConfig)
     match column_type:
         case "con":
             return 0.0

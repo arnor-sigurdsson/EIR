@@ -100,7 +100,8 @@ def get_test_outputs_inits(
             "model_type", "mlp_residual"
         )
         cur_model_config = _get_test_output_model_config(
-            output_model_type=cur_model_type
+            output_model_type=cur_model_type,
+            cur_settings=cur_init_injected["model_config"],
         )
         cur_init_injected["model_config"] = cur_model_config
 
@@ -114,6 +115,7 @@ def get_output_test_init_base_func_map() -> Dict[str, Callable]:
         "test_output": get_test_tabular_base_output_inits,
         "test_output_copy": get_test_tabular_base_output_inits,
         "test_output_sequence": get_test_sequence_base_output_inits,
+        "test_output_array": get_test_array_base_output_inits,
     }
 
     return mapping
@@ -414,9 +416,33 @@ def get_test_sequence_base_output_inits(test_path: Path, split_to_test: bool) ->
     return test_target_init_kwargs
 
 
+def get_test_array_base_output_inits(test_path: Path, split_to_test: bool) -> Dict:
+    output_source = _inject_train_source_path(
+        test_path=test_path,
+        source="local",
+        local_name="array",
+        split_to_test=split_to_test,
+    )
+
+    test_target_init_kwargs = {
+        "output_info": {
+            "output_name": "test_output_array",
+            "output_type": "array",
+            "output_source": str(output_source),
+        },
+        "model_config": {"model_type": "lcl"},
+    }
+
+    return test_target_init_kwargs
+
+
 def _get_test_output_model_config(
-    output_model_type: Literal["mlp_residual", "linear"]
-) -> Dict:
+    output_model_type: Literal["mlp_residual", "linear"], cur_settings: dict
+) -> dict:
+    """
+    Done just to have a default model config for the output model
+    if nothing is specified.
+    """
     base = {
         "model_type": output_model_type,
     }
@@ -427,5 +453,8 @@ def _get_test_output_model_config(
                 "layers": [1],
                 "fc_task_dim": 128,
             }
+
+        case _:
+            return cur_settings
 
     return base

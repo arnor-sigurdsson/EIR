@@ -58,9 +58,13 @@ def get_seq_output_configs(
             if i.output_info.output_name == config_dict["output_info"]["output_name"]
         )
 
-        config_object = init_seq_output_config(
-            yaml_config_as_dict=config_dict, base_output_config=cur_base_output_config
-        )
+        config_object = cur_base_output_config
+        if cur_base_output_config.output_info.output_type == "sequence":
+            config_object = init_seq_output_config(
+                yaml_config_as_dict=config_dict,
+                base_output_config=cur_base_output_config,
+            )
+
         config_objects.append(config_object)
 
     return config_objects

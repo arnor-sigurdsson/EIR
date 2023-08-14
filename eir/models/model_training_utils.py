@@ -67,6 +67,39 @@ class ColumnType(Enum):
     CAT = "cat"
 
 
+def prepare_all_targets(
+    output_objects: "al_output_objects_as_dict",
+    device: str,
+    labels: "al_training_labels_target",
+) -> "al_training_labels_target":
+    labels_prepared = parse_tabular_target_labels(
+        output_objects=output_objects,
+        device=device,
+        labels=labels,
+    )
+
+    labels_prepared = _recursive_to_device(obj=labels_prepared, device=device)
+
+    return labels_prepared
+
+
+def _recursive_to_device(
+    obj: Any,
+    device: str,
+) -> Any:
+    if isinstance(obj, torch.Tensor):
+        return obj.to(device=device)
+    elif isinstance(obj, dict):
+        return {
+            key: _recursive_to_device(obj=value, device=device)
+            for key, value in obj.items()
+        }
+    elif isinstance(obj, list):
+        return [_recursive_to_device(obj=value, device=device) for value in obj]
+    else:
+        return obj
+
+
 def parse_tabular_target_labels(
     output_objects: "al_output_objects_as_dict",
     device: str,

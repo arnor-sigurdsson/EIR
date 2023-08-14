@@ -9,6 +9,7 @@ from eir.data_load.label_setup import (
     merge_target_columns,
 )
 from eir.setup import schemas
+from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
 from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__)
@@ -36,7 +37,7 @@ def set_up_tabular_output(
     )
 
     output_type_info = output_config.output_type_info
-    assert isinstance(output_type_info, schemas.TabularOutputTypeConfig)
+    assert isinstance(output_type_info, TabularOutputTypeConfig)
 
     target_columns = merge_target_columns(
         target_con_columns=list(output_type_info.target_con_columns),

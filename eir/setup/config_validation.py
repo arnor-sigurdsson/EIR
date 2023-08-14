@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Sequence
 import pandas as pd
 
 from eir.setup import schemas
+from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
 
 if TYPE_CHECKING:
     from eir.setup.config import Configs
@@ -46,12 +47,8 @@ def validate_output_configs(output_configs: Sequence[schemas.OutputConfig]) -> N
         output_source = Path(output_config.output_info.output_source)
 
         match output_config.output_type_info:
-            case schemas.TabularOutputTypeConfig(
-                target_cat_columns,
-                target_con_columns,
-                _,
-                _,
-                _,
+            case TabularOutputTypeConfig(
+                target_cat_columns, target_con_columns, _, _, _
             ):
                 expected_columns = list(target_cat_columns) + list(target_con_columns)
                 validate_tabular_file(

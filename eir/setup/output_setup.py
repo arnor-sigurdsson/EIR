@@ -2,6 +2,10 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Protocol
 
 from eir.data_load.label_setup import al_label_transformers
 from eir.setup import schemas
+from eir.setup.output_setup_modules.array_output_setup import (
+    ComputedArrayOutputInfo,
+    set_up_array_output,
+)
 from eir.setup.output_setup_modules.sequence_output_setup import (
     ComputedSequenceOutputInfo,
     set_up_sequence_output,
@@ -18,7 +22,9 @@ if TYPE_CHECKING:
 
 logger = get_logger(name=__name__)
 
-al_output_objects = ComputedTabularOutputInfo | ComputedSequenceOutputInfo
+al_output_objects = (
+    ComputedTabularOutputInfo | ComputedSequenceOutputInfo | ComputedArrayOutputInfo
+)
 al_output_objects_as_dict = Dict[str, al_output_objects]
 
 
@@ -93,6 +99,7 @@ def get_output_setup_function_map() -> dict[str, Callable[..., al_output_objects
     setup_mapping: dict[str, Callable[..., al_output_objects]] = {
         "tabular": set_up_tabular_output,
         "sequence": set_up_sequence_output,
+        "array": set_up_array_output,
     }
 
     return setup_mapping

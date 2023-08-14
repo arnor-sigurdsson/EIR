@@ -46,17 +46,17 @@ def create_test_datasets(
 
 
 @pytest.fixture()
-def create_test_dloaders(create_test_config: config.Configs, create_test_datasets):
+def create_test_dataloaders(create_test_config: config.Configs, create_test_datasets):
     c = create_test_config
     gc = c.global_config
     train_dataset, valid_dataset = create_test_datasets
 
-    train_dloader = DataLoader(
+    train_dataloader = DataLoader(
         train_dataset, batch_size=gc.batch_size, shuffle=True, drop_last=True
     )
 
-    valid_dloader = DataLoader(
+    valid_dataloader = DataLoader(
         valid_dataset, batch_size=gc.batch_size, shuffle=False, drop_last=False
     )
 
-    return train_dloader, valid_dloader, train_dataset, valid_dataset
+    return train_dataloader, valid_dataloader, train_dataset, valid_dataset

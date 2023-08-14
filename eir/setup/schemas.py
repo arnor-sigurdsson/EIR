@@ -16,15 +16,21 @@ from eir.models.input.omics.omics_models import (
 from eir.models.input.sequence.transformer_models import SequenceModelConfig
 from eir.models.input.tabular.tabular import SimpleTabularModel, TabularModelConfig
 from eir.models.layers import ResidualMLPConfig
+from eir.models.output.array.array_output_modules import ArrayOutputModuleConfig
 from eir.models.output.output_module_setup import TabularOutputModuleConfig
 from eir.models.output.sequence.sequence_output_modules import (
     SequenceOutputModuleConfig,
 )
 from eir.setup.schema_modules.latent_analysis_schemas import LatentSamplingConfig
+from eir.setup.schema_modules.output_schemas_array import (
+    ArrayOutputSamplingConfig,
+    ArrayOutputTypeConfig,
+)
 from eir.setup.schema_modules.output_schemas_sequence import (
     SequenceOutputSamplingConfig,
     SequenceOutputTypeConfig,
 )
+from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
 from eir.setup.setup_utils import get_all_optimizer_names
 
 if TYPE_CHECKING:
@@ -74,10 +80,18 @@ al_models_classes = Union[
 
 
 al_output_module_configs_classes = (
-    Type[TabularOutputModuleConfig] | Type[SequenceOutputModuleConfig]
+    Type[TabularOutputModuleConfig]
+    | Type[SequenceOutputModuleConfig]
+    | Type[ArrayOutputModuleConfig]
 )
 
-al_output_module_configs = TabularOutputModuleConfig | SequenceOutputModuleConfig
+al_output_type_configs = (
+    SequenceOutputTypeConfig | TabularOutputTypeConfig | ArrayOutputTypeConfig
+)
+
+al_output_module_configs = (
+    TabularOutputModuleConfig | SequenceOutputModuleConfig | ArrayOutputModuleConfig
+)
 
 
 al_tokenizer_choices = (
@@ -94,15 +108,6 @@ al_tokenizer_choices = (
 )
 
 al_max_sequence_length = Union[int, Literal["max", "average"]]
-
-al_cat_loss_names = Literal["CrossEntropyLoss"]
-al_con_loss_names = Literal[
-    "MSELoss",
-    "L1Loss",
-    "SmoothL1Loss",
-    "PoissonNLLLoss",
-    "HuberLoss",
-]
 
 
 @dataclass
@@ -668,7 +673,7 @@ class ArrayInputDataConfig:
 
     mixing_subtype: Union[Literal["mixup"]] = "mixup"
     modality_dropout_rate: float = 0.0
-    normalization: Optional[Literal["element", "channel"]] = "element"
+    normalization: Optional[Literal["element", "channel"]] = "channel"
 
 
 @dataclass
@@ -701,35 +706,7 @@ class OutputInfoConfig:
     output_source: str
     output_name: str
     output_type: Literal["tabular", "sequence"]
-
-
-@dataclass
-class TabularOutputTypeConfig:
-    """
-    :param target_cat_columns:
-        Which columns from ``label_file`` to use as categorical targets.
-
-    :param target_con_columns:
-        Which columns from ``label_file`` to use as continuous targets.
-
-    :param label_parsing_chunk_size:
-        Number of rows to process at time when loading in the ``input_source``. Useful
-        when RAM is limited.
-
-    :param cat_label_smoothing:
-        Label smoothing to apply to categorical targets.
-
-    :param uncertainty_weighted_mt_loss:
-        Whether to use uncertainty weighted loss for multitask / multilabel learning.
-    """
-
-    target_cat_columns: Sequence[str] = field(default_factory=list)
-    target_con_columns: Sequence[str] = field(default_factory=list)
-    label_parsing_chunk_size: Union[None, int] = None
-    cat_label_smoothing: float = 0.0
-    cat_loss_name: al_cat_loss_names = "CrossEntropyLoss"
-    con_loss_name: al_con_loss_names = "MSELoss"
-    uncertainty_weighted_mt_loss: bool = True
+    output_inner_key: Optional[str] = None
 
 
 @dataclass
@@ -752,7 +729,13 @@ class OutputConfig:
     """
 
     output_info: OutputInfoConfig
-    output_type_info: TabularOutputTypeConfig | SequenceOutputTypeConfig
-    model_config: TabularOutputModuleConfig | SequenceOutputModuleConfig
+    output_type_info: (
+        TabularOutputTypeConfig | SequenceOutputTypeConfig | ArrayOutputTypeConfig
+    )
+    model_config: (
+        TabularOutputModuleConfig | SequenceOutputModuleConfig | ArrayOutputModuleConfig
+    )
 
-    sampling_config: SequenceOutputSamplingConfig | None = None
+    sampling_config: Optional[
+        SequenceOutputSamplingConfig | ArrayOutputSamplingConfig | dict
+    ] = None

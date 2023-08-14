@@ -43,7 +43,7 @@ def _get_projection_layer_types() -> list[str]:
     target_dimension=integers(min_value=1, max_value=1000),
     projection_layer_type=sampled_from(_get_projection_layer_types()),
 )
-@settings(deadline=500)
+@settings(deadline=None)
 def test_get_projection_layer_output_dimension(
     input_dimension: int,
     target_dimension: int,

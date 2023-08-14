@@ -2,6 +2,14 @@ from typing import TYPE_CHECKING, Dict, Type
 
 import torch
 
+from eir.models.model_setup_modules.input_model_setup_array import (
+    get_array_feature_extractor,
+)
+from eir.models.output.array.array_output_modules import (
+    ArrayOutputModuleConfig,
+    ArrayOutputWrapperModule,
+    get_array_output_module,
+)
 from eir.models.output.linear import LinearOutputModule, LinearOutputModuleConfig
 from eir.models.output.mlp_residual import (
     ResidualMLPOutputModule,
@@ -12,6 +20,8 @@ from eir.models.output.sequence.sequence_output_modules import (
     SequenceOutputModule,
     SequenceOutputModuleConfig,
 )
+from eir.setup.input_setup_modules.common import DataDimensions
+from eir.setup.output_setup_modules.array_output_setup import ComputedArrayOutputInfo
 from eir.setup.output_setup_modules.sequence_output_setup import (
     ComputedSequenceOutputInfo,
 )
@@ -26,6 +36,7 @@ al_output_module_init_configs = (
     ResidualMLPOutputModuleConfig
     | LinearOutputModuleConfig
     | SequenceOutputModuleConfig
+    | ArrayOutputModuleConfig
 )
 
 al_sequence_module_classes = Type[SequenceOutputModule]
@@ -36,7 +47,12 @@ al_output_module_classes = (
     | Type[LinearOutputModule]
     | Type[SequenceOutputModule]
 )
-al_output_modules = ResidualMLPOutputModule | LinearOutputModule | SequenceOutputModule
+al_output_modules = (
+    ResidualMLPOutputModule
+    | LinearOutputModule
+    | SequenceOutputModule
+    | ArrayOutputWrapperModule
+)
 
 
 def get_sequence_output_module_from_model_config(
@@ -102,5 +118,42 @@ def get_tabular_output_module_from_model_config(
 
     torch_device = torch.device(device=device)
     output_module = output_module.to(device=torch_device)
+
+    return output_module
+
+
+def get_array_output_module_from_model_config(
+    output_object: ComputedArrayOutputInfo,
+    input_dimension: int,
+    device: str,
+) -> al_output_modules:
+    output_model_config = output_object.output_config.model_config
+    assert isinstance(output_model_config, ArrayOutputModuleConfig)
+
+    output_module_type = output_model_config.model_type
+    output_name = output_object.output_config.output_info.output_name
+
+    output_module: al_output_modules
+
+    input_data_dimension = DataDimensions(
+        channels=1,
+        height=1,
+        width=input_dimension,
+    )
+
+    feature_extractor = get_array_feature_extractor(
+        model_init_config=output_model_config.model_init_config,
+        data_dimensions=input_data_dimension,
+        model_type=output_module_type,
+    )
+
+    array_output_module = get_array_output_module(
+        feature_extractor=feature_extractor,
+        output_name=output_name,
+        target_data_dimensions=output_object.data_dimensions,
+    )
+
+    torch_device = torch.device(device=device)
+    output_module = array_output_module.to(device=torch_device)
 
     return output_module

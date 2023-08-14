@@ -4,19 +4,27 @@ from typing import TYPE_CHECKING, Dict, Iterable, Optional, Sequence, Tuple, Uni
 
 import pandas as pd
 import torch
+from tqdm import tqdm
 
+from eir.data_load.data_source_modules.deeplake_ops import (
+    is_deeplake_dataset,
+    load_deeplake_dataset,
+)
 from eir.data_load.label_setup import (
     Labels,
     TabularFileInfo,
     al_all_column_ops,
+    al_label_dict,
     al_label_transformers,
     al_target_label_dict,
     gather_ids_from_data_source,
     gather_ids_from_tabular_file,
+    get_file_path_iterator,
     save_transformer_set,
     set_up_train_and_valid_tabular_data,
 )
 from eir.setup import schemas
+from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -36,7 +44,7 @@ def set_up_all_targets_wrapper(
     logger.info("Setting up target labels.")
 
     custom_ops = hooks.custom_column_label_parsing_ops if hooks else None
-    supervised_target_labels = set_up_supervised_target_labels_wrapper(
+    supervised_target_labels = set_up_all_target_labels_wrapper(
         output_configs=output_configs,
         custom_label_ops=custom_ops,
         train_ids=train_ids,
@@ -61,7 +69,7 @@ class MergedTargetLabels:
         return {**self.train_labels, **self.valid_labels}
 
 
-def set_up_supervised_target_labels_wrapper(
+def set_up_all_target_labels_wrapper(
     output_configs: Sequence[schemas.OutputConfig],
     custom_label_ops: al_all_column_ops,
     train_ids: Sequence[str],
@@ -96,8 +104,16 @@ def set_up_supervised_target_labels_wrapper(
                     valid_ids=valid_ids,
                     output_name=output_name,
                 )
+
+            case "array":
+                cur_labels = set_up_file_target_labels(
+                    train_ids=train_ids,
+                    valid_ids=valid_ids,
+                    output_config=output_config,
+                )
+
             case _:
-                raise ValueError(f"Unknown output type: {output_type}")
+                raise ValueError(f"Unknown output type: '{output_type}'.")
 
         df_train_cur = pd.DataFrame.from_dict(cur_labels.train_labels, orient="index")
         df_valid_cur = pd.DataFrame.from_dict(cur_labels.valid_labels, orient="index")
@@ -133,8 +149,12 @@ def set_up_delayed_target_labels(
 ) -> Labels:
     train_ids_set = set(train_ids)
     valid_ids_set = set(valid_ids)
-    train_labels = {id_: {output_name: torch.nan} for id_ in train_ids_set}
-    valid_labels = {id_: {output_name: torch.nan} for id_ in valid_ids_set}
+    train_labels: al_label_dict = {
+        id_: {output_name: torch.nan} for id_ in train_ids_set
+    }
+    valid_labels: al_label_dict = {
+        id_: {output_name: torch.nan} for id_ in valid_ids_set
+    }
 
     return Labels(
         train_labels=train_labels,
@@ -143,7 +163,66 @@ def set_up_delayed_target_labels(
     )
 
 
-def df_to_nested_dict(df: pd.DataFrame) -> dict[str, dict[str, dict[str, float | int]]]:
+def set_up_file_target_labels(
+    train_ids: Sequence[str],
+    valid_ids: Sequence[str],
+    output_config: schemas.OutputConfig,
+) -> Labels:
+    output_name = output_config.output_info.output_name
+    output_source = output_config.output_info.output_source
+
+    id_to_data_pointer_mapping = gather_data_pointers_from_data_source(
+        data_source=Path(output_source),
+        validate=True,
+    )
+
+    train_ids_set = set(train_ids)
+    train_labels: al_label_dict = {
+        id_: {output_name: id_to_data_pointer_mapping[id_]} for id_ in train_ids_set
+    }
+
+    valid_ids_set = set(valid_ids)
+    valid_labels: al_label_dict = {
+        id_: {output_name: id_to_data_pointer_mapping[id_]} for id_ in valid_ids_set
+    }
+
+    return Labels(
+        train_labels=train_labels,
+        valid_labels=valid_labels,
+        label_transformers={},
+    )
+
+
+def gather_data_pointers_from_data_source(
+    data_source: Path,
+    validate: bool = True,
+) -> dict[str, Path | int]:
+    """
+    Disk: ID -> file path
+    Deeplake: ID -> integer index
+    """
+    if is_deeplake_dataset(data_source=str(data_source)):
+        deeplake_ds = load_deeplake_dataset(data_source=str(data_source))
+        iterator = (sample.numpy().item() for sample in deeplake_ds["ID"])
+        iterator = ((str(i), index) for i, index in enumerate(iterator))
+    else:
+        iterator = get_file_path_iterator(data_source=data_source, validate=validate)
+        iterator = ((f.stem, f) for f in iterator)
+
+    logger.debug("Gathering data pointers from %s.", data_source)
+    id_to_pointer_mapping = {}
+    for id_, pointer in tqdm(iterator, desc="Progress"):
+        if id_ in id_to_pointer_mapping:
+            raise ValueError(f"Duplicate ID: {id_}")
+
+        id_to_pointer_mapping[id_] = pointer
+
+    return id_to_pointer_mapping
+
+
+def df_to_nested_dict(
+    df: pd.DataFrame,
+) -> dict[str, dict[str, dict[str, float | int | Path]]]:
     """
     The df has a 2-level multi index, like so ['ID', output_name]
 
@@ -153,7 +232,7 @@ def df_to_nested_dict(df: pd.DataFrame) -> dict[str, dict[str, dict[str, float |
     """
     index_dict = df.to_dict(orient="index")
 
-    parsed_dict: dict[str, dict[str, dict[str, float | int]]] = {}
+    parsed_dict: dict[str, dict[str, dict[str, float | int | Path]]] = {}
     for key_tuple, value in index_dict.items():
         cur_id, cur_output_name = key_tuple
 
@@ -210,7 +289,7 @@ def get_tabular_target_file_infos(
 
         output_name = output_config.output_info.output_name
         output_type_info = output_config.output_type_info
-        assert isinstance(output_type_info, schemas.TabularOutputTypeConfig)
+        assert isinstance(output_type_info, TabularOutputTypeConfig)
 
         tabular_info = TabularFileInfo(
             file_path=Path(output_config.output_info.output_source),

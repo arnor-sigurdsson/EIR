@@ -1,7 +1,7 @@
 from typing import Tuple
+from unittest import mock
 
 import numpy as np
-import pandas as pd
 import pytest
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
@@ -81,71 +81,53 @@ def test_set_up_test_labels(
     assert len(tabular_file_infos) == 1
     target_tabular_info = tabular_file_infos["test_output"]
 
-    df_labels_test = pd.DataFrame(index=test_ids)
-    for output_name, tabular_info in tabular_file_infos.items():
-        all_columns = list(tabular_info.cat_columns) + list(tabular_info.con_columns)
-        if not all_columns:
-            raise ValueError(f"No columns specified in {tabular_file_infos}.")
-
-        df_cur_labels = predict_target_setup._load_labels_for_predict(
-            tabular_info=tabular_info,
-            ids_to_keep=test_ids,
-            custom_label_ops=None,
+    with mock.patch(
+        target="eir.predict_modules.predict_target_setup.load_transformers",
+        return_value=_get_mock_transformers(
+            cat_target_column=target_tabular_info.cat_columns[0],
+            con_target_column=target_tabular_info.con_columns[0],
+        ),
+    ):
+        test_target_labels = predict_target_setup.get_target_labels_for_testing(
+            configs_overloaded_for_predict=test_configs,
+            custom_column_label_parsing_ops=None,
+            ids=test_ids,
         )
-        df_cur_labels["Output Name"] = output_name
 
-        df_labels_test = pd.concat((df_labels_test, df_cur_labels))
-
-    df_labels_test = df_labels_test.set_index("Output Name", append=True)
-    df_labels_test = df_labels_test.dropna(how="all")
-    df_labels_test, dropped_con_indices = set_random_con_targets_to_missing(
-        df_labels_test=df_labels_test
-    )
+    transformers = test_target_labels.label_transformers["test_output"]
 
     assert len(target_tabular_info.cat_columns) == 1
     assert len(target_tabular_info.con_columns) == 1
-    cat_column = target_tabular_info.cat_columns[0]
     con_column = target_tabular_info.con_columns[0]
-
-    transformers = _get_mock_transformers(
-        cat_target_column=cat_column,
-        con_target_column=con_column,
-    )
-
-    test_target_labels = None
-    if with_target_labels:
-        test_target_labels = predict_target_setup.parse_labels_for_predict(
-            con_columns=target_tabular_info.con_columns,
-            cat_columns=target_tabular_info.cat_columns,
-            df_labels_test=df_labels_test,
-            all_output_label_transformers=transformers,
-        )
 
     con_transformer = transformers["test_output"][con_column]
     con_mean = con_transformer.mean_.reshape(1, -1)
     expected_transformed_value = con_transformer.transform(con_mean).squeeze()
 
+    df_labels_test, dropped_con_indices = set_random_con_targets_to_missing(
+        data_dict=test_target_labels.label_dict
+    )
+
     all_dropped_ids = set(i[0] for i in dropped_con_indices)
-    for id_, target in test_target_labels.items():
+    for id_, target in test_target_labels.label_dict.items():
         cur_value = target["test_output"][con_column]
         if id_ in all_dropped_ids:
             assert cur_value == expected_transformed_value
 
 
 def set_random_con_targets_to_missing(
-    df_labels_test: pd.DataFrame,
-) -> Tuple[pd.DataFrame, np.ndarray]:
+    data_dict: dict[str, dict[str, dict[str, float]]]
+) -> Tuple[dict[str, dict[str, dict[str, float]]], np.ndarray]:
     fraction = 0.2
+    keys = list(data_dict.keys())
+    num_rows_to_nan = int(fraction * len(keys))
 
-    num_rows_to_nan = int(fraction * len(df_labels_test))
+    random_indices = np.random.choice(keys, num_rows_to_nan, replace=False)
 
-    random_indices = np.random.choice(
-        df_labels_test.index, num_rows_to_nan, replace=False
-    )
+    for key in random_indices:
+        data_dict[key]["test_output"]["Height"] = np.nan
 
-    df_labels_test.loc[random_indices, "Height"] = np.nan
-
-    return df_labels_test, random_indices
+    return data_dict, random_indices
 
 
 @pytest.mark.parametrize("create_test_data", [{"task_type": "multi"}], indirect=True)
@@ -214,39 +196,20 @@ def test_set_up_test_dataset(
     assert len(tabular_file_infos) == 1
     target_tabular_info = tabular_file_infos["test_output"]
 
-    df_labels_test = pd.DataFrame(index=test_ids)
-    for output_name, tabular_info in tabular_file_infos.items():
-        all_columns = list(tabular_info.cat_columns) + list(tabular_info.con_columns)
-        if not all_columns:
-            raise ValueError(f"No columns specified in {tabular_file_infos}.")
-
-        df_cur_labels = predict_target_setup._load_labels_for_predict(
-            tabular_info=tabular_info,
-            ids_to_keep=test_ids,
-            custom_label_ops=None,
+    with mock.patch(
+        target="eir.predict_modules.predict_target_setup.load_transformers",
+        return_value=_get_mock_transformers(
+            cat_target_column=target_tabular_info.cat_columns[0],
+            con_target_column=target_tabular_info.con_columns[0],
+        ),
+    ):
+        test_target_labels = predict_target_setup.get_target_labels_for_testing(
+            configs_overloaded_for_predict=test_configs,
+            custom_column_label_parsing_ops=None,
+            ids=test_ids,
         )
-        df_cur_labels["Output Name"] = output_name
 
-        df_labels_test = pd.concat((df_labels_test, df_cur_labels))
-
-    df_labels_test = df_labels_test.set_index("Output Name", append=True)
-    df_labels_test = df_labels_test.dropna(how="all")
-
-    assert len(target_tabular_info.cat_columns) == 1
-    assert len(target_tabular_info.con_columns) == 1
-    transformers = _get_mock_transformers(
-        cat_target_column=target_tabular_info.cat_columns[0],
-        con_target_column=target_tabular_info.con_columns[0],
-    )
-
-    test_target_labels = None
-    if with_target_labels:
-        test_target_labels = predict_target_setup.parse_labels_for_predict(
-            con_columns=target_tabular_info.con_columns,
-            cat_columns=target_tabular_info.cat_columns,
-            df_labels_test=df_labels_test,
-            all_output_label_transformers=transformers,
-        )
+    transformers = test_target_labels.label_transformers["test_output"]
 
     test_inputs = predict_input_setup.set_up_inputs_for_predict(
         test_inputs_configs=test_configs.input_configs,
@@ -263,7 +226,7 @@ def test_set_up_test_dataset(
 
     test_dataset = predict_data.set_up_default_dataset(
         configs=test_configs,
-        target_labels_dict=test_target_labels,
+        target_labels_dict=test_target_labels.label_dict,
         inputs_as_dict=test_inputs,
         outputs_as_dict=outputs_as_dict,
     )

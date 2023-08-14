@@ -230,7 +230,7 @@ def typed_partial_for_hook(
     return update_wrapper(partial_func, func)
 
 
-def get_data_loading_hooks(
+def get_input_data_loading_hooks(
     inputs: al_input_objects_as_dict,
 ) -> dict[str, Callable[..., np.ndarray | Image]]:
     mapping = {}

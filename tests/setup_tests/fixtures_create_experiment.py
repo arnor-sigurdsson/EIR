@@ -55,7 +55,7 @@ def prep_modelling_test_configs(
     create_test_data,
     create_test_labels,
     create_test_config: config.Configs,
-    create_test_dloaders,
+    create_test_dataloaders,
     create_test_model,
     create_test_datasets,
 ) -> Tuple[Experiment, ModelTestConfig]:
@@ -65,7 +65,7 @@ def prep_modelling_test_configs(
     """
     c = create_test_config
     gc = c.global_config
-    train_loader, valid_loader, train_dataset, valid_dataset = create_test_dloaders
+    train_loader, valid_loader, train_dataset, valid_dataset = create_test_dataloaders
     target_labels = create_test_labels
 
     model = create_test_model
