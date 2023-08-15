@@ -3,7 +3,7 @@ import types
 from argparse import Namespace
 from collections import Counter
 from copy import copy
-from dataclasses import dataclass
+from dataclasses import dataclass, fields, is_dataclass
 from typing import (
     Any,
     Callable,
@@ -283,6 +283,10 @@ def get_global_config(global_configs: Iterable[dict]) -> schemas.GlobalConfig:
         combined_config=combined_config
     )
 
+    validate_keys_against_dataclass(
+        input_dict=combined_config, dataclass_type=schemas.GlobalConfig
+    )
+
     combined_config_namespace = Namespace(**combined_config)
 
     global_config_object = schemas.GlobalConfig(**combined_config_namespace.__dict__)
@@ -338,8 +342,27 @@ def _check_input_config_names(input_configs: Iterable[schemas.InputConfig]) -> N
         )
 
 
+def validate_keys_against_dataclass(
+    input_dict: Dict[str, Any], dataclass_type: Type
+) -> None:
+    if not is_dataclass(dataclass_type):
+        raise TypeError(f"Provided type {dataclass_type.__name__} is not a dataclass")
+
+    expected_keys = {field.name for field in fields(dataclass_type)}
+
+    actual_keys = set(input_dict.keys())
+
+    unexpected_keys = actual_keys - expected_keys
+    if unexpected_keys:
+        raise ValueError(
+            f"Unexpected keys found in configuration: {', '.join(unexpected_keys)}"
+        )
+
+
 def init_input_config(yaml_config_as_dict: Dict[str, Any]) -> schemas.InputConfig:
     cfg = yaml_config_as_dict
+
+    validate_keys_against_dataclass(input_dict=cfg, dataclass_type=schemas.InputConfig)
 
     input_info_object = schemas.InputDataConfig(**cfg["input_info"])
 
@@ -597,6 +620,10 @@ def get_interpretation_config_schema_map() -> (
 def load_fusion_configs(fusion_configs: Iterable[dict]) -> schemas.FusionConfig:
     combined_config = combine_dicts(dicts=fusion_configs)
 
+    validate_keys_against_dataclass(
+        input_dict=combined_config, dataclass_type=schemas.FusionConfig
+    )
+
     combined_config.setdefault("model_type", "mlp-residual")
     combined_config.setdefault("model_config", {})
 
@@ -652,6 +679,8 @@ def init_output_config(
     yaml_config_as_dict: Dict[str, Any],
 ) -> schemas.OutputConfig:
     cfg = yaml_config_as_dict
+
+    validate_keys_against_dataclass(input_dict=cfg, dataclass_type=schemas.OutputConfig)
 
     output_info_object = schemas.OutputInfoConfig(**cfg["output_info"])
 
