@@ -23,7 +23,7 @@ def get_array_model(
     return wrapper_model
 
 
-def get_array_feature_extractor(
+def get_array_input_feature_extractor(
     model_init_config: al_array_model_configs,
     data_dimensions: DataDimensions,
     model_type: al_array_model_types,

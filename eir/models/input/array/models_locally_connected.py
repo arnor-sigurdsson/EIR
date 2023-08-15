@@ -20,6 +20,7 @@ from eir.models.layers.lcl_layers import LCL, LCLResidualBlock
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
+    from eir.models.output.array.array_output_modules import LCLOutputModelConfig
     from eir.setup.input_setup_modules.common import DataDimensions
 
 logger = get_logger(__name__)
@@ -154,6 +155,13 @@ class LCLModelConfig:
 
     :param cutoff:
         Feature dimension cutoff where the automatic network setup stops adding layers.
+        The 'auto' option is only supported when using the model for array *outputs*,
+        and will set the cutoff to roughly the number of output features.
+
+    :param direction:
+        Whether to use a "down" or "up" network. "Down" means that the feature
+        representation will get smaller as it is propagated through the network, whereas
+        "up" means that the feature representation will get larger.
 
     :param attention_inclusion_cutoff:
         Cutoff to start including attention blocks in the network. If set to ``None``,
@@ -178,16 +186,18 @@ class LCLModelConfig:
     stochastic_depth_p: float = 0.00
     l1: float = 0.00
 
-    cutoff: int = 1024
+    cutoff: int | Literal["auto"] = 1024
+    direction: Literal["down", "up"] = "down"
     attention_inclusion_cutoff: Optional[int] = None
 
 
 class LCLModel(nn.Module):
     def __init__(
         self,
-        model_config: LCLModelConfig,
+        model_config: Union[LCLModelConfig, "LCLOutputModelConfig"],
         data_dimensions: "DataDimensions",
         flatten_fn: FlattenFunc,
+        dynamic_cutoff: Optional[int] = None,
     ):
         super().__init__()
 
@@ -210,14 +220,18 @@ class LCLModel(nn.Module):
             bias=True,
         )
 
+        cutoff = dynamic_cutoff or self.model_config.cutoff
+        assert isinstance(cutoff, int)
+
         lcl_parameter_spec = LCParameterSpec(
             in_features=self.fc_0.out_features,
             kernel_width=self.model_config.kernel_width,
             channel_exp_base=self.model_config.channel_exp_base,
             dropout_p=self.model_config.rb_do,
-            cutoff=self.model_config.cutoff,
+            cutoff=cutoff,
             stochastic_depth_p=self.model_config.stochastic_depth_p,
             attention_inclusion_cutoff=self.model_config.attention_inclusion_cutoff,
+            direction=self.model_config.direction,
         )
         self.lcl_blocks = _get_lcl_blocks(
             lcl_spec=lcl_parameter_spec,
@@ -279,6 +293,7 @@ class LCParameterSpec:
     stochastic_depth_p: float
     cutoff: int
     attention_inclusion_cutoff: Optional[int] = None
+    direction: Literal["down", "up"] = "down"
 
 
 def _get_lcl_blocks(
@@ -327,8 +342,12 @@ def _generate_lcl_blocks_from_spec(
         for block in range(block_dim):
             cur_out_feature_sets = 2 ** (s.channel_exp_base + cur_layer_index)
             cur_kernel_width = s.kernel_width
-            while cur_out_feature_sets >= cur_kernel_width:
-                cur_kernel_width *= 2
+
+            cur_out_feature_sets, cur_kernel_width = _adjust_auto_params(
+                cur_out_feature_sets=cur_out_feature_sets,
+                cur_kernel_width=cur_kernel_width,
+                direction=s.direction,
+            )
 
             cur_size = block_modules[-1].out_features
 
@@ -343,6 +362,27 @@ def _generate_lcl_blocks_from_spec(
             block_modules.append(cur_block)
 
     return nn.Sequential(*block_modules)
+
+
+def _adjust_auto_params(
+    cur_out_feature_sets: int, cur_kernel_width: int, direction: Literal["down", "up"]
+) -> tuple[int, int]:
+    """
+    Down: increase kernel width until it is larger than the number of output feature
+    sets.
+    Up: increase number of output feature sets until it is larger than the kernel width.
+
+    """
+    if direction == "down":
+        while cur_out_feature_sets >= cur_kernel_width:
+            cur_kernel_width *= 2
+    elif direction == "up":
+        while cur_out_feature_sets <= cur_kernel_width:
+            cur_out_feature_sets *= 2
+    else:
+        raise ValueError(f"Unknown direction: {direction}")
+
+    return cur_out_feature_sets, cur_kernel_width
 
 
 def generate_lcl_residual_blocks_auto(lcl_parameter_spec: LCParameterSpec):
@@ -381,11 +421,19 @@ def generate_lcl_residual_blocks_auto(lcl_parameter_spec: LCParameterSpec):
 
         cur_out_feature_sets = 2 ** (s.channel_exp_base + cur_index)
         cur_kernel_width = s.kernel_width
-        while cur_out_feature_sets >= cur_kernel_width:
-            cur_kernel_width *= 2
+        cur_out_feature_sets, cur_kernel_width = _adjust_auto_params(
+            cur_out_feature_sets=cur_out_feature_sets,
+            cur_kernel_width=cur_kernel_width,
+            direction=s.direction,
+        )
 
         cur_size = block_modules[-1].out_features
-        if cur_size <= s.cutoff:
+
+        if _should_break_auto(
+            cur_size=cur_size,
+            cutoff=s.cutoff,
+            direction=s.direction,
+        ):
             break
 
         cur_block = LCLResidualBlock(
@@ -416,6 +464,17 @@ def generate_lcl_residual_blocks_auto(lcl_parameter_spec: LCParameterSpec):
         cur_size,
     )
     return nn.Sequential(*block_modules)
+
+
+def _should_break_auto(
+    cur_size: int, cutoff: int, direction: Literal["up", "down"]
+) -> bool:
+    if direction == "down":
+        return cur_size <= cutoff
+    elif direction == "up":
+        return cur_size >= cutoff
+    else:
+        raise ValueError(f"Unknown direction: {direction}")
 
 
 class LCLAttentionBlock(nn.Module):

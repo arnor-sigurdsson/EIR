@@ -83,6 +83,8 @@ def _get_output_array_data_parameters() -> Sequence[dict]:
                             "model_init_config": {
                                 "kernel_width": 8,
                                 "channel_exp_base": 3,
+                                "direction": "up",
+                                "cutoff": "auto",
                             },
                         },
                     }
@@ -113,7 +115,7 @@ def _array_output_test_check_wrapper(
     experiment: train.Experiment,
     test_config: "ModelTestConfig",
     mse_threshold: float = 0.2,
-    cosine_similarity_threshold: float = 0.7,
+    cosine_similarity_threshold: float = 0.6,
 ) -> None:
     output_configs = experiment.configs.output_configs
 

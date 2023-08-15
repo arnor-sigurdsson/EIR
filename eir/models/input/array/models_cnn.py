@@ -652,6 +652,7 @@ def auto_find_no_cnn_residual_blocks_needed(
                 )
 
             break
+
         else:
             cur_no_blocks = sum(residual_blocks)
 

@@ -10,7 +10,7 @@ from eir.models.input.tabular.tabular import get_unique_values_from_transformers
 from eir.models.meta import meta
 from eir.models.meta.meta import al_input_modules
 from eir.models.model_setup_modules.input_model_setup.input_model_setup_array import (
-    get_array_feature_extractor,
+    get_array_input_feature_extractor,
     get_array_model,
 )
 from eir.models.model_setup_modules.input_model_setup.input_model_setup_image import (
@@ -26,9 +26,13 @@ from eir.models.model_setup_modules.input_model_setup.input_model_setup_tabular 
     SimpleTabularModel,
     get_tabular_model,
 )
-from eir.models.model_setup_modules.output_model_setup import (
+from eir.models.model_setup_modules.output_model_setup_modules.output_model_setup_array import (  # noqa
     get_array_output_module_from_model_config,
+)
+from eir.models.model_setup_modules.output_model_setup_modules.output_model_setup_sequence import (  # noqa
     get_sequence_output_module_from_model_config,
+)
+from eir.models.model_setup_modules.output_model_setup_modules.output_model_setup_tabular import (  # noqa
     get_tabular_output_module_from_model_config,
 )
 from eir.models.output.sequence.sequence_output_modules import (
@@ -310,7 +314,7 @@ def get_input_modules(
 
             case ComputedArrayInputInfo():
                 assert isinstance(input_model_config, schemas.ArrayModelConfig)
-                array_feature_extractor = get_array_feature_extractor(
+                array_feature_extractor = get_array_input_feature_extractor(
                     model_type=input_model_config.model_type,
                     model_init_config=input_model_config.model_init_config,
                     data_dimensions=inputs_object.data_dimensions,

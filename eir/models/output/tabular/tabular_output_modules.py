@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 from typing import Literal, Union
 
-from eir.models.output.linear import LinearOutputModuleConfig
-from eir.models.output.mlp_residual import ResidualMLPOutputModuleConfig
+from eir.models.output.tabular.linear import LinearOutputModuleConfig
+from eir.models.output.tabular.mlp_residual import ResidualMLPOutputModuleConfig
 
 
 @dataclass

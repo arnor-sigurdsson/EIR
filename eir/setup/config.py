@@ -26,11 +26,11 @@ from eir.models.fusion.fusion_identity import IdentityConfig
 from eir.models.fusion.fusion_mgmoe import MGMoEModelConfig
 from eir.models.input.array.array_models import (
     ArrayModelConfig,
+    LCLModelConfig,
     get_array_config_dataclass_mapping,
 )
 from eir.models.input.image.image_models import ImageModelConfig
 from eir.models.input.omics.omics_models import (
-    LCLModelConfig,
     OmicsModelConfig,
     get_omics_config_dataclass_mapping,
 )
@@ -43,13 +43,16 @@ from eir.models.input.tabular.tabular import (
     TabularModelConfig,
 )
 from eir.models.layers.mlp_layers import ResidualMLPConfig
-from eir.models.output.array.array_output_modules import ArrayOutputModuleConfig
-from eir.models.output.linear import LinearOutputModuleConfig
-from eir.models.output.mlp_residual import ResidualMLPOutputModuleConfig
+from eir.models.output.array.array_output_modules import (
+    ArrayOutputModuleConfig,
+    LCLOutputModelConfig,
+)
 from eir.models.output.sequence.sequence_output_modules import (
     SequenceOutputModuleConfig,
     TransformerSequenceOutputModuleConfig,
 )
+from eir.models.output.tabular.linear import LinearOutputModuleConfig
+from eir.models.output.tabular.mlp_residual import ResidualMLPOutputModuleConfig
 from eir.models.output.tabular.tabular_output_modules import TabularOutputModuleConfig
 from eir.setup import schemas
 from eir.setup.config_setup_modules.config_setup_utils import (
@@ -813,7 +816,7 @@ def get_output_config_type_init_callable_map() -> al_output_model_init_map:
             "sequence": TransformerSequenceOutputModuleConfig,
         },
         "array": {
-            "lcl": LCLModelConfig,
+            "lcl": LCLOutputModelConfig,
         },
     }
 

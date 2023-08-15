@@ -179,9 +179,9 @@ output heads
 of the tabular output model.
 (trough the `model_init_config` field in the `\-\-output_configs` `.yaml` files).
 
-.. autoclass:: eir.models.output.mlp_residual.ResidualMLPOutputModuleConfig
+.. autoclass:: eir.models.output.tabular.mlp_residual.ResidualMLPOutputModuleConfig
 
-.. autoclass:: eir.models.output.linear.LinearOutputModuleConfig
+.. autoclass:: eir.models.output.tabular.linear.LinearOutputModuleConfig
 
 **Sequence Output Modules**
 

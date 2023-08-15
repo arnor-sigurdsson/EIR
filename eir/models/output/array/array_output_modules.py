@@ -1,19 +1,25 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, Type
 
 import torch
 from torch import nn
 
-from eir.models.input.array.array_models import (
-    al_array_model_configs,
-    al_array_model_types,
-    al_array_models,
-    al_pre_normalization,
-)
+from eir.models.input.array.array_models import al_pre_normalization
+from eir.models.input.array.models_locally_connected import LCLModel, LCLModelConfig
 from eir.models.layers.projection_layers import get_projection_layer
 
 if TYPE_CHECKING:
     from eir.setup.input_setup_modules.common import DataDimensions
+
+al_array_model_types = Literal["lcl"]
+al_output_array_model_classes = Type[LCLModel]
+al_output_array_models = LCLModel
+al_output_array_model_config_classes = Type["LCLOutputModelConfig"]
+
+
+@dataclass
+class LCLOutputModelConfig(LCLModelConfig):
+    cutoff: int | Literal["auto"] = "auto"
 
 
 @dataclass
@@ -28,14 +34,14 @@ class ArrayOutputModuleConfig:
     """
 
     model_type: al_array_model_types
-    model_init_config: al_array_model_configs
+    model_init_config: LCLOutputModelConfig
     pre_normalization: al_pre_normalization = None
 
 
 class ArrayOutputWrapperModule(nn.Module):
     def __init__(
         self,
-        feature_extractor: al_array_models,
+        feature_extractor: al_output_array_models,
         output_name: str,
         target_data_dimensions: "DataDimensions",
     ):
@@ -65,7 +71,7 @@ class ArrayOutputWrapperModule(nn.Module):
 
 
 def get_array_output_module(
-    feature_extractor: al_array_models,
+    feature_extractor: al_output_array_models,
     output_name: str,
     target_data_dimensions: "DataDimensions",
 ) -> ArrayOutputWrapperModule:
