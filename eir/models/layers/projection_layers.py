@@ -11,6 +11,7 @@ def get_projection_layer(
     input_dimension: int,
     target_dimension: int,
     projection_layer_type: Literal["auto", "lcl", "lcl_residual", "linear"] = "auto",
+    lcl_diff_tolerance: int = 0,
 ) -> LCLResidualBlock | LCL | nn.Linear | nn.Identity:
     if projection_layer_type == "auto":
         if input_dimension == target_dimension:
@@ -20,6 +21,7 @@ def get_projection_layer(
             input_dimension=input_dimension,
             target_dimension=target_dimension,
             layer_type="lcl_residual",
+            diff_tolerance=lcl_diff_tolerance,
         )
         if lcl_residual_projection is not None:
             return lcl_residual_projection
@@ -28,6 +30,7 @@ def get_projection_layer(
             input_dimension=input_dimension,
             target_dimension=target_dimension,
             layer_type="lcl",
+            diff_tolerance=lcl_diff_tolerance,
         )
         if lcl_projection is not None:
             return lcl_projection
@@ -43,6 +46,7 @@ def get_projection_layer(
             input_dimension=input_dimension,
             target_dimension=target_dimension,
             layer_type="lcl_residual",
+            diff_tolerance=lcl_diff_tolerance,
         )
         if layer is None:
             raise ValueError(
@@ -59,6 +63,7 @@ def get_projection_layer(
             input_dimension=input_dimension,
             target_dimension=target_dimension,
             layer_type="lcl",
+            diff_tolerance=lcl_diff_tolerance,
         )
         if layer is None:
             raise ValueError(
@@ -89,6 +94,7 @@ def get_lcl_projection_layer(
     layer_type: Literal["lcl_residual", "lcl"] = "lcl_residual",
     kernel_width_candidates: Sequence[int] = tuple(range(1, 1024 + 1)),
     out_feature_sets_candidates: Sequence[int] = tuple(range(1, 512 + 1)),
+    diff_tolerance: int = 0,
 ) -> LCLResidualBlock | LCL | None:
     layer_class: Type[LCLResidualBlock] | Type[LCL]
     match layer_type:
@@ -108,6 +114,7 @@ def get_lcl_projection_layer(
         n_layers=n_lcl_layers,
         kernel_width_candidates=kernel_width_candidates,
         out_feature_sets_candidates=out_feature_sets_candidates,
+        diff_tolerance=diff_tolerance,
     )
 
     if solution is None:
@@ -129,6 +136,7 @@ def _find_best_lcl_kernel_width_and_out_feature_sets(
     n_layers: int,
     kernel_width_candidates: Sequence[int] = tuple(range(1, 1024 + 1)),
     out_feature_sets_candidates: Sequence[int] = tuple(range(1, 64 + 1)),
+    diff_tolerance: int = 0,
 ) -> Tuple[int, int] | None:
     best_diff = np.Inf
     best_kernel_width = None
@@ -164,7 +172,7 @@ def _find_best_lcl_kernel_width_and_out_feature_sets(
                 best_kernel_width = kernel_width
                 best_out_feature_sets = out_feature_sets
 
-            if diff == 0:
+            if diff <= diff_tolerance:
                 break
 
     if best_diff != 0:

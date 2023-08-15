@@ -53,10 +53,13 @@ class ArrayOutputWrapperModule(nn.Module):
         self.target_width = self.data_dimensions.num_elements()
         self.target_shape = self.data_dimensions.full_shape()
 
+        diff_tolerance = get_diff_tolerance(num_target_elements=self.target_width)
+
         self.projection_head = get_projection_layer(
             input_dimension=self.feature_extractor.num_out_features,
             target_dimension=self.target_width,
             projection_layer_type="lcl_residual",
+            lcl_diff_tolerance=diff_tolerance,
         )
 
     def forward(self, x: torch.Tensor) -> dict[str, torch.Tensor]:
@@ -68,6 +71,10 @@ class ArrayOutputWrapperModule(nn.Module):
         out = out.reshape(-1, *self.target_shape)
 
         return {self.output_name: out}
+
+
+def get_diff_tolerance(num_target_elements: int) -> int:
+    return int(0.001 * num_target_elements)
 
 
 def get_array_output_module(
