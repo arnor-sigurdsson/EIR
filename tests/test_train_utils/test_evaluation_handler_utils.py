@@ -236,7 +236,10 @@ def test_prepare_sequence_output_manual_sample_data(
         "OriginExtraCol",
         "ExtraTarget",
     }
-    assert prepared_test_data["test_tabular"]["OriginExtraCol"].dtype == int
-    assert prepared_test_data["test_tabular"]["ExtraTarget"].dtype == float
+    assert prepared_test_data["test_tabular"]["OriginExtraCol"].dtype == torch.int64
+    assert prepared_test_data["test_tabular"]["ExtraTarget"].dtype in (
+        torch.float64,
+        torch.float32,
+    )
 
     assert prepared_test_data["test_bytes"].shape == (128,)

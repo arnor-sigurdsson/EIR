@@ -37,7 +37,7 @@ def test_streamline_tabular_data_for_transformers():
     for name, value in result.items():
         assert isinstance(value, torch.Tensor)
         expected = transformers[name].transform(tabular_input[name])
-        value_np = value.numpy()
+        value_np = value.numpy().squeeze()
         assert np.array_equal(value_np, expected)
 
 
