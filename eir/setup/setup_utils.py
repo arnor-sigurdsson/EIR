@@ -1,4 +1,4 @@
-from typing import Iterable, Sequence, Type, Union
+from typing import Iterable, Optional, Sequence, Type, Union
 
 import torch
 from torch_optimizer import _NAME_OPTIM_MAP
@@ -92,14 +92,19 @@ def collect_stats(
     tensor_iterable: Iterable[torch.Tensor],
     collector_class: al_collector_classes,
     shape: tuple,
+    max_samples: Optional[int] = None,
 ) -> ChannelBasedRunningStatistics | ElementBasedRunningStatistics:
     stats = set_up_collector_instance(collector_class=collector_class, shape=shape)
 
-    for it in tqdm(tensor_iterable, desc="Gathering Statistics: "):
+    for index, it in enumerate(tqdm(tensor_iterable, desc="Gathering Statistics: ")):
         if hasattr(it, "data"):
             stats.update(it.data)
         else:
             stats.update(it)
+
+        if max_samples is not None and index >= max_samples:
+            break
+
     return stats
 
 

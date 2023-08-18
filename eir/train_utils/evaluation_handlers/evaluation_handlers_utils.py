@@ -9,6 +9,7 @@ import numpy as np
 import torch
 from aislib.misc_utils import ensure_path_exists, get_logger
 from PIL import Image
+from sklearn.preprocessing import LabelEncoder, StandardScaler
 from torch.utils.data import DataLoader, Dataset
 from torchtext.vocab import Vocab
 from transformers import PreTrainedTokenizerBase
@@ -175,13 +176,19 @@ def convert_image_input_to_raw(
 def convert_tabular_input_to_raw(
     data: Dict[str, torch.Tensor], input_transformers: al_label_transformers
 ) -> Dict[str, np.ndarray]:
-    all_reversed = {}
+    all_reversed: Dict[str, np.ndarray] = {}
     for col_name, tensor_data in data.items():
         transformer = input_transformers[col_name]
         tensor_data_reshaped = tensor_data.numpy().reshape(-1, 1)
         assert tensor_data_reshaped.shape[0] > 0, "Empty tensor"
 
-        cur_reversed = transformer.inverse_transform(tensor_data_reshaped)
+        it = transformer.inverse_transform
+        if isinstance(transformer, StandardScaler):
+            cur_reversed = it(tensor_data_reshaped)
+        elif isinstance(transformer, LabelEncoder):
+            cur_reversed = it(tensor_data_reshaped.ravel())
+        else:
+            raise NotImplementedError()
 
         cur_reversed = cur_reversed.squeeze()
         assert cur_reversed.ndim == 0
@@ -242,7 +249,9 @@ def general_pre_process_prepared_inputs(
     i.e. not the sequence output specific things we define here in the train module.
     """
 
-    inputs_final = prepared_inputs
+    inputs_final = impute_missing_modalities_wrapper(
+        inputs_values=prepared_inputs, inputs_objects=experiment.inputs
+    )
 
     loader_batch = (inputs_final, target_labels, sample_id)
 
@@ -331,16 +340,17 @@ def decode_tokens(
 
 def _streamline_tabular_data_for_transformers(
     tabular_input: dict[str, np.ndarray], transformers: al_label_transformers
-) -> dict[str, np.ndarray]:
+) -> dict[str, torch.Tensor]:
     parsed_output = {}
     for name, value in tabular_input.items():
         cur_transformer = transformers[name]
-        value_np = np.array(value)
+        value_np = np.array([value])
         value_streamlined = streamline_values_for_transformers(
             transformer=cur_transformer, values=value_np
         )
         value_transformed = cur_transformer.transform(value_streamlined)
-        parsed_output[name] = value_transformed
+        value_tensor = torch.from_numpy(value_transformed)
+        parsed_output[name] = value_tensor
     return parsed_output
 
 
@@ -382,8 +392,8 @@ def post_prepare_manual_sequence_inputs(
 
 def prepare_manual_sample_data(
     sample_inputs: Dict[str, Any], input_objects: "al_input_objects_as_dict"
-) -> dict[str, torch.Tensor | dict[str, np.ndarray]]:
-    prepared_inputs: dict[str, torch.Tensor | dict[str, np.ndarray]] = {}
+) -> dict[str, torch.Tensor | dict[str, torch.Tensor]]:
+    prepared_inputs: dict[str, torch.Tensor | dict[str, torch.Tensor]] = {}
     for name, data in sample_inputs.items():
         input_object = input_objects[name]
         input_info = input_object.input_config.input_info

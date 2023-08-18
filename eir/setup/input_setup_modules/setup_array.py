@@ -51,6 +51,7 @@ def set_up_array_input(
             inner_key=input_config.input_info.input_inner_key,
             normalization=input_type_info.normalization,
             data_dimensions=data_dimensions,
+            max_samples=input_type_info.adaptive_normalization_max_samples,
         )
 
     array_input_info = ComputedArrayInputInfo(
@@ -75,6 +76,7 @@ def get_array_normalization_values(
     inner_key: Optional[str],
     normalization: Optional[Literal["element", "channel"]],
     data_dimensions: DataDimensions,
+    max_samples: Optional[int],
 ) -> ArrayNormalizationStats:
     input_source = source
     deeplake_inner_key = inner_key
@@ -108,6 +110,7 @@ def get_array_normalization_values(
         tensor_iterable=tensor_iterator,
         collector_class=collector_class,
         shape=data_dimensions.full_shape(),
+        max_samples=max_samples,
     )
 
     means = _add_extra_dims_if_needed(

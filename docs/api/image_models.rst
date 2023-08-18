@@ -174,6 +174,10 @@ For example, the ``ResNet`` architecture includes the ``layers`` and ``block`` p
    :members:
    :exclude-members: forward
 
+.. autoclass:: timm.models.repvit.RepViT
+   :members:
+   :exclude-members: forward
+
 .. autoclass:: timm.models.resnet.ResNet
    :members:
    :exclude-members: forward
@@ -235,6 +239,10 @@ For example, the ``ResNet`` architecture includes the ``layers`` and ``block`` p
    :exclude-members: forward
 
 .. autoclass:: timm.models.vision_transformer_relpos.VisionTransformerRelPos
+   :members:
+   :exclude-members: forward
+
+.. autoclass:: timm.models.vision_transformer_sam.VisionTransformerSAM
    :members:
    :exclude-members: forward
 

@@ -35,9 +35,10 @@ def test_streamline_tabular_data_for_transformers():
     assert isinstance(result, dict)
     assert set(result.keys()) == set(tabular_input.keys())
     for name, value in result.items():
-        assert isinstance(value, np.ndarray)
+        assert isinstance(value, torch.Tensor)
         expected = transformers[name].transform(tabular_input[name])
-        assert np.array_equal(value, expected)
+        value_np = value.numpy()
+        assert np.array_equal(value_np, expected)
 
 
 def test_modality_skip_when_test_mode() -> None:

@@ -1,0 +1,27 @@
+output_info:
+  output_source: "eir_tutorials/d_array_output/01_array_mnist_generation/data/mnist_npy"
+  output_name: mnist_output
+  output_type: array
+
+output_type_info:
+  normalization: channel
+  adaptive_normalization_max_samples: 10000
+
+model_config:
+  model_type: lcl
+  model_init_config:
+    channel_exp_base: 4
+
+sampling_config:
+  manual_inputs:
+    - "mnist_label":
+        "CLASS": "0"
+
+    - "mnist_label":
+        "CLASS": "0"
+
+    - "mnist_label":
+        "CLASS": "5"
+
+    - "mnist_label":
+        "CLASS": "5"

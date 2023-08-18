@@ -24,6 +24,15 @@ Sequence Generation
     c_sequence_output/02_sequence_to_sequence.rst
     c_sequence_output/03_image_to_sequence.rst
 
+Array Generation
+================
+
+.. toctree::
+    :maxdepth: 2
+
+    d_array_output/01_autoencoder.rst
+
+
 Customizing EIR
 ===============
 

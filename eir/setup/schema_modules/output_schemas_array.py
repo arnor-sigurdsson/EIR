@@ -9,9 +9,15 @@ class ArrayOutputTypeConfig:
         Which type of normalization to apply to the array data. If ``element``, will
         normalize each element in the array independently. If ``channel``, will
         normalize each channel in the array independently.
+
+    :param adaptive_normalization_max_samples:
+        If using adaptive normalization (channel / element),
+        how many samples to use to compute the normalization parameters.
+        If None, will use all samples.
     """
 
     normalization: Optional[Literal["element", "channel"]] = "channel"
+    adaptive_normalization_max_samples: Optional[int] = None
 
 
 @dataclass

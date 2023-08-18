@@ -39,6 +39,7 @@ def set_up_array_output(
             inner_key=output_config.output_info.output_inner_key,
             normalization=output_type_info.normalization,
             data_dimensions=data_dimensions,
+            max_samples=output_type_info.adaptive_normalization_max_samples,
         )
 
     array_output_object = ComputedArrayOutputInfo(

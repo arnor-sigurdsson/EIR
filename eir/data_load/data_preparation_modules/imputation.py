@@ -1,4 +1,4 @@
-from typing import Any, Dict, Tuple, Union
+from typing import Any, Dict, Literal, Tuple, Union
 
 import torch
 
@@ -46,16 +46,19 @@ def impute_missing_modalities(
             dtype = dtypes[input_name]
 
             shape: Tuple[int, ...]
+            approach: Literal["constant", "random"]
             match input_object:
                 case ComputedOmicsInputInfo():
                     assert input_type == "omics"
                     dimensions = input_object.data_dimensions
                     shape = dimensions.channels, dimensions.height, dimensions.width
+                    approach = "constant"
 
                 case ComputedSequenceInputInfo() | ComputedBytesInputInfo():
                     assert input_type in ("sequence", "bytes")
                     max_length = input_object.computed_max_length
                     shape = (max_length,)
+                    approach = "constant"
 
                 case ComputedImageInputInfo():
                     assert input_type == "image"
@@ -67,6 +70,7 @@ def impute_missing_modalities(
 
                     num_channels = input_object.num_channels
                     shape = (num_channels, *size)
+                    approach = "random"
 
                 case ComputedTabularInputInfo() | ComputedPredictTabularInputInfo():
                     assert input_type == "tabular"
@@ -76,12 +80,16 @@ def impute_missing_modalities(
                 case ComputedArrayInputInfo():
                     assert input_type == "array"
                     shape = input_object.data_dimensions.full_shape()
+                    approach = "random"
 
                 case _:
                     raise ValueError(f"Unrecognized input type {input_type}")
 
             imputed_tensor = impute_single_missing_modality(
-                shape=shape, fill_value=fill_value, dtype=dtype
+                shape=shape,
+                fill_value=fill_value,
+                dtype=dtype,
+                approach=approach,
             )
             inputs_values[input_name] = imputed_tensor
 
@@ -89,9 +97,19 @@ def impute_missing_modalities(
 
 
 def impute_single_missing_modality(
-    shape: Tuple[int, ...], fill_value: Any, dtype: Any
+    shape: Tuple[int, ...],
+    fill_value: Any,
+    dtype: Any,
+    approach: Literal["constant", "random"],
 ) -> torch.Tensor:
-    imputed_tensor = torch.empty(shape, dtype=dtype).fill_(fill_value)
+    match approach:
+        case "constant":
+            imputed_tensor = torch.empty(shape, dtype=dtype).fill_(fill_value)
+        case "random":
+            imputed_tensor = torch.empty(shape, dtype=dtype).normal_()
+        case _:
+            raise ValueError(f"Unrecognized approach {approach}")
+
     return imputed_tensor
 
 
