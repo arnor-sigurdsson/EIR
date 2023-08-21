@@ -260,12 +260,9 @@ found in the ``predictions.csv`` file:
 
 The ``True Label Untransformed`` column contains the actual labels, as they were
 in the raw data. The ``True Label`` column contains the labels after they have been
-numerically encoded / normalized in ``EIR``. For example above, we can see that the
-first rows have the ``True Label`` of ``5``,
-which untransformed represents ``Sub-Saharan
-African`` ancestry. The other columns represent the raw network outputs
-for each of the classes. Indeed, we can see that the highest value is in the
-``Sub-Saharan African`` column, which is the predicted class.
+numerically encoded / normalized in ``EIR``.
+The other columns represent the raw network outputs
+for each of the classes.
 
 D - Applying to your own data (e.g. UKBB)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

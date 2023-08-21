@@ -80,7 +80,7 @@ if __name__ == "__main__":
 
     experiment_iter = chain.from_iterable(
         [
-            a_using_eir_experiments,
+            # a_using_eir_experiments,
             c_sequence_outputs_experiments,
             b_customizing_eir_experiments,
             d_array_outputs_experiments,

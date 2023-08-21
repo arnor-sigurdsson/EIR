@@ -7,6 +7,8 @@ eir_tutorials/tutorial_runs/a_using_eir/tutorial_01_run/
 │       └── predictions.csv
 ├── calculated_metrics.json
 ├── configs
+├── meta
+│   └── eir_version.txt
 ├── model_info.txt
 ├── results
 │   └── ancestry_output

@@ -185,20 +185,30 @@ def get_split_output_generator(
         output_gather = {
             k: v for k, v in model_outputs.items() if k in output_objects_by_type.gather
         }
-        target_gather = {
-            k: v for k, v in target_labels.items() if k in output_objects_by_type.gather
-        }
+
+        if target_labels is None:
+            target_gather = {}
+        else:
+            target_gather = {
+                k: v
+                for k, v in target_labels.items()
+                if k in output_objects_by_type.gather
+            }
 
         output_compute = {
             k: v
             for k, v in model_outputs.items()
             if k in output_objects_by_type.compute
         }
-        target_compute = {
-            k: v
-            for k, v in target_labels.items()
-            if k in output_objects_by_type.compute
-        }
+
+        if target_labels is None:
+            target_compute = {}
+        else:
+            target_compute = {
+                k: v
+                for k, v in target_labels.items()
+                if k in output_objects_by_type.compute
+            }
 
         yield SplitModelOutputs(
             output_compute=output_compute,

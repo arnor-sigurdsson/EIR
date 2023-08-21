@@ -101,7 +101,7 @@ Here is a comparison of generated images at iteration 500:
     :width: 50%
     :align: center
 
-And at iteration 9500, we can observe the improvements in generation:
+And at iteration 9000, we can observe the improvements in generation:
 
 .. image:: ../tutorial_files/d_array_output/01_array_mnist_generation/figures/0_autoencoder/comparison_iteration_9000.png
     :width: 50%
@@ -163,7 +163,7 @@ Here is a visualization of the latent space:
     :width: 100%
     :align: center
 
-Here is a comparison of generated images at iteration 500 and 9500:
+Here is a comparison of generated images at iteration 500 and 9000:
 
 .. image:: ../tutorial_files/d_array_output/01_array_mnist_generation/figures/1_autoencoder_augmented/comparison_iteration_500.png
     :width: 50%

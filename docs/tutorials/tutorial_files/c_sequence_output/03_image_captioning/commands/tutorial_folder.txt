@@ -7,5 +7,4 @@ eir_tutorials/c_sequence_output/03_image_captioning
 └── data
     └── image_captioning
         ├── captions.csv
-        ├── conf
         └── images
