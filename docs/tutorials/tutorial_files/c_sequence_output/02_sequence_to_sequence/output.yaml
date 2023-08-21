@@ -1,5 +1,5 @@
 output_info:
-  output_source: eir_tutorials/c_sequence_output/02_sequence_to_sequence.rst/data/eng-spanish/english.csv
+  output_source: eir_tutorials/c_sequence_output/02_sequence_to_sequence/data/eng-spanish/english.csv
   output_name: english
   output_type: sequence
 

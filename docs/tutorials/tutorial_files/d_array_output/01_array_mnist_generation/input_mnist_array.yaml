@@ -1,0 +1,15 @@
+input_info:
+  input_source: "eir_tutorials/d_array_output/01_array_mnist_generation/data/mnist_npy"
+  input_name: mnist
+  input_type: array
+
+input_type_info:
+  normalization: channel
+  adaptive_normalization_max_samples: 10000
+
+
+model_config:
+  model_type: lcl
+  model_init_config:
+    kernel_width: 8
+    attention_inclusion_cutoff: 128

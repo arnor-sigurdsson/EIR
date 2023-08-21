@@ -1,0 +1,12 @@
+eir_tutorials/d_array_output/01_array_mnist_generation
+├── conf
+│   ├── globals.yaml
+│   ├── input_mnist_array.yaml
+│   ├── input_mnist_array_with_label.yaml
+│   ├── input_mnist_label.yaml
+│   ├── output.yaml
+│   └── output_with_label.yaml
+└── data
+    ├── __MACOSX
+    ├── mnist_labels.csv
+    └── mnist_npy

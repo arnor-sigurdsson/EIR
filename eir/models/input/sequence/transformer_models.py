@@ -10,7 +10,7 @@ from torch.nn import TransformerEncoder, TransformerEncoderLayer
 from torch.nn.functional import pad
 from transformers import PretrainedConfig, PreTrainedModel
 
-from eir.models.layers import _find_lcl_padding_needed
+from eir.models.layers.lcl_layers import _find_lcl_padding_needed
 from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__, tqdm_compatible=True)

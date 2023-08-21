@@ -1,0 +1,5 @@
+eirtrain \
+--global_configs eir_tutorials/d_array_output/01_array_mnist_generation/conf/globals.yaml \
+--input_configs eir_tutorials/d_array_output/01_array_mnist_generation/conf/input_mnist_array_with_label.yaml eir_tutorials/d_array_output/01_array_mnist_generation/conf/input_mnist_label.yaml \
+--output_configs eir_tutorials/d_array_output/01_array_mnist_generation/conf/output_with_label.yaml \
+--globals.output_folder=eir_tutorials/tutorial_runs/d_array_output/02_array_mnist_generation_with_labels

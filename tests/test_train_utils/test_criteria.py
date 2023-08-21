@@ -10,7 +10,8 @@ from torch import nn
 from eir.setup.config import Configs
 from eir.setup.input_setup import set_up_inputs_for_training
 from eir.setup.output_setup import set_up_outputs_for_training
-from eir.setup.schemas import OutputConfig, TabularOutputTypeConfig
+from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
+from eir.setup.schemas import OutputConfig
 from eir.target_setup.target_label_setup import MergedTargetLabels
 from eir.train_utils.criteria import (
     _calc_con_loss,

@@ -3,6 +3,7 @@ import os
 import tempfile
 from argparse import Namespace
 from copy import copy
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Mapping
 
@@ -309,3 +310,28 @@ def test_recursive_search(dict_: Mapping, target: Any):
         for key in path:
             dict_copy = dict_copy[key]
         assert dict_copy == target
+
+
+@dataclass
+class MockDataclass:
+    field1: str
+    field2: int
+
+
+def test_validate_keys_against_dataclass():
+    valid_input_dict = {"field1": "value1", "field2": 42}
+    config.validate_keys_against_dataclass(
+        input_dict=valid_input_dict, dataclass_type=MockDataclass
+    )
+
+    invalid_input_dict = {"field1": "value1", "unexpected_field": 42}
+    with pytest.raises(ValueError, match="Unexpected keys found"):
+        config.validate_keys_against_dataclass(
+            input_dict=invalid_input_dict, dataclass_type=MockDataclass
+        )
+
+    non_dataclass_type = int
+    with pytest.raises(TypeError, match="Provided type int is not a dataclass"):
+        config.validate_keys_against_dataclass(
+            input_dict=valid_input_dict, dataclass_type=non_dataclass_type
+        )

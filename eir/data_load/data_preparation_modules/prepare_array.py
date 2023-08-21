@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional
 
 import numpy as np
 import torch
@@ -10,7 +10,7 @@ from eir.setup.input_setup_modules.setup_array import ArrayNormalizationStats
 
 
 def array_load_wrapper(
-    data_pointer: Union[Path, int],
+    data_pointer: Path | int,
     input_source: str,
     deeplake_inner_key: Optional[str] = None,
 ) -> np.ndarray:
@@ -62,8 +62,9 @@ def normalize_array(
     if normalization_stats is None:
         return array
 
+    means = normalization_stats.means
     stds = normalization_stats.stds
-    array = (array - normalization_stats.means) / (stds + epsilon)
+    array = (array.to(device="cpu") - means) / (stds + epsilon)
 
     return array
 
@@ -74,7 +75,8 @@ def un_normalize_array(
     if normalization_stats is None:
         return array
 
+    means = normalization_stats.means
     stds = normalization_stats.stds
-    array = array * stds + normalization_stats.means
+    array = array.to(device="cpu") * stds + means
 
     return array

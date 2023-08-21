@@ -874,7 +874,9 @@ def _get_categorical_sample_indices_for_attributions(
     target_column: str,
     target_classes_numerical: Sequence[int],
 ) -> Tuple[int, ...]:
-    acc_label_counts: DefaultDict[int | float, int] = defaultdict(lambda: 0)
+    acc_label_counts: DefaultDict[int | float | torch.Tensor, int] = defaultdict(
+        lambda: 0
+    )
     acc_label_limit = max_attributions_per_class
     indices = []
 

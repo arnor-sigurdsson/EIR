@@ -1,0 +1,8 @@
+input_info:
+  input_source: "eir_tutorials/d_array_output/01_array_mnist_generation/data/mnist_labels.csv"
+  input_name: mnist_label
+  input_type: tabular
+
+input_type_info:
+  input_cat_columns:
+    - "CLASS"

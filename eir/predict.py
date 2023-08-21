@@ -27,8 +27,15 @@ from eir.predict_modules.predict_attributions import compute_predict_attribution
 from eir.predict_modules.predict_config import converge_train_and_predict_configs
 from eir.predict_modules.predict_data import set_up_default_dataset
 from eir.predict_modules.predict_input_setup import set_up_inputs_for_predict
-from eir.predict_modules.predict_sequence_output import predict_sequence_wrapper
-from eir.predict_modules.predict_tabular_output import predict_tabular_wrapper
+from eir.predict_modules.predict_output_modules.predict_array_output import (
+    predict_array_wrapper,
+)
+from eir.predict_modules.predict_output_modules.predict_sequence_output import (
+    predict_sequence_wrapper,
+)
+from eir.predict_modules.predict_output_modules.predict_tabular_output import (
+    predict_tabular_wrapper,
+)
 from eir.predict_modules.predict_target_setup import get_target_labels_for_testing
 from eir.setup.config import Configs, get_main_parser
 from eir.setup.input_setup import al_input_objects_as_dict
@@ -187,6 +194,11 @@ def predict(
     )
 
     predict_sequence_wrapper(
+        predict_experiment=predict_experiment,
+        output_folder=predict_cl_args.output_folder,
+    )
+
+    predict_array_wrapper(
         predict_experiment=predict_experiment,
         output_folder=predict_cl_args.output_folder,
     )

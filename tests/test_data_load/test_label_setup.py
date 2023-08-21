@@ -14,7 +14,7 @@ from eir.setup.config import Configs
 from eir.target_setup.target_label_setup import (
     gather_all_ids_from_output_configs,
     get_tabular_target_file_infos,
-    set_up_supervised_target_labels_wrapper,
+    set_up_all_target_labels_wrapper,
 )
 
 
@@ -161,7 +161,7 @@ def test_set_up_train_and_valid_tabular_data(
     )
     train_ids, valid_ids = train.split_ids(ids=all_array_ids, valid_size=gc.valid_size)
 
-    target_labels = set_up_supervised_target_labels_wrapper(
+    target_labels = set_up_all_target_labels_wrapper(
         output_configs=test_configs.output_configs,
         custom_label_ops=None,
         train_ids=train_ids,
@@ -228,13 +228,13 @@ def test_streamline_values_for_transformer():
     test_values = np.array([1, 2, 3, 4, 5])
 
     scaler_transformer = StandardScaler()
-    streamlined_values_scaler = label_setup._streamline_values_for_transformers(
+    streamlined_values_scaler = label_setup.streamline_values_for_transformers(
         transformer=scaler_transformer, values=test_values
     )
     assert streamlined_values_scaler.shape == (5, 1)
 
     encoder_transformer = LabelEncoder()
-    streamlined_values_encoder = label_setup._streamline_values_for_transformers(
+    streamlined_values_encoder = label_setup.streamline_values_for_transformers(
         transformer=encoder_transformer, values=test_values
     )
     assert streamlined_values_encoder.shape == (5,)

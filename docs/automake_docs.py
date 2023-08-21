@@ -18,6 +18,7 @@ from docs.doc_modules.c_sequence_outputs import (
     b_sequence_to_sequence,
     c_image_captioning,
 )
+from docs.doc_modules.d_array_outputs import a_array_mnist_generation
 from docs.doc_modules.experiments import AutoDocExperimentInfo, make_tutorial_data
 
 
@@ -63,16 +64,26 @@ def _get_c_sequence_outputs_experiments() -> Iterable[AutoDocExperimentInfo]:
     )
 
 
+def _get_d_array_outputs_experiments() -> Iterable[AutoDocExperimentInfo]:
+    a_experiments = a_array_mnist_generation.get_experiments()
+
+    return chain(
+        a_experiments,
+    )
+
+
 if __name__ == "__main__":
     a_using_eir_experiments = _get_a_using_eir_experiments()
     c_sequence_outputs_experiments = _get_c_sequence_outputs_experiments()
     b_customizing_eir_experiments = _get_b_customizing_eir_experiments()
+    d_array_outputs_experiments = _get_d_array_outputs_experiments()
 
     experiment_iter = chain.from_iterable(
         [
-            a_using_eir_experiments,
+            # a_using_eir_experiments,
             c_sequence_outputs_experiments,
             b_customizing_eir_experiments,
+            d_array_outputs_experiments,
         ]
     )
     for experiment in experiment_iter:

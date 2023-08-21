@@ -9,7 +9,7 @@ repos:
     rev: v4.4.0
     hooks:
       - id: check-added-large-files
-        args: ['--maxkb=1024']
+        args: ['--maxkb=2048']
 
   - repo: https://github.com/pycqa/isort
     rev: 5.12.0
@@ -37,12 +37,6 @@ repos:
         language: system
         types: [ python ]
         stages: [ push ]
-
-      - id: update-reqs
-        name: Update requirements.txt
-        entry: ./misc/update_reqs.sh
-        language: system
-        stages: [ commit ]
 
       - id: check-versions
         name: Check project versions

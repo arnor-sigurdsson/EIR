@@ -4,6 +4,7 @@ from typing import Literal, Optional
 
 import numpy as np
 import torch
+from aislib.misc_utils import get_logger
 
 from eir.data_load.data_source_modules.deeplake_ops import (
     get_deeplake_input_source_iterable,
@@ -21,6 +22,8 @@ from eir.setup.setup_utils import (
     al_collector_classes,
     collect_stats,
 )
+
+logger = get_logger(name=__name__)
 
 
 @dataclass
@@ -42,10 +45,13 @@ def set_up_array_input(
     assert isinstance(input_type_info, schemas.ArrayInputDataConfig)
 
     normalization_stats: Optional[ArrayNormalizationStats] = None
-    if input_type_info.normalization == "element":
+    if input_type_info.normalization is not None:
         normalization_stats = get_array_normalization_values(
-            input_config=input_config,
+            source=input_config.input_info.input_source,
+            inner_key=input_config.input_info.input_inner_key,
+            normalization=input_type_info.normalization,
             data_dimensions=data_dimensions,
+            max_samples=input_type_info.adaptive_normalization_max_samples,
         )
 
     array_input_info = ComputedArrayInputInfo(
@@ -66,14 +72,14 @@ class ArrayNormalizationStats:
 
 
 def get_array_normalization_values(
-    input_config: schemas.InputConfig,
+    source: str,
+    inner_key: Optional[str],
+    normalization: Optional[Literal["element", "channel"]],
     data_dimensions: DataDimensions,
+    max_samples: Optional[int],
 ) -> ArrayNormalizationStats:
-    input_type_info = input_config.input_type_info
-    assert isinstance(input_type_info, schemas.ArrayInputDataConfig)
-
-    input_source = input_config.input_info.input_source
-    deeplake_inner_key = input_config.input_info.input_inner_key
+    input_source = source
+    deeplake_inner_key = inner_key
 
     if is_deeplake_dataset(data_source=input_source):
         deeplake_ds = load_deeplake_dataset(data_source=input_source)
@@ -87,21 +93,84 @@ def get_array_normalization_values(
         np_iterator = (np.load(str(i)) for i in file_iterator)
         tensor_iterator = (torch.from_numpy(i).float() for i in np_iterator)
 
-    collector_class: al_collector_classes = ElementBasedRunningStatistics
-    if input_type_info.normalization == "channel":
+    tensor_iterator = (i.reshape(data_dimensions.full_shape()) for i in tensor_iterator)
+
+    collector_class: al_collector_classes
+    if normalization == "channel":
         collector_class = ChannelBasedRunningStatistics
+    elif normalization == "element":
+        collector_class = ElementBasedRunningStatistics
+    else:
+        raise ValueError(
+            f"Invalid normalization type: {normalization}. "
+            f"Must be one of ['element', 'channel']"
+        )
 
     gathered_stats = collect_stats(
         tensor_iterable=tensor_iterator,
         collector_class=collector_class,
         shape=data_dimensions.full_shape(),
+        max_samples=max_samples,
+    )
+
+    means = _add_extra_dims_if_needed(
+        normalization_tensor=gathered_stats.mean,
+        data_shape=data_dimensions.full_shape(),
+        normalization_type=normalization,
+    )
+
+    stds = _add_extra_dims_if_needed(
+        normalization_tensor=gathered_stats.std,
+        data_shape=data_dimensions.full_shape(),
+        normalization_type=normalization,
     )
 
     normalization_stats = ArrayNormalizationStats(
         shape=data_dimensions.full_shape(),
-        means=gathered_stats.mean,
-        stds=gathered_stats.std,
-        type=input_type_info.normalization,
+        means=means,
+        stds=stds,
+        type=normalization,
     )
 
+    _check_normalization_stats(source=source, normalization_stats=normalization_stats)
+
     return normalization_stats
+
+
+def _add_extra_dims_if_needed(
+    normalization_tensor: torch.Tensor,
+    data_shape: tuple,
+    normalization_type: Optional[Literal["element", "channel"]],
+) -> torch.Tensor:
+    if normalization_type == "element":
+        assert normalization_tensor.shape == data_shape
+        return normalization_tensor
+
+    elif normalization_type == "channel":
+        assert normalization_tensor.dim() == 1
+        assert normalization_tensor.shape[0] == data_shape[0]
+
+        num_extra_dims = len(data_shape) - 1
+        new_shape = (data_shape[0],) + (1,) * num_extra_dims
+        reshaped_tensor = normalization_tensor.view(*new_shape)
+
+        return reshaped_tensor
+
+    else:
+        raise ValueError(
+            f"Invalid normalization type: {normalization_type}. "
+            f"Must be one of ['element', 'channel']"
+        )
+
+
+def _check_normalization_stats(
+    source: str, normalization_stats: ArrayNormalizationStats, epsilon: float = 1e-10
+) -> None:
+    if torch.any(normalization_stats.stds < epsilon):
+        num_zero_stds = torch.sum(normalization_stats.stds < epsilon).item()
+        logger.warning(
+            f"In source {source}, "
+            f"{num_zero_stds} elements have zero or near-zero standard deviation. "
+            "This may lead to large values when normalizing. "
+            "Consider handling these cases specifically.",
+        )

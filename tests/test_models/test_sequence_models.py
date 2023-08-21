@@ -3,7 +3,7 @@ from typing import Dict, Sequence
 
 import pytest
 
-from eir.models.model_setup_modules.input_model_setup_sequence import (
+from eir.models.model_setup_modules.input_model_setup.input_model_setup_sequence import (  # noqa
     _get_hf_sequence_feature_extractor_objects,
     _get_manual_out_features_for_external_feature_extractor,
 )

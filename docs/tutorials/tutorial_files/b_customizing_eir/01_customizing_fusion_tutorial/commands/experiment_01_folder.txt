@@ -1,5 +1,7 @@
 eir_tutorials/tutorial_runs/b_customizing_eir/tutorial_01_run
 ├── configs
+├── meta
+│   └── eir_version.txt
 ├── model_info.txt
 ├── results
 │   └── ancestry_output

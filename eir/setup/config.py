@@ -3,7 +3,7 @@ import types
 from argparse import Namespace
 from collections import Counter
 from copy import copy
-from dataclasses import dataclass
+from dataclasses import dataclass, fields, is_dataclass
 from typing import (
     Any,
     Callable,
@@ -26,6 +26,7 @@ from eir.models.fusion.fusion_identity import IdentityConfig
 from eir.models.fusion.fusion_mgmoe import MGMoEModelConfig
 from eir.models.input.array.array_models import (
     ArrayModelConfig,
+    LCLModelConfig,
     get_array_config_dataclass_mapping,
 )
 from eir.models.input.image.image_models import ImageModelConfig
@@ -41,14 +42,18 @@ from eir.models.input.tabular.tabular import (
     SimpleTabularModelConfig,
     TabularModelConfig,
 )
-from eir.models.layers import ResidualMLPConfig
-from eir.models.output.linear import LinearOutputModuleConfig
-from eir.models.output.mlp_residual import ResidualMLPOutputModuleConfig
-from eir.models.output.output_module_setup import TabularOutputModuleConfig
+from eir.models.layers.mlp_layers import ResidualMLPConfig
+from eir.models.output.array.array_output_modules import (
+    ArrayOutputModuleConfig,
+    LCLOutputModelConfig,
+)
 from eir.models.output.sequence.sequence_output_modules import (
     SequenceOutputModuleConfig,
     TransformerSequenceOutputModuleConfig,
 )
+from eir.models.output.tabular.linear import LinearOutputModuleConfig
+from eir.models.output.tabular.mlp_residual import ResidualMLPOutputModuleConfig
+from eir.models.output.tabular.tabular_output_modules import TabularOutputModuleConfig
 from eir.setup import schemas
 from eir.setup.config_setup_modules.config_setup_utils import (
     get_yaml_iterator_with_injections,
@@ -58,6 +63,7 @@ from eir.setup.config_setup_modules.output_config_setup_sequence import (
 )
 from eir.setup.config_validation import validate_train_configs
 from eir.setup.schema_modules.latent_analysis_schemas import LatentSamplingConfig
+from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
 from eir.train_utils.utils import configure_global_eir_logging
 from eir.utils.logging import get_logger
 
@@ -68,10 +74,13 @@ al_input_types = Union[
     schemas.ByteInputDataConfig,
 ]
 
-al_output_types = Union[schemas.TabularOutputTypeConfig]
 
 al_output_types_schema_map = dict[
-    str, Union[Type[schemas.TabularOutputTypeConfig], Type]
+    str,
+    Union[
+        Type[TabularOutputTypeConfig],
+        Type,
+    ],
 ]
 
 al_output_module_config_class_getter = (
@@ -82,12 +91,14 @@ al_output_model_config_classes = (
     Type[ResidualMLPOutputModuleConfig]
     | Type[LinearOutputModuleConfig]
     | Type[TransformerSequenceOutputModuleConfig]
+    | Type[LCLModelConfig]
 )
 
 al_output_model_configs = (
     ResidualMLPOutputModuleConfig
     | LinearOutputModuleConfig
     | TransformerSequenceOutputModuleConfig
+    | LCLModelConfig
 )
 al_output_model_init_map = dict[str, dict[str, al_output_model_config_classes]]
 
@@ -272,6 +283,10 @@ def get_global_config(global_configs: Iterable[dict]) -> schemas.GlobalConfig:
         combined_config=combined_config
     )
 
+    validate_keys_against_dataclass(
+        input_dict=combined_config, dataclass_type=schemas.GlobalConfig
+    )
+
     combined_config_namespace = Namespace(**combined_config)
 
     global_config_object = schemas.GlobalConfig(**combined_config_namespace.__dict__)
@@ -327,8 +342,27 @@ def _check_input_config_names(input_configs: Iterable[schemas.InputConfig]) -> N
         )
 
 
+def validate_keys_against_dataclass(
+    input_dict: Dict[str, Any], dataclass_type: Type
+) -> None:
+    if not is_dataclass(dataclass_type):
+        raise TypeError(f"Provided type {dataclass_type.__name__} is not a dataclass")
+
+    expected_keys = {field.name for field in fields(dataclass_type)}
+
+    actual_keys = set(input_dict.keys())
+
+    unexpected_keys = actual_keys - expected_keys
+    if unexpected_keys:
+        raise ValueError(
+            f"Unexpected keys found in configuration: {', '.join(unexpected_keys)}"
+        )
+
+
 def init_input_config(yaml_config_as_dict: Dict[str, Any]) -> schemas.InputConfig:
     cfg = yaml_config_as_dict
+
+    validate_keys_against_dataclass(input_dict=cfg, dataclass_type=schemas.InputConfig)
 
     input_info_object = schemas.InputDataConfig(**cfg["input_info"])
 
@@ -586,6 +620,10 @@ def get_interpretation_config_schema_map() -> (
 def load_fusion_configs(fusion_configs: Iterable[dict]) -> schemas.FusionConfig:
     combined_config = combine_dicts(dicts=fusion_configs)
 
+    validate_keys_against_dataclass(
+        input_dict=combined_config, dataclass_type=schemas.FusionConfig
+    )
+
     combined_config.setdefault("model_type", "mlp-residual")
     combined_config.setdefault("model_config", {})
 
@@ -642,6 +680,8 @@ def init_output_config(
 ) -> schemas.OutputConfig:
     cfg = yaml_config_as_dict
 
+    validate_keys_against_dataclass(input_dict=cfg, dataclass_type=schemas.OutputConfig)
+
     output_info_object = schemas.OutputInfoConfig(**cfg["output_info"])
 
     output_schema_map = get_outputs_types_schema_map()
@@ -657,25 +697,54 @@ def init_output_config(
         model_init_kwargs_base=cfg.get("model_config", {}),
     )
 
+    sampling_config = _set_up_basic_sampling_config(
+        output_type_config=output_type_info_object,
+        sampling_config=cfg.get("sampling_config", {}),
+    )
+
     output_config = schemas.OutputConfig(
         output_info=output_info_object,
         output_type_info=output_type_info_object,
         model_config=model_config,
-        sampling_config=cfg.get("sampling_config", {}),
+        sampling_config=sampling_config,
     )
 
     return output_config
 
 
+def _set_up_basic_sampling_config(
+    output_type_config: schemas.al_output_type_configs, sampling_config: dict
+) -> dict | schemas.ArrayOutputSamplingConfig:
+    """
+    Note that the sequence sampling config currently has it's own logic
+    in output_config_setup_sequence.py.
+    """
+    sampling_config_object: dict | schemas.ArrayOutputSamplingConfig
+    match output_type_config:
+        case schemas.ArrayOutputTypeConfig():
+            sampling_config_object = schemas.ArrayOutputSamplingConfig(
+                **sampling_config
+            )
+        case schemas.TabularOutputTypeConfig() | schemas.SequenceOutputTypeConfig():
+            sampling_config_object = sampling_config
+        case _:
+            raise ValueError(f"Unknown output type config '{output_type_config}'.")
+
+    return sampling_config_object
+
+
 def get_outputs_types_schema_map() -> (
     Dict[
         str,
-        Type[schemas.TabularOutputTypeConfig] | Type[schemas.SequenceOutputTypeConfig],
+        Type[schemas.TabularOutputTypeConfig]
+        | Type[schemas.SequenceOutputTypeConfig]
+        | Type[schemas.ArrayOutputTypeConfig],
     ]
 ):
     mapping = {
         "tabular": schemas.TabularOutputTypeConfig,
         "sequence": schemas.SequenceOutputTypeConfig,
+        "array": schemas.ArrayOutputTypeConfig,
     }
 
     return mapping
@@ -695,6 +764,7 @@ def get_output_module_config_class_map() -> (
     mapping = {
         "tabular": TabularOutputModuleConfig,
         "sequence": SequenceOutputModuleConfig,
+        "array": ArrayOutputModuleConfig,
     }
 
     return mapping
@@ -774,6 +844,9 @@ def get_output_config_type_init_callable_map() -> al_output_model_init_map:
         "sequence": {
             "sequence": TransformerSequenceOutputModuleConfig,
         },
+        "array": {
+            "lcl": LCLOutputModelConfig,
+        },
     }
 
     return mapping
@@ -802,7 +875,7 @@ def get_all_tabular_targets(
 
         output_name = output_config.output_info.output_name
         output_type_info = output_config.output_type_info
-        assert isinstance(output_type_info, schemas.TabularOutputTypeConfig)
+        assert isinstance(output_type_info, TabularOutputTypeConfig)
         con_targets[output_name] = output_type_info.target_con_columns
         cat_targets[output_name] = output_type_info.target_cat_columns
 

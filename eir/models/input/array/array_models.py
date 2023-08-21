@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING, Dict, Literal, Optional, Type, Union
 import torch
 from torch import nn
 
-from eir.models.input.omics.models_cnn import CNNModel, CNNModelConfig
-from eir.models.input.omics.models_locally_connected import (
+from eir.models.input.array.models_cnn import CNNModel, CNNModelConfig
+from eir.models.input.array.models_locally_connected import (
     FlattenFunc,
     LCLModel,
     LCLModelConfig,

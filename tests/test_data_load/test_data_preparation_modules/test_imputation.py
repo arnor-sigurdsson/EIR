@@ -124,7 +124,10 @@ def test_impute_missing_modalities(
 
 def test_impute_single_missing_modality():
     imputed_test_tensor = imputation.impute_single_missing_modality(
-        shape=(10, 10), fill_value=0, dtype=torch.float
+        shape=(10, 10),
+        fill_value=0,
+        dtype=torch.float,
+        approach="constant",
     )
     assert imputed_test_tensor.numel() == 100
     assert len(imputed_test_tensor.shape) == 2
@@ -132,3 +135,18 @@ def test_impute_single_missing_modality():
     assert imputed_test_tensor.shape[1] == 10
 
     assert (imputed_test_tensor == 0.0).all()
+
+
+def test_impute_single_missing_modality_random():
+    imputed_test_tensor = imputation.impute_single_missing_modality(
+        shape=(10, 10),
+        fill_value=0,
+        dtype=torch.float,
+        approach="random",
+    )
+    assert imputed_test_tensor.numel() == 100
+    assert len(imputed_test_tensor.shape) == 2
+    assert imputed_test_tensor.shape[0] == 10
+    assert imputed_test_tensor.shape[1] == 10
+
+    assert not (imputed_test_tensor == 0.0).all()

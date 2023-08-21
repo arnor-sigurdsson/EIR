@@ -28,7 +28,6 @@ from eir.train import get_dataloaders
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "model_type": {"model_type": "cnn"},
                     },
                     {
                         "input_info": {"input_name": "test_tabular"},

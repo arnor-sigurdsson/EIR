@@ -127,3 +127,7 @@ def plot_tsne(outputs: np.ndarray, folder: Path) -> None:
     plt.title("t-SNE plot of latent space")
 
     plt.savefig(folder / "tsne.png")
+
+
+def plot_umap(outputs: np.ndarray, folder: Path) -> None:
+    pass

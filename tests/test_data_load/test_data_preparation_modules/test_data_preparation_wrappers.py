@@ -1,10 +1,10 @@
 import numpy as np
 import torch
 
-from eir.data_load.data_preparation_modules.preparation_wrappers import (
+from eir.data_load.data_preparation_modules.input_preparation_wrappers import (
     _should_skip_modality,
 )
-from eir.train_utils.train_handlers_sequence_output import (
+from eir.train_utils.evaluation_handlers.evaluation_handlers_utils import (
     _streamline_tabular_data_for_transformers,
 )
 
@@ -35,9 +35,10 @@ def test_streamline_tabular_data_for_transformers():
     assert isinstance(result, dict)
     assert set(result.keys()) == set(tabular_input.keys())
     for name, value in result.items():
-        assert isinstance(value, np.ndarray)
+        assert isinstance(value, torch.Tensor)
         expected = transformers[name].transform(tabular_input[name])
-        assert np.array_equal(value, expected)
+        value_np = value.numpy().squeeze()
+        assert np.array_equal(value_np, expected)
 
 
 def test_modality_skip_when_test_mode() -> None:

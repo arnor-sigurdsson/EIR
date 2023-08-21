@@ -3,8 +3,8 @@ from typing import TYPE_CHECKING, Callable, Dict
 import torch
 from torch import nn
 
-from eir.models.layers import MLPResidualBlock, ResidualMLPConfig
-from eir.models.models_base import (
+from eir.models.layers.mlp_layers import MLPResidualBlock, ResidualMLPConfig
+from eir.models.models_utils import (
     calculate_module_dict_outputs,
     create_multi_task_blocks_with_first_adaptor_block,
 )

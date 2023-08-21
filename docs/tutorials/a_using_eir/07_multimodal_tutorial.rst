@@ -69,19 +69,19 @@ Here are the configurations files for the tabular data:
 
 .. literalinclude:: ../tutorial_files/a_using_eir/07_multimodal_tutorial/07_globals.yaml
     :language: yaml
-    :caption:
+    :caption: 07_globals.yaml
 
 .. literalinclude:: ../tutorial_files/a_using_eir/07_multimodal_tutorial/07_input_tabular.yaml
     :language: yaml
-    :caption:
+    :caption: 07_input_tabular.yaml
 
 .. literalinclude:: ../tutorial_files/a_using_eir/07_multimodal_tutorial/07_fusion.yaml
     :language: yaml
-    :caption:
+    :caption: 07_fusion.yaml
 
 .. literalinclude:: ../tutorial_files/a_using_eir/07_multimodal_tutorial/07_output.yaml
     :language: yaml
-    :caption:
+    :caption: 07_output.yaml
 
 As usual, we can run the following command to train:
 

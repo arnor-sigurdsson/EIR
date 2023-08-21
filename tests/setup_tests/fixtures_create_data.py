@@ -214,11 +214,13 @@ def _make_deeplake_test_dataset(
         name = f"{name}_{sub_folder_name}"
     ds = deeplake.empty(base_output_folder / name, overwrite=True)
 
-    ds.create_tensor("ID", htype="text")
-    ds.create_tensor("test_genotype")
-    ds.create_tensor("test_image", htype="image", sample_compression="jpg")
-    ds.create_tensor("test_sequence", htype="text")
-    ds.create_tensor("test_array")
+    ds.create_tensor(name="ID", htype="text")
+    ds.create_tensor(
+        name="test_genotype",
+    )
+    ds.create_tensor(name="test_image", htype="image", sample_compression="jpg")
+    ds.create_tensor(name="test_sequence", htype="text")
+    ds.create_tensor(name="test_array")
     with ds:
         for sample_id, sample in samples.items():
             ds.append(sample, append_empty=True)

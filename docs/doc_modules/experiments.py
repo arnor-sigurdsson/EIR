@@ -139,7 +139,8 @@ def run_experiment_from_command(command: List[str], force_run: bool = False):
         output_folder_inject_string = output_folder_injected[0]
         run_folder = Path(output_folder_inject_string.split(".output_folder=")[-1])
 
-    if not force_run and run_folder.exists():
+    training_file = run_folder / "train_average_history.log"
+    if not force_run and training_file.exists():
         return run_folder
 
     subprocess.run(args=command)

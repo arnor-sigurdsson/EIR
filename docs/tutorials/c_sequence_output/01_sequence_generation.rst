@@ -191,7 +191,7 @@ model, let's see how we can do it with a token-level model. This time,
 we will use the IMDB dataset,
 but with an implementation of BPE (Byte Pair Encoding) tokenization.
 
-BPE, as detailed in this [paper](https://arxiv.org/abs/1508.07909v5),
+BPE, as detailed in this `paper <https://arxiv.org/abs/1508.07909v5>`_,
 is a sub-word tokenization method that progressively learns the
 most common sequences of characters (or bytes)
 to form an efficient set of tokens.

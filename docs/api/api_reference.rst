@@ -83,15 +83,15 @@ The documentation below details what the parameters passed to the respective mod
 Omics Feature Extractors
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. autoclass:: eir.models.input.omics.models_cnn.CNNModelConfig
+.. autoclass:: eir.models.input.array.models_cnn.CNNModelConfig
 
-.. autoclass:: eir.models.input.omics.models_identity.IdentityModelConfig
+.. autoclass:: eir.models.input.array.models_identity.IdentityModelConfig
 
-.. autoclass:: eir.models.input.omics.models_locally_connected.SimpleLCLModelConfig
+.. autoclass:: eir.models.input.array.models_locally_connected.SimpleLCLModelConfig
 
-.. autoclass:: eir.models.input.omics.models_locally_connected.LCLModelConfig
+.. autoclass:: eir.models.input.array.models_locally_connected.LCLModelConfig
 
-.. autoclass:: eir.models.input.omics.models_linear.LinearModelConfig
+.. autoclass:: eir.models.input.array.models_linear.LinearModelConfig
 
 Tabular Feature Extractors
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -116,7 +116,7 @@ Image Feature Extractors
 
 **Built-in Image Feature Extractors**
 
-.. autoclass:: eir.models.input.omics.models_cnn.CNNModelConfig
+.. autoclass:: eir.models.input.array.models_cnn.CNNModelConfig
     :noindex:
 
 **External Image Feature Extractors**
@@ -127,10 +127,10 @@ the external image models.
 Array Feature Extractors
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. autoclass:: eir.models.input.omics.models_cnn.CNNModelConfig
+.. autoclass:: eir.models.input.array.models_cnn.CNNModelConfig
     :noindex:
 
-.. autoclass:: eir.models.input.omics.models_locally_connected.LCLModelConfig
+.. autoclass:: eir.models.input.array.models_locally_connected.LCLModelConfig
     :noindex:
 
 
@@ -165,23 +165,37 @@ Output Type Configuration
 
 .. autoclass:: eir.setup.schema_modules.output_schemas_sequence.SequenceOutputTypeConfig
 
+.. autoclass:: eir.setup.schema_modules.output_schemas_array.ArrayOutputTypeConfig
+
 Output Module Configuration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. autoclass:: eir.models.output.output_module_setup.TabularOutputModuleConfig
+**Tabular Output Modules**
 
-.. autoclass:: eir.models.output.sequence.sequence_output_modules.SequenceOutputModuleConfig
+.. autoclass:: eir.models.output.tabular.tabular_output_modules.TabularOutputModuleConfig
 
 The documentation below details what the parameters passed to the respective output
 output heads
+of the tabular output model.
 (trough the `model_init_config` field in the `\-\-output_configs` `.yaml` files).
 
-.. autoclass:: eir.models.output.mlp_residual.ResidualMLPOutputModuleConfig
+.. autoclass:: eir.models.output.tabular.mlp_residual.ResidualMLPOutputModuleConfig
 
-.. autoclass:: eir.models.output.linear.LinearOutputModuleConfig
+.. autoclass:: eir.models.output.tabular.linear.LinearOutputModuleConfig
+
+**Sequence Output Modules**
+
+.. autoclass:: eir.models.output.sequence.sequence_output_modules.SequenceOutputModuleConfig
+
+**Array Output Modules**
+
+.. autoclass:: eir.models.output.array.array_output_modules.ArrayOutputModuleConfig
+
 
 Output Sampling Configuration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. autoclass:: eir.setup.schema_modules.output_schemas_sequence.SequenceOutputSamplingConfig
+
+.. autoclass:: eir.setup.schema_modules.output_schemas_array.ArrayOutputSamplingConfig
 

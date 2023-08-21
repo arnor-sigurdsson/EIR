@@ -34,18 +34,18 @@ from eir.utils.logging import get_logger
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 # Type Aliases
-al_all_column_ops = Optional[Dict[str, Tuple[ColumnOperation, ...]]]
-al_train_val_dfs = Tuple[pd.DataFrame, pd.DataFrame]
+al_all_column_ops = Optional[dict[str, tuple[ColumnOperation, ...]]]
+al_train_val_dfs = tuple[pd.DataFrame, pd.DataFrame]
 
 # e.g. 'Asia' or '5' for categorical or 1.511 for continuous
-al_label_values_raw = Union[float, int]
-al_sample_labels_raw = Dict[str, al_label_values_raw]
-al_label_dict = Dict[str, al_sample_labels_raw]
+al_label_values_raw = float | int | Path
+al_sample_labels_raw = dict[str, al_label_values_raw]
+al_label_dict = dict[str, al_sample_labels_raw]
 al_target_label_dict = dict[str, al_label_dict]  # account for output name
-al_target_columns = Dict[Literal["con", "cat"], list[str]]
+al_target_columns = dict[Literal["con", "cat"], list[str]]
 al_label_transformers_object = Union[StandardScaler, LabelEncoder]
-al_label_transformers = Dict[str, al_label_transformers_object]
-al_pd_dtypes = Union[np.ndarray, pd.CategoricalDtype]
+al_label_transformers = dict[str, al_label_transformers_object]
+al_pd_dtypes = np.ndarray | pd.CategoricalDtype
 
 
 @dataclass
@@ -174,7 +174,7 @@ def _fit_transformer_on_label_column(
     else:
         series_values = column_series.values
 
-    series_values_streamlined = _streamline_values_for_transformers(
+    series_values_streamlined = streamline_values_for_transformers(
         transformer=transformer, values=series_values
     )
 
@@ -183,7 +183,7 @@ def _fit_transformer_on_label_column(
     return transformer
 
 
-def _streamline_values_for_transformers(
+def streamline_values_for_transformers(
     transformer: al_label_transformers_object, values: np.ndarray
 ) -> np.ndarray:
     """
@@ -204,7 +204,7 @@ def transform_label_df(
 
     for column_name, transformer_instance in label_transformers.items():
         series_values = df_labels_copy[column_name].values
-        series_values_streamlined = _streamline_values_for_transformers(
+        series_values_streamlined = streamline_values_for_transformers(
             transformer=transformer_instance, values=series_values
         )
 

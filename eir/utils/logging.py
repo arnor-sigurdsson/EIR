@@ -1,3 +1,4 @@
+import copy
 import logging
 
 from termcolor import colored
@@ -21,18 +22,18 @@ class TQDMLoggingHandler(logging.Handler):
 
 class ColoredFormatter(logging.Formatter):
     def format(self, record):
-        levelname = record.levelname
-        if record.levelno == logging.DEBUG:
-            levelname = colored(levelname, "blue")
-        elif record.levelno == logging.INFO:
-            levelname = colored(levelname, "green")
-        elif record.levelno == logging.WARNING:
-            levelname = colored(levelname, "yellow")
-        elif record.levelno == logging.ERROR:
-            levelname = colored(levelname, "red")
+        record_copy = copy.copy(record)
 
-        record.levelname = levelname
-        return super().format(record)
+        if record_copy.levelno == logging.DEBUG:
+            record_copy.levelname = colored(record_copy.levelname, "blue")
+        elif record_copy.levelno == logging.INFO:
+            record_copy.levelname = colored(record_copy.levelname, "green")
+        elif record_copy.levelno == logging.WARNING:
+            record_copy.levelname = colored(record_copy.levelname, "yellow")
+        elif record_copy.levelno == logging.ERROR:
+            record_copy.levelname = colored(record_copy.levelname, "red")
+
+        return super().format(record_copy)
 
 
 def get_logger(name: str, tqdm_compatible: bool = False) -> logging.Logger:

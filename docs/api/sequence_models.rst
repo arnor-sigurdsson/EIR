@@ -1346,6 +1346,58 @@ These models are contributed by `nghuyong <https://huggingface.co/nghuyong>`__ a
     classifier_dropout (`float`, *optional*):
         The dropout ratio for the classification head.
 
+.. class:: transformers.models.falcon.configuration_falcon.FalconConfig(vocab_size=65024, hidden_size=4544, num_hidden_layers=32, num_attention_heads=71, layer_norm_epsilon=1e-05, initializer_range=0.02, use_cache=True, hidden_dropout=0.0, attention_dropout=0.0, num_kv_heads=None, alibi=False, new_decoder_architecture=False, multi_query=True, parallel_attn=True, bias=False, bos_token_id=11, eos_token_id=11, **kwargs)
+
+This is the configuration class to store the configuration of a ``FalconModel``. It is used to instantiate a Falcon
+model according to the specified arguments, defining the model architecture. Instantiating a configuration with the
+defaults will yield a similar configuration to that of the
+`tiiuae/falcon-7b <https://huggingface.co/tiiuae/falcon-7b>`__ architecture.
+
+Configuration objects inherit from ``PretrainedConfig`` and can be used to control the model outputs. Read the
+documentation from ``PretrainedConfig`` for more information.
+
+
+Args:
+    vocab_size (`int`, *optional*, defaults to 65024):
+        Vocabulary size of the Falcon model. Defines the number of different tokens that can be represented by the
+        `inputs_ids` passed when calling ``FalconModel``
+    hidden_size (`int`, *optional*, defaults to 4544):
+        Dimension of the hidden representations.
+    num_hidden_layers (`int`, *optional*, defaults to 32):
+        Number of hidden layers in the Transformer decoder.
+    num_attention_heads (`int`, *optional*, defaults to 71):
+        Number of attention heads for each attention layer in the Transformer encoder.
+    initializer_range (`float`, *optional*, defaults to 0.02):
+        The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
+    use_cache (`bool`, *optional*, defaults to `True`):
+        Whether the model should return the last key/values attentions (not used by all models). Only relevant if
+        `config.is_decoder=True`.
+    layer_norm_epsilon (`float`, *optional*, defaults to 1e-5):
+        The epsilon used by the layer normalization layers.
+    hidden_dropout (`float`, *optional*, defaults to 0.0):
+        The dropout probability for MLP layers.
+    attention_dropout (`float`, *optional*, defaults to 0.0):
+        The dropout probability for attention layers.
+    num_kv_heads (`int`, *optional*):
+        Number of key-value heads to use per attention layer. If unset, defaults to the same value as
+        `num_attention_heads`.
+    alibi (`bool`, *optional*, defaults to `False`):
+        Whether to use ALiBi positional biases during self-attention.
+    new_decoder_architecture (`bool`, *optional*, defaults to `False`):
+        Whether to use the new (Falcon-40B) decoder architecture. If `True`, the `multi_query` and `parallel_attn`
+        arguments are ignored, as the new decoder always uses parallel attention.
+    multi_query (`bool`, *optional*, defaults to `True`):
+        Whether to use multi-query attention in the decoder. Ignored when `new_decoder_architecture` is `True`.
+    parallel_attn (`bool`, *optional*, defaults to `True`):
+        Whether to compute attention in parallel with the feedforward layer. If False, they are consecutive
+        instead, as in the original Transformer architecture. Ignored when `new_decoder_architecture` is `True`.
+    bias (`bool`, *optional*, defaults to `False`):
+        Whether to use bias on Linear layers.
+    bos_token_id (`int`, *optional*, defaults to 11):
+        The id of the "beginning-of-sequence" token.
+    eos_token_id (`int`, *optional*, defaults to 11):
+        The id of the "end-of-sequence" token.
+
 .. class:: transformers.models.flaubert.configuration_flaubert.FlaubertConfig(pre_norm=False, layerdrop=0.0, vocab_size=30145, emb_dim=2048, n_layers=12, n_heads=16, dropout=0.1, attention_dropout=0.1, gelu_activation=True, sinusoidal_embeddings=False, causal=False, asm=False, n_langs=1, use_lang_emb=True, max_position_embeddings=512, embed_init_std=0.02209708691207961, layer_norm_eps=1e-12, init_std=0.02, bos_index=0, eos_index=1, pad_index=2, unk_index=3, mask_index=5, is_encoder=True, summary_type='first', summary_use_proj=True, summary_activation=None, summary_proj_to_labels=True, summary_first_dropout=0.1, start_n_top=5, end_n_top=5, mask_token_id=0, lang_id=0, pad_token_id=2, bos_token_id=0, **kwargs)
 
 The FlauBERT model was proposed in the paper `FlauBERT: Unsupervised Language Model Pre-training for French <https://arxiv.org/abs/1912.05372>`__ by Hang Le et al. It's a transformer model pretrained using a masked language
@@ -1761,7 +1813,7 @@ Args:
     attention_type (`bool`, *optional*, defaults to `True`):
         Whether to use Multi-Query Attion (`True`) or Multi-Head Attention (`False`).
 
-.. class:: transformers.models.gpt_neox.configuration_gpt_neox.GPTNeoXConfig(vocab_size=50432, hidden_size=6144, num_hidden_layers=44, num_attention_heads=64, intermediate_size=24576, hidden_act='gelu', rotary_pct=0.25, rotary_emb_base=10000, classifier_dropout=0.1, max_position_embeddings=2048, initializer_range=0.02, layer_norm_eps=1e-05, use_cache=True, bos_token_id=0, eos_token_id=2, tie_word_embeddings=False, use_parallel_residual=True, **kwargs)
+.. class:: transformers.models.gpt_neox.configuration_gpt_neox.GPTNeoXConfig(vocab_size=50432, hidden_size=6144, num_hidden_layers=44, num_attention_heads=64, intermediate_size=24576, hidden_act='gelu', rotary_pct=0.25, rotary_emb_base=10000, attention_dropout=0.0, hidden_dropout=0.0, classifier_dropout=0.1, max_position_embeddings=2048, initializer_range=0.02, layer_norm_eps=1e-05, use_cache=True, bos_token_id=0, eos_token_id=2, tie_word_embeddings=False, use_parallel_residual=True, rope_scaling=None, **kwargs)
 
 We introduce GPT-NeoX-20B, a 20 billion parameter autoregressive language model trained on the Pile, whose weights will
 be made freely and openly available to the public through a permissive license. It is, to the best of our knowledge,
@@ -1802,6 +1854,11 @@ additional tokens to whitespace characters, making the model more suitable for c
         percentage of hidden dimensions to allocate to rotary embeddings
     rotary_emb_base (`int`, *optional*, defaults to 10000)
         base for computing rotary embeddings frequency
+    attention_dropout (`float`, *optional*, defaults to 0.0):
+        The dropout ratio probability of the attention score.
+    hidden_dropout (`float`, *optional*, defaults to 0.0):
+        The dropout ratio of (1) the word embeddings, (2) the post-attention hidden states, and (3) the post-mlp
+        hidden states.
     classifier_dropout (`float`, *optional*, defaults to 0.1):
         Argument used when doing token classification, used in the model ``GPTNeoXForTokenClassification``.
 
@@ -1819,6 +1876,14 @@ additional tokens to whitespace characters, making the model more suitable for c
     use_parallel_residual (`bool`, *optional*, defaults to `True`):
         Whether to use a "parallel" formulation in each Transformer layer, which can provide a slight training
         speedup at large scales (e.g. 20B).
+    rope_scaling (`Dict`, *optional*):
+        Dictionary containing the scaling configuration for the RoPE embeddings. Currently supports three scaling
+        strategies: linear and dynamic. Their scaling factor must be an float greater than 1. The expected format
+        is `{"type": strategy name, "factor": scaling factor}`. When using this flag, don't update
+        `max_position_embeddings` to the expected new maximum. See the following thread for more information on how
+        these scaling strategies behave:
+        https://www.reddit.com/r/LocalLLaMA/comments/14mrgpr/dynamically_scaled_rope_further_increases/. This is an
+        experimental feature, subject to breaking API changes in future versions.
 
 .. class:: transformers.models.gpt_neox_japanese.configuration_gpt_neox_japanese.GPTNeoXJapaneseConfig(vocab_size=32000, hidden_size=2560, num_hidden_layers=32, num_attention_heads=32, intermediate_multiple_size=4, hidden_act='gelu', rotary_pct=1.0, rotary_emb_base=10000, max_position_embeddings=2048, initializer_range=0.02, layer_norm_eps=1e-05, use_cache=True, bos_token_id=31996, eos_token_id=31999, attention_dropout=0.1, hidden_dropout=0.0, **kwargs)
 
@@ -2288,7 +2353,7 @@ Args:
     use_cache (`bool`, *optional*, defaults to `True`):
         Whether or not the model should return the last key/values attentions (not used by all models)
 
-.. class:: transformers.models.llama.configuration_llama.LlamaConfig(vocab_size=32000, hidden_size=4096, intermediate_size=11008, num_hidden_layers=32, num_attention_heads=32, hidden_act='silu', max_position_embeddings=2048, initializer_range=0.02, rms_norm_eps=1e-06, use_cache=True, pad_token_id=0, bos_token_id=1, eos_token_id=2, tie_word_embeddings=False, **kwargs)
+.. class:: transformers.models.llama.configuration_llama.LlamaConfig(vocab_size=32000, hidden_size=4096, intermediate_size=11008, num_hidden_layers=32, num_attention_heads=32, num_key_value_heads=None, hidden_act='silu', max_position_embeddings=2048, initializer_range=0.02, rms_norm_eps=1e-06, use_cache=True, pad_token_id=0, bos_token_id=1, eos_token_id=2, pretraining_tp=1, tie_word_embeddings=False, rope_scaling=None, **kwargs)
 
 The LLaMA model was proposed in `LLaMA: Open and Efficient Foundation Language Models <https://arxiv.org/abs/2302.13971>`__ by Hugo Touvron, Thibaut Lavril, Gautier Izacard, Xavier Martinet, Marie-Anne Lachaux, Timothée Lacroix, Baptiste Rozière, Naman Goyal, Eric Hambro, Faisal Azhar, Aurelien Rodriguez, Armand Joulin, Edouard Grave, Guillaume Lample. It is a collection of foundation language models ranging from 7B to 65B parameters.
 
@@ -2334,6 +2399,19 @@ Args:
         Number of hidden layers in the Transformer encoder.
     num_attention_heads (`int`, *optional*, defaults to 32):
         Number of attention heads for each attention layer in the Transformer encoder.
+    num_key_value_heads (`int`, *optional*):
+        This is the number of key_value heads that should be used to implement Grouped Query Attention. If
+        `num_key_value_heads=num_attention_heads`, the model will use Multi Head Attention (MHA), if
+        `num_key_value_heads=1 the model will use Multi Query Attention (MQA) otherwise GQA is used. When
+        converting a multi-head checkpoint to a GQA checkpoint, each group key and value head should be constructed
+        by meanpooling all the original heads within that group. For more details checkout `this
+        paper <https://arxiv.org/pdf/2305.13245.pdf>`__. If it is not specified, will default to
+        `num_attention_heads`.
+    pretraining_tp (`int`, *optional*, defaults to `1`):
+        Experimental feature. Tensor parallelism rank used during pretraining. Please refer to `this
+        document <https://huggingface.co/docs/transformers/parallelism>`__ to understand more about it. This value is
+        necessary to ensure exact reproducibility of the pretraining results. Please refer to `this
+        issue <https://github.com/pytorch/pytorch/issues/76232>`__.
     hidden_act (`str` or `function`, *optional*, defaults to `"silu"`):
         The non-linear activation function (function or string) in the decoder.
     max_position_embeddings (`int`, *optional*, defaults to 2048):
@@ -2348,6 +2426,14 @@ Args:
         relevant if `config.is_decoder=True`.
     tie_word_embeddings(`bool`, *optional*, defaults to `False`):
         Whether to tie weight embeddings
+    rope_scaling (`Dict`, *optional*):
+        Dictionary containing the scaling configuration for the RoPE embeddings. Currently supports three scaling
+        strategies: linear and dynamic. Their scaling factor must be an float greater than 1. The expected format
+        is `{"type": strategy name, "factor": scaling factor}`. When using this flag, don't update
+        `max_position_embeddings` to the expected new maximum. See the following thread for more information on how
+        these scaling strategies behave:
+        https://www.reddit.com/r/LocalLLaMA/comments/14mrgpr/dynamically_scaled_rope_further_increases/. This is an
+        experimental feature, subject to breaking API changes in future versions.
 
 .. class:: transformers.models.longformer.configuration_longformer.LongformerConfig(attention_window: Union[List[int], int] = 512, sep_token_id: int = 2, pad_token_id: int = 1, bos_token_id: int = 0, eos_token_id: int = 2, vocab_size: int = 30522, hidden_size: int = 768, num_hidden_layers: int = 12, num_attention_heads: int = 12, intermediate_size: int = 3072, hidden_act: str = 'gelu', hidden_dropout_prob: float = 0.1, attention_probs_dropout_prob: float = 0.1, max_position_embeddings: int = 512, type_vocab_size: int = 2, initializer_range: float = 0.02, layer_norm_eps: float = 1e-12, onnx_export: bool = False, **kwargs)
 
@@ -3219,6 +3305,58 @@ Args:
     relative_attention_num_buckets (`int`, *optional*, defaults to 32):
         The number of buckets to use for each attention layer.
 
+.. class:: transformers.models.mra.configuration_mra.MraConfig(vocab_size=50265, hidden_size=768, num_hidden_layers=12, num_attention_heads=12, intermediate_size=3072, hidden_act='gelu', hidden_dropout_prob=0.1, attention_probs_dropout_prob=0.1, max_position_embeddings=512, type_vocab_size=1, initializer_range=0.02, layer_norm_eps=1e-05, position_embedding_type='absolute', block_per_row=4, approx_mode='full', initial_prior_first_n_blocks=0, initial_prior_diagonal_n_blocks=0, pad_token_id=1, bos_token_id=0, eos_token_id=2, **kwargs)
+
+The MRA model was proposed in `Multi Resolution Analysis (MRA) for Approximate Self-Attention <https://arxiv.org/abs/2207.10284>`__ by Zhanpeng Zeng, Sourav Pal, Jeffery Kline, Glenn M Fung, and Vikas Singh.
+
+The abstract from the paper is the following:
+
+*Transformers have emerged as a preferred model for many tasks in natural langugage processing and vision. Recent efforts on training and deploying Transformers more efficiently have identified many strategies to approximate the self-attention matrix, a key module in a Transformer architecture. Effective ideas include various prespecified sparsity patterns, low-rank basis expansions and combinations thereof. In this paper, we revisit classical Multiresolution Analysis (MRA) concepts such as Wavelets, whose potential value in this setting remains underexplored thus far. We show that simple approximations based on empirical feedback and design choices informed by modern hardware and implementation challenges, eventually yield a MRA-based approach for self-attention with an excellent performance profile across most criteria of interest. We undertake an extensive set of experiments and demonstrate that this multi-resolution scheme outperforms most efficient self-attention proposals and is favorable for both short and long sequences. Code is available at https://github.com/mlpen/mra-attention.*
+
+This model was contributed by `novice03 <https://huggingface.co/novice03>`__.
+The original code can be found `here <https://github.com/mlpen/mra-attention>`__.
+
+
+Args:
+    vocab_size (`int`, *optional*, defaults to 50265):
+        Vocabulary size of the Mra model. Defines the number of different tokens that can be represented by the
+        `inputs_ids` passed when calling ``MraModel``.
+    hidden_size (`int`, *optional*, defaults to 768):
+        Dimension of the encoder layers and the pooler layer.
+    num_hidden_layers (`int`, *optional*, defaults to 12):
+        Number of hidden layers in the Transformer encoder.
+    num_attention_heads (`int`, *optional*, defaults to 12):
+        Number of attention heads for each attention layer in the Transformer encoder.
+    intermediate_size (`int`, *optional*, defaults to 3072):
+        Dimension of the "intermediate" (i.e., feed-forward) layer in the Transformer encoder.
+    hidden_act (`str` or `function`, *optional*, defaults to `"gelu"`):
+        The non-linear activation function (function or string) in the encoder and pooler. If string, `"gelu"`,
+        `"relu"`, `"selu"` and `"gelu_new"` are supported.
+    hidden_dropout_prob (`float`, *optional*, defaults to 0.1):
+        The dropout probabilitiy for all fully connected layers in the embeddings, encoder, and pooler.
+    attention_probs_dropout_prob (`float`, *optional*, defaults to 0.1):
+        The dropout ratio for the attention probabilities.
+    max_position_embeddings (`int`, *optional*, defaults to 512):
+        The maximum sequence length that this model might ever be used with. Typically set this to something large
+        just in case (e.g., 512 or 1024 or 2048).
+    type_vocab_size (`int`, *optional*, defaults to 1):
+        The vocabulary size of the `token_type_ids` passed when calling ``MraModel``.
+    initializer_range (`float`, *optional*, defaults to 0.02):
+        The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
+    layer_norm_eps (`float`, *optional*, defaults to 1e-5):
+        The epsilon used by the layer normalization layers.
+    position_embedding_type (`str`, *optional*, defaults to `"absolute"`):
+        Type of position embedding. Choose one of `"absolute"`, `"relative_key"`, `"relative_key_query"`.
+    block_per_row (`int`, *optional*, defaults to 4):
+        Used to set the budget for the high resolution scale.
+    approx_mode (`str`, *optional*, defaults to `"full"`):
+        Controls whether both low and high resolution approximations are used. Set to `"full"` for both low and
+        high resolution and `"sparse"` for only low resolution.
+    initial_prior_first_n_blocks (`int`, *optional*, defaults to 0):
+        The initial number of blocks for which high resolution is used.
+    initial_prior_diagonal_n_blocks (`int`, *optional*, defaults to 0):
+        The number of diagonal blocks for which high resolution is used.
+
 .. class:: transformers.models.mvp.configuration_mvp.MvpConfig(vocab_size=50267, max_position_embeddings=1024, encoder_layers=12, encoder_ffn_dim=4096, encoder_attention_heads=16, decoder_layers=12, decoder_ffn_dim=4096, decoder_attention_heads=16, encoder_layerdrop=0.0, decoder_layerdrop=0.0, activation_function='gelu', d_model=1024, dropout=0.1, attention_dropout=0.0, activation_dropout=0.0, init_std=0.02, classifier_dropout=0.0, scale_embedding=False, use_cache=True, pad_token_id=1, bos_token_id=0, eos_token_id=2, is_encoder_decoder=True, decoder_start_token_id=2, forced_eos_token_id=2, use_prompt=False, prompt_length=100, prompt_mid_dim=800, **kwargs)
 
 The MVP model was proposed in `MVP: Multi-task Supervised Pre-training for Natural Language Generation <https://arxiv.org/abs/2206.12131>`__ by Tianyi Tang, Junyi Li, Wayne Xin Zhao and Ji-Rong Wen.
@@ -3509,7 +3647,7 @@ Args:
     layer_norm_eps (`float`, *optional*, defaults to 1e-12):
         The epsilon used by the layer normalization layers.
 
-.. class:: transformers.models.open_llama.configuration_open_llama.OpenLlamaConfig(vocab_size=100000, hidden_size=4096, intermediate_size=11008, num_hidden_layers=32, num_attention_heads=32, hidden_act='silu', max_position_embeddings=2048, initializer_range=0.02, rms_norm_eps=1e-06, use_cache=True, pad_token_id=0, bos_token_id=1, eos_token_id=2, tie_word_embeddings=False, use_memory_efficient_attention=True, hidden_dropout_prob=0.1, attention_dropout_prob=0.1, use_stable_embedding=True, shared_input_output_embedding=True, **kwargs)
+.. class:: transformers.models.open_llama.configuration_open_llama.OpenLlamaConfig(vocab_size=100000, hidden_size=4096, intermediate_size=11008, num_hidden_layers=32, num_attention_heads=32, hidden_act='silu', max_position_embeddings=2048, initializer_range=0.02, rms_norm_eps=1e-06, use_cache=True, pad_token_id=0, bos_token_id=1, eos_token_id=2, tie_word_embeddings=False, use_memory_efficient_attention=True, hidden_dropout_prob=0.1, attention_dropout_prob=0.1, use_stable_embedding=True, shared_input_output_embedding=True, rope_scaling=None, **kwargs)
 
 The Open-Llama model was proposed in `Open-Llama project <https://github.com/s-JoL/Open-Llama>`__ by community developer s-JoL.
 
@@ -3547,6 +3685,14 @@ Args:
         relevant if `config.is_decoder=True`.
     tie_word_embeddings(`bool`, *optional*, defaults to `False`):
         Whether to tie weight embeddings
+    rope_scaling (`Dict`, *optional*):
+        Dictionary containing the scaling configuration for the RoPE embeddings. Currently supports three scaling
+        strategies: linear and dynamic. Their scaling factor must be an float greater than 1. The expected format
+        is `{"type": strategy name, "factor": scaling factor}`. When using this flag, don't update
+        `max_position_embeddings` to the expected new maximum. See the following thread for more information on how
+        these scaling strategies behave:
+        https://www.reddit.com/r/LocalLLaMA/comments/14mrgpr/dynamically_scaled_rope_further_increases/. This is an
+        experimental feature, subject to breaking API changes in future versions.
 
 .. class:: transformers.models.openai.configuration_openai.OpenAIGPTConfig(vocab_size=40478, n_positions=512, n_embd=768, n_layer=12, n_head=12, afn='gelu', resid_pdrop=0.1, embd_pdrop=0.1, attn_pdrop=0.1, layer_norm_epsilon=1e-05, initializer_range=0.02, summary_type='cls_index', summary_use_proj=True, summary_activation=None, summary_proj_to_labels=True, summary_first_dropout=0.1, **kwargs)
 

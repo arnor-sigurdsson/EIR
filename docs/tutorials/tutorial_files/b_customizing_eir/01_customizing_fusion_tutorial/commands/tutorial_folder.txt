@@ -1,5 +1,10 @@
 eir_tutorials/a_using_eir/01_basic_tutorial/
 ├── conf
+│   ├── large_scale_fusion.yaml
+│   ├── large_scale_globals.yaml
+│   ├── large_scale_input_gln.yaml
+│   ├── large_scale_input_tabular.yaml
+│   ├── large_scale_output.yaml
 │   ├── tutorial_01_globals.yaml
 │   ├── tutorial_01_input.yaml
 │   └── tutorial_01_outputs.yaml

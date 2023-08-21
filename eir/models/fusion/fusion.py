@@ -5,7 +5,7 @@ import torch
 from torch import nn
 
 from eir.models.fusion import fusion_default, fusion_identity, fusion_mgmoe
-from eir.models.layers import ResidualMLPConfig
+from eir.models.layers.mlp_layers import ResidualMLPConfig
 from eir.utils.logging import get_logger
 
 al_fusion_model = Literal["pass-through", "mlp-residual", "identity", "mgmoe"]
@@ -42,7 +42,7 @@ def get_fusion_modules(
 
     fusion_in_dim = _get_fusion_input_dimension(modules_to_fuse=modules_to_fuse)
 
-    if any(i for i in output_types.values() if i == "tabular"):
+    if any(i for i in output_types.values() if i in ("tabular", "array")):
         fusion_class = get_fusion_class(fusion_model_type=fusion_model_type)
         computing_fusion_module = fusion_class(
             model_config=model_config,
@@ -58,6 +58,8 @@ def get_fusion_modules(
             fusion_callable=pass_through_fuse,
         )
         fusion_modules["pass-through"] = pass_through_fusion_module
+
+    assert len(fusion_modules) > 0
 
     return fusion_modules
 

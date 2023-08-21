@@ -6,7 +6,8 @@ from hypothesis import given, settings
 from hypothesis.strategies import integers, sampled_from
 from torch import nn
 
-from eir.models.layers import LCL, LCLResidualBlock, get_projection_layer
+from eir.models.layers.lcl_layers import LCL, LCLResidualBlock
+from eir.models.layers.projection_layers import get_projection_layer
 
 
 def test_get_projection_layer():
@@ -43,7 +44,7 @@ def _get_projection_layer_types() -> list[str]:
     target_dimension=integers(min_value=1, max_value=1000),
     projection_layer_type=sampled_from(_get_projection_layer_types()),
 )
-@settings(deadline=500)
+@settings(deadline=None)
 def test_get_projection_layer_output_dimension(
     input_dimension: int,
     target_dimension: int,

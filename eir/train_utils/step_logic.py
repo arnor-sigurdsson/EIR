@@ -40,6 +40,10 @@ from eir.setup.input_setup_modules.setup_omics import ComputedOmicsInputInfo
 from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
 from eir.setup.input_setup_modules.setup_tabular import ComputedTabularInputInfo
 from eir.setup.output_setup import al_output_objects_as_dict
+from eir.train_utils.evaluation_handlers.evaluation_handlers_utils import (
+    SpecialTokens,
+    get_special_tokens,
+)
 from eir.train_utils.metrics import (
     add_loss_to_metrics,
     add_multi_task_average_metrics,
@@ -50,10 +54,6 @@ from eir.train_utils.metrics import (
 )
 from eir.train_utils.optim import AttrDelegatedSWAWrapper, get_optimizer_backward_kwargs
 from eir.train_utils.train_handlers import HandlerConfig
-from eir.train_utils.train_handlers_sequence_output import (
-    SpecialTokens,
-    get_special_tokens,
-)
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -239,7 +239,7 @@ def prepare_base_batch_default(
     if not target_labels:
         target_labels = {}
     else:
-        target_labels = model_training_utils.parse_tabular_target_labels(
+        target_labels = model_training_utils.prepare_all_targets(
             output_objects=output_objects,
             device=device,
             labels=target_labels,

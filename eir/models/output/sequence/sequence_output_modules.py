@@ -142,7 +142,7 @@ class SequenceOutputModule(nn.Module):
 
         self.head = nn.Linear(self.embedding_dim, self.num_tokens)
 
-    def forward(self, input: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    def forward(self, input: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         out = input[self.output_name]
         out = out.reshape(out.shape[0], self.max_length, self.embedding_dim)
 

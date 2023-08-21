@@ -213,6 +213,7 @@ def get_04_imdb_run_5_combined_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/04_imdb_output.yaml",
         "--04_imdb_globals.output_folder=eir_tutorials/tutorial_runs"
         "/a_using_eir/tutorial_04_imdb_run_combined",
+        "--04_imdb_globals.device='cpu'",
     ]
 
     mapping = [

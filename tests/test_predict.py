@@ -8,7 +8,7 @@ import torch
 
 from eir import predict, train
 from eir.experiment_io.experiment_io import load_serialized_train_experiment
-from eir.models.input.omics.models_cnn import CNNModel
+from eir.models.input.array.models_cnn import CNNModel
 from eir.models.input.omics.omics_models import get_omics_model_init_kwargs
 from eir.models.model_setup_modules.model_io import load_model
 from eir.predict_modules.predict_attributions import compute_predict_attributions
@@ -301,6 +301,18 @@ def _get_predict_test_data_parametrization() -> List[Dict[str, Any]]:
                     {
                         "output_info": {"output_name": "test_output_sequence"},
                     },
+                    {
+                        "output_info": {
+                            "output_name": "test_output_array",
+                        },
+                        "model_config": {
+                            "model_type": "lcl",
+                            "model_init_config": {
+                                "kernel_width": 8,
+                                "channel_exp_base": 3,
+                            },
+                        },
+                    },
                 ],
             },
         },
@@ -360,6 +372,8 @@ def test_predict(
 
     _check_sequence_predict_results(tmp_path=tmp_path, expected_n_samples=10)
 
+    _check_array_predict_results(tmp_path=tmp_path, expected_n_samples=10)
+
 
 def _check_sequence_predict_results(tmp_path: Path, expected_n_samples: int) -> None:
     sequence_predictions_path = (
@@ -369,6 +383,18 @@ def _check_sequence_predict_results(tmp_path: Path, expected_n_samples: int) -> 
 
     found_files = list(
         i for i in sequence_predictions_path.iterdir() if i.suffix == ".txt"
+    )
+    assert len(found_files) == expected_n_samples
+
+
+def _check_array_predict_results(tmp_path: Path, expected_n_samples: int) -> None:
+    array_predictions_path = (
+        tmp_path / "results/test_output_array/test_output_array/samples/0/auto"
+    )
+    assert array_predictions_path.exists()
+
+    found_files = list(
+        i for i in array_predictions_path.iterdir() if i.suffix == ".npy"
     )
     assert len(found_files) == expected_n_samples
 

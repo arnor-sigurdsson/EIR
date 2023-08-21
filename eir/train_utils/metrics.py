@@ -40,7 +40,8 @@ from torch.linalg import vector_norm
 from torch.utils.tensorboard import SummaryWriter
 
 from eir.data_load.data_utils import get_output_info_generator
-from eir.setup.schemas import OutputConfig, TabularOutputTypeConfig
+from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
+from eir.setup.schemas import OutputConfig
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
