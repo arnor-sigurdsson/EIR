@@ -26,9 +26,20 @@
 
 ---
 
-Supervised modelling and sequence generation on genotype, tabular, sequence, image, array, and binary data.
+Supervised modelling, sequence generation, and array output on genotype, tabular, sequence, image, array, and binary input data.
 
 **WARNING:** This project is in alpha phase. Expect backwards incompatible changes and API changes.
+
+# Table of Contents
+1. [Install](#install)
+2. [Usage](#usage)
+3. [Use Cases](#use-cases)
+4. [Features](#features)
+5. [Supported Inputs and Outputs](#supported-inputs-and-outputs)
+6. [Related Projects](#related-projects)
+7. [Citation](#citation)
+8. [Acknowledgements](#acknowledgements)
+
 
 ## Install
 
@@ -76,8 +87,23 @@ If you are an ML/DL researcher developing new models, etc., it might not fit you
   - Computes and graphs various evaluation metrics (e.g., RMSE, PCC and R2 for regression tasks, accuracy, ROC-AUC, etc. for classification tasks) during training.
 - **Sequence generation**
   - Supports various sequence generation tasks, including basic sequence generation, sequence to sequence transformations, and image to sequence transformations. For more information, refer to the respective tutorials: [sequence generation](https://eir.readthedocs.io/en/latest/tutorials/c_sequence_output/01_sequence_generation.html), [sequence to sequence](https://eir.readthedocs.io/en/latest/tutorials/c_sequence_output/02_sequence_to_sequence.html), and [image to sequence](https://eir.readthedocs.io/en/latest/tutorials/c_sequence_output/03_image_to_sequence.html).
+- **Array Output**
+  - Supports array output tasks, such as building simple autoencoders for tasks like [MNIST Digit Generation](https://eir.readthedocs.io/en/latest/tutorials/d_array_output/01_autoencoder.html). 
 
 - [Many more settings](https://eir.readthedocs.io/en/latest/api_reference.html) and configurations (e.g., augmentation, regularization, optimizers) available.
+
+## Supported Inputs and Outputs
+
+| Modality   | Input | Output |
+|------------|:-----:|:------:|
+| Genotype   | x     | †      |
+| Tabular    | x     | x      |
+| Sequence   | x     | x      |
+| Image      | x     | †      |
+| Array      | x     | x      |
+| Binary     | x     |        |
+
+† While not directly supported, genotype and image modalities can be treated as arrays. For example see the [MNIST Digit Generation](https://eir.readthedocs.io/en/latest/tutorials/d_array_output/01_autoencoder.html) tutorial.
 
 ## Related Projects
 
