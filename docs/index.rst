@@ -1,9 +1,11 @@
 EIR
 ===
 
-``EIR`` is a framework for supervised modelling
-and sequence generation
-on genotype, tabular, sequence, image, array, and binary data.
+``EIR`` is a framework for
+supervised modelling,
+sequence generation and
+array generation
+on genotype, tabular, sequence, image, array, and binary input data.
 It is designed to provide
 a high-level, yet modular API
 that reduces the amount of boilerplate code
