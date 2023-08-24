@@ -1,6 +1,7 @@
 from typing import Iterable, Optional, Sequence, Type, Union
 
 import torch
+from aislib.misc_utils import get_logger
 from torch_optimizer import _NAME_OPTIM_MAP
 from tqdm import tqdm
 from transformers.models.auto.modeling_auto import MODEL_MAPPING_NAMES
@@ -9,18 +10,24 @@ al_collector_classes = Union[
     Type["ChannelBasedRunningStatistics"], Type["ElementBasedRunningStatistics"]
 ]
 
+logger = get_logger(name=__name__)
+
 
 class ChannelBasedRunningStatistics:
     """
     Adapted from https://gist.github.com/thomasbrandon/ad5b1218fc573c10ea4e1f0c63658469.
+
+    Note assumes CxHxW input shape. final_n_dims is the number of last dimensions
+    that are averaged over. For example, if the input shape is (C, H, W) and
+    final_n_dims is 2, then the mean and variance will be computed over the
+    (H, W) dimensions, resulting in tensors of shape (C,).
     """
 
     def __init__(self, final_n_dims: int = 2):
         self.final_n_dims: int = final_n_dims
+        self.shape: tuple = tuple()
         self.n: int = 0
         self.sum: torch.Tensor = torch.empty(0)
-
-        self.shape: torch.Size = torch.Size()
         self.num_var: torch.Tensor = torch.empty(0)
 
     @torch.no_grad()
@@ -93,6 +100,7 @@ def collect_stats(
     collector_class: al_collector_classes,
     shape: tuple,
     max_samples: Optional[int] = None,
+    name: Optional[str] = None,
 ) -> ChannelBasedRunningStatistics | ElementBasedRunningStatistics:
     stats = set_up_collector_instance(collector_class=collector_class, shape=shape)
 
@@ -104,6 +112,12 @@ def collect_stats(
 
         if max_samples is not None and index >= max_samples:
             break
+
+    if name is not None:
+        logger.info(
+            f"Collected stats for {name}, "
+            f"with means {stats.mean} and standard deviations {stats.std}."
+        )
 
     return stats
 

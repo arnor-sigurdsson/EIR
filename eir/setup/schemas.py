@@ -669,6 +669,8 @@ class ArrayInputDataConfig:
         Which type of normalization to apply to the array data. If ``element``, will
         normalize each element in the array independently. If ``channel``, will
         normalize each channel in the array independently.
+        For 'channel', assumes PyTorch format where the channel dimension is the
+        first dimension.
 
     :param adaptive_normalization_max_samples:
         If using adaptive normalization (channel / element),

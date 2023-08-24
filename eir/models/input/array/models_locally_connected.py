@@ -108,14 +108,21 @@ class LCLModelConfig:
     to ensure that the feature representations become smaller as they are propagated
     through the network.
 
+    :param patch_size:
+        Controls the size of the patches used in the first layer. If set to ``None``,
+        the input is flattened according to the torch ``flatten`` function. Note that
+        when using this parameter, we generally want the kernel width to be set to
+        the multiplication of the patch size.
+
     :param layers:
         Controls the number of layers in the model. If set to ``None``, the model will
         automatically set up the number of layers according to the ``cutoff`` parameter
         value.
 
     :param kernel_width:
-        With of the locally connected kernels. Note that this refers to the flattened
-        input, meaning that if we have a one-hot encoding of 4 values (e.g. SNPs), 12
+        With of the locally connected kernels. Note that in the context of genomic
+        inputs this refers to the flattened input,
+        meaning that if we have a one-hot encoding of 4 values (e.g. SNPs), 12
         refers to 12/4 = 3 SNPs per locally connected window. Can be set to ``None`` if
         the ``num_lcl_chunks`` parameter is set, which means that the kernel width
         will be set automatically according to
@@ -172,9 +179,11 @@ class LCLModelConfig:
         attention cutoff >= 256, the attention block will be included.
     """
 
+    patch_size: Optional[tuple[int, int, int]] = None
+
     layers: Union[None, List[int]] = None
 
-    kernel_width: int = 16
+    kernel_width: int | Literal["patch"] = 16
     first_kernel_expansion: int = -2
 
     channel_exp_base: int = 2
@@ -205,8 +214,13 @@ class LCLModel(nn.Module):
         self.data_dimensions = data_dimensions
         self.flatten_fn = flatten_fn
 
+        kernel_width = parse_kernel_width(
+            kernel_width=self.model_config.kernel_width,
+            patch_size=self.model_config.patch_size,
+        )
+
         fc_0_kernel_size = calc_value_after_expansion(
-            base=self.model_config.kernel_width,
+            base=kernel_width,
             expansion=self.model_config.first_kernel_expansion,
         )
         fc_0_channel_exponent = calc_value_after_expansion(
@@ -225,7 +239,7 @@ class LCLModel(nn.Module):
 
         lcl_parameter_spec = LCParameterSpec(
             in_features=self.fc_0.out_features,
-            kernel_width=self.model_config.kernel_width,
+            kernel_width=kernel_width,
             channel_exp_base=self.model_config.channel_exp_base,
             dropout_p=self.model_config.rb_do,
             cutoff=cutoff,
@@ -262,6 +276,19 @@ class LCLModel(nn.Module):
         out = self.lcl_blocks(out)
 
         return out
+
+
+def parse_kernel_width(
+    kernel_width: int | Literal["patch"],
+    patch_size: Optional[tuple[int, int, int]],
+) -> int:
+    if kernel_width == "patch":
+        if patch_size is None:
+            raise ValueError(
+                "kernel_width set to 'patch', but no patch_size was specified."
+            )
+        kernel_width = patch_size[0] * patch_size[1] * patch_size[2]
+    return kernel_width
 
 
 def flatten_h_w_fortran(x: torch.Tensor) -> torch.Tensor:
@@ -485,10 +512,12 @@ class LCLAttentionBlock(nn.Module):
         num_heads: Union[int, Literal["auto"]] = "auto",
         dropout_p: float = 0.0,
         num_layers: int = 2,
+        dim_feedforward_factor: int = 4,
     ):
         super().__init__()
 
         self.embedding_dim = embedding_dim
+        self.dim_feedforward_factor = dim_feedforward_factor
         self.in_features = in_features
         self.dropout_p = dropout_p
         self.num_layers = num_layers
@@ -500,7 +529,7 @@ class LCLAttentionBlock(nn.Module):
         encoder_layer = nn.TransformerEncoderLayer(
             d_model=self.embedding_dim,
             nhead=self.num_heads,
-            dim_feedforward=self.embedding_dim * 4,
+            dim_feedforward=self.embedding_dim * self.dim_feedforward_factor,
             activation="gelu",
             norm_first=True,
             batch_first=True,

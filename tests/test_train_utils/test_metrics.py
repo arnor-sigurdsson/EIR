@@ -29,29 +29,31 @@ def test_calculate_batch_metrics():
         metric_dict=test_batch_metrics, **loss_kwargs
     )
 
-    test_batch_metrics_w_loss = test_batch_metrics_w_loss["test_output"]
+    test_batch_metrics_w_loss = test_batch_metrics_w_loss["test_output_tabular"]
 
-    assert test_batch_metrics_w_loss["Origin"]["test_output_Origin_mcc"] == 1.0
-    assert test_batch_metrics_w_loss["Origin"]["test_output_Origin_loss"] == 0.0
+    assert test_batch_metrics_w_loss["Origin"]["test_output_tabular_Origin_mcc"] == 1.0
+    assert test_batch_metrics_w_loss["Origin"]["test_output_tabular_Origin_loss"] == 0.0
 
-    assert test_batch_metrics_w_loss["BMI"]["test_output_BMI_r2"] == 1.0
-    assert test_batch_metrics_w_loss["BMI"]["test_output_BMI_rmse"] == 0.0
+    assert test_batch_metrics_w_loss["BMI"]["test_output_tabular_BMI_r2"] == 1.0
+    assert test_batch_metrics_w_loss["BMI"]["test_output_tabular_BMI_rmse"] == 0.0
 
     # sometimes slight numerical instability with scipy pearsonr
-    assert isclose(test_batch_metrics_w_loss["BMI"]["test_output_BMI_pcc"], 1.0)
-    assert test_batch_metrics_w_loss["BMI"]["test_output_BMI_loss"] == 0.0
+    assert isclose(test_batch_metrics_w_loss["BMI"]["test_output_tabular_BMI_pcc"], 1.0)
+    assert test_batch_metrics_w_loss["BMI"]["test_output_tabular_BMI_loss"] == 0.0
 
-    assert test_batch_metrics_w_loss["Height"]["test_output_Height_r2"] < 0
-    assert test_batch_metrics_w_loss["Height"]["test_output_Height_rmse"] > 0.0
-    assert isclose(test_batch_metrics_w_loss["Height"]["test_output_Height_pcc"], -1.0)
-    assert test_batch_metrics_w_loss["Height"]["test_output_Height_loss"] == 1.0
+    assert test_batch_metrics_w_loss["Height"]["test_output_tabular_Height_r2"] < 0
+    assert test_batch_metrics_w_loss["Height"]["test_output_tabular_Height_rmse"] > 0.0
+    assert isclose(
+        test_batch_metrics_w_loss["Height"]["test_output_tabular_Height_pcc"], -1.0
+    )
+    assert test_batch_metrics_w_loss["Height"]["test_output_tabular_Height_loss"] == 1.0
 
 
 def get_calculate_batch_metrics_data_test_kwargs():
     standard_scaler_fit_arr = [[0.0], [1.0], [2.0]]
 
     outputs = {
-        "test_output": {
+        "test_output_tabular": {
             "Origin": torch.tensor([[1, 0, 0], [0, 1, 0], [0, 0, 1]]),
             "HairColor": torch.tensor([[1, 0, 0], [0, 1, 0], [0, 0, 1]]),
             "BMI": torch.tensor([1.0, 2.0, 3.0]).unsqueeze(1),
@@ -60,7 +62,7 @@ def get_calculate_batch_metrics_data_test_kwargs():
     }
 
     labels = {
-        "test_output": {
+        "test_output_tabular": {
             "Origin": torch.tensor([0, 1, 2]),
             "HairColor": torch.tensor([0, 1, 2]),
             "BMI": torch.tensor([1.0, 2.0, 3.0]).unsqueeze(1),
@@ -69,7 +71,7 @@ def get_calculate_batch_metrics_data_test_kwargs():
     }
 
     target_transformers = {
-        "test_output": {
+        "test_output_tabular": {
             "Origin": LabelEncoder().fit([1, 2, 3]),
             "HairColor": LabelEncoder().fit([1, 2, 3]),
             "BMI": StandardScaler().fit(standard_scaler_fit_arr),
@@ -97,10 +99,10 @@ def get_calculate_batch_metrics_data_test_kwargs():
 
 def _get_metrics_test_module_test_outputs_as_dict():
     test_outputs_as_dict = {
-        "test_output": ComputedTabularOutputInfo(
+        "test_output_tabular": ComputedTabularOutputInfo(
             output_config=OutputConfig(
                 output_info=OutputInfoConfig(
-                    output_name="test_output",
+                    output_name="test_output_tabular",
                     output_type="tabular",
                     output_source="None",
                 ),
@@ -125,7 +127,7 @@ def _get_metrics_test_module_test_outputs_as_dict():
 
 def _get_add_loss_to_metrics_kwargs(outputs_as_dict):
     losses = {
-        "test_output": {
+        "test_output_tabular": {
             "Origin": torch.tensor(0.0),
             "HairColor": torch.tensor(0.0),
             "BMI": torch.tensor(0.0),
@@ -215,10 +217,10 @@ def test_calculate_losses_good():
         criteria=test_criteria, targets=test_labels, inputs=test_outputs
     )
 
-    assert perfect_pred_loss["test_output"]["Height"].item() == 0.0
-    assert perfect_pred_loss["test_output"]["BMI"].item() == 0.0
+    assert perfect_pred_loss["test_output_tabular"]["Height"].item() == 0.0
+    assert perfect_pred_loss["test_output_tabular"]["BMI"].item() == 0.0
 
-    assert 0.904 < perfect_pred_loss["test_output"]["Origin"].item() < 0.905
+    assert 0.904 < perfect_pred_loss["test_output_tabular"]["Origin"].item() < 0.905
 
 
 def test_calculate_losses_bad():
@@ -234,12 +236,15 @@ def test_calculate_losses_bad():
     )
 
     expected_rmse = 4.0
-    assert bad_prediction_loss["test_output"]["Height"].item() == expected_rmse
-    assert bad_prediction_loss["test_output"]["BMI"].item() == expected_rmse
+    assert bad_prediction_loss["test_output_tabular"]["Height"].item() == expected_rmse
+    assert bad_prediction_loss["test_output_tabular"]["BMI"].item() == expected_rmse
 
     # check that the loss is more than upper bound (0.905) in perfect case
     perfect_upper_bound = 0.905
-    assert bad_prediction_loss["test_output"]["Origin"].item() > perfect_upper_bound
+    assert (
+        bad_prediction_loss["test_output_tabular"]["Origin"].item()
+        > perfect_upper_bound
+    )
 
 
 def set_up_calculate_losses_data(
@@ -268,13 +273,19 @@ def set_up_calculate_losses_data(
     test_outputs["HairColor"] = one_hot(test_outputs["HairColor"])
     test_outputs["HairColor"] = test_outputs["HairColor"].to(dtype=torch.float32)
 
-    return test_criteria, {"test_output": test_labels}, {"test_output": test_outputs}
+    return (
+        test_criteria,
+        {"test_output_tabular": test_labels},
+        {"test_output_tabular": test_outputs},
+    )
 
 
 def test_aggregate_losses():
     # expected average of [0,1,2,3,4] = 2.0
     losses_dict = {
-        "test_output": {str(i): torch.tensor(i, dtype=torch.float32) for i in range(5)}
+        "test_output_tabular": {
+            str(i): torch.tensor(i, dtype=torch.float32) for i in range(5)
+        }
     }
 
     test_aggregated_losses = metrics.aggregate_losses(losses_dict)
@@ -340,7 +351,7 @@ def test_get_model_l1_loss(get_l1_test_model):
                 ],
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": [],
@@ -367,7 +378,7 @@ def test_get_model_l1_loss(get_l1_test_model):
                 ],
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": [],
@@ -395,7 +406,7 @@ def test_get_model_l1_loss(get_l1_test_model):
                 ],
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": [],
@@ -426,7 +437,7 @@ def test_get_model_l1_loss(get_l1_test_model):
                 ],
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": [],
@@ -453,7 +464,7 @@ def test_get_model_l1_loss(get_l1_test_model):
                 },
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": [],
@@ -490,7 +501,7 @@ def test_get_model_l1_loss(get_l1_test_model):
                 ],
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": [],

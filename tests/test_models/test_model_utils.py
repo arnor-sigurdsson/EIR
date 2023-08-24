@@ -202,7 +202,7 @@ def test_stack_list_of_tensor_dicts():
 
 def set_up_stack_list_of_output_tensor_dicts_data():
     test_batch_base = {
-        "test_output": {
+        "test_output_tabular": {
             "Target_Column_1": torch.ones((5, 5)),
             "Target_Column_2": torch.ones((5, 5)) * 2,
         }
@@ -211,8 +211,8 @@ def set_up_stack_list_of_output_tensor_dicts_data():
     test_list_of_batches = [deepcopy(test_batch_base) for _ in range(3)]
 
     for i in range(3):
-        test_list_of_batches[i]["test_output"]["Target_Column_1"] *= i
-        test_list_of_batches[i]["test_output"]["Target_Column_2"] *= i
+        test_list_of_batches[i]["test_output_tabular"]["Target_Column_1"] *= i
+        test_list_of_batches[i]["test_output_tabular"]["Target_Column_2"] *= i
 
     return test_list_of_batches
 
@@ -222,13 +222,13 @@ def test_stack_list_of_output_target_dicts():
 
     test_output = model_training_utils.stack_list_of_output_target_dicts(test_input)
 
-    assert (test_output["test_output"]["Target_Column_1"][0] == 0.0).all()
-    assert (test_output["test_output"]["Target_Column_1"][5] == 1.0).all()
-    assert (test_output["test_output"]["Target_Column_1"][10] == 2.0).all()
+    assert (test_output["test_output_tabular"]["Target_Column_1"][0] == 0.0).all()
+    assert (test_output["test_output_tabular"]["Target_Column_1"][5] == 1.0).all()
+    assert (test_output["test_output_tabular"]["Target_Column_1"][10] == 2.0).all()
 
-    assert (test_output["test_output"]["Target_Column_2"][0] == 0.0).all()
-    assert (test_output["test_output"]["Target_Column_2"][5] == 2.0).all()
-    assert (test_output["test_output"]["Target_Column_2"][10] == 4.0).all()
+    assert (test_output["test_output_tabular"]["Target_Column_2"][0] == 0.0).all()
+    assert (test_output["test_output_tabular"]["Target_Column_2"][5] == 2.0).all()
+    assert (test_output["test_output_tabular"]["Target_Column_2"][10] == 4.0).all()
 
 
 def test_calc_size_after_conv_sequence():
@@ -359,7 +359,7 @@ def test_calc_conv_params_needed_fuzzy(test_input: Tuple[int, int, int, int]) ->
                 },
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": [],

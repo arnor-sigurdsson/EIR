@@ -106,7 +106,7 @@ def create_test_column_ops():
                 ],
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": [],
@@ -134,7 +134,7 @@ def create_test_column_ops():
                 ],
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": [],
@@ -321,7 +321,7 @@ def test_transform_all_labels_in_sample_with_extra_con(
                 ],
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": [],
@@ -349,7 +349,7 @@ def test_transform_all_labels_in_sample_with_extra_con(
                 ],
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": [],
@@ -383,7 +383,7 @@ def test_label_df_parse_wrapper(
         label_parsing_chunk_size=main_target_info.label_parsing_chunk_size
     )
     df_labels = parse_wrapper(
-        label_file_tabular_info=target_file_infos["test_output"],
+        label_file_tabular_info=target_file_infos["test_output_tabular"],
         ids_to_keep=None,
     )
 
@@ -975,7 +975,7 @@ def test_check_parsed_label_df_fail(
             "injections": {
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": [],
@@ -998,7 +998,7 @@ def test_split_df_by_ids(create_test_data, create_test_config):
     )
     assert len(target_file_infos) == 1
 
-    main_target_file_info = target_file_infos["test_output"]
+    main_target_file_info = target_file_infos["test_output_tabular"]
 
     df_labels = label_setup.label_df_parse_wrapper(
         label_file_tabular_info=main_target_file_info,
@@ -1058,7 +1058,7 @@ def test_validate_df_fail():
             "injections": {
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": [],
@@ -1081,7 +1081,7 @@ def test_split_ids(create_test_data, create_test_config):
     )
     assert len(target_file_infos) == 1
 
-    main_target_file_info = target_file_infos["test_output"]
+    main_target_file_info = target_file_infos["test_output_tabular"]
 
     df_labels = label_setup.label_df_parse_wrapper(
         label_file_tabular_info=main_target_file_info,
@@ -1279,7 +1279,7 @@ def test_save_target_transformer(patched_joblib):
     label_setup.save_label_transformer(
         run_folder=Path("/tmp/"),
         transformer_name="harry_du_bois",
-        output_name="test_output",
+        output_name="test_output_tabular",
         target_transformer_object=test_transformer,
     )
     assert patched_joblib.dump.call_count == 1

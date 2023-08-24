@@ -30,7 +30,7 @@ def get_array_data_to_test():
 def _get_classification_output_configs() -> Sequence[Dict]:
     output_configs = [
         {
-            "output_info": {"output_name": "test_output"},
+            "output_info": {"output_name": "test_output_tabular"},
             "output_type_info": {
                 "target_cat_columns": ["Origin"],
                 "target_con_columns": [],
@@ -150,7 +150,7 @@ def check_array_activations(
 def _get_regression_output_configs() -> Sequence[Dict]:
     output_configs = [
         {
-            "output_info": {"output_name": "test_output"},
+            "output_info": {"output_name": "test_output_tabular"},
             "output_type_info": {
                 "target_cat_columns": [],
                 "target_con_columns": ["Height"],
@@ -214,7 +214,20 @@ def _get_regression_output_configs() -> Sequence[Dict]:
                         "model_config": {
                             "model_type": "lcl",
                         },
-                    }
+                    },
+                    {
+                        "input_info": {"input_name": "test_array_lcl_patch"},
+                        "input_type_info": {
+                            "normalization": None,
+                        },
+                        "model_config": {
+                            "model_type": "lcl",
+                            "model_init_config": {
+                                "patch_size": [1, 1, 10],
+                                "kernel_width": "patch",
+                            },
+                        },
+                    },
                 ],
                 "output_configs": _get_regression_output_configs(),
             },

@@ -107,7 +107,8 @@ class CNNModelConfig:
 
     :param attention_inclusion_cutoff:
         If the dimension of width * height is less than this value, attention will be
-        included in the model across channels and width * height after that point.
+        included in the model across channels and width * height as embedding dimension
+        after that point (with the channels representing the length of the sequence).
 
     :param l1:
         L1 regularization to apply to the first layer.
@@ -115,7 +116,7 @@ class CNNModelConfig:
 
     layers: Union[None, List[int]] = None
 
-    num_output_features: int = 32
+    num_output_features: int = 256
 
     channel_exp_base: int = 2
     first_channel_expansion: int = 1

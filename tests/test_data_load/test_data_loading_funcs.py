@@ -39,7 +39,7 @@ from eir.train import get_dataloaders
                 ],
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin", "OriginExtraCol"],
                             "target_con_columns": ["Height"],
@@ -60,7 +60,8 @@ def test_get_weighted_random_sampler(
 
     patched_train_dataset = patch_dataset_to_be_unbalanced(dataset=train_dataset)
     columns_to_sample = [
-        "test_output." + i for i in targets_object.cat_targets["test_output"]
+        "test_output_tabular." + i
+        for i in targets_object.cat_targets["test_output_tabular"]
     ]
     random_sampler = data_loading_funcs.get_weighted_random_sampler(
         samples=patched_train_dataset.samples,
@@ -78,7 +79,9 @@ def test_get_weighted_random_sampler(
     )
 
     label_counts = _gather_dataloader_target_label_distributions(
-        dataloader=train_dataloader, target_col="Origin", output_name="test_output"
+        dataloader=train_dataloader,
+        target_col="Origin",
+        output_name="test_output_tabular",
     )
     are_close = _check_if_all_numbers_close(
         list_of_numbers=list(label_counts.values()), abs_tol=200
@@ -95,7 +98,9 @@ def test_get_weighted_random_sampler(
     )
 
     label_counts_imbalanced = _gather_dataloader_target_label_distributions(
-        dataloader=train_dataloader, target_col="Origin", output_name="test_output"
+        dataloader=train_dataloader,
+        target_col="Origin",
+        output_name="test_output_tabular",
     )
     are_close_imb = _check_if_all_numbers_close(
         list_of_numbers=list(label_counts_imbalanced.values()), abs_tol=100
@@ -119,7 +124,7 @@ def patch_dataset_to_be_unbalanced(dataset):
     new_samples = []
     cur_values = 0
     for sample in dataset.samples:
-        if sample.target_labels["test_output"]["Origin"] == 1:
+        if sample.target_labels["test_output_tabular"]["Origin"] == 1:
             if cur_values < max_values:
                 new_samples.append(sample)
                 cur_values += 1
@@ -164,12 +169,12 @@ def test_gather_column_sampling_weights(test_labels):
     test_samples = generate_test_samples(
         test_labels=test_labels,
         target_columns=test_target_columns,
-        output_name="test_output",
+        output_name="test_output_tabular",
     )
     all_target_weights_test_dict = data_loading_funcs._gather_column_sampling_weights(
         samples=test_samples,
         columns_to_sample=test_target_columns,
-        output_name="test_output",
+        output_name="test_output_tabular",
     )
 
     for cur_label_weight_dict in all_target_weights_test_dict.values():
@@ -243,14 +248,14 @@ def test_aggregate_column_sampling_weights_auto(test_labels):
     test_samples = generate_test_samples(
         test_labels=test_labels,
         target_columns=target_columns,
-        output_name="test_output",
+        output_name="test_output_tabular",
     )
 
     gather_func = data_loading_funcs._gather_column_sampling_weights
     test_all_label_weights_and_counts = gather_func(
         samples=test_samples,
         columns_to_sample=target_columns,
-        output_name="test_output",
+        output_name="test_output_tabular",
     )
     agg_func = data_loading_funcs._aggregate_column_sampling_weights
     test_weights, test_samples_per_epoch = agg_func(

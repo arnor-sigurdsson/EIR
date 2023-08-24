@@ -76,9 +76,87 @@ def get_array_model_init_kwargs(
     match model_type:
         case "lcl":
             assert isinstance(model_config, LCLModelConfig)
-            kwargs["flatten_fn"] = partial(torch.flatten, start_dim=1)
+
+            if model_config.patch_size is not None:
+                assert isinstance(model_config.patch_size, (tuple, list))
+                assert len(model_config.patch_size) == 3, model_config.patch_size
+                kwargs["flatten_fn"] = partial(
+                    patchify_and_flatten,
+                    size=model_config.patch_size,
+                )
+            else:
+                kwargs["flatten_fn"] = partial(torch.flatten, start_dim=1)
 
     return kwargs
+
+
+def check_patch_and_input_size_compatibility(
+    patch_size: Union[tuple[int, int, int], list[int]],
+    data_dimensions: "DataDimensions",
+) -> None:
+    assert isinstance(patch_size, (tuple, list))
+    assert len(patch_size) == 3, patch_size
+
+    channels, height, width = patch_size
+
+    if (
+        data_dimensions.channels % channels != 0
+        or data_dimensions.height % height != 0
+        or data_dimensions.width % width != 0
+    ):
+        mismatch_details = (
+            f"Data dimensions {data_dimensions.full_shape()} "
+            f"cannot be evenly divided into patches of size {patch_size}. "
+            f"Mismatch in channels: {data_dimensions.channels % channels}, "
+            f"height: {data_dimensions.height % height}, "
+            f"width: {data_dimensions.width % width}."
+        )
+        raise ValueError(mismatch_details)
+
+
+def patchify_and_flatten(
+    x: torch.Tensor,
+    size: tuple[int, int, int],
+) -> torch.Tensor:
+    stride = size
+    patches = patchify(x=x, size=size, stride=stride)
+    flattened = flatten_patches(patches=patches)
+    return flattened
+
+
+def patchify(
+    x: torch.Tensor, size: tuple[int, int, int], stride: tuple[int, int, int]
+) -> torch.Tensor:
+    """
+
+    size: (C, H, W)
+
+    Input shape: [256, 3, 64, 64]
+
+    Batch size: batch_size
+    Channels: C
+    Vertical patches: height / H
+    Horizontal patches: width / W
+    Patch channels: C
+    Patch height: H
+    Patch width: W
+
+    After unfolding: [batch_size, C, height / H, width / W, C, H, W]
+
+    After permuting: [batch_size, height / H, width / W, C, C, H, W]
+    """
+    patches = (
+        x.unfold(1, size[0], stride[0])
+        .unfold(2, size[1], stride[1])
+        .unfold(3, size[2], stride[2])
+    )
+    patches = patches.permute(0, 2, 3, 4, 1, 5, 6)
+    return patches
+
+
+def flatten_patches(patches: torch.Tensor) -> torch.Tensor:
+    reshaped_patches = patches.reshape(patches.size(0), -1)
+    return reshaped_patches
 
 
 @dataclass

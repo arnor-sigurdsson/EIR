@@ -51,7 +51,7 @@ if TYPE_CHECKING:
                 ],
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": [],
@@ -177,7 +177,7 @@ def _set_up_bad_label_file_for_testing(label_file: Path) -> None:
                 ],
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": [],
@@ -356,7 +356,7 @@ def _corrupt_arrays_for_testing(
                 ],
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": ["Height"],
@@ -444,7 +444,7 @@ def test_construct_dataset_init_params_from_cl_args(
                 ],
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": [],
@@ -537,7 +537,7 @@ def check_dataset(
     classes_tested: List[str],
     target_transformers: Dict[str, al_label_transformers],
     check_targets: bool = True,
-    output_name: str = "test_output",
+    output_name: str = "test_output_tabular",
     target_column="Origin",
 ) -> None:
     assert len(dataset) == exp_no_sample

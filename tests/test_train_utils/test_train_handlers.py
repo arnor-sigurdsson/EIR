@@ -13,7 +13,7 @@ al_prep_modelling_test_configs = Tuple[Experiment, ModelTestConfig]
 
 def test_unflatten_engine_metrics_dict():
     test_step_base = {
-        "test_output": {
+        "test_output_tabular": {
             "Origin": {"test_output_Origin_mcc": 0.9, "test_output_Origin_loss": 0.1},
             "Height": {"test_output_Height_pcc": 0.9, "test_output_Height_rmse": 0.1},
         }
@@ -30,11 +30,19 @@ def test_unflatten_engine_metrics_dict():
     )
 
     # we want to make sure the original values are present
-    assert test_output["test_output"]["Origin"]["test_output_Origin_mcc"] == 0.99
-    assert test_output["test_output"]["Height"]["test_output_Height_pcc"] == 0.99
+    assert (
+        test_output["test_output_tabular"]["Origin"]["test_output_Origin_mcc"] == 0.99
+    )
+    assert (
+        test_output["test_output_tabular"]["Height"]["test_output_Height_pcc"] == 0.99
+    )
 
-    assert test_output["test_output"]["Origin"]["test_output_Origin_loss"] == 0.11
-    assert test_output["test_output"]["Height"]["test_output_Height_rmse"] == 0.11
+    assert (
+        test_output["test_output_tabular"]["Origin"]["test_output_Origin_loss"] == 0.11
+    )
+    assert (
+        test_output["test_output_tabular"]["Height"]["test_output_Height_rmse"] == 0.11
+    )
 
 
 def test_get_attribution_handler_and_event_no_act_sample_factor():
