@@ -441,3 +441,75 @@ def test_make_random_snps_missing_none():
 
     assert (array.sum(1) != 1).sum() == 0
     assert (array[:, 3, :] == 0).all()
+
+
+def test_shuffle_columns_some():
+    test_array = torch.tensor(
+        [
+            [
+                [True, False, True],
+                [False, True, False],
+                [False, False, False],
+                [False, False, False],
+            ]
+        ],
+        dtype=torch.bool,
+    )
+
+    with patch("torch.rand", autospec=True) as mock_rand:
+        mock_rand.return_value = torch.tensor([0.2])
+
+        shuffled_array = data_augmentation.shuffle_random_omics_columns(
+            omics_array=test_array.clone(),
+            percentage=1.0,
+            probability=1.0,
+        )
+        assert not torch.equal(shuffled_array, test_array)
+
+
+def test_shuffle_columns_none():
+    test_array = torch.tensor(
+        [
+            [
+                [True, False, True],
+                [False, True, False],
+                [False, False, False],
+                [False, False, False],
+            ]
+        ],
+        dtype=torch.bool,
+    )
+
+    with patch("torch.rand", autospec=True) as mock_rand:
+        mock_rand.return_value = torch.tensor([0.9])
+
+        shuffled_array = data_augmentation.shuffle_random_omics_columns(
+            omics_array=test_array.clone(),
+            percentage=1.0,
+            probability=0.0,
+        )
+        assert torch.equal(shuffled_array, test_array)
+
+
+def test_shuffle_columns_one_hot():
+    test_array = torch.tensor(
+        [
+            [
+                [True, False, True],
+                [False, True, False],
+                [False, False, False],
+                [False, False, False],
+            ]
+        ],
+        dtype=torch.bool,
+    )
+
+    with patch("torch.rand", autospec=True) as mock_rand:
+        mock_rand.return_value = torch.tensor([0.2])
+
+        shuffled_array = data_augmentation.shuffle_random_omics_columns(
+            omics_array=test_array.clone(),
+            percentage=1.0,
+            probability=1.0,
+        )
+        assert (shuffled_array.sum(dim=1) == 1).all()

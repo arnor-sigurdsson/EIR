@@ -410,6 +410,13 @@ class OmicsInputDataConfig:
     :param na_augment_prob:
         Probability of applying NA augmentation to a given sample.
 
+    :param shuffle_augment_perc:
+        Percentage of the input (i.e. percentage of SNPs) to augment by shuffling the
+        one-hot encoding of the SNPs.
+
+    :param shuffle_augment_prob:
+        Probability of applying shuffle augmentation to a given sample.
+
     :param omics_format:
         Currently unsupported (i.e. does nothing), which format the omics data is in.
 
@@ -426,6 +433,8 @@ class OmicsInputDataConfig:
     subset_snps_file: Optional[str] = None
     na_augment_perc: float = 0.2
     na_augment_prob: float = 0.8
+    shuffle_augment_perc: float = 0.1
+    shuffle_augment_prob: float = 0.8
     omics_format: Literal["one-hot"] = "one-hot"
     mixing_subtype: Union[Literal["mixup", "cutmix-block", "cutmix-uniform"]] = "mixup"
     modality_dropout_rate: float = 0.0
