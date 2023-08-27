@@ -18,6 +18,8 @@ def test_prepare_genotype_array_train_mode():
         genotype_array=test_array,
         na_augment_perc=1.0,
         na_augment_prob=1.0,
+        shuffle_augment_perc=1.0,
+        shuffle_augment_prob=1.0,
         test_mode=False,
     )
 
@@ -35,6 +37,8 @@ def test_prepare_genotype_array_test_mode():
         genotype_array=test_array,
         na_augment_perc=1.0,
         na_augment_prob=1.0,
+        shuffle_augment_perc=1.0,
+        shuffle_augment_prob=1.0,
         test_mode=True,
     )
     assert prepared_array_test != test_array
