@@ -19,7 +19,7 @@ def test_prepare_genotype_array_train_mode():
         na_augment_perc=1.0,
         na_augment_prob=1.0,
         shuffle_augment_perc=1.0,
-        shuffle_augment_prob=1.0,
+        shuffle_augment_prob=0.0,
         test_mode=False,
     )
 
@@ -27,6 +27,20 @@ def test_prepare_genotype_array_train_mode():
     assert (test_array_copy == test_array).all()
 
     assert (prepared_array_train[:, -1, :] == 1).all()
+
+    prepared_array_train = prepare_omics.prepare_one_hot_omics_data(
+        genotype_array=test_array,
+        na_augment_perc=1.0,
+        na_augment_prob=1.0,
+        shuffle_augment_perc=1.0,
+        shuffle_augment_prob=1.0,
+        test_mode=False,
+    )
+
+    assert prepared_array_train != test_array
+    assert (test_array_copy == test_array).all()
+
+    assert (prepared_array_train[:, -1, :] != 1).any()
 
 
 def test_prepare_genotype_array_test_mode():
