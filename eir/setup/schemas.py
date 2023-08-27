@@ -433,8 +433,8 @@ class OmicsInputDataConfig:
     subset_snps_file: Optional[str] = None
     na_augment_perc: float = 0.2
     na_augment_prob: float = 0.8
-    shuffle_augment_perc: float = 0.1
-    shuffle_augment_prob: float = 0.8
+    shuffle_augment_perc: float = 0.0
+    shuffle_augment_prob: float = 0.0
     omics_format: Literal["one-hot"] = "one-hot"
     mixing_subtype: Union[Literal["mixup", "cutmix-block", "cutmix-uniform"]] = "mixup"
     modality_dropout_rate: float = 0.0
