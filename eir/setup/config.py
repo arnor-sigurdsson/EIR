@@ -45,6 +45,7 @@ from eir.models.input.tabular.tabular import (
 from eir.models.layers.mlp_layers import ResidualMLPConfig
 from eir.models.output.array.array_output_modules import (
     ArrayOutputModuleConfig,
+    CNNUpscaleModelConfig,
     LCLOutputModelConfig,
 )
 from eir.models.output.sequence.sequence_output_modules import (
@@ -92,6 +93,7 @@ al_output_model_config_classes = (
     | Type[LinearOutputModuleConfig]
     | Type[TransformerSequenceOutputModuleConfig]
     | Type[LCLModelConfig]
+    | Type[CNNUpscaleModelConfig]
 )
 
 al_output_model_configs = (
@@ -99,6 +101,7 @@ al_output_model_configs = (
     | LinearOutputModuleConfig
     | TransformerSequenceOutputModuleConfig
     | LCLModelConfig
+    | CNNUpscaleModelConfig
 )
 al_output_model_init_map = dict[str, dict[str, al_output_model_config_classes]]
 
@@ -846,6 +849,7 @@ def get_output_config_type_init_callable_map() -> al_output_model_init_map:
         },
         "array": {
             "lcl": LCLOutputModelConfig,
+            "cnn": CNNUpscaleModelConfig,
         },
     }
 
@@ -886,9 +890,19 @@ def get_all_tabular_targets(
 def _check_input_and_output_config_names(
     input_configs: Sequence[schemas.InputConfig],
     output_configs: Sequence[schemas.OutputConfig],
+    skip_keys: Sequence[str] = ("sequence",),
 ) -> None:
+    """
+    We allow for the same name to be used for sequence inputs and outputs,
+    as it's used for specifying e.g. different model settings for the input feature
+    extractor vs. the output module.
+    """
     input_names = set(i.input_info.input_name for i in input_configs)
-    output_names = set(i.output_info.output_name for i in output_configs)
+    output_names = set(
+        i.output_info.output_name
+        for i in output_configs
+        if i.output_info.output_type not in skip_keys
+    )
 
     intersection = output_names.intersection(input_names)
     if len(intersection) > 0:

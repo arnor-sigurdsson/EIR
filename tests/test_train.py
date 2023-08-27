@@ -59,7 +59,7 @@ def test_prepare_run_folder_fail(patched_get_run_folder, tmp_path):
                 ],
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": [],
@@ -82,14 +82,15 @@ def test_get_default_experiment(
 
     assert len(default_experiment.criteria) == 1
     assert isinstance(
-        default_experiment.criteria["test_output"]["Origin"], nn.CrossEntropyLoss
+        default_experiment.criteria["test_output_tabular"]["Origin"],
+        nn.CrossEntropyLoss,
     )
 
     assert len(default_experiment.inputs) == 1
     assert set(default_experiment.inputs.keys()) == {"test_genotype"}
 
     assert len(default_experiment.outputs) == 1
-    assert default_experiment.outputs["test_output"].target_columns == {
+    assert default_experiment.outputs["test_output_tabular"].target_columns == {
         "cat": ["Origin"],
         "con": [],
     }
@@ -111,7 +112,7 @@ def test_get_default_experiment(
                 ],
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": [],
@@ -128,7 +129,7 @@ def test_get_dataloaders(
 ):
     test_config = create_test_config
     gc = test_config.global_config
-    gc.weighted_sampling_columns = ["test_output.Origin"]
+    gc.weighted_sampling_columns = ["test_output_tabular.Origin"]
 
     train_dataset, valid_dataset = create_test_datasets
     train_sampler = get_train_sampler(
@@ -193,7 +194,7 @@ def test_get_optimizer():
                 ],
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": ["Height"],
@@ -212,7 +213,7 @@ def test_get_optimizer():
                 ],
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": ["Height"],
@@ -257,7 +258,7 @@ def test_get_model(create_test_config: Configs, create_test_labels):
 def _check_model(model_type: str, model: nn.Module):
     if model_type == "cnn":
         assert isinstance(model, MetaModel)
-        output_module = model.output_modules.test_output
+        output_module = model.output_modules.test_output_tabular
         origin_module = output_module.multi_task_branches["Origin"]
         assert origin_module[-1][-1].out_features == 3
 

@@ -59,7 +59,7 @@ def _get_sequence_test_specific_fusion_configs() -> Dict:
                 "fusion_configs": _get_sequence_test_specific_fusion_configs(),
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": [],
@@ -92,7 +92,7 @@ def _get_sequence_test_specific_fusion_configs() -> Dict:
                 ],
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": [],
@@ -116,7 +116,7 @@ def _get_sequence_test_specific_fusion_configs() -> Dict:
                 ],
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": [],
                             "target_con_columns": ["Height"],
@@ -166,7 +166,7 @@ def test_sequence_modelling(prep_modelling_test_configs):
                 "fusion_configs": _get_sequence_test_specific_fusion_configs(),
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": ["Height", "ExtraTarget"],
@@ -193,7 +193,7 @@ def test_sequence_modelling(prep_modelling_test_configs):
                 "fusion_configs": _get_sequence_test_specific_fusion_configs(),
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": ["Height", "ExtraTarget"],
@@ -232,7 +232,7 @@ def test_sequence_modelling(prep_modelling_test_configs):
                 "fusion_configs": _get_sequence_test_specific_fusion_configs(),
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": ["Height", "ExtraTarget"],
@@ -293,7 +293,7 @@ def test_mt_sequence_modelling(prep_modelling_test_configs):
                 "fusion_configs": _get_sequence_test_specific_fusion_configs(),
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": [],

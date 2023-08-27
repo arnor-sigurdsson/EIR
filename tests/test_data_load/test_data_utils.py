@@ -20,7 +20,7 @@ from eir.data_load.data_utils import get_train_sampler
                 ],
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": [],
@@ -37,7 +37,7 @@ def test_get_train_sampler(create_test_data, create_test_datasets, create_test_c
     gc = test_config.global_config
 
     train_dataset, *_ = create_test_datasets
-    gc.weighted_sampling_columns = ["test_output.Origin"]
+    gc.weighted_sampling_columns = ["test_output_tabular.Origin"]
 
     test_sampler = get_train_sampler(
         columns_to_sample=gc.weighted_sampling_columns, train_dataset=train_dataset

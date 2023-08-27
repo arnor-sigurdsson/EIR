@@ -73,7 +73,7 @@ def test_get_named_predict_dict_iterators(tmp_path: Path) -> None:
                 ],
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": [],
@@ -218,7 +218,7 @@ def _overload_test_yaml_object_for_predict(
                 ],
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": [],
@@ -265,7 +265,7 @@ def test_get_maybe_patched_null_sequence_output_source_for_generation():
         "output_info": {
             "output_type": "sequence",
             "output_source": None,
-            "output_name": "test_output",
+            "output_name": "test_output_tabular",
         }
     }
 

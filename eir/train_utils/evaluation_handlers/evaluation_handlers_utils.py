@@ -413,6 +413,8 @@ def prepare_manual_sample_data(
                     genotype_array=array_raw,
                     na_augment_perc=input_type_info.na_augment_perc,
                     na_augment_prob=input_type_info.na_augment_prob,
+                    shuffle_augment_perc=input_type_info.shuffle_augment_perc,
+                    shuffle_augment_prob=input_type_info.shuffle_augment_prob,
                     test_mode=True,
                 )
                 prepared_inputs[name] = array_prepared

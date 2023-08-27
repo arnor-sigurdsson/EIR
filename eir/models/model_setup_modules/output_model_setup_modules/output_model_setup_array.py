@@ -8,6 +8,8 @@ from eir.models.input.array.models_locally_connected import FlattenFunc, LCLMode
 from eir.models.model_setup_modules.output_model_setup_modules import al_output_modules
 from eir.models.output.array.array_output_modules import (
     ArrayOutputModuleConfig,
+    CNNUpscaleModel,
+    CNNUpscaleModelConfig,
     LCLOutputModelConfig,
     al_array_model_types,
     al_output_array_model_classes,
@@ -86,6 +88,7 @@ def get_array_output_feature_extractor(
 def get_array_output_model_mapping() -> Dict[str, al_output_array_model_classes]:
     mapping = {
         "lcl": LCLModel,
+        "cnn": CNNUpscaleModel,
     }
 
     return mapping
@@ -103,6 +106,7 @@ def get_array_output_config_dataclass_mapping() -> (
 ):
     mapping = {
         "lcl": LCLOutputModelConfig,
+        "cnn": CNNUpscaleModelConfig,
     }
 
     return mapping
@@ -120,9 +124,20 @@ def get_array_output_model_init_kwargs(
     model_config: al_output_array_model_configs,
     input_data_dimensions: DataDimensions,
     output_data_dimensions: Optional[DataDimensions],
-) -> dict[str, Union[DataDimensions, LCLOutputModelConfig, FlattenFunc, int]]:
+) -> dict[
+    str,
+    Union[
+        DataDimensions, LCLOutputModelConfig | CNNUpscaleModelConfig, FlattenFunc, int
+    ],
+]:
     kwargs: dict[
-        str, Union[DataDimensions, LCLOutputModelConfig, FlattenFunc, int]
+        str,
+        Union[
+            DataDimensions,
+            LCLOutputModelConfig | CNNUpscaleModelConfig,
+            FlattenFunc,
+            int,
+        ],
     ] = {}
 
     model_config_dataclass = get_array_output_model_config_dataclass(
@@ -146,5 +161,10 @@ def get_array_output_model_init_kwargs(
                     num_elements,
                 )
                 kwargs["dynamic_cutoff"] = num_elements
+
+        case "cnn":
+            assert isinstance(model_config, CNNUpscaleModelConfig)
+            assert output_data_dimensions is not None
+            kwargs["target_dimensions"] = output_data_dimensions
 
     return kwargs

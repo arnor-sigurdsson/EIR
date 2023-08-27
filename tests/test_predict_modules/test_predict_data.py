@@ -31,7 +31,7 @@ from tests.test_data_load.test_datasets import check_dataset
                 ],
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": ["Height"],
@@ -51,7 +51,7 @@ from tests.test_data_load.test_datasets import check_dataset
                 ],
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": ["Height"],
@@ -79,7 +79,7 @@ def test_set_up_test_labels(
         output_configs=test_configs.output_configs
     )
     assert len(tabular_file_infos) == 1
-    target_tabular_info = tabular_file_infos["test_output"]
+    target_tabular_info = tabular_file_infos["test_output_tabular"]
 
     with mock.patch(
         target="eir.predict_modules.predict_target_setup.load_transformers",
@@ -94,13 +94,13 @@ def test_set_up_test_labels(
             ids=test_ids,
         )
 
-    transformers = test_target_labels.label_transformers["test_output"]
+    transformers = test_target_labels.label_transformers["test_output_tabular"]
 
     assert len(target_tabular_info.cat_columns) == 1
     assert len(target_tabular_info.con_columns) == 1
     con_column = target_tabular_info.con_columns[0]
 
-    con_transformer = transformers["test_output"][con_column]
+    con_transformer = transformers["test_output_tabular"][con_column]
     con_mean = con_transformer.mean_.reshape(1, -1)
     expected_transformed_value = con_transformer.transform(con_mean).squeeze()
 
@@ -110,7 +110,7 @@ def test_set_up_test_labels(
 
     all_dropped_ids = set(i[0] for i in dropped_con_indices)
     for id_, target in test_target_labels.label_dict.items():
-        cur_value = target["test_output"][con_column]
+        cur_value = target["test_output_tabular"][con_column]
         if id_ in all_dropped_ids:
             assert cur_value == expected_transformed_value
 
@@ -125,7 +125,7 @@ def set_random_con_targets_to_missing(
     random_indices = np.random.choice(keys, num_rows_to_nan, replace=False)
 
     for key in random_indices:
-        data_dict[key]["test_output"]["Height"] = np.nan
+        data_dict[key]["test_output_tabular"]["Height"] = np.nan
 
     return data_dict, random_indices
 
@@ -145,7 +145,7 @@ def set_random_con_targets_to_missing(
                 ],
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": ["Height"],
@@ -165,7 +165,7 @@ def set_random_con_targets_to_missing(
                 ],
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": ["Height"],
@@ -194,7 +194,7 @@ def test_set_up_test_dataset(
         output_configs=test_configs.output_configs
     )
     assert len(tabular_file_infos) == 1
-    target_tabular_info = tabular_file_infos["test_output"]
+    target_tabular_info = tabular_file_infos["test_output_tabular"]
 
     with mock.patch(
         target="eir.predict_modules.predict_target_setup.load_transformers",
@@ -209,7 +209,7 @@ def test_set_up_test_dataset(
             ids=test_ids,
         )
 
-    transformers = test_target_labels.label_transformers["test_output"]
+    transformers = test_target_labels.label_transformers["test_output_tabular"]
 
     test_inputs = predict_input_setup.set_up_inputs_for_predict(
         test_inputs_configs=test_configs.input_configs,
@@ -246,8 +246,8 @@ def test_set_up_test_dataset(
 
 def _get_mock_transformers(cat_target_column: str, con_target_column: str):
     mock_label_encoder = LabelEncoder().fit(["Asia", "Europe", "Africa"])
-    transformers = {"test_output": {cat_target_column: mock_label_encoder}}
+    transformers = {"test_output_tabular": {cat_target_column: mock_label_encoder}}
     mock_standard_scaler = StandardScaler().fit([[1], [2], [3]])
-    transformers["test_output"][con_target_column] = mock_standard_scaler
+    transformers["test_output_tabular"][con_target_column] = mock_standard_scaler
 
     return transformers

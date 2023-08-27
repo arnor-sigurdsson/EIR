@@ -7,14 +7,20 @@ from torch import nn
 from eir.models.input.array.array_models import al_pre_normalization
 from eir.models.input.array.models_locally_connected import LCLModel, LCLModelConfig
 from eir.models.layers.projection_layers import get_projection_layer
+from eir.models.output.array.output_array_models_cnn import (
+    CNNUpscaleModel,
+    CNNUpscaleModelConfig,
+)
 
 if TYPE_CHECKING:
     from eir.setup.input_setup_modules.common import DataDimensions
 
-al_array_model_types = Literal["lcl"]
-al_output_array_model_classes = Type[LCLModel]
-al_output_array_models = LCLModel
-al_output_array_model_config_classes = Type["LCLOutputModelConfig"]
+al_array_model_types = Literal["lcl", "cnn"]
+al_output_array_model_classes = Type[LCLModel] | Type[CNNUpscaleModel]
+al_output_array_models = LCLModel | CNNUpscaleModel
+al_output_array_model_config_classes = (
+    Type["LCLOutputModelConfig"] | Type[CNNUpscaleModelConfig]
+)
 
 
 @dataclass
@@ -64,6 +70,8 @@ class ArrayOutputWrapperModule(nn.Module):
 
     def forward(self, x: torch.Tensor) -> dict[str, torch.Tensor]:
         out = self.feature_extractor(x)
+
+        out = out.reshape(out.shape[0], -1)
         out = self.projection_head(out)
 
         out = out[:, : self.target_width]

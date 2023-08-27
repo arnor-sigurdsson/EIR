@@ -258,20 +258,20 @@ def test_mixup_all_targets(test_targets):
     }
     random_indices = torch.randperm(len(test_targets)).to(dtype=torch.long)
     all_target_columns = target_columns["con"] + target_columns["cat"]
-    targets = {"test_output": {c: test_targets for c in all_target_columns}}
+    targets = {"test_output_tabular": {c: test_targets for c in all_target_columns}}
 
     def _target_columns_gen():
         for con_column in target_columns["con"]:
-            yield "test_output", "con", con_column
+            yield "test_output_tabular", "con", con_column
         for cat_column in target_columns["cat"]:
-            yield "test_output", "cat", cat_column
+            yield "test_output_tabular", "cat", cat_column
 
     all_mixed_targets = data_augmentation.mixup_all_targets(
         targets=targets,
         random_index_for_mixing=random_indices,
         target_columns_gen=_target_columns_gen(),
     )
-    for _, targets_permuted in all_mixed_targets["test_output"].items():
+    for _, targets_permuted in all_mixed_targets["test_output_tabular"].items():
         assert set(test_targets.tolist()) == set(targets_permuted.tolist())
 
         # Probabilistic guarantee here (i.e. would fail if all were the same)
@@ -355,13 +355,17 @@ def test_calc_all_mixed_losses(test_inputs, expected_output):
 
     def _target_columns_gen():
         for con_column in target_columns["con"]:
-            yield "test_output", "con", con_column
+            yield "test_output_tabular", "con", con_column
         for cat_column in target_columns["cat"]:
-            yield "test_output", "cat", cat_column
+            yield "test_output_tabular", "cat", cat_column
 
-    targets = {"test_output": {c: test_inputs["targets"] for c in all_target_columns}}
+    targets = {
+        "test_output_tabular": {c: test_inputs["targets"] for c in all_target_columns}
+    }
     targets_permuted = {
-        "test_output": {c: test_inputs["targets_permuted"] for c in all_target_columns}
+        "test_output_tabular": {
+            c: test_inputs["targets_permuted"] for c in all_target_columns
+        }
     }
     mixed_object = data_augmentation.MixingObject(
         targets=targets,
@@ -370,15 +374,19 @@ def test_calc_all_mixed_losses(test_inputs, expected_output):
         permuted_indexes=torch.LongTensor([0]),
     )
 
-    test_criteria = {"test_output": {c: nn.MSELoss() for c in all_target_columns}}
-    outputs = {"test_output": {c: test_inputs["outputs"] for c in all_target_columns}}
+    test_criteria = {
+        "test_output_tabular": {c: nn.MSELoss() for c in all_target_columns}
+    }
+    outputs = {
+        "test_output_tabular": {c: test_inputs["outputs"] for c in all_target_columns}
+    }
     all_losses = data_augmentation.calc_all_mixed_losses(
         target_columns_gen=_target_columns_gen(),
         criteria=test_criteria,
         outputs=outputs,
         mixed_object=mixed_object,
     )
-    for _, loss in all_losses["test_output"].items():
+    for _, loss in all_losses["test_output_tabular"].items():
         assert loss.item() == expected_output
 
 
@@ -433,3 +441,75 @@ def test_make_random_snps_missing_none():
 
     assert (array.sum(1) != 1).sum() == 0
     assert (array[:, 3, :] == 0).all()
+
+
+def test_shuffle_columns_some():
+    test_array = torch.tensor(
+        [
+            [
+                [True, False, True],
+                [False, True, False],
+                [False, False, False],
+                [False, False, False],
+            ]
+        ],
+        dtype=torch.bool,
+    )
+
+    with patch("torch.rand", autospec=True) as mock_rand:
+        mock_rand.return_value = torch.tensor([0.2])
+
+        shuffled_array = data_augmentation.shuffle_random_omics_columns(
+            omics_array=test_array.clone(),
+            percentage=1.0,
+            probability=1.0,
+        )
+        assert not torch.equal(shuffled_array, test_array)
+
+
+def test_shuffle_columns_none():
+    test_array = torch.tensor(
+        [
+            [
+                [True, False, True],
+                [False, True, False],
+                [False, False, False],
+                [False, False, False],
+            ]
+        ],
+        dtype=torch.bool,
+    )
+
+    with patch("torch.rand", autospec=True) as mock_rand:
+        mock_rand.return_value = torch.tensor([0.9])
+
+        shuffled_array = data_augmentation.shuffle_random_omics_columns(
+            omics_array=test_array.clone(),
+            percentage=1.0,
+            probability=0.0,
+        )
+        assert torch.equal(shuffled_array, test_array)
+
+
+def test_shuffle_columns_one_hot():
+    test_array = torch.tensor(
+        [
+            [
+                [True, False, True],
+                [False, True, False],
+                [False, False, False],
+                [False, False, False],
+            ]
+        ],
+        dtype=torch.bool,
+    )
+
+    with patch("torch.rand", autospec=True) as mock_rand:
+        mock_rand.return_value = torch.tensor([0.2])
+
+        shuffled_array = data_augmentation.shuffle_random_omics_columns(
+            omics_array=test_array.clone(),
+            percentage=1.0,
+            probability=1.0,
+        )
+        assert (shuffled_array.sum(dim=1) == 1).all()

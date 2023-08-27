@@ -111,6 +111,7 @@ def get_array_normalization_values(
         collector_class=collector_class,
         shape=data_dimensions.full_shape(),
         max_samples=max_samples,
+        name=source,
     )
 
     means = _add_extra_dims_if_needed(

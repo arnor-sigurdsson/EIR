@@ -34,7 +34,7 @@ from tests.setup_tests.fixtures_create_data import TestDataConfig
                 ],
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": ["Height"],
@@ -64,7 +64,7 @@ def test_load_labels_for_predict(
         output_configs=test_configs.output_configs
     )
     assert len(tabular_infos) == 1
-    target_tabular_info = tabular_infos["test_output"]
+    target_tabular_info = tabular_infos["test_output_tabular"]
 
     df_test = _load_labels_for_predict(
         tabular_info=target_tabular_info, ids_to_keep=test_ids

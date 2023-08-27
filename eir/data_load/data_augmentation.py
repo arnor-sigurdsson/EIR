@@ -345,3 +345,33 @@ def make_random_omics_columns_missing(
     omics_array[:, :, random_to_drop] = missing_arr
 
     return omics_array
+
+
+def shuffle_random_omics_columns(
+    omics_array: torch.Tensor, percentage: float = 0.05, probability: float = 1.0
+) -> torch.Tensor:
+    random_draw = torch.rand(1).item()
+    if random_draw > probability:
+        return omics_array
+
+    n_snps = omics_array.shape[2]
+    n_to_shuffle = int(n_snps * percentage)
+    random_to_shuffle = torch.randperm(n_snps)[:n_to_shuffle].to(dtype=torch.long)
+
+    one_hot_random = torch.zeros(
+        omics_array.shape[0],
+        4,
+        n_to_shuffle,
+        dtype=torch.bool,
+    )
+
+    random_indices = torch.randint(
+        0,
+        4,
+        (omics_array.shape[0], n_to_shuffle),
+    )
+    one_hot_random.scatter_(1, random_indices.unsqueeze(1), 1)
+
+    omics_array[:, :, random_to_shuffle] = one_hot_random
+
+    return omics_array

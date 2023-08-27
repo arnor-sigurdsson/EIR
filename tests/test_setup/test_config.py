@@ -60,7 +60,7 @@ def create_cl_args_config_files(
                 ],
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": [],
@@ -114,7 +114,7 @@ def test_generate_aggregated_config_basic(
                 ],
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": [],
@@ -133,7 +133,7 @@ def test_generate_aggregated_config_fail(
     with open(input_file, "r") as infile:
         original_config = yaml.load(stream=infile, Loader=yaml.FullLoader)
 
-    original_config["input_info"]["input_name"] = "test_output"
+    original_config["input_info"]["input_name"] = "test_output_tabular"
 
     with open(input_file, "w") as outfile:
         yaml.dump(data=original_config, stream=outfile)
@@ -168,7 +168,7 @@ def test_generate_aggregated_config_fail(
                 ],
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": [],
@@ -214,7 +214,7 @@ def test_generate_aggregated_config_with_overload(create_cl_args_config_files):
                 ],
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": [],

@@ -74,6 +74,8 @@ def prepare_inputs_disk(
                     genotype_array=array_raw,
                     na_augment_perc=input_type_info.na_augment_perc,
                     na_augment_prob=input_type_info.na_augment_prob,
+                    shuffle_augment_perc=input_type_info.shuffle_augment_perc,
+                    shuffle_augment_prob=input_type_info.shuffle_augment_prob,
                     test_mode=test_mode,
                 )
 
@@ -178,6 +180,8 @@ def prepare_inputs_memory(
                     genotype_array=data,
                     na_augment_perc=input_type_info.na_augment_perc,
                     na_augment_prob=input_type_info.na_augment_prob,
+                    shuffle_augment_perc=input_type_info.shuffle_augment_perc,
+                    shuffle_augment_prob=input_type_info.shuffle_augment_prob,
                     test_mode=test_mode,
                 )
 

@@ -42,7 +42,7 @@ from tests.test_predict_modules.test_predict_config import (
                 ],
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": [],
@@ -62,7 +62,7 @@ from tests.test_predict_modules.test_predict_config import (
                 ],
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": [],
@@ -292,7 +292,7 @@ def _get_predict_test_data_parametrization() -> List[Dict[str, Any]]:
                 },
                 "output_configs": [
                     {
-                        "output_info": {"output_name": "test_output"},
+                        "output_info": {"output_name": "test_output_tabular"},
                         "output_type_info": {
                             "target_cat_columns": ["Origin"],
                             "target_con_columns": [],
@@ -404,19 +404,21 @@ def _check_tabular_predict_results(
     base_experiment: train.Experiment,
     train_configs_for_testing: predict.LoadedTrainExperiment,
 ) -> None:
-    origin_predictions_path = tmp_path_ / "test_output" / "Origin" / "predictions.csv"
+    origin_predictions_path = (
+        tmp_path_ / "test_output_tabular" / "Origin" / "predictions.csv"
+    )
     df_test = pd.read_csv(origin_predictions_path, index_col="ID")
 
     tabular_infos = get_tabular_target_file_infos(
         output_configs=train_configs_for_testing.configs.output_configs
     )
     assert len(tabular_infos) == 1
-    target_tabular_info = tabular_infos["test_output"]
+    target_tabular_info = tabular_infos["test_output_tabular"]
 
     assert len(target_tabular_info.cat_columns) == 1
     target_column = target_tabular_info.cat_columns[0]
 
-    output = base_experiment.outputs["test_output"]
+    output = base_experiment.outputs["test_output_tabular"]
     target_classes = sorted(output.target_transformers[target_column].classes_)
 
     # check that columns in predictions.csv are in correct sorted order
@@ -429,4 +431,4 @@ def _check_tabular_predict_results(
     prediction_accuracy = (predictions == true_labels).sum() / len(true_labels)
     assert prediction_accuracy > 0.7
 
-    assert (tmp_path_ / "test_output/Origin/attributions").exists()
+    assert (tmp_path_ / "test_output_tabular/Origin/attributions").exists()

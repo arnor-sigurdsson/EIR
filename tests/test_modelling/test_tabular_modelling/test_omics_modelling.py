@@ -19,7 +19,7 @@ def _get_classification_output_configs(
 ) -> Sequence[Dict]:
     output_configs = [
         {
-            "output_info": {"output_name": "test_output"},
+            "output_info": {"output_name": "test_output_tabular"},
             "output_type_info": {
                 "target_cat_columns": ["Origin"],
                 "target_con_columns": [],
@@ -294,7 +294,7 @@ def _get_snp_attributions_generator(cur_output_act_paths: Dict[str, Path]):
 def _get_regression_output_configs() -> Sequence[Dict]:
     output_configs = [
         {
-            "output_info": {"output_name": "test_output"},
+            "output_info": {"output_name": "test_output_tabular"},
             "output_type_info": {
                 "target_cat_columns": [],
                 "target_con_columns": ["Height"],
@@ -422,7 +422,7 @@ def _get_multi_task_output_configs(
             },
         },
         {
-            "output_info": {"output_name": "test_output"},
+            "output_info": {"output_name": "test_output_tabular"},
             "output_type_info": {
                 "target_cat_columns": ["Origin"],
                 "target_con_columns": ["Height"],

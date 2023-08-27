@@ -4,7 +4,10 @@ from typing import Optional, Union
 import numpy as np
 import torch
 
-from eir.data_load.data_augmentation import make_random_omics_columns_missing
+from eir.data_load.data_augmentation import (
+    make_random_omics_columns_missing,
+    shuffle_random_omics_columns,
+)
 from eir.data_load.data_preparation_modules.common import _load_deeplake_sample
 from eir.data_load.data_source_modules import deeplake_ops
 
@@ -39,6 +42,8 @@ def prepare_one_hot_omics_data(
     genotype_array: np.ndarray,
     na_augment_perc: float,
     na_augment_prob: float,
+    shuffle_augment_perc: float,
+    shuffle_augment_prob: float,
     test_mode: bool,
 ) -> torch.Tensor:
     """
@@ -53,6 +58,13 @@ def prepare_one_hot_omics_data(
             omics_array=tensor_bool,
             percentage=na_augment_perc,
             probability=na_augment_prob,
+        )
+
+    if not test_mode and shuffle_augment_perc > 0 and shuffle_augment_prob > 0:
+        tensor_bool = shuffle_random_omics_columns(
+            omics_array=tensor_bool,
+            percentage=shuffle_augment_perc,
+            probability=shuffle_augment_prob,
         )
 
     assert tensor_bool.dtype == torch.bool

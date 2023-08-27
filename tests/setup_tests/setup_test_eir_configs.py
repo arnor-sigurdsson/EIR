@@ -85,7 +85,7 @@ def get_test_outputs_inits(
     for init_dict in output_configs_dicts:
         cur_name = init_dict["output_info"]["output_name"]
 
-        cur_base_func_keys = [i for i in base_func_map.keys() if cur_name == i]
+        cur_base_func_keys = [i for i in base_func_map.keys() if cur_name.startswith(i)]
         assert len(cur_base_func_keys) == 1
         cur_base_func_key = cur_base_func_keys[0]
 
@@ -112,7 +112,7 @@ def get_test_outputs_inits(
 
 def get_output_test_init_base_func_map() -> Dict[str, Callable]:
     mapping = {
-        "test_output": get_test_tabular_base_output_inits,
+        "test_output_tabular": get_test_tabular_base_output_inits,
         "test_output_copy": get_test_tabular_base_output_inits,
         "test_output_sequence": get_test_sequence_base_output_inits,
         "test_output_array": get_test_array_base_output_inits,
@@ -377,7 +377,7 @@ def get_test_tabular_base_output_inits(test_path: Path, split_to_test: bool) -> 
 
     test_target_init_kwargs = {
         "output_info": {
-            "output_name": "test_output",
+            "output_name": "test_output_tabular",
             "output_type": "tabular",
             "output_source": str(label_file),
         },

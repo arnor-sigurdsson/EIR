@@ -76,7 +76,7 @@ def _get_output_array_data_parameters() -> Sequence[dict]:
                 "output_configs": [
                     {
                         "output_info": {
-                            "output_name": "test_output_array",
+                            "output_name": "test_output_array_lcl",
                         },
                         "model_config": {
                             "model_type": "lcl",
@@ -87,7 +87,19 @@ def _get_output_array_data_parameters() -> Sequence[dict]:
                                 "cutoff": "auto",
                             },
                         },
-                    }
+                    },
+                    {
+                        "output_info": {
+                            "output_name": "test_output_array_cnn",
+                        },
+                        "model_config": {
+                            "model_type": "cnn",
+                            "model_init_config": {
+                                "channel_exp_base": 3,
+                                "allow_pooling": False,
+                            },
+                        },
+                    },
                 ],
             },
         },

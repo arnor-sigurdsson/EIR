@@ -35,7 +35,7 @@ def _get_criteria_parametrization():
             ],
             "output_configs": [
                 {
-                    "output_info": {"output_name": "test_output"},
+                    "output_info": {"output_name": "test_output_tabular"},
                     "output_type_info": {
                         "target_cat_columns": ["Origin"],
                         "target_con_columns": ["Height"],
@@ -74,7 +74,7 @@ def _get_criteria_parametrization():
 def _get_output_configs(cat_loss_name: str, con_loss_name: str) -> list[dict]:
     base = [
         {
-            "output_info": {"output_name": "test_output"},
+            "output_info": {"output_name": "test_output_tabular"},
             "output_type_info": {
                 "target_cat_columns": ["Origin"],
                 "target_con_columns": ["Height"],
