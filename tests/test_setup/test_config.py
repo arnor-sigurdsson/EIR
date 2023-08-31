@@ -325,7 +325,7 @@ def test_validate_keys_against_dataclass():
     )
 
     invalid_input_dict = {"field1": "value1", "unexpected_field": 42}
-    with pytest.raises(ValueError, match="Unexpected keys found"):
+    with pytest.raises(KeyError, match="Unexpected keys found"):
         config.validate_keys_against_dataclass(
             input_dict=invalid_input_dict, dataclass_type=MockDataclass
         )

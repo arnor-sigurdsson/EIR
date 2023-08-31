@@ -346,7 +346,7 @@ def _check_input_config_names(input_configs: Iterable[schemas.InputConfig]) -> N
 
 
 def validate_keys_against_dataclass(
-    input_dict: Dict[str, Any], dataclass_type: Type
+    input_dict: Dict[str, Any], dataclass_type: Type, name: str = ""
 ) -> None:
     if not is_dataclass(dataclass_type):
         raise TypeError(f"Provided type {dataclass_type.__name__} is not a dataclass")
@@ -357,15 +357,26 @@ def validate_keys_against_dataclass(
 
     unexpected_keys = actual_keys - expected_keys
     if unexpected_keys:
-        raise ValueError(
-            f"Unexpected keys found in configuration: {', '.join(unexpected_keys)}"
+        message = (
+            f"Unexpected keys found in configuration: '{', '.join(unexpected_keys)}'. "
+            f"Expected keys of type '{dataclass_type.__name__}': "
+            f"'{', '.join(expected_keys)}'."
         )
+
+        if name:
+            message = f"{name}: {message}"
+
+        raise KeyError(message)
 
 
 def init_input_config(yaml_config_as_dict: Dict[str, Any]) -> schemas.InputConfig:
     cfg = yaml_config_as_dict
 
-    validate_keys_against_dataclass(input_dict=cfg, dataclass_type=schemas.InputConfig)
+    validate_keys_against_dataclass(
+        input_dict=cfg,
+        dataclass_type=schemas.InputConfig,
+        name=cfg.get("input_info", {}).get("input_name", ""),
+    )
 
     input_info_object = schemas.InputDataConfig(**cfg["input_info"])
 
@@ -683,7 +694,11 @@ def init_output_config(
 ) -> schemas.OutputConfig:
     cfg = yaml_config_as_dict
 
-    validate_keys_against_dataclass(input_dict=cfg, dataclass_type=schemas.OutputConfig)
+    validate_keys_against_dataclass(
+        input_dict=cfg,
+        dataclass_type=schemas.OutputConfig,
+        name=cfg.get("output_info", {}).get("output_name", ""),
+    )
 
     output_info_object = schemas.OutputInfoConfig(**cfg["output_info"])
 
@@ -822,7 +837,7 @@ def set_up_output_module_config(
 
 def set_up_output_module_init_config(
     model_init_kwargs_base: Union[None, dict],
-    output_type: Literal["tabular", "sequence"],
+    output_type: Literal["tabular", "sequence", "array"],
     model_type: str,
     output_module_init_class_map: al_output_model_init_map,
 ) -> al_output_model_configs:

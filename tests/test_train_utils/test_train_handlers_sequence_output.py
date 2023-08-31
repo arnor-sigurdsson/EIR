@@ -5,7 +5,6 @@ from unittest.mock import create_autospec
 import pytest
 import torch
 from torchtext.vocab import Vocab
-from transformers import PreTrainedTokenizerBase
 
 from eir.train_utils.evaluation_handlers.evaluation_handlers_utils import decode_tokens
 from eir.train_utils.evaluation_handlers.train_handlers_sequence_output import (
@@ -230,34 +229,15 @@ def tokens():
     return [0, 1, 2, 3]
 
 
-def test_decode_tokens_with_pretrained_tokenizer(tokens, decoded_tokens):
-    mock_tokenizer = create_autospec(PreTrainedTokenizerBase)
-    mock_tokenizer.decode.return_value = " ".join(decoded_tokens)
-    vocab = None
-    split_on = None
-
-    result = decode_tokens(
-        tokens=tokens,
-        tokenizer=mock_tokenizer,
-        vocab=vocab,
-        split_on=split_on,
-    )
-
-    mock_tokenizer.decode.assert_called_once_with(
-        token_ids=tokens,
-        skip_special_tokens=True,
-    )
-    assert result == " ".join(decoded_tokens)
-
-
 def test_decode_tokens_with_vocab_and_split(tokens, decoded_tokens):
-    tokenizer = None
     mock_vocab = create_autospec(Vocab)
     mock_vocab.lookup_tokens.return_value = decoded_tokens
     split_on = " "
 
     result = decode_tokens(
-        tokens=tokens, tokenizer=tokenizer, vocab=mock_vocab, split_on=split_on
+        tokens=tokens,
+        vocab=mock_vocab,
+        split_on=split_on,
     )
 
     mock_vocab.lookup_tokens.assert_called_once_with(indices=tokens)
@@ -265,13 +245,14 @@ def test_decode_tokens_with_vocab_and_split(tokens, decoded_tokens):
 
 
 def test_decode_tokens_with_vocab_and_no_split(tokens, decoded_tokens):
-    tokenizer = None
     mock_vocab = create_autospec(Vocab)
     mock_vocab.lookup_tokens.return_value = decoded_tokens
     split_on = None
 
     result = decode_tokens(
-        tokens=tokens, tokenizer=tokenizer, vocab=mock_vocab, split_on=split_on
+        tokens=tokens,
+        vocab=mock_vocab,
+        split_on=split_on,
     )
 
     mock_vocab.lookup_tokens.assert_called_once_with(indices=tokens)

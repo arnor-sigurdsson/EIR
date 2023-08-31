@@ -351,13 +351,13 @@ def test_add_specials_to_hf_tokenizer():
 def test_sync_hf_and_pytorch_vocab():
     hf_tokenizer = mock.create_autospec(spec=PreTrainedTokenizer)
     hf_tokenizer.get_vocab.return_value = {"a": 1, "b": 0, "c": 2}
-    vocab = setup_sequence._sync_hf_and_pytorch_vocab(hf_tokenizer=hf_tokenizer)
+    vocab = setup_sequence.sync_hf_and_pytorch_vocab(hf_tokenizer=hf_tokenizer)
     assert isinstance(vocab, Vocab)
     assert vocab.get_stoi() == {"a": 1, "b": 0, "c": 2}
 
 
 @mock.patch(f"{_get_mock_target()}._get_hf_tokenizer")
-@mock.patch(f"{_get_mock_target()}._sync_hf_and_pytorch_vocab")
+@mock.patch(f"{_get_mock_target()}.sync_hf_and_pytorch_vocab")
 def test_get_sequence_input_objects_from_pretrained(sync_vocab_mock, tokenizer_mock):
     input_config = mock.create_autospec(spec=schemas.InputConfig)
     input_config.input_type_info = mock.create_autospec(

@@ -79,39 +79,24 @@ def get_sequence_input_objects_from_output(
     output_config: OutputConfig, matching_input_config: InputConfig
 ) -> setup_sequence.al_sequence_input_objects_basic:
     gathered_stats = setup_sequence.GatheredSequenceStats()
-
     output_type_info = output_config.output_type_info
     assert isinstance(output_type_info, SequenceOutputTypeConfig)
 
-    vocab_file = output_type_info.vocab_file
-    vocab_iter = setup_sequence.get_vocab_iterator(
-        input_source=output_config.output_info.output_source,
-        split_on=output_type_info.split_on,
-        gathered_stats=gathered_stats,
-        vocab_file=output_type_info.vocab_file,
-    )
-    tokenizer = setup_sequence.get_tokenizer(
+    tokenizer, gathered_stats = setup_sequence.get_tokenizer(
         input_config=matching_input_config,
-    )
-    tokenized_vocab_iter = setup_sequence.get_tokenized_vocab_iterator(
-        vocab_iterator=vocab_iter, tokenizer=tokenizer
+        gathered_stats=gathered_stats,
     )
 
-    min_freq = output_type_info.min_freq
-    if vocab_file:
-        logger.info(
-            "Minimum word/token frequency will be set to 0 as vocabulary is loaded "
-            "from file %s.",
-            vocab_file,
-        )
-        min_freq = 1
-
-    vocab = setup_sequence.build_vocab_from_iterator(
-        iterator=tokenized_vocab_iter,
-        specials=setup_sequence.get_default_sequence_specials(),
-        min_freq=min_freq,
+    vocab = setup_sequence.init_vocab(
+        source=output_config.output_info.output_source,
+        inner_key=output_config.output_info.output_inner_key,
+        tokenizer_name=output_type_info.tokenizer,
+        split_on=output_type_info.split_on,
+        vocab_file=output_type_info.vocab_file,
+        min_freq=output_type_info.min_freq,
+        gathered_stats=gathered_stats,
+        tokenizer=tokenizer,
     )
-    vocab.set_default_index(vocab["<unk>"])
 
     encode_func = setup_sequence.get_tokenizer_encode_func(
         tokenizer=tokenizer, pytorch_vocab=vocab

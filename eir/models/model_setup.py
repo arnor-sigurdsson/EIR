@@ -12,7 +12,7 @@ from eir.models.model_setup_modules.meta_setup import (
 )
 from eir.models.model_setup_modules.model_io import load_model
 from eir.models.model_setup_modules.pretrained_setup import (
-    overload_fusion_model_feature_extractors_with_pretrained,
+    overload_meta_model_feature_extractors_with_pretrained,
 )
 from eir.models.output.sequence.sequence_output_modules import (
     overload_embeddings_with_pretrained,
@@ -67,7 +67,7 @@ def get_model(
 
         return loaded_meta_model
 
-    input_modules = overload_fusion_model_feature_extractors_with_pretrained(
+    input_modules = overload_meta_model_feature_extractors_with_pretrained(
         input_modules=meta_kwargs["input_modules"],
         inputs_as_dict=inputs_as_dict,
         outputs_as_dict=outputs_as_dict,

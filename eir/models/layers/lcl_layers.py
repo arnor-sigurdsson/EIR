@@ -168,7 +168,9 @@ class LCLResidualBlock(nn.Module):
         )
         self.fc_2 = LCL(**fc_2_kwargs)
 
-        if in_features == out_feature_sets:
+        self.out_features = self.fc_2.out_features
+
+        if in_features == self.out_features:
             self.downsample_identity = lambda x: x
         else:
             self.downsample_identity = LCL(
@@ -179,8 +181,6 @@ class LCLResidualBlock(nn.Module):
             )
 
         self.stochastic_depth = StochasticDepth(p=stochastic_depth_p, mode="batch")
-
-        self.out_features = self.fc_2.out_features
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         out = self.norm_1(x)

@@ -198,8 +198,10 @@ def _check_current_and_loaded_input_config_compatibility(
 
         if current_value != loaded_value:
             logger.warning(
-                "Expected '%s' to be the same in current input configuration '%s' and "
-                "loaded input configuration '%s' (loaded from '%s'). If you are loading"
+                "Expected '%s' to be the same in current input configuration"
+                "\n'%s'\n and "
+                "loaded input configuration \n'%s'\n "
+                "(loaded from '%s'). If you are loading"
                 " a pretrained EIR module, this can be expected if you are changing "
                 "parameters that are expected to be agnostic across runs (e.g. dropout)"
                 ", but in many cases this will cause (a) the model you are trying to "

@@ -4,6 +4,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
 from typing import (
+    Any,
     Callable,
     Generator,
     Iterator,
@@ -12,6 +13,7 @@ from typing import (
     Sequence,
     Tuple,
     Union,
+    cast,
     overload,
 )
 
@@ -46,10 +48,14 @@ class TokenizerProtocolRaw(Protocol):
     def __call__(self, raw_input: str) -> Sequence[str]:
         ...
 
+    __closure__: Optional[Tuple[Any, ...]]
+
 
 class TokenizerProtocolPreSplit(Protocol):
     def __call__(self, raw_input_split: Sequence[str]) -> Sequence[str]:
         ...
+
+    __closure__: Optional[Tuple[Any, ...]]
 
 
 class EncodeFuncProtocol(Protocol):
@@ -157,37 +163,22 @@ def get_sequence_input_objects_from_input(
     input_type_info = input_config.input_type_info
     assert isinstance(input_type_info, schemas.SequenceInputDataConfig)
 
-    vocab_file = input_type_info.vocab_file
-
     tokenizer: TokenizerProtocolRaw | TokenizerProtocolPreSplit
-    tokenizer = get_tokenizer(input_config=input_config)
-
-    vocab_iter = get_vocab_iterator(
-        input_source=input_config.input_info.input_source,
-        split_on=input_type_info.split_on,
+    tokenizer, gathered_stats = get_tokenizer(
+        input_config=input_config,
         gathered_stats=gathered_stats,
+    )
+
+    vocab = init_vocab(
+        source=input_config.input_info.input_source,
+        inner_key=input_config.input_info.input_inner_key,
+        tokenizer_name=input_type_info.tokenizer,
+        split_on=input_type_info.split_on,
         vocab_file=input_type_info.vocab_file,
-        deeplake_inner_key=input_config.input_info.input_inner_key,
+        min_freq=input_type_info.min_freq,
+        gathered_stats=gathered_stats,
+        tokenizer=tokenizer,
     )
-    tokenized_vocab_iter = get_tokenized_vocab_iterator(
-        vocab_iterator=vocab_iter, tokenizer=tokenizer
-    )
-
-    min_freq = input_type_info.min_freq
-    if vocab_file:
-        logger.info(
-            "Minimum word/token frequency will be set to 0 as vocabulary is loaded "
-            "from file %s.",
-            vocab_file,
-        )
-        min_freq = 1
-
-    vocab = build_vocab_from_iterator(
-        iterator=tokenized_vocab_iter,
-        specials=get_default_sequence_specials(),
-        min_freq=min_freq,
-    )
-    vocab.set_default_index(vocab["<unk>"])
 
     encode_func: EncodeFuncProtocol
     encode_func = get_tokenizer_encode_func(
@@ -198,9 +189,82 @@ def get_sequence_input_objects_from_input(
     return vocab, gathered_stats, tokenizer, encode_func
 
 
+def init_vocab(
+    source: str,
+    inner_key: Optional[str],
+    tokenizer_name: str,
+    split_on: Optional[str],
+    vocab_file: Optional[str],
+    min_freq: int,
+    gathered_stats: "GatheredSequenceStats",
+    tokenizer: TokenizerProtocolRaw | TokenizerProtocolPreSplit,
+) -> Vocab:
+    if tokenizer_name == "bpe":
+        assert gathered_stats.total_count > 0
+        tokenizer_object = extract_tokenizer_object_from_function(
+            tokenizer_callable=tokenizer
+        )
+        vocab = sync_hf_and_pytorch_vocab(hf_tokenizer=tokenizer_object)
+    else:
+        assert gathered_stats.total_count == 0
+
+        vocab_iter = get_vocab_iterator(
+            input_source=source,
+            split_on=split_on,
+            gathered_stats=gathered_stats,
+            vocab_file=vocab_file,
+            deeplake_inner_key=inner_key,
+        )
+        tokenized_vocab_iter = get_tokenized_vocab_iterator(
+            vocab_iterator=vocab_iter, tokenizer=tokenizer
+        )
+
+        min_freq = _init_min_freq(
+            vocab_file=vocab_file,
+            min_freq=min_freq,
+        )
+
+        vocab = build_vocab_from_iterator(
+            iterator=tokenized_vocab_iter,
+            specials=get_default_sequence_specials(),
+            min_freq=min_freq,
+        )
+
+    vocab.set_default_index(vocab["<unk>"])
+
+    return vocab
+
+
+def _init_min_freq(
+    vocab_file: Optional[str],
+    min_freq: int,
+) -> int:
+    if vocab_file:
+        logger.info(
+            "Minimum word/token frequency will be set to 0 as vocabulary is loaded "
+            "from file %s.",
+            vocab_file,
+        )
+        min_freq = 1
+    return min_freq
+
+
+def extract_tokenizer_object_from_function(
+    tokenizer_callable: TokenizerProtocolRaw | TokenizerProtocolPreSplit,
+) -> Tokenizer | PreTrainedTokenizer:
+    closure = tokenizer_callable.__closure__
+    assert closure is not None
+    assert len(closure) == 1
+
+    tokenizer_object = closure[0].cell_contents
+    assert isinstance(tokenizer_object, (Tokenizer, PreTrainedTokenizer))
+    return tokenizer_object
+
+
 def get_tokenizer(
     input_config: schemas.InputConfig,
-) -> TokenizerProtocolPreSplit | TokenizerProtocolRaw:
+    gathered_stats: "GatheredSequenceStats",
+) -> tuple[TokenizerProtocolPreSplit | TokenizerProtocolRaw, "GatheredSequenceStats"]:
     input_type_info = input_config.input_type_info
     assert isinstance(input_type_info, schemas.SequenceInputDataConfig)
     tokenizer_name = input_type_info.tokenizer
@@ -210,7 +274,7 @@ def get_tokenizer(
         vocab_iter = get_vocab_iterator(
             input_source=input_config.input_info.input_source,
             split_on=input_type_info.split_on,
-            gathered_stats=GatheredSequenceStats(),
+            gathered_stats=gathered_stats,
             vocab_file=input_type_info.vocab_file,
             deeplake_inner_key=input_config.input_info.input_inner_key,
         )
@@ -229,7 +293,7 @@ def get_tokenizer(
             tokenizer_language=input_type_info.tokenizer_language,
         )
 
-    return tokenizer
+    return tokenizer, gathered_stats
 
 
 def _get_default_specials_map() -> dict:
@@ -268,12 +332,12 @@ def get_sequence_input_objects_from_pretrained(
     ) -> Sequence[int]:
         return hf_tokenizer.encode(text=raw_input_split, is_split_into_words=True)
 
-    vocab = _sync_hf_and_pytorch_vocab(hf_tokenizer=hf_tokenizer)
+    vocab = sync_hf_and_pytorch_vocab(hf_tokenizer=hf_tokenizer)
 
     return vocab, gathered_stats, hf_tokenizer, _passthrough_hf_encode
 
 
-def _sync_hf_and_pytorch_vocab(hf_tokenizer: PreTrainedTokenizer) -> Vocab:
+def sync_hf_and_pytorch_vocab(hf_tokenizer: Tokenizer | PreTrainedTokenizer) -> Vocab:
     hf_tokenizer_vocab = hf_tokenizer.get_vocab()
     hf_tokenizer_vocab_sorted = OrderedDict(
         {k: v for k, v in sorted(hf_tokenizer_vocab.items(), key=lambda item: item[1])}
@@ -342,9 +406,9 @@ def get_bpe_tokenizer(
         return tokens
 
     if split_on is None:
-        return _tokenize_raw
+        return cast(TokenizerProtocolRaw, _tokenize_raw)
     else:
-        return _tokenize_pre_split
+        return cast(TokenizerProtocolPreSplit, _tokenize_pre_split)
 
 
 def _get_bpe_tokenizer_object(
@@ -401,6 +465,7 @@ def get_basic_tokenizer(
     logger.debug(
         "Using tokenizer '%s' with language '%s'.", tokenizer_name, tokenizer_language
     )
+
     tokenizer = get_pytorch_tokenizer(
         tokenizer=tokenizer_name, language=tokenizer_language
     )
@@ -413,7 +478,7 @@ def get_basic_tokenizer(
         input_joined = " ".join(raw_input_split)
         return tokenizer(input_joined)
 
-    return _join_and_tokenize
+    return cast(TokenizerProtocolPreSplit, _join_and_tokenize)
 
 
 def _validate_pytorch_tokenizer_args(
@@ -657,7 +722,9 @@ def possibly_gather_all_stats_from_input(
     """
     gathered_stats = prev_gathered_stats
 
-    if vocab_file and max_length in {"average", "max"}:
+    dynamic_and_vocab_file = vocab_file and max_length in {"average", "max"}
+
+    if dynamic_and_vocab_file:
         logger.info(
             "Doing a full pass over input data despite vocabulary file %s being "
             "present, as dynamic max length '%s' was requested.",

@@ -1877,7 +1877,7 @@ additional tokens to whitespace characters, making the model more suitable for c
         Whether to use a "parallel" formulation in each Transformer layer, which can provide a slight training
         speedup at large scales (e.g. 20B).
     rope_scaling (`Dict`, *optional*):
-        Dictionary containing the scaling configuration for the RoPE embeddings. Currently supports three scaling
+        Dictionary containing the scaling configuration for the RoPE embeddings. Currently supports two scaling
         strategies: linear and dynamic. Their scaling factor must be an float greater than 1. The expected format
         is `{"type": strategy name, "factor": scaling factor}`. When using this flag, don't update
         `max_position_embeddings` to the expected new maximum. See the following thread for more information on how
@@ -2353,7 +2353,7 @@ Args:
     use_cache (`bool`, *optional*, defaults to `True`):
         Whether or not the model should return the last key/values attentions (not used by all models)
 
-.. class:: transformers.models.llama.configuration_llama.LlamaConfig(vocab_size=32000, hidden_size=4096, intermediate_size=11008, num_hidden_layers=32, num_attention_heads=32, num_key_value_heads=None, hidden_act='silu', max_position_embeddings=2048, initializer_range=0.02, rms_norm_eps=1e-06, use_cache=True, pad_token_id=0, bos_token_id=1, eos_token_id=2, pretraining_tp=1, tie_word_embeddings=False, rope_scaling=None, **kwargs)
+.. class:: transformers.models.llama.configuration_llama.LlamaConfig(vocab_size=32000, hidden_size=4096, intermediate_size=11008, num_hidden_layers=32, num_attention_heads=32, num_key_value_heads=None, hidden_act='silu', max_position_embeddings=2048, initializer_range=0.02, rms_norm_eps=1e-06, use_cache=True, pad_token_id=None, bos_token_id=1, eos_token_id=2, pretraining_tp=1, tie_word_embeddings=False, rope_scaling=None, **kwargs)
 
 The LLaMA model was proposed in `LLaMA: Open and Efficient Foundation Language Models <https://arxiv.org/abs/2302.13971>`__ by Hugo Touvron, Thibaut Lavril, Gautier Izacard, Xavier Martinet, Marie-Anne Lachaux, Timothée Lacroix, Baptiste Rozière, Naman Goyal, Eric Hambro, Faisal Azhar, Aurelien Rodriguez, Armand Joulin, Edouard Grave, Guillaume Lample. It is a collection of foundation language models ranging from 7B to 65B parameters.
 
@@ -2427,7 +2427,7 @@ Args:
     tie_word_embeddings(`bool`, *optional*, defaults to `False`):
         Whether to tie weight embeddings
     rope_scaling (`Dict`, *optional*):
-        Dictionary containing the scaling configuration for the RoPE embeddings. Currently supports three scaling
+        Dictionary containing the scaling configuration for the RoPE embeddings. Currently supports two scaling
         strategies: linear and dynamic. Their scaling factor must be an float greater than 1. The expected format
         is `{"type": strategy name, "factor": scaling factor}`. When using this flag, don't update
         `max_position_embeddings` to the expected new maximum. See the following thread for more information on how
@@ -3305,6 +3305,73 @@ Args:
     relative_attention_num_buckets (`int`, *optional*, defaults to 32):
         The number of buckets to use for each attention layer.
 
+.. class:: transformers.models.mpt.configuration_mpt.MptConfig(d_model: int = 2048, n_heads: int = 16, n_layers: int = 24, expansion_ratio: int = 4, max_seq_len: int = 2048, vocab_size: int = 50368, resid_pdrop: float = 0.0, layer_norm_epsilon: float = 1e-05, emb_pdrop: float = 0.0, learned_pos_emb: bool = True, attn_config: transformers.models.mpt.configuration_mpt.MptAttentionConfig = None, init_device: str = 'cpu', logit_scale: Union[float, str, NoneType] = None, no_bias: bool = True, verbose: int = 0, embedding_fraction: float = 1.0, norm_type: str = 'low_precision_layernorm', use_cache: bool = False, initializer_range=0.02, **kwargs)
+
+The MPT model was proposed by the `MosaicML <https://www.mosaicml.com/>`__ team and released with multiple sizes and finetuned variants. The MPT models is a series of open source and commercially usable LLMs pre-trained on 1T tokens. 
+
+MPT models are GPT-style decoder-only transformers with several improvements: performance-optimized layer implementations, architecture changes that provide greater training stability, and the elimination of context length limits by replacing positional embeddings with ALiBi. 
+
+- MPT base: MPT base pre-trained models on next token prediction 
+- MPT instruct: MPT base models fine-tuned on instruction based tasks
+- MPT storywriter: MPT base models fine-tuned for 2500 steps on 65k-token excerpts of fiction books contained in the books3 corpus, this enables the model to handle very long sequences
+
+The original code is available at the  ``llm-foundry``(https://github.com/mosaicml/llm-foundry/tree/main) repository.
+
+Read more about it `in the release blogpost <https://www.mosaicml.com/blog/mpt-7b>`__
+
+Tips:
+
+- Learn more about some techniques behind training of the model `in this section of llm-foundry repository <https://github.com/mosaicml/llm-foundry/blob/main/TUTORIAL.md#faqs>`__
+- If you want to use the advanced version of the model (triton kernels, direct flash attention integration), you can still use the original model implementation by adding `trust_remote_code=True` when calling `from_pretrained`.
+
+- `Fine-tuning Notebook <https://colab.research.google.com/drive/1HCpQkLL7UXW8xJUJJ29X7QAeNJKO0frZ?usp=sharing>`__ on how to fine-tune MPT-7B on a free Google Colab instance to turn the model into a Chatbot.
+
+
+Args:
+    d_model (`int`, *optional*, defaults to 2048):
+        Dimensionality of the embeddings and hidden states.
+    n_heads (`int`, *optional*, defaults to 16):
+        Number of attention heads for each attention layer in the Transformer encoder.
+    n_layers (`int`, *optional*, defaults to 24):
+        Number of hidden layers in the Transformer encoder.
+    expansion_ratio (`int`, *optional*, defaults to 4):
+        The ratio of the up/down scale in the MLP.
+    max_seq_len (`int`, *optional*, defaults to 2048):
+        The maximum sequence length of the model.
+    vocab_size (`int`, *optional*, defaults to 50368):
+        Vocabulary size of the Mpt model. Defines the maximum number of different tokens that can be represented by
+        the `inputs_ids` passed when calling ``MptModel``. Check `this
+        discussion <https://huggingface.co/bigscience/mpt/discussions/120#633d28389addb8530b406c2a>`__ on how the
+        `vocab_size` has been defined.
+    resid_pdrop (`float`, *optional*, defaults to 0.1):
+        The dropout probability applied to the attention output before combining with residual.
+    layer_norm_epsilon (`float`, *optional*, defaults to 1e-5):
+        The epsilon to use in the layer normalization layers.
+    emb_pdrop (`float`, *optional*, defaults to 0.1):
+        The dropout probability for the embedding layer.
+    learned_pos_emb (`bool`, *optional*, defaults to `False`):
+        Whether to use learned positional embeddings.
+    attn_config (`dict`, *optional*):
+        A dictionary used to configure the model's attention module.
+    init_device (`str`, *optional*):
+        The device to use for parameter initialization. Defined for backward compatibility
+    logit_scale (`float`, *optional*):
+        If not None, scale the logits by this value.
+    no_bias (`bool`, *optional*, defaults to `True`):
+        Whether to use bias in all linear layers.
+    verbose (`int`, *optional*, defaults to 0):
+        The verbosity level to use for logging. Used in the previous versions of MPT models for logging. This
+        argument is deprecated.
+    embedding_fraction (`float`, *optional*, defaults to 1.0):
+        The fraction to scale the gradients of the embedding layer by.
+    norm_type (`str`, *optional*, defaults to `"low_precision_layernorm"`):
+        Type of layer norm to use. All MPT models uses the same layer norm implementation. Defined for backward
+        compatibility.
+    use_cache (`bool`, *optional*, defaults to `True`):
+        Whether or not the model should return the last key/values attentions (not used by all models).
+    initializer_range (`float`, *optional*, defaults to 0.02):
+        The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
+
 .. class:: transformers.models.mra.configuration_mra.MraConfig(vocab_size=50265, hidden_size=768, num_hidden_layers=12, num_attention_heads=12, intermediate_size=3072, hidden_act='gelu', hidden_dropout_prob=0.1, attention_probs_dropout_prob=0.1, max_position_embeddings=512, type_vocab_size=1, initializer_range=0.02, layer_norm_eps=1e-05, position_embedding_type='absolute', block_per_row=4, approx_mode='full', initial_prior_first_n_blocks=0, initial_prior_diagonal_n_blocks=0, pad_token_id=1, bos_token_id=0, eos_token_id=2, **kwargs)
 
 The MRA model was proposed in `Multi Resolution Analysis (MRA) for Approximate Self-Attention <https://arxiv.org/abs/2207.10284>`__ by Zhanpeng Zeng, Sourav Pal, Jeffery Kline, Glenn M Fung, and Vikas Singh.
@@ -3647,7 +3714,7 @@ Args:
     layer_norm_eps (`float`, *optional*, defaults to 1e-12):
         The epsilon used by the layer normalization layers.
 
-.. class:: transformers.models.open_llama.configuration_open_llama.OpenLlamaConfig(vocab_size=100000, hidden_size=4096, intermediate_size=11008, num_hidden_layers=32, num_attention_heads=32, hidden_act='silu', max_position_embeddings=2048, initializer_range=0.02, rms_norm_eps=1e-06, use_cache=True, pad_token_id=0, bos_token_id=1, eos_token_id=2, tie_word_embeddings=False, use_memory_efficient_attention=True, hidden_dropout_prob=0.1, attention_dropout_prob=0.1, use_stable_embedding=True, shared_input_output_embedding=True, rope_scaling=None, **kwargs)
+.. class:: transformers.models.deprecated.open_llama.configuration_open_llama.OpenLlamaConfig(vocab_size=100000, hidden_size=4096, intermediate_size=11008, num_hidden_layers=32, num_attention_heads=32, hidden_act='silu', max_position_embeddings=2048, initializer_range=0.02, rms_norm_eps=1e-06, use_cache=True, pad_token_id=0, bos_token_id=1, eos_token_id=2, tie_word_embeddings=False, use_memory_efficient_attention=True, hidden_dropout_prob=0.1, attention_dropout_prob=0.1, use_stable_embedding=True, shared_input_output_embedding=True, rope_scaling=None, **kwargs)
 
 The Open-Llama model was proposed in `Open-Llama project <https://github.com/s-JoL/Open-Llama>`__ by community developer s-JoL.
 
@@ -3686,7 +3753,7 @@ Args:
     tie_word_embeddings(`bool`, *optional*, defaults to `False`):
         Whether to tie weight embeddings
     rope_scaling (`Dict`, *optional*):
-        Dictionary containing the scaling configuration for the RoPE embeddings. Currently supports three scaling
+        Dictionary containing the scaling configuration for the RoPE embeddings. Currently supports two scaling
         strategies: linear and dynamic. Their scaling factor must be an float greater than 1. The expected format
         is `{"type": strategy name, "factor": scaling factor}`. When using this flag, don't update
         `max_position_embeddings` to the expected new maximum. See the following thread for more information on how
@@ -4838,7 +4905,7 @@ Args:
     output_groups (`int`, *optional*, defaults to 4):
         The number of groups in the third feed forward network layer.
 
-.. class:: transformers.models.switch_transformers.configuration_switch_transformers.SwitchTransformersConfig(vocab_size=32128, d_model=768, d_kv=64, d_ff=2048, expert_capacity=64, num_layers=12, num_sparse_encoder_layers=3, num_decoder_layers=12, num_sparse_decoder_layers=3, num_heads=12, num_experts=8, router_bias=False, router_jitter_noise=0.01, router_dtype='float32', router_ignore_padding_tokens=False, relative_attention_num_buckets=32, relative_attention_max_distance=128, dropout_rate=0.1, layer_norm_epsilon=1e-06, router_z_loss_coef=0.001, router_aux_loss_coef=0.001, initializer_factor=1.0, feed_forward_proj='relu', is_encoder_decoder=True, add_router_probs=False, use_cache=True, pad_token_id=0, eos_token_id=1, **kwargs)
+.. class:: transformers.models.switch_transformers.configuration_switch_transformers.SwitchTransformersConfig(vocab_size=32128, d_model=768, d_kv=64, d_ff=2048, expert_capacity=64, num_layers=12, num_sparse_encoder_layers=3, num_decoder_layers=12, num_sparse_decoder_layers=3, num_heads=12, num_experts=8, router_bias=False, router_jitter_noise=0.01, router_dtype='float32', router_ignore_padding_tokens=False, relative_attention_num_buckets=32, relative_attention_max_distance=128, dropout_rate=0.1, layer_norm_epsilon=1e-06, router_z_loss_coef=0.001, router_aux_loss_coef=0.001, initializer_factor=1.0, dense_act_fn='relu', is_encoder_decoder=True, add_router_probs=False, use_cache=True, pad_token_id=0, eos_token_id=1, **kwargs)
 
 The SwitchTransformers model was proposed in `Switch Transformers: Scaling to Trillion Parameter Models with Simple and Efficient Sparsity <https://arxiv.org/abs/2101.03961>`__ by William Fedus, Barret Zoph, Noam Shazeer.
 
@@ -4918,7 +4985,7 @@ Arguments:
     use_cache (`bool`, *optional*, defaults to `True`):
         Whether or not the model should return the last key/values attentions (not used by all models).
 
-.. class:: transformers.models.t5.configuration_t5.T5Config(vocab_size=32128, d_model=512, d_kv=64, d_ff=2048, num_layers=6, num_decoder_layers=None, num_heads=8, relative_attention_num_buckets=32, relative_attention_max_distance=128, dropout_rate=0.1, layer_norm_epsilon=1e-06, initializer_factor=1.0, feed_forward_proj='relu', is_encoder_decoder=True, use_cache=True, pad_token_id=0, eos_token_id=1, **kwargs)
+.. class:: transformers.models.t5.configuration_t5.T5Config(vocab_size=32128, d_model=512, d_kv=64, d_ff=2048, num_layers=6, num_decoder_layers=None, num_heads=8, relative_attention_num_buckets=32, relative_attention_max_distance=128, dropout_rate=0.1, layer_norm_epsilon=1e-06, initializer_factor=1.0, feed_forward_proj='relu', is_encoder_decoder=True, use_cache=True, pad_token_id=0, eos_token_id=1, classifier_dropout=0.0, **kwargs)
 
 The T5 model was presented in `Exploring the Limits of Transfer Learning with a Unified Text-to-Text Transformer <https://arxiv.org/pdf/1910.10683.pdf>`__ by `Colin Raffel <https://huggingface.co/craffel>`__, Noam Shazeer, `Adam Roberts <https://huggingface.co/adarob>`__, Katherine Lee, Sharan Narang,
 Michael Matena, Yanqi Zhou, Wei Li, `Peter J. Liu <https://huggingface.co/peterjliu>`__.
@@ -5010,6 +5077,8 @@ Arguments:
         The maximum distance of the longer sequences for the bucket separation.
     dropout_rate (`float`, *optional*, defaults to 0.1):
         The ratio for all dropout layers.
+    classifier_dropout (`float`, *optional*, defaults to 0.0):
+        The dropout ratio for classifier.
     layer_norm_eps (`float`, *optional*, defaults to 1e-6):
         The epsilon used by the layer normalization layers.
     initializer_factor (`float`, *optional*, defaults to 1):

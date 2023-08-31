@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 logger = get_logger(name=__name__)
 
 
-def overload_fusion_model_feature_extractors_with_pretrained(
+def overload_meta_model_feature_extractors_with_pretrained(
     input_modules: "al_input_modules",
     inputs_as_dict: al_input_objects_as_dict,
     outputs_as_dict: "al_output_objects_as_dict",
@@ -40,6 +40,12 @@ def overload_fusion_model_feature_extractors_with_pretrained(
     that all input setup parameters that have to do with architecture match exactly
     between the (a) pretrained input config and (b) the input config loading the
     pretrained model.
+
+    The strict parameter being set to false is due to the fact that we can have e.g.
+    different fusion modules in the current model vs the pretrained model, which should
+    raise an error e.g. if continuing training from a checkpoint. However in this case,
+    it acceptable to have different fusion modules, as long as the input modules are
+    matching.
     """
 
     any_pretrained = any(
@@ -73,6 +79,7 @@ def overload_fusion_model_feature_extractors_with_pretrained(
             inputs_as_dict=inputs_as_dict,
             outputs_as_dict=outputs_as_dict,
             meta_class_getter=meta_class_getter,
+            strict=False,
         )
 
         pretrained_name = pretrained_config.load_module_name

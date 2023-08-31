@@ -84,6 +84,7 @@ class SimpleTabularModel(nn.Module):
         self.con_columns = con_columns
         self.unique_label_values = unique_label_values_per_column
         self.device = device
+        self.fc_layer = model_init_config.fc_layer
 
         self.embeddings_dict = set_up_embedding_dict(
             unique_label_values=unique_label_values_per_column
@@ -100,7 +101,7 @@ class SimpleTabularModel(nn.Module):
         self.input_dim = emb_total_dim + con_total_dim
 
         self.layer: nn.Identity | nn.Linear = nn.Identity()
-        if model_init_config.fc_layer:
+        if self.fc_layer:
             self.layer = nn.Linear(
                 in_features=self.input_dim, out_features=self.input_dim, bias=True
             )
@@ -117,7 +118,7 @@ class SimpleTabularModel(nn.Module):
 
     @property
     def l1_penalized_weights(self) -> torch.Tensor:
-        if not self.cat_columns:
+        if not self.cat_columns and not self.fc_layer:
             return torch.empty(0)
 
         return torch.cat([torch.flatten(i) for i in self.parameters()])

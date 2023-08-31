@@ -32,11 +32,13 @@ def get_fusion_modules(
     model_config: al_fusion_model_configs,
     modules_to_fuse: "al_input_modules",
     out_feature_per_feature_extractor: Dict[str, int],
-    output_types: dict[str, Literal["tabular", "sequence"]],
+    output_types: dict[str, Literal["tabular", "sequence", "array"]],
+    strict: bool = True,
 ) -> nn.ModuleDict:
-    _check_fusion_modules(
-        output_types=output_types, fusion_model_type=fusion_model_type
-    )
+    if strict:
+        _check_fusion_modules(
+            output_types=output_types, fusion_model_type=fusion_model_type
+        )
 
     fusion_modules = nn.ModuleDict()
 
@@ -65,29 +67,55 @@ def get_fusion_modules(
 
 
 def _check_fusion_modules(
-    output_types: dict[str, Literal["tabular", "sequence"]], fusion_model_type: str
+    output_types: dict[str, Literal["tabular", "sequence", "array"]],
+    fusion_model_type: str,
 ) -> None:
-    output_set = set(output_types.values())
+    if not output_types:
+        raise ValueError("output_types cannot be empty.")
 
-    if output_set == {"sequence"} and fusion_model_type != "pass-through":
+    output_set = set(output_types.values())
+    computed_set = {"tabular", "array"}
+    pass_through_set = {"sequence"}
+    supported_fusion_models = {"mlp-residual", "mgmoe", "identity", "pass-through"}
+
+    if not output_set.issubset(computed_set.union(pass_through_set)):
         raise ValueError(
-            "When using only sequence outputs, only pass-through is supported. "
+            f"Invalid output type(s). "
+            f"Supported types are {computed_set.union(pass_through_set)}."
+        )
+
+    if fusion_model_type not in supported_fusion_models:
+        raise ValueError(
+            f"Invalid fusion_model_type. Supported types are {supported_fusion_models}."
+        )
+
+    if output_set == pass_through_set and fusion_model_type != "pass-through":
+        raise ValueError(
+            f"When using only {pass_through_set} outputs, "
+            f"only pass-through is supported. "
             f"Got {fusion_model_type}. To use pass-through, "
             f"set fusion_model_type to 'pass-through'."
         )
-    elif output_set == {"sequence", "tabular"} and fusion_model_type != "pass-through":
-        logger.warning(
-            "Note: When using both sequence and tabular outputs, "
-            f"the fusion model type {fusion_model_type} is only applied to "
-            "the tabular outputs. The fusion for sequence outputs are handled "
-            "by the sequence output module itself, and the feature representations "
-            "from the input modules are passed through directly to the output module."
-        )
-    elif output_set == {"tabular"} and fusion_model_type == "pass-through":
+
+    elif output_set.issubset(computed_set) and fusion_model_type == "pass-through":
         raise ValueError(
-            "When using only tabular outputs, pass-through is not supported. "
+            f"When using only {computed_set} outputs, pass-through is not supported. "
             f"Got {fusion_model_type}. Kindly set the fusion_model_type "
-            "to 'mlp-residual' 'mgmoe', or 'identity'."
+            "to 'mlp-residual', 'mgmoe', or 'identity'."
+        )
+
+    elif (
+        pass_through_set.intersection(output_set)
+        and fusion_model_type != "pass-through"
+    ):
+        logger.warning(
+            f"Note: When using {output_set} outputs, "
+            f"the fusion model type {fusion_model_type} "
+            f"is only applied to the {computed_set} outputs. "
+            f"The fusion for {pass_through_set} outputs "
+            "is handled by the respective output module themselves, "
+            "and the feature representations are passed through"
+            " directly to the output module."
         )
 
 

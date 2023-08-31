@@ -722,7 +722,7 @@ class OutputInfoConfig:
 
     output_source: str
     output_name: str
-    output_type: Literal["tabular", "sequence"]
+    output_type: Literal["tabular", "sequence", "array"]
     output_inner_key: Optional[str] = None
 
 

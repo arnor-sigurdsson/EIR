@@ -216,6 +216,7 @@ def get_array_output_auto_validation_samples(
 
         prepared_eval_samples[output_name] = []
 
+        assert isinstance(config.sampling_config, ArrayOutputSamplingConfig)
         for i in range(config.sampling_config.n_eval_inputs):
             input_to_model, target_labels, cur_id = next(eval_sample_iterator)
 

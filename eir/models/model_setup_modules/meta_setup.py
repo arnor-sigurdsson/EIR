@@ -121,6 +121,7 @@ def get_meta_model_class_and_kwargs_from_configs(
     inputs_as_dict: al_input_objects_as_dict,
     outputs_as_dict: "al_output_objects_as_dict",
     meta_class_getter: MetaClassGetterCallable = get_default_meta_class,
+    strict: bool = True,
 ) -> Tuple[Type[al_meta_model], Dict[str, Any]]:
     meta_model_class = meta_class_getter(meta_model_type="default")
 
@@ -129,6 +130,7 @@ def get_meta_model_class_and_kwargs_from_configs(
         fusion_config=fusion_config,
         inputs_as_dict=inputs_as_dict,
         outputs_as_dict=outputs_as_dict,
+        strict=strict,
     )
 
     return meta_model_class, meta_model_kwargs
@@ -139,6 +141,7 @@ def get_meta_model_kwargs_from_configs(
     fusion_config: schemas.FusionConfig,
     inputs_as_dict: al_input_objects_as_dict,
     outputs_as_dict: "al_output_objects_as_dict",
+    strict: bool = True,
 ) -> Dict[str, Any]:
     kwargs: dict[str, Any] = {}
     input_modules = get_input_modules(
@@ -158,6 +161,7 @@ def get_meta_model_kwargs_from_configs(
         modules_to_fuse=input_modules,
         out_feature_per_feature_extractor=out_feature_per_feature_extractor,
         output_types=output_types,
+        strict=strict,
     )
     kwargs["fusion_modules"] = fusion_modules
 
@@ -182,8 +186,8 @@ def get_meta_model_kwargs_from_configs(
 
 def _get_output_types(
     outputs_as_dict: "al_output_objects_as_dict",
-) -> dict[str, Literal["tabular", "sequence"]]:
-    outputs_to_types_mapping: dict[str, Literal["tabular", "sequence"]] = {}
+) -> dict[str, Literal["tabular", "sequence", "array"]]:
+    outputs_to_types_mapping: dict[str, Literal["tabular", "sequence", "array"]] = {}
 
     for output_name, output_object in outputs_as_dict.items():
         output_type = output_object.output_config.output_info.output_type
@@ -200,7 +204,7 @@ def _get_maybe_computed_out_dims(fusion_modules: nn.ModuleDict) -> Optional[int]
 
 
 def _match_fusion_outputs_to_output_types(
-    output_types: dict[str, Literal["tabular", "sequence"]]
+    output_types: dict[str, Literal["tabular", "sequence", "array"]]
 ) -> dict[str, str]:
     output_name_to_fusion_output_type = {}
 
@@ -336,7 +340,7 @@ def get_output_modules(
     device: str,
     computed_out_dimensions: Optional[int] = None,
     feature_dimensions_and_types: Optional[Dict[str, FeatureExtractorInfo]] = None,
-) -> Tuple[nn.ModuleDict, Dict[str, Literal["tabular", "sequence"]]]:
+) -> Tuple[nn.ModuleDict, Dict[str, Literal["tabular", "sequence", "array"]]]:
     output_modules = nn.ModuleDict()
     output_types = {}
 

@@ -131,7 +131,6 @@ def sequence_out_single_sample_evaluation_wrapper(
 
                 generated_sample = decode_tokens(
                     tokens=generated_tokens,
-                    tokenizer=cur_input_object.tokenizer,
                     vocab=cur_input_object.vocab,
                     split_on=output_type_info.split_on,
                 )

@@ -12,7 +12,6 @@ from PIL import Image
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from torch.utils.data import DataLoader, Dataset
 from torchtext.vocab import Vocab
-from transformers import PreTrainedTokenizerBase
 
 from eir.data_load.data_preparation_modules.imputation import (
     impute_missing_modalities_wrapper,
@@ -125,7 +124,6 @@ def convert_model_inputs_to_raw(
                     tokens=data.numpy().squeeze(0).tolist(),
                     vocab=input_object.vocab,
                     split_on=input_type_info.split_on,
-                    tokenizer=input_object.tokenizer,
                 )
                 special_tokens = get_special_tokens(
                     tokenizer=input_object.tokenizer, vocab=input_object.vocab
@@ -320,15 +318,10 @@ def get_special_tokens(tokenizer: Callable, vocab: Vocab) -> SpecialTokens:
 
 
 def decode_tokens(
-    tokens: list[int], tokenizer: Callable, vocab: Vocab, split_on: str | None
+    tokens: list[int],
+    vocab: Vocab,
+    split_on: str | None,
 ) -> str:
-    if isinstance(tokenizer, PreTrainedTokenizerBase):
-        generated_sample = tokenizer.decode(
-            token_ids=tokens,
-            skip_special_tokens=True,
-        )
-        return generated_sample
-
     tokens_decoded = vocab.lookup_tokens(indices=tokens)
     if split_on is not None:
         generated_sample = split_on.join(tokens_decoded)
