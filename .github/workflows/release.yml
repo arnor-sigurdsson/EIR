@@ -24,8 +24,8 @@ jobs:
         env:
           PYTEST_GROUP: ${{ matrix.group }}
         run: |
-          pip install tox==4.9.0
-          pip install poetry==1.5.1
+          pip install tox==4.11.3
+          pip install poetry==1.6.1
           tox -e py_partial
 
   getrelease:
@@ -73,7 +73,7 @@ jobs:
         with:
           python-version: '3.11'
           architecture: x64
-      - run: pip install poetry==1.5.1
+      - run: pip install poetry==1.6.1
       - run: poetry build
       - run: poetry publish --username=__token__ --password=${{ secrets.PYPI_TOKEN }}
 
