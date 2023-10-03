@@ -79,11 +79,14 @@ def save_command_as_text(command: List[str], output_path: Path) -> None:
     output_path.write_text(command_as_str)
 
 
-def set_up_conf_files(base_path: Path, conf_output_path: Path):
+def set_up_conf_files(base_path: Path, conf_output_path: Path) -> None:
     ensure_path_exists(path=conf_output_path, is_folder=True)
     for path in base_path.rglob("*"):
         if path.suffix == ".yaml":
-            copy2(path, conf_output_path)
+            relative_path = path.relative_to(base_path)
+            destination_path = conf_output_path / relative_path
+            ensure_path_exists(path=destination_path.parent, is_folder=True)
+            copy2(src=path, dst=destination_path)
 
 
 def find_and_copy_files(

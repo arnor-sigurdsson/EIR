@@ -32,6 +32,15 @@ Array Generation
 
     d_array_output/01_autoencoder.rst
 
+Pretraining
+============
+
+.. toctree::
+    :maxdepth: 2
+
+    e_pretraining/01_checkpointing.rst
+
+
 
 Customizing EIR
 ===============

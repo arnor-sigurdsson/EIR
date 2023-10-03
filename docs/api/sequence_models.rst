@@ -797,6 +797,140 @@ Args:
     classifier_dropout (`float`, *optional*):
         The dropout ratio for the classification head.
 
+.. class:: transformers.models.llama.configuration_llama.LlamaConfig(vocab_size=32000, hidden_size=4096, intermediate_size=11008, num_hidden_layers=32, num_attention_heads=32, num_key_value_heads=None, hidden_act='silu', max_position_embeddings=2048, initializer_range=0.02, rms_norm_eps=1e-06, use_cache=True, pad_token_id=None, bos_token_id=1, eos_token_id=2, pretraining_tp=1, tie_word_embeddings=False, rope_theta=10000.0, rope_scaling=None, **kwargs)
+
+The Code Llama model was proposed in `Code Llama: Open Foundation Models for Code <https://ai.meta.com/research/publications/code-llama-open-foundation-models-for-code/>`__ by Baptiste Rozière, Jonas Gehring, Fabian Gloeckle, Sten Sootla, Itai Gat, Xiaoqing Ellen Tan, Yossi Adi, Jingyu Liu, Tal Remez, Jérémy Rapin, Artyom Kozhevnikov, Ivan Evtimov, Joanna Bitton, Manish Bhatt, Cristian Canton Ferrer, Aaron Grattafiori, Wenhan Xiong, Alexandre Défossez, Jade Copet, Faisal Azhar, Hugo Touvron, Louis Martin, Nicolas Usunier, Thomas Scialom, Gabriel Synnaeve.
+
+The abstract from the paper is the following:
+
+*We release Code Llama, a family of large language models for code based on Llama 2 providing state-of-the-art performance among open models, infilling capabilities, support for large input contexts, and zero-shot instruction following ability for programming tasks. We provide multiple flavors to cover a wide range of applications: foundation models (Code Llama), Python specializations (Code Llama - Python), and instruction-following models (Code Llama - Instruct) with 7B, 13B and 34B parameters each. All models are trained on sequences of 16k tokens and show improvements on inputs with up to 100k tokens. 7B and 13B Code Llama and Code Llama - Instruct variants support infilling based on surrounding content. Code Llama reaches state-of-the-art performance among open models on several code benchmarks, with scores of up to 53% and 55% on HumanEval and MBPP, respectively. Notably, Code Llama - Python 7B outperforms Llama 2 70B on HumanEval and MBPP, and all our models outperform every other publicly available model on MultiPL-E. We release Code Llama under a permissive license that allows for both research and commercial use.*
+
+Check out all Code Llama models `here <https://huggingface.co/models?search=code_llama>`__ and the officially released ones in the `codellama org <https://huggingface.co/codellama>`__.
+
+<Tip warning={true}>
+
+The `Llama2` family models, on which Code Llama is based, were trained using `bfloat16`, but the original inference uses `float16`. Let's look at the different precisions:
+
+* `float32`: PyTorch convention on model initialization is to load models in `float32`, no matter with which `dtype` the model weights were stored. `transformers` also follows this convention for consistency with PyTorch. This will be picked by default. If you want the `AutoModel` API to cast the load the checkpoints with the storage weights type, you must specify `torch_dtype="auto"`, e.g. `model = AutoModelForCausalLM.from_pretrained("path", torch_dtype = "auto")`.
+* `bfloat16`: Code Llama was trained with this precision, so we recommend using it for further training or fine-tuning.
+* `float16`: We recommend running inference using this precision, as it's usually faster than `bfloat16`, and evaluation metrics show no discernible degradation with respect to `bfloat16`. You can also run inference using `bfloat16`, and we recommend you check inference results with both `float16` and `bfloat16` after fine-tuning.
+
+As mentioned above, the `dtype` of the storage weights is mostly irrelevant unless you are using `torch_dtype="auto"` when initializing a model using. The reason is that the model will first be downloaded (using the `dtype` of the checkpoints online) and then will be casted to the default `dtype` of `torch` (becomes `torch.float32`). If there is a specified `torch_dtype`, it will be used instead.
+
+</Tip>
+
+Tips:
+
+- These models have the same architecture as the `Llama2` models
+- The infilling task is supported out of the box. You should be using the `tokenizer.fill_token` where you want your input to be filled.
+- The model conversion script is the same as for the `Llama2` family:
+
+Here is a sample usage
+```bash
+python src/transformers/models/llama/convert_llama_weights_to_hf.py \
+    --input_dir /path/to/downloaded/llama/weights --model_size 7B --output_dir /output/path
+```
+Note that executing the script requires enough CPU RAM to host the whole model in float16 precision (even if the biggest versions
+come in several checkpoints they each contain a part of each weight of the model, so we need to load them all in RAM).
+
+- After conversion, the model and tokenizer can be loaded via:
+
+::
+
+>>> from transformers import LlamaForCausalLM, CodeLlamaTokenizer
+
+>>> tokenizer = CodeLlamaTokenizer.from_pretrained("codellama/CodeLlama-7b-hf")
+>>> model = LlamaForCausalLM.from_pretrained("codellama/CodeLlama-7b-hf")
+>>> PROMPT = '''def remove_non_ascii(s: str) -> str:
+    """ <FILL_ME>
+    return result
+'''
+>>> input_ids = tokenizer(PROMPT, return_tensors="pt")`"input_ids"]
+>>> generated_ids = model.generate(input_ids, max_new_tokens=128)
+
+>>> filling = tokenizer.batch_decode(generated_ids[:, input_ids.shape[1]:], skip_special_tokens = True)[0]
+>>> print(PROMPT.replace("<FILL_ME>", filling))
+def remove_non_ascii(s: str) -> str:
+    """ Remove non-ASCII characters from a string.
+
+    Args:
+        s: The string to remove non-ASCII characters from.
+
+    Returns:
+        The string with non-ASCII characters removed.
+    """
+    result = ""
+    for c in s:
+        if ord(c) < 128:
+            result += c
+    return result
+
+If you only want the infilled part:
+::
+
+>>> from transformers import pipeline
+>>> import torch
+
+>>> generator = pipeline("text-generation",model="codellama/CodeLlama-7b-hf",torch_dtype=torch.float16, device_map="auto")
+>>> generator('def remove_non_ascii(s: str) -> str:\n    """ <FILL_ME>\n    return result', max_new_tokens = 128, return_type = 1)
+
+Under the hood, the tokenizer [automatically splits by `<FILL_ME>` <https://huggingface.co/docs/transformers/main/model_doc/code_llama#transformers.CodeLlamaTokenizer.fill_token>`__ to create a formatted input string that follows `the original training pattern <https://github.com/facebookresearch/codellama/blob/cb51c14ec761370ba2e2bc351374a79265d0465e/llama/generation.py#L402>`__. This is more robust than preparing the pattern yourself: it avoids pitfalls, such as token glueing, that are very hard to debug.  To see how much CPU and GPU memory you need for this model or others, try `this calculator <https://huggingface.co/spaces/hf-accelerate/model-memory-usage>`__ which can help determine that value.
+
+- The LLaMA tokenizer is a BPE model based on `sentencepiece <https://github.com/google/sentencepiece>`__. One quirk of sentencepiece is that when decoding a sequence, if the first token is the start of the word (e.g. "Banana"), the tokenizer does not prepend the prefix space to the string.
+
+This model was contributed by `ArthurZucker <https://huggingface.co/ArthurZ>`__. The original code of the authors can be found `here <https://github.com/facebookresearch/llama>`__.
+
+
+Args:
+    vocab_size (`int`, *optional*, defaults to 32000):
+        Vocabulary size of the LLaMA model. Defines the number of different tokens that can be represented by the
+        `inputs_ids` passed when calling ``LlamaModel``
+    hidden_size (`int`, *optional*, defaults to 4096):
+        Dimension of the hidden representations.
+    intermediate_size (`int`, *optional*, defaults to 11008):
+        Dimension of the MLP representations.
+    num_hidden_layers (`int`, *optional*, defaults to 32):
+        Number of hidden layers in the Transformer encoder.
+    num_attention_heads (`int`, *optional*, defaults to 32):
+        Number of attention heads for each attention layer in the Transformer encoder.
+    num_key_value_heads (`int`, *optional*):
+        This is the number of key_value heads that should be used to implement Grouped Query Attention. If
+        `num_key_value_heads=num_attention_heads`, the model will use Multi Head Attention (MHA), if
+        `num_key_value_heads=1 the model will use Multi Query Attention (MQA) otherwise GQA is used. When
+        converting a multi-head checkpoint to a GQA checkpoint, each group key and value head should be constructed
+        by meanpooling all the original heads within that group. For more details checkout `this
+        paper <https://arxiv.org/pdf/2305.13245.pdf>`__. If it is not specified, will default to
+        `num_attention_heads`.
+    pretraining_tp (`int`, *optional*, defaults to `1`):
+        Experimental feature. Tensor parallelism rank used during pretraining. Please refer to `this
+        document <https://huggingface.co/docs/transformers/parallelism>`__ to understand more about it. This value is
+        necessary to ensure exact reproducibility of the pretraining results. Please refer to `this
+        issue <https://github.com/pytorch/pytorch/issues/76232>`__.
+    hidden_act (`str` or `function`, *optional*, defaults to `"silu"`):
+        The non-linear activation function (function or string) in the decoder.
+    max_position_embeddings (`int`, *optional*, defaults to 2048):
+        The maximum sequence length that this model might ever be used with. Llama 1 supports up to 2048 tokens,
+        Llama 2 up to 4096, CodeLlama up to 16384.
+    initializer_range (`float`, *optional*, defaults to 0.02):
+        The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
+    rms_norm_eps (`float`, *optional*, defaults to 1e-12):
+        The epsilon used by the rms normalization layers.
+    use_cache (`bool`, *optional*, defaults to `True`):
+        Whether or not the model should return the last key/values attentions (not used by all models). Only
+        relevant if `config.is_decoder=True`.
+    tie_word_embeddings(`bool`, *optional*, defaults to `False`):
+        Whether to tie weight embeddings
+    rope_theta (`float`, *optional*, defaults to 10000.0):
+        The base period of the RoPE embeddings.
+    rope_scaling (`Dict`, *optional*):
+        Dictionary containing the scaling configuration for the RoPE embeddings. Currently supports two scaling
+        strategies: linear and dynamic. Their scaling factor must be an float greater than 1. The expected format
+        is `{"type": strategy name, "factor": scaling factor}`. When using this flag, don't update
+        `max_position_embeddings` to the expected new maximum. See the following thread for more information on how
+        these scaling strategies behave:
+        https://www.reddit.com/r/LocalLLaMA/comments/14mrgpr/dynamically_scaled_rope_further_increases/. This is an
+        experimental feature, subject to breaking API changes in future versions.
+
 .. class:: transformers.models.codegen.configuration_codegen.CodeGenConfig(vocab_size=50400, n_positions=2048, n_ctx=2048, n_embd=4096, n_layer=28, n_head=16, rotary_dim=64, n_inner=None, activation_function='gelu_new', resid_pdrop=0.0, embd_pdrop=0.0, attn_pdrop=0.0, layer_norm_epsilon=1e-05, initializer_range=0.02, use_cache=True, bos_token_id=50256, eos_token_id=50256, tie_word_embeddings=False, **kwargs)
 
 The CodeGen model was proposed in `A Conversational Paradigm for Program Synthesis <https://arxiv.org/abs/2203.13474>`__ by Erik Nijkamp, Bo Pang, Hiroaki Hayashi, Lifu Tu, Huan Wang, Yingbo Zhou, Silvio Savarese, and Caiming Xiong.
@@ -1346,16 +1480,20 @@ These models are contributed by `nghuyong <https://huggingface.co/nghuyong>`__ a
     classifier_dropout (`float`, *optional*):
         The dropout ratio for the classification head.
 
-.. class:: transformers.models.falcon.configuration_falcon.FalconConfig(vocab_size=65024, hidden_size=4544, num_hidden_layers=32, num_attention_heads=71, layer_norm_epsilon=1e-05, initializer_range=0.02, use_cache=True, hidden_dropout=0.0, attention_dropout=0.0, num_kv_heads=None, alibi=False, new_decoder_architecture=False, multi_query=True, parallel_attn=True, bias=False, bos_token_id=11, eos_token_id=11, **kwargs)
+.. class:: transformers.models.falcon.configuration_falcon.FalconConfig(vocab_size=65024, hidden_size=4544, num_hidden_layers=32, num_attention_heads=71, layer_norm_epsilon=1e-05, initializer_range=0.02, use_cache=True, hidden_dropout=0.0, attention_dropout=0.0, num_kv_heads=None, alibi=False, new_decoder_architecture=False, multi_query=True, parallel_attn=True, bias=False, max_position_embeddings=2048, rope_theta=10000.0, rope_scaling=None, bos_token_id=11, eos_token_id=11, **kwargs)
 
-This is the configuration class to store the configuration of a ``FalconModel``. It is used to instantiate a Falcon
-model according to the specified arguments, defining the model architecture. Instantiating a configuration with the
-defaults will yield a similar configuration to that of the
-`tiiuae/falcon-7b <https://huggingface.co/tiiuae/falcon-7b>`__ architecture.
+Falcon is a class of causal decoder-only models built by `TII <https://www.tii.ae/>`__. The largest Falcon checkpoints
+have been trained on >=1T tokens of text, with a particular emphasis on the `RefinedWeb <https://arxiv.org/abs/2306.01116>`__
+corpus. They are made available under the Apache 2.0 license.
 
-Configuration objects inherit from ``PretrainedConfig`` and can be used to control the model outputs. Read the
-documentation from ``PretrainedConfig`` for more information.
 
+Falcon's architecture is modern and optimized for inference, with multi-query attention and support for efficient
+attention variants like `FlashAttention`. Both 'base' models trained only as causal language models as well as
+'instruct' models that have received further fine-tuning are available.
+
+
+Falcon models are (as of 2023) some of the largest and most powerful open-source language models,
+and consistently rank highly in the `OpenLLM leaderboard <https://huggingface.co/spaces/HuggingFaceH4/open_llm_leaderboard>`__.
 
 Args:
     vocab_size (`int`, *optional*, defaults to 65024):
@@ -1393,6 +1531,19 @@ Args:
         instead, as in the original Transformer architecture. Ignored when `new_decoder_architecture` is `True`.
     bias (`bool`, *optional*, defaults to `False`):
         Whether to use bias on Linear layers.
+    max_position_embeddings (`int`, *optional*, defaults to 2048):
+        The maximum sequence length that this model might ever be used with, when `alibi` is `False`. Pretrained
+        Falcon models with RoPE support up to 2048 tokens.
+    rope_theta (`float`, *optional*, defaults to 10000.0):
+        The base period of the RoPE embeddings.
+    rope_scaling (`Dict`, *optional*):
+        Dictionary containing the scaling configuration for the RoPE embeddings. Currently supports two scaling
+        strategies: linear and dynamic. Their scaling factor must be an float greater than 1. The expected format
+        is `{"type": strategy name, "factor": scaling factor}`. When using this flag, don't update
+        `max_position_embeddings` to the expected new maximum. See the following thread for more information on how
+        these scaling strategies behave:
+        https://www.reddit.com/r/LocalLLaMA/comments/14mrgpr/dynamically_scaled_rope_further_increases/. This is an
+        experimental feature, subject to breaking API changes in future versions.
     bos_token_id (`int`, *optional*, defaults to 11):
         The id of the "beginning-of-sequence" token.
     eos_token_id (`int`, *optional*, defaults to 11):
@@ -1711,7 +1862,7 @@ Args:
         Number of attention heads for each attention layer in the Transformer encoder.
     n_inner (`int`, *optional*, defaults to None):
         Dimensionality of the inner feed-forward layers. `None` will set it to 4 times n_embd
-    activation_function (`str`, *optional*, defaults to `"gelu"`):
+    activation_function (`str`, *optional*, defaults to `"gelu_new"`):
         Activation function, to be selected in the list `["relu", "silu", "gelu", "tanh", "gelu_new"]`.
     resid_pdrop (`float`, *optional*, defaults to 0.1):
         The dropout probability for all fully connected layers in the embeddings, encoder, and pooler.
@@ -2353,7 +2504,7 @@ Args:
     use_cache (`bool`, *optional*, defaults to `True`):
         Whether or not the model should return the last key/values attentions (not used by all models)
 
-.. class:: transformers.models.llama.configuration_llama.LlamaConfig(vocab_size=32000, hidden_size=4096, intermediate_size=11008, num_hidden_layers=32, num_attention_heads=32, num_key_value_heads=None, hidden_act='silu', max_position_embeddings=2048, initializer_range=0.02, rms_norm_eps=1e-06, use_cache=True, pad_token_id=None, bos_token_id=1, eos_token_id=2, pretraining_tp=1, tie_word_embeddings=False, rope_scaling=None, **kwargs)
+.. class:: transformers.models.llama.configuration_llama.LlamaConfig(vocab_size=32000, hidden_size=4096, intermediate_size=11008, num_hidden_layers=32, num_attention_heads=32, num_key_value_heads=None, hidden_act='silu', max_position_embeddings=2048, initializer_range=0.02, rms_norm_eps=1e-06, use_cache=True, pad_token_id=None, bos_token_id=1, eos_token_id=2, pretraining_tp=1, tie_word_embeddings=False, rope_theta=10000.0, rope_scaling=None, **kwargs)
 
 The LLaMA model was proposed in `LLaMA: Open and Efficient Foundation Language Models <https://arxiv.org/abs/2302.13971>`__ by Hugo Touvron, Thibaut Lavril, Gautier Izacard, Xavier Martinet, Marie-Anne Lachaux, Timothée Lacroix, Baptiste Rozière, Naman Goyal, Eric Hambro, Faisal Azhar, Aurelien Rodriguez, Armand Joulin, Edouard Grave, Guillaume Lample. It is a collection of foundation language models ranging from 7B to 65B parameters.
 
@@ -2415,8 +2566,8 @@ Args:
     hidden_act (`str` or `function`, *optional*, defaults to `"silu"`):
         The non-linear activation function (function or string) in the decoder.
     max_position_embeddings (`int`, *optional*, defaults to 2048):
-        The maximum sequence length that this model might ever be used with. Typically set this to something large
-        just in case (e.g., 512 or 1024 or 2048).
+        The maximum sequence length that this model might ever be used with. Llama 1 supports up to 2048 tokens,
+        Llama 2 up to 4096, CodeLlama up to 16384.
     initializer_range (`float`, *optional*, defaults to 0.02):
         The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
     rms_norm_eps (`float`, *optional*, defaults to 1e-12):
@@ -2426,6 +2577,8 @@ Args:
         relevant if `config.is_decoder=True`.
     tie_word_embeddings(`bool`, *optional*, defaults to `False`):
         Whether to tie weight embeddings
+    rope_theta (`float`, *optional*, defaults to 10000.0):
+        The base period of the RoPE embeddings.
     rope_scaling (`Dict`, *optional*):
         Dictionary containing the scaling configuration for the RoPE embeddings. Currently supports two scaling
         strategies: linear and dynamic. Their scaling factor must be an float greater than 1. The expected format
@@ -3713,53 +3866,6 @@ Args:
         The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
     layer_norm_eps (`float`, *optional*, defaults to 1e-12):
         The epsilon used by the layer normalization layers.
-
-.. class:: transformers.models.deprecated.open_llama.configuration_open_llama.OpenLlamaConfig(vocab_size=100000, hidden_size=4096, intermediate_size=11008, num_hidden_layers=32, num_attention_heads=32, hidden_act='silu', max_position_embeddings=2048, initializer_range=0.02, rms_norm_eps=1e-06, use_cache=True, pad_token_id=0, bos_token_id=1, eos_token_id=2, tie_word_embeddings=False, use_memory_efficient_attention=True, hidden_dropout_prob=0.1, attention_dropout_prob=0.1, use_stable_embedding=True, shared_input_output_embedding=True, rope_scaling=None, **kwargs)
-
-The Open-Llama model was proposed in `Open-Llama project <https://github.com/s-JoL/Open-Llama>`__ by community developer s-JoL.
-
-The model is mainly based on LLaMA with some modifications, incorporating memory-efficient attention from Xformers, stable embedding from Bloom, and shared input-output embedding from PaLM.
-And the model is pre-trained on both Chinese and English, which gives it better performance on Chinese language tasks.
-
-This model was contributed by `s-JoL <https://huggingface.co/s-JoL>`__.
-The original code can be found `Open-Llama <https://github.com/s-JoL/Open-Llama>`__.
-Checkpoint and usage can be found at `s-JoL/Open-Llama-V1 <https://huggingface.co/s-JoL/Open-Llama-V1>`__.
-
-
-Args:
-    vocab_size (`int`, *optional*, defaults to 32000):
-        Vocabulary size of the Open-Llama model. Defines the number of different tokens that can be represented by
-        the `inputs_ids` passed when calling ``OpenLlamaModel``
-    hidden_size (`int`, *optional*, defaults to 4096):
-        Dimension of the hidden representations.
-    intermediate_size (`int`, *optional*, defaults to 11008):
-        Dimension of the MLP representations.
-    num_hidden_layers (`int`, *optional*, defaults to 32):
-        Number of hidden layers in the Transformer encoder.
-    num_attention_heads (`int`, *optional*, defaults to 32):
-        Number of attention heads for each attention layer in the Transformer encoder.
-    hidden_act (`str` or `function`, *optional*, defaults to `"silu"`):
-        The non-linear activation function (function or string) in the decoder.
-    max_position_embeddings (`int`, *optional*, defaults to 2048):
-        The maximum sequence length that this model might ever be used with. Typically set this to something large
-        just in case (e.g., 512 or 1024 or 2048).
-    initializer_range (`float`, *optional*, defaults to 0.02):
-        The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
-    rms_norm_eps (`float`, *optional*, defaults to 1e-12):
-        The epsilon used by the rms normalization layers.
-    use_cache (`bool`, *optional*, defaults to `True`):
-        Whether or not the model should return the last key/values attentions (not used by all models). Only
-        relevant if `config.is_decoder=True`.
-    tie_word_embeddings(`bool`, *optional*, defaults to `False`):
-        Whether to tie weight embeddings
-    rope_scaling (`Dict`, *optional*):
-        Dictionary containing the scaling configuration for the RoPE embeddings. Currently supports two scaling
-        strategies: linear and dynamic. Their scaling factor must be an float greater than 1. The expected format
-        is `{"type": strategy name, "factor": scaling factor}`. When using this flag, don't update
-        `max_position_embeddings` to the expected new maximum. See the following thread for more information on how
-        these scaling strategies behave:
-        https://www.reddit.com/r/LocalLLaMA/comments/14mrgpr/dynamically_scaled_rope_further_increases/. This is an
-        experimental feature, subject to breaking API changes in future versions.
 
 .. class:: transformers.models.openai.configuration_openai.OpenAIGPTConfig(vocab_size=40478, n_positions=512, n_embd=768, n_layer=12, n_head=12, afn='gelu', resid_pdrop=0.1, embd_pdrop=0.1, attn_pdrop=0.1, layer_norm_epsilon=1e-05, initializer_range=0.02, summary_type='cls_index', summary_use_proj=True, summary_activation=None, summary_proj_to_labels=True, summary_first_dropout=0.1, **kwargs)
 

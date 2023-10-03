@@ -25,7 +25,8 @@ A - Data
 
 Here, we will be using the well known MNIST dataset.
 The dataset here consists of preprocessed NumPy arrays
-containing the MNIST handwritten digit images.
+containing the MNIST handwritten digit images. To download the data,
+`use this link. <https://drive.google.com/file/d/1q-ZBJJvLLW61AGBfYfLtKADvY4j4_OGb>`__
 
 After downloading the data,
 the folder structure should look like this:
