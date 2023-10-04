@@ -1,4 +1,4 @@
-Using EIR - Supervised Learning
+Supervised Learning
 ===============================
 
 .. toctree::
@@ -24,6 +24,7 @@ Sequence Generation
     c_sequence_output/02_sequence_to_sequence.rst
     c_sequence_output/03_image_to_sequence.rst
 
+
 Array Generation
 ================
 
@@ -32,6 +33,7 @@ Array Generation
 
     d_array_output/01_autoencoder.rst
 
+
 Pretraining
 ============
 
@@ -39,7 +41,6 @@ Pretraining
     :maxdepth: 2
 
     e_pretraining/01_checkpointing.rst
-
 
 
 Customizing EIR
