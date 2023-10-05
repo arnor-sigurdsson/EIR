@@ -566,7 +566,9 @@ def get_vocab_iterator(
             vocab_file,
         )
         vocab_iter = yield_tokens_from_file(
-            file_path=vocab_file, split_on=" ", gathered_stats=gathered_stats
+            file_path=vocab_file,
+            split_on=split_on,
+            gathered_stats=gathered_stats,
         )
 
     return vocab_iter
@@ -640,14 +642,15 @@ def yield_tokens_from_deeplake_dataset(
 
 def yield_tokens_from_file(
     file_path: str, split_on: Optional[str], gathered_stats: GatheredSequenceStats
-):
+) -> Generator[Sequence[str], None, None]:
     gathered_stats.total_files += 1
 
     split_func = get_sequence_split_function(split_on=split_on)
 
     with open(file_path, "r") as f:
         for line in f:
-            cur_line = split_func(line.strip())
+            line_parsed = line[:-1] if line.endswith('\n') else line
+            cur_line = split_func(line_parsed)
 
             cur_length = len(cur_line)
             gathered_stats.total_count += len(cur_line)
@@ -691,12 +694,12 @@ def yield_tokens_from_csv(
 
 def get_sequence_split_function(
     split_on: Optional[str],
-) -> Callable[[str], list[str] | str]:
+) -> Callable[[str], list[str]]:
     match split_on:
         case "":
             return lambda x: list(x)
         case None:
-            return lambda x: x
+            return lambda x: [x]
         case _:
             return lambda x: x.split(split_on)
 
