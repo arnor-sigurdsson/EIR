@@ -250,7 +250,7 @@ def test_get_vocab_iterator_vocab_file(tmp_path: Path):
         gathered_stats=gathered_stats_vocab,
         vocab_file=str(vocab_file),
     )
-    vocab = set(word for sequence in vocab_iter_diff_split for word in sequence)
+    vocab = set(token for token in vocab_iter_diff_split)
     assert vocab == set(test_pool)
     assert gathered_stats_vocab.total_count == len(vocab)
 
@@ -315,7 +315,7 @@ def test_possibly_gather_all_stats_from_input(tmp_path):
         gathered_stats=gathered_stats_vocab,
         vocab_file=str(vocab_file),
     )
-    vocab = set(word for sequence in vocab_iter_diff_split for word in sequence)
+    vocab = set(token for token in vocab_iter_diff_split)
     assert vocab == set(test_pool)
     assert gathered_stats_vocab.total_count == len(vocab)
 
@@ -397,7 +397,7 @@ def test_yield_tokens_from_file(tmp_path):
     assert gathered_stats.total_files == 1
     assert gathered_stats.total_count == 4
     assert gathered_stats.max_length == 1
-    assert result == [["a"], ["b"], ["c"], ["d"]]
+    assert result == ["a", "b", "c", "d"]
 
 
 def test_yield_tokens_from_file_handle_different_splits(tmp_path):
@@ -435,7 +435,7 @@ def test_yield_tokens_from_file_retain_newline(tmp_path):
         )
     )
 
-    assert result == [["a"], [""], ["b"]]
+    assert result == ["a", "", "b"]
 
 
 def test_update_max_length(tmp_path):

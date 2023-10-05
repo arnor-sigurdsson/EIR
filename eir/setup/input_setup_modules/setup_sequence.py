@@ -546,6 +546,11 @@ def get_vocab_iterator(
     vocab_file: Union[str, None] = None,
     deeplake_inner_key: Optional[str] = None,
 ) -> Generator[Sequence[str], None, None]:
+    """
+    Note: When using a vocabulary file, we explicitly expect one token per line,
+    therefore we do not split on any character.
+    """
+
     if vocab_file is None:
         logger.info(
             "Vocabulary will be collected from input source %s, "
@@ -567,7 +572,7 @@ def get_vocab_iterator(
         )
         vocab_iter = yield_tokens_from_file(
             file_path=vocab_file,
-            split_on=split_on,
+            split_on=None,
             gathered_stats=gathered_stats,
         )
 
@@ -649,11 +654,15 @@ def yield_tokens_from_file(
 
     with open(file_path, "r") as f:
         for line in f:
-            line_parsed = line[:-1] if line.endswith('\n') else line
+            line_parsed = line[:-1] if line.endswith("\n") else line
             cur_line = split_func(line_parsed)
 
             cur_length = len(cur_line)
-            gathered_stats.total_count += len(cur_line)
+
+            if split_on is None:
+                gathered_stats.total_count += 1
+            else:
+                gathered_stats.total_count += len(cur_line)
 
             if cur_length > gathered_stats.max_length:
                 gathered_stats.max_length = cur_length
@@ -694,12 +703,12 @@ def yield_tokens_from_csv(
 
 def get_sequence_split_function(
     split_on: Optional[str],
-) -> Callable[[str], list[str]]:
+) -> Callable[[str], list[str] | str]:
     match split_on:
         case "":
             return lambda x: list(x)
         case None:
-            return lambda x: [x]
+            return lambda x: x
         case _:
             return lambda x: x.split(split_on)
 
