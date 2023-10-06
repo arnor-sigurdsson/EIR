@@ -46,7 +46,7 @@ and so on:
 
 - ``colorama`` : Cross-platform colored terminal text.
 
-- ``torchtext``  – PyTorch core devs and James Bradbury: Text utilities and datasets for PyTorch
+- ``torchtext``  – PyTorch Text Team: Text utilities, models, transforms, and datasets for PyTorch.
 
 - ``transformers``  – The Hugging Face team (past and future) with the help of all our contributors (https://github.com/huggingface/transformers/graphs/contributors): State-of-the-art Machine Learning for JAX, PyTorch and TensorFlow
 
