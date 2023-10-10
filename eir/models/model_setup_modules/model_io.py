@@ -82,9 +82,11 @@ def _load_model_weights(
         )
 
     incompatible_keys = model.load_state_dict(
-        state_dict=loaded_weights_state_dict, strict=False
+        state_dict=loaded_weights_state_dict,
+        strict=False,
     )
 
+    total_keys = len(loaded_weights_state_dict)
     no_missing = len(incompatible_keys.missing_keys)
     no_unexpected = len(incompatible_keys.unexpected_keys)
     no_incompatible_keys = no_missing + no_unexpected
@@ -105,6 +107,13 @@ def _load_model_weights(
             repr_object.repr(incompatible_keys.missing_keys),
             repr_object.repr(incompatible_keys.unexpected_keys),
         )
+
+    logger.info(
+        "Successfully loaded %d/%d modules from %s.",
+        total_keys,
+        total_keys,
+        model_state_dict_path,
+    )
 
     torch_device = torch.device(device)
     model = model.to(device=torch_device)
