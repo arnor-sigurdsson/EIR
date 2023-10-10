@@ -538,6 +538,7 @@ class LCLAttentionBlock(nn.Module):
         self.encoder = nn.TransformerEncoder(
             encoder_layer=encoder_layer,
             num_layers=self.num_layers,
+            enable_nested_tensor=False,
         )
 
         self.pos_emb = PositionalEmbedding(

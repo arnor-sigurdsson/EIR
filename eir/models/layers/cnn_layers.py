@@ -78,7 +78,9 @@ class ConvAttentionBlock(nn.Module):
         )
 
         self.encoder = nn.TransformerEncoder(
-            encoder_layer=encoder_layer, num_layers=num_layers
+            encoder_layer=encoder_layer,
+            num_layers=num_layers,
+            enable_nested_tensor=False,
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:

@@ -31,13 +31,15 @@ def latent_analysis_wrapper(
     )
     ensure_path_exists(path=latent_output_folder, is_folder=True)
 
+    outputs_parsed = parse_latent_outputs(latent_outputs=latent_outputs.outputs)
+
     save_latent_outputs(
-        outputs=latent_outputs.outputs,
+        outputs=outputs_parsed,
         ids=latent_outputs.ids,
         folder=latent_output_folder,
     )
-    plot_pca(outputs=latent_outputs.outputs, folder=latent_output_folder)
-    plot_tsne(outputs=latent_outputs.outputs, folder=latent_output_folder)
+    plot_pca(outputs=outputs_parsed, folder=latent_output_folder)
+    plot_tsne(outputs=outputs_parsed, folder=latent_output_folder)
 
 
 def register_latent_hook(
@@ -73,6 +75,10 @@ def register_latent_hook(
         return latent_output_object
 
     return get_outputs_and_remove_hook
+
+
+def parse_latent_outputs(latent_outputs: np.ndarray) -> np.ndarray:
+    return latent_outputs.reshape(latent_outputs.shape[0], -1)
 
 
 def save_latent_outputs(

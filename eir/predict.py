@@ -175,7 +175,7 @@ def predict(
 
     run_all_eval_hook_analysis(
         hook_outputs=hook_outputs,
-        run_folder=predict_cl_args.output_folder,
+        run_folder=Path(predict_cl_args.output_folder),
         iteration="predict",
     )
 

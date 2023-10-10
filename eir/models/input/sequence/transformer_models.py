@@ -424,7 +424,9 @@ class TransformerFeatureExtractor(nn.Module):
             norm_first=True,
         )
         self.transformer_encoder = TransformerEncoder(
-            encoder_layer=encoder_layer_base, num_layers=self.model_config.num_layers
+            encoder_layer=encoder_layer_base,
+            num_layers=self.model_config.num_layers,
+            enable_nested_tensor=False,
         )
 
     @property

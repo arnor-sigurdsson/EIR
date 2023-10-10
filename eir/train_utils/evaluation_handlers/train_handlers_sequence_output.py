@@ -26,7 +26,7 @@ from eir.train_utils.evaluation_handlers.evaluation_handlers_utils import (
     general_pre_process_prepared_inputs,
     get_dataset_loader_single_sample_generator,
     get_special_tokens,
-    post_prepare_manual_sequence_inputs,
+    post_prepare_manual_inputs,
     prepare_base_input,
     prepare_manual_sample_data,
     remove_special_tokens_from_string,
@@ -187,7 +187,7 @@ def get_sequence_output_manual_input_samples(
                 sample_inputs=single_sample_inputs, input_objects=input_objects
             )
 
-            final_inputs = post_prepare_manual_sequence_inputs(
+            final_inputs = post_prepare_manual_inputs(
                 prepared_inputs=prepared_inputs,
                 output_name=output_name,
                 input_objects=input_objects,

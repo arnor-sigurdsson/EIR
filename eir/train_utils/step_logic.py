@@ -20,6 +20,7 @@ from torch import autocast, nn
 from torch.cuda.amp import GradScaler
 from torch.nn.functional import pad
 from torch.nn.utils import clip_grad_norm_
+from torch.optim.optimizer import Optimizer
 
 from eir.data_load.data_augmentation import get_mix_data_hook, hook_mix_loss
 from eir.data_load.data_utils import Batch
@@ -468,7 +469,7 @@ def hook_default_optimizer_backward(
 
     step_func = get_optimizer_step_func(
         do_amp=gc.amp,
-        optimizer_step=experiment.optimizer.step,
+        optimizer=experiment.optimizer,
         amp_scaler=amp_scaler,
         device=gc.device,
     )
@@ -535,15 +536,15 @@ def maybe_apply_gradient_clipping_to_model(
 
 def get_optimizer_step_func(
     do_amp: bool,
-    optimizer_step: Callable,
+    optimizer: Optimizer,
     amp_scaler: Optional["GradScaler"],
     device: str,
 ) -> Callable:
     if do_amp and device != "cpu":
         assert amp_scaler is not None
-        return partial(amp_scaler.step, optimizer=optimizer_step)
+        return partial(amp_scaler.step, optimizer=optimizer)
     else:
-        return optimizer_step
+        return optimizer.step
 
 
 def should_perform_optimizer_step(
