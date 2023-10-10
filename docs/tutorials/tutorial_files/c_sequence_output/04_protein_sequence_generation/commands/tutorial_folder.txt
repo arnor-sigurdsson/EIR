@@ -1,0 +1,14 @@
+eir_tutorials/c_sequence_output/04_protein_sequence_generation
+├── conf
+│   ├── fusion.yaml
+│   ├── globals.yaml
+│   ├── inputs_tabular.yaml
+│   ├── inputs_tabular_test.yaml
+│   ├── output.yaml
+│   ├── output_conditioned.yaml
+│   └── output_conditioned_test.yaml
+└── data
+    ├── test_protein_sequences.csv
+    ├── test_tabular_info.csv
+    ├── train_protein_sequences.csv
+    └── train_tabular_info.csv

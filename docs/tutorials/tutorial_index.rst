@@ -23,6 +23,7 @@ Sequence Generation
     c_sequence_output/01_sequence_generation.rst
     c_sequence_output/02_sequence_to_sequence.rst
     c_sequence_output/03_image_to_sequence.rst
+    c_sequence_output/04_tabular_to_sequence.rst
 
 
 Array Generation

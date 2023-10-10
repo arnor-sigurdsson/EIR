@@ -1,0 +1,17 @@
+output_info:
+  output_source: eir_tutorials/c_sequence_output/04_protein_sequence_generation/data/train_protein_sequences.csv
+  output_name: protein_sequence
+  output_type: sequence
+
+output_type_info:
+  max_length: 128
+  split_on: ""
+  sampling_strategy_if_longer: "uniform"
+  min_freq: 1
+
+model_config:
+  embedding_dim: 64
+
+sampling_config:
+  generated_sequence_length: 128
+  n_eval_inputs: 10
