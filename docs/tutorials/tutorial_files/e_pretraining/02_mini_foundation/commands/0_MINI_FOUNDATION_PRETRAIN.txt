@@ -1,0 +1,6 @@
+eirtrain \
+--global_configs eir_tutorials/e_pretraining/02_mini_foundation/conf/globals.yaml \
+--input_configs eir_tutorials/e_pretraining/02_mini_foundation/conf/inputs_image_array_cnn.yaml eir_tutorials/e_pretraining/02_mini_foundation/conf/inputs_sequence.yaml \
+--fusion_configs eir_tutorials/e_pretraining/02_mini_foundation/conf/fusion.yaml \
+--output_configs eir_tutorials/e_pretraining/02_mini_foundation/conf/output_sequence.yaml \
+--globals.output_folder=eir_tutorials/tutorial_runs/e_pretraining/02_mini_foundation

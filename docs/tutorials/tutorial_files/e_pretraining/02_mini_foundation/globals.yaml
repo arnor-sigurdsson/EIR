@@ -1,0 +1,13 @@
+output_folder: eir_tutorials/tutorial_runs/e_pretraining/02_mini_foundation
+valid_size: 1024
+n_saved_models: 1
+checkpoint_interval: 500
+plot_skip_steps: 200
+sample_interval: 500
+memory_dataset: true
+dataloader_workers: 0
+n_epochs: 20
+batch_size: 256
+lr: 0.0005
+optimizer: "adabelief"
+device: "mps"

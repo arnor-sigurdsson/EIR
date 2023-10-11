@@ -42,6 +42,7 @@ Pretraining
     :maxdepth: 2
 
     e_pretraining/01_checkpointing.rst
+    e_pretraining/02_mini_foundation.rst
 
 
 Customizing EIR

@@ -1,0 +1,8 @@
+output_info:
+  output_source: eir_tutorials/e_pretraining/02_mini_foundation/data/IMDB/imdb_labels.csv
+  output_name: imdb_output
+  output_type: tabular
+
+output_type_info:
+  target_cat_columns:
+    - Sentiment

@@ -1,0 +1,14 @@
+output_info:
+  output_source: eir_tutorials/e_pretraining/02_mini_foundation/data/image_captioning/captions.csv
+  output_name: text
+  output_type: sequence
+
+output_type_info:
+  max_length: 128
+  split_on: ""
+  sampling_strategy_if_longer: "uniform"
+  vocab_file: eir_tutorials/e_pretraining/02_mini_foundation/data/vocab.txt
+
+sampling_config:
+  generated_sequence_length: 64
+  n_eval_inputs: 10
