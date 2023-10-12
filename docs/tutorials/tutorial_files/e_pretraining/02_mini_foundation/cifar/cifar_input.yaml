@@ -1,0 +1,13 @@
+input_info:
+  input_source: eir_tutorials/e_pretraining/02_mini_foundation/data/CIFAR10/images
+  input_name: image_input
+  input_type: image
+
+model_config:
+  model_type: cnn
+  model_init_config:
+    channel_exp_base: 5
+    kernel_width: 2
+    down_stride_width: 2
+    kernel_height: 2
+    down_stride_height: 2

@@ -17,9 +17,10 @@ from docs.doc_modules.c_sequence_outputs import (
     a_sequence_generation,
     b_sequence_to_sequence,
     c_image_captioning,
+    d_protein_sequence_generation,
 )
 from docs.doc_modules.d_array_outputs import a_array_mnist_generation
-from docs.doc_modules.e_pretraining import a_mini_foundation
+from docs.doc_modules.e_pretraining import a_checkpointing, b_mini_foundation
 from docs.doc_modules.experiments import AutoDocExperimentInfo, make_tutorial_data
 
 
@@ -57,11 +58,13 @@ def _get_c_sequence_outputs_experiments() -> Iterable[AutoDocExperimentInfo]:
     a_experiments = a_sequence_generation.get_experiments()
     b_experiments = b_sequence_to_sequence.get_experiments()
     c_experiments = c_image_captioning.get_experiments()
+    d_experiments = d_protein_sequence_generation.get_experiments()
 
     return chain(
         a_experiments,
         b_experiments,
         c_experiments,
+        d_experiments,
     )
 
 
@@ -74,10 +77,12 @@ def _get_d_array_outputs_experiments() -> Iterable[AutoDocExperimentInfo]:
 
 
 def _get_e_pretraining_outputs_experiments() -> Iterable[AutoDocExperimentInfo]:
-    a_experiments = a_mini_foundation.get_experiments()
+    a_experiments = a_checkpointing.get_experiments()
+    b_experiments = b_mini_foundation.get_experiments()
 
     return chain(
         a_experiments,
+        b_experiments,
     )
 
 
@@ -90,10 +95,10 @@ if __name__ == "__main__":
 
     experiment_iter = chain.from_iterable(
         [
-            # a_using_eir_experiments,
-            # c_sequence_outputs_experiments,
-            # b_customizing_eir_experiments,
-            # d_array_outputs_experiments,
+            a_using_eir_experiments,
+            c_sequence_outputs_experiments,
+            b_customizing_eir_experiments,
+            d_array_outputs_experiments,
             e_pretraining_experiments,
         ]
     )

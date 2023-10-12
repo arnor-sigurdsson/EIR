@@ -250,7 +250,7 @@ def test_get_vocab_iterator_vocab_file(tmp_path: Path):
         gathered_stats=gathered_stats_vocab,
         vocab_file=str(vocab_file),
     )
-    vocab = set(word for sequence in vocab_iter_diff_split for word in sequence)
+    vocab = set(token for token in vocab_iter_diff_split)
     assert vocab == set(test_pool)
     assert gathered_stats_vocab.total_count == len(vocab)
 
@@ -315,7 +315,7 @@ def test_possibly_gather_all_stats_from_input(tmp_path):
         gathered_stats=gathered_stats_vocab,
         vocab_file=str(vocab_file),
     )
-    vocab = set(word for sequence in vocab_iter_diff_split for word in sequence)
+    vocab = set(token for token in vocab_iter_diff_split)
     assert vocab == set(test_pool)
     assert gathered_stats_vocab.total_count == len(vocab)
 
@@ -376,3 +376,82 @@ def test_get_sequence_input_objects_from_pretrained(sync_vocab_mock, tokenizer_m
     assert sync_vocab_mock.called
     assert isinstance(stats, setup_sequence.GatheredSequenceStats)
     assert encode("input string") == [1, 2, 3]
+
+
+def test_yield_tokens_from_file(tmp_path):
+    d = tmp_path / "sub"
+    d.mkdir()
+    p = d / "vocab.txt"
+    p.write_text("a\nb\nc\nd")
+
+    gathered_stats = setup_sequence.GatheredSequenceStats()
+
+    result = list(
+        setup_sequence.yield_tokens_from_file(
+            file_path=str(p),
+            split_on=None,
+            gathered_stats=gathered_stats,
+        )
+    )
+
+    assert gathered_stats.total_files == 1
+    assert gathered_stats.total_count == 4
+    assert gathered_stats.max_length == 1
+    assert result == ["a", "b", "c", "d"]
+
+
+def test_yield_tokens_from_file_handle_different_splits(tmp_path):
+    d = tmp_path / "sub"
+    d.mkdir()
+    p = d / "vocab.txt"
+
+    p.write_text("a b c\nd e f")
+
+    gathered_stats = setup_sequence.GatheredSequenceStats()
+
+    result = list(
+        setup_sequence.yield_tokens_from_file(
+            file_path=str(p),
+            split_on=" ",
+            gathered_stats=gathered_stats,
+        )
+    )
+
+    assert result == [["a", "b", "c"], ["d", "e", "f"]]
+
+
+def test_yield_tokens_from_file_retain_newline(tmp_path):
+    tmp_dir = tmp_path / "sub"
+    tmp_dir.mkdir()
+    vocab_file = tmp_dir / "vocab.txt"
+
+    vocab_file.write_text("a\n\nb")
+    gathered_stats = setup_sequence.GatheredSequenceStats()
+    result = list(
+        setup_sequence.yield_tokens_from_file(
+            file_path=str(vocab_file),
+            split_on=None,
+            gathered_stats=gathered_stats,
+        )
+    )
+
+    assert result == ["a", "", "b"]
+
+
+def test_update_max_length(tmp_path):
+    tmp_dir = tmp_path / "sub"
+    tmp_dir.mkdir()
+    vocab_file = tmp_dir / "vocab.txt"
+
+    vocab_file.write_text("a\nbc\ndef")
+
+    gathered_stats = setup_sequence.GatheredSequenceStats()
+    _ = list(
+        setup_sequence.yield_tokens_from_file(
+            file_path=str(vocab_file),
+            split_on="",
+            gathered_stats=gathered_stats,
+        )
+    )
+
+    assert gathered_stats.max_length == 3

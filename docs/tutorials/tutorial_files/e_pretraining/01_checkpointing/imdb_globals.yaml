@@ -1,0 +1,13 @@
+output_folder: eir_tutorials/tutorial_runs/e_pretraining/01_checkpointing
+valid_size: 1024
+n_saved_models: 1
+checkpoint_interval: 200
+plot_skip_steps: 0
+sample_interval: 200
+memory_dataset: true
+dataloader_workers: 0
+n_epochs: 5
+batch_size: 64
+lr: 0.0005
+optimizer: "adabelief"
+device: "cpu"

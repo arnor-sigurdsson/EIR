@@ -82,9 +82,11 @@ def _load_model_weights(
         )
 
     incompatible_keys = model.load_state_dict(
-        state_dict=loaded_weights_state_dict, strict=False
+        state_dict=loaded_weights_state_dict,
+        strict=False,
     )
 
+    total_keys = len(loaded_weights_state_dict)
     no_missing = len(incompatible_keys.missing_keys)
     no_unexpected = len(incompatible_keys.unexpected_keys)
     no_incompatible_keys = no_missing + no_unexpected
@@ -105,6 +107,13 @@ def _load_model_weights(
             repr_object.repr(incompatible_keys.missing_keys),
             repr_object.repr(incompatible_keys.unexpected_keys),
         )
+
+    logger.info(
+        "Successfully loaded %d/%d modules from %s.",
+        total_keys,
+        total_keys,
+        model_state_dict_path,
+    )
 
     torch_device = torch.device(device)
     model = model.to(device=torch_device)
@@ -139,17 +148,30 @@ def _filter_state_dict_keys(
 def _filter_incompatible_parameter_shapes_for_loading(
     source_state_dict: Dict[str, Any], destination_state_dict: Dict[str, Any]
 ) -> Dict[str, Any]:
+    """
+    Note that the way this is used is a bit unclear / backwards, but the destination
+    state dict is the one that contains weights loaded from the pretrained model,
+    and the source state dict is the current, randomly initialized model.
+
+    When there is a shape that is incompatible, but with the same name, we replace
+    the parameter in the destination state dict with the one from the source state.
+    This ensures that when we model.load_state_dict(...), we effectively maintain
+    the original weights in the source model, vs. alternatively having a clash
+    trying to load incompatible weights into the source model that happen to have
+    the same name.
+    """
+
     destination_state_dict = deepcopy(destination_state_dict)
 
-    for k in destination_state_dict:
-        if k in source_state_dict:
-            if destination_state_dict[k].shape != source_state_dict[k].shape:
+    for key in destination_state_dict:
+        if key in source_state_dict:
+            if destination_state_dict[key].shape != source_state_dict[key].shape:
                 logger.info(
-                    f"Skipping loading of parameter: {k} "
+                    f"Skipping loading of parameter: {key} "
                     f"due to incompatible shapes. "
-                    f"Source shape: {source_state_dict[k].shape}. "
-                    f"Destination shape: {destination_state_dict[k].shape}."
+                    f"Source shape: {source_state_dict[key].shape}. "
+                    f"Destination shape: {destination_state_dict[key].shape}."
                 )
-                destination_state_dict[k] = source_state_dict[k]
+                destination_state_dict[key] = source_state_dict[key]
 
     return destination_state_dict

@@ -247,7 +247,7 @@ def df_to_nested_dict(
 def gather_all_ids_from_output_configs(
     output_configs: Sequence[schemas.OutputConfig],
 ) -> Tuple[str, ...]:
-    all_ids = set()
+    all_ids: set[str] = set()
     for config in output_configs:
         cur_source = Path(config.output_info.output_source)
         if cur_source.suffix == ".csv":

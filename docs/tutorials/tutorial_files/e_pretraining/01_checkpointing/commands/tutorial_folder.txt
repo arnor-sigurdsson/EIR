@@ -1,0 +1,12 @@
+eir_tutorials/e_pretraining/01_checkpointing
+├── conf
+│   ├── imdb_fusion.yaml
+│   ├── imdb_globals.yaml
+│   ├── imdb_input.yaml
+│   └── imdb_output.yaml
+└── data
+    └── IMDB
+        ├── IMDB_Reviews
+        ├── conf
+        ├── imdb.vocab
+        └── imdb_labels.csv

@@ -1,8 +1,8 @@
 from copy import copy
-from dataclasses import dataclass, fields
+from dataclasses import asdict, dataclass, fields
 from pathlib import Path
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Dict, Iterable, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Union
 
 import dill
 import joblib
@@ -196,6 +196,13 @@ def _check_current_and_loaded_input_config_compatibility(
         current_value = getattr(current_input_config, key)
         loaded_value = getattr(loaded_input_config, key)
 
+        if _should_skip_warning(
+            key=key,
+            current_value=current_value,
+            loaded_value=loaded_value,
+        ):
+            continue
+
         if current_value != loaded_value:
             logger.warning(
                 "Expected '%s' to be the same in current input configuration"
@@ -216,6 +223,22 @@ def _check_current_and_loaded_input_config_compatibility(
                 loaded_value,
                 serialized_input_config_path,
             )
+
+
+def _should_skip_warning(key: str, current_value: Any, loaded_value: Any) -> bool:
+    if key != "model_config":
+        return False
+
+    current_dict = asdict(current_value)
+    loaded_dict = asdict(loaded_value)
+
+    differing_keys = [k for k, v in current_dict.items() if loaded_dict.get(k) != v]
+
+    return (
+        len(differing_keys) == 1
+        and differing_keys[0] == "model_type"
+        and "linked" in loaded_dict["model_type"]
+    )
 
 
 def serialize_chosen_input_objects(

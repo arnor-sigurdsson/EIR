@@ -185,27 +185,33 @@ def test_maybe_apply_gradient_clipping_to_model():
 
 
 def test_get_optimizer_step_func():
-    optimizer_step = MagicMock()
+    optimizer = MagicMock()
     amp_scaler = GradScaler()
 
     step_func = step_logic.get_optimizer_step_func(
-        do_amp=True, optimizer_step=optimizer_step, amp_scaler=amp_scaler, device="cuda"
-    )
-    assert step_func.func.__self__ is amp_scaler
-    assert step_func.keywords == {"optimizer": optimizer_step}
-
-    step_func = step_logic.get_optimizer_step_func(
-        do_amp=False,
-        optimizer_step=optimizer_step,
+        do_amp=True,
+        optimizer=optimizer,
         amp_scaler=amp_scaler,
         device="cuda",
     )
-    assert step_func is optimizer_step
+    assert step_func.func.__self__ is amp_scaler
+    assert step_func.keywords == {"optimizer": optimizer}
 
     step_func = step_logic.get_optimizer_step_func(
-        do_amp=True, optimizer_step=optimizer_step, amp_scaler=amp_scaler, device="cpu"
+        do_amp=False,
+        optimizer=optimizer,
+        amp_scaler=amp_scaler,
+        device="cuda",
     )
-    assert step_func is optimizer_step
+    assert step_func is optimizer.step
+
+    step_func = step_logic.get_optimizer_step_func(
+        do_amp=True,
+        optimizer=optimizer,
+        amp_scaler=amp_scaler,
+        device="cpu",
+    )
+    assert step_func is optimizer.step
 
 
 def test_maybe_update_model_parameters_with_swa_basics():

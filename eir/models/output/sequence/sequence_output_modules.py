@@ -116,6 +116,7 @@ class SequenceOutputModule(nn.Module):
         self.output_transformer = nn.TransformerEncoder(
             encoder_layer=transformer_output_layer_base,
             num_layers=self.output_model_init_config.num_layers,
+            enable_nested_tensor=False,
         )
 
         self.match_projections = nn.ModuleDict()

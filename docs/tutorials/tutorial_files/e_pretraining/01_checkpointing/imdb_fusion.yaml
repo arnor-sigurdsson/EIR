@@ -1,0 +1,3 @@
+model_type: mlp-residual
+model_config:
+  fc_task_dim: 128

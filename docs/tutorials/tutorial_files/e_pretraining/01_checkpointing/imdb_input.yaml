@@ -1,0 +1,13 @@
+input_info:
+  input_source: eir_tutorials/e_pretraining/01_checkpointing/data/IMDB/IMDB_Reviews
+  input_name: captions
+  input_type: sequence
+
+input_type_info:
+  max_length: 64
+  split_on: " "
+  tokenizer: null
+  sampling_strategy_if_longer: "uniform"
+
+model_config:
+  embedding_dim: 64

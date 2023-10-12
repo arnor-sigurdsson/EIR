@@ -1,0 +1,8 @@
+input_info:
+  input_source: eir_tutorials/c_sequence_output/04_protein_sequence_generation/data/test_tabular_info.csv
+  input_name: proteins_tabular
+  input_type: tabular
+
+input_type_info:
+  input_cat_columns:
+    - classification

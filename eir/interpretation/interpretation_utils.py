@@ -94,8 +94,9 @@ def plot_attributions_bar(
         x="Attribution",
         y="Input",
         order=order,
-        palette="Blues_d",
-        errcolor=".2",
+        color="#1f77b4",
+        legend=False,
+        err_kws={"color": ".2"},
         capsize=0.1,
         errorbar=("ci", 95),
     )

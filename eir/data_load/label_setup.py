@@ -472,6 +472,9 @@ def gather_ids_from_data_source(
     if is_deeplake_dataset(data_source=str(data_source)):
         deeplake_ds = load_deeplake_dataset(data_source=str(data_source))
         iterator = (sample.numpy().item() for sample in deeplake_ds["ID"])
+    elif data_source.suffix == ".csv":
+        ids = gather_ids_from_tabular_file(file_path=data_source)
+        iterator = (str(i) for i in ids)
     else:
         iterator = get_file_path_iterator(data_source=data_source, validate=validate)
         iterator = (i.stem for i in iterator)
@@ -482,7 +485,7 @@ def gather_ids_from_data_source(
     return all_ids
 
 
-def gather_ids_from_tabular_file(file_path: Path):
+def gather_ids_from_tabular_file(file_path: Path) -> Tuple[str, ...]:
     df = pd.read_csv(file_path, usecols=["ID"])
     all_ids = tuple(df["ID"].astype(str))
 

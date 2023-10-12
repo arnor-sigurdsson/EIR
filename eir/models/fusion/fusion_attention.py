@@ -102,7 +102,9 @@ class SequenceProjection(nn.Module):
         )
 
         self.encoder = nn.TransformerEncoder(
-            encoder_layer=encoder_layer_base, num_layers=1
+            encoder_layer=encoder_layer_base,
+            num_layers=1,
+            enable_nested_tensor=False,
         )
 
         self.downsample_identity: nn.Linear | nn.Identity | LCL | LCLResidualBlock = (
@@ -174,7 +176,9 @@ class SequenceResidualCrossAttentionProjection(nn.Module):
             norm_first=True,
         )
         self.encoder = nn.TransformerEncoder(
-            encoder_layer=encoder_layer_base, num_layers=1
+            encoder_layer=encoder_layer_base,
+            num_layers=1,
+            enable_nested_tensor=False,
         )
 
         ca_mask = torch.ones((1, self.target_max_length)).bool()

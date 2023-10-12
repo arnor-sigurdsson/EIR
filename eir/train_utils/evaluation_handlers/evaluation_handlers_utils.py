@@ -347,16 +347,21 @@ def _streamline_tabular_data_for_transformers(
     return parsed_output
 
 
-def post_prepare_manual_sequence_inputs(
+def post_prepare_manual_inputs(
     prepared_inputs: Dict[str, Any],
     output_name: str,
     input_objects: "al_input_objects_as_dict",
 ) -> Dict[str, torch.Tensor]:
-    prepared_inputs_masked = {}
+    prepared_inputs_post = {}
 
     for input_name, prepared_input in prepared_inputs.items():
         input_object = input_objects[input_name]
         input_info = input_object.input_config.input_info
+
+        input_type = input_info.input_type
+        if input_type != "sequence":
+            prepared_inputs_post[input_name] = prepared_input
+            continue
 
         assert isinstance(input_object, ComputedSequenceInputInfo)
         assert input_object.tokenizer is not None
@@ -368,19 +373,29 @@ def post_prepare_manual_sequence_inputs(
 
         if input_name == output_name:
             if input_info.input_type == "sequence":
-                prepared_inputs_masked[output_name] = torch.tensor(
+                prepared_inputs_post[output_name] = torch.tensor(
                     [i for i in prepared_input if i != pad_idx], dtype=torch.long
                 )
             else:
                 raise NotImplementedError()
 
         else:
-            prepared_inputs_masked[input_name] = prepared_input
+            prepared_inputs_post[input_name] = prepared_input
 
-    prepared_inputs_batched = {
-        k: v.unsqueeze(0) for k, v in prepared_inputs_masked.items()
-    }
+    prepared_inputs_batched = _recursive_unsqueeze(data=prepared_inputs_post, dim=0)
     return prepared_inputs_batched
+
+
+def _recursive_unsqueeze(
+    data: dict,
+    dim: int,
+) -> Any:
+    if isinstance(data, dict):
+        return {k: _recursive_unsqueeze(v, dim=dim) for k, v in data.items()}
+    elif isinstance(data, torch.Tensor):
+        return data.unsqueeze(dim=dim)
+    else:
+        raise NotImplementedError()
 
 
 def prepare_manual_sample_data(

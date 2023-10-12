@@ -234,8 +234,16 @@ def get_image_normalization_values(
     assert means is not None
     assert stds is not None
 
-    means_tensor = torch.tensor(means)
-    stds_tensor = torch.tensor(stds)
+    if torch.is_tensor(means):
+        assert isinstance(means, torch.Tensor)
+        means_tensor = means.clone().detach()
+    else:
+        means_tensor = torch.tensor(means)
+    if torch.is_tensor(stds):
+        assert isinstance(stds, torch.Tensor)
+        stds_tensor = stds.clone().detach()
+    else:
+        stds_tensor = torch.tensor(stds)
 
     stats = ImageNormalizationStats(
         channel_means=means_tensor,

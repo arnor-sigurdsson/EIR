@@ -46,7 +46,7 @@ and so on:
 
 - ``colorama`` : Cross-platform colored terminal text.
 
-- ``torchtext``  – PyTorch core devs and James Bradbury: Text utilities and datasets for PyTorch
+- ``torchtext``  – PyTorch Text Team: Text utilities, models, transforms, and datasets for PyTorch.
 
 - ``transformers``  – The Hugging Face team (past and future) with the help of all our contributors (https://github.com/huggingface/transformers/graphs/contributors): State-of-the-art Machine Learning for JAX, PyTorch and TensorFlow
 
@@ -54,21 +54,21 @@ and so on:
 
 - ``ipython``  – The IPython Development Team: IPython: Productive Interactive Computing
 
-- ``perceiver-pytorch``  – Phil Wang: Perceiver - Pytorch
-
 - ``timm``  – Ross Wightman: PyTorch Image Models
 
 - ``captum``  – PyTorch Team: Model interpretability for PyTorch
 
-- ``aioboto3``  – Terry Cain: Async boto3 wrapper
-
 - ``deeplake``  – activeloop.ai: Activeloop Deep Lake
+
+- ``aioboto3``  – Terry Cain: Async boto3 wrapper
 
 - ``termcolor`` : ANSI color formatting for output in terminal
 
-- ``tokenizers``  – Anthony MOI: Fast and Customizable Tokenizers
+- ``tokenizers``  – Anthony MOI <m.anthony.moi@gmail.com>: 
 
 - ``pyarrow`` : Python library for Apache Arrow
+
+- ``einops``  – Alex Rogozhnikov: A new flavour of deep learning operations
 
 - ``memory-profiler``  – Fabian Pedregosa: A module for monitoring memory usage of a python program
 
@@ -82,7 +82,7 @@ and so on:
 
 - ``ipykernel`` : IPython Kernel for Jupyter
 
-- ``coverage``  – Ned Batchelder and 216 others: Code coverage measurement for Python
+- ``coverage``  – Ned Batchelder and 218 others: Code coverage measurement for Python
 
 - ``snakeviz`` : A web-based viewer for Python profiler output
 

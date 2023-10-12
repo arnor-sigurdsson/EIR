@@ -1,7 +1,7 @@
 import os
 from copy import copy
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Callable, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Tuple, Union
 
 from torch import distributed as dist
 from torch.nn.parallel import DistributedDataParallel
@@ -47,19 +47,25 @@ def maybe_make_model_distributed(
 
     local_rank = int(os.environ["LOCAL_RANK"])
 
-    ddp_kwargs: dict[str, Optional[int] | Optional[list[int]]] = {
-        "device_ids": None,
-        "output_device": None,
-    }
-    if "cuda" in device:
-        ddp_kwargs = {"device_ids": [local_rank], "output_device": local_rank}
+    device_ids = None
+    output_device = None
 
-    model = AttrDelegatedDistributedDataParallel(module=model, **ddp_kwargs)
+    if "cuda" in device:
+        device_ids = [local_rank]
+        output_device = local_rank
+
+    model = AttrDelegatedDistributedDataParallel(
+        module=model,
+        device_ids=device_ids,
+        output_device=output_device,
+    )
 
     logger.info(
-        "Initialized distributed model with rank '%d' and arguments: '%s'.",
+        "Initialized distributed model with rank '%d' and arguments "
+        "'device_ids': '%s', 'output_device': '%s'.",
         local_rank,
-        ddp_kwargs,
+        device_ids,
+        output_device,
     )
 
     return model

@@ -379,7 +379,6 @@ def plot_tabular_categorical_attributions(
         y=category_attributions,
         color="black",
         markers=".",
-        scale=1.0,
         errorbar=("ci", 95),
         capsize=0.1,
         linestyles="",
@@ -389,6 +388,7 @@ def plot_tabular_categorical_attributions(
     ax.set_xlabel(feature_name_to_plot)
     ax.set_ylabel("Attribution (impact on model output)")
 
+    ax.set_xticks(ax.get_xticks())
     ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
 
     plt.tight_layout()
