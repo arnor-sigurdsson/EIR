@@ -20,7 +20,7 @@ and so on:
 
 - ``matplotlib``  – John D. Hunter, Michael Droettboom: Python plotting package
 
-- ``pytorch-ignite``  – PyTorch Core Team: A lightweight library to help with training neural networks in PyTorch.
+- ``pytorch-ignite``  – PyTorch-Ignite Team: A lightweight library to help with training neural networks in PyTorch.
 
 - ``tqdm`` : Fast, Extensible Progress Meter
 
