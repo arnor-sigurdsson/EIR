@@ -9,6 +9,7 @@ from matplotlib import pyplot as plt
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from torch import nn
+from umap import UMAP
 
 if TYPE_CHECKING:
     from eir.train_utils.evaluation import EvaluationResults
@@ -31,15 +32,16 @@ def latent_analysis_wrapper(
     )
     ensure_path_exists(path=latent_output_folder, is_folder=True)
 
-    outputs_parsed = parse_latent_outputs(latent_outputs=latent_outputs.outputs)
-
     save_latent_outputs(
-        outputs=outputs_parsed,
+        outputs=latent_outputs.outputs,
         ids=latent_outputs.ids,
         folder=latent_output_folder,
     )
+
+    outputs_parsed = parse_latent_outputs(latent_outputs=latent_outputs.outputs)
     plot_pca(outputs=outputs_parsed, folder=latent_output_folder)
     plot_tsne(outputs=outputs_parsed, folder=latent_output_folder)
+    plot_umap(outputs=outputs_parsed, folder=latent_output_folder)
 
 
 def register_latent_hook(
@@ -84,7 +86,7 @@ def parse_latent_outputs(latent_outputs: np.ndarray) -> np.ndarray:
 def save_latent_outputs(
     outputs: np.ndarray, ids: list[str], folder: Path
 ) -> np.ndarray:
-    assert len(outputs) == len(ids)
+    assert len(outputs) == len(ids), "Number of outputs and IDs must match."
 
     ids_array = np.array(ids)
     max_str_len = max(len(id_) for id_ in ids_array)
@@ -92,7 +94,7 @@ def save_latent_outputs(
     structured_array = np.empty(
         len(outputs),
         dtype=[
-            ("Latent", float, outputs.shape[1]),
+            ("Latent", float, outputs.shape[1:]),
             ("ID", f"U{max_str_len}"),
         ],
     )
@@ -136,4 +138,15 @@ def plot_tsne(outputs: np.ndarray, folder: Path) -> None:
 
 
 def plot_umap(outputs: np.ndarray, folder: Path) -> None:
-    pass
+    umap = UMAP(n_components=2)
+
+    reduced = umap.fit_transform(X=outputs)
+
+    plt.figure(figsize=(8, 6))
+    plt.scatter(reduced[:, 0], reduced[:, 1], s=2)
+
+    plt.xlabel("UMAP 1")
+    plt.ylabel("UMAP 2")
+    plt.title("UMAP plot of latent space")
+
+    plt.savefig(folder / "umap.png")
