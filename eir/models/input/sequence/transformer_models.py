@@ -382,7 +382,7 @@ class BasicTransformerFeatureExtractorModelConfig:
         The number of encoder blocks in the transformer model.
 
     :param dim_feedforward:
-        The dimension of the feedforward network model
+        The dimension of the feedforward layers in the transformer model.
 
     :param dropout:
          Dropout value to use in the encoder layers.

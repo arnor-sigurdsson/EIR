@@ -112,7 +112,8 @@ class LCLModelConfig:
         Controls the size of the patches used in the first layer. If set to ``None``,
         the input is flattened according to the torch ``flatten`` function. Note that
         when using this parameter, we generally want the kernel width to be set to
-        the multiplication of the patch size.
+        the multiplication of the patch size. Order follows PyTorch convention, i.e.,
+        [channels, height, width].
 
     :param layers:
         Controls the number of layers in the model. If set to ``None``, the model will
