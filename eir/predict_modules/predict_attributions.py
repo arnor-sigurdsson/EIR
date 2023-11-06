@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 from random import sample
-from typing import TYPE_CHECKING, Literal, Union
+from typing import TYPE_CHECKING, Literal, Sequence, Union
 
 from aislib.misc_utils import ensure_path_exists
 from torch import nn
@@ -14,7 +14,10 @@ from eir.experiment_io.experiment_io import LoadedTrainExperiment
 from eir.interpretation.interpretation import tabular_attribution_analysis_wrapper
 from eir.predict_modules.predict_data import set_up_default_dataset
 from eir.predict_modules.predict_input_setup import set_up_inputs_for_predict
-from eir.predict_modules.predict_target_setup import get_target_labels_for_testing
+from eir.predict_modules.predict_target_setup import (
+    MergedPredictTargetLabels,
+    get_target_labels_for_testing,
+)
 from eir.setup.config import Configs
 from eir.setup.input_setup import al_input_objects_as_dict
 from eir.setup.output_setup import al_output_objects_as_dict
@@ -96,7 +99,7 @@ def get_background_source_config(
         )
         return train_configs
 
-    raise ValueError()
+    raise ValueError("Invalid background source. Expected 'train' or 'predict'.")
 
 
 @dataclass
@@ -145,10 +148,6 @@ def _get_predict_background_loader(
     background_ids_pool = label_setup.gather_all_ids_from_all_inputs(
         input_configs=configs.input_configs
     )
-    background_ids_sampled = sample(
-        population=background_ids_pool,
-        k=num_attribution_background_samples,
-    )
 
     custom_ops = None
     if loaded_hooks is not None:
@@ -157,7 +156,13 @@ def _get_predict_background_loader(
     target_labels = get_target_labels_for_testing(
         configs_overloaded_for_predict=configs,
         custom_column_label_parsing_ops=custom_ops,
-        ids=background_ids_sampled,
+        ids=background_ids_pool,
+    )
+
+    background_ids_sampled = _get_background_ids_sample(
+        target_labels=target_labels,
+        ids_inputs=background_ids_pool,
+        num_attribution_background_samples=num_attribution_background_samples,
     )
 
     background_inputs_as_dict = set_up_inputs_for_predict(
@@ -197,3 +202,21 @@ def _get_predict_attribution_output_folder_target(
     ensure_path_exists(path=attribution_output_folder, is_folder=True)
 
     return attribution_output_folder
+
+
+def _get_background_ids_sample(
+    target_labels: MergedPredictTargetLabels,
+    ids_inputs: Sequence[str],
+    num_attribution_background_samples: int,
+) -> list[str]:
+    ids_target_set = set(target_labels.label_dict.keys())
+    ids_inputs_set = set(ids_inputs)
+
+    ids_common: list[str] = list(ids_target_set.intersection(ids_inputs_set))
+
+    background_ids_sampled: list[str] = sample(
+        population=ids_common,
+        k=num_attribution_background_samples,
+    )
+
+    return background_ids_sampled

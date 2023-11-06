@@ -70,6 +70,8 @@ and so on:
 
 - ``einops``  – Alex Rogozhnikov: A new flavour of deep learning operations
 
+- ``umap-learn`` : Uniform Manifold Approximation and Projection
+
 - ``memory-profiler``  – Fabian Pedregosa: A module for monitoring memory usage of a python program
 
 - ``pytest``  – Holger Krekel, Bruno Oliveira, Ronny Pfannschmidt, Floris Bruynooghe, Brianna Laugher, Florian Bruhin and others: pytest: simple powerful testing with Python

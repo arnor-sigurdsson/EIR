@@ -41,6 +41,7 @@ termcolor = "^2.3.0"
 tokenizers = "^0.14.0"
 pyarrow = "^13.0.0"
 einops = "^0.7.0"
+umap-learn = "^0.5.4"
 
 [tool.poetry.group.dev.dependencies]
 memory-profiler = "^0.61.0"
