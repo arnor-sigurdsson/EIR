@@ -232,6 +232,30 @@ def _get_regression_output_configs() -> Sequence[Dict]:
                 "output_configs": _get_regression_output_configs(),
             },
         },
+        # Case 3: Transformer
+        {
+            "injections": {
+                "global_configs": {
+                    "memory_dataset": True,
+                },
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_array"},
+                        "input_type_info": {
+                            "normalization": None,
+                        },
+                        "model_config": {
+                            "model_type": "transformer",
+                            "model_init_config": {
+                                "patch_size": [1, 1, 10],
+                                "embedding_dim": 32,
+                            },
+                        },
+                    },
+                ],
+                "output_configs": _get_regression_output_configs(),
+            },
+        },
     ],
     indirect=True,
 )
