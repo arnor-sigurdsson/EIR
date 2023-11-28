@@ -113,6 +113,12 @@ Args:
         `Self-Attention with Relative Position Representations (Shaw et al.) <https://arxiv.org/abs/1803.02155>`__.
         For more information on `"relative_key_query"`, please refer to *Method 4* in `Improve Transformer Models
         with Better Relative Position Embeddings (Huang et al.) <https://arxiv.org/abs/2009.13658>`__.
+    pad_token_id (`int`, *optional*, defaults to 0):
+        Padding token id.
+    bos_token_id (`int`, *optional*, defaults to 2):
+        Beginning of stream token id.
+    eos_token_id (`int`, *optional*, defaults to 3):
+        End of stream token id.
 
 .. class:: transformers.models.bart.configuration_bart.BartConfig(vocab_size=50265, max_position_embeddings=1024, encoder_layers=12, encoder_ffn_dim=4096, encoder_attention_heads=16, decoder_layers=12, decoder_ffn_dim=4096, decoder_attention_heads=16, encoder_layerdrop=0.0, decoder_layerdrop=0.0, activation_function='gelu', d_model=1024, dropout=0.1, attention_dropout=0.0, activation_dropout=0.0, init_std=0.02, classifier_dropout=0.0, scale_embedding=False, use_cache=True, num_labels=3, pad_token_id=1, bos_token_id=0, eos_token_id=2, is_encoder_decoder=True, decoder_start_token_id=2, forced_eos_token_id=2, **kwargs)
 
@@ -528,11 +534,11 @@ Args:
         Please refer to the paper about LayerDrop: https://arxiv.org/abs/1909.11556 for further details
     activation_dropout (`float`, *optional*, defaults to 0.0):
         The dropout ratio for activations inside the fully connected layer.
-    pad_token_id (`int`, *optional*, defaults to 1)
+    pad_token_id (`int`, *optional*, defaults to 1):
         Padding token id.
-    bos_token_id (`int`, *optional*, defaults to 0)
+    bos_token_id (`int`, *optional*, defaults to 0):
         Beginning of stream token id.
-    eos_token_id (`int`, *optional*, defaults to 2)
+    eos_token_id (`int`, *optional*, defaults to 2):
         End of stream token id.
 
 .. class:: transformers.models.blenderbot.configuration_blenderbot.BlenderbotConfig(vocab_size=8008, max_position_embeddings=128, encoder_layers=2, encoder_ffn_dim=10240, encoder_attention_heads=32, decoder_layers=24, decoder_ffn_dim=10240, decoder_attention_heads=32, encoder_layerdrop=0.0, decoder_layerdrop=0.0, use_cache=True, is_encoder_decoder=True, activation_function='gelu', d_model=2560, dropout=0.1, attention_dropout=0.0, activation_dropout=0.0, init_std=0.02, decoder_start_token_id=1, scale_embedding=False, pad_token_id=0, bos_token_id=1, eos_token_id=2, encoder_no_repeat_ngram_size=3, forced_eos_token_id=2, **kwargs)
@@ -890,9 +896,9 @@ Args:
     intermediate_size (`int`, *optional*, defaults to 11008):
         Dimension of the MLP representations.
     num_hidden_layers (`int`, *optional*, defaults to 32):
-        Number of hidden layers in the Transformer encoder.
+        Number of hidden layers in the Transformer decoder.
     num_attention_heads (`int`, *optional*, defaults to 32):
-        Number of attention heads for each attention layer in the Transformer encoder.
+        Number of attention heads for each attention layer in the Transformer decoder.
     num_key_value_heads (`int`, *optional*):
         This is the number of key_value heads that should be used to implement Grouped Query Attention. If
         `num_key_value_heads=num_attention_heads`, the model will use Multi Head Attention (MHA), if
@@ -901,11 +907,6 @@ Args:
         by meanpooling all the original heads within that group. For more details checkout `this
         paper <https://arxiv.org/pdf/2305.13245.pdf>`__. If it is not specified, will default to
         `num_attention_heads`.
-    pretraining_tp (`int`, *optional*, defaults to `1`):
-        Experimental feature. Tensor parallelism rank used during pretraining. Please refer to `this
-        document <https://huggingface.co/docs/transformers/parallelism>`__ to understand more about it. This value is
-        necessary to ensure exact reproducibility of the pretraining results. Please refer to `this
-        issue <https://github.com/pytorch/pytorch/issues/76232>`__.
     hidden_act (`str` or `function`, *optional*, defaults to `"silu"`):
         The non-linear activation function (function or string) in the decoder.
     max_position_embeddings (`int`, *optional*, defaults to 2048):
@@ -913,25 +914,50 @@ Args:
         Llama 2 up to 4096, CodeLlama up to 16384.
     initializer_range (`float`, *optional*, defaults to 0.02):
         The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
-    rms_norm_eps (`float`, *optional*, defaults to 1e-12):
+    rms_norm_eps (`float`, *optional*, defaults to 1e-06):
         The epsilon used by the rms normalization layers.
     use_cache (`bool`, *optional*, defaults to `True`):
         Whether or not the model should return the last key/values attentions (not used by all models). Only
         relevant if `config.is_decoder=True`.
-    tie_word_embeddings(`bool`, *optional*, defaults to `False`):
+    pad_token_id (`int`, *optional*):
+        Padding token id.
+    bos_token_id (`int`, *optional*, defaults to 1):
+        Beginning of stream token id.
+    eos_token_id (`int`, *optional*, defaults to 2):
+        End of stream token id.
+    pretraining_tp (`int`, *optional*, defaults to 1):
+        Experimental feature. Tensor parallelism rank used during pretraining. Please refer to `this
+        document <https://huggingface.co/docs/transformers/parallelism>`__ to understand more about it. This value is
+        necessary to ensure exact reproducibility of the pretraining results. Please refer to `this
+        issue <https://github.com/pytorch/pytorch/issues/76232>`__.
+    tie_word_embeddings (`bool`, *optional*, defaults to `False`):
         Whether to tie weight embeddings
     rope_theta (`float`, *optional*, defaults to 10000.0):
         The base period of the RoPE embeddings.
     rope_scaling (`Dict`, *optional*):
         Dictionary containing the scaling configuration for the RoPE embeddings. Currently supports two scaling
-        strategies: linear and dynamic. Their scaling factor must be an float greater than 1. The expected format
-        is `{"type": strategy name, "factor": scaling factor}`. When using this flag, don't update
+        strategies: linear and dynamic. Their scaling factor must be a float greater than 1. The expected format is
+        `{"type": strategy name, "factor": scaling factor}`. When using this flag, don't update
         `max_position_embeddings` to the expected new maximum. See the following thread for more information on how
         these scaling strategies behave:
         https://www.reddit.com/r/LocalLLaMA/comments/14mrgpr/dynamically_scaled_rope_further_increases/. This is an
         experimental feature, subject to breaking API changes in future versions.
-    attention_bias (`bool`, defaults to `False`):
+    attention_bias (`bool`, defaults to `False`, *optional*, defaults to `False`):
         Whether to use a bias in the query, key, value and output projection layers during self-attention.
+
+
+::
+
+>>> from transformers import LlamaModel, LlamaConfig
+
+>>> # Initializing a LLaMA llama-7b style configuration
+>>> configuration = LlamaConfig()
+
+>>> # Initializing a model from the llama-7b style configuration
+>>> model = LlamaModel(configuration)
+
+>>> # Accessing the model configuration
+>>> configuration = model.config
 
 .. class:: transformers.models.codegen.configuration_codegen.CodeGenConfig(vocab_size=50400, n_positions=2048, n_ctx=2048, n_embd=4096, n_layer=28, n_head=16, rotary_dim=64, n_inner=None, activation_function='gelu_new', resid_pdrop=0.0, embd_pdrop=0.0, attn_pdrop=0.0, layer_norm_epsilon=1e-05, initializer_range=0.02, use_cache=True, bos_token_id=50256, eos_token_id=50256, tie_word_embeddings=False, **kwargs)
 
@@ -953,6 +979,8 @@ Args:
     n_positions (`int`, *optional*, defaults to 2048):
         The maximum sequence length that this model might ever be used with. Typically set this to something large
         just in case (e.g., 512 or 1024 or 2048).
+    n_ctx (`int`, *optional*, defaults to 2048):
+        This attribute is used in `CodeGenModel.__init__` without any real effect.
     n_embd (`int`, *optional*, defaults to 4096):
         Dimensionality of the embeddings and hidden states.
     n_layer (`int`, *optional*, defaults to 28):
@@ -961,22 +989,29 @@ Args:
         Number of attention heads for each attention layer in the Transformer encoder.
     rotary_dim (`int`, *optional*, defaults to 64):
         Number of dimensions in the embedding that Rotary Position Embedding is applied to.
-    n_inner (`int`, *optional*, defaults to None):
+    n_inner (`int`, *optional*):
         Dimensionality of the inner feed-forward layers. `None` will set it to 4 times n_embd
     activation_function (`str`, *optional*, defaults to `"gelu_new"`):
         Activation function, to be selected in the list `["relu", "silu", "gelu", "tanh", "gelu_new"]`.
-    resid_pdrop (`float`, *optional*, defaults to 0.1):
+    resid_pdrop (`float`, *optional*, defaults to 0.0):
         The dropout probability for all fully connected layers in the embeddings, encoder, and pooler.
-    embd_pdrop (`int`, *optional*, defaults to 0.1):
+    embd_pdrop (`int`, *optional*, defaults to 0.0):
         The dropout ratio for the embeddings.
-    attn_pdrop (`float`, *optional*, defaults to 0.1):
+    attn_pdrop (`float`, *optional*, defaults to 0.0):
         The dropout ratio for the attention.
-    layer_norm_epsilon (`float`, *optional*, defaults to 1e-5):
+    layer_norm_epsilon (`float`, *optional*, defaults to 1e-05):
         The epsilon to use in the layer normalization layers.
     initializer_range (`float`, *optional*, defaults to 0.02):
         The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
     use_cache (`bool`, *optional*, defaults to `True`):
         Whether or not the model should return the last key/values attentions (not used by all models).
+    bos_token_id (`int`, *optional*, defaults to 50256):
+        Beginning of stream token id.
+    eos_token_id (`int`, *optional*, defaults to 50256):
+        End of stream token id.
+    tie_word_embeddings (`bool`, *optional*, defaults to `False`):
+        Whether the model's input and output word embeddings should be tied. Note that this is only relevant if the
+        model has a output word embedding layer.
 
 .. class:: transformers.models.ctrl.configuration_ctrl.CTRLConfig(vocab_size=246534, n_positions=256, n_embd=1280, dff=8192, n_layer=48, n_head=16, resid_pdrop=0.1, embd_pdrop=0.1, layer_norm_epsilon=1e-06, initializer_range=0.02, use_cache=True, **kwargs)
 
@@ -1031,7 +1066,7 @@ Args:
         The dropout probability for all fully connected layers in the embeddings, encoder, and pooler.
     embd_pdrop (`int`, *optional*, defaults to 0.1):
         The dropout ratio for the embeddings.
-    layer_norm_epsilon (`float`, *optional*, defaults to 1e-6):
+    layer_norm_epsilon (`float`, *optional*, defaults to 1e-06):
         The epsilon to use in the layer normalization layers
     initializer_range (`float`, *optional*, defaults to 0.02):
         The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
@@ -1507,13 +1542,13 @@ Args:
         Number of hidden layers in the Transformer decoder.
     num_attention_heads (`int`, *optional*, defaults to 71):
         Number of attention heads for each attention layer in the Transformer encoder.
+    layer_norm_epsilon (`float`, *optional*, defaults to 1e-05):
+        The epsilon used by the layer normalization layers.
     initializer_range (`float`, *optional*, defaults to 0.02):
         The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
     use_cache (`bool`, *optional*, defaults to `True`):
         Whether the model should return the last key/values attentions (not used by all models). Only relevant if
         `config.is_decoder=True`.
-    layer_norm_epsilon (`float`, *optional*, defaults to 1e-5):
-        The epsilon used by the layer normalization layers.
     hidden_dropout (`float`, *optional*, defaults to 0.0):
         The dropout probability for MLP layers.
     attention_dropout (`float`, *optional*, defaults to 0.0):
@@ -1540,8 +1575,8 @@ Args:
         The base period of the RoPE embeddings.
     rope_scaling (`Dict`, *optional*):
         Dictionary containing the scaling configuration for the RoPE embeddings. Currently supports two scaling
-        strategies: linear and dynamic. Their scaling factor must be an float greater than 1. The expected format
-        is `{"type": strategy name, "factor": scaling factor}`. When using this flag, don't update
+        strategies: linear and dynamic. Their scaling factor must be a float greater than 1. The expected format is
+        `{"type": strategy name, "factor": scaling factor}`. When using this flag, don't update
         `max_position_embeddings` to the expected new maximum. See the following thread for more information on how
         these scaling strategies behave:
         https://www.reddit.com/r/LocalLLaMA/comments/14mrgpr/dynamically_scaled_rope_further_increases/. This is an
@@ -1862,7 +1897,7 @@ Args:
         Number of hidden layers in the Transformer encoder.
     n_head (`int`, *optional*, defaults to 12):
         Number of attention heads for each attention layer in the Transformer encoder.
-    n_inner (`int`, *optional*, defaults to None):
+    n_inner (`int`, *optional*):
         Dimensionality of the inner feed-forward layers. `None` will set it to 4 times n_embd
     activation_function (`str`, *optional*, defaults to `"gelu_new"`):
         Activation function, to be selected in the list `["relu", "silu", "gelu", "tanh", "gelu_new"]`.
@@ -1872,7 +1907,7 @@ Args:
         The dropout ratio for the embeddings.
     attn_pdrop (`float`, *optional*, defaults to 0.1):
         The dropout ratio for the attention.
-    layer_norm_epsilon (`float`, *optional*, defaults to 1e-5):
+    layer_norm_epsilon (`float`, *optional*, defaults to 1e-05):
         The epsilon to use in the layer normalization layers.
     initializer_range (`float`, *optional*, defaults to 0.02):
         The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
@@ -1911,6 +1946,10 @@ Args:
         Scale attention weights by dividing by sqrt(hidden_size)..
     use_cache (`bool`, *optional*, defaults to `True`):
         Whether or not the model should return the last key/values attentions (not used by all models).
+    bos_token_id (`int`, *optional*, defaults to 50256):
+        Id of the beginning of sentence token in the vocabulary.
+    eos_token_id (`int`, *optional*, defaults to 50256):
+        Id of the end of sentence token in the vocabulary.
     scale_attn_by_inverse_layer_idx (`bool`, *optional*, defaults to `False`):
         Whether to additionally scale attention weights by `1 / layer_idx + 1`.
     reorder_and_upcast_attn (`bool`, *optional*, defaults to `False`):
@@ -2031,8 +2070,8 @@ additional tokens to whitespace characters, making the model more suitable for c
         speedup at large scales (e.g. 20B).
     rope_scaling (`Dict`, *optional*):
         Dictionary containing the scaling configuration for the RoPE embeddings. Currently supports two scaling
-        strategies: linear and dynamic. Their scaling factor must be an float greater than 1. The expected format
-        is `{"type": strategy name, "factor": scaling factor}`. When using this flag, don't update
+        strategies: linear and dynamic. Their scaling factor must be a float greater than 1. The expected format is
+        `{"type": strategy name, "factor": scaling factor}`. When using this flag, don't update
         `max_position_embeddings` to the expected new maximum. See the following thread for more information on how
         these scaling strategies behave:
         https://www.reddit.com/r/LocalLLaMA/comments/14mrgpr/dynamically_scaled_rope_further_increases/. This is an
@@ -2413,8 +2452,6 @@ Args:
     use_cache (`bool`, *optional*, defaults to `True`):
         Whether or not the model should return the last key/values attentions (not used by all models). Only
         relevant if `config.is_decoder=True`.
-    classifier_dropout (`float`, *optional*):
-        The dropout ratio for the classification head.
     max_2d_position_embeddings (`int`, *optional*, defaults to 1024):
         The maximum value that the 2D position embedding might ever used. Typically set this to something large
         just in case (e.g., 1024).
@@ -2549,9 +2586,9 @@ Args:
     intermediate_size (`int`, *optional*, defaults to 11008):
         Dimension of the MLP representations.
     num_hidden_layers (`int`, *optional*, defaults to 32):
-        Number of hidden layers in the Transformer encoder.
+        Number of hidden layers in the Transformer decoder.
     num_attention_heads (`int`, *optional*, defaults to 32):
-        Number of attention heads for each attention layer in the Transformer encoder.
+        Number of attention heads for each attention layer in the Transformer decoder.
     num_key_value_heads (`int`, *optional*):
         This is the number of key_value heads that should be used to implement Grouped Query Attention. If
         `num_key_value_heads=num_attention_heads`, the model will use Multi Head Attention (MHA), if
@@ -2560,11 +2597,6 @@ Args:
         by meanpooling all the original heads within that group. For more details checkout `this
         paper <https://arxiv.org/pdf/2305.13245.pdf>`__. If it is not specified, will default to
         `num_attention_heads`.
-    pretraining_tp (`int`, *optional*, defaults to `1`):
-        Experimental feature. Tensor parallelism rank used during pretraining. Please refer to `this
-        document <https://huggingface.co/docs/transformers/parallelism>`__ to understand more about it. This value is
-        necessary to ensure exact reproducibility of the pretraining results. Please refer to `this
-        issue <https://github.com/pytorch/pytorch/issues/76232>`__.
     hidden_act (`str` or `function`, *optional*, defaults to `"silu"`):
         The non-linear activation function (function or string) in the decoder.
     max_position_embeddings (`int`, *optional*, defaults to 2048):
@@ -2572,25 +2604,50 @@ Args:
         Llama 2 up to 4096, CodeLlama up to 16384.
     initializer_range (`float`, *optional*, defaults to 0.02):
         The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
-    rms_norm_eps (`float`, *optional*, defaults to 1e-12):
+    rms_norm_eps (`float`, *optional*, defaults to 1e-06):
         The epsilon used by the rms normalization layers.
     use_cache (`bool`, *optional*, defaults to `True`):
         Whether or not the model should return the last key/values attentions (not used by all models). Only
         relevant if `config.is_decoder=True`.
-    tie_word_embeddings(`bool`, *optional*, defaults to `False`):
+    pad_token_id (`int`, *optional*):
+        Padding token id.
+    bos_token_id (`int`, *optional*, defaults to 1):
+        Beginning of stream token id.
+    eos_token_id (`int`, *optional*, defaults to 2):
+        End of stream token id.
+    pretraining_tp (`int`, *optional*, defaults to 1):
+        Experimental feature. Tensor parallelism rank used during pretraining. Please refer to `this
+        document <https://huggingface.co/docs/transformers/parallelism>`__ to understand more about it. This value is
+        necessary to ensure exact reproducibility of the pretraining results. Please refer to `this
+        issue <https://github.com/pytorch/pytorch/issues/76232>`__.
+    tie_word_embeddings (`bool`, *optional*, defaults to `False`):
         Whether to tie weight embeddings
     rope_theta (`float`, *optional*, defaults to 10000.0):
         The base period of the RoPE embeddings.
     rope_scaling (`Dict`, *optional*):
         Dictionary containing the scaling configuration for the RoPE embeddings. Currently supports two scaling
-        strategies: linear and dynamic. Their scaling factor must be an float greater than 1. The expected format
-        is `{"type": strategy name, "factor": scaling factor}`. When using this flag, don't update
+        strategies: linear and dynamic. Their scaling factor must be a float greater than 1. The expected format is
+        `{"type": strategy name, "factor": scaling factor}`. When using this flag, don't update
         `max_position_embeddings` to the expected new maximum. See the following thread for more information on how
         these scaling strategies behave:
         https://www.reddit.com/r/LocalLLaMA/comments/14mrgpr/dynamically_scaled_rope_further_increases/. This is an
         experimental feature, subject to breaking API changes in future versions.
-    attention_bias (`bool`, defaults to `False`):
+    attention_bias (`bool`, defaults to `False`, *optional*, defaults to `False`):
         Whether to use a bias in the query, key, value and output projection layers during self-attention.
+
+
+::
+
+>>> from transformers import LlamaModel, LlamaConfig
+
+>>> # Initializing a LLaMA llama-7b style configuration
+>>> configuration = LlamaConfig()
+
+>>> # Initializing a model from the llama-7b style configuration
+>>> model = LlamaModel(configuration)
+
+>>> # Accessing the model configuration
+>>> configuration = model.config
 
 .. class:: transformers.models.longformer.configuration_longformer.LongformerConfig(attention_window: Union[List[int], int] = 512, sep_token_id: int = 2, pad_token_id: int = 1, bos_token_id: int = 0, eos_token_id: int = 2, vocab_size: int = 30522, hidden_size: int = 768, num_hidden_layers: int = 12, num_attention_heads: int = 12, intermediate_size: int = 3072, hidden_act: str = 'gelu', hidden_dropout_prob: float = 0.1, attention_probs_dropout_prob: float = 0.1, max_position_embeddings: int = 512, type_vocab_size: int = 2, initializer_range: float = 0.02, layer_norm_eps: float = 1e-12, onnx_export: bool = False, **kwargs)
 
@@ -2898,13 +2955,8 @@ This model was contributed by `valhalla <https://huggingface.co/valhalla>`__.
 
 .. class:: transformers.models.marian.configuration_marian.MarianConfig(vocab_size=58101, decoder_vocab_size=None, max_position_embeddings=1024, encoder_layers=12, encoder_ffn_dim=4096, encoder_attention_heads=16, decoder_layers=12, decoder_ffn_dim=4096, decoder_attention_heads=16, encoder_layerdrop=0.0, decoder_layerdrop=0.0, use_cache=True, is_encoder_decoder=True, activation_function='gelu', d_model=1024, dropout=0.1, attention_dropout=0.0, activation_dropout=0.0, init_std=0.02, decoder_start_token_id=58100, scale_embedding=False, pad_token_id=58100, eos_token_id=0, forced_eos_token_id=0, share_encoder_decoder_embeddings=True, **kwargs)
 
-This is the configuration class to store the configuration of a ``MarianModel``. It is used to instantiate an
-Marian model according to the specified arguments, defining the model architecture. Instantiating a configuration
-with the defaults will yield a similar configuration to that of the Marian
-`Helsinki-NLP/opus-mt-en-de <https://huggingface.co/Helsinki-NLP/opus-mt-en-de>`__ architecture.
-
-Configuration objects inherit from ``PretrainedConfig`` and can be used to control the model outputs. Read the
-documentation from ``PretrainedConfig`` for more information.
+A framework for translation models, using the same models as BART. Translations should be similar, but not identical to output in the test set linked to in each model card.
+This model was contributed by `sshleifer <https://huggingface.co/sshleifer>`__.
 
 
 Args:
@@ -3500,17 +3552,17 @@ Args:
         the `inputs_ids` passed when calling ``MptModel``. Check `this
         discussion <https://huggingface.co/bigscience/mpt/discussions/120#633d28389addb8530b406c2a>`__ on how the
         `vocab_size` has been defined.
-    resid_pdrop (`float`, *optional*, defaults to 0.1):
+    resid_pdrop (`float`, *optional*, defaults to 0.0):
         The dropout probability applied to the attention output before combining with residual.
-    layer_norm_epsilon (`float`, *optional*, defaults to 1e-5):
+    layer_norm_epsilon (`float`, *optional*, defaults to 1e-05):
         The epsilon to use in the layer normalization layers.
-    emb_pdrop (`float`, *optional*, defaults to 0.1):
+    emb_pdrop (`float`, *optional*, defaults to 0.0):
         The dropout probability for the embedding layer.
-    learned_pos_emb (`bool`, *optional*, defaults to `False`):
+    learned_pos_emb (`bool`, *optional*, defaults to `True`):
         Whether to use learned positional embeddings.
     attn_config (`dict`, *optional*):
         A dictionary used to configure the model's attention module.
-    init_device (`str`, *optional*):
+    init_device (`str`, *optional*, defaults to `"cpu"`):
         The device to use for parameter initialization. Defined for backward compatibility
     logit_scale (`float`, *optional*):
         If not None, scale the logits by this value.
@@ -3524,7 +3576,7 @@ Args:
     norm_type (`str`, *optional*, defaults to `"low_precision_layernorm"`):
         Type of layer norm to use. All MPT models uses the same layer norm implementation. Defined for backward
         compatibility.
-    use_cache (`bool`, *optional*, defaults to `True`):
+    use_cache (`bool`, *optional*, defaults to `False`):
         Whether or not the model should return the last key/values attentions (not used by all models).
     initializer_range (`float`, *optional*, defaults to 0.02):
         The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
@@ -3938,7 +3990,7 @@ Args:
         The dropout ratio for the embeddings.
     attn_pdrop (`float`, *optional*, defaults to 0.1):
         The dropout ratio for the attention.
-    layer_norm_epsilon (`float`, *optional*, defaults to 1e-5):
+    layer_norm_epsilon (`float`, *optional*, defaults to 1e-05):
         The epsilon to use in the layer normalization layers
     initializer_range (`float`, *optional*, defaults to 0.02):
         The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
@@ -3973,8 +4025,6 @@ Args:
         ``OpenAIGPTDoubleHeadsModel``.
 
         The dropout ratio to be used after the projection and activation.
-    use_cache (`bool`, *optional*, defaults to `True`):
-        Whether or not the model should return the last key/values attentions (not used by all models).
 
 .. class:: transformers.models.opt.configuration_opt.OPTConfig(vocab_size=50272, hidden_size=768, num_hidden_layers=12, ffn_dim=3072, max_position_embeddings=2048, do_layer_norm_before=True, _remove_final_layer_norm=False, word_embed_proj_dim=None, dropout=0.1, attention_dropout=0.0, num_attention_heads=12, activation_function='relu', layerdrop=0.0, init_std=0.02, use_cache=True, pad_token_id=1, bos_token_id=2, eos_token_id=2, enable_bias=True, layer_norm_elementwise_affine=True, **kwargs)
 
@@ -4253,8 +4303,8 @@ Args:
         The base period of the RoPE embeddings.
     rope_scaling (`Dict`, *optional*):
         Dictionary containing the scaling configuration for the RoPE embeddings. Currently supports two scaling
-        strategies: linear and dynamic. Their scaling factor must be an float greater than 1. The expected format
-        is `{"type": strategy name, "factor": scaling factor}`. When using this flag, don't update
+        strategies: linear and dynamic. Their scaling factor must be a float greater than 1. The expected format is
+        `{"type": strategy name, "factor": scaling factor}`. When using this flag, don't update
         `max_position_embeddings` to the expected new maximum. See the following thread for more information on how
         these scaling strategies behave:
         https://www.reddit.com/r/LocalPersimmon/comments/14mrgpr/dynamically_scaled_rope_further_increases/. This
@@ -4954,7 +5004,7 @@ Args:
         Dimensionality of the attention hidden states. Will default to `hidden_size` if unset.
     intermediate_size (`int`, *optional*):
         Dimensionality of the inner feed-forward layers. Will default to 4 times `hidden_size` if unset.
-    layer_norm_eps (`float`, *optional*, defaults to 1e-5):
+    layer_norm_epsilon (`float`, *optional*, defaults to 1e-05):
         The epsilon to use in the layer normalization layers.
     bos_token_id (`int`, *optional*, defaults to 0):
         The id of the beginning of sentence token in the vocabulary. Defaults to 0 as RWKV uses the same tokenizer
@@ -4962,7 +5012,7 @@ Args:
     eos_token_id (`int`, *optional*, defaults to 0):
         The id of the end of sentence token in the vocabulary. Defaults to 0 as RWKV uses the same tokenizer as
         GPTNeoX.
-    rescale_every (`int`, *optional*, default to 6):
+    rescale_every (`int`, *optional*, defaults to 6):
         At inference, the hidden states (and weights of the correponding output layers) are divided by 2 every
         `rescale_every` layer. If set to 0 or a negative number, no rescale is done.
     tie_word_embeddings (`bool`, *optional*, defaults to `False`):

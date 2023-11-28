@@ -1,0 +1,13 @@
+input_info:
+  input_source: eir_tutorials/a_using_eir/08_array_tutorial/data/processed_sample_data/arrays_1d
+  input_name: genotype_as_array
+  input_type: array
+
+model_config:
+  model_type: transformer
+  model_init_config:
+    embedding_dim: 32
+    patch_size:
+      - 1
+      - 1
+      - 4
