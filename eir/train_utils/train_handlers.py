@@ -20,6 +20,7 @@ from ignite.contrib.handlers import ProgressBar
 from ignite.engine import CallableEventWithFilter, Engine, Events, EventsList, events
 from ignite.handlers import EarlyStopping, ModelCheckpoint
 from ignite.metrics import RunningAverage
+from ignite.metrics.metric import RunningBatchWise
 from torch import nn
 
 from eir.data_load.data_utils import get_output_info_generator
@@ -452,9 +453,16 @@ def _attach_running_average_metrics(
             metric_name_key=metric_name,
         )
 
-        RunningAverage(
-            output_transform=partial_func, alpha=0.98, epoch_bound=False
-        ).attach(engine, name=metric_name)
+        running_average = RunningAverage(
+            output_transform=partial_func,
+            alpha=0.98,
+        )
+
+        running_average.attach(
+            engine,
+            name=metric_name,
+            usage=RunningBatchWise(),
+        )
 
 
 def _call_and_undo_ignite_local_rank_side_effects(func: Callable, kwargs: Dict):

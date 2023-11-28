@@ -3,10 +3,13 @@ eir_tutorials/a_using_eir/08_array_tutorial/
 │   ├── globals.yaml
 │   ├── input_1d_cnn.yaml
 │   ├── input_1d_lcl.yaml
+│   ├── input_1d_transformer.yaml
 │   ├── input_2d_cnn.yaml
 │   ├── input_2d_lcl.yaml
+│   ├── input_2d_transformer.yaml
 │   ├── input_3d_cnn.yaml
 │   ├── input_3d_lcl.yaml
+│   ├── input_3d_transformer.yaml
 │   └── outputs.yaml
 └── data
     ├── processed_sample_data

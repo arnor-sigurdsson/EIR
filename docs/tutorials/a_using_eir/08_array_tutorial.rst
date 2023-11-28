@@ -3,8 +3,8 @@
 .. role:: raw-html(raw)
     :format: html
 
-08 – Training on arrays
-=======================
+08 – Training on arrays with CNN, LCL, and Transformer Models
+=============================================================
 
 In this tutorial, we will be looking at the built in support
 for training models on structured arrays in ``EIR``. Here, structured
@@ -58,7 +58,7 @@ Here are the configurations for the 1D case:
     The CNN functionality for arrays is currently experimental,
     and might change in later versions of ``EIR``.
 
-We will be training both the CNN and LCL (locally-connected-layers) models,
+We will be training both the CNN, LCL (locally-connected-layers) and transformer models,
 here is an example configuration for the LCL model:
 
 .. literalinclude:: ../tutorial_files/a_using_eir/08_array_tutorial/input_1d_lcl.yaml
@@ -79,12 +79,28 @@ here is an example configuration for the LCL model:
     parameter is applied in row-order,
     meaning a width of 8 will cover the first row of the first 8 SNPs.
 
-As usual, we can run the following command to train for the CNN and LCL cases:
+Here is an example configuration for the transformer model:
+
+.. literalinclude:: ../tutorial_files/a_using_eir/08_array_tutorial/input_1d_transformer.yaml
+    :language: yaml
+    :caption: input_1d_transformer.yaml
+
+.. important::
+    For the transformer models, the ``patch_size`` parameter is used
+    to determine the size of the patches that are fed into the transformer.
+    The total number of input elements must be divisible by the patch size.
+    The order follows the same convention as PyTorch, meaning CxHxW. For 1D and 2D
+    inputs, use a size of 1 for the redundant dimensions when specifying the patch size.
+
+As usual, we can run the following command to train for the CNN, LCL and Tranformer cases:
 
 .. literalinclude:: ../tutorial_files/a_using_eir/08_array_tutorial/commands/CNN_1.txt
     :language: console
 
 .. literalinclude:: ../tutorial_files/a_using_eir/08_array_tutorial/commands/LCL_1.txt
+    :language: console
+
+.. literalinclude:: ../tutorial_files/a_using_eir/08_array_tutorial/commands/Transformer_1.txt
     :language: console
 
 For the 2D and 3D cases, here are the configurations:
@@ -97,6 +113,10 @@ For the 2D and 3D cases, here are the configurations:
     :language: yaml
     :caption: input_2d_lcl.yaml
 
+.. literalinclude:: ../tutorial_files/a_using_eir/08_array_tutorial/input_2d_transformer.yaml
+    :language: yaml
+    :caption: input_2d_transformer.yaml
+
 .. literalinclude:: ../tutorial_files/a_using_eir/08_array_tutorial/input_3d_cnn.yaml
     :language: yaml
     :caption: input_3d_cnn.yaml
@@ -104,6 +124,10 @@ For the 2D and 3D cases, here are the configurations:
 .. literalinclude:: ../tutorial_files/a_using_eir/08_array_tutorial/input_3d_lcl.yaml
     :language: yaml
     :caption: input_3d_lcl.yaml
+
+.. literalinclude:: ../tutorial_files/a_using_eir/08_array_tutorial/input_3d_transformer.yaml
+    :language: yaml
+    :caption: input_3d_transformer.yaml
 
 
 .. note::
@@ -125,7 +149,9 @@ After training, I got the following validation results:
     :width: 100%
     :align: center
 
-So, here it seems that the LCL models are performing a bit better than the CNN models.
+So, here it seems that the transformer models and
+LCL models are performing a bit better than the CNN models, with the transformers
+being the best.
 However, we are training for a relatively short time, and one might get better
 results by e.g. increasing the number of filters in the CNN case.
 

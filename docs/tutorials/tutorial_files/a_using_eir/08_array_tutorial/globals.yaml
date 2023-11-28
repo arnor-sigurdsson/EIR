@@ -3,3 +3,4 @@ checkpoint_interval: 200
 sample_interval: 200
 n_epochs: 20
 memory_dataset: True
+device: "mps"

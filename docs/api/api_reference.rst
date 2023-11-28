@@ -133,6 +133,9 @@ Array Feature Extractors
 .. autoclass:: eir.models.input.array.models_locally_connected.LCLModelConfig
     :noindex:
 
+.. autoclass:: eir.models.input.array.models_transformers.ArrayTransformerConfig
+    :noindex:
+
 
 Fusion Configurations
 ---------------------

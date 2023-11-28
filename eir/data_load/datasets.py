@@ -358,12 +358,14 @@ def _log_missing_samples_between_modalities(
 ) -> None:
     missing_counts = {k: 0 for k in input_keys}
     missing_ids: dict[str, list[str]] = {k: [] for k in input_keys}
+    any_missing = False
 
     for sample in samples:
         for key in input_keys:
             if key not in sample.inputs:
                 missing_counts[key] += 1
                 missing_ids[key].append(sample.sample_id)
+                any_missing = True
 
     no_samples = len(samples)
     message = (
@@ -384,6 +386,17 @@ def _log_missing_samples_between_modalities(
         message += cur_str
 
     logger.info(message.rstrip())
+
+    if any_missing:
+        warning_message = (
+            "There were missing inputs in samples for some modalities,"
+            "Please review the info log above for detailed counts and IDs."
+            "If this is expected, ignore this message. If not, possible "
+            "causes are (a) different inputs having different sample IDs"
+            "present, (b) sample IDs between inputs / targets are not matching,"
+            "or (c) something else."
+        )
+        logger.warning(warning_message)
 
 
 def _add_target_labels_to_samples(

@@ -11,22 +11,35 @@ from eir.models.input.array.models_locally_connected import (
     LCLModel,
     LCLModelConfig,
 )
+from eir.models.input.array.models_transformers import (
+    ArrayTransformer,
+    ArrayTransformerConfig,
+)
 
 if TYPE_CHECKING:
     from eir.setup.input_setup_modules.common import DataDimensions
 
 al_array_model_types = Literal["cnn", "lcl"]
 
-al_array_model_classes = Type[CNNModel] | Type[LCLModel]
-al_array_models = CNNModel | LCLModel
+al_array_model_classes = Type[CNNModel] | Type[LCLModel] | Type[ArrayTransformer]
+al_array_models = CNNModel | LCLModel | ArrayTransformer
 
-al_array_model_config_classes = Type[CNNModelConfig] | Type[LCLModelConfig]
-al_array_model_configs = CNNModelConfig | LCLModelConfig
+al_array_model_config_classes = (
+    Type[CNNModelConfig] | Type[LCLModelConfig] | Type[ArrayTransformerConfig]
+)
+al_array_model_configs = CNNModelConfig | LCLModelConfig | ArrayTransformerConfig
 
 al_pre_normalization = Optional[Literal["instancenorm", "layernorm"]]
 
 al_array_model_init_kwargs = dict[
-    str, Union["DataDimensions", CNNModelConfig, LCLModelConfig, FlattenFunc]
+    str,
+    Union[
+        "DataDimensions",
+        CNNModelConfig,
+        LCLModelConfig,
+        ArrayTransformerConfig,
+        FlattenFunc,
+    ],
 ]
 
 
@@ -34,6 +47,7 @@ def get_array_model_mapping() -> Dict[str, al_array_model_classes]:
     mapping = {
         "cnn": CNNModel,
         "lcl": LCLModel,
+        "transformer": ArrayTransformer,
     }
 
     return mapping
@@ -48,6 +62,7 @@ def get_array_config_dataclass_mapping() -> Dict[str, al_array_model_config_clas
     mapping = {
         "cnn": CNNModelConfig,
         "lcl": LCLModelConfig,
+        "transformer": ArrayTransformerConfig,
     }
 
     return mapping
@@ -62,10 +77,8 @@ def get_array_model_init_kwargs(
     model_type: al_array_model_types,
     model_config: al_array_model_configs,
     data_dimensions: "DataDimensions",
-) -> dict[str, Union["DataDimensions", CNNModelConfig, LCLModelConfig, FlattenFunc]]:
-    kwargs: dict[
-        str, Union["DataDimensions", CNNModelConfig, LCLModelConfig, FlattenFunc]
-    ] = {}
+) -> al_array_model_init_kwargs:
+    kwargs: al_array_model_init_kwargs = {}
 
     model_config_dataclass = get_model_config_dataclass(model_type=model_type)
     model_config_dataclass_instance = model_config_dataclass(**model_config.__dict__)
@@ -86,6 +99,14 @@ def get_array_model_init_kwargs(
                 )
             else:
                 kwargs["flatten_fn"] = partial(torch.flatten, start_dim=1)
+
+        case "transformer":
+            assert isinstance(model_config, ArrayTransformerConfig)
+            kwargs["flatten_fn"] = partial(
+                patchify,
+                size=model_config.patch_size,
+                stride=model_config.patch_size,
+            )
 
     return kwargs
 
