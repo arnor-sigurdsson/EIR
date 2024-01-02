@@ -72,6 +72,14 @@ and so on:
 
 - ``umap-learn`` : Uniform Manifold Approximation and Projection
 
+- ``fastapi`` : FastAPI framework, high performance, easy to learn, fast to code, ready for production
+
+- ``uvicorn`` : The lightning-fast ASGI server.
+
+- ``pydantic`` : Data validation using Python type hints
+
+- ``tiktoken``  – Shantanu Jain: tiktoken is a fast BPE tokeniser for use with OpenAI's models
+
 - ``memory-profiler``  – Fabian Pedregosa: A module for monitoring memory usage of a python program
 
 - ``pytest``  – Holger Krekel, Bruno Oliveira, Ronny Pfannschmidt, Floris Bruynooghe, Brianna Laugher, Florian Bruhin and others: pytest: simple powerful testing with Python
@@ -84,7 +92,7 @@ and so on:
 
 - ``ipykernel`` : IPython Kernel for Jupyter
 
-- ``coverage``  – Ned Batchelder and 218 others: Code coverage measurement for Python
+- ``coverage``  – Ned Batchelder and 222 others: Code coverage measurement for Python
 
 - ``snakeviz`` : A web-based viewer for Python profiler output
 

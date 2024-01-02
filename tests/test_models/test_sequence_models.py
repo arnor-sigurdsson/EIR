@@ -115,6 +115,7 @@ def _get_common_model_config_overload() -> dict:
         "encoder_attention_heads": n_heads,
         "decoder_attention_heads": n_heads,
         "num_heads": n_heads,
+        "num_key_value_heads": n_heads,
         "intermediate_size": 32,
         "d_model": 16,
         "pad_token_id": 0,
