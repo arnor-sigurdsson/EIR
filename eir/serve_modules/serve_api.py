@@ -3,15 +3,15 @@ from typing import Any, Sequence
 from aislib.misc_utils import get_logger
 from fastapi import FastAPI
 
-from eir.deploy_modules.deploy_api_models import ResponseModel, create_input_model
-from eir.deploy_modules.deploy_experiment_io import DeployExperiment
-from eir.deploy_modules.deploy_input_setup import general_pre_process
-from eir.deploy_modules.deploy_post_process import general_post_process
-from eir.deploy_modules.deploy_prediction import run_deploy_prediction
-from eir.deploy_modules.deploy_schemas import ComputedDeployTabularInputInfo
 from eir.predict_modules.predict_tabular_input_setup import (
     ComputedPredictTabularInputInfo,
 )
+from eir.serve_modules.serve_api_models import ResponseModel, create_input_model
+from eir.serve_modules.serve_experiment_io import ServeExperiment
+from eir.serve_modules.serve_input_setup import general_pre_process
+from eir.serve_modules.serve_post_process import general_post_process
+from eir.serve_modules.serve_prediction import run_serve_prediction
+from eir.serve_modules.serve_schemas import ComputedServeTabularInputInfo
 from eir.setup.input_setup import al_input_objects_as_dict
 from eir.setup.input_setup_modules.setup_array import ComputedArrayInputInfo
 from eir.setup.input_setup_modules.setup_bytes import ComputedBytesInputInfo
@@ -32,21 +32,21 @@ from eir.setup.schemas import InputConfig
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
-async def process_request(data: Sequence, deploy_experiment: DeployExperiment) -> Any:
+async def process_request(data: Sequence, serve_experiment: ServeExperiment) -> Any:
     batch = general_pre_process(
         data=data,
-        deploy_experiment=deploy_experiment,
+        serve_experiment=serve_experiment,
     )
 
-    prediction = run_deploy_prediction(
-        deploy_experiment=deploy_experiment,
+    prediction = run_serve_prediction(
+        serve_experiment=serve_experiment,
         batch=batch,
     )
 
     response = general_post_process(
         outputs=prediction,
-        input_objects=deploy_experiment.inputs,
-        output_objects=deploy_experiment.outputs,
+        input_objects=serve_experiment.inputs,
+        output_objects=serve_experiment.outputs,
     )
     return response
 
@@ -54,7 +54,7 @@ async def process_request(data: Sequence, deploy_experiment: DeployExperiment) -
 def create_predict_endpoint(
     app: FastAPI,
     configs: Sequence[InputConfig],
-    deploy_experiment: DeployExperiment,
+    serve_experiment: ServeExperiment,
 ) -> None:
     input_model = create_input_model(configs=configs)
 
@@ -63,16 +63,16 @@ def create_predict_endpoint(
         data = [request.model_dump()]  # type: ignore
         response_data = await process_request(
             data=data,
-            deploy_experiment=deploy_experiment,
+            serve_experiment=serve_experiment,
         )
 
         return ResponseModel(result=response_data[0])
 
 
-def create_info_endpoint(app: FastAPI, deploy_experiment: DeployExperiment) -> None:
+def create_info_endpoint(app: FastAPI, serve_experiment: ServeExperiment) -> None:
     model_info: dict[str, Any] = get_model_info(
-        input_objects=deploy_experiment.inputs,
-        output_objects=deploy_experiment.outputs,
+        input_objects=serve_experiment.inputs,
+        output_objects=serve_experiment.outputs,
     )
 
     @app.get("/info")
@@ -107,7 +107,7 @@ def get_model_info(
             case (
                 ComputedTabularInputInfo()
                 | ComputedPredictTabularInputInfo()
-                | ComputedDeployTabularInputInfo()
+                | ComputedServeTabularInputInfo()
             ):
                 pass
 

@@ -117,16 +117,16 @@ for around an hour on a laptop.
 C - Deployment
 --------------
 
-In this final section, we demonstrate deploying our trained model for sequence-to-sequence translation as a web service and interacting with it using HTTP requests.
+In this final section, we demonstrate serving our trained model for sequence-to-sequence translation as a web service and interacting with it using HTTP requests.
 
 Starting the Web Service
 """""""""""""""""""""""""
 
-To deploy the model, use the following command:
+To serve the model, use the following command:
 
 .. code-block:: shell
 
-    eirdeploy --model-path [MODEL_PATH]
+    eirserve --model-path [MODEL_PATH]
 
 Replace `[MODEL_PATH]` with the actual path to your trained model.
 This command initiates a web service that listens for incoming requests.
@@ -176,10 +176,10 @@ Additionally, you can send requests using `bash`:
 Analyzing Responses
 """""""""""""""""""
 
-After sending requests to the deployed model, the responses can be analyzed.
+After sending requests to the served model, the responses can be analyzed.
 These responses provide insights into the model's ability to translate from Spanish to English.
 
-.. literalinclude:: ../tutorial_files/c_sequence_output/02_sequence_to_sequence/deploy_results/predictions.json
+.. literalinclude:: ../tutorial_files/c_sequence_output/02_sequence_to_sequence/serve_results/predictions.json
     :language: json
     :caption: predictions.json
 

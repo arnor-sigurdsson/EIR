@@ -3,8 +3,8 @@ from typing import TYPE_CHECKING
 import numpy as np
 import torch
 
-from eir.deploy_modules.deploy_experiment_io import DeployExperiment
 from eir.models.model_training_utils import predict_on_batch
+from eir.serve_modules.serve_experiment_io import ServeExperiment
 from eir.setup.schema_modules.output_schemas_sequence import (
     SequenceOutputSamplingConfig,
 )
@@ -19,25 +19,25 @@ from eir.train_utils.evaluation_handlers.train_handlers_sequence_output import (
 )
 
 if TYPE_CHECKING:
-    from eir.deploy_modules.deploy_input_setup import DeployBatch
+    from eir.serve_modules.serve_input_setup import ServeBatch
 
 
 @torch.inference_mode()
-def run_deploy_prediction(
-    deploy_experiment: DeployExperiment, batch: "DeployBatch"
+def run_serve_prediction(
+    serve_experiment: ServeExperiment, batch: "ServeBatch"
 ) -> dict[str, dict[str, torch.Tensor | list[int] | np.ndarray]]:
     one_shot_prediction = predict_on_batch(
-        model=deploy_experiment.model,
+        model=serve_experiment.model,
         inputs=batch.inputs,
     )
 
-    sequence_predictions = _run_deploy_sequence_generation(
-        deploy_experiment=deploy_experiment,
+    sequence_predictions = _run_serve_sequence_generation(
+        serve_experiment=serve_experiment,
         batch=batch,
     )
 
-    array_predictions = _run_deploy_array_generation(
-        deploy_experiment=deploy_experiment,
+    array_predictions = _run_serve_array_generation(
+        serve_experiment=serve_experiment,
         batch=batch,
     )
 
@@ -51,9 +51,9 @@ def run_deploy_prediction(
     return merged
 
 
-def _run_deploy_sequence_generation(
-    deploy_experiment: DeployExperiment,
-    batch: "DeployBatch",
+def _run_serve_sequence_generation(
+    serve_experiment: ServeExperiment,
+    batch: "ServeBatch",
 ) -> dict[str, dict[str, list[int]]]:
     """
     Note that we always expect two levels for the predictions, in the case
@@ -62,7 +62,7 @@ def _run_deploy_sequence_generation(
     """
     prepared = {}
 
-    output_configs = deploy_experiment.configs.output_configs
+    output_configs = serve_experiment.configs.output_configs
     for config in output_configs:
         if config.output_info.output_type != "sequence":
             continue
@@ -83,14 +83,14 @@ def _run_deploy_sequence_generation(
                 sample_id="manual_request",
             )
 
-            hooks = deploy_experiment.hooks
+            hooks = serve_experiment.hooks
             assert hooks is not None
 
             generated_tokens = autoregressive_sequence_generation(
-                input_objects=deploy_experiment.inputs,
+                input_objects=serve_experiment.inputs,
                 eval_sample=eval_sample,
                 seq_output_name=cur_output_name,
-                experiment=deploy_experiment,
+                experiment=serve_experiment,
                 default_eir_hooks=hooks,
                 sampling_config=config.sampling_config,
             )
@@ -100,13 +100,13 @@ def _run_deploy_sequence_generation(
     return prepared
 
 
-def _run_deploy_array_generation(
-    deploy_experiment: DeployExperiment,
-    batch: "DeployBatch",
+def _run_serve_array_generation(
+    serve_experiment: ServeExperiment,
+    batch: "ServeBatch",
 ) -> dict[str, dict[str, np.ndarray]]:
     prepared = {}
 
-    output_configs = deploy_experiment.configs.output_configs
+    output_configs = serve_experiment.configs.output_configs
 
     for config in output_configs:
         if config.output_info.output_type != "array":
@@ -122,13 +122,13 @@ def _run_deploy_array_generation(
             sample_id="manual_request",
         )
 
-        hooks = deploy_experiment.hooks
+        hooks = serve_experiment.hooks
         assert hooks is not None
 
         array_output = array_generation(
             eval_sample=eval_sample,
             array_output_name=cur_output_name,
-            experiment=deploy_experiment,
+            experiment=serve_experiment,
             default_eir_hooks=hooks,
         )
 

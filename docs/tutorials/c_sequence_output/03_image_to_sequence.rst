@@ -97,16 +97,16 @@ or use a larger dataset.
 D - Deployment
 --------------
 
-In this final section, we demonstrate deploying our trained image captioning model as a web service and interacting with it using HTTP requests.
+In this final section, we demonstrate serving our trained image captioning model as a web service and interacting with it using HTTP requests.
 
 Starting the Web Service
 """""""""""""""""""""""""
 
-To deploy the model, use the following command:
+To serve the model, use the following command:
 
 .. code-block:: shell
 
-    eirdeploy --model-path [MODEL_PATH]
+    eirserve --model-path [MODEL_PATH]
 
 Replace `[MODEL_PATH]` with the actual path to your trained model.
 This command initiates a web service that listens for incoming requests.
@@ -167,28 +167,28 @@ Analyzing Responses
 
 Before analyzing the responses, let's view the images that were used for generating captions:
 
-.. figure:: ../tutorial_files/c_sequence_output/03_image_captioning/deploy_results/000000000009.jpg
+.. figure:: ../tutorial_files/c_sequence_output/03_image_captioning/serve_results/000000000009.jpg
    :alt: Image 000000000009
    :align: center
 
 000000000009.jpg
 
-.. figure:: ../tutorial_files/c_sequence_output/03_image_captioning/deploy_results/000000000034.jpg
+.. figure:: ../tutorial_files/c_sequence_output/03_image_captioning/serve_results/000000000034.jpg
    :alt: Image 000000000034
    :align: center
 
 000000000034.jpg
 
-.. figure:: ../tutorial_files/c_sequence_output/03_image_captioning/deploy_results//000000581929.jpg
+.. figure:: ../tutorial_files/c_sequence_output/03_image_captioning/serve_results//000000581929.jpg
    :alt: Image 000000581929
    :align: center
 
 000000581929.jpg
 
-After sending requests to the deployed model, the responses can be analyzed.
+After sending requests to the served model, the responses can be analyzed.
 These responses provide insights into the model's capability to generate captions for the input images.
 
-.. literalinclude:: ../tutorial_files/c_sequence_output/03_image_captioning/deploy_results/predictions.json
+.. literalinclude:: ../tutorial_files/c_sequence_output/03_image_captioning/serve_results/predictions.json
     :language: json
     :caption: predictions.json
 

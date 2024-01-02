@@ -3,7 +3,6 @@ from typing import Any, Dict, Literal, Optional, Protocol, Tuple, Type, Union, c
 
 from torch import nn
 
-from eir.deploy_modules.deploy_schemas import ComputedDeployTabularInputInfo
 from eir.models.fusion import fusion
 from eir.models.input.image.image_models import get_image_model_class
 from eir.models.input.sequence.sequence_models import get_sequence_model_class
@@ -42,6 +41,7 @@ from eir.models.output.sequence.sequence_output_modules import (
 from eir.predict_modules.predict_tabular_input_setup import (
     ComputedPredictTabularInputInfo,
 )
+from eir.serve_modules.serve_schemas import ComputedServeTabularInputInfo
 from eir.setup import schemas
 from eir.setup.input_setup import al_input_objects_as_dict
 from eir.setup.input_setup_modules.common import DataDimensions
@@ -275,7 +275,7 @@ def get_input_modules(
             case (
                 ComputedTabularInputInfo()
                 | ComputedPredictTabularInputInfo()
-                | ComputedDeployTabularInputInfo()
+                | ComputedServeTabularInputInfo()
             ):
                 transformers = inputs_object.labels.label_transformers
                 input_type_info = inputs_object.input_config.input_type_info
@@ -434,7 +434,7 @@ def _get_feature_extractors_input_dimensions_per_axis(
             case (
                 ComputedTabularInputInfo()
                 | ComputedPredictTabularInputInfo()
-                | ComputedDeployTabularInputInfo()
+                | ComputedServeTabularInputInfo()
             ):
                 input_model = input_modules[name]
                 assert isinstance(input_model, SimpleTabularModel)

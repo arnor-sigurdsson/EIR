@@ -13,10 +13,10 @@ from eir.data_load.label_setup import (
     al_label_transformers,
     al_label_transformers_object,
 )
-from eir.deploy_modules.deploy_schemas import ComputedDeployTabularInputInfo
 from eir.predict_modules.predict_tabular_input_setup import (
     ComputedPredictTabularInputInfo,
 )
+from eir.serve_modules.serve_schemas import ComputedServeTabularInputInfo
 from eir.setup.input_setup import al_input_objects_as_dict
 from eir.setup.input_setup_modules.setup_array import ComputedArrayInputInfo
 from eir.setup.input_setup_modules.setup_bytes import ComputedBytesInputInfo
@@ -86,7 +86,7 @@ def prepare_request_input_data(
             case (
                 ComputedTabularInputInfo()
                 | ComputedPredictTabularInputInfo()
-                | ComputedDeployTabularInputInfo()
+                | ComputedServeTabularInputInfo()
             ):
                 assert input_type == "tabular"
                 transformers = input_object.labels.label_transformers

@@ -25,13 +25,13 @@ from torch.optim.optimizer import Optimizer
 from eir.data_load.data_augmentation import get_mix_data_hook, hook_mix_loss
 from eir.data_load.data_utils import Batch
 from eir.data_load.label_setup import al_all_column_ops
-from eir.deploy_modules.deploy_schemas import ComputedDeployTabularInputInfo
 from eir.models import model_training_utils
 from eir.models.input.tabular.tabular import get_tabular_inputs
 from eir.models.model_setup_modules.meta_setup import al_meta_model
 from eir.predict_modules.predict_tabular_input_setup import (
     ComputedPredictTabularInputInfo,
 )
+from eir.serve_modules.serve_schemas import ComputedServeTabularInputInfo
 from eir.setup import schemas
 from eir.setup.config import Configs, get_all_tabular_targets
 from eir.setup.input_setup import al_input_objects_as_dict
@@ -284,7 +284,7 @@ def _prepare_inputs_for_model(
             case (
                 ComputedTabularInputInfo()
                 | ComputedPredictTabularInputInfo()
-                | ComputedDeployTabularInputInfo()
+                | ComputedServeTabularInputInfo()
             ):
                 tabular_source_input = batch_inputs[input_name]
                 for tabular_name, tensor in tabular_source_input.items():

@@ -7,9 +7,9 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 from docs.doc_modules.c_sequence_outputs.utils import get_content_root
-from docs.doc_modules.deploy_experiments_utils import copy_inputs, load_data_for_deploy
-from docs.doc_modules.deployment_experiments import AutoDocDeploymentInfo
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
+from docs.doc_modules.serve_experiments_utils import copy_inputs, load_data_for_serve
+from docs.doc_modules.serving_experiments import AutoDocServingInfo
 from docs.doc_modules.utils import add_model_path_to_command
 
 CONTENT_ROOT = CR = get_content_root()
@@ -163,10 +163,10 @@ def generate_image_grid(
     plt.savefig(output_folder / filename, bbox_inches="tight", dpi=200)
 
 
-def get_image_captioning_02_image_and_text_deploy() -> AutoDocDeploymentInfo:
+def get_image_captioning_02_image_and_text_serve() -> AutoDocServingInfo:
     base_path = f"docs/tutorials/tutorial_files/{CR}/{TN}"
 
-    server_command = ["eirdeploy", "--model-path", "FILL_MODEL"]
+    server_command = ["eirserve", "--model-path", "FILL_MODEL"]
 
     image_base = (
         "eir_tutorials/c_sequence_output/03_image_captioning/"
@@ -192,22 +192,22 @@ def get_image_captioning_02_image_and_text_deploy() -> AutoDocDeploymentInfo:
         run_path="eir_tutorials/tutorial_runs/c_sequence_output/03_image_captioning",
     )
 
-    copy_inputs_to_deploy = (
+    copy_inputs_to_serve = (
         copy_inputs,
         {
             "example_requests": example_requests,
-            "output_folder": str(Path(base_path) / "deploy_results"),
+            "output_folder": str(Path(base_path) / "serve_results"),
         },
     )
 
-    ade = AutoDocDeploymentInfo(
+    ade = AutoDocServingInfo(
         name="IMAGE_TO_SEQUENCE_DEPLOY",
         base_path=Path(base_path),
         server_command=server_command,
         pre_run_command_modifications=(add_model_path,),
-        post_run_functions=(copy_inputs_to_deploy,),
+        post_run_functions=(copy_inputs_to_serve,),
         example_requests=example_requests,
-        data_loading_function=load_data_for_deploy,
+        data_loading_function=load_data_for_serve,
     )
 
     return ade
@@ -216,7 +216,7 @@ def get_image_captioning_02_image_and_text_deploy() -> AutoDocDeploymentInfo:
 def get_experiments() -> Sequence[AutoDocExperimentInfo]:
     exp_1 = get_image_captioning_01_text_only()
     exp_2 = get_image_captioning_02_image_and_text()
-    exp_3 = get_image_captioning_02_image_and_text_deploy()
+    exp_3 = get_image_captioning_02_image_and_text_serve()
 
     return [
         exp_1,

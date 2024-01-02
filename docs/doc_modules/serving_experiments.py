@@ -10,15 +10,15 @@ from typing import Any, Callable, Dict, List, Sequence, Tuple
 
 import requests
 
-from docs.doc_modules.deploy_experiments_utils import send_request
 from docs.doc_modules.experiments import save_command_as_text
+from docs.doc_modules.serve_experiments_utils import send_request
 from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__)
 
 
 @dataclass
-class AutoDocDeploymentInfo:
+class AutoDocServingInfo:
     name: str
     base_path: Path
     server_command: list[str]
@@ -29,8 +29,8 @@ class AutoDocDeploymentInfo:
     url: str = "http://localhost:8000/predict"
 
 
-def make_deployment_tutorial_data(
-    auto_doc_experiment_info: AutoDocDeploymentInfo,
+def make_serving_tutorial_data(
+    auto_doc_experiment_info: AutoDocServingInfo,
 ) -> None:
     ade = auto_doc_experiment_info
 
@@ -38,7 +38,7 @@ def make_deployment_tutorial_data(
     for command_modification in ade.pre_run_command_modifications:
         command = command_modification(command)
 
-    predictions = run_deploy_experiment_from_command(
+    predictions = run_serve_experiment_from_command(
         command=command,
         url=ade.url,
         example_requests=ade.example_requests,
@@ -47,7 +47,7 @@ def make_deployment_tutorial_data(
 
     save_predictions_as_json(
         predictions=predictions,
-        output_dir=ade.base_path / "deploy_results",
+        output_dir=ade.base_path / "serve_results",
     )
 
     save_command_as_text(
@@ -59,7 +59,7 @@ def make_deployment_tutorial_data(
         func(**kwargs)
 
 
-def run_deploy_experiment_from_command(
+def run_serve_experiment_from_command(
     command: List[str],
     url: str,
     example_requests: list[dict[str, Any]],

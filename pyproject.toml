@@ -81,7 +81,7 @@ build-backend = "poetry.core.masonry.api"
 [tool.poetry.scripts]
 eirtrain = "eir.train:main"
 eirpredict = "eir.predict:main"
-eirdeploy = "eir.deploy:main"
+eirserve = "eir.serve:main"
 
 [tool.isort]
 profile = "black"

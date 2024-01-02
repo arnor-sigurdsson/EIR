@@ -14,7 +14,7 @@ from torchvision.datasets.folder import default_loader
 logger = get_logger(name=__name__)
 
 
-def load_data_for_deploy(data: dict[str, Any]) -> dict[str, Any]:
+def load_data_for_serve(data: dict[str, Any]) -> dict[str, Any]:
     loaded_data = {}
     for key, data_pointer in data.items():
         if isinstance(data_pointer, str):

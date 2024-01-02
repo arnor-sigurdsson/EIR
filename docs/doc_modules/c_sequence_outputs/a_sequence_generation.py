@@ -5,9 +5,9 @@ from typing import Sequence
 from aislib.misc_utils import ensure_path_exists
 
 from docs.doc_modules.c_sequence_outputs.utils import get_content_root
-from docs.doc_modules.deploy_experiments_utils import load_data_for_deploy
-from docs.doc_modules.deployment_experiments import AutoDocDeploymentInfo
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
+from docs.doc_modules.serve_experiments_utils import load_data_for_serve
+from docs.doc_modules.serving_experiments import AutoDocServingInfo
 from docs.doc_modules.utils import add_model_path_to_command, get_saved_model_path
 
 CONTENT_ROOT = CR = get_content_root()
@@ -198,10 +198,10 @@ def get_sequence_gen_02_imdb_generation_bpe() -> AutoDocExperimentInfo:
     return ade
 
 
-def get_sequence_gen_02_imdb_generation_deploy() -> AutoDocDeploymentInfo:
+def get_sequence_gen_02_imdb_generation_serve() -> AutoDocServingInfo:
     base_path = f"docs/tutorials/tutorial_files/{CR}/{TN}"
 
-    server_command = ["eirdeploy", "--model-path", "FILL_MODEL"]
+    server_command = ["eirserve", "--model-path", "FILL_MODEL"]
 
     example_requests = [
         {
@@ -230,14 +230,14 @@ def get_sequence_gen_02_imdb_generation_deploy() -> AutoDocDeploymentInfo:
         "01_sequence_generation",
     )
 
-    ade = AutoDocDeploymentInfo(
+    ade = AutoDocServingInfo(
         name="SEQUENCE_GENERATION_DEPLOY",
         base_path=Path(base_path),
         server_command=server_command,
         pre_run_command_modifications=(add_model_path,),
         post_run_functions=(),
         example_requests=example_requests,
-        data_loading_function=load_data_for_deploy,
+        data_loading_function=load_data_for_serve,
     )
 
     return ade
@@ -260,7 +260,7 @@ def get_experiments() -> Sequence[AutoDocExperimentInfo]:
     exp_1 = get_sequence_gen_01_imdb_generation()
     exp_2 = get_sequence_gen_01_imdb_generation_predict()
     exp_3 = get_sequence_gen_02_imdb_generation_bpe()
-    exp_4 = get_sequence_gen_02_imdb_generation_deploy()
+    exp_4 = get_sequence_gen_02_imdb_generation_serve()
 
     return [
         exp_1,

@@ -4,10 +4,10 @@ import uvicorn
 from aislib.misc_utils import get_logger
 from fastapi import FastAPI
 
-from eir.deploy_modules.deploy_api import create_info_endpoint, create_predict_endpoint
-from eir.deploy_modules.deploy_experiment_io import (
-    DeployExperiment,
-    load_experiment_for_deploy,
+from eir.serve_modules.serve_api import create_info_endpoint, create_predict_endpoint
+from eir.serve_modules.serve_experiment_io import (
+    ServeExperiment,
+    load_experiment_for_serve,
 )
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
@@ -15,16 +15,16 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 app = FastAPI()
 
 
-def load_experiment(model_path: str, device: str) -> DeployExperiment:
-    deploy_experiment = load_experiment_for_deploy(
+def load_experiment(model_path: str, device: str) -> ServeExperiment:
+    serve_experiment = load_experiment_for_serve(
         model_path=model_path,
         device=device,
     )
-    return deploy_experiment
+    return serve_experiment
 
 
 def get_cl_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Load a model for deployment.")
+    parser = argparse.ArgumentParser(description="Load a model for serving.")
     parser.add_argument(
         "--model-path",
         type=str,
@@ -61,7 +61,7 @@ def get_cl_args() -> argparse.Namespace:
 def main():
     args = get_cl_args()
 
-    deploy_experiment = load_experiment(
+    serve_experiment = load_experiment(
         model_path=args.model_path,
         device=args.device,
     )
@@ -69,13 +69,13 @@ def main():
 
     create_info_endpoint(
         app=app,
-        deploy_experiment=deploy_experiment,
+        serve_experiment=serve_experiment,
     )
 
     create_predict_endpoint(
         app=app,
-        configs=deploy_experiment.configs.input_configs,
-        deploy_experiment=deploy_experiment,
+        configs=serve_experiment.configs.input_configs,
+        serve_experiment=serve_experiment,
     )
 
     uvicorn.run(app=app, host=args.host, port=args.port)

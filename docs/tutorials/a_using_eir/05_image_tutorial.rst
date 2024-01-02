@@ -209,17 +209,17 @@ not a hot dog.
 D - Deployment
 --------------
 
-In this final section, we demonstrate deploying our trained image classification model
+In this final section, we demonstrate serving our trained image classification model
 as a web service and interacting with it using HTTP requests.
 
 Starting the Web Service
 """""""""""""""""""""""""
 
-To deploy the model, use the following command:
+To serve the model, use the following command:
 
 .. code-block:: shell
 
-    eirdeploy --model-path [MODEL_PATH]
+    eirserve --model-path [MODEL_PATH]
 
 Replace `[MODEL_PATH]` with the actual path to your trained model.
 This command initiates a web service that listens for incoming requests.
@@ -279,23 +279,23 @@ Analyzing Responses
 
 Before we going into the responses, let's view the images that were used for predictions:
 
-.. figure:: ../tutorial_files/a_using_eir/05_image_tutorial/deploy_results/1040579.jpg
+.. figure:: ../tutorial_files/a_using_eir/05_image_tutorial/serve_results/1040579.jpg
    :alt: Image 1040579
    :align: center
 
 1040579.jpg
 
-.. figure:: ../tutorial_files/a_using_eir/05_image_tutorial/deploy_results/108743.jpg
+.. figure:: ../tutorial_files/a_using_eir/05_image_tutorial/serve_results/108743.jpg
    :alt: Image 108743
    :align: center
 
 108743.jpg
 
 
-After sending requests to the deployed model, the responses can be analyzed.
+After sending requests to the served model, the responses can be analyzed.
 These responses provide insights into the model's predictions based on the input images.
 
-.. literalinclude:: ../tutorial_files/a_using_eir/05_image_tutorial/deploy_results/predictions.json
+.. literalinclude:: ../tutorial_files/a_using_eir/05_image_tutorial/serve_results/predictions.json
     :language: json
     :caption: predictions.json
 

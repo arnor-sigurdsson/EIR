@@ -5,9 +5,9 @@ from typing import Sequence
 import pandas as pd
 
 from docs.doc_modules.c_sequence_outputs.utils import get_content_root
-from docs.doc_modules.deploy_experiments_utils import load_data_for_deploy
-from docs.doc_modules.deployment_experiments import AutoDocDeploymentInfo
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
+from docs.doc_modules.serve_experiments_utils import load_data_for_serve
+from docs.doc_modules.serving_experiments import AutoDocServingInfo
 from docs.doc_modules.utils import add_model_path_to_command
 
 CONTENT_ROOT = CR = get_content_root()
@@ -171,10 +171,10 @@ def save_translations(folder_path: Path, output_folder: Path) -> None:
     data.to_html(output_folder / "translations.html")
 
 
-def get_sequence_to_sequence_03_spanish_to_english_deploy() -> AutoDocDeploymentInfo:
+def get_sequence_to_sequence_03_spanish_to_english_serve() -> AutoDocServingInfo:
     base_path = f"docs/tutorials/tutorial_files/{CR}/{TN}"
 
-    server_command = ["eirdeploy", "--model-path", "FILL_MODEL"]
+    server_command = ["eirserve", "--model-path", "FILL_MODEL"]
 
     example_requests = [
         {
@@ -200,14 +200,14 @@ def get_sequence_to_sequence_03_spanish_to_english_deploy() -> AutoDocDeployment
         run_path="eir_tutorials/tutorial_runs/c_sequence_output/" "02_seq_to_seq",
     )
 
-    ade = AutoDocDeploymentInfo(
+    ade = AutoDocServingInfo(
         name="SEQUENCE_TO_SEQUENCE_DEPLOY",
         base_path=Path(base_path),
         server_command=server_command,
         pre_run_command_modifications=(add_model_path,),
         post_run_functions=(),
         example_requests=example_requests,
-        data_loading_function=load_data_for_deploy,
+        data_loading_function=load_data_for_serve,
     )
 
     return ade
@@ -216,7 +216,7 @@ def get_sequence_to_sequence_03_spanish_to_english_deploy() -> AutoDocDeployment
 def get_experiments() -> Sequence[AutoDocExperimentInfo]:
     exp_1 = get_sequence_to_sequence_01_english_only()
     exp_2 = get_sequence_to_sequence_02_spanish_to_english()
-    exp_3 = get_sequence_to_sequence_03_spanish_to_english_deploy()
+    exp_3 = get_sequence_to_sequence_03_spanish_to_english_serve()
 
     return [
         exp_1,

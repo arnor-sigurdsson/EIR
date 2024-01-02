@@ -13,9 +13,9 @@ from PIL import Image
 from umap import UMAP
 
 from docs.doc_modules.d_array_outputs.utils import get_content_root
-from docs.doc_modules.deploy_experiments_utils import copy_inputs, load_data_for_deploy
-from docs.doc_modules.deployment_experiments import AutoDocDeploymentInfo
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
+from docs.doc_modules.serve_experiments_utils import copy_inputs, load_data_for_serve
+from docs.doc_modules.serving_experiments import AutoDocServingInfo
 from docs.doc_modules.utils import add_model_path_to_command, get_saved_model_path
 
 CONTENT_ROOT = CR = get_content_root()
@@ -417,10 +417,10 @@ def _add_model_path_to_command(command: list[str]) -> list[str]:
     return command
 
 
-def get_array_gen_02_mnist_generation_deploy() -> AutoDocDeploymentInfo:
+def get_array_gen_02_mnist_generation_serve() -> AutoDocServingInfo:
     base_path = f"docs/tutorials/tutorial_files/{CR}/{TN}"
 
-    server_command = ["eirdeploy", "--model-path", "FILL_MODEL"]
+    server_command = ["eirserve", "--model-path", "FILL_MODEL"]
 
     image_base = "eir_tutorials/d_array_output/01_array_mnist_generation/data/mnist_npy"
     example_requests = [
@@ -440,11 +440,11 @@ def get_array_gen_02_mnist_generation_deploy() -> AutoDocDeploymentInfo:
         run_path="eir_tutorials/tutorial_runs/d_array_output/01_array_mnist_generation",
     )
 
-    copy_inputs_to_deploy = (
+    copy_inputs_to_serve = (
         copy_inputs,
         {
             "example_requests": example_requests,
-            "output_folder": str(Path(base_path) / "deploy_results"),
+            "output_folder": str(Path(base_path) / "serve_results"),
         },
     )
 
@@ -452,21 +452,21 @@ def get_array_gen_02_mnist_generation_deploy() -> AutoDocDeploymentInfo:
         decode_and_save_images,
         {
             "predictions_file": str(
-                Path(base_path) / "deploy_results" / "predictions.json"
+                Path(base_path) / "serve_results" / "predictions.json"
             ),
-            "output_folder": str(Path(base_path) / "deploy_results"),
+            "output_folder": str(Path(base_path) / "serve_results"),
             "image_shape": (28, 28),
         },
     )
 
-    ade = AutoDocDeploymentInfo(
+    ade = AutoDocServingInfo(
         name="ARRAY_GENERATION_DEPLOY",
         base_path=Path(base_path),
         server_command=server_command,
         pre_run_command_modifications=(add_model_path,),
-        post_run_functions=(copy_inputs_to_deploy, decode_and_save_images_func),
+        post_run_functions=(copy_inputs_to_serve, decode_and_save_images_func),
         example_requests=example_requests,
-        data_loading_function=load_data_for_deploy,
+        data_loading_function=load_data_for_serve,
     )
 
     return ade
@@ -498,7 +498,7 @@ def decode_and_save_images(
 def get_experiments() -> Sequence[AutoDocExperimentInfo]:
     exp_1 = get_array_gen_01_mnist_generation()
     exp_2 = get_array_gen_02_mnist_generation()
-    exp_3 = get_array_gen_02_mnist_generation_deploy()
+    exp_3 = get_array_gen_02_mnist_generation_serve()
 
     return [
         exp_1,

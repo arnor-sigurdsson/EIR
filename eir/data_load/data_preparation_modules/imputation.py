@@ -2,10 +2,10 @@ from typing import Any, Dict, Literal, Tuple, Union
 
 import torch
 
-from eir.deploy_modules.deploy_schemas import ComputedDeployTabularInputInfo
 from eir.predict_modules.predict_tabular_input_setup import (
     ComputedPredictTabularInputInfo,
 )
+from eir.serve_modules.serve_schemas import ComputedServeTabularInputInfo
 from eir.setup.input_setup import al_input_objects_as_dict
 from eir.setup.input_setup_modules.setup_array import ComputedArrayInputInfo
 from eir.setup.input_setup_modules.setup_bytes import ComputedBytesInputInfo
@@ -76,7 +76,7 @@ def impute_missing_modalities(
                 case (
                     ComputedTabularInputInfo()
                     | ComputedPredictTabularInputInfo()
-                    | ComputedDeployTabularInputInfo()
+                    | ComputedServeTabularInputInfo()
                 ):
                     assert input_type == "tabular"
                     inputs_values[input_name] = fill_value
@@ -130,7 +130,7 @@ def _get_default_impute_fill_values(
             case (
                 ComputedTabularInputInfo()
                 | ComputedPredictTabularInputInfo()
-                | ComputedDeployTabularInputInfo()
+                | ComputedServeTabularInputInfo()
             ):
                 fill_values[input_name] = _build_tabular_fill_value(
                     input_object=input_object
@@ -156,7 +156,7 @@ def _build_tabular_fill_value(
     input_object: Union[
         "ComputedTabularInputInfo",
         "ComputedPredictTabularInputInfo",
-        "ComputedDeployTabularInputInfo",
+        "ComputedServeTabularInputInfo",
     ]
 ) -> dict[str, int | float]:
     fill_value = {}

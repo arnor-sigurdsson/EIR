@@ -2,9 +2,9 @@ from functools import partial
 from pathlib import Path
 from typing import Sequence
 
-from docs.doc_modules.deploy_experiments_utils import copy_inputs, load_data_for_deploy
-from docs.doc_modules.deployment_experiments import AutoDocDeploymentInfo
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
+from docs.doc_modules.serve_experiments_utils import copy_inputs, load_data_for_serve
+from docs.doc_modules.serving_experiments import AutoDocServingInfo
 from docs.doc_modules.utils import add_model_path_to_command
 
 
@@ -161,10 +161,10 @@ def get_05_hot_dog_run_2_combined_pretrained_info() -> AutoDocExperimentInfo:
     return ade
 
 
-def get_05_hot_dog_run_1_deploy_info() -> AutoDocDeploymentInfo:
+def get_05_hot_dog_run_1_serve_info() -> AutoDocServingInfo:
     base_path = "docs/tutorials/tutorial_files/a_using_eir/05_image_tutorial"
 
-    server_command = ["eirdeploy", "--model-path", "FILL_MODEL"]
+    server_command = ["eirserve", "--model-path", "FILL_MODEL"]
 
     base = (
         "eir_tutorials/a_using_eir/05_image_tutorial/data/"
@@ -187,22 +187,22 @@ def get_05_hot_dog_run_1_deploy_info() -> AutoDocDeploymentInfo:
         "tutorial_05_is_it_a_hot_dog_pretrained_combined",
     )
 
-    copy_inputs_to_deploy = (
+    copy_inputs_to_serve = (
         copy_inputs,
         {
             "example_requests": example_requests,
-            "output_folder": str(Path(base_path) / "deploy_results"),
+            "output_folder": str(Path(base_path) / "serve_results"),
         },
     )
 
-    ade = AutoDocDeploymentInfo(
+    ade = AutoDocServingInfo(
         name="IMAGE_DEPLOY",
         base_path=Path(base_path),
         server_command=server_command,
         pre_run_command_modifications=(add_model_path,),
-        post_run_functions=(copy_inputs_to_deploy,),
+        post_run_functions=(copy_inputs_to_serve,),
         example_requests=example_requests,
-        data_loading_function=load_data_for_deploy,
+        data_loading_function=load_data_for_serve,
     )
 
     return ade
@@ -212,6 +212,6 @@ def get_experiments() -> Sequence[AutoDocExperimentInfo]:
     exp_1 = get_05_hot_dog_run_1_resnet_info()
     exp_2 = get_05_hot_dog_run_2_resnet_pretrained_info()
     exp_3 = get_05_hot_dog_run_2_combined_pretrained_info()
-    exp_4 = get_05_hot_dog_run_1_deploy_info()
+    exp_4 = get_05_hot_dog_run_1_serve_info()
 
     return [exp_1, exp_2, exp_3, exp_4]

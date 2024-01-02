@@ -228,22 +228,22 @@ as an exercise for those interested.
 D - Deployment
 --------------
 
-This section guides you through deploying a multimodal
+This section guides you through serving a multimodal
 model that combines tabular data, text descriptions, and images.
-We'll demonstrate how to interact with this deployed model using HTTP requests.
+We'll demonstrate how to interact with this served model using HTTP requests.
 
 Starting the Web Service
 """""""""""""""""""""""""
 
-To deploy the multimodal model, use the following command:
+To serve the multimodal model, use the following command:
 
 .. code-block:: shell
 
-    eirdeploy --model-path [MODEL_PATH]
+    eirserve --model-path [MODEL_PATH]
 
 Replace `[MODEL_PATH]` with the actual path to your trained multimodal model. This command starts a web service that listens for incoming HTTP requests.
 
-Example of the deployment command:
+Example of the serving command:
 
 .. literalinclude:: ../tutorial_files/a_using_eir/07_multimodal_tutorial/commands/COMBINED_SEQUENCE_DEPLOY.txt
     :language: console
@@ -280,13 +280,13 @@ Once the server is running, you can send requests containing tabular data, text 
 Analyzing Responses
 """""""""""""""""""
 
-After sending requests to the deployed model,
+After sending requests to the served model,
 you will receive responses that provide a prediction
 based on the combined data (tabular, description, and image).
 
 Let's take a look at some example predictions made by the model:
 
-.. literalinclude:: ../tutorial_files/a_using_eir/07_multimodal_tutorial/deploy_results/predictions.json
+.. literalinclude:: ../tutorial_files/a_using_eir/07_multimodal_tutorial/serve_results/predictions.json
     :language: json
     :caption: predictions.json
 
@@ -299,7 +299,7 @@ would not want to adopt a 250 year old sage cat? :)
 
 While not visible in the JSON above, here is the image used:
 
-.. figure:: ../tutorial_files/a_using_eir/07_multimodal_tutorial/deploy_results/86e1089a3.jpg
+.. figure:: ../tutorial_files/a_using_eir/07_multimodal_tutorial/serve_results/86e1089a3.jpg
    :alt: Example Pet Image
    :align: center
 

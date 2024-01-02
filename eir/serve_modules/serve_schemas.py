@@ -5,11 +5,11 @@ from eir.setup.schemas import InputConfig
 
 
 @dataclass
-class ComputedDeployTabularInputInfo:
-    labels: "DeployLabels"
+class ComputedServeTabularInputInfo:
+    labels: "ServeLabels"
     input_config: InputConfig
 
 
 @dataclass
-class DeployLabels:
+class ServeLabels:
     label_transformers: al_label_transformers

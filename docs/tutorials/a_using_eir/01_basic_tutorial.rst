@@ -303,17 +303,17 @@ that we have found to work well as a starting point:
 E - Deployment
 ^^^^^^^^^^^^^^
 
-In this final section, we demonstrate deploying our trained model
+In this final section, we demonstrate serving our trained model
 as a web service and interacting with it using HTTP requests.
 
 Starting the Web Service
 """""""""""""""""""""""""
 
-To deploy the model, use the following command:
+To serve the model, use the following command:
 
 .. code-block:: shell
 
-    eirdeploy --model-path [MODEL_PATH]
+    eirserve --model-path [MODEL_PATH]
 
 Replace `[MODEL_PATH]` with the actual path to your trained model.
 This command initiates a web service that listens for incoming requests.
@@ -356,6 +356,6 @@ Analyzing Responses
 
 Here are some examples of responses from the server for a set of inputs:
 
-.. literalinclude:: ../tutorial_files/a_using_eir/01_basic_tutorial/deploy_results/predictions.json
+.. literalinclude:: ../tutorial_files/a_using_eir/01_basic_tutorial/serve_results/predictions.json
     :language: json
     :caption: predictions.json

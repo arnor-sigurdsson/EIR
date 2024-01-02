@@ -2,9 +2,9 @@ from functools import partial
 from pathlib import Path
 from typing import Sequence
 
-from docs.doc_modules.deploy_experiments_utils import load_data_for_deploy
-from docs.doc_modules.deployment_experiments import AutoDocDeploymentInfo
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
+from docs.doc_modules.serve_experiments_utils import load_data_for_serve
+from docs.doc_modules.serving_experiments import AutoDocServingInfo
 from docs.doc_modules.utils import add_model_path_to_command
 
 
@@ -245,12 +245,12 @@ def get_04_imdb_run_5_combined_info() -> AutoDocExperimentInfo:
     return ade
 
 
-def get_04_imdb_run_1_deploy_info() -> AutoDocDeploymentInfo:
+def get_04_imdb_run_1_serve_info() -> AutoDocServingInfo:
     base_path = (
         "docs/tutorials/tutorial_files/a_using_eir/04_pretrained_sequence_tutorial"
     )
 
-    server_command = ["eirdeploy", "--model-path", "FILL_MODEL"]
+    server_command = ["eirserve", "--model-path", "FILL_MODEL"]
 
     base_inputs = [
         "This move was great! I loved it!",
@@ -290,14 +290,14 @@ def get_04_imdb_run_1_deploy_info() -> AutoDocDeploymentInfo:
         "tutorial_04_imdb_run_combined",
     )
 
-    ade = AutoDocDeploymentInfo(
+    ade = AutoDocServingInfo(
         name="COMBINED_SEQUENCE_DEPLOY",
         base_path=Path(base_path),
         server_command=server_command,
         pre_run_command_modifications=(add_model_path,),
         post_run_functions=(),
         example_requests=example_requests,
-        data_loading_function=load_data_for_deploy,
+        data_loading_function=load_data_for_serve,
     )
 
     return ade
@@ -309,6 +309,6 @@ def get_experiments() -> Sequence[AutoDocExperimentInfo]:
     exp_3 = get_04_imdb_run_3_longformer_info()
     exp_4 = get_04_imdb_run_4_tiny_bert_info()
     exp_5 = get_04_imdb_run_5_combined_info()
-    exp_6 = get_04_imdb_run_1_deploy_info()
+    exp_6 = get_04_imdb_run_1_serve_info()
 
     return [exp_1, exp_2, exp_3, exp_4, exp_5, exp_6]

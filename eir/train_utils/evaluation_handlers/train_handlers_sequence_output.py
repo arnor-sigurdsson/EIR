@@ -35,8 +35,8 @@ from eir.train_utils.evaluation_handlers.evaluation_handlers_utils import (
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
-    from eir.deploy import DeployExperiment
     from eir.predict import PredictExperiment, PredictHooks
+    from eir.serve import ServeExperiment
     from eir.train import Experiment, al_input_objects_as_dict
     from eir.train_utils.step_logic import Hooks
 
@@ -57,7 +57,7 @@ class SequenceOutputEvalSample:
 
 
 def sequence_out_single_sample_evaluation_wrapper(
-    experiment: Union["Experiment", "PredictExperiment", "DeployExperiment"],
+    experiment: Union["Experiment", "PredictExperiment", "ServeExperiment"],
     input_objects: "al_input_objects_as_dict",
     auto_dataset_to_load_from: Dataset,
     iteration: int,
@@ -283,7 +283,7 @@ def autoregressive_sequence_generation(
     input_objects: "al_input_objects_as_dict",
     eval_sample: SequenceOutputEvalSample,
     seq_output_name: str,
-    experiment: Union["Experiment", "PredictExperiment", "DeployExperiment"],
+    experiment: Union["Experiment", "PredictExperiment", "ServeExperiment"],
     default_eir_hooks: Union["Hooks", "PredictHooks"],
     sampling_config: SequenceOutputSamplingConfig,
 ) -> list[int]:

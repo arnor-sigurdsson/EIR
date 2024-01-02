@@ -4,13 +4,13 @@ from typing import TYPE_CHECKING, Union
 
 from aislib.misc_utils import get_logger
 
-from eir.deploy_modules.deploy_input_setup import set_up_inputs_for_deploy
 from eir.experiment_io.experiment_io import (
     LoadedTrainExperiment,
     load_serialized_train_experiment,
 )
 from eir.models import model_setup
 from eir.models.meta.meta import MetaModel
+from eir.serve_modules.serve_input_setup import set_up_inputs_for_serve
 from eir.setup.config import Configs
 from eir.setup.input_setup import al_input_objects_as_dict
 
@@ -23,7 +23,7 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
 @dataclass(frozen=True)
-class DeployExperiment:
+class ServeExperiment:
     configs: Configs
     hooks: Union["Hooks", None]
     metrics: "al_metric_record_dict"
@@ -32,10 +32,10 @@ class DeployExperiment:
     model: MetaModel
 
 
-def load_experiment_for_deploy(
+def load_experiment_for_serve(
     model_path: str,
     device: str,
-) -> DeployExperiment:
+) -> ServeExperiment:
     model_path_object = Path(model_path)
     run_folder = model_path_object.parent.parent
 
@@ -46,7 +46,7 @@ def load_experiment_for_deploy(
 
     loaded_train_experiment.configs.global_config.device = device
 
-    inputs = set_up_inputs_for_deploy(
+    inputs = set_up_inputs_for_serve(
         test_inputs_configs=train_configs.input_configs,
         hooks=default_train_hooks,
         output_folder=str(run_folder),
@@ -54,7 +54,7 @@ def load_experiment_for_deploy(
 
     logger.info("Loading EIR PyTorch model from '%s'.", model_path)
 
-    model = load_pytorch_eir_model_for_deploy(
+    model = load_pytorch_eir_model_for_serve(
         model_pt_path=str(model_path),
         loaded_train_experiment=loaded_train_experiment,
         inputs=inputs,
@@ -64,17 +64,17 @@ def load_experiment_for_deploy(
     assert not model.training
 
     loaded_train_experiment_as_dict = loaded_train_experiment.__dict__
-    deploy_experiment_kwargs = {
+    serve_experiment_kwargs = {
         **{"model": model, "inputs": inputs},
         **loaded_train_experiment_as_dict,
     }
 
-    deploy_experiment = DeployExperiment(**deploy_experiment_kwargs)
+    serve_experiment = ServeExperiment(**serve_experiment_kwargs)
 
-    return deploy_experiment
+    return serve_experiment
 
 
-def load_pytorch_eir_model_for_deploy(
+def load_pytorch_eir_model_for_serve(
     model_pt_path: str,
     loaded_train_experiment: LoadedTrainExperiment,
     inputs: al_input_objects_as_dict,

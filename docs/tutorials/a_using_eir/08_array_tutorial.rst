@@ -159,16 +159,16 @@ results by e.g. increasing the number of filters in the CNN case.
 C - Deployment
 ^^^^^^^^^^^^^^
 
-In this final section, we demonstrate deploying our trained model for 3D array data as a web service and interacting with it using HTTP requests.
+In this final section, we demonstrate serving our trained model for 3D array data as a web service and interacting with it using HTTP requests.
 
 Starting the Web Service
 """""""""""""""""""""""""
 
-To deploy the model, use the following command:
+To serve the model, use the following command:
 
 .. code-block:: shell
 
-    eirdeploy --model-path [MODEL_PATH]
+    eirserve --model-path [MODEL_PATH]
 
 Replace `[MODEL_PATH]` with the actual path to your trained model.
 This command initiates a web service that listens for incoming requests.
@@ -212,9 +212,9 @@ Here's an example Python function demonstrating this process:
 Analyzing Responses
 """""""""""""""""""
 
-After sending requests to the deployed model, the responses might look something like this:
+After sending requests to the served model, the responses might look something like this:
 
-.. literalinclude:: ../tutorial_files/a_using_eir/08_array_tutorial/deploy_results/predictions.json
+.. literalinclude:: ../tutorial_files/a_using_eir/08_array_tutorial/serve_results/predictions.json
     :language: json
     :caption: predictions.json
 

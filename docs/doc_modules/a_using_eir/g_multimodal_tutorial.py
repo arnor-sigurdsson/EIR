@@ -5,9 +5,9 @@ from typing import Sequence
 
 import pandas as pd
 
-from docs.doc_modules.deploy_experiments_utils import copy_inputs, load_data_for_deploy
-from docs.doc_modules.deployment_experiments import AutoDocDeploymentInfo
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
+from docs.doc_modules.serve_experiments_utils import copy_inputs, load_data_for_serve
+from docs.doc_modules.serving_experiments import AutoDocServingInfo
 from docs.doc_modules.utils import add_model_path_to_command
 
 
@@ -238,10 +238,10 @@ def get_07_multimodal_run_3_tabular_description_image_info() -> AutoDocExperimen
     return ade
 
 
-def get_07_multimodal_deploy_tabular_description_image_info() -> AutoDocDeploymentInfo:
+def get_07_multimodal_serve_tabular_description_image_info() -> AutoDocServingInfo:
     base_path = "docs/tutorials/tutorial_files/a_using_eir/07_multimodal_tutorial/"
 
-    server_command = ["eirdeploy", "--model-path", "FILL_MODEL"]
+    server_command = ["eirserve", "--model-path", "FILL_MODEL"]
 
     base = {
         "pets_tabular": {
@@ -285,22 +285,22 @@ def get_07_multimodal_deploy_tabular_description_image_info() -> AutoDocDeployme
         "tutorial_07c_multimodal_tabular_description_image",
     )
 
-    copy_inputs_to_deploy = (
+    copy_inputs_to_serve = (
         copy_inputs,
         {
             "example_requests": example_requests,
-            "output_folder": str(Path(base_path) / "deploy_results"),
+            "output_folder": str(Path(base_path) / "serve_results"),
         },
     )
 
-    ade = AutoDocDeploymentInfo(
+    ade = AutoDocServingInfo(
         name="COMBINED_SEQUENCE_DEPLOY",
         base_path=Path(base_path),
         server_command=server_command,
         pre_run_command_modifications=(add_model_path,),
-        post_run_functions=(copy_inputs_to_deploy,),
+        post_run_functions=(copy_inputs_to_serve,),
         example_requests=example_requests,
-        data_loading_function=load_data_for_deploy,
+        data_loading_function=load_data_for_serve,
     )
 
     return ade
@@ -435,7 +435,7 @@ def get_experiments() -> Sequence[AutoDocExperimentInfo]:
     exp_1 = get_07_multimodal_run_1_tabular_info()
     exp_2 = get_07_multimodal_run_2_tabular_description_info()
     exp_3 = get_07_multimodal_run_3_tabular_description_image_info()
-    exp_4 = get_07_multimodal_deploy_tabular_description_image_info()
+    exp_4 = get_07_multimodal_serve_tabular_description_image_info()
     exp_a1 = get_07_mm_apx_run_1_tab_desc_pre_info()
     exp_a2 = get_07_mm_apx_run_2_tab_desc_mt_info()
 

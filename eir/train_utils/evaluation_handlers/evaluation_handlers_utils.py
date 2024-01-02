@@ -42,11 +42,11 @@ from eir.data_load.label_setup import (
     al_label_transformers,
     streamline_values_for_transformers,
 )
-from eir.deploy_modules.deploy_schemas import ComputedDeployTabularInputInfo
 from eir.interpretation.interpret_image import un_normalize
 from eir.predict_modules.predict_tabular_input_setup import (
     ComputedPredictTabularInputInfo,
 )
+from eir.serve_modules.serve_schemas import ComputedServeTabularInputInfo
 from eir.setup.input_setup_modules.setup_array import (
     ArrayNormalizationStats,
     ComputedArrayInputInfo,
@@ -75,8 +75,8 @@ from eir.setup.schemas import (
 from eir.train_utils.utils import call_hooks_stage_iterable
 
 if TYPE_CHECKING:
-    from eir.deploy import DeployExperiment
     from eir.predict import PredictExperiment, PredictHooks
+    from eir.serve import ServeExperiment
     from eir.setup.input_setup import al_input_objects_as_dict
     from eir.train import Experiment
     from eir.train_utils.step_logic import Hooks
@@ -124,7 +124,7 @@ def convert_model_inputs_to_raw(
             case (
                 ComputedTabularInputInfo()
                 | ComputedPredictTabularInputInfo()
-                | ComputedDeployTabularInputInfo()
+                | ComputedServeTabularInputInfo()
             ):
                 assert isinstance(data, dict)
                 raw_input = convert_tabular_input_to_raw(
@@ -233,7 +233,7 @@ def general_pre_process_prepared_inputs(
     prepared_inputs: dict[str, Any],
     target_labels: dict[str, Any],
     sample_id: str,
-    experiment: Union["Experiment", "PredictExperiment", "DeployExperiment"],
+    experiment: Union["Experiment", "PredictExperiment", "ServeExperiment"],
     custom_hooks: Union["Hooks", "PredictHooks"],
 ) -> Batch:
     """
@@ -475,7 +475,7 @@ def prepare_manual_sample_data(
             case (
                 ComputedTabularInputInfo()
                 | ComputedPredictTabularInputInfo()
-                | ComputedDeployTabularInputInfo()
+                | ComputedServeTabularInputInfo()
             ):
                 assert isinstance(input_type_info, TabularInputDataConfig)
                 transformers = input_object.labels.label_transformers

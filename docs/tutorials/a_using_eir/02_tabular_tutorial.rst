@@ -183,17 +183,17 @@ and we did not do extensive hyper-parameter tuning!
 E - Deployment
 ^^^^^^^^^^^^^^
 
-In this final section, we demonstrate deploying our trained model
+In this final section, we demonstrate serving our trained model
 as a web service and interacting with it using HTTP requests.
 
 Starting the Web Service
 """""""""""""""""""""""""
 
-To deploy the model, use the following command:
+To serve the model, use the following command:
 
 .. code-block:: shell
 
-    eirdeploy --model-path [MODEL_PATH]
+    eirserve --model-path [MODEL_PATH]
 
 Replace `[MODEL_PATH]` with the actual path to your trained model.
 This command initiates a web service that listens for incoming requests.
@@ -253,10 +253,10 @@ Additionally, you can send requests using `bash`:
 Analyzing Responses
 """""""""""""""""""
 
-After sending requests to the deployed model, the responses can be analyzed.
+After sending requests to the served model, the responses can be analyzed.
 These responses provide insights into the model's predictions based on the input data.
 
-.. literalinclude:: ../tutorial_files/a_using_eir/02_tabular_tutorial/deploy_results/predictions.json
+.. literalinclude:: ../tutorial_files/a_using_eir/02_tabular_tutorial/serve_results/predictions.json
     :language: json
     :caption: predictions.json
 

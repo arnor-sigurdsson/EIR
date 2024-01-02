@@ -242,16 +242,16 @@ the sequence generation functionality in ``EIR``. Thank you for reading!
 F - Deployment
 --------------
 
-In this final section, we demonstrate deploying our trained model for sequence generation as a web service and interacting with it using HTTP requests.
+In this final section, we demonstrate serving our trained model for sequence generation as a web service and interacting with it using HTTP requests.
 
 Starting the Web Service
 """""""""""""""""""""""""
 
-To deploy the model, use the following command:
+To serve the model, use the following command:
 
 .. code-block:: shell
 
-    eirdeploy --model-path [MODEL_PATH]
+    eirserve --model-path [MODEL_PATH]
 
 Replace `[MODEL_PATH]` with the actual path to your trained model.
 This command initiates a web service that listens for incoming requests.
@@ -262,7 +262,7 @@ Here is an example of the command:
     :language: console
 
 .. important::
-    Currently neither deploying nor predicting works with the "bpe" tokenizer
+    Currently neither serving nor predicting works with the "bpe" tokenizer
     due to a bug / design decision in the library that implements it,
     see `here <https://github.com/huggingface/tokenizers/issues/566>`__
     for more information.
@@ -307,10 +307,10 @@ Additionally, you can send requests using `bash`:
 Analyzing Responses
 """""""""""""""""""
 
-After sending requests to the deployed model, the responses can be analyzed.
+After sending requests to the served model, the responses can be analyzed.
 These responses demonstrate the model's ability to generate text sequences based on the provided prompts.
 
-.. literalinclude:: ../tutorial_files/c_sequence_output/01_sequence_generation/deploy_results/predictions.json
+.. literalinclude:: ../tutorial_files/c_sequence_output/01_sequence_generation/serve_results/predictions.json
     :language: json
     :caption: predictions.json
 

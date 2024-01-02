@@ -13,11 +13,6 @@ from eir.data_load.data_preparation_modules.imputation import (
 from eir.data_load.data_preparation_modules.input_preparation_wrappers import (
     prepare_inputs_memory,
 )
-from eir.deploy_modules.deploy_network_utils import prepare_request_input_data
-from eir.deploy_modules.deploy_schemas import (
-    ComputedDeployTabularInputInfo,
-    DeployLabels,
-)
 from eir.experiment_io.experiment_io import load_transformers
 from eir.predict_modules.predict_input_setup import (
     get_input_setup_function_map_for_predict,
@@ -25,6 +20,8 @@ from eir.predict_modules.predict_input_setup import (
 from eir.predict_modules.predict_tabular_input_setup import (
     ComputedPredictTabularInputInfo,
 )
+from eir.serve_modules.serve_network_utils import prepare_request_input_data
+from eir.serve_modules.serve_schemas import ComputedServeTabularInputInfo, ServeLabels
 from eir.setup.input_setup import (
     al_input_objects_as_dict,
     get_input_name_config_iterator,
@@ -35,14 +32,14 @@ from eir.setup.schemas import InputConfig, TabularInputDataConfig, al_input_conf
 from eir.train_utils.utils import call_hooks_stage_iterable
 
 if TYPE_CHECKING:
-    from eir.deploy_modules.deploy_experiment_io import DeployExperiment
+    from eir.serve_modules.serve_experiment_io import ServeExperiment
     from eir.train import Experiment, Hooks
 
 logger = get_logger(name=__name__)
 
 
 @dataclass(frozen=True)
-class DeployBatch:
+class ServeBatch:
     """
     Note, we keep the pre_hook_inputs around for cases like autoregressive
     generation where we use the actual input token ids. This is simpler for e.g.
@@ -56,7 +53,7 @@ class DeployBatch:
     ids: list[str]
 
 
-def set_up_inputs_for_deploy(
+def set_up_inputs_for_serve(
     test_inputs_configs: al_input_configs,
     hooks: Union["Hooks", None],
     output_folder: str,
@@ -66,7 +63,7 @@ def set_up_inputs_for_deploy(
     name_config_iter = get_input_name_config_iterator(input_configs=test_inputs_configs)
     for name, input_config in name_config_iter:
         cur_input_data_config = input_config.input_info
-        setup_func = get_input_setup_function_for_deploy(
+        setup_func = get_input_setup_function_for_serve(
             input_type=cur_input_data_config.input_type
         )
         logger.info(
@@ -87,9 +84,9 @@ def set_up_inputs_for_deploy(
 
 
 def general_pre_process(
-    data: Sequence, deploy_experiment: "DeployExperiment"
-) -> DeployBatch:
-    exp = deploy_experiment
+    data: Sequence, serve_experiment: "ServeExperiment"
+) -> ServeBatch:
+    exp = serve_experiment
 
     inputs_parsed = parse_request_input_data_wrapper(
         data=data,
@@ -116,7 +113,7 @@ def general_pre_process(
     )
     batch = state["batch"]
 
-    batch_final = DeployBatch(
+    batch_final = ServeBatch(
         pre_hook_inputs=inputs_final,
         inputs=batch.inputs,
         target_labels={},
@@ -136,17 +133,17 @@ def parse_request_input_data_wrapper(
     return parsed_data
 
 
-def get_input_setup_function_for_deploy(input_type: str) -> Callable:
+def get_input_setup_function_for_serve(input_type: str) -> Callable:
     mapping_predict = get_input_setup_function_map_for_predict()
 
-    mapping_predict["tabular"] = _setup_tabular_input_for_deploy
+    mapping_predict["tabular"] = _setup_tabular_input_for_serve
 
     return mapping_predict[input_type]
 
 
-def _setup_tabular_input_for_deploy(
+def _setup_tabular_input_for_serve(
     input_config: InputConfig, output_folder: Path, *args, **kwargs
-) -> ComputedDeployTabularInputInfo:
+) -> ComputedServeTabularInputInfo:
     input_info = input_config.input_info
     input_type_info = input_config.input_type_info
 
@@ -160,14 +157,14 @@ def _setup_tabular_input_for_deploy(
         transformers_to_load={input_info.input_name: all_columns},
         output_folder=str(output_folder),
     )
-    deploy_labels = DeployLabels(label_transformers=transformers[input_info.input_name])
+    serve_labels = ServeLabels(label_transformers=transformers[input_info.input_name])
 
-    deploy_tabular_info = ComputedDeployTabularInputInfo(
-        labels=deploy_labels,
+    serve_tabular_info = ComputedServeTabularInputInfo(
+        labels=serve_labels,
         input_config=input_config,
     )
 
-    return deploy_tabular_info
+    return serve_tabular_info
 
 
 def _load_request_data(data: Sequence) -> Dict[str, Any]:
@@ -179,7 +176,7 @@ def _load_request_data(data: Sequence) -> Dict[str, Any]:
 
 def general_pre_process_raw_inputs(
     raw_inputs: dict[str, Any],
-    experiment: Union["Experiment", "DeployExperiment"],
+    experiment: Union["Experiment", "ServeExperiment"],
 ) -> dict[str, torch.Tensor]:
     inputs_prepared_for_memory = {}
     for name, cur_input in raw_inputs.items():
@@ -192,7 +189,7 @@ def general_pre_process_raw_inputs(
             case (
                 ComputedTabularInputInfo()
                 | ComputedPredictTabularInputInfo()
-                | ComputedDeployTabularInputInfo()
+                | ComputedServeTabularInputInfo()
             ):
                 cur_input = _impute_missing_tabular_values(
                     input_object=input_object,
@@ -218,7 +215,7 @@ def general_pre_process_raw_inputs(
 def _impute_missing_tabular_values(
     input_object: ComputedTabularInputInfo
     | ComputedPredictTabularInputInfo
-    | ComputedDeployTabularInputInfo,
+    | ComputedServeTabularInputInfo,
     inputs_values: dict[str, Any],
 ) -> dict[str, Any]:
     # TODO: Implement

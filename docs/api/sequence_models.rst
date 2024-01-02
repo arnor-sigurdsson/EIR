@@ -3385,7 +3385,7 @@ The abstract from the paper is the following:
 
 *Natural Language Processing (NLP) has recently achieved great success by using huge pre-trained models with hundreds
 of millions of parameters. However, these models suffer from heavy model sizes and high latency such that they cannot
-be deployed to resource-limited mobile devices. In this paper, we propose MobileBERT for compressing and accelerating
+be served to resource-limited mobile devices. In this paper, we propose MobileBERT for compressing and accelerating
 the popular BERT model. Like the original BERT, MobileBERT is task-agnostic, that is, it can be generically applied to
 various downstream NLP tasks via simple fine-tuning. Basically, MobileBERT is a thin version of BERT_LARGE, while
 equipped with bottleneck structures and a carefully designed balance between self-attentions and feed-forward networks.
@@ -3587,7 +3587,7 @@ The MRA model was proposed in `Multi Resolution Analysis (MRA) for Approximate S
 
 The abstract from the paper is the following:
 
-*Transformers have emerged as a preferred model for many tasks in natural langugage processing and vision. Recent efforts on training and deploying Transformers more efficiently have identified many strategies to approximate the self-attention matrix, a key module in a Transformer architecture. Effective ideas include various prespecified sparsity patterns, low-rank basis expansions and combinations thereof. In this paper, we revisit classical Multiresolution Analysis (MRA) concepts such as Wavelets, whose potential value in this setting remains underexplored thus far. We show that simple approximations based on empirical feedback and design choices informed by modern hardware and implementation challenges, eventually yield a MRA-based approach for self-attention with an excellent performance profile across most criteria of interest. We undertake an extensive set of experiments and demonstrate that this multi-resolution scheme outperforms most efficient self-attention proposals and is favorable for both short and long sequences. Code is available at https://github.com/mlpen/mra-attention.*
+*Transformers have emerged as a preferred model for many tasks in natural langugage processing and vision. Recent efforts on training and serving Transformers more efficiently have identified many strategies to approximate the self-attention matrix, a key module in a Transformer architecture. Effective ideas include various prespecified sparsity patterns, low-rank basis expansions and combinations thereof. In this paper, we revisit classical Multiresolution Analysis (MRA) concepts such as Wavelets, whose potential value in this setting remains underexplored thus far. We show that simple approximations based on empirical feedback and design choices informed by modern hardware and implementation challenges, eventually yield a MRA-based approach for self-attention with an excellent performance profile across most criteria of interest. We undertake an extensive set of experiments and demonstrate that this multi-resolution scheme outperforms most efficient self-attention proposals and is favorable for both short and long sequences. Code is available at https://github.com/mlpen/mra-attention.*
 
 This model was contributed by `novice03 <https://huggingface.co/novice03>`__.
 The original code can be found `here <https://github.com/mlpen/mra-attention>`__.
@@ -6044,7 +6044,7 @@ attention mechanism based on Locality Sensitive Hashing (LSH), decreases the qua
 We bypass the quadratic cost by considering self-attention as a sum of individual tokens associated with Bernoulli random 
 variables that can, in principle, be sampled at once by a single hash (although in practice, this number may be a small constant). 
 This leads to an efficient sampling scheme to estimate self-attention which relies on specific modifications of 
-LSH (to enable deployment on GPU architectures). We evaluate our algorithm on the GLUE benchmark with standard 512 sequence 
+LSH (to enable serving on GPU architectures). We evaluate our algorithm on the GLUE benchmark with standard 512 sequence
 length where we see favorable performance relative to a standard pretrained Transformer. On the Long Range Arena (LRA) benchmark, 
 for evaluating performance on long sequences, our method achieves results consistent with softmax self-attention but with sizable 
 speed-ups and memory savings and often outperforms other efficient self-attention methods. Our code is available at this https URL*

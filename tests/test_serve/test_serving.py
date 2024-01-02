@@ -9,10 +9,10 @@ import pytest
 from scipy.spatial.distance import cosine
 from sklearn.metrics import mean_squared_error
 
-from docs.doc_modules.deploy_experiments_utils import load_data_for_deploy
-from docs.doc_modules.deployment_experiments import run_deploy_experiment_from_command
+from docs.doc_modules.serve_experiments_utils import load_data_for_serve
+from docs.doc_modules.serving_experiments import run_serve_experiment_from_command
 from eir import train
-from eir.deploy_modules.deploy_network_utils import _deserialize_array
+from eir.serve_modules.serve_network_utils import _deserialize_array
 from eir.setup.schemas import InputConfig, OutputConfig
 from tests.test_modelling.test_modelling_utils import check_performance_result_wrapper
 from tests.test_modelling.test_sequence_modelling.test_sequence_output_modelling import (  # noqa
@@ -161,7 +161,7 @@ def get_base_parametrization(compiled: bool = False) -> dict:
     get_parametrization(),
     indirect=True,
 )
-def test_multi_deployment(
+def test_multi_serving(
     create_test_config_init_base: Tuple["TestConfigInits", "TestDataConfig"],
     prep_modelling_test_configs: Tuple[train.Experiment, "ModelTestConfig"],
 ):
@@ -179,7 +179,7 @@ def test_multi_deployment(
 
     saved_model_path = next((test_config.run_path / "saved_models").iterdir())
 
-    command = ["eirdeploy", "--model-path", str(saved_model_path)]
+    command = ["eirserve", "--model-path", str(saved_model_path)]
 
     input_configs = experiment.configs.input_configs
 
@@ -194,11 +194,11 @@ def test_multi_deployment(
         ids.append(random_id)
         example_requests.append(example_request)
 
-    response = run_deploy_experiment_from_command(
+    response = run_serve_experiment_from_command(
         command=command,
         url="http://localhost:8000/predict",
         example_requests=example_requests,
-        data_loading_function=load_data_for_deploy,
+        data_loading_function=load_data_for_serve,
     )
 
     for idx, random_id in enumerate(ids):

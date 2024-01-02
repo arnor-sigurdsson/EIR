@@ -91,18 +91,18 @@ to perform better than training on raw binary data.
 B - Deployment
 --------------
 
-In this section, we'll guide you through deploying our t
+In this section, we'll guide you through serving our t
 rained IMDB Reviews Bytes Classification model as a web service and show you
 how to interact with it using HTTP requests.
 
 Starting the Web Service
 """""""""""""""""""""""""
 
-To deploy the model, execute the following command:
+To serve the model, execute the following command:
 
 .. code-block:: shell
 
-    eirdeploy --model-path [MODEL_PATH]
+    eirserve --model-path [MODEL_PATH]
 
 Replace `[MODEL_PATH]` with the actual path to your trained model. This command initiates a web service that listens for incoming HTTP requests.
 
@@ -142,21 +142,21 @@ Here's an example Python function to demonstrate how to send a request:
 Analyzing Responses
 """""""""""""""""""
 
-After sending requests to the deployed model, you will receive responses that provide insights into the model's predictions based on the input text data.
+After sending requests to the served model, you will receive responses that provide insights into the model's predictions based on the input text data.
 
 Let's take a look at some of the text data used for predictions:
 
-.. literalinclude:: ../tutorial_files/a_using_eir/06_raw_bytes_tutorial/deploy_results/10021_2.txt
+.. literalinclude:: ../tutorial_files/a_using_eir/06_raw_bytes_tutorial/serve_results/10021_2.txt
    :language: text
    :caption: 10021_2.txt
 
-.. literalinclude:: ../tutorial_files/a_using_eir/06_raw_bytes_tutorial/deploy_results/10132_9.txt
+.. literalinclude:: ../tutorial_files/a_using_eir/06_raw_bytes_tutorial/serve_results/10132_9.txt
    :language: text
    :caption: 10132_9.txt
 
 Here are examples of the model's predictions:
 
-.. literalinclude:: ../tutorial_files/a_using_eir/06_raw_bytes_tutorial/deploy_results/predictions.json
+.. literalinclude:: ../tutorial_files/a_using_eir/06_raw_bytes_tutorial/serve_results/predictions.json
     :language: json
     :caption: predictions.json
 
