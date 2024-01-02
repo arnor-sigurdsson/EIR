@@ -393,7 +393,7 @@ def _log_missing_samples_between_modalities(
             "Please review the info log above for detailed counts and IDs. "
             "If this is expected, ignore this message. If not, possible "
             "causes are (a) different inputs having different sample IDs "
-            "present, (b) sample IDs between inputs / targets are not matching,"
+            "present, (b) sample IDs between inputs / targets are not matching, "
             "or (c) something else."
         )
         logger.warning(warning_message)
