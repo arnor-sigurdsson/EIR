@@ -206,4 +206,97 @@ on the french fries
 when deciding that this is indeed,
 not a hot dog.
 
+D - Deployment
+--------------
+
+In this final section, we demonstrate deploying our trained image classification model
+as a web service and interacting with it using HTTP requests.
+
+Starting the Web Service
+"""""""""""""""""""""""""
+
+To deploy the model, use the following command:
+
+.. code-block:: shell
+
+    eirdeploy --model-path [MODEL_PATH]
+
+Replace `[MODEL_PATH]` with the actual path to your trained model.
+This command initiates a web service that listens for incoming requests.
+
+Here is an example of the command:
+
+.. literalinclude:: ../tutorial_files/a_using_eir/05_image_tutorial/commands/IMAGE_DEPLOY.txt
+    :language: console
+
+Sending Requests
+""""""""""""""""
+
+With the server running, we can now send image-based requests. For this model, we send encoded images to different feature extraction endpoints.
+
+Here's an example Python function demonstrating this process:
+
+.. code-block:: python
+
+    import requests
+    import base64
+    from PIL import Image
+    from io import BytesIO
+
+    def encode_image_to_base64(file_path: str) -> str:
+        with Image.open(file_path) as image:
+            buffered = BytesIO()
+            image.save(buffered, format="JPEG")
+            return base64.b64encode(buffered.getvalue()).decode("utf-8")
+
+    def send_request(url: str, payload: dict):
+        response = requests.post(url, json=payload)
+        return response.json()
+
+    payload = {
+        "hot_dog_efficientnet": encode_image_to_base64("path/to/image1.jpg"),
+        "hot_dog_resnet18": encode_image_to_base64("path/to/image1.jpg")
+    }
+
+    response = send_request('http://localhost:8000/predict', payload)
+    print(response)
+
+Additionally, you can send requests using `bash`. Note that this requires preparing the base64-encoded image content in advance:
+
+.. code-block:: bash
+
+    curl -X 'POST' \\
+      'http://localhost:8000/predict' \\
+      -H 'accept: application/json' \\
+      -H 'Content-Type: application/json' \\
+      -d '{
+          "hot_dog_efficientnet": "[BASE64_ENCODED_IMAGE]",
+          "hot_dog_resnet18": "[BASE64_ENCODED_IMAGE]"
+      }'
+
+Analyzing Responses
+"""""""""""""""""""
+
+Before we going into the responses, let's view the images that were used for predictions:
+
+.. figure:: ../tutorial_files/a_using_eir/05_image_tutorial/deploy_results/1040579.jpg
+   :alt: Image 1040579
+   :align: center
+
+1040579.jpg
+
+.. figure:: ../tutorial_files/a_using_eir/05_image_tutorial/deploy_results/108743.jpg
+   :alt: Image 108743
+   :align: center
+
+108743.jpg
+
+
+After sending requests to the deployed model, the responses can be analyzed.
+These responses provide insights into the model's predictions based on the input images.
+
+.. literalinclude:: ../tutorial_files/a_using_eir/05_image_tutorial/deploy_results/predictions.json
+    :language: json
+    :caption: predictions.json
+
 With that, we conclude this image tutorial. Thank you for reading!

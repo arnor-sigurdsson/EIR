@@ -257,7 +257,7 @@ def gather_all_ids_from_output_configs(
         else:
             raise NotImplementedError(
                 "Only csv and directory data sources are supported."
-                f"Got: {cur_source}"
+                f" Got: {cur_source}"
             )
         all_ids.update(cur_ids)
 

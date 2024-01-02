@@ -299,6 +299,74 @@ the moderately active class, we see:
     Remember that this does not necessarily tell us anything about actual
     biological causality!
 
+E - Deployment
+--------------
+
+In this final section, we demonstrate deploying our trained model
+as a web service and interacting with it using HTTP requests.
+
+Starting the Web Service
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+To deploy the model, use the following command:
+
+.. code-block:: shell
+
+    eirdeploy --model-path [MODEL_PATH]
+
+Replace `[MODEL_PATH]` with the actual path to your trained model.
+This command initiates a web service that listens for incoming requests.
+
+Here is an example of the command:
+
+.. literalinclude:: ../tutorial_files/a_using_eir/03_sequence_tutorial/commands/SEQUENCE_DEPLOY.txt
+    :language: console
+
+Sending Requests
+^^^^^^^^^^^^^^^^
+
+With the server running, we can now send requests. For sequence data like IMDb reviews,
+we send the payload as a simple JSON object.
+
+Here's an example Python function demonstrating this process:
+
+.. code-block:: python
+
+    import requests
+
+    def send_request(url: str, payload: dict):
+        response = requests.post(url, json=payload)
+        return response.json()
+
+    payload = {
+        "imdb_reviews": "This movie was great! I loved it!"
+    }
+
+    response = send_request('http://localhost:8000/predict', payload)
+    print(response)
+
+Additionally, you can send requests using `bash`:
+
+.. code-block:: bash
+
+    curl -X 'POST' \\
+      'http://localhost:8000/predict' \\
+      -H 'accept: application/json' \\
+      -H 'Content-Type: application/json' \\
+      -d '{
+          "imdb_reviews": "This movie was great! I loved it!"
+      }'
+
+Analyzing Responses
+^^^^^^^^^^^^^^^^^^^
+
+After sending requests to the deployed model, the responses can be analyzed.
+These responses provide insights into the model's predictions based on the input data.
+
+.. literalinclude:: ../tutorial_files/a_using_eir/03_sequence_tutorial/deploy_results/predictions.json
+    :language: json
+    :caption: predictions.json
+
 This concludes the sequence tutorial,
 thank you for making it this far.
 I hope you enjoyed it and it was useful to you.

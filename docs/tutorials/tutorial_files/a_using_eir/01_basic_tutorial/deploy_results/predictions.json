@@ -1,0 +1,59 @@
+[
+    {
+        "request": {
+            "genotype": "eir_tutorials/a_using_eir/01_basic_tutorial/data/processed_sample_data/arrays/A374.npy"
+        },
+        "response": {
+            "result": {
+                "ancestry_output": {
+                    "Origin": {
+                        "Asia": 0.020682919770479202,
+                        "Eastern_Asia": 0.0017788332188501954,
+                        "Europe": 0.5174471735954285,
+                        "Latin_America_and_the_Caribbean": 0.0029727756045758724,
+                        "Middle_East": 0.4559131860733032,
+                        "Sub-Saharan_Africa": 0.0012051383964717388
+                    }
+                }
+            }
+        }
+    },
+    {
+        "request": {
+            "genotype": "eir_tutorials/a_using_eir/01_basic_tutorial/data/processed_sample_data/arrays/Ayodo_468C.npy"
+        },
+        "response": {
+            "result": {
+                "ancestry_output": {
+                    "Origin": {
+                        "Asia": 0.0019262178102508187,
+                        "Eastern_Asia": 0.004091696348041296,
+                        "Europe": 0.00432152533903718,
+                        "Latin_America_and_the_Caribbean": 0.026729054749011993,
+                        "Middle_East": 0.14826367795467377,
+                        "Sub-Saharan_Africa": 0.8146678805351257
+                    }
+                }
+            }
+        }
+    },
+    {
+        "request": {
+            "genotype": "eir_tutorials/a_using_eir/01_basic_tutorial/data/processed_sample_data/arrays/NOR146.npy"
+        },
+        "response": {
+            "result": {
+                "ancestry_output": {
+                    "Origin": {
+                        "Asia": 0.027914732694625854,
+                        "Eastern_Asia": 0.0009801631094887853,
+                        "Europe": 0.8832816481590271,
+                        "Latin_America_and_the_Caribbean": 0.012947280891239643,
+                        "Middle_East": 0.07402269542217255,
+                        "Sub-Saharan_Africa": 0.0008533666259609163
+                    }
+                }
+            }
+        }
+    }
+]

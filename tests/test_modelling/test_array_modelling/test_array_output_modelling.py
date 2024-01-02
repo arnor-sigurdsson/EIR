@@ -141,6 +141,7 @@ def _array_output_test_check_wrapper(
         latest_sample = test_config.last_sample_folders[output_name][output_name]
         auto_folder = latest_sample / "auto"
 
+        did_check = False
         for f in auto_folder.iterdir():
             if f.suffix != ".npy":
                 continue
@@ -166,3 +167,6 @@ def _array_output_test_check_wrapper(
                 v=generated_array.ravel(),
             )
             assert cosine_similarity > cosine_similarity_threshold
+            did_check = True
+
+        assert did_check

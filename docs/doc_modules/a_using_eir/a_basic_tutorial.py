@@ -4,6 +4,8 @@ from typing import List, Sequence
 
 import pandas as pd
 
+from docs.doc_modules.deploy_experiments_utils import load_data_for_deploy
+from docs.doc_modules.deployment_experiments import AutoDocDeploymentInfo
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
 from docs.doc_modules.utils import get_saved_model_path
 
@@ -242,9 +244,39 @@ def csv_preview(run_path: Path, output_path: Path) -> None:
         f.write("<br>")
 
 
-def get_experiments() -> Sequence[AutoDocExperimentInfo]:
+def get_tutorial_01_run_3_deploy() -> AutoDocDeploymentInfo:
+    base_path = "docs/tutorials/tutorial_files/a_using_eir/01_basic_tutorial"
+
+    model_path_placeholder = "FILL_MODEL"
+
+    server_command = ["eirdeploy", "--model-path", model_path_placeholder]
+
+    base = (
+        "eir_tutorials/a_using_eir/01_basic_tutorial/data/processed_sample_data/arrays"
+    )
+    example_requests = [
+        {"genotype": f"{base}/A374.npy"},
+        {"genotype": f"{base}/Ayodo_468C.npy"},
+        {"genotype": f"{base}/NOR146.npy"},
+    ]
+
+    ade = AutoDocDeploymentInfo(
+        name="GLN_1_DEPLOY",
+        base_path=Path(base_path),
+        server_command=server_command,
+        pre_run_command_modifications=(_add_model_path_to_command,),
+        post_run_functions=(),
+        example_requests=example_requests,
+        data_loading_function=load_data_for_deploy,
+    )
+
+    return ade
+
+
+def get_experiments() -> Sequence[AutoDocExperimentInfo | AutoDocDeploymentInfo]:
     exp_1 = get_tutorial_01_run_1_gln_info()
     exp_2 = get_tutorial_01_run_2_gln_info()
     exp_3 = get_tutorial_01_run_2_gln_predict_info()
+    exp_4 = get_tutorial_01_run_3_deploy()
 
-    return [exp_1, exp_2, exp_3]
+    return [exp_1, exp_2, exp_3, exp_4]

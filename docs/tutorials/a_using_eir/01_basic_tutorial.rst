@@ -299,3 +299,63 @@ that we have found to work well as a starting point:
     :language: yaml
     :caption: output.yaml
 
+
+E - Deployment
+^^^^^^^^^^^^^^
+
+In this final section, we demonstrate deploying our trained model
+as a web service and interacting with it using HTTP requests.
+
+Starting the Web Service
+"""""""""""""""""""""""""
+
+To deploy the model, use the following command:
+
+.. code-block:: shell
+
+    eirdeploy --model-path [MODEL_PATH]
+
+Replace `[MODEL_PATH]` with the actual path to your trained model.
+This command initiates a web service that listens for incoming requests.
+
+Here is an example of the command:
+
+.. literalinclude:: ../tutorial_files/a_using_eir/01_basic_tutorial/commands/GLN_1_DEPLOY.txt
+    :language: console
+
+Sending Requests
+""""""""""""""""
+
+With the server running, we can now send requests.
+The requests are prepared by loading numpy array data,
+converting it to base64 encoded strings, and then constructing a JSON payload.
+
+Here's an example Python function demonstrating this process:
+
+.. code-block:: python
+
+    import numpy as np
+    import base64
+    import requests
+
+    def encode_numpy_array(file_path: str) -> str:
+        array = np.load(file_path)
+        encoded = base64.b64encode(array.tobytes()).decode('utf-8')
+        return encoded
+
+    def send_request(url: str, payload: dict):
+        response = requests.post(url, json=payload)
+        return response.json()
+
+    encoded_data = encode_numpy_array('path_to_your_numpy_array.npy')
+    response = send_request('http://localhost:8000/predict', {'genotype': encoded_data})
+    print(response)
+
+Analyzing Responses
+"""""""""""""""""""
+
+Here are some examples of responses from the server for a set of inputs:
+
+.. literalinclude:: ../tutorial_files/a_using_eir/01_basic_tutorial/deploy_results/predictions.json
+    :language: json
+    :caption: predictions.json

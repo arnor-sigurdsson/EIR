@@ -1,11 +1,14 @@
+from functools import partial
 from pathlib import Path
 from typing import Sequence
 
 from aislib.misc_utils import ensure_path_exists
 
 from docs.doc_modules.c_sequence_outputs.utils import get_content_root
+from docs.doc_modules.deploy_experiments_utils import load_data_for_deploy
+from docs.doc_modules.deployment_experiments import AutoDocDeploymentInfo
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
-from docs.doc_modules.utils import get_saved_model_path
+from docs.doc_modules.utils import add_model_path_to_command, get_saved_model_path
 
 CONTENT_ROOT = CR = get_content_root()
 TUTORIAL_NAME = TN = "01_sequence_generation"
@@ -195,6 +198,51 @@ def get_sequence_gen_02_imdb_generation_bpe() -> AutoDocExperimentInfo:
     return ade
 
 
+def get_sequence_gen_02_imdb_generation_deploy() -> AutoDocDeploymentInfo:
+    base_path = f"docs/tutorials/tutorial_files/{CR}/{TN}"
+
+    server_command = ["eirdeploy", "--model-path", "FILL_MODEL"]
+
+    example_requests = [
+        {
+            "imdb_output": "This movie was great, I have to say ",
+        },
+        {
+            "imdb_output": "This movie was terrible, I ",
+        },
+        {
+            "imdb_output": "This movie was so ",
+        },
+        {
+            "imdb_output": "This movi",
+        },
+        {
+            "imdb_output": "Toda",
+        },
+        {
+            "imdb_output": "",
+        },
+    ]
+
+    add_model_path = partial(
+        add_model_path_to_command,
+        run_path="eir_tutorials/tutorial_runs/c_sequence_output/"
+        "01_sequence_generation",
+    )
+
+    ade = AutoDocDeploymentInfo(
+        name="SEQUENCE_GENERATION_DEPLOY",
+        base_path=Path(base_path),
+        server_command=server_command,
+        pre_run_command_modifications=(add_model_path,),
+        post_run_functions=(),
+        example_requests=example_requests,
+        data_loading_function=load_data_for_deploy,
+    )
+
+    return ade
+
+
 def _get_model_path_for_predict() -> str:
     run_1_output_path = f"eir_tutorials/tutorial_runs/{CR}/{TN}"
     model_path = get_saved_model_path(run_folder=Path(run_1_output_path))
@@ -212,9 +260,11 @@ def get_experiments() -> Sequence[AutoDocExperimentInfo]:
     exp_1 = get_sequence_gen_01_imdb_generation()
     exp_2 = get_sequence_gen_01_imdb_generation_predict()
     exp_3 = get_sequence_gen_02_imdb_generation_bpe()
+    exp_4 = get_sequence_gen_02_imdb_generation_deploy()
 
     return [
         exp_1,
         exp_2,
         exp_3,
+        exp_4,
     ]

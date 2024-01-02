@@ -10,6 +10,7 @@ from typing import (
     Union,
 )
 
+from eir.deploy_modules.deploy_schemas import ComputedDeployTabularInputInfo
 from eir.experiment_io.experiment_io import get_run_folder_from_model_path
 from eir.predict_modules.predict_tabular_input_setup import (
     ComputedPredictTabularInputInfo,
@@ -58,6 +59,7 @@ al_input_objects = Union[
     ComputedImageInputInfo,
     ComputedArrayInputInfo,
     ComputedPredictTabularInputInfo,
+    ComputedDeployTabularInputInfo,
 ]
 al_input_objects_as_dict = Dict[str, al_input_objects]
 
@@ -65,12 +67,14 @@ al_serializable_input_objects = Union[
     ComputedSequenceInputInfo,
     ComputedImageInputInfo,
     ComputedBytesInputInfo,
+    ComputedArrayInputInfo,
 ]
 
 al_serializable_input_classes = Union[
     Type[ComputedSequenceInputInfo],
     Type[ComputedImageInputInfo],
     Type[ComputedBytesInputInfo],
+    Type[ComputedArrayInputInfo],
 ]
 
 

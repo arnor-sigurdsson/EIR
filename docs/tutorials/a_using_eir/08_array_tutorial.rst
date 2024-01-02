@@ -155,4 +155,67 @@ being the best.
 However, we are training for a relatively short time, and one might get better
 results by e.g. increasing the number of filters in the CNN case.
 
+
+C - Deployment
+^^^^^^^^^^^^^^
+
+In this final section, we demonstrate deploying our trained model for 3D array data as a web service and interacting with it using HTTP requests.
+
+Starting the Web Service
+"""""""""""""""""""""""""
+
+To deploy the model, use the following command:
+
+.. code-block:: shell
+
+    eirdeploy --model-path [MODEL_PATH]
+
+Replace `[MODEL_PATH]` with the actual path to your trained model.
+This command initiates a web service that listens for incoming requests.
+
+Here is an example of the command:
+
+.. literalinclude:: ../tutorial_files/a_using_eir/08_array_tutorial/commands/ARRAY_DEPLOY.txt
+    :language: console
+
+Sending Requests
+""""""""""""""""
+
+With the server running, we can now send requests for 3D array data.
+The data is encoded in base64 before sending.
+
+Here's an example Python function demonstrating this process:
+
+.. code-block:: python
+
+    import requests
+    import numpy as np
+    import base64
+
+    def encode_array_to_base64(file_path: str) -> str:
+        array_np = np.load(file_path)
+        array_bytes = array_np.tobytes()
+        return base64.b64encode(array_bytes).decode('utf-8')
+
+    def send_request(url: str, payload: dict):
+        response = requests.post(url, json=payload)
+        return response.json()
+
+    payload = {
+        "genotype_as_array": encode_array_to_base64("path/to/array_file.npy")
+    }
+
+    response = send_request('http://localhost:8000/predict', payload)
+    print(response)
+
+
+Analyzing Responses
+"""""""""""""""""""
+
+After sending requests to the deployed model, the responses might look something like this:
+
+.. literalinclude:: ../tutorial_files/a_using_eir/08_array_tutorial/deploy_results/predictions.json
+    :language: json
+    :caption: predictions.json
+
 If you made it this far, thanks for reading! I hope you found this tutorial useful.

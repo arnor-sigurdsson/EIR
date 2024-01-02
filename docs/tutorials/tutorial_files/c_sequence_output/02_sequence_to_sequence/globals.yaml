@@ -4,7 +4,7 @@ n_saved_models: 1
 checkpoint_interval: 500
 sample_interval: 500
 memory_dataset: true
-n_epochs: 25
+n_epochs: 10
 batch_size: 256
 lr: 0.0005
 optimizer: "adabelief"

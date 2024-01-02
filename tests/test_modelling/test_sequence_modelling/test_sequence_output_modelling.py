@@ -1,4 +1,5 @@
 from itertools import chain
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
@@ -171,10 +172,11 @@ def test_sequence_output_modelling_bpe(
 
 
 def _sequence_output_test_check_wrapper(
-    experiment: train.Experiment, test_config: "ModelTestConfig"
+    experiment: train.Experiment,
+    test_config: "ModelTestConfig",
 ) -> None:
     output_configs = experiment.configs.output_configs
-    set_all = _get_expected_keywords_set()
+    set_all = get_expected_keywords_set()
 
     for output_config in output_configs:
         output_name = output_config.output_info.output_name
@@ -185,23 +187,25 @@ def _sequence_output_test_check_wrapper(
 
         latest_sample = test_config.last_sample_folders[output_name][output_name]
 
-        for f in latest_sample.iterdir():
-            if f.suffix != ".txt":
-                continue
-
+        did_check = False
+        for f in Path(latest_sample).rglob("*_generated.txt"):
             with open(f, "r") as infile:
                 content = infile.read().split()
 
                 intersection = set(content).intersection(set_all)
                 if not intersection:
                     raise AssertionError(f"No expected words found in file {f}")
-                if not len(intersection) == 3:
+                if len(intersection) < 3:
                     raise AssertionError(
                         f"Expected words found in file {f} do not match minimum length."
                     )
 
+                did_check = True
 
-def _get_expected_keywords_set() -> set[str]:
+        assert did_check, f"No .txt files found in {latest_sample}."
+
+
+def get_expected_keywords_set() -> set[str]:
     expected_base = get_text_sequence_base()
     set_base = set(expected_base)
     expected_dynamic = get_continent_keyword_map()

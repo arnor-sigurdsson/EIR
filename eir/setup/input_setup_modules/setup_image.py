@@ -66,7 +66,7 @@ def set_up_image_input_for_training(
 
     num_channels = input_type_info.num_channels
     if not num_channels:
-        num_channels = infer_num_channels(
+        num_channels = infer_num_image_channels(
             data_source=input_config.input_info.input_source,
             deeplake_inner_key=input_config.input_info.input_inner_key,
         )
@@ -99,7 +99,9 @@ def set_up_image_input_for_training(
     return image_input_info
 
 
-def infer_num_channels(data_source: str, deeplake_inner_key: Optional[str]) -> int:
+def infer_num_image_channels(
+    data_source: str, deeplake_inner_key: Optional[str]
+) -> int:
     if is_deeplake_dataset(data_source=data_source):
         assert deeplake_inner_key is not None
         deeplake_ds = load_deeplake_dataset(data_source=data_source)

@@ -2,6 +2,7 @@ from typing import Any, Dict, Literal, Tuple, Union
 
 import torch
 
+from eir.deploy_modules.deploy_schemas import ComputedDeployTabularInputInfo
 from eir.predict_modules.predict_tabular_input_setup import (
     ComputedPredictTabularInputInfo,
 )
@@ -72,7 +73,11 @@ def impute_missing_modalities(
                     shape = (num_channels, *size)
                     approach = "random"
 
-                case ComputedTabularInputInfo() | ComputedPredictTabularInputInfo():
+                case (
+                    ComputedTabularInputInfo()
+                    | ComputedPredictTabularInputInfo()
+                    | ComputedDeployTabularInputInfo()
+                ):
                     assert input_type == "tabular"
                     inputs_values[input_name] = fill_value
                     continue
@@ -122,7 +127,11 @@ def _get_default_impute_fill_values(
             case ComputedOmicsInputInfo():
                 fill_values[input_name] = False
 
-            case ComputedTabularInputInfo() | ComputedPredictTabularInputInfo():
+            case (
+                ComputedTabularInputInfo()
+                | ComputedPredictTabularInputInfo()
+                | ComputedDeployTabularInputInfo()
+            ):
                 fill_values[input_name] = _build_tabular_fill_value(
                     input_object=input_object
                 )
@@ -144,7 +153,11 @@ def _get_default_impute_fill_values(
 
 
 def _build_tabular_fill_value(
-    input_object: Union["ComputedTabularInputInfo", "ComputedPredictTabularInputInfo"]
+    input_object: Union[
+        "ComputedTabularInputInfo",
+        "ComputedPredictTabularInputInfo",
+        "ComputedDeployTabularInputInfo",
+    ]
 ) -> dict[str, int | float]:
     fill_value = {}
     transformers = input_object.labels.label_transformers

@@ -1,4 +1,5 @@
 import textwrap
+from functools import partial
 from pathlib import Path
 from typing import Sequence
 
@@ -6,7 +7,10 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 from docs.doc_modules.c_sequence_outputs.utils import get_content_root
+from docs.doc_modules.deploy_experiments_utils import copy_inputs, load_data_for_deploy
+from docs.doc_modules.deployment_experiments import AutoDocDeploymentInfo
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
+from docs.doc_modules.utils import add_model_path_to_command
 
 CONTENT_ROOT = CR = get_content_root()
 TUTORIAL_NAME = TN = "03_image_captioning"
@@ -159,11 +163,63 @@ def generate_image_grid(
     plt.savefig(output_folder / filename, bbox_inches="tight", dpi=200)
 
 
+def get_image_captioning_02_image_and_text_deploy() -> AutoDocDeploymentInfo:
+    base_path = f"docs/tutorials/tutorial_files/{CR}/{TN}"
+
+    server_command = ["eirdeploy", "--model-path", "FILL_MODEL"]
+
+    image_base = (
+        "eir_tutorials/c_sequence_output/03_image_captioning/"
+        "data/image_captioning/images"
+    )
+    example_requests = [
+        {
+            "image_captioning": f"{image_base}/000000000009.jpg",
+            "captions": "",
+        },
+        {
+            "image_captioning": f"{image_base}/000000000034.jpg",
+            "captions": "",
+        },
+        {
+            "image_captioning": f"{image_base}/000000581929.jpg",
+            "captions": "A horse",
+        },
+    ]
+
+    add_model_path = partial(
+        add_model_path_to_command,
+        run_path="eir_tutorials/tutorial_runs/c_sequence_output/03_image_captioning",
+    )
+
+    copy_inputs_to_deploy = (
+        copy_inputs,
+        {
+            "example_requests": example_requests,
+            "output_folder": str(Path(base_path) / "deploy_results"),
+        },
+    )
+
+    ade = AutoDocDeploymentInfo(
+        name="IMAGE_TO_SEQUENCE_DEPLOY",
+        base_path=Path(base_path),
+        server_command=server_command,
+        pre_run_command_modifications=(add_model_path,),
+        post_run_functions=(copy_inputs_to_deploy,),
+        example_requests=example_requests,
+        data_loading_function=load_data_for_deploy,
+    )
+
+    return ade
+
+
 def get_experiments() -> Sequence[AutoDocExperimentInfo]:
     exp_1 = get_image_captioning_01_text_only()
     exp_2 = get_image_captioning_02_image_and_text()
+    exp_3 = get_image_captioning_02_image_and_text_deploy()
 
     return [
         exp_1,
         exp_2,
+        exp_3,
     ]

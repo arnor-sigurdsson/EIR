@@ -239,3 +239,79 @@ generate more meaningful sequences:
 Hopefully this tutorial has given you a good overview of how to use
 the sequence generation functionality in ``EIR``. Thank you for reading!
 
+F - Deployment
+--------------
+
+In this final section, we demonstrate deploying our trained model for sequence generation as a web service and interacting with it using HTTP requests.
+
+Starting the Web Service
+"""""""""""""""""""""""""
+
+To deploy the model, use the following command:
+
+.. code-block:: shell
+
+    eirdeploy --model-path [MODEL_PATH]
+
+Replace `[MODEL_PATH]` with the actual path to your trained model.
+This command initiates a web service that listens for incoming requests.
+
+Here is an example of the command:
+
+.. literalinclude:: ../tutorial_files/c_sequence_output/01_sequence_generation/commands/SEQUENCE_GENERATION_DEPLOY.txt
+    :language: console
+
+.. important::
+    Currently neither deploying nor predicting works with the "bpe" tokenizer
+    due to a bug / design decision in the library that implements it,
+    see `here <https://github.com/huggingface/tokenizers/issues/566>`__
+    for more information.
+
+Sending Requests
+""""""""""""""""
+
+With the server running, we can now send requests for generating sequences based on initial text prompts.
+
+Here's an example Python function demonstrating this process:
+
+.. code-block:: python
+
+    import requests
+
+    def send_request(url: str, payload: dict):
+        response = requests.post(url, json=payload)
+        return response.json()
+
+    example_requests = [
+        {"imdb_output": "This movie was great, I have to say "},
+        {"imdb_output": "This movie was terrible, I "},
+    ]
+
+    for payload in example_requests:
+        response = send_request('http://localhost:8000/predict', payload)
+        print(f"Prompt: {payload['imdb_output']}")
+        print(f"Generated text: {response}\n")
+
+Additionally, you can send requests using `bash`:
+
+.. code-block:: bash
+
+    curl -X 'POST' \\
+      'http://localhost:8000/predict' \\
+      -H 'accept: application/json' \\
+      -H 'Content-Type: application/json' \\
+      -d '{
+          "imdb_output": "This movie was great, I have to say "
+      }'
+
+Analyzing Responses
+"""""""""""""""""""
+
+After sending requests to the deployed model, the responses can be analyzed.
+These responses demonstrate the model's ability to generate text sequences based on the provided prompts.
+
+.. literalinclude:: ../tutorial_files/c_sequence_output/01_sequence_generation/deploy_results/predictions.json
+    :language: json
+    :caption: predictions.json
+
+If you made it this far, I want to thank you for reading!

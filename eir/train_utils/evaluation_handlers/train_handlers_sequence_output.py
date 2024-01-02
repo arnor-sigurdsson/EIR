@@ -35,6 +35,7 @@ from eir.train_utils.evaluation_handlers.evaluation_handlers_utils import (
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
+    from eir.deploy import DeployExperiment
     from eir.predict import PredictExperiment, PredictHooks
     from eir.train import Experiment, al_input_objects_as_dict
     from eir.train_utils.step_logic import Hooks
@@ -56,13 +57,14 @@ class SequenceOutputEvalSample:
 
 
 def sequence_out_single_sample_evaluation_wrapper(
-    experiment: Union["Experiment", "PredictExperiment"],
+    experiment: Union["Experiment", "PredictExperiment", "DeployExperiment"],
     input_objects: "al_input_objects_as_dict",
     auto_dataset_to_load_from: Dataset,
     iteration: int,
     output_folder: str,
 ) -> None:
     default_eir_hooks = experiment.hooks
+    assert default_eir_hooks is not None
 
     output_configs = experiment.configs.output_configs
 
@@ -184,7 +186,8 @@ def get_sequence_output_manual_input_samples(
 
         for idx, single_sample_inputs in enumerate(sample_data_from_yaml):
             prepared_inputs = prepare_manual_sample_data(
-                sample_inputs=single_sample_inputs, input_objects=input_objects
+                sample_inputs=single_sample_inputs,
+                input_objects=input_objects,
             )
 
             final_inputs = post_prepare_manual_inputs(
@@ -275,15 +278,24 @@ def _get_eval_sample_generator(
         yield "manual", eval_sample
 
 
-@torch.no_grad()
+@torch.inference_mode()
 def autoregressive_sequence_generation(
     input_objects: "al_input_objects_as_dict",
     eval_sample: SequenceOutputEvalSample,
     seq_output_name: str,
-    experiment: Union["Experiment", "PredictExperiment"],
+    experiment: Union["Experiment", "PredictExperiment", "DeployExperiment"],
     default_eir_hooks: Union["Hooks", "PredictHooks"],
     sampling_config: SequenceOutputSamplingConfig,
 ) -> list[int]:
+    """
+    Note that it's currently a bit weird / perhaps suboptimal how we are dealing
+    with the input data here. While normally one could have the final, prepared
+    input (including embeddings) as a direct input to the model, we have here
+    what is more similar to what is returned from the data loader, namely e.g.
+    token IDs. The sequence of IDs is then used in the loop and appended to,
+    which in turn goes through the general batch preparation hook, which e.g.
+    looks up the embeddings.
+    """
     output_object = experiment.outputs[seq_output_name]
     input_object = input_objects[seq_output_name]
 
@@ -291,20 +303,28 @@ def autoregressive_sequence_generation(
     assert isinstance(input_object, ComputedSequenceInputInfo)
 
     _check_vocab_consistency(
-        output_object_vocab=output_object.vocab, input_object_vocab=input_object.vocab
+        output_object_vocab=output_object.vocab,
+        input_object_vocab=input_object.vocab,
     )
 
     assert output_object.tokenizer is not None
     st = get_special_tokens(
-        tokenizer=output_object.tokenizer, vocab=output_object.vocab
+        tokenizer=output_object.tokenizer,
+        vocab=output_object.vocab,
     )
 
     prepared_sample_inputs = prepare_base_input(
         prepared_inputs=eval_sample.inputs_to_model,
     )
 
-    generated_tokens = _extract_base_generated_tokens(
-        prepared_inputs=prepared_sample_inputs, seq_output_name=seq_output_name
+    generated_tokens_base = _extract_base_generated_tokens(
+        prepared_inputs=prepared_sample_inputs,
+        seq_output_name=seq_output_name,
+    )
+
+    generated_tokens = _ensure_no_extra_padding(
+        tokens=generated_tokens_base,
+        pad_idx=st.pad_idx,
     )
 
     for i in range(len(generated_tokens), sampling_config.generated_sequence_length):
@@ -317,7 +337,8 @@ def autoregressive_sequence_generation(
         )
 
         target_index = _compute_target_index(
-            current_generated_length=i, max_length=output_object.computed_max_length
+            current_generated_length=i,
+            max_length=output_object.computed_max_length,
         )
 
         batch = general_pre_process_prepared_inputs(
@@ -328,7 +349,10 @@ def autoregressive_sequence_generation(
             custom_hooks=default_eir_hooks,
         )
 
-        outputs = predict_on_batch(model=experiment.model, inputs=batch.inputs)
+        outputs = predict_on_batch(
+            model=experiment.model,
+            inputs=batch.inputs,
+        )
 
         next_token_index = sample_next_token_index_from_output(
             outputs=outputs,
@@ -355,6 +379,10 @@ def _check_vocab_consistency(
 def _extract_base_generated_tokens(
     prepared_inputs: Dict[str, torch.Tensor], seq_output_name: str
 ) -> list[int]:
+    """
+    Note that we are expecting / enforcing the token IDs being passed in here,
+    not the embeddings.
+    """
     tensor_base = prepared_inputs[seq_output_name]
     assert tensor_base.dim() == 2, tensor_base.dim()
 
@@ -362,6 +390,20 @@ def _extract_base_generated_tokens(
     assert isinstance(list_base, list)
 
     return list_base
+
+
+def _ensure_no_extra_padding(tokens: list[int], pad_idx: int) -> list[int]:
+    """
+    Needed in case the sequence is already at max due to padding, as the autoregressive
+    functionality itself takes care of shifting, bos insertion, padding etc. So, it
+    expects just the sequence as given, without any padding. However, some processing
+    code might have added padding to the end, so we have this little safeguard here.
+    """
+    generated_tokens = [i for i in tokens if i != pad_idx]
+    if generated_tokens:
+        assert generated_tokens[-1] != pad_idx
+
+    return generated_tokens
 
 
 def _compute_target_index(current_generated_length: int, max_length: int) -> int:

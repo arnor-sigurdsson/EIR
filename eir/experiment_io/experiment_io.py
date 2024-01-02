@@ -243,8 +243,8 @@ def _should_skip_warning(key: str, current_value: Any, loaded_value: Any) -> boo
 
 def serialize_chosen_input_objects(
     inputs_dict: "al_input_objects_as_dict", run_folder: Path
-):
-    targets_to_serialize = {"sequence", "bytes", "image"}
+) -> None:
+    targets_to_serialize = {"sequence", "bytes", "image", "array"}
     for input_name, input_ in inputs_dict.items():
         input_type = input_.input_config.input_info.input_type
 
@@ -324,7 +324,7 @@ def check_version(run_folder: Path) -> None:
         logger.warning(
             f"The version of EIR used to train this model is {loaded_version}, "
             f"while the current version is {cur_version}. "
-            f"This may cause unexpected behavior."
+            f"This may cause unexpected behavior and subtle bugs."
         )
 
 

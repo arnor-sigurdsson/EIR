@@ -1,7 +1,14 @@
+import base64
+from functools import partial
 from pathlib import Path
-from typing import Sequence
+from typing import Any, Sequence
 
+import numpy as np
+
+from docs.doc_modules.deploy_experiments_utils import copy_inputs
+from docs.doc_modules.deployment_experiments import AutoDocDeploymentInfo
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
+from docs.doc_modules.utils import add_model_path_to_command
 
 
 def get_06_imdb_binary_run_1_transformer_info() -> AutoDocExperimentInfo:
@@ -64,7 +71,58 @@ def get_06_imdb_binary_run_1_transformer_info() -> AutoDocExperimentInfo:
     return ade
 
 
+def get_06_imdb_binary_deploy_transformer_info() -> AutoDocDeploymentInfo:
+    base_path = "docs/tutorials/tutorial_files/a_using_eir/06_raw_bytes_tutorial"
+
+    model_path_placeholder = "FILL_MODEL"
+
+    server_command = ["eirdeploy", "--model-path", model_path_placeholder]
+
+    base = "eir_tutorials/a_using_eir/03_sequence_tutorial/data/IMDB/IMDB_Reviews"
+    example_requests = [
+        {"imdb_reviews_bytes_base_transformer": f"{base}/10021_2.txt"},
+        {"imdb_reviews_bytes_base_transformer": f"{base}/10132_9.txt"},
+    ]
+
+    add_model_path = partial(
+        add_model_path_to_command,
+        run_path="eir_tutorials/tutorial_runs/a_using_eir/"
+        "tutorial_06_imdb_sentiment_binary",
+    )
+
+    copy_inputs_to_deploy = (
+        copy_inputs,
+        {
+            "example_requests": example_requests,
+            "output_folder": str(Path(base_path) / "deploy_results"),
+        },
+    )
+
+    ade = AutoDocDeploymentInfo(
+        name="BYTES_DEPLOY",
+        base_path=Path(base_path),
+        server_command=server_command,
+        pre_run_command_modifications=(add_model_path,),
+        post_run_functions=(copy_inputs_to_deploy,),
+        example_requests=example_requests,
+        data_loading_function=_load_data_for_binary_deploy,
+    )
+
+    return ade
+
+
+def _load_data_for_binary_deploy(data: dict[str, Any]) -> dict[str, Any]:
+    loaded_data = {}
+    for key, data_pointer in data.items():
+        arr = np.fromfile(data_pointer, dtype="uint8")
+        arr_bytes = arr.tobytes()
+        base_64_encoded = base64.b64encode(arr_bytes).decode("utf-8")
+        loaded_data[key] = base_64_encoded
+    return loaded_data
+
+
 def get_experiments() -> Sequence[AutoDocExperimentInfo]:
     exp_1 = get_06_imdb_binary_run_1_transformer_info()
+    exp_2 = get_06_imdb_binary_deploy_transformer_info()
 
-    return [exp_1]
+    return [exp_1, exp_2]

@@ -7,6 +7,5 @@ eir_tutorials/d_array_output/01_array_mnist_generation
 │   ├── output.yaml
 │   └── output_with_label.yaml
 └── data
-    ├── __MACOSX
     ├── mnist_labels.csv
     └── mnist_npy

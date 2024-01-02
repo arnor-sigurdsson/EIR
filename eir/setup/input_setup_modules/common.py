@@ -63,6 +63,27 @@ def get_data_dimension_from_data_source(
     )
 
 
+def get_dtype_from_data_source(
+    data_source: Path,
+    deeplake_inner_key: Optional[str] = None,
+) -> np.dtype:
+    if is_deeplake_dataset(data_source=str(data_source)):
+        assert (
+            deeplake_inner_key is not None
+        ), "Deeplake inner key is required for Deeplake datasets"
+        deeplake_ds = load_deeplake_dataset(data_source=str(data_source))
+        deeplake_iter = get_deeplake_input_source_iterable(
+            deeplake_dataset=deeplake_ds, inner_key=deeplake_inner_key
+        )
+        data_type = next(deeplake_iter).dtype
+    else:
+        iterator = get_file_path_iterator(data_source=data_source)
+        path = next(iterator)
+        data_type = np.load(file=path).dtype
+
+    return data_type
+
+
 def get_default_sequence_specials() -> List[str]:
     default_specials = ["<bos>", "<unk>", "<mask>", "<pad>", "<eos>"]
     return default_specials

@@ -30,7 +30,9 @@ class AutoDocExperimentInfo:
     force_run_command: bool = False
 
 
-def make_tutorial_data(auto_doc_experiment_info: AutoDocExperimentInfo) -> None:
+def make_training_or_predict_tutorial_data(
+    auto_doc_experiment_info: AutoDocExperimentInfo,
+) -> None:
     ade = auto_doc_experiment_info
 
     get_data(url=ade.data_url, output_path=ade.data_output_path)

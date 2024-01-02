@@ -5,8 +5,11 @@ input_info:
 
 input_type_info:
   max_length: 32
-  split_on: null
-  tokenizer: "bpe"
-  adaptive_tokenizer_max_vocab_size: 1024
+  split_on: " "
   sampling_strategy_if_longer: "uniform"
-  min_freq: 1
+  min_freq: 10
+
+model_config:
+  embedding_dim: 128
+  model_init_config:
+    num_layers: 6

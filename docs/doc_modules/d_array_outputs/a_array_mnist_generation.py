@@ -1,5 +1,7 @@
+import base64
 import json
 import os
+from functools import partial
 from pathlib import Path
 from typing import Sequence
 
@@ -7,11 +9,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from PIL import Image
 from umap import UMAP
 
 from docs.doc_modules.d_array_outputs.utils import get_content_root
+from docs.doc_modules.deploy_experiments_utils import copy_inputs, load_data_for_deploy
+from docs.doc_modules.deployment_experiments import AutoDocDeploymentInfo
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
-from docs.doc_modules.utils import get_saved_model_path
+from docs.doc_modules.utils import add_model_path_to_command, get_saved_model_path
 
 CONTENT_ROOT = CR = get_content_root()
 TUTORIAL_NAME = TN = "01_array_mnist_generation"
@@ -147,8 +152,8 @@ def visualize_latents(label_file: str, latents_path: str, output_folder: str) ->
 
     latents_2d = np.array(merged_df["Latent"].tolist())
 
-    tsne = UMAP(n_components=2, random_state=42)
-    latents_reduced = tsne.fit_transform(latents_2d)
+    umap = UMAP(n_components=2)
+    latents_reduced = umap.fit_transform(latents_2d)
 
     palette = sns.color_palette("tab10", n_colors=merged_df["CLASS"].nunique())
 
@@ -412,11 +417,91 @@ def _add_model_path_to_command(command: list[str]) -> list[str]:
     return command
 
 
+def get_array_gen_02_mnist_generation_deploy() -> AutoDocDeploymentInfo:
+    base_path = f"docs/tutorials/tutorial_files/{CR}/{TN}"
+
+    server_command = ["eirdeploy", "--model-path", "FILL_MODEL"]
+
+    image_base = "eir_tutorials/d_array_output/01_array_mnist_generation/data/mnist_npy"
+    example_requests = [
+        {
+            "mnist": f"{image_base}/10001.npy",
+        },
+        {
+            "mnist": f"{image_base}/50496.npy",
+        },
+        {
+            "mnist": f"{image_base}/25640.npy",
+        },
+    ]
+
+    add_model_path = partial(
+        add_model_path_to_command,
+        run_path="eir_tutorials/tutorial_runs/d_array_output/01_array_mnist_generation",
+    )
+
+    copy_inputs_to_deploy = (
+        copy_inputs,
+        {
+            "example_requests": example_requests,
+            "output_folder": str(Path(base_path) / "deploy_results"),
+        },
+    )
+
+    decode_and_save_images_func = (
+        decode_and_save_images,
+        {
+            "predictions_file": str(
+                Path(base_path) / "deploy_results" / "predictions.json"
+            ),
+            "output_folder": str(Path(base_path) / "deploy_results"),
+            "image_shape": (28, 28),
+        },
+    )
+
+    ade = AutoDocDeploymentInfo(
+        name="ARRAY_GENERATION_DEPLOY",
+        base_path=Path(base_path),
+        server_command=server_command,
+        pre_run_command_modifications=(add_model_path,),
+        post_run_functions=(copy_inputs_to_deploy, decode_and_save_images_func),
+        example_requests=example_requests,
+        data_loading_function=load_data_for_deploy,
+    )
+
+    return ade
+
+
+def decode_and_save_images(
+    predictions_file: str,
+    output_folder: str,
+    image_shape: tuple,
+) -> None:
+    os.makedirs(output_folder, exist_ok=True)
+
+    with open(predictions_file, "r") as file:
+        predictions = json.load(file)
+
+    for i, prediction in enumerate(predictions):
+        base64_array = prediction["response"]["result"]["mnist_output"]
+        array_bytes = base64.b64decode(base64_array)
+
+        array_np = np.frombuffer(array_bytes, dtype=np.float32).reshape(image_shape)
+
+        array_np = (array_np - array_np.min()) / (array_np.max() - array_np.min())
+        array_np = (array_np * 255).astype(np.uint8)
+
+        image = Image.fromarray(array_np, mode="L")
+        image.save(Path(output_folder) / f"mnist_output_{i}.png")
+
+
 def get_experiments() -> Sequence[AutoDocExperimentInfo]:
     exp_1 = get_array_gen_01_mnist_generation()
     exp_2 = get_array_gen_02_mnist_generation()
+    exp_3 = get_array_gen_02_mnist_generation_deploy()
 
     return [
         exp_1,
         exp_2,
+        exp_3,
     ]

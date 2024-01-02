@@ -1,7 +1,11 @@
+from functools import partial
 from pathlib import Path
 from typing import Sequence
 
+from docs.doc_modules.deploy_experiments_utils import load_data_for_deploy
+from docs.doc_modules.deployment_experiments import AutoDocDeploymentInfo
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
+from docs.doc_modules.utils import add_model_path_to_command
 
 
 def get_03_imdb_run_1_transformer_info() -> AutoDocExperimentInfo:
@@ -146,8 +150,56 @@ def get_03_peptides_run_1_transformer_info() -> AutoDocExperimentInfo:
     return ade
 
 
+def get_03_imdb_run_1_deploy_info() -> AutoDocDeploymentInfo:
+    base_path = "docs/tutorials/tutorial_files/a_using_eir/03_sequence_tutorial"
+
+    server_command = ["eirdeploy", "--model-path", "FILL_MODEL"]
+
+    example_requests = [
+        {
+            "imdb_reviews": "This move was great! I loved it!",
+        },
+        {
+            "imdb_reviews": "This move was terrible! I hated it!",
+        },
+        {
+            "imdb_reviews": "You'll have to have your wits about "
+            "you and your brain fully switched"
+            " on watching Oppenheimer as it could easily get away from a "
+            "nonattentive viewer. This is intelligent filmmaking which shows "
+            "it's audience great respect. It fires dialogue packed with "
+            "information at a relentless pace and jumps to very different "
+            "times in Oppenheimer's life continuously through it's 3 hour"
+            " runtime. There are visual clues to guide the viewer through these"
+            " times but again you'll have to get to grips with these quite "
+            "quickly. This relentlessness helps to express the urgency with "
+            "which the US attacked it's chase for the atomic bomb before "
+            "Germany could do the same. An absolute career best performance "
+            "from (the consistenly brilliant) Cillian Murphy anchors the film. ",
+        },
+    ]
+
+    add_model_path = partial(
+        add_model_path_to_command,
+        run_path="eir_tutorials/tutorial_runs/a_using_eir/tutorial_03_imdb_run",
+    )
+
+    ade = AutoDocDeploymentInfo(
+        name="SEQUENCE_DEPLOY",
+        base_path=Path(base_path),
+        server_command=server_command,
+        pre_run_command_modifications=(add_model_path,),
+        post_run_functions=(),
+        example_requests=example_requests,
+        data_loading_function=load_data_for_deploy,
+    )
+
+    return ade
+
+
 def get_experiments() -> Sequence[AutoDocExperimentInfo]:
     exp_1 = get_03_imdb_run_1_transformer_info()
     exp_2 = get_03_peptides_run_1_transformer_info()
+    exp_3 = get_03_imdb_run_1_deploy_info()
 
-    return [exp_1, exp_2]
+    return [exp_1, exp_2, exp_3]

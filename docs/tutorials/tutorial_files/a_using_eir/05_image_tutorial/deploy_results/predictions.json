@@ -1,0 +1,34 @@
+[
+    {
+        "request": {
+            "hot_dog_efficientnet": "eir_tutorials/a_using_eir/05_image_tutorial/data/hot_dog_not_hot_dog/food_images/1040579.jpg",
+            "hot_dog_resnet18": "eir_tutorials/a_using_eir/05_image_tutorial/data/hot_dog_not_hot_dog/food_images/1040579.jpg"
+        },
+        "response": {
+            "result": {
+                "hot_dog_output": {
+                    "CLASS": {
+                        "Hot Dog": 0.8906751275062561,
+                        "Not Hot Dog": 0.1093248724937439
+                    }
+                }
+            }
+        }
+    },
+    {
+        "request": {
+            "hot_dog_efficientnet": "eir_tutorials/a_using_eir/05_image_tutorial/data/hot_dog_not_hot_dog/food_images/108743.jpg",
+            "hot_dog_resnet18": "eir_tutorials/a_using_eir/05_image_tutorial/data/hot_dog_not_hot_dog/food_images/108743.jpg"
+        },
+        "response": {
+            "result": {
+                "hot_dog_output": {
+                    "CLASS": {
+                        "Hot Dog": 0.05285842716693878,
+                        "Not Hot Dog": 0.9471415281295776
+                    }
+                }
+            }
+        }
+    }
+]
