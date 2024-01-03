@@ -1,0 +1,46 @@
+[
+    {
+        "request": {
+            "english": "",
+            "spanish": "Tengo mucho hambre"
+        },
+        "response": {
+            "result": {
+                "english": "I am very hungry today."
+            }
+        }
+    },
+    {
+        "request": {
+            "english": "",
+            "spanish": "¿Por qué Tomás sigue en Boston?"
+        },
+        "response": {
+            "result": {
+                "english": "Why is Tom still in Boston?"
+            }
+        }
+    },
+    {
+        "request": {
+            "english": "Why",
+            "spanish": "¿Por qué Tomás sigue en Boston?"
+        },
+        "response": {
+            "result": {
+                "english": "Why is Tom still in Boston?"
+            }
+        }
+    },
+    {
+        "request": {
+            "english": "",
+            "spanish": "Un gato muy alto"
+        },
+        "response": {
+            "result": {
+                "english": "A cat was very sad."
+            }
+        }
+    }
+]

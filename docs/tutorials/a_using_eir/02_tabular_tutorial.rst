@@ -179,5 +179,87 @@ performance is perhaps a nice baseline, especially since
 TabNet is a much more complex model,
 and we did not do extensive hyper-parameter tuning!
 
+
+E - Serving
+^^^^^^^^^^^
+
+In this final section, we demonstrate serving our trained model
+as a web service and interacting with it using HTTP requests.
+
+Starting the Web Service
+"""""""""""""""""""""""""
+
+To serve the model, use the following command:
+
+.. code-block:: shell
+
+    eirserve --model-path [MODEL_PATH]
+
+Replace `[MODEL_PATH]` with the actual path to your trained model.
+This command initiates a web service that listens for incoming requests.
+
+Here is an example of the command:
+
+.. literalinclude:: ../tutorial_files/a_using_eir/02_tabular_tutorial/commands/TABULAR_DEPLOY.txt
+    :language: console
+
+Sending Requests
+""""""""""""""""
+
+With the server running, we can now send requests. For tabular data,
+we send the payload directly as a Python dictionary.
+
+Here's an example Python function demonstrating this process:
+
+.. code-block:: python
+
+    import requests
+
+    def send_request(url: str, payload: dict):
+        response = requests.post(url, json=payload)
+        return response.json()
+
+    payload = {
+        "poker_hands": {
+            "S1": "3", "C1": "12",
+            "S2": "3", "C2": "2",
+            "S3": "3", "C3": "11",
+            "S4": "4", "C4": "5",
+            "S5": "2", "C5": "5"
+        }
+    }
+
+    response = send_request('http://localhost:8000/predict', payload)
+    print(response)
+
+Additionally, you can send requests using `bash`:
+
+.. code-block:: bash
+
+    curl -X 'POST' \\
+      'http://localhost:8000/predict' \\
+      -H 'accept: application/json' \\
+      -H 'Content-Type: application/json' \\
+      -d '{
+          "poker_hands": {
+              "S1": "3", "C1": "12",
+              "S2": "3", "C2": "2",
+              "S3": "3", "C3": "11",
+              "S4": "4", "C4": "5",
+              "S5": "2", "C5": "5"
+          }
+      }'
+
+Analyzing Responses
+"""""""""""""""""""
+
+After sending requests to the served model, the responses can be analyzed.
+These responses provide insights into the model's predictions based on the input data.
+
+.. literalinclude:: ../tutorial_files/a_using_eir/02_tabular_tutorial/serve_results/predictions.json
+    :language: json
+    :caption: predictions.json
+
+
 If you made it this far, I want to thank you for reading. I hope this tutorial was
 useful / interesting to you!

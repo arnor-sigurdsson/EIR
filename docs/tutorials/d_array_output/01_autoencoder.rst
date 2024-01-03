@@ -187,6 +187,139 @@ obvious, the generated images of the same class are not completely identical
 (although they are extremely similar),
 due to some stochasticity injected into the model.
 
+
+D - Serving
+-----------
+
+In this final section, we demonstrate serving our trained model for MNIST array generation as a web service and interacting with it using HTTP requests.
+
+Starting the Web Service
+"""""""""""""""""""""""""
+
+To serve the model, use the following command:
+
+.. code-block:: shell
+
+    eirserve --model-path [MODEL_PATH]
+
+Replace `[MODEL_PATH]` with the actual path to your trained model.
+This command initiates a web service that listens for incoming requests.
+
+Here is an example of the command:
+
+.. literalinclude:: ../tutorial_files/d_array_output/01_array_mnist_generation/commands/ARRAY_GENERATION_DEPLOY.txt
+    :language: console
+
+
+Sending Requests
+""""""""""""""""
+
+With the server running, we can now send requests with MNIST data arrays.
+The data arrays are encoded in base64 before sending.
+
+Here's an example Python function demonstrating this process:
+
+.. code-block:: python
+
+    import requests
+    import numpy as np
+    import base64
+
+    def encode_array_to_base64(file_path: str) -> str:
+        array_np = np.load(file_path)
+        array_bytes = array_np.tobytes()
+        return base64.b64encode(array_bytes).decode('utf-8')
+
+    def send_request(url: str, payload: dict):
+        response = requests.post(url, json=payload)
+        return response.json()
+
+    payload = {
+        "mnist": encode_array_to_base64("path/to/mnist_array.npy")
+    }
+
+    response = send_request('http://localhost:8000/predict', payload)
+    print(response)
+
+
+Retrieving Array Information
+"""""""""""""""""""""""""""""
+
+You can get information about the array type and shape
+by sending a GET request to the `/info` endpoint:
+
+.. code-block:: bash
+
+    curl -X 'GET' \\
+      'http://localhost:8000/info' \\
+      -H 'accept: application/json'
+
+This request will return details about the expected array input and output formats,
+such as type, shape, and data type.
+
+
+Decoding and Processing the Response
+""""""""""""""""""""""""""""""""""""
+
+After receiving a response, you can decode the base64 encoded array,
+reshape it, and cast it to the appropriate dtype using the information
+obtained from the ``/info`` endpoint:
+
+.. code-block:: python
+
+    def decode_array_from_base64(encoded_array: str, shape: tuple):
+        array_bytes = base64.b64decode(encoded_array)
+        return np.frombuffer(array_bytes, dtype=np.float32).reshape(shape)
+
+    array_np = decode_array_from_base64(
+        response['mnist_output'], shape=(28, 28)
+    )
+
+.. important::
+    While the original output arrays can be of any dtype, and that information is
+    provided in the ``/info`` endpoint, the response output
+    arrays are always of dtype ``float32``,
+    which is the output dtype of the model itself. The model output is then un-normalized
+    using the training set statistics (assuming normalization was used during training).
+
+For example, since these are images originally in ``uint8`` format,
+we can process the response arrays as follows:
+
+.. code-block:: python
+
+    from PIL import Image
+
+    array_np = (array_np - array_np.min()) / (array_np.max() - array_np.min())
+    array_np = (array_np * 255).astype(np.uint8)
+
+    image = Image.fromarray(array_np)
+    image.show()
+
+
+Analyzing Responses
+"""""""""""""""""""
+
+After sending requests to the served model, the responses can be analyzed.
+
+.. literalinclude:: ../tutorial_files/d_array_output/01_array_mnist_generation/serve_results/predictions.json
+    :language: json
+    :caption: predictions.json
+
+For example, using the approach described above, we can visualize the generated images
+from the responses:
+
+.. image:: ../tutorial_files/d_array_output/01_array_mnist_generation/serve_results/mnist_output_0.png
+    :width: 33%
+    :align: center
+
+.. image:: ../tutorial_files/d_array_output/01_array_mnist_generation/serve_results/mnist_output_1.png
+    :width: 33%
+    :align: center
+
+.. image:: ../tutorial_files/d_array_output/01_array_mnist_generation/serve_results/mnist_output_2.png
+    :width: 33%
+    :align: center
+
 If you made it this far, thank you for reading!
 I hope this tutorial was
 interesting and useful to you!

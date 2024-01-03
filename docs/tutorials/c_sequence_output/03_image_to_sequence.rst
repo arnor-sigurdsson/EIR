@@ -94,4 +94,102 @@ is still decreasing, we could train the model
 for longer, try a larger model, use larger images,
 or use a larger dataset.
 
+D - Serving
+-----------
+
+In this final section, we demonstrate serving our trained image captioning model as a web service and interacting with it using HTTP requests.
+
+Starting the Web Service
+"""""""""""""""""""""""""
+
+To serve the model, use the following command:
+
+.. code-block:: shell
+
+    eirserve --model-path [MODEL_PATH]
+
+Replace `[MODEL_PATH]` with the actual path to your trained model.
+This command initiates a web service that listens for incoming requests.
+
+Here is an example of the command:
+
+.. literalinclude:: ../tutorial_files/c_sequence_output/03_image_captioning/commands/IMAGE_TO_SEQUENCE_DEPLOY.txt
+    :language: console
+
+Sending Requests
+""""""""""""""""
+
+With the server running, we can now send image-based requests for caption generation. For this model, we send images and receive their captions.
+
+Here's an example Python function demonstrating this process:
+
+.. code-block:: python
+
+    import requests
+    import base64
+    from PIL import Image
+    from io import BytesIO
+
+    def encode_image_to_base64(file_path: str) -> str:
+        with Image.open(file_path) as image:
+            buffered = BytesIO()
+            image.save(buffered, format="JPEG")
+            return base64.b64encode(buffered.getvalue()).decode("utf-8")
+
+    def send_request(url: str, payload: dict):
+        response = requests.post(url, json=payload)
+        return response.json()
+
+    payload = {
+        "image_captioning": encode_image_to_base64("path/to/image.jpg"),
+        "captions": ""
+    }
+
+    response = send_request('http://localhost:8000/predict', payload)
+    print(response)
+
+Additionally, you can send requests using `bash`.
+Note that this requires preparing the base64-encoded image content in advance:
+
+.. code-block:: bash
+
+    curl -X 'POST' \\
+      'http://localhost:8000/predict' \\
+      -H 'accept: application/json' \\
+      -H 'Content-Type: application/json' \\
+      -d '{
+          "image_captioning": "[BASE64_ENCODED_IMAGE]",
+          "captions": ""
+      }'
+
+Analyzing Responses
+"""""""""""""""""""
+
+Before analyzing the responses, let's view the images that were used for generating captions:
+
+.. figure:: ../tutorial_files/c_sequence_output/03_image_captioning/serve_results/000000000009.jpg
+   :alt: Image 000000000009
+   :align: center
+
+000000000009.jpg
+
+.. figure:: ../tutorial_files/c_sequence_output/03_image_captioning/serve_results/000000000034.jpg
+   :alt: Image 000000000034
+   :align: center
+
+000000000034.jpg
+
+.. figure:: ../tutorial_files/c_sequence_output/03_image_captioning/serve_results//000000581929.jpg
+   :alt: Image 000000581929
+   :align: center
+
+000000581929.jpg
+
+After sending requests to the served model, the responses can be analyzed.
+These responses provide insights into the model's capability to generate captions for the input images.
+
+.. literalinclude:: ../tutorial_files/c_sequence_output/03_image_captioning/serve_results/predictions.json
+    :language: json
+    :caption: predictions.json
+
 Thank you for reading!

@@ -1,0 +1,32 @@
+[
+    {
+        "request": {
+            "imdb_reviews_bytes_base_transformer": "eir_tutorials/a_using_eir/03_sequence_tutorial/data/IMDB/IMDB_Reviews/10021_2.txt"
+        },
+        "response": {
+            "result": {
+                "imdb_output": {
+                    "Sentiment": {
+                        "Negative": 0.7503469586372375,
+                        "Positive": 0.24965302646160126
+                    }
+                }
+            }
+        }
+    },
+    {
+        "request": {
+            "imdb_reviews_bytes_base_transformer": "eir_tutorials/a_using_eir/03_sequence_tutorial/data/IMDB/IMDB_Reviews/10132_9.txt"
+        },
+        "response": {
+            "result": {
+                "imdb_output": {
+                    "Sentiment": {
+                        "Negative": 0.1934361606836319,
+                        "Positive": 0.8065637946128845
+                    }
+                }
+            }
+        }
+    }
+]

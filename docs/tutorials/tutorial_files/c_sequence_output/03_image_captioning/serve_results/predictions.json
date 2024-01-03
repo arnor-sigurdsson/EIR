@@ -1,0 +1,35 @@
+[
+    {
+        "request": {
+            "image_captioning": "eir_tutorials/c_sequence_output/03_image_captioning/data/image_captioning/images/000000000009.jpg",
+            "captions": ""
+        },
+        "response": {
+            "result": {
+                "captions": "a close up of a plate of rice and broccoli "
+            }
+        }
+    },
+    {
+        "request": {
+            "image_captioning": "eir_tutorials/c_sequence_output/03_image_captioning/data/image_captioning/images/000000000034.jpg",
+            "captions": ""
+        },
+        "response": {
+            "result": {
+                "captions": "Two zebras standing next to each other on a field."
+            }
+        }
+    },
+    {
+        "request": {
+            "image_captioning": "eir_tutorials/c_sequence_output/03_image_captioning/data/image_captioning/images/000000581929.jpg",
+            "captions": "A horse"
+        },
+        "response": {
+            "result": {
+                "captions": "A horse that is grazing in the grass."
+            }
+        }
+    }
+]

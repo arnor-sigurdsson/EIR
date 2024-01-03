@@ -3,7 +3,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from itertools import cycle
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, Iterator, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, Iterator, Optional, Union
 
 import numpy as np
 import torch
@@ -15,9 +15,6 @@ from torchtext.vocab import Vocab
 
 from eir.data_load.data_preparation_modules.imputation import (
     impute_missing_modalities_wrapper,
-)
-from eir.data_load.data_preparation_modules.input_preparation_wrappers import (
-    prepare_inputs_memory,
 )
 from eir.data_load.data_preparation_modules.prepare_array import (
     array_load_wrapper,
@@ -49,6 +46,7 @@ from eir.interpretation.interpret_image import un_normalize
 from eir.predict_modules.predict_tabular_input_setup import (
     ComputedPredictTabularInputInfo,
 )
+from eir.serve_modules.serve_schemas import ComputedServeTabularInputInfo
 from eir.setup.input_setup_modules.setup_array import (
     ArrayNormalizationStats,
     ComputedArrayInputInfo,
@@ -61,6 +59,8 @@ from eir.setup.input_setup_modules.setup_image import (
 from eir.setup.input_setup_modules.setup_omics import ComputedOmicsInputInfo
 from eir.setup.input_setup_modules.setup_sequence import (
     ComputedSequenceInputInfo,
+    TokenizerProtocolPreSplit,
+    TokenizerProtocolRaw,
     get_sequence_split_function,
 )
 from eir.setup.input_setup_modules.setup_tabular import ComputedTabularInputInfo
@@ -76,6 +76,7 @@ from eir.train_utils.utils import call_hooks_stage_iterable
 
 if TYPE_CHECKING:
     from eir.predict import PredictExperiment, PredictHooks
+    from eir.serve import ServeExperiment
     from eir.setup.input_setup import al_input_objects_as_dict
     from eir.train import Experiment
     from eir.train_utils.step_logic import Hooks
@@ -86,12 +87,28 @@ logger = get_logger(name=__name__)
 def remove_special_tokens_from_string(
     string: str, special_tokens: "SpecialTokens"
 ) -> str:
+    """
+    TODO:   Deprecate in favor of `remove_special_tokens`, due to not being guaranteed
+            to handle spaces / split_on correctly, only removes the tokens themselves
+            and creates extra spaces.
+    """
     token_names = ["mask_token", "pad_token", "eos_token", "bos_token", "unk_token"]
     for token in token_names:
         assert hasattr(special_tokens, token)
         token_value = getattr(special_tokens, token)
         string = string.replace(token_value, "")
     return string
+
+
+def remove_special_tokens(
+    tokens: list[int], special_tokens: "SpecialTokens"
+) -> list[int]:
+    token_names = ["mask_idx", "pad_idx", "eos_idx", "bos_idx", "unk_idx"]
+    for token in token_names:
+        assert hasattr(special_tokens, token)
+        token_value = getattr(special_tokens, token)
+        tokens = [i for i in tokens if i != token_value]
+    return tokens
 
 
 def convert_model_inputs_to_raw(
@@ -104,7 +121,11 @@ def convert_model_inputs_to_raw(
 
         raw_input: str | np.ndarray | dict[str, np.ndarray]
         match input_object:
-            case ComputedTabularInputInfo() | ComputedPredictTabularInputInfo():
+            case (
+                ComputedTabularInputInfo()
+                | ComputedPredictTabularInputInfo()
+                | ComputedServeTabularInputInfo()
+            ):
                 assert isinstance(data, dict)
                 raw_input = convert_tabular_input_to_raw(
                     data=data,
@@ -208,38 +229,11 @@ def convert_array_input_to_raw(
     return data_un_normalized_numpy
 
 
-def general_pre_process_raw_inputs(
-    raw_inputs: dict[str, Any],
-    experiment: "Experiment",
-) -> dict[str, torch.Tensor]:
-    inputs_prepared_for_memory = {}
-    for name, cur_input in raw_inputs.items():
-        input_object = experiment.inputs[name]
-
-        if input_object.input_config.input_info.input_type == "sequence":
-            assert isinstance(input_object, ComputedSequenceInputInfo)
-            cur_input = input_object.encode_func(cur_input)
-
-        inputs_prepared_for_memory[name] = cur_input
-
-    inputs_prepared = prepare_inputs_memory(
-        inputs=inputs_prepared_for_memory,
-        inputs_objects=experiment.inputs,
-        test_mode=True,
-    )
-
-    inputs_final = impute_missing_modalities_wrapper(
-        inputs_values=inputs_prepared, inputs_objects=experiment.inputs
-    )
-
-    return inputs_final
-
-
 def general_pre_process_prepared_inputs(
     prepared_inputs: dict[str, Any],
     target_labels: dict[str, Any],
     sample_id: str,
-    experiment: Union["Experiment", "PredictExperiment"],
+    experiment: Union["Experiment", "PredictExperiment", "ServeExperiment"],
     custom_hooks: Union["Hooks", "PredictHooks"],
 ) -> Batch:
     """
@@ -281,7 +275,9 @@ class SpecialTokens:
     unk_token: str
 
 
-def get_special_tokens(tokenizer: Callable, vocab: Vocab) -> SpecialTokens:
+def get_special_tokens(
+    tokenizer: TokenizerProtocolRaw | TokenizerProtocolPreSplit, vocab: Vocab
+) -> SpecialTokens:
     keys_and_defaults = (
         ("mask_token", "<mask>"),
         ("pad_token", "<pad>"),
@@ -429,10 +425,12 @@ def prepare_manual_sample_data(
 
             case ComputedSequenceInputInfo():
                 assert isinstance(input_type_info, SequenceInputDataConfig)
-                split_func = get_sequence_split_function(
-                    split_on=input_type_info.split_on
+
+                sequence_split = streamline_sequence_manual_data(
+                    data=data,
+                    split_on=input_type_info.split_on,
                 )
-                sequence_split = split_func(data)
+
                 sequence_tokenized = input_object.encode_func(sequence_split)
                 sequence_array = np.array(sequence_tokenized)
 
@@ -474,7 +472,11 @@ def prepare_manual_sample_data(
                 )
                 prepared_inputs[name] = prepared_image_data
 
-            case ComputedTabularInputInfo() | ComputedPredictTabularInputInfo():
+            case (
+                ComputedTabularInputInfo()
+                | ComputedPredictTabularInputInfo()
+                | ComputedServeTabularInputInfo()
+            ):
                 assert isinstance(input_type_info, TabularInputDataConfig)
                 transformers = input_object.labels.label_transformers
                 tabular_data = _streamline_tabular_data_for_transformers(
@@ -567,3 +569,24 @@ def prepare_base_input(
 ) -> dict[str, Any]:
     prepared_sample_inputs_copy = deepcopy(prepared_inputs)
     return prepared_sample_inputs_copy
+
+
+def streamline_sequence_manual_data(
+    data: str, split_on: Optional[str]
+) -> list[str] | str:
+    """
+    This is to specifically handle the case of an empty string / None being passed
+    here. If e.g. we call the split_func on '', we will get [''], which will
+    end up being encoded as a <unk> token. Instead, we want to return an empty
+    list here. In e.g. the validation handler code, this is also set explicitly.
+    """
+
+    sequence_streamlined: list[str] | str
+    if data == "" or data is None:
+        sequence_streamlined = []
+    else:
+        split_func = get_sequence_split_function(split_on=split_on)
+        split_data = split_func(data)
+        sequence_streamlined = split_data
+
+    return sequence_streamlined

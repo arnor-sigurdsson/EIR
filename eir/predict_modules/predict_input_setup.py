@@ -50,15 +50,21 @@ def get_input_setup_function_map_for_predict() -> (
         "omics": setup_omics.set_up_omics_input,
         "tabular": setup_tabular_input_for_testing,
         "sequence": partial(
-            load_serialized_input_object, input_class=ComputedSequenceInputInfo
+            load_serialized_input_object,
+            input_class=ComputedSequenceInputInfo,
         ),
         "bytes": partial(
-            load_serialized_input_object, input_class=ComputedBytesInputInfo
+            load_serialized_input_object,
+            input_class=ComputedBytesInputInfo,
         ),
         "image": partial(
-            load_serialized_input_object, input_class=ComputedImageInputInfo
+            load_serialized_input_object,
+            input_class=ComputedImageInputInfo,
         ),
-        "array": setup_array.set_up_array_input,
+        "array": partial(
+            load_serialized_input_object,
+            input_class=setup_array.ComputedArrayInputInfo,
+        ),
     }
 
     return setup_mapping

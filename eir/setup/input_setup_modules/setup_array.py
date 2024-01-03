@@ -15,6 +15,7 @@ from eir.setup import schemas
 from eir.setup.input_setup_modules.common import (
     DataDimensions,
     get_data_dimension_from_data_source,
+    get_dtype_from_data_source,
 )
 from eir.setup.setup_utils import (
     ChannelBasedRunningStatistics,
@@ -30,6 +31,7 @@ logger = get_logger(name=__name__)
 class ComputedArrayInputInfo:
     input_config: schemas.InputConfig
     data_dimensions: "DataDimensions"
+    dtype: np.dtype
     normalization_stats: Optional["ArrayNormalizationStats"] = None
 
 
@@ -54,9 +56,15 @@ def set_up_array_input(
             max_samples=input_type_info.adaptive_normalization_max_samples,
         )
 
+    dtype = get_dtype_from_data_source(
+        data_source=Path(input_config.input_info.input_source),
+        deeplake_inner_key=input_config.input_info.input_inner_key,
+    )
+
     array_input_info = ComputedArrayInputInfo(
         input_config=input_config,
         data_dimensions=data_dimensions,
+        dtype=dtype,
         normalization_stats=normalization_stats,
     )
 

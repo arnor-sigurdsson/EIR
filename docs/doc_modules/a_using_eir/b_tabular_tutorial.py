@@ -2,6 +2,8 @@ from pathlib import Path
 from typing import List, Sequence
 
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
+from docs.doc_modules.serve_experiments_utils import load_data_for_serve
+from docs.doc_modules.serving_experiments import AutoDocServingInfo
 from docs.doc_modules.utils import get_saved_model_path
 
 
@@ -124,6 +126,43 @@ def get_02_poker_hands_run_1_predict_info() -> AutoDocExperimentInfo:
     return ade
 
 
+def get_03_poker_hands_run_1_serve_info() -> AutoDocServingInfo:
+    base_path = "docs/tutorials/tutorial_files/a_using_eir/02_tabular_tutorial"
+
+    model_path_placeholder = "FILL_MODEL"
+
+    server_command = ["eirserve", "--model-path", model_path_placeholder]
+
+    example_requests = [
+        {
+            "poker_hands": {
+                "S1": "3",
+                "C1": "12",
+                "S2": "3",
+                "C2": "2",
+                "S3": "3",
+                "C3": "11",
+                "S4": "4",
+                "C4": "5",
+                "S5": "2",
+                "C5": "5",
+            }
+        },
+    ]
+
+    ade = AutoDocServingInfo(
+        name="TABULAR_DEPLOY",
+        base_path=Path(base_path),
+        server_command=server_command,
+        pre_run_command_modifications=(_add_model_path_to_command,),
+        post_run_functions=(),
+        example_requests=example_requests,
+        data_loading_function=load_data_for_serve,
+    )
+
+    return ade
+
+
 def _get_model_path_for_predict() -> str:
     run_1_output_path = "eir_tutorials/tutorial_runs/a_using_eir/tutorial_02_run"
     model_path = get_saved_model_path(run_folder=Path(run_1_output_path))
@@ -137,8 +176,9 @@ def _add_model_path_to_command(command: List[str]) -> List[str]:
     return command
 
 
-def get_experiments() -> Sequence[AutoDocExperimentInfo]:
+def get_experiments() -> Sequence[AutoDocExperimentInfo | AutoDocServingInfo]:
     exp_1 = get_02_poker_hands_run_1_tabular_info()
     exp_2 = get_02_poker_hands_run_1_predict_info()
+    exp_3 = get_03_poker_hands_run_1_serve_info()
 
-    return [exp_1, exp_2]
+    return [exp_1, exp_2, exp_3]

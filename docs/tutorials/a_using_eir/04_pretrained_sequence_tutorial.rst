@@ -287,3 +287,76 @@ just act on the same input like we did above.
     Combining input configs is not only confined to sequence models or even the same
     modalities. For example, to train a model that uses genotype, sequence and tabular
     data, just pass the relevant configurations to the ``--input_configs`` flag!
+
+F - Serving
+-----------
+
+In this final section, we demonstrate serving our trained model
+as a web service and interacting with it using HTTP requests.
+
+Starting the Web Service
+"""""""""""""""""""""""""
+
+To serve the model, use the following command:
+
+.. code-block:: shell
+
+    eirserve --model-path [MODEL_PATH]
+
+Replace `[MODEL_PATH]` with the actual path to your trained model.
+This command initiates a web service that listens for incoming requests.
+
+Here is an example of the command:
+
+.. literalinclude:: ../tutorial_files/a_using_eir/04_pretrained_sequence_tutorial/commands/COMBINED_SEQUENCE_DEPLOY.txt
+    :language: console
+
+Sending Requests
+""""""""""""""""
+
+With the server running, we can now send requests. For this model, we send different features extracted from the same input text.
+
+Here's an example Python function demonstrating this process:
+
+.. code-block:: python
+
+    import requests
+
+    def send_request(url: str, payload: dict):
+        response = requests.post(url, json=payload)
+        return response.json()
+
+    payload = {
+        "imdb_reviews_windowed": "This movie was great! I loved it!",
+        "imdb_reviews_longformer": "This movie was great! I loved it!",
+        "imdb_reviews_tiny_bert": "This movie was great! I loved it!"
+    }
+
+    response = send_request('http://localhost:8000/predict', payload)
+    print(response)
+
+Additionally, you can send requests using `bash`:
+
+.. code-block:: bash
+
+    curl -X 'POST' \\
+      'http://localhost:8000/predict' \\
+      -H 'accept: application/json' \\
+      -H 'Content-Type: application/json' \\
+      -d '{
+          "imdb_reviews_windowed": "This movie was great! I loved it!",
+          "imdb_reviews_longformer": "This movie was great! I loved it!",
+          "imdb_reviews_tiny_bert": "This movie was great! I loved it!"
+      }'
+
+Analyzing Responses
+"""""""""""""""""""
+
+After sending requests to the served model, the responses can be analyzed.
+These responses provide insights into the model's predictions based on the input data.
+
+.. literalinclude:: ../tutorial_files/a_using_eir/04_pretrained_sequence_tutorial/serve_results/predictions.json
+    :language: json
+    :caption: predictions.json
+
+If you made it this far, I want to thank you for reading!

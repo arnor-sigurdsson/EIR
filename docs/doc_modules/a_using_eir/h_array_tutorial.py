@@ -1,3 +1,4 @@
+from functools import partial
 from pathlib import Path
 from typing import Sequence
 
@@ -6,6 +7,9 @@ import pandas as pd
 import seaborn as sns
 
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
+from docs.doc_modules.serve_experiments_utils import load_data_for_serve
+from docs.doc_modules.serving_experiments import AutoDocServingInfo
+from docs.doc_modules.utils import add_model_path_to_command
 
 
 def get_tutorial_08_run_cnn_1_info() -> AutoDocExperimentInfo:
@@ -470,6 +474,42 @@ def plot_validation_perf_average(data: pd.DataFrame) -> plt.Figure:
     return plt.gcf()
 
 
+def get_tutorial_08_run_3_serve() -> AutoDocServingInfo:
+    base_path = "docs/tutorials/tutorial_files/a_using_eir/08_array_tutorial"
+
+    model_path_placeholder = "FILL_MODEL"
+
+    server_command = ["eirserve", "--model-path", model_path_placeholder]
+
+    base = (
+        "eir_tutorials/a_using_eir/08_array_tutorial/data/"
+        "processed_sample_data/arrays_3d"
+    )
+    example_requests = [
+        {"genotype_as_array": f"{base}/A374.npy"},
+        {"genotype_as_array": f"{base}/Ayodo_468C.npy"},
+        {"genotype_as_array": f"{base}/NOR146.npy"},
+    ]
+
+    add_model_path = partial(
+        add_model_path_to_command,
+        run_path="eir_tutorials/tutorial_runs/a_using_eir/"
+        "tutorial_08_run_transformer-3d",
+    )
+
+    ade = AutoDocServingInfo(
+        name="ARRAY_DEPLOY",
+        base_path=Path(base_path),
+        server_command=server_command,
+        pre_run_command_modifications=(add_model_path,),
+        post_run_functions=(),
+        example_requests=example_requests,
+        data_loading_function=load_data_for_serve,
+    )
+
+    return ade
+
+
 def get_experiments() -> Sequence[AutoDocExperimentInfo]:
     exp_1 = get_tutorial_08_run_cnn_1_info()
     exp_2 = get_tutorial_08_run_cnn_2_info()
@@ -480,6 +520,7 @@ def get_experiments() -> Sequence[AutoDocExperimentInfo]:
     exp_7 = get_tutorial_08_run_transformer_1_info()
     exp_8 = get_tutorial_08_run_transformer_2_info()
     exp_9 = get_tutorial_08_run_transformer_3_info()
+    exp_10 = get_tutorial_08_run_3_serve()
 
     return [
         exp_1,
@@ -491,4 +532,5 @@ def get_experiments() -> Sequence[AutoDocExperimentInfo]:
         exp_7,
         exp_8,
         exp_9,
+        exp_10,
     ]

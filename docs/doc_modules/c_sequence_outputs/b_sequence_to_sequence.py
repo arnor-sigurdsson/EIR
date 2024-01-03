@@ -1,3 +1,4 @@
+from functools import partial
 from pathlib import Path
 from typing import Sequence
 
@@ -5,6 +6,9 @@ import pandas as pd
 
 from docs.doc_modules.c_sequence_outputs.utils import get_content_root
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
+from docs.doc_modules.serve_experiments_utils import load_data_for_serve
+from docs.doc_modules.serving_experiments import AutoDocServingInfo
+from docs.doc_modules.utils import add_model_path_to_command
 
 CONTENT_ROOT = CR = get_content_root()
 TUTORIAL_NAME = TN = "02_sequence_to_sequence"
@@ -37,8 +41,8 @@ def get_sequence_to_sequence_01_english_only() -> AutoDocExperimentInfo:
     for i in range(5):
         mapping.append(
             (
-                f"samples/13500/auto/{i}_generated.txt",
-                f"figures/auto_generated_{i}_iter_13500_only_english.txt",
+                f"samples/5000/auto/{i}_generated.txt",
+                f"figures/auto_generated_{i}_iter_5000_only_english.txt",
             )
         )
 
@@ -101,14 +105,14 @@ def get_sequence_to_sequence_02_spanish_to_english() -> AutoDocExperimentInfo:
     for i in range(10):
         mapping.append(
             (
-                f"samples/13500/auto/{i}_generated.txt",
-                f"figures/auto_generated_{i}_iter_13500_spanish_to_english.txt",
+                f"samples/5000/auto/{i}_generated.txt",
+                f"figures/auto_generated_{i}_iter_5000_spanish_to_english.txt",
             )
         )
         mapping.append(
             (
-                f"samples/13500/auto/{i}_inputs/spanish.txt",
-                f"figures/auto_input_{i}_iter_13500_spanish_to_english.txt",
+                f"samples/5000/auto/{i}_inputs/spanish.txt",
+                f"figures/auto_input_{i}_iter_5000_spanish_to_english.txt",
             )
         )
 
@@ -167,11 +171,55 @@ def save_translations(folder_path: Path, output_folder: Path) -> None:
     data.to_html(output_folder / "translations.html")
 
 
+def get_sequence_to_sequence_03_spanish_to_english_serve() -> AutoDocServingInfo:
+    base_path = f"docs/tutorials/tutorial_files/{CR}/{TN}"
+
+    server_command = ["eirserve", "--model-path", "FILL_MODEL"]
+
+    example_requests = [
+        {
+            "english": "",
+            "spanish": "Tengo mucho hambre",
+        },
+        {
+            "english": "",
+            "spanish": "¿Por qué Tomás sigue en Boston?",
+        },
+        {
+            "english": "Why",
+            "spanish": "¿Por qué Tomás sigue en Boston?",
+        },
+        {
+            "english": "",
+            "spanish": "Un gato muy alto",
+        },
+    ]
+
+    add_model_path = partial(
+        add_model_path_to_command,
+        run_path="eir_tutorials/tutorial_runs/c_sequence_output/" "02_seq_to_seq",
+    )
+
+    ade = AutoDocServingInfo(
+        name="SEQUENCE_TO_SEQUENCE_DEPLOY",
+        base_path=Path(base_path),
+        server_command=server_command,
+        pre_run_command_modifications=(add_model_path,),
+        post_run_functions=(),
+        example_requests=example_requests,
+        data_loading_function=load_data_for_serve,
+    )
+
+    return ade
+
+
 def get_experiments() -> Sequence[AutoDocExperimentInfo]:
     exp_1 = get_sequence_to_sequence_01_english_only()
     exp_2 = get_sequence_to_sequence_02_spanish_to_english()
+    exp_3 = get_sequence_to_sequence_03_spanish_to_english_serve()
 
     return [
         exp_1,
         exp_2,
+        exp_3,
     ]

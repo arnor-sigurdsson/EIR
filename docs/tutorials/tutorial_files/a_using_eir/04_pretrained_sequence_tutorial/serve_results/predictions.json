@@ -1,0 +1,53 @@
+[
+    {
+        "request": {
+            "imdb_reviews_windowed": "This move was great! I loved it!",
+            "imdb_reviews_longformer": "This move was great! I loved it!",
+            "imdb_reviews_tiny_bert": "This move was great! I loved it!"
+        },
+        "response": {
+            "result": {
+                "imdb_output": {
+                    "Sentiment": {
+                        "Negative": 0.02603462152183056,
+                        "Positive": 0.9739654064178467
+                    }
+                }
+            }
+        }
+    },
+    {
+        "request": {
+            "imdb_reviews_windowed": "This move was terrible! I hated it!",
+            "imdb_reviews_longformer": "This move was terrible! I hated it!",
+            "imdb_reviews_tiny_bert": "This move was terrible! I hated it!"
+        },
+        "response": {
+            "result": {
+                "imdb_output": {
+                    "Sentiment": {
+                        "Negative": 0.9671392440795898,
+                        "Positive": 0.03286070004105568
+                    }
+                }
+            }
+        }
+    },
+    {
+        "request": {
+            "imdb_reviews_windowed": "You'll have to have your wits about you and your brain fully switched on watching Oppenheimer as it could easily get away from a nonattentive viewer. This is intelligent filmmaking which shows it's audience great respect. It fires dialogue packed with information at a relentless pace and jumps to very different times in Oppenheimer's life continuously through it's 3 hour runtime. There are visual clues to guide the viewer through these times but again you'll have to get to grips with these quite quickly. This relentlessness helps to express the urgency with which the US attacked it's chase for the atomic bomb before Germany could do the same. An absolute career best performance from (the consistenly brilliant) Cillian Murphy anchors the film. ",
+            "imdb_reviews_longformer": "You'll have to have your wits about you and your brain fully switched on watching Oppenheimer as it could easily get away from a nonattentive viewer. This is intelligent filmmaking which shows it's audience great respect. It fires dialogue packed with information at a relentless pace and jumps to very different times in Oppenheimer's life continuously through it's 3 hour runtime. There are visual clues to guide the viewer through these times but again you'll have to get to grips with these quite quickly. This relentlessness helps to express the urgency with which the US attacked it's chase for the atomic bomb before Germany could do the same. An absolute career best performance from (the consistenly brilliant) Cillian Murphy anchors the film. ",
+            "imdb_reviews_tiny_bert": "You'll have to have your wits about you and your brain fully switched on watching Oppenheimer as it could easily get away from a nonattentive viewer. This is intelligent filmmaking which shows it's audience great respect. It fires dialogue packed with information at a relentless pace and jumps to very different times in Oppenheimer's life continuously through it's 3 hour runtime. There are visual clues to guide the viewer through these times but again you'll have to get to grips with these quite quickly. This relentlessness helps to express the urgency with which the US attacked it's chase for the atomic bomb before Germany could do the same. An absolute career best performance from (the consistenly brilliant) Cillian Murphy anchors the film. "
+        },
+        "response": {
+            "result": {
+                "imdb_output": {
+                    "Sentiment": {
+                        "Negative": 0.017884565517306328,
+                        "Positive": 0.9821153879165649
+                    }
+                }
+            }
+        }
+    }
+]

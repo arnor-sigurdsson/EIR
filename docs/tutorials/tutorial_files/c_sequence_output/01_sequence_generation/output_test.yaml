@@ -4,10 +4,15 @@ output_info:
   output_type: sequence
 
 output_type_info:
-  max_length: 32
+  max_length: 64
   split_on: ""
   sampling_strategy_if_longer: "uniform"
   min_freq: 1
+
+model_config:
+  embedding_dim: 64
+  model_init_config:
+    num_layers: 6
 
 sampling_config:
   generated_sequence_length: 64

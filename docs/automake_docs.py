@@ -21,7 +21,14 @@ from docs.doc_modules.c_sequence_outputs import (
 )
 from docs.doc_modules.d_array_outputs import a_array_mnist_generation
 from docs.doc_modules.e_pretraining import a_checkpointing, b_mini_foundation
-from docs.doc_modules.experiments import AutoDocExperimentInfo, make_tutorial_data
+from docs.doc_modules.experiments import (
+    AutoDocExperimentInfo,
+    make_training_or_predict_tutorial_data,
+)
+from docs.doc_modules.serving_experiments import (
+    AutoDocServingInfo,
+    make_serving_tutorial_data,
+)
 
 
 def _get_a_using_eir_experiments() -> Iterable[AutoDocExperimentInfo]:
@@ -103,7 +110,14 @@ if __name__ == "__main__":
         ]
     )
     for experiment in experiment_iter:
-        make_tutorial_data(auto_doc_experiment_info=experiment)
+        match experiment:
+            case AutoDocExperimentInfo():
+                make_training_or_predict_tutorial_data(
+                    auto_doc_experiment_info=experiment
+                )
+
+            case AutoDocServingInfo():
+                make_serving_tutorial_data(auto_doc_experiment_info=experiment)
 
     generate_timm_api_info.run_all()
     generate_hf_sequence_info.run_all()

@@ -1,0 +1,22 @@
+{
+    "Type": "Cat",
+    "Name": "Nibble",
+    "Age": 3000.0,
+    "Breed1": "Tabby",
+    "Breed2": "0",
+    "Gender": "Male",
+    "Color1": "Black",
+    "Color2": "White",
+    "Color3": "0",
+    "MaturitySize": "Small",
+    "FurLength": "Short",
+    "Vaccinated": "No",
+    "Dewormed": "No",
+    "Sterilized": "No",
+    "Health": "Healthy",
+    "Quantity": 1.0,
+    "Fee": "Free",
+    "State": "Selangor",
+    "VideoAmt": 0.0,
+    "PhotoAmt": 1.0
+}

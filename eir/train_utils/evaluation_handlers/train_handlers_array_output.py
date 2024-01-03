@@ -28,6 +28,7 @@ from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from eir.predict import PredictExperiment, PredictHooks
+    from eir.serve import ServeExperiment
     from eir.train import Experiment, Hooks, al_input_objects_as_dict
 
 logger = get_logger(name=__name__)
@@ -137,7 +138,7 @@ def array_out_single_sample_evaluation_wrapper(
 def array_generation(
     eval_sample: ArrayOutputEvalSample,
     array_output_name: str,
-    experiment: Union["Experiment", "PredictExperiment"],
+    experiment: Union["Experiment", "PredictExperiment", "ServeExperiment"],
     default_eir_hooks: Union["Hooks", "PredictHooks"],
 ) -> np.ndarray:
     output_object = experiment.outputs[array_output_name]
@@ -156,12 +157,16 @@ def array_generation(
         custom_hooks=default_eir_hooks,
     )
 
-    outputs = predict_on_batch(model=experiment.model, inputs=batch.inputs)
+    outputs = predict_on_batch(
+        model=experiment.model,
+        inputs=batch.inputs,
+    )
 
     array_output = outputs[array_output_name][array_output_name]
 
     array_output_raw = un_normalize_array(
-        array=array_output, normalization_stats=output_object.normalization_stats
+        array=array_output,
+        normalization_stats=output_object.normalization_stats,
     )
 
     array_output_raw_numpy = array_output_raw.cpu().numpy()

@@ -1,0 +1,2 @@
+eirdeploy \
+--model-path eir_tutorials/tutorial_runs/a_using_eir/tutorial_06_imdb_sentiment_binary/saved_models/tutorial_06_imdb_sentiment_binary_model_15000_perf-average=0.5741.pt

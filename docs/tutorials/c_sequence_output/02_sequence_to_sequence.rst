@@ -69,11 +69,11 @@ I got the following training curve:
 
 Here are a couple of example of the generated sentences using only English data:
 
-.. literalinclude:: ../tutorial_files/c_sequence_output/02_sequence_to_sequence/figures/auto_generated_0_iter_13500_only_english.txt
+.. literalinclude:: ../tutorial_files/c_sequence_output/02_sequence_to_sequence/figures/auto_generated_0_iter_5000_only_english.txt
     :language: console
     :caption: Generated English caption using only English data 1
 
-.. literalinclude:: ../tutorial_files/c_sequence_output/02_sequence_to_sequence/figures/auto_generated_1_iter_13500_only_english.txt
+.. literalinclude:: ../tutorial_files/c_sequence_output/02_sequence_to_sequence/figures/auto_generated_1_iter_5000_only_english.txt
     :language: console
     :caption: Generated English caption using only English data 2
 
@@ -112,6 +112,75 @@ Now, we can look at some of the generated sentences:
 
 While these are not perfect translations,
 they are maybe not too bad considering a simple model trained
-for around half and hour on a laptop.
+for around an hour on a laptop.
+
+C - Serving
+-----------
+
+In this final section, we demonstrate serving our trained model for sequence-to-sequence translation as a web service and interacting with it using HTTP requests.
+
+Starting the Web Service
+"""""""""""""""""""""""""
+
+To serve the model, use the following command:
+
+.. code-block:: shell
+
+    eirserve --model-path [MODEL_PATH]
+
+Replace `[MODEL_PATH]` with the actual path to your trained model.
+This command initiates a web service that listens for incoming requests.
+
+Here is an example of the command:
+
+.. literalinclude:: ../tutorial_files/c_sequence_output/02_sequence_to_sequence/commands/SEQUENCE_TO_SEQUENCE_DEPLOY.txt
+    :language: console
+
+Sending Requests
+""""""""""""""""
+
+With the server running, we can now send requests for translating text from Spanish to English.
+
+Here's an example Python function demonstrating this process:
+
+.. code-block:: python
+
+    import requests
+
+    def send_request(url: str, payload: dict):
+        response = requests.post(url, json=payload)
+        return response.json()
+
+    example_requests = [
+        {"english": "", "spanish": "Tengo mucho hambre"},
+        {"english": "", "spanish": "¿Por qué Tomás sigue en Boston?"},
+    ]
+
+    for payload in example_requests:
+        response = send_request('http://localhost:8000/predict', payload)
+        print(f"Spanish: {payload['spanish']}")
+        print(f"Translated to English: {response['english']}\n")
+
+Additionally, you can send requests using `bash`:
+
+.. code-block:: bash
+
+    curl -X 'POST' \\
+      'http://localhost:8000/predict' \\
+      -H 'accept: application/json' \\
+      -H 'Content-Type: application/json' \\
+      -d '{
+          "english": "", "spanish": "Tengo mucho hambre"
+      }'
+
+Analyzing Responses
+"""""""""""""""""""
+
+After sending requests to the served model, the responses can be analyzed.
+These responses provide insights into the model's ability to translate from Spanish to English.
+
+.. literalinclude:: ../tutorial_files/c_sequence_output/02_sequence_to_sequence/serve_results/predictions.json
+    :language: json
+    :caption: predictions.json
 
 Thanks for reading!

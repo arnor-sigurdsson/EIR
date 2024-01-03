@@ -41,6 +41,7 @@ from eir.models.output.sequence.sequence_output_modules import (
 from eir.predict_modules.predict_tabular_input_setup import (
     ComputedPredictTabularInputInfo,
 )
+from eir.serve_modules.serve_schemas import ComputedServeTabularInputInfo
 from eir.setup import schemas
 from eir.setup.input_setup import al_input_objects_as_dict
 from eir.setup.input_setup_modules.common import DataDimensions
@@ -271,7 +272,11 @@ def get_input_modules(
                 )
                 input_modules[input_name] = cur_omics_model
 
-            case ComputedTabularInputInfo() | ComputedPredictTabularInputInfo():
+            case (
+                ComputedTabularInputInfo()
+                | ComputedPredictTabularInputInfo()
+                | ComputedServeTabularInputInfo()
+            ):
                 transformers = inputs_object.labels.label_transformers
                 input_type_info = inputs_object.input_config.input_type_info
                 assert isinstance(input_type_info, TabularInputDataConfig)
@@ -426,7 +431,11 @@ def _get_feature_extractors_input_dimensions_per_axis(
                     width=input_type_info.size[-1],
                 )
 
-            case ComputedTabularInputInfo() | ComputedPredictTabularInputInfo():
+            case (
+                ComputedTabularInputInfo()
+                | ComputedPredictTabularInputInfo()
+                | ComputedServeTabularInputInfo()
+            ):
                 input_model = input_modules[name]
                 assert isinstance(input_model, SimpleTabularModel)
                 fusion_in_dims[name] = DataDimensions(

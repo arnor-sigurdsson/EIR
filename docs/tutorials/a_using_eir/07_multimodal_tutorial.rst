@@ -225,6 +225,87 @@ pre-trained model, and see if that improves the performance. However,
 this tutorial is getting long enough already, so we will leave that
 as an exercise for those interested.
 
+D - Serving
+-----------
+
+This section guides you through serving a multimodal
+model that combines tabular data, text descriptions, and images.
+We'll demonstrate how to interact with this served model using HTTP requests.
+
+Starting the Web Service
+"""""""""""""""""""""""""
+
+To serve the multimodal model, use the following command:
+
+.. code-block:: shell
+
+    eirserve --model-path [MODEL_PATH]
+
+Replace `[MODEL_PATH]` with the actual path to your trained multimodal model. This command starts a web service that listens for incoming HTTP requests.
+
+Example of the serving command:
+
+.. literalinclude:: ../tutorial_files/a_using_eir/07_multimodal_tutorial/commands/COMBINED_SEQUENCE_DEPLOY.txt
+    :language: console
+
+Preparing and Sending Requests
+""""""""""""""""""""""""""""""
+
+Once the server is running, you can send requests containing tabular data, text descriptions, and image paths. Here's an example Python function to demonstrate this process:
+
+.. code-block:: python
+
+    import requests
+    import json
+
+    def send_request(url: str, request_data: dict):
+        response = requests.post(url, json=request_data)
+        return response.json()
+
+    request_data = {
+        "pets_tabular": {
+            "Type": "Cat",
+            "Name": "Nibble",
+            "Age": 1.0,
+            "Breed1": "Tabby",
+            ...
+        },
+        "pet_descriptions": "A super cute tabby cat!!!",
+        "cute_pet_images": "path/to/image.jpg"
+    }
+
+    response = send_request('http://localhost:8000/predict', request_data)
+    print(response)
+
+Analyzing Responses
+"""""""""""""""""""
+
+After sending requests to the served model,
+you will receive responses that provide a prediction
+based on the combined data (tabular, description, and image).
+
+Let's take a look at some example predictions made by the model:
+
+.. literalinclude:: ../tutorial_files/a_using_eir/07_multimodal_tutorial/serve_results/predictions.json
+    :language: json
+    :caption: predictions.json
+
+You can see that the inputs to the models are basically identical, except
+that we are varying the age of the pet. The general trend is that the older
+the pet, the longer it takes to be adopted, according to the model. This,
+unfortunately, is perhaps not surprising and is particularly visible when
+we increase the age to the extreme of 3000 months (250 years) – I mean, who
+would not want to adopt a 250 year old sage cat? :)
+
+While not visible in the JSON above, here is the image used:
+
+.. figure:: ../tutorial_files/a_using_eir/07_multimodal_tutorial/serve_results/86e1089a3.jpg
+   :alt: Example Pet Image
+   :align: center
+
+86e1089a3.jpg
+
+
 That is it for the main part of the tutorial. I hope you enjoyed it!
 Below are a couple of appendixes with some additional experiments
 that might be interesting.

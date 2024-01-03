@@ -1,0 +1,41 @@
+[
+    {
+        "request": {
+            "proteins_tabular": {
+                "classification": "HYDROLASE"
+            },
+            "protein_sequence": ""
+        },
+        "response": {
+            "result": {
+                "protein_sequence": "IDGFDVKFVKEFDVIVELPFSIPRDRFIVDLELEGKNYIAGYARRIVTDGETYFVKVASILGELGEGFSIALDVDETGDSLGVIFSLKDESGKPFYSKEKANPNAGKSVFNVNAKKYASIVKLGARLD"
+            }
+        }
+    },
+    {
+        "request": {
+            "proteins_tabular": {
+                "classification": "TRANSFERASE"
+            },
+            "protein_sequence": ""
+        },
+        "response": {
+            "result": {
+                "protein_sequence": "KIRLTPNPRPFYELDLEELDISKVKIQDKELEYKYITLTYTLEENFDKIFKSKVINTNFIEKKKEVEFAIYYKKLETLNIILNAFDSGYIEIKSEDELKKSDINAILEINLLIIGIENHHHVLYLNHH"
+            }
+        }
+    },
+    {
+        "request": {
+            "proteins_tabular": {
+                "classification": "OXIDOREDUCTASE"
+            },
+            "protein_sequence": "AAA"
+        },
+        "response": {
+            "result": {
+                "protein_sequence": "AAALERYDPVGTTHIRSPNIAVRNSSRAALDYSIDLIFRYLHTTHKAVKGAALRAIAARSAAVPVLTHVTVGGDSPRLVTPVPTPIDLFGDAAVPGLGRAINFGSSHGFGLVTQERKGVDINYGPFYD"
+            }
+        }
+    }
+]

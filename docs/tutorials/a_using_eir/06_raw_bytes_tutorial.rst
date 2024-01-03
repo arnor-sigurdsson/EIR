@@ -78,7 +78,7 @@ compared to running on the raw bytes like we are doing here.
 It can well be we need to configure our model better,
 or train it on more data, but for now we will say that
 adapting the training to the task (in this case NLP) seems
-to perform better than training on raw binary data!
+to perform better than training on raw binary data.
 
 .. tip::
     Here we are training on natural language data,
@@ -86,3 +86,78 @@ to perform better than training on raw binary data!
     any type of file on a disk (e.g. images, videos,
     or other more obscure formats). As we saw above
     however, good results not guaranteed!
+
+
+B - Serving
+-----------
+
+In this section, we'll guide you through serving our t
+rained IMDB Reviews Bytes Classification model as a web service and show you
+how to interact with it using HTTP requests.
+
+Starting the Web Service
+"""""""""""""""""""""""""
+
+To serve the model, execute the following command:
+
+.. code-block:: shell
+
+    eirserve --model-path [MODEL_PATH]
+
+Replace `[MODEL_PATH]` with the actual path to your trained model. This command initiates a web service that listens for incoming HTTP requests.
+
+Here is an example of the command used:
+
+.. literalinclude:: ../tutorial_files/a_using_eir/06_raw_bytes_tutorial/commands/BINARY_DEPLOY.txt
+    :language: console
+
+Sending Requests
+""""""""""""""""
+
+Once the server is up and running, you can send requests to it. For this binary model, we send text data in byte format to the model's endpoint.
+
+Here's an example Python function to demonstrate how to send a request:
+
+.. code-block:: python
+
+    import requests
+    import numpy as np
+    import base64
+
+    def load_and_encode_data(data_pointer: str) -> str:
+        arr = np.fromfile(data_pointer, dtype="uint8")
+        arr_bytes = arr.tobytes()
+        return base64.b64encode(arr_bytes).decode("utf-8")
+
+    def send_request(url: str, encoded_data: str):
+        payload = {"data": encoded_data}
+        response = requests.post(url, json=payload)
+        return response.json()
+
+    encoded_data = load_and_encode_data('path/to/textfile.txt')
+    response = send_request('http://localhost:8000/predict', encoded_data)
+    print(response)
+
+
+Analyzing Responses
+"""""""""""""""""""
+
+After sending requests to the served model, you will receive responses that provide insights into the model's predictions based on the input text data.
+
+Let's take a look at some of the text data used for predictions:
+
+.. literalinclude:: ../tutorial_files/a_using_eir/06_raw_bytes_tutorial/serve_results/10021_2.txt
+   :language: text
+   :caption: 10021_2.txt
+
+.. literalinclude:: ../tutorial_files/a_using_eir/06_raw_bytes_tutorial/serve_results/10132_9.txt
+   :language: text
+   :caption: 10132_9.txt
+
+Here are examples of the model's predictions:
+
+.. literalinclude:: ../tutorial_files/a_using_eir/06_raw_bytes_tutorial/serve_results/predictions.json
+    :language: json
+    :caption: predictions.json
+
+This concludes our tutorial, thank you for following along!

@@ -2,11 +2,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+import numpy as np
+
 from eir.setup.input_setup_modules.common import DataDimensions
 from eir.setup.input_setup_modules.setup_array import (
     ArrayNormalizationStats,
     get_array_normalization_values,
     get_data_dimension_from_data_source,
+    get_dtype_from_data_source,
 )
 from eir.setup.schemas import ArrayOutputTypeConfig, OutputConfig
 from eir.utils.logging import get_logger
@@ -18,6 +21,7 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 class ComputedArrayOutputInfo:
     output_config: OutputConfig
     data_dimensions: DataDimensions
+    dtype: np.dtype
     normalization_stats: Optional[ArrayNormalizationStats] = None
 
 
@@ -42,10 +46,16 @@ def set_up_array_output(
             max_samples=output_type_info.adaptive_normalization_max_samples,
         )
 
+    dtype = get_dtype_from_data_source(
+        data_source=Path(output_config.output_info.output_source),
+        deeplake_inner_key=output_config.output_info.output_inner_key,
+    )
+
     array_output_object = ComputedArrayOutputInfo(
         output_config=output_config,
         data_dimensions=data_dimensions,
         normalization_stats=normalization_stats,
+        dtype=dtype,
     )
 
     return array_output_object
