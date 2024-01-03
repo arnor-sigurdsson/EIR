@@ -149,7 +149,7 @@ def get_base_parametrization(compiled: bool = False) -> dict:
                 "array",
             ),
             "extras": {"array_dims": 1},
-            "manual_test_data_creator": lambda: "test_multi_modal_multi_task",
+            "manual_test_data_creator": lambda: "test_multi_modal_multi_task_serving",
             "random_samples_dropped_from_modalities": False,
             "source": "local",
         },
