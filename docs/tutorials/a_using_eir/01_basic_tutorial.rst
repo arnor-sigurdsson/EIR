@@ -300,8 +300,8 @@ that we have found to work well as a starting point:
     :caption: output.yaml
 
 
-E - Deployment
-^^^^^^^^^^^^^^
+E - Serving
+^^^^^^^^^^^
 
 In this final section, we demonstrate serving our trained model
 as a web service and interacting with it using HTTP requests.

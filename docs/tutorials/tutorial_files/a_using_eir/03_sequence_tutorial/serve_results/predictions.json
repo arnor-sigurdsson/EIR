@@ -7,8 +7,8 @@
             "result": {
                 "imdb_output": {
                     "Sentiment": {
-                        "Negative": 0.015489818528294563,
-                        "Positive": 0.9845102429389954
+                        "Negative": 0.5614073872566223,
+                        "Positive": 0.4385926127433777
                     }
                 }
             }
@@ -22,8 +22,8 @@
             "result": {
                 "imdb_output": {
                     "Sentiment": {
-                        "Negative": 0.9004154801368713,
-                        "Positive": 0.09958454966545105
+                        "Negative": 0.9533361792564392,
+                        "Positive": 0.04666382819414139
                     }
                 }
             }
@@ -37,8 +37,8 @@
             "result": {
                 "imdb_output": {
                     "Sentiment": {
-                        "Negative": 0.08171583712100983,
-                        "Positive": 0.9182841181755066
+                        "Negative": 0.037015847861766815,
+                        "Positive": 0.9629841446876526
                     }
                 }
             }

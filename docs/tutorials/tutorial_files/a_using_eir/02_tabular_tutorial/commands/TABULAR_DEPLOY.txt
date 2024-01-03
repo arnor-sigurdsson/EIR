@@ -1,2 +1,2 @@
-eirdeploy \
+eirserve \
 --model-path eir_tutorials/tutorial_runs/a_using_eir/tutorial_02_run/saved_models/tutorial_02_run_model_15000_perf-average=0.8582.pt

@@ -7,8 +7,8 @@
             "result": {
                 "imdb_output": {
                     "Sentiment": {
-                        "Negative": 0.7203794121742249,
-                        "Positive": 0.27962052822113037
+                        "Negative": 0.7503469586372375,
+                        "Positive": 0.24965302646160126
                     }
                 }
             }
@@ -22,8 +22,8 @@
             "result": {
                 "imdb_output": {
                     "Sentiment": {
-                        "Negative": 0.19920076429843903,
-                        "Positive": 0.8007991909980774
+                        "Negative": 0.1934361606836319,
+                        "Positive": 0.8065637946128845
                     }
                 }
             }

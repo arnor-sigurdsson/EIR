@@ -156,8 +156,8 @@ However, we are training for a relatively short time, and one might get better
 results by e.g. increasing the number of filters in the CNN case.
 
 
-C - Deployment
-^^^^^^^^^^^^^^
+C - Serving
+^^^^^^^^^^^
 
 In this final section, we demonstrate serving our trained model for 3D array data as a web service and interacting with it using HTTP requests.
 

@@ -288,8 +288,8 @@ just act on the same input like we did above.
     modalities. For example, to train a model that uses genotype, sequence and tabular
     data, just pass the relevant configurations to the ``--input_configs`` flag!
 
-F - Deployment
---------------------
+F - Serving
+-----------
 
 In this final section, we demonstrate serving our trained model
 as a web service and interacting with it using HTTP requests.

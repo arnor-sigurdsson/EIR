@@ -239,8 +239,8 @@ generate more meaningful sequences:
 Hopefully this tutorial has given you a good overview of how to use
 the sequence generation functionality in ``EIR``. Thank you for reading!
 
-F - Deployment
---------------
+F - Serving
+-----------
 
 In this final section, we demonstrate serving our trained model for sequence generation as a web service and interacting with it using HTTP requests.
 

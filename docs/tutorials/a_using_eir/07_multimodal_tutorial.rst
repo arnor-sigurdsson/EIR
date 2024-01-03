@@ -225,8 +225,8 @@ pre-trained model, and see if that improves the performance. However,
 this tutorial is getting long enough already, so we will leave that
 as an exercise for those interested.
 
-D - Deployment
---------------
+D - Serving
+-----------
 
 This section guides you through serving a multimodal
 model that combines tabular data, text descriptions, and images.

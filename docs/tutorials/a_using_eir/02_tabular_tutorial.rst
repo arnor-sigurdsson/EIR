@@ -180,8 +180,8 @@ TabNet is a much more complex model,
 and we did not do extensive hyper-parameter tuning!
 
 
-E - Deployment
-^^^^^^^^^^^^^^
+E - Serving
+^^^^^^^^^^^
 
 In this final section, we demonstrate serving our trained model
 as a web service and interacting with it using HTTP requests.

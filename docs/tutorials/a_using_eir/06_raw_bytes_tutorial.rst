@@ -88,8 +88,8 @@ to perform better than training on raw binary data.
     however, good results not guaranteed!
 
 
-B - Deployment
---------------
+B - Serving
+-----------
 
 In this section, we'll guide you through serving our t
 rained IMDB Reviews Bytes Classification model as a web service and show you

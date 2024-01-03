@@ -803,7 +803,7 @@ Args:
     classifier_dropout (`float`, *optional*):
         The dropout ratio for the classification head.
 
-.. class:: transformers.models.llama.configuration_llama.LlamaConfig(vocab_size=32000, hidden_size=4096, intermediate_size=11008, num_hidden_layers=32, num_attention_heads=32, num_key_value_heads=None, hidden_act='silu', max_position_embeddings=2048, initializer_range=0.02, rms_norm_eps=1e-06, use_cache=True, pad_token_id=None, bos_token_id=1, eos_token_id=2, pretraining_tp=1, tie_word_embeddings=False, rope_theta=10000.0, rope_scaling=None, attention_bias=False, **kwargs)
+.. class:: transformers.models.llama.configuration_llama.LlamaConfig(vocab_size=32000, hidden_size=4096, intermediate_size=11008, num_hidden_layers=32, num_attention_heads=32, num_key_value_heads=None, hidden_act='silu', max_position_embeddings=2048, initializer_range=0.02, rms_norm_eps=1e-06, use_cache=True, pad_token_id=None, bos_token_id=1, eos_token_id=2, pretraining_tp=1, tie_word_embeddings=False, rope_theta=10000.0, rope_scaling=None, attention_bias=False, attention_dropout=0.0, **kwargs)
 
 The Code Llama model was proposed in `Code Llama: Open Foundation Models for Code <https://ai.meta.com/research/publications/code-llama-open-foundation-models-for-code/>`__ by Baptiste Rozière, Jonas Gehring, Fabian Gloeckle, Sten Sootla, Itai Gat, Xiaoqing Ellen Tan, Yossi Adi, Jingyu Liu, Tal Remez, Jérémy Rapin, Artyom Kozhevnikov, Ivan Evtimov, Joanna Bitton, Manish Bhatt, Cristian Canton Ferrer, Aaron Grattafiori, Wenhan Xiong, Alexandre Défossez, Jade Copet, Faisal Azhar, Hugo Touvron, Louis Martin, Nicolas Usunier, Thomas Scialom, Gabriel Synnaeve.
 
@@ -944,7 +944,8 @@ Args:
         experimental feature, subject to breaking API changes in future versions.
     attention_bias (`bool`, defaults to `False`, *optional*, defaults to `False`):
         Whether to use a bias in the query, key, value and output projection layers during self-attention.
-
+    attention_dropout (`float`, *optional*, defaults to 0.0):
+        The dropout ratio for the attention probabilities.
 
 ::
 
@@ -2543,7 +2544,7 @@ Args:
     use_cache (`bool`, *optional*, defaults to `True`):
         Whether or not the model should return the last key/values attentions (not used by all models)
 
-.. class:: transformers.models.llama.configuration_llama.LlamaConfig(vocab_size=32000, hidden_size=4096, intermediate_size=11008, num_hidden_layers=32, num_attention_heads=32, num_key_value_heads=None, hidden_act='silu', max_position_embeddings=2048, initializer_range=0.02, rms_norm_eps=1e-06, use_cache=True, pad_token_id=None, bos_token_id=1, eos_token_id=2, pretraining_tp=1, tie_word_embeddings=False, rope_theta=10000.0, rope_scaling=None, attention_bias=False, **kwargs)
+.. class:: transformers.models.llama.configuration_llama.LlamaConfig(vocab_size=32000, hidden_size=4096, intermediate_size=11008, num_hidden_layers=32, num_attention_heads=32, num_key_value_heads=None, hidden_act='silu', max_position_embeddings=2048, initializer_range=0.02, rms_norm_eps=1e-06, use_cache=True, pad_token_id=None, bos_token_id=1, eos_token_id=2, pretraining_tp=1, tie_word_embeddings=False, rope_theta=10000.0, rope_scaling=None, attention_bias=False, attention_dropout=0.0, **kwargs)
 
 The LLaMA model was proposed in `LLaMA: Open and Efficient Foundation Language Models <https://arxiv.org/abs/2302.13971>`__ by Hugo Touvron, Thibaut Lavril, Gautier Izacard, Xavier Martinet, Marie-Anne Lachaux, Timothée Lacroix, Baptiste Rozière, Naman Goyal, Eric Hambro, Faisal Azhar, Aurelien Rodriguez, Armand Joulin, Edouard Grave, Guillaume Lample. It is a collection of foundation language models ranging from 7B to 65B parameters.
 
@@ -2634,7 +2635,8 @@ Args:
         experimental feature, subject to breaking API changes in future versions.
     attention_bias (`bool`, defaults to `False`, *optional*, defaults to `False`):
         Whether to use a bias in the query, key, value and output projection layers during self-attention.
-
+    attention_dropout (`float`, *optional*, defaults to 0.0):
+        The dropout ratio for the attention probabilities.
 
 ::
 
@@ -3375,6 +3377,95 @@ Args:
         Whether or not the model should return the last key/values attentions (not used by all models). Only
         relevant if `config.is_decoder=True`.
 
+.. class:: transformers.models.mixtral.configuration_mixtral.MixtralConfig(vocab_size=32000, hidden_size=4096, intermediate_size=14336, num_hidden_layers=32, num_attention_heads=32, num_key_value_heads=8, hidden_act='silu', max_position_embeddings=131072, initializer_range=0.02, rms_norm_eps=1e-05, use_cache=True, pad_token_id=None, bos_token_id=1, eos_token_id=2, tie_word_embeddings=False, rope_theta=1000000.0, sliding_window=4096, attention_dropout=0.0, num_experts_per_tok=2, num_local_experts=8, output_router_logits=False, router_aux_loss_coef=0.001, **kwargs)
+
+Mixtral-8x7B is Mistral AI's second Large Language Model (LLM). 
+
+The Mixtral model was proposed by the `Mistral AI <https://mistral.ai/>`__ team.
+
+It was introduced in the `Mixtral of Experts blogpost <https://mistral.ai/news/mixtral-of-experts/>`__ with the following introduction:
+
+*Today, the team is proud to release Mixtral 8x7B, a high-quality sparse mixture of experts models (SMoE) with open weights. Licensed under Apache 2.0. Mixtral outperforms Llama 2 70B on most benchmarks with 6x faster inference. It is the strongest open-weight model with a permissive license and the best model overall regarding cost/performance trade-offs. In particular, it matches or outperforms GPT3.5 on most standard benchmarks.*
+
+Tips:
+
+
+- The model needs to be converted using the `conversion script <https://github.com/huggingface/transformers/blob/main/src/transformers/models/mixtral/convert_mixtral_weights_to_hf.py>`__.
+- If the model is quantized to 4bits, a single A100 is enough to fit the entire 45B model.
+
+This model was contributed by `Younes Belkada <https://huggingface.co/ybelkada>`__ and `Arthur Zucker <https://huggingface.co/ArthurZ>`__ .
+The original code can be found `here <https://github.com/mistralai/mistral-src>`__.
+
+
+#Args:
+    vocab_size (`int`, *optional*, defaults to 32000):
+        Vocabulary size of the Mixtral model. Defines the number of different tokens that can be represented by the
+        `inputs_ids` passed when calling ``MixtralModel``
+    hidden_size (`int`, *optional*, defaults to 4096):
+        Dimension of the hidden representations.
+    intermediate_size (`int`, *optional*, defaults to 14336):
+        Dimension of the MLP representations.
+    num_hidden_layers (`int`, *optional*, defaults to 32):
+        Number of hidden layers in the Transformer encoder.
+    num_attention_heads (`int`, *optional*, defaults to 32):
+        Number of attention heads for each attention layer in the Transformer encoder.
+    num_key_value_heads (`int`, *optional*, defaults to 8):
+        This is the number of key_value heads that should be used to implement Grouped Query Attention. If
+        `num_key_value_heads=num_attention_heads`, the model will use Multi Head Attention (MHA), if
+        `num_key_value_heads=1 the model will use Multi Query Attention (MQA) otherwise GQA is used. When
+        converting a multi-head checkpoint to a GQA checkpoint, each group key and value head should be constructed
+        by meanpooling all the original heads within that group. For more details checkout `this
+        paper <https://arxiv.org/pdf/2305.13245.pdf>`__. If it is not specified, will default to `8`.
+    hidden_act (`str` or `function`, *optional*, defaults to `"silu"`):
+        The non-linear activation function (function or string) in the decoder.
+    max_position_embeddings (`int`, *optional*, defaults to `4096*32`):
+        The maximum sequence length that this model might ever be used with. Mixtral's sliding window attention
+        allows sequence of up to 4096*32 tokens.
+    initializer_range (`float`, *optional*, defaults to 0.02):
+        The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
+    rms_norm_eps (`float`, *optional*, defaults to 1e-05):
+        The epsilon used by the rms normalization layers.
+    use_cache (`bool`, *optional*, defaults to `True`):
+        Whether or not the model should return the last key/values attentions (not used by all models). Only
+        relevant if `config.is_decoder=True`.
+    pad_token_id (`int`, *optional*):
+        The id of the padding token.
+    bos_token_id (`int`, *optional*, defaults to 1):
+        The id of the "beginning-of-sequence" token.
+    eos_token_id (`int`, *optional*, defaults to 2):
+        The id of the "end-of-sequence" token.
+    tie_word_embeddings (`bool`, *optional*, defaults to `False`):
+        Whether the model's input and output word embeddings should be tied.
+    rope_theta (`float`, *optional*, defaults to 1000000.0):
+        The base period of the RoPE embeddings.
+    sliding_window (`int`, *optional*, defaults to 4096):
+        Sliding window attention window size. If not specified, will default to `4096`.
+    attention_dropout (`float`, *optional*, defaults to 0.0):
+        The dropout ratio for the attention probabilities.
+    num_experts_per_tok (`int`, *optional*, defaults to 2):
+        The number of experts to root per-token, can be also interpreted as the `top-p` routing
+        parameter
+    num_local_experts (`int`, *optional*, defaults to 8):
+        Number of experts per Sparse MLP layer.
+    output_router_logits (`bool`, *optional*, defaults to `False`):
+        Whether or not the router logits should be returned by the model. Enabeling this will also
+        allow the model to output the auxiliary loss. See `here <>`__ for more details
+    router_aux_loss_coef (`float`, *optional*, defaults to 0.001):
+        The aux loss factor for the total loss.
+
+::
+
+>>> from transformers import MixtralModel, MixtralConfig
+
+>>> # Initializing a Mixtral 7B style configuration
+>>> configuration = MixtralConfig()
+
+>>> # Initializing a model from the Mixtral 7B style configuration
+>>> model = MixtralModel(configuration)
+
+>>> # Accessing the model configuration
+>>> configuration = model.config
+
 .. class:: transformers.models.mobilebert.configuration_mobilebert.MobileBertConfig(vocab_size=30522, hidden_size=512, num_hidden_layers=24, num_attention_heads=4, intermediate_size=512, hidden_act='relu', hidden_dropout_prob=0.0, attention_probs_dropout_prob=0.1, max_position_embeddings=512, type_vocab_size=2, initializer_range=0.02, layer_norm_eps=1e-12, pad_token_id=0, embedding_size=128, trigram_input=True, use_bottleneck=True, intra_bottleneck_size=128, use_bottleneck_attention=False, key_query_shared_bottleneck=True, num_feedforward_networks=4, normalization_type='no_norm', classifier_activation=True, classifier_dropout=None, **kwargs)
 
 The MobileBERT model was proposed in `MobileBERT: a Compact Task-Agnostic BERT for Resource-Limited Devices <https://arxiv.org/abs/2004.02984>`__ by Zhiqing Sun, Hongkun Yu, Xiaodan Song, Renjie Liu, Yiming Yang, and Denny
@@ -3385,7 +3476,7 @@ The abstract from the paper is the following:
 
 *Natural Language Processing (NLP) has recently achieved great success by using huge pre-trained models with hundreds
 of millions of parameters. However, these models suffer from heavy model sizes and high latency such that they cannot
-be served to resource-limited mobile devices. In this paper, we propose MobileBERT for compressing and accelerating
+be deployed to resource-limited mobile devices. In this paper, we propose MobileBERT for compressing and accelerating
 the popular BERT model. Like the original BERT, MobileBERT is task-agnostic, that is, it can be generically applied to
 various downstream NLP tasks via simple fine-tuning. Basically, MobileBERT is a thin version of BERT_LARGE, while
 equipped with bottleneck structures and a carefully designed balance between self-attentions and feed-forward networks.
@@ -3587,7 +3678,7 @@ The MRA model was proposed in `Multi Resolution Analysis (MRA) for Approximate S
 
 The abstract from the paper is the following:
 
-*Transformers have emerged as a preferred model for many tasks in natural langugage processing and vision. Recent efforts on training and serving Transformers more efficiently have identified many strategies to approximate the self-attention matrix, a key module in a Transformer architecture. Effective ideas include various prespecified sparsity patterns, low-rank basis expansions and combinations thereof. In this paper, we revisit classical Multiresolution Analysis (MRA) concepts such as Wavelets, whose potential value in this setting remains underexplored thus far. We show that simple approximations based on empirical feedback and design choices informed by modern hardware and implementation challenges, eventually yield a MRA-based approach for self-attention with an excellent performance profile across most criteria of interest. We undertake an extensive set of experiments and demonstrate that this multi-resolution scheme outperforms most efficient self-attention proposals and is favorable for both short and long sequences. Code is available at https://github.com/mlpen/mra-attention.*
+*Transformers have emerged as a preferred model for many tasks in natural langugage processing and vision. Recent efforts on training and deploying Transformers more efficiently have identified many strategies to approximate the self-attention matrix, a key module in a Transformer architecture. Effective ideas include various prespecified sparsity patterns, low-rank basis expansions and combinations thereof. In this paper, we revisit classical Multiresolution Analysis (MRA) concepts such as Wavelets, whose potential value in this setting remains underexplored thus far. We show that simple approximations based on empirical feedback and design choices informed by modern hardware and implementation challenges, eventually yield a MRA-based approach for self-attention with an excellent performance profile across most criteria of interest. We undertake an extensive set of experiments and demonstrate that this multi-resolution scheme outperforms most efficient self-attention proposals and is favorable for both short and long sequences. Code is available at https://github.com/mlpen/mra-attention.*
 
 This model was contributed by `novice03 <https://huggingface.co/novice03>`__.
 The original code can be found `here <https://github.com/mlpen/mra-attention>`__.
@@ -4318,6 +4409,63 @@ Args:
     partial_rotary_factor (`float`, *optional*, default to 0.5):
         Percentage of the query and keys which will have rotary embedding.
 
+.. class:: transformers.models.phi.configuration_phi.PhiConfig(vocab_size=51200, hidden_size=2048, intermediate_size=8192, num_hidden_layers=24, num_attention_heads=32, resid_pdrop=0.0, embd_pdrop=0.0, attention_dropout=0.0, hidden_act='gelu_new', max_position_embeddings=2048, initializer_range=0.02, layer_norm_eps=1e-05, use_cache=True, tie_word_embeddings=False, rope_theta=10000.0, rope_scaling=None, partial_rotary_factor=0.5, qk_layernorm=False, bos_token_id=1, eos_token_id=2, **kwargs)
+
+The Phi-1 model was proposed in `Textbooks Are All You Need <https://arxiv.org/abs/2306.11644>`__ by Suriya Gunasekar, Yi Zhang, Jyoti Aneja, Caio César Teodoro Mendes, Allie Del Giorno, Sivakanth Gopi, Mojan Javaheripi, Piero Kauffmann, Gustavo de Rosa, Olli Saarikivi, Adil Salim, Shital Shah, Harkirat Singh Behl, Xin Wang, Sébastien Bubeck, Ronen Eldan, Adam Tauman Kalai, Yin Tat Lee and Yuanzhi Li.
+
+The Phi-1.5 model was proposed in `Textbooks Are All You Need II: phi-1.5 technical report <https://arxiv.org/abs/2309.05463>`__ by Yuanzhi Li, Sébastien Bubeck, Ronen Eldan, Allie Del Giorno, Suriya Gunasekar and Yin Tat Lee.
+
+#Args:
+    vocab_size (`int`, *optional*, defaults to 51200):
+        Vocabulary size of the Phi model. Defines the number of different tokens that can be represented by the
+        `inputs_ids` passed when calling ``PhiModel``.
+    hidden_size (`int`, *optional*, defaults to 2048):
+        Dimension of the hidden representations.
+    intermediate_size (`int`, *optional*, defaults to 8192):
+        Dimension of the MLP representations.
+    num_hidden_layers (`int`, *optional*, defaults to 24):
+        Number of hidden layers in the Transformer decoder.
+    num_attention_heads (`int`, *optional*, defaults to 32):
+        Number of attention heads for each attention layer in the Transformer decoder.
+    resid_pdrop (`float`, *optional*, defaults to 0.0):
+        Dropout probability for mlp outputs.
+    embd_pdrop (`int`, *optional*, defaults to 0.0):
+        The dropout ratio for the embeddings.
+    attention_dropout (`float`, *optional*, defaults to 0.0):
+        The dropout ratio after computing the attention scores.
+    hidden_act (`str` or `function`, *optional*, defaults to `"gelu_new"`):
+        The non-linear activation function (function or string) in the decoder.
+    max_position_embeddings (`int`, *optional*, defaults to 2048):
+        The maximum sequence length that this model might ever be used with. Phi-1 and Phi-1.5 supports up to 2048
+        tokens.
+    initializer_range (`float`, *optional*, defaults to 0.02):
+        The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
+    layer_norm_eps (`float`, *optional*, defaults to 1e-05):
+        The epsilon used by the rms normalization layers.
+    use_cache (`bool`, *optional*, defaults to `True`):
+        Whether or not the model should return the last key/values attentions (not used by all models). Only
+        relevant if `config.is_decoder=True`. Whether to tie weight embeddings or not.
+    tie_word_embeddings (`bool`, *optional*, defaults to `False`):
+        Whether to tie weight embeddings
+    rope_theta (`float`, *optional*, defaults to 10000.0):
+        The base period of the RoPE embeddings.
+    rope_scaling (`Dict`, *optional*):
+        Dictionary containing the scaling configuration for the RoPE embeddings. Currently supports two scaling
+        strategies: linear and dynamic. Their scaling factor must be an float greater than 1. The expected format
+        is `{"type": strategy name, "factor": scaling factor}`. When using this flag, don't update
+        `max_position_embeddings` to the expected new maximum. See the following thread for more information on how
+        these scaling strategies behave:
+        https://www.reddit.com/r/LocalPersimmon/comments/14mrgpr/dynamically_scaled_rope_further_increases/. This
+        is an experimental feature, subject to breaking API changes in future versions.
+    partial_rotary_factor (`float`, *optional*, defaults to 0.5):
+        Percentage of the query and keys which will have rotary embedding.
+    qk_layernorm (`bool`, *optional*, defaults to `False`):
+        Whether or not to normalize the Queries and Keys after projecting the hidden states
+    bos_token_id (`int`, *optional*, defaults to 1):
+        Denotes beginning of sequences token id.
+    eos_token_id (`int`, *optional*, defaults to 2):
+        Denotes end of sequences token id.
+
 .. class:: transformers.models.plbart.configuration_plbart.PLBartConfig(vocab_size=50005, max_position_embeddings=1024, encoder_layers=6, encoder_ffn_dim=3072, encoder_attention_heads=12, decoder_layers=6, decoder_ffn_dim=3072, decoder_attention_heads=12, encoder_layerdrop=0.0, decoder_layerdrop=0.0, use_cache=True, is_encoder_decoder=True, activation_function='gelu', d_model=768, dropout=0.1, attention_dropout=0.1, activation_dropout=0.0, init_std=0.02, classifier_dropout=0.0, scale_embedding=True, pad_token_id=1, bos_token_id=0, eos_token_id=2, forced_eos_token_id=2, **kwargs)
 
 of PLBart
@@ -4770,9 +4918,8 @@ The original code can be found `here <https://github.com/princeton-nlp/DinkyTrai
 
 Args:
     vocab_size (`int`, *optional*, defaults to 50265):
-        Vocabulary size of the RoBERTa-PreLayerNorm model. Defines the number of different tokens that can be
-        represented by the `inputs_ids` passed when calling ``RobertaPreLayerNormModel`` or
-        ``TFRobertaPreLayerNormModel``.
+        Vocabulary size of the RoBERTa-PreLayerNorm model. Defines the number of different tokens that can be represented by the
+        `inputs_ids` passed when calling ``RobertaPreLayerNormModel`` or ``TFRobertaPreLayerNormModel``.
     hidden_size (`int`, *optional*, defaults to 768):
         Dimensionality of the encoder layers and the pooler layer.
     num_hidden_layers (`int`, *optional*, defaults to 12):
@@ -4792,8 +4939,7 @@ Args:
         The maximum sequence length that this model might ever be used with. Typically set this to something large
         just in case (e.g., 512 or 1024 or 2048).
     type_vocab_size (`int`, *optional*, defaults to 2):
-        The vocabulary size of the `token_type_ids` passed when calling ``RobertaPreLayerNormModel`` or
-        ``TFRobertaPreLayerNormModel``.
+        The vocabulary size of the `token_type_ids` passed when calling ``RobertaPreLayerNormModel`` or ``TFRobertaPreLayerNormModel``.
     initializer_range (`float`, *optional*, defaults to 0.02):
         The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
     layer_norm_eps (`float`, *optional*, defaults to 1e-12):
@@ -5354,7 +5500,7 @@ Arguments:
     use_cache (`bool`, *optional*, defaults to `True`):
         Whether or not the model should return the last key/values attentions (not used by all models).
 
-.. class:: transformers.models.transfo_xl.configuration_transfo_xl.TransfoXLConfig(vocab_size=267735, cutoffs=[20000, 40000, 200000], d_model=1024, d_embed=1024, n_head=16, d_head=64, d_inner=4096, div_val=4, pre_lnorm=False, n_layer=18, mem_len=1600, clamp_len=1000, same_length=True, proj_share_all_but_first=True, attn_type=0, sample_softmax=-1, adaptive=True, dropout=0.1, dropatt=0.0, untie_r=True, init='normal', init_range=0.01, proj_init_std=0.01, init_std=0.02, layer_norm_epsilon=1e-05, eos_token_id=0, **kwargs)
+.. class:: transformers.models.deprecated.transfo_xl.configuration_transfo_xl.TransfoXLConfig(vocab_size=267735, cutoffs=[20000, 40000, 200000], d_model=1024, d_embed=1024, n_head=16, d_head=64, d_inner=4096, div_val=4, pre_lnorm=False, n_layer=18, mem_len=1600, clamp_len=1000, same_length=True, proj_share_all_but_first=True, attn_type=0, sample_softmax=-1, adaptive=True, dropout=0.1, dropatt=0.0, untie_r=True, init='normal', init_range=0.01, proj_init_std=0.01, init_std=0.02, layer_norm_epsilon=1e-05, eos_token_id=0, **kwargs)
 
 The Transformer-XL model was proposed in `Transformer-XL: Attentive Language Models Beyond a Fixed-Length Context <https://arxiv.org/abs/1901.02860>`__ by Zihang Dai, Zhilin Yang, Yiming Yang, Jaime Carbonell, Quoc V. Le, Ruslan
 Salakhutdinov. It's a causal (uni-directional) transformer with relative positioning (sinusoïdal) embeddings which can
@@ -5429,7 +5575,7 @@ Args:
         Whether or not to use adaptive softmax.
     dropout (`float`, *optional*, defaults to 0.1):
         The dropout probability for all fully connected layers in the embeddings, encoder, and pooler.
-    dropatt (`float`, *optional*, defaults to 0):
+    dropatt (`float`, *optional*, defaults to 0.0):
         The dropout ratio for the attention probabilities.
     untie_r (`boolean`, *optional*, defaults to `True`):
         Whether ot not to untie relative position biases.
@@ -5441,8 +5587,10 @@ Args:
         Parameters initialized by N(0, init_std)
     init_std (`float`, *optional*, defaults to 0.02):
         Parameters initialized by N(0, init_std)
-    layer_norm_epsilon (`float`, *optional*, defaults to 1e-5):
+    layer_norm_epsilon (`float`, *optional*, defaults to 1e-05):
         The epsilon to use in the layer normalization layers
+    eos_token_id (`int`, *optional*, defaults to 0):
+        End of stream token id.
 
 .. class:: transformers.models.visual_bert.configuration_visual_bert.VisualBertConfig(vocab_size=30522, hidden_size=768, visual_embedding_dim=512, num_hidden_layers=12, num_attention_heads=12, intermediate_size=3072, hidden_act='gelu', hidden_dropout_prob=0.1, attention_probs_dropout_prob=0.1, max_position_embeddings=512, type_vocab_size=2, initializer_range=0.02, layer_norm_eps=1e-12, bypass_transformer=False, special_visual_initialize=True, pad_token_id=1, bos_token_id=0, eos_token_id=2, **kwargs)
 
@@ -6044,7 +6192,7 @@ attention mechanism based on Locality Sensitive Hashing (LSH), decreases the qua
 We bypass the quadratic cost by considering self-attention as a sum of individual tokens associated with Bernoulli random 
 variables that can, in principle, be sampled at once by a single hash (although in practice, this number may be a small constant). 
 This leads to an efficient sampling scheme to estimate self-attention which relies on specific modifications of 
-LSH (to enable serving on GPU architectures). We evaluate our algorithm on the GLUE benchmark with standard 512 sequence
+LSH (to enable deployment on GPU architectures). We evaluate our algorithm on the GLUE benchmark with standard 512 sequence 
 length where we see favorable performance relative to a standard pretrained Transformer. On the Long Range Arena (LRA) benchmark, 
 for evaluating performance on long sequences, our method achieves results consistent with softmax self-attention but with sizable 
 speed-ups and memory savings and often outperforms other efficient self-attention methods. Our code is available at this https URL*

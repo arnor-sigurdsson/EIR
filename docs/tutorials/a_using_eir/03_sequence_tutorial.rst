@@ -299,8 +299,8 @@ the moderately active class, we see:
     Remember that this does not necessarily tell us anything about actual
     biological causality!
 
-E - Deployment
---------------
+E - Serving
+-----------
 
 In this final section, we demonstrate serving our trained model
 as a web service and interacting with it using HTTP requests.

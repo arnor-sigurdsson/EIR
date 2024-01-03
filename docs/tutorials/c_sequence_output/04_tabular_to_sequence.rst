@@ -142,8 +142,8 @@ This will save the results in the specified ``--output_folder``. While we do eva
 the loss, it's perhaps more interesting to look at the generated sequences as well as
 the latent sampling, available in the ``results`` and ``latents`` folders, respectively.
 
-F - Deployment
---------------
+F - Serving
+-----------
 
 In this final section, we demonstrate serving our trained model for protein sequence generation with tabular inputs as a web service and interacting with it using HTTP requests.
 

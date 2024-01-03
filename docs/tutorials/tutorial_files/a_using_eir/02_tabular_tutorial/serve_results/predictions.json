@@ -1,44 +1,33 @@
 [
     {
         "request": {
-            "imdb_reviews": "This move was great! I loved it!"
-        },
-        "response": {
-            "result": {
-                "imdb_output": {
-                    "Sentiment": {
-                        "Negative": 0.015489818528294563,
-                        "Positive": 0.9845102429389954
-                    }
-                }
+            "poker_hands": {
+                "S1": "3",
+                "C1": "12",
+                "S2": "3",
+                "C2": "2",
+                "S3": "3",
+                "C3": "11",
+                "S4": "4",
+                "C4": "5",
+                "S5": "2",
+                "C5": "5"
             }
-        }
-    },
-    {
-        "request": {
-            "imdb_reviews": "This move was terrible! I hated it!"
         },
         "response": {
             "result": {
-                "imdb_output": {
-                    "Sentiment": {
-                        "Negative": 0.9004154801368713,
-                        "Positive": 0.09958454966545105
-                    }
-                }
-            }
-        }
-    },
-    {
-        "request": {
-            "imdb_reviews": "You'll have to have your wits about you and your brain fully switched on watching Oppenheimer as it could easily get away from a nonattentive viewer. This is intelligent filmmaking which shows it's audience great respect. It fires dialogue packed with information at a relentless pace and jumps to very different times in Oppenheimer's life continuously through it's 3 hour runtime. There are visual clues to guide the viewer through these times but again you'll have to get to grips with these quite quickly. This relentlessness helps to express the urgency with which the US attacked it's chase for the atomic bomb before Germany could do the same. An absolute career best performance from (the consistenly brilliant) Cillian Murphy anchors the film. "
-        },
-        "response": {
-            "result": {
-                "imdb_output": {
-                    "Sentiment": {
-                        "Negative": 0.08171583712100983,
-                        "Positive": 0.9182841181755066
+                "poker_prediction": {
+                    "CLASS": {
+                        "0": 3.670288961643564e-08,
+                        "1": 0.9927617907524109,
+                        "2": 0.00012372664059512317,
+                        "3": 0.007051416207104921,
+                        "4": 1.1847131275999345e-08,
+                        "5": 2.9717891720792977e-06,
+                        "6": 1.7033452195391874e-06,
+                        "7": 2.951494388980791e-05,
+                        "8": 1.3575507182395086e-05,
+                        "9": 1.5261475709849037e-05
                     }
                 }
             }

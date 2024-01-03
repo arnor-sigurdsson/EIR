@@ -114,8 +114,8 @@ While these are not perfect translations,
 they are maybe not too bad considering a simple model trained
 for around an hour on a laptop.
 
-C - Deployment
---------------
+C - Serving
+-----------
 
 In this final section, we demonstrate serving our trained model for sequence-to-sequence translation as a web service and interacting with it using HTTP requests.
 

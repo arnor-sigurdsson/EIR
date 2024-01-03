@@ -94,8 +94,8 @@ is still decreasing, we could train the model
 for longer, try a larger model, use larger images,
 or use a larger dataset.
 
-D - Deployment
---------------
+D - Serving
+-----------
 
 In this final section, we demonstrate serving our trained image captioning model as a web service and interacting with it using HTTP requests.
 

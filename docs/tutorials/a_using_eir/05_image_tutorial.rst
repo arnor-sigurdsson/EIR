@@ -206,8 +206,8 @@ on the french fries
 when deciding that this is indeed,
 not a hot dog.
 
-D - Deployment
---------------
+D - Serving
+-----------
 
 In this final section, we demonstrate serving our trained image classification model
 as a web service and interacting with it using HTTP requests.

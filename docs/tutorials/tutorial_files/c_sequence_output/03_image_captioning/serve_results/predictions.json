@@ -6,7 +6,7 @@
         },
         "response": {
             "result": {
-                "captions": "a number of food items on a white plate"
+                "captions": "a close up of a plate of rice and broccoli "
             }
         }
     },
@@ -17,7 +17,7 @@
         },
         "response": {
             "result": {
-                "captions": "The zebra is running along the grass next to the bush."
+                "captions": "Two zebras standing next to each other on a field."
             }
         }
     },
@@ -28,7 +28,7 @@
         },
         "response": {
             "result": {
-                "captions": "A horse grazes on grass in a grassy area."
+                "captions": "A horse that is grazing in the grass."
             }
         }
     }

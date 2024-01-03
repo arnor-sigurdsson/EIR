@@ -188,8 +188,8 @@ obvious, the generated images of the same class are not completely identical
 due to some stochasticity injected into the model.
 
 
-D - Deployment
---------------
+D - Serving
+-----------
 
 In this final section, we demonstrate serving our trained model for MNIST array generation as a web service and interacting with it using HTTP requests.
 
