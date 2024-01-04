@@ -68,6 +68,7 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
         experiment_metrics=exp.metrics,
         loss_function=exp.loss_function,
         device=gc.device,
+        missing_ids_per_output=exp.valid_dataset.missing_ids_per_output,
         with_labels=True,
     )
 
@@ -235,6 +236,7 @@ def run_split_evaluation(
     experiment_metrics: metrics.al_metric_record_dict,
     loss_function: Callable,
     device: str,
+    missing_ids_per_output: dict[str, set[str]],
     with_labels: bool = True,
 ) -> EvaluationResults:
     """
@@ -309,9 +311,19 @@ def run_split_evaluation(
 
     full_gathered_metrics = {}
     if with_labels and len(split_output_objects.gather) > 0:
+        (
+            model_outputs_filtered,
+            target_labels_filtered,
+        ) = metrics.filter_missing_outputs_and_labels(
+            batch_ids=full_gathered_ids_total,
+            model_outputs=full_gathered_output_batches_stacked,
+            target_labels=full_gathered_label_batches_stacked,
+            missing_ids_per_output=missing_ids_per_output,
+        )
+
         full_gathered_metrics = compute_eval_metrics_wrapper(
-            val_outputs=full_gathered_output_batches_stacked,
-            val_target_labels=full_gathered_label_batches_stacked,
+            val_outputs=model_outputs_filtered,
+            val_target_labels=target_labels_filtered,
             outputs=split_output_objects.gather,
             experiment_metrics=experiment_metrics,
             loss_function=loss_function,
@@ -406,6 +418,7 @@ def compute_eval_metrics_wrapper(
     val_target_labels = model_training_utils.parse_tabular_target_labels(
         output_objects=outputs, device=device, labels=val_target_labels
     )
+
     eval_metrics_dict = metrics.calculate_batch_metrics(
         outputs_as_dict=outputs,
         outputs=val_outputs,

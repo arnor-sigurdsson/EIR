@@ -27,6 +27,7 @@ from eir.setup.schemas import (
 from eir.target_setup.target_label_setup import (
     df_to_nested_dict,
     gather_data_pointers_from_data_source,
+    gather_torch_nan_missing_ids,
     get_tabular_target_file_infos,
 )
 
@@ -45,6 +46,7 @@ class PredictTargetLabels:
 class MergedPredictTargetLabels:
     label_dict: al_target_label_dict
     label_transformers: dict[str, dict[str, al_label_transformers]]
+    missing_ids_per_output: dict[str, set[str]]
 
     @property
     def all_labels(self):
@@ -167,6 +169,8 @@ def get_target_labels_for_testing(
 
     df_labels_test = pd.DataFrame(index=list(ids))
     tabular_label_transformers = {}
+    all_ids: set[str] = set(ids)
+    missing_ids: dict[str, set[str]] = {}
 
     tabular_target_files_info = get_tabular_target_file_infos(
         output_configs=pc.output_configs
@@ -188,16 +192,30 @@ def get_target_labels_for_testing(
                 )
                 tabular_label_transformers[output_name] = cur_labels.label_transformers
 
+                missing_ids[output_name] = all_ids.difference(
+                    set(cur_labels.all_labels.keys())
+                )
+
             case ArrayOutputTypeConfig():
                 cur_labels = _set_up_predict_file_target_labels(
                     ids=ids,
                     output_config=output_config,
                 )
 
+                cur_missing_ids = gather_torch_nan_missing_ids(
+                    labels=cur_labels.all_labels,
+                    output_name=output_name,
+                )
+                missing_ids[output_name] = cur_missing_ids
+
             case SequenceOutputTypeConfig():
                 cur_labels = set_up_delayed_predict_target_labels(
                     ids=ids,
                     output_name=output_name,
+                )
+
+                missing_ids[output_name] = all_ids.difference(
+                    set(cur_labels.all_labels.keys())
                 )
 
             case _:
@@ -220,6 +238,7 @@ def get_target_labels_for_testing(
     test_labels_object = MergedPredictTargetLabels(
         label_dict=test_labels_dict,
         label_transformers=tabular_label_transformers,
+        missing_ids_per_output=missing_ids,
     )
 
     return test_labels_object

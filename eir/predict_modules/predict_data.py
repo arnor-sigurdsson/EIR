@@ -13,12 +13,14 @@ def set_up_default_dataset(
     target_labels_dict: Union[None, al_target_label_dict],
     inputs_as_dict: al_input_objects_as_dict,
     outputs_as_dict: al_output_objects_as_dict,
+    missing_ids_per_output: dict[str, set[str]],
 ) -> al_datasets:
     test_dataset_kwargs = datasets.construct_default_dataset_kwargs_from_cl_args(
         target_labels_dict=target_labels_dict,
         outputs=outputs_as_dict,
         inputs=inputs_as_dict,
         test_mode=True,
+        missing_ids_per_output=missing_ids_per_output,
     )
 
     test_dataset = datasets.DiskDataset(**test_dataset_kwargs)

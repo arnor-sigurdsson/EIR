@@ -72,6 +72,9 @@ def create_test_data(request, tmp_path_factory, parse_test_cl_args) -> "TestData
             _delete_random_files_from_folder(
                 folder=sequence_sample_folder, n_to_drop=50
             )
+            sequence_csv = base_outfolder / "sequence.csv"
+            _delete_random_rows_from_csv(csv_file=sequence_csv, n_to_drop=50)
+
     arrays_path = base_outfolder / "array"
     if "array" in test_data_config.modalities and not arrays_path.exists():
         array_sample_folder = create_test_array_data_and_labels(

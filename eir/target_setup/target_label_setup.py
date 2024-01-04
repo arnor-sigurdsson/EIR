@@ -1,3 +1,4 @@
+import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, Iterable, Optional, Sequence, Tuple, Union
@@ -44,25 +45,26 @@ def set_up_all_targets_wrapper(
     logger.info("Setting up target labels.")
 
     custom_ops = hooks.custom_column_label_parsing_ops if hooks else None
-    supervised_target_labels = set_up_all_target_labels_wrapper(
+    target_labels = set_up_all_target_labels_wrapper(
         output_configs=output_configs,
         custom_label_ops=custom_ops,
         train_ids=train_ids,
         valid_ids=valid_ids,
     )
     save_transformer_set(
-        transformers_per_source=supervised_target_labels.label_transformers,
+        transformers_per_source=target_labels.label_transformers,
         run_folder=run_folder,
     )
 
-    return supervised_target_labels
+    return target_labels
 
 
 @dataclass
 class MergedTargetLabels:
     train_labels: al_target_label_dict
     valid_labels: al_target_label_dict
-    label_transformers: Dict[str, al_label_transformers]
+    label_transformers: dict[str, al_label_transformers]
+    missing_ids_per_output: dict[str, set[str]]
 
     @property
     def all_labels(self):
@@ -75,9 +77,27 @@ def set_up_all_target_labels_wrapper(
     train_ids: Sequence[str],
     valid_ids: Sequence[str],
 ) -> MergedTargetLabels:
+    """
+    We have different ways of setting up the missing labels information depending
+    on the output type.
+
+    For tabular, we have a csv file with the labels, so we can just read that in.
+    Missing rows in the csv file are not included, and we can directly infer
+    the missing IDs from full set of IDs compared to the IDs in the csv file.
+
+    For sequence, the labels are computed on the fly during training, so we
+    simply set up a dictionary with the IDs as keys and torch.nan as values.
+    TODO:   Fill out the values here with the actual labels depending on available
+            files / rows in sequence input .csv.
+
+    For array, we read what files are available on the disk, and flag the missing
+    ones as torch.nan.
+    """
     df_labels_train = pd.DataFrame(index=list(train_ids))
     df_labels_valid = pd.DataFrame(index=list(valid_ids))
     label_transformers = {}
+    all_ids: set[str] = set(train_ids).union(set(valid_ids))
+    missing_ids: dict[str, set[str]] = {}
 
     tabular_target_labels_info = get_tabular_target_file_infos(
         output_configs=output_configs
@@ -98,11 +118,20 @@ def set_up_all_target_labels_wrapper(
                 )
                 cur_transformers = cur_labels.label_transformers
                 label_transformers[output_name] = cur_transformers
+
+                missing_ids[output_name] = all_ids.difference(
+                    set(cur_labels.all_labels.keys())
+                )
+
             case "sequence":
                 cur_labels = set_up_delayed_target_labels(
                     train_ids=train_ids,
                     valid_ids=valid_ids,
                     output_name=output_name,
+                )
+
+                missing_ids[output_name] = all_ids.difference(
+                    set(cur_labels.all_labels.keys())
                 )
 
             case "array":
@@ -111,6 +140,12 @@ def set_up_all_target_labels_wrapper(
                     valid_ids=valid_ids,
                     output_config=output_config,
                 )
+
+                cur_missing_ids = gather_torch_nan_missing_ids(
+                    labels=cur_labels.all_labels,
+                    output_name=output_name,
+                )
+                missing_ids[output_name] = cur_missing_ids
 
             case _:
                 raise ValueError(f"Unknown output type: '{output_type}'.")
@@ -137,6 +172,7 @@ def set_up_all_target_labels_wrapper(
         train_labels=train_labels_dict,
         valid_labels=valid_labels_dict,
         label_transformers=label_transformers,
+        missing_ids_per_output=missing_ids,
     )
 
     return labels_data_object
@@ -168,6 +204,11 @@ def set_up_file_target_labels(
     valid_ids: Sequence[str],
     output_config: schemas.OutputConfig,
 ) -> Labels:
+    """
+    Note we have the .get(id_, torch.nan) here because we want to be able to
+    handle if we have partially missing output modalities, e.g. in the case
+    of output arrays, but we don't want to just drop those IDs.
+    """
     output_name = output_config.output_info.output_name
     output_source = output_config.output_info.output_source
 
@@ -178,12 +219,14 @@ def set_up_file_target_labels(
 
     train_ids_set = set(train_ids)
     train_labels: al_label_dict = {
-        id_: {output_name: id_to_data_pointer_mapping[id_]} for id_ in train_ids_set
+        id_: {output_name: id_to_data_pointer_mapping.get(id_, torch.nan)}
+        for id_ in train_ids_set
     }
 
     valid_ids_set = set(valid_ids)
     valid_labels: al_label_dict = {
-        id_: {output_name: id_to_data_pointer_mapping[id_]} for id_ in valid_ids_set
+        id_: {output_name: id_to_data_pointer_mapping.get(id_, torch.nan)}
+        for id_ in valid_ids_set
     }
 
     return Labels(
@@ -191,6 +234,16 @@ def set_up_file_target_labels(
         valid_labels=valid_labels,
         label_transformers={},
     )
+
+
+def gather_torch_nan_missing_ids(labels: al_label_dict, output_name: str) -> set[str]:
+    missing_ids = set()
+    for id_, label in labels.items():
+        cur_label = label[output_name]
+        if isinstance(cur_label, float) and math.isnan(cur_label):
+            missing_ids.add(id_)
+
+    return missing_ids
 
 
 def gather_data_pointers_from_data_source(
@@ -222,24 +275,26 @@ def gather_data_pointers_from_data_source(
 
 def df_to_nested_dict(
     df: pd.DataFrame,
-) -> dict[str, dict[str, dict[str, float | int | Path]]]:
+) -> Dict[str, Dict[str, Dict[str, Union[float, int, Path]]]]:
     """
-    The df has a 2-level multi index, like so ['ID', output_name]
+    Convert a DataFrame with a 2-level multi index ['ID', 'Output Name']
+    to a nested dict.
 
-    We want to convert it to a nested dict like so:
+    The resulting structure is
 
-        {'ID': {output_name: {target_output_column: target_column_value}}}
+    {'ID': {output_name: {inner_output_identifier: inner_output_value}}}.
+
+    For each output_name, only relevant columns are included.
     """
-    index_dict = df.to_dict(orient="index")
+    parsed_dict: Dict[str, Dict[str, Dict[str, Union[float, int, Path]]]] = {}
 
-    parsed_dict: dict[str, dict[str, dict[str, float | int | Path]]] = {}
-    for key_tuple, value in index_dict.items():
-        cur_id, cur_output_name = key_tuple
-
+    for (cur_id, cur_output_name), group_df in df.groupby(level=[0, 1]):
         if cur_id not in parsed_dict:
             parsed_dict[cur_id] = {}
 
-        parsed_dict[cur_id][cur_output_name] = value
+        filtered_dict = group_df.dropna(axis=1, how="all").to_dict(orient="records")[0]
+
+        parsed_dict[cur_id][cur_output_name] = filtered_dict
 
     return parsed_dict
 

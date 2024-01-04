@@ -51,6 +51,7 @@ from eir.train_utils.metrics import (
     add_multi_task_average_metrics,
     aggregate_losses,
     calculate_batch_metrics,
+    filter_missing_outputs_and_labels,
     get_uncertainty_loss_hook,
     hook_add_l1_loss,
 )
@@ -579,11 +580,25 @@ def maybe_update_model_parameters_with_swa(
 
 def hook_default_compute_metrics(
     experiment: "Experiment", batch: "Batch", state: Dict, *args, **kwargs
-):
+) -> dict[str, Any]:
+    model_outputs = state["model_outputs"]
+    target_labels = batch.target_labels
+    ids = batch.ids
+
+    (
+        model_outputs_filtered,
+        target_labels_filtered,
+    ) = filter_missing_outputs_and_labels(
+        batch_ids=ids,
+        model_outputs=model_outputs,
+        target_labels=target_labels,
+        missing_ids_per_output=experiment.valid_dataset.missing_ids_per_output,
+    )
+
     train_batch_metrics = calculate_batch_metrics(
         outputs_as_dict=experiment.outputs,
-        outputs=state["model_outputs"],
-        labels=batch.target_labels,
+        outputs=model_outputs_filtered,
+        labels=target_labels_filtered,
         mode="train",
         metric_record_dict=experiment.metrics,
     )
@@ -608,11 +623,25 @@ def hook_default_compute_metrics(
 
 def hook_default_per_target_loss(
     experiment: "Experiment", batch: "Batch", state: Dict, *args, **kwargs
-) -> Dict:
+) -> dict[str, Any]:
     context_manager = get_maybe_amp_context_manager_from_state(state=state)
     with context_manager:
+        model_outputs = state["model_outputs"]
+        target_labels = batch.target_labels
+        ids = batch.ids
+
+        (
+            model_outputs_filtered,
+            target_labels_filtered,
+        ) = filter_missing_outputs_and_labels(
+            batch_ids=ids,
+            model_outputs=model_outputs,
+            target_labels=target_labels,
+            missing_ids_per_output=experiment.valid_dataset.missing_ids_per_output,
+        )
+
         per_target_train_losses = experiment.loss_function(
-            inputs=state["model_outputs"], targets=batch.target_labels
+            inputs=model_outputs_filtered, targets=target_labels_filtered
         )
 
         state_updates = {"per_target_train_losses": per_target_train_losses}

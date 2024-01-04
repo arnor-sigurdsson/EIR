@@ -229,6 +229,7 @@ def test_set_up_test_dataset(
         target_labels_dict=test_target_labels.label_dict,
         inputs_as_dict=test_inputs,
         outputs_as_dict=outputs_as_dict,
+        missing_ids_per_output=test_target_labels.missing_ids_per_output,
     )
 
     classes_tested = sorted(list(test_data_config.target_classes.keys()))

@@ -166,6 +166,7 @@ def predict(
         loss_function=loss_func,
         device=predict_experiment.configs.global_config.device,
         with_labels=predict_cl_args.evaluate,
+        missing_ids_per_output=predict_experiment.test_dataset.missing_ids_per_output,
     )
 
     hook_outputs = deregister_pre_evaluation_hooks(
@@ -270,11 +271,13 @@ def get_default_predict_experiment(
             custom_column_label_parsing_ops=label_ops,
             ids=test_ids,
         )
+        missing_ids_per_output = target_labels.missing_ids_per_output
     else:
         test_ids = label_setup.gather_all_ids_from_all_inputs(
             input_configs=configs_overloaded_for_predict.input_configs
         )
         target_labels = None
+        missing_ids_per_output = {}
 
     test_inputs = set_up_inputs_for_predict(
         test_inputs_configs=configs_overloaded_for_predict.input_configs,
@@ -289,6 +292,7 @@ def get_default_predict_experiment(
         target_labels_dict=label_dict,
         inputs_as_dict=test_inputs,
         outputs_as_dict=loaded_train_experiment.outputs,
+        missing_ids_per_output=missing_ids_per_output,
     )
     predict_batch_size = _auto_set_test_batch_size(
         batch_size=configs_overloaded_for_predict.global_config.batch_size,

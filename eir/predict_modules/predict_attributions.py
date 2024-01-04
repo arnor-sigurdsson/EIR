@@ -176,6 +176,7 @@ def _get_predict_background_loader(
         outputs_as_dict=outputs_as_dict,
         target_labels_dict=target_labels.label_dict,
         inputs_as_dict=background_inputs_as_dict,
+        missing_ids_per_output=target_labels.missing_ids_per_output,
     )
 
     check_dataset_and_batch_size_compatibility(

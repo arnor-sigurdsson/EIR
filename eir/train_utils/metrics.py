@@ -347,14 +347,14 @@ def calculate_prediction_losses(
 
     for output_name, target_dict in inputs.items():
         for output_head_name, input_tensor in target_dict.items():
-            cur_target_col_labels = targets[output_name][output_head_name]
+            cur_inner_target = targets[output_name][output_head_name]
             criterion = criteria[output_name][output_head_name]
 
             if output_name not in losses_dict:
                 losses_dict[output_name] = {}
 
             losses_dict[output_name][output_head_name] = criterion(
-                input=input_tensor, target=cur_target_col_labels
+                input=input_tensor, target=cur_inner_target
             )
 
     return losses_dict
@@ -849,3 +849,50 @@ def get_performance_averaging_functions(
     }
 
     return performance_averaging_functions
+
+
+def filter_missing_outputs_and_labels(
+    batch_ids: Sequence[str],
+    model_outputs: Dict[str, Dict[str, torch.Tensor]],
+    target_labels: Dict[str, Dict[str, torch.Tensor]],
+    missing_ids_per_output: Dict[str, set[str]],
+) -> Tuple[Dict[str, Dict[str, torch.Tensor]], Dict[str, Dict[str, torch.Tensor]]]:
+    filtered_outputs = {}
+    filtered_labels = {}
+
+    for output_name, output_inner_dict in model_outputs.items():
+        missing_ids = missing_ids_per_output.get(output_name, set())
+
+        if not missing_ids:
+            filtered_outputs[output_name] = output_inner_dict
+            filtered_labels[output_name] = target_labels[output_name]
+
+        else:
+            filtered_inner_dict = {}
+            filtered_inner_labels = {}
+
+            valid_indices = [
+                i for i, id_ in enumerate(batch_ids) if id_ not in missing_ids
+            ]
+
+            if not valid_indices:
+                raise ValueError(
+                    f"No valid IDs found for output '{output_name}'. "
+                    "This may be due to the sparsity of this output. "
+                    "Consider increasing the batch size or reviewing the "
+                    "data distribution."
+                )
+
+            valid_indices_tensor = torch.tensor(valid_indices)
+
+            if valid_indices:
+                for inner_key, inner_tensor in output_inner_dict.items():
+                    filtered_inner_dict[inner_key] = inner_tensor[valid_indices_tensor]
+
+                for label, label_tensor in target_labels[output_name].items():
+                    filtered_inner_labels[label] = label_tensor[valid_indices_tensor]
+
+            filtered_outputs[output_name] = filtered_inner_dict
+            filtered_labels[output_name] = filtered_inner_labels
+
+    return filtered_outputs, filtered_labels
