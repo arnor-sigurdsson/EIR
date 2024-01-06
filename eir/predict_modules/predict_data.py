@@ -6,6 +6,7 @@ from eir.data_load.label_setup import al_target_label_dict
 from eir.setup.config import Configs
 from eir.setup.input_setup import al_input_objects_as_dict
 from eir.setup.output_setup import al_output_objects_as_dict
+from eir.target_setup.target_label_setup import MissingTargetsInfo
 
 
 def set_up_default_dataset(
@@ -13,7 +14,7 @@ def set_up_default_dataset(
     target_labels_dict: Union[None, al_target_label_dict],
     inputs_as_dict: al_input_objects_as_dict,
     outputs_as_dict: al_output_objects_as_dict,
-    missing_ids_per_output: dict[str, set[str]],
+    missing_ids_per_output: MissingTargetsInfo,
 ) -> al_datasets:
     test_dataset_kwargs = datasets.construct_default_dataset_kwargs_from_cl_args(
         target_labels_dict=target_labels_dict,

@@ -45,7 +45,8 @@ def latent_analysis_wrapper(
 
 
 def register_latent_hook(
-    model: nn.Module, layer_path: str
+    model: nn.Module,
+    layer_path: str,
 ) -> Callable[["EvaluationResults"], LatentHookOutput]:
     outputs = []
 
@@ -70,9 +71,11 @@ def register_latent_hook(
     ) -> LatentHookOutput:
         handle.remove()
         outputs_arr = np.concatenate(outputs, axis=0)
-        ids = evaluation_results.ids
+        ids = evaluation_results.all_ids
         latent_output_object = LatentHookOutput(
-            outputs=outputs_arr, ids=ids, name=layer_path
+            outputs=outputs_arr,
+            ids=ids,
+            name=layer_path,
         )
         return latent_output_object
 

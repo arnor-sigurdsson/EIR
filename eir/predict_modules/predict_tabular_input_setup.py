@@ -104,10 +104,13 @@ def get_input_labels_for_predict(
         con_label_columns=tabular_file_info.con_columns,
         con_manual_values=train_con_column_means,
         name="test_df",
+        impute_missing=True,
     )
 
     df_labels_test_final = transform_label_df(
-        df_labels=df_labels_test_no_na, label_transformers=loaded_fit_label_transformers
+        df_labels=df_labels_test_no_na,
+        label_transformers=loaded_fit_label_transformers,
+        impute_missing=True,
     )
 
     labels_dict = df_labels_test_final.to_dict("index")

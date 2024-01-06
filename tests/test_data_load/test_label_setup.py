@@ -187,7 +187,9 @@ def test_set_up_all_target_transformers(get_transformer_test_data):
     df_test_labels, test_target_columns_dict = get_transformer_test_data
 
     all_target_transformers = label_setup._get_fit_label_transformers(
-        df_labels=df_test_labels, label_columns=test_target_columns_dict
+        df_labels=df_test_labels,
+        label_columns=test_target_columns_dict,
+        impute_missing=False,
     )
 
     height_transformer = all_target_transformers["Height"]
@@ -203,7 +205,9 @@ def test_fit_scaler_transformer_on_target_column(get_transformer_test_data):
     transformer = label_setup._get_transformer(column_type="con")
 
     height_transformer = label_setup._fit_transformer_on_label_column(
-        column_series=df_test_labels["Height"], transformer=transformer
+        column_series=df_test_labels["Height"],
+        transformer=transformer,
+        impute_missing=False,
     )
 
     assert height_transformer.n_samples_seen_ == 3
@@ -211,13 +215,15 @@ def test_fit_scaler_transformer_on_target_column(get_transformer_test_data):
     assert height_transformer.transform([[170]]) == 0
 
 
-def test_fit_labelencoder_transformer_on_target_column(get_transformer_test_data):
+def test_fit_label_encoder_transformer_on_target_column(get_transformer_test_data):
     df_test_labels, test_target_columns_dict = get_transformer_test_data
 
     transformer = label_setup._get_transformer(column_type="cat")
 
     origin_transformer = label_setup._fit_transformer_on_label_column(
-        column_series=df_test_labels["Origin"], transformer=transformer
+        column_series=df_test_labels["Origin"],
+        transformer=transformer,
+        impute_missing=False,
     )
 
     assert origin_transformer.transform(["Africa"]).item() == 0
@@ -256,10 +262,13 @@ def test_transform_all_labels_in_sample_targets_only(
     target_transformers = label_setup._get_fit_label_transformers(
         df_labels=df_test_labels,
         label_columns=test_target_columns_dict,
+        impute_missing=False,
     )
 
     transformed_df = label_setup.transform_label_df(
-        df_labels=df_test_labels, label_transformers=target_transformers
+        df_labels=df_test_labels,
+        label_transformers=target_transformers,
+        impute_missing=False,
     )
 
     transformed_sample_labels = transformed_df.loc[test_input_key].to_dict()
@@ -288,11 +297,15 @@ def test_transform_all_labels_in_sample_with_extra_con(
 
     test_target_columns_dict["con"].append("Extra_Con")
     label_transformers = label_setup._get_fit_label_transformers(
-        df_labels=df_test_labels, label_columns=test_target_columns_dict
+        df_labels=df_test_labels,
+        label_columns=test_target_columns_dict,
+        impute_missing=False,
     )
 
     df_test_labels_transformed = label_setup.transform_label_df(
-        df_labels=df_test_labels, label_transformers=label_transformers
+        df_labels=df_test_labels,
+        label_transformers=label_transformers,
+        impute_missing=False,
     )
 
     transformed_sample_labels = df_test_labels_transformed.loc[test_input_key].to_dict()
@@ -401,10 +414,10 @@ def test_ensure_categorical_columns_are_str(get_test_nan_df):
     column_dtypes = df_converted.dtypes.to_dict()
 
     for column, dtype in column_dtypes.items():
-        assert isinstance(dtype, pd.CategoricalDtype) or dtype == float
+        assert isinstance(dtype, object) or dtype == float
 
-        if isinstance(dtype, pd.CategoricalDtype):
-            categories = df_converted[column].cat.categories
+        if isinstance(dtype, object) and dtype != float:
+            categories = df_converted[column].unique()
             assert all(isinstance(i, str) for i in categories)
 
 
@@ -525,7 +538,7 @@ def test_get_all_label_columns_and_dtypes(
 
     assert set(columns) == set(expected)
     for column in cat_columns:
-        assert isinstance(dtypes[column], pd.CategoricalDtype)
+        assert isinstance(dtypes[column], object)
     for column in con_columns:
         assert dtypes[column] == float
 
@@ -1128,8 +1141,8 @@ def get_test_nan_df():
     """
     df = pd.DataFrame(
         {
-            "A": pd.Series([np.nan, 3, np.nan, np.nan], dtype="category"),
-            "B": pd.Series([2, 4, np.nan, 3], dtype="category"),
+            "A": pd.Series([np.nan, 3, np.nan, np.nan], dtype="object"),
+            "B": pd.Series([2, 4, np.nan, 3], dtype="object"),
             "C": pd.Series([np.nan, np.nan, np.nan, np.nan], dtype="float"),
             "D": pd.Series([0.0, 1.0, 5.0, 4.0], dtype="float"),
         },
@@ -1158,10 +1171,6 @@ def test_process_train_and_label_dfs(get_test_nan_df, get_test_nan_tabular_file_
     train_df = test_df.copy()
     valid_df = test_df.copy()
 
-    for cat_col in label_info.cat_columns:
-        train_df[cat_col] = train_df[cat_col].cat.add_categories(5)
-        train_df[cat_col] = train_df[cat_col].cat.add_categories("NA")
-
     train_df = train_df.fillna(5)
 
     train_df = label_setup.ensure_categorical_columns_and_format(df=train_df)
@@ -1172,17 +1181,18 @@ def test_process_train_and_label_dfs(get_test_nan_df, get_test_nan_tabular_file_
         tabular_info=label_info,
         df_labels_train=train_df,
         df_labels_valid=valid_df,
+        impute_missing=True,
     )
 
-    assert set(label_transformers["A"].classes_) == {"5", "3", "NA"}
-    assert set(label_transformers["B"].classes_) == {"2", "3", "4", "5", "NA"}
+    assert set(label_transformers["A"].classes_) == {"5", "3", "nan"}
+    assert set(label_transformers["B"].classes_) == {"2", "3", "4", "5", "nan"}
 
     a_t = label_transformers["A"]
     assert set(train_df_filled["A"].unique()) == {0, 1}
     assert set(a_t.inverse_transform(train_df_filled["A"].unique())) == {"5", "3"}
 
     assert set(valid_df_filled["A"].unique()) == {0, 2}
-    assert set(a_t.inverse_transform(valid_df_filled["A"].unique())) == {"NA", "3"}
+    assert set(a_t.inverse_transform(valid_df_filled["A"].unique())) == {"nan", "3"}
 
     b_t = label_transformers["B"]
     assert set(train_df_filled["B"].unique()) == {0, 1, 2, 3}
@@ -1198,7 +1208,7 @@ def test_process_train_and_label_dfs(get_test_nan_df, get_test_nan_tabular_file_
         "2",
         "3",
         "4",
-        "NA",
+        "nan",
     }
 
     assert (train_df_filled["C"] == 0.0).all()
@@ -1218,25 +1228,38 @@ def test_handle_missing_label_values_in_df(
         cat_label_columns=label_info.cat_columns,
         con_label_columns=label_info.con_columns,
         con_manual_values={"C": 3.0},
+        impute_missing=True,
     )
 
-    assert set(test_df_filled["A"].unique()) == {"NA", 3}
-    assert set(test_df_filled["B"].unique()) == {"NA", 2, 3, 4}
+    assert set(test_df_filled["A"].unique()) == {"nan", 3}
+    assert set(test_df_filled["B"].unique()) == {"nan", 2, 3, 4}
     assert (test_df_filled["C"] == 3.0).all()
     assert (test_df_filled["D"] == test_df["D"]).all()
 
 
-@pytest.mark.parametrize("include_missing", [False, True])
+@pytest.mark.parametrize("impute_missing", [False, True])
 def test_fill_categorical_nans(
-    include_missing: bool, get_test_nan_df: pd.DataFrame
+    impute_missing: bool, get_test_nan_df: pd.DataFrame
 ) -> None:
+    """
+    Only when we impute missing do we call df.fillna('nan'), this is the case for
+    inputs where we e.g. actually want to encode them in the tabular input. For
+    targets, we keep them as np.nan as they are never actually used.
+    """
     test_df = get_test_nan_df
     test_df_filled = label_setup._fill_categorical_nans(
-        df=test_df, column_names=["A", "B"], include_missing=include_missing
+        df=test_df,
+        column_names=["A", "B"],
+        impute_missing=impute_missing,
     )
 
-    assert set(test_df_filled["A"].unique()) == {"NA", 3}
-    assert set(test_df_filled["B"].unique()) == {"NA", 2, 3, 4}
+    if impute_missing:
+        assert set(test_df_filled["A"].unique()) == {"nan", 3}
+        assert set(test_df_filled["B"].unique()) == {"nan", 2, 3, 4}
+    else:
+        assert set(test_df_filled["A"].unique()) == {np.nan, 3}
+        assert set(test_df_filled["B"].unique()) == {np.nan, 2, 3, 4}
+
     assert test_df_filled["C"].isna().values.all()
     assert test_df_filled["D"].notna().values.all()
 
@@ -1258,7 +1281,10 @@ def test_fill_continuous_nans(get_test_nan_df):
 
     manual_values = {"A": 1.0, "B": 2.0, "C": 3.0}
     test_df_filled = label_setup._fill_continuous_nans(
-        df=test_df, column_names=["A", "B", "C"], con_means_dict=manual_values
+        df=test_df,
+        column_names=["A", "B", "C"],
+        con_means_dict=manual_values,
+        impute_missing=True,
     )
 
     assert test_df_filled["A"].loc[0] == 1.0

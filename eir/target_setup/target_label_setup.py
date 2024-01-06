@@ -29,6 +29,7 @@ from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeCon
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
+    from eir.predict_modules.predict_target_setup import PredictTargetLabels
     from eir.train import Hooks
 
 
@@ -60,11 +61,17 @@ def set_up_all_targets_wrapper(
 
 
 @dataclass
+class MissingTargetsInfo:
+    missing_ids_per_modality: dict[str, set[str]]
+    missing_ids_within_modality: dict[str, dict[str, set[str]]]
+
+
+@dataclass
 class MergedTargetLabels:
     train_labels: al_target_label_dict
     valid_labels: al_target_label_dict
     label_transformers: dict[str, al_label_transformers]
-    missing_ids_per_output: dict[str, set[str]]
+    missing_ids_per_output: MissingTargetsInfo
 
     @property
     def all_labels(self):
@@ -96,8 +103,10 @@ def set_up_all_target_labels_wrapper(
     df_labels_train = pd.DataFrame(index=list(train_ids))
     df_labels_valid = pd.DataFrame(index=list(valid_ids))
     label_transformers = {}
+
     all_ids: set[str] = set(train_ids).union(set(valid_ids))
-    missing_ids: dict[str, set[str]] = {}
+    per_modality_missing_ids: dict[str, set[str]] = {}
+    within_modality_missing_ids: dict[str, dict[str, set[str]]] = {}
 
     tabular_target_labels_info = get_tabular_target_file_infos(
         output_configs=output_configs
@@ -119,9 +128,19 @@ def set_up_all_target_labels_wrapper(
                 cur_transformers = cur_labels.label_transformers
                 label_transformers[output_name] = cur_transformers
 
-                missing_ids[output_name] = all_ids.difference(
+                per_modality_missing_ids[output_name] = all_ids.difference(
                     set(cur_labels.all_labels.keys())
                 )
+
+                missing_ids_per_target_column = compute_missing_ids_per_tabular_output(
+                    tabular_labels=cur_labels,
+                    tabular_info=tabular_info,
+                    output_name=output_name,
+                )
+                within_modality_missing_ids = {
+                    **within_modality_missing_ids,
+                    **missing_ids_per_target_column,
+                }
 
             case "sequence":
                 cur_labels = set_up_delayed_target_labels(
@@ -130,7 +149,7 @@ def set_up_all_target_labels_wrapper(
                     output_name=output_name,
                 )
 
-                missing_ids[output_name] = all_ids.difference(
+                per_modality_missing_ids[output_name] = all_ids.difference(
                     set(cur_labels.all_labels.keys())
                 )
 
@@ -145,7 +164,7 @@ def set_up_all_target_labels_wrapper(
                     labels=cur_labels.all_labels,
                     output_name=output_name,
                 )
-                missing_ids[output_name] = cur_missing_ids
+                per_modality_missing_ids[output_name] = cur_missing_ids
 
             case _:
                 raise ValueError(f"Unknown output type: '{output_type}'.")
@@ -168,14 +187,43 @@ def set_up_all_target_labels_wrapper(
     train_labels_dict = df_to_nested_dict(df=df_labels_train)
     valid_labels_dict = df_to_nested_dict(df=df_labels_valid)
 
+    missing_target_info = MissingTargetsInfo(
+        missing_ids_per_modality=per_modality_missing_ids,
+        missing_ids_within_modality=within_modality_missing_ids,
+    )
+
     labels_data_object = MergedTargetLabels(
         train_labels=train_labels_dict,
         valid_labels=valid_labels_dict,
         label_transformers=label_transformers,
-        missing_ids_per_output=missing_ids,
+        missing_ids_per_output=missing_target_info,
     )
 
     return labels_data_object
+
+
+def compute_missing_ids_per_tabular_output(
+    tabular_labels: Union[Labels, "PredictTargetLabels"],
+    tabular_info: TabularFileInfo,
+    output_name: str,
+) -> dict[str, dict[str, set[str]]]:
+    missing_per_target_column: dict[str, dict[str, set[str]]] = {output_name: {}}
+
+    all_ids = set(tabular_labels.all_labels.keys())
+
+    all_columns = list(tabular_info.con_columns) + list(tabular_info.cat_columns)
+
+    for target_column in all_columns:
+        cur_missing = set()
+
+        for id_ in all_ids:
+            cur_label = tabular_labels.all_labels[id_][target_column]
+            if isinstance(cur_label, float) and math.isnan(cur_label):
+                cur_missing.add(id_)
+
+        missing_per_target_column[output_name][target_column] = cur_missing
+
+    return missing_per_target_column
 
 
 def set_up_delayed_target_labels(

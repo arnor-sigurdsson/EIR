@@ -16,6 +16,7 @@ import torch
 from timm.data.mixup import rand_bbox
 
 from eir.data_load.data_utils import Batch, get_output_info_generator
+from eir.target_setup.target_label_setup import MissingTargetsInfo
 from eir.train_utils.metrics import filter_missing_outputs_and_labels
 from eir.utils.logging import get_logger
 
@@ -317,7 +318,7 @@ def calc_all_mixed_losses(
     criteria: "al_criteria_dict",
     outputs: dict[str, dict[str, torch.Tensor]],
     mixed_object: MixingObject,
-    missing_ids_per_output: dict[str, set[str]],
+    missing_ids_per_output: MissingTargetsInfo,
 ) -> dict[str, dict[str, torch.Tensor]]:
     losses: dict[str, dict[str, torch.Tensor]] = {
         output_name: {} for output_name in outputs.keys()
@@ -326,34 +327,29 @@ def calc_all_mixed_losses(
     model_outputs = outputs
     target_labels = mixed_object.targets
 
-    (
-        model_outputs_filtered,
-        target_labels_filtered,
-    ) = filter_missing_outputs_and_labels(
+    filtered_outputs = filter_missing_outputs_and_labels(
         batch_ids=mixed_object.ids,
         model_outputs=model_outputs,
         target_labels=target_labels,
-        missing_ids_per_output=missing_ids_per_output,
+        missing_ids_info=missing_ids_per_output,
     )
 
     target_labels_permuted = mixed_object.targets_permuted
     ids_permuted = [mixed_object.ids[i] for i in mixed_object.permuted_indexes]
-    (
-        _,
-        permuted_target_labels_filtered,
-    ) = filter_missing_outputs_and_labels(
+    filtered_outputs_permuted = filter_missing_outputs_and_labels(
         batch_ids=ids_permuted,
         model_outputs=model_outputs,
         target_labels=target_labels_permuted,
-        missing_ids_per_output=missing_ids_per_output,
+        missing_ids_info=missing_ids_per_output,
     )
+    filtered_targets_permuted = filtered_outputs_permuted.target_labels
 
     for output_name, target_type, target_name in target_columns_gen:
         cur_loss = calc_mixed_loss(
             criterion=criteria[output_name][target_name],
-            outputs=model_outputs_filtered[output_name][target_name],
-            targets=target_labels_filtered[output_name][target_name],
-            targets_permuted=permuted_target_labels_filtered[output_name][target_name],
+            outputs=filtered_outputs.model_outputs[output_name][target_name],
+            targets=filtered_outputs.target_labels[output_name][target_name],
+            targets_permuted=filtered_targets_permuted[output_name][target_name],
             lambda_=mixed_object.lambda_,
         )
         losses[output_name][target_name] = cur_loss

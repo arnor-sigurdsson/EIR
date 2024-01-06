@@ -24,7 +24,7 @@ def predict_tabular_wrapper(
     predict_config: "PredictExperiment",
     all_predictions: dict[str, dict[str, torch.Tensor]],
     all_labels: dict[str, dict[str, torch.Tensor]],
-    all_ids: list[str],
+    all_ids: dict[str, dict[str, list[str]]],
     predict_cl_args: Namespace,
 ) -> None:
     target_columns_gen = get_output_info_generator(
@@ -56,8 +56,10 @@ def predict_tabular_wrapper(
         if all_labels:
             target_labels = all_labels[output_name][target_column_name].cpu().numpy()
 
+        cur_ids = all_ids[output_name][target_column_name]
+
         df_merged_predictions = _merge_ids_predictions_and_labels(
-            ids=all_ids,
+            ids=cur_ids,
             predictions=predictions,
             labels=target_labels,
             prediction_classes=classes,
@@ -82,7 +84,7 @@ def predict_tabular_wrapper(
             plot_config = PerformancePlotConfig(
                 val_outputs=predictions,
                 val_labels=cur_labels,
-                val_ids=all_ids,
+                val_ids=cur_ids,
                 iteration=0,
                 column_name=target_column_name,
                 column_type=target_head_name,

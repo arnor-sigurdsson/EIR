@@ -585,20 +585,17 @@ def hook_default_compute_metrics(
     target_labels = batch.target_labels
     ids = batch.ids
 
-    (
-        model_outputs_filtered,
-        target_labels_filtered,
-    ) = filter_missing_outputs_and_labels(
+    filtered_outputs = filter_missing_outputs_and_labels(
         batch_ids=ids,
         model_outputs=model_outputs,
         target_labels=target_labels,
-        missing_ids_per_output=experiment.valid_dataset.missing_ids_per_output,
+        missing_ids_info=experiment.valid_dataset.missing_ids_per_output,
     )
 
     train_batch_metrics = calculate_batch_metrics(
         outputs_as_dict=experiment.outputs,
-        outputs=model_outputs_filtered,
-        labels=target_labels_filtered,
+        outputs=filtered_outputs.model_outputs,
+        labels=filtered_outputs.target_labels,
         mode="train",
         metric_record_dict=experiment.metrics,
     )
@@ -630,18 +627,16 @@ def hook_default_per_target_loss(
         target_labels = batch.target_labels
         ids = batch.ids
 
-        (
-            model_outputs_filtered,
-            target_labels_filtered,
-        ) = filter_missing_outputs_and_labels(
+        filtered_outputs = filter_missing_outputs_and_labels(
             batch_ids=ids,
             model_outputs=model_outputs,
             target_labels=target_labels,
-            missing_ids_per_output=experiment.valid_dataset.missing_ids_per_output,
+            missing_ids_info=experiment.valid_dataset.missing_ids_per_output,
         )
 
         per_target_train_losses = experiment.loss_function(
-            inputs=model_outputs_filtered, targets=target_labels_filtered
+            inputs=filtered_outputs.model_outputs,
+            targets=filtered_outputs.target_labels,
         )
 
         state_updates = {"per_target_train_losses": per_target_train_losses}

@@ -47,7 +47,7 @@ def set_up_tabular_input_for_training(
         custom_label_ops=custom_ops,
         train_ids=train_ids,
         valid_ids=valid_ids,
-        include_missing=True,
+        impute_missing=True,
     )
 
     total_num_features = get_tabular_num_features(

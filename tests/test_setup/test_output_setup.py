@@ -17,7 +17,9 @@ def test_set_up_num_classes(get_transformer_test_data):
     df_test, test_target_columns_dict = get_transformer_test_data
 
     test_transformers = label_setup._get_fit_label_transformers(
-        df_labels=df_test, label_columns=test_target_columns_dict
+        df_labels=df_test,
+        label_columns=test_target_columns_dict,
+        impute_missing=False,
     )
 
     num_classes = set_up_num_outputs_per_target(target_transformers=test_transformers)

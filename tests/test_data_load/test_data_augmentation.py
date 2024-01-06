@@ -367,13 +367,17 @@ def test_calc_all_mixed_losses(test_inputs, expected_output):
             c: test_inputs["targets_permuted"] for c in all_target_columns
         }
     }
-    ids = tuple(str(i) for i in range(len(test_inputs["outputs"])))
+
+    n_samples = len(test_inputs["outputs"])
+    ids = tuple(str(i) for i in range(n_samples))
+
+    permuted_indexes = torch.LongTensor(list(range(n_samples)))
     mixed_object = data_augmentation.MixingObject(
         ids=ids,
         targets=targets,
         targets_permuted=targets_permuted,
         lambda_=test_inputs["lambda_"],
-        permuted_indexes=torch.LongTensor([0]),
+        permuted_indexes=permuted_indexes,
     )
 
     test_criteria = {
@@ -382,12 +386,18 @@ def test_calc_all_mixed_losses(test_inputs, expected_output):
     outputs = {
         "test_output_tabular": {c: test_inputs["outputs"] for c in all_target_columns}
     }
+
+    missing_ids = data_augmentation.MissingTargetsInfo(
+        missing_ids_per_modality={},
+        missing_ids_within_modality={},
+    )
+
     all_losses = data_augmentation.calc_all_mixed_losses(
         target_columns_gen=_target_columns_gen(),
         criteria=test_criteria,
         outputs=outputs,
         mixed_object=mixed_object,
-        missing_ids_per_output={},
+        missing_ids_per_output=missing_ids,
     )
     for _, loss in all_losses["test_output_tabular"].items():
         assert loss.item() == expected_output

@@ -164,6 +164,9 @@ def _merge_labels_from_modalities(base_path: Path) -> None:
     df_final["Height"] /= len(dfs)
     df_final["ExtraTarget"] /= len(dfs)
 
+    for col in df_final.columns:
+        df_final.loc[df_final.sample(frac=0.10).index, col] = np.nan
+
     df_final.to_csv(base_path / "labels.csv")
 
 

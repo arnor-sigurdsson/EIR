@@ -60,7 +60,10 @@ from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from eir.setup.output_setup import al_output_objects_as_dict
-    from eir.target_setup.target_label_setup import MergedTargetLabels
+    from eir.target_setup.target_label_setup import (
+        MergedTargetLabels,
+        MissingTargetsInfo,
+    )
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -118,7 +121,7 @@ def construct_default_dataset_kwargs_from_cl_args(
     inputs: al_input_objects_as_dict,
     outputs: "al_output_objects_as_dict",
     test_mode: bool,
-    missing_ids_per_output: Dict[str, Set[str]],
+    missing_ids_per_output: "MissingTargetsInfo",
     ids_to_keep: Union[None, Sequence[str]] = None,
 ) -> Dict[str, Any]:
     ids_to_keep_set = set(ids_to_keep) if ids_to_keep is not None else None
@@ -165,7 +168,7 @@ class DatasetBase(Dataset):
         inputs: al_input_objects_as_dict,
         outputs: "al_output_objects_as_dict",
         test_mode: bool,
-        missing_ids_per_output: Dict[str, Set[str]],
+        missing_ids_per_output: "MissingTargetsInfo",
         target_labels_dict: Optional[al_target_label_dict] = None,
         ids_to_keep: Optional[Set[str]] = None,
     ):
@@ -513,7 +516,7 @@ class DiskDataset(DatasetBase):
         )
 
         targets_final = impute_missing_output_modalities_wrapper(
-            outputs_values=targets_prepared, outputs_objects=self.outputs
+            outputs_values=targets_prepared, output_objects=self.outputs
         )
 
         sample_id = sample.sample_id
@@ -562,7 +565,7 @@ class MemoryDataset(DatasetBase):
         )
 
         targets_final = impute_missing_output_modalities_wrapper(
-            outputs_values=targets_prepared, outputs_objects=self.outputs
+            outputs_values=targets_prepared, output_objects=self.outputs
         )
 
         sample_id = sample.sample_id

@@ -822,7 +822,9 @@ def _get_interpretation_data_producer(
 
         inputs_detached = _detach_all_inputs(tensor_inputs=batch.inputs)
         batch_interpretation = Batch(
-            inputs=inputs_detached, target_labels=batch.target_labels, ids=batch.ids
+            inputs=inputs_detached,
+            target_labels=batch.target_labels,
+            ids=batch.ids,
         )
 
         raw_inputs = {k: v for k, v in loader_batch[0].items()}

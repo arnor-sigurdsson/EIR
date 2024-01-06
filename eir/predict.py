@@ -36,7 +36,10 @@ from eir.predict_modules.predict_output_modules.predict_sequence_output import (
 from eir.predict_modules.predict_output_modules.predict_tabular_output import (
     predict_tabular_wrapper,
 )
-from eir.predict_modules.predict_target_setup import get_target_labels_for_testing
+from eir.predict_modules.predict_target_setup import (
+    MissingTargetsInfo,
+    get_target_labels_for_testing,
+)
 from eir.setup.config import Configs, get_main_parser
 from eir.setup.input_setup import al_input_objects_as_dict
 from eir.setup.output_setup import al_output_objects_as_dict
@@ -190,7 +193,7 @@ def predict(
         predict_config=predict_experiment,
         all_predictions=predict_results.gathered_outputs,
         all_labels=predict_results.gathered_labels,
-        all_ids=predict_results.ids,
+        all_ids=predict_results.ids_per_output,
         predict_cl_args=predict_cl_args,
     )
 
@@ -277,7 +280,10 @@ def get_default_predict_experiment(
             input_configs=configs_overloaded_for_predict.input_configs
         )
         target_labels = None
-        missing_ids_per_output = {}
+        missing_ids_per_output = MissingTargetsInfo(
+            missing_ids_per_modality={},
+            missing_ids_within_modality={},
+        )
 
     test_inputs = set_up_inputs_for_predict(
         test_inputs_configs=configs_overloaded_for_predict.input_configs,

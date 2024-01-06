@@ -277,6 +277,13 @@ def _craft_example_request(
 
             for col in all_columns:
                 value = labels_df.loc[labels_df["ID"] == random_id, col].iloc[0]
+
+                # for now, we just fail here if we have a missing value
+                # allowing only fully complete samples
+                # later we can add something more sophisticated if needed
+                if pd.isna(value):
+                    assert False
+
                 tabular_data[col] = value
 
             example_request[input_name] = tabular_data
