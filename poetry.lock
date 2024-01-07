@@ -560,19 +560,20 @@ files = [
 
 [[package]]
 name = "captum"
-version = "0.6.0"
+version = "0.7.0"
 description = "Model interpretability for PyTorch"
 optional = false
 python-versions = ">=3.6"
 files = [
-    {file = "captum-0.6.0-py3-none-any.whl", hash = "sha256:6b157d6c625cc365c5f9630f1380fbb283194001dd77c0f7c07c827bdbe58661"},
-    {file = "captum-0.6.0.tar.gz", hash = "sha256:01bb374622d46b56acd590462757bf2087ed3721dcebf4922db0fa77548d6524"},
+    {file = "captum-0.7.0-py3-none-any.whl", hash = "sha256:2cbec9aa4b6ec325c2fdf369c1fdabb011017122e2314e2af009496d53a0757c"},
+    {file = "captum-0.7.0.tar.gz", hash = "sha256:7ca87d0dc67b3b7589a730b970b9536172a5468e0e31bf8657fdd73abc568a33"},
 ]
 
 [package.dependencies]
 matplotlib = "*"
 numpy = "*"
 torch = ">=1.6"
+tqdm = "*"
 
 [package.extras]
 dev = ["annoy", "black (==22.3.0)", "flake8", "flask", "flask-compress", "ipython", "ipywidgets", "jupyter", "mypy (>=0.760)", "parameterized", "pytest", "pytest-cov", "scikit-learn", "sphinx", "sphinx-autodoc-typehints", "sphinxcontrib-katex", "ufmt", "usort (==1.0.2)"]
@@ -6777,4 +6778,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11.0,<3.12"
-content-hash = "548d2e0d502f43bb81777dfdf5c0557c04546b8944321eaa45b3ba462ebc463a"
+content-hash = "a22a6a71c3847c6d03825e8f2dcda09f0450418738aa67b90d801bbc33efc97d"

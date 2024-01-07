@@ -124,6 +124,7 @@ def parse_tabular_target_labels(
                         dtype=torch.float, device=device
                     )
                 elif column_type == ColumnType.CAT.value:
+                    cur_labels = replace_nan_and_cast_to_long(cur_labels=cur_labels)
                     labels_casted[output_name_][column_name] = cur_labels.to(
                         dtype=torch.long, device=device
                     )
@@ -137,6 +138,50 @@ def parse_tabular_target_labels(
                 )
 
     return labels_casted
+
+
+def replace_nan_and_cast_to_long(
+    cur_labels: torch.Tensor,
+    replacement_value: int = -1,
+) -> torch.Tensor:
+    """
+    Replace NaN values in a PyTorch tensor and cast it to a long integer
+    (torch.long) type.
+
+    When casting a tensor from a floating-point type (like float64) to an
+    integer type (like long), NaN values need to be handled specially. In PyTorch,
+    the behavior of casting NaN values to integers can be inconsistent
+    across different environments, leading to unexpected results.
+
+    For example:
+    - On a local machine (e.g., Mac), NaN values may be converted to 0.
+    - On some servers (e.g., GitHub Actions server), NaN values may be converted to
+      -9223372036854775808, which is the minimum value for a 64-bit integer.
+
+    This function explicitly replaces NaN values in the tensor with a defined integer
+    before casting. This ensures consistent and defined behavior across
+    different platforms.
+
+    Example:
+    >>> cur_labels = torch.tensor([nan, nan, 2., nan, 1.], dtype=torch.float64)
+    >>> cur_labels.to(dtype=torch.long)
+    tensor([0, 0, 2, 0, 1])
+    or
+    tensor([-9223372036854775808, -9223372036854775808, 2, -9223372036854775808, 1])
+    >>> cur_labels = torch.tensor([nan, nan, 2., nan, 1.], dtype=torch.float64)
+    >>> replace_nan_and_cast_to_long(cur_labels)
+    tensor([-1, -1,  2, -1,  1])
+
+    Note:
+    The choice of `replacement_value` should be made carefully, in the case of
+    categories, they are encoded from 0 to n-1, so using a negative value is
+    potentially a reasonable choice.
+    """
+
+    cur_labels = cur_labels.where(
+        ~cur_labels.isnan(), torch.tensor(replacement_value, dtype=torch.float64)
+    )
+    return cur_labels.to(dtype=torch.long)
 
 
 def get_prediction_outputs_generator(

@@ -237,7 +237,7 @@ def get_target_labels_for_testing(
 
             case _:
                 raise NotImplementedError(
-                    f"Output type {output_type_info} " f"not implemented"
+                    f"Output type {output_type_info} not implemented"
                 )
 
         df_labels_cur = pd.DataFrame.from_dict(cur_labels.label_dict, orient="index")

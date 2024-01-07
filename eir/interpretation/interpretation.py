@@ -64,6 +64,7 @@ from eir.setup.output_setup_modules.tabular_output_setup import (
     ComputedTabularOutputInfo,
 )
 from eir.setup.schemas import InputConfig, OutputConfig
+from eir.target_setup.target_label_setup import MissingTargetsInfo
 from eir.train_utils.evaluation import validation_handler
 from eir.train_utils.utils import (
     call_hooks_stage_iterable,
@@ -252,6 +253,7 @@ def tabular_attribution_analysis_wrapper(
             act_func=act_func,
             output_name=output_name,
             target_column_name=target_column_name,
+            missing_ids_per_output=dataset_to_interpret.missing_ids_per_output,
         )
 
         input_names_and_types = _extract_input_names_and_types(
@@ -620,13 +622,25 @@ def get_sample_attribution_producer(
     act_func: Callable,
     target_column_name: str,
     output_name: str,
+    missing_ids_per_output: MissingTargetsInfo,
 ) -> Generator["SampleAttribution", None, None]:
+    missing_for_modality = missing_ids_per_output.missing_ids_per_modality
+    cur_missing_ids = missing_for_modality[output_name]
+
+    missing_within_modality = missing_ids_per_output.missing_ids_within_modality
+    cur_missing_ids_within = missing_within_modality[output_name][target_column_name]
+
     for batch, raw_inputs in data_producer:
         sample_target_labels = batch.target_labels
+        cur_target_label = sample_target_labels[output_name][target_column_name]
+
+        cur_id = batch.ids[0]
+        if cur_id in cur_missing_ids or cur_id in cur_missing_ids_within:
+            continue
 
         sample_all_modalities_attributions = act_func(
             inputs=batch.inputs,
-            sample_label=sample_target_labels[output_name][target_column_name],
+            sample_label=cur_target_label,
         )
 
         if sample_all_modalities_attributions is None:
@@ -767,11 +781,12 @@ def get_attributions(
         internal_batch_size=internal_batch_size,
     )
 
-    with suppress_stdout_and_stderr():
-        if column_type == "con":
-            output = explainer.attribute(**common_kwargs)
-        else:
-            output = explainer.attribute(target=sample_label, **common_kwargs)
+    if column_type == "con":
+        output = explainer.attribute(**common_kwargs)
+    else:
+        assert sample_label >= 0, f"Got {sample_label} for {inputs} and {column_type}."
+
+        output = explainer.attribute(target=sample_label, **common_kwargs)
 
     output = [o.detach().cpu().numpy() for o in output]
 

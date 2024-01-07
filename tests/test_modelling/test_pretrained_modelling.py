@@ -121,15 +121,20 @@ def test_pre_trained_module_setup(
     train.train(experiment=experiment)
 
     _get_experiment_overloaded_for_pretrained_extractor(
-        experiment=experiment, test_config=test_config, rename_pretrained_inputs=False
+        experiment=experiment,
+        test_config=test_config,
+        rename_pretrained_inputs=False,
     )
 
     _get_experiment_overloaded_for_pretrained_extractor(
-        experiment=experiment, test_config=test_config, rename_pretrained_inputs=True
+        experiment=experiment,
+        test_config=test_config,
+        rename_pretrained_inputs=True,
     )
 
     _get_experiment_overloaded_for_pretrained_checkpoint(
-        experiment=experiment, test_config=test_config
+        experiment=experiment,
+        test_config=test_config,
     )
 
     _get_experiment_overloaded_for_pretrained_checkpoint(
@@ -278,7 +283,9 @@ def test_pre_training_and_loading(
         pretrained_experiment,
         pretrained_test_config,
     ) = _get_experiment_overloaded_for_pretrained_extractor(
-        experiment=experiment, test_config=test_config, rename_pretrained_inputs=True
+        experiment=experiment,
+        test_config=test_config,
+        rename_pretrained_inputs=True,
     )
 
     train.train(experiment=pretrained_experiment)

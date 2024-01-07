@@ -216,10 +216,6 @@ def transform_label_df(
     """
     If impute missing, we transform the values as they are, as we assume the
     encoder has been fit on the missing values as well.
-
-    Note we ensure float dtypes for LabelEncoder as we have a mix of nan and integer
-    values, otherwise we have a mixed column data type there. Trying to convert to
-    int will fail with Cannot convert float NaN to integer.
     """
     df_labels_copy = df_labels.copy()
 
@@ -254,9 +250,6 @@ def transform_label_df(
             match transformer_instance:
                 case LabelEncoder():
                     df_labels_copy.loc[~non_nan_mask, column_name] = np.nan
-                    df_labels_copy[column_name] = df_labels_copy[column_name].astype(
-                        float
-                    )
 
     return df_labels_copy
 

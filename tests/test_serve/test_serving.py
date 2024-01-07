@@ -198,7 +198,7 @@ def test_multi_serving(
     example_requests = []
 
     n_sample_requests = 10
-    n_retries_per_request = 5
+    n_retries_per_request = 10
     for i in range(n_sample_requests):
         n_cur_retries = 0
 
@@ -269,6 +269,18 @@ def _craft_example_request(
             example_request[input_name] = str(array_path)
 
         elif input_type == "tabular":
+            # for now, we just fail here if we have a missing value
+            # allowing only fully complete samples
+            # later we can add something more sophisticated if needed
+            # note that we check for *all* columns, not just the ones
+            # that are inputs, so we can properly compare the results
+            any_na = (
+                labels_df.loc[labels_df["ID"] == random_id].isna().any(axis=1).iloc[0]
+            )
+
+            if any_na:
+                assert False
+
             cat_columns = list(config.input_type_info.input_cat_columns)
             con_columns = list(config.input_type_info.input_con_columns)
             all_columns = cat_columns + con_columns
@@ -277,12 +289,6 @@ def _craft_example_request(
 
             for col in all_columns:
                 value = labels_df.loc[labels_df["ID"] == random_id, col].iloc[0]
-
-                # for now, we just fail here if we have a missing value
-                # allowing only fully complete samples
-                # later we can add something more sophisticated if needed
-                if pd.isna(value):
-                    assert False
 
                 tabular_data[col] = value
 
