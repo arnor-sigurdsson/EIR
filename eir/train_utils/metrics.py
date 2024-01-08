@@ -894,7 +894,14 @@ def filter_missing_outputs_and_labels(
                 i for i, id_ in enumerate(batch_ids) if id_ not in combined_missing_ids
             ]
             if not valid_indices:
-                continue
+                raise NotImplementedError(
+                    f"Found no valid indices for output {output_name} and inner key "
+                    f"{inner_key}. This can happen for very sparse targets where "
+                    f"no valid indices are present for this target in a batch. "
+                    f"Solutions include increasing the batch size if this "
+                    f"happens during training, manually imputing the missing targets ,"
+                    f" or removing this target from the output setup."
+                )
 
             valid_indices_tensor = torch.tensor(valid_indices)
 

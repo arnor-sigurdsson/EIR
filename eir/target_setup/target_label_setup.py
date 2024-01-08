@@ -149,9 +149,13 @@ def set_up_all_target_labels_wrapper(
                     output_name=output_name,
                 )
 
-                per_modality_missing_ids[output_name] = all_ids.difference(
-                    set(cur_labels.all_labels.keys())
+                missing_sequence_ids = _find_sequence_output_missing_ids(
+                    train_ids=train_ids,
+                    valid_ids=valid_ids,
+                    output_source=output_config.output_info.output_source,
                 )
+
+                per_modality_missing_ids[output_name] = missing_sequence_ids
 
             case "array":
                 cur_labels = set_up_file_target_labels(
@@ -245,6 +249,26 @@ def set_up_delayed_target_labels(
         valid_labels=valid_labels,
         label_transformers={},
     )
+
+
+def _find_sequence_output_missing_ids(
+    train_ids: Sequence[str],
+    valid_ids: Sequence[str],
+    output_source: str,
+) -> set[str]:
+    if is_deeplake_dataset(data_source=output_source):
+        deeplake_ds = load_deeplake_dataset(data_source=output_source)
+        seq_ids = set(str(i) for i in deeplake_ds["ID"].numpy())
+    else:
+        seq_ids = set(gather_ids_from_data_source(data_source=Path(output_source)))
+
+    train_ids_set = set(train_ids)
+    valid_ids_set = set(valid_ids)
+    all_ids = train_ids_set.union(valid_ids_set)
+
+    missing_ids = all_ids.difference(seq_ids)
+
+    return missing_ids
 
 
 def set_up_file_target_labels(
