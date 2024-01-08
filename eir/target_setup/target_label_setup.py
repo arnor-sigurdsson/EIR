@@ -1,4 +1,5 @@
 import math
+import reprlib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, Iterable, Optional, Sequence, Tuple, Union
@@ -64,6 +65,83 @@ def set_up_all_targets_wrapper(
 class MissingTargetsInfo:
     missing_ids_per_modality: dict[str, set[str]]
     missing_ids_within_modality: dict[str, dict[str, set[str]]]
+
+
+def log_missing_targets_info(
+    missing_targets_info: MissingTargetsInfo, all_ids: set[str]
+) -> None:
+    repr_formatter = reprlib.Repr()
+    repr_formatter.maxset = 10
+
+    logger.info(
+        "Checking for missing target information. "
+        "These will be ignored during loss and metric computation.\n"
+    )
+
+    total_ids_count = len(all_ids)
+    missing_within = missing_targets_info.missing_ids_within_modality
+    max_columns_to_log = 5
+
+    for modality, missing_ids in missing_targets_info.missing_ids_per_modality.items():
+        missing_count = len(missing_ids)
+
+        if missing_count == 0:
+            logger.info(f"Modality '{modality}' has no missing target IDs.")
+            continue
+
+        formatted_missing_ids = repr_formatter.repr(missing_ids)
+        complete_count = total_ids_count - missing_count
+        fraction_complete = (complete_count / total_ids_count) * 100
+
+        logger.info(
+            f"Missing target IDs for modality: '{modality}'\n"
+            f"  - Missing IDs: {formatted_missing_ids}\n"
+            f"  - Stats: Missing: {missing_count}, "
+            f"Complete: {complete_count}/{total_ids_count} "
+            f"({fraction_complete:.2f}% complete)\n"
+        )
+
+        if modality in missing_within:
+            columns_logged = 0
+            for target_column, ids in missing_within[modality].items():
+                missing_within_count = len(ids)
+
+                if missing_within_count == 0:
+                    logger.info(
+                        f"  - No missing target IDs in modality '{modality}', "
+                        f"Column: '{target_column}'."
+                    )
+                    columns_logged += 1
+                    if columns_logged >= max_columns_to_log:
+                        break
+                    continue
+
+                if columns_logged >= max_columns_to_log:
+                    additional_columns = (
+                        len(missing_within[modality]) - max_columns_to_log
+                    )
+                    logger.info(
+                        f"  - There are {additional_columns} "
+                        f"more columns with missing IDs in modality '{modality}' "
+                        f"not displayed."
+                    )
+                    break
+
+                complete_within_count = total_ids_count - missing_within_count
+                fraction_complete_within = (
+                    complete_within_count / total_ids_count
+                ) * 100
+
+                formatted_ids = repr_formatter.repr(ids)
+                logger.info(
+                    f"  - Missing target IDs within modality '{modality}', "
+                    f"Column: '{target_column}'\n"
+                    f"      - Missing IDs: {formatted_ids}\n"
+                    f"      - Stats: Missing: {missing_within_count}, "
+                    f"Complete: {complete_within_count}/{total_ids_count} "
+                    f"({fraction_complete_within:.2f}% complete)\n"
+                )
+                columns_logged += 1
 
 
 @dataclass
@@ -195,6 +273,7 @@ def set_up_all_target_labels_wrapper(
         missing_ids_per_modality=per_modality_missing_ids,
         missing_ids_within_modality=within_modality_missing_ids,
     )
+    log_missing_targets_info(missing_targets_info=missing_target_info, all_ids=all_ids)
 
     labels_data_object = MergedTargetLabels(
         train_labels=train_labels_dict,
