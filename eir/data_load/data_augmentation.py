@@ -328,7 +328,7 @@ def calc_all_mixed_losses(
     target_labels = mixed_object.targets
 
     filtered_outputs = filter_missing_outputs_and_labels(
-        batch_ids=mixed_object.ids,
+        batch_ids=list(mixed_object.ids),
         model_outputs=model_outputs,
         target_labels=target_labels,
         missing_ids_info=missing_ids_per_output,
