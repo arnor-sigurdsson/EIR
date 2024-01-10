@@ -72,6 +72,9 @@ def create_test_data(request, tmp_path_factory, parse_test_cl_args) -> "TestData
             _delete_random_files_from_folder(
                 folder=sequence_sample_folder, n_to_drop=50
             )
+            sequence_csv = base_outfolder / "sequence.csv"
+            _delete_random_rows_from_csv(csv_file=sequence_csv, n_to_drop=50)
+
     arrays_path = base_outfolder / "array"
     if "array" in test_data_config.modalities and not arrays_path.exists():
         array_sample_folder = create_test_array_data_and_labels(
@@ -86,6 +89,7 @@ def create_test_data(request, tmp_path_factory, parse_test_cl_args) -> "TestData
     if drop_random_samples:
         label_file = test_data_config.scoped_tmp_path / "labels.csv"
         _delete_random_rows_from_csv(csv_file=label_file, n_to_drop=50)
+        _delete_random_cells_from_csv(csv_file=label_file, fraction_to_drop=0.10)
 
     if test_data_config.request_params.get("split_to_test", False):
         post_split_callables = _get_test_post_split_callables()
@@ -231,6 +235,15 @@ def _delete_random_rows_from_csv(csv_file: Path, n_to_drop: int):
     drop_indices = np.random.choice(df.index, n_to_drop, replace=False)
     df_subset = df.drop(drop_indices)
     df_subset.to_csv(path_or_buf=csv_file)
+
+
+def _delete_random_cells_from_csv(csv_file: Path, fraction_to_drop: float = 0.10):
+    df = pd.read_csv(filepath_or_buffer=csv_file, index_col=0)
+
+    for col in df.columns:
+        df.loc[df.sample(frac=fraction_to_drop).index, col] = np.nan
+
+    df.to_csv(path_or_buf=csv_file)
 
 
 def _delete_random_files_from_folder(folder: Path, n_to_drop: int):

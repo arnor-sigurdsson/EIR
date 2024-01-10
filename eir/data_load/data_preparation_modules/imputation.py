@@ -13,7 +13,19 @@ from eir.setup.input_setup_modules.setup_image import ComputedImageInputInfo
 from eir.setup.input_setup_modules.setup_omics import ComputedOmicsInputInfo
 from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
 from eir.setup.input_setup_modules.setup_tabular import ComputedTabularInputInfo
-from eir.setup.schemas import ImageInputDataConfig, TabularInputDataConfig
+from eir.setup.output_setup import al_output_objects_as_dict
+from eir.setup.output_setup_modules.array_output_setup import ComputedArrayOutputInfo
+from eir.setup.output_setup_modules.sequence_output_setup import (
+    ComputedSequenceOutputInfo,
+)
+from eir.setup.output_setup_modules.tabular_output_setup import (
+    ComputedTabularOutputInfo,
+)
+from eir.setup.schemas import (
+    ImageInputDataConfig,
+    TabularInputDataConfig,
+    TabularOutputTypeConfig,
+)
 
 al_fill_values = dict[str, bool | int | float | dict[str, int | float]]
 
@@ -168,7 +180,7 @@ def _build_tabular_fill_value(
     cat_columns = input_type_info.input_cat_columns
     for cat_column in cat_columns:
         cur_label_encoder = transformers[cat_column]
-        fill_value[cat_column] = cur_label_encoder.transform(["NA"]).item()
+        fill_value[cat_column] = cur_label_encoder.transform(["nan"]).item()
 
     con_columns = input_type_info.input_con_columns
     for con_column in con_columns:
@@ -189,3 +201,163 @@ def _get_default_impute_dtypes(inputs_objects: "al_input_objects_as_dict"):
             dtypes[input_name] = torch.float
 
     return dtypes
+
+
+def impute_missing_output_modalities_wrapper(
+    outputs_values: dict[str, Any], output_objects: "al_output_objects_as_dict"
+) -> dict[str, dict[str, torch.Tensor | int | float]]:
+    impute_dtypes = _get_default_output_impute_dtypes(outputs_objects=output_objects)
+    impute_fill_values = _get_default_output_impute_fill_values(
+        outputs_objects=output_objects
+    )
+    outputs_imputed_modalities = impute_missing_output_modalities(
+        outputs_values=outputs_values,
+        outputs_objects=output_objects,
+        fill_values=impute_fill_values,
+        dtypes=impute_dtypes,
+    )
+
+    outputs_imputed = impute_partially_missing_output_modalities(
+        outputs_values=outputs_imputed_modalities,
+        output_objects=output_objects,
+    )
+
+    return outputs_imputed
+
+
+def impute_partially_missing_output_modalities(
+    outputs_values: dict[str, Any],
+    output_objects: "al_output_objects_as_dict",
+) -> dict[str, dict[str, torch.Tensor | int | float]]:
+    for output_name, output_object in output_objects.items():
+        match output_object:
+            case ComputedTabularOutputInfo():
+                cur_output_value = outputs_values[output_name]
+                output_type_info = output_object.output_config.output_type_info
+
+                assert isinstance(output_type_info, TabularOutputTypeConfig)
+
+                cat_columns = set(output_type_info.target_cat_columns)
+                con_columns = set(output_type_info.target_con_columns)
+                output_columns = cat_columns.union(con_columns)
+
+                for output_column in output_columns:
+                    if output_column not in cur_output_value:
+                        cur_output_value[output_column] = torch.nan
+
+                outputs_values[output_name] = cur_output_value
+
+    return outputs_values
+
+
+def impute_missing_output_modalities(
+    outputs_values: dict[str, Any],
+    outputs_objects: "al_output_objects_as_dict",
+    fill_values: al_fill_values,
+    dtypes: dict[str, Any],
+) -> dict[str, dict[str, torch.Tensor | int | float]]:
+    """
+    Note that ultimately we never want to use these values for anything e.g. in the
+    loss calculation, but rather just skip them completely. However, we do need
+    the shapes to match for collation purposes.
+
+    Note we skip imputing sequence outputs as they are handled on the fly
+    separately based on the input.
+    """
+    for output_name, output_object in outputs_objects.items():
+        output_type = output_object.output_config.output_info.output_type
+        if output_name not in outputs_values:
+            fill_value = fill_values[output_name]
+            dtype = dtypes[output_name]
+
+            shape: Tuple[int, ...]
+            approach: Literal["constant", "random"]
+            match output_object:
+                case ComputedSequenceOutputInfo():
+                    continue
+
+                case ComputedArrayOutputInfo():
+                    assert output_type == "array"
+                    shape = output_object.data_dimensions.full_shape()
+                    approach = "random"
+
+                case ComputedTabularOutputInfo():
+                    assert output_type == "tabular"
+                    outputs_values[output_name] = fill_value
+                    continue
+
+                case _:
+                    raise ValueError(f"Unrecognized output type {output_type}")
+
+            imputed_tensor = impute_single_missing_modality(
+                shape=shape,
+                fill_value=fill_value,
+                dtype=dtype,
+                approach=approach,
+            )
+            outputs_values[output_name] = {output_name: imputed_tensor}
+
+    return outputs_values
+
+
+def _get_default_output_impute_dtypes(
+    outputs_objects: al_output_objects_as_dict,
+) -> dict[str, Any]:
+    dtypes = {}
+    for output_name, output_object in outputs_objects.items():
+        match output_object:
+            case ComputedTabularOutputInfo():
+                dtypes[output_name] = torch.float
+            case ComputedSequenceOutputInfo():
+                dtypes[output_name] = torch.long
+            case ComputedArrayOutputInfo():
+                dtypes[output_name] = torch.float
+            case _:
+                raise ValueError(
+                    f"Unrecognized output type"
+                    f" {output_object.output_config.output_info.output_type}"
+                )
+
+    return dtypes
+
+
+def _get_default_output_impute_fill_values(
+    outputs_objects: al_output_objects_as_dict,
+) -> al_fill_values:
+    fill_values: al_fill_values = {}
+    for output_name, output_object in outputs_objects.items():
+        match output_object:
+            case ComputedTabularOutputInfo():
+                fill_values[output_name] = _build_tabular_output_fill_value(
+                    output_object=output_object
+                )
+            case ComputedSequenceOutputInfo():
+                fill_values[output_name] = 0
+            case ComputedArrayOutputInfo():
+                fill_values[output_name] = torch.nan
+            case _:
+                raise ValueError(
+                    f"Unrecognized output type"
+                    f" {output_object.output_config.output_info.output_type}"
+                )
+
+    return fill_values
+
+
+def _build_tabular_output_fill_value(
+    output_object: Union["ComputedTabularOutputInfo",]
+) -> dict[str, int | float]:
+    fill_value: dict[str, int | float] = {}
+
+    output_type_info = output_object.output_config.output_type_info
+    assert isinstance(output_type_info, TabularOutputTypeConfig)
+
+    cat_columns = output_type_info.target_cat_columns
+    for cat_column in cat_columns:
+        fill_value[cat_column] = torch.nan
+
+    con_columns = output_type_info.target_con_columns
+    for con_column in con_columns:
+        fill_value[con_column] = torch.nan
+
+    return fill_value

@@ -72,7 +72,7 @@ def set_up_train_and_valid_tabular_data(
     custom_label_ops: al_all_column_ops,
     train_ids: Sequence[str],
     valid_ids: Sequence[str],
-    include_missing: bool = False,
+    impute_missing: bool = False,
 ) -> Labels:
     """
     Splits and does split based processing (e.g. scaling validation set with training
@@ -103,7 +103,7 @@ def set_up_train_and_valid_tabular_data(
         tabular_info=tabular_file_info,
         df_labels_train=df_labels_train,
         df_labels_valid=df_labels_valid,
-        include_missing=include_missing,
+        impute_missing=impute_missing,
     )
 
     train_labels_dict = df_labels_train.to_dict("index")
@@ -119,7 +119,9 @@ def set_up_train_and_valid_tabular_data(
 
 
 def _get_fit_label_transformers(
-    df_labels: pd.DataFrame, label_columns: al_target_columns
+    df_labels: pd.DataFrame,
+    label_columns: al_target_columns,
+    impute_missing: bool,
 ) -> al_label_transformers:
     label_transformers = {}
 
@@ -138,7 +140,9 @@ def _get_fit_label_transformers(
 
             cur_transformer = _get_transformer(column_type=column_type)
             cur_target_transformer_fit = _fit_transformer_on_label_column(
-                column_series=cur_series, transformer=cur_transformer
+                column_series=cur_series,
+                transformer=cur_transformer,
+                impute_missing=impute_missing,
             )
             label_transformers[label_column] = cur_target_transformer_fit
 
@@ -157,6 +161,7 @@ def _get_transformer(column_type):
 def _fit_transformer_on_label_column(
     column_series: pd.Series,
     transformer: al_label_transformers_object,
+    impute_missing: bool,
 ) -> al_label_transformers_object:
     """
     TODO:   Possibly use the categorical codes here directly in the fit call. Then we
@@ -169,13 +174,19 @@ def _fit_transformer_on_label_column(
     do we change the values of a categorical column?
     """
 
-    if isinstance(column_series.dtype, pd.CategoricalDtype):
-        series_values = column_series.cat.categories.values
+    if isinstance(column_series.dtype, object) and column_series.dtype != float:
+        series_values = np.unique(column_series.values)
+        if not impute_missing:
+            series_values = series_values[series_values != "nan"]
+        else:
+            series_values = np.append(series_values, "nan")
     else:
         series_values = column_series.values
+        series_values = series_values[~np.isnan(series_values)]
 
     series_values_streamlined = streamline_values_for_transformers(
-        transformer=transformer, values=series_values
+        transformer=transformer,
+        values=series_values,
     )
 
     transformer.fit(series_values_streamlined)
@@ -198,18 +209,47 @@ def streamline_values_for_transformers(
 
 
 def transform_label_df(
-    df_labels: pd.DataFrame, label_transformers: al_label_transformers
+    df_labels: pd.DataFrame,
+    label_transformers: al_label_transformers,
+    impute_missing: bool,
 ) -> pd.DataFrame:
+    """
+    If impute missing, we transform the values as they are, as we assume the
+    encoder has been fit on the missing values as well.
+    """
     df_labels_copy = df_labels.copy()
 
     for column_name, transformer_instance in label_transformers.items():
         series_values = df_labels_copy[column_name].values
-        series_values_streamlined = streamline_values_for_transformers(
-            transformer=transformer_instance, values=series_values
-        )
-
         transform_func = transformer_instance.transform
-        df_labels_copy[column_name] = transform_func(series_values_streamlined)
+
+        if impute_missing:
+            series_values_streamlined = streamline_values_for_transformers(
+                transformer=transformer_instance, values=series_values
+            )
+            df_labels_copy[column_name] = transform_func(series_values_streamlined)
+        else:
+            match transformer_instance:
+                case StandardScaler():
+                    non_nan_mask = df_labels_copy[column_name].notna()
+                case LabelEncoder():
+                    non_nan_mask = df_labels_copy[column_name] != "nan"
+                case _:
+                    raise ValueError()
+
+            non_nan_values = df_labels_copy.loc[non_nan_mask, column_name].values
+
+            series_values_streamlined = streamline_values_for_transformers(
+                transformer=transformer_instance,
+                values=non_nan_values,
+            )
+
+            transformed_values = transform_func(series_values_streamlined).squeeze()
+            df_labels_copy.loc[non_nan_mask, column_name] = transformed_values
+
+            match transformer_instance:
+                case LabelEncoder():
+                    df_labels_copy.loc[~non_nan_mask, column_name] = np.nan
 
     return df_labels_copy
 
@@ -429,14 +469,10 @@ def ensure_categorical_columns_and_format(df: pd.DataFrame) -> pd.DataFrame:
     df_copy = df.copy()
     for column in df_copy.columns:
         if df_copy[column].dtype == object:
-            logger.info(
-                "Implicitly casting %s of type 'object' to categorical dtype.", column
-            )
-            df_copy[column] = df_copy[column].astype(pd.CategoricalDtype())
+            df_copy[column] = df_copy[column].astype(str)
 
         if isinstance(df_copy[column].dtype, pd.CategoricalDtype):
-            mapping = {k: str(k) for k in df_copy[column].cat.categories}
-            df_copy[column] = df_copy[column].cat.rename_categories(mapping)
+            df_copy[column] = df_copy[column].astype(str)
 
     return df_copy
 
@@ -547,7 +583,7 @@ def _get_column_dtypes(
     dtypes = {}
 
     for cat_column in cat_columns:
-        dtypes[cat_column] = pd.CategoricalDtype()
+        dtypes[cat_column] = object
     for con_column in con_columns:
         dtypes[con_column] = float
 
@@ -852,8 +888,7 @@ def _check_parsed_label_df(
             f"Columns asked for in CL args ({missing_columns}) "
             f"missing from columns in label dataframe (with columns "
             f"{df_labels.columns}. The missing columns are not "
-            f"found in the raw label file and not calculated by a forward "
-            f"reference in the supplied custom library."
+            f"found in the raw label file."
         )
 
     assert df_labels.index.dtype == object
@@ -861,10 +896,10 @@ def _check_parsed_label_df(
     column_dtypes = df_labels.dtypes.to_dict()
 
     for column, dtype in column_dtypes.items():
-        assert isinstance(dtype, pd.CategoricalDtype) or dtype == float, (column, dtype)
+        assert isinstance(dtype, object) or dtype == float, (column, dtype)
 
-        if isinstance(dtype, pd.CategoricalDtype):
-            categories = df_labels[column].cat.categories
+        if isinstance(dtype, object) and dtype != float:
+            categories = np.unique(df_labels[column].values)
             assert all(isinstance(i, str) for i in categories), categories
 
     return df_labels
@@ -954,7 +989,7 @@ def _process_train_and_label_dfs(
     tabular_info: TabularFileInfo,
     df_labels_train: pd.DataFrame,
     df_labels_valid: pd.DataFrame,
-    include_missing: bool = False,
+    impute_missing: bool,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, al_label_transformers]:
     """
     NOTE: Possibly, we will run into problem here in the future in the scenario that
@@ -975,7 +1010,7 @@ def _process_train_and_label_dfs(
         con_label_columns=tabular_info.con_columns,
         con_manual_values=train_con_means,
         name="train df",
-        include_missing=include_missing,
+        impute_missing=impute_missing,
     )
 
     df_labels_valid_no_nan = handle_missing_label_values_in_df(
@@ -984,7 +1019,7 @@ def _process_train_and_label_dfs(
         con_label_columns=tabular_info.con_columns,
         con_manual_values=train_con_means,
         name="valid df",
-        include_missing=include_missing,
+        impute_missing=impute_missing,
     )
 
     label_columns: al_target_columns = {
@@ -992,13 +1027,19 @@ def _process_train_and_label_dfs(
         "cat": list(tabular_info.cat_columns),
     }
     fit_label_transformers = _get_fit_label_transformers(
-        df_labels=df_labels_train_no_nan, label_columns=label_columns
+        df_labels=df_labels_train_no_nan,
+        label_columns=label_columns,
+        impute_missing=impute_missing,
     )
     df_train_final = transform_label_df(
-        df_labels=df_labels_train_no_nan, label_transformers=fit_label_transformers
+        df_labels=df_labels_train_no_nan,
+        label_transformers=fit_label_transformers,
+        impute_missing=impute_missing,
     )
     df_valid_final = transform_label_df(
-        df_labels=df_labels_valid_no_nan, label_transformers=fit_label_transformers
+        df_labels=df_labels_valid_no_nan,
+        label_transformers=fit_label_transformers,
+        impute_missing=impute_missing,
     )
 
     return df_train_final, df_valid_final, fit_label_transformers
@@ -1015,15 +1056,15 @@ def handle_missing_label_values_in_df(
     df: pd.DataFrame,
     cat_label_columns: Sequence[str],
     con_label_columns: Sequence[str],
+    impute_missing: bool,
     con_manual_values: Union[Dict[str, float], None] = None,
     name: str = "df",
-    include_missing: bool = False,
 ) -> pd.DataFrame:
     df_filled_cat = _fill_categorical_nans(
         df=df,
         column_names=cat_label_columns,
         name=name,
-        include_missing=include_missing,
+        impute_missing=impute_missing,
     )
 
     if con_manual_values is None:
@@ -1034,6 +1075,7 @@ def handle_missing_label_values_in_df(
             column_names=con_label_columns,
             name=name,
             con_means_dict=con_manual_values,
+            impute_missing=impute_missing,
         )
 
     return df_filled_final
@@ -1042,7 +1084,7 @@ def handle_missing_label_values_in_df(
 def _fill_categorical_nans(
     df: pd.DataFrame,
     column_names: Sequence[str],
-    include_missing: bool,
+    impute_missing: bool,
     name: str = "df",
 ) -> pd.DataFrame:
     """
@@ -1051,16 +1093,17 @@ def _fill_categorical_nans(
     """
 
     missing_stats = _get_missing_stats_string(df=df, columns_to_check=column_names)
-    logger.debug(
-        "Replacing NaNs in categorical columns %s (counts: %s) in %s with 'NA'.",
-        column_names,
-        missing_stats,
-        name,
-    )
+
     for column in column_names:
-        na_found = df[column].isna().sum() != 0
-        if na_found or include_missing:
-            df[column] = df[column].cat.add_categories("NA").fillna("NA")
+        if impute_missing:
+            logger.debug(
+                "Replacing NaNs in categorical columns %s (counts: %s) "
+                "in %s with 'NA'.",
+                column_names,
+                missing_stats,
+                name,
+            )
+            df[column] = df[column].fillna("nan")
 
     return df
 
@@ -1069,18 +1112,21 @@ def _fill_continuous_nans(
     df: pd.DataFrame,
     column_names: Sequence[str],
     con_means_dict: Dict[str, float],
+    impute_missing: bool,
     name: str = "df",
 ) -> pd.DataFrame:
     missing_stats = _get_missing_stats_string(df=df, columns_to_check=column_names)
-    logger.debug(
-        "Replacing NaNs in continuous columns %s (counts: %s) in %s with %s",
-        column_names,
-        missing_stats,
-        name,
-        con_means_dict,
-    )
 
-    df[column_names] = df[column_names].fillna(con_means_dict)
+    if impute_missing:
+        logger.debug(
+            "Replacing NaNs in continuous columns %s (counts: %s) in %s with %s",
+            column_names,
+            missing_stats,
+            name,
+            con_means_dict,
+        )
+
+        df[column_names] = df[column_names].fillna(con_means_dict)
     return df
 
 

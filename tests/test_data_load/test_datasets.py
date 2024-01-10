@@ -408,9 +408,10 @@ def test_construct_dataset_init_params_from_cl_args(
         outputs=outputs_as_dict,
         inputs=inputs,
         test_mode=False,
+        missing_ids_per_output=target_labels.missing_ids_per_output,
     )
 
-    assert len(constructed_args) == 5
+    assert len(constructed_args) == 6
     assert len(constructed_args.get("inputs")) == 2
 
     gotten_input_names = set(constructed_args.get("inputs").keys())

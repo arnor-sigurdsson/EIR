@@ -36,7 +36,10 @@ from eir.predict_modules.predict_output_modules.predict_sequence_output import (
 from eir.predict_modules.predict_output_modules.predict_tabular_output import (
     predict_tabular_wrapper,
 )
-from eir.predict_modules.predict_target_setup import get_target_labels_for_testing
+from eir.predict_modules.predict_target_setup import (
+    MissingTargetsInfo,
+    get_target_labels_for_testing,
+)
 from eir.setup.config import Configs, get_main_parser
 from eir.setup.input_setup import al_input_objects_as_dict
 from eir.setup.output_setup import al_output_objects_as_dict
@@ -166,6 +169,7 @@ def predict(
         loss_function=loss_func,
         device=predict_experiment.configs.global_config.device,
         with_labels=predict_cl_args.evaluate,
+        missing_ids_per_output=predict_experiment.test_dataset.missing_ids_per_output,
     )
 
     hook_outputs = deregister_pre_evaluation_hooks(
@@ -189,7 +193,7 @@ def predict(
         predict_config=predict_experiment,
         all_predictions=predict_results.gathered_outputs,
         all_labels=predict_results.gathered_labels,
-        all_ids=predict_results.ids,
+        all_ids=predict_results.ids_per_output,
         predict_cl_args=predict_cl_args,
     )
 
@@ -270,11 +274,16 @@ def get_default_predict_experiment(
             custom_column_label_parsing_ops=label_ops,
             ids=test_ids,
         )
+        missing_ids_per_output = target_labels.missing_ids_per_output
     else:
         test_ids = label_setup.gather_all_ids_from_all_inputs(
             input_configs=configs_overloaded_for_predict.input_configs
         )
         target_labels = None
+        missing_ids_per_output = MissingTargetsInfo(
+            missing_ids_per_modality={},
+            missing_ids_within_modality={},
+        )
 
     test_inputs = set_up_inputs_for_predict(
         test_inputs_configs=configs_overloaded_for_predict.input_configs,
@@ -289,6 +298,7 @@ def get_default_predict_experiment(
         target_labels_dict=label_dict,
         inputs_as_dict=test_inputs,
         outputs_as_dict=loaded_train_experiment.outputs,
+        missing_ids_per_output=missing_ids_per_output,
     )
     predict_batch_size = _auto_set_test_batch_size(
         batch_size=configs_overloaded_for_predict.global_config.batch_size,

@@ -26,6 +26,7 @@ from tqdm import tqdm
 
 from eir.data_load.data_preparation_modules.imputation import (
     impute_missing_modalities_wrapper,
+    impute_missing_output_modalities_wrapper,
 )
 from eir.data_load.data_preparation_modules.input_preparation_wrappers import (
     get_input_data_loading_hooks,
@@ -59,7 +60,10 @@ from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from eir.setup.output_setup import al_output_objects_as_dict
-    from eir.target_setup.target_label_setup import MergedTargetLabels
+    from eir.target_setup.target_label_setup import (
+        MergedTargetLabels,
+        MissingTargetsInfo,
+    )
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -90,6 +94,7 @@ def set_up_datasets_from_configs(
         outputs=outputs_as_dict,
         test_mode=False,
         ids_to_keep=train_ids_to_keep,
+        missing_ids_per_output=target_labels.missing_ids_per_output,
     )
 
     valid_kwargs = construct_default_dataset_kwargs_from_cl_args(
@@ -98,6 +103,7 @@ def set_up_datasets_from_configs(
         outputs=outputs_as_dict,
         test_mode=True,
         ids_to_keep=valid_ids_to_keep,
+        missing_ids_per_output=target_labels.missing_ids_per_output,
     )
 
     train_dataset: al_datasets = dataset_class(**train_kwargs)
@@ -115,6 +121,7 @@ def construct_default_dataset_kwargs_from_cl_args(
     inputs: al_input_objects_as_dict,
     outputs: "al_output_objects_as_dict",
     test_mode: bool,
+    missing_ids_per_output: "MissingTargetsInfo",
     ids_to_keep: Union[None, Sequence[str]] = None,
 ) -> Dict[str, Any]:
     ids_to_keep_set = set(ids_to_keep) if ids_to_keep is not None else None
@@ -124,6 +131,7 @@ def construct_default_dataset_kwargs_from_cl_args(
         "outputs": outputs,
         "target_labels_dict": target_labels_dict,
         "test_mode": test_mode,
+        "missing_ids_per_output": missing_ids_per_output,
         "ids_to_keep": ids_to_keep_set,
     }
 
@@ -160,6 +168,7 @@ class DatasetBase(Dataset):
         inputs: al_input_objects_as_dict,
         outputs: "al_output_objects_as_dict",
         test_mode: bool,
+        missing_ids_per_output: "MissingTargetsInfo",
         target_labels_dict: Optional[al_target_label_dict] = None,
         ids_to_keep: Optional[Set[str]] = None,
     ):
@@ -171,6 +180,7 @@ class DatasetBase(Dataset):
         self.outputs = outputs
         self.test_mode = test_mode
         self.target_labels_dict = target_labels_dict if target_labels_dict else {}
+        self.missing_ids_per_output = missing_ids_per_output
         self.ids_to_keep = set(ids_to_keep) if ids_to_keep else None
 
     def init_label_attributes(self):
@@ -505,8 +515,12 @@ class DiskDataset(DatasetBase):
             output_objects=self.outputs,
         )
 
+        targets_final = impute_missing_output_modalities_wrapper(
+            outputs_values=targets_prepared, output_objects=self.outputs
+        )
+
         sample_id = sample.sample_id
-        return inputs_final, targets_prepared, sample_id
+        return inputs_final, targets_final, sample_id
 
     def __len__(self):
         return len(self.samples)
@@ -550,9 +564,13 @@ class MemoryDataset(DatasetBase):
             output_objects=self.outputs,
         )
 
+        targets_final = impute_missing_output_modalities_wrapper(
+            outputs_values=targets_prepared, output_objects=self.outputs
+        )
+
         sample_id = sample.sample_id
 
-        return inputs_final, targets_prepared, sample_id
+        return inputs_final, targets_final, sample_id
 
     def __len__(self):
         return len(self.samples)

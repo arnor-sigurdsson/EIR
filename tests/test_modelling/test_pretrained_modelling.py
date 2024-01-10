@@ -85,6 +85,18 @@ def _get_pre_trained_module_setup_parametrization() -> Dict:
                 {
                     "output_info": {"output_name": "test_output_sequence"},
                 },
+                {
+                    "output_info": {
+                        "output_name": "test_output_array_cnn",
+                    },
+                    "model_config": {
+                        "model_type": "cnn",
+                        "model_init_config": {
+                            "channel_exp_base": 3,
+                            "allow_pooling": False,
+                        },
+                    },
+                },
             ],
         },
     }
@@ -100,7 +112,9 @@ def _get_pre_trained_module_setup_parametrization() -> Dict:
                 "omics",
                 "sequence",
                 "image",
+                "array",
             ),
+            "extras": {"array_dims": 1},
             "manual_test_data_creator": lambda: "test_multi_modal_multi_task",
         }
     ],
@@ -121,15 +135,20 @@ def test_pre_trained_module_setup(
     train.train(experiment=experiment)
 
     _get_experiment_overloaded_for_pretrained_extractor(
-        experiment=experiment, test_config=test_config, rename_pretrained_inputs=False
+        experiment=experiment,
+        test_config=test_config,
+        rename_pretrained_inputs=False,
     )
 
     _get_experiment_overloaded_for_pretrained_extractor(
-        experiment=experiment, test_config=test_config, rename_pretrained_inputs=True
+        experiment=experiment,
+        test_config=test_config,
+        rename_pretrained_inputs=True,
     )
 
     _get_experiment_overloaded_for_pretrained_checkpoint(
-        experiment=experiment, test_config=test_config
+        experiment=experiment,
+        test_config=test_config,
     )
 
     _get_experiment_overloaded_for_pretrained_checkpoint(
@@ -186,7 +205,9 @@ def _add_new_feature_extractor_to_experiment(
                 "omics",
                 "sequence",
                 "image",
+                "array",
             ),
+            "extras": {"array_dims": 1},
             "manual_test_data_creator": lambda: "test_multi_modal_multi_task",
         }
     ],
@@ -261,6 +282,18 @@ def _add_new_feature_extractor_to_experiment(
                     {
                         "output_info": {"output_name": "test_output_sequence"},
                     },
+                    {
+                        "output_info": {
+                            "output_name": "test_output_array_cnn",
+                        },
+                        "model_config": {
+                            "model_type": "cnn",
+                            "model_init_config": {
+                                "channel_exp_base": 3,
+                                "allow_pooling": False,
+                            },
+                        },
+                    },
                 ],
             },
         }
@@ -278,7 +311,9 @@ def test_pre_training_and_loading(
         pretrained_experiment,
         pretrained_test_config,
     ) = _get_experiment_overloaded_for_pretrained_extractor(
-        experiment=experiment, test_config=test_config, rename_pretrained_inputs=True
+        experiment=experiment,
+        test_config=test_config,
+        rename_pretrained_inputs=True,
     )
 
     train.train(experiment=pretrained_experiment)

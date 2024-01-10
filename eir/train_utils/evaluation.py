@@ -17,6 +17,7 @@ from eir.setup.output_setup import (
     al_output_objects_as_dict,
 )
 from eir.setup.schemas import GlobalConfig
+from eir.target_setup.target_label_setup import MissingTargetsInfo
 from eir.train_utils import metrics, utils
 from eir.train_utils.evaluation_handlers.train_handlers_array_output import (
     array_out_single_sample_evaluation_wrapper,
@@ -68,6 +69,7 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
         experiment_metrics=exp.metrics,
         loss_function=exp.loss_function,
         device=gc.device,
+        missing_ids_per_output=exp.valid_dataset.missing_ids_per_output,
         with_labels=True,
     )
 
@@ -95,7 +97,7 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
         save_tabular_evaluation_results_wrapper(
             val_outputs=evaluation_results.gathered_outputs,
             val_labels=evaluation_results.gathered_labels,
-            val_ids=evaluation_results.ids,
+            val_ids=evaluation_results.ids_per_output,
             iteration=iteration,
             experiment=handler_config.experiment,
         )
@@ -145,7 +147,8 @@ def register_pre_evaluation_hooks(
     if global_config.latent_sampling is not None:
         for layer_path in global_config.latent_sampling.layers_to_sample:
             model_hook_finalizers[f"latent_{layer_path}"] = register_latent_hook(
-                model=model, layer_path=layer_path
+                model=model,
+                layer_path=layer_path,
             )
 
     return model_hook_finalizers
@@ -224,7 +227,8 @@ class EvaluationResults:
     metrics_with_averages: metrics.al_step_metric_dict
     gathered_outputs: dict[str, dict[str, torch.Tensor]]
     gathered_labels: dict[str, dict[str, torch.Tensor]]
-    ids: list[str]
+    ids_per_output: dict[str, dict[str, list[str]]]
+    all_ids: list[str]
 
 
 def run_split_evaluation(
@@ -235,6 +239,7 @@ def run_split_evaluation(
     experiment_metrics: metrics.al_metric_record_dict,
     loss_function: Callable,
     device: str,
+    missing_ids_per_output: MissingTargetsInfo,
     with_labels: bool = True,
 ) -> EvaluationResults:
     """
@@ -307,11 +312,18 @@ def run_split_evaluation(
         list_of_target_batch_dicts=full_gathered_output_batches_total
     )
 
+    filtered_values = metrics.filter_missing_outputs_and_labels(
+        batch_ids=full_gathered_ids_total,
+        model_outputs=full_gathered_output_batches_stacked,
+        target_labels=full_gathered_label_batches_stacked,
+        missing_ids_info=missing_ids_per_output,
+    )
+
     full_gathered_metrics = {}
     if with_labels and len(split_output_objects.gather) > 0:
         full_gathered_metrics = compute_eval_metrics_wrapper(
-            val_outputs=full_gathered_output_batches_stacked,
-            val_target_labels=full_gathered_label_batches_stacked,
+            val_outputs=filtered_values.model_outputs,
+            val_target_labels=filtered_values.target_labels,
             outputs=split_output_objects.gather,
             experiment_metrics=experiment_metrics,
             loss_function=loss_function,
@@ -322,9 +334,10 @@ def run_split_evaluation(
 
     evaluation_results = EvaluationResults(
         metrics_with_averages=all_metrics,
-        gathered_outputs=full_gathered_output_batches_stacked,
-        gathered_labels=full_gathered_label_batches_stacked,
-        ids=full_gathered_ids_total,
+        gathered_outputs=filtered_values.model_outputs,
+        gathered_labels=filtered_values.target_labels,
+        ids_per_output=filtered_values.ids,
+        all_ids=full_gathered_ids_total,
     )
 
     return evaluation_results
@@ -406,6 +419,7 @@ def compute_eval_metrics_wrapper(
     val_target_labels = model_training_utils.parse_tabular_target_labels(
         output_objects=outputs, device=device, labels=val_target_labels
     )
+
     eval_metrics_dict = metrics.calculate_batch_metrics(
         outputs_as_dict=outputs,
         outputs=val_outputs,
@@ -437,7 +451,7 @@ def compute_eval_metrics_wrapper(
 def save_tabular_evaluation_results_wrapper(
     val_outputs: Dict[str, Dict[str, torch.Tensor]],
     val_labels: Dict[str, Dict[str, torch.Tensor]],
-    val_ids: List[str],
+    val_ids: dict[str, dict[str, list[str]]],
     iteration: int,
     experiment: "Experiment",
 ) -> None:
@@ -463,10 +477,12 @@ def save_tabular_evaluation_results_wrapper(
                 cur_val_labels_np = cur_val_labels.cpu().numpy()
                 target_transformers = output_object.target_transformers
 
+                cur_val_ids = val_ids[output_name][column_name]
+
                 plot_config = PerformancePlotConfig(
                     val_outputs=cur_val_outputs_np,
                     val_labels=cur_val_labels_np,
-                    val_ids=val_ids,
+                    val_ids=cur_val_ids,
                     iteration=iteration,
                     column_name=column_name,
                     column_type=column_type,

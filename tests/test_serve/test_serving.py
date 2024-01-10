@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, Sequence, Tuple
 import numpy as np
 import pandas as pd
 import pytest
+from aislib.misc_utils import get_logger
 from scipy.spatial.distance import cosine
 from sklearn.metrics import mean_squared_error
 
@@ -23,6 +24,9 @@ if TYPE_CHECKING:
     from tests.setup_tests.fixtures_create_configs import TestConfigInits
     from tests.setup_tests.fixtures_create_data import TestDataConfig
     from tests.setup_tests.fixtures_create_experiment import ModelTestConfig
+
+
+logger = get_logger(name=__name__)
 
 
 def get_parametrization():
@@ -149,8 +153,8 @@ def get_base_parametrization(compiled: bool = False) -> dict:
                 "array",
             ),
             "extras": {"array_dims": 1},
-            "manual_test_data_creator": lambda: "test_multi_modal_multi_task_serving",
-            "random_samples_dropped_from_modalities": False,
+            "manual_test_data_creator": lambda: "test_multi_modal_multi_task",
+            "random_samples_dropped_from_modalities": True,
             "source": "local",
         },
     ],
@@ -165,6 +169,13 @@ def test_multi_serving(
     create_test_config_init_base: Tuple["TestConfigInits", "TestDataConfig"],
     prep_modelling_test_configs: Tuple[train.Experiment, "ModelTestConfig"],
 ):
+    """
+    We have the retries below as sometimes we can get random IDs of samples
+    that have partially dropped modalities, and currently the function that
+    crafts the example code (as well as the serving module) expects all
+    modalities to be present. This is something we can fix/update in the future.
+    """
+
     _, test_data_config = create_test_config_init_base
     experiment, test_config = prep_modelling_test_configs
 
@@ -186,11 +197,23 @@ def test_multi_serving(
     ids = []
     example_requests = []
 
-    for i in range(10):
-        random_id, example_request = _craft_example_request(
-            scoped_test_path=test_data_config.scoped_tmp_path,
-            input_configs=input_configs,
-        )
+    n_sample_requests = 10
+    n_retries_per_request = 10
+    for i in range(n_sample_requests):
+        n_cur_retries = 0
+
+        try:
+            random_id, example_request = _craft_example_request(
+                scoped_test_path=test_data_config.scoped_tmp_path,
+                input_configs=input_configs,
+            )
+        except Exception as e:
+            if n_cur_retries < n_retries_per_request:
+                n_cur_retries += 1
+                continue
+            else:
+                raise e
+
         ids.append(random_id)
         example_requests.append(example_request)
 
@@ -246,6 +269,18 @@ def _craft_example_request(
             example_request[input_name] = str(array_path)
 
         elif input_type == "tabular":
+            # for now, we just fail here if we have a missing value
+            # allowing only fully complete samples
+            # later we can add something more sophisticated if needed
+            # note that we check for *all* columns, not just the ones
+            # that are inputs, so we can properly compare the results
+            any_na = (
+                labels_df.loc[labels_df["ID"] == random_id].isna().any(axis=1).iloc[0]
+            )
+
+            if any_na:
+                assert False
+
             cat_columns = list(config.input_type_info.input_cat_columns)
             con_columns = list(config.input_type_info.input_con_columns)
             all_columns = cat_columns + con_columns
@@ -254,6 +289,7 @@ def _craft_example_request(
 
             for col in all_columns:
                 value = labels_df.loc[labels_df["ID"] == random_id, col].iloc[0]
+
                 tabular_data[col] = value
 
             example_request[input_name] = tabular_data

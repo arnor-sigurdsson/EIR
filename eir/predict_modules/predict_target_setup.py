@@ -25,8 +25,11 @@ from eir.setup.schemas import (
     TabularOutputTypeConfig,
 )
 from eir.target_setup.target_label_setup import (
+    MissingTargetsInfo,
+    compute_missing_ids_per_tabular_output,
     df_to_nested_dict,
     gather_data_pointers_from_data_source,
+    gather_torch_nan_missing_ids,
     get_tabular_target_file_infos,
 )
 
@@ -45,6 +48,7 @@ class PredictTargetLabels:
 class MergedPredictTargetLabels:
     label_dict: al_target_label_dict
     label_transformers: dict[str, dict[str, al_label_transformers]]
+    missing_ids_per_output: MissingTargetsInfo
 
     @property
     def all_labels(self):
@@ -125,11 +129,14 @@ def parse_labels_for_predict(
         con_label_columns=con_columns,
         con_manual_values=train_con_column_means,
         name="test_df",
+        impute_missing=False,
     )
 
     assert len(label_transformers) > 0
     df_labels_test = transform_label_df(
-        df_labels=df_labels_test, label_transformers=label_transformers
+        df_labels=df_labels_test,
+        label_transformers=label_transformers,
+        impute_missing=False,
     )
 
     test_labels_dict = df_labels_test.to_dict(orient="index")
@@ -168,6 +175,10 @@ def get_target_labels_for_testing(
     df_labels_test = pd.DataFrame(index=list(ids))
     tabular_label_transformers = {}
 
+    all_ids: set[str] = set(ids)
+    per_modality_missing_ids: dict[str, set[str]] = {}
+    within_modality_missing_ids: dict[str, dict[str, set[str]]] = {}
+
     tabular_target_files_info = get_tabular_target_file_infos(
         output_configs=pc.output_configs
     )
@@ -188,11 +199,31 @@ def get_target_labels_for_testing(
                 )
                 tabular_label_transformers[output_name] = cur_labels.label_transformers
 
+                per_modality_missing_ids[output_name] = all_ids.difference(
+                    set(cur_labels.all_labels.keys())
+                )
+
+                missing_ids_per_target_column = compute_missing_ids_per_tabular_output(
+                    tabular_labels=cur_labels,
+                    tabular_info=cur_tabular_info,
+                    output_name=output_name,
+                )
+                within_modality_missing_ids = {
+                    **within_modality_missing_ids,
+                    **missing_ids_per_target_column,
+                }
+
             case ArrayOutputTypeConfig():
                 cur_labels = _set_up_predict_file_target_labels(
                     ids=ids,
                     output_config=output_config,
                 )
+
+                cur_missing_ids = gather_torch_nan_missing_ids(
+                    labels=cur_labels.all_labels,
+                    output_name=output_name,
+                )
+                per_modality_missing_ids[output_name] = cur_missing_ids
 
             case SequenceOutputTypeConfig():
                 cur_labels = set_up_delayed_predict_target_labels(
@@ -200,9 +231,13 @@ def get_target_labels_for_testing(
                     output_name=output_name,
                 )
 
+                per_modality_missing_ids[output_name] = all_ids.difference(
+                    set(cur_labels.all_labels.keys())
+                )
+
             case _:
                 raise NotImplementedError(
-                    f"Output type {output_type_info} " f"not implemented"
+                    f"Output type {output_type_info} not implemented"
                 )
 
         df_labels_cur = pd.DataFrame.from_dict(cur_labels.label_dict, orient="index")
@@ -217,9 +252,15 @@ def get_target_labels_for_testing(
 
     test_labels_dict = df_to_nested_dict(df=df_labels_test)
 
+    missing_target_info = MissingTargetsInfo(
+        missing_ids_per_modality=per_modality_missing_ids,
+        missing_ids_within_modality=within_modality_missing_ids,
+    )
+
     test_labels_object = MergedPredictTargetLabels(
         label_dict=test_labels_dict,
         label_transformers=tabular_label_transformers,
+        missing_ids_per_output=missing_target_info,
     )
 
     return test_labels_object

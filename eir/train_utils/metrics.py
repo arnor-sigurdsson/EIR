@@ -42,6 +42,7 @@ from torch.utils.tensorboard import SummaryWriter
 from eir.data_load.data_utils import get_output_info_generator
 from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
 from eir.setup.schemas import OutputConfig
+from eir.target_setup.target_label_setup import MissingTargetsInfo
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -347,14 +348,14 @@ def calculate_prediction_losses(
 
     for output_name, target_dict in inputs.items():
         for output_head_name, input_tensor in target_dict.items():
-            cur_target_col_labels = targets[output_name][output_head_name]
+            cur_inner_target = targets[output_name][output_head_name]
             criterion = criteria[output_name][output_head_name]
 
             if output_name not in losses_dict:
                 losses_dict[output_name] = {}
 
             losses_dict[output_name][output_head_name] = criterion(
-                input=input_tensor, target=cur_target_col_labels
+                input=input_tensor, target=cur_inner_target
             )
 
     return losses_dict
@@ -849,3 +850,82 @@ def get_performance_averaging_functions(
     }
 
     return performance_averaging_functions
+
+
+@dataclass
+class FilteredOutputsAndLabels:
+    model_outputs: Dict[str, Dict[str, torch.Tensor]]
+    target_labels: Dict[str, Dict[str, torch.Tensor]]
+    ids: Dict[str, Dict[str, List[str]]]
+
+
+def filter_missing_outputs_and_labels(
+    batch_ids: list[str],
+    model_outputs: Dict[str, Dict[str, torch.Tensor]],
+    target_labels: Dict[str, Dict[str, torch.Tensor]],
+    missing_ids_info: MissingTargetsInfo,
+) -> FilteredOutputsAndLabels:
+    """
+    Note: Later we can maybe have pre-computed sets of IDs per modality-output
+    combination, which might be more efficient than the current approach. One could
+    perhaps set up some nice data structures for this.
+    """
+    filtered_outputs = {}
+    filtered_labels = {}
+    filtered_ids: dict[str, dict[str, list[str]]] = {}
+
+    for output_name, output_inner_dict in model_outputs.items():
+        missing_modality_ids = missing_ids_info.missing_ids_per_modality.get(
+            output_name, set()
+        )
+
+        filtered_inner_dict = {}
+        filtered_inner_labels = {}
+        filtered_inner_ids = {}
+
+        missing_within_modality = missing_ids_info.missing_ids_within_modality
+        for inner_key, modality_output_tensor in output_inner_dict.items():
+            cur_missing_ids = missing_within_modality.get(output_name, {}).get(
+                inner_key, set()
+            )
+
+            no_missing = not cur_missing_ids and not missing_modality_ids
+            if no_missing:
+                filtered_inner_dict[inner_key] = modality_output_tensor
+                filtered_inner_labels[inner_key] = target_labels[output_name][inner_key]
+                filtered_inner_ids[inner_key] = batch_ids
+                continue
+
+            combined_missing_ids = missing_modality_ids.union(cur_missing_ids)
+
+            valid_indices = [
+                i for i, id_ in enumerate(batch_ids) if id_ not in combined_missing_ids
+            ]
+
+            all_valid = len(valid_indices) == len(batch_ids)
+            if all_valid:
+                filtered_inner_dict[inner_key] = modality_output_tensor
+                filtered_inner_labels[inner_key] = target_labels[output_name][inner_key]
+                filtered_inner_ids[inner_key] = batch_ids
+                continue
+
+            valid_indices_tensor = torch.tensor(valid_indices)
+
+            output_tensor = modality_output_tensor[valid_indices_tensor]
+            filtered_inner_dict[inner_key] = output_tensor
+
+            target_tensor = target_labels[output_name][inner_key]
+            filtered_inner_labels[inner_key] = target_tensor[valid_indices_tensor]
+
+            ids: list[str] = [batch_ids[i] for i in valid_indices]
+            filtered_inner_ids[inner_key] = ids
+
+        filtered_outputs[output_name] = filtered_inner_dict
+        filtered_labels[output_name] = filtered_inner_labels
+        filtered_ids[output_name] = filtered_inner_ids
+
+    return FilteredOutputsAndLabels(
+        model_outputs=filtered_outputs,
+        target_labels=filtered_labels,
+        ids=filtered_ids,
+    )

@@ -1,12 +1,23 @@
 from dataclasses import dataclass
 from functools import partial
-from typing import TYPE_CHECKING, Any, Dict, Generator, Iterable, Protocol, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Generator,
+    Iterable,
+    Protocol,
+    Sequence,
+    Tuple,
+)
 
 import numpy as np
 import torch
 from timm.data.mixup import rand_bbox
 
 from eir.data_load.data_utils import Batch, get_output_info_generator
+from eir.target_setup.target_label_setup import MissingTargetsInfo
+from eir.train_utils.metrics import filter_missing_outputs_and_labels
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -23,6 +34,7 @@ logger = get_logger(name=__name__)
 
 @dataclass
 class MixingObject:
+    ids: Sequence[str]
     targets: "al_training_labels_target"
     targets_permuted: "al_training_labels_target"
     lambda_: float
@@ -112,6 +124,7 @@ def hook_default_mix_data(
     target_columns_gen = get_output_info_generator(outputs_as_dict=experiment.outputs)
 
     mixing_info = get_mixing_info(
+        ids=batch.ids,
         mixing_alpha=gc.mixing_alpha,
         batch_size=gc.batch_size,
         target_labels=batch.target_labels,
@@ -144,6 +157,7 @@ def hook_default_mix_data(
 
 
 def get_mixing_info(
+    ids: Sequence[str],
     mixing_alpha: float,
     batch_size: int,
     target_labels: "al_training_labels_target",
@@ -154,11 +168,12 @@ def get_mixing_info(
     permuted_indexes = get_random_batch_indices_to_mix(batch_size=batch_size)
     targets_permuted = mixup_all_targets(
         targets=target_labels,
-        random_index_for_mixing=permuted_indexes,
+        permuted_indices_for_mixing=permuted_indexes,
         target_columns_gen=target_columns_gen,
     )
 
     mixing_info = MixingObject(
+        ids=ids,
         targets=target_labels,
         targets_permuted=targets_permuted,
         lambda_=lambda_,
@@ -178,7 +193,13 @@ def _sample_lambda(mixing_alpha: float) -> float:
     return lambda_
 
 
-def hook_mix_loss(experiment: "Experiment", state: Dict, *args, **kwargs) -> Dict:
+def hook_mix_loss(
+    experiment: "Experiment",
+    state: Dict,
+    batch: "Batch",
+    *args,
+    **kwargs,
+) -> Dict:
     target_columns_gen = get_output_info_generator(outputs_as_dict=experiment.outputs)
 
     mixed_losses = calc_all_mixed_losses(
@@ -186,6 +207,7 @@ def hook_mix_loss(experiment: "Experiment", state: Dict, *args, **kwargs) -> Dic
         criteria=experiment.criteria,
         outputs=state["model_outputs"],
         mixed_object=state["mixing_info"],
+        missing_ids_per_output=experiment.valid_dataset.missing_ids_per_output,
     )
 
     state_updates = {"per_target_train_losses": mixed_losses}
@@ -262,7 +284,7 @@ def get_uniform_cutmix_indices(input_length: int, lambda_: float) -> torch.Tenso
 
 def mixup_all_targets(
     targets: "al_training_labels_target",
-    random_index_for_mixing: torch.Tensor,
+    permuted_indices_for_mixing: torch.Tensor,
     target_columns_gen: Generator[Tuple[str, str, str], None, None],
 ) -> "al_training_labels_target":
     targets_permuted: "al_training_labels_target" = {}
@@ -273,7 +295,8 @@ def mixup_all_targets(
 
         cur_targets = targets[output_name][target_name]
         cur_targets_permuted = mixup_targets(
-            targets=cur_targets, random_index_for_mixing=random_index_for_mixing
+            targets=cur_targets,
+            permuted_indices_for_mixing=permuted_indices_for_mixing,
         )
         targets_permuted[output_name][target_name] = cur_targets_permuted
 
@@ -282,10 +305,10 @@ def mixup_all_targets(
 
 def mixup_targets(
     targets: al_target_values,
-    random_index_for_mixing: torch.Tensor,
+    permuted_indices_for_mixing: torch.Tensor,
 ) -> al_target_values:
     targets_permuted = targets.detach().clone()
-    targets_permuted = targets_permuted[random_index_for_mixing]
+    targets_permuted = targets_permuted[permuted_indices_for_mixing]
 
     return targets_permuted
 
@@ -295,17 +318,38 @@ def calc_all_mixed_losses(
     criteria: "al_criteria_dict",
     outputs: dict[str, dict[str, torch.Tensor]],
     mixed_object: MixingObject,
+    missing_ids_per_output: MissingTargetsInfo,
 ) -> dict[str, dict[str, torch.Tensor]]:
     losses: dict[str, dict[str, torch.Tensor]] = {
         output_name: {} for output_name in outputs.keys()
     }
 
+    model_outputs = outputs
+    target_labels = mixed_object.targets
+
+    filtered_outputs = filter_missing_outputs_and_labels(
+        batch_ids=list(mixed_object.ids),
+        model_outputs=model_outputs,
+        target_labels=target_labels,
+        missing_ids_info=missing_ids_per_output,
+    )
+
+    target_labels_permuted = mixed_object.targets_permuted
+    ids_permuted = [mixed_object.ids[i] for i in mixed_object.permuted_indexes]
+    filtered_outputs_permuted = filter_missing_outputs_and_labels(
+        batch_ids=ids_permuted,
+        model_outputs=model_outputs,
+        target_labels=target_labels_permuted,
+        missing_ids_info=missing_ids_per_output,
+    )
+    filtered_targets_permuted = filtered_outputs_permuted.target_labels
+
     for output_name, target_type, target_name in target_columns_gen:
         cur_loss = calc_mixed_loss(
             criterion=criteria[output_name][target_name],
-            outputs=outputs[output_name][target_name],
-            targets=mixed_object.targets[output_name][target_name],
-            targets_permuted=mixed_object.targets_permuted[output_name][target_name],
+            outputs=filtered_outputs.model_outputs[output_name][target_name],
+            targets=filtered_outputs.target_labels[output_name][target_name],
+            targets_permuted=filtered_targets_permuted[output_name][target_name],
             lambda_=mixed_object.lambda_,
         )
         losses[output_name][target_name] = cur_loss

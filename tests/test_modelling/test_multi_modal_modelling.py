@@ -88,6 +88,18 @@ def get_base_parametrization(compiled: bool = False) -> dict:
                 {
                     "output_info": {"output_name": "test_output_sequence"},
                 },
+                {
+                    "output_info": {
+                        "output_name": "test_output_array_cnn",
+                    },
+                    "model_config": {
+                        "model_type": "cnn",
+                        "model_init_config": {
+                            "channel_exp_base": 3,
+                            "allow_pooling": False,
+                        },
+                    },
+                },
             ],
         },
     }
@@ -104,7 +116,9 @@ def get_base_parametrization(compiled: bool = False) -> dict:
                 "omics",
                 "sequence",
                 "image",
+                "array",
             ),
+            "extras": {"array_dims": 1},
             "manual_test_data_creator": lambda: "test_multi_modal_multi_task",
             "random_samples_dropped_from_modalities": True,
             "source": "local",
@@ -115,7 +129,9 @@ def get_base_parametrization(compiled: bool = False) -> dict:
                 "omics",
                 "sequence",
                 "image",
+                "array",
             ),
+            "extras": {"array_dims": 1},
             "manual_test_data_creator": lambda: "test_multi_modal_multi_task",
             "source": "deeplake",
         },
