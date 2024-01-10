@@ -124,7 +124,9 @@ def parse_tabular_target_labels(
                         dtype=torch.float, device=device
                     )
                 elif column_type == ColumnType.CAT.value:
-                    cur_labels = replace_nan_and_cast_to_long(cur_labels=cur_labels)
+                    cur_labels = replace_nan_and_cast_to_long(
+                        cur_labels=cur_labels.to(dtype=torch.float), device=device
+                    )
                     labels_casted[output_name_][column_name] = cur_labels.to(
                         dtype=torch.long, device=device
                     )
@@ -142,6 +144,7 @@ def parse_tabular_target_labels(
 
 def replace_nan_and_cast_to_long(
     cur_labels: torch.Tensor,
+    device: str,
     replacement_value: int = -1,
 ) -> torch.Tensor:
     """
@@ -163,12 +166,12 @@ def replace_nan_and_cast_to_long(
     different platforms.
 
     Example:
-    >>> cur_labels = torch.tensor([nan, nan, 2., nan, 1.], dtype=torch.float64)
+    >>> cur_labels = torch.tensor([nan, nan, 2., nan, 1.], dtype=torch.float32)
     >>> cur_labels.to(dtype=torch.long)
     tensor([0, 0, 2, 0, 1])
     or
     tensor([-9223372036854775808, -9223372036854775808, 2, -9223372036854775808, 1])
-    >>> cur_labels = torch.tensor([nan, nan, 2., nan, 1.], dtype=torch.float64)
+    >>> cur_labels = torch.tensor([nan, nan, 2., nan, 1.], dtype=torch.float32)
     >>> replace_nan_and_cast_to_long(cur_labels)
     tensor([-1, -1,  2, -1,  1])
 
@@ -178,9 +181,15 @@ def replace_nan_and_cast_to_long(
     potentially a reasonable choice.
     """
 
-    cur_labels = cur_labels.where(
-        ~cur_labels.isnan(), torch.tensor(replacement_value, dtype=torch.float64)
+    replacement_tensor = torch.tensor(
+        replacement_value,
+        dtype=torch.float32,
+        device=device,
     )
+
+    cur_labels = cur_labels.to(device=device)
+
+    cur_labels = cur_labels.where(~cur_labels.isnan(), replacement_tensor)
     return cur_labels.to(dtype=torch.long)
 
 
