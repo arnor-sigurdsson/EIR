@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock
 
 import numpy as np
+import pytest
 from PIL import Image
 
 from eir.data_load.data_preparation_modules import prepare_image
@@ -10,12 +11,14 @@ from eir.setup.input_setup_modules.setup_image import (
 )
 
 
-def test_prepare_image_data():
+@pytest.mark.parametrize("resize_approach", ["resize", "randomcrop", "centercrop"])
+def test_prepare_image_data(resize_approach):
     normalization_stats = ImageNormalizationStats(channel_means=[0], channel_stds=[0.1])
     base_transforms, all_transforms = get_image_transforms(
         target_size=(32, 32),
         normalization_stats=normalization_stats,
         auto_augment=False,
+        resize_approach=resize_approach,
     )
 
     input_config_mock = MagicMock()
