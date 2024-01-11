@@ -19,6 +19,7 @@ from eir.models.model_setup_modules.output_model_setup_modules.output_model_setu
 from eir.models.model_setup_modules.output_model_setup_modules.output_model_setup_tabular import (  # noqa
     get_tabular_output_module_from_model_config,
 )
+from eir.models.model_training_utils import recursive_to_device
 from eir.models.output.sequence.sequence_output_modules import (
     SequenceOutputModuleConfig,
 )
@@ -65,6 +66,8 @@ def general_post_process(
         - array outputs: np.ndarray
     """
     post_processed: dict[str, Any] = {}
+
+    outputs = recursive_to_device(obj=outputs, device="cpu")
 
     for output_name, output_object in output_objects.items():
         output_model_config = output_object.output_config.model_config

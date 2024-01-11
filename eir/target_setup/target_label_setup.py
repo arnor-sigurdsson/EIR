@@ -75,7 +75,7 @@ def log_missing_targets_info(
 
     logger.info(
         "Checking for missing target information. "
-        "These will be ignored during loss and metric computation.\n"
+        "These will be ignored during loss and metric computation."
     )
 
     total_ids_count = len(all_ids)

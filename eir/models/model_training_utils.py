@@ -78,12 +78,12 @@ def prepare_all_targets(
         labels=labels,
     )
 
-    labels_prepared = _recursive_to_device(obj=labels_prepared, device=device)
+    labels_prepared = recursive_to_device(obj=labels_prepared, device=device)
 
     return labels_prepared
 
 
-def _recursive_to_device(
+def recursive_to_device(
     obj: Any,
     device: str,
 ) -> Any:
@@ -91,11 +91,11 @@ def _recursive_to_device(
         return obj.to(device=device)
     elif isinstance(obj, dict):
         return {
-            key: _recursive_to_device(obj=value, device=device)
+            key: recursive_to_device(obj=value, device=device)
             for key, value in obj.items()
         }
     elif isinstance(obj, list):
-        return [_recursive_to_device(obj=value, device=device) for value in obj]
+        return [recursive_to_device(obj=value, device=device) for value in obj]
     else:
         return obj
 
