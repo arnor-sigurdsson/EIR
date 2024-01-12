@@ -98,6 +98,11 @@ def set_up_train_and_valid_tabular_data(
     )
     pre_check_label_df(df=df_labels_train, name="Training DataFrame")
     pre_check_label_df(df=df_labels_valid, name="Validation DataFrame")
+    check_train_valid_df_sync(
+        df_train=df_labels_train,
+        df_valid=df_labels_valid,
+        cat_columns=tabular_file_info.cat_columns,
+    )
 
     df_labels_train, df_labels_valid, label_transformers = _process_train_and_label_dfs(
         tabular_info=tabular_file_info,
@@ -119,7 +124,8 @@ def set_up_train_and_valid_tabular_data(
 
 
 def _get_fit_label_transformers(
-    df_labels: pd.DataFrame,
+    df_labels_train: pd.DataFrame,
+    df_labels_full: pd.DataFrame,
     label_columns: al_target_columns,
     impute_missing: bool,
 ) -> al_label_transformers:
@@ -136,7 +142,12 @@ def _get_fit_label_transformers(
             )
 
         for label_column in label_columns_for_cur_type:
-            cur_series = df_labels[label_column]
+            if column_type == "con":
+                cur_series = df_labels_train[label_column]
+            elif column_type == "cat":
+                cur_series = df_labels_full[label_column]
+            else:
+                raise ValueError()
 
             cur_transformer = _get_transformer(column_type=column_type)
             cur_target_transformer_fit = _fit_transformer_on_label_column(
@@ -225,7 +236,8 @@ def transform_label_df(
 
         if impute_missing:
             series_values_streamlined = streamline_values_for_transformers(
-                transformer=transformer_instance, values=series_values
+                transformer=transformer_instance,
+                values=series_values,
             )
             df_labels_copy[column_name] = transform_func(series_values_streamlined)
         else:
@@ -680,6 +692,47 @@ def pre_check_label_df(df: pd.DataFrame, name: str) -> None:
             )
 
 
+def check_train_valid_df_sync(
+    df_train: pd.DataFrame, df_valid: pd.DataFrame, cat_columns: Sequence[str]
+) -> None:
+    for col in cat_columns:
+        train_values = set(df_train[col].unique())
+        valid_values = set(df_valid[col].unique())
+
+        mismatched_values = valid_values - train_values
+
+        if mismatched_values:
+            total_mismatch_count = sum(df_valid[col].isin(mismatched_values))
+            total_count = len(df_valid) + len(df_train)
+            percentage = (total_mismatch_count / total_count) * 100
+
+            error_message = (
+                f"Mismatched values found in column '{col}': {mismatched_values}. "
+                f"Count: {total_mismatch_count}, "
+                f"Percentage of total data: {percentage:.2f}%.\n"
+                f"This happens as there are values in the validation set that "
+                f"are not present in the training set. "
+                f"This can happen by chance when working with sparse/rare "
+                f"categorical values and/or small datasets. These values will still be "
+                f"encoded and used during validation, but might result in nonsensical "
+                f"predictions as the model never saw them during training.\n"
+                f"One approach to fix this "
+                f"is trying a different train/validation split, "
+                f"which can be done by:\n"
+                f"  1. Running the command with a different seed, "
+                f"e.g. EIR_SEED=1 eirtrain ...\n"
+                f"  2. Manually specifying the train/validation split, "
+                f" using manual_valid_ids_file: <.txt file> in the global "
+                f"configuration.\n"
+                f"  3. Using a different train/validation split ratio, using "
+                f" the valid_size parameter in the global configuration."
+                f"Other solutions include:\n"
+                f"  4. Skipping the column if it's not crucial.\n"
+                f"  5. Binning sparse/rare values into broader categories.\n"
+            )
+            logger.warning(error_message)
+
+
 def _ensure_id_str_dtype(dtypes: Union[Dict[str, Any], None]) -> Dict[str, Any]:
     if dtypes is None:
         dtypes = {"ID": str}
@@ -696,7 +749,7 @@ def _get_currently_available_columns(
 ) -> List[str]:
     """
     If custom label operations are specified, the requested columns could be forward
-    references. Hence we should not raise an error if there is a possibility of them
+    references. Hence, we should not raise an error if there is a possibility of them
     being created at runtime.
 
     However if no custom operations are specified, we should fail here if columns
@@ -1022,12 +1075,15 @@ def _process_train_and_label_dfs(
         impute_missing=impute_missing,
     )
 
+    df_labels_full = pd.concat([df_labels_train_no_nan, df_labels_valid_no_nan])
+
     label_columns: al_target_columns = {
         "con": list(tabular_info.con_columns),
         "cat": list(tabular_info.cat_columns),
     }
     fit_label_transformers = _get_fit_label_transformers(
-        df_labels=df_labels_train_no_nan,
+        df_labels_train=df_labels_train_no_nan,
+        df_labels_full=df_labels_full,
         label_columns=label_columns,
         impute_missing=impute_missing,
     )
