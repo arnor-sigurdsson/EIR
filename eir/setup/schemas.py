@@ -625,7 +625,15 @@ class ImageInputDataConfig:
     :param size:
         Target size of the images for training.  If size is a sequence like
         (h, w), output size will be matched to this. If size is an int,
-        smaller edge of the image will be matched to this number.
+        the image will be resized to (size, size).
+
+    :param resize_approach:
+        The method used for resizing the images. Options are:
+        - "resize": Directly resize the image to the target size.
+        - "randomcrop": Resize the image to a larger size than the target and then
+          apply a random crop to the target size.
+        - "centercrop": Resize the image to a larger size than the target and then
+          apply a center crop to the target size.
 
     :param mean_normalization_values:
         Average channel values to normalize images with. This can be a sequence matching
@@ -656,6 +664,7 @@ class ImageInputDataConfig:
 
     auto_augment: bool = True
     size: Sequence[int] = (64,)
+    resize_approach: Union[Literal["resize", "randomcrop", "centercrop"]] = "resize"
     mean_normalization_values: Union[None, Sequence[float]] = None
     stds_normalization_values: Union[None, Sequence[float]] = None
     num_channels: Optional[int] = None

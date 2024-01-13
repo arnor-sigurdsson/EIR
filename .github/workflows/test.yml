@@ -19,6 +19,6 @@ jobs:
         env:
           PYTEST_GROUP: ${{ matrix.group }}
         run: |
-          pip install tox==4.11.4
+          pip install tox==4.12.0
           pip install poetry==1.7.1
           tox -e py_partial

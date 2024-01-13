@@ -187,7 +187,8 @@ def test_set_up_all_target_transformers(get_transformer_test_data):
     df_test_labels, test_target_columns_dict = get_transformer_test_data
 
     all_target_transformers = label_setup._get_fit_label_transformers(
-        df_labels=df_test_labels,
+        df_labels_train=df_test_labels,
+        df_labels_full=df_test_labels,
         label_columns=test_target_columns_dict,
         impute_missing=False,
     )
@@ -260,7 +261,8 @@ def test_transform_all_labels_in_sample_targets_only(
     df_test_labels, test_target_columns_dict = get_transformer_test_data
 
     target_transformers = label_setup._get_fit_label_transformers(
-        df_labels=df_test_labels,
+        df_labels_train=df_test_labels,
+        df_labels_full=df_test_labels,
         label_columns=test_target_columns_dict,
         impute_missing=False,
     )
@@ -297,7 +299,8 @@ def test_transform_all_labels_in_sample_with_extra_con(
 
     test_target_columns_dict["con"].append("Extra_Con")
     label_transformers = label_setup._get_fit_label_transformers(
-        df_labels=df_test_labels,
+        df_labels_train=df_test_labels,
+        df_labels_full=df_test_labels,
         label_columns=test_target_columns_dict,
         impute_missing=False,
     )
@@ -1163,6 +1166,9 @@ def test_process_train_and_label_dfs(get_test_nan_df, get_test_nan_tabular_file_
     """
     NOTE:   Here we have the situation where we have NA in valid, but not in train. This
             means that we have to make sure we have manually added the 'NA' to train.
+
+    NOTE:   We have to manually convert A and B back to object, as pandas will convert
+            them to int64 when we fillna.
     """
 
     test_df = get_test_nan_df
@@ -1172,6 +1178,8 @@ def test_process_train_and_label_dfs(get_test_nan_df, get_test_nan_tabular_file_
     valid_df = test_df.copy()
 
     train_df = train_df.fillna(5)
+    train_df["A"] = train_df["A"].astype(object)
+    train_df["B"] = train_df["B"].astype(object)
 
     train_df = label_setup.ensure_categorical_columns_and_format(df=train_df)
     valid_df = label_setup.ensure_categorical_columns_and_format(df=valid_df)

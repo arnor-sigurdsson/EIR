@@ -85,6 +85,7 @@ def set_up_image_input_for_training(
         target_size=input_type_info.size,
         normalization_stats=normalization_stats,
         auto_augment=input_type_info.auto_augment,
+        resize_approach=input_type_info.resize_approach,
     )
 
     image_input_info = ComputedImageInputInfo(
@@ -259,13 +260,31 @@ def get_image_transforms(
     target_size: Sequence[int],
     normalization_stats: ImageNormalizationStats,
     auto_augment: bool,
-) -> Tuple[Compose, Compose]:
+    resize_approach: str,
+) -> Tuple[transforms.Compose, transforms.Compose]:
+    if len(target_size) == 1:
+        target_size = (target_size[0], target_size[0])
+        logger.info(
+            "Got target size as a single value. Assuming square image and "
+            "setting target size to %s.",
+            target_size,
+        )
+
     random_transforms = transforms.TrivialAugmentWide()
-    target_resize = [int(i * 1.5) for i in target_size]
+
+    if resize_approach == "randomcrop":
+        resize_transform = transforms.Resize([int(i * 1.5) for i in target_size])
+        crop_transform = transforms.RandomCrop(target_size)
+    elif resize_approach == "centercrop":
+        resize_transform = transforms.Resize([int(i * 1.5) for i in target_size])
+        crop_transform = transforms.CenterCrop(target_size)
+    else:
+        resize_transform = transforms.Resize(target_size)
+        crop_transform = transforms.Lambda(lambda x: x)
 
     base = [
-        transforms.Resize(size=target_resize),
-        transforms.CenterCrop(size=target_size),
+        resize_transform,
+        crop_transform,
         transforms.ToTensor(),
         transforms.Normalize(
             mean=normalization_stats.channel_means,

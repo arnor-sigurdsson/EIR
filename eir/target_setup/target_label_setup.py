@@ -86,7 +86,7 @@ def log_missing_targets_info(
         missing_count = len(missing_ids)
 
         if missing_count == 0:
-            logger.info(f"Modality '{modality}' has no missing target IDs.")
+            logger.info(f"Output modality '{modality}' has no missing target IDs.")
             continue
 
         formatted_missing_ids = repr_formatter.repr(missing_ids)

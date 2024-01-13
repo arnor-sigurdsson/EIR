@@ -148,7 +148,7 @@ def run_experiment_from_command(command: List[str], force_run: bool = False):
     if not force_run and training_file.exists():
         return run_folder
 
-    subprocess.run(args=command)
+    subprocess.run(args=command, check=True)
 
     return run_folder
 
