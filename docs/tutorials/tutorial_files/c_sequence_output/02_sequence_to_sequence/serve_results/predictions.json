@@ -6,7 +6,7 @@
         },
         "response": {
             "result": {
-                "english": "I am very hungry today."
+                "english": "I have a lot of hungry and I'm very hungry."
             }
         }
     },
@@ -39,7 +39,7 @@
         },
         "response": {
             "result": {
-                "english": "A cat was very sad."
+                "english": "A cat is very tall"
             }
         }
     }

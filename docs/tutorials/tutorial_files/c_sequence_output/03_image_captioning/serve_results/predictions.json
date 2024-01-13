@@ -6,7 +6,7 @@
         },
         "response": {
             "result": {
-                "captions": "a close up of a plate of rice and broccoli "
+                "captions": "a plate that has a plate of salad on it"
             }
         }
     },
@@ -17,7 +17,7 @@
         },
         "response": {
             "result": {
-                "captions": "Two zebras standing next to each other on a field."
+                "captions": "A zebra standing on top of a lush green field."
             }
         }
     },
@@ -28,7 +28,7 @@
         },
         "response": {
             "result": {
-                "captions": "A horse that is grazing in the grass."
+                "captions": "A horse on grass with a woman in the background and an open field with grass in the background"
             }
         }
     }
