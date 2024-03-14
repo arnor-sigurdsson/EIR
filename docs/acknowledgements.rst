@@ -82,7 +82,7 @@ and so on:
 
 - ``memory-profiler``  – Fabian Pedregosa: A module for monitoring memory usage of a python program
 
-- ``pytest``  – Holger Krekel, Bruno Oliveira, Ronny Pfannschmidt, Floris Bruynooghe, Brianna Laugher, Florian Bruhin and others: pytest: simple powerful testing with Python
+- ``pytest``  – Holger Krekel, Bruno Oliveira, Ronny Pfannschmidt, Floris Bruynooghe, Brianna Laugher, Florian Bruhin, Others (See AUTHORS): pytest: simple powerful testing with Python
 
 - ``tox`` : tox is a generic virtualenv management and test command line tool
 
@@ -98,7 +98,7 @@ and so on:
 
 - ``pytest-cov``  – Marc Schlaich: Pytest plugin for measuring coverage.
 
-- ``pynvim``  – Thiago de Arruda: Python client to neovim
+- ``pynvim``  – Neovim Authors: Python client for Neovim
 
 - ``pre-commit``  – Anthony Sottile: A framework for managing and maintaining multi-language pre-commit hooks.
 
