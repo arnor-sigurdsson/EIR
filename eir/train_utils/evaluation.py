@@ -317,6 +317,7 @@ def run_split_evaluation(
         model_outputs=full_gathered_output_batches_stacked,
         target_labels=full_gathered_label_batches_stacked,
         missing_ids_info=missing_ids_per_output,
+        with_labels=with_labels,
     )
 
     full_gathered_metrics = {}

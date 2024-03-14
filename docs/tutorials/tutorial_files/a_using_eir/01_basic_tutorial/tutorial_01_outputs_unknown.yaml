@@ -1,0 +1,7 @@
+output_info:
+  output_name: ancestry_output
+  output_source: null
+  output_type: tabular
+output_type_info:
+  target_cat_columns:
+    - Origin

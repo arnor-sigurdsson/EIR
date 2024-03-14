@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from eir.predict import PredictExperiment
 
 
-def predict_tabular_wrapper(
+def predict_tabular_wrapper_with_labels(
     predict_config: "PredictExperiment",
     all_predictions: dict[str, dict[str, torch.Tensor]],
     all_labels: dict[str, dict[str, torch.Tensor]],
@@ -109,6 +109,77 @@ def _merge_ids_predictions_and_labels(
 
     if labels is not None:
         df[label_column_name] = labels
+
+    if prediction_classes is None:
+        prediction_classes = [f"Score Class {i}" for i in range(predictions.shape[1])]
+
+    df[prediction_classes] = predictions
+
+    return df
+
+
+def predict_tabular_wrapper_no_labels(
+    predict_config: "PredictExperiment",
+    all_predictions: dict[str, dict[str, torch.Tensor]],
+    all_ids: dict[str, dict[str, list[str]]],
+    predict_cl_args: Namespace,
+) -> None:
+    target_columns_gen = get_output_info_generator(
+        outputs_as_dict=predict_config.outputs
+    )
+
+    for output_name, target_head_name, target_column_name in target_columns_gen:
+        if target_head_name == "general":
+            continue
+
+        target_predictions = all_predictions[output_name][target_column_name]
+        predictions = _parse_predictions(target_predictions=target_predictions)
+
+        cur_output_object = predict_config.outputs[output_name]
+        assert isinstance(cur_output_object, ComputedTabularOutputInfo)
+
+        target_transformers = cur_output_object.target_transformers
+        cur_target_transformer = target_transformers[target_column_name]
+        classes = _get_target_class_names(
+            transformer=cur_target_transformer, target_column=target_column_name
+        )
+
+        output_folder = Path(
+            predict_cl_args.output_folder, output_name, target_column_name
+        )
+        ensure_path_exists(path=output_folder, is_folder=True)
+
+        cur_ids = all_ids[output_name][target_column_name]
+
+        df_predictions = _merge_ids_and_predictions(
+            ids=cur_ids,
+            predictions=predictions,
+            prediction_classes=classes,
+        )
+
+        df_predictions = _add_inverse_transformed_columns_to_predictions(
+            df=df_predictions,
+            target_column_name=target_column_name,
+            target_column_type=target_head_name,
+            transformer=cur_target_transformer,
+            evaluation=predict_cl_args.evaluate,
+        )
+
+        _save_predictions(
+            df_predictions=df_predictions,
+            output_folder=output_folder,
+        )
+
+
+def _merge_ids_and_predictions(
+    ids: Sequence[str],
+    predictions: np.ndarray,
+    prediction_classes: Optional[Sequence[str]] = None,
+) -> pd.DataFrame:
+    df = pd.DataFrame()
+
+    df["ID"] = ids
+    df = df.set_index("ID")
 
     if prediction_classes is None:
         prediction_classes = [f"Score Class {i}" for i in range(predictions.shape[1])]

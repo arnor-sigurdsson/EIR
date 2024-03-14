@@ -332,6 +332,7 @@ def calc_all_mixed_losses(
         model_outputs=model_outputs,
         target_labels=target_labels,
         missing_ids_info=missing_ids_per_output,
+        with_labels=True,
     )
 
     target_labels_permuted = mixed_object.targets_permuted
@@ -341,6 +342,7 @@ def calc_all_mixed_losses(
         model_outputs=model_outputs,
         target_labels=target_labels_permuted,
         missing_ids_info=missing_ids_per_output,
+        with_labels=True,
     )
     filtered_targets_permuted = filtered_outputs_permuted.target_labels
 

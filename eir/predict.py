@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Callable, Iterable, Literal, Union
 
 import numpy as np
+from aislib.misc_utils import ensure_path_exists
 from torch.utils.data import DataLoader
 
 from eir import train
@@ -34,7 +35,8 @@ from eir.predict_modules.predict_output_modules.predict_sequence_output import (
     predict_sequence_wrapper,
 )
 from eir.predict_modules.predict_output_modules.predict_tabular_output import (
-    predict_tabular_wrapper,
+    predict_tabular_wrapper_no_labels,
+    predict_tabular_wrapper_with_labels,
 )
 from eir.predict_modules.predict_target_setup import (
     MissingTargetsInfo,
@@ -189,13 +191,20 @@ def predict(
             metrics=predict_results.metrics_with_averages,
         )
 
-    predict_tabular_wrapper(
-        predict_config=predict_experiment,
-        all_predictions=predict_results.gathered_outputs,
-        all_labels=predict_results.gathered_labels,
-        all_ids=predict_results.ids_per_output,
-        predict_cl_args=predict_cl_args,
-    )
+        predict_tabular_wrapper_with_labels(
+            predict_config=predict_experiment,
+            all_predictions=predict_results.gathered_outputs,
+            all_labels=predict_results.gathered_labels,
+            all_ids=predict_results.ids_per_output,
+            predict_cl_args=predict_cl_args,
+        )
+    else:
+        predict_tabular_wrapper_no_labels(
+            predict_config=predict_experiment,
+            all_predictions=predict_results.gathered_outputs,
+            all_ids=predict_results.ids_per_output,
+            predict_cl_args=predict_cl_args,
+        )
 
     predict_sequence_wrapper(
         predict_experiment=predict_experiment,
@@ -209,6 +218,7 @@ def predict(
 
 
 def serialize_prediction_metrics(output_folder: Path, metrics: al_step_metric_dict):
+    ensure_path_exists(path=output_folder, is_folder=True)
     with open(str(output_folder / "calculated_metrics.json"), "w") as outfile:
         parsed = _convert_dict_values_to_python_objects(object_=metrics)
         json.dump(obj=parsed, fp=outfile)
