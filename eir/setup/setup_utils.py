@@ -182,7 +182,8 @@ def get_unsupported_hf_models() -> dict:
         "clipseg": "Not strictly sequence model.",
         "clip_vision_model": "Not strictly sequence model.",
         "clvp": "Not strictly sequence model.",
-        "chinese_clip": "Not strictlyasequence model.",
+        "chinese_clip": "Not strictly sequence model.",
+        "chinese_clip_vision_model": "Not strictly sequence model.",
         "conditional_detr": "Not strictly sequence model.",
         "convbert": "HF error.",
         "convnext": "Not strictly sequence model..",
@@ -268,6 +269,8 @@ def get_unsupported_hf_models() -> dict:
         "timesformer": "Not strictly sequence model.",
         "timm_backbone": "Not strictly sequence model.",
         "trajectory_transformer": "Not strictly sequence model.",
+        "transfo-xl": "Internal TypeError: type_as() missing 1 required positional"
+        " arguments: other.",
         "tvlt": "Not strictly sequence model.",
         "tvp": "Not strictly sequence model.",
         "patchtsmixer": "Not strictly sequence model.",

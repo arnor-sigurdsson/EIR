@@ -54,7 +54,7 @@ and so on:
 
 - ``ipython``  – The IPython Development Team: IPython: Productive Interactive Computing
 
-- ``timm``  – Ross Wightman: PyTorch Image Models
+- ``timm`` : PyTorch Image Models
 
 - ``captum``  – PyTorch Team: Model interpretability for PyTorch
 
