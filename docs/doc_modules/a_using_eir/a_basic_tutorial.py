@@ -160,8 +160,10 @@ def get_tutorial_01_run_2_gln_predict_info() -> AutoDocExperimentInfo:
 
     conf_output_path = "eir_tutorials/a_using_eir/01_basic_tutorial/conf"
 
-    run_1_output_path = "eir_tutorials/tutorial_runs/a_using_eir/tutorial_01_run"
-
+    run_1_output_path = (
+        "eir_tutorials/tutorial_runs/a_using_eir/tutorial_01_run/"
+        "test_predictions/known_outputs"
+    )
     command = [
         "eirpredict",
         "--global_configs",
@@ -202,6 +204,69 @@ def get_tutorial_01_run_2_gln_predict_info() -> AutoDocExperimentInfo:
 
     ade = AutoDocExperimentInfo(
         name="GLN_1_PREDICT",
+        data_url="https://drive.google.com/file/d/1MELauhv7zFwxM8nonnj3iu_SmS69MuNi",
+        data_output_path=data_output_path,
+        conf_output_path=Path(conf_output_path),
+        base_path=Path(base_path),
+        command=command,
+        files_to_copy_mapping=mapping,
+        pre_run_command_modifications=(_add_model_path_to_command,),
+        post_run_functions=(csv_preview_func,),
+        force_run_command=True,
+    )
+
+    return ade
+
+
+def get_tutorial_01_run_3_gln_predict_info() -> AutoDocExperimentInfo:
+    """
+    We are abusing the `make_tutorial_data` here a bit by switching to the predict
+    code, but we'll allow it for now.
+    """
+    base_path = "docs/tutorials/tutorial_files/a_using_eir/01_basic_tutorial"
+
+    conf_output_path = "eir_tutorials/a_using_eir/01_basic_tutorial/conf"
+
+    run_1_output_path = (
+        "eir_tutorials/tutorial_runs/a_using_eir/tutorial_01_run/"
+        "test_predictions/unknown_outputs"
+    )
+
+    command = [
+        "eirpredict",
+        "--global_configs",
+        f"{conf_output_path}/tutorial_01_globals.yaml",
+        "--input_configs",
+        f"{conf_output_path}/tutorial_01_input.yaml",
+        "--output_configs",
+        f"{conf_output_path}/tutorial_01_outputs_unknown.yaml",
+        "--model_path",
+        "FILL_MODEL",
+        "--output_folder",
+        run_1_output_path,
+    ]
+
+    data_output_path = Path(
+        "data/tutorial_data/01_basic_tutorial/processed_sample_data.zip"
+    )
+
+    mapping = [
+        (
+            "Origin/predictions.csv",
+            "tutorial_data/predictions_test_unknown.csv",
+        ),
+    ]
+
+    csv_preview_func = (
+        csv_preview,
+        {
+            "run_path": Path(run_1_output_path),
+            "output_path": Path(base_path, "csv_preview_unknown.html"),
+        },
+    )
+
+    ade = AutoDocExperimentInfo(
+        name="GLN_1_PREDICT_UNKNOWN",
         data_url="https://drive.google.com/file/d/1MELauhv7zFwxM8nonnj3iu_SmS69MuNi",
         data_output_path=data_output_path,
         conf_output_path=Path(conf_output_path),
@@ -277,6 +342,7 @@ def get_experiments() -> Sequence[AutoDocExperimentInfo | AutoDocServingInfo]:
     exp_1 = get_tutorial_01_run_1_gln_info()
     exp_2 = get_tutorial_01_run_2_gln_info()
     exp_3 = get_tutorial_01_run_2_gln_predict_info()
-    exp_4 = get_tutorial_01_run_3_serve()
+    exp_4 = get_tutorial_01_run_3_gln_predict_info()
+    exp_5 = get_tutorial_01_run_3_serve()
 
-    return [exp_1, exp_2, exp_3, exp_4]
+    return [exp_1, exp_2, exp_3, exp_4, exp_5]

@@ -590,6 +590,7 @@ def hook_default_compute_metrics(
         model_outputs=model_outputs,
         target_labels=target_labels,
         missing_ids_info=experiment.valid_dataset.missing_ids_per_output,
+        with_labels=True,
     )
 
     train_batch_metrics = calculate_batch_metrics(
@@ -632,6 +633,7 @@ def hook_default_per_target_loss(
             model_outputs=model_outputs,
             target_labels=target_labels,
             missing_ids_info=experiment.valid_dataset.missing_ids_per_output,
+            with_labels=True,
         )
 
         per_target_train_losses = experiment.loss_function(

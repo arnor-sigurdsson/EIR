@@ -44,21 +44,34 @@ def base_validate_input_info(input_info: schemas.InputDataConfig) -> None:
 def validate_output_configs(output_configs: Sequence[schemas.OutputConfig]) -> None:
     for output_config in output_configs:
         base_validate_output_info(output_info=output_config.output_info)
-        output_source = Path(output_config.output_info.output_source)
 
         match output_config.output_type_info:
             case TabularOutputTypeConfig(
-                target_cat_columns, target_con_columns, _, _, _
+                target_cat_columns,
+                target_con_columns,
+                _,
+                _,
+                _,
             ):
+                output_source = output_config.output_info.output_source
+
+                if output_source is None:
+                    continue
+
+                output_source_path = Path(output_source)
+
                 expected_columns = list(target_cat_columns) + list(target_con_columns)
                 validate_tabular_file(
-                    file_to_check=output_source,
+                    file_to_check=output_source_path,
                     expected_columns=expected_columns,
                     name="Tabular output",
                 )
 
 
 def base_validate_output_info(output_info: schemas.OutputInfoConfig) -> None:
+    if output_info.output_source is None:
+        return
+
     if not Path(output_info.output_source).exists():
         raise ValueError(
             f"Output source {output_info.output_source} does not exist. "

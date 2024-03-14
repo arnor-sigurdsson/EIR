@@ -1504,14 +1504,14 @@ These models are contributed by `nghuyong <https://huggingface.co/nghuyong>`__ a
         The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
     layer_norm_eps (`float`, *optional*, defaults to 1e-12):
         The epsilon used by the layer normalization layers.
+    pad_token_id (`int`, *optional*, defaults to 0):
+        Padding token id.
     position_embedding_type (`str`, *optional*, defaults to `"absolute"`):
         Type of position embedding. Choose one of `"absolute"`, `"relative_key"`, `"relative_key_query"`. For
         positional embeddings use `"absolute"`. For more information on `"relative_key"`, please refer to
         `Self-Attention with Relative Position Representations (Shaw et al.) <https://arxiv.org/abs/1803.02155>`__.
         For more information on `"relative_key_query"`, please refer to *Method 4* in `Improve Transformer Models
         with Better Relative Position Embeddings (Huang et al.) <https://arxiv.org/abs/2009.13658>`__.
-    is_decoder (`bool`, *optional*, defaults to `False`):
-        Whether the model is used as a decoder or not. If `False`, the model is used as an encoder.
     use_cache (`bool`, *optional*, defaults to `True`):
         Whether or not the model should return the last key/values attentions (not used by all models). Only
         relevant if `config.is_decoder=True`.
@@ -2006,7 +2006,7 @@ Args:
     attention_type (`bool`, *optional*, defaults to `True`):
         Whether to use Multi-Query Attion (`True`) or Multi-Head Attention (`False`).
 
-.. class:: transformers.models.gpt_neox.configuration_gpt_neox.GPTNeoXConfig(vocab_size=50432, hidden_size=6144, num_hidden_layers=44, num_attention_heads=64, intermediate_size=24576, hidden_act='gelu', rotary_pct=0.25, rotary_emb_base=10000, attention_dropout=0.0, hidden_dropout=0.0, classifier_dropout=0.1, max_position_embeddings=2048, initializer_range=0.02, layer_norm_eps=1e-05, use_cache=True, bos_token_id=0, eos_token_id=2, tie_word_embeddings=False, use_parallel_residual=True, rope_scaling=None, **kwargs)
+.. class:: transformers.models.gpt_neox.configuration_gpt_neox.GPTNeoXConfig(vocab_size=50432, hidden_size=6144, num_hidden_layers=44, num_attention_heads=64, intermediate_size=24576, hidden_act='gelu', rotary_pct=0.25, rotary_emb_base=10000, attention_dropout=0.0, hidden_dropout=0.0, classifier_dropout=0.1, max_position_embeddings=2048, initializer_range=0.02, layer_norm_eps=1e-05, use_cache=True, bos_token_id=0, eos_token_id=2, tie_word_embeddings=False, use_parallel_residual=True, rope_scaling=None, attention_bias=True, **kwargs)
 
 We introduce GPT-NeoX-20B, a 20 billion parameter autoregressive language model trained on the Pile, whose weights will
 be made freely and openly available to the public through a permissive license. It is, to the best of our knowledge,
@@ -2077,6 +2077,8 @@ additional tokens to whitespace characters, making the model more suitable for c
         these scaling strategies behave:
         https://www.reddit.com/r/LocalLLaMA/comments/14mrgpr/dynamically_scaled_rope_further_increases/. This is an
         experimental feature, subject to breaking API changes in future versions.
+    attention_bias (`bool`, *optional*, defaults to `True`):
+        Whether to use a bias in the query, key, value and output projection layers during self-attention.
 
 .. class:: transformers.models.gpt_neox_japanese.configuration_gpt_neox_japanese.GPTNeoXJapaneseConfig(vocab_size=32000, hidden_size=2560, num_hidden_layers=32, num_attention_heads=32, intermediate_multiple_size=4, hidden_act='gelu', rotary_pct=1.0, rotary_emb_base=10000, max_position_embeddings=2048, initializer_range=0.02, layer_norm_eps=1e-05, use_cache=True, bos_token_id=31996, eos_token_id=31999, attention_dropout=0.1, hidden_dropout=0.0, **kwargs)
 
@@ -3377,7 +3379,7 @@ Args:
         Whether or not the model should return the last key/values attentions (not used by all models). Only
         relevant if `config.is_decoder=True`.
 
-.. class:: transformers.models.mixtral.configuration_mixtral.MixtralConfig(vocab_size=32000, hidden_size=4096, intermediate_size=14336, num_hidden_layers=32, num_attention_heads=32, num_key_value_heads=8, hidden_act='silu', max_position_embeddings=131072, initializer_range=0.02, rms_norm_eps=1e-05, use_cache=True, pad_token_id=None, bos_token_id=1, eos_token_id=2, tie_word_embeddings=False, rope_theta=1000000.0, sliding_window=4096, attention_dropout=0.0, num_experts_per_tok=2, num_local_experts=8, output_router_logits=False, router_aux_loss_coef=0.001, **kwargs)
+.. class:: transformers.models.mixtral.configuration_mixtral.MixtralConfig(vocab_size=32000, hidden_size=4096, intermediate_size=14336, num_hidden_layers=32, num_attention_heads=32, num_key_value_heads=8, hidden_act='silu', max_position_embeddings=131072, initializer_range=0.02, rms_norm_eps=1e-05, use_cache=True, pad_token_id=None, bos_token_id=1, eos_token_id=2, tie_word_embeddings=False, rope_theta=1000000.0, sliding_window=None, attention_dropout=0.0, num_experts_per_tok=2, num_local_experts=8, output_router_logits=False, router_aux_loss_coef=0.001, **kwargs)
 
 Mixtral-8x7B is Mistral AI's second Large Language Model (LLM). 
 
@@ -3438,7 +3440,7 @@ The original code can be found `here <https://github.com/mistralai/mistral-src>`
         Whether the model's input and output word embeddings should be tied.
     rope_theta (`float`, *optional*, defaults to 1000000.0):
         The base period of the RoPE embeddings.
-    sliding_window (`int`, *optional*, defaults to 4096):
+    sliding_window (`int`, *optional*):
         Sliding window attention window size. If not specified, will default to `4096`.
     attention_dropout (`float`, *optional*, defaults to 0.0):
         The dropout ratio for the attention probabilities.
@@ -4409,7 +4411,7 @@ Args:
     partial_rotary_factor (`float`, *optional*, default to 0.5):
         Percentage of the query and keys which will have rotary embedding.
 
-.. class:: transformers.models.phi.configuration_phi.PhiConfig(vocab_size=51200, hidden_size=2048, intermediate_size=8192, num_hidden_layers=24, num_attention_heads=32, resid_pdrop=0.0, embd_pdrop=0.0, attention_dropout=0.0, hidden_act='gelu_new', max_position_embeddings=2048, initializer_range=0.02, layer_norm_eps=1e-05, use_cache=True, tie_word_embeddings=False, rope_theta=10000.0, rope_scaling=None, partial_rotary_factor=0.5, qk_layernorm=False, bos_token_id=1, eos_token_id=2, **kwargs)
+.. class:: transformers.models.phi.configuration_phi.PhiConfig(vocab_size=51200, hidden_size=2048, intermediate_size=8192, num_hidden_layers=24, num_attention_heads=32, num_key_value_heads=None, resid_pdrop=0.0, embd_pdrop=0.0, attention_dropout=0.0, hidden_act='gelu_new', max_position_embeddings=2048, initializer_range=0.02, layer_norm_eps=1e-05, use_cache=True, tie_word_embeddings=False, rope_theta=10000.0, rope_scaling=None, partial_rotary_factor=0.5, qk_layernorm=False, bos_token_id=1, eos_token_id=2, **kwargs)
 
 The Phi-1 model was proposed in `Textbooks Are All You Need <https://arxiv.org/abs/2306.11644>`__ by Suriya Gunasekar, Yi Zhang, Jyoti Aneja, Caio César Teodoro Mendes, Allie Del Giorno, Sivakanth Gopi, Mojan Javaheripi, Piero Kauffmann, Gustavo de Rosa, Olli Saarikivi, Adil Salim, Shital Shah, Harkirat Singh Behl, Xin Wang, Sébastien Bubeck, Ronen Eldan, Adam Tauman Kalai, Yin Tat Lee and Yuanzhi Li.
 
@@ -4427,6 +4429,14 @@ The Phi-1.5 model was proposed in `Textbooks Are All You Need II: phi-1.5 techni
         Number of hidden layers in the Transformer decoder.
     num_attention_heads (`int`, *optional*, defaults to 32):
         Number of attention heads for each attention layer in the Transformer decoder.
+    num_key_value_heads (`int`, *optional*):
+        This is the number of key_value heads that should be used to implement Grouped Query Attention. If
+        `num_key_value_heads=num_attention_heads`, the model will use Multi Head Attention (MHA), if
+        `num_key_value_heads=1 the model will use Multi Query Attention (MQA) otherwise GQA is used. When
+        converting a multi-head checkpoint to a GQA checkpoint, each group key and value head should be constructed
+        by meanpooling all the original heads within that group. For more details checkout `this
+        paper <https://arxiv.org/pdf/2305.13245.pdf>`__. If it is not specified, will default to
+        `num_attention_heads`.
     resid_pdrop (`float`, *optional*, defaults to 0.0):
         Dropout probability for mlp outputs.
     embd_pdrop (`int`, *optional*, defaults to 0.0):
@@ -4460,7 +4470,7 @@ The Phi-1.5 model was proposed in `Textbooks Are All You Need II: phi-1.5 techni
     partial_rotary_factor (`float`, *optional*, defaults to 0.5):
         Percentage of the query and keys which will have rotary embedding.
     qk_layernorm (`bool`, *optional*, defaults to `False`):
-        Whether or not to normalize the Queries and Keys after projecting the hidden states
+        Whether or not to normalize the Queries and Keys after projecting the hidden states.
     bos_token_id (`int`, *optional*, defaults to 1):
         Denotes beginning of sequences token id.
     eos_token_id (`int`, *optional*, defaults to 2):
@@ -4623,6 +4633,66 @@ Args:
         smoothing is performed.
     use_cache (`bool`, *optional*, defaults to `True`):
         Whether or not the model should return the last key/values attentions (not used by all models).
+
+.. class:: transformers.models.qwen2.configuration_qwen2.Qwen2Config(vocab_size=151936, hidden_size=4096, intermediate_size=22016, num_hidden_layers=32, num_attention_heads=32, num_key_value_heads=32, hidden_act='silu', max_position_embeddings=32768, initializer_range=0.02, rms_norm_eps=1e-06, use_cache=True, tie_word_embeddings=False, rope_theta=10000.0, use_sliding_window=False, sliding_window=4096, max_window_layers=28, attention_dropout=0.0, **kwargs)
+
+Qwen2 is the new model series of large language models from the Qwen team. Previously, we released the Qwen series, including Qwen-72B, Qwen-1.8B, Qwen-VL, Qwen-Audio, etc.
+
+#Args:
+    vocab_size (`int`, *optional*, defaults to 151936):
+        Vocabulary size of the Qwen2 model. Defines the number of different tokens that can be represented by the
+        `inputs_ids` passed when calling ``Qwen2Model``
+    hidden_size (`int`, *optional*, defaults to 4096):
+        Dimension of the hidden representations.
+    intermediate_size (`int`, *optional*, defaults to 22016):
+        Dimension of the MLP representations.
+    num_hidden_layers (`int`, *optional*, defaults to 32):
+        Number of hidden layers in the Transformer encoder.
+    num_attention_heads (`int`, *optional*, defaults to 32):
+        Number of attention heads for each attention layer in the Transformer encoder.
+    num_key_value_heads (`int`, *optional*, defaults to 32):
+        This is the number of key_value heads that should be used to implement Grouped Query Attention. If
+        `num_key_value_heads=num_attention_heads`, the model will use Multi Head Attention (MHA), if
+        `num_key_value_heads=1 the model will use Multi Query Attention (MQA) otherwise GQA is used. When
+        converting a multi-head checkpoint to a GQA checkpoint, each group key and value head should be constructed
+        by meanpooling all the original heads within that group. For more details checkout `this
+        paper <https://arxiv.org/pdf/2305.13245.pdf>`__. If it is not specified, will default to `32`.
+    hidden_act (`str` or `function`, *optional*, defaults to `"silu"`):
+        The non-linear activation function (function or string) in the decoder.
+    max_position_embeddings (`int`, *optional*, defaults to 32768):
+        The maximum sequence length that this model might ever be used with.
+    initializer_range (`float`, *optional*, defaults to 0.02):
+        The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
+    rms_norm_eps (`float`, *optional*, defaults to 1e-06):
+        The epsilon used by the rms normalization layers.
+    use_cache (`bool`, *optional*, defaults to `True`):
+        Whether or not the model should return the last key/values attentions (not used by all models). Only
+        relevant if `config.is_decoder=True`.
+    tie_word_embeddings (`bool`, *optional*, defaults to `False`):
+        Whether the model's input and output word embeddings should be tied.
+    rope_theta (`float`, *optional*, defaults to 10000.0):
+        The base period of the RoPE embeddings.
+    use_sliding_window (`bool`, *optional*, defaults to `False`):
+        Whether to use sliding window attention.
+    sliding_window (`int`, *optional*, defaults to 4096):
+        Sliding window attention (SWA) window size. If not specified, will default to `4096`.
+    max_window_layers (`int`, *optional*, defaults to 28):
+        The number of layers that use SWA (Sliding Window Attention). The bottom layers use SWA while the top use full attention.
+    attention_dropout (`float`, *optional*, defaults to 0.0):
+        The dropout ratio for the attention probabilities.
+
+::
+
+>>> from transformers import Qwen2Model, Qwen2Config
+
+>>> # Initializing a Qwen2 style configuration
+>>> configuration = Qwen2Config()
+
+>>> # Initializing a model from the Qwen2-7B style configuration
+>>> model = Qwen2Model(configuration)
+
+>>> # Accessing the model configuration
+>>> configuration = model.config
 
 .. class:: transformers.models.reformer.configuration_reformer.ReformerConfig(attention_head_size=64, attn_layers=['local', 'lsh', 'local', 'lsh', 'local', 'lsh'], axial_norm_std=1.0, axial_pos_embds=True, axial_pos_shape=[64, 64], axial_pos_embds_dim=[64, 192], chunk_size_lm_head=0, eos_token_id=2, feed_forward_size=512, hash_seed=None, hidden_act='relu', hidden_dropout_prob=0.05, hidden_size=256, initializer_range=0.02, is_decoder=False, layer_norm_eps=1e-12, local_num_chunks_before=1, local_num_chunks_after=0, local_attention_probs_dropout_prob=0.05, local_attn_chunk_length=64, lsh_attn_chunk_length=64, lsh_attention_probs_dropout_prob=0.0, lsh_num_chunks_before=1, lsh_num_chunks_after=0, max_position_embeddings=4096, num_attention_heads=12, num_buckets=None, num_hashes=1, pad_token_id=0, vocab_size=320, tie_word_embeddings=False, use_cache=True, classifier_dropout=None, **kwargs)
 
@@ -5339,7 +5409,7 @@ Arguments:
     vocab_size (`int`, *optional*, defaults to 32128):
         Vocabulary size of the SwitchTransformers model. Defines the number of different tokens that can be
         represented by the `inputs_ids` passed when calling ``SwitchTransformersModel``.
-    d_model (`int`, *optional*, defaults to 512):
+    d_model (`int`, *optional*, defaults to 768):
         Size of the encoder layers and the pooler layer.
     d_kv (`int`, *optional*, defaults to 64):
         Size of the key, query, value projections per attention head. `d_kv` has to be equal to `d_model //
@@ -5351,21 +5421,19 @@ Arguments:
         Transformer.
     num_layers (`int`, *optional*, defaults to 12):
         Number of dense hidden layers in the Transformer encoder layer.
-    num_sparse_encoder_layers (`int`, *optional*, defaults to 6):
+    num_sparse_encoder_layers (`int`, *optional*, defaults to 3):
         Number of sparse (MoE) dense hidden layers in the Transformer encoder layer.
     num_decoder_layers (`int`, *optional*, defaults to 12):
         Number of hidden layers in the Transformer decoder. Will use the same value as `num_layers` if not set.
-    num_sparse_decoder_layers (`int`, *optional*, defaults to 12):
+    num_sparse_decoder_layers (`int`, *optional*, defaults to 3):
         Number of sparse (MoE) dense hidden layers in the Transformer decoder layer.
-    num_heads (`int`, *optional*, defaults to 8):
+    num_heads (`int`, *optional*, defaults to 12):
         Number of attention heads for each attention layer in the Transformer encoder.
     num_experts (`int`, *optional*, defaults to 8):
         Number of experts for each SwitchTransformer layer.
-    router_type (`str`, *optional*, defaults to `"tokens_masked"`):
-        Router type - choose between `"tokens_masked", `"tokens_scatter"` and `"experts_masked"`.
-    router_bias (`bool`, *optional*, defaults to `True`):
+    router_bias (`bool`, *optional*, defaults to `False`):
         Whether to add a bias to the router.
-    router_jitter_noise (`float`, *optional*, defaults to 0.1):
+    router_jitter_noise (`float`, *optional*, defaults to 0.01):
         Amount of noise to add to the router.
     router_dtype (`str`, *optional*, default to `"float32"`):
         The `dtype` used for the routers. It is preferable to keep the `dtype` to `"float32"` as specified in the
@@ -5384,10 +5452,10 @@ Arguments:
         The z loss factor for the total loss.
     router_aux_loss_coef (`float`, *optional*, defaults to 0.001):
         The aux loss factor for the total loss.
-    initializer_factor (`float`, *optional*, defaults to 1):
+    initializer_factor (`float`, *optional*, defaults to 1.0):
         A factor for initializing all weight matrices (should be kept to 1, used internally for initialization
         testing).
-    feed_forward_proj (`string`, *optional*, defaults to `"relu"`):
+    dense_act_fn (`string`, *optional*, defaults to `"relu"`):
         Type of feed forward layer to be used. Should be one of `"relu"` or `"gated-gelu"`. SwitchTransformersv1.1
         uses the `"gated-gelu"` feed forward projection. Original SwitchTransformers uses `"relu"`.
     add_router_probs (`bool`, *optional*, defaults to `False`):

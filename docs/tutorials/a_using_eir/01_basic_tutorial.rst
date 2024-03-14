@@ -209,6 +209,9 @@ Check the :ref:`api-reference` reference for a full overview.
 C - Predicting on external samples
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Predicting on samples with known labels
+"""""""""""""""""""""""""""""""""""""""
+
 To predict on external samples, we run ``eirpredict``.
 As we can see when running ``eirpredict --help``, it looks quite
 similar to ``eirtrain``:
@@ -264,7 +267,44 @@ numerically encoded / normalized in ``EIR``.
 The other columns represent the raw network outputs
 for each of the classes.
 
-D - Applying to your own data (e.g. UKBB)
+Predicting on samples with unknown labels
+"""""""""""""""""""""""""""""""""""""""""
+
+Notice that when running the command above, we knew the labels of the samples we were
+predicting on. In practice, we are often predicting on samples we have no clue
+about the labels of. In this case, we can again use the ``eirpredict`` with slightly
+modified arguments:
+
+.. literalinclude:: ../tutorial_files/a_using_eir/01_basic_tutorial/commands/GLN_1_PREDICT_UNKNOWN.txt
+    :language: console
+    :emphasize-lines: 4,6
+
+We can notice a couple of changes here compared to the previous command:
+
+1. We have removed the ``--evaluate`` flag, as we do not have the labels for the samples
+   we are predicting on.
+2. We have a different output configuation file, ``tutorial_01_outputs_unknown.yaml``.
+3. We have a different output folder, ``tutorial_01_unknown``.
+
+If we take a look at the ``tutorial_01_outputs_unknown.yaml`` file, we can see that
+it contains the following:
+
+.. literalinclude:: ../tutorial_files/a_using_eir/01_basic_tutorial/tutorial_01_outputs_unknown.yaml
+    :language: yaml
+    :caption: tutorial_01_outputs_unknown.yaml
+    :emphasize-lines: 3
+
+Notice that everything is the same as before, but for ``output_source`` we have
+``null`` instead of the `.csv` label file we had before.
+
+Taking a look at the produced ``predictions.csv`` file, we can see that we only
+have the actual predictions, and no true labels:
+
+.. raw:: html
+   :file: ../tutorial_files/a_using_eir/01_basic_tutorial/csv_preview_unknown.html
+
+
+D - Applying to your own data (e.g. UK Biobank)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Thank you for reading this far! Hopefully this tutorial introduced you well enough to
@@ -273,6 +313,10 @@ it first (see: `plink pipelines`_). Then you will have to set the relevant paths
 inputs (e.g. ``input_source``, ``snp_file``) and outputs
 (e.g. ``output_source``, ``target_cat_columns`` or ``target_con_columns``
 if you have continuous targets).
+
+.. important::
+    If you are interested in quickly training deep learning models for genomic prediction,
+    the `EIR-auto-GP`_ project might be of use to you.
 
 When moving to large scale data such as the UK Biobank, the configurations we used
 on the ancestry toy data in this tutorial will likely not be sufficient. For example,

@@ -864,6 +864,7 @@ def filter_missing_outputs_and_labels(
     model_outputs: Dict[str, Dict[str, torch.Tensor]],
     target_labels: Dict[str, Dict[str, torch.Tensor]],
     missing_ids_info: MissingTargetsInfo,
+    with_labels: bool,
 ) -> FilteredOutputsAndLabels:
     """
     Note: Later we can maybe have pre-computed sets of IDs per modality-output
@@ -892,7 +893,13 @@ def filter_missing_outputs_and_labels(
             no_missing = not cur_missing_ids and not missing_modality_ids
             if no_missing:
                 filtered_inner_dict[inner_key] = modality_output_tensor
-                filtered_inner_labels[inner_key] = target_labels[output_name][inner_key]
+
+                if with_labels:
+                    cur_targets = target_labels[output_name][inner_key]
+                else:
+                    cur_targets = torch.tensor([])
+                filtered_inner_labels[inner_key] = cur_targets
+
                 filtered_inner_ids[inner_key] = batch_ids
                 continue
 
@@ -905,7 +912,13 @@ def filter_missing_outputs_and_labels(
             all_valid = len(valid_indices) == len(batch_ids)
             if all_valid:
                 filtered_inner_dict[inner_key] = modality_output_tensor
-                filtered_inner_labels[inner_key] = target_labels[output_name][inner_key]
+
+                if with_labels:
+                    cur_targets = target_labels[output_name][inner_key]
+                else:
+                    cur_targets = torch.tensor([])
+                filtered_inner_labels[inner_key] = cur_targets
+
                 filtered_inner_ids[inner_key] = batch_ids
                 continue
 
@@ -914,8 +927,12 @@ def filter_missing_outputs_and_labels(
             output_tensor = modality_output_tensor[valid_indices_tensor]
             filtered_inner_dict[inner_key] = output_tensor
 
-            target_tensor = target_labels[output_name][inner_key]
-            filtered_inner_labels[inner_key] = target_tensor[valid_indices_tensor]
+            if with_labels:
+                cur_targets = target_labels[output_name][inner_key]
+                filtered_inner_labels[inner_key] = cur_targets[valid_indices_tensor]
+            else:
+                cur_targets = torch.tensor([])
+                filtered_inner_labels[inner_key] = cur_targets
 
             ids: list[str] = [batch_ids[i] for i in valid_indices]
             filtered_inner_ids[inner_key] = ids
