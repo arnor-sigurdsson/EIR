@@ -60,7 +60,7 @@ def _get_classification_output_configs(
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {"na_augment_prob": 0.8},
+                        "input_type_info": {"na_augment_beta": 0.8},
                         "model_config": {
                             "model_type": "linear",
                             "model_init_config": {"l1": 1e-04},

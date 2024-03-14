@@ -41,8 +41,7 @@ class OmicsConsumerCallable(Protocol):
     def __call__(
         self,
         attribution: Optional["SampleAttribution"],
-    ) -> Optional[ParsedOmicsAttributions]:
-        ...
+    ) -> Optional[ParsedOmicsAttributions]: ...
 
 
 def get_omics_consumer(

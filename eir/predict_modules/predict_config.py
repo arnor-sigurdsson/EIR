@@ -183,8 +183,7 @@ class InputSequenceMatchingFunction(Protocol):
         self,
         train_config: schemas.InputConfig,
         predict_dict_iterator: Iterable[dict],
-    ) -> dict:
-        ...
+    ) -> dict: ...
 
 
 class OutputSequenceMatchingFunction(Protocol):
@@ -192,8 +191,7 @@ class OutputSequenceMatchingFunction(Protocol):
         self,
         train_config: schemas.OutputConfig,
         predict_dict_iterator: Iterable[dict],
-    ) -> dict:
-        ...
+    ) -> dict: ...
 
 
 def get_config_sequence_matching_func(

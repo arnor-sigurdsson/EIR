@@ -40,10 +40,10 @@ def omics_load_wrapper(
 
 def prepare_one_hot_omics_data(
     genotype_array: np.ndarray,
-    na_augment_perc: float,
-    na_augment_prob: float,
-    shuffle_augment_perc: float,
-    shuffle_augment_prob: float,
+    na_augment_alpha: float,
+    na_augment_beta: float,
+    shuffle_augment_alpha: float,
+    shuffle_augment_beta: float,
     test_mode: bool,
 ) -> torch.Tensor:
     """
@@ -53,18 +53,18 @@ def prepare_one_hot_omics_data(
 
     tensor_bool = torch.BoolTensor(genotype_array).unsqueeze(0).detach().clone()
 
-    if not test_mode and na_augment_perc > 0 and na_augment_prob > 0:
+    if not test_mode and na_augment_alpha > 0 and na_augment_beta > 0:
         tensor_bool = make_random_omics_columns_missing(
             omics_array=tensor_bool,
-            percentage=na_augment_perc,
-            probability=na_augment_prob,
+            alpha=na_augment_alpha,
+            beta=na_augment_beta,
         )
 
-    if not test_mode and shuffle_augment_perc > 0 and shuffle_augment_prob > 0:
+    if not test_mode and shuffle_augment_alpha > 0 and shuffle_augment_beta > 0:
         tensor_bool = shuffle_random_omics_columns(
             omics_array=tensor_bool,
-            percentage=shuffle_augment_perc,
-            probability=shuffle_augment_prob,
+            alpha=shuffle_augment_alpha,
+            beta=shuffle_augment_beta,
         )
 
     assert tensor_bool.dtype == torch.bool

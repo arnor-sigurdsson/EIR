@@ -432,28 +432,50 @@ def test_make_random_snps_missing_some():
         assert (array[:, 3, mock_return] == expected_missing).all()
 
 
-def test_make_random_snps_missing_all():
+def test_make_random_snps_missing_uniform_distribution():
     test_array = torch.zeros((1, 4, 1000), dtype=torch.bool)
     test_array[:, 0, :] = True
 
     array = data_augmentation.make_random_omics_columns_missing(
-        omics_array=test_array, percentage=1.0, probability=1.0
+        omics_array=test_array,
+        alpha=1.0,
+        beta=1.0,
     )
 
-    assert (array.sum(1) != 1).sum() == 0
-    assert (array[:, 3, :] == 1).all()
+    assert array[:, 0, :].any(), "Expected some SNPs to be set to the default state."
+    assert not array[:, 1, :].any(), "Expected no SNPs in this state."
+    assert array[:, 3, :].any(), "Expected some SNPs to be set to the missing state."
 
 
-def test_make_random_snps_missing_none():
+def test_make_random_snps_missing_maximal():
     test_array = torch.zeros((1, 4, 1000), dtype=torch.bool)
     test_array[:, 0, :] = True
 
     array = data_augmentation.make_random_omics_columns_missing(
-        omics_array=test_array, percentage=1.0, probability=0.0
+        omics_array=test_array,
+        alpha=100.0,
+        beta=1.0,
     )
 
-    assert (array.sum(1) != 1).sum() == 0
-    assert (array[:, 3, :] == 0).all()
+    missing_percentage = (array[:, 3, :].sum() / 1000).item()
+
+    assert (
+        missing_percentage > 0.95
+    ), "Expected a high percentage of SNPs to be set to missing."
+
+
+def test_make_random_snps_missing_minimal():
+    test_array = torch.zeros((1, 4, 1000), dtype=torch.bool)
+    test_array[:, 0, :] = True
+
+    array = data_augmentation.make_random_omics_columns_missing(
+        omics_array=test_array,
+        alpha=1.0,
+        beta=100.0,
+    )
+
+    missing_percentage = (array[:, 3, :].sum() / 1000).item()
+    assert missing_percentage < 0.05, "Expected minimal SNPs to be set to missing."
 
 
 def test_shuffle_columns_some():
@@ -474,34 +496,10 @@ def test_shuffle_columns_some():
 
         shuffled_array = data_augmentation.shuffle_random_omics_columns(
             omics_array=test_array.clone(),
-            percentage=1.0,
-            probability=1.0,
+            alpha=100.0,
+            beta=1.0,
         )
         assert not torch.equal(shuffled_array, test_array)
-
-
-def test_shuffle_columns_none():
-    test_array = torch.tensor(
-        [
-            [
-                [True, False, True],
-                [False, True, False],
-                [False, False, False],
-                [False, False, False],
-            ]
-        ],
-        dtype=torch.bool,
-    )
-
-    with patch("torch.rand", autospec=True) as mock_rand:
-        mock_rand.return_value = torch.tensor([0.9])
-
-        shuffled_array = data_augmentation.shuffle_random_omics_columns(
-            omics_array=test_array.clone(),
-            percentage=1.0,
-            probability=0.0,
-        )
-        assert torch.equal(shuffled_array, test_array)
 
 
 def test_shuffle_columns_one_hot():
@@ -522,7 +520,7 @@ def test_shuffle_columns_one_hot():
 
         shuffled_array = data_augmentation.shuffle_random_omics_columns(
             omics_array=test_array.clone(),
-            percentage=1.0,
-            probability=1.0,
+            alpha=1.0,
+            beta=1.0,
         )
         assert (shuffled_array.sum(dim=1) == 1).all()

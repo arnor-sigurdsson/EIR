@@ -199,7 +199,11 @@ def get_prediction_outputs_generator(
     batch_prep_hook_kwargs: Dict[str, Any],
     model: Module,
     with_labels: bool = True,
-) -> Generator[al_dataloader_gathered_predictions, None, None,]:
+) -> Generator[
+    al_dataloader_gathered_predictions,
+    None,
+    None,
+]:
     assert not model.training
     for loader_batch in data_loader:
         state = call_hooks_stage_iterable(

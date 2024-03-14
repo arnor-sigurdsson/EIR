@@ -132,7 +132,7 @@ def convert_model_inputs_to_raw(
                     input_transformers=input_object.labels.label_transformers,
                 )
 
-            case (ComputedOmicsInputInfo() | ComputedBytesInputInfo()):
+            case ComputedOmicsInputInfo() | ComputedBytesInputInfo():
                 assert isinstance(data, torch.Tensor)
                 raw_input = data.numpy().squeeze()
 
@@ -415,10 +415,10 @@ def prepare_manual_sample_data(
 
                 array_prepared = prepare_one_hot_omics_data(
                     genotype_array=array_raw,
-                    na_augment_perc=input_type_info.na_augment_perc,
-                    na_augment_prob=input_type_info.na_augment_prob,
-                    shuffle_augment_perc=input_type_info.shuffle_augment_perc,
-                    shuffle_augment_prob=input_type_info.shuffle_augment_prob,
+                    na_augment_alpha=input_type_info.na_augment_alpha,
+                    na_augment_beta=input_type_info.na_augment_beta,
+                    shuffle_augment_alpha=input_type_info.shuffle_augment_alpha,
+                    shuffle_augment_beta=input_type_info.shuffle_augment_beta,
                     test_mode=True,
                 )
                 prepared_inputs[name] = array_prepared

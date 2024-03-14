@@ -58,7 +58,6 @@ al_omics_model_configs = Union[
 
 @dataclass
 class OmicsModelConfig:
-
     """
     :param model_type:
          Which type of image model to use.
@@ -124,9 +123,9 @@ def get_omics_model_init_kwargs(
     to just model_config object).
     """
 
-    kwargs: dict[
-        str, Union["DataDimensions", al_omics_model_configs | FlattenFunc]
-    ] = {}
+    kwargs: dict[str, Union["DataDimensions", al_omics_model_configs | FlattenFunc]] = (
+        {}
+    )
     base_kwargs = model_config.__dict__
     base_kwargs = _enforce_omics_specific_settings(
         base_kwargs=base_kwargs, model_type=model_type

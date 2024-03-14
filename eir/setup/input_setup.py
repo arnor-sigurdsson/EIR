@@ -84,13 +84,11 @@ class InputSetupFunction(Protocol):
         input_config: schemas.InputConfig,
         hooks: Optional["Hooks"],
         **kwargs,
-    ) -> al_input_objects:
-        ...
+    ) -> al_input_objects: ...
 
 
 class InputSetupGetterFunction(Protocol):
-    def __call__(self, input_config: schemas.InputConfig) -> InputSetupFunction:
-        ...
+    def __call__(self, input_config: schemas.InputConfig) -> InputSetupFunction: ...
 
 
 def set_up_inputs_general(

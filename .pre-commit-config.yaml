@@ -2,7 +2,7 @@ default_language_version:
   python: python3
 repos:
   - repo: https://github.com/ambv/black
-    rev: 23.7.0
+    rev: 24.2.0
     hooks:
       - id: black
   - repo: https://github.com/pre-commit/pre-commit-hooks

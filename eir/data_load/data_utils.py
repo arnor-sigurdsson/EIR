@@ -52,15 +52,15 @@ class Batch:
 
 
 @overload
-def get_train_sampler(columns_to_sample: None, train_dataset: "DatasetBase") -> None:
-    ...
+def get_train_sampler(
+    columns_to_sample: None, train_dataset: "DatasetBase"
+) -> None: ...
 
 
 @overload
 def get_train_sampler(
     columns_to_sample: Sequence[str], train_dataset: "DatasetBase"
-) -> Union[WeightedRandomSampler, DistributedSampler]:
-    ...
+) -> Union[WeightedRandomSampler, DistributedSampler]: ...
 
 
 def get_train_sampler(columns_to_sample, train_dataset):

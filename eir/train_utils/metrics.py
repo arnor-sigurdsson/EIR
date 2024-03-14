@@ -70,8 +70,7 @@ class MetricFunctionProtocol(Protocol):
         labels: np.ndarray,
         column_name: str,
         output_name: str,
-    ) -> float:
-        ...
+    ) -> float: ...
 
 
 class AverageMetricFunctionProtocol(Protocol):
@@ -80,8 +79,7 @@ class AverageMetricFunctionProtocol(Protocol):
         metric_dict: al_step_metric_dict,
         output_name: str,
         column_name: str,
-    ) -> float:
-        ...
+    ) -> float: ...
 
 
 al_averaging_functions_dict = Dict[str, AverageMetricFunctionProtocol]

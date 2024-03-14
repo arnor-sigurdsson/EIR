@@ -27,7 +27,6 @@ al_emb_lookup_dict = Dict[str, Dict[str, Dict[int, int]]]
 
 @dataclass
 class TabularModelConfig:
-
     """
     :param model_type:
          Which type of image model to use.

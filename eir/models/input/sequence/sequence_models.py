@@ -14,8 +14,7 @@ class SequenceModelClassGetterFunction(Protocol):
         Type[TransformerFeatureExtractor]
         | Type[TransformerWrapperModel]
         | Type[SequenceOutputTransformerFeatureExtractor]
-    ):
-        ...
+    ): ...
 
 
 def get_sequence_model_class(

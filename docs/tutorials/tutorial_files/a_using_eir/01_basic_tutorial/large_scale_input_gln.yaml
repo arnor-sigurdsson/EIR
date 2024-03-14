@@ -4,8 +4,8 @@ input_info:
   input_type: "omics"
 input_type_info:
   mixing_subtype: "cutmix-block"
-  na_augment_perc: 0.2
-  na_augment_prob: 1.0
+  na_augment_alpha: 1.0
+  na_augment_beta: 2.0
   snp_file: "FILL" # can delete if not computing attributions
 model_config:
   model_type: "genome-local-net"

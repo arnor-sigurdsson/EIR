@@ -443,8 +443,7 @@ class AttributionCallable(Protocol):
         inputs: Dict[str, torch.Tensor],
         sample_label: torch.Tensor,
         **kwargs,
-    ) -> list[np.ndarray]:
-        ...
+    ) -> list[np.ndarray]: ...
 
 
 def get_attribution(
@@ -581,8 +580,7 @@ class BasicConsumerCallable(Protocol):
     def __call__(
         self,
         attribution: Optional["SampleAttribution"],
-    ) -> Optional[Sequence["SampleAttribution"]]:
-        ...
+    ) -> Optional[Sequence["SampleAttribution"]]: ...
 
 
 def _get_consumer_from_input_type(

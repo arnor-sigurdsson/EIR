@@ -416,17 +416,15 @@ def init_input_config(yaml_config_as_dict: Dict[str, Any]) -> schemas.InputConfi
     return input_config
 
 
-def get_inputs_schema_map() -> (
-    Dict[
-        str,
-        Union[
-            Type[schemas.OmicsInputDataConfig],
-            Type[schemas.TabularInputDataConfig],
-            Type[schemas.SequenceInputDataConfig],
-            Type[schemas.ByteInputDataConfig],
-        ],
-    ]
-):
+def get_inputs_schema_map() -> Dict[
+    str,
+    Union[
+        Type[schemas.OmicsInputDataConfig],
+        Type[schemas.TabularInputDataConfig],
+        Type[schemas.SequenceInputDataConfig],
+        Type[schemas.ByteInputDataConfig],
+    ],
+]:
     mapping = {
         "omics": schemas.OmicsInputDataConfig,
         "tabular": schemas.TabularInputDataConfig,
@@ -643,9 +641,9 @@ def load_fusion_configs(fusion_configs: Iterable[dict]) -> schemas.FusionConfig:
 
     fusion_model_type = combined_config["model_type"]
 
-    model_dataclass_config_class: Type[ResidualMLPConfig] | Type[
-        MGMoEModelConfig
-    ] | Type[IdentityConfig] = ResidualMLPConfig
+    model_dataclass_config_class: (
+        Type[ResidualMLPConfig] | Type[MGMoEModelConfig] | Type[IdentityConfig]
+    ) = ResidualMLPConfig
     if fusion_model_type == "mgmoe":
         model_dataclass_config_class = MGMoEModelConfig
     elif fusion_model_type == "linear":
@@ -751,14 +749,12 @@ def _set_up_basic_sampling_config(
     return sampling_config_object
 
 
-def get_outputs_types_schema_map() -> (
-    Dict[
-        str,
-        Type[schemas.TabularOutputTypeConfig]
-        | Type[schemas.SequenceOutputTypeConfig]
-        | Type[schemas.ArrayOutputTypeConfig],
-    ]
-):
+def get_outputs_types_schema_map() -> Dict[
+    str,
+    Type[schemas.TabularOutputTypeConfig]
+    | Type[schemas.SequenceOutputTypeConfig]
+    | Type[schemas.ArrayOutputTypeConfig],
+]:
     mapping = {
         "tabular": schemas.TabularOutputTypeConfig,
         "sequence": schemas.SequenceOutputTypeConfig,
