@@ -181,7 +181,9 @@ def get_test_omics_input_init(
         },
         "input_type_info": {
             "na_augment_alpha": 1.0,
-            "na_augment_beta": 2.0,
+            "na_augment_beta": 5.0,
+            "shuffle_augment_alpha": 1.0,
+            "shuffle_augment_beta": 20.0,
             "snp_file": str(test_path / "test_snps.bim"),
         },
         "model_config": {"model_type": "genome-local-net"},

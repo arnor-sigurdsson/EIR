@@ -305,7 +305,7 @@ have the actual predictions, and no true labels:
 
 
 D - Applying to your own data (e.g. UK Biobank)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Thank you for reading this far! Hopefully this tutorial introduced you well enough to
 the framework so you can apply it to your own data. For that, you will have to process

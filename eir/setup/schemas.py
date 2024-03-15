@@ -471,9 +471,9 @@ class OmicsInputDataConfig:
     snp_file: Optional[str] = None
     subset_snps_file: Optional[str] = None
     na_augment_alpha: float = 1.0
-    na_augment_beta: float = 2.0
-    shuffle_augment_alpha: float = 1.0
-    shuffle_augment_beta: float = 5.0
+    na_augment_beta: float = 5.0
+    shuffle_augment_alpha: float = 0.0
+    shuffle_augment_beta: float = 0.0
     omics_format: Literal["one-hot"] = "one-hot"
     mixing_subtype: Union[Literal["mixup", "cutmix-block", "cutmix-uniform"]] = "mixup"
     modality_dropout_rate: float = 0.0
