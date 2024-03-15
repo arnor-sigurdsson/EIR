@@ -45,22 +45,19 @@ from eir.utils.logging import get_logger
 
 
 class TokenizerProtocolRaw(Protocol):
-    def __call__(self, raw_input: str) -> Sequence[str]:
-        ...
+    def __call__(self, raw_input: str) -> Sequence[str]: ...
 
     __closure__: Optional[Tuple[Any, ...]]
 
 
 class TokenizerProtocolPreSplit(Protocol):
-    def __call__(self, raw_input_split: Sequence[str]) -> Sequence[str]:
-        ...
+    def __call__(self, raw_input_split: Sequence[str]) -> Sequence[str]: ...
 
     __closure__: Optional[Tuple[Any, ...]]
 
 
 class EncodeFuncProtocol(Protocol):
-    def __call__(self, raw_input: Sequence[str] | str) -> Sequence[int]:
-        ...
+    def __call__(self, raw_input: Sequence[str] | str) -> Sequence[int]: ...
 
 
 al_hf_tokenizer_inputs = Union[TextInput, PreTokenizedInput, EncodedInput]
@@ -136,15 +133,13 @@ def set_up_sequence_input_for_training(
 class SequenceInputObjectGetterFunctionBasic(Protocol):
     def __call__(
         self, input_config: schemas.InputConfig
-    ) -> al_sequence_input_objects_basic:
-        ...
+    ) -> al_sequence_input_objects_basic: ...
 
 
 class SequenceInputObjectGetterFunctionHF(Protocol):
     def __call__(
         self, input_config: schemas.InputConfig
-    ) -> al_sequence_input_objects_hf:
-        ...
+    ) -> al_sequence_input_objects_hf: ...
 
 
 def _get_sequence_input_object_func(
@@ -505,12 +500,10 @@ def get_tokenizer_encode_func(
     pytorch_vocab: Vocab,
 ) -> EncodeFuncProtocol:
     @overload
-    def _encode_func(raw_input: str) -> Sequence[int]:
-        ...
+    def _encode_func(raw_input: str) -> Sequence[int]: ...
 
     @overload
-    def _encode_func(raw_input: Sequence[str]) -> Sequence[int]:
-        ...
+    def _encode_func(raw_input: Sequence[str]) -> Sequence[int]: ...
 
     def _encode_func(raw_input):
         input_tokenized = tokenizer(raw_input)
@@ -525,12 +518,10 @@ def get_tokenized_vocab_iterator(
     tokenizer: TokenizerProtocolRaw | TokenizerProtocolPreSplit,
 ) -> Generator[Sequence[str], None, None]:
     @overload
-    def _do_tokenize(list_of_words_: str) -> Sequence[str]:
-        ...
+    def _do_tokenize(list_of_words_: str) -> Sequence[str]: ...
 
     @overload
-    def _do_tokenize(list_of_words_: Sequence[str]) -> Sequence[str]:
-        ...
+    def _do_tokenize(list_of_words_: Sequence[str]) -> Sequence[str]: ...
 
     def _do_tokenize(list_of_words_):
         return tokenizer(list_of_words_)

@@ -339,15 +339,13 @@ def _get_early_stopping_handler(
 @overload
 def _get_early_stopping_event_filter_kwargs(
     early_stopping_iteration_buffer: None, sample_interval: int
-) -> dict[str, int]:
-    ...
+) -> dict[str, int]: ...
 
 
 @overload
 def _get_early_stopping_event_filter_kwargs(
     early_stopping_iteration_buffer: int, sample_interval: int
-) -> dict[str, Callable[[Engine, int], bool]]:
-    ...
+) -> dict[str, Callable[[Engine, int], bool]]: ...
 
 
 def _get_early_stopping_event_filter_kwargs(

@@ -50,13 +50,11 @@ class OutputSetupFunction(Protocol):
         self,
         input_config: schemas.OutputConfig,
         **kwargs,
-    ) -> al_output_objects:
-        ...
+    ) -> al_output_objects: ...
 
 
 class OutputSetupGetterFunction(Protocol):
-    def __call__(self, output_config: schemas.OutputConfig) -> OutputSetupFunction:
-        ...
+    def __call__(self, output_config: schemas.OutputConfig) -> OutputSetupFunction: ...
 
 
 def set_up_outputs_general(

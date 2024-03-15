@@ -403,19 +403,58 @@ class OmicsInputDataConfig:
         arrays for the modelling. Requires the ``snp_file`` parameter to
         be passed in.
 
-    :param na_augment_perc:
-        Percentage of the input (i.e. percentage of SNPs) to augment by setting the
-        SNPs to 'missing' (i.e. ``[0, 0, 0, 1]`` in one-hot encoding).
+    :param na_augment_alpha:
+        Used to control the extent of missing data augmentation in the omics data.
+        A value is sampled from a beta distribution, and the sampled value is used
+        to set a percentage of the SNPs to be 'missing'.
 
-    :param na_augment_prob:
-        Probability of applying NA augmentation to a given sample.
+        The alpha (α) parameter of the beta distribution, influencing the shape of the
+        distribution towards 1. Higher values of alpha (compared to beta) bias the
+        distribution to sample larger percentages of SNPs to be set as 'missing',
+        leading to a higher likelihood of missingness.
+        Conversely, lower values of alpha (compared to beta) result in sampling lower
+        percentages, thus reducing the probability and extent of missingness.
+        For example, setting alpha to 1.0 and beta to 5.0 will skew the distribution
+        towards lower percentages of missingness, since beta is significantly larger.
+        Setting alpha to 5.0 and beta to 1.0 will skew the distribution towards higher
+        percentages of missingness, since alpha is significantly larger.
 
-    :param shuffle_augment_perc:
-        Percentage of the input (i.e. percentage of SNPs) to augment by shuffling the
-        one-hot encoding of the SNPs.
+    :param na_augment_beta:
+        Used to control the extent of missing data augmentation in the omics data.
+        A value is sampled from a beta distribution, and the sampled value is used
+        to set a percentage of the SNPs to be 'missing'.
 
-    :param shuffle_augment_prob:
-        Probability of applying shuffle augmentation to a given sample.
+        Beta (β) parameter of the beta distribution, influencing the shape of the
+        distribution towards 0. Higher values of beta (compared to alpha) bias the
+        distribution to sample smaller percentages of SNPs to be set as 'missing',
+        leading to a lower likelihood and extent of missingness.
+        Conversely, lower values of beta (compared to alpha) result in sampling
+        larger percentages, thus increasing the probability and extent of missingness.
+
+    :param shuffle_augment_alpha:
+        Used to control the extent of shuffling data augmentation in the omics data.
+        A value is sampled from a beta distribution, and the sampled value is used to
+        determine the percentage of the SNPs to be shuffled.
+
+        The alpha (α) parameter of the beta distribution, influencing the shape of
+        the distribution towards 1. Higher values of alpha (compared to beta) bias
+        the distribution to sample larger percentages of SNPs to be shuffled, leading
+        to a higher likelihood of extensive shuffling. Conversely, lower values of
+        alpha (compared to beta) result in sampling lower percentages, thus reducing
+        the extent of shuffling. Setting alpha to a significantly larger value than
+        beta will skew the distribution towards higher percentages of shuffling.
+
+    :param shuffle_augment_beta:
+        Used to control the extent of shuffling data augmentation in the omics data.
+        A value is sampled from a beta distribution, and the sampled value is used to
+        determine the percentage of the SNPs to be shuffled.
+
+        Beta (β) parameter of the beta distribution, influencing the shape of the
+        distribution towards 0. Higher values of beta (compared to alpha) bias the
+        distribution to sample smaller percentages of SNPs to be shuffled, leading to
+        a lower likelihood and extent of shuffling. Conversely, lower values of beta
+        (compared to alpha) result in sampling larger percentages, thus increasing
+        the likelihood and extent of shuffling.
 
     :param omics_format:
         Currently unsupported (i.e. does nothing), which format the omics data is in.
@@ -431,10 +470,10 @@ class OmicsInputDataConfig:
 
     snp_file: Optional[str] = None
     subset_snps_file: Optional[str] = None
-    na_augment_perc: float = 0.2
-    na_augment_prob: float = 0.8
-    shuffle_augment_perc: float = 0.0
-    shuffle_augment_prob: float = 0.0
+    na_augment_alpha: float = 1.0
+    na_augment_beta: float = 5.0
+    shuffle_augment_alpha: float = 0.0
+    shuffle_augment_beta: float = 0.0
     omics_format: Literal["one-hot"] = "one-hot"
     mixing_subtype: Union[Literal["mixup", "cutmix-block", "cutmix-uniform"]] = "mixup"
     modality_dropout_rate: float = 0.0
@@ -737,7 +776,6 @@ class OutputInfoConfig:
 
 @dataclass
 class OutputConfig:
-
     """
     :param output_info:
         Information about the output source, name and type.

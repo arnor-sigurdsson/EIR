@@ -112,8 +112,7 @@ class MetaClassGetterCallable(Protocol):
     def __call__(
         self,
         meta_model_type: str,
-    ) -> Type[al_meta_model]:
-        ...
+    ) -> Type[al_meta_model]: ...
 
 
 def get_meta_model_class_and_kwargs_from_configs(

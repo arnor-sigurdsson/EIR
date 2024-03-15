@@ -26,8 +26,7 @@ class ArrayConsumerCallable(Protocol):
     def __call__(
         self,
         attribution: Optional["SampleAttribution"],
-    ) -> Optional[dict[str, np.ndarray]]:
-        ...
+    ) -> Optional[dict[str, np.ndarray]]: ...
 
 
 def get_array_sum_consumer(

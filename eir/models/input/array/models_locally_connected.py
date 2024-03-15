@@ -30,8 +30,7 @@ class FlattenFunc(Protocol):
     def __call__(
         self,
         x: torch.Tensor,
-    ) -> torch.Tensor:
-        ...
+    ) -> torch.Tensor: ...
 
 
 @dataclass

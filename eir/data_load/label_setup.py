@@ -272,8 +272,7 @@ class LabelDFParseWrapperProtocol(Protocol):
         label_file_tabular_info: TabularFileInfo,
         ids_to_keep: Union[None, Sequence[str]],
         custom_label_ops: al_all_column_ops = None,
-    ) -> pd.DataFrame:
-        ...
+    ) -> pd.DataFrame: ...
 
 
 def get_label_parsing_wrapper(

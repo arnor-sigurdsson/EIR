@@ -72,10 +72,10 @@ def prepare_inputs_disk(
                 assert isinstance(input_type_info, OmicsInputDataConfig)
                 input_prepared = prepare_one_hot_omics_data(
                     genotype_array=array_raw,
-                    na_augment_perc=input_type_info.na_augment_perc,
-                    na_augment_prob=input_type_info.na_augment_prob,
-                    shuffle_augment_perc=input_type_info.shuffle_augment_perc,
-                    shuffle_augment_prob=input_type_info.shuffle_augment_prob,
+                    na_augment_alpha=input_type_info.na_augment_alpha,
+                    na_augment_beta=input_type_info.na_augment_beta,
+                    shuffle_augment_alpha=input_type_info.shuffle_augment_alpha,
+                    shuffle_augment_beta=input_type_info.shuffle_augment_beta,
                     test_mode=test_mode,
                 )
 
@@ -178,10 +178,10 @@ def prepare_inputs_memory(
                 assert isinstance(input_type_info, OmicsInputDataConfig)
                 input_prepared = prepare_one_hot_omics_data(
                     genotype_array=data,
-                    na_augment_perc=input_type_info.na_augment_perc,
-                    na_augment_prob=input_type_info.na_augment_prob,
-                    shuffle_augment_perc=input_type_info.shuffle_augment_perc,
-                    shuffle_augment_prob=input_type_info.shuffle_augment_prob,
+                    na_augment_alpha=input_type_info.na_augment_alpha,
+                    na_augment_beta=input_type_info.na_augment_beta,
+                    shuffle_augment_alpha=input_type_info.shuffle_augment_alpha,
+                    shuffle_augment_beta=input_type_info.shuffle_augment_beta,
                     test_mode=test_mode,
                 )
 

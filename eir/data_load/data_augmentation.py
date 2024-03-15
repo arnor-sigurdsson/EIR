@@ -71,8 +71,7 @@ class MixingCallable(Protocol):
         tensor: torch.Tensor,
         lambda_: float,
         random_batch_indices_to_mix: torch.Tensor,
-    ) -> torch.Tensor:
-        ...
+    ) -> torch.Tensor: ...
 
 
 def _get_mixing_func_map() -> Dict[str, Dict[str, MixingCallable]]:
@@ -375,14 +374,18 @@ def calc_mixed_loss(
 
 
 def make_random_omics_columns_missing(
-    omics_array: torch.Tensor, percentage: float = 0.05, probability: float = 1.0
+    omics_array: torch.Tensor,
+    alpha: float = 1.0,
+    beta: float = 2.0,
 ) -> torch.Tensor:
-    random_draw = torch.rand(1).item()
-    if random_draw > probability:
-        return omics_array
+    if alpha <= 0 or beta <= 0:
+        raise ValueError("Alpha and Beta must be positive.")
+
+    dist = torch.distributions.beta.Beta(alpha, beta)
+    percentage_sampled = dist.sample().item()
 
     n_snps = omics_array.shape[2]
-    n_to_drop = int(n_snps * percentage)
+    n_to_drop = int(n_snps * percentage_sampled)
     random_to_drop = torch.randperm(n_snps)[:n_to_drop].to(dtype=torch.long)
 
     missing_arr = torch.tensor([False, False, False, True], dtype=torch.bool).reshape(
@@ -394,14 +397,18 @@ def make_random_omics_columns_missing(
 
 
 def shuffle_random_omics_columns(
-    omics_array: torch.Tensor, percentage: float = 0.05, probability: float = 1.0
+    omics_array: torch.Tensor,
+    alpha: float = 1.0,
+    beta: float = 5.0,
 ) -> torch.Tensor:
-    random_draw = torch.rand(1).item()
-    if random_draw > probability:
-        return omics_array
+    if alpha <= 0 or beta <= 0:
+        raise ValueError("Alpha and Beta must be positive.")
+
+    dist = torch.distributions.beta.Beta(alpha, beta)
+    percentage_sampled = dist.sample().item()
 
     n_snps = omics_array.shape[2]
-    n_to_shuffle = int(n_snps * percentage)
+    n_to_shuffle = int(n_snps * percentage_sampled)
     random_to_shuffle = torch.randperm(n_snps)[:n_to_shuffle].to(dtype=torch.long)
 
     one_hot_random = torch.zeros(

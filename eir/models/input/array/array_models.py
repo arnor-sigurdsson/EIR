@@ -182,7 +182,6 @@ def flatten_patches(patches: torch.Tensor) -> torch.Tensor:
 
 @dataclass
 class ArrayModelConfig:
-
     """
     :param model_type:
          Which type of image model to use.

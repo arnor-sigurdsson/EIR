@@ -7,8 +7,7 @@ from eir.models.input.array.models_cnn import CNNModelConfig
 
 
 class ImageModelClassGetterFunction(Protocol):
-    def __call__(self, model_type: str) -> Type["ImageWrapperModel"]:
-        ...
+    def __call__(self, model_type: str) -> Type["ImageWrapperModel"]: ...
 
 
 def get_image_model_class(model_type: str) -> Type["ImageWrapperModel"]:
@@ -20,7 +19,6 @@ def get_image_model_class(model_type: str) -> Type["ImageWrapperModel"]:
 
 @dataclass
 class ImageModelConfig:
-
     """
     :param model_type:
          Which type of image model to use.

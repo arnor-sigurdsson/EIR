@@ -30,7 +30,6 @@ class LCLOutputModelConfig(LCLModelConfig):
 
 @dataclass
 class ArrayOutputModuleConfig:
-
     """
     :param model_type:
          Which type of image model to use.

@@ -24,7 +24,6 @@ if TYPE_CHECKING:
 
 @dataclass
 class ResidualMLPOutputModuleConfig(ResidualMLPConfig):
-
     """
     :param layers:
         Number of residual MLP residual blocks to use in the output module.

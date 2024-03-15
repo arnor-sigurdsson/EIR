@@ -18,7 +18,6 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 
 @dataclass
 class SequenceModelConfig:
-
     """
     :param model_init_config:
           Configuration / arguments used to initialise model.

@@ -16,31 +16,34 @@ def test_prepare_genotype_array_train_mode():
 
     prepared_array_train = prepare_omics.prepare_one_hot_omics_data(
         genotype_array=test_array,
-        na_augment_perc=1.0,
-        na_augment_prob=1.0,
-        shuffle_augment_perc=1.0,
-        shuffle_augment_prob=0.0,
+        na_augment_alpha=100.0,
+        na_augment_beta=1.0,
+        shuffle_augment_alpha=1.0,
+        shuffle_augment_beta=0.0,
         test_mode=False,
     )
 
     assert prepared_array_train != test_array
     assert (test_array_copy == test_array).all()
 
-    assert (prepared_array_train[:, -1, :] == 1).all()
+    assert (prepared_array_train[:, -1, :] == 1).sum() / 100 > 0.95
 
     prepared_array_train = prepare_omics.prepare_one_hot_omics_data(
         genotype_array=test_array,
-        na_augment_perc=1.0,
-        na_augment_prob=1.0,
-        shuffle_augment_perc=1.0,
-        shuffle_augment_prob=1.0,
+        na_augment_alpha=100.0,
+        na_augment_beta=1.0,
+        shuffle_augment_alpha=100.0,
+        shuffle_augment_beta=1.0,
         test_mode=False,
     )
 
     assert prepared_array_train != test_array
     assert (test_array_copy == test_array).all()
 
-    assert (prepared_array_train[:, -1, :] != 1).any()
+    assert prepared_array_train.sum() == 100
+    # check roughly evenly distributed after shuffling
+    for i in range(4):
+        assert (prepared_array_train[:, i, :] == 1).sum() < 40
 
 
 def test_prepare_genotype_array_test_mode():
@@ -49,10 +52,10 @@ def test_prepare_genotype_array_test_mode():
 
     prepared_array_test = prepare_omics.prepare_one_hot_omics_data(
         genotype_array=test_array,
-        na_augment_perc=1.0,
-        na_augment_prob=1.0,
-        shuffle_augment_perc=1.0,
-        shuffle_augment_prob=1.0,
+        na_augment_alpha=1.0,
+        na_augment_beta=1.0,
+        shuffle_augment_alpha=1.0,
+        shuffle_augment_beta=1.0,
         test_mode=True,
     )
     assert prepared_array_test != test_array

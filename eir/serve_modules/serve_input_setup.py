@@ -213,9 +213,11 @@ def general_pre_process_raw_inputs(
 
 
 def _impute_missing_tabular_values(
-    input_object: ComputedTabularInputInfo
-    | ComputedPredictTabularInputInfo
-    | ComputedServeTabularInputInfo,
+    input_object: (
+        ComputedTabularInputInfo
+        | ComputedPredictTabularInputInfo
+        | ComputedServeTabularInputInfo
+    ),
     inputs_values: dict[str, Any],
 ) -> dict[str, Any]:
     # TODO: Implement

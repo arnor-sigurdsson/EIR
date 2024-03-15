@@ -12,8 +12,7 @@ class DataFrameFunctionProtocol(Protocol):
         df: pd.DataFrame,
         column_name: Optional[str] = None,
         **kwargs: Any
-    ) -> pd.DataFrame:
-        ...
+    ) -> pd.DataFrame: ...
 
 
 @dataclass

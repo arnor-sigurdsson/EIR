@@ -436,7 +436,8 @@ def test_construct_dataset_init_params_from_cl_args(
                     {
                         "input_info": {"input_name": "test_genotype"},
                         "input_type_info": {
-                            "na_augment_perc": 0.05,
+                            "na_augment_alpha": 0.0,
+                            "na_augment_beta": 0.0,
                         },
                         "model_config": {
                             "model_type": "linear",
@@ -464,7 +465,7 @@ def test_datasets(
     parse_test_cl_args: dict,
 ):
     """
-    We set `na_augment_perc` here to 0.0 as a safety guard against it having be set
+    We set `na_augment_alpha` here to 0.0 as a safety guard against it having be set
     in the defined args setup. This is because the `check_dataset` currently assumes
     no SNPs have been dropped out.
     """
