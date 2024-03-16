@@ -293,6 +293,7 @@ def compute_missing_ids_per_tabular_output(
     missing_per_target_column: dict[str, dict[str, set[str]]] = {output_name: {}}
 
     all_ids = set(tabular_labels.all_labels.keys())
+    all_labels = tabular_labels.all_labels
 
     all_columns = list(tabular_info.con_columns) + list(tabular_info.cat_columns)
 
@@ -300,7 +301,7 @@ def compute_missing_ids_per_tabular_output(
         cur_missing = set()
 
         for id_ in all_ids:
-            cur_label = tabular_labels.all_labels[id_][target_column]
+            cur_label = all_labels[id_][target_column]
             if isinstance(cur_label, float) and math.isnan(cur_label):
                 cur_missing.add(id_)
 
