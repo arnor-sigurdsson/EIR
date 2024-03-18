@@ -12,6 +12,7 @@ from typing import (
     Union,
 )
 
+import numpy as np
 import pandas as pd
 import seaborn as sns
 import torch
@@ -25,6 +26,7 @@ from captum.attr import IntegratedGradients
 from captum.attr._utils.approximation_methods import approximation_parameters
 from captum.attr._utils.common import _reshape_and_sum
 from matplotlib import pyplot as plt
+from scipy.stats import bootstrap
 from torch import Tensor
 
 from eir.setup import schemas
@@ -73,14 +75,20 @@ def stratify_attributions_by_target_classes(
 
 
 def plot_attributions_bar(
-    df_attributions: pd.DataFrame, outpath: Path, top_n: int = 20, title: str = ""
+    df_attributions: pd.DataFrame,
+    outpath: Union[str, Path],
+    top_n: int = 20,
+    title: str = "",
+    use_boostrap: bool = True,
 ) -> None:
     df_token_top_n = calculate_top_n_tokens(
-        df_attributions=df_attributions, top_n=top_n
+        df_attributions=df_attributions,
+        top_n=top_n,
+        use_bootstrap=use_boostrap,
     )
-    df_attributions_top_n_sorted = filter_and_sort_attributions(
-        df_attributions=df_attributions, df_token_top_n=df_token_top_n
-    )
+    df_attributions_top_n_sorted = df_attributions[
+        df_attributions["Input"].isin(df_token_top_n.index)
+    ]
 
     order = (
         df_attributions_top_n_sorted.groupby("Input")
@@ -95,8 +103,6 @@ def plot_attributions_bar(
         y="Input",
         order=order,
         color="#1f77b4",
-        legend=False,
-        err_kws={"color": ".2"},
         capsize=0.1,
         errorbar=("ci", 95),
     )
@@ -113,12 +119,54 @@ def plot_attributions_bar(
     plt.close("all")
 
 
-def calculate_top_n_tokens(df_attributions: pd.DataFrame, top_n: int) -> pd.DataFrame:
-    df_token_stats = calculate_token_statistics(df_attributions=df_attributions)
+def calculate_token_statistics(
+    df_attributions: pd.DataFrame,
+    use_bootstrap: bool = True,
+    n_bootstraps: int = 1000,
+) -> pd.DataFrame:
+    token_stats = pd.DataFrame()
 
-    df_token_stats["AttributionScore"] = (
-        df_token_stats["AttributionMean"] - df_token_stats["AttributionStd"]
+    for input_feature in df_attributions["Input"].unique():
+        feature_attributions = df_attributions[
+            df_attributions["Input"] == input_feature
+        ]["Attribution"].to_numpy()
+
+        if use_bootstrap:
+            res = bootstrap(
+                (feature_attributions,),
+                np.mean,
+                n_resamples=n_bootstraps,
+                method="basic",
+            )
+            mean = np.mean(feature_attributions)
+            ci_low, ci_high = res.confidence_interval.low, res.confidence_interval.high
+            ci_size = ci_high - ci_low
+
+            token_stats.loc[input_feature, "AttributionMean"] = mean
+            token_stats.loc[input_feature, "CI_Size"] = ci_size
+        else:
+            mean = feature_attributions.mean()
+            token_stats.loc[input_feature, "AttributionMean"] = mean
+            token_stats.loc[input_feature, "CI_Size"] = 0
+
+    return token_stats.abs()
+
+
+def calculate_top_n_tokens(
+    df_attributions: pd.DataFrame,
+    top_n: int,
+    use_bootstrap: bool,
+) -> pd.DataFrame:
+    df_token_stats = calculate_token_statistics(
+        df_attributions, use_bootstrap=use_bootstrap
     )
+
+    if use_bootstrap:
+        df_token_stats["AttributionScore"] = df_token_stats["AttributionMean"] - (
+            0.5 * df_token_stats["CI_Size"]
+        )
+    else:
+        df_token_stats["AttributionScore"] = df_token_stats["AttributionMean"]
 
     df_token_stats_top_n = df_token_stats.nlargest(top_n, "AttributionScore")
     df_token_stats_top_n_sorted = df_token_stats_top_n.sort_values(
@@ -126,14 +174,6 @@ def calculate_top_n_tokens(df_attributions: pd.DataFrame, top_n: int) -> pd.Data
     )
 
     return df_token_stats_top_n_sorted
-
-
-def calculate_token_statistics(df_attributions: pd.DataFrame) -> pd.DataFrame:
-    df_token_stats = df_attributions.groupby("Input").agg(
-        AttributionMean=("Attribution", "mean"),
-        AttributionStd=("Attribution", "std"),
-    )
-    return df_token_stats
 
 
 def filter_and_sort_attributions(
