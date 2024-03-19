@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import torch
+from aislib.misc_utils import get_logger
 from captum._utils.common import (
     _expand_additional_forward_args,
     _expand_target,
@@ -34,6 +35,9 @@ from eir.setup import schemas
 if TYPE_CHECKING:
     from eir.data_load.label_setup import al_label_transformers_object
     from eir.interpretation.interpretation import SampleAttribution
+
+
+logger = get_logger(name=__name__)
 
 
 def get_target_class_name(
@@ -132,6 +136,21 @@ def calculate_token_statistics(
         ]["Attribution"].to_numpy()
 
         if use_bootstrap:
+
+            if len(np.unique(feature_attributions)) < 2:
+                logger.warning(
+                    f"Feature '{input_feature}' has less than 2 unique attribution"
+                    f" values; unable to perform bootstrapping. "
+                    f"Calculating mean without bootstrapping and setting CI_Size to 0 "
+                    f"as a default. "
+                )
+
+                token_stats.loc[input_feature, "AttributionMean"] = np.mean(
+                    feature_attributions
+                )
+                token_stats.loc[input_feature, "CI_Size"] = 0
+                continue
+
             res = bootstrap(
                 (feature_attributions,),
                 np.mean,
