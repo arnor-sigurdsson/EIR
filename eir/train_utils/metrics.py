@@ -2,7 +2,7 @@ import csv
 import warnings
 from copy import copy
 from dataclasses import dataclass
-from functools import partial
+from functools import partial, wraps
 from pathlib import Path
 from statistics import mean
 from typing import (
@@ -62,6 +62,8 @@ if TYPE_CHECKING:
 # output_name -> target_name -> metric name: value
 al_step_metric_dict = Dict[str, Dict[str, Dict[str, float]]]
 
+logger = get_logger(name=__name__)
+
 
 class MetricFunctionProtocol(Protocol):
     def __call__(
@@ -91,8 +93,6 @@ al_cat_averaging_metric_choices = Sequence[
     Literal["mcc", "acc", "roc-auc-macro", "ap-macro"]
 ]
 al_con_averaging_metric_choices = Sequence[Literal["r2", "pcc", "loss"]]
-
-logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
 @dataclass()
@@ -220,15 +220,79 @@ def average_performances_across_tasks(
         cur_value = cur_metric_func(
             metric_dict=metric_dict, output_name=output_name, column_name=column_name
         )
-        all_metrics.append(cur_value)
 
-        all_metrics.append(cur_value)
+        if not np.isnan(cur_value):
+            all_metrics.append(cur_value)
 
     average = np.array(all_metrics).mean()
 
     return average
 
 
+def handle_empty(default_value: float, metric_name: Optional[str] = None):
+    """
+    This can happen when modelling on multiple outputs, which can vary in their
+    sparsity, and by chance some outputs are empty in a batch.
+    """
+
+    def decorator(func):
+        logged = False
+
+        @wraps(func)
+        def wrapper(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs):
+            nonlocal logged
+            if (outputs.size == 0 or labels.size == 0) and not logged:
+                logger.info(
+                    f"Empty inputs encountered in "
+                    f"{metric_name or func.__name__}, "
+                    f"returning default value: {default_value}"
+                )
+                logged = True
+            if outputs.size == 0 or labels.size == 0:
+                return default_value
+            return func(outputs, labels, *args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def handle_class_mismatch(default_value: float, metric_name: Optional[str] = None):
+    """
+    Decorator to handle cases where the number of unique classes in 'labels'
+    does not match the number of columns in 'outputs'. This scenario can occur
+    in multi-class classification tasks with sparse or imbalanced outputs.
+    """
+
+    def decorator(func):
+        logged = False
+
+        @wraps(func)
+        def wrapper(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs):
+            nonlocal logged
+            unique_classes = np.unique(labels)
+            # For binary classification we have this special case
+            if outputs.shape[1] == 2 and len(unique_classes) == 1:
+                pass
+            elif len(unique_classes) != outputs.shape[1]:
+                if not logged:
+                    logger.info(
+                        f"Class mismatch encountered in "
+                        f"{metric_name or func.__name__}, "
+                        f"expected number of classes: {outputs.shape[1]}, "
+                        f"found unique classes in labels: {len(unique_classes)}. "
+                        f"Returning default value: {default_value}"
+                    )
+                    logged = True
+                return default_value
+            return func(outputs, labels, *args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+@handle_empty(default_value=np.nan, metric_name="MCC")
 def calc_mcc(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
     prediction = np.argmax(a=outputs, axis=1)
 
@@ -239,6 +303,8 @@ def calc_mcc(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
     return mcc
 
 
+@handle_class_mismatch(default_value=np.nan, metric_name="ROC-AUC")
+@handle_empty(default_value=np.nan, metric_name="ROC-AUC")
 def calc_roc_auc_ovo(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
     """
     TODO:   In rare scenarios, we might run into the issue of not having all labels
@@ -265,6 +331,8 @@ def calc_roc_auc_ovo(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -
     return roc_auc
 
 
+@handle_class_mismatch(default_value=np.nan, metric_name="AP")
+@handle_empty(default_value=np.nan, metric_name="AP")
 def calc_average_precision(
     outputs: np.ndarray, labels: np.ndarray, *args, **kwargs
 ) -> float:
@@ -284,6 +352,7 @@ def calc_average_precision(
     return average_precision
 
 
+@handle_empty(default_value=np.nan, metric_name="ACC")
 def calc_acc(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
     pred = np.argmax(outputs, axis=1)
 
@@ -291,6 +360,7 @@ def calc_acc(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
     return accuracy
 
 
+@handle_empty(default_value=np.nan, metric_name="PCC")
 def calc_pcc(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
     if len(outputs) < 2:
         return 0.0
@@ -299,6 +369,7 @@ def calc_pcc(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
     return pcc
 
 
+@handle_empty(default_value=np.nan, metric_name="R2")
 def calc_r2(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
     if len(outputs) < 2:
         return 0.0
@@ -307,6 +378,7 @@ def calc_r2(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
     return r2
 
 
+@handle_empty(default_value=np.nan, metric_name="RMSE")
 def calc_rmse(
     outputs: np.ndarray,
     labels: np.ndarray,
@@ -332,29 +404,62 @@ def calc_rmse(
     return rmse
 
 
-def calculate_prediction_losses(
-    criteria: "al_criteria_dict",
-    inputs: dict[str, dict[str, torch.Tensor]],
-    targets: dict[str, dict[str, torch.Tensor]],
-) -> dict[str, dict[str, torch.Tensor]]:
-    """
-    Inputs here refers to the input to the loss functions, which is the output
-    from the actual models.
-    """
+class LogEmptyLossProtocol(Protocol):
+    def __call__(self, output_name: str, output_head_name: str) -> None: ...
 
-    losses_dict: dict[str, dict[str, torch.Tensor]] = {}
 
-    for output_name, target_dict in inputs.items():
-        for output_head_name, input_tensor in target_dict.items():
-            cur_inner_target = targets[output_name][output_head_name]
-            criterion = criteria[output_name][output_head_name]
+def log_empty_loss_once() -> LogEmptyLossProtocol:
+    logged_combinations = set()
 
-            if output_name not in losses_dict:
-                losses_dict[output_name] = {}
-
-            losses_dict[output_name][output_head_name] = criterion(
-                input=input_tensor, target=cur_inner_target
+    def log(output_name: str, output_head_name: str) -> None:
+        if (output_name, output_head_name) not in logged_combinations:
+            logger.info(
+                f"Empty output batch encountered for {output_name},"
+                f" {output_head_name}; "
+                f"setting loss to NaN for this batch and future empty batches. "
+                f"Empty batches will not be used for training."
             )
+            logged_combinations.add((output_name, output_head_name))
+
+    return log
+
+
+def calculate_prediction_losses(
+    criteria: "Dict[str, Dict[str, torch.nn.Module]]",
+    inputs: Dict[str, Dict[str, torch.Tensor]],
+    targets: Dict[str, Dict[str, torch.Tensor]],
+    log_empty_loss_callable: LogEmptyLossProtocol,
+) -> Dict[str, Dict[str, torch.Tensor]]:
+    """
+    We check for empty output tensors and log a warning if we encounter them.
+    This can happen when modelling on multiple outputs, which can vary in their
+    sparsity, and by chance some outputs are empty in a batch.
+    """
+    losses_dict: Dict[str, Dict[str, torch.Tensor]] = {}
+
+    for output_name, target_dict in targets.items():
+        for output_head_name, cur_inner_target in target_dict.items():
+            if output_head_name in inputs[output_name]:
+                input_tensor = inputs[output_name][output_head_name]
+                criterion = criteria[output_name][output_head_name]
+
+                if output_name not in losses_dict:
+                    losses_dict[output_name] = {}
+
+                if input_tensor.nelement() > 0 and cur_inner_target.nelement() > 0:
+                    computed_loss = criterion(
+                        input=input_tensor,
+                        target=cur_inner_target,
+                    )
+                else:
+                    log_empty_loss_callable(
+                        output_name=output_name, output_head_name=output_head_name
+                    )
+                    computed_loss = torch.tensor(np.nan, requires_grad=True)
+
+                losses_dict[output_name][output_head_name] = computed_loss
+            else:
+                raise KeyError(f"Missing input for {output_name} {output_head_name}")
 
     return losses_dict
 
@@ -362,9 +467,14 @@ def calculate_prediction_losses(
 def aggregate_losses(losses_dict: Dict[str, Dict[str, torch.Tensor]]) -> torch.Tensor:
     losses_values = []
     for output_name, targets_for_output_dict in losses_dict.items():
-        losses_values += list(targets_for_output_dict.values())
-    average_loss = torch.mean(torch.stack(losses_values))
+        for loss in targets_for_output_dict.values():
+            if not torch.isnan(loss).any():
+                losses_values.append(loss)
 
+    if not losses_values:
+        return torch.tensor(np.nan, requires_grad=True)
+
+    average_loss = torch.mean(torch.stack(losses_values))
     return average_loss
 
 
@@ -709,10 +819,14 @@ def get_default_metrics(
     mcc = MetricRecord(name="mcc", function=calc_mcc)
     acc = MetricRecord(name="acc", function=calc_acc)
     roc_auc_macro = MetricRecord(
-        name="roc-auc-macro", function=calc_roc_auc_ovo, only_val=True
+        name="roc-auc-macro",
+        function=calc_roc_auc_ovo,
+        only_val=True,
     )
     ap_macro = MetricRecord(
-        name="ap-macro", function=calc_average_precision, only_val=True
+        name="ap-macro",
+        function=calc_average_precision,
+        only_val=True,
     )
 
     rmse = MetricRecord(
@@ -720,8 +834,16 @@ def get_default_metrics(
         function=partial(calc_rmse, target_transformers=target_transformers),
         minimize_goal=True,
     )
-    r2 = MetricRecord(name="r2", function=calc_r2, only_val=True)
-    pcc = MetricRecord(name="pcc", function=calc_pcc, only_val=True)
+    r2 = MetricRecord(
+        name="r2",
+        function=calc_r2,
+        only_val=True,
+    )
+    pcc = MetricRecord(
+        name="pcc",
+        function=calc_pcc,
+        only_val=True,
+    )
 
     avg_metrics = parse_averaging_metrics(
         cat_averaging_metrics=cat_averaging_metrics,
@@ -908,6 +1030,7 @@ def filter_missing_outputs_and_labels(
             ]
 
             all_valid = len(valid_indices) == len(batch_ids)
+            no_valid = len(valid_indices) == 0
             if all_valid:
                 filtered_inner_dict[inner_key] = modality_output_tensor
 
@@ -918,6 +1041,23 @@ def filter_missing_outputs_and_labels(
                 filtered_inner_labels[inner_key] = cur_targets
 
                 filtered_inner_ids[inner_key] = batch_ids
+                continue
+            elif no_valid:
+                filtered_inner_dict[inner_key] = torch.tensor(
+                    [],
+                    dtype=modality_output_tensor.dtype,
+                    device=modality_output_tensor.device,
+                )
+                if with_labels:
+                    cur_targets = torch.tensor(
+                        [],
+                        dtype=target_labels[output_name][inner_key].dtype,
+                        device=target_labels[output_name][inner_key].device,
+                    )
+                else:
+                    cur_targets = torch.tensor([])
+                filtered_inner_labels[inner_key] = cur_targets
+                filtered_inner_ids[inner_key] = []
                 continue
 
             valid_indices_tensor = torch.tensor(valid_indices)

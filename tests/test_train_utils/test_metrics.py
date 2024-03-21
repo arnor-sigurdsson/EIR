@@ -184,14 +184,15 @@ def test_calc_rmse_no_samples():
     scaler = StandardScaler()
     target_transformers = {"output1": {"column1": scaler}}
 
-    with pytest.raises(ValueError):
-        metrics.calc_rmse(
-            outputs=outputs,
-            labels=labels,
-            target_transformers=target_transformers,
-            output_name="output1",
-            column_name="column1",
-        )
+    rmse = metrics.calc_rmse(
+        outputs=outputs,
+        labels=labels,
+        target_transformers=target_transformers,
+        output_name="output1",
+        column_name="column1",
+    )
+
+    assert np.isnan(rmse)
 
 
 def test_calculate_losses_good():
@@ -213,8 +214,12 @@ def test_calculate_losses_good():
         label_values=common_values, output_values=common_values
     )
 
+    log_empty_once = metrics.log_empty_loss_once()
     perfect_pred_loss = metrics.calculate_prediction_losses(
-        criteria=test_criteria, targets=test_labels, inputs=test_outputs
+        criteria=test_criteria,
+        targets=test_labels,
+        inputs=test_outputs,
+        log_empty_loss_callable=log_empty_once,
     )
 
     assert perfect_pred_loss["test_output_tabular"]["Height"].item() == 0.0
@@ -231,8 +236,12 @@ def test_calculate_losses_bad():
         label_values=label_values, output_values=output_values
     )
 
+    log_empty_once = metrics.log_empty_loss_once()
     bad_prediction_loss = metrics.calculate_prediction_losses(
-        criteria=test_criteria, targets=test_labels, inputs=test_outputs
+        criteria=test_criteria,
+        targets=test_labels,
+        inputs=test_outputs,
+        log_empty_loss_callable=log_empty_once,
     )
 
     expected_rmse = 4.0
@@ -521,3 +530,72 @@ def test_hook_add_l1_loss(prep_modelling_test_configs):
 
     l1_loss = state_update["loss"]
     assert l1_loss > 0.0
+
+
+@pytest.fixture
+def setup_data():
+    batch_ids = ["id1", "id2", "id3"]
+    model_outputs = {
+        "output1": {
+            "inner1": torch.randn(3, 10),
+            "inner2": torch.randn(3, 20),
+        }
+    }
+    target_labels = {
+        "output1": {
+            "inner1": torch.randint(0, 2, (3,)),
+            "inner2": torch.randint(0, 2, (3,)),
+        }
+    }
+    missing_ids_info = metrics.MissingTargetsInfo(
+        missing_ids_per_modality={"output1": set()},
+        missing_ids_within_modality={"output1": {"inner1": set(), "inner2": set()}},
+    )
+    return batch_ids, model_outputs, target_labels, missing_ids_info
+
+
+def test_no_missing_data(setup_data):
+    batch_ids, model_outputs, target_labels, missing_ids_info = setup_data
+    result = metrics.filter_missing_outputs_and_labels(
+        batch_ids=batch_ids,
+        model_outputs=model_outputs,
+        target_labels=target_labels,
+        missing_ids_info=missing_ids_info,
+        with_labels=True,
+    )
+    assert isinstance(
+        result, metrics.FilteredOutputsAndLabels
+    ), "Result should be an instance of FilteredOutputsAndLabels"
+    assert (
+        "output1" in result.model_outputs
+    ), "Output1 should be present in the filtered outputs"
+    assert (
+        "inner1" in result.model_outputs["output1"]
+    ), "Inner1 should be present in the filtered outputs of output1"
+    assert torch.equal(
+        result.model_outputs["output1"]["inner1"], model_outputs["output1"]["inner1"]
+    ), "Filtered output tensor should match the original"
+    assert torch.equal(
+        result.target_labels["output1"]["inner1"], target_labels["output1"]["inner1"]
+    ), "Filtered labels should match the original"
+
+
+def test_all_ids_missing(setup_data):
+    batch_ids, model_outputs, target_labels, _ = setup_data
+    missing_ids_info = metrics.MissingTargetsInfo(
+        missing_ids_per_modality={"output1": set(batch_ids)},
+        missing_ids_within_modality={},
+    )
+    result = metrics.filter_missing_outputs_and_labels(
+        batch_ids=batch_ids,
+        model_outputs=model_outputs,
+        target_labels=target_labels,
+        missing_ids_info=missing_ids_info,
+        with_labels=True,
+    )
+    assert (
+        len(result.model_outputs["output1"]["inner1"]) == 0
+    ), "Should return an empty tensor for outputs when all IDs are missing"
+    assert (
+        len(result.target_labels["output1"]["inner1"]) == 0
+    ), "Should return an empty tensor for labels when all IDs are missing"

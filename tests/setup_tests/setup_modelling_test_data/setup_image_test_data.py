@@ -8,6 +8,7 @@ from PIL import Image
 
 from tests.setup_tests.setup_modelling_test_data.setup_targets_test_data import (
     get_current_test_label_values,
+    get_test_label_file_fieldnames,
     set_up_label_file_writing,
     set_up_label_line_dict,
 )
@@ -24,7 +25,7 @@ def create_test_image_data(
 ) -> Path:
     c = test_data_config
 
-    fieldnames = ["ID", "Origin", "Height", "OriginExtraCol", "ExtraTarget"]
+    fieldnames = get_test_label_file_fieldnames()
     label_file_handle, label_file_writer = set_up_label_file_writing(
         base_path=c.scoped_tmp_path, fieldnames=fieldnames, extra_name="_image"
     )

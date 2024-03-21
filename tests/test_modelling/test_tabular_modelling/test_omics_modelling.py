@@ -773,6 +773,74 @@ def test_multi_task(
             )
 
 
+@pytest.mark.skipif(
+    condition=should_skip_in_gha_macos(), reason="In GHA and platform is Darwin."
+)
+@pytest.mark.parametrize(
+    "create_test_data",
+    [
+        {
+            "task_type": "multi_task",
+            "random_samples_dropped_from_modalities": True,
+        }
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize(
+    "create_test_config_init_base",
+    [
+        # Case 0: Using the GLN
+        {
+            "injections": {
+                "global_configs": {
+                    "lr": 1e-03,
+                    "gradient_noise": 0.001,
+                    "compile_model": _should_compile(),
+                },
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "model_config": {
+                            "model_type": "genome-local-net",
+                            "model_init_config": {
+                                "kernel_width": 8,
+                                "channel_exp_base": 2,
+                                "l1": 2e-05,
+                                "rb_do": 0.20,
+                                "attention_inclusion_cutoff": 512,
+                            },
+                        },
+                    },
+                ],
+                "fusion_configs": {
+                    "model_config": {
+                        "fc_task_dim": 64,
+                        "fc_do": 0.20,
+                        "rb_do": 0.20,
+                    },
+                },
+                "output_configs": [
+                    {
+                        "output_info": {"output_name": "test_output_tabular"},
+                        "output_type_info": {
+                            "target_cat_columns": ["Origin", "SparseOrigin"],
+                            "target_con_columns": ["Height", "SparseHeight"],
+                        },
+                    },
+                ],
+            },
+        },
+    ],
+    indirect=True,
+)
+def test_sparse_multi_task(
+    prep_modelling_test_configs: Tuple[train.Experiment, "ModelTestConfig"],
+):
+    experiment, test_config = prep_modelling_test_configs
+
+    train.train(experiment=experiment)
+
+
 def get_all_tabular_input_columns(configs: Configs) -> List[str]:
     extra_columns = []
     for input_config in configs.input_configs:
