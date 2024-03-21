@@ -63,15 +63,22 @@ def add_series_to_axis(
 
 def generate_validation_curve_from_series(
     series: pd.Series, title_extra: str = "", skiprows: int = 200
-) -> Tuple[plt.Figure, plt.Axes]:
+) -> Tuple[Optional[plt.Figure], Optional[plt.Axes]]:
     fig, ax = plt.subplots()
 
     valid_series_cut = series[series.index > skiprows]
 
     extreme_func = _get_min_or_max_funcs(valid_series_cut.name)
     extreme_valid_idx, extreme_valid_value = _get_validation_extreme_value_and_iter(
-        extreme_func, valid_series_cut
+        extreme_index_func=extreme_func, validation_values=valid_series_cut
     )
+
+    if extreme_valid_idx is None or extreme_valid_value is None:
+        logger.warning(
+            "No valid extreme value found for series %s. Skipping plot generation.",
+            valid_series_cut.name,
+        )
+        return None, None
 
     xlim_upper = valid_series_cut.index.max()
 
@@ -127,9 +134,21 @@ def _parse_metrics_colname(column_name: str) -> str:
 
 
 def _get_validation_extreme_value_and_iter(
-    extreme_index_func: Callable, validation_values: pd.Series
-) -> Tuple[int, float]:
+    extreme_index_func: Callable,
+    validation_values: pd.Series,
+) -> Tuple[Optional[int], Optional[float]]:
+    """
+    For sparse targets, we might get e.g. for ROC AUC:
+
+        iteration
+        200   NaN
+
+    """
     extreme_index: int = extreme_index_func(validation_values)
+
+    if np.isnan(extreme_index):
+        return None, None
+
     extreme_value: float = validation_values[extreme_index]
 
     return extreme_index, extreme_value
@@ -174,7 +193,8 @@ def gen_eval_graphs(plot_config: "PerformancePlotConfig"):
             )
         except Exception as e:
             logger.error(
-                "Call to function %s resulted in error %s. No plot will be generated.",
+                "Call to function %s resulted in error: '%s'. "
+                "No plot will be generated.",
                 plot_func,
                 e,
             )
@@ -352,7 +372,11 @@ def generate_multi_class_roc_curve(
 
     unique_classes = sorted(transformer.classes_)
     n_classes = len(unique_classes)
-    assert len(np.unique(y_true)) == n_classes
+    if len(np.unique(y_true)) != n_classes:
+        raise ValueError(
+            f"Expected {n_classes} unique classes when plotting multiclass "
+            f"ROC-AUC curve, got {np.unique(y_true)}."
+        )
 
     y_true_bin = label_binarize(y=y_true, classes=range(n_classes))
 
@@ -430,7 +454,12 @@ def generate_multi_class_pr_curve(
 
     unique_classes = sorted(transformer.classes_)
     n_classes = len(unique_classes)
-    assert len(np.unique(y_true)) == n_classes
+
+    if len(np.unique(y_true)) != n_classes:
+        raise ValueError(
+            f"Expected {n_classes} unique classes when plotting multiclass"
+            f" PR curve, got {np.unique(y_true)}."
+        )
 
     y_true_bin = label_binarize(y_true, classes=range(n_classes))
 
@@ -559,6 +588,9 @@ def generate_all_training_curves(
         figure_object, axis_object = generate_validation_curve_from_series(
             series=valid_series, title_extra=title_extra, skiprows=plot_skip_steps
         )
+
+        if figure_object is None:
+            continue
 
         if metric_suffix in training_history_df.columns:
             train_series = training_history_df[metric_suffix]

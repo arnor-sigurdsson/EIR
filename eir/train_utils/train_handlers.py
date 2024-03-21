@@ -15,12 +15,14 @@ from typing import (
 )
 
 import aislib.misc_utils
+import numpy as np
+import torch
 import yaml
 from ignite.contrib.handlers import ProgressBar
 from ignite.engine import CallableEventWithFilter, Engine, Events, EventsList, events
 from ignite.handlers import EarlyStopping, ModelCheckpoint
 from ignite.metrics import RunningAverage
-from ignite.metrics.metric import RunningBatchWise
+from ignite.metrics.metric import Metric, RunningBatchWise
 from torch import nn
 
 from eir.data_load.data_utils import get_output_info_generator
@@ -418,6 +420,39 @@ def _parse_metrics_for_train_running_average(
     return parsed_metrics
 
 
+class MyRunningAverage(RunningAverage):
+    def __init__(
+        self,
+        src: Optional[Metric] = None,
+        alpha: float = 0.98,
+        output_transform: Optional[Callable] = None,
+        epoch_bound: Optional[bool] = None,
+        device: Optional[Union[str, torch.device]] = None,
+    ):
+        super().__init__(
+            src=src,
+            alpha=alpha,
+            output_transform=output_transform,
+            epoch_bound=epoch_bound,
+            device=device,
+        )
+
+    def update(self, output: Union[torch.Tensor, float]) -> None:
+        """
+        We have this checking for nan to avoid corrupting / making the running
+        average always become nan if a NaN output value (due to an empty output
+        batch for a given target) being encountered.
+        """
+        if isinstance(output, torch.Tensor):
+            if torch.isnan(output).any():
+                return
+        else:
+            if np.isnan(output):
+                return
+
+        super().update(output)
+
+
 def _attach_running_average_metrics(
     engine: Engine, monitoring_metrics: List[Tuple[str, str, str]]
 ) -> None:
@@ -428,7 +463,7 @@ def _attach_running_average_metrics(
     Basically what we attach to the trainer operates on the output of the
     update / step function, that we pass to the Engine definition.
 
-    We use a partial so each lambda has it's own metric variable (otherwise
+    We use a partial so each lambda has its own metric variable (otherwise
     they all reference the same object as it gets overwritten).
     """
     for output_name, column_name, metric_name in monitoring_metrics:
@@ -451,7 +486,7 @@ def _attach_running_average_metrics(
             metric_name_key=metric_name,
         )
 
-        running_average = RunningAverage(
+        running_average = MyRunningAverage(
             output_transform=partial_func,
             alpha=0.98,
         )

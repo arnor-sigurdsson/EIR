@@ -26,8 +26,8 @@ def set_up_label_line_dict(sample_name: str, fieldnames: List[str]):
 
 
 def get_current_test_label_values(
-    values_dict, num_active_elements_in_sample: int, cur_class: str
-):
+    values_dict: dict, num_active_elements_in_sample: int, cur_class: str
+) -> dict:
     class_base_heights = {"Asia": 120, "Europe": 140, "Africa": 160}
     cur_base_height = class_base_heights[cur_class]
 
@@ -37,8 +37,24 @@ def get_current_test_label_values(
     height_value = cur_base_height + added_height + noise
     values_dict["Height"] = height_value
     values_dict["ExtraTarget"] = height_value - 50
+    values_dict["SparseHeight"] = height_value
 
     values_dict["Origin"] = cur_class
     values_dict["OriginExtraCol"] = cur_class
+    values_dict["SparseOrigin"] = cur_class
 
     return values_dict
+
+
+def get_test_label_file_fieldnames() -> list[str]:
+    fieldnames = [
+        "ID",
+        "Origin",
+        "Height",
+        "OriginExtraCol",
+        "ExtraTarget",
+        "SparseHeight",
+        "SparseOrigin",
+    ]
+
+    return fieldnames

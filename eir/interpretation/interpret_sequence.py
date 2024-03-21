@@ -148,6 +148,7 @@ def analyze_sequence_input_attributions(
             df_attributions=df_token_importances,
             outpath=target_outfolder / f"token_influence_{class_name}.pdf",
             title=f"{target_column_name} – {class_name}",
+            use_boostrap=True,
         )
         df_token_importances.to_csv(
             path_or_buf=target_outfolder / f"token_influence_{class_name}.csv"

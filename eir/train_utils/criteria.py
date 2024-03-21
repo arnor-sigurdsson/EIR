@@ -13,7 +13,7 @@ from eir.setup.output_setup_modules.tabular_output_setup import (
     ComputedTabularOutputInfo,
 )
 from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
-from eir.train_utils.metrics import calculate_prediction_losses
+from eir.train_utils.metrics import calculate_prediction_losses, log_empty_loss_once
 
 if TYPE_CHECKING:
     from eir.setup.output_setup import al_output_objects_as_dict
@@ -178,7 +178,12 @@ def _calc_con_loss(input: torch.Tensor, target: torch.Tensor, loss_func: al_con_
 
 
 def get_loss_callable(criteria: al_criteria_dict) -> Callable:
-    single_task_loss_func = partial(calculate_prediction_losses, criteria=criteria)
+    log_empty_callable = log_empty_loss_once()
+    single_task_loss_func = partial(
+        calculate_prediction_losses,
+        criteria=criteria,
+        log_empty_loss_callable=log_empty_callable,
+    )
     return single_task_loss_func
 
 
