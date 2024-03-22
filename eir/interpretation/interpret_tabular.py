@@ -72,13 +72,14 @@ def analyze_tabular_input_attributions(
 
     plot_attributions_bar(
         df_attributions=df_attributions,
-        outpath=attribution_outfolder / "feature_importance.pdf",
-        use_boostrap=False,
+        output_path=attribution_outfolder / "feature_importance.pdf",
+        use_bootstrap=False,
     )
     plot_attributions_bar(
         df_attributions=df_attributions,
-        outpath=attribution_outfolder / "feature_importance_with_boostrap.pdf",
-        use_boostrap=True,
+        output_path=attribution_outfolder
+        / "feature_importance_sorted_with_bootstrap.pdf",
+        use_bootstrap=True,
     )
     df_attributions.to_csv(attribution_outfolder / "feature_importances.csv")
 

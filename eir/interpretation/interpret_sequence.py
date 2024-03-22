@@ -146,9 +146,9 @@ def analyze_sequence_input_attributions(
         ensure_path_exists(path=target_outfolder, is_folder=True)
         plot_attributions_bar(
             df_attributions=df_token_importances,
-            outpath=target_outfolder / f"token_influence_{class_name}.pdf",
+            output_path=target_outfolder / f"token_influence_{class_name}.pdf",
             title=f"{target_column_name} – {class_name}",
-            use_boostrap=True,
+            use_bootstrap=True,
         )
         df_token_importances.to_csv(
             path_or_buf=target_outfolder / f"token_influence_{class_name}.csv"

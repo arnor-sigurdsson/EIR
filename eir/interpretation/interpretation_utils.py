@@ -1,9 +1,11 @@
+import logging
 import random
 from collections import defaultdict
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
+    Callable,
     DefaultDict,
     Generator,
     List,
@@ -80,15 +82,15 @@ def stratify_attributions_by_target_classes(
 
 def plot_attributions_bar(
     df_attributions: pd.DataFrame,
-    outpath: Union[str, Path],
+    output_path: Union[str, Path],
     top_n: int = 20,
     title: str = "",
-    use_boostrap: bool = True,
+    use_bootstrap: bool = True,
 ) -> None:
     df_token_top_n = calculate_top_n_tokens(
         df_attributions=df_attributions,
         top_n=top_n,
-        use_bootstrap=use_boostrap,
+        use_bootstrap=use_bootstrap,
     )
     df_attributions_top_n_sorted = df_attributions[
         df_attributions["Input"].isin(df_token_top_n.index)
@@ -118,7 +120,7 @@ def plot_attributions_bar(
         ax.set_title(title)
 
     sns_figure.set_size_inches(10, 0.5 * top_n)
-    sns_figure.savefig(fname=outpath, bbox_inches="tight")
+    sns_figure.savefig(fname=output_path, bbox_inches="tight")
 
     plt.close("all")
 
@@ -128,7 +130,8 @@ def calculate_token_statistics(
     use_bootstrap: bool = True,
     n_bootstraps: int = 1000,
 ) -> pd.DataFrame:
-    token_stats = pd.DataFrame()
+    df_token_stats = pd.DataFrame()
+    log_once_callable = get_log_once_callable(logger_=logger)
 
     for input_feature in df_attributions["Input"].unique():
         feature_attributions = df_attributions[
@@ -138,17 +141,18 @@ def calculate_token_statistics(
         if use_bootstrap:
 
             if len(np.unique(feature_attributions)) < 2:
-                logger.warning(
-                    f"Feature '{input_feature}' has less than 2 unique attribution"
-                    f" values; unable to perform bootstrapping. "
-                    f"Calculating mean without bootstrapping and setting CI_Size to 0 "
-                    f"as a default. "
+                log_once_callable(
+                    f"Feature '{input_feature}' has less than 2 unique attribution "
+                    f"values; unable to perform bootstrapping. Calculating mean "
+                    f"without bootstrapping and setting CI_Size to 0 as a default. "
+                    f"There might be other input features with the same issue, this "
+                    f"message will only be logged once per attribution calculation."
                 )
 
-                token_stats.loc[input_feature, "AttributionMean"] = np.mean(
+                df_token_stats.loc[input_feature, "AttributionMean"] = np.mean(
                     feature_attributions
                 )
-                token_stats.loc[input_feature, "CI_Size"] = 0
+                df_token_stats.loc[input_feature, "CI_Size"] = np.nan
                 continue
 
             res = bootstrap(
@@ -161,14 +165,26 @@ def calculate_token_statistics(
             ci_low, ci_high = res.confidence_interval.low, res.confidence_interval.high
             ci_size = ci_high - ci_low
 
-            token_stats.loc[input_feature, "AttributionMean"] = mean
-            token_stats.loc[input_feature, "CI_Size"] = ci_size
+            df_token_stats.loc[input_feature, "AttributionMean"] = mean
+            df_token_stats.loc[input_feature, "CI_Size"] = ci_size
         else:
             mean = feature_attributions.mean()
-            token_stats.loc[input_feature, "AttributionMean"] = mean
-            token_stats.loc[input_feature, "CI_Size"] = 0
+            df_token_stats.loc[input_feature, "AttributionMean"] = mean
+            df_token_stats.loc[input_feature, "CI_Size"] = 0
 
-    return token_stats.abs()
+    return df_token_stats
+
+
+def get_log_once_callable(logger_: logging.Logger) -> Callable:
+    has_logged = False
+
+    def _do_log_once(msg: str):
+        nonlocal has_logged
+        if not has_logged:
+            logger_.info(msg)
+            has_logged = True
+
+    return _do_log_once
 
 
 def calculate_top_n_tokens(
@@ -177,7 +193,8 @@ def calculate_top_n_tokens(
     use_bootstrap: bool,
 ) -> pd.DataFrame:
     df_token_stats = calculate_token_statistics(
-        df_attributions, use_bootstrap=use_bootstrap
+        df_attributions=df_attributions,
+        use_bootstrap=use_bootstrap,
     )
 
     if use_bootstrap:
