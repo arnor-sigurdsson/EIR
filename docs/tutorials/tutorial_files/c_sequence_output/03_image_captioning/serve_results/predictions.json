@@ -6,7 +6,7 @@
         },
         "response": {
             "result": {
-                "captions": "a plate that has a plate of salad on it"
+                "captions": "A plate with a sandwich, and a"
             }
         }
     },
@@ -17,7 +17,7 @@
         },
         "response": {
             "result": {
-                "captions": "A zebra standing on top of a lush green field."
+                "captions": "A zebra is grazing in the grass near some trees."
             }
         }
     },
@@ -28,7 +28,7 @@
         },
         "response": {
             "result": {
-                "captions": "A horse on grass with a woman in the background and an open field with grass in the background"
+                "captions": "A horse that is grazing in a field."
             }
         }
     }

@@ -8,8 +8,8 @@
             "result": {
                 "hot_dog_output": {
                     "CLASS": {
-                        "Hot Dog": 0.9109156727790833,
-                        "Not Hot Dog": 0.08908427506685257
+                        "Hot Dog": 0.9126383066177368,
+                        "Not Hot Dog": 0.0873616561293602
                     }
                 }
             }
@@ -24,8 +24,8 @@
             "result": {
                 "hot_dog_output": {
                     "CLASS": {
-                        "Hot Dog": 0.06047385185956955,
-                        "Not Hot Dog": 0.9395261406898499
+                        "Hot Dog": 0.06148751825094223,
+                        "Not Hot Dog": 0.9385125041007996
                     }
                 }
             }

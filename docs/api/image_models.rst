@@ -118,6 +118,10 @@ For example, the ``ResNet`` architecture includes the ``layers`` and ``block`` p
    :members:
    :exclude-members: forward
 
+.. autoclass:: timm.models.hgnet.HighPerfGpuNet
+   :members:
+   :exclude-members: forward
+
 .. autoclass:: timm.models.hrnet.HighResolutionNet
    :members:
    :exclude-members: forward

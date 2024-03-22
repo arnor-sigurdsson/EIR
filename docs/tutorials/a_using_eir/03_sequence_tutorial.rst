@@ -150,8 +150,8 @@ towards a Positive and Negative sentiment.
 
 .. note::
 
-    Which tokens are included in this plot is chosen based both on the
-    average and standard deviation of the attribution. The raw values
+    Which tokens are included in this plot and how they are sorted is based both on the
+    average and 95% confidence interval of the attribution. The raw values
     are also stored, in case you want to do your own analysis.
     The CIs represent the 95% confidence interval
     after 1,000 bootstrap samples.
