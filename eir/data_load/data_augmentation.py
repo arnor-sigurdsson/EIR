@@ -375,22 +375,26 @@ def calc_mixed_loss(
 
 def make_random_omics_columns_missing(
     omics_array: torch.Tensor,
-    alpha: float = 1.0,
-    beta: float = 2.0,
+    na_augment_alpha: float = 1.0,
+    na_augment_beta: float = 9.0,
 ) -> torch.Tensor:
-    if alpha <= 0 or beta <= 0:
+    if na_augment_alpha <= 0 or na_augment_beta <= 0:
         raise ValueError("Alpha and Beta must be positive.")
 
-    dist = torch.distributions.beta.Beta(alpha, beta)
+    dist = torch.distributions.beta.Beta(na_augment_alpha, na_augment_beta)
     percentage_sampled = dist.sample().item()
 
     n_snps = omics_array.shape[2]
     n_to_drop = int(n_snps * percentage_sampled)
     random_to_drop = torch.randperm(n_snps)[:n_to_drop].to(dtype=torch.long)
 
-    missing_arr = torch.tensor([False, False, False, True], dtype=torch.bool).reshape(
-        -1, 1
-    )
+    missing_list = [
+        False,
+        False,
+        False,
+        True,
+    ]
+    missing_arr = torch.tensor(missing_list, dtype=torch.bool).reshape(-1, 1)
     omics_array[:, :, random_to_drop] = missing_arr
 
     return omics_array
@@ -398,13 +402,13 @@ def make_random_omics_columns_missing(
 
 def shuffle_random_omics_columns(
     omics_array: torch.Tensor,
-    alpha: float = 1.0,
-    beta: float = 5.0,
+    shuffle_augment_alpha: float = 1.0,
+    shuffle_augment_beta: float = 19.0,
 ) -> torch.Tensor:
-    if alpha <= 0 or beta <= 0:
+    if shuffle_augment_alpha <= 0 or shuffle_augment_beta <= 0:
         raise ValueError("Alpha and Beta must be positive.")
 
-    dist = torch.distributions.beta.Beta(alpha, beta)
+    dist = torch.distributions.beta.Beta(shuffle_augment_alpha, shuffle_augment_beta)
     percentage_sampled = dist.sample().item()
 
     n_snps = omics_array.shape[2]

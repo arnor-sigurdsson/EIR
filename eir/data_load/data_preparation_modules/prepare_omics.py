@@ -56,15 +56,15 @@ def prepare_one_hot_omics_data(
     if not test_mode and na_augment_alpha > 0 and na_augment_beta > 0:
         tensor_bool = make_random_omics_columns_missing(
             omics_array=tensor_bool,
-            alpha=na_augment_alpha,
-            beta=na_augment_beta,
+            na_augment_alpha=na_augment_alpha,
+            na_augment_beta=na_augment_beta,
         )
 
     if not test_mode and shuffle_augment_alpha > 0 and shuffle_augment_beta > 0:
         tensor_bool = shuffle_random_omics_columns(
             omics_array=tensor_bool,
-            alpha=shuffle_augment_alpha,
-            beta=shuffle_augment_beta,
+            shuffle_augment_alpha=shuffle_augment_alpha,
+            shuffle_augment_beta=shuffle_augment_beta,
         )
 
     assert tensor_bool.dtype == torch.bool

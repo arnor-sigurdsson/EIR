@@ -438,8 +438,8 @@ def test_make_random_snps_missing_uniform_distribution():
 
     array = data_augmentation.make_random_omics_columns_missing(
         omics_array=test_array,
-        alpha=1.0,
-        beta=1.0,
+        na_augment_alpha=1.0,
+        na_augment_beta=1.0,
     )
 
     assert array[:, 0, :].any(), "Expected some SNPs to be set to the default state."
@@ -453,8 +453,8 @@ def test_make_random_snps_missing_maximal():
 
     array = data_augmentation.make_random_omics_columns_missing(
         omics_array=test_array,
-        alpha=100.0,
-        beta=1.0,
+        na_augment_alpha=100.0,
+        na_augment_beta=1.0,
     )
 
     missing_percentage = (array[:, 3, :].sum() / 1000).item()
@@ -470,8 +470,8 @@ def test_make_random_snps_missing_minimal():
 
     array = data_augmentation.make_random_omics_columns_missing(
         omics_array=test_array,
-        alpha=1.0,
-        beta=100.0,
+        na_augment_alpha=1.0,
+        na_augment_beta=100.0,
     )
 
     missing_percentage = (array[:, 3, :].sum() / 1000).item()
@@ -496,8 +496,8 @@ def test_shuffle_columns_some():
 
         shuffled_array = data_augmentation.shuffle_random_omics_columns(
             omics_array=test_array.clone(),
-            alpha=100.0,
-            beta=1.0,
+            shuffle_augment_alpha=100.0,
+            shuffle_augment_beta=1.0,
         )
         assert not torch.equal(shuffled_array, test_array)
 
@@ -520,7 +520,7 @@ def test_shuffle_columns_one_hot():
 
         shuffled_array = data_augmentation.shuffle_random_omics_columns(
             omics_array=test_array.clone(),
-            alpha=1.0,
-            beta=1.0,
+            shuffle_augment_alpha=1.0,
+            shuffle_augment_beta=1.0,
         )
         assert (shuffled_array.sum(dim=1) == 1).all()

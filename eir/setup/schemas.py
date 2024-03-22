@@ -418,6 +418,9 @@ class OmicsInputDataConfig:
         towards lower percentages of missingness, since beta is significantly larger.
         Setting alpha to 5.0 and beta to 1.0 will skew the distribution towards higher
         percentages of missingness, since alpha is significantly larger.
+        Examples:
+        - alpha = 1.0, beta = 9.0:  μ=E(X)=0.05, σ=SD(X)=0.0476 (avg 5% missing)
+        - alpha = 1.0, beta = 4.0:  μ=E(X)=0.2, σ=SD(X)=0.1633 (avg 20% missing)
 
     :param na_augment_beta:
         Used to control the extent of missing data augmentation in the omics data.
@@ -443,6 +446,9 @@ class OmicsInputDataConfig:
         alpha (compared to beta) result in sampling lower percentages, thus reducing
         the extent of shuffling. Setting alpha to a significantly larger value than
         beta will skew the distribution towards higher percentages of shuffling.
+        Examples:
+        - alpha = 1.0, beta = 9.0:  μ=E(X)=0.05, σ=SD(X)=0.0476 (avg 5% shuffled)
+        - alpha = 1.0, beta = 4.0:  μ=E(X)=0.2, σ=SD(X)=0.1633 (avg 20% shuffled)
 
     :param shuffle_augment_beta:
         Used to control the extent of shuffling data augmentation in the omics data.
@@ -670,9 +676,9 @@ class ImageInputDataConfig:
         The method used for resizing the images. Options are:
         - "resize": Directly resize the image to the target size.
         - "randomcrop": Resize the image to a larger size than the target and then
-          apply a random crop to the target size.
+        apply a random crop to the target size.
         - "centercrop": Resize the image to a larger size than the target and then
-          apply a center crop to the target size.
+        apply a center crop to the target size.
 
     :param mean_normalization_values:
         Average channel values to normalize images with. This can be a sequence matching

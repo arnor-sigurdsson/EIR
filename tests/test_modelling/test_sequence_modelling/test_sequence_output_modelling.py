@@ -197,7 +197,8 @@ def _sequence_output_test_check_wrapper(
                     raise AssertionError(f"No expected words found in file {f}")
                 if len(intersection) < 3:
                     raise AssertionError(
-                        f"Expected words found in file {f} do not match minimum length."
+                        f"Expected words found in file {f} do not match "
+                        f"minimum length: {intersection}"
                     )
 
                 did_check = True
