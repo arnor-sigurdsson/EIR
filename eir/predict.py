@@ -293,6 +293,7 @@ def get_default_predict_experiment(
         missing_ids_per_output = MissingTargetsInfo(
             missing_ids_per_modality={},
             missing_ids_within_modality={},
+            precomputed_missing_ids={},
         )
 
     test_inputs = set_up_inputs_for_predict(

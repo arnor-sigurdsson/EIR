@@ -1086,6 +1086,8 @@ def _process_train_and_label_dfs(
         label_columns=label_columns,
         impute_missing=impute_missing,
     )
+
+    logger.debug("Transforming label columns in train and validation dataframes.")
     df_train_final = transform_label_df(
         df_labels=df_labels_train_no_nan,
         label_transformers=fit_label_transformers,

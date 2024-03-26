@@ -30,6 +30,8 @@ from eir.target_setup.target_label_setup import (
     df_to_nested_dict,
     gather_data_pointers_from_data_source,
     gather_torch_nan_missing_ids,
+    get_all_output_and_target_names,
+    get_missing_targets_info,
     get_tabular_target_file_infos,
 )
 
@@ -252,9 +254,11 @@ def get_target_labels_for_testing(
 
     test_labels_dict = df_to_nested_dict(df=df_labels_test)
 
-    missing_target_info = MissingTargetsInfo(
+    outputs_and_targets = get_all_output_and_target_names(output_configs=output_configs)
+    missing_target_info = get_missing_targets_info(
         missing_ids_per_modality=per_modality_missing_ids,
         missing_ids_within_modality=within_modality_missing_ids,
+        output_and_target_names=outputs_and_targets,
     )
 
     test_labels_object = MergedPredictTargetLabels(

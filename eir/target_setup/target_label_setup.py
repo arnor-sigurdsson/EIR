@@ -1,9 +1,12 @@
 import math
+import os
 import reprlib
 from dataclasses import dataclass
+from multiprocessing import Pool
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, Iterable, Optional, Sequence, Tuple, Union
 
+import numpy as np
 import pandas as pd
 import torch
 from tqdm import tqdm
@@ -26,6 +29,8 @@ from eir.data_load.label_setup import (
     set_up_train_and_valid_tabular_data,
 )
 from eir.setup import schemas
+from eir.setup.schema_modules.output_schemas_array import ArrayOutputTypeConfig
+from eir.setup.schema_modules.output_schemas_sequence import SequenceOutputTypeConfig
 from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
 from eir.utils.logging import get_logger
 
@@ -65,6 +70,75 @@ def set_up_all_targets_wrapper(
 class MissingTargetsInfo:
     missing_ids_per_modality: dict[str, set[str]]
     missing_ids_within_modality: dict[str, dict[str, set[str]]]
+    precomputed_missing_ids: dict[str, dict[str, set[str]]]
+
+
+def get_missing_targets_info(
+    missing_ids_per_modality: dict[str, set[str]],
+    missing_ids_within_modality: dict[str, dict[str, set[str]]],
+    output_and_target_names: dict[str, list[str]],
+) -> MissingTargetsInfo:
+
+    precomputed_missing_ids = _precompute_missing_ids(
+        missing_ids_per_modality=missing_ids_per_modality,
+        missing_ids_within_modality=missing_ids_within_modality,
+        output_and_target_names=output_and_target_names,
+    )
+
+    return MissingTargetsInfo(
+        missing_ids_per_modality=missing_ids_per_modality,
+        missing_ids_within_modality=missing_ids_within_modality,
+        precomputed_missing_ids=precomputed_missing_ids,
+    )
+
+
+def _precompute_missing_ids(
+    missing_ids_per_modality: dict[str, set[str]],
+    missing_ids_within_modality: dict[str, dict[str, set[str]]],
+    output_and_target_names: dict[str, list[str]],
+) -> dict[str, dict[str, set[str]]]:
+    """
+    One could potentially optimize this space-wise by tracking modality-inner_key
+    combinations that lead to the same set of missing IDs, then having them point
+    to the same object (set of missing IDs) in memory.
+    """
+
+    precomputed_missing_ids: dict[str, dict[str, set[str]]] = {}
+
+    for modality, target_names in output_and_target_names.items():
+        if modality not in precomputed_missing_ids:
+            precomputed_missing_ids[modality] = {}
+
+        ids_this_modality = missing_ids_per_modality.get(modality, set())
+        missing_ids_within = missing_ids_within_modality.get(modality, {})
+
+        for target_name in target_names:
+            cur_missing_within = missing_ids_within.get(target_name, set())
+            combined_ids = ids_this_modality.union(cur_missing_within)
+
+            if combined_ids:
+                precomputed_missing_ids[modality][target_name] = combined_ids
+
+    return precomputed_missing_ids
+
+
+def get_all_output_and_target_names(
+    output_configs: Sequence[schemas.OutputConfig],
+) -> dict[str, list[str]]:
+    output_and_target_names = {}
+
+    for output_config in output_configs:
+        output_name = output_config.output_info.output_name
+        match output_config.output_type_info:
+            case TabularOutputTypeConfig(
+                target_con_columns=con_columns, target_cat_columns=cat_columns
+            ):
+                all_columns = list(con_columns) + list(cat_columns)
+                output_and_target_names[output_name] = all_columns
+            case ArrayOutputTypeConfig() | SequenceOutputTypeConfig():
+                output_and_target_names[output_name] = [output_name]
+
+    return output_and_target_names
 
 
 def log_missing_targets_info(
@@ -266,12 +340,18 @@ def set_up_all_target_labels_wrapper(
     df_labels_train = df_labels_train.dropna(how="all")
     df_labels_valid = df_labels_valid.dropna(how="all")
 
+    logger.debug("Converting train DF to dict.")
     train_labels_dict = df_to_nested_dict(df=df_labels_train)
+    logger.debug("Converting valid DF to dict.")
     valid_labels_dict = df_to_nested_dict(df=df_labels_valid)
 
-    missing_target_info = MissingTargetsInfo(
+    output_and_target_names = get_all_output_and_target_names(
+        output_configs=output_configs
+    )
+    missing_target_info = get_missing_targets_info(
         missing_ids_per_modality=per_modality_missing_ids,
         missing_ids_within_modality=within_modality_missing_ids,
+        output_and_target_names=output_and_target_names,
     )
     log_missing_targets_info(missing_targets_info=missing_target_info, all_ids=all_ids)
 
@@ -425,9 +505,7 @@ def gather_data_pointers_from_data_source(
     return id_to_pointer_mapping
 
 
-def df_to_nested_dict(
-    df: pd.DataFrame,
-) -> Dict[str, Dict[str, Dict[str, Union[float, int, Path]]]]:
+def df_to_nested_dict(df: pd.DataFrame, num_processes: int = -1) -> Dict:
     """
     Convert a DataFrame with a 2-level multi index ['ID', 'Output Name']
     to a nested dict.
@@ -438,17 +516,53 @@ def df_to_nested_dict(
 
     For each output_name, only relevant columns are included.
     """
-    parsed_dict: Dict[str, Dict[str, Dict[str, Union[float, int, Path]]]] = {}
+    if num_processes == -1:
+        dataset_size = len(df)
+        if dataset_size < 10000:
+            num_processes = 1
+        else:
+            cpu_count = os.cpu_count()
+            if cpu_count is None:
+                logger.warning("Could not determine number of CPUs. Using 1.")
+                num_processes = 1
+            else:
+                num_processes = min(cpu_count, max(1, dataset_size // 10000))
 
-    for (cur_id, cur_output_name), group_df in df.groupby(level=[0, 1]):
-        if cur_id not in parsed_dict:
-            parsed_dict[cur_id] = {}
+    logger.debug(
+        "Setting number of processes for parallel processing of DF to dict to %d.",
+        num_processes,
+    )
+    chunks = np.array_split(df, num_processes)
+    with Pool(num_processes) as pool:
+        dicts = pool.map(_process_chunk, chunks)
+    return _merge_dicts(dicts)
 
+
+def _process_chunk(
+    chunk: pd.DataFrame,
+) -> dict[str, dict[str, dict[str, float | int | str]]]:
+    nested_dict: dict[str, dict[str, dict[str, float | int | str]]] = {}
+    for (cur_id, cur_output_name), group_df in chunk.groupby(level=[0, 1]):
         filtered_dict = group_df.dropna(axis=1, how="all").to_dict(orient="records")[0]
+        if cur_id not in nested_dict:
+            nested_dict[cur_id] = {}
+        nested_dict[cur_id][cur_output_name] = filtered_dict
+    return nested_dict
 
-        parsed_dict[cur_id][cur_output_name] = filtered_dict
 
-    return parsed_dict
+def _merge_dicts(dicts: list[dict]) -> dict:
+    final_dict = {}
+    for d in dicts:
+        for key, value in d.items():
+            if key not in final_dict:
+                final_dict[key] = value
+            else:
+                for output_name, output_values in value.items():
+                    if output_name not in final_dict[key]:
+                        final_dict[key][output_name] = output_values
+                    else:
+                        final_dict[key][output_name].update(output_values)
+    return final_dict
 
 
 def gather_all_ids_from_output_configs(
