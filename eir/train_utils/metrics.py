@@ -298,6 +298,7 @@ def calc_mcc(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=RuntimeWarning)
+        warnings.simplefilter("ignore", category=UserWarning)
         mcc = matthews_corrcoef(labels, prediction)
 
     return mcc
@@ -657,6 +658,7 @@ def persist_metrics(
     prefixes: Dict[str, str],
     writer_funcs: Union[None, Dict[str, Dict[str, Callable]]] = None,
 ):
+
     hc = handler_config
     exp = handler_config.experiment
     gc = exp.configs.global_config
@@ -751,7 +753,9 @@ def _add_metrics_to_writer(
         for metric_name, metric_value in metric_dict.items():
             cur_name = name + f"/{metric_name}"
             writer.add_scalar(
-                tag=cur_name, scalar_value=metric_value, global_step=iteration
+                tag=cur_name,
+                scalar_value=metric_value,
+                global_step=iteration,
             )
 
 
@@ -760,7 +764,7 @@ def get_buffered_metrics_writer(buffer_interval: int):
 
     def append_metrics_to_file(
         filepath: Path, metrics: Dict[str, float], iteration: int, write_header=False
-    ):
+    ) -> None:
         nonlocal buffer
 
         dict_to_write = {**{"iteration": iteration}, **metrics}
@@ -997,8 +1001,33 @@ def filter_missing_outputs_and_labels(
         filtered_inner_labels = {}
         filtered_inner_ids = {}
 
+        output_missing_info = precomputed.get(output_name, {})
+        if not output_missing_info:
+            filtered_outputs[output_name] = output_inner_dict
+            if with_labels:
+                filtered_labels[output_name] = target_labels[output_name]
+            else:
+                filtered_labels[output_name] = {
+                    inner_key: torch.tensor([]) for inner_key in output_inner_dict
+                }
+            filtered_ids[output_name] = {
+                inner_key: batch_ids for inner_key in output_inner_dict
+            }
+            continue
+
         for inner_key, modality_output_tensor in output_inner_dict.items():
-            cur_missing_ids = precomputed.get(output_name, {}).get(inner_key, set())
+            cur_missing_ids = output_missing_info.get(inner_key, set())
+
+            if not cur_missing_ids:
+                filtered_inner_dict[inner_key] = modality_output_tensor
+                if with_labels:
+                    filtered_inner_labels[inner_key] = target_labels[output_name][
+                        inner_key
+                    ]
+                else:
+                    filtered_inner_labels[inner_key] = torch.tensor([])
+                filtered_inner_ids[inner_key] = batch_ids
+                continue
 
             valid_indices = [
                 i for i, id_ in enumerate(batch_ids) if id_ not in cur_missing_ids

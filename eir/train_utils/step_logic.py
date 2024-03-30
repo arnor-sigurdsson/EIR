@@ -581,17 +581,8 @@ def maybe_update_model_parameters_with_swa(
 def hook_default_compute_metrics(
     experiment: "Experiment", batch: "Batch", state: Dict, *args, **kwargs
 ) -> dict[str, Any]:
-    model_outputs = state["model_outputs"]
-    target_labels = batch.target_labels
-    ids = batch.ids
 
-    filtered_outputs = filter_missing_outputs_and_labels(
-        batch_ids=ids,
-        model_outputs=model_outputs,
-        target_labels=target_labels,
-        missing_ids_info=experiment.valid_dataset.missing_ids_per_output,
-        with_labels=True,
-    )
+    filtered_outputs = state["filtered_outputs"]
 
     train_batch_metrics = calculate_batch_metrics(
         outputs_as_dict=experiment.outputs,
@@ -641,7 +632,10 @@ def hook_default_per_target_loss(
             targets=filtered_outputs.target_labels,
         )
 
-        state_updates = {"per_target_train_losses": per_target_train_losses}
+        state_updates = {
+            "per_target_train_losses": per_target_train_losses,
+            "filtered_outputs": filtered_outputs,
+        }
 
     return state_updates
 

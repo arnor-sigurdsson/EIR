@@ -393,7 +393,7 @@ def test_calc_all_mixed_losses(test_inputs, expected_output):
         precomputed_missing_ids={},
     )
 
-    all_losses = data_augmentation.calc_all_mixed_losses(
+    all_losses, _ = data_augmentation.calc_all_mixed_losses(
         target_columns_gen=_target_columns_gen(),
         criteria=test_criteria,
         outputs=outputs,

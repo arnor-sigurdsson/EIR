@@ -1,11 +1,12 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Dict, Sequence
 
+import pandas as pd
+
 from eir.data_load import label_setup
 from eir.data_load.label_setup import (
     TabularFileInfo,
     al_all_column_ops,
-    al_label_dict,
     al_label_transformers,
     transform_label_df,
 )
@@ -25,12 +26,12 @@ class ComputedPredictTabularInputInfo:
 
 @dataclass
 class PredictInputLabels:
-    label_dict: al_label_dict
+    predict_labels: pd.DataFrame
     label_transformers: al_label_transformers
 
     @property
     def all_labels(self):
-        return self.label_dict
+        return self.predict_labels
 
 
 def setup_tabular_input_for_testing(
@@ -113,10 +114,8 @@ def get_input_labels_for_predict(
         impute_missing=True,
     )
 
-    labels_dict = df_labels_test_final.to_dict("index")
-
     labels_data_object = PredictInputLabels(
-        label_dict=labels_dict,
+        predict_labels=df_labels_test_final,
         label_transformers=loaded_fit_label_transformers,
     )
 

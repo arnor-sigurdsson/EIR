@@ -314,7 +314,7 @@ def add_data_to_samples(
         match input_object:
             case ComputedTabularInputInfo() | ComputedPredictTabularInputInfo():
                 samples = add_tabular_data_to_samples(
-                    tabular_dict=input_object.labels.all_labels,
+                    df_tabular=input_object.labels.all_labels,
                     samples=samples,
                     ids_to_keep=ids_to_keep,
                     source_name=input_name,

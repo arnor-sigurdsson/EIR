@@ -17,7 +17,10 @@ from timm.data.mixup import rand_bbox
 
 from eir.data_load.data_utils import Batch, get_output_info_generator
 from eir.target_setup.target_label_setup import MissingTargetsInfo
-from eir.train_utils.metrics import filter_missing_outputs_and_labels
+from eir.train_utils.metrics import (
+    FilteredOutputsAndLabels,
+    filter_missing_outputs_and_labels,
+)
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -201,7 +204,7 @@ def hook_mix_loss(
 ) -> Dict:
     target_columns_gen = get_output_info_generator(outputs_as_dict=experiment.outputs)
 
-    mixed_losses = calc_all_mixed_losses(
+    mixed_losses, filtered_outputs = calc_all_mixed_losses(
         target_columns_gen=target_columns_gen,
         criteria=experiment.criteria,
         outputs=state["model_outputs"],
@@ -209,7 +212,10 @@ def hook_mix_loss(
         missing_ids_per_output=experiment.valid_dataset.missing_ids_per_output,
     )
 
-    state_updates = {"per_target_train_losses": mixed_losses}
+    state_updates = {
+        "per_target_train_losses": mixed_losses,
+        "filtered_outputs": filtered_outputs,
+    }
 
     return state_updates
 
@@ -318,7 +324,7 @@ def calc_all_mixed_losses(
     outputs: dict[str, dict[str, torch.Tensor]],
     mixed_object: MixingObject,
     missing_ids_per_output: MissingTargetsInfo,
-) -> dict[str, dict[str, torch.Tensor]]:
+) -> tuple[dict[str, dict[str, torch.Tensor]], FilteredOutputsAndLabels]:
     losses: dict[str, dict[str, torch.Tensor]] = {
         output_name: {} for output_name in outputs.keys()
     }
@@ -355,7 +361,7 @@ def calc_all_mixed_losses(
         )
         losses[output_name][target_name] = cur_loss
 
-    return losses
+    return losses, filtered_outputs
 
 
 def calc_mixed_loss(

@@ -35,7 +35,6 @@ from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeCon
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
-    from eir.predict_modules.predict_target_setup import PredictTargetLabels
     from eir.train import Hooks
 
 
@@ -280,15 +279,20 @@ def set_up_all_target_labels_wrapper(
                 cur_transformers = cur_labels.label_transformers
                 label_transformers[output_name] = cur_transformers
 
-                per_modality_missing_ids[output_name] = all_ids.difference(
-                    set(cur_labels.all_labels.keys())
-                )
+                all_labels = cur_labels.all_labels
+                cur_ids = set(all_labels.index)
+                missing_ids = all_ids.difference(cur_ids)
+                per_modality_missing_ids[output_name] = missing_ids
 
+                logger.debug(
+                    "Estimating missing IDs for tabular output %s.", output_name
+                )
                 missing_ids_per_target_column = compute_missing_ids_per_tabular_output(
-                    tabular_labels=cur_labels,
+                    all_labels_df=all_labels,
                     tabular_info=tabular_info,
                     output_name=output_name,
                 )
+
                 within_modality_missing_ids = {
                     **within_modality_missing_ids,
                     **missing_ids_per_target_column,
@@ -301,7 +305,10 @@ def set_up_all_target_labels_wrapper(
                     output_name=output_name,
                 )
 
-                missing_sequence_ids = _find_sequence_output_missing_ids(
+                logger.debug(
+                    "Estimating missing IDs for sequence output %s.", output_name
+                )
+                missing_sequence_ids = find_sequence_output_missing_ids(
                     train_ids=train_ids,
                     valid_ids=valid_ids,
                     output_source=output_config.output_info.output_source,
@@ -316,6 +323,7 @@ def set_up_all_target_labels_wrapper(
                     output_config=output_config,
                 )
 
+                logger.debug("Estimating missing IDs for array output %s.", output_name)
                 cur_missing_ids = gather_torch_nan_missing_ids(
                     labels=cur_labels.all_labels,
                     output_name=output_name,
@@ -325,8 +333,8 @@ def set_up_all_target_labels_wrapper(
             case _:
                 raise ValueError(f"Unknown output type: '{output_type}'.")
 
-        df_train_cur = pd.DataFrame.from_dict(cur_labels.train_labels, orient="index")
-        df_valid_cur = pd.DataFrame.from_dict(cur_labels.valid_labels, orient="index")
+        df_train_cur = cur_labels.train_labels
+        df_valid_cur = cur_labels.valid_labels
 
         df_train_cur["Output Name"] = output_name
         df_valid_cur["Output Name"] = output_name
@@ -366,25 +374,15 @@ def set_up_all_target_labels_wrapper(
 
 
 def compute_missing_ids_per_tabular_output(
-    tabular_labels: Union[Labels, "PredictTargetLabels"],
+    all_labels_df: pd.DataFrame,
     tabular_info: TabularFileInfo,
-    output_name: str,
-) -> dict[str, dict[str, set[str]]]:
-    missing_per_target_column: dict[str, dict[str, set[str]]] = {output_name: {}}
-
-    all_ids = set(tabular_labels.all_labels.keys())
-    all_labels = tabular_labels.all_labels
-
+    output_name: str = "output",
+) -> Dict[str, Dict[str, set[str]]]:
+    missing_per_target_column: Dict[str, Dict[str, set[str]]] = {output_name: {}}
     all_columns = list(tabular_info.con_columns) + list(tabular_info.cat_columns)
 
     for target_column in all_columns:
-        cur_missing = set()
-
-        for id_ in all_ids:
-            cur_label = all_labels[id_][target_column]
-            if isinstance(cur_label, float) and math.isnan(cur_label):
-                cur_missing.add(id_)
-
+        cur_missing = set(all_labels_df.index[all_labels_df[target_column].isna()])
         missing_per_target_column[output_name][target_column] = cur_missing
 
     return missing_per_target_column
@@ -404,14 +402,19 @@ def set_up_delayed_target_labels(
         id_: {output_name: torch.nan} for id_ in valid_ids_set
     }
 
+    df_train = pd.DataFrame.from_dict(train_labels, orient="index")
+    df_train["Output Name"] = output_name
+    df_valid = pd.DataFrame.from_dict(valid_labels, orient="index")
+    df_valid["Output Name"] = output_name
+
     return Labels(
-        train_labels=train_labels,
-        valid_labels=valid_labels,
+        train_labels=df_train,
+        valid_labels=df_valid,
         label_transformers={},
     )
 
 
-def _find_sequence_output_missing_ids(
+def find_sequence_output_missing_ids(
     train_ids: Sequence[str],
     valid_ids: Sequence[str],
     output_source: str,
@@ -461,19 +464,24 @@ def set_up_file_target_labels(
         for id_ in valid_ids_set
     }
 
+    df_train = pd.DataFrame.from_dict(train_labels, orient="index")
+    df_train["Output Name"] = output_name
+    df_valid = pd.DataFrame.from_dict(valid_labels, orient="index")
+    df_valid["Output Name"] = output_name
+
     return Labels(
-        train_labels=train_labels,
-        valid_labels=valid_labels,
+        train_labels=df_train,
+        valid_labels=df_valid,
         label_transformers={},
     )
 
 
-def gather_torch_nan_missing_ids(labels: al_label_dict, output_name: str) -> set[str]:
+def gather_torch_nan_missing_ids(labels: pd.DataFrame, output_name: str) -> set[str]:
     missing_ids = set()
-    for id_, label in labels.items():
+    for id_, label in labels.iterrows():
         cur_label = label[output_name]
         if isinstance(cur_label, float) and math.isnan(cur_label):
-            missing_ids.add(id_)
+            missing_ids.add(str(id_))
 
     return missing_ids
 
@@ -540,13 +548,24 @@ def df_to_nested_dict(df: pd.DataFrame, num_processes: int = -1) -> Dict:
 
 def _process_chunk(
     chunk: pd.DataFrame,
-) -> dict[str, dict[str, dict[str, float | int | str]]]:
-    nested_dict: dict[str, dict[str, dict[str, float | int | str]]] = {}
-    for (cur_id, cur_output_name), group_df in chunk.groupby(level=[0, 1]):
-        filtered_dict = group_df.dropna(axis=1, how="all").to_dict(orient="records")[0]
+) -> Dict[str, Dict[str, Dict[str, float | int | str]]]:
+    nested_dict: Dict[str, Dict[str, Dict[str, float | int | str]]] = {}
+    for row in chunk.itertuples(index=True, name="Row"):
+        # Tuple of (ID, Output Name)
+        multi_index = row.Index
+        cur_id, cur_output_name = multi_index
+
+        row_dict = {}
+        # Skip the first element as it's the multi-index
+        name_value_iter = zip(chunk.columns, row[1:])
+        for column_name, value in name_value_iter:
+            if pd.notna(value):
+                row_dict[column_name] = value
+
         if cur_id not in nested_dict:
             nested_dict[cur_id] = {}
-        nested_dict[cur_id][cur_output_name] = filtered_dict
+        nested_dict[cur_id][cur_output_name] = row_dict
+
     return nested_dict
 
 
