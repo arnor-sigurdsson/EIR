@@ -114,7 +114,7 @@ and so on:
 
 - ``tomlkit``  – Sébastien Eustace: Style preserving TOML library
 
-- ``gdown``  – Kentaro Wada: Google Drive direct download of big files.
+- ``gdown`` : Google Drive Public File/Folder Downloader
 
 - ``hypothesis``  – David R. MacIver and Zac Hatfield-Dodds: A library for property-based testing
 
