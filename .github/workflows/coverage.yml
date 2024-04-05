@@ -22,7 +22,8 @@ jobs:
         pip install tox==4.14.1
         pip install poetry==1.8.2
         tox -e py_partial
-    - name: Publish coverage to Codecov
-      uses: codecov/codecov-action@v3
+    - name: Generate report
+      uses: codecov/codecov-action@v4
       with:
         fail_ci_if_error: true
+        token: ${{ secrets.CODECOV_TOKEN }}
