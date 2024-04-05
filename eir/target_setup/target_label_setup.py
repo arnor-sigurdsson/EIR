@@ -6,7 +6,6 @@ from multiprocessing import Pool
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, Iterable, Optional, Sequence, Tuple, Union
 
-import numpy as np
 import pandas as pd
 import torch
 from tqdm import tqdm
@@ -540,7 +539,14 @@ def df_to_nested_dict(df: pd.DataFrame, num_processes: int = -1) -> Dict:
         "Setting number of processes for parallel processing of DF to dict to %d.",
         num_processes,
     )
-    chunks = np.array_split(df, num_processes)
+
+    chunk_size = len(df) // num_processes
+    chunks: list[pd.DataFrame] = []
+    for i in range(0, len(df), chunk_size):
+        start: int = i
+        end: int = i + chunk_size
+        chunks.append(df.iloc[start:end])
+
     with Pool(num_processes) as pool:
         dicts = pool.map(_process_chunk, chunks)
     return _merge_dicts(dicts)

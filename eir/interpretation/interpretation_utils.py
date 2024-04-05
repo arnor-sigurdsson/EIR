@@ -9,6 +9,7 @@ from typing import (
     DefaultDict,
     Generator,
     List,
+    Optional,
     Sequence,
     Tuple,
     Union,
@@ -114,7 +115,8 @@ def plot_attributions_bar(
     )
 
     plt.tight_layout()
-    sns_figure: plt.Figure = ax.get_figure()
+    sns_figure: Optional[plt.Figure] = ax.get_figure()
+    assert sns_figure is not None
 
     if title:
         ax.set_title(title)

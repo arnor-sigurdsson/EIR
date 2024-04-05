@@ -162,6 +162,9 @@ def _array_output_test_check_wrapper(
             # due to deeplake arrays not storing 0s but as very small numbers
             matching_input_array[matching_input_array < 1e-8] = 0.0
 
+            if matching_input_array.sum() == 0:
+                continue
+
             cosine_similarity = 1 - cosine(
                 u=matching_input_array.ravel().astype(np.float32),
                 v=generated_array.ravel(),

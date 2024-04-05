@@ -36,7 +36,9 @@ def prepare_request_input_data(
     request_data: Dict[str, Any],
     input_objects: al_input_objects_as_dict,
 ) -> Dict[str, Any]:
-    inputs_prepared: dict[str, np.ndarray | torch.Tensor | list[str] | str | dict] = {}
+    inputs_prepared: dict[
+        str, np.ndarray | torch.Tensor | list[str] | str | dict | Image.Image
+    ] = {}
 
     for name, serialized_data in request_data.items():
         input_object = input_objects[name]

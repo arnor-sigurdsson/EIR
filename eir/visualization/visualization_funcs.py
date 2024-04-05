@@ -48,14 +48,28 @@ def add_series_to_axis(
         ax_plot_kwargs = {}
 
     ax_object.plot(
-        xticks, series_cut.values, zorder=1, alpha=0.5, linewidth=0.8, **ax_plot_kwargs
+        xticks,
+        series_cut.values,
+        zorder=1,
+        alpha=0.5,
+        linewidth=0.8,
+        **ax_plot_kwargs,
     )
 
-    # plt actually uses the '_' internally
-    lines_to_legend = [
-        line for line in ax_object.lines if not line.get_label().startswith("_")
-    ]
-    labels_to_legend = [line.get_label() for line in lines_to_legend]
+    lines_to_legend: list[plt.Line2D] = []
+    for line in ax_object.lines:
+        line_label = line.get_label()
+        assert isinstance(line_label, str)
+
+        if not line_label.startswith("_"):
+            lines_to_legend.append(line)
+
+    labels_to_legend: list[str] = []
+    for line in lines_to_legend:
+        line_label = line.get_label()
+        assert isinstance(line_label, str)
+        labels_to_legend.append(line_label)
+
     ax_object.legend(lines_to_legend, labels_to_legend)
 
     return ax_object
@@ -415,7 +429,7 @@ def generate_multi_class_roc_curve(
         linewidth=4,
     )
 
-    colors = iter(cm.tab20(np.arange(n_classes)))
+    colors = iter(cm.get_cmap("tab20", n_classes)(np.arange(n_classes)))
     for i, color in zip(range(n_classes), colors):
         plt.plot(
             fpr[i],
@@ -489,7 +503,7 @@ def generate_multi_class_pr_curve(
         f"(area = {average_precision_micro:0.4g})",
     )
 
-    colors = iter(cm.tab20(np.arange(n_classes)))
+    colors = iter(cm.get_cmap("tab20", n_classes)(np.arange(n_classes)))
     for i, color in zip(range(n_classes), colors):
         plt.plot(
             recall[i],
@@ -591,6 +605,8 @@ def generate_all_training_curves(
 
         if figure_object is None:
             continue
+
+        assert axis_object is not None
 
         if metric_suffix in training_history_df.columns:
             train_series = training_history_df[metric_suffix]
