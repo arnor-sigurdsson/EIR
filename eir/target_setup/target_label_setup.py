@@ -523,6 +523,10 @@ def df_to_nested_dict(df: pd.DataFrame, num_processes: int = -1) -> Dict:
 
     For each output_name, only relevant columns are included.
     """
+
+    if df.empty:
+        return {}
+
     if num_processes == -1:
         dataset_size = len(df)
         if dataset_size < 10000:
@@ -540,7 +544,7 @@ def df_to_nested_dict(df: pd.DataFrame, num_processes: int = -1) -> Dict:
         num_processes,
     )
 
-    chunk_size = len(df) // num_processes
+    chunk_size = max(1, len(df) // num_processes)
     chunks: list[pd.DataFrame] = []
     for i in range(0, len(df), chunk_size):
         start: int = i
