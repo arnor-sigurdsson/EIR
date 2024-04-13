@@ -6,7 +6,7 @@
         },
         "response": {
             "result": {
-                "captions": "A plate with a sandwich, and a"
+                "captions": "A bowl of broccoli and a is on a plate."
             }
         }
     },
@@ -17,7 +17,7 @@
         },
         "response": {
             "result": {
-                "captions": "A zebra is grazing in the grass near some trees."
+                "captions": "Two zebras standing side by side in a grassy field."
             }
         }
     },
@@ -28,7 +28,7 @@
         },
         "response": {
             "result": {
-                "captions": "A horse that is grazing in a field."
+                "captions": "A horse and a goat grazing in the grass"
             }
         }
     }

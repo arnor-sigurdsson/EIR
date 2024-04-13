@@ -452,6 +452,8 @@ def plot_validation_perf_average(data: pd.DataFrame) -> plt.Figure:
             color_index = 1
         elif model_type == "TRANSFORMER":
             color_index = 2
+        else:
+            raise ValueError(f"Unknown model type: {model_type}")
 
         line_style = line_style_dict[model_dim.lower()]
 

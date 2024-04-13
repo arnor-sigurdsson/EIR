@@ -14,5 +14,6 @@ model_config:
     layers: [1, 1, 1, 1]
     block: "BasicBlock"
 
-
+interpretation_config:
+    num_samples_to_interpret: 30
 

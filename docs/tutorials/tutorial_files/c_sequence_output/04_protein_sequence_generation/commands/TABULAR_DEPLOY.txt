@@ -1,2 +1,2 @@
 eirserve \
---model-path eir_tutorials/tutorial_runs/c_sequence_output/04_protein_sequence_generation_tabular/saved_models/04_protein_sequence_generation_tabular_model_5500_perf-average=-1.7328.pt
+--model-path eir_tutorials/tutorial_runs/c_sequence_output/04_protein_sequence_generation_tabular/saved_models/04_protein_sequence_generation_tabular_model_5500_perf-average=-1.7293.pt
