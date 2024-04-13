@@ -6,7 +6,6 @@ import numpy as np
 import torch
 from aislib.misc_utils import ensure_path_exists
 from captum.attr._utils.visualization import visualize_image_attr_multiple
-from matplotlib.colors import LinearSegmentedColormap
 from torchvision.transforms import Normalize
 
 from eir.interpretation.interpretation_utils import (
@@ -70,21 +69,19 @@ def analyze_image_input_attributions(
         )
         raw_input = raw_input.transpose(1, 2, 0)
 
-        cmap = get_default_img_attribution_cmap()
         figure, _ = visualize_image_attr_multiple(
             attr=attributions,
             original_image=raw_input,
             methods=["original_image", "heat_map"],
             signs=["all", "absolute_value"],
             show_colorbar=True,
-            cmap=cmap,
             use_pyplot=False,
         )
 
         name = f"image_{sample_attribution.sample_info.ids[0]}_{cur_label_name}.pdf"
-        outpath = attribution_outfolder / "single_samples" / name
-        ensure_path_exists(path=outpath)
-        figure.savefig(outpath, dpi=300)
+        output_path = attribution_outfolder / "single_samples" / name
+        ensure_path_exists(path=output_path)
+        figure.savefig(output_path, dpi=300)
         plt.close("all")
 
 
@@ -97,21 +94,13 @@ def un_normalize(
     """
     means = torch.Tensor(normalization_stats.channel_means)
     stds = torch.Tensor(normalization_stats.channel_stds)
-    unnorm = Normalize(
+    un_norm = Normalize(
         mean=(-means / stds).tolist(),
         std=(1.0 / stds).tolist(),
     )
 
     img_as_tensor = torch.Tensor(normalized_img)
-    img_unnormalized = unnorm(img_as_tensor).cpu().numpy()
-    img_final = img_unnormalized.clip(None, 1.0)
+    img_un_normalized = un_norm(img_as_tensor).cpu().numpy()
+    img_final = img_un_normalized.clip(None, 1.0)
 
     return img_final
-
-
-def get_default_img_attribution_cmap() -> LinearSegmentedColormap:
-    default_cmap = LinearSegmentedColormap.from_list(
-        "custom blue", [(0, "#ffffff"), (0.25, "#252b36"), (1, "#000000")], N=256
-    )
-
-    return default_cmap

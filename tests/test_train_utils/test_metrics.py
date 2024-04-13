@@ -14,6 +14,7 @@ from eir.setup.output_setup_modules.tabular_output_setup import (
 )
 from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
 from eir.setup.schemas import OutputConfig, OutputInfoConfig
+from eir.target_setup.target_label_setup import get_missing_targets_info
 from eir.train_utils import metrics
 from eir.train_utils.criteria import get_criteria
 
@@ -547,9 +548,19 @@ def setup_data():
             "inner2": torch.randint(0, 2, (3,)),
         }
     }
-    missing_ids_info = metrics.MissingTargetsInfo(
-        missing_ids_per_modality={"output1": set()},
-        missing_ids_within_modality={"output1": {"inner1": set(), "inner2": set()}},
+
+    missing_per_modality = {"output1": set()}
+    missing_within_modality = {"output1": {"inner1": set(), "inner2": set()}}
+    output_and_target_names = {
+        "output1": {
+            "inner1": "inner1",
+            "inner2": "inner2",
+        },
+    }
+    missing_ids_info = get_missing_targets_info(
+        missing_ids_per_modality=missing_per_modality,
+        missing_ids_within_modality=missing_within_modality,
+        output_and_target_names=output_and_target_names,
     )
     return batch_ids, model_outputs, target_labels, missing_ids_info
 
@@ -582,10 +593,12 @@ def test_no_missing_data(setup_data):
 
 def test_all_ids_missing(setup_data):
     batch_ids, model_outputs, target_labels, _ = setup_data
-    missing_ids_info = metrics.MissingTargetsInfo(
+    missing_ids_info = get_missing_targets_info(
         missing_ids_per_modality={"output1": set(batch_ids)},
         missing_ids_within_modality={},
+        output_and_target_names={"output1": {"inner1": "inner1", "inner2": "inner2"}},
     )
+
     result = metrics.filter_missing_outputs_and_labels(
         batch_ids=batch_ids,
         model_outputs=model_outputs,
@@ -593,9 +606,16 @@ def test_all_ids_missing(setup_data):
         missing_ids_info=missing_ids_info,
         with_labels=True,
     )
+
     assert (
         len(result.model_outputs["output1"]["inner1"]) == 0
     ), "Should return an empty tensor for outputs when all IDs are missing"
     assert (
         len(result.target_labels["output1"]["inner1"]) == 0
+    ), "Should return an empty tensor for labels when all IDs are missing"
+    assert (
+        len(result.model_outputs["output1"]["inner2"]) == 0
+    ), "Should return an empty tensor for outputs when all IDs are missing"
+    assert (
+        len(result.target_labels["output1"]["inner2"]) == 0
     ), "Should return an empty tensor for labels when all IDs are missing"

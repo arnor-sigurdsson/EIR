@@ -12,6 +12,7 @@ from eir.data_load.data_source_modules.csv_ops import ColumnOperation
 from eir.data_load.label_setup import merge_target_columns
 from eir.setup.config import Configs
 from eir.target_setup.target_label_setup import (
+    _precompute_missing_ids,
     gather_all_ids_from_output_configs,
     get_tabular_target_file_infos,
     set_up_all_target_labels_wrapper,
@@ -1342,3 +1343,106 @@ def test_merge_target_columns_pass(test_input, expected):
 def test_merge_target_columns_fail():
     with pytest.raises(ValueError):
         merge_target_columns([], [])
+
+
+def test_empty_inputs():
+    missing_ids_per_modality = {}
+    missing_ids_within_modality = {}
+    output_and_target_names = {}
+    result = _precompute_missing_ids(
+        missing_ids_per_modality=missing_ids_per_modality,
+        missing_ids_within_modality=missing_ids_within_modality,
+        output_and_target_names=output_and_target_names,
+    )
+    assert result == {}
+
+
+def test_missing_ids_per_modality_only():
+    missing_ids_per_modality = {
+        "modality1": {"id1", "id2"},
+        "modality2": {"id3", "id4"},
+    }
+    missing_ids_within_modality = {}
+    output_and_target_names = {
+        "modality1": ["target1", "target2"],
+        "modality2": ["target3", "target4"],
+    }
+    result = _precompute_missing_ids(
+        missing_ids_per_modality=missing_ids_per_modality,
+        missing_ids_within_modality=missing_ids_within_modality,
+        output_and_target_names=output_and_target_names,
+    )
+    expected_result = {
+        "modality1": {
+            "target1": {"id1", "id2"},
+            "target2": {"id1", "id2"},
+        },
+        "modality2": {
+            "target3": {"id3", "id4"},
+            "target4": {"id3", "id4"},
+        },
+    }
+    assert result == expected_result
+
+
+def test_missing_ids_within_modality_only():
+    missing_ids_per_modality = {}
+    missing_ids_within_modality = {
+        "modality1": {"target1": {"id1", "id2"}, "target2": {"id3"}},
+        "modality2": {"target3": {"id4", "id5"}},
+    }
+    output_and_target_names = {
+        "modality1": ["target1", "target2"],
+        "modality2": ["target3", "target4"],
+    }
+    result = _precompute_missing_ids(
+        missing_ids_per_modality=missing_ids_per_modality,
+        missing_ids_within_modality=missing_ids_within_modality,
+        output_and_target_names=output_and_target_names,
+    )
+    expected_result = {
+        "modality1": {
+            "target1": {"id1", "id2"},
+            "target2": {"id3"},
+        },
+        "modality2": {
+            "target3": {"id4", "id5"},
+        },
+    }
+    assert result == expected_result
+
+
+def test_both_missing_ids():
+    missing_ids_per_modality = {
+        "modality1": {"id1", "id2"},
+        "modality2": {"id3"},
+    }
+    missing_ids_within_modality = {
+        "modality1": {
+            "target1": {"id4"},
+            "target2": {"id5", "id6"},
+        },
+        "modality2": {
+            "target3": {"id7"},
+        },
+    }
+    output_and_target_names = {
+        "modality1": ["target1", "target2"],
+        "modality2": ["target3", "target4"],
+    }
+    result = _precompute_missing_ids(
+        missing_ids_per_modality=missing_ids_per_modality,
+        missing_ids_within_modality=missing_ids_within_modality,
+        output_and_target_names=output_and_target_names,
+    )
+    expected_result = {
+        "modality1": {
+            "target1": {"id1", "id2", "id4"},
+            "target2": {"id1", "id2", "id5", "id6"},
+        },
+        "modality2": {
+            "target3": {"id3", "id7"},
+            "target4": {"id3"},
+        },
+    }
+    assert result == expected_result

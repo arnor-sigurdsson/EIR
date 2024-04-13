@@ -6,7 +6,7 @@
         },
         "response": {
             "result": {
-                "english": "I'm very hungry now."
+                "english": "I'm very hungry and"
             }
         }
     },
@@ -28,7 +28,7 @@
         },
         "response": {
             "result": {
-                "english": "Why is Tom still in Boston?"
+                "english": "Why is Tom still Boston?"
             }
         }
     },
@@ -39,7 +39,7 @@
         },
         "response": {
             "result": {
-                "english": "A cat very big"
+                "english": "A cat was very high."
             }
         }
     }

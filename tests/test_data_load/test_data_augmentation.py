@@ -390,9 +390,10 @@ def test_calc_all_mixed_losses(test_inputs, expected_output):
     missing_ids = data_augmentation.MissingTargetsInfo(
         missing_ids_per_modality={},
         missing_ids_within_modality={},
+        precomputed_missing_ids={},
     )
 
-    all_losses = data_augmentation.calc_all_mixed_losses(
+    all_losses, _ = data_augmentation.calc_all_mixed_losses(
         target_columns_gen=_target_columns_gen(),
         criteria=test_criteria,
         outputs=outputs,

@@ -50,13 +50,13 @@ al_pd_dtypes = np.ndarray | pd.CategoricalDtype
 
 @dataclass
 class Labels:
-    train_labels: al_label_dict
-    valid_labels: al_label_dict
+    train_labels: pd.DataFrame
+    valid_labels: pd.DataFrame
     label_transformers: al_label_transformers
 
     @property
-    def all_labels(self):
-        return {**self.train_labels, **self.valid_labels}
+    def all_labels(self) -> pd.DataFrame:
+        return pd.concat([self.train_labels, self.valid_labels])
 
 
 @dataclass
@@ -111,12 +111,9 @@ def set_up_train_and_valid_tabular_data(
         impute_missing=impute_missing,
     )
 
-    train_labels_dict = df_labels_train.to_dict("index")
-    valid_labels_dict = df_labels_valid.to_dict("index")
-
     labels_data_object = Labels(
-        train_labels=train_labels_dict,
-        valid_labels=valid_labels_dict,
+        train_labels=df_labels_train,
+        valid_labels=df_labels_valid,
         label_transformers=label_transformers,
     )
 
@@ -1086,6 +1083,8 @@ def _process_train_and_label_dfs(
         label_columns=label_columns,
         impute_missing=impute_missing,
     )
+
+    logger.debug("Transforming label columns in train and validation dataframes.")
     df_train_final = transform_label_df(
         df_labels=df_labels_train_no_nan,
         label_transformers=fit_label_transformers,

@@ -533,6 +533,7 @@ class LCLAttentionBlock(nn.Module):
             activation="gelu",
             norm_first=True,
             batch_first=True,
+            dropout=self.dropout_p,
         )
 
         self.encoder = nn.TransformerEncoder(
@@ -554,7 +555,7 @@ class LCLAttentionBlock(nn.Module):
         out = self.encoder(out)
         out = torch.flatten(input=out, start_dim=1)
 
-        return out
+        return out + x
 
 
 def _do_add_attention(

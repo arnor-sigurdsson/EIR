@@ -65,7 +65,8 @@ def _create_and_save_test_array(
     dims = c.extras["array_dims"]
 
     base_array, elements_active = _set_up_base_test_array(
-        dims=dims, class_integer=class_integer
+        dims=dims,
+        class_integer=class_integer,
     )
 
     np.save(str(sample_output_path), base_array)
@@ -74,7 +75,8 @@ def _create_and_save_test_array(
 
 
 def _set_up_base_test_array(
-    dims: int, class_integer: int
+    dims: int,
+    class_integer: int,
 ) -> Tuple[np.ndarray, np.ndarray]:
     candidates = np.array(list(range(0, 100, 10)))
 

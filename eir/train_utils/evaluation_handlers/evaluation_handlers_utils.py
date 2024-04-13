@@ -112,14 +112,14 @@ def remove_special_tokens(
 
 
 def convert_model_inputs_to_raw(
-    inputs_to_model: Dict[str, torch.Tensor | dict[str, torch.Tensor]],
+    inputs_to_model: dict[str, torch.Tensor | dict[str, torch.Tensor]],
     input_objects: "al_input_objects_as_dict",
-) -> Dict[str, str | np.ndarray | dict[str, np.ndarray]]:
+) -> dict[str, str | np.ndarray | dict[str, np.ndarray] | Image.Image]:
     raw_inputs = {}
     for input_name, data in inputs_to_model.items():
         input_object = input_objects[input_name]
 
-        raw_input: str | np.ndarray | dict[str, np.ndarray]
+        raw_input: str | np.ndarray | dict[str, np.ndarray] | Image.Image
         match input_object:
             case (
                 ComputedTabularInputInfo()
@@ -176,7 +176,7 @@ def convert_model_inputs_to_raw(
 
 def convert_image_input_to_raw(
     data: torch.Tensor, normalization_stats: ImageNormalizationStats
-) -> Image:
+) -> Image.Image:
     data_np: np.ndarray = data.numpy()
     assert data_np.ndim == 4, "Input should be 4D"
     assert data_np.shape[0] == 1, "The batch dimension should be 1"
@@ -506,7 +506,7 @@ def prepare_manual_sample_data(
 
 
 def serialize_raw_inputs(
-    raw_inputs: Dict[str, Union[np.ndarray, str, Image]],
+    raw_inputs: dict[str, str | np.ndarray | dict[str, np.ndarray] | Image.Image],
     input_objects: "al_input_objects_as_dict",
     output_path: Path,
 ) -> None:

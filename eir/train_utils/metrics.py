@@ -298,6 +298,7 @@ def calc_mcc(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=RuntimeWarning)
+        warnings.simplefilter("ignore", category=UserWarning)
         mcc = matthews_corrcoef(labels, prediction)
 
     return mcc
@@ -657,6 +658,7 @@ def persist_metrics(
     prefixes: Dict[str, str],
     writer_funcs: Union[None, Dict[str, Dict[str, Callable]]] = None,
 ):
+
     hc = handler_config
     exp = handler_config.experiment
     gc = exp.configs.global_config
@@ -751,7 +753,9 @@ def _add_metrics_to_writer(
         for metric_name, metric_value in metric_dict.items():
             cur_name = name + f"/{metric_name}"
             writer.add_scalar(
-                tag=cur_name, scalar_value=metric_value, global_step=iteration
+                tag=cur_name,
+                scalar_value=metric_value,
+                global_step=iteration,
             )
 
 
@@ -760,7 +764,7 @@ def get_buffered_metrics_writer(buffer_interval: int):
 
     def append_metrics_to_file(
         filepath: Path, metrics: Dict[str, float], iteration: int, write_header=False
-    ):
+    ) -> None:
         nonlocal buffer
 
         dict_to_write = {**{"iteration": iteration}, **metrics}
@@ -980,99 +984,74 @@ class FilteredOutputsAndLabels:
 
 
 def filter_missing_outputs_and_labels(
-    batch_ids: list[str],
+    batch_ids: List[str],
     model_outputs: Dict[str, Dict[str, torch.Tensor]],
     target_labels: Dict[str, Dict[str, torch.Tensor]],
     missing_ids_info: MissingTargetsInfo,
-    with_labels: bool,
+    with_labels: bool = True,
 ) -> FilteredOutputsAndLabels:
-    """
-    Note: Later we can maybe have pre-computed sets of IDs per modality-output
-    combination, which might be more efficient than the current approach. One could
-    perhaps set up some nice data structures for this.
-    """
     filtered_outputs = {}
     filtered_labels = {}
-    filtered_ids: dict[str, dict[str, list[str]]] = {}
+    filtered_ids: Dict[str, Dict[str, List[str]]] = {}
+
+    precomputed = missing_ids_info.precomputed_missing_ids
 
     for output_name, output_inner_dict in model_outputs.items():
-        missing_modality_ids = missing_ids_info.missing_ids_per_modality.get(
-            output_name, set()
-        )
-
         filtered_inner_dict = {}
         filtered_inner_labels = {}
         filtered_inner_ids = {}
 
-        missing_within_modality = missing_ids_info.missing_ids_within_modality
+        output_missing_info = precomputed.get(output_name, {})
+        if not output_missing_info:
+            filtered_outputs[output_name] = output_inner_dict
+            if with_labels:
+                filtered_labels[output_name] = target_labels[output_name]
+            else:
+                filtered_labels[output_name] = {
+                    inner_key: torch.tensor([]) for inner_key in output_inner_dict
+                }
+            filtered_ids[output_name] = {
+                inner_key: batch_ids for inner_key in output_inner_dict
+            }
+            continue
+
         for inner_key, modality_output_tensor in output_inner_dict.items():
-            cur_missing_ids = missing_within_modality.get(output_name, {}).get(
-                inner_key, set()
-            )
+            cur_missing_ids = output_missing_info.get(inner_key, set())
 
-            no_missing = not cur_missing_ids and not missing_modality_ids
-            if no_missing:
+            if not cur_missing_ids:
                 filtered_inner_dict[inner_key] = modality_output_tensor
-
                 if with_labels:
-                    cur_targets = target_labels[output_name][inner_key]
+                    filtered_inner_labels[inner_key] = target_labels[output_name][
+                        inner_key
+                    ]
                 else:
-                    cur_targets = torch.tensor([])
-                filtered_inner_labels[inner_key] = cur_targets
-
+                    filtered_inner_labels[inner_key] = torch.tensor([])
                 filtered_inner_ids[inner_key] = batch_ids
                 continue
-
-            combined_missing_ids = missing_modality_ids.union(cur_missing_ids)
 
             valid_indices = [
-                i for i, id_ in enumerate(batch_ids) if id_ not in combined_missing_ids
+                i for i, id_ in enumerate(batch_ids) if id_ not in cur_missing_ids
             ]
+            valid_indices_tensor = torch.tensor(
+                valid_indices,
+                device=modality_output_tensor.device,
+                dtype=torch.long,
+            )
 
-            all_valid = len(valid_indices) == len(batch_ids)
-            no_valid = len(valid_indices) == 0
-            if all_valid:
-                filtered_inner_dict[inner_key] = modality_output_tensor
-
-                if with_labels:
-                    cur_targets = target_labels[output_name][inner_key]
-                else:
-                    cur_targets = torch.tensor([])
-                filtered_inner_labels[inner_key] = cur_targets
-
-                filtered_inner_ids[inner_key] = batch_ids
-                continue
-            elif no_valid:
-                filtered_inner_dict[inner_key] = torch.tensor(
-                    [],
-                    dtype=modality_output_tensor.dtype,
-                    device=modality_output_tensor.device,
-                )
-                if with_labels:
-                    cur_targets = torch.tensor(
-                        [],
-                        dtype=target_labels[output_name][inner_key].dtype,
-                        device=target_labels[output_name][inner_key].device,
-                    )
-                else:
-                    cur_targets = torch.tensor([])
-                filtered_inner_labels[inner_key] = cur_targets
-                filtered_inner_ids[inner_key] = []
-                continue
-
-            valid_indices_tensor = torch.tensor(valid_indices)
-
-            output_tensor = modality_output_tensor[valid_indices_tensor]
+            output_tensor = modality_output_tensor.index_select(
+                dim=0, index=valid_indices_tensor
+            )
             filtered_inner_dict[inner_key] = output_tensor
 
             if with_labels:
-                cur_targets = target_labels[output_name][inner_key]
-                filtered_inner_labels[inner_key] = cur_targets[valid_indices_tensor]
-            else:
-                cur_targets = torch.tensor([])
+                cur_targets = target_labels[output_name][inner_key].index_select(
+                    dim=0, index=valid_indices_tensor
+                )
                 filtered_inner_labels[inner_key] = cur_targets
+            else:
+                filtered_inner_labels[inner_key] = torch.tensor([])
 
-            ids: list[str] = [batch_ids[i] for i in valid_indices]
+            ids = [batch_ids[i] for i in valid_indices]
             filtered_inner_ids[inner_key] = ids
 
         filtered_outputs[output_name] = filtered_inner_dict

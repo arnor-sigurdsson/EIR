@@ -9,9 +9,9 @@ jobs:
     name: Test group ${{ matrix.group }}
     runs-on: ubuntu-22.04
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Setup Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.11'
         architecture: x64
@@ -22,7 +22,8 @@ jobs:
         pip install tox==4.14.1
         pip install poetry==1.8.2
         tox -e py_partial
-    - name: Publish coverage to Codecov
-      uses: codecov/codecov-action@v3
+    - name: Generate report
+      uses: codecov/codecov-action@v4
       with:
         fail_ci_if_error: true
+        token: ${{ secrets.CODECOV_TOKEN }}
