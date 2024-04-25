@@ -75,16 +75,20 @@ def load_yaml_config(config_path: str) -> Dict[str, Any]:
 
 
 def recursive_dict_replace(
-    dict_: MutableMapping, dict_to_inject: MutableMapping
+    dict_: MutableMapping,
+    dict_to_inject: MutableMapping,
 ) -> dict:
     for cur_key, cur_value in dict_to_inject.items():
         if cur_key not in dict_:
             dict_[cur_key] = {}
 
         old_dict_value = dict_.get(cur_key)
-        if isinstance(cur_value, MutableMapping):
+        cur_is_dict = isinstance(cur_value, MutableMapping)
+        old_is_dict = isinstance(old_dict_value, MutableMapping)
+        if cur_is_dict and old_is_dict:
+            assert isinstance(cur_value, MutableMapping)
             assert isinstance(old_dict_value, MutableMapping)
-            recursive_dict_replace(old_dict_value, cur_value)
+            recursive_dict_replace(dict_=old_dict_value, dict_to_inject=cur_value)
         else:
             dict_[cur_key] = cur_value
 

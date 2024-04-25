@@ -122,6 +122,8 @@ def _get_common_model_config_overload() -> dict:
         "attention_window": 16,
         "axial_pos_embds_dim": (4, 12),
         "axial_pos_shape": (8, 8),
+        "num_channels": 8,
+        "num_groups": 4,
     }
 
     assert config["hidden_size"] % n_heads == 0
