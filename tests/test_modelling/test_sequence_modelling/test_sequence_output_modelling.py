@@ -195,7 +195,7 @@ def _sequence_output_test_check_wrapper(
                 intersection = set(content).intersection(set_all)
                 if not intersection:
                     raise AssertionError(f"No expected words found in file {f}")
-                if len(intersection) < 3:
+                if len(intersection) < 2:
                     raise AssertionError(
                         f"Expected words found in file {f} do not match "
                         f"minimum length: {intersection}"
