@@ -16,7 +16,6 @@ from sklearn.preprocessing import LabelEncoder, StandardScaler, label_binarize
 from sklearn.utils.multiclass import unique_labels
 
 matplotlib.use("Agg")
-import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.ticker import MaxNLocator
@@ -429,7 +428,7 @@ def generate_multi_class_roc_curve(
         linewidth=4,
     )
 
-    colors = iter(cm.get_cmap("tab20", n_classes)(np.arange(n_classes)))
+    colors = iter(plt.get_cmap("tab20", n_classes)(np.arange(n_classes)))
     for i, color in zip(range(n_classes), colors):
         plt.plot(
             fpr[i],
@@ -503,7 +502,7 @@ def generate_multi_class_pr_curve(
         f"(area = {average_precision_micro:0.4g})",
     )
 
-    colors = iter(cm.get_cmap("tab20", n_classes)(np.arange(n_classes)))
+    colors = iter(plt.get_cmap("tab20", n_classes)(np.arange(n_classes)))
     for i, color in zip(range(n_classes), colors):
         plt.plot(
             recall[i],
