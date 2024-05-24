@@ -1,7 +1,9 @@
 import pytest
 
-from eir.models.model_training_utils import check_eir_model
-from tests.test_models.model_testing_utils import prepare_example_batch
+from tests.test_models.model_testing_utils import (
+    check_eir_model,
+    prepare_example_test_batch,
+)
 
 
 @pytest.mark.parametrize(
@@ -59,7 +61,7 @@ def test_bytes_models(
 ):
     model = create_test_model
 
-    example_batch = prepare_example_batch(
+    example_batch = prepare_example_test_batch(
         configs=create_test_config, labels=create_test_labels, model=model
     )
 

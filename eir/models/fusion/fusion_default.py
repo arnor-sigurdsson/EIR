@@ -20,7 +20,8 @@ logger = get_logger(__name__)
 
 
 def default_fuse_features(features: Dict[str, torch.Tensor]) -> torch.Tensor:
-    return torch.cat(tuple(features.values()), dim=1)
+    feature_flatten = {k: v.flatten(start_dim=1) for k, v in features.items()}
+    return torch.cat(tuple(feature_flatten.values()), dim=1)
 
 
 class MLPResidualFusionModule(nn.Module):
@@ -61,7 +62,8 @@ class MLPResidualFusionModule(nn.Module):
     def forward(self, inputs: Dict[str, torch.Tensor]) -> torch.Tensor:
         fused_features = self.fusion_callable(inputs)
         out = calculate_module_dict_outputs(
-            input_=fused_features, module_dict=self.fusion_modules
+            input_=fused_features,
+            module_dict=self.fusion_modules,
         )
 
         return out["fusion"]

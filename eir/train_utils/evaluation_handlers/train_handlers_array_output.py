@@ -1,3 +1,4 @@
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, Generator, Iterator, Sequence, Tuple, Union
 
@@ -24,6 +25,7 @@ from eir.train_utils.evaluation_handlers.evaluation_handlers_utils import (
     prepare_manual_sample_data,
     serialize_raw_inputs,
 )
+from eir.train_utils.step_modules.diffusion import p_sample_loop
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -105,12 +107,23 @@ def array_out_single_sample_evaluation_wrapper(
         )
 
         for idx, (eval_type, eval_sample) in enumerate(sample_generator):
-            generated_array = array_generation(
-                eval_sample=eval_sample,
-                array_output_name=cur_output_name,
-                experiment=experiment,
-                default_eir_hooks=default_eir_hooks,
-            )
+            if output_type_info.loss == "diffusion":
+                time_steps = output_type_info.diffusion_time_steps
+                assert time_steps is not None
+                generated_array = reverse_diffusion_array_generation(
+                    eval_sample=eval_sample,
+                    array_output_name=cur_output_name,
+                    experiment=experiment,
+                    default_eir_hooks=default_eir_hooks,
+                    num_steps=time_steps,
+                )
+            else:
+                generated_array = one_shot_array_generation(
+                    eval_sample=eval_sample,
+                    array_output_name=cur_output_name,
+                    experiment=experiment,
+                    default_eir_hooks=default_eir_hooks,
+                )
 
             cur_output_path = (
                 cur_sample_output_folder / eval_type / f"{idx}_generated.npy"
@@ -135,7 +148,7 @@ def array_out_single_sample_evaluation_wrapper(
 
 
 @torch.no_grad()
-def array_generation(
+def one_shot_array_generation(
     eval_sample: ArrayOutputEvalSample,
     array_output_name: str,
     experiment: Union["Experiment", "PredictExperiment", "ServeExperiment"],
@@ -172,6 +185,55 @@ def array_generation(
     array_output_raw_numpy = array_output_raw.cpu().numpy()
 
     return array_output_raw_numpy
+
+
+@torch.inference_mode()
+def reverse_diffusion_array_generation(
+    eval_sample: ArrayOutputEvalSample,
+    array_output_name: str,
+    experiment: Union["Experiment", "PredictExperiment", "ServeExperiment"],
+    default_eir_hooks: Union["Hooks", "PredictHooks"],
+    num_steps: int,
+) -> np.ndarray:
+    output_object = experiment.outputs[array_output_name]
+    assert isinstance(output_object, ComputedArrayOutputInfo)
+
+    dimensions = output_object.data_dimensions
+    shape = (1,) + dimensions.full_shape()
+
+    prepared_sample_inputs = prepare_base_input(
+        prepared_inputs=eval_sample.inputs_to_model,
+    )
+
+    batch = general_pre_process_prepared_inputs(
+        prepared_inputs=prepared_sample_inputs,
+        target_labels=eval_sample.target_labels,
+        sample_id=eval_sample.sample_id,
+        experiment=experiment,
+        custom_hooks=default_eir_hooks,
+    )
+    batch_inputs = deepcopy(batch.inputs)
+
+    dc = output_object.diffusion_config
+    assert dc is not None
+    states = p_sample_loop(
+        config=dc,
+        batch_inputs=batch_inputs,
+        output_name=array_output_name,
+        model=experiment.model,
+        output_shape=shape,
+        time_steps=num_steps,
+    )
+
+    final_state = states[-1]
+
+    final_output = un_normalize_array(
+        array=torch.from_numpy(final_state),
+        normalization_stats=output_object.normalization_stats,
+    )
+
+    final_output_numpy = final_output.cpu().numpy()
+    return final_output_numpy
 
 
 def get_array_output_manual_input_samples(

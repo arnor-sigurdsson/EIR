@@ -159,7 +159,7 @@ def _enforce_omics_specific_settings(
 
     for key, value in expected[model_type].items():
         logger.info(
-            f"Overriding {key} to {value} for {model_type} in omics."
+            f"Overriding {key} to {value} for {model_type} in omics. "
             "If you want more control of these parameters, "
             "it might be a good idea to use the array input functionality."
         )

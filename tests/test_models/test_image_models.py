@@ -6,9 +6,11 @@ import timm
 import torch
 from timm.models import get_pretrained_cfg_value
 
-from eir.models.model_training_utils import check_eir_model
 from tests.conftest import should_skip_in_gha
-from tests.test_models.model_testing_utils import prepare_example_batch
+from tests.test_models.model_testing_utils import (
+    check_eir_model,
+    prepare_example_test_batch,
+)
 
 
 def get_test_internal_image_models_parametrization() -> Sequence[Dict]:
@@ -81,7 +83,7 @@ def test_internal_image_models(
 ):
     model = create_test_model
 
-    example_batch = prepare_example_batch(
+    example_batch = prepare_example_test_batch(
         configs=create_test_config,
         labels=create_test_labels,
         model=model,
@@ -137,6 +139,10 @@ def get_test_external_image_models_parametrization() -> Sequence[Dict]:
         else:
             size = size[-1]
 
+        num_output_features = 0
+        if model_type.startswith("crossvit") or model_type.startswith("coat"):
+            num_output_features = 128
+
         cur_params = {
             "injections": {
                 "input_configs": [
@@ -152,6 +158,7 @@ def get_test_external_image_models_parametrization() -> Sequence[Dict]:
                             "model_type": model_type,
                             "pretrained_model": False,
                             "model_init_config": {},
+                            "num_output_features": num_output_features,
                         },
                     }
                 ],
@@ -193,7 +200,7 @@ def test_external_image_models(
 ):
     model = create_test_model
 
-    example_batch = prepare_example_batch(
+    example_batch = prepare_example_test_batch(
         configs=create_test_config,
         labels=create_test_labels,
         model=model,

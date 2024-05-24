@@ -901,7 +901,7 @@ def get_all_tabular_targets(
 def _check_input_and_output_config_names(
     input_configs: Sequence[schemas.InputConfig],
     output_configs: Sequence[schemas.OutputConfig],
-    skip_keys: Sequence[str] = ("sequence",),
+    skip_keys: Sequence[str] = ("sequence", "array"),
 ) -> None:
     """
     We allow for the same name to be used for sequence inputs and outputs,

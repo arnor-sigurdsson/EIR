@@ -10,7 +10,13 @@ from eir.models.layers.lcl_layers import LCL, LCLResidualBlock
 def get_projection_layer(
     input_dimension: int,
     target_dimension: int,
-    projection_layer_type: Literal["auto", "lcl", "lcl_residual", "linear"] = "auto",
+    projection_layer_type: Literal[
+        "auto",
+        "lcl",
+        "lcl_residual",
+        "linear",
+        "cnn",
+    ] = "auto",
     lcl_diff_tolerance: int = 0,
 ) -> LCLResidualBlock | LCL | nn.Linear | nn.Identity:
     if projection_layer_type == "auto":
@@ -84,6 +90,10 @@ def get_projection_layer(
                 out_features=target_dimension,
                 bias=True,
             )
+
+    elif projection_layer_type == "cnn":
+        raise NotImplementedError()
+
     else:
         raise ValueError(f"Invalid projection_layer_type: {projection_layer_type}")
 

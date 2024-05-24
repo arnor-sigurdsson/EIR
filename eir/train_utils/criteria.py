@@ -169,7 +169,11 @@ def _get_label_smoothing(
             raise ValueError(f"Unknown column type: {column_type}")
 
 
-def _calc_con_loss(input: torch.Tensor, target: torch.Tensor, loss_func: al_con_losses):
+def _calc_con_loss(
+    input: torch.Tensor,
+    target: torch.Tensor,
+    loss_func: al_con_losses,
+) -> torch.Tensor:
     match loss_func:
         case nn.PoissonNLLLoss():
             return loss_func(log_input=input.squeeze(), target=target.squeeze())

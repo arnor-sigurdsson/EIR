@@ -252,6 +252,8 @@ class LCLModel(nn.Module):
             block_layer_spec=self.model_config.layers,
         )
 
+        self.output_shape = (1, 1, self.lcl_blocks[-1].out_features)
+
         self._init_weights()
 
     @property

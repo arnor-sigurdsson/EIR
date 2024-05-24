@@ -5,8 +5,11 @@ from pathlib import Path
 from typing import Callable, Iterable, Literal, Union
 
 import numpy as np
+import torchtext
 from aislib.misc_utils import ensure_path_exists
 from torch.utils.data import DataLoader
+
+torchtext.disable_torchtext_deprecation_warning()
 
 from eir import train
 from eir.data_load import datasets, label_setup

@@ -7,10 +7,12 @@ from eir.models.model_setup_modules.input_model_setup.input_model_setup_sequence
     _get_hf_sequence_feature_extractor_objects,
     _get_manual_out_features_for_external_feature_extractor,
 )
-from eir.models.model_training_utils import check_eir_model
 from eir.setup.setup_utils import get_all_hf_model_names
 from tests.conftest import should_skip_in_gha
-from tests.test_models.model_testing_utils import prepare_example_batch
+from tests.test_models.model_testing_utils import (
+    check_eir_model,
+    prepare_example_test_batch,
+)
 
 
 @pytest.mark.parametrize(
@@ -85,7 +87,7 @@ def test_internal_sequence_models(
 ):
     model = create_test_model
 
-    example_batch = prepare_example_batch(
+    example_batch = prepare_example_test_batch(
         configs=create_test_config, labels=create_test_labels, model=model
     )
 
@@ -223,7 +225,7 @@ def test_external_sequence_models_forward(
     """
     model = create_test_model
 
-    example_batch = prepare_example_batch(
+    example_batch = prepare_example_test_batch(
         configs=create_test_config,
         labels=create_test_labels,
         model=model,

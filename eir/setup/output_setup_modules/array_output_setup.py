@@ -12,6 +12,10 @@ from eir.setup.input_setup_modules.setup_array import (
     get_dtype_from_data_source,
 )
 from eir.setup.schemas import ArrayOutputTypeConfig, OutputConfig
+from eir.train_utils.step_modules.diffusion import (
+    DiffusionConfig,
+    initialize_diffusion_config,
+)
 from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
@@ -23,6 +27,7 @@ class ComputedArrayOutputInfo:
     data_dimensions: DataDimensions
     dtype: np.dtype
     normalization_stats: Optional[ArrayNormalizationStats] = None
+    diffusion_config: Optional[DiffusionConfig] = None
 
 
 def set_up_array_output(
@@ -51,11 +56,22 @@ def set_up_array_output(
         deeplake_inner_key=output_config.output_info.output_inner_key,
     )
 
+    diffusion_config = None
+    if output_type_info.loss == "diffusion":
+        time_steps = output_type_info.diffusion_time_steps
+        if time_steps is None:
+            raise ValueError(
+                "Diffusion loss requires specifying the number of time steps."
+                "Please set `diffusion_time_steps` in the output config."
+            )
+        diffusion_config = initialize_diffusion_config(time_steps=time_steps)
+
     array_output_object = ComputedArrayOutputInfo(
         output_config=output_config,
         data_dimensions=data_dimensions,
         normalization_stats=normalization_stats,
         dtype=dtype,
+        diffusion_config=diffusion_config,
     )
 
     return array_output_object

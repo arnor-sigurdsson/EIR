@@ -117,6 +117,8 @@ class ArrayTransformer(nn.Module):
             enable_nested_tensor=False,
         )
 
+        self.output_shape = (1, self.num_patches, self.embedding_dim)
+
     @property
     def num_out_features(self) -> int:
         return self.num_patches * self.embedding_dim

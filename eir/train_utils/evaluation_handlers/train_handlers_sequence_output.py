@@ -4,8 +4,11 @@ from typing import TYPE_CHECKING, Any, Dict, Generator, Iterator, Sequence, Tupl
 
 import torch
 import torch.nn.functional as F
+import torchtext
 from aislib.misc_utils import ensure_path_exists
 from torch.utils.data import Dataset
+
+torchtext.disable_torchtext_deprecation_warning()
 from torchtext.vocab import Vocab
 
 from eir.data_load.datasets import al_getitem_return

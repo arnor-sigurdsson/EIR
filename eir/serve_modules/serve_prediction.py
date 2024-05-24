@@ -5,13 +5,15 @@ import torch
 
 from eir.models.model_training_utils import predict_on_batch
 from eir.serve_modules.serve_experiment_io import ServeExperiment
+from eir.setup.schema_modules.output_schemas_array import ArrayOutputTypeConfig
 from eir.setup.schema_modules.output_schemas_sequence import (
     SequenceOutputSamplingConfig,
 )
 from eir.setup.schemas import SequenceOutputTypeConfig
 from eir.train_utils.evaluation_handlers.train_handlers_array_output import (
     ArrayOutputEvalSample,
-    array_generation,
+    one_shot_array_generation,
+    reverse_diffusion_array_generation,
 )
 from eir.train_utils.evaluation_handlers.train_handlers_sequence_output import (
     SequenceOutputEvalSample,
@@ -113,6 +115,8 @@ def _run_serve_array_generation(
             continue
 
         cur_output_name = config.output_info.output_name
+        output_type_info = config.output_type_info
+        assert isinstance(output_type_info, ArrayOutputTypeConfig)
 
         assert config.sampling_config is not None
 
@@ -125,12 +129,25 @@ def _run_serve_array_generation(
         hooks = serve_experiment.hooks
         assert hooks is not None
 
-        array_output = array_generation(
-            eval_sample=eval_sample,
-            array_output_name=cur_output_name,
-            experiment=serve_experiment,
-            default_eir_hooks=hooks,
-        )
+        is_diffusion = output_type_info.loss == "diffusion"
+
+        if is_diffusion:
+            time_steps = output_type_info.diffusion_time_steps
+            assert time_steps is not None
+            array_output = reverse_diffusion_array_generation(
+                eval_sample=eval_sample,
+                array_output_name=cur_output_name,
+                experiment=serve_experiment,
+                default_eir_hooks=hooks,
+                num_steps=time_steps,
+            )
+        else:
+            array_output = one_shot_array_generation(
+                eval_sample=eval_sample,
+                array_output_name=cur_output_name,
+                experiment=serve_experiment,
+                default_eir_hooks=hooks,
+            )
 
         prepared[cur_output_name] = {cur_output_name: array_output}
 

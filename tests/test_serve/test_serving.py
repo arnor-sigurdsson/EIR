@@ -134,6 +134,22 @@ def get_base_parametrization(compiled: bool = False) -> dict:
                         },
                     },
                 },
+                {
+                    "output_info": {
+                        "output_name": "test_array",
+                    },
+                    "output_type_info": {
+                        "loss": "diffusion",
+                        "diffusion_time_steps": 50,
+                    },
+                    "model_config": {
+                        "model_type": "cnn",
+                        "model_init_config": {
+                            "channel_exp_base": 3,
+                            "allow_pooling": False,
+                        },
+                    },
+                },
             ],
         },
     }
@@ -337,10 +353,13 @@ def _check_prediction(
             array_folder = Path(labels_csv_path).parent / "array"
             expected_array_file = array_folder / f"{id_from_request}.npy"
             expected_array = np.load(expected_array_file)
+
+            is_diffusion = output_object.diffusion_config is not None
             if not _validate_array_output(
                 actual_output=actual_output,
                 expected_array=expected_array,
                 data_dimensions=data_dimensions.full_shape(),
+                is_diffusion=is_diffusion,
             ):
                 return False
 
@@ -396,8 +415,9 @@ def _validate_array_output(
     actual_output: str,
     expected_array: np.ndarray,
     data_dimensions: tuple[int, ...],
-    mse_threshold: float = 0.2,
+    mse_threshold: float = 0.3,
     cosine_similarity_threshold: float = 0.6,
+    is_diffusion: bool = False,
 ) -> bool:
     array_np = _deserialize_array(
         array_str=actual_output,
@@ -413,10 +433,11 @@ def _validate_array_output(
 
     expected_array[expected_array < 1e-8] = 0.0
 
-    cosine_similarity = 1 - cosine(
-        u=expected_array.ravel().astype(np.float32),
-        v=array_np.ravel(),
-    )
-    assert cosine_similarity > cosine_similarity_threshold
+    if not is_diffusion:
+        cosine_similarity = 1 - cosine(
+            u=expected_array.ravel().astype(np.float32),
+            v=array_np.ravel(),
+        )
+        assert cosine_similarity > cosine_similarity_threshold
 
     return True

@@ -1,3 +1,5 @@
+from typing import Any, Dict
+
 import torch
 from torch.utils.data._utils.collate import default_collate
 
@@ -6,13 +8,21 @@ from eir.data_load.data_preparation_modules.imputation import (
 )
 from eir.data_load.data_utils import Batch
 from eir.data_load.label_setup import Labels
+from eir.models.model_setup_modules.meta_setup import al_meta_model
 from eir.setup.config import Configs
 from eir.setup.input_setup import set_up_inputs_for_training
 from eir.setup.output_setup import set_up_outputs_for_training
 from eir.train_utils.step_logic import prepare_base_batch_default
 
 
-def prepare_example_batch(
+def check_eir_model(
+    meta_model: "al_meta_model", example_inputs: Dict[str, Any]
+) -> None:
+    with torch.inference_mode():
+        meta_model(inputs=example_inputs)
+
+
+def prepare_example_test_batch(
     configs: Configs, labels: Labels, model: torch.nn.Module, batch_size: int = 2
 ) -> Batch:
     inputs_as_dict = set_up_inputs_for_training(

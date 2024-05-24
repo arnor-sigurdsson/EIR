@@ -2,6 +2,8 @@ from copy import copy
 from typing import Any, Dict, Union
 
 import timm
+import torch
+from timm.models import CoaT, CrossVit
 from torch import nn
 
 from eir.models.input.array.models_cnn import CNNModel, CNNModelConfig
@@ -49,9 +51,24 @@ def get_image_model(
         )
 
     feature_extractor = feature_extractor.to(device=device)
+
+    _check_image_model_num_output_features_compatibility(
+        feature_extractor=feature_extractor,
+        num_output_features=model_config.num_output_features,
+    )
+
+    estimated_out_shape = estimate_feature_extractor_out_shape(
+        feature_extractor=feature_extractor,
+        data_dimensions=data_dimensions,
+        num_output_features=model_config.num_output_features,
+        device=device,
+    )
+
     wrapper_model_class = model_registry_lookup(model_type="image-wrapper-default")
     model = wrapper_model_class(
-        feature_extractor=feature_extractor, model_config=model_config
+        feature_extractor=feature_extractor,
+        model_config=model_config,
+        estimated_out_shape=estimated_out_shape,
     )
 
     if model_config.freeze_pretrained_model:
@@ -59,6 +76,58 @@ def get_image_model(
             param.requires_grad = False
 
     return model
+
+
+def _check_image_model_num_output_features_compatibility(
+    feature_extractor: nn.Module, num_output_features: int
+) -> None:
+    match feature_extractor, num_output_features:
+        case CrossVit(), 0:
+            raise ValueError(
+                "CrossVit model requires num_output_features to be set to a value "
+                "greater than 0."
+            )
+        case CoaT(), 0:
+            raise ValueError(
+                "CoaT model requires num_output_features to be set to a value "
+                "greater than 0."
+            )
+
+
+def estimate_feature_extractor_out_shape(
+    feature_extractor: nn.Module,
+    data_dimensions: DataDimensions,
+    num_output_features: int,
+    device: str,
+) -> tuple[int, ...]:
+    example_input = prepare_example_image_test_input(
+        data_dimensions=data_dimensions,
+        device=device,
+    )
+
+    has_forward_features = hasattr(feature_extractor, "forward_features")
+    has_num_out_features = num_output_features > 0
+
+    with torch.inference_mode():
+        if has_forward_features and not has_num_out_features:
+            feature_extractor_out = feature_extractor.forward_features(example_input)
+        else:
+            feature_extractor_out = feature_extractor(example_input)
+
+    estimated_shape = feature_extractor_out.shape[1:]
+    logger.debug("Estimated shape of feature extractor output: %s", estimated_shape)
+
+    return estimated_shape
+
+
+def prepare_example_image_test_input(
+    data_dimensions: DataDimensions,
+    device: str,
+    batch_size: int = 2,
+) -> torch.Tensor:
+    full_shape = data_dimensions.full_shape()
+    example_input = torch.rand((batch_size, *full_shape)).to(device=device)
+    return example_input
 
 
 def _get_all_timm_models() -> list[str]:

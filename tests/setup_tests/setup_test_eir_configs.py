@@ -116,6 +116,8 @@ def get_output_test_init_base_func_map() -> Dict[str, Callable]:
         "test_output_copy": get_test_tabular_base_output_inits,
         "test_output_sequence": get_test_sequence_base_output_inits,
         "test_output_array": get_test_array_base_output_inits,
+        # For diffusion compatibility
+        "test_array": get_test_array_base_output_inits,
     }
 
     return mapping
@@ -129,6 +131,7 @@ def get_input_test_init_base_func_map() -> Dict[str, Callable]:
         "test_bytes": get_test_bytes_input_init,
         "test_image": get_test_image_input_init,
         "test_array": get_test_array_input_init,
+        "copy_test_array": get_test_array_input_init,
     }
 
     return mapping
@@ -316,7 +319,7 @@ def get_test_image_input_init(
         "model_config": {
             "model_type": "cnn",
             "pretrained_model": False,
-            "num_output_features": 128,
+            "num_output_features": 0,
             "freeze_pretrained_model": False,
             "model_init_config": {
                 "layers": [2],

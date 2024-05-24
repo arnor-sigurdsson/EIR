@@ -2,9 +2,10 @@ from typing import Tuple
 
 import torch
 from aislib.misc_utils import get_logger
-from aislib.pytorch_modules import Swish
 from torch import nn
 from torchvision.ops import StochasticDepth
+
+from eir.models.layers.norm_layers import GRN
 
 logger = get_logger(name=__name__)
 
@@ -22,7 +23,7 @@ class SEBlock(nn.Module):
             padding=0,
             bias=True,
         )
-        self.act_1 = Swish()
+        self.act_1 = nn.GELU()
 
         self.conv_up = nn.Conv2d(
             in_channels=reduced_channels,
@@ -137,7 +138,18 @@ class CNNResidualBlockBase(nn.Module):
         self.stochastic_depth_p = stochastic_depth_p
 
         self.rb_do = nn.Dropout2d(rb_do)
-        self.act_1 = Swish()
+
+        self.conv_ds = nn.Conv2d(
+            in_channels=self.in_channels,
+            out_channels=self.in_channels,
+            kernel_size=3,
+            stride=1,
+            padding=1,
+            bias=True,
+            groups=in_channels,
+        )
+
+        self.act_1 = nn.GELU()
 
         self.norm_1 = nn.GroupNorm(num_groups=1, num_channels=in_channels)
         self.conv_1 = nn.Conv2d(
@@ -156,6 +168,8 @@ class CNNResidualBlockBase(nn.Module):
         conv_2_kernel_w, conv_2_padding_w = _compute_conv_2_parameters(
             conv_1_kernel_size=conv_1_kernel_w, dilation=dilation_w
         )
+
+        self.grn = GRN(in_channels=out_channels)
 
         self.conv_2 = nn.Conv2d(
             in_channels=self.out_channels,
@@ -204,12 +218,15 @@ class FirstCNNBlock(CNNResidualBlockBase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        delattr(self, "conv_ds")
         delattr(self, "norm_1")
         delattr(self, "downsample_identity")
         delattr(self, "act_1")
+        delattr(self, "grn")
         delattr(self, "rb_do")
         delattr(self, "conv_2")
         delattr(self, "se_block")
+        delattr(self, "stochastic_depth")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         out = self.conv_1(x)
@@ -224,7 +241,10 @@ class CNNResidualBlock(CNNResidualBlockBase):
         self.full_preact = full_preact
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        out = self.norm_1(x)
+
+        out = self.conv_ds(x)
+
+        out = self.norm_1(out)
 
         if self.full_preact:
             identity = self.downsample_identity(out)
@@ -234,6 +254,7 @@ class CNNResidualBlock(CNNResidualBlockBase):
         out = self.conv_1(out)
 
         out = self.act_1(out)
+        out = self.grn(out)
         out = self.rb_do(out)
         out = self.conv_2(out)
 
@@ -245,3 +266,141 @@ class CNNResidualBlock(CNNResidualBlockBase):
         out = out + identity
 
         return out
+
+
+class DownSamplingResidualBlock(nn.Module):
+    def __init__(
+        self,
+        in_channels: int,
+        in_height: int,
+        in_width: int,
+    ):
+        super().__init__()
+
+        self.in_channels = in_channels
+        self.out_channels = in_channels
+        self.in_height = in_height
+        self.in_width = in_width
+
+        self.stride_h, self.stride_w = _compute_params_for_down_sampling(
+            cur_height=in_height,
+            cur_width=in_width,
+        )
+
+        self.norm_1 = nn.GroupNorm(num_groups=1, num_channels=in_channels)
+        self.act_1 = nn.GELU()
+
+        self.conv_1 = nn.Conv2d(
+            in_channels=self.in_channels,
+            out_channels=self.out_channels,
+            kernel_size=3,
+            stride=(self.stride_h, self.stride_w),
+            padding=1,
+            bias=True,
+        )
+
+        self.identity = nn.Conv2d(
+            in_channels=self.in_channels,
+            out_channels=self.out_channels,
+            kernel_size=3,
+            stride=(self.stride_h, self.stride_w),
+            padding=1,
+            bias=True,
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        identity = self.identity(x)
+
+        out = self.norm_1(x)
+        out = self.act_1(out)
+        out = self.conv_1(out)
+
+        out = out + identity
+
+        return out
+
+
+def _compute_params_for_down_sampling(
+    cur_height: int, cur_width: int
+) -> tuple[int, int]:
+
+    if cur_height == 1:
+        stride_h = 1
+    else:
+        stride_h = 2
+
+    if cur_width == 1:
+        stride_w = 1
+    else:
+        stride_w = 2
+
+    return stride_h, stride_w
+
+
+class UpSamplingResidualBlock(nn.Module):
+    def __init__(
+        self,
+        in_channels: int,
+        in_height: int,
+        in_width: int,
+        upsample_height: bool = True,
+        upsample_width: bool = True,
+    ):
+        super().__init__()
+
+        self.in_channels = in_channels
+        self.out_channels = in_channels
+        self.in_height = in_height
+        self.in_width = in_width
+        self.upsample_height = upsample_height
+        self.upsample_width = upsample_width
+
+        self.stride_h, self.stride_w = _compute_params_for_up_sampling(
+            upsample_height=upsample_height,
+            upsample_width=upsample_width,
+        )
+
+        kernel_h = 4 if upsample_height else 3
+        kernel_w = 4 if upsample_width else 3
+        kernel_size = (kernel_h, kernel_w)
+
+        self.norm_1 = nn.GroupNorm(num_groups=1, num_channels=in_channels)
+        self.act_1 = nn.GELU()
+
+        self.conv_1 = nn.ConvTranspose2d(
+            in_channels=self.in_channels,
+            out_channels=self.out_channels,
+            kernel_size=kernel_size,
+            stride=(self.stride_h, self.stride_w),
+            padding=1,
+            bias=True,
+        )
+
+        self.identity = nn.ConvTranspose2d(
+            in_channels=self.in_channels,
+            out_channels=self.out_channels,
+            kernel_size=kernel_size,
+            stride=(self.stride_h, self.stride_w),
+            padding=1,
+            bias=True,
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        identity = self.identity(x)
+
+        out = self.norm_1(x)
+        out = self.act_1(out)
+        out = self.conv_1(out)
+
+        out = out + identity
+
+        return out
+
+
+def _compute_params_for_up_sampling(
+    upsample_height: bool,
+    upsample_width: bool,
+):
+    stride_h = 2 if upsample_height else 1
+    stride_w = 2 if upsample_width else 1
+    return stride_h, stride_w

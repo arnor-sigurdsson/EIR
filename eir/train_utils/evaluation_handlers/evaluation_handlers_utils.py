@@ -242,7 +242,8 @@ def general_pre_process_prepared_inputs(
     """
 
     inputs_final = impute_missing_modalities_wrapper(
-        inputs_values=prepared_inputs, inputs_objects=experiment.inputs
+        inputs_values=prepared_inputs,
+        inputs_objects=experiment.inputs,
     )
 
     loader_batch = (inputs_final, target_labels, sample_id)

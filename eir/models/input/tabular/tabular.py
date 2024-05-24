@@ -147,7 +147,8 @@ def attach_embeddings(model: nn.Module, embeddings_dict: al_emb_lookup_dict) -> 
         cur_embedding_dim = calc_embedding_dimension(n_categories=n_categories)
 
         embedding_module = nn.Embedding(
-            num_embeddings=n_categories, embedding_dim=cur_embedding_dim
+            num_embeddings=n_categories,
+            embedding_dim=cur_embedding_dim,
         )
         setattr(model, "embed_" + emb_col, embedding_module)
 
