@@ -559,8 +559,8 @@ def get_is_not_eir_model_condition(
         "bytes",
         "image",
     )
-    is_unknown_sequence_model = model_type not in ("sequence-default",)
-    not_from_eir = is_possibly_external and is_unknown_sequence_model
+    is_unknown_model = model_type not in ("sequence-default", "cnn", "lcl")
+    not_from_eir = is_possibly_external and is_unknown_model
     return not_from_eir
 
 
@@ -730,17 +730,24 @@ def init_output_config(
 
 def _set_up_basic_sampling_config(
     output_type_config: schemas.al_output_type_configs, sampling_config: dict
-) -> dict | schemas.ArrayOutputSamplingConfig:
+) -> dict | schemas.ArrayOutputSamplingConfig | schemas.ImageOutputSamplingConfig:
     """
     Note that the sequence sampling config currently has it's own logic
     in output_config_setup_sequence.py.
     """
-    sampling_config_object: dict | schemas.ArrayOutputSamplingConfig
+    sampling_config_object: (
+        dict | schemas.ArrayOutputSamplingConfig | schemas.ImageOutputSamplingConfig
+    )
     match output_type_config:
         case schemas.ArrayOutputTypeConfig():
             sampling_config_object = schemas.ArrayOutputSamplingConfig(
                 **sampling_config
             )
+        case schemas.ImageOutputTypeConfig():
+            sampling_config_object = schemas.ImageOutputSamplingConfig(
+                **sampling_config
+            )
+
         case schemas.TabularOutputTypeConfig() | schemas.SequenceOutputTypeConfig():
             sampling_config_object = sampling_config
         case _:
@@ -753,12 +760,14 @@ def get_outputs_types_schema_map() -> Dict[
     str,
     Type[schemas.TabularOutputTypeConfig]
     | Type[schemas.SequenceOutputTypeConfig]
-    | Type[schemas.ArrayOutputTypeConfig],
+    | Type[schemas.ArrayOutputTypeConfig]
+    | Type[schemas.ImageOutputTypeConfig],
 ]:
     mapping = {
         "tabular": schemas.TabularOutputTypeConfig,
         "sequence": schemas.SequenceOutputTypeConfig,
         "array": schemas.ArrayOutputTypeConfig,
+        "image": schemas.ImageOutputTypeConfig,
     }
 
     return mapping
@@ -779,6 +788,7 @@ def get_output_module_config_class_map() -> (
         "tabular": TabularOutputModuleConfig,
         "sequence": SequenceOutputModuleConfig,
         "array": ArrayOutputModuleConfig,
+        "image": ArrayOutputModuleConfig,
     }
 
     return mapping
@@ -862,6 +872,10 @@ def get_output_config_type_init_callable_map() -> al_output_model_init_map:
             "lcl": LCLOutputModelConfig,
             "cnn": CNNUpscaleModelConfig,
         },
+        "image": {
+            "lcl": LCLOutputModelConfig,
+            "cnn": CNNUpscaleModelConfig,
+        },
     }
 
     return mapping
@@ -901,7 +915,7 @@ def get_all_tabular_targets(
 def _check_input_and_output_config_names(
     input_configs: Sequence[schemas.InputConfig],
     output_configs: Sequence[schemas.OutputConfig],
-    skip_keys: Sequence[str] = ("sequence", "array"),
+    skip_keys: Sequence[str] = ("sequence", "array", "image"),
 ) -> None:
     """
     We allow for the same name to be used for sequence inputs and outputs,

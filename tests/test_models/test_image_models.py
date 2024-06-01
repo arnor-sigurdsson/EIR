@@ -116,7 +116,11 @@ def get_timm_models_to_test() -> List[str]:
     assert len(models_filtered) > 0
 
     models_manual_filtered = []
-    not_allowed = {"levit", "convit"}
+    not_allowed = {
+        "efficientnet_b1_pruned",  # only works with 3 channels
+        "efficientnet_b2_pruned",  # only works with 3 channels
+        "efficientnet_b3_pruned",  # only works with 3 channels
+    }
     for model_name in models_filtered:
         if any(i in model_name for i in not_allowed):
             continue

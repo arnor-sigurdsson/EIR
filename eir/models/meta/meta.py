@@ -34,7 +34,10 @@ class FusionModuleProtocol(Protocol):
 
 
 class OutputModuleProtocol(Protocol):
-    def __call__(self, input: al_fused_features) -> Dict[str, torch.Tensor]: ...
+    def __call__(
+        self,
+        input: al_fused_features,
+    ) -> Dict[str, torch.Tensor]: ...
 
 
 al_input_modules = MutableMapping[
@@ -64,8 +67,8 @@ class MetaModel(nn.Module):
     ) -> dict[str, dict[str, torch.Tensor]]:
 
         feature_extractors_out = {}
-        for module_name, module_input in inputs.items():
-            cur_input_module = self.input_modules[module_name]
+        for module_name, cur_input_module in self.input_modules.items():
+            module_input = inputs[module_name]
             feature_extractors_out[module_name] = cur_input_module(module_input)
 
         fused_features = {}
@@ -76,6 +79,10 @@ class MetaModel(nn.Module):
         for output_name, output_module in self.output_modules.items():
             cur_fusion_target = self.fusion_to_output_mapping[output_name]
             corresponding_fused_features = fused_features[cur_fusion_target]
+
+            key = f"__extras_{output_name}"
+            if key in inputs:
+                corresponding_fused_features[key] = inputs[key]
 
             cur_output = output_module(corresponding_fused_features)
             output_modules_out[output_name] = cur_output

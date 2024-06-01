@@ -21,6 +21,7 @@ from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputIn
 from eir.setup.input_setup_modules.setup_tabular import ComputedTabularInputInfo
 from eir.setup.output_setup import al_output_objects_as_dict
 from eir.setup.output_setup_modules.array_output_setup import ComputedArrayOutputInfo
+from eir.setup.output_setup_modules.image_output_setup import ComputedImageOutputInfo
 from eir.setup.output_setup_modules.sequence_output_setup import (
     ComputedSequenceOutputInfo,
 )
@@ -137,6 +138,13 @@ def get_model_info(
                     "type": "array",
                     "shape": shape,
                     "dtype": output_object.dtype.str,
+                }
+
+            case ComputedImageOutputInfo():
+                shape = output_object.data_dimensions.full_shape()
+                model_info["outputs"][name] = {
+                    "type": "image",
+                    "shape": shape,
                 }
 
             case _:

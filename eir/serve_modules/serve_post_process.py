@@ -11,7 +11,7 @@ from eir.models.model_setup_modules.input_model_setup.input_model_setup_sequence
     get_sequence_model,
 )
 from eir.models.model_setup_modules.output_model_setup_modules.output_model_setup_array import (  # noqa
-    get_array_output_module_from_model_config,
+    get_array_or_image_output_module_from_model_config,
 )
 from eir.models.model_setup_modules.output_model_setup_modules.output_model_setup_sequence import (  # noqa
     get_sequence_output_module_from_model_config,
@@ -29,6 +29,7 @@ from eir.setup.input_setup import al_input_objects_as_dict
 from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
 from eir.setup.output_setup import al_output_objects_as_dict
 from eir.setup.output_setup_modules.array_output_setup import ComputedArrayOutputInfo
+from eir.setup.output_setup_modules.image_output_setup import ComputedImageOutputInfo
 from eir.setup.output_setup_modules.sequence_output_setup import (
     ComputedSequenceOutputInfo,
 )
@@ -125,6 +126,15 @@ def general_post_process(
                 post_processed[output_name] = generated_sample
 
             case ComputedArrayOutputInfo():
+                assert isinstance(output_model_config, schemas.ArrayOutputModuleConfig)
+
+                array_np = cur_model_outputs[output_name]
+                assert isinstance(array_np, np.ndarray)
+
+                array_base64 = _post_process_array_outputs(array=array_np)
+                post_processed[output_name] = array_base64
+
+            case ComputedImageOutputInfo():
                 assert isinstance(output_model_config, schemas.ArrayOutputModuleConfig)
 
                 array_np = cur_model_outputs[output_name]

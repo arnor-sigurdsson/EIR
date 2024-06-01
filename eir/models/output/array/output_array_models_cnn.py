@@ -233,7 +233,8 @@ def setup_blocks(
 
         in_channels = out_channels
 
-        if block_counter % up_sample_every_n_blocks == 0:
+        up_every = up_sample_every_n_blocks
+        if up_every and block_counter % up_every == 0:
 
             do_height = current_height < target_height
             do_width = current_width < target_width
@@ -358,6 +359,7 @@ class CNNPassThroughUpscaleModel(nn.Module):
         feature_extractor_infos: dict[str, "FeatureExtractorInfo"],
         target_dimensions: "DataDimensions",
         output_name: str,
+        diffusion_time_steps: Optional[int] = None,
     ) -> None:
         super(CNNPassThroughUpscaleModel, self).__init__()
 
@@ -369,7 +371,9 @@ class CNNPassThroughUpscaleModel(nn.Module):
         cur_shape = cur_fei.output_shape
         assert cur_shape is not None
 
-        linked_down_every = cur_fei.extras["down_every_n_blocks"]
+        linked_down_every = cur_fei.extras.get("down_every_n_blocks")
+        if not linked_down_every:
+            linked_down_every = 2
 
         initial_channels = cur_shape[0]
         self.initial_height = cur_shape[1]
@@ -379,6 +383,7 @@ class CNNPassThroughUpscaleModel(nn.Module):
         self.target_height = target_dimensions.height
         self.target_channels = target_dimensions.channels
         self.target_size = self.target_height * self.target_width
+        self.diffusion_time_steps = diffusion_time_steps
 
         self.ca_layers: nn.ModuleDict = nn.ModuleDict()
         for name, fei in feature_extractor_infos.items():
@@ -397,6 +402,15 @@ class CNNPassThroughUpscaleModel(nn.Module):
                     )
 
                 self.ca_layers[name] = cur_blocks
+
+        self.timestep_mixing_layer: nn.Identity | TimeStepMixingBlock = nn.Identity()
+        if self.diffusion_time_steps is not None:
+            self.timestep_mixing_layer = TimeStepMixingBlock(
+                input_channels=initial_channels,
+                input_height=self.initial_height,
+                input_width=self.initial_width,
+                n_time_steps=self.diffusion_time_steps,
+            )
 
         (
             self.blocks,
@@ -428,6 +442,9 @@ class CNNPassThroughUpscaleModel(nn.Module):
     def num_out_features(self) -> int:
         return self.target_channels * self.final_height * self.final_width
 
+    def timestep_embeddings(self, t: torch.Tensor) -> torch.Tensor:
+        return self.timestep_mixing_layer.time_embedding(t)
+
     def forward(self, input: dict[str, torch.Tensor]) -> torch.Tensor:
         out = input[self.output_name]
 
@@ -437,8 +454,12 @@ class CNNPassThroughUpscaleModel(nn.Module):
                 sizes=(1, self.initial_height, self.initial_width),
             )
 
+        if self.diffusion_time_steps is not None:
+            t_emb = input[f"__extras_{self.output_name}"]
+            out = self.timestep_mixing_layer(input=out, t_emb=t_emb)
+
         for name, input_tensor in input.items():
-            if name == self.output_name:
+            if name == self.output_name or name.startswith("__extras_"):
                 continue
 
             cur_cross_attention: nn.ModuleList = self.ca_layers[name]
@@ -447,6 +468,68 @@ class CNNPassThroughUpscaleModel(nn.Module):
 
         out = self.blocks(out)
         out = self.final_layer(out)
+        return out
+
+
+class TimeStepMixingBlock(nn.Module):
+    def __init__(
+        self,
+        input_channels: int,
+        input_height: int,
+        input_width: int,
+        n_time_steps: int,
+    ):
+        super(TimeStepMixingBlock, self).__init__()
+
+        self.input_channels = input_channels
+        self.input_height = input_height
+        self.input_width = input_width
+
+        embedding_dim = input_height * input_width
+
+        self.norm_1 = nn.GroupNorm(num_groups=1, num_channels=input_channels)
+        self.act_1 = nn.GELU()
+
+        self.time_embedding = nn.Embedding(
+            num_embeddings=n_time_steps,
+            embedding_dim=embedding_dim,
+        )
+
+        self.cross_attention = UniDirectionalCrossAttention(
+            dim=input_height * input_width,
+            dim_head=input_height * input_width,
+            context_dim=embedding_dim,
+            heads=1,
+        )
+
+    def forward(self, input: torch.Tensor, t_emb: torch.Tensor) -> torch.Tensor:
+        identity = input
+
+        out = self.norm_1(input)
+
+        # (B, C, H, W) -> (B, C, H * W) -> (B, seq, emb_dim)
+        out = out.view(
+            out.shape[0],
+            self.input_channels,
+            self.input_height * self.input_width,
+        )
+
+        # (B, emb_dim) -> (B, 1, emb_dim)
+        t_emb = t_emb.unsqueeze(1)
+
+        out = self.cross_attention(x=out, context=t_emb)
+
+        out = self.act_1(out)
+
+        out = out.view(
+            out.shape[0],
+            self.input_channels,
+            self.input_height,
+            self.input_width,
+        )
+
+        out = out + identity
+
         return out
 
 

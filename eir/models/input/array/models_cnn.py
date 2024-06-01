@@ -600,7 +600,7 @@ def auto_find_no_cnn_residual_blocks_needed(
     if (
         (stride_w == 1 and input_size_w > cutoff)
         or (stride_h == 1 and input_size_h > cutoff)
-    ) and down_sample_every_n_blocks is None:
+    ) and not down_sample_every_n_blocks:
         err_dim = "width" if stride_w == 1 else "height"
         logger.warning(
             f"With stride=1, the {err_dim} size "

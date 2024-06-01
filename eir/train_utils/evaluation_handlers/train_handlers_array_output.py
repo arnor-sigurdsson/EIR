@@ -1,19 +1,37 @@
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, Generator, Iterator, Sequence, Tuple, Union
+from pathlib import Path
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Generator,
+    Iterator,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+)
 
 import numpy as np
 import torch
 from aislib.misc_utils import ensure_path_exists
+from PIL import Image
 from torch.utils.data import Dataset
 
 from eir.data_load.data_preparation_modules.prepare_array import un_normalize_array
 from eir.data_load.datasets import al_getitem_return
+from eir.interpretation.interpret_image import un_normalize_image
 from eir.models.model_training_utils import predict_on_batch
+from eir.setup.input_setup_modules.setup_array import ArrayNormalizationStats
+from eir.setup.input_setup_modules.setup_image import ImageNormalizationStats
 from eir.setup.output_setup_modules.array_output_setup import ComputedArrayOutputInfo
+from eir.setup.output_setup_modules.image_output_setup import ComputedImageOutputInfo
 from eir.setup.schemas import (
     ArrayOutputSamplingConfig,
     ArrayOutputTypeConfig,
+    ImageOutputSamplingConfig,
+    ImageOutputTypeConfig,
     OutputConfig,
 )
 from eir.train_utils import utils
@@ -79,7 +97,7 @@ def array_out_single_sample_evaluation_wrapper(
     )
 
     for config in output_configs:
-        if config.output_info.output_type != "array":
+        if config.output_info.output_type not in ("array", "image"):
             continue
 
         cur_input_name = config.output_info.output_name
@@ -98,7 +116,9 @@ def array_out_single_sample_evaluation_wrapper(
         )
 
         output_type_info = config.output_type_info
-        assert isinstance(output_type_info, ArrayOutputTypeConfig)
+        assert isinstance(
+            output_type_info, (ArrayOutputTypeConfig, ImageOutputTypeConfig)
+        )
 
         assert config.sampling_config is not None
 
@@ -128,8 +148,16 @@ def array_out_single_sample_evaluation_wrapper(
             cur_output_path = (
                 cur_sample_output_folder / eval_type / f"{idx}_generated.npy"
             )
-            ensure_path_exists(path=cur_output_path)
-            np.save(file=cur_output_path, arr=generated_array)
+            match output_type_info:
+                case ArrayOutputTypeConfig():
+                    save_array_output(
+                        array=generated_array, output_path=cur_output_path
+                    )
+                case ImageOutputTypeConfig():
+                    cur_output_path = cur_output_path.with_suffix(".png")
+                    save_image_output(
+                        array=generated_array, output_path=cur_output_path
+                    )
 
             cur_inputs_output_path = (
                 cur_sample_output_folder / eval_type / f"{idx}_inputs"
@@ -156,7 +184,7 @@ def one_shot_array_generation(
 ) -> np.ndarray:
     output_object = experiment.outputs[array_output_name]
 
-    assert isinstance(output_object, ComputedArrayOutputInfo)
+    assert isinstance(output_object, (ComputedArrayOutputInfo, ComputedImageOutputInfo))
 
     prepared_sample_inputs = prepare_base_input(
         prepared_inputs=eval_sample.inputs_to_model,
@@ -177,7 +205,8 @@ def one_shot_array_generation(
 
     array_output = outputs[array_output_name][array_output_name]
 
-    array_output_raw = un_normalize_array(
+    assert output_object.normalization_stats is not None
+    array_output_raw = un_normalize_wrapper(
         array=array_output,
         normalization_stats=output_object.normalization_stats,
     )
@@ -196,7 +225,7 @@ def reverse_diffusion_array_generation(
     num_steps: int,
 ) -> np.ndarray:
     output_object = experiment.outputs[array_output_name]
-    assert isinstance(output_object, ComputedArrayOutputInfo)
+    assert isinstance(output_object, (ComputedArrayOutputInfo, ComputedImageOutputInfo))
 
     dimensions = output_object.data_dimensions
     shape = (1,) + dimensions.full_shape()
@@ -227,13 +256,69 @@ def reverse_diffusion_array_generation(
 
     final_state = states[-1]
 
-    final_output = un_normalize_array(
+    assert output_object.normalization_stats is not None
+    final_output = un_normalize_wrapper(
         array=torch.from_numpy(final_state),
         normalization_stats=output_object.normalization_stats,
     )
 
     final_output_numpy = final_output.cpu().numpy()
     return final_output_numpy
+
+
+def un_normalize_wrapper(
+    array: torch.Tensor,
+    normalization_stats: ArrayNormalizationStats | ImageNormalizationStats,
+) -> torch.Tensor:
+
+    match normalization_stats:
+        case ArrayNormalizationStats():
+            un_normalized = un_normalize_array(
+                array=array,
+                normalization_stats=normalization_stats,
+            )
+        case ImageNormalizationStats():
+            un_normalized_arr = un_normalize_image(
+                normalized_img=array.cpu().numpy(),
+                normalization_stats=normalization_stats,
+            )
+            un_normalized = torch.from_numpy(un_normalized_arr)
+        case _:
+            raise ValueError("Normalization stats not recognized.")
+
+    return un_normalized
+
+
+def save_array_output(array: np.ndarray, output_path: Path | str) -> None:
+    ensure_path_exists(path=Path(output_path))
+    np.save(file=output_path, arr=array)
+
+
+def save_image_output(array: np.ndarray, output_path: Path | str) -> None:
+    ensure_path_exists(path=Path(output_path))
+
+    assert array.ndim == 4, "Input should be 4D"
+    assert array.shape[0] == 1, "The batch size should be 1."
+
+    array = array.squeeze(0)
+    array_hwc = np.moveaxis(array, 0, -1)
+    array_uint8 = (array_hwc * 255).astype(np.uint8)
+
+    n_channels = array_uint8.shape[-1]
+    mode: Optional[str]
+    match n_channels:
+        case 1:
+            mode = "L"
+            array_uint8 = array_uint8.squeeze(-1)
+        case 3:
+            mode = "RGB"
+        case 4:
+            mode = "RGBA"
+        case _:
+            mode = None
+
+    pil_image = Image.fromarray(array_uint8, mode=mode)
+    pil_image.save(output_path)
 
 
 def get_array_output_manual_input_samples(
@@ -243,10 +328,14 @@ def get_array_output_manual_input_samples(
     prepared_samples: dict[str, list[ArrayOutputEvalSample]] = {}
 
     for config_idx, config in enumerate(output_configs):
-        if not config.sampling_config or config.output_info.output_type != "array":
+        array_or_image = config.output_info.output_type in ("array", "image")
+        if not config.sampling_config or not array_or_image:
             continue
 
-        assert isinstance(config.sampling_config, ArrayOutputSamplingConfig)
+        assert isinstance(
+            config.sampling_config,
+            (ArrayOutputSamplingConfig, ImageOutputSamplingConfig),
+        )
 
         sample_data_from_yaml = config.sampling_config.manual_inputs
         output_name = config.output_info.output_name
@@ -276,14 +365,18 @@ def get_array_output_auto_validation_samples(
     prepared_eval_samples: dict[str, list[ArrayOutputEvalSample]] = {}
 
     for config_idx, config in enumerate(output_configs):
-        if not config.sampling_config or config.output_info.output_type != "array":
+        array_or_image = config.output_info.output_type in ("array", "image")
+        if not config.sampling_config or not array_or_image:
             continue
 
         output_name = config.output_info.output_name
 
         prepared_eval_samples[output_name] = []
 
-        assert isinstance(config.sampling_config, ArrayOutputSamplingConfig)
+        assert isinstance(
+            config.sampling_config,
+            (ArrayOutputSamplingConfig, ImageOutputSamplingConfig),
+        )
         for i in range(config.sampling_config.n_eval_inputs):
             input_to_model, target_labels, cur_id = next(eval_sample_iterator)
 

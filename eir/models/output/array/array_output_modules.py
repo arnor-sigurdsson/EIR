@@ -68,7 +68,10 @@ class ArrayOutputWrapperModule(nn.Module):
             lcl_diff_tolerance=0,
         )
 
-    def forward(self, x: torch.Tensor) -> dict[str, torch.Tensor]:
+    def forward(
+        self,
+        x: torch.Tensor,
+    ) -> dict[str, torch.Tensor]:
         out = self.feature_extractor(x)
 
         out = out.reshape(out.shape[0], -1)

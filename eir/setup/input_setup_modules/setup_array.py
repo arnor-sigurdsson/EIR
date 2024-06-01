@@ -95,7 +95,7 @@ def get_array_normalization_values(
         ds_iter = get_deeplake_input_source_iterable(
             deeplake_dataset=deeplake_ds, inner_key=deeplake_inner_key
         )
-        tensor_iterator = (torch.from_numpy(i.numpy()) for i in ds_iter)
+        tensor_iterator = (torch.from_numpy(i.numpy()).float() for i in ds_iter)
     else:
         file_iterator = Path(input_source).rglob("*")
         np_iterator = (np.load(str(i)) for i in file_iterator)

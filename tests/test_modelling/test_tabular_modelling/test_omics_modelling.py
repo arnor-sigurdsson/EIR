@@ -184,8 +184,8 @@ def test_classification(prep_modelling_test_configs):
                         "input_info": {"input_name": "test_genotype"},
                         "input_type_info": {
                             "subset_snps_file": "auto",
-                            "na_augment_alpha": 0.0,
-                            "na_augment_beta": 0.0,
+                            "na_augment_alpha": 1.0,
+                            "na_augment_beta": 9.0,
                             "shuffle_augment_alpha": 0.0,
                             "shuffle_augment_beta": 0.0,
                         },
@@ -207,8 +207,8 @@ def test_classification(prep_modelling_test_configs):
                         "input_info": {"input_name": "test_genotype"},
                         "input_type_info": {
                             "subset_snps_file": "auto",
-                            "na_augment_alpha": 0.0,
-                            "na_augment_beta": 0.0,
+                            "na_augment_alpha": 1.0,
+                            "na_augment_beta": 9.0,
                             "shuffle_augment_alpha": 0.0,
                             "shuffle_augment_beta": 0.0,
                         },

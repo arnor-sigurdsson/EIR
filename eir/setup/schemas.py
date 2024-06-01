@@ -26,6 +26,10 @@ from eir.setup.schema_modules.output_schemas_array import (
     ArrayOutputSamplingConfig,
     ArrayOutputTypeConfig,
 )
+from eir.setup.schema_modules.output_schemas_image import (
+    ImageOutputSamplingConfig,
+    ImageOutputTypeConfig,
+)
 from eir.setup.schema_modules.output_schemas_sequence import (
     SequenceOutputSamplingConfig,
     SequenceOutputTypeConfig,
@@ -86,7 +90,10 @@ al_output_module_configs_classes = (
 )
 
 al_output_type_configs = (
-    SequenceOutputTypeConfig | TabularOutputTypeConfig | ArrayOutputTypeConfig
+    SequenceOutputTypeConfig
+    | TabularOutputTypeConfig
+    | ArrayOutputTypeConfig
+    | ImageOutputTypeConfig
 )
 
 al_output_module_configs = (
@@ -680,6 +687,11 @@ class ImageInputDataConfig:
         - "centercrop": Resize the image to a larger size than the target and then
         apply a center crop to the target size.
 
+    :param adaptive_normalization_max_samples:
+        If using adaptive normalization (channel),
+        how many samples to use to compute the normalization parameters.
+        If None, will use all samples.
+
     :param mean_normalization_values:
         Average channel values to normalize images with. This can be a sequence matching
         the number of channels, or None. If None and using a pretrained model, the
@@ -710,6 +722,7 @@ class ImageInputDataConfig:
     auto_augment: bool = True
     size: Sequence[int] = (64,)
     resize_approach: Union[Literal["resize", "randomcrop", "centercrop"]] = "resize"
+    adaptive_normalization_max_samples: Optional[int] = None
     mean_normalization_values: Union[None, Sequence[float]] = None
     stds_normalization_values: Union[None, Sequence[float]] = None
     num_channels: Optional[int] = None
@@ -800,12 +813,18 @@ class OutputConfig:
 
     output_info: OutputInfoConfig
     output_type_info: (
-        TabularOutputTypeConfig | SequenceOutputTypeConfig | ArrayOutputTypeConfig
+        TabularOutputTypeConfig
+        | SequenceOutputTypeConfig
+        | ArrayOutputTypeConfig
+        | ImageOutputTypeConfig
     )
     model_config: (
         TabularOutputModuleConfig | SequenceOutputModuleConfig | ArrayOutputModuleConfig
     )
 
     sampling_config: Optional[
-        SequenceOutputSamplingConfig | ArrayOutputSamplingConfig | dict
+        SequenceOutputSamplingConfig
+        | ArrayOutputSamplingConfig
+        | ImageOutputSamplingConfig
+        | dict
     ] = None

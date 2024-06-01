@@ -5,24 +5,6 @@ from torch import nn
 from torch.nn import functional as F
 
 
-def prepare_diffusion_batch_prev(
-    inputs: torch.Tensor, num_steps: int = 1000
-) -> tuple[torch.Tensor, torch.Tensor]:
-    device = inputs.device
-
-    step = torch.randint(0, num_steps, (1,)).item()
-
-    beta_t = step / num_steps
-    noise_scale = torch.sqrt(torch.tensor(beta_t)).to(device)
-    data_scale = torch.sqrt(1 - torch.tensor(beta_t)).to(device)
-
-    noise = torch.randn_like(inputs).to(device=device) * noise_scale
-
-    noisy_inputs = data_scale * inputs + noise
-
-    return noisy_inputs, inputs
-
-
 @dataclass
 class DiffusionConfig:
     time_steps: int
@@ -62,11 +44,10 @@ def prepare_diffusion_batch(
     inputs: torch.Tensor,
     batch_size: int,
     num_steps: int,
-) -> tuple[torch.Tensor, torch.Tensor]:
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     Later we can return t from here as well if used in models.
     """
-
     t = torch.randint(
         low=0,
         high=num_steps,
@@ -83,7 +64,8 @@ def prepare_diffusion_batch(
         t=t,
         noise=noise,
     )
-    return x_noisy, noise
+
+    return x_noisy, noise, t
 
 
 def q_sample(
@@ -166,6 +148,9 @@ def p_sample(
 ) -> torch.Tensor:
 
     current_state = batch_inputs[output_name]
+    output_module = getattr(model.output_modules, output_name)
+    t_emb = output_module.feature_extractor.timestep_embeddings(t)
+    batch_inputs[f"__extras_{output_name}"] = t_emb
 
     betas_t = extract(
         a=config.betas,

@@ -42,6 +42,7 @@ from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputIn
 from eir.setup.input_setup_modules.setup_tabular import ComputedTabularInputInfo
 from eir.setup.output_setup import al_output_objects_as_dict
 from eir.setup.output_setup_modules.array_output_setup import ComputedArrayOutputInfo
+from eir.setup.output_setup_modules.image_output_setup import ComputedImageOutputInfo
 from eir.train_utils.metrics import (
     add_loss_to_metrics,
     add_multi_task_average_metrics,
@@ -271,31 +272,37 @@ def _prepare_inputs_for_model(
 
     for input_name, input_object in input_objects.items():
         match input_object:
-            case ComputedOmicsInputInfo() | ComputedImageInputInfo():
+            case ComputedOmicsInputInfo():
                 cur_tensor = batch_inputs[input_name]
                 cur_tensor = cur_tensor.to(dtype=torch.float32)
                 cur_tensor = cur_tensor.to(device=device)
 
                 inputs_prepared[input_name] = cur_tensor
 
-            case ComputedArrayInputInfo():
+            case ComputedArrayInputInfo() | ComputedImageInputInfo():
                 cur_tensor = batch_inputs[input_name]
                 cur_tensor = cur_tensor.to(dtype=torch.float32)
                 cur_tensor = cur_tensor.to(device=device)
 
                 if input_name in (i for i in output_objects.keys()):
                     matching_output = output_objects[input_name]
-                    assert isinstance(matching_output, ComputedArrayOutputInfo)
+                    assert isinstance(
+                        matching_output,
+                        (ComputedArrayOutputInfo, ComputedImageOutputInfo),
+                    )
                     output_config = matching_output.output_config
                     output_type_info = output_config.output_type_info
-                    assert isinstance(output_type_info, schemas.ArrayOutputTypeConfig)
+                    assert isinstance(
+                        output_type_info,
+                        (schemas.ArrayOutputTypeConfig, schemas.ImageOutputTypeConfig),
+                    )
                     loss = output_type_info.loss
 
                     if loss == "diffusion":
                         assert matching_output.diffusion_config is not None
                         num_steps = output_type_info.diffusion_time_steps
                         assert num_steps is not None
-                        cur_tensor, cur_target = prepare_diffusion_batch(
+                        cur_tensor, cur_target, t = prepare_diffusion_batch(
                             diffusion_config=matching_output.diffusion_config,
                             inputs=cur_tensor,
                             batch_size=cur_tensor.shape[0],
@@ -303,6 +310,9 @@ def _prepare_inputs_for_model(
                         )
                         cur_targets = {input_name: cur_target}
                         targets_prepared[input_name] = cur_targets
+                        output_module = getattr(model.output_modules, input_name)
+                        t_emb = output_module.feature_extractor.timestep_embeddings(t)
+                        inputs_prepared[f"__extras_{input_name}"] = t_emb
 
                 inputs_prepared[input_name] = cur_tensor
 
@@ -412,21 +422,27 @@ def hook_default_optimizer_backward(
     )
 
     loss = maybe_scale_loss_with_grad_accumulation_steps(
-        loss=state["loss"], grad_acc_steps=gc.gradient_accumulation_steps
+        loss=state["loss"],
+        grad_acc_steps=gc.gradient_accumulation_steps,
     )
 
     amp_scaler = state.get("amp_scaler")
     loss = maybe_scale_loss_with_amp_scaler(
-        do_amp=gc.amp, loss=loss, amp_scaler=amp_scaler, device=gc.device
+        do_amp=gc.amp,
+        loss=loss,
+        amp_scaler=amp_scaler,
+        device=gc.device,
     )
 
     loss.backward(**optimizer_backward_kwargs)
 
     maybe_apply_gradient_noise_to_model(
-        model=experiment.model, gradient_noise=gc.gradient_noise
+        model=experiment.model,
+        gradient_noise=gc.gradient_noise,
     )
     maybe_apply_gradient_clipping_to_model(
-        model=experiment.model, gradient_clipping=gc.gradient_clipping
+        model=experiment.model,
+        gradient_clipping=gc.gradient_clipping,
     )
 
     step_func = get_optimizer_step_func(

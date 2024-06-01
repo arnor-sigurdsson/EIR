@@ -42,7 +42,7 @@ from eir.data_load.label_setup import (
     al_label_transformers,
     streamline_values_for_transformers,
 )
-from eir.interpretation.interpret_image import un_normalize
+from eir.interpretation.interpret_image import un_normalize_image
 from eir.predict_modules.predict_tabular_input_setup import (
     ComputedPredictTabularInputInfo,
 )
@@ -181,7 +181,7 @@ def convert_image_input_to_raw(
     assert data_np.ndim == 4, "Input should be 4D"
     assert data_np.shape[0] == 1, "The batch dimension should be 1"
 
-    cur_input = un_normalize(
+    cur_input = un_normalize_image(
         normalized_img=data_np,
         normalization_stats=normalization_stats,
     )
@@ -189,7 +189,21 @@ def convert_image_input_to_raw(
     cur_input = cur_input.squeeze(axis=0)
     cur_input_hwc = np.moveaxis(cur_input, 0, -1)
     raw_input_uint = (cur_input_hwc * 255).astype(np.uint8)
-    return Image.fromarray(raw_input_uint)
+
+    n_channels = raw_input_uint.shape[-1]
+    mode: Optional[str]
+    match n_channels:
+        case 1:
+            mode = "L"
+            raw_input_uint = raw_input_uint.squeeze(axis=-1)
+        case 3:
+            mode = "RGB"
+        case 4:
+            mode = "RGBA"
+        case _:
+            mode = None
+
+    return Image.fromarray(raw_input_uint, mode=mode)
 
 
 def convert_tabular_input_to_raw(

@@ -505,7 +505,8 @@ class DiskDataset(DatasetBase):
         )
 
         inputs_final = impute_missing_modalities_wrapper(
-            inputs_values=inputs_prepared, inputs_objects=self.inputs
+            inputs_values=inputs_prepared,
+            inputs_objects=self.inputs,
         )
 
         target_labels = sample.target_labels
@@ -513,10 +514,12 @@ class DiskDataset(DatasetBase):
         targets_prepared = prepare_outputs_disk(
             outputs=target_labels,
             output_objects=self.outputs,
+            test_mode=self.test_mode,
         )
 
         targets_final = impute_missing_output_modalities_wrapper(
-            outputs_values=targets_prepared, output_objects=self.outputs
+            outputs_values=targets_prepared,
+            output_objects=self.outputs,
         )
 
         sample_id = sample.sample_id
@@ -554,7 +557,8 @@ class MemoryDataset(DatasetBase):
         )
 
         inputs_final = impute_missing_modalities_wrapper(
-            inputs_values=inputs_prepared, inputs_objects=self.inputs
+            inputs_values=inputs_prepared,
+            inputs_objects=self.inputs,
         )
 
         target_labels = sample.target_labels
@@ -562,10 +566,12 @@ class MemoryDataset(DatasetBase):
         targets_prepared = prepare_outputs_memory(
             outputs=target_labels,
             output_objects=self.outputs,
+            test_mode=self.test_mode,
         )
 
         targets_final = impute_missing_output_modalities_wrapper(
-            outputs_values=targets_prepared, output_objects=self.outputs
+            outputs_values=targets_prepared,
+            output_objects=self.outputs,
         )
 
         sample_id = sample.sample_id

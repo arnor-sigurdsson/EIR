@@ -6,6 +6,7 @@ import pandas as pd
 
 from eir.setup import schemas
 from eir.setup.schema_modules.output_schemas_array import ArrayOutputTypeConfig
+from eir.setup.schema_modules.output_schemas_image import ImageOutputTypeConfig
 from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
 
 if TYPE_CHECKING:
@@ -73,8 +74,17 @@ def validate_output_configs(output_configs: Sequence[schemas.OutputConfig]) -> N
                 if loss == "diffusion":
                     if model_type not in ("cnn",):
                         raise ValueError(
-                            "Currently, diffusion loss is only supported for "
+                            "Currently, diffusion loss is only supported for output "
                             "array model type 'cnn'. Please check the model type for "
+                            f"output '{name}'."
+                        )
+            case ImageOutputTypeConfig(_, _, loss, _):
+                model_type = output_config.model_config.model_type
+                if loss == "diffusion":
+                    if model_type not in ("cnn",):
+                        raise ValueError(
+                            "Currently, diffusion loss is only supported for output "
+                            "image model type 'cnn'. Please check the model type for "
                             f"output '{name}'."
                         )
 
@@ -130,13 +140,15 @@ def validate_config_sync(
 ) -> None:
     input_names = {input_config.input_info.input_name for input_config in input_configs}
 
-    arr_out_configs = (
-        i for i in output_configs if i.output_info.output_type == "array"
-    )
-    for output_config in arr_out_configs:
+    diff_out_configs = [
+        i for i in output_configs if i.output_info.output_type in ("array", "image")
+    ]
+    for output_config in diff_out_configs:
         output_name = output_config.output_info.output_name
         output_type_info = output_config.output_type_info
-        assert isinstance(output_type_info, ArrayOutputTypeConfig)
+        assert isinstance(
+            output_type_info, (ArrayOutputTypeConfig, ImageOutputTypeConfig)
+        )
         is_diffusion = output_type_info.loss == "diffusion"
         if is_diffusion and output_name not in input_names:
             raise ValueError(

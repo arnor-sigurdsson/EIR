@@ -12,13 +12,19 @@ from eir.data_load.data_preparation_modules.prepare_array import (
     array_load_wrapper,
     prepare_array_data,
 )
+from eir.data_load.data_preparation_modules.prepare_image import (
+    image_load_wrapper,
+    prepare_image_data,
+)
 from eir.setup.output_setup import al_output_objects_as_dict
 from eir.setup.output_setup_modules.array_output_setup import ComputedArrayOutputInfo
+from eir.setup.output_setup_modules.image_output_setup import ComputedImageOutputInfo
 
 
 def prepare_outputs_disk(
     outputs: dict[str, Any],
     output_objects: "al_output_objects_as_dict",
+    test_mode: bool,
 ) -> dict[str, dict[str, torch.Tensor | int | float]]:
     prepared_outputs: dict[str, dict[str, torch.Tensor | int | float]] = {}
 
@@ -27,6 +33,7 @@ def prepare_outputs_disk(
         output_source = output_object.output_config.output_info.output_source
         deeplake_inner_key = output_object.output_config.output_info.output_inner_key
 
+        output_prepared: dict[str, torch.Tensor | int | float]
         match output_object:
             case ComputedArrayOutputInfo():
                 data_pointer = output[output_name]
@@ -39,9 +46,21 @@ def prepare_outputs_disk(
                     array_data=loaded_array,
                     normalization_stats=output_object.normalization_stats,
                 )
-                output_prepared: dict[str, torch.Tensor | int | float] = {
-                    output_name: array_prepared
-                }
+                output_prepared = {output_name: array_prepared}
+
+            case ComputedImageOutputInfo():
+                data_pointer = output[output_name]
+                loaded_image = image_load_wrapper(
+                    data_pointer=data_pointer,
+                    input_source=output_source,
+                    deeplake_inner_key=deeplake_inner_key,
+                )
+                image_prepared = prepare_image_data(
+                    image_input_object=output_object,
+                    image_data=loaded_image,
+                    test_mode=test_mode,
+                )
+                output_prepared = {output_name: image_prepared}
 
             case _:
                 output_prepared = output
@@ -54,6 +73,7 @@ def prepare_outputs_disk(
 def prepare_outputs_memory(
     outputs: dict[str, Any],
     output_objects: "al_output_objects_as_dict",
+    test_mode: bool,
 ) -> dict[str, dict[str, torch.Tensor | int | float]]:
     prepared_outputs: dict[str, dict[str, torch.Tensor | int | float]] = {}
 
@@ -70,6 +90,15 @@ def prepare_outputs_memory(
                 output_prepared: dict[str, torch.Tensor | int | float] = {
                     output_name: array_prepared
                 }
+
+            case ComputedImageOutputInfo():
+                loaded_image = output[output_name]
+                image_prepared = prepare_image_data(
+                    image_input_object=output_object,
+                    image_data=loaded_image,
+                    test_mode=test_mode,
+                )
+                output_prepared = {output_name: image_prepared}
 
             case _:
                 output_prepared = output
@@ -95,6 +124,18 @@ def get_output_data_loading_hooks(
             case ComputedArrayOutputInfo():
                 inner_function = typed_partial_for_hook(
                     array_load_wrapper,
+                    **common_kwargs,
+                )
+
+                mapping[output_name] = typed_partial_for_hook(
+                    _extract_nested_output_and_call,
+                    output_name=output_name,
+                    function=inner_function,
+                )
+
+            case ComputedImageOutputInfo():
+                inner_function = typed_partial_for_hook(
+                    image_load_wrapper,
                     **common_kwargs,
                 )
 

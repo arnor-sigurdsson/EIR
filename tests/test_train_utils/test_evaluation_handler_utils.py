@@ -25,8 +25,8 @@ from tests.setup_tests.setup_modelling_test_data.setup_omics_test_data import (
 
 def test_convert_image_input_to_raw():
     normalization_stats = ImageNormalizationStats(
-        channel_means=torch.Tensor([0.5, 0.5, 0.5]),
-        channel_stds=torch.Tensor([0.5, 0.5, 0.5]),
+        means=torch.Tensor([0.5, 0.5, 0.5]),
+        stds=torch.Tensor([0.5, 0.5, 0.5]),
     )
     valid_input = torch.randn((1, 3, 64, 64))
     valid_output = convert_image_input_to_raw(
@@ -89,7 +89,7 @@ def _generate_manual_sample_test_data(tmp_path) -> dict[str, Any]:
 
     # 4. Image
     image_base = np.zeros((16, 16), dtype=np.uint8)
-    img = Image.fromarray(image_base)
+    img = Image.fromarray(image_base, mode="L")
     image_file_path = tmp_path / "image.png"
     img.save(image_file_path)
     sample_inputs["test_image"] = Path(image_file_path)
@@ -226,7 +226,7 @@ def test_prepare_sequence_output_manual_sample_data(
 
     assert prepared_test_data["test_genotype"].shape == (1, 4, 1000)
 
-    assert prepared_test_data["test_image"].shape == (3, 16, 16)
+    assert prepared_test_data["test_image"].shape == (1, 16, 16)
 
     assert prepared_test_data["test_sequence"].shape == (63,)
 

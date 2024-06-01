@@ -15,7 +15,7 @@ al_fusion_model_configs = (
 
 ComputedType = NewType("ComputedType", torch.Tensor)
 PassThroughType = NewType("PassThroughType", Dict[str, torch.Tensor])
-al_fused_features = dict[str, ComputedType | PassThroughType]
+al_fused_features = dict[str, ComputedType | PassThroughType | torch.Tensor]
 
 if TYPE_CHECKING:
     from eir.models.meta.meta import al_input_modules
@@ -48,7 +48,7 @@ def get_fusion_modules(
     any_tabular = any(i for i in output_types.values() if i in ("tabular",))
     any_sequence = any(i for i in output_types.values() if i in ("sequence",))
 
-    any_array = any(i for i in output_types.values() if i in ("array",))
+    any_array = any(i for i in output_types.values() if i in ("array", "image"))
     array_and_no_diffusion = any_array and not any_diffusion
     array_and_diffusion = any_array and any_diffusion
 

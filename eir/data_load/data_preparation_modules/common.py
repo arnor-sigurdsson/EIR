@@ -9,7 +9,9 @@ from eir.data_load.data_source_modules import deeplake_ops
 
 
 def _load_deeplake_sample(
-    data_pointer: int, input_source: str, inner_key: str
+    data_pointer: int,
+    input_source: str,
+    inner_key: str,
 ) -> np.ndarray:
     """
     Deeplake warns about indexing directly into a DS, vs. random access. For now we'll

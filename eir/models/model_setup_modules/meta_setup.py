@@ -28,7 +28,7 @@ from eir.models.model_setup_modules.input_model_setup.input_model_setup_tabular 
     get_tabular_model,
 )
 from eir.models.model_setup_modules.output_model_setup_modules.output_model_setup_array import (  # noqa
-    get_array_output_module_from_model_config,
+    get_array_or_image_output_module_from_model_config,
 )
 from eir.models.model_setup_modules.output_model_setup_modules.output_model_setup_sequence import (  # noqa
     get_sequence_output_module_from_model_config,
@@ -54,6 +54,7 @@ from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputIn
 from eir.setup.input_setup_modules.setup_tabular import ComputedTabularInputInfo
 from eir.setup.output_setup import al_output_objects_as_dict
 from eir.setup.output_setup_modules.array_output_setup import ComputedArrayOutputInfo
+from eir.setup.output_setup_modules.image_output_setup import ComputedImageOutputInfo
 from eir.setup.output_setup_modules.sequence_output_setup import (
     ComputedSequenceOutputInfo,
 )
@@ -179,6 +180,7 @@ def get_meta_model_kwargs_from_configs(
         device=global_config.device,
         computed_out_dimensions=computed_out_dimension,
         feature_dimensions_and_types=feature_dims_and_types,
+        fusion_model_type=fusion_config.model_type,
     )
     fusion_to_output_mapping = _match_fusion_outputs_to_output_types(
         output_types=output_types,
@@ -208,7 +210,7 @@ def _extract_diffusion_targets(
     diffusion_targets = {}
     for name, output in outputs_as_dict.items():
         match output:
-            case ComputedArrayOutputInfo():
+            case ComputedArrayOutputInfo() | ComputedImageOutputInfo():
                 if output.diffusion_config is not None:
                     diffusion_targets[name] = True
 
@@ -234,7 +236,7 @@ def _match_fusion_outputs_to_output_types(
                 output_name_to_fusion_output_type[output_name] = "computed"
             case "sequence":
                 output_name_to_fusion_output_type[output_name] = "pass-through"
-            case "array":
+            case "array" | "image":
                 if output_name in diffusion_targets:
                     output_name_to_fusion_output_type[output_name] = "pass-through"
                 else:
@@ -279,9 +281,11 @@ def get_all_feature_extractor_dimensions_and_types(
 
         extras = {}
         match input_object:
-            case ComputedArrayInputInfo():
+            case ComputedArrayInputInfo() | ComputedImageInputInfo():
                 cur_config = input_object.input_config.model_config
-                assert isinstance(cur_config, schemas.ArrayModelConfig)
+                assert isinstance(
+                    cur_config, (schemas.ArrayModelConfig, schemas.ImageModelConfig)
+                )
                 mic = cur_config.model_init_config
                 if isinstance(mic, CNNModelConfig):
                     extras["down_every_n_blocks"] = mic.down_sample_every_n_blocks
@@ -387,6 +391,7 @@ def get_input_modules(
 def get_output_modules(
     outputs_as_dict: "al_output_objects_as_dict",
     device: str,
+    fusion_model_type: str,
     computed_out_dimensions: Optional[int] = None,
     feature_dimensions_and_types: Optional[Dict[str, FeatureExtractorInfo]] = None,
 ) -> Tuple[nn.ModuleDict, Dict[str, Literal["tabular", "sequence", "array"]]]:
@@ -423,32 +428,35 @@ def get_output_modules(
                 )
                 output_modules[output_name] = sequence_output_module
 
-            case ComputedArrayOutputInfo():
+            case ComputedArrayOutputInfo() | ComputedImageOutputInfo():
                 assert isinstance(output_model_config, schemas.ArrayOutputModuleConfig)
                 feat_dims = feature_dimensions_and_types
 
                 is_diffusion = output_object.diffusion_config is not None
+                setup_func = get_array_or_image_output_module_from_model_config
                 match is_diffusion:
                     case True:
                         assert feat_dims is not None
-                        array_output_module = get_array_output_module_from_model_config(
+                        output_module = setup_func(
                             output_object=output_object,
                             input_dimension=computed_out_dimensions,
+                            fusion_model_type=fusion_model_type,
                             feature_extractor_infos=feat_dims,
                             device=device,
                         )
                     case False:
                         assert computed_out_dimensions is not None
-                        array_output_module = get_array_output_module_from_model_config(
+                        output_module = setup_func(
                             output_object=output_object,
                             input_dimension=computed_out_dimensions,
+                            fusion_model_type=fusion_model_type,
                             feature_extractor_infos=feat_dims,
                             device=device,
                         )
                     case _:
                         raise ValueError()
 
-                output_modules[output_name] = array_output_module
+                output_modules[output_name] = output_module
             case _:
                 raise NotImplementedError(
                     "Only tabular, sequence and array outputs are supported"

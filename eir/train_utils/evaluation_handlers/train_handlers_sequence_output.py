@@ -1,3 +1,4 @@
+import json
 from copy import copy
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, Generator, Iterator, Sequence, Tuple, Union
@@ -120,6 +121,8 @@ def sequence_out_single_sample_evaluation_wrapper(
             )
             assert isinstance(config.sampling_config, SequenceOutputSamplingConfig)
 
+            meta = {}
+
             for idx, (eval_type, eval_sample) in enumerate(sample_generator):
                 generated_tokens = autoregressive_sequence_generation(
                     input_objects=input_objects,
@@ -168,6 +171,17 @@ def sequence_out_single_sample_evaluation_wrapper(
                     input_objects=input_objects,
                     output_path=cur_inputs_output_path,
                 )
+
+                cur_id = eval_sample.sample_id
+                meta[cur_id] = {
+                    "generated": str(cur_output_path.resolve()),
+                    "inputs": str(cur_inputs_output_path.resolve()),
+                    "index": idx,
+                }
+
+            meta_path = cur_sample_output_folder / "meta.json"
+            with open(meta_path, "w") as f:
+                json.dump(meta, f, indent=4)
 
 
 def get_sequence_output_manual_input_samples(
@@ -240,7 +254,7 @@ def get_sequence_output_auto_validation_samples(
             cur_eval_sample = SequenceOutputEvalSample(
                 inputs_to_model=cur_inputs_masked,
                 target_labels=target_labels,
-                sample_id=cur_id,
+                sample_id=cur_id[0],
             )
 
             prepared_eval_samples[output_name].append(cur_eval_sample)

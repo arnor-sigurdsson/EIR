@@ -86,7 +86,14 @@ def get_base_parametrization(compiled: bool = False) -> dict:
                     },
                 },
                 {
-                    "output_info": {"output_name": "test_output_sequence"},
+                    "output_info": {
+                        "output_name": "test_output_sequence",
+                    },
+                    "model_config": {
+                        "model_init_config": {
+                            "dropout": 0.0,
+                        }
+                    },
                 },
                 {
                     "output_info": {
@@ -133,6 +140,7 @@ def get_base_parametrization(compiled: bool = False) -> dict:
             ),
             "extras": {"array_dims": 1},
             "manual_test_data_creator": lambda: "test_multi_modal_multi_task",
+            "random_samples_dropped_from_modalities": True,
             "source": "deeplake",
         },
     ],

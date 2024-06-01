@@ -12,6 +12,7 @@ from eir.data_load.label_setup import al_label_transformers_object
 from eir.models import model_training_utils
 from eir.setup.output_setup import (
     ComputedArrayOutputInfo,
+    ComputedImageOutputInfo,
     ComputedSequenceOutputInfo,
     ComputedTabularOutputInfo,
     al_output_objects_as_dict,
@@ -401,7 +402,11 @@ def get_split_outputs_map(output_objects: al_output_objects_as_dict) -> dict[str
         match output_object:
             case ComputedTabularOutputInfo():
                 mapping[output_name] = "gather"
-            case ComputedSequenceOutputInfo() | ComputedArrayOutputInfo():
+            case (
+                ComputedSequenceOutputInfo()
+                | ComputedArrayOutputInfo()
+                | ComputedImageOutputInfo()
+            ):
                 mapping[output_name] = "compute"
             case _:
                 raise ValueError(f"Unknown output type: {type(output_object)}")

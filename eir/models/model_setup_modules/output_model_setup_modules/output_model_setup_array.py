@@ -20,6 +20,7 @@ from eir.models.output.array.array_output_modules import (
 )
 from eir.setup.input_setup_modules.common import DataDimensions
 from eir.setup.output_setup_modules.array_output_setup import ComputedArrayOutputInfo
+from eir.setup.output_setup_modules.image_output_setup import ComputedImageOutputInfo
 
 if TYPE_CHECKING:
     from eir.models.model_setup_modules.meta_setup import FeatureExtractorInfo
@@ -41,9 +42,10 @@ al_output_array_model_configs = LCLOutputModelConfig | CNNUpscaleModelConfig
 logger = get_logger(name=__name__)
 
 
-def get_array_output_module_from_model_config(
-    output_object: ComputedArrayOutputInfo,
+def get_array_or_image_output_module_from_model_config(
+    output_object: ComputedArrayOutputInfo | ComputedImageOutputInfo,
     input_dimension: Optional[int],
+    fusion_model_type: str,
     feature_extractor_infos: Optional[dict[str, "FeatureExtractorInfo"]],
     device: str,
 ) -> al_output_modules:
@@ -64,7 +66,14 @@ def get_array_output_module_from_model_config(
             width=input_dimension,
         )
 
-    use_passthrough = output_object.diffusion_config is not None
+    is_diffusion = output_object.diffusion_config is not None
+    is_pass_through_fusion = fusion_model_type == "pass-through"
+    use_passthrough = is_diffusion or is_pass_through_fusion
+
+    diffusion_time_steps = None
+    if is_diffusion:
+        assert output_object.diffusion_config is not None
+        diffusion_time_steps = output_object.diffusion_config.time_steps
 
     feature_extractor = get_array_output_feature_extractor(
         model_init_config=output_model_config.model_init_config,
@@ -74,6 +83,7 @@ def get_array_output_module_from_model_config(
         output_data_dimensions=output_object.data_dimensions,
         output_name=output_name,
         use_passthrough=use_passthrough,
+        diffusion_time_steps=diffusion_time_steps,
     )
 
     array_output_module = get_array_output_module(
@@ -96,10 +106,12 @@ def get_array_output_feature_extractor(
     output_data_dimensions: Optional[DataDimensions],
     output_name: str,
     use_passthrough: bool,
+    diffusion_time_steps: Optional[int],
 ) -> al_output_array_models:
 
     model_type = parse_model_type(
-        model_type=model_type, use_passthrough=use_passthrough
+        model_type=model_type,
+        use_passthrough=use_passthrough,
     )
 
     array_model_class = get_array_output_model_class(model_type=model_type)
@@ -110,6 +122,7 @@ def get_array_output_feature_extractor(
         feature_extractor_infos=feature_extractor_infos,
         output_data_dimensions=output_data_dimensions,
         output_name=output_name,
+        diffusion_time_steps=diffusion_time_steps,
     )
 
     array_model = array_model_class(**model_init_kwargs)  # type: ignore
@@ -167,6 +180,7 @@ def get_array_output_model_init_kwargs(
     feature_extractor_infos: Optional[dict[str, "FeatureExtractorInfo"]],
     output_data_dimensions: Optional[DataDimensions],
     output_name: str,
+    diffusion_time_steps: Optional[int],
 ) -> al_output_array_model_init_kwargs:
     kwargs: al_output_array_model_init_kwargs = {}
 
@@ -204,5 +218,8 @@ def get_array_output_model_init_kwargs(
             kwargs["target_dimensions"] = output_data_dimensions
             kwargs["feature_extractor_infos"] = feature_extractor_infos
             kwargs["output_name"] = output_name
+
+            if diffusion_time_steps:
+                kwargs["diffusion_time_steps"] = diffusion_time_steps
 
     return kwargs

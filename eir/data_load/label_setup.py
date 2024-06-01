@@ -511,11 +511,15 @@ def gather_all_ids_from_all_inputs(
 
 
 def gather_ids_from_data_source(
-    data_source: Path, validate: bool = True
+    data_source: Path,
+    validate: bool = True,
 ) -> Tuple[str, ...]:
+    iterator: Generator[str, None, None] | Generator[Path, None, None]
     if is_deeplake_dataset(data_source=str(data_source)):
-        deeplake_ds = load_deeplake_dataset(data_source=str(data_source))
-        iterator = (sample.numpy().item() for sample in deeplake_ds["ID"])
+        iterator = build_deeplake_available_id_iterator(
+            data_source=data_source,
+            inner_key="ID",
+        )
     elif data_source.suffix == ".csv":
         ids = gather_ids_from_tabular_file(file_path=data_source)
         iterator = (str(i) for i in ids)
@@ -527,6 +531,21 @@ def gather_ids_from_data_source(
     all_ids = tuple(i for i in tqdm(iterator, desc="Progress"))
 
     return all_ids
+
+
+def build_deeplake_available_id_iterator(
+    data_source: Path, inner_key: str
+) -> Generator[str, None, None]:
+    deeplake_ds = load_deeplake_dataset(data_source=str(data_source))
+    for sample in deeplake_ds:
+        inner_key_tensor = sample[inner_key]
+        is_empty = inner_key_tensor.size == 0
+
+        if is_empty:
+            continue
+
+        id_ = sample["ID"].numpy().item()
+        yield id_
 
 
 def gather_ids_from_tabular_file(file_path: Path) -> Tuple[str, ...]:

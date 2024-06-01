@@ -1,12 +1,14 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Sequence
+from typing import Any, Dict, Sequence
 
+import numpy as np
 import pandas as pd
 import torch
 from sklearn.preprocessing import StandardScaler
 
 from eir.data_load import label_setup
+from eir.data_load.data_source_modules.deeplake_ops import is_deeplake_dataset
 from eir.data_load.label_setup import (
     TabularFileInfo,
     al_all_column_ops,
@@ -20,6 +22,7 @@ from eir.predict_modules.predict_tabular_input_setup import prep_missing_con_dic
 from eir.setup.config import Configs
 from eir.setup.schemas import (
     ArrayOutputTypeConfig,
+    ImageOutputTypeConfig,
     OutputConfig,
     SequenceOutputTypeConfig,
     TabularOutputTypeConfig,
@@ -27,6 +30,7 @@ from eir.setup.schemas import (
 from eir.target_setup.target_label_setup import (
     MissingTargetsInfo,
     compute_missing_ids_per_tabular_output,
+    convert_dtypes,
     df_to_nested_dict,
     gather_data_pointers_from_data_source,
     gather_torch_nan_missing_ids,
@@ -180,13 +184,17 @@ def get_target_labels_for_testing(
     per_modality_missing_ids: dict[str, set[str]] = {}
     within_modality_missing_ids: dict[str, dict[str, set[str]]] = {}
 
+    dtypes: dict[str, dict[str, Any]] = {}
+
     tabular_target_files_info = get_tabular_target_file_infos(
         output_configs=pc.output_configs
     )
 
     for output_config in output_configs:
+        output_source = output_config.output_info.output_source
         output_type_info = output_config.output_type_info
         output_name = output_config.output_info.output_name
+
         match output_type_info:
             case TabularOutputTypeConfig():
                 cur_tabular_info = tabular_target_files_info[output_name]
@@ -227,7 +235,7 @@ def get_target_labels_for_testing(
 
                 per_modality_missing_ids[output_name] = cur_missing_ids
 
-            case ArrayOutputTypeConfig():
+            case ArrayOutputTypeConfig() | ImageOutputTypeConfig():
                 cur_labels = _set_up_predict_file_target_labels(
                     ids=ids,
                     output_config=output_config,
@@ -239,6 +247,14 @@ def get_target_labels_for_testing(
                 )
                 per_modality_missing_ids[output_name] = cur_missing_ids
 
+                # this is needed as having missing modalities in deeplake
+                # will cause conversion of int64 deeplake pointers to float64
+                is_deeplake = is_deeplake_dataset(data_source=output_source)
+                if is_deeplake:
+                    dtypes[output_name] = {output_name: np.dtype("int64")}
+                else:
+                    dtypes[output_name] = {output_name: np.dtype("O")}
+
             case _:
                 raise NotImplementedError(
                     f"Output type {output_type_info} not implemented"
@@ -248,13 +264,17 @@ def get_target_labels_for_testing(
 
         df_labels_cur["Output Name"] = output_name
 
+        if output_name not in dtypes:
+            dtypes[output_name] = df_labels_cur.dtypes.to_dict()
+
         df_labels_test = pd.concat((df_labels_test, df_labels_cur))
 
     df_labels_test = df_labels_test.set_index("Output Name", append=True)
 
     df_labels_test = df_labels_test.dropna(how="all")
 
-    test_labels_dict = df_to_nested_dict(df=df_labels_test)
+    dtypes = convert_dtypes(dtypes=dtypes)
+    test_labels_dict = df_to_nested_dict(df=df_labels_test, dtypes=dtypes)
 
     outputs_and_targets = get_all_output_and_target_names(output_configs=output_configs)
     missing_target_info = get_missing_targets_info(
@@ -278,10 +298,12 @@ def _set_up_predict_file_target_labels(
 ) -> PredictTargetLabels:
     output_name = output_config.output_info.output_name
     output_source = output_config.output_info.output_source
+    output_inner_key = output_config.output_info.output_inner_key
 
     id_to_data_pointer_mapping = gather_data_pointers_from_data_source(
         data_source=Path(output_source),
         validate=True,
+        output_inner_key=output_inner_key,
     )
 
     ids_set = set(ids)

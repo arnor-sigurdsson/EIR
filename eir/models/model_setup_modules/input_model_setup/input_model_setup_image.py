@@ -47,6 +47,7 @@ def get_image_model(
         feature_extractor = _meta_get_image_model_from_scratch(
             model_type=model_config.model_type,
             model_init_config=model_config.model_init_config,
+            in_chans=input_channels,
             num_output_features=model_config.num_output_features,
         )
 
@@ -142,7 +143,11 @@ def _get_all_timm_models() -> list[str]:
 
 
 def _parse_init_kwargs(model_config: ImageModelConfig) -> Dict[str, Any]:
-    init_kwargs = copy(model_config.model_init_config)
+    init_config = copy(model_config.model_init_config)
+    if isinstance(init_config, dict):
+        init_kwargs = init_config
+    else:
+        init_kwargs = init_config.__dict__
     assert isinstance(init_kwargs, dict)
 
     model_config_out_features = getattr(model_config, "num_output_features")
@@ -161,14 +166,18 @@ def _parse_init_kwargs(model_config: ImageModelConfig) -> Dict[str, Any]:
 
 
 def _meta_get_image_model_from_scratch(
-    model_type: str, model_init_config: dict, num_output_features: Union[None, int]
+    model_type: str,
+    model_init_config: dict,
+    in_chans: int,
+    num_output_features: Union[None, int],
 ) -> nn.Module:
     """
     A kind of ridiculous way to initialize modules from scratch that are found in timm,
-    but could not find a better way at first glance given how timm is set up.
+    but could not find a better way at first glance.
     """
 
     feature_extractor_model_config = copy(model_init_config)
+    feature_extractor_model_config["in_chans"] = in_chans
     if num_output_features:
         feature_extractor_model_config["num_classes"] = num_output_features
 
