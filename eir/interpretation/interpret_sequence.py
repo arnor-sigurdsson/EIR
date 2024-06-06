@@ -7,6 +7,10 @@ from typing import TYPE_CHECKING, Dict, Iterable, Sequence, Tuple
 import numpy as np
 import pandas as pd
 import torch
+import torchtext
+
+torchtext.disable_torchtext_deprecation_warning()
+
 import torchtext.vocab
 from aislib.misc_utils import ensure_path_exists
 from captum.attr._utils.visualization import (

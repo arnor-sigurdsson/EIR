@@ -551,11 +551,13 @@ def gather_data_pointers_from_data_source(
     if is_deeplake_dataset(data_source=str(data_source)):
         assert output_inner_key is not None
         iterator = build_deeplake_available_pointer_iterator(
-            data_source=data_source, inner_key=output_inner_key
+            data_source=data_source,
+            inner_key=output_inner_key,
         )
     else:
         iterator_base = get_file_path_iterator(
-            data_source=data_source, validate=validate
+            data_source=data_source,
+            validate=validate,
         )
         iterator = ((f.stem, f) for f in iterator_base)
 

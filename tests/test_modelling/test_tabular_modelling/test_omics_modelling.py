@@ -42,8 +42,14 @@ def _get_classification_output_configs(
 @pytest.mark.parametrize(
     "create_test_data",
     [
-        {"task_type": "binary"},
-        {"task_type": "multi"},
+        {
+            "task_type": "binary",
+        },
+        {
+            "task_type": "multi",
+            "random_samples_dropped_from_modalities": True,
+            "source": "deeplake",
+        },
     ],
     indirect=True,
 )
