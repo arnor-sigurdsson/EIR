@@ -4,6 +4,9 @@ from unittest.mock import create_autospec
 
 import pytest
 import torch
+import torchtext
+
+torchtext.disable_torchtext_deprecation_warning()
 from torchtext.vocab import Vocab
 
 from eir.train_utils.evaluation_handlers.evaluation_handlers_utils import decode_tokens

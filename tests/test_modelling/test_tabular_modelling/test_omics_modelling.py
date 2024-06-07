@@ -427,7 +427,8 @@ def test_regression(prep_modelling_test_configs):
 
 
 def _get_multi_task_output_configs(
-    label_smoothing: float = 0.0, uncertainty_mt_loss: bool = True
+    label_smoothing: float = 0.0,
+    uncertainty_mt_loss: bool = True,
 ) -> Sequence[Dict]:
     output_configs = [
         {

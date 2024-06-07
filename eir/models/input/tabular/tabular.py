@@ -109,12 +109,6 @@ class SimpleTabularModel(nn.Module):
     def num_out_features(self) -> int:
         return self.input_dim
 
-    def script_submodules_for_tracing(self):
-        for name, module in self.named_modules():
-            if isinstance(module, nn.Embedding):
-                scripted_module = torch.jit.script(obj=module)
-                setattr(self, name, scripted_module)
-
     @property
     def l1_penalized_weights(self) -> torch.Tensor:
         if not self.cat_columns and not self.fc_layer:

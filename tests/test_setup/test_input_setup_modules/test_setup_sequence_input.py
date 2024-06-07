@@ -5,7 +5,10 @@ from typing import Sequence
 from unittest import mock
 
 import pytest
+import torchtext
 from aislib.misc_utils import ensure_path_exists
+
+torchtext.disable_torchtext_deprecation_warning()
 from torchtext.vocab import Vocab
 from transformers import PreTrainedTokenizer
 

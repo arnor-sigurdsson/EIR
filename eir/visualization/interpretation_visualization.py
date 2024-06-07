@@ -132,7 +132,9 @@ def plot_top_gradients(
 
 
 def plot_snp_manhattan_plots(
-    df_snp_grads: pd.DataFrame, outfolder: Path, title_extra: str = ""
+    df_snp_grads: pd.DataFrame,
+    outfolder: Path,
+    title_extra: str = "",
 ):
     df_snp_grads_copy = df_snp_grads.copy()
 

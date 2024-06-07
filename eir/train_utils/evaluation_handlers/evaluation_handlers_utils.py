@@ -7,10 +7,13 @@ from typing import TYPE_CHECKING, Any, Dict, Iterator, Optional, Union
 
 import numpy as np
 import torch
+import torchtext
 from aislib.misc_utils import ensure_path_exists, get_logger
 from PIL import Image
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from torch.utils.data import DataLoader, Dataset
+
+torchtext.disable_torchtext_deprecation_warning()
 from torchtext.vocab import Vocab
 
 from eir.data_load.data_preparation_modules.imputation import (
