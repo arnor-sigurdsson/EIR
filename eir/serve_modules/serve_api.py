@@ -103,7 +103,11 @@ def get_model_info(
                 pass
 
             case ComputedImageInputInfo():
-                pass
+                shape = input_object.data_dimensions.full_shape()
+                model_info["inputs"][name] = {
+                    "type": "image",
+                    "shape": shape,
+                }
 
             case (
                 ComputedTabularInputInfo()

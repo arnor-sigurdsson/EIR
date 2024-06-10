@@ -6,6 +6,7 @@ import torch
 from eir.models.model_training_utils import predict_on_batch
 from eir.serve_modules.serve_experiment_io import ServeExperiment
 from eir.setup.schema_modules.output_schemas_array import ArrayOutputTypeConfig
+from eir.setup.schema_modules.output_schemas_image import ImageOutputTypeConfig
 from eir.setup.schema_modules.output_schemas_sequence import (
     SequenceOutputSamplingConfig,
 )
@@ -111,12 +112,14 @@ def _run_serve_array_generation(
     output_configs = serve_experiment.configs.output_configs
 
     for config in output_configs:
-        if config.output_info.output_type != "array":
+        if config.output_info.output_type not in ("array", "image"):
             continue
 
         cur_output_name = config.output_info.output_name
         output_type_info = config.output_type_info
-        assert isinstance(output_type_info, ArrayOutputTypeConfig)
+        assert isinstance(
+            output_type_info, (ArrayOutputTypeConfig, ImageOutputTypeConfig)
+        )
 
         assert config.sampling_config is not None
 

@@ -84,11 +84,15 @@ class ConvAttentionBlock(nn.Module):
             enable_nested_tensor=False,
         )
 
+        self.grn = GRN(in_channels=channels)
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         out = x.view(-1, self.in_channels, self.in_height * self.in_width)
         out = self.encoder(out)
         out = out.view(-1, self.in_channels, self.in_height, self.in_width)
-        return out
+        out = self.grn(out)
+
+        return x + out
 
 
 def _adjust_num_heads(num_heads: int, embedding_dim: int) -> int:

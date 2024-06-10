@@ -265,10 +265,10 @@ Additionally, you can send requests using `bash`. Note that this requires prepar
 
 .. code-block:: bash
 
-    curl -X 'POST' \\
-      'http://localhost:8000/predict' \\
-      -H 'accept: application/json' \\
-      -H 'Content-Type: application/json' \\
+    curl -X 'POST' \
+      'http://localhost:8000/predict' \
+      -H 'accept: application/json' \
+      -H 'Content-Type: application/json' \
       -d '{
           "hot_dog_efficientnet": "[BASE64_ENCODED_IMAGE]",
           "hot_dog_resnet18": "[BASE64_ENCODED_IMAGE]"

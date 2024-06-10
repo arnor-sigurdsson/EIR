@@ -250,8 +250,8 @@ by sending a GET request to the `/info` endpoint:
 
 .. code-block:: bash
 
-    curl -X 'GET' \\
-      'http://localhost:8000/info' \\
+    curl -X 'GET' \
+      'http://localhost:8000/info' \
       -H 'accept: application/json'
 
 This request will return details about the expected array input and output formats,

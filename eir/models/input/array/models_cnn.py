@@ -67,13 +67,15 @@ class CNNModelConfig:
         Base kernel width of the convolutions.
 
     :param first_kernel_expansion_width:
-        Factor to extend the first kernel's width.
+        Factor to extend the first kernel's width. The result of the multiplication
+        will be rounded to the nearest integer.
 
     :param down_stride_width:
         Down stride of the convolutional layers along the width.
 
     :param first_stride_expansion_width:
-        Factor to extend the first layer stride along the width.
+        Factor to extend the first layer stride along the width. The result of the
+        multiplication will be rounded to the nearest integer.
 
     :param dilation_factor_width:
         Base dilation factor of the convolutions along the width in the network.
@@ -82,13 +84,15 @@ class CNNModelConfig:
         Base kernel height of the convolutions.
 
     :param first_kernel_expansion_height:
-        Factor to extend the first kernel's height.
+        Factor to extend the first kernel's height. The result of the multiplication
+        will be rounded to the nearest integer.
 
     :param down_stride_height:
         Down stride of the convolutional layers along the height.
 
     :param first_stride_expansion_height:
         Factor to extend the first layer stride along the height.
+        The result of the multiplication will be rounded to the nearest integer.
 
     :param dilation_factor_height:
         Base dilation factor of the convolutions along the height in the network.
@@ -131,15 +135,15 @@ class CNNModelConfig:
     first_channel_expansion: int = 1
 
     kernel_width: int = 12
-    first_kernel_expansion_width: int = 1
+    first_kernel_expansion_width: float = 1.0
     down_stride_width: int = 4
-    first_stride_expansion_width: int = 1
+    first_stride_expansion_width: float = 1.0
     dilation_factor_width: int = 1
 
     kernel_height: int = 4
-    first_kernel_expansion_height: int = 1
+    first_kernel_expansion_height: float = 1.0
     down_stride_height: int = 1
-    first_stride_expansion_height: int = 1
+    first_stride_expansion_height: float = 1.0
     dilation_factor_height: int = 1
 
     allow_first_conv_size_reduction: bool = True
@@ -175,11 +179,13 @@ def _validate_cnn_config(model_config: CNNModelConfig) -> None:
             f"This is currently not supported."
         )
 
-    first_stride_w = mc.down_stride_width * mc.first_stride_expansion_width
-    first_kernel_w = mc.kernel_width * mc.first_kernel_expansion_width
+    first_stride_w = int(round(mc.down_stride_width * mc.first_stride_expansion_width))
+    first_kernel_w = int(round(mc.kernel_width * mc.first_kernel_expansion_width))
 
-    first_stride_h = mc.down_stride_height * mc.first_stride_expansion_height
-    first_kernel_h = mc.kernel_height * mc.first_kernel_expansion_height
+    first_stride_h = int(
+        round(mc.down_stride_height * mc.first_stride_expansion_height)
+    )
+    first_kernel_h = int(round(mc.kernel_height * mc.first_kernel_expansion_height))
 
     if first_stride_w > first_kernel_w:
         raise ValueError(
@@ -372,8 +378,8 @@ def _make_conv_layers(
     first_conv_channels = 2**mc.channel_exp_base * mc.first_channel_expansion
 
     down_stride_w = mc.down_stride_width
-    first_conv_kernel_w = mc.kernel_width * mc.first_kernel_expansion_width
-    first_conv_stride_w = down_stride_w * mc.first_stride_expansion_width
+    first_conv_kernel_w = int(round(mc.kernel_width * mc.first_kernel_expansion_width))
+    first_conv_stride_w = int(round(down_stride_w * mc.first_stride_expansion_width))
 
     conv_param_suggestion_w = calc_conv_params_needed(
         input_size=data_dimensions.width,
@@ -384,8 +390,12 @@ def _make_conv_layers(
     )
 
     down_stride_h = mc.down_stride_height
-    first_conv_kernel_h = mc.kernel_height * mc.first_kernel_expansion_height
-    first_conv_stride_h = mc.down_stride_height * mc.first_stride_expansion_height
+    first_conv_kernel_h = int(
+        round(mc.kernel_height * mc.first_kernel_expansion_height)
+    )
+    first_conv_stride_h = int(
+        round(mc.down_stride_height * mc.first_stride_expansion_height)
+    )
 
     conv_param_suggestion_h = calc_conv_params_needed(
         input_size=data_dimensions.height,
@@ -566,16 +576,16 @@ def _get_cur_dilation(
 def auto_find_no_cnn_residual_blocks_needed(
     input_size_w: int,
     kernel_w: int,
-    first_kernel_expansion_w: int,
+    first_kernel_expansion_w: float,
     stride_w: int,
-    first_stride_expansion_w: int,
+    first_stride_expansion_w: float,
     dilation_w: int,
     down_sample_every_n_blocks: Optional[int],
     input_size_h: int,
     kernel_h: int,
-    first_kernel_expansion_h: int,
+    first_kernel_expansion_h: float,
     stride_h: int,
-    first_stride_expansion_h: int,
+    first_stride_expansion_h: float,
     dilation_h: int,
     cutoff: int,
 ) -> List[int]:
@@ -611,31 +621,37 @@ def auto_find_no_cnn_residual_blocks_needed(
             f"despite not reaching the cutoff."
         )
 
+    first_kernel_w = int(round(kernel_w * first_kernel_expansion_w))
+    first_stride_w = int(round(stride_w * first_stride_expansion_w))
+
     conv_param_suggestion_w_first = calc_conv_params_needed(
         input_size=input_size_w,
-        kernel_size=kernel_w * first_kernel_expansion_w,
-        stride=stride_w * first_stride_expansion_w,
+        kernel_size=first_kernel_w,
+        stride=first_stride_w,
         dilation=dilation_w,
     )
 
+    first_kernel_h = int(round(kernel_h * first_kernel_expansion_h))
+    first_stride_h = int(round(stride_h * first_stride_expansion_h))
+
     conv_param_suggestion_h_first = calc_conv_params_needed(
         input_size=input_size_h,
-        kernel_size=kernel_h * first_kernel_expansion_h,
-        stride=stride_h * first_stride_expansion_h,
+        kernel_size=first_kernel_h,
+        stride=first_stride_h,
         dilation=dilation_h,
     )
 
     cur_size_w = conv_output_formula(
         input_size=input_size_w,
         kernel_size=conv_param_suggestion_w_first.kernel_size,
-        stride=stride_w * first_stride_expansion_w,
+        stride=first_stride_w,
         dilation=dilation_w,
         padding=conv_param_suggestion_w_first.padding,
     )
     cur_size_h = conv_output_formula(
         input_size=input_size_h,
         kernel_size=conv_param_suggestion_h_first.kernel_size,
-        stride=stride_h * first_stride_expansion_h,
+        stride=first_stride_h,
         dilation=dilation_h,
         padding=conv_param_suggestion_h_first.padding,
     )

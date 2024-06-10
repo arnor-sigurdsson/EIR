@@ -25,6 +25,7 @@ from docs.doc_modules.experiments import (
     AutoDocExperimentInfo,
     make_training_or_predict_tutorial_data,
 )
+from docs.doc_modules.f_image_outputs import a_image_foundation
 from docs.doc_modules.serving_experiments import (
     AutoDocServingInfo,
     make_serving_tutorial_data,
@@ -93,12 +94,21 @@ def _get_e_pretraining_outputs_experiments() -> Iterable[AutoDocExperimentInfo]:
     )
 
 
+def _get_f_image_outputs_experiments() -> Iterable[AutoDocExperimentInfo]:
+    a_experiments = a_image_foundation.get_experiments()
+
+    return chain(
+        a_experiments,
+    )
+
+
 if __name__ == "__main__":
     a_using_eir_experiments = _get_a_using_eir_experiments()
     c_sequence_outputs_experiments = _get_c_sequence_outputs_experiments()
     b_customizing_eir_experiments = _get_b_customizing_eir_experiments()
     d_array_outputs_experiments = _get_d_array_outputs_experiments()
     e_pretraining_experiments = _get_e_pretraining_outputs_experiments()
+    f_image_outputs_experiments = _get_f_image_outputs_experiments()
 
     experiment_iter = chain.from_iterable(
         [
@@ -107,6 +117,7 @@ if __name__ == "__main__":
             b_customizing_eir_experiments,
             d_array_outputs_experiments,
             e_pretraining_experiments,
+            f_image_outputs_experiments,
         ]
     )
     for experiment in experiment_iter:

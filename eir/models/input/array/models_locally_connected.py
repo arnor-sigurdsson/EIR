@@ -17,6 +17,7 @@ from torch import nn
 
 from eir.models.input.sequence.transformer_models import PositionalEmbedding
 from eir.models.layers.lcl_layers import LCL, LCLResidualBlock
+from eir.models.layers.norm_layers import LayerScale
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -551,13 +552,17 @@ class LCLAttentionBlock(nn.Module):
             zero_init=True,
         )
 
+        self.ls = LayerScale(dim=self.in_features, init_values=1e-5)
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         out = x.reshape(x.shape[0], -1, self.embedding_dim)
         out = self.pos_emb(out)
         out = self.encoder(out)
         out = torch.flatten(input=out, start_dim=1)
 
-        return out + x
+        out = self.ls(out)
+
+        return x + out
 
 
 def _do_add_attention(

@@ -236,10 +236,10 @@ Additionally, you can send requests using `bash`:
 
 .. code-block:: bash
 
-    curl -X 'POST' \\
-      'http://localhost:8000/predict' \\
-      -H 'accept: application/json' \\
-      -H 'Content-Type: application/json' \\
+    curl -X 'POST' \
+      'http://localhost:8000/predict' \
+      -H 'accept: application/json' \
+      -H 'Content-Type: application/json' \
       -d '{
           "poker_hands": {
               "S1": "3", "C1": "12",

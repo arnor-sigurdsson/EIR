@@ -153,10 +153,10 @@ Note that this requires preparing the base64-encoded image content in advance:
 
 .. code-block:: bash
 
-    curl -X 'POST' \\
-      'http://localhost:8000/predict' \\
-      -H 'accept: application/json' \\
-      -H 'Content-Type: application/json' \\
+    curl -X 'POST' \
+      'http://localhost:8000/predict' \
+      -H 'accept: application/json' \
+      -H 'Content-Type: application/json' \
       -d '{
           "image_captioning": "[BASE64_ENCODED_IMAGE]",
           "captions": ""
