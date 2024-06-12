@@ -55,7 +55,7 @@ def general_post_process(
     outputs: dict[str, dict[str, torch.Tensor | list[int] | np.ndarray]],
     output_objects: al_output_objects_as_dict,
     input_objects: al_input_objects_as_dict,
-) -> list[dict[str, Any]]:
+) -> dict[str, Any]:
     """
     Note that we always expect two levels for the predictions, in the case
     of tabular that's the output name and the column name, in the case of
@@ -150,7 +150,7 @@ def general_post_process(
 
     post_processed = object_to_primitives(obj=post_processed)
 
-    return [post_processed]
+    return post_processed
 
 
 def _ensure_streamlined_tabular_values(

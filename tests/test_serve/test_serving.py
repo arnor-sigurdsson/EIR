@@ -240,7 +240,7 @@ def test_multi_serving(
     response = run_serve_experiment_from_command(
         command=command,
         url="http://localhost:8000/predict",
-        example_requests=example_requests,
+        example_requests=[example_requests],
         data_loading_function=load_data_for_serve,
     )
 

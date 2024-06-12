@@ -41,7 +41,7 @@ def _serialize_image_to_base64(file_path: str) -> str:
     return base64.b64encode(buffered.getvalue()).decode("utf-8")
 
 
-def send_request(url: str, payload: dict) -> dict:
+def send_request(url: str, payload: list[dict]) -> dict:
     try:
         response = requests.post(url, json=payload)
         response.raise_for_status()

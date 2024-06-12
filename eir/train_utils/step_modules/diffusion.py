@@ -104,7 +104,7 @@ def p_sample_loop(
     model: nn.Module,
     output_shape: tuple,
     time_steps: int,
-) -> list:
+) -> list[torch.Tensor]:
     device = next(model.parameters()).device
 
     current_state: torch.Tensor = torch.randn(output_shape, device=device)

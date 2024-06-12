@@ -39,17 +39,21 @@ async def process_request(data: Sequence, serve_experiment: ServeExperiment) -> 
         serve_experiment=serve_experiment,
     )
 
-    prediction = run_serve_prediction(
+    predictions = run_serve_prediction(
         serve_experiment=serve_experiment,
         batch=batch,
     )
 
-    response = general_post_process(
-        outputs=prediction,
-        input_objects=serve_experiment.inputs,
-        output_objects=serve_experiment.outputs,
-    )
-    return response
+    responses = []
+    for prediction in predictions:
+        response = general_post_process(
+            outputs=prediction,
+            input_objects=serve_experiment.inputs,
+            output_objects=serve_experiment.outputs,
+        )
+        responses.append(response)
+
+    return responses
 
 
 def create_predict_endpoint(
@@ -60,14 +64,14 @@ def create_predict_endpoint(
     input_model = create_input_model(configs=configs)
 
     @app.post("/predict", response_model=ResponseModel)
-    async def predict(request: input_model) -> ResponseModel:  # type: ignore
-        data = [request.model_dump()]  # type: ignore
+    async def predict(requests: list[input_model]) -> ResponseModel:  # type: ignore
+        data = [request.model_dump() for request in requests]  # type: ignore
         response_data = await process_request(
             data=data,
             serve_experiment=serve_experiment,
         )
 
-        return ResponseModel(result=response_data[0])
+        return ResponseModel(result=response_data)
 
 
 def create_info_endpoint(app: FastAPI, serve_experiment: ServeExperiment) -> None:

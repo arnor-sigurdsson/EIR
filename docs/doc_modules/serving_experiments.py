@@ -62,7 +62,7 @@ def make_serving_tutorial_data(
 def run_serve_experiment_from_command(
     command: List[str],
     url: str,
-    example_requests: list[dict[str, Any]],
+    example_requests: list[list[dict[str, Any]]],
     data_loading_function: Callable[[dict[str, Any]], dict[str, Any]],
 ) -> list[dict[str, Any]]:
     _run_server, process_storage = server_run_factory()
@@ -86,10 +86,14 @@ def run_serve_experiment_from_command(
     responses = []
     for request in example_requests:
         if data_loading_function:
-            request_data = data_loading_function(request)
+
+            loaded_items = []
+            for sample in request:
+                loaded_items.append(data_loading_function(sample))
+
             response = send_request(
                 url=url,
-                payload=request_data,
+                payload=loaded_items,
             )
 
             cur_info = {"request": request, "response": response}

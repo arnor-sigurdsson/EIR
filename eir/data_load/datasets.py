@@ -73,7 +73,7 @@ al_dataset_types = Type[al_datasets]
 # embeddings --> remain str, cat targets --> int, con extra/target --> float
 al_sample_label_dict_target = Dict[str, Dict[str, Union[int, float, torch.Tensor]]]
 al_inputs = Union[Dict[str, torch.Tensor], Dict[str, Any]]
-al_getitem_return = Tuple[Dict[str, torch.Tensor], al_sample_label_dict_target, str]
+al_getitem_return = tuple[dict[str, torch.Tensor], al_sample_label_dict_target, str]
 
 
 def set_up_datasets_from_configs(

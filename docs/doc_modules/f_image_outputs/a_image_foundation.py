@@ -124,24 +124,26 @@ def get_image_gen_02_mnist_generation_serve() -> AutoDocServingInfo:
     image_base = "docs/tutorials/tutorial_files/f_image_output/_static"
     _add_small_altercation_versions(static_folder=image_base)
     example_requests = [
-        {
-            "image": f"{image_base}/image_0.png",
-        },
-        {
-            "image": f"{image_base}/image_1.png",
-        },
-        {
-            "image": f"{image_base}/image_2.png",
-        },
-        {
-            "image": f"{image_base}/image_0_altered.png",
-        },
-        {
-            "image": f"{image_base}/image_1_altered.png",
-        },
-        {
-            "image": f"{image_base}/image_2_altered.png",
-        },
+        [
+            {
+                "image": f"{image_base}/image_0.png",
+            },
+            {
+                "image": f"{image_base}/image_1.png",
+            },
+            {
+                "image": f"{image_base}/image_2.png",
+            },
+            {
+                "image": f"{image_base}/image_0_altered.png",
+            },
+            {
+                "image": f"{image_base}/image_1_altered.png",
+            },
+            {
+                "image": f"{image_base}/image_2_altered.png",
+            },
+        ]
     ]
 
     add_model_path = partial(
@@ -152,7 +154,7 @@ def get_image_gen_02_mnist_generation_serve() -> AutoDocServingInfo:
     copy_inputs_to_serve = (
         copy_inputs,
         {
-            "example_requests": example_requests,
+            "example_requests": example_requests[0],
             "output_folder": str(Path(base_path) / "serve_results"),
         },
     )
@@ -219,10 +221,10 @@ def decode_and_save_images(
     os.makedirs(output_folder, exist_ok=True)
 
     with open(predictions_file, "r") as file:
-        predictions = json.load(file)
+        predictions = json.load(file)[0]
 
-    for i, prediction in enumerate(predictions):
-        base64_array = prediction["response"]["result"]["image"]
+    for i, prediction in enumerate(predictions["response"]["result"]):
+        base64_array = prediction["image"]
         array_bytes = base64.b64decode(base64_array)
 
         array_np = np.frombuffer(array_bytes, dtype=np.float32).reshape(tensor_shape)

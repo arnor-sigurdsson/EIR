@@ -98,7 +98,7 @@ def test_prepare_current_autoregressive_input():
     pad_idx = 0
 
     expected_output = deepcopy(prepared_sample_inputs)
-    expected_output[seq_output_name] = torch.tensor([[3, 4, 5, 6, 0]])
+    expected_output[seq_output_name] = torch.tensor([3, 4, 5, 6, 0])
 
     result = _prepare_current_autoregressive_input(
         prepared_sample_inputs=prepared_sample_inputs,
@@ -111,7 +111,7 @@ def test_prepare_current_autoregressive_input():
 
 
 def test_sample_next_token_index_from_output():
-    outputs = {"seq_output": {"seq_output": torch.rand(5, 5)}}
+    outputs = {"seq_output": {"seq_output": torch.rand(1, 5, 5)}}
     seq_output_name = "seq_output"
     sampling_config = SequenceOutputSamplingConfig(
         manual_inputs=[{"token": "hello"}],
@@ -120,16 +120,18 @@ def test_sample_next_token_index_from_output():
         top_k=5,
         top_p=0.9,
     )
-    current_target_index = 3
+    current_target_indices = [3]
 
     result = sample_next_token_index_from_output(
         outputs=outputs,
         seq_output_name=seq_output_name,
         sampling_config=sampling_config,
-        current_target_index=current_target_index,
+        current_target_indices=current_target_indices,
     )
 
-    assert isinstance(result, int)
+    assert isinstance(result, list)
+    assert len(result) == 1
+    assert isinstance(result[0], int)
 
 
 def test_top_k_top_p_filtering():
@@ -137,13 +139,15 @@ def test_top_k_top_p_filtering():
     top_k -> tensor([  -inf,   -inf,   -inf, 0.4000, 0.5000, 0.6000])
     top_p -> tensor([  -inf,   -inf,   -inf,   -inf, 0.5000, 0.6000])
     """
-    logits = torch.tensor([0.1, 0.2, 0.3, 0.4, 0.5, 0.6], dtype=torch.float)
+    values = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
+    logits = torch.tensor(values, dtype=torch.float).unsqueeze(0)
+
     top_k = 3
     top_p = 0.5
     filter_value = -float("Inf")
 
     expected_output = torch.tensor(
-        [-float("Inf"), -float("Inf"), -float("Inf"), -float("Inf"), 0.5, 0.6]
+        [[-float("Inf"), -float("Inf"), -float("Inf"), -float("Inf"), 0.5, 0.6]]
     )
 
     result = top_k_top_p_filtering(
@@ -205,26 +209,32 @@ def test_autoregressive_sequence_generation(
 
     base = [5, 6, 7]
     test_input = torch.tensor([base], dtype=torch.long)
-    eval_sample = SequenceOutputEvalSample(
-        inputs_to_model={"test_output_sequence": test_input},
-        target_labels={"test_output_sequence": "World"},
-        sample_id="0",
+    eval_samples = (
+        SequenceOutputEvalSample(
+            inputs_to_model={"test_output_sequence": test_input},
+            target_labels={"test_output_sequence": "World"},
+            sample_id="0",
+        ),
     )
 
     seq_output_name = "test_output_sequence"
 
-    result = autoregressive_sequence_generation(
+    batch_result = autoregressive_sequence_generation(
         input_objects=experiment.inputs,
-        eval_sample=eval_sample,
+        eval_samples=eval_samples,
         seq_output_name=seq_output_name,
         experiment=experiment,
         default_eir_hooks=experiment.hooks,
         sampling_config=sampling_config,
     )
 
-    assert isinstance(result, list)
-    assert len(result) <= sampling_config.generated_sequence_length
-    assert result[:3] == base
+    assert isinstance(batch_result, list)
+
+    item_result = batch_result[0]
+    assert isinstance(item_result, list)
+
+    assert len(item_result) <= sampling_config.generated_sequence_length
+    assert item_result[:3] == base
 
 
 @pytest.fixture

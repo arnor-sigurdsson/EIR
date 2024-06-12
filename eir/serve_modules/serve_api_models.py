@@ -1,4 +1,4 @@
-from typing import Any, Dict, Sequence, Type
+from typing import Any, Sequence, Type
 
 from pydantic import BaseModel, create_model
 
@@ -37,4 +37,4 @@ def create_input_model(configs: Sequence[InputConfig]) -> Type[BaseModel]:
 
 
 class ResponseModel(BaseModel):
-    result: Dict[str, Any]
+    result: list[dict[str, Any]]

@@ -1,6 +1,6 @@
 import base64
 from io import BytesIO
-from typing import Any, Dict, Union
+from typing import Any, Dict, Sequence, Union
 
 import numpy as np
 import numpy.typing as npt
@@ -31,14 +31,33 @@ from eir.train_utils.evaluation_handlers.evaluation_handlers_utils import (
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
+al_inputs_prepared = dict[
+    str,
+    np.ndarray | torch.Tensor | list[str] | str | dict | Image.Image,
+]
+
+
+def prepare_request_input_data_wrapper(
+    request_data: Sequence[dict[str, Any]],
+    input_objects: al_input_objects_as_dict,
+) -> Sequence[al_inputs_prepared]:
+    all_inputs_prepared = []
+
+    for request in request_data:
+        inputs_prepared = prepare_request_input_data(
+            request_data=request,
+            input_objects=input_objects,
+        )
+        all_inputs_prepared.append(inputs_prepared)
+
+    return all_inputs_prepared
+
 
 def prepare_request_input_data(
     request_data: Dict[str, Any],
     input_objects: al_input_objects_as_dict,
 ) -> Dict[str, Any]:
-    inputs_prepared: dict[
-        str, np.ndarray | torch.Tensor | list[str] | str | dict | Image.Image
-    ] = {}
+    inputs_prepared: al_inputs_prepared = {}
 
     for name, serialized_data in request_data.items():
         input_object = input_objects[name]

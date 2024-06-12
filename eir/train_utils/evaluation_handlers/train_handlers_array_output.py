@@ -18,6 +18,7 @@ import torch
 from aislib.misc_utils import ensure_path_exists
 from PIL import Image
 from torch.utils.data import Dataset
+from torch.utils.data._utils.collate import default_collate
 
 from eir.data_load.data_preparation_modules.prepare_array import un_normalize_array
 from eir.data_load.datasets import al_getitem_return
@@ -38,6 +39,7 @@ from eir.train_utils import utils
 from eir.train_utils.evaluation_handlers.evaluation_handlers_utils import (
     convert_model_inputs_to_raw,
     general_pre_process_prepared_inputs,
+    get_batch_generator,
     get_dataset_loader_single_sample_generator,
     prepare_base_input,
     prepare_manual_sample_data,
@@ -92,7 +94,7 @@ def array_out_single_sample_evaluation_wrapper(
         output_configs=output_configs,
         eval_sample_iterator=auto_validation_generator,
     )
-    eval_samples = ArrayOutputEvalSamples(
+    eval_samples_base = ArrayOutputEvalSamples(
         auto_samples=auto_samples, manual_samples=manual_samples
     )
 
@@ -103,8 +105,8 @@ def array_out_single_sample_evaluation_wrapper(
         cur_input_name = config.output_info.output_name
         cur_output_name = config.output_info.output_name
 
-        not_in_manual_samples = cur_output_name not in eval_samples.manual_samples
-        not_in_auto_samples = cur_output_name not in eval_samples.auto_samples
+        not_in_manual_samples = cur_output_name not in eval_samples_base.manual_samples
+        not_in_auto_samples = cur_output_name not in eval_samples_base.auto_samples
         if not_in_manual_samples and not_in_auto_samples:
             continue
 
@@ -123,77 +125,98 @@ def array_out_single_sample_evaluation_wrapper(
         assert config.sampling_config is not None
 
         sample_generator = _get_eval_sample_generator(
-            eval_samples=eval_samples, output_name=cur_output_name
+            eval_samples=eval_samples_base, output_name=cur_output_name
         )
 
-        for idx, (eval_type, eval_sample) in enumerate(sample_generator):
+        batch_generator = get_batch_generator(
+            iterator=enumerate(sample_generator),
+            batch_size=experiment.configs.global_config.batch_size,
+        )
+
+        for batch in batch_generator:
+            batch_indices, batch_eval_data = zip(*batch)
+            batch_eval_types, batch_eval_samples = zip(*batch_eval_data)
+
             if output_type_info.loss == "diffusion":
                 time_steps = output_type_info.diffusion_time_steps
                 assert time_steps is not None
-                generated_array = reverse_diffusion_array_generation(
-                    eval_sample=eval_sample,
+                batch_generated_arrays = reverse_diffusion_array_generation(
+                    eval_samples=batch_eval_samples,
                     array_output_name=cur_output_name,
                     experiment=experiment,
                     default_eir_hooks=default_eir_hooks,
                     num_steps=time_steps,
                 )
             else:
-                generated_array = one_shot_array_generation(
-                    eval_sample=eval_sample,
+                batch_generated_arrays = one_shot_array_generation(
+                    eval_samples=batch_eval_samples,
                     array_output_name=cur_output_name,
                     experiment=experiment,
                     default_eir_hooks=default_eir_hooks,
                 )
 
-            cur_output_path = (
-                cur_sample_output_folder / eval_type / f"{idx}_generated.npy"
-            )
-            match output_type_info:
-                case ArrayOutputTypeConfig():
-                    save_array_output(
-                        array=generated_array, output_path=cur_output_path
-                    )
-                case ImageOutputTypeConfig():
-                    cur_output_path = cur_output_path.with_suffix(".png")
-                    save_image_output(
-                        array=generated_array, output_path=cur_output_path
-                    )
+            for eval_type, idx, eval_sample, generated_array in zip(
+                batch_eval_types,
+                batch_indices,
+                batch_eval_samples,
+                batch_generated_arrays,
+            ):
 
-            cur_inputs_output_path = (
-                cur_sample_output_folder / eval_type / f"{idx}_inputs"
-            )
+                cur_output_path = (
+                    cur_sample_output_folder / eval_type / f"{idx}_generated.npy"
+                )
+                match output_type_info:
+                    case ArrayOutputTypeConfig():
+                        save_array_output(
+                            array=generated_array, output_path=cur_output_path
+                        )
+                    case ImageOutputTypeConfig():
+                        cur_output_path = cur_output_path.with_suffix(".png")
+                        save_image_output(
+                            array=generated_array, output_path=cur_output_path
+                        )
 
-            raw_inputs = convert_model_inputs_to_raw(
-                inputs_to_model=eval_sample.inputs_to_model,
-                input_objects=input_objects,
-            )
+                cur_inputs_output_path = (
+                    cur_sample_output_folder / eval_type / f"{idx}_inputs"
+                )
 
-            serialize_raw_inputs(
-                raw_inputs=raw_inputs,
-                input_objects=input_objects,
-                output_path=cur_inputs_output_path,
-            )
+                raw_inputs = convert_model_inputs_to_raw(
+                    inputs_to_model=eval_sample.inputs_to_model,
+                    input_objects=input_objects,
+                )
+
+                serialize_raw_inputs(
+                    raw_inputs=raw_inputs,
+                    input_objects=input_objects,
+                    output_path=cur_inputs_output_path,
+                )
 
 
 @torch.no_grad()
 def one_shot_array_generation(
-    eval_sample: ArrayOutputEvalSample,
+    eval_samples: tuple[ArrayOutputEvalSample, ...],
     array_output_name: str,
     experiment: Union["Experiment", "PredictExperiment", "ServeExperiment"],
     default_eir_hooks: Union["Hooks", "PredictHooks"],
-) -> np.ndarray:
+) -> list[np.ndarray]:
     output_object = experiment.outputs[array_output_name]
 
     assert isinstance(output_object, (ComputedArrayOutputInfo, ComputedImageOutputInfo))
 
-    prepared_sample_inputs = prepare_base_input(
-        prepared_inputs=eval_sample.inputs_to_model,
+    array_sampling_batch = prepare_array_sampling_batch(
+        eval_samples=eval_samples, array_output_name=array_output_name
     )
+    prepared_sample_inputs = array_sampling_batch.prepared_inputs
+    prepared_targets = array_sampling_batch.prepared_targets
+
+    all_inputs = default_collate(prepared_sample_inputs)
+    all_targets = default_collate(prepared_targets)
+    all_ids = [eval_sample.sample_id for eval_sample in eval_samples]
 
     batch = general_pre_process_prepared_inputs(
-        prepared_inputs=prepared_sample_inputs,
-        target_labels=eval_sample.target_labels,
-        sample_id=eval_sample.sample_id,
+        prepared_inputs=all_inputs,
+        target_labels=all_targets,
+        sample_ids=all_ids,
         experiment=experiment,
         custom_hooks=default_eir_hooks,
     )
@@ -203,41 +226,58 @@ def one_shot_array_generation(
         inputs=batch.inputs,
     )
 
-    array_output = outputs[array_output_name][array_output_name]
+    batch_size = len(eval_samples)
+    array_outputs = outputs[array_output_name][array_output_name]
 
     assert output_object.normalization_stats is not None
-    array_output_raw = un_normalize_wrapper(
-        array=array_output,
-        normalization_stats=output_object.normalization_stats,
-    )
 
-    array_output_raw_numpy = array_output_raw.cpu().numpy()
+    final_numpy_outputs = []
+    for batch_idx in range(batch_size):
+        cur_output = array_outputs[batch_idx]
+        cur_output_raw = un_normalize_wrapper(
+            array=cur_output,
+            normalization_stats=output_object.normalization_stats,
+        )
+        cur_output_numpy = cur_output_raw.cpu().numpy()
+        final_numpy_outputs.append(cur_output_numpy)
 
-    return array_output_raw_numpy
+    return final_numpy_outputs
 
 
 @torch.inference_mode()
 def reverse_diffusion_array_generation(
-    eval_sample: ArrayOutputEvalSample,
+    eval_samples: tuple[ArrayOutputEvalSample, ...],
     array_output_name: str,
     experiment: Union["Experiment", "PredictExperiment", "ServeExperiment"],
     default_eir_hooks: Union["Hooks", "PredictHooks"],
     num_steps: int,
-) -> np.ndarray:
+) -> list[np.ndarray]:
+    """
+    TODO: Consider not keeping / making configurable whether to keep intermediate
+          states as this might blow up memory usage in some cases.
+    """
     output_object = experiment.outputs[array_output_name]
     assert isinstance(output_object, (ComputedArrayOutputInfo, ComputedImageOutputInfo))
 
     dimensions = output_object.data_dimensions
-    shape = (1,) + dimensions.full_shape()
+    batch_size = len(eval_samples)
+    shape = (batch_size,) + dimensions.full_shape()
 
-    prepared_sample_inputs = prepare_base_input(
-        prepared_inputs=eval_sample.inputs_to_model,
+    array_sampling_batch = prepare_array_sampling_batch(
+        eval_samples=eval_samples,
+        array_output_name=array_output_name,
     )
+    prepared_sample_inputs = array_sampling_batch.prepared_inputs
+    prepared_targets = array_sampling_batch.prepared_targets
+
+    all_inputs = default_collate(prepared_sample_inputs)
+    all_targets = default_collate(prepared_targets)
+    all_ids = [eval_sample.sample_id for eval_sample in eval_samples]
 
     batch = general_pre_process_prepared_inputs(
-        prepared_inputs=prepared_sample_inputs,
-        target_labels=eval_sample.target_labels,
-        sample_id=eval_sample.sample_id,
+        prepared_inputs=all_inputs,
+        target_labels=all_targets,
+        sample_ids=all_ids,
         experiment=experiment,
         custom_hooks=default_eir_hooks,
     )
@@ -254,16 +294,51 @@ def reverse_diffusion_array_generation(
         time_steps=num_steps,
     )
 
-    final_state = states[-1]
+    final_states = states[-1]
 
     assert output_object.normalization_stats is not None
-    final_output = un_normalize_wrapper(
-        array=torch.from_numpy(final_state),
-        normalization_stats=output_object.normalization_stats,
-    )
+    final_numpy_outputs = []
+    for batch_idx in range(batch_size):
+        cur_sample_final_state = final_states[batch_idx]
+        cur_final_output = un_normalize_wrapper(
+            array=torch.from_numpy(cur_sample_final_state),
+            normalization_stats=output_object.normalization_stats,
+        )
+        cur_final_output_numpy = cur_final_output.cpu().numpy()
+        final_numpy_outputs.append(cur_final_output_numpy)
 
-    final_output_numpy = final_output.cpu().numpy()
-    return final_output_numpy
+    return final_numpy_outputs
+
+
+@dataclass(frozen=False)
+class ArraySamplingBatch:
+    prepared_inputs: list[dict[str, torch.Tensor]]
+    prepared_targets: list[dict[str, torch.Tensor]]
+
+
+def prepare_array_sampling_batch(
+    eval_samples: Sequence[ArrayOutputEvalSample],
+    array_output_name: str,
+) -> ArraySamplingBatch:
+    """
+    Every sample has an extra batch dimension by default from e.g. the data
+    loader and preparation. We squeeze here as we collate multiple samples
+    later to avoid an extra dimension.
+    """
+    prepared_sample_inputs = []
+    prepared_targets = []
+
+    for eval_sample in eval_samples:
+        cur_inputs = eval_sample.inputs_to_model
+        cur_prepared = prepare_base_input(prepared_inputs=cur_inputs)
+
+        prepared_sample_inputs.append(cur_prepared)
+        prepared_targets.append(eval_sample.target_labels)
+
+    return ArraySamplingBatch(
+        prepared_inputs=prepared_sample_inputs,
+        prepared_targets=prepared_targets,
+    )
 
 
 def un_normalize_wrapper(
@@ -297,10 +372,8 @@ def save_array_output(array: np.ndarray, output_path: Path | str) -> None:
 def save_image_output(array: np.ndarray, output_path: Path | str) -> None:
     ensure_path_exists(path=Path(output_path))
 
-    assert array.ndim == 4, "Input should be 4D"
-    assert array.shape[0] == 1, "The batch size should be 1."
+    assert array.ndim == 3, "Input should be 3D"
 
-    array = array.squeeze(0)
     array_hwc = np.moveaxis(array, 0, -1)
     array_uint8 = (array_hwc * 255).astype(np.uint8)
 

@@ -3,7 +3,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from itertools import cycle
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Iterator, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, Iterator, Optional, Tuple, Union
 
 import numpy as np
 import torch
@@ -145,7 +145,7 @@ def convert_model_inputs_to_raw(
                 assert isinstance(input_type_info, SequenceInputDataConfig)
                 assert input_object.tokenizer is not None
                 raw_input = decode_tokens(
-                    tokens=data.numpy().squeeze(0).tolist(),
+                    tokens=data.numpy().squeeze().tolist(),
                     vocab=input_object.vocab,
                     split_on=input_type_info.split_on,
                 )
@@ -181,15 +181,13 @@ def convert_image_input_to_raw(
     data: torch.Tensor, normalization_stats: ImageNormalizationStats
 ) -> Image.Image:
     data_np: np.ndarray = data.numpy()
-    assert data_np.ndim == 4, "Input should be 4D"
-    assert data_np.shape[0] == 1, "The batch dimension should be 1"
+    assert data_np.ndim == 3, "Input should be 3D"
 
     cur_input = un_normalize_image(
         normalized_img=data_np,
         normalization_stats=normalization_stats,
     )
 
-    cur_input = cur_input.squeeze(axis=0)
     cur_input_hwc = np.moveaxis(cur_input, 0, -1)
     raw_input_uint = (cur_input_hwc * 255).astype(np.uint8)
 
@@ -249,7 +247,7 @@ def convert_array_input_to_raw(
 def general_pre_process_prepared_inputs(
     prepared_inputs: dict[str, Any],
     target_labels: dict[str, Any],
-    sample_id: str,
+    sample_ids: list[str],
     experiment: Union["Experiment", "PredictExperiment", "ServeExperiment"],
     custom_hooks: Union["Hooks", "PredictHooks"],
 ) -> Batch:
@@ -263,7 +261,7 @@ def general_pre_process_prepared_inputs(
         inputs_objects=experiment.inputs,
     )
 
-    loader_batch = (inputs_final, target_labels, sample_id)
+    loader_batch = (inputs_final, target_labels, sample_ids)
 
     batch_prep_hook_kwargs = {"experiment": experiment}
     state = call_hooks_stage_iterable(
@@ -566,13 +564,38 @@ def serialize_raw_inputs(
 
 
 def get_dataset_loader_single_sample_generator(
-    dataset: Dataset, infinite: bool = True
+    dataset: Dataset,
+    infinite: bool = True,
 ) -> Iterator[al_getitem_return]:
-    loader = DataLoader(dataset=dataset, batch_size=1, shuffle=True)
+    loader: Iterator[al_getitem_return]
     if infinite:
-        yield from cycle(loader)
+        loader = cycle(DataLoader(dataset=dataset, batch_size=1, shuffle=True))
+    else:
+        loader = iter(DataLoader(dataset=dataset, batch_size=1, shuffle=True))
 
-    yield from loader
+    for input_to_model, target_labels, cur_ids in loader:
+        inputs_squeezed = _recursive_batch_dimension_squeeze(inputs=input_to_model)
+        yield inputs_squeezed, target_labels, cur_ids
+
+
+def _recursive_batch_dimension_squeeze(
+    inputs: dict[str, torch.Tensor]
+) -> dict[str, torch.Tensor]:
+    """
+    We need this function as when returning from a dataloader one sample at a time,
+    the single samples include a batch dimension. When concatenating these samples
+    we will end up with an extra dimension causing downstream issues.
+    """
+
+    inputs_squeezed = {}
+    for name, data in inputs.items():
+        if isinstance(data, dict):
+            inputs_squeezed[name] = _recursive_batch_dimension_squeeze(data)
+        else:
+            assert data.shape[0] == 1
+            inputs_squeezed[name] = data.squeeze(dim=0)
+
+    return inputs_squeezed
 
 
 def extract_input_types(input_objects: "al_input_objects_as_dict") -> dict[str, str]:
@@ -608,3 +631,17 @@ def streamline_sequence_manual_data(
         sequence_streamlined = split_data
 
     return sequence_streamlined
+
+
+def get_batch_generator(
+    iterator: Iterator[Tuple[int, Tuple[Any, Any]]],
+    batch_size: int,
+) -> Iterator[list[Tuple[int, Tuple[Any, Any]]]]:
+    batch = []
+    for item in iterator:
+        batch.append(item)
+        if len(batch) == batch_size:
+            yield batch
+            batch = []
+    if batch:
+        yield batch

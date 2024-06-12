@@ -28,13 +28,13 @@ def test_convert_image_input_to_raw():
         means=torch.Tensor([0.5, 0.5, 0.5]),
         stds=torch.Tensor([0.5, 0.5, 0.5]),
     )
-    valid_input = torch.randn((1, 3, 64, 64))
+    valid_input = torch.randn((3, 64, 64))
     valid_output = convert_image_input_to_raw(
         data=valid_input, normalization_stats=normalization_stats
     )
     assert isinstance(valid_output, Image.Image)
 
-    invalid_input = torch.randn((3, 64, 64))
+    invalid_input = torch.randn((1, 3, 64, 64))
     with pytest.raises(AssertionError):
         convert_image_input_to_raw(
             data=invalid_input, normalization_stats=normalization_stats
