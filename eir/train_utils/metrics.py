@@ -30,7 +30,6 @@ from sklearn.metrics import (
     accuracy_score,
     average_precision_score,
     matthews_corrcoef,
-    mean_squared_error,
     r2_score,
     roc_auc_score,
 )
@@ -394,11 +393,14 @@ def calc_rmse(
     labels_2d = labels.reshape(-1, 1)
     outputs_2d = outputs.reshape(-1, 1)
 
-    labels = cur_target_transformer.inverse_transform(X=labels_2d).squeeze()
-    predictions = cur_target_transformer.inverse_transform(X=outputs_2d).squeeze()
+    mean_ = cur_target_transformer.mean_
+    scale_ = cur_target_transformer.scale_
+
+    labels = (labels_2d * scale_ + mean_).squeeze()
+    predictions = (outputs_2d * scale_ + mean_).squeeze()
 
     if np.shape(labels):
-        rmse = np.sqrt(mean_squared_error(y_true=labels, y_pred=predictions))
+        rmse = np.sqrt(np.mean((labels - predictions) ** 2))
     else:
         rmse = np.sqrt((labels - predictions) ** 2)
 
@@ -657,7 +659,7 @@ def persist_metrics(
     write_header: bool,
     prefixes: Dict[str, str],
     writer_funcs: Union[None, Dict[str, Dict[str, Callable]]] = None,
-):
+) -> None:
 
     hc = handler_config
     exp = handler_config.experiment
@@ -686,9 +688,10 @@ def persist_metrics(
                 plot_skip_steps=gc.plot_skip_steps,
             )
 
-            cur_func = get_buffered_metrics_writer(buffer_interval=1)
             if writer_funcs:
                 cur_func = writer_funcs[output_name][target_name]
+            else:
+                cur_func = get_buffered_metrics_writer(buffer_interval=1)
 
             cur_func(
                 filepath=target_history_file,
@@ -763,7 +766,10 @@ def get_buffered_metrics_writer(buffer_interval: int):
     buffer = []
 
     def append_metrics_to_file(
-        filepath: Path, metrics: Dict[str, float], iteration: int, write_header=False
+        filepath: Path,
+        metrics: Dict[str, float],
+        iteration: int,
+        write_header=False,
     ) -> None:
         nonlocal buffer
 
@@ -820,8 +826,14 @@ def get_default_metrics(
     cat_averaging_metrics: Optional[al_cat_averaging_metric_choices],
     con_averaging_metrics: Optional[al_con_averaging_metric_choices],
 ) -> "al_metric_record_dict":
-    mcc = MetricRecord(name="mcc", function=calc_mcc)
-    acc = MetricRecord(name="acc", function=calc_acc)
+    mcc = MetricRecord(
+        name="mcc",
+        function=calc_mcc,
+    )
+    acc = MetricRecord(
+        name="acc",
+        function=calc_acc,
+    )
     roc_auc_macro = MetricRecord(
         name="roc-auc-macro",
         function=calc_roc_auc_ovo,
