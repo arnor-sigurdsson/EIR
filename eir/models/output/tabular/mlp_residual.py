@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Dict, Literal, Sequence, Union
 
 import torch
-from aislib.pytorch_modules import Swish
 from torch import nn
 
 from eir.models.layers.mlp_layers import MLPResidualBlock, ResidualMLPConfig
@@ -102,7 +101,7 @@ def get_linear_final_act_spec(in_features: int, dropout_p: float):
     spec = OrderedDict(
         {
             "norm_final": (nn.LayerNorm, {"normalized_shape": in_features}),
-            "act_final": (Swish, {}),
+            "act_final": (nn.GELU, {}),
             "do_final": (nn.Dropout, {"p": dropout_p}),
         }
     )

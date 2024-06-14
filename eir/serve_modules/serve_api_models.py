@@ -6,7 +6,9 @@ from eir.setup.schemas import InputConfig, TabularInputDataConfig
 
 
 def create_tabular_model(
-    name: str, cat_columns: Sequence[str], con_columns: Sequence[str]
+    name: str,
+    cat_columns: Sequence[str],
+    con_columns: Sequence[str],
 ) -> Type[BaseModel]:
     fields: dict[str, Any] = {col: (str, ...) for col in cat_columns}
     fields.update({col: (float, ...) for col in con_columns})

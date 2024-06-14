@@ -266,11 +266,11 @@ def set_up_all_target_labels_wrapper(
             when we concatenate the dataframes, we will have NaNs in the columns
             that are not present in all output modalities.
 
-    Note:   We store the dtypes here as e.g. form int columns, concatenating will
+    Note:   We store the dtypes here as e.g. from int columns, concatenating will
             create NaNs, which will convert the int columns to float.
     """
-    df_labels_train = pd.DataFrame(index=list(train_ids))
-    df_labels_valid = pd.DataFrame(index=list(valid_ids))
+    df_labels_train = pd.DataFrame()
+    df_labels_valid = pd.DataFrame()
     label_transformers = {}
 
     all_ids: set[str] = set(train_ids).union(set(valid_ids))
