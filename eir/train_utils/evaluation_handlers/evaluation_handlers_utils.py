@@ -16,9 +16,6 @@ from torch.utils.data import DataLoader, Dataset
 torchtext.disable_torchtext_deprecation_warning()
 from torchtext.vocab import Vocab
 
-from eir.data_load.data_preparation_modules.imputation import (
-    impute_missing_modalities_wrapper,
-)
 from eir.data_load.data_preparation_modules.prepare_array import (
     array_load_wrapper,
     prepare_array_data,
@@ -256,12 +253,7 @@ def general_pre_process_prepared_inputs(
     i.e. not the sequence output specific things we define here in the train module.
     """
 
-    inputs_final = impute_missing_modalities_wrapper(
-        inputs_values=prepared_inputs,
-        inputs_objects=experiment.inputs,
-    )
-
-    loader_batch = (inputs_final, target_labels, sample_ids)
+    loader_batch = (prepared_inputs, target_labels, sample_ids)
 
     batch_prep_hook_kwargs = {"experiment": experiment}
     state = call_hooks_stage_iterable(
@@ -355,7 +347,7 @@ def _streamline_tabular_data_for_transformers(
         )
         value_transformed = cur_transformer.transform(value_streamlined)
         value_tensor = torch.from_numpy(value_transformed)
-        parsed_output[name] = value_tensor
+        parsed_output[name] = value_tensor.squeeze(0)
     return parsed_output
 
 
@@ -385,8 +377,10 @@ def post_prepare_manual_inputs(
 
         if input_name == output_name:
             if input_info.input_type == "sequence":
+                prepared_input_no_pad = [i for i in prepared_input if i != pad_idx]
                 prepared_inputs_post[output_name] = torch.tensor(
-                    [i for i in prepared_input if i != pad_idx], dtype=torch.long
+                    prepared_input_no_pad,
+                    dtype=torch.long,
                 )
             else:
                 raise NotImplementedError()
@@ -394,8 +388,7 @@ def post_prepare_manual_inputs(
         else:
             prepared_inputs_post[input_name] = prepared_input
 
-    prepared_inputs_batched = _recursive_unsqueeze(data=prepared_inputs_post, dim=0)
-    return prepared_inputs_batched
+    return prepared_inputs_post
 
 
 def _recursive_unsqueeze(
@@ -573,9 +566,9 @@ def get_dataset_loader_single_sample_generator(
     else:
         loader = iter(DataLoader(dataset=dataset, batch_size=1, shuffle=True))
 
-    for input_to_model, target_labels, cur_ids in loader:
+    for input_to_model, _, cur_ids in loader:
         inputs_squeezed = _recursive_batch_dimension_squeeze(inputs=input_to_model)
-        yield inputs_squeezed, target_labels, cur_ids
+        yield inputs_squeezed, {}, cur_ids
 
 
 def _recursive_batch_dimension_squeeze(

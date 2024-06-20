@@ -118,7 +118,9 @@ def _run_serve_sequence_generation(
         if output_type_info.sequence_operation == "autoregressive":
             assert isinstance(config.sampling_config, SequenceOutputSamplingConfig)
 
-            eval_samples = _build_sequence_eval_samples_batch(serve_batch=batch)
+            eval_samples = _build_sequence_eval_samples_batch(
+                serve_batch=batch,
+            )
 
             hooks = serve_experiment.hooks
             assert hooks is not None
@@ -143,8 +145,11 @@ def _build_sequence_eval_samples_batch(
     eval_samples = []
 
     for i in range(len(serve_batch.ids)):
+
+        prepared_inputs = serve_batch.inputs_split[i]
+
         eval_sample = SequenceOutputEvalSample(
-            inputs_to_model=serve_batch.inputs_split[i],
+            inputs_to_model=prepared_inputs,
             target_labels={},
             sample_id=serve_batch.ids[i],
         )

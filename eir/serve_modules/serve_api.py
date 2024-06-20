@@ -65,8 +65,7 @@ def create_predict_endpoint(
 
     @app.post("/predict", response_model=ResponseModel)
     async def predict(requests: list[input_model]) -> ResponseModel:  # type: ignore
-        logger.info(f"Received {len(requests)} requests.")
-        logger.info(f"Input model has fields {input_model.model_fields}.")
+        logger.info(f"Received {len(requests)} samples in request.")
         data = [request.model_dump() for request in requests]  # type: ignore
         response_data = await process_request(
             data=data,

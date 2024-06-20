@@ -13,6 +13,9 @@ from torch.utils.data._utils.collate import default_collate
 torchtext.disable_torchtext_deprecation_warning()
 from torchtext.vocab import Vocab
 
+from eir.data_load.data_preparation_modules.imputation import (
+    impute_missing_modalities_wrapper,
+)
 from eir.data_load.datasets import al_getitem_return
 from eir.models.model_training_utils import predict_on_batch
 from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
@@ -82,7 +85,8 @@ def sequence_out_single_sample_evaluation_wrapper(
         return
 
     manual_samples = get_sequence_output_manual_input_samples(
-        output_configs=output_configs, input_objects=input_objects
+        output_configs=output_configs,
+        input_objects=input_objects,
     )
 
     auto_validation_generator = get_dataset_loader_single_sample_generator(
@@ -94,7 +98,8 @@ def sequence_out_single_sample_evaluation_wrapper(
         eval_sample_iterator=auto_validation_generator,
     )
     eval_samples_base = SequenceOutputEvalSamples(
-        auto_samples=auto_samples, manual_samples=manual_samples
+        auto_samples=auto_samples,
+        manual_samples=manual_samples,
     )
 
     for config in output_configs:
@@ -197,8 +202,10 @@ def sequence_out_single_sample_evaluation_wrapper(
 
                     cur_id = eval_sample.sample_id
                     meta[cur_id] = {
-                        "generated": str(cur_output_path.resolve()),
-                        "inputs": str(cur_inputs_output_path.resolve()),
+                        "generated": str(cur_output_path.relative_to(output_folder)),
+                        "inputs": str(
+                            cur_inputs_output_path.relative_to(output_folder)
+                        ),
                         "index": idx,
                     }
 
@@ -230,8 +237,13 @@ def get_sequence_output_manual_input_samples(
                 input_objects=input_objects,
             )
 
+            imputed_inputs = impute_missing_modalities_wrapper(
+                inputs_values=prepared_inputs,
+                inputs_objects=input_objects,
+            )
+
             final_inputs = post_prepare_manual_inputs(
-                prepared_inputs=prepared_inputs,
+                prepared_inputs=imputed_inputs,
                 output_name=output_name,
                 input_objects=input_objects,
             )
@@ -295,7 +307,7 @@ def _mask_targets_for_auto_eval_generation(
     for input_name, raw_input in inputs.items():
         if input_name == output_name:
             if input_types[input_name] == "sequence":
-                raw_inputs_masked[output_name] = torch.tensor([[]], dtype=torch.long)
+                raw_inputs_masked[output_name] = torch.tensor([], dtype=torch.long)
             else:
                 raise NotImplementedError()
 
@@ -484,16 +496,18 @@ def _check_vocab_consistency(
 
 
 def _extract_base_generated_tokens(
-    prepared_inputs: Dict[str, torch.Tensor], seq_output_name: str
+    prepared_inputs: Dict[str, torch.Tensor],
+    seq_output_name: str,
 ) -> list[int]:
     """
     Note that we are expecting / enforcing the token IDs being passed in here,
     not the embeddings.
     """
     tensor_base = prepared_inputs[seq_output_name]
-    assert tensor_base.dim() == 2, tensor_base.dim()
 
-    list_base = tensor_base.squeeze(0).tolist()
+    assert tensor_base.dim() == 1, (tensor_base, tensor_base.dim())
+
+    list_base = tensor_base.tolist()
     assert isinstance(list_base, list)
 
     return list_base

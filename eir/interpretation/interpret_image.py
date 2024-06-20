@@ -67,6 +67,7 @@ def analyze_image_input_attributions(
             normalization_stats=input_object.normalization_stats,
         )
         raw_input = raw_input.transpose(1, 2, 0)
+        attributions = attributions.transpose(1, 2, 0)
 
         figure, _ = visualize_image_attr_multiple(
             attr=attributions,

@@ -42,7 +42,7 @@ def test_mask_targets_for_auto_eval_generation():
 
     expected_output = {
         "a": 1,
-        "b": torch.tensor([[]], dtype=torch.long),
+        "b": torch.tensor([], dtype=torch.long),
         "c": 3,
     }
 
@@ -61,7 +61,7 @@ def test_mask_targets_for_auto_eval_generation():
 
 
 def test_extract_base_generated_tokens():
-    prepared_inputs = {"sequence_output": torch.tensor([[1, 2, 3]])}
+    prepared_inputs = {"sequence_output": torch.tensor([1, 2, 3])}
     seq_output_name = "sequence_output"
 
     base_tokens = _extract_base_generated_tokens(
@@ -208,7 +208,7 @@ def test_autoregressive_sequence_generation(
     )
 
     base = [5, 6, 7]
-    test_input = torch.tensor([base], dtype=torch.long)
+    test_input = torch.tensor(base, dtype=torch.long)
     eval_samples = (
         SequenceOutputEvalSample(
             inputs_to_model={"test_output_sequence": test_input},

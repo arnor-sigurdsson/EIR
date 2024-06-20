@@ -242,6 +242,7 @@ def test_multi_serving(
         url="http://localhost:8000/predict",
         example_requests=[example_requests],
         data_loading_function=load_data_for_serve,
+        base_path=None,
     )
 
     for idx, random_id in enumerate(ids):

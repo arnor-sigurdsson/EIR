@@ -20,6 +20,9 @@ from PIL import Image
 from torch.utils.data import Dataset
 from torch.utils.data._utils.collate import default_collate
 
+from eir.data_load.data_preparation_modules.imputation import (
+    impute_missing_modalities_wrapper,
+)
 from eir.data_load.data_preparation_modules.prepare_array import un_normalize_array
 from eir.data_load.datasets import al_getitem_return
 from eir.interpretation.interpret_image import un_normalize_image
@@ -84,7 +87,8 @@ def array_out_single_sample_evaluation_wrapper(
         return
 
     manual_samples = get_array_output_manual_input_samples(
-        output_configs=output_configs, input_objects=input_objects
+        output_configs=output_configs,
+        input_objects=input_objects,
     )
 
     auto_validation_generator = get_dataset_loader_single_sample_generator(
@@ -95,7 +99,8 @@ def array_out_single_sample_evaluation_wrapper(
         eval_sample_iterator=auto_validation_generator,
     )
     eval_samples_base = ArrayOutputEvalSamples(
-        auto_samples=auto_samples, manual_samples=manual_samples
+        auto_samples=auto_samples,
+        manual_samples=manual_samples,
     )
 
     for config in output_configs:
@@ -417,11 +422,17 @@ def get_array_output_manual_input_samples(
 
         for idx, single_sample_inputs in enumerate(sample_data_from_yaml):
             prepared_inputs = prepare_manual_sample_data(
-                sample_inputs=single_sample_inputs, input_objects=input_objects
+                sample_inputs=single_sample_inputs,
+                input_objects=input_objects,
+            )
+
+            imputed_inputs = impute_missing_modalities_wrapper(
+                inputs_values=prepared_inputs,
+                inputs_objects=input_objects,
             )
 
             cur_eval_sample = ArrayOutputEvalSample(
-                inputs_to_model=prepared_inputs,
+                inputs_to_model=imputed_inputs,
                 target_labels={},
                 sample_id=f"manual_{idx}",
             )
