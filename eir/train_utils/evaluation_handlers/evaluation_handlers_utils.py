@@ -142,7 +142,7 @@ def convert_model_inputs_to_raw(
                 assert isinstance(input_type_info, SequenceInputDataConfig)
                 assert input_object.tokenizer is not None
                 raw_input = decode_tokens(
-                    tokens=data.numpy().squeeze().tolist(),
+                    tokens=data.numpy().tolist(),
                     vocab=input_object.vocab,
                     split_on=input_type_info.split_on,
                 )
