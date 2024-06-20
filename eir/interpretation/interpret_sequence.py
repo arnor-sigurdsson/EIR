@@ -307,9 +307,10 @@ def get_sequence_token_importance(
 def get_sequence_feature_importance_df(
     token_importances: Dict[str, list[float]]
 ) -> pd.DataFrame:
-    df = pd.concat({k: pd.Series(v) for k, v in token_importances.items()})
-    df = df.reset_index(level=0).reset_index(drop=True)
-    df.columns = ["Input", "Attribution"]
+    df: pd.DataFrame = pd.DataFrame.from_dict(token_importances, orient="index").T
+
+    df = df.reset_index(drop=True)
+    df = df.melt(var_name="Input", value_name="Attribution")
 
     return df
 

@@ -645,6 +645,8 @@ def _process_chunk(
     for row in chunk.itertuples(index=True, name="Row"):
         # Tuple of (ID, Output Name)
         multi_index = row.Index
+        assert isinstance(multi_index, tuple)
+        assert len(multi_index) == 2
         cur_id, cur_output_name = multi_index
         cur_output_dtypes = dtypes[cur_output_name]
 

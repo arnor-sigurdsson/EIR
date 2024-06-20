@@ -225,7 +225,7 @@ def _add_inverse_transformed_column(
     df_copy = df.copy()
 
     tt_it = transformer.inverse_transform
-    values = df[column_name].values
+    values = np.asarray(df[column_name].values)
     col_name = f"{column_name} Untransformed"
 
     if isinstance(transformer, LabelEncoder):

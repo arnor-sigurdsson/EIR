@@ -145,4 +145,8 @@ def get_csv_id_sequence_iterator(
         if pd.isna(cur_seq):
             cur_seq = ""
 
-        yield row.Index, cur_seq
+        cur_index = row.Index
+        assert isinstance(cur_index, str)
+        assert isinstance(cur_seq, str)
+
+        yield cur_index, cur_seq

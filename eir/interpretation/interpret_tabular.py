@@ -239,9 +239,10 @@ def parse_tabular_attributions_for_feature_importance(
 def get_tabular_attribution_df(
     parsed_attributions: Dict[str, List[float]]
 ) -> pd.DataFrame:
-    df = pd.concat({k: pd.Series(v) for k, v in parsed_attributions.items()})
-    df = df.reset_index(level=0).reset_index(drop=True)
-    df.columns = ["Input", "Attribution"]
+    df: pd.DataFrame = pd.DataFrame.from_dict(parsed_attributions, orient="index").T
+
+    df = df.reset_index(drop=True)
+    df = df.melt(var_name="Input", value_name="Attribution")
 
     return df
 
