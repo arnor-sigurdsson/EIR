@@ -9,7 +9,6 @@ from typing import (
     Optional,
     Protocol,
     Tuple,
-    TypeVar,
     Union,
 )
 
@@ -36,8 +35,6 @@ from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from eir.train_utils.evaluation import PerformancePlotConfig
-
-T = TypeVar("T", int, float, str)
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -140,7 +137,7 @@ def generate_validation_curve_from_series(
 
 
 class SeriesMinMaxProtocol(Protocol):
-    def __call__(self, series: pd.Series[T]) -> Union[int, str]: ...
+    def __call__(self, series: pd.Series) -> Union[int, str]: ...
 
 
 def _get_min_or_max_funcs(
