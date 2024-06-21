@@ -123,28 +123,16 @@ With the server running, we can now send requests with COCO images. The images a
 
 Here's an example Python function demonstrating this process:
 
-.. code-block:: python
+.. literalinclude:: ../tutorial_files/f_image_output/01_image_foundation/request_example/python_request_example_module.py
+    :language: python
+    :caption: request_example_module.py
 
-    import requests
-    from PIL import Image
-    import base64
-    from io import BytesIO
+When running this, we get the following output:
 
-    def encode_image_to_base64(file_path: str) -> str:
-        with open(file_path, "rb") as image_file:
-            image_bytes = image_file.read()
-            return base64.b64encode(image_bytes).decode('utf-8')
+.. literalinclude:: ../tutorial_files/f_image_output/01_image_foundation/request_example/python_request_example.json
+    :language: json
+    :caption: request_example.json
 
-    def send_request(url: str, payload: dict):
-        response = requests.post(url, json=payload)
-        return response.json()
-
-    payload = {
-        "image": encode_image_to_base64("path/to/image.png")
-    }
-
-    response = send_request('http://localhost:8000/predict', payload)
-    print(response)
 
 Retrieving Image Information
 """""""""""""""""""""""""""""
@@ -181,8 +169,10 @@ obtained from the ``/info`` endpoint:
         return image_np
 
     def display_image(image_np: np.ndarray) -> None:
-        image_np = (image_np - image_np.min()) / (image_np.max() - image_np.min())
+        image_np = np.transpose(array_np, (1, 2, 0))
+        image_np = np.clip(image_np, 0, 1)
         image_np = (image_np * 255).astype(np.uint8)
+
         image = Image.fromarray(image_np, mode="RGB")
         plt.imshow(image)
         plt.axis('off')
@@ -193,6 +183,16 @@ obtained from the ``/info`` endpoint:
     image_shape = (64, 64, 3)
     image_np = decode_image_from_base64(base64_str=base64_image, image_shape=image_shape)
     display_image(image_np=image_np)
+
+.. note::
+    There is a slight difference in how we convert the model outputs compared to
+    the :ref:`c-array-output-mnist-generation-tutorial` tutorial. This is because
+    when using the `image` modality, the images are by default normalized to the
+    range [0, 1]. So here, we clip them to ensure they are within this range (as
+    the un-normalized model output might be slightly outside this range).
+    Whereas in the other tutorial, the images encoded as arrays are
+    originally in the range [0, 255]. Therefore, we here ensure the [0, 1] range
+    and then convert it back to the [0, 255] range for visualization.
 
 
 Analyzing Responses

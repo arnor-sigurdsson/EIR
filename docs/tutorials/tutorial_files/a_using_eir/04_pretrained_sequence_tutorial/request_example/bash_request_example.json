@@ -1,0 +1,12 @@
+{
+    "result": [
+        {
+            "imdb_output": {
+                "Sentiment": {
+                    "Negative": 0.022120043635368347,
+                    "Positive": 0.9778799414634705
+                }
+            }
+        }
+    ]
+}

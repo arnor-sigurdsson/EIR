@@ -94,7 +94,8 @@ Now, when we are generating arrays, ``EIR`` will
 save some of the generated arrays (as well as the corresponding inputs)
 during training under the ``results/samples/<iteration>`` folders
 (the sampling is configurable by the sampling configuration
-in the output config). We can load these numpy arrays and visualize them.
+in the output config). We can load these numpy arrays,
+clip them to the range [0,255] and visualize them.
 
 Here is a comparison of generated images at iteration 500:
 
@@ -219,27 +220,15 @@ The data arrays are encoded in base64 before sending.
 
 Here's an example Python function demonstrating this process:
 
-.. code-block:: python
+.. literalinclude:: ../tutorial_files/d_array_output/01_array_mnist_generation/request_example/python_request_example_module.py
+    :language: python
+    :caption: request_example_module.py
 
-    import requests
-    import numpy as np
-    import base64
+When running this, we get the following output:
 
-    def encode_array_to_base64(file_path: str) -> str:
-        array_np = np.load(file_path)
-        array_bytes = array_np.tobytes()
-        return base64.b64encode(array_bytes).decode('utf-8')
-
-    def send_request(url: str, payload: dict):
-        response = requests.post(url, json=payload)
-        return response.json()
-
-    payload = {
-        "mnist": encode_array_to_base64("path/to/mnist_array.npy")
-    }
-
-    response = send_request('http://localhost:8000/predict', payload)
-    print(response)
+.. literalinclude:: ../tutorial_files/d_array_output/01_array_mnist_generation/request_example/python_request_example.json
+    :language: json
+    :caption: request_example.json
 
 
 Retrieving Array Information
@@ -282,18 +271,25 @@ obtained from the ``/info`` endpoint:
     which is the output dtype of the model itself. The model output is then un-normalized
     using the training set statistics (assuming normalization was used during training).
 
-For example, since these are images originally in ``uint8`` format,
+For example, since these are images (encoded as arrays) originally in ``uint8`` format,
 we can process the response arrays as follows:
 
 .. code-block:: python
 
     from PIL import Image
 
-    array_np = (array_np - array_np.min()) / (array_np.max() - array_np.min())
-    array_np = (array_np * 255).astype(np.uint8)
+    array_np = array_np.clip(0, 255).astype(np.uint8)
 
     image = Image.fromarray(array_np)
     image.show()
+
+.. note::
+    The ``clip`` function is used to ensure that the values are within the valid range
+    for the image data type (0-255 for ``uint8``). As the raw array values are
+    composed of values between 0-255, the generated arrays (after un-normalization)
+    in the EIR pipeline are on this scale as well. However, for displaying purposes,
+    we enforce this range (as the model output can sometimes be slightly out of
+    the original range).
 
 
 Analyzing Responses

@@ -13,7 +13,10 @@ from torchvision import transforms
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
 from docs.doc_modules.f_image_outputs.utils import get_content_root
 from docs.doc_modules.serve_experiments_utils import copy_inputs, load_data_for_serve
-from docs.doc_modules.serving_experiments import AutoDocServingInfo
+from docs.doc_modules.serving_experiments import (
+    AutoDocServingInfo,
+    build_request_example_module_from_function,
+)
 from docs.doc_modules.utils import add_model_path_to_command, get_saved_model_path
 
 CONTENT_ROOT = CR = get_content_root()
@@ -125,24 +128,12 @@ def get_image_gen_02_mnist_generation_serve() -> AutoDocServingInfo:
     _add_small_altercation_versions(static_folder=image_base)
     example_requests = [
         [
-            {
-                "image": f"{image_base}/image_0.png",
-            },
-            {
-                "image": f"{image_base}/image_1.png",
-            },
-            {
-                "image": f"{image_base}/image_2.png",
-            },
-            {
-                "image": f"{image_base}/image_0_altered.png",
-            },
-            {
-                "image": f"{image_base}/image_1_altered.png",
-            },
-            {
-                "image": f"{image_base}/image_2_altered.png",
-            },
+            {"image": f"{image_base}/image_0.png"},
+            {"image": f"{image_base}/image_1.png"},
+            {"image": f"{image_base}/image_2.png"},
+            {"image": f"{image_base}/image_0_altered.png"},
+            {"image": f"{image_base}/image_1_altered.png"},
+            {"image": f"{image_base}/image_2_altered.png"},
         ]
     ]
 
@@ -174,6 +165,12 @@ def get_image_gen_02_mnist_generation_serve() -> AutoDocServingInfo:
         },
     )
 
+    example_request_module_python = build_request_example_module_from_function(
+        function=example_request_function_python,
+        name="python",
+        language="python",
+    )
+
     ade = AutoDocServingInfo(
         name="ARRAY_GENERATION_DEPLOY",
         base_path=Path(base_path),
@@ -182,9 +179,39 @@ def get_image_gen_02_mnist_generation_serve() -> AutoDocServingInfo:
         post_run_functions=(copy_inputs_to_serve, decode_and_save_images_func),
         example_requests=example_requests,
         data_loading_function=load_data_for_serve,
+        request_example_modules=[
+            example_request_module_python,
+        ],
     )
 
     return ade
+
+
+def example_request_function_python():
+    import base64
+
+    import requests
+
+    def encode_image_to_base64(file_path: str) -> str:
+        with open(file_path, "rb") as image_file:
+            image_bytes = image_file.read()
+            return base64.b64encode(image_bytes).decode("utf-8")
+
+    def send_request(url: str, payload: list[dict]) -> list[dict]:
+        response = requests.post(url, json=payload)
+        response.raise_for_status()
+        return response.json()
+
+    image_base = "eir_tutorials/f_image_output/01_image_foundation/data/images"
+    payload = [
+        {"image": encode_image_to_base64(f"{image_base}/000000000009.jpg")},
+    ]
+
+    response = send_request(url="http://localhost:8000/predict", payload=payload)
+    print(response)
+
+    # --skip-after
+    return response
 
 
 def _add_small_altercation_versions(static_folder: str) -> None:
@@ -228,9 +255,9 @@ def decode_and_save_images(
         array_bytes = base64.b64decode(base64_array)
 
         array_np = np.frombuffer(array_bytes, dtype=np.float32).reshape(tensor_shape)
-        array_np = np.transpose(array_np, (1, 2, 0))
 
-        array_np = (array_np - array_np.min()) / (array_np.max() - array_np.min())
+        array_np = np.transpose(array_np, (1, 2, 0))
+        array_np = np.clip(array_np, 0.0, 1.0)
         array_np = (array_np * 255).astype(np.uint8)
 
         image = Image.fromarray(array_np, mode="RGB")

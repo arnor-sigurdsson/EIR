@@ -1,2 +1,2 @@
 eirserve \
---model-path eir_tutorials/tutorial_runs/c_sequence_output/02_seq_to_seq/saved_models/02_seq_to_seq_model_5000_perf-average=-0.2346.pt
+--model-path eir_tutorials/tutorial_runs/c_sequence_output/02_seq_to_seq/saved_models/02_seq_to_seq_model_5000_perf-average=-0.2243.pt

@@ -4,7 +4,10 @@ from typing import Sequence
 
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
 from docs.doc_modules.serve_experiments_utils import copy_inputs, load_data_for_serve
-from docs.doc_modules.serving_experiments import AutoDocServingInfo
+from docs.doc_modules.serving_experiments import (
+    AutoDocServingInfo,
+    build_request_example_module_from_function,
+)
 from docs.doc_modules.utils import add_model_path_to_command
 
 
@@ -171,14 +174,16 @@ def get_05_hot_dog_run_1_serve_info() -> AutoDocServingInfo:
         "hot_dog_not_hot_dog/food_images"
     )
     example_requests = [
-        {
-            "hot_dog_efficientnet": f"{base}/1040579.jpg",
-            "hot_dog_resnet18": f"{base}/1040579.jpg",
-        },
-        {
-            "hot_dog_efficientnet": f"{base}/108743.jpg",
-            "hot_dog_resnet18": f"{base}/108743.jpg",
-        },
+        [
+            {
+                "hot_dog_efficientnet": f"{base}/1040579.jpg",
+                "hot_dog_resnet18": f"{base}/1040579.jpg",
+            },
+            {
+                "hot_dog_efficientnet": f"{base}/108743.jpg",
+                "hot_dog_resnet18": f"{base}/108743.jpg",
+            },
+        ],
     ]
 
     add_model_path = partial(
@@ -190,9 +195,15 @@ def get_05_hot_dog_run_1_serve_info() -> AutoDocServingInfo:
     copy_inputs_to_serve = (
         copy_inputs,
         {
-            "example_requests": example_requests,
+            "example_requests": example_requests[0],
             "output_folder": str(Path(base_path) / "serve_results"),
         },
+    )
+
+    example_request_module_python = build_request_example_module_from_function(
+        function=example_request_function_python,
+        name="python",
+        language="python",
     )
 
     ade = AutoDocServingInfo(
@@ -203,9 +214,52 @@ def get_05_hot_dog_run_1_serve_info() -> AutoDocServingInfo:
         post_run_functions=(copy_inputs_to_serve,),
         example_requests=example_requests,
         data_loading_function=load_data_for_serve,
+        request_example_modules=[
+            example_request_module_python,
+        ],
     )
 
     return ade
+
+
+def example_request_function_python():
+    import base64
+    from io import BytesIO
+
+    import requests
+    from PIL import Image
+
+    def encode_image_to_base64(file_path: str) -> str:
+        with Image.open(file_path) as image:
+            buffered = BytesIO()
+            image.save(buffered, format="JPEG")
+            return base64.b64encode(buffered.getvalue()).decode("utf-8")
+
+    def send_request(url: str, payload: list[dict]) -> dict:
+        response_ = requests.post(url, json=payload)
+        response_.raise_for_status()
+        return response_.json()
+
+    base = (
+        "eir_tutorials/a_using_eir/05_image_tutorial/data/"
+        "hot_dog_not_hot_dog/food_images"
+    )
+    payload = [
+        {
+            "hot_dog_efficientnet": encode_image_to_base64(f"{base}/1040579.jpg"),
+            "hot_dog_resnet18": encode_image_to_base64(f"{base}/1040579.jpg"),
+        },
+        {
+            "hot_dog_efficientnet": encode_image_to_base64(f"{base}/108743.jpg"),
+            "hot_dog_resnet18": encode_image_to_base64(f"{base}/108743.jpg"),
+        },
+    ]
+
+    response = send_request(url="http://localhost:8000/predict", payload=payload)
+    print(response)
+
+    # --skip-after
+    return response
 
 
 def get_experiments() -> Sequence[AutoDocExperimentInfo]:

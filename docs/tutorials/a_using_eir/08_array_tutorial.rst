@@ -157,7 +157,7 @@ results by e.g. increasing the number of filters in the CNN case.
 
 
 C - Serving
-^^^^^^^^^^^
+-----------
 
 In this final section, we demonstrate serving our trained model for 3D array data as a web service and interacting with it using HTTP requests.
 
@@ -181,32 +181,19 @@ Here is an example of the command:
 Sending Requests
 """"""""""""""""
 
-With the server running, we can now send requests for 3D array data.
-The data is encoded in base64 before sending.
+With the server running, we can now send requests. For this model, we send 3D numpy arrays encoded in base64 in a batched format.
 
 Here's an example Python function demonstrating this process:
 
-.. code-block:: python
+.. literalinclude:: ../tutorial_files/a_using_eir/08_array_tutorial/request_example/python_request_example_module.py
+    :language: python
+    :caption: request_example_module.py
 
-    import requests
-    import numpy as np
-    import base64
+When running this, we get the following output:
 
-    def encode_array_to_base64(file_path: str) -> str:
-        array_np = np.load(file_path)
-        array_bytes = array_np.tobytes()
-        return base64.b64encode(array_bytes).decode('utf-8')
-
-    def send_request(url: str, payload: dict):
-        response = requests.post(url, json=payload)
-        return response.json()
-
-    payload = {
-        "genotype_as_array": encode_array_to_base64("path/to/array_file.npy")
-    }
-
-    response = send_request('http://localhost:8000/predict', payload)
-    print(response)
+.. literalinclude:: ../tutorial_files/a_using_eir/08_array_tutorial/request_example/python_request_example.json
+    :language: json
+    :caption: request_example.json
 
 
 Analyzing Responses

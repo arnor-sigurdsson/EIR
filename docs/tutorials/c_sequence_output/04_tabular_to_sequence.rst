@@ -171,36 +171,28 @@ With the server running, we can now send requests that include tabular data to g
 
 Here's an example Python function demonstrating this process:
 
-.. code-block:: python
+.. literalinclude:: ../tutorial_files/c_sequence_output/04_protein_sequence_generation/request_example/python_request_example_module.py
+    :language: python
+    :caption: request_example_module.py
 
-    import requests
+When running this, we get the following output:
 
-    def send_request(url: str, payload: dict):
-        response = requests.post(url, json=payload)
-        return response.json()
+.. literalinclude:: ../tutorial_files/c_sequence_output/04_protein_sequence_generation/request_example/python_request_example.json
+    :language: json
+    :caption: request_example.json
 
-    example_requests = [
-        {"proteins_tabular": {"classification": "HYDROLASE"}, "protein_sequence": ""},
-        {"proteins_tabular": {"classification": "TRANSFERASE"}, "protein_sequence": ""},
-    ]
+Additionally, you can send requests using bash:
 
-    for payload in example_requests:
-        response = send_request('http://localhost:8000/predict', payload)
-        print(f"Classification: {payload['proteins_tabular']['classification']}")
-        print(f"Generated protein sequence: {response['protein_sequence']}\n")
+.. literalinclude:: ../tutorial_files/c_sequence_output/04_protein_sequence_generation/request_example/bash_request_example_module.sh
+    :language: console
+    :caption: request_example_module.sh
 
-Additionally, you can send requests using `bash`:
+When running this, we get the following output:
 
-.. code-block:: bash
+.. literalinclude:: ../tutorial_files/c_sequence_output/04_protein_sequence_generation/request_example/bash_request_example.json
+    :language: json
+    :caption: request_example.json
 
-    curl -X 'POST' \
-      'http://localhost:8000/predict' \
-      -H 'accept: application/json' \
-      -H 'Content-Type: application/json' \
-      -d '{
-          "proteins_tabular": {"classification": "HYDROLASE"},
-          "protein_sequence": ""
-      }'
 
 Analyzing Responses
 """""""""""""""""""

@@ -1,41 +1,37 @@
 [
     {
-        "request": {
-            "proteins_tabular": {
-                "classification": "HYDROLASE"
+        "request": [
+            {
+                "proteins_tabular": {
+                    "classification": "HYDROLASE"
+                },
+                "protein_sequence": ""
             },
-            "protein_sequence": ""
-        },
-        "response": {
-            "result": {
-                "protein_sequence": "EILYEGKLLSGGVDAVFLPVRRDIKSVSALGYQSVDEDRILQSGDTIIVRDGPKIIGGLRAHAVHESIGLTLEGPAEFGVGSPEARFDETVRRTGVLVDHLDVAPVTARRRGVLVKGRLEFAIGLVIA"
-            }
-        }
-    },
-    {
-        "request": {
-            "proteins_tabular": {
-                "classification": "TRANSFERASE"
+            {
+                "proteins_tabular": {
+                    "classification": "TRANSFERASE"
+                },
+                "protein_sequence": ""
             },
-            "protein_sequence": ""
-        },
-        "response": {
-            "result": {
-                "protein_sequence": "KEIYLNGAVNKYIYNVTNLSSGKEATKDIKKASKVTGQAAIREVKGDKIIKAYARKEDKLSKDPIIKDNLIVGIKELISFEYVTGNPDFVSLRLKGVLGGYTFEFVKPNKDEFFVAIPYFKTVEEKID"
+            {
+                "proteins_tabular": {
+                    "classification": "OXIDOREDUCTASE"
+                },
+                "protein_sequence": "AAA"
             }
-        }
-    },
-    {
-        "request": {
-            "proteins_tabular": {
-                "classification": "OXIDOREDUCTASE"
-            },
-            "protein_sequence": "AAA"
-        },
+        ],
         "response": {
-            "result": {
-                "protein_sequence": "AAALLKLKKAVVLTGSQAILALGAVGAGASLRGGSADFQPVVAPGTASGIPTASVTFVKEAAQVLAENAATAVFGRDGDALRLTVTDAELDRTVETRVSPPLEKAVILALASAEDEEATRGVIVATGA"
-            }
+            "result": [
+                {
+                    "protein_sequence": "LPQPLIDPAVQAVRPEARIPDPGGRVDTTLSEAARLRHSRLQVLEQRFLTVGEAAEFLGYPTEEHSLHGPGLGPVESGLTHVTHIGREEVRLARDDAERLLGVVQADGGGPTALARAAHDLSLDLAR"
+                },
+                {
+                    "protein_sequence": "HHHHHHHSGKGLVVAAARHGGLAVHKGEVREVVTLIEAQLQTLKLSRAEAQEFGDVQGVRAGKGGVSSAVRAFTFRGGIEAPGKGRVISAKTLDAFDTGVNPLLGLVDDGDLRRAVVGSVVIDTHIR"
+                },
+                {
+                    "protein_sequence": "AAANGGLSALKEKIGSAKFPLIDESEKFNVVSQSNVFDFSLGYEKSEAIKVEDNNKAAFDLFVALIERVITLNAAITPNNSIQNVAETLTKIRSAIQYRITGFADRPLISRISKAEVPIAEIIALGF"
+                }
+            ]
         }
     }
 ]

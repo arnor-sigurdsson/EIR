@@ -1,5 +1,5 @@
 input_info:
-  input_source: eir_tutorials/c_sequence_output/03_image_captioning/data/image_captioning/images
+  input_source: eir_tutorials/c_sequence_output/03_image_captioning/data/images
   input_name: image_captioning
   input_type: image
 

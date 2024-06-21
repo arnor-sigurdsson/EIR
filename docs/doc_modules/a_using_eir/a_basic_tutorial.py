@@ -6,7 +6,10 @@ import pandas as pd
 
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
 from docs.doc_modules.serve_experiments_utils import load_data_for_serve
-from docs.doc_modules.serving_experiments import AutoDocServingInfo
+from docs.doc_modules.serving_experiments import (
+    AutoDocServingInfo,
+    build_request_example_module_from_function,
+)
 from docs.doc_modules.utils import get_saved_model_path
 
 
@@ -320,10 +323,18 @@ def get_tutorial_01_run_3_serve() -> AutoDocServingInfo:
         "eir_tutorials/a_using_eir/01_basic_tutorial/data/processed_sample_data/arrays"
     )
     example_requests = [
-        {"genotype": f"{base}/A374.npy"},
-        {"genotype": f"{base}/Ayodo_468C.npy"},
-        {"genotype": f"{base}/NOR146.npy"},
+        [
+            {"genotype": f"{base}/A374.npy"},
+            {"genotype": f"{base}/Ayodo_468C.npy"},
+            {"genotype": f"{base}/NOR146.npy"},
+        ]
     ]
+
+    example_request_module = build_request_example_module_from_function(
+        function=example_request_function,
+        name="python",
+        language="python",
+    )
 
     ade = AutoDocServingInfo(
         name="GLN_1_DEPLOY",
@@ -333,9 +344,38 @@ def get_tutorial_01_run_3_serve() -> AutoDocServingInfo:
         post_run_functions=(),
         example_requests=example_requests,
         data_loading_function=load_data_for_serve,
+        request_example_modules=[example_request_module],
     )
 
     return ade
+
+
+def example_request_function():
+    import base64
+
+    import numpy as np
+    import requests
+
+    def encode_numpy_array(file_path: str) -> str:
+        array = np.load(file_path)
+        encoded = base64.b64encode(array.tobytes()).decode("utf-8")
+        return encoded
+
+    def send_request(url: str, payload: list[dict]):
+        response = requests.post(url, json=payload)
+        return response.json()
+
+    encoded_data = encode_numpy_array(
+        file_path="eir_tutorials/a_using_eir/01_basic_tutorial/data/"
+        "processed_sample_data/arrays/A_French-4.DG.npy"
+    )
+    response = send_request(
+        url="http://localhost:8000/predict", payload=[{"genotype": encoded_data}]
+    )
+    print(response)
+
+    # --skip-after
+    return response
 
 
 def get_experiments() -> Sequence[AutoDocExperimentInfo | AutoDocServingInfo]:

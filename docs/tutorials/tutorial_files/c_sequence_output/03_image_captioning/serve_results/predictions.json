@@ -1,35 +1,31 @@
 [
     {
-        "request": {
-            "image_captioning": "eir_tutorials/c_sequence_output/03_image_captioning/data/image_captioning/images/000000000009.jpg",
-            "captions": ""
-        },
-        "response": {
-            "result": {
-                "captions": "A bowl of broccoli and a is on a plate."
+        "request": [
+            {
+                "image_captioning": "eir_tutorials/c_sequence_output/03_image_captioning/data/images/000000000009.jpg",
+                "captions": ""
+            },
+            {
+                "image_captioning": "eir_tutorials/c_sequence_output/03_image_captioning/data/images/000000000034.jpg",
+                "captions": ""
+            },
+            {
+                "image_captioning": "eir_tutorials/c_sequence_output/03_image_captioning/data/images/000000581929.jpg",
+                "captions": "A horse"
             }
-        }
-    },
-    {
-        "request": {
-            "image_captioning": "eir_tutorials/c_sequence_output/03_image_captioning/data/image_captioning/images/000000000034.jpg",
-            "captions": ""
-        },
+        ],
         "response": {
-            "result": {
-                "captions": "Two zebras standing side by side in a grassy field."
-            }
-        }
-    },
-    {
-        "request": {
-            "image_captioning": "eir_tutorials/c_sequence_output/03_image_captioning/data/image_captioning/images/000000581929.jpg",
-            "captions": "A horse"
-        },
-        "response": {
-            "result": {
-                "captions": "A horse and a goat grazing in the grass"
-            }
+            "result": [
+                {
+                    "captions": "a a sandwich and french fries"
+                },
+                {
+                    "captions": "A zebra grazes in a green field with"
+                },
+                {
+                    "captions": "A horse stands in the middle of a grassy field. "
+                }
+            ]
         }
     }
 ]

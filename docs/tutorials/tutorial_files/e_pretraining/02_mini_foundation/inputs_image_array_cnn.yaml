@@ -3,6 +3,9 @@ input_info:
   input_name: image_input
   input_type: image
 
+input_type_info:
+  adaptive_normalization_max_samples: 10000
+
 model_config:
   model_type: cnn
   model_init_config:

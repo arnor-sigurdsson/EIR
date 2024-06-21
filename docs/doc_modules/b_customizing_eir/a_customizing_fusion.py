@@ -71,6 +71,7 @@ def modify_experiment(experiment: train.Experiment) -> train.Experiment:
         outputs_as_dict=experiment.outputs,
         computed_out_dimensions=my_fusion_module.num_out_features,
         device=experiment.configs.global_config.device,
+        fusion_model_type="computed",
     )
 
     my_model = MetaModel(

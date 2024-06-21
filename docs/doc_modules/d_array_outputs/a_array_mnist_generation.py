@@ -15,7 +15,10 @@ from umap import UMAP
 from docs.doc_modules.d_array_outputs.utils import get_content_root
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
 from docs.doc_modules.serve_experiments_utils import copy_inputs, load_data_for_serve
-from docs.doc_modules.serving_experiments import AutoDocServingInfo
+from docs.doc_modules.serving_experiments import (
+    AutoDocServingInfo,
+    build_request_example_module_from_function,
+)
 from docs.doc_modules.utils import add_model_path_to_command, get_saved_model_path
 
 CONTENT_ROOT = CR = get_content_root()
@@ -215,7 +218,7 @@ def load_images_and_iterations(
         index = int(parts[4].split(".")[0])
 
         image_path = os.path.join(folder_path, file_name)
-        image_data = np.load(image_path)
+        image_data = np.load(image_path).clip(0, 255).astype(np.uint8)
 
         if image_type == "inputs":
             images_data["inputs"].setdefault(iteration, [None] * 5)[index] = image_data
@@ -384,6 +387,7 @@ def plot_inputs_and_images(input_folder: Path, output_folder: Path) -> None:
         with open(input_file, "r") as json_file:
             input_data = json.load(json_file)
         image_data = np.load(str(generated_file)).squeeze()
+        image_data = image_data.clip(0, 255).astype(np.uint8)
         images_and_inputs.append((input_data, image_data))
 
     num_images = len(images_and_inputs)
@@ -424,15 +428,11 @@ def get_array_gen_02_mnist_generation_serve() -> AutoDocServingInfo:
 
     image_base = "eir_tutorials/d_array_output/01_array_mnist_generation/data/mnist_npy"
     example_requests = [
-        {
-            "mnist": f"{image_base}/10001.npy",
-        },
-        {
-            "mnist": f"{image_base}/50496.npy",
-        },
-        {
-            "mnist": f"{image_base}/25640.npy",
-        },
+        [
+            {"mnist": f"{image_base}/10001.npy"},
+            {"mnist": f"{image_base}/50496.npy"},
+            {"mnist": f"{image_base}/25640.npy"},
+        ],
     ]
 
     add_model_path = partial(
@@ -443,7 +443,7 @@ def get_array_gen_02_mnist_generation_serve() -> AutoDocServingInfo:
     copy_inputs_to_serve = (
         copy_inputs,
         {
-            "example_requests": example_requests,
+            "example_requests": example_requests[0],
             "output_folder": str(Path(base_path) / "serve_results"),
         },
     )
@@ -459,6 +459,12 @@ def get_array_gen_02_mnist_generation_serve() -> AutoDocServingInfo:
         },
     )
 
+    example_request_module_python = build_request_example_module_from_function(
+        function=example_request_function_python,
+        name="python",
+        language="python",
+    )
+
     ade = AutoDocServingInfo(
         name="ARRAY_GENERATION_DEPLOY",
         base_path=Path(base_path),
@@ -467,9 +473,40 @@ def get_array_gen_02_mnist_generation_serve() -> AutoDocServingInfo:
         post_run_functions=(copy_inputs_to_serve, decode_and_save_images_func),
         example_requests=example_requests,
         data_loading_function=load_data_for_serve,
+        request_example_modules=[
+            example_request_module_python,
+        ],
     )
 
     return ade
+
+
+def example_request_function_python():
+    import base64
+
+    import numpy as np
+    import requests
+
+    def encode_array_to_base64(file_path: str) -> str:
+        array_np = np.load(file_path)
+        array_bytes = array_np.tobytes()
+        return base64.b64encode(array_bytes).decode("utf-8")
+
+    def send_request(url: str, payload: list[dict]) -> list[dict]:
+        response = requests.post(url, json=payload)
+        response.raise_for_status()
+        return response.json()
+
+    image_base = "eir_tutorials/d_array_output/01_array_mnist_generation/data/mnist_npy"
+    payload = [
+        {"mnist": encode_array_to_base64(f"{image_base}/10001.npy")},
+    ]
+
+    response = send_request(url="http://localhost:8000/predict", payload=payload)
+    print(response)
+
+    # --skip-after
+    return response
 
 
 def decode_and_save_images(
@@ -480,16 +517,14 @@ def decode_and_save_images(
     os.makedirs(output_folder, exist_ok=True)
 
     with open(predictions_file, "r") as file:
-        predictions = json.load(file)
+        predictions = json.load(file)[0]
 
-    for i, prediction in enumerate(predictions):
-        base64_array = prediction["response"]["result"]["mnist_output"]
+    for i, prediction in enumerate(predictions["response"]["result"]):
+        base64_array = prediction["mnist_output"]
         array_bytes = base64.b64decode(base64_array)
 
         array_np = np.frombuffer(array_bytes, dtype=np.float32).reshape(image_shape)
-
-        array_np = (array_np - array_np.min()) / (array_np.max() - array_np.min())
-        array_np = (array_np * 255).astype(np.uint8)
+        array_np = array_np.clip(0, 255).astype(np.uint8)
 
         image = Image.fromarray(array_np, mode="L")
         image.save(Path(output_folder) / f"mnist_output_{i}.png")

@@ -7,7 +7,10 @@ import pandas as pd
 
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
 from docs.doc_modules.serve_experiments_utils import copy_inputs, load_data_for_serve
-from docs.doc_modules.serving_experiments import AutoDocServingInfo
+from docs.doc_modules.serving_experiments import (
+    AutoDocServingInfo,
+    build_request_example_module_from_function,
+)
 from docs.doc_modules.utils import add_model_path_to_command
 
 
@@ -271,13 +274,15 @@ def get_07_multimodal_serve_tabular_description_image_info() -> AutoDocServingIn
         "images/86e1089a3.jpg",
     }
     example_requests = [
-        base,
+        [
+            base,
+        ]
     ]
 
     for age in [5.0, 10.0, 3000.0]:
         new_request = deepcopy(base)
         new_request["pets_tabular"]["Age"] = age
-        example_requests.append(new_request)
+        example_requests[0].append(new_request)
 
     add_model_path = partial(
         add_model_path_to_command,
@@ -288,9 +293,15 @@ def get_07_multimodal_serve_tabular_description_image_info() -> AutoDocServingIn
     copy_inputs_to_serve = (
         copy_inputs,
         {
-            "example_requests": example_requests,
+            "example_requests": example_requests[0],
             "output_folder": str(Path(base_path) / "serve_results"),
         },
+    )
+
+    example_request_module_python = build_request_example_module_from_function(
+        function=example_request_function_python,
+        name="python",
+        language="python",
     )
 
     ade = AutoDocServingInfo(
@@ -301,9 +312,67 @@ def get_07_multimodal_serve_tabular_description_image_info() -> AutoDocServingIn
         post_run_functions=(copy_inputs_to_serve,),
         example_requests=example_requests,
         data_loading_function=load_data_for_serve,
+        request_example_modules=[example_request_module_python],
     )
 
     return ade
+
+
+def example_request_function_python():
+    import base64
+    from copy import deepcopy
+    from io import BytesIO
+
+    import requests
+    from PIL import Image
+
+    def encode_image_to_base64(file_path: str) -> str:
+        with Image.open(file_path) as image:
+            buffered = BytesIO()
+            image.save(buffered, format="JPEG")
+            return base64.b64encode(buffered.getvalue()).decode("utf-8")
+
+    def send_request(url: str, payload: list[dict]) -> dict:
+        response_ = requests.post(url, json=payload)
+        response_.raise_for_status()
+        return response_.json()
+
+    base = {
+        "pets_tabular": {
+            "Type": "Cat",
+            "Name": "Nibble",
+            "Age": 1.0,
+            "Breed1": "Tabby",
+            "Breed2": "0",
+            "Gender": "Male",
+            "Color1": "Black",
+            "Color2": "White",
+            "Color3": "0",
+            "MaturitySize": "Small",
+            "FurLength": "Short",
+            "Vaccinated": "No",
+            "Dewormed": "No",
+            "Sterilized": "No",
+            "Health": "Healthy",
+            "Quantity": 1.0,
+            "Fee": "Free",
+            "State": "Selangor",
+            "VideoAmt": 0.0,
+            "PhotoAmt": 1.0,
+        },
+        "pet_descriptions": "A super cute tabby cat!!!",
+        "cute_pet_images": encode_image_to_base64(
+            "eir_tutorials/a_using_eir/07_multimodal_tutorial/data/images/86e1089a3.jpg"
+        ),
+    }
+
+    payload = [deepcopy(base)]
+
+    response = send_request(url="http://localhost:8000/predict", payload=payload)
+    print(response)
+
+    # --skip-after
+    return response
 
 
 def get_07_mm_apx_run_1_tab_desc_pre_info() -> AutoDocExperimentInfo:

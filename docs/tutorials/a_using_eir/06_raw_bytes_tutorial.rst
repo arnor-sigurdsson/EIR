@@ -114,30 +114,19 @@ Here is an example of the command used:
 Sending Requests
 """"""""""""""""
 
-Once the server is up and running, you can send requests to it. For this binary model, we send text data in byte format to the model's endpoint.
+With the server running, we can now send requests. For this model, we send raw byte data encoded in base64 in a batched format.
 
-Here's an example Python function to demonstrate how to send a request:
+Here's an example Python function demonstrating this process:
 
-.. code-block:: python
+.. literalinclude:: ../tutorial_files/a_using_eir/06_raw_bytes_tutorial/request_example/python_request_example_module.py
+    :language: python
+    :caption: request_example_module.py
 
-    import requests
-    import numpy as np
-    import base64
+When running this, we get the following output:
 
-    def load_and_encode_data(data_pointer: str) -> str:
-        arr = np.fromfile(data_pointer, dtype="uint8")
-        arr_bytes = arr.tobytes()
-        return base64.b64encode(arr_bytes).decode("utf-8")
-
-    def send_request(url: str, encoded_data: str):
-        payload = {"data": encoded_data}
-        response = requests.post(url, json=payload)
-        return response.json()
-
-    encoded_data = load_and_encode_data('path/to/textfile.txt')
-    response = send_request('http://localhost:8000/predict', encoded_data)
-    print(response)
-
+.. literalinclude:: ../tutorial_files/a_using_eir/06_raw_bytes_tutorial/request_example/python_request_example.json
+    :language: json
+    :caption: request_example.json
 
 Analyzing Responses
 """""""""""""""""""

@@ -4,7 +4,7 @@ sample_interval: 1000
 valid_size: 1000
 batch_size: 64
 n_epochs: 10
-device: "cpu"
+device: "mps"
 optimizer: adabelief
 lr: 0.001
 memory_dataset: true

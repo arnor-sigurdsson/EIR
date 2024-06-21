@@ -4,7 +4,10 @@ from typing import Sequence
 
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
 from docs.doc_modules.serve_experiments_utils import load_data_for_serve
-from docs.doc_modules.serving_experiments import AutoDocServingInfo
+from docs.doc_modules.serving_experiments import (
+    AutoDocServingInfo,
+    build_request_example_module_from_function,
+)
 from docs.doc_modules.utils import add_model_path_to_command
 
 
@@ -156,32 +159,45 @@ def get_03_imdb_run_1_serve_info() -> AutoDocServingInfo:
     server_command = ["eirserve", "--model-path", "FILL_MODEL"]
 
     example_requests = [
-        {
-            "imdb_reviews": "This move was great! I loved it!",
-        },
-        {
-            "imdb_reviews": "This move was terrible! I hated it!",
-        },
-        {
-            "imdb_reviews": "You'll have to have your wits about "
-            "you and your brain fully switched"
-            " on watching Oppenheimer as it could easily get away from a "
-            "nonattentive viewer. This is intelligent filmmaking which shows "
-            "it's audience great respect. It fires dialogue packed with "
-            "information at a relentless pace and jumps to very different "
-            "times in Oppenheimer's life continuously through it's 3 hour"
-            " runtime. There are visual clues to guide the viewer through these"
-            " times but again you'll have to get to grips with these quite "
-            "quickly. This relentlessness helps to express the urgency with "
-            "which the US attacked it's chase for the atomic bomb before "
-            "Germany could do the same. An absolute career best performance "
-            "from (the consistenly brilliant) Cillian Murphy anchors the film. ",
-        },
+        [
+            {
+                "imdb_reviews": "This move was great! I loved it!",
+            },
+            {
+                "imdb_reviews": "This move was terrible! I hated it!",
+            },
+            {
+                "imdb_reviews": "You'll have to have your wits about "
+                "you and your brain fully switched"
+                " on watching Oppenheimer as it could easily get away from a "
+                "nonattentive viewer. This is intelligent filmmaking which shows "
+                "it's audience great respect. It fires dialogue packed with "
+                "information at a relentless pace and jumps to very different "
+                "times in Oppenheimer's life continuously through it's 3 hour"
+                " runtime. There are visual clues to guide the viewer through these"
+                " times but again you'll have to get to grips with these quite "
+                "quickly. This relentlessness helps to express the urgency with "
+                "which the US attacked it's chase for the atomic bomb before "
+                "Germany could do the same. An absolute career best performance "
+                "from (the consistenly brilliant) Cillian Murphy anchors the film. ",
+            },
+        ],
     ]
 
     add_model_path = partial(
         add_model_path_to_command,
         run_path="eir_tutorials/tutorial_runs/a_using_eir/tutorial_03_imdb_run",
+    )
+
+    example_request_module_python = build_request_example_module_from_function(
+        function=example_request_function_python,
+        name="python",
+        language="python",
+    )
+
+    bash_args = _get_example_request_bash_args()
+    example_request_module_bash = build_request_example_module_from_function(
+        **bash_args
     )
 
     ade = AutoDocServingInfo(
@@ -192,9 +208,57 @@ def get_03_imdb_run_1_serve_info() -> AutoDocServingInfo:
         post_run_functions=(),
         example_requests=example_requests,
         data_loading_function=load_data_for_serve,
+        request_example_modules=[
+            example_request_module_python,
+            example_request_module_bash,
+        ],
     )
 
     return ade
+
+
+def example_request_function_python():
+    import requests
+
+    def send_request(url: str, payload: list[dict]) -> dict:
+        response = requests.post(url, json=payload)
+        response.raise_for_status()
+        return response.json()
+
+    payload = [
+        {"imdb_reviews": "This movie was great! I loved it!"},
+    ]
+
+    response = send_request(url="http://localhost:8000/predict", payload=payload)
+    print(response)
+
+    # --skip-after
+    return response
+
+
+def _get_example_request_bash_args():
+    command = """curl -X POST \\
+        "http://localhost:8000/predict" \\
+        -H "accept: application/json" \\
+        -H "Content-Type: application/json" \\
+        -d '[{"imdb_reviews": "This movie was great! I loved it!"}]
+           '"""
+
+    def _function_to_run_example() -> dict:
+        import json
+        import subprocess
+
+        result = subprocess.run(command, shell=True, capture_output=True, text=True)
+        result_as_dict = json.loads(result.stdout)
+        return result_as_dict
+
+    command_as_text = command
+    return {
+        "function": _function_to_run_example,
+        "custom_body": command_as_text,
+        "name": "bash",
+        "language": "shell",
+    }
 
 
 def get_experiments() -> Sequence[AutoDocExperimentInfo]:

@@ -8,7 +8,10 @@ import seaborn as sns
 
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
 from docs.doc_modules.serve_experiments_utils import load_data_for_serve
-from docs.doc_modules.serving_experiments import AutoDocServingInfo
+from docs.doc_modules.serving_experiments import (
+    AutoDocServingInfo,
+    build_request_example_module_from_function,
+)
 from docs.doc_modules.utils import add_model_path_to_command
 
 
@@ -259,14 +262,6 @@ def get_tutorial_08_run_lcl_3_info() -> AutoDocExperimentInfo:
         "eir_tutorials/a_using_eir/08_array_tutorial/data/processed_sample_data.zip"
     )
 
-    make_comparison_plot = (
-        _plot_performance,
-        {
-            "base_dir": Path("eir_tutorials/tutorial_runs/a_using_eir/"),
-            "output_path": Path(base_path, "figures", "val_comparison.png"),
-        },
-    )
-
     ade = AutoDocExperimentInfo(
         name="LCL_3",
         data_url="https://drive.google.com/file/d/1p-RfWqPiYGcmQI7LM60fXkIRSS5AFXM8",
@@ -275,7 +270,6 @@ def get_tutorial_08_run_lcl_3_info() -> AutoDocExperimentInfo:
         base_path=Path(base_path),
         command=command,
         files_to_copy_mapping=mapping,
-        post_run_functions=(make_comparison_plot,),
     )
 
     return ade
@@ -393,6 +387,14 @@ def get_tutorial_08_run_transformer_3_info() -> AutoDocExperimentInfo:
         "eir_tutorials/a_using_eir/08_array_tutorial/data/processed_sample_data.zip"
     )
 
+    make_comparison_plot = (
+        _plot_performance,
+        {
+            "base_dir": Path("eir_tutorials/tutorial_runs/a_using_eir/"),
+            "output_path": Path(base_path, "figures", "val_comparison.png"),
+        },
+    )
+
     ade = AutoDocExperimentInfo(
         name="Transformer_3",
         data_url="https://drive.google.com/file/d/1p-RfWqPiYGcmQI7LM60fXkIRSS5AFXM8",
@@ -401,7 +403,7 @@ def get_tutorial_08_run_transformer_3_info() -> AutoDocExperimentInfo:
         base_path=Path(base_path),
         command=command,
         files_to_copy_mapping=mapping,
-        post_run_functions=(),
+        post_run_functions=(make_comparison_plot,),
     )
 
     return ade
@@ -488,15 +490,23 @@ def get_tutorial_08_run_3_serve() -> AutoDocServingInfo:
         "processed_sample_data/arrays_3d"
     )
     example_requests = [
-        {"genotype_as_array": f"{base}/A374.npy"},
-        {"genotype_as_array": f"{base}/Ayodo_468C.npy"},
-        {"genotype_as_array": f"{base}/NOR146.npy"},
+        [
+            {"genotype_as_array": f"{base}/A374.npy"},
+            {"genotype_as_array": f"{base}/Ayodo_468C.npy"},
+            {"genotype_as_array": f"{base}/NOR146.npy"},
+        ]
     ]
 
     add_model_path = partial(
         add_model_path_to_command,
         run_path="eir_tutorials/tutorial_runs/a_using_eir/"
         "tutorial_08_run_transformer-3d",
+    )
+
+    example_request_module_python = build_request_example_module_from_function(
+        function=example_request_function_python,
+        name="python",
+        language="python",
     )
 
     ade = AutoDocServingInfo(
@@ -507,9 +517,45 @@ def get_tutorial_08_run_3_serve() -> AutoDocServingInfo:
         post_run_functions=(),
         example_requests=example_requests,
         data_loading_function=load_data_for_serve,
+        request_example_modules=[
+            example_request_module_python,
+        ],
     )
 
     return ade
+
+
+def example_request_function_python():
+    import base64
+
+    import numpy as np
+    import requests
+
+    def encode_array_to_base64(file_path: str) -> str:
+        array_np = np.load(file_path)
+        array_bytes = array_np.tobytes()
+        return base64.b64encode(array_bytes).decode("utf-8")
+
+    def send_request(url: str, payload: list[dict]) -> dict:
+        response = requests.post(url, json=payload)
+        response.raise_for_status()
+        return response.json()
+
+    base = (
+        "eir_tutorials/a_using_eir/08_array_tutorial/data/processed_sample_data/"
+        "arrays_3d"
+    )
+    payload = [
+        {"genotype_as_array": encode_array_to_base64(f"{base}/A374.npy")},
+        {"genotype_as_array": encode_array_to_base64(f"{base}/Ayodo_468C.npy")},
+        {"genotype_as_array": encode_array_to_base64(f"{base}/NOR146.npy")},
+    ]
+
+    response = send_request(url="http://localhost:8000/predict", payload=payload)
+    print(response)
+
+    # --skip-after
+    return response
 
 
 def get_experiments() -> Sequence[AutoDocExperimentInfo]:

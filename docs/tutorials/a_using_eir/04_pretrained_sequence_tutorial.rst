@@ -225,7 +225,7 @@ of our model for our task.
 
 .. note::
     For the pretrained models, we again take advantage of the excellent work from
-    Hugging Face. In this case, the have a `hub <https://huggingface.co/models>`_
+    Hugging Face. In this case, they have a `hub <https://huggingface.co/models>`_
     with a bunch of pretrained models,
     which we can use with ``EIR``.
 
@@ -314,40 +314,36 @@ Here is an example of the command:
 Sending Requests
 """"""""""""""""
 
-With the server running, we can now send requests. For this model, we send different features extracted from the same input text.
+With the server running,
+we can now send requests.
+For this model, we send different features extracted from the same input text
+in a batched format.
 
 Here's an example Python function demonstrating this process:
 
-.. code-block:: python
+.. literalinclude:: ../tutorial_files/a_using_eir/04_pretrained_sequence_tutorial/request_example/python_request_example_module.py
+    :language: python
+    :caption: request_example_module.py
 
-    import requests
+When running this, we get the following output:
 
-    def send_request(url: str, payload: dict):
-        response = requests.post(url, json=payload)
-        return response.json()
+.. literalinclude:: ../tutorial_files/a_using_eir/04_pretrained_sequence_tutorial/request_example/python_request_example.json
+    :language: json
+    :caption: request_example.json
 
-    payload = {
-        "imdb_reviews_windowed": "This movie was great! I loved it!",
-        "imdb_reviews_longformer": "This movie was great! I loved it!",
-        "imdb_reviews_tiny_bert": "This movie was great! I loved it!"
-    }
+We can also send the same request using the `curl` command:
 
-    response = send_request('http://localhost:8000/predict', payload)
-    print(response)
+.. literalinclude:: ../tutorial_files/a_using_eir/04_pretrained_sequence_tutorial/request_example/bash_request_example_module.sh
+    :language: console
+    :caption: request_example_module.sh
 
-Additionally, you can send requests using `bash`:
+When running this, we get the following output:
 
-.. code-block:: bash
+.. literalinclude:: ../tutorial_files/a_using_eir/04_pretrained_sequence_tutorial/request_example/bash_request_example.json
+    :language: json
+    :caption: request_example.json
 
-    curl -X 'POST' \
-      'http://localhost:8000/predict' \
-      -H 'accept: application/json' \
-      -H 'Content-Type: application/json' \
-      -d '{
-          "imdb_reviews_windowed": "This movie was great! I loved it!",
-          "imdb_reviews_longformer": "This movie was great! I loved it!",
-          "imdb_reviews_tiny_bert": "This movie was great! I loved it!"
-      }'
+
 
 Analyzing Responses
 """""""""""""""""""

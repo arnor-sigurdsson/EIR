@@ -326,36 +326,32 @@ Sending Requests
 ^^^^^^^^^^^^^^^^
 
 With the server running, we can now send requests. For sequence data like IMDb reviews,
-we send the payload as a simple JSON object.
+we send the payload as a batched JSON object.
 
 Here's an example Python function demonstrating this process:
 
-.. code-block:: python
+.. literalinclude:: ../tutorial_files/a_using_eir/03_sequence_tutorial/request_example/python_request_example_module.py
+    :language: python
+    :caption: request_example_module.py
 
-    import requests
+When running this, we get the following output:
 
-    def send_request(url: str, payload: dict):
-        response = requests.post(url, json=payload)
-        return response.json()
+.. literalinclude:: ../tutorial_files/a_using_eir/03_sequence_tutorial/request_example/python_request_example.json
+    :language: json
+    :caption: request_example.json
 
-    payload = {
-        "imdb_reviews": "This movie was great! I loved it!"
-    }
+We can also send the same request using the `curl` command:
 
-    response = send_request('http://localhost:8000/predict', payload)
-    print(response)
+.. literalinclude:: ../tutorial_files/a_using_eir/03_sequence_tutorial/request_example/bash_request_example_module.sh
+    :language: console
+    :caption: request_example_module.sh
 
-Additionally, you can send requests using `bash`:
+When running this, we get the following output:
 
-.. code-block:: bash
+.. literalinclude:: ../tutorial_files/a_using_eir/03_sequence_tutorial/request_example/bash_request_example.json
+    :language: json
+    :caption: request_example.json
 
-    curl -X 'POST' \
-      'http://localhost:8000/predict' \
-      -H 'accept: application/json' \
-      -H 'Content-Type: application/json' \
-      -d '{
-          "imdb_reviews": "This movie was great! I loved it!"
-      }'
 
 Analyzing Responses
 ^^^^^^^^^^^^^^^^^^^

@@ -1,32 +1,32 @@
 [
     {
-        "request": {
-            "imdb_reviews_bytes_base_transformer": "eir_tutorials/a_using_eir/03_sequence_tutorial/data/IMDB/IMDB_Reviews/10021_2.txt"
-        },
+        "request": [
+            {
+                "imdb_reviews_bytes_base_transformer": "eir_tutorials/a_using_eir/03_sequence_tutorial/data/IMDB/IMDB_Reviews/10021_2.txt"
+            },
+            {
+                "imdb_reviews_bytes_base_transformer": "eir_tutorials/a_using_eir/03_sequence_tutorial/data/IMDB/IMDB_Reviews/10132_9.txt"
+            }
+        ],
         "response": {
-            "result": {
-                "imdb_output": {
-                    "Sentiment": {
-                        "Negative": 0.7403308749198914,
-                        "Positive": 0.25966906547546387
+            "result": [
+                {
+                    "imdb_output": {
+                        "Sentiment": {
+                            "Negative": 0.6905774474143982,
+                            "Positive": 0.3094225525856018
+                        }
+                    }
+                },
+                {
+                    "imdb_output": {
+                        "Sentiment": {
+                            "Negative": 0.18255534768104553,
+                            "Positive": 0.8174446225166321
+                        }
                     }
                 }
-            }
-        }
-    },
-    {
-        "request": {
-            "imdb_reviews_bytes_base_transformer": "eir_tutorials/a_using_eir/03_sequence_tutorial/data/IMDB/IMDB_Reviews/10132_9.txt"
-        },
-        "response": {
-            "result": {
-                "imdb_output": {
-                    "Sentiment": {
-                        "Negative": 0.22369135916233063,
-                        "Positive": 0.7763086557388306
-                    }
-                }
-            }
+            ]
         }
     }
 ]
