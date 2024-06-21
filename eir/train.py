@@ -14,7 +14,6 @@ from ignite.engine import Engine
 from torch import nn
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader, DistributedSampler, WeightedRandomSampler
-from torch.utils.tensorboard import SummaryWriter
 
 from eir import __version__
 from eir.data_load import datasets
@@ -95,7 +94,6 @@ class Experiment:
     optimizer: Optimizer
     criteria: al_criteria_dict
     loss_function: Callable
-    writer: SummaryWriter
     metrics: "al_metric_record_dict"
     hooks: Hooks
 
@@ -185,8 +183,6 @@ def get_default_experiment(
         outputs_as_dict=outputs_as_dict,
     )
 
-    writer = get_summary_writer(run_folder=run_folder)
-
     loss_func = get_loss_callable(
         criteria=criteria,
     )
@@ -212,7 +208,6 @@ def get_default_experiment(
         optimizer=optimizer,
         criteria=criteria,
         loss_function=loss_func,
-        writer=writer,
         metrics=metrics,
         hooks=hooks,
     )
@@ -284,13 +279,6 @@ def check_dataset_and_batch_size_compatibility(
             f" passed to the prediction module. Future work includes making this "
             f"easier to work with."
         )
-
-
-def get_summary_writer(run_folder: Path) -> SummaryWriter:
-    log_dir = Path(run_folder / "tensorboard_logs")
-    writer = SummaryWriter(log_dir=str(log_dir))
-
-    return writer
 
 
 def _log_model(

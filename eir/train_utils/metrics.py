@@ -36,7 +36,6 @@ from sklearn.metrics import (
 from sklearn.preprocessing import StandardScaler, label_binarize
 from torch import nn
 from torch.linalg import vector_norm
-from torch.utils.tensorboard import SummaryWriter
 
 from eir.data_load.data_utils import get_output_info_generator
 from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
@@ -663,7 +662,6 @@ def persist_metrics(
 
     hc = handler_config
     exp = handler_config.experiment
-    gc = exp.configs.global_config
 
     target_generator = get_output_info_generator(outputs_as_dict=exp.outputs)
 
@@ -679,14 +677,6 @@ def persist_metrics(
     for output_name, target_and_file_dict in metrics_files.items():
         for target_name, target_history_file in target_and_file_dict.items():
             cur_metric_dict = metrics_dict[output_name][target_name]
-
-            _add_metrics_to_writer(
-                name=f"{prefixes['writer']}/{target_name}",
-                metric_dict=cur_metric_dict,
-                iteration=iteration,
-                writer=exp.writer,
-                plot_skip_steps=gc.plot_skip_steps,
-            )
 
             if writer_funcs:
                 cur_func = writer_funcs[output_name][target_name]
@@ -739,27 +729,6 @@ def _ensure_metrics_paths_exists(metrics_files: Dict[str, Dict[str, Path]]) -> N
     for output_name, target_and_file_dict in metrics_files.items():
         for path in target_and_file_dict.values():
             ensure_path_exists(path=path)
-
-
-def _add_metrics_to_writer(
-    name: str,
-    metric_dict: Dict[str, float],
-    iteration: int,
-    writer: SummaryWriter,
-    plot_skip_steps: int,
-) -> None:
-    """
-    We do %10 to reduce the amount of training data going to tensorboard, otherwise
-    it slows down with many large experiments.
-    """
-    if iteration >= plot_skip_steps and iteration % 10 == 0:
-        for metric_name, metric_value in metric_dict.items():
-            cur_name = name + f"/{metric_name}"
-            writer.add_scalar(
-                tag=cur_name,
-                scalar_value=metric_value,
-                global_step=iteration,
-            )
 
 
 def get_buffered_metrics_writer(buffer_interval: int):
