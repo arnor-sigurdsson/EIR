@@ -351,8 +351,9 @@ def get_long_format_attribution_df(
     for k, v in parsed_attributions.items():
         if not isinstance(v, list):
             raise ValueError(f"Value for key '{k}' must be a list")
-        if not all(isinstance(x, (int, float)) for x in v):
-            raise ValueError(f"All values in list for key '{k}' must be numbers")
+        if not all(isinstance(x, (int, float, np.float32, np.float64)) for x in v):
+            breakpoint()
+            raise ValueError(f"All values in list {v} for key '{k}' must be numbers")
         series_dict[k] = pd.Series(v)
 
     df: pd.DataFrame = pd.concat(series_dict)
