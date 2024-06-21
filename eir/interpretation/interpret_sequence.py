@@ -2,7 +2,7 @@ from collections import defaultdict
 from copy import copy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, Iterable, Sequence, Tuple
+from typing import TYPE_CHECKING, Dict, Iterable, Mapping, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
@@ -22,6 +22,7 @@ from torchtext.vocab import Vocab
 
 from eir.interpretation.interpretation_utils import (
     get_basic_sample_attributions_to_analyse_generator,
+    get_long_format_attribution_df,
     get_target_class_name,
     plot_attributions_bar,
     stratify_attributions_by_target_classes,
@@ -143,8 +144,8 @@ def analyze_sequence_input_attributions(
         token_importances = get_sequence_token_importance(
             attributions=target_attributions, vocab=vocab, input_name=input_name
         )
-        df_token_importances = get_sequence_feature_importance_df(
-            token_importances=token_importances
+        df_token_importances = get_long_format_attribution_df(
+            parsed_attributions=token_importances
         )
         target_outfolder = attribution_outfolder / f"{class_name}"
         ensure_path_exists(path=target_outfolder, is_folder=True)
@@ -305,12 +306,17 @@ def get_sequence_token_importance(
 
 
 def get_sequence_feature_importance_df(
-    token_importances: Dict[str, list[float]]
+    token_importances: dict[str, list[float]]
 ) -> pd.DataFrame:
-    df: pd.DataFrame = pd.DataFrame.from_dict(token_importances, orient="index").T
 
-    df = df.reset_index(drop=True)
-    df = df.melt(var_name="Input", value_name="Attribution")
+    series_dict: Mapping[str, pd.Series] = {
+        k: pd.Series(v) for k, v in token_importances.items()
+    }
+
+    df: pd.DataFrame = pd.concat(series_dict)
+    df = df.reset_index(level=0).reset_index(drop=True)
+
+    df = df.rename(columns={df.columns[0]: "Input", df.columns[1]: "Attribution"})
 
     return df
 

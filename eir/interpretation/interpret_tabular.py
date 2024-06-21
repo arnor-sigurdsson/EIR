@@ -10,6 +10,7 @@ from sklearn.preprocessing import LabelEncoder
 
 from eir.experiment_io.experiment_io import load_transformers
 from eir.interpretation.interpretation_utils import (
+    get_long_format_attribution_df,
     plot_attributions_bar,
     stratify_attributions_by_target_classes,
 )
@@ -66,7 +67,7 @@ def analyze_tabular_input_attributions(
         all_attributions=all_attributions,
         input_name=input_name,
     )
-    df_attributions = get_tabular_attribution_df(
+    df_attributions = get_long_format_attribution_df(
         parsed_attributions=parsed_attributions
     )
 
@@ -234,17 +235,6 @@ def parse_tabular_attributions_for_feature_importance(
             column_attributions[column].append(cur_column_attributions)
 
     return column_attributions
-
-
-def get_tabular_attribution_df(
-    parsed_attributions: Dict[str, List[float]]
-) -> pd.DataFrame:
-    df: pd.DataFrame = pd.DataFrame.from_dict(parsed_attributions, orient="index").T
-
-    df = df.reset_index(drop=True)
-    df = df.melt(var_name="Input", value_name="Attribution")
-
-    return df
 
 
 def _gather_continuous_inputs(

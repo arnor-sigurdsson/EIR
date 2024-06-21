@@ -336,3 +336,28 @@ class MyIntegratedGradients(IntegratedGradients):
                 for total_grad, input, baseline in zip(total_grads, inputs, baselines)
             )
         return attributions
+
+
+def get_long_format_attribution_df(
+    parsed_attributions: dict[str, list[float]]
+) -> pd.DataFrame:
+    if not isinstance(parsed_attributions, dict):
+        raise TypeError("Input must be a dictionary")
+
+    if not parsed_attributions:
+        return pd.DataFrame(columns=["Input", "Attribution"])
+
+    series_dict: dict[str, pd.Series] = {}
+    for k, v in parsed_attributions.items():
+        if not isinstance(v, list):
+            raise ValueError(f"Value for key '{k}' must be a list")
+        if not all(isinstance(x, (int, float)) for x in v):
+            raise ValueError(f"All values in list for key '{k}' must be numbers")
+        series_dict[k] = pd.Series(v)
+
+    df: pd.DataFrame = pd.concat(series_dict)
+    df = df.reset_index(level=0).reset_index(drop=True)
+
+    df = df.rename(columns={df.columns[0]: "Input", df.columns[1]: "Attribution"})
+
+    return df
