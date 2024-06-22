@@ -9,7 +9,7 @@ from eir.setup.input_setup_modules.setup_image import (
     ImageNormalizationStats,
     get_image_normalization_values,
     get_image_transforms,
-    infer_num_image_channels,
+    get_num_channels_wrapper,
 )
 from eir.setup.schemas import ImageOutputTypeConfig, OutputConfig
 from eir.train_utils.step_modules.diffusion import (
@@ -36,15 +36,19 @@ def set_up_image_output(
     output_config: OutputConfig, *args, **kwargs
 ) -> ComputedImageOutputInfo:
 
+    output_info = output_config.output_info
     output_type_info = output_config.output_type_info
     assert isinstance(output_type_info, ImageOutputTypeConfig)
 
+    image_mode = output_type_info.mode
     num_channels = output_type_info.num_channels
-    if not num_channels:
-        num_channels = infer_num_image_channels(
-            data_source=output_config.output_info.output_source,
-            deeplake_inner_key=output_config.output_info.output_inner_key,
-        )
+
+    num_channels = get_num_channels_wrapper(
+        image_mode=image_mode,
+        num_channels=num_channels,
+        source=output_info.output_source,
+        deeplake_inner_key=output_info.output_inner_key,
+    )
 
     data_dimensions = DataDimensions(
         channels=num_channels,
@@ -66,6 +70,7 @@ def set_up_image_output(
         stds_normalization_values=oti.stds_normalization_values,
         adaptive_normalization_max_samples=oti.adaptive_normalization_max_samples,
         data_dimensions=data_dimensions,
+        image_mode=oti.mode,
     )
 
     base_transforms, all_transforms = get_image_transforms(

@@ -65,12 +65,20 @@ def set_up_image_input_for_training(
     input_type_info = input_config.input_type_info
     assert isinstance(input_type_info, schemas.ImageInputDataConfig)
 
+    image_mode = input_type_info.mode
     num_channels = input_type_info.num_channels
-    if not num_channels:
+    if not num_channels and not image_mode:
         num_channels = infer_num_image_channels(
             data_source=input_config.input_info.input_source,
             deeplake_inner_key=input_config.input_info.input_inner_key,
         )
+
+    num_channels = get_num_channels_wrapper(
+        image_mode=image_mode,
+        num_channels=num_channels,
+        source=input_config.input_info.input_source,
+        deeplake_inner_key=input_config.input_info.input_inner_key,
+    )
 
     data_dimension = DataDimensions(
         channels=num_channels,
@@ -89,6 +97,7 @@ def set_up_image_input_for_training(
         stds_normalization_values=iti.stds_normalization_values,
         adaptive_normalization_max_samples=iti.adaptive_normalization_max_samples,
         data_dimensions=data_dimension,
+        image_mode=iti.mode,
     )
 
     base_transforms, all_transforms = get_image_transforms(
@@ -108,6 +117,52 @@ def set_up_image_input_for_training(
     )
 
     return image_input_info
+
+
+def get_num_channels_wrapper(
+    image_mode: Optional[str],
+    num_channels: Optional[int],
+    source: str,
+    deeplake_inner_key: Optional[str],
+) -> int:
+
+    if image_mode and num_channels:
+        raise ValueError(
+            "Got both image mode and number of channels. Please only specify one."
+        )
+
+    if image_mode is not None:
+        num_channels = get_num_channels_from_image_mode(image_mode=image_mode)
+        return num_channels
+
+    elif num_channels:
+        return num_channels
+
+    else:
+        num_channels = infer_num_image_channels(
+            data_source=source,
+            deeplake_inner_key=deeplake_inner_key,
+        )
+        return num_channels
+
+
+def get_num_channels_from_image_mode(image_mode: Optional[str]) -> int:
+
+    match image_mode:
+        case "RGB":
+            channels = 3
+        case "L":
+            channels = 1
+        case "RGBA":
+            channels = 4
+        case _:
+            raise ValueError(f"Unknown image mode: {image_mode}")
+
+    logger.debug(
+        "Inferred number of channels from image mode %s as: %d", image_mode, channels
+    )
+
+    return channels
 
 
 def infer_num_image_channels(
@@ -166,6 +221,7 @@ def get_image_normalization_values(
     stds_normalization_values: Optional[Sequence[float] | torch.Tensor],
     adaptive_normalization_max_samples: Optional[int],
     data_dimensions: DataDimensions,
+    image_mode: Optional[str],
 ) -> ImageNormalizationStats:
 
     pretrained_model_configs = get_timm_configs()
@@ -230,10 +286,22 @@ def get_image_normalization_values(
                 image_iter = get_deeplake_input_source_iterable(
                     deeplake_dataset=deeplake_ds, inner_key=deeplake_inner_key
                 )
-                tensor_iterator = (to_tensor(i.numpy()).float() for i in image_iter)
+
+                numpy_iter = (i.numpy() for i in image_iter)
+
+                if image_mode:
+                    image_iter = (Image.fromarray(i) for i in numpy_iter)
+                    image_iter = (i.convert(image_mode) for i in image_iter)
+                    numpy_iter = (np.array(i) for i in image_iter)
+
+                tensor_iterator = (to_tensor(i).float() for i in numpy_iter)
+
             else:
                 file_iterator = Path(input_source).rglob("*")
                 image_iterator = (default_image_loader(str(f)) for f in file_iterator)
+                if image_mode:
+                    image_iterator = (i.convert(image_mode) for i in image_iterator)
+
                 tensor_iterator = (to_tensor(i) for i in image_iterator)
 
             tensor_iterator = _get_maybe_truncated_tensor_iterator(

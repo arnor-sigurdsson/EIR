@@ -290,7 +290,8 @@ def reverse_diffusion_array_generation(
 
     dc = output_object.diffusion_config
     assert dc is not None
-    states = p_sample_loop(
+
+    final_states = p_sample_loop(
         config=dc,
         batch_inputs=batch_inputs,
         output_name=array_output_name,
@@ -298,8 +299,6 @@ def reverse_diffusion_array_generation(
         output_shape=shape,
         time_steps=num_steps,
     )
-
-    final_states = states[-1]
 
     assert output_object.normalization_stats is not None
     final_numpy_outputs = []

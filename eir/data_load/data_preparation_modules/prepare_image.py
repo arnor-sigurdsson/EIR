@@ -36,6 +36,7 @@ def prepare_image_data(
 def image_load_wrapper(
     data_pointer: Union[Path, int],
     input_source: str,
+    image_mode: Optional[str],
     deeplake_inner_key: Optional[str] = None,
 ) -> Image:
     """
@@ -55,5 +56,8 @@ def image_load_wrapper(
     else:
         assert isinstance(data_pointer, Path)
         pil_image = default_image_loader(path=str(data_pointer))
+
+    if image_mode is not None:
+        pil_image = pil_image.convert(mode=image_mode)
 
     return pil_image

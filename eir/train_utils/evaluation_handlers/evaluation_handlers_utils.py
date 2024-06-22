@@ -471,6 +471,7 @@ def prepare_manual_sample_data(
                 assert isinstance(input_type_info, ImageInputDataConfig)
                 image_data = image_load_wrapper(
                     data_pointer=data,
+                    image_mode=input_type_info.mode,
                     input_source=input_info.input_source,
                     deeplake_inner_key=input_info.input_inner_key,
                 )

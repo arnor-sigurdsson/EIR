@@ -18,7 +18,10 @@ from eir.data_load.data_preparation_modules.prepare_image import (
 )
 from eir.setup.output_setup import al_output_objects_as_dict
 from eir.setup.output_setup_modules.array_output_setup import ComputedArrayOutputInfo
-from eir.setup.output_setup_modules.image_output_setup import ComputedImageOutputInfo
+from eir.setup.output_setup_modules.image_output_setup import (
+    ComputedImageOutputInfo,
+    ImageOutputTypeConfig,
+)
 
 
 def prepare_outputs_disk(
@@ -49,10 +52,13 @@ def prepare_outputs_disk(
                 output_prepared = {output_name: array_prepared}
 
             case ComputedImageOutputInfo():
+                output_type_info = output_object.output_config.output_type_info
+                assert isinstance(output_type_info, ImageOutputTypeConfig)
                 data_pointer = output[output_name]
                 loaded_image = image_load_wrapper(
                     data_pointer=data_pointer,
                     input_source=output_source,
+                    image_mode=output_type_info.mode,
                     deeplake_inner_key=deeplake_inner_key,
                 )
                 image_prepared = prepare_image_data(
@@ -134,9 +140,12 @@ def get_output_data_loading_hooks(
                 )
 
             case ComputedImageOutputInfo():
+                output_type_info = output_object.output_config.output_type_info
+                assert isinstance(output_type_info, ImageOutputTypeConfig)
                 inner_function = typed_partial_for_hook(
                     image_load_wrapper,
                     **common_kwargs,
+                    image_mode=output_type_info.mode,
                 )
 
                 mapping[output_name] = typed_partial_for_hook(

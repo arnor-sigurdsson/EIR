@@ -43,6 +43,12 @@ def sample_autoregressive_batch(
     batch_size: int,
     special_tokens: SpecialTokens,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
+    """
+    The reason for padding with the BOS token is that the tensor we get here
+    is already at max_length. If we had e.g. a full, long sequence, we could
+    simply slice that directly (+1 for the target), but here we need to pad
+    the input at the beginning, opting for a BOS token.
+    """
     st = special_tokens
 
     inputs = []

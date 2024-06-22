@@ -1,6 +1,6 @@
 import base64
 from io import BytesIO
-from typing import Any, Dict, Sequence, Union
+from typing import Any, Dict, Literal, Optional, Sequence, Union
 
 import numpy as np
 import numpy.typing as npt
@@ -24,7 +24,7 @@ from eir.setup.input_setup_modules.setup_image import ComputedImageInputInfo
 from eir.setup.input_setup_modules.setup_omics import ComputedOmicsInputInfo
 from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
 from eir.setup.input_setup_modules.setup_tabular import ComputedTabularInputInfo
-from eir.setup.schemas import SequenceInputDataConfig
+from eir.setup.schemas import ImageInputDataConfig, SequenceInputDataConfig
 from eir.train_utils.evaluation_handlers.evaluation_handlers_utils import (
     streamline_sequence_manual_data,
 )
@@ -101,7 +101,10 @@ def prepare_request_input_data(
 
             case ComputedImageInputInfo():
                 assert input_type == "image"
-                image_data = _deserialize_image(image_str=serialized_data)
+                assert isinstance(input_type_info, ImageInputDataConfig)
+                image_data = _deserialize_image(
+                    image_str=serialized_data, image_mode=input_type_info.mode
+                )
                 inputs_prepared[name] = image_data
 
             case (
@@ -174,10 +177,16 @@ def _deserialize_array(
     return np.frombuffer(array_bytes, dtype=dtype).reshape(shape).copy()
 
 
-def _deserialize_image(image_str: str) -> Image.Image:
+def _deserialize_image(
+    image_str: str, image_mode: Optional[Literal["L", "RGB", "RGBA"]]
+) -> Image.Image:
     """
     Note we convert to RGB to be compatible with the default_loader.
     """
     image_data = base64.b64decode(image_str)
     image = Image.open(BytesIO(image_data))
-    return image.convert("RGB")
+
+    if image_mode is not None:
+        return image.convert(image_mode)
+
+    return image

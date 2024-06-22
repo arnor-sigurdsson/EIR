@@ -32,9 +32,20 @@ class ImageOutputTypeConfig:
         If None and training from scratch, will iterate over training data and compute
         the running average per channel.
 
+    :param mode:
+        An explicit mode to convert loaded images to. Useful when working with
+        input data with a mixed number of channels, or you want to convert
+        images to a specific mode.
+        Options are
+        - "RGB": Red, Green, Blue (channels=3)
+        - "L": Grayscale (channels=1)
+        - "RGBA": Red, Green, Blue, Alpha (channels=4)
+
     :param num_channels:
         Number of channels in the images. If None, will try to infer the number of
-        channels from a random image in the training data.
+        channels from a random image in the training data. Useful when known
+        ahead of time how many channels the images have, will raise an error if
+        an image with a different number of channels is encountered.
 
     :param loss:
         Which loss to use for training the model. Either ``mse`` or ``diffusion``.
@@ -49,9 +60,10 @@ class ImageOutputTypeConfig:
     adaptive_normalization_max_samples: Optional[int] = None
     mean_normalization_values: Union[None, Sequence[float]] = None
     stds_normalization_values: Union[None, Sequence[float]] = None
+    mode: Optional[Literal["RGB", "L", "RGBA"]] = None
     num_channels: Optional[int] = None
     loss: Literal["mse", "diffusion"] = "mse"
-    diffusion_time_steps: Optional[int] = 500
+    diffusion_time_steps: Optional[int] = 1000
 
 
 @dataclass

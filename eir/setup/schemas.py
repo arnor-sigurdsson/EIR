@@ -304,7 +304,7 @@ class GlobalConfig:
     amp: bool = False
     compile_model: bool = False
     weighted_sampling_columns: Union[None, Sequence[str]] = None
-    lr: float = 1e-03
+    lr: float = 3e-04
     lr_lb: float = 0.0
     find_lr: bool = False
     lr_schedule: Literal["cycle", "plateau", "same", "cosine"] = "plateau"
@@ -318,7 +318,7 @@ class GlobalConfig:
     early_stopping_patience: int = 10
     early_stopping_buffer: Union[None, int] = None
     warmup_steps: Union[Literal["auto"], int] = "auto"
-    optimizer: al_optimizers = "adam"  # type: ignore
+    optimizer: al_optimizers = "adamw"  # type: ignore
     b1: float = 0.9
     b2: float = 0.999
     wd: float = 1e-04
@@ -706,9 +706,20 @@ class ImageInputDataConfig:
         If None and training from scratch, will iterate over training data and compute
         the running average per channel.
 
+    :param mode:
+        An explicit mode to convert loaded images to. Useful when working with
+        input data with a mixed number of channels, or you want to convert
+        images to a specific mode.
+        Options are
+        - "RGB": Red, Green, Blue (channels=3)
+        - "L": Grayscale (channels=1)
+        - "RGBA": Red, Green, Blue, Alpha (channels=4)
+
     :param num_channels:
         Number of channels in the images. If None, will try to infer the number of
-        channels from a random image in the training data.
+        channels from a random image in the training data. Useful when known
+        ahead of time how many channels the images have, will raise an error if
+        an image with a different number of channels is encountered.
 
     :param mixing_subtype:
         Which type of mixing to use on the image data given that ``mixing_alpha`` is
@@ -725,6 +736,7 @@ class ImageInputDataConfig:
     adaptive_normalization_max_samples: Optional[int] = None
     mean_normalization_values: Union[None, Sequence[float]] = None
     stds_normalization_values: Union[None, Sequence[float]] = None
+    mode: Optional[Literal["RGB", "L", "RGBA"]] = None
     num_channels: Optional[int] = None
     mixing_subtype: Union[Literal["mixup"], Literal["cutmix"]] = "mixup"
     modality_dropout_rate: float = 0.0

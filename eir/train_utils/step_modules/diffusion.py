@@ -104,16 +104,15 @@ def p_sample_loop(
     model: nn.Module,
     output_shape: tuple,
     time_steps: int,
-) -> list[torch.Tensor]:
+) -> torch.Tensor:
     device = next(model.parameters()).device
 
     current_state: torch.Tensor = torch.randn(output_shape, device=device)
     batch_inputs[output_name] = current_state
 
     batch_size = output_shape[0]
-    states = []
-    for i in reversed(range(0, time_steps)):
 
+    for i in reversed(range(0, time_steps)):
         t = torch.full(
             size=(batch_size,),
             fill_value=i,
@@ -130,11 +129,9 @@ def p_sample_loop(
             t_index=i,
         )
 
-        states.append(current_state.cpu().numpy())
-
         batch_inputs[output_name] = current_state
 
-    return states
+    return current_state.cpu().numpy()
 
 
 @torch.no_grad()
