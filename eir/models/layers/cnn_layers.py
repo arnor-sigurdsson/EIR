@@ -1,10 +1,12 @@
-from typing import Tuple
+from typing import Literal, Tuple
 
 import torch
 from aislib.misc_utils import get_logger
+from einops import rearrange
 from torch import nn
 from torchvision.ops import StochasticDepth
 
+from eir.models.layers.attention_layers import LinearAttention
 from eir.models.layers.norm_layers import GRN
 
 logger = get_logger(name=__name__)
@@ -55,41 +57,70 @@ class ConvAttentionBlock(nn.Module):
         width: int,
         num_heads: int = 4,
         dropout_p: float = 0.1,
-        num_layers: int = 2,
+        attention_mode: Literal["spatial", "channel"] = "spatial",
+        attention_type: Literal["full", "linear"] = "full",
     ):
         super().__init__()
         self.in_channels = channels
         self.out_channels = channels
         self.in_height = height
         self.in_width = width
+        self.attention_mode = attention_mode
+        self.attention_type = attention_type
 
-        self.embedding_dim = height * width
+        self.embedding_dim = channels if attention_mode == "spatial" else height * width
         self.num_heads = _adjust_num_heads(
-            num_heads=num_heads, embedding_dim=self.embedding_dim
+            num_heads=num_heads,
+            embedding_dim=self.embedding_dim,
         )
 
-        encoder_layer = nn.TransformerEncoderLayer(
-            d_model=self.embedding_dim,
-            nhead=self.num_heads,
-            dim_feedforward=self.embedding_dim * 4,
-            activation="gelu",
-            norm_first=True,
-            batch_first=True,
-            dropout=dropout_p,
-        )
+        self.attention: nn.MultiheadAttention | LinearAttention
+        if attention_type == "full":
+            self.attention = nn.MultiheadAttention(
+                embed_dim=self.embedding_dim,
+                num_heads=self.num_heads,
+                batch_first=True,
+                dropout=dropout_p,
+            )
+        elif attention_type == "linear":
+            self.attention = LinearAttention(
+                embed_dim=self.embedding_dim,
+                heads=self.num_heads,
+                dim_head=self.embedding_dim // self.num_heads,
+            )
 
-        self.encoder = nn.TransformerEncoder(
-            encoder_layer=encoder_layer,
-            num_layers=num_layers,
-            enable_nested_tensor=False,
-        )
-
+        self.norm = nn.LayerNorm(self.embedding_dim)
         self.grn = GRN(in_channels=channels)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        out = x.view(-1, self.in_channels, self.in_height * self.in_width)
-        out = self.encoder(out)
-        out = out.view(-1, self.in_channels, self.in_height, self.in_width)
+        batch_size, channels, height, width = x.size()
+
+        if self.attention_type == "full":
+            if self.attention_mode == "spatial":
+                out = rearrange(x, "b c h w -> b (h w) c")
+            elif self.attention_mode == "channel":
+                out = rearrange(x, "b c h w -> b (h w) c").permute(0, 2, 1)
+            else:
+                raise ValueError()
+
+            attn_output, _ = self.attention(out, out, out)
+            out = self.norm(out + attn_output)
+
+            if self.attention_mode == "spatial":
+                out = rearrange(out, "b (h w) c -> b c h w", h=height, w=width)
+            elif self.attention_mode == "channel":
+                out = rearrange(out, "b c (h w) -> b c h w", h=height, w=width)
+            else:
+                raise ValueError()
+
+        elif self.attention_type == "linear":
+            assert self.attention_mode == "spatial"
+            attn_output = self.attention(x)
+            out = self.norm(x + attn_output)
+
+        else:
+            raise ValueError()
+
         out = self.grn(out)
 
         return x + out
@@ -350,7 +381,7 @@ class UpSamplingResidualBlock(nn.Module):
         upsample_height: bool = True,
         upsample_width: bool = True,
     ):
-        super().__init__()
+        super(UpSamplingResidualBlock, self).__init__()
 
         self.in_channels = in_channels
         self.out_channels = in_channels
@@ -364,36 +395,40 @@ class UpSamplingResidualBlock(nn.Module):
             upsample_width=upsample_width,
         )
 
-        kernel_h = 4 if upsample_height else 3
-        kernel_w = 4 if upsample_width else 3
-        kernel_size = (kernel_h, kernel_w)
+        self.upsample = nn.Upsample(
+            scale_factor=(self.stride_h, self.stride_w),
+            mode="bilinear",
+            align_corners=True,
+        )
 
         self.norm_1 = nn.GroupNorm(num_groups=1, num_channels=in_channels)
         self.act_1 = nn.GELU()
 
-        self.conv_1 = nn.ConvTranspose2d(
+        self.conv_1 = nn.Conv2d(
             in_channels=self.in_channels,
             out_channels=self.out_channels,
-            kernel_size=kernel_size,
-            stride=(self.stride_h, self.stride_w),
+            kernel_size=3,
+            stride=1,
             padding=1,
             bias=True,
         )
 
-        self.identity = nn.ConvTranspose2d(
+        self.identity = nn.Conv2d(
             in_channels=self.in_channels,
             out_channels=self.out_channels,
-            kernel_size=kernel_size,
-            stride=(self.stride_h, self.stride_w),
-            padding=1,
+            kernel_size=1,
+            stride=1,
+            padding=0,
             bias=True,
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        identity = self.identity(x)
+        identity = self.upsample(x)
+        identity = self.identity(identity)
 
         out = self.norm_1(x)
         out = self.act_1(out)
+        out = self.upsample(out)
         out = self.conv_1(out)
 
         out = out + identity

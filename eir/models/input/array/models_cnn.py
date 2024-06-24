@@ -119,10 +119,6 @@ class CNNModelConfig:
         included in the model across channels and width * height as embedding dimension
         after that point (with the channels representing the length of the sequence).
 
-    :param num_attention_layers_per_block:
-        Number of attention layers to include in succession after each residual block
-        once the width * height is less than the attention_inclusion_cutoff.
-
     :param l1:
         L1 regularization to apply to the first layer.
     """
@@ -157,7 +153,6 @@ class CNNModelConfig:
     stochastic_depth_p: float = 0.00
 
     attention_inclusion_cutoff: int = 256
-    num_attention_layers_per_block: int = 1
 
     l1: float = 0.00
 
@@ -427,14 +422,19 @@ def _make_conv_layers(
         input_height=data_dimensions.height,
         conv_sequence=nn.Sequential(*conv_blocks),
     )
-    if first_width * first_height <= mc.attention_inclusion_cutoff:
+    do_add_attention = _do_add_attention(
+        width=first_width,
+        height=first_height,
+        attention_inclusion_cutoff=mc.attention_inclusion_cutoff,
+    )
+
+    if do_add_attention:
         last_block = conv_blocks[-1]
         assert isinstance(last_block, (CNNResidualBlock, FirstCNNBlock))
         cur_attention_block = ConvAttentionBlock(
             channels=last_block.out_channels,
             width=first_width,
             height=first_height,
-            num_layers=mc.num_attention_layers_per_block,
         )
         conv_blocks.append(cur_attention_block)
 
@@ -473,16 +473,34 @@ def _make_conv_layers(
                     conv_sequence=nn.Sequential(*conv_blocks),
                 )
 
-            if cur_height * cur_width <= mc.attention_inclusion_cutoff:
+            do_add_attention = _do_add_attention(
+                width=cur_width,
+                height=cur_height,
+                attention_inclusion_cutoff=mc.attention_inclusion_cutoff,
+            )
+            if do_add_attention:
                 cur_attention_block = ConvAttentionBlock(
                     channels=cur_block.out_channels,
                     width=cur_width,
                     height=cur_height,
-                    num_layers=mc.num_attention_layers_per_block,
                 )
                 conv_blocks.append(cur_attention_block)
 
     return conv_blocks
+
+
+def _do_add_attention(
+    width: int,
+    height: int,
+    attention_inclusion_cutoff: int,
+) -> bool:
+    if attention_inclusion_cutoff == 0:
+        return False
+
+    if width * height <= attention_inclusion_cutoff:
+        return True
+
+    return False
 
 
 def _get_conv_residual_block(

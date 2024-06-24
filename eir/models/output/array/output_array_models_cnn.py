@@ -39,10 +39,6 @@ class CNNUpscaleModelConfig:
         dimension after that point
         (with the channels representing the length of the sequence).
 
-    :param num_attention_layers_per_block:
-        Number of attention layers to include in succession after each residual block
-        once the width * height is less than the attention_inclusion_cutoff.
-
     :param allow_pooling:
         Whether to allow adaptive average pooling in the model to match the target
         dimensions.
@@ -56,7 +52,6 @@ class CNNUpscaleModelConfig:
     rb_do: float = 0.1
     stochastic_depth_p: float = 0.1
     attention_inclusion_cutoff: int = 256
-    num_attention_layers_per_block: int = 1
     allow_pooling: bool = True
     num_ca_blocks: int = 1
 
@@ -181,7 +176,6 @@ def setup_blocks(
     target_height: int,
     target_width: int,
     attention_inclusion_cutoff: int,
-    num_attention_layers: int,
     up_sample_every_n_blocks: int,
     allow_pooling: bool = True,
 ) -> Tuple[nn.Sequential, int, int, int]:
@@ -200,7 +194,6 @@ def setup_blocks(
             channels=in_channels,
             width=current_width,
             height=current_height,
-            num_layers=num_attention_layers,
         )
         blocks.add_module(
             name=f"block_{len(blocks)}",
@@ -263,7 +256,6 @@ def setup_blocks(
                 channels=out_channels,
                 width=current_width,
                 height=current_height,
-                num_layers=num_attention_layers,
             )
             blocks.add_module(
                 name=f"block_{len(blocks)}",
@@ -331,7 +323,6 @@ class CNNUpscaleModel(nn.Module):
             out_channels=2**self.model_config.channel_exp_base,
             allow_pooling=self.model_config.allow_pooling,
             attention_inclusion_cutoff=self.model_config.attention_inclusion_cutoff,
-            num_attention_layers=self.model_config.num_attention_layers_per_block,
             up_sample_every_n_blocks=1,
         )
 
@@ -434,7 +425,6 @@ class CNNPassThroughUpscaleModel(nn.Module):
             out_channels=2**self.model_config.channel_exp_base,
             allow_pooling=self.model_config.allow_pooling,
             attention_inclusion_cutoff=self.model_config.attention_inclusion_cutoff,
-            num_attention_layers=self.model_config.num_attention_layers_per_block,
             up_sample_every_n_blocks=linked_down_every,
         )
 
