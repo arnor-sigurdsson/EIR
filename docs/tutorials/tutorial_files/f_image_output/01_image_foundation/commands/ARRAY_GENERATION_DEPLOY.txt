@@ -1,2 +1,2 @@
 eirserve \
---model-path eir_tutorials/tutorial_runs/f_image_output/01_image_foundation/saved_models/01_image_foundation_model_32000_perf-average=0.9435.pt
+--model-path eir_tutorials/tutorial_runs/f_image_output/01_image_foundation/saved_models/01_image_foundation_model_17000_perf-average=0.9492.pt
