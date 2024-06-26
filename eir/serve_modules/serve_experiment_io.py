@@ -81,7 +81,7 @@ def load_pytorch_eir_model_for_serve(
     device: str,
 ) -> model_setup.al_meta_model:
     func = model_setup.get_meta_model_class_and_kwargs_from_configs
-    fusion_model_class, fusion_model_kwargs = func(
+    meta_model_class, meta_model_kwargs = func(
         global_config=loaded_train_experiment.configs.global_config,
         fusion_config=loaded_train_experiment.configs.fusion_config,
         inputs_as_dict=inputs,
@@ -90,8 +90,8 @@ def load_pytorch_eir_model_for_serve(
 
     model = model_setup.load_model(
         model_path=Path(model_pt_path),
-        model_class=fusion_model_class,
-        model_init_kwargs=fusion_model_kwargs,
+        model_class=meta_model_class,
+        model_init_kwargs=meta_model_kwargs,
         device=device,
         test_mode=True,
         strict_shapes=True,

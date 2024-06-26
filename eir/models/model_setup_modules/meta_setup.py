@@ -9,7 +9,11 @@ from eir.models.input.image.image_models import get_image_model_class
 from eir.models.input.sequence.sequence_models import get_sequence_model_class
 from eir.models.input.tabular.tabular import get_unique_values_from_transformers
 from eir.models.meta import meta
-from eir.models.meta.meta import al_input_modules
+from eir.models.meta.meta_utils import (
+    al_fusion_modules,
+    al_input_modules,
+    al_output_modules,
+)
 from eir.models.model_setup_modules.input_model_setup.input_model_setup_array import (
     get_array_input_feature_extractor,
     get_array_model,
@@ -39,6 +43,7 @@ from eir.models.model_setup_modules.output_model_setup_modules.output_model_setu
 from eir.models.output.sequence.sequence_output_modules import (
     SequenceOutputModuleConfig,
 )
+from eir.models.tensor_broker.tensor_broker import get_tensor_broker
 from eir.predict_modules.predict_tabular_input_setup import (
     ComputedPredictTabularInputInfo,
 )
@@ -189,6 +194,22 @@ def get_meta_model_kwargs_from_configs(
     kwargs["output_modules"] = output_modules
     kwargs["fusion_to_output_mapping"] = fusion_to_output_mapping
 
+    input_configs = [i.input_config for i in inputs_as_dict.values()]
+    output_configs = [i.output_config for i in outputs_as_dict.values()]
+    tensor_broker = get_tensor_broker(
+        input_objects=inputs_as_dict,
+        output_objects=outputs_as_dict,
+        input_modules=input_modules,
+        fusion_modules=fusion_modules,
+        output_modules=output_modules,
+        fusion_to_output_mapping=fusion_to_output_mapping,
+        input_configs=input_configs,
+        fusion_configs=[fusion_config],
+        output_configs=output_configs,
+        device=global_config.device,
+    )
+    kwargs["tensor_broker"] = tensor_broker
+
     return kwargs
 
 
@@ -217,7 +238,7 @@ def _extract_diffusion_targets(
     return diffusion_targets
 
 
-def _get_maybe_computed_out_dims(fusion_modules: nn.ModuleDict) -> Optional[int]:
+def _get_maybe_computed_out_dims(fusion_modules: al_fusion_modules) -> Optional[int]:
     if "computed" in fusion_modules:
         return fusion_modules["computed"].num_out_features
 
@@ -227,8 +248,10 @@ def _get_maybe_computed_out_dims(fusion_modules: nn.ModuleDict) -> Optional[int]
 def _match_fusion_outputs_to_output_types(
     output_types: dict[str, Literal["tabular", "sequence", "array"]],
     diffusion_targets: dict[str, bool],
-) -> dict[str, str]:
-    output_name_to_fusion_output_type = {}
+) -> dict[str, Literal["computed", "pass-through"]]:
+    output_name_to_fusion_output_type: dict[
+        str, Literal["computed", "pass-through"]
+    ] = {}
 
     for output_name, output_type in output_types.items():
         match output_type:
@@ -394,8 +417,8 @@ def get_output_modules(
     fusion_model_type: str,
     computed_out_dimensions: Optional[int] = None,
     feature_dimensions_and_types: Optional[Dict[str, FeatureExtractorInfo]] = None,
-) -> Tuple[nn.ModuleDict, Dict[str, Literal["tabular", "sequence", "array"]]]:
-    output_modules = nn.ModuleDict()
+) -> Tuple[al_output_modules, Dict[str, Literal["tabular", "sequence", "array"]]]:
+    output_modules: al_output_modules = cast(al_output_modules, nn.ModuleDict())
     output_types = {}
 
     for output_name, output_object in outputs_as_dict.items():

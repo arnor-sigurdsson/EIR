@@ -26,7 +26,6 @@ from eir.data_load.data_utils import Batch
 from eir.data_load.label_setup import al_all_column_ops
 from eir.models import model_training_utils
 from eir.models.input.tabular.tabular import get_tabular_inputs
-from eir.models.model_setup_modules.meta_setup import al_meta_model
 from eir.predict_modules.predict_tabular_input_setup import (
     ComputedPredictTabularInputInfo,
 )
@@ -61,6 +60,7 @@ from eir.train_utils.train_handlers import HandlerConfig
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
+    from eir.models.model_setup_modules.meta_setup import al_meta_model
     from eir.train import Experiment
 
 al_training_labels_target = Dict[str, Dict[str, torch.Tensor]]
@@ -536,7 +536,7 @@ def should_perform_optimizer_step(
 
 def maybe_update_model_parameters_with_swa(
     n_iter_before_swa: Optional[int],
-    model: al_meta_model,
+    model: "al_meta_model",
     iteration: int,
     sample_interval: int,
 ) -> None:

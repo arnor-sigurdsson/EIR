@@ -50,7 +50,7 @@ if TYPE_CHECKING:
         al_target_columns,
     )
     from eir.models.input.omics.omics_models import al_omics_models  # noqa: F401
-    from eir.models.meta.meta import FeatureExtractorProtocolWithL1
+    from eir.models.meta.meta_utils import FeatureExtractorProtocolWithL1
     from eir.setup.output_setup import al_output_objects_as_dict
     from eir.train import Experiment, al_criteria_dict  # noqa: F401
     from eir.train_utils.step_logic import al_training_labels_target

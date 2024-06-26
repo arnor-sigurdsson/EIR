@@ -35,6 +35,7 @@ from eir.setup.schema_modules.output_schemas_sequence import (
     SequenceOutputTypeConfig,
 )
 from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
+from eir.setup.schema_modules.tensor_broker_schemas import TensorBrokerConfig
 from eir.setup.setup_utils import get_all_optimizer_names
 
 if TYPE_CHECKING:
@@ -374,6 +375,7 @@ class InputConfig:
     model_config: al_feature_extractor_configs
     pretrained_config: Union[None, "BasicPretrainedConfig"] = None
     interpretation_config: Union[None, "BasicInterpretationConfig"] = None
+    tensor_broker_config: Union[None, TensorBrokerConfig] = None
 
 
 @dataclass
@@ -784,6 +786,7 @@ class FusionConfig:
 
     model_type: Literal["mlp-residual", "identity", "mgmoe", "pass-through"]
     model_config: Union[ResidualMLPConfig, IdentityConfig, MGMoEModelConfig]
+    tensor_broker_config: Union[None, TensorBrokerConfig] = None
 
 
 @dataclass
@@ -840,3 +843,4 @@ class OutputConfig:
         | ImageOutputSamplingConfig
         | dict
     ] = None
+    tensor_broker_config: Union[None, TensorBrokerConfig] = None

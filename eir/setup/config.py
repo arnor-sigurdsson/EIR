@@ -65,6 +65,7 @@ from eir.setup.config_setup_modules.output_config_setup_sequence import (
 from eir.setup.config_validation import validate_train_configs
 from eir.setup.schema_modules.latent_analysis_schemas import LatentSamplingConfig
 from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
+from eir.setup.tensor_broker_setup import set_up_tensor_broker_config
 from eir.train_utils.utils import configure_global_eir_logging
 from eir.utils.logging import get_logger
 
@@ -405,12 +406,17 @@ def init_input_config(yaml_config_as_dict: Dict[str, Any]) -> schemas.InputConfi
         interpretation_config_dict=cfg.get("interpretation_config", None),
     )
 
+    tensor_broker_config = set_up_tensor_broker_config(
+        tensor_broker_config=cfg.get("tensor_broker_config", {})
+    )
+
     input_config = schemas.InputConfig(
         input_info=input_info_object,
         input_type_info=input_type_info_object,
         pretrained_config=pretrained_config,
         model_config=model_config,
         interpretation_config=interpretation_config,
+        tensor_broker_config=tensor_broker_config,
     )
 
     return input_config
@@ -652,8 +658,14 @@ def load_fusion_configs(fusion_configs: Iterable[dict]) -> schemas.FusionConfig:
     fusion_config_kwargs = combined_config["model_config"]
     fusion_model_config = model_dataclass_config_class(**fusion_config_kwargs)
 
+    tensor_broker_config = set_up_tensor_broker_config(
+        tensor_broker_config=combined_config.get("tensor_broker_config", {})
+    )
+
     fusion_config = schemas.FusionConfig(
-        model_type=combined_config["model_type"], model_config=fusion_model_config
+        model_type=combined_config["model_type"],
+        model_config=fusion_model_config,
+        tensor_broker_config=tensor_broker_config,
     )
 
     return fusion_config
@@ -718,11 +730,16 @@ def init_output_config(
         sampling_config=cfg.get("sampling_config", {}),
     )
 
+    tensor_broker_config = set_up_tensor_broker_config(
+        tensor_broker_config=cfg.get("tensor_broker_config", {})
+    )
+
     output_config = schemas.OutputConfig(
         output_info=output_info_object,
         output_type_info=output_type_info_object,
         model_config=model_config,
         sampling_config=sampling_config,
+        tensor_broker_config=tensor_broker_config,
     )
 
     return output_config

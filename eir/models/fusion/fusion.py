@@ -1,11 +1,12 @@
 from functools import partial
-from typing import TYPE_CHECKING, Callable, Dict, Literal, NewType, Type
+from typing import TYPE_CHECKING, Callable, Dict, Literal, NewType, Type, cast
 
 import torch
 from torch import nn
 
 from eir.models.fusion import fusion_default, fusion_identity, fusion_mgmoe
 from eir.models.layers.mlp_layers import ResidualMLPConfig
+from eir.models.meta.meta_utils import FusionModuleProtocol, al_fusion_modules
 from eir.utils.logging import get_logger
 
 al_fusion_model = Literal["pass-through", "mlp-residual", "identity", "mgmoe"]
@@ -18,7 +19,7 @@ PassThroughType = NewType("PassThroughType", Dict[str, torch.Tensor])
 al_fused_features = dict[str, ComputedType | PassThroughType | torch.Tensor]
 
 if TYPE_CHECKING:
-    from eir.models.meta.meta import al_input_modules
+    from eir.models.meta.meta_utils import al_input_modules
 
 logger = get_logger(name=__name__)
 
@@ -35,14 +36,14 @@ def get_fusion_modules(
     output_types: dict[str, Literal["tabular", "sequence", "array"]],
     any_diffusion: bool,
     strict: bool = True,
-) -> nn.ModuleDict:
+) -> al_fusion_modules:
     if strict:
         _check_fusion_modules(
             output_types=output_types,
             fusion_model_type=fusion_model_type,
         )
 
-    fusion_modules = nn.ModuleDict()
+    fusion_modules: al_fusion_modules = cast(al_fusion_modules, nn.ModuleDict())
 
     fusion_in_dim = _get_fusion_input_dimension(modules_to_fuse=modules_to_fuse)
     any_tabular = any(i for i in output_types.values() if i in ("tabular",))
@@ -62,12 +63,15 @@ def get_fusion_modules(
         fusion_modules["computed"] = computing_fusion_module
 
     if any_sequence or array_and_diffusion:
+        model_config = fusion_identity.IdentityConfig()
         pass_through_fusion_module = fusion_identity.IdentityFusionModel(
-            model_config=fusion_identity.IdentityConfig(),
+            model_config=model_config,
             fusion_in_dim=fusion_in_dim,
             fusion_callable=pass_through_fuse,
         )
-        fusion_modules["pass-through"] = pass_through_fusion_module
+        fusion_modules["pass-through"] = cast(
+            FusionModuleProtocol, pass_through_fusion_module
+        )
 
     assert len(fusion_modules) > 0
 

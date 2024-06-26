@@ -69,7 +69,7 @@ class ConvAttentionBlock(nn.Module):
         self.attention_type = attention_type
 
         self.embedding_dim = channels if attention_mode == "spatial" else height * width
-        self.num_heads = _adjust_num_heads(
+        self.num_heads = adjust_num_heads(
             num_heads=num_heads,
             embedding_dim=self.embedding_dim,
         )
@@ -126,7 +126,7 @@ class ConvAttentionBlock(nn.Module):
         return x + out
 
 
-def _adjust_num_heads(num_heads: int, embedding_dim: int) -> int:
+def adjust_num_heads(num_heads: int, embedding_dim: int) -> int:
     while embedding_dim % num_heads != -0:
         num_heads -= 1
 

@@ -5,7 +5,7 @@ from einops import rearrange
 from torch import Tensor, einsum, nn
 
 from eir.models.layers.lcl_layers import LCL, LCLResidualBlock
-from eir.models.layers.projection_layers import get_projection_layer
+from eir.models.layers.projection_layers import get_1d_projection_layer
 
 al_projection_layer_types = Literal["auto", "lcl", "lcl_residual", "linear"]
 
@@ -85,7 +85,7 @@ class SequenceProjection(nn.Module):
         self.norm_1 = nn.LayerNorm(normalized_shape=in_features)
         self.act = nn.GELU()
 
-        self.projection_layer = get_projection_layer(
+        self.projection_layer = get_1d_projection_layer(
             input_dimension=in_features,
             target_dimension=self.out_dim,
             projection_layer_type=self.projection_layer_type,
@@ -111,7 +111,7 @@ class SequenceProjection(nn.Module):
             nn.Identity()
         )
         if self.in_features != self.out_dim:
-            self.downsample_identity = get_projection_layer(
+            self.downsample_identity = get_1d_projection_layer(
                 input_dimension=in_features,
                 target_dimension=self.out_dim,
                 projection_layer_type=self.projection_layer_type,

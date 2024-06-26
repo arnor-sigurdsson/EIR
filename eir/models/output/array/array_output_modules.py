@@ -6,7 +6,7 @@ from torch import nn
 
 from eir.models.input.array.array_models import al_pre_normalization
 from eir.models.input.array.models_locally_connected import LCLModel, LCLModelConfig
-from eir.models.layers.projection_layers import get_projection_layer
+from eir.models.layers.projection_layers import get_1d_projection_layer
 from eir.models.output.array.output_array_models_cnn import (
     CNNPassThroughUpscaleModel,
     CNNUpscaleModel,
@@ -61,7 +61,7 @@ class ArrayOutputWrapperModule(nn.Module):
         self.target_width = self.data_dimensions.num_elements()
         self.target_shape = self.data_dimensions.full_shape()
 
-        self.projection_head = get_projection_layer(
+        self.projection_head = get_1d_projection_layer(
             input_dimension=self.feature_extractor.num_out_features,
             target_dimension=self.target_width,
             projection_layer_type="auto",

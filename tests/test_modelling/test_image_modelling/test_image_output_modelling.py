@@ -64,6 +64,34 @@ def _get_image_out_parametrization(loss: str) -> dict[str, Any]:
                     "allow_pooling": False,
                 },
             },
+            "tensor_broker_config": {
+                "message_configs": [
+                    {
+                        "name": "last_cnn_layer_cat_conv",
+                        "layer_path": "output_modules.test_image.feature_extractor."
+                        "final_layer.0",
+                        "use_from_cache": ["first_cnn_layer_copy"],
+                        "cache_fusion_type": "cat+conv",
+                        "projection_type": "linear",
+                    },
+                    {
+                        "name": "last_cnn_layer_lcl_sum",
+                        "layer_path": "output_modules.test_image.feature_extractor."
+                        "final_layer.0",
+                        "use_from_cache": ["first_cnn_layer"],
+                        "cache_fusion_type": "sum",
+                        "projection_type": "lcl_residual",
+                    },
+                    {
+                        "name": "last_cnn_layer_ca",
+                        "layer_path": "output_modules.test_image.feature_extractor."
+                        "final_layer.0",
+                        "use_from_cache": ["first_cnn_layer"],
+                        "cache_fusion_type": "cross-attention",
+                        "projection_type": "sequence",
+                    },
+                ],
+            },
         },
     ]
 
@@ -88,6 +116,16 @@ def _get_image_out_parametrization(loss: str) -> dict[str, Any]:
                     "down_sample_every_n_blocks": 1,
                 },
             },
+            "tensor_broker_config": {
+                "message_configs": [
+                    {
+                        "name": "first_cnn_layer",
+                        "layer_path": "input_modules.test_image.feature_extractor"
+                        ".conv.0.conv_1",
+                        "cache_tensor": True,
+                    },
+                ]
+            },
         }
     ]
 
@@ -111,6 +149,16 @@ def _get_image_out_parametrization(loss: str) -> dict[str, Any]:
                     "allow_first_conv_size_reduction": False,
                     "down_sample_every_n_blocks": 1,
                 },
+            },
+            "tensor_broker_config": {
+                "message_configs": [
+                    {
+                        "name": "first_cnn_layer_copy",
+                        "layer_path": "input_modules.copy_test_image.feature_extractor"
+                        ".conv.0.conv_1",
+                        "cache_tensor": True,
+                    },
+                ]
             },
         }
         input_configs.append(copy_config)

@@ -361,7 +361,7 @@ class CNNPassThroughUpscaleModel(nn.Module):
         if output_name not in feature_extractor_infos:
             raise ValueError(
                 f"When using CNNPassThroughUpscaleModel, the output_name "
-                f"'{output_name}' must be included as an input module, as the"
+                f"'{output_name}' must be included as an input module, as the "
                 f"passthrough model is intended to be linked with a feature "
                 f"extractor."
             )
