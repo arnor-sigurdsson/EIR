@@ -5,6 +5,7 @@ import torch.backends
 import torch.cuda
 
 from eir.setup.config_setup_modules.config_setup_utils import recursive_dict_replace
+from tests.conftest import get_system_info
 
 
 def get_test_base_global_init(
@@ -12,9 +13,10 @@ def get_test_base_global_init(
     allow_mps: bool = True,
 ) -> Sequence[dict]:
     device = "cpu"
+    in_gha, _ = get_system_info()
     if allow_cuda:
         device = "cuda" if torch.cuda.is_available() else device
-    if allow_mps:
+    if allow_mps and not in_gha:
         device = "mps" if torch.backends.mps.is_available() else device
 
     global_inits = [
