@@ -9,7 +9,7 @@ from eir.setup.config_setup_modules.config_setup_utils import recursive_dict_rep
 
 def get_test_base_global_init(
     allow_cuda: bool = True,
-    allow_mps: bool = False,
+    allow_mps: bool = True,
 ) -> Sequence[dict]:
     device = "cpu"
     if allow_cuda:
