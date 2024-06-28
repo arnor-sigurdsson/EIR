@@ -887,7 +887,7 @@ def calc_conv_params_needed(
     solutions = []
 
     for s in param_suggestions:
-        padding = _solve_for_padding(
+        padding = solve_for_padding(
             input_size=input_size,
             target_size=s.target_size,
             dilation=s.dilation,
@@ -998,7 +998,7 @@ def conv_output_formula(
     return out_size
 
 
-def _solve_for_padding(
+def solve_for_padding(
     input_size: int, target_size: int, dilation: int, stride: int, kernel_size: int
 ) -> Union[int, None]:
     p = Symbol("p", integer=True, nonnegative=True)

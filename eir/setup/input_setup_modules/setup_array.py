@@ -4,7 +4,6 @@ from typing import Literal, Optional
 
 import numpy as np
 import torch
-from aislib.misc_utils import get_logger
 
 from eir.data_load.data_source_modules.deeplake_ops import (
     get_deeplake_input_source_iterable,
@@ -23,6 +22,7 @@ from eir.setup.setup_utils import (
     al_collector_classes,
     collect_stats,
 )
+from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__)
 

@@ -1,10 +1,11 @@
 from typing import Iterable, Optional, Sequence, Type, Union
 
 import torch
-from aislib.misc_utils import get_logger
 from torch_optimizer import _NAME_OPTIM_MAP
 from tqdm import tqdm
 from transformers.models.auto.modeling_auto import MODEL_MAPPING_NAMES
+
+from eir.utils.logging import get_logger
 
 al_collector_classes = Union[
     Type["ChannelBasedRunningStatistics"], Type["ElementBasedRunningStatistics"]

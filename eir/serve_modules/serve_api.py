@@ -1,6 +1,5 @@
 from typing import Any, Sequence
 
-from aislib.misc_utils import get_logger
 from fastapi import FastAPI
 
 from eir.predict_modules.predict_tabular_input_setup import (
@@ -29,6 +28,7 @@ from eir.setup.output_setup_modules.tabular_output_setup import (
     ComputedTabularOutputInfo,
 )
 from eir.setup.schemas import InputConfig
+from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 

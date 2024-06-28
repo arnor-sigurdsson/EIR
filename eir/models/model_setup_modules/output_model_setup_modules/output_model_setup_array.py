@@ -2,7 +2,6 @@ from functools import partial
 from typing import TYPE_CHECKING, Dict, Optional, Union
 
 import torch
-from aislib.misc_utils import get_logger
 
 from eir.models.input.array.models_locally_connected import FlattenFunc, LCLModel
 from eir.models.model_setup_modules.output_model_setup_modules import al_output_modules
@@ -21,6 +20,7 @@ from eir.models.output.array.array_output_modules import (
 from eir.setup.input_setup_modules.common import DataDimensions
 from eir.setup.output_setup_modules.array_output_setup import ComputedArrayOutputInfo
 from eir.setup.output_setup_modules.image_output_setup import ComputedImageOutputInfo
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from eir.models.model_setup_modules.meta_setup import FeatureExtractorInfo

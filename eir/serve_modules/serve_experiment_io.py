@@ -2,8 +2,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Union
 
-from aislib.misc_utils import get_logger
-
 from eir.experiment_io.experiment_io import (
     LoadedTrainExperiment,
     load_serialized_train_experiment,
@@ -13,6 +11,7 @@ from eir.models.meta.meta import MetaModel
 from eir.serve_modules.serve_input_setup import set_up_inputs_for_serve
 from eir.setup.config import Configs
 from eir.setup.input_setup import al_input_objects_as_dict
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from eir.train import Hooks, al_output_objects_as_dict

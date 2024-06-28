@@ -361,6 +361,10 @@ class InputConfig:
     :param interpretation_config:
         Configuration for interpretation analysis when applicable.
 
+    :param tensor_broker_config:
+        Configuration for tensor broker when applicable. Note that this is an
+        experimental feature.
+
     """
 
     input_info: "InputDataConfig"

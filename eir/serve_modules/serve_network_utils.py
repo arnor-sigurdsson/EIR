@@ -5,7 +5,6 @@ from typing import Any, Dict, Literal, Optional, Sequence, Union
 import numpy as np
 import numpy.typing as npt
 import torch
-from aislib.misc_utils import get_logger
 from PIL import Image
 from sklearn.preprocessing import StandardScaler
 
@@ -28,6 +27,7 @@ from eir.setup.schemas import ImageInputDataConfig, SequenceInputDataConfig
 from eir.train_utils.evaluation_handlers.evaluation_handlers_utils import (
     streamline_sequence_manual_data,
 )
+from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 

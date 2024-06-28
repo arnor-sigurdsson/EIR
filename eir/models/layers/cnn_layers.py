@@ -1,13 +1,13 @@
 from typing import Literal, Tuple
 
 import torch
-from aislib.misc_utils import get_logger
 from einops import rearrange
 from torch import nn
 from torchvision.ops import StochasticDepth
 
 from eir.models.layers.attention_layers import LinearAttention
 from eir.models.layers.norm_layers import GRN
+from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__)
 
@@ -89,7 +89,7 @@ class ConvAttentionBlock(nn.Module):
                 dim_head=self.embedding_dim // self.num_heads,
             )
 
-        self.norm = nn.LayerNorm(self.embedding_dim)
+        self.norm = nn.LayerNorm(normalized_shape=self.embedding_dim)
         self.grn = GRN(in_channels=channels)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -193,6 +193,7 @@ class CNNResidualBlockBase(nn.Module):
             kernel_size=(self.conv_1_kernel_h, self.conv_1_kernel_w),
             stride=(self.down_stride_h, self.down_stride_w),
             padding=(self.conv_1_padding_h, self.conv_1_padding_w),
+            dilation=(self.dilation_h, self.dilation_w),
             bias=True,
         )
 
@@ -223,6 +224,7 @@ class CNNResidualBlockBase(nn.Module):
                 kernel_size=(self.conv_1_kernel_h, self.conv_1_kernel_w),
                 stride=(self.down_stride_h, self.down_stride_w),
                 padding=(self.conv_1_padding_h, self.conv_1_padding_w),
+                dilation=(self.dilation_h, self.dilation_w),
                 bias=True,
             )
         )

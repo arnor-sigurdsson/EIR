@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any, Sequence, Tuple
 import numpy as np
 import pandas as pd
 import pytest
-from aislib.misc_utils import get_logger
 from scipy.spatial.distance import cosine
 from sklearn.metrics import mean_squared_error
 
@@ -15,6 +14,7 @@ from docs.doc_modules.serving_experiments import run_serve_experiment_from_comma
 from eir import train
 from eir.serve_modules.serve_network_utils import _deserialize_array
 from eir.setup.schemas import InputConfig, OutputConfig
+from eir.utils.logging import get_logger
 from tests.test_modelling.test_modelling_utils import check_performance_result_wrapper
 from tests.test_modelling.test_sequence_modelling.test_sequence_output_modelling import (  # noqa
     get_expected_keywords_set,

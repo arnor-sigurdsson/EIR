@@ -82,7 +82,7 @@ def _get_image_out_parametrization(loss: str) -> dict[str, Any]:
                     "name": "last_cnn_layer_lcl_sum",
                     "layer_path": "output_modules.test_image.feature_extractor."
                     "final_layer.0",
-                    "use_from_cache": ["first_cnn_layer"],
+                    "use_from_cache": ["first_downsample_layer"],
                     "cache_fusion_type": "sum",
                     "projection_type": "lcl_residual",
                 },
@@ -93,6 +93,14 @@ def _get_image_out_parametrization(loss: str) -> dict[str, Any]:
                     "use_from_cache": ["first_cnn_layer"],
                     "cache_fusion_type": "cross-attention",
                     "projection_type": "sequence",
+                },
+                {
+                    "name": "last_cnn_layer_grouped_linear",
+                    "layer_path": "output_modules.test_image.feature_extractor."
+                    "final_layer.0",
+                    "use_from_cache": ["first_downsample_layer"],
+                    "cache_fusion_type": "sum",
+                    "projection_type": "grouped_linear",
                 },
             ],
         }
@@ -129,7 +137,13 @@ def _get_image_out_parametrization(loss: str) -> dict[str, Any]:
                     "layer_path": "input_modules.test_image.feature_extractor"
                     ".conv.0.conv_1",
                     "cache_tensor": True,
-                }
+                },
+                {
+                    "name": "first_downsample_layer",
+                    "layer_path": "input_modules.test_image.feature_extractor"
+                    ".conv.3",
+                    "cache_tensor": True,
+                },
             ]
         }
 

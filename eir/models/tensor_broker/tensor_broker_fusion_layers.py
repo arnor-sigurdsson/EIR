@@ -1,3 +1,4 @@
+import math
 from typing import Literal
 
 import torch
@@ -83,13 +84,16 @@ class GatedSumFusionLayer(nn.Module):
         self,
         input_shape: torch.Size,
         context_shape: torch.Size,
+        initial_input_bias: float = 0.9,
     ):
         super().__init__()
         self.input_shape = input_shape
         self.context_shape = context_shape
 
-        self.gate_input = nn.Parameter(torch.randn(1), requires_grad=True)
-        self.gate_projected = nn.Parameter(torch.randn(1), requires_grad=True)
+        input_init = torch.Tensor([math.log(initial_input_bias)])
+        projected_init = torch.Tensor([math.log(1 - initial_input_bias)])
+        self.gate_input = nn.Parameter(input_init, requires_grad=True)
+        self.gate_projected = nn.Parameter(projected_init, requires_grad=True)
 
     def forward(
         self, input_tensor: torch.Tensor, projected_context_tensor: torch.Tensor

@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, Sequence, Union
 
 import torch
-from aislib.misc_utils import get_logger
 from torch.utils.data._utils.collate import default_collate
 
 from eir.data_load.data_preparation_modules.imputation import (
@@ -30,6 +29,7 @@ from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputIn
 from eir.setup.input_setup_modules.setup_tabular import ComputedTabularInputInfo
 from eir.setup.schemas import InputConfig, TabularInputDataConfig, al_input_configs
 from eir.train_utils.utils import call_hooks_stage_iterable
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from eir.serve_modules.serve_experiment_io import ServeExperiment

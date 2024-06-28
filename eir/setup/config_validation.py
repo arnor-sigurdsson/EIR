@@ -17,6 +17,16 @@ def validate_train_configs(configs: "Configs") -> None:
     validate_input_configs(input_configs=configs.input_configs)
     validate_output_configs(output_configs=configs.output_configs)
 
+    validate_config_sync(
+        input_configs=configs.input_configs, output_configs=configs.output_configs
+    )
+
+    validate_tensor_broker_configs(
+        input_configs=configs.input_configs,
+        fusion_configs=[configs.fusion_config],
+        output_configs=configs.output_configs,
+    )
+
 
 def validate_input_configs(input_configs: Sequence[schemas.InputConfig]) -> None:
     for input_config in input_configs:
@@ -154,7 +164,70 @@ def validate_config_sync(
             raise ValueError(
                 f"Diffusion loss is only supported when the corresponding input data "
                 f"for the output '{output_name}' is provided. "
-                "In practice, this means adding an array input configuration with the "
+                "In practice, this means adding an input configuration with the "
                 "same name and input_source as the output. "
                 "This is needed to calculate the diffusion loss."
             )
+
+
+def validate_tensor_broker_configs(
+    input_configs: Sequence[schemas.InputConfig],
+    fusion_configs: Sequence[schemas.FusionConfig],
+    output_configs: Sequence[schemas.OutputConfig],
+) -> None:
+    all_tensor_broker_configs: list[schemas.TensorBrokerConfig] = []
+    all_configs = list(input_configs) + list(fusion_configs) + list(output_configs)
+
+    for config in all_configs:
+        if (
+            hasattr(config, "tensor_broker_config")
+            and config.tensor_broker_config is not None
+        ):
+            all_tensor_broker_configs.append(config.tensor_broker_config)
+
+    if not all_tensor_broker_configs:
+        return
+
+    all_message_names = []
+    for broker_config in all_tensor_broker_configs:
+        all_message_names.extend([msg.name for msg in broker_config.message_configs])
+
+    if len(all_message_names) != len(set(all_message_names)):
+        counts = {name: all_message_names.count(name) for name in all_message_names}
+        raise ValueError(
+            f"All tensor message names must be unique across all configs."
+            f"Got counts: {counts}"
+        )
+
+    for broker_config in all_tensor_broker_configs:
+        for msg in broker_config.message_configs:
+            if (
+                msg.cache_fusion_type == "cross-attention"
+                and msg.projection_type != "sequence"
+            ):
+                raise ValueError(
+                    f"Cross-attention is only allowed with 'sequence' projection. "
+                    f"Message '{msg.name}' uses {msg.projection_type}."
+                )
+
+    cached_messages = set()
+    used_messages = set()
+    for broker_config in all_tensor_broker_configs:
+        for msg in broker_config.message_configs:
+            if msg.cache_tensor:
+                cached_messages.add(msg.name)
+            if msg.use_from_cache:
+                used_messages.update(msg.use_from_cache)
+
+    unused_caches = cached_messages - used_messages
+    if unused_caches:
+        raise ValueError(
+            f"The following tensor messages are never used: {unused_caches}"
+        )
+
+    unused_needing_cache = used_messages - cached_messages
+    if unused_needing_cache:
+        raise ValueError(
+            f"The following tensor messages are used but not cached: "
+            f"{unused_needing_cache}"
+        )

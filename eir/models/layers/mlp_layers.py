@@ -76,7 +76,7 @@ class MLPResidualBlock(nn.Module):
                 bias=True,
             )
 
-        self.ls = LayerScale(dim=out_features)
+        self.ls = LayerScale(dim=out_features, init_values=1.0)
 
         self.stochastic_depth = StochasticDepth(p=self.stochastic_depth_p, mode="batch")
 

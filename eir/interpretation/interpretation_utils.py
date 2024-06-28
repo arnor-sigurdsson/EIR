@@ -19,7 +19,6 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import torch
-from aislib.misc_utils import get_logger
 from captum._utils.common import (
     _expand_additional_forward_args,
     _expand_target,
@@ -34,6 +33,7 @@ from scipy.stats import bootstrap
 from torch import Tensor
 
 from eir.setup import schemas
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from eir.data_load.label_setup import al_label_transformers_object

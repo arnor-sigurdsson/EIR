@@ -2,13 +2,13 @@ import math
 from typing import Optional
 
 import torch
-from aislib.misc_utils import get_logger
 from torch import nn
 from torch.nn import Parameter
 from torch.nn import functional as F
 from torchvision.ops import StochasticDepth
 
 from eir.models.layers.norm_layers import LayerScale
+from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__)
 
@@ -171,7 +171,7 @@ class LCLResidualBlock(nn.Module):
 
         self.out_features = self.fc_2.out_features
 
-        self.ls = LayerScale(dim=self.out_features)
+        self.ls = LayerScale(dim=self.out_features, init_values=1.0)
 
         if in_features == self.out_features:
             self.downsample_identity = lambda x: x

@@ -1,5 +1,15 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, Dict, Literal, Sequence, Tuple
+from difflib import get_close_matches
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Literal,
+    Optional,
+    Sequence,
+    Tuple,
+)
 
 import torch
 from torch import nn
@@ -28,9 +38,12 @@ from eir.train_utils.step_logic import (
     al_dataloader_getitem_batch,
     prepare_base_batch_default,
 )
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     pass
+
+logger = get_logger(name=__name__)
 
 
 @dataclass
@@ -83,7 +96,7 @@ def create_tensor_shapes_estimation_hook(
         elif isinstance(output, dict):
             cur_output_shapes = {k: v.shape[1:] for k, v in output.items()}
             for k, v in cur_output_shapes.items():
-                output_shapes[f"{layer_path}--{k}"] = v
+                output_shapes[f"{layer_path}.{k}"] = v
 
         if len(args) > 0:
             input_tensor = args[0]
@@ -102,7 +115,7 @@ def create_tensor_shapes_estimation_hook(
         elif isinstance(input_tensor, dict):
             cur_input_shapes = {k: v.shape[1:] for k, v in input_tensor.items()}
             for k, v in cur_input_shapes.items():
-                input_shapes[f"{layer_path}--{k}"] = v
+                input_shapes[f"{layer_path}.{k}"] = v
 
     return hook
 
@@ -172,13 +185,22 @@ def attach_store_forward_hook(
     module: nn.Module,
     cache: Dict[str, CachedTensor],
     layer_path: str,
+    layer_cache_target: Literal["input", "output"],
 ) -> Callable[[], None]:
     def hook(module: nn.Module, args: Tuple[torch.Tensor, ...], output: torch.Tensor):
-        cache[layer_path] = CachedTensor(
-            tensor=output,
-            shape=output.shape,
-            layer_path=layer_path,
-        )
+
+        if layer_cache_target == "input":
+            cache[layer_path] = CachedTensor(
+                tensor=args[0],
+                shape=args[0].shape,
+                layer_path=layer_path,
+            )
+        else:
+            cache[layer_path] = CachedTensor(
+                tensor=output,
+                shape=output.shape,
+                layer_path=layer_path,
+            )
 
     handle = module.register_forward_hook(hook)
 
@@ -275,27 +297,34 @@ def get_tensor_broker(
     tensor_cache: Dict[str, CachedTensor] = {}
     all_named_modules: dict[str, nn.Module] = dict(module_storage.named_modules())
 
-    have_been_cached_mapping = {}
+    have_been_cached_mapping: dict[str, tuple[str, str]] = {}
     for config in all_configs:
         if not config.tensor_broker_config:
             continue
 
         for tmc in config.tensor_broker_config.message_configs:
             layer_path = tmc.layer_path
+            layer_cache_target = tmc.layer_cache_target
 
             if tmc.cache_tensor:
-                if layer_path not in all_named_modules:
-                    raise ValueError(
-                        f"Layer path {layer_path} not found in module storage, "
-                        f"please check the layer path in the tensor broker config."
-                    )
+                msg = (
+                    f"When attempting to cache '{tmc.name}', "
+                    f"layer path '{layer_path}' was not found in module storage. "
+                    f"please check the layer path in the tensor broker config."
+                )
+                module = fuzzy_dict_lookup(
+                    d=all_named_modules,
+                    key=layer_path,
+                    custom_prefix_message=msg,
+                )
 
                 attach_store_forward_hook(
-                    module=all_named_modules[layer_path],
+                    module=module,
                     cache=tensor_cache,
                     layer_path=layer_path,
+                    layer_cache_target=layer_cache_target,
                 )
-                have_been_cached_mapping[tmc.name] = layer_path
+                have_been_cached_mapping[tmc.name] = (layer_path, layer_cache_target)
 
     have_been_used_from_cache = set()
     for config in all_configs:
@@ -309,13 +338,26 @@ def get_tensor_broker(
             if tmc.use_from_cache:
                 for from_name in tmc.use_from_cache:
 
-                    from_path = have_been_cached_mapping[from_name]
+                    from_path, cache_target = have_been_cached_mapping[from_name]
                     message_name = f"{to_name}: {from_path}>>>{to_path}"
                     # . is not allowed in layer names in Torch
                     message_name = message_name.replace(".", "--")
 
-                    from_shape_no_batch = output_shapes[from_path]
-                    to_shape_no_batch = input_shapes[to_path]
+                    if cache_target == "output":
+                        from_shape_no_batch = output_shapes[from_path]
+                    else:
+                        from_shape_no_batch = input_shapes[from_path]
+
+                    msg = (
+                        f"When setting up message '{message_name}', "
+                        f"the destination path "
+                        f"'{to_path}' was not found as a module in the model."
+                    )
+                    to_shape_no_batch = fuzzy_dict_lookup(
+                        d=input_shapes,
+                        key=to_path,
+                        custom_prefix_message=msg,
+                    )
 
                     projection_layer, projected_shape = get_projection_layer(
                         from_shape_no_batch=from_shape_no_batch,
@@ -344,3 +386,40 @@ def get_tensor_broker(
 
     tensor_broker_modules = tensor_broker_modules.to(device=device)
     return tensor_broker_modules
+
+
+def fuzzy_dict_lookup(
+    d: Dict[str, Any],
+    key: str,
+    num_suggestions: int = 3,
+    custom_prefix_message: Optional[str] = None,
+) -> Any:
+    if key in d:
+        return d[key]
+
+    close_matches = get_close_matches(key, d.keys(), n=num_suggestions, cutoff=0.6)
+
+    error_parts = []
+
+    if custom_prefix_message:
+        error_parts.append(f"{custom_prefix_message}")
+
+    error_parts.append(f"Key not found: '{key}'")
+
+    if close_matches:
+        suggestions = "\n".join(f"  - {match}" for match in close_matches)
+        error_parts.append(f"Did you mean one of these?\n{suggestions}")
+    else:
+        error_parts.append("No close matches found.")
+
+    sample_keys = list(d.keys())[:5]
+    if sample_keys:
+        examples = "\n".join(f"  - {k}" for k in sample_keys)
+        error_parts.append(f"Example keys from the dictionary:\n{examples}")
+        if len(d) > 5:
+            error_parts.append(f"  ... ({len(d) - 5} more keys)")
+
+    error_message = "\n".join(error_parts)
+    logger.error(error_message)
+
+    raise KeyError(f"Key '{key}' not found. See logs for details.")

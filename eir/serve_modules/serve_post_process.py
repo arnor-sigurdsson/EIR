@@ -3,7 +3,6 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import torch
-from aislib.misc_utils import get_logger
 from scipy.special import softmax
 from sklearn.preprocessing import StandardScaler
 
@@ -44,6 +43,7 @@ from eir.train_utils.evaluation_handlers.train_handlers_sequence_output import (
     get_special_tokens,
     remove_special_tokens_from_string,
 )
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     pass
