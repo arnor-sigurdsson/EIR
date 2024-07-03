@@ -4420,13 +4420,13 @@ testing = ["fields", "hunter", "process-tests", "pytest-xdist", "virtualenv"]
 
 [[package]]
 name = "pytest-split"
-version = "0.8.2"
+version = "0.9.0"
 description = "Pytest plugin which splits the test suite to equally sized sub suites based on test execution time."
 optional = false
-python-versions = ">=3.7.1,<4.0"
+python-versions = "<4.0,>=3.8.1"
 files = [
-    {file = "pytest_split-0.8.2-py3-none-any.whl", hash = "sha256:b7fa704659cb224b9f7f5c24536bc04eff351f42d852bf0312e03774fd9c0972"},
-    {file = "pytest_split-0.8.2.tar.gz", hash = "sha256:446f330e3607572027f3861058c27d9b3eaa80d83dc86675abe2978bbf50c02f"},
+    {file = "pytest_split-0.9.0-py3-none-any.whl", hash = "sha256:9e197df601828d76a1ab615158d9c6253ec9f96e46c1d3ea27187aa5ac0ef9de"},
+    {file = "pytest_split-0.9.0.tar.gz", hash = "sha256:ca52527e4d9024f6ec3aba723527bd276d12096024999b1f5b8445a38da1e81c"},
 ]
 
 [package.dependencies]
@@ -6832,4 +6832,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11.0,<3.12"
-content-hash = "4cce1813db7bc6906edfa185e2e0948bcd344d28fcdd669711faacbb9e4d7ca8"
+content-hash = "dc440b24c270161d4779bedbb9cac239611fb907f2bd183f981a7852ab6ca4cb"
