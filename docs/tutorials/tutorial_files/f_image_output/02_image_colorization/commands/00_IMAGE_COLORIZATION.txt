@@ -1,0 +1,6 @@
+eirtrain \
+--global_configs eir_tutorials/f_image_output/02_image_colorization/conf/globals.yaml \
+--input_configs eir_tutorials/f_image_output/02_image_colorization/conf/inputs_image_cnn.yaml \
+--fusion_configs eir_tutorials/f_image_output/02_image_colorization/conf/fusion.yaml \
+--output_configs eir_tutorials/f_image_output/02_image_colorization/conf/output_image.yaml \
+--globals.output_folder=eir_tutorials/tutorial_runs/f_image_output/02_image_colorization

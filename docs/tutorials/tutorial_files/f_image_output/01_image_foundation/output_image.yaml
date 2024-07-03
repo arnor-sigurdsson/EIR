@@ -7,8 +7,7 @@ output_type_info:
   adaptive_normalization_max_samples: 10000
   loss: "mse"
   size:
-    - 64
-    - 64
+    - 128
 
 model_config:
   model_type: cnn

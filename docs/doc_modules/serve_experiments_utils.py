@@ -8,9 +8,9 @@ from typing import Any
 
 import numpy as np
 import requests
-from aislib.misc_utils import get_logger
 
 from eir.setup.input_setup_modules.setup_image import default_image_loader
+from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__)
 

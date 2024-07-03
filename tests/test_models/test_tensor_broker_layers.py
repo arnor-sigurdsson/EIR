@@ -2,7 +2,7 @@ import pytest
 import torch
 import torch.nn as nn
 
-from eir.models.tensor_broker.tensor_broker_projection_layers import (
+from eir.models.tensor_broker.projection_modules.grouped_linear import (
     GroupedDownProjectionLayer,
     GroupedDownProjectionLayerFactorized,
     GroupedUpProjectionLayer,
@@ -71,7 +71,10 @@ def test_get_retracted_shape(input_shape, target_shape, expected_shape):
 def test_grouped_up_projection_layer():
     input_shape = [32, 64]
     target_shape = [32, 64, 128]
-    layer = GroupedUpProjectionLayer(input_shape, target_shape)
+    layer = GroupedUpProjectionLayer(
+        input_shape=input_shape,
+        target_shape=target_shape,
+    )
     input_tensor = torch.rand(10, 32, 64)  # Batch size of 10
     output = layer(input_tensor)
     assert output.shape == (10, 32, 64, 128)

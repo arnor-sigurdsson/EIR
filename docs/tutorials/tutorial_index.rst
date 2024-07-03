@@ -42,6 +42,7 @@ Image Generation
     :maxdepth: 2
 
     f_image_output/01_foundational_autoencoder.rst
+    f_image_output/02_image_coloring_and_upscaling.rst
 
 Pretraining
 ============

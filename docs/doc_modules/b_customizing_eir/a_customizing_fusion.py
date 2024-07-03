@@ -4,7 +4,8 @@ import torch
 from torch import nn
 
 from eir import train
-from eir.models.meta.meta import FeatureExtractorProtocol, MetaModel, al_fused_features
+from eir.models.meta.meta import MetaModel, al_fused_features
+from eir.models.meta.meta_utils import FeatureExtractorProtocol
 from eir.models.model_setup_modules.meta_setup import get_output_modules
 from eir.setup.config import get_configs
 from eir.train_utils import step_logic

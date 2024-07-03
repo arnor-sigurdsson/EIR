@@ -7,7 +7,7 @@ from torch import nn
 
 from eir.models.fusion.fusion_attention import UniDirectionalCrossAttention
 from eir.models.layers.cnn_layers import adjust_num_heads
-from eir.models.tensor_broker.tensor_broker_projection_layers import (
+from eir.models.tensor_broker.projection_modules.sequence import (
     get_reshape_to_attention_dims_func,
 )
 

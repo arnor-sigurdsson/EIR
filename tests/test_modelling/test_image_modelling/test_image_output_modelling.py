@@ -102,6 +102,14 @@ def _get_image_out_parametrization(loss: str) -> dict[str, Any]:
                     "cache_fusion_type": "sum",
                     "projection_type": "grouped_linear",
                 },
+                {
+                    "name": "last_cnn_layer_interpolate",
+                    "layer_path": "output_modules.test_image.feature_extractor."
+                    "final_layer.0",
+                    "use_from_cache": ["first_downsample_layer"],
+                    "cache_fusion_type": "sum",
+                    "projection_type": "interpolate",
+                },
             ],
         }
 

@@ -1,0 +1,35 @@
+output_info:
+  output_source: eir_tutorials/f_image_output/02_image_colorization/data/images
+  output_name: image
+  output_type: image
+
+output_type_info:
+  adaptive_normalization_max_samples: 10000
+  loss: "mse"
+  mode: "RGB"
+  size:
+    - 128
+
+model_config:
+  model_type: cnn
+  model_init_config:
+    channel_exp_base: 6
+    allow_pooling: true
+    attention_inclusion_cutoff: 256
+    stochastic_depth_p: 0.0
+    rb_do: 0.0
+
+tensor_broker_config:
+  message_configs:
+    - name: second_cnn_upscale_layer_16x16
+      layer_path: output_modules.image.feature_extractor.blocks.block_4
+      use_from_cache:
+        - second_residual_layer_16x16
+    - name: third_cnn_upscale_layer_32_x32
+      layer_path: output_modules.image.feature_extractor.blocks.block_6
+      use_from_cache:
+        - first_residual_layer_32x32
+    - name: final_layer
+      layer_path: output_modules.image.feature_extractor.final_layer
+      use_from_cache:
+        - first_cnn_layer

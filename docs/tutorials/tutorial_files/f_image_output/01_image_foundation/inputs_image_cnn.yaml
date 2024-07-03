@@ -5,11 +5,10 @@ input_info:
 
 input_type_info:
   adaptive_normalization_max_samples: 10000
-  auto_augment: true
+  auto_augment: false
   mode: "RGB"
   size:
-    - 64
-    - 64
+    - 128
 
 model_config:
   model_type: cnn
@@ -17,13 +16,13 @@ model_config:
     channel_exp_base: 6
     kernel_width: 3
     down_stride_width: 1
-    first_stride_expansion_width: 1
-    first_kernel_expansion_width: 1
+    first_stride_expansion_width: 4
+    first_kernel_expansion_width: 1.3
     kernel_height: 3
     down_stride_height: 1
-    first_stride_expansion_height: 1
-    first_kernel_expansion_height: 1
-    allow_first_conv_size_reduction: false
+    first_stride_expansion_height: 4
+    first_kernel_expansion_height: 1.3
+    allow_first_conv_size_reduction: true
     attention_inclusion_cutoff: 256
     down_sample_every_n_blocks: 1
     layers:

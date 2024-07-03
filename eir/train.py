@@ -178,6 +178,10 @@ def get_default_experiment(
         model=model,
         device=torch.device(configs.global_config.device),
     )
+    _log_model(
+        model=model,
+        structure_file=run_folder / "model_info.txt",
+    )
 
     criteria = get_criteria(
         outputs_as_dict=outputs_as_dict,
@@ -331,10 +335,6 @@ def run_experiment(experiment: Experiment) -> None:
     gc = experiment.configs.global_config
     run_folder = utils.get_run_folder(output_folder=gc.output_folder)
 
-    _log_model(
-        model=experiment.model,
-        structure_file=run_folder / "model_info.txt",
-    )
     _log_eir_version_info(outfile=get_version_file(run_folder=run_folder))
 
     keys_to_serialize = get_default_experiment_keys_to_serialize()

@@ -13,10 +13,14 @@ from eir.models.layers.cnn_layers import (
     UpSamplingResidualBlock,
 )
 from eir.models.layers.norm_layers import GRN
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from eir.models.model_setup_modules.meta_setup import FeatureExtractorInfo
     from eir.setup.input_setup_modules.common import DataDimensions
+
+
+logger = get_logger(name=__name__)
 
 
 @dataclass
@@ -46,6 +50,17 @@ class CNNUpscaleModelConfig:
     :param num_ca_blocks:
           Number of cross-attention blocks to include in the model when fusing
           with other feature extractor outputs.
+
+    :param up_every_n_blocks:
+        If set, the model will upsample every n blocks. If not set, the model will
+        use the down_every_n_blocks parameter in linked feature extractor, if
+        that is the case and the pass-through upscale model is being used (
+        the default for diffusion models, or if pass-through fusion model is used).
+        Otherwise, will default to 2.
+
+    :param n_final_extra_blocks:
+        Number of extra blocks to add at the end of the model after upsampling
+        has reached the target size.
     """
 
     channel_exp_base: int
@@ -54,6 +69,8 @@ class CNNUpscaleModelConfig:
     attention_inclusion_cutoff: int = 256
     allow_pooling: bool = True
     num_ca_blocks: int = 1
+    up_every_n_blocks: Optional[int] = None
+    n_final_extra_blocks: int = 1
 
 
 class CNNUpscaleResidualBlock(nn.Module):
@@ -177,6 +194,7 @@ def setup_blocks(
     target_width: int,
     attention_inclusion_cutoff: int,
     up_sample_every_n_blocks: int,
+    n_final_extra_blocks: int,
     allow_pooling: bool = True,
 ) -> Tuple[nn.Sequential, int, int, int]:
     blocks = nn.Sequential()
@@ -262,6 +280,19 @@ def setup_blocks(
                 module=cur_attention_block,
             )
 
+    for _ in range(n_final_extra_blocks):
+        blocks.add_module(
+            name=f"block_{len(blocks)}",
+            module=CNNUpscaleResidualBlock(
+                in_channels=in_channels,
+                in_height=current_height,
+                in_width=current_width,
+                out_channels=out_channels,
+                stride=(1, 1),
+            ),
+        )
+        in_channels = out_channels
+
     not_matching = current_height != target_height or current_width != target_width
     if allow_pooling and not_matching:
         blocks.add_module(
@@ -293,6 +324,11 @@ class CNNUpscaleModel(nn.Module):
         self.target_height = target_dimensions.height
         self.target_channels = target_dimensions.channels
 
+        up_every_n_blocks = model_config.up_every_n_blocks
+        if not up_every_n_blocks:
+            logger.debug("Using default up_every_n_blocks=2.")
+            up_every_n_blocks = 2
+
         ratio = math.sqrt(self.target_height * self.target_width / input_size)
         initial_height = int(self.target_height / ratio)
         initial_width = int(self.target_width / ratio)
@@ -323,7 +359,8 @@ class CNNUpscaleModel(nn.Module):
             out_channels=2**self.model_config.channel_exp_base,
             allow_pooling=self.model_config.allow_pooling,
             attention_inclusion_cutoff=self.model_config.attention_inclusion_cutoff,
-            up_sample_every_n_blocks=1,
+            up_sample_every_n_blocks=up_every_n_blocks,
+            n_final_extra_blocks=model_config.n_final_extra_blocks,
         )
 
         self.final_layer = nn.Conv2d(
@@ -370,9 +407,17 @@ class CNNPassThroughUpscaleModel(nn.Module):
         cur_shape = cur_fei.output_shape
         assert cur_shape is not None
 
-        linked_down_every = cur_fei.extras.get("down_every_n_blocks")
-        if not linked_down_every:
-            linked_down_every = 2
+        up_every_n_blocks = model_config.up_every_n_blocks
+        if not up_every_n_blocks:
+            up_every_n_blocks = cur_fei.extras.get("down_every_n_blocks")
+            if up_every_n_blocks:
+                logger.debug(
+                    "Using down_every_n_blocks=%s from linked feature extractor.",
+                    up_every_n_blocks,
+                )
+            else:
+                logger.debug("Using default up_every_n_blocks=2.")
+                up_every_n_blocks = 2
 
         initial_channels = cur_shape[0]
         self.initial_height = cur_shape[1]
@@ -425,7 +470,8 @@ class CNNPassThroughUpscaleModel(nn.Module):
             out_channels=2**self.model_config.channel_exp_base,
             allow_pooling=self.model_config.allow_pooling,
             attention_inclusion_cutoff=self.model_config.attention_inclusion_cutoff,
-            up_sample_every_n_blocks=linked_down_every,
+            up_sample_every_n_blocks=up_every_n_blocks,
+            n_final_extra_blocks=model_config.n_final_extra_blocks,
         )
 
         self.final_layer = nn.Sequential(

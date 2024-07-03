@@ -23,7 +23,7 @@ CONTENT_ROOT = CR = get_content_root()
 TUTORIAL_NAME = TN = "01_image_foundation"
 
 
-def train_image_gen_01_foundation_autoencoder() -> AutoDocExperimentInfo:
+def train_image_gen_01_image_autoencoder() -> AutoDocExperimentInfo:
     base_path = f"docs/tutorials/tutorial_files/{CR}/{TN}"
 
     conf_output_path = f"eir_tutorials/{CR}/{TN}/conf"
@@ -65,14 +65,14 @@ def train_image_gen_01_foundation_autoencoder() -> AutoDocExperimentInfo:
         )
         mapping.append(
             (
-                f"samples/20000/auto/{i}_generated.png",
-                f"figures/0_autoencoder/examples/auto_generated_iter_20000_{i}.png",
+                f"samples/35000/auto/{i}_generated.png",
+                f"figures/0_autoencoder/examples/auto_generated_iter_35000_{i}.png",
             )
         )
         mapping.append(
             (
-                f"samples/20000/auto/{i}_inputs/image.png",
-                f"figures/0_autoencoder/examples/auto_inputs_iter_20000_{i}.png",
+                f"samples/35000/auto/{i}_inputs/image.png",
+                f"figures/0_autoencoder/examples/auto_inputs_iter_35000_{i}.png",
             )
         )
 
@@ -119,7 +119,7 @@ def train_image_gen_01_foundation_autoencoder() -> AutoDocExperimentInfo:
     return ade
 
 
-def get_image_gen_02_mnist_generation_serve() -> AutoDocServingInfo:
+def get_image_gen_02_image_autoencoder_serve() -> AutoDocServingInfo:
     base_path = f"docs/tutorials/tutorial_files/{CR}/{TN}"
 
     server_command = ["eirserve", "--model-path", "FILL_MODEL"]
@@ -131,9 +131,6 @@ def get_image_gen_02_mnist_generation_serve() -> AutoDocServingInfo:
             {"image": f"{image_base}/image_0.png"},
             {"image": f"{image_base}/image_1.png"},
             {"image": f"{image_base}/image_2.png"},
-            {"image": f"{image_base}/image_0_altered.png"},
-            {"image": f"{image_base}/image_1_altered.png"},
-            {"image": f"{image_base}/image_2_altered.png"},
         ]
     ]
 
@@ -159,8 +156,8 @@ def get_image_gen_02_mnist_generation_serve() -> AutoDocServingInfo:
             "output_folder": str(Path(base_path) / "serve_results"),
             "tensor_shape": (
                 3,
-                64,
-                64,
+                128,
+                128,
             ),
         },
     )
@@ -223,7 +220,7 @@ def _add_small_altercation_versions(static_folder: str) -> None:
                 brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1
             ),
             transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
-            transforms.RandomResizedCrop(size=(64, 64), scale=(0.8, 1.0)),
+            transforms.RandomResizedCrop(size=(128, 128), scale=(0.8, 1.0)),
         ]
     )
 
@@ -289,8 +286,8 @@ def _add_model_path_to_command(command: list[str]) -> list[str]:
 
 
 def get_experiments() -> Sequence[AutoDocExperimentInfo]:
-    exp_1 = train_image_gen_01_foundation_autoencoder()
-    exp_2 = get_image_gen_02_mnist_generation_serve()
+    exp_1 = train_image_gen_01_image_autoencoder()
+    exp_2 = get_image_gen_02_image_autoencoder_serve()
 
     return [
         exp_1,

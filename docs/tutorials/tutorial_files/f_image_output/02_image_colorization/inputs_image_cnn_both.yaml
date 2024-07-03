@@ -1,0 +1,37 @@
+input_info:
+  input_source: eir_tutorials/f_image_output/02_image_colorization/data/images
+  input_name: image
+  input_type: image
+
+input_type_info:
+  adaptive_normalization_max_samples: 10000
+  auto_augment: false
+  mode: "L"
+  size:
+    - 32
+
+model_config:
+  model_type: cnn
+  model_init_config:
+    channel_exp_base: 6
+    kernel_width: 3
+    down_stride_width: 1
+    first_stride_expansion_width: 1
+    first_kernel_expansion_width: 1
+    kernel_height: 3
+    down_stride_height: 1
+    first_stride_expansion_height: 1
+    first_kernel_expansion_height: 1
+    allow_first_conv_size_reduction: false
+    attention_inclusion_cutoff: 256
+    down_sample_every_n_blocks: null
+    layers:
+      - 1
+      - 1
+
+tensor_broker_config:
+  message_configs:
+    - name: first_cnn_layer
+      layer_path: input_modules.image.feature_extractor.conv.0.conv_1
+      cache_tensor: true
+      layer_cache_target: "input"

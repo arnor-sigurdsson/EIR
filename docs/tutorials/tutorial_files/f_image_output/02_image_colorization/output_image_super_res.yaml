@@ -1,0 +1,47 @@
+output_info:
+  output_source: eir_tutorials/f_image_output/02_image_colorization/data/images
+  output_name: image
+  output_type: image
+
+output_type_info:
+  adaptive_normalization_max_samples: 10000
+  loss: "mse"
+  mode: "RGB"
+  size:
+    - 128
+
+model_config:
+  model_type: cnn
+  model_init_config:
+    channel_exp_base: 6
+    allow_pooling: false
+    attention_inclusion_cutoff: 256
+    stochastic_depth_p: 0.0
+    rb_do: 0.0
+    up_every_n_blocks: 2
+
+tensor_broker_config:
+  message_configs:
+    - name: first_cnn_upscale_layer_32x32
+      layer_path: output_modules.image.feature_extractor.blocks.block_0
+      use_from_cache:
+        - first_cnn_layer
+    - name: second_cnn_upscale_layer_32x32
+      layer_path: output_modules.image.feature_extractor.blocks.block_1
+      use_from_cache:
+        - first_cnn_layer
+    - name: third_cnn_upscale_layer_64x64
+      layer_path: output_modules.image.feature_extractor.blocks.block_3
+      use_from_cache:
+        - first_cnn_layer
+      projection_type: "interpolate"
+    - name: fourth_cnn_upscale_layer_64x64
+      layer_path: output_modules.image.feature_extractor.blocks.block_4
+      use_from_cache:
+        - first_cnn_layer
+      projection_type: "interpolate"
+    - name: final_cnn_upscale_layer_128x128
+      layer_path: output_modules.image.feature_extractor.blocks.block_6
+      use_from_cache:
+        - first_cnn_layer
+      projection_type: "interpolate"

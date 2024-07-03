@@ -10,7 +10,7 @@ from tests.conftest import get_system_info
 
 def get_test_base_global_init(
     allow_cuda: bool = True,
-    allow_mps: bool = True,
+    allow_mps: bool = False,
 ) -> Sequence[dict]:
     device = "cpu"
     in_gha, _ = get_system_info()

@@ -274,7 +274,8 @@ def get_image_normalization_values(
             input_source = source
             deeplake_inner_key = inner_key
             logger.info(
-                "Not using a pretrained model and no mean and standard deviation "
+                "Not using an external pretrained model "
+                "and no mean and standard deviation "
                 "statistics passed in. Gathering running image means and standard "
                 "deviations from %s.",
                 input_source,
