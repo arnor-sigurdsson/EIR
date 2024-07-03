@@ -256,6 +256,7 @@ def get_unsupported_hf_models() -> dict:
         "retribert": "Cannot do straightforward look up of embeddings.",
         "resnet": "Not strictly sequence model.",
         "regnet": "Not strictly sequence model.",
+        "rt_detr": "Not strictly sequence model.",
         "sam": "Not strictly sequence model.",
         "segformer": "Not strictly sequence model.",
         "seamless_m4t": "Not strictly sequence model.",
