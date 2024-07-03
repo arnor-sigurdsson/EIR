@@ -2,9 +2,10 @@ from dataclasses import dataclass, field
 from typing import List
 
 import torch
-from aislib.pytorch_modules import Swish
 from torch import nn
 from torchvision.ops import StochasticDepth
+
+from eir.models.layers.norm_layers import LayerScale
 
 
 @dataclass
@@ -60,7 +61,7 @@ class MLPResidualBlock(nn.Module):
             in_features=in_features, out_features=out_features, bias=True
         )
 
-        self.act_1 = Swish()
+        self.act_1 = nn.GELU()
         self.do = nn.Dropout(p=dropout_p)
         self.fc_2 = nn.Linear(
             in_features=out_features, out_features=out_features, bias=True
@@ -70,8 +71,12 @@ class MLPResidualBlock(nn.Module):
             self.downsample_identity = lambda x: x
         else:
             self.downsample_identity = nn.Linear(
-                in_features=in_features, out_features=out_features, bias=True
+                in_features=in_features,
+                out_features=out_features,
+                bias=True,
             )
+
+        self.ls = LayerScale(dim=out_features, init_values=1.0)
 
         self.stochastic_depth = StochasticDepth(p=self.stochastic_depth_p, mode="batch")
 
@@ -86,6 +91,7 @@ class MLPResidualBlock(nn.Module):
         out = self.act_1(out)
         out = self.do(out)
         out = self.fc_2(out)
+        out = self.ls(out)
 
         out = self.stochastic_depth(out)
 

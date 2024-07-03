@@ -8,3 +8,9 @@ input_type_info:
 
 model_config:
   model_type: genome-local-net
+
+tensor_broker_config:
+  message_configs:
+    - name: first_cnn_layer
+      layer_path: input_modules.genotype.fc_0
+      cache_tensor: true

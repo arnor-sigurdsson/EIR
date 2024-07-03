@@ -6,8 +6,9 @@ from torch import nn
 
 from eir.models.input.array.array_models import al_pre_normalization
 from eir.models.input.array.models_locally_connected import LCLModel, LCLModelConfig
-from eir.models.layers.projection_layers import get_projection_layer
+from eir.models.layers.projection_layers import get_1d_projection_layer
 from eir.models.output.array.output_array_models_cnn import (
+    CNNPassThroughUpscaleModel,
     CNNUpscaleModel,
     CNNUpscaleModelConfig,
 )
@@ -15,9 +16,11 @@ from eir.models.output.array.output_array_models_cnn import (
 if TYPE_CHECKING:
     from eir.setup.input_setup_modules.common import DataDimensions
 
-al_array_model_types = Literal["lcl", "cnn"]
-al_output_array_model_classes = Type[LCLModel] | Type[CNNUpscaleModel]
-al_output_array_models = LCLModel | CNNUpscaleModel
+al_array_model_types = Literal["lcl", "cnn", "cnn-passthrough"]
+al_output_array_model_classes = (
+    Type[LCLModel] | Type[CNNUpscaleModel] | Type[CNNPassThroughUpscaleModel]
+)
+al_output_array_models = LCLModel | CNNUpscaleModel | CNNPassThroughUpscaleModel
 al_output_array_model_config_classes = (
     Type["LCLOutputModelConfig"] | Type[CNNUpscaleModelConfig]
 )
@@ -32,14 +35,14 @@ class LCLOutputModelConfig(LCLModelConfig):
 class ArrayOutputModuleConfig:
     """
     :param model_type:
-         Which type of image model to use.
+        Which type of image model to use.
 
     :param model_init_config:
-          Configuration used to initialise model.
+        Configuration used to initialise model.
     """
 
     model_type: al_array_model_types
-    model_init_config: LCLOutputModelConfig
+    model_init_config: LCLOutputModelConfig | CNNUpscaleModelConfig
     pre_normalization: al_pre_normalization = None
 
 
@@ -58,16 +61,17 @@ class ArrayOutputWrapperModule(nn.Module):
         self.target_width = self.data_dimensions.num_elements()
         self.target_shape = self.data_dimensions.full_shape()
 
-        diff_tolerance = get_diff_tolerance(num_target_elements=self.target_width)
-
-        self.projection_head = get_projection_layer(
+        self.projection_head = get_1d_projection_layer(
             input_dimension=self.feature_extractor.num_out_features,
             target_dimension=self.target_width,
-            projection_layer_type="lcl_residual",
-            lcl_diff_tolerance=diff_tolerance,
+            projection_layer_type="auto",
+            lcl_diff_tolerance=0,
         )
 
-    def forward(self, x: torch.Tensor) -> dict[str, torch.Tensor]:
+    def forward(
+        self,
+        x: torch.Tensor,
+    ) -> dict[str, torch.Tensor]:
         out = self.feature_extractor(x)
 
         out = out.reshape(out.shape[0], -1)

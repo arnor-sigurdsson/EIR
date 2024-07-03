@@ -7,7 +7,10 @@ from aislib.misc_utils import ensure_path_exists
 from docs.doc_modules.c_sequence_outputs.utils import get_content_root
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
 from docs.doc_modules.serve_experiments_utils import load_data_for_serve
-from docs.doc_modules.serving_experiments import AutoDocServingInfo
+from docs.doc_modules.serving_experiments import (
+    AutoDocServingInfo,
+    build_request_example_module_from_function,
+)
 from docs.doc_modules.utils import add_model_path_to_command, get_saved_model_path
 
 CONTENT_ROOT = CR = get_content_root()
@@ -204,30 +207,31 @@ def get_sequence_gen_02_imdb_generation_serve() -> AutoDocServingInfo:
     server_command = ["eirserve", "--model-path", "FILL_MODEL"]
 
     example_requests = [
-        {
-            "imdb_output": "This movie was great, I have to say ",
-        },
-        {
-            "imdb_output": "This movie was terrible, I ",
-        },
-        {
-            "imdb_output": "This movie was so ",
-        },
-        {
-            "imdb_output": "This movi",
-        },
-        {
-            "imdb_output": "Toda",
-        },
-        {
-            "imdb_output": "",
-        },
+        [
+            {"imdb_output": "This movie was great, I have to say "},
+            {"imdb_output": "This movie was terrible, I "},
+            {"imdb_output": "This movie was so "},
+            {"imdb_output": "This movi"},
+            {"imdb_output": "Toda"},
+            {"imdb_output": ""},
+        ]
     ]
 
     add_model_path = partial(
         add_model_path_to_command,
         run_path="eir_tutorials/tutorial_runs/c_sequence_output/"
         "01_sequence_generation",
+    )
+
+    example_request_module_python = build_request_example_module_from_function(
+        function=example_request_function_python,
+        name="python",
+        language="python",
+    )
+
+    bash_args = _get_example_request_bash_args()
+    example_request_module_bash = build_request_example_module_from_function(
+        **bash_args
     )
 
     ade = AutoDocServingInfo(
@@ -238,9 +242,57 @@ def get_sequence_gen_02_imdb_generation_serve() -> AutoDocServingInfo:
         post_run_functions=(),
         example_requests=example_requests,
         data_loading_function=load_data_for_serve,
+        request_example_modules=[
+            example_request_module_python,
+            example_request_module_bash,
+        ],
     )
 
     return ade
+
+
+def example_request_function_python():
+    import requests
+
+    def send_request(url: str, payload: list[dict]) -> list[dict]:
+        response = requests.post(url, json=payload)
+        response.raise_for_status()
+        return response.json()
+
+    payload = [
+        {"imdb_output": "This movie was silly, I have to say "},
+    ]
+
+    response = send_request(url="http://localhost:8000/predict", payload=payload)
+    print(response)
+
+    # --skip-after
+    return response
+
+
+def _get_example_request_bash_args():
+    command = """curl -X POST \\
+        "http://localhost:8000/predict" \\
+        -H "accept: application/json" \\
+        -H "Content-Type: application/json" \\
+        -d '[{"imdb_output": "This movie was great! I loved "}]
+           '"""
+
+    def _function_to_run_example() -> dict:
+        import json
+        import subprocess
+
+        result = subprocess.run(command, shell=True, capture_output=True, text=True)
+        result_as_dict = json.loads(result.stdout)
+        return result_as_dict
+
+    command_as_text = command
+    return {
+        "function": _function_to_run_example,
+        "custom_body": command_as_text,
+        "name": "bash",
+        "language": "shell",
+    }
 
 
 def _get_model_path_for_predict() -> str:

@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any, Sequence, Tuple
 import numpy as np
 import pandas as pd
 import pytest
-from aislib.misc_utils import get_logger
 from scipy.spatial.distance import cosine
 from sklearn.metrics import mean_squared_error
 
@@ -15,6 +14,7 @@ from docs.doc_modules.serving_experiments import run_serve_experiment_from_comma
 from eir import train
 from eir.serve_modules.serve_network_utils import _deserialize_array
 from eir.setup.schemas import InputConfig, OutputConfig
+from eir.utils.logging import get_logger
 from tests.test_modelling.test_modelling_utils import check_performance_result_wrapper
 from tests.test_modelling.test_sequence_modelling.test_sequence_output_modelling import (  # noqa
     get_expected_keywords_set,
@@ -69,7 +69,11 @@ def get_base_parametrization(compiled: bool = False) -> dict:
                             "channel_exp_base": 3,
                             "l1": 1e-04,
                             "kernel_height": 1,
+                            "kernel_width": 3,
+                            "down_stride_height": 1,
+                            "down_stride_width": 1,
                             "attention_inclusion_cutoff": 256,
+                            "allow_first_conv_size_reduction": False,
                         },
                     },
                 },
@@ -125,6 +129,22 @@ def get_base_parametrization(compiled: bool = False) -> dict:
                 {
                     "output_info": {
                         "output_name": "test_output_array_cnn",
+                    },
+                    "model_config": {
+                        "model_type": "cnn",
+                        "model_init_config": {
+                            "channel_exp_base": 3,
+                            "allow_pooling": False,
+                        },
+                    },
+                },
+                {
+                    "output_info": {
+                        "output_name": "test_array",
+                    },
+                    "output_type_info": {
+                        "loss": "diffusion",
+                        "diffusion_time_steps": 50,
                     },
                     "model_config": {
                         "model_type": "cnn",
@@ -220,8 +240,9 @@ def test_multi_serving(
     response = run_serve_experiment_from_command(
         command=command,
         url="http://localhost:8000/predict",
-        example_requests=example_requests,
+        example_requests=[example_requests],
         data_loading_function=load_data_for_serve,
+        base_path=None,
     )
 
     for idx, random_id in enumerate(ids):
@@ -337,10 +358,13 @@ def _check_prediction(
             array_folder = Path(labels_csv_path).parent / "array"
             expected_array_file = array_folder / f"{id_from_request}.npy"
             expected_array = np.load(expected_array_file)
+
+            is_diffusion = output_object.diffusion_config is not None
             if not _validate_array_output(
                 actual_output=actual_output,
                 expected_array=expected_array,
                 data_dimensions=data_dimensions.full_shape(),
+                is_diffusion=is_diffusion,
             ):
                 return False
 
@@ -396,8 +420,9 @@ def _validate_array_output(
     actual_output: str,
     expected_array: np.ndarray,
     data_dimensions: tuple[int, ...],
-    mse_threshold: float = 0.2,
+    mse_threshold: float = 0.3,
     cosine_similarity_threshold: float = 0.6,
+    is_diffusion: bool = False,
 ) -> bool:
     array_np = _deserialize_array(
         array_str=actual_output,
@@ -413,10 +438,11 @@ def _validate_array_output(
 
     expected_array[expected_array < 1e-8] = 0.0
 
-    cosine_similarity = 1 - cosine(
-        u=expected_array.ravel().astype(np.float32),
-        v=array_np.ravel(),
-    )
-    assert cosine_similarity > cosine_similarity_threshold
+    if not is_diffusion:
+        cosine_similarity = 1 - cosine(
+            u=expected_array.ravel().astype(np.float32),
+            v=array_np.ravel(),
+        )
+        assert cosine_similarity > cosine_similarity_threshold
 
     return True

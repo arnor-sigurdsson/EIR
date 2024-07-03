@@ -1,5 +1,5 @@
 output_info:
-  output_source: eir_tutorials/c_sequence_output/03_image_captioning/data/image_captioning/captions.csv
+  output_source: eir_tutorials/c_sequence_output/03_image_captioning/data/captions.csv
   output_name: captions
   output_type: sequence
 

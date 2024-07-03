@@ -94,7 +94,9 @@ def set_up_train_and_valid_tabular_data(
     _validate_df(df=df_labels)
 
     df_labels_train, df_labels_valid = _split_df_by_ids(
-        df=df_labels, train_ids=train_ids, valid_ids=valid_ids
+        df=df_labels,
+        train_ids=list(train_ids),
+        valid_ids=list(valid_ids),
     )
     pre_check_label_df(df=df_labels_train, name="Training DataFrame")
     pre_check_label_df(df=df_labels_valid, name="Validation DataFrame")
@@ -183,7 +185,8 @@ def _fit_transformer_on_label_column(
     """
 
     if isinstance(column_series.dtype, object) and column_series.dtype != float:
-        series_values = np.unique(column_series.values)
+        values_array: np.ndarray = np.asarray(column_series.values)
+        series_values = np.unique(values_array)
         if not impute_missing:
             series_values = series_values[series_values != "nan"]
         else:
@@ -228,7 +231,7 @@ def transform_label_df(
     df_labels_copy = df_labels.copy()
 
     for column_name, transformer_instance in label_transformers.items():
-        series_values = df_labels_copy[column_name].values
+        series_values = np.asarray(df_labels_copy[column_name].values)
         transform_func = transformer_instance.transform
 
         if impute_missing:
@@ -247,10 +250,11 @@ def transform_label_df(
                     raise ValueError()
 
             non_nan_values = df_labels_copy.loc[non_nan_mask, column_name].values
+            non_nan_values_arr = np.asarray(non_nan_values)
 
             series_values_streamlined = streamline_values_for_transformers(
                 transformer=transformer_instance,
-                values=non_nan_values,
+                values=non_nan_values_arr,
             )
 
             transformed_values = transform_func(series_values_streamlined).squeeze()
@@ -388,10 +392,11 @@ def chunked_label_df_parse_wrapper(
         dtypes=dtypes,
     )
 
-    processed_chunks = []
+    processed_chunks: list[pd.DataFrame] = []
     supplied_columns = get_passed_in_columns(tabular_info=label_file_tabular_info)
 
     for chunk in chunk_generator:
+        assert isinstance(chunk, pd.DataFrame)
         df_labels_filtered = _filter_ids_from_label_df(
             df_labels=chunk, ids_to_keep=ids_to_keep
         )
@@ -435,7 +440,7 @@ def _get_label_df_chunk_generator(
     columns: Sequence[str],
     custom_label_ops: al_all_column_ops,
     dtypes: Optional[Dict[str, Any]] = None,
-) -> pd.DataFrame:
+) -> Generator[pd.DataFrame, None, None]:
     """
     We accept only loading the available columns at this point because the passed
     in columns might be forward referenced, meaning that they might be created
@@ -511,11 +516,15 @@ def gather_all_ids_from_all_inputs(
 
 
 def gather_ids_from_data_source(
-    data_source: Path, validate: bool = True
+    data_source: Path,
+    validate: bool = True,
 ) -> Tuple[str, ...]:
+    iterator: Generator[str, None, None] | Generator[Path, None, None]
     if is_deeplake_dataset(data_source=str(data_source)):
-        deeplake_ds = load_deeplake_dataset(data_source=str(data_source))
-        iterator = (sample.numpy().item() for sample in deeplake_ds["ID"])
+        iterator = build_deeplake_available_id_iterator(
+            data_source=data_source,
+            inner_key="ID",
+        )
     elif data_source.suffix == ".csv":
         ids = gather_ids_from_tabular_file(file_path=data_source)
         iterator = (str(i) for i in ids)
@@ -527,6 +536,21 @@ def gather_ids_from_data_source(
     all_ids = tuple(i for i in tqdm(iterator, desc="Progress"))
 
     return all_ids
+
+
+def build_deeplake_available_id_iterator(
+    data_source: Path, inner_key: str
+) -> Generator[str, None, None]:
+    deeplake_ds = load_deeplake_dataset(data_source=str(data_source))
+    for sample in deeplake_ds:
+        inner_key_tensor = sample[inner_key]
+        is_empty = inner_key_tensor.size == 0
+
+        if is_empty:
+            continue
+
+        id_ = sample["ID"].numpy().item()
+        yield id_
 
 
 def gather_ids_from_tabular_file(file_path: Path) -> Tuple[str, ...]:
@@ -748,11 +772,13 @@ def _get_currently_available_columns(
     references. Hence, we should not raise an error if there is a possibility of them
     being created at runtime.
 
-    However if no custom operations are specified, we should fail here if columns
+    However, if no custom operations are specified, we should fail here if columns
     are not found.
     """
 
-    label_file_columns_set = set(pd.read_csv(label_fpath, dtype={"ID": str}, nrows=0))
+    label_file_columns_set = set(
+        pd.read_csv(label_fpath, dtype={"ID": str}, nrows=0).columns
+    )
 
     requested_columns_set = set(requested_columns)
 
@@ -838,7 +864,7 @@ def _apply_column_operations_to_df(
 
         if _should_apply_op_sequence(
             operation_name=operation_name,
-            columns_in_df=df.columns,
+            columns_in_df=list(df.columns),
             label_columns=label_columns,
         ):
             df = _apply_operation_sequence(
@@ -865,7 +891,7 @@ def _apply_column_operations_to_df(
 
 
 def _should_apply_op_sequence(
-    operation_name: str, columns_in_df: Sequence[str], label_columns: Sequence[str]
+    operation_name: str, columns_in_df: list[str], label_columns: Sequence[str]
 ) -> bool:
     column_in_df = operation_name in columns_in_df
     column_expected_to_be_made = (
@@ -975,7 +1001,9 @@ def _drop_not_needed_label_columns(
 
 
 def _split_df_by_ids(
-    df: pd.DataFrame, train_ids: Sequence[str], valid_ids: Sequence[str]
+    df: pd.DataFrame,
+    train_ids: list[str],
+    valid_ids: list[str],
 ) -> al_train_val_dfs:
     df_labels_train = df.loc[df.index.intersection(train_ids)]
     df_labels_valid = df.loc[df.index.intersection(valid_ids)]

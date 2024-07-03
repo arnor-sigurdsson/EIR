@@ -24,6 +24,6 @@ def get_omics_model_from_model_config(
     if model_type == "cnn":
         size_after_conv = omics_model.data_size_after_conv
         assert isinstance(size_after_conv, int)
-        assert size_after_conv >= 8
+        assert size_after_conv >= 1
 
     return omics_model

@@ -1,10 +1,11 @@
 from typing import Iterable, Optional, Sequence, Type, Union
 
 import torch
-from aislib.misc_utils import get_logger
 from torch_optimizer import _NAME_OPTIM_MAP
 from tqdm import tqdm
 from transformers.models.auto.modeling_auto import MODEL_MAPPING_NAMES
+
+from eir.utils.logging import get_logger
 
 al_collector_classes = Union[
     Type["ChannelBasedRunningStatistics"], Type["ElementBasedRunningStatistics"]
@@ -227,6 +228,7 @@ def get_unsupported_hf_models() -> dict:
         "idefics2": "Not strictly sequence model.",
         "jamba": "Fast Mamba kernels are not available error.",
         "jukebox": "Not strictly sequence model.",
+        "jetmoe": "Shape mismatch error.",
         "kosmos-2": "Not strictly sequence model.",
         "layoutlmv2": "Not strictly sequence model.",
         "layoutlmv3": "Not strictly sequence model.",
@@ -243,6 +245,8 @@ def get_unsupported_hf_models() -> dict:
         "mobilenet_v2": "Not strictly sequence model.",
         "mobilevit": "Not strictly sequence model.",
         "mobilevitv2": "Not strictly sequence model.",
+        "musicgen": "Not strictly sequence model.",
+        "musicgen_melody": "Not strictly sequence model.",
         "mt5": "Not implemented in EIR for feature extraction yet.",
         "oneformer": "Not strictly sequence model.",
         "open-llama": "'OpenLlamaAttention' object has no attribute 'rope_theta'.",
@@ -252,6 +256,7 @@ def get_unsupported_hf_models() -> dict:
         "retribert": "Cannot do straightforward look up of embeddings.",
         "resnet": "Not strictly sequence model.",
         "regnet": "Not strictly sequence model.",
+        "rt_detr": "Not strictly sequence model.",
         "sam": "Not strictly sequence model.",
         "segformer": "Not strictly sequence model.",
         "seamless_m4t": "Not strictly sequence model.",

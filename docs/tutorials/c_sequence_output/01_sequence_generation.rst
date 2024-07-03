@@ -274,35 +274,28 @@ With the server running, we can now send requests for generating sequences based
 
 Here's an example Python function demonstrating this process:
 
-.. code-block:: python
+.. literalinclude:: ../tutorial_files/c_sequence_output/01_sequence_generation/request_example/python_request_example_module.py
+    :language: python
+    :caption: request_example_module.py
 
-    import requests
+When running this, we get the following output:
 
-    def send_request(url: str, payload: dict):
-        response = requests.post(url, json=payload)
-        return response.json()
+.. literalinclude:: ../tutorial_files/c_sequence_output/01_sequence_generation/request_example/python_request_example.json
+    :language: json
+    :caption: request_example.json
 
-    example_requests = [
-        {"imdb_output": "This movie was great, I have to say "},
-        {"imdb_output": "This movie was terrible, I "},
-    ]
+Additionally, you can send requests using bash:
 
-    for payload in example_requests:
-        response = send_request('http://localhost:8000/predict', payload)
-        print(f"Prompt: {payload['imdb_output']}")
-        print(f"Generated text: {response}\n")
+.. literalinclude:: ../tutorial_files/c_sequence_output/01_sequence_generation/request_example/bash_request_example_module.sh
+    :language: console
+    :caption: request_example_module.sh
 
-Additionally, you can send requests using `bash`:
+When running this, we get the following output:
 
-.. code-block:: bash
+.. literalinclude:: ../tutorial_files/c_sequence_output/01_sequence_generation/request_example/bash_request_example.json
+    :language: json
+    :caption: request_example.json
 
-    curl -X 'POST' \\
-      'http://localhost:8000/predict' \\
-      -H 'accept: application/json' \\
-      -H 'Content-Type: application/json' \\
-      -d '{
-          "imdb_output": "This movie was great, I have to say "
-      }'
 
 Analyzing Responses
 """""""""""""""""""

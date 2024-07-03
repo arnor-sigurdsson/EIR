@@ -6,6 +6,10 @@ from eir.setup.output_setup_modules.array_output_setup import (
     ComputedArrayOutputInfo,
     set_up_array_output,
 )
+from eir.setup.output_setup_modules.image_output_setup import (
+    ComputedImageOutputInfo,
+    set_up_image_output,
+)
 from eir.setup.output_setup_modules.sequence_output_setup import (
     ComputedSequenceOutputInfo,
     set_up_sequence_output,
@@ -23,7 +27,10 @@ if TYPE_CHECKING:
 logger = get_logger(name=__name__)
 
 al_output_objects = (
-    ComputedTabularOutputInfo | ComputedSequenceOutputInfo | ComputedArrayOutputInfo
+    ComputedTabularOutputInfo
+    | ComputedSequenceOutputInfo
+    | ComputedArrayOutputInfo
+    | ComputedImageOutputInfo
 )
 al_output_objects_as_dict = Dict[str, al_output_objects]
 
@@ -98,6 +105,7 @@ def get_output_setup_function_map() -> dict[str, Callable[..., al_output_objects
         "tabular": set_up_tabular_output,
         "sequence": set_up_sequence_output,
         "array": set_up_array_output,
+        "image": set_up_image_output,
     }
 
     return setup_mapping

@@ -1,6 +1,16 @@
 from pathlib import Path
 from textwrap import wrap
-from typing import TYPE_CHECKING, Callable, Dict, List, Literal, Optional, Tuple, Union
+from typing import (
+    TYPE_CHECKING,
+    Callable,
+    Dict,
+    List,
+    Literal,
+    Optional,
+    Protocol,
+    Tuple,
+    Union,
+)
 
 import matplotlib
 import numpy as np
@@ -16,7 +26,6 @@ from sklearn.preprocessing import LabelEncoder, StandardScaler, label_binarize
 from sklearn.utils.multiclass import unique_labels
 
 matplotlib.use("Agg")
-import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.ticker import MaxNLocator
@@ -26,7 +35,6 @@ from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from eir.train_utils.evaluation import PerformancePlotConfig
-
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -49,7 +57,7 @@ def add_series_to_axis(
 
     ax_object.plot(
         xticks,
-        series_cut.values,
+        np.asarray(series_cut.values),
         zorder=1,
         alpha=0.5,
         linewidth=0.8,
@@ -82,7 +90,7 @@ def generate_validation_curve_from_series(
 
     valid_series_cut = series[series.index > skiprows]
 
-    extreme_func = _get_min_or_max_funcs(valid_series_cut.name)
+    extreme_func = _get_min_or_max_funcs(column_name=str(valid_series_cut.name))
     extreme_valid_idx, extreme_valid_value = _get_validation_extreme_value_and_iter(
         extreme_index_func=extreme_func, validation_values=valid_series_cut
     )
@@ -112,7 +120,7 @@ def generate_validation_curve_from_series(
     ax.set(title=title_extra)
 
     ax.set_xlabel("Iteration")
-    y_label = _parse_metrics_colname(valid_series_cut.name)
+    y_label = _parse_metrics_colname(column_name=str(valid_series_cut.name))
     ax.set_ylabel(y_label)
 
     ax.set_xlim(left=skiprows + 1, right=xlim_upper)
@@ -128,17 +136,21 @@ def generate_validation_curve_from_series(
     return fig, ax
 
 
+class SeriesMinMaxProtocol(Protocol):
+    def __call__(self, series: pd.Series) -> Union[int, str]: ...
+
+
 def _get_min_or_max_funcs(
     column_name: str,
-) -> Union[pd.Series.idxmin, pd.Series.idxmax]:
+) -> SeriesMinMaxProtocol:
     """
     The functions returned here will be explicitly called on a pd.Series instance.
     """
 
-    func = pd.Series.idxmax
-    metric = _parse_metrics_colname(column_name)
+    func: SeriesMinMaxProtocol = pd.Series.idxmax  # type: ignore
+    metric = _parse_metrics_colname(str(column_name))
     if metric in ["LOSS", "RMSE", "LOSS-AVERAGE"]:
-        return pd.Series.idxmin
+        return pd.Series.idxmin  # type: ignore
 
     return func
 
@@ -429,7 +441,7 @@ def generate_multi_class_roc_curve(
         linewidth=4,
     )
 
-    colors = iter(cm.get_cmap("tab20", n_classes)(np.arange(n_classes)))
+    colors = iter(plt.get_cmap("tab20", n_classes)(np.arange(n_classes)))
     for i, color in zip(range(n_classes), colors):
         plt.plot(
             fpr[i],
@@ -503,7 +515,7 @@ def generate_multi_class_pr_curve(
         f"(area = {average_precision_micro:0.4g})",
     )
 
-    colors = iter(cm.get_cmap("tab20", n_classes)(np.arange(n_classes)))
+    colors = iter(plt.get_cmap("tab20", n_classes)(np.arange(n_classes)))
     for i, color in zip(range(n_classes), colors):
         plt.plot(
             recall[i],
@@ -617,6 +629,6 @@ def generate_all_training_curves(
                 ax_plot_kwargs={"label": "Train", "c": "orange"},
             )
 
-        fname_identifier = _parse_metrics_colname(column_name=valid_series.name)
+        fname_identifier = _parse_metrics_colname(column_name=str(valid_series.name))
         figure_object.savefig(output_folder / f"training_curve_{fname_identifier}.pdf")
         plt.close("all")

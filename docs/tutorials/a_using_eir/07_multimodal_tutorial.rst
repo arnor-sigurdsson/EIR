@@ -248,34 +248,23 @@ Example of the serving command:
 .. literalinclude:: ../tutorial_files/a_using_eir/07_multimodal_tutorial/commands/COMBINED_SEQUENCE_DEPLOY.txt
     :language: console
 
-Preparing and Sending Requests
-""""""""""""""""""""""""""""""
+Sending Requests
+""""""""""""""""
 
-Once the server is running, you can send requests containing tabular data, text descriptions, and image paths. Here's an example Python function to demonstrate this process:
+With the server running, we can now send requests. For this multimodal model, we send a combination of tabular data, description text, and an image encoded in base64 in a batched format.
 
-.. code-block:: python
+Here's an example Python function demonstrating this process:
 
-    import requests
-    import json
+.. literalinclude:: ../tutorial_files/a_using_eir/07_multimodal_tutorial/request_example/python_request_example_module.py
+    :language: python
+    :caption: request_example_module.py
 
-    def send_request(url: str, request_data: dict):
-        response = requests.post(url, json=request_data)
-        return response.json()
+When running this, we get the following output:
 
-    request_data = {
-        "pets_tabular": {
-            "Type": "Cat",
-            "Name": "Nibble",
-            "Age": 1.0,
-            "Breed1": "Tabby",
-            ...
-        },
-        "pet_descriptions": "A super cute tabby cat!!!",
-        "cute_pet_images": "path/to/image.jpg"
-    }
+.. literalinclude:: ../tutorial_files/a_using_eir/07_multimodal_tutorial/request_example/python_request_example.json
+    :language: json
+    :caption: request_example.json
 
-    response = send_request('http://localhost:8000/predict', request_data)
-    print(response)
 
 Analyzing Responses
 """""""""""""""""""

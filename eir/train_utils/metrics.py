@@ -30,14 +30,12 @@ from sklearn.metrics import (
     accuracy_score,
     average_precision_score,
     matthews_corrcoef,
-    mean_squared_error,
     r2_score,
     roc_auc_score,
 )
 from sklearn.preprocessing import StandardScaler, label_binarize
 from torch import nn
 from torch.linalg import vector_norm
-from torch.utils.tensorboard import SummaryWriter
 
 from eir.data_load.data_utils import get_output_info_generator
 from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
@@ -52,7 +50,7 @@ if TYPE_CHECKING:
         al_target_columns,
     )
     from eir.models.input.omics.omics_models import al_omics_models  # noqa: F401
-    from eir.models.meta.meta import FeatureExtractorProtocolWithL1
+    from eir.models.meta.meta_utils import FeatureExtractorProtocolWithL1
     from eir.setup.output_setup import al_output_objects_as_dict
     from eir.train import Experiment, al_criteria_dict  # noqa: F401
     from eir.train_utils.step_logic import al_training_labels_target
@@ -394,11 +392,14 @@ def calc_rmse(
     labels_2d = labels.reshape(-1, 1)
     outputs_2d = outputs.reshape(-1, 1)
 
-    labels = cur_target_transformer.inverse_transform(X=labels_2d).squeeze()
-    predictions = cur_target_transformer.inverse_transform(X=outputs_2d).squeeze()
+    mean_ = cur_target_transformer.mean_
+    scale_ = cur_target_transformer.scale_
+
+    labels = (labels_2d * scale_ + mean_).squeeze()
+    predictions = (outputs_2d * scale_ + mean_).squeeze()
 
     if np.shape(labels):
-        rmse = np.sqrt(mean_squared_error(y_true=labels, y_pred=predictions))
+        rmse = np.sqrt(np.mean((labels - predictions) ** 2))
     else:
         rmse = np.sqrt((labels - predictions) ** 2)
 
@@ -657,11 +658,10 @@ def persist_metrics(
     write_header: bool,
     prefixes: Dict[str, str],
     writer_funcs: Union[None, Dict[str, Dict[str, Callable]]] = None,
-):
+) -> None:
 
     hc = handler_config
     exp = handler_config.experiment
-    gc = exp.configs.global_config
 
     target_generator = get_output_info_generator(outputs_as_dict=exp.outputs)
 
@@ -678,17 +678,10 @@ def persist_metrics(
         for target_name, target_history_file in target_and_file_dict.items():
             cur_metric_dict = metrics_dict[output_name][target_name]
 
-            _add_metrics_to_writer(
-                name=f"{prefixes['writer']}/{target_name}",
-                metric_dict=cur_metric_dict,
-                iteration=iteration,
-                writer=exp.writer,
-                plot_skip_steps=gc.plot_skip_steps,
-            )
-
-            cur_func = get_buffered_metrics_writer(buffer_interval=1)
             if writer_funcs:
                 cur_func = writer_funcs[output_name][target_name]
+            else:
+                cur_func = get_buffered_metrics_writer(buffer_interval=1)
 
             cur_func(
                 filepath=target_history_file,
@@ -738,32 +731,14 @@ def _ensure_metrics_paths_exists(metrics_files: Dict[str, Dict[str, Path]]) -> N
             ensure_path_exists(path=path)
 
 
-def _add_metrics_to_writer(
-    name: str,
-    metric_dict: Dict[str, float],
-    iteration: int,
-    writer: SummaryWriter,
-    plot_skip_steps: int,
-) -> None:
-    """
-    We do %10 to reduce the amount of training data going to tensorboard, otherwise
-    it slows down with many large experiments.
-    """
-    if iteration >= plot_skip_steps and iteration % 10 == 0:
-        for metric_name, metric_value in metric_dict.items():
-            cur_name = name + f"/{metric_name}"
-            writer.add_scalar(
-                tag=cur_name,
-                scalar_value=metric_value,
-                global_step=iteration,
-            )
-
-
 def get_buffered_metrics_writer(buffer_interval: int):
     buffer = []
 
     def append_metrics_to_file(
-        filepath: Path, metrics: Dict[str, float], iteration: int, write_header=False
+        filepath: Path,
+        metrics: Dict[str, float],
+        iteration: int,
+        write_header=False,
     ) -> None:
         nonlocal buffer
 
@@ -820,8 +795,14 @@ def get_default_metrics(
     cat_averaging_metrics: Optional[al_cat_averaging_metric_choices],
     con_averaging_metrics: Optional[al_con_averaging_metric_choices],
 ) -> "al_metric_record_dict":
-    mcc = MetricRecord(name="mcc", function=calc_mcc)
-    acc = MetricRecord(name="acc", function=calc_acc)
+    mcc = MetricRecord(
+        name="mcc",
+        function=calc_mcc,
+    )
+    acc = MetricRecord(
+        name="acc",
+        function=calc_acc,
+    )
     roc_auc_macro = MetricRecord(
         name="roc-auc-macro",
         function=calc_roc_auc_ovo,

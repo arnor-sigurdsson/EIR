@@ -202,3 +202,10 @@ Output Sampling Configuration
 
 .. autoclass:: eir.setup.schema_modules.output_schemas_array.ArrayOutputSamplingConfig
 
+
+Tensor Broker Configuration
+---------------------------
+
+.. autoclass:: eir.setup.schema_modules.tensor_broker_schemas.TensorBrokerConfig
+
+.. autoclass:: eir.setup.schema_modules.tensor_broker_schemas.TensorMessageConfig

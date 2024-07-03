@@ -1,34 +1,34 @@
 [
     {
-        "request": {
-            "hot_dog_efficientnet": "eir_tutorials/a_using_eir/05_image_tutorial/data/hot_dog_not_hot_dog/food_images/1040579.jpg",
-            "hot_dog_resnet18": "eir_tutorials/a_using_eir/05_image_tutorial/data/hot_dog_not_hot_dog/food_images/1040579.jpg"
-        },
+        "request": [
+            {
+                "hot_dog_efficientnet": "eir_tutorials/a_using_eir/05_image_tutorial/data/hot_dog_not_hot_dog/food_images/1040579.jpg",
+                "hot_dog_resnet18": "eir_tutorials/a_using_eir/05_image_tutorial/data/hot_dog_not_hot_dog/food_images/1040579.jpg"
+            },
+            {
+                "hot_dog_efficientnet": "eir_tutorials/a_using_eir/05_image_tutorial/data/hot_dog_not_hot_dog/food_images/108743.jpg",
+                "hot_dog_resnet18": "eir_tutorials/a_using_eir/05_image_tutorial/data/hot_dog_not_hot_dog/food_images/108743.jpg"
+            }
+        ],
         "response": {
-            "result": {
-                "hot_dog_output": {
-                    "CLASS": {
-                        "Hot Dog": 0.8565942049026489,
-                        "Not Hot Dog": 0.14340578019618988
+            "result": [
+                {
+                    "hot_dog_output": {
+                        "CLASS": {
+                            "Hot Dog": 0.9132360219955444,
+                            "Not Hot Dog": 0.08676399290561676
+                        }
+                    }
+                },
+                {
+                    "hot_dog_output": {
+                        "CLASS": {
+                            "Hot Dog": 0.05062240734696388,
+                            "Not Hot Dog": 0.9493775367736816
+                        }
                     }
                 }
-            }
-        }
-    },
-    {
-        "request": {
-            "hot_dog_efficientnet": "eir_tutorials/a_using_eir/05_image_tutorial/data/hot_dog_not_hot_dog/food_images/108743.jpg",
-            "hot_dog_resnet18": "eir_tutorials/a_using_eir/05_image_tutorial/data/hot_dog_not_hot_dog/food_images/108743.jpg"
-        },
-        "response": {
-            "result": {
-                "hot_dog_output": {
-                    "CLASS": {
-                        "Hot Dog": 0.07436760514974594,
-                        "Not Hot Dog": 0.9256323575973511
-                    }
-                }
-            }
+            ]
         }
     }
 ]

@@ -37,7 +37,9 @@ def create_test_image_data(
             sample_outpath = image_output_folder / f"{sample_idx}_{cls}.png"
 
             cur_image_object = create_test_image(
-                size=16, patch_size=4, target_class=cls
+                size=16,
+                patch_size=4,
+                target_class=cls,
             )
             cur_image_object.image.save(fp=sample_outpath)
 
@@ -90,7 +92,7 @@ def create_test_image(
     elif target_class == "Europe":
         image_base[12:, 12:] = patch_base
 
-    img = Image.fromarray(image_base)
+    img = Image.fromarray(image_base, mode="L")
 
     image_sample = ImageTestSample(
         image=img,

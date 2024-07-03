@@ -1,9 +1,14 @@
+import json
+import subprocess
 from pathlib import Path
 from typing import List, Sequence
 
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
 from docs.doc_modules.serve_experiments_utils import load_data_for_serve
-from docs.doc_modules.serving_experiments import AutoDocServingInfo
+from docs.doc_modules.serving_experiments import (
+    AutoDocServingInfo,
+    build_request_example_module_from_function,
+)
 from docs.doc_modules.utils import get_saved_model_path
 
 
@@ -134,6 +139,60 @@ def get_03_poker_hands_run_1_serve_info() -> AutoDocServingInfo:
     server_command = ["eirserve", "--model-path", model_path_placeholder]
 
     example_requests = [
+        [
+            {
+                "poker_hands": {
+                    "S1": "3",
+                    "C1": "12",
+                    "S2": "3",
+                    "C2": "2",
+                    "S3": "3",
+                    "C3": "11",
+                    "S4": "4",
+                    "C4": "5",
+                    "S5": "2",
+                    "C5": "5",
+                }
+            },
+        ]
+    ]
+
+    example_request_module_python = build_request_example_module_from_function(
+        function=example_request_function_python,
+        name="python",
+        language="python",
+    )
+
+    bash_args = _get_example_request_bash_args()
+    example_request_module_bash = build_request_example_module_from_function(
+        **bash_args
+    )
+
+    ade = AutoDocServingInfo(
+        name="TABULAR_DEPLOY",
+        base_path=Path(base_path),
+        server_command=server_command,
+        pre_run_command_modifications=(_add_model_path_to_command,),
+        post_run_functions=(),
+        example_requests=example_requests,
+        data_loading_function=load_data_for_serve,
+        request_example_modules=[
+            example_request_module_python,
+            example_request_module_bash,
+        ],
+    )
+
+    return ade
+
+
+def example_request_function_python():
+    import requests
+
+    def send_request(url: str, payload: list[dict]):
+        response = requests.post(url, json=payload)
+        return response.json()
+
+    payload = [
         {
             "poker_hands": {
                 "S1": "3",
@@ -147,20 +206,36 @@ def get_03_poker_hands_run_1_serve_info() -> AutoDocServingInfo:
                 "S5": "2",
                 "C5": "5",
             }
-        },
+        }
     ]
 
-    ade = AutoDocServingInfo(
-        name="TABULAR_DEPLOY",
-        base_path=Path(base_path),
-        server_command=server_command,
-        pre_run_command_modifications=(_add_model_path_to_command,),
-        post_run_functions=(),
-        example_requests=example_requests,
-        data_loading_function=load_data_for_serve,
-    )
+    response = send_request(url="http://localhost:8000/predict", payload=payload)
+    print(response)
 
-    return ade
+    # --skip-after
+    return response
+
+
+def _get_example_request_bash_args():
+    command = """curl -X POST \\
+        "http://localhost:8000/predict" \\
+        -H "accept: application/json" \\
+        -H "Content-Type: application/json" \\
+        -d '[{"poker_hands": {"S1": "3", "C1": "12", "S2": "3", "C2": "2", "S3": "3",
+         "C3": "11", "S4": "4", "C4": "5", "S5": "2", "C5": "5"}}]'"""
+
+    def _function_to_run_example() -> dict:
+        result = subprocess.run(command, shell=True, capture_output=True, text=True)
+        result_as_dict = json.loads(result.stdout)
+        return result_as_dict
+
+    command_as_text = command
+    return {
+        "function": _function_to_run_example,
+        "custom_body": command_as_text,
+        "name": "bash",
+        "language": "shell",
+    }
 
 
 def _get_model_path_for_predict() -> str:

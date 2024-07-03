@@ -16,7 +16,9 @@ import torch
 from torch import nn
 
 from eir.models.input.sequence.transformer_models import PositionalEmbedding
+from eir.models.layers.attention_layers import LinearAttention
 from eir.models.layers.lcl_layers import LCL, LCLResidualBlock
+from eir.models.layers.norm_layers import LayerScale
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -251,6 +253,8 @@ class LCLModel(nn.Module):
             lcl_spec=lcl_parameter_spec,
             block_layer_spec=self.model_config.layers,
         )
+
+        self.output_shape = (1, 1, self.lcl_blocks[-1].out_features)
 
         self._init_weights()
 
@@ -511,37 +515,38 @@ class LCLAttentionBlock(nn.Module):
         in_features: int,
         num_heads: Union[int, Literal["auto"]] = "auto",
         dropout_p: float = 0.0,
-        num_layers: int = 2,
-        dim_feedforward_factor: int = 4,
+        attention_type: Literal["full", "linear"] = "full",
     ):
         super().__init__()
 
         self.embedding_dim = embedding_dim
-        self.dim_feedforward_factor = dim_feedforward_factor
         self.in_features = in_features
         self.dropout_p = dropout_p
-        self.num_layers = num_layers
+        self.attention_type = attention_type
         self.out_features = in_features
 
         if num_heads == "auto":
             self.num_heads = embedding_dim
+        else:
+            self.num_heads = num_heads
+        assert isinstance(self.num_heads, int)
 
-        encoder_layer = nn.TransformerEncoderLayer(
-            d_model=self.embedding_dim,
-            nhead=self.num_heads,
-            dim_feedforward=self.embedding_dim * self.dim_feedforward_factor,
-            activation="gelu",
-            norm_first=True,
-            batch_first=True,
-            dropout=self.dropout_p,
-        )
+        self.attention: nn.MultiheadAttention | LinearAttention
+        if attention_type == "full":
+            self.attention = nn.MultiheadAttention(
+                embed_dim=self.embedding_dim,
+                num_heads=self.num_heads,
+                batch_first=True,
+                dropout=dropout_p,
+            )
+        elif attention_type == "linear":
+            self.attention = LinearAttention(
+                embed_dim=self.embedding_dim,
+                heads=self.num_heads,
+                dim_head=self.embedding_dim // self.num_heads,
+            )
 
-        self.encoder = nn.TransformerEncoder(
-            encoder_layer=encoder_layer,
-            num_layers=self.num_layers,
-            enable_nested_tensor=False,
-        )
-
+        self.norm = nn.LayerNorm(self.embedding_dim)
         self.pos_emb = PositionalEmbedding(
             embedding_dim=self.embedding_dim,
             max_length=self.in_features // self.embedding_dim,
@@ -549,13 +554,25 @@ class LCLAttentionBlock(nn.Module):
             zero_init=True,
         )
 
+        self.ls = LayerScale(dim=self.in_features, init_values=1e-5)
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         out = x.reshape(x.shape[0], -1, self.embedding_dim)
         out = self.pos_emb(out)
-        out = self.encoder(out)
-        out = torch.flatten(input=out, start_dim=1)
 
-        return out + x
+        if self.attention_type == "full":
+            attn_output, _ = self.attention(out, out, out)
+            out = self.norm(out + attn_output)
+        elif self.attention_type == "linear":
+            attn_output = self.attention(out)
+            out = self.norm(out + attn_output)
+        else:
+            raise ValueError("attention_type must be either 'full' or 'linear'")
+
+        out = torch.flatten(out, start_dim=1)
+        out = self.ls(out)
+
+        return x + out
 
 
 def _do_add_attention(

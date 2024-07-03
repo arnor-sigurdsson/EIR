@@ -42,8 +42,14 @@ def _get_classification_output_configs(
 @pytest.mark.parametrize(
     "create_test_data",
     [
-        {"task_type": "binary"},
-        {"task_type": "multi"},
+        {
+            "task_type": "binary",
+        },
+        {
+            "task_type": "multi",
+            "random_samples_dropped_from_modalities": True,
+            "source": "deeplake",
+        },
     ],
     indirect=True,
 )
@@ -184,8 +190,8 @@ def test_classification(prep_modelling_test_configs):
                         "input_info": {"input_name": "test_genotype"},
                         "input_type_info": {
                             "subset_snps_file": "auto",
-                            "na_augment_alpha": 0.0,
-                            "na_augment_beta": 0.0,
+                            "na_augment_alpha": 1.0,
+                            "na_augment_beta": 9.0,
                             "shuffle_augment_alpha": 0.0,
                             "shuffle_augment_beta": 0.0,
                         },
@@ -207,8 +213,8 @@ def test_classification(prep_modelling_test_configs):
                         "input_info": {"input_name": "test_genotype"},
                         "input_type_info": {
                             "subset_snps_file": "auto",
-                            "na_augment_alpha": 0.0,
-                            "na_augment_beta": 0.0,
+                            "na_augment_alpha": 1.0,
+                            "na_augment_beta": 9.0,
                             "shuffle_augment_alpha": 0.0,
                             "shuffle_augment_beta": 0.0,
                         },
@@ -421,7 +427,8 @@ def test_regression(prep_modelling_test_configs):
 
 
 def _get_multi_task_output_configs(
-    label_smoothing: float = 0.0, uncertainty_mt_loss: bool = True
+    label_smoothing: float = 0.0,
+    uncertainty_mt_loss: bool = True,
 ) -> Sequence[Dict]:
     output_configs = [
         {

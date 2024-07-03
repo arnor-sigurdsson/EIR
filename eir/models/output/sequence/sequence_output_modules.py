@@ -187,6 +187,13 @@ def overload_embeddings_with_pretrained(
     if not pretrained_checkpoint:
         return model
 
+    any_sequence_inputs = any(
+        input_object.input_config.input_info.input_type == "sequence"
+        for input_object in inputs.values()
+    )
+    if not any_sequence_inputs:
+        return model
+
     logger.info(
         f"Overloading embeddings with pretrained checkpoint {pretrained_checkpoint}."
     )

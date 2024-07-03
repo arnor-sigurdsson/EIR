@@ -35,6 +35,15 @@ Array Generation
     d_array_output/01_autoencoder.rst
 
 
+Image Generation
+================
+
+.. toctree::
+    :maxdepth: 2
+
+    f_image_output/01_foundational_autoencoder.rst
+    f_image_output/02_image_coloring_and_upscaling.rst
+
 Pretraining
 ============
 

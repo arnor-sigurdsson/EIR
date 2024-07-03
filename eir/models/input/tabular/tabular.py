@@ -109,12 +109,6 @@ class SimpleTabularModel(nn.Module):
     def num_out_features(self) -> int:
         return self.input_dim
 
-    def script_submodules_for_tracing(self):
-        for name, module in self.named_modules():
-            if isinstance(module, nn.Embedding):
-                scripted_module = torch.jit.script(obj=module)
-                setattr(self, name, scripted_module)
-
     @property
     def l1_penalized_weights(self) -> torch.Tensor:
         if not self.cat_columns and not self.fc_layer:
@@ -147,7 +141,8 @@ def attach_embeddings(model: nn.Module, embeddings_dict: al_emb_lookup_dict) -> 
         cur_embedding_dim = calc_embedding_dimension(n_categories=n_categories)
 
         embedding_module = nn.Embedding(
-            num_embeddings=n_categories, embedding_dim=cur_embedding_dim
+            num_embeddings=n_categories,
+            embedding_dim=cur_embedding_dim,
         )
         setattr(model, "embed_" + emb_col, embedding_module)
 

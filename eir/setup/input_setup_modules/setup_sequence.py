@@ -17,6 +17,9 @@ from typing import (
     overload,
 )
 
+import torchtext
+
+torchtext.disable_torchtext_deprecation_warning()
 import pandas as pd
 from tokenizers import Tokenizer
 from tokenizers.models import BPE

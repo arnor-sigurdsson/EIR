@@ -7,7 +7,10 @@ import numpy as np
 
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
 from docs.doc_modules.serve_experiments_utils import copy_inputs
-from docs.doc_modules.serving_experiments import AutoDocServingInfo
+from docs.doc_modules.serving_experiments import (
+    AutoDocServingInfo,
+    build_request_example_module_from_function,
+)
 from docs.doc_modules.utils import add_model_path_to_command
 
 
@@ -80,8 +83,10 @@ def get_06_imdb_binary_serve_transformer_info() -> AutoDocServingInfo:
 
     base = "eir_tutorials/a_using_eir/03_sequence_tutorial/data/IMDB/IMDB_Reviews"
     example_requests = [
-        {"imdb_reviews_bytes_base_transformer": f"{base}/10021_2.txt"},
-        {"imdb_reviews_bytes_base_transformer": f"{base}/10132_9.txt"},
+        [
+            {"imdb_reviews_bytes_base_transformer": f"{base}/10021_2.txt"},
+            {"imdb_reviews_bytes_base_transformer": f"{base}/10132_9.txt"},
+        ],
     ]
 
     add_model_path = partial(
@@ -93,9 +98,15 @@ def get_06_imdb_binary_serve_transformer_info() -> AutoDocServingInfo:
     copy_inputs_to_serve = (
         copy_inputs,
         {
-            "example_requests": example_requests,
+            "example_requests": example_requests[0],
             "output_folder": str(Path(base_path) / "serve_results"),
         },
+    )
+
+    example_request_module_python = build_request_example_module_from_function(
+        function=example_request_function_python,
+        name="python",
+        language="python",
     )
 
     ade = AutoDocServingInfo(
@@ -106,9 +117,49 @@ def get_06_imdb_binary_serve_transformer_info() -> AutoDocServingInfo:
         post_run_functions=(copy_inputs_to_serve,),
         example_requests=example_requests,
         data_loading_function=_load_data_for_binary_serve,
+        request_example_modules=[
+            example_request_module_python,
+        ],
     )
 
     return ade
+
+
+def example_request_function_python():
+    import base64
+
+    import numpy as np
+    import requests
+
+    def load_and_encode_data(data_pointer: str) -> str:
+        arr = np.fromfile(data_pointer, dtype="uint8")
+        arr_bytes = arr.tobytes()
+        return base64.b64encode(arr_bytes).decode("utf-8")
+
+    def send_request(url: str, payload: list[dict]) -> dict:
+        response = requests.post(url, json=payload)
+        response.raise_for_status()
+        return response.json()
+
+    base = "eir_tutorials/a_using_eir/03_sequence_tutorial/data/IMDB/IMDB_Reviews"
+    payload = [
+        {
+            "imdb_reviews_bytes_base_transformer": load_and_encode_data(
+                f"{base}/10021_2.txt"
+            )
+        },
+        {
+            "imdb_reviews_bytes_base_transformer": load_and_encode_data(
+                f"{base}/10132_9.txt"
+            )
+        },
+    ]
+
+    response = send_request(url="http://localhost:8000/predict", payload=payload)
+    print(response)
+
+    # --skip-after
+    return response
 
 
 def _load_data_for_binary_serve(data: dict[str, Any]) -> dict[str, Any]:

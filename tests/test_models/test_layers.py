@@ -7,30 +7,30 @@ from hypothesis.strategies import integers, sampled_from
 from torch import nn
 
 from eir.models.layers.lcl_layers import LCL, LCLResidualBlock
-from eir.models.layers.projection_layers import get_projection_layer
+from eir.models.layers.projection_layers import get_1d_projection_layer
 
 
 def test_get_projection_layer():
     input_dimension = 8
     target_dimension = 16
 
-    layer = get_projection_layer(input_dimension, target_dimension, "auto")
+    layer = get_1d_projection_layer(input_dimension, target_dimension, "auto")
     assert isinstance(layer, (LCLResidualBlock, LCL, nn.Linear))
 
-    layer = get_projection_layer(input_dimension, target_dimension, "lcl_residual")
+    layer = get_1d_projection_layer(input_dimension, target_dimension, "lcl_residual")
     assert isinstance(layer, LCLResidualBlock)
 
-    layer = get_projection_layer(input_dimension, target_dimension, "lcl")
+    layer = get_1d_projection_layer(input_dimension, target_dimension, "lcl")
     assert isinstance(layer, LCL)
 
-    layer = get_projection_layer(input_dimension, target_dimension, "linear")
+    layer = get_1d_projection_layer(input_dimension, target_dimension, "linear")
     assert isinstance(layer, nn.Linear)
 
-    layer = get_projection_layer(input_dimension, input_dimension, "linear")
+    layer = get_1d_projection_layer(input_dimension, input_dimension, "linear")
     assert isinstance(layer, nn.Identity)
 
     with pytest.raises(ValueError) as e_info:
-        get_projection_layer(input_dimension, target_dimension, "invalid_type")
+        get_1d_projection_layer(input_dimension, target_dimension, "invalid_type")
     assert str(e_info.value) == "Invalid projection_layer_type: invalid_type"
 
 
@@ -51,7 +51,7 @@ def test_get_projection_layer_output_dimension(
     projection_layer_type: Literal["auto", "lcl_residual", "lcl", "linear"],
 ) -> None:
     try:
-        layer = get_projection_layer(
+        layer = get_1d_projection_layer(
             input_dimension=input_dimension,
             target_dimension=target_dimension,
             projection_layer_type=projection_layer_type,

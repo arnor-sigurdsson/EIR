@@ -5,15 +5,18 @@ import torch.backends
 import torch.cuda
 
 from eir.setup.config_setup_modules.config_setup_utils import recursive_dict_replace
+from tests.conftest import get_system_info
 
 
 def get_test_base_global_init(
-    allow_cuda: bool = True, allow_mps: bool = False
+    allow_cuda: bool = True,
+    allow_mps: bool = False,
 ) -> Sequence[dict]:
     device = "cpu"
+    in_gha, _ = get_system_info()
     if allow_cuda:
         device = "cuda" if torch.cuda.is_available() else device
-    if allow_mps:
+    if allow_mps and not in_gha:
         device = "mps" if torch.backends.mps.is_available() else device
 
     global_inits = [
@@ -76,7 +79,10 @@ def get_test_inputs_inits(
 
 
 def get_test_outputs_inits(
-    test_path: Path, output_configs_dicts: Sequence[dict], split_to_test: bool
+    test_path: Path,
+    output_configs_dicts: Sequence[dict],
+    split_to_test: bool,
+    source: Literal["local", "deeplake"],
 ) -> Sequence[dict]:
     inits = []
 
@@ -90,7 +96,11 @@ def get_test_outputs_inits(
         cur_base_func_key = cur_base_func_keys[0]
 
         cur_base_func = base_func_map.get(cur_base_func_key)
-        cur_init_base = cur_base_func(test_path=test_path, split_to_test=split_to_test)
+        cur_init_base = cur_base_func(
+            test_path=test_path,
+            split_to_test=split_to_test,
+            source=source,
+        )
 
         cur_init_injected = recursive_dict_replace(
             dict_=cur_init_base, dict_to_inject=init_dict
@@ -116,6 +126,10 @@ def get_output_test_init_base_func_map() -> Dict[str, Callable]:
         "test_output_copy": get_test_tabular_base_output_inits,
         "test_output_sequence": get_test_sequence_base_output_inits,
         "test_output_array": get_test_array_base_output_inits,
+        "test_output_image": get_test_image_base_output_inits,
+        # For diffusion compatibility
+        "test_array": get_test_array_base_output_inits,
+        "test_image": get_test_image_base_output_inits,
     }
 
     return mapping
@@ -128,7 +142,9 @@ def get_input_test_init_base_func_map() -> Dict[str, Callable]:
         "test_sequence": get_test_sequence_input_init,
         "test_bytes": get_test_bytes_input_init,
         "test_image": get_test_image_input_init,
+        "copy_test_image": get_test_image_input_init,
         "test_array": get_test_array_input_init,
+        "copy_test_array": get_test_array_input_init,
     }
 
     return mapping
@@ -316,7 +332,7 @@ def get_test_image_input_init(
         "model_config": {
             "model_type": "cnn",
             "pretrained_model": False,
-            "num_output_features": 128,
+            "num_output_features": 0,
             "freeze_pretrained_model": False,
             "model_init_config": {
                 "layers": [2],
@@ -372,7 +388,9 @@ def get_test_base_fusion_init(model_type: str) -> Sequence[dict]:
         raise ValueError("Unknown fusion model type: '%s'" % model_type)
 
 
-def get_test_tabular_base_output_inits(test_path: Path, split_to_test: bool) -> Dict:
+def get_test_tabular_base_output_inits(
+    test_path: Path, split_to_test: bool, *args, **kwargs
+) -> Dict:
     label_file = test_path / "labels.csv"
     if split_to_test:
         label_file = test_path / "labels_train.csv"
@@ -392,10 +410,14 @@ def get_test_tabular_base_output_inits(test_path: Path, split_to_test: bool) -> 
     return test_target_init_kwargs
 
 
-def get_test_sequence_base_output_inits(test_path: Path, split_to_test: bool) -> Dict:
+def get_test_sequence_base_output_inits(
+    test_path: Path,
+    split_to_test: bool,
+    source: Literal["local", "deeplake"],
+) -> Dict:
     output_source = _inject_train_source_path(
         test_path=test_path,
-        source="local",
+        source=source,
         local_name="sequence",
         split_to_test=split_to_test,
     )
@@ -405,6 +427,7 @@ def get_test_sequence_base_output_inits(test_path: Path, split_to_test: bool) ->
             "output_name": "test_output_sequence",
             "output_type": "sequence",
             "output_source": str(output_source),
+            "output_inner_key": "test_sequence",
         },
         "output_type_info": {
             "max_length": 32,
@@ -418,10 +441,14 @@ def get_test_sequence_base_output_inits(test_path: Path, split_to_test: bool) ->
     return test_target_init_kwargs
 
 
-def get_test_array_base_output_inits(test_path: Path, split_to_test: bool) -> Dict:
+def get_test_array_base_output_inits(
+    test_path: Path,
+    split_to_test: bool,
+    source: Literal["local", "deeplake"],
+) -> Dict:
     output_source = _inject_train_source_path(
         test_path=test_path,
-        source="local",
+        source=source,
         local_name="array",
         split_to_test=split_to_test,
     )
@@ -431,8 +458,36 @@ def get_test_array_base_output_inits(test_path: Path, split_to_test: bool) -> Di
             "output_name": "test_output_array",
             "output_type": "array",
             "output_source": str(output_source),
+            "output_inner_key": "test_array",
         },
         "model_config": {"model_type": "lcl"},
+    }
+
+    return test_target_init_kwargs
+
+
+def get_test_image_base_output_inits(
+    test_path: Path,
+    split_to_test: bool,
+    source: Literal["local", "deeplake"],
+) -> Dict:
+    output_source = _inject_train_source_path(
+        test_path=test_path,
+        source=source,
+        local_name="image",
+        split_to_test=split_to_test,
+    )
+
+    test_target_init_kwargs = {
+        "output_info": {
+            "output_name": "test_output_image",
+            "output_type": "image",
+            "output_source": str(output_source),
+            "output_inner_key": "test_image",
+        },
+        "model_config": {
+            "model_type": "cnn",
+        },
     }
 
     return test_target_init_kwargs

@@ -2,9 +2,11 @@ import pytest
 
 from eir.models.input.array import models_cnn
 from eir.models.layers.cnn_layers import FirstCNNBlock
-from eir.models.model_training_utils import check_eir_model
 from eir.setup.input_setup_modules.common import DataDimensions
-from tests.test_models.model_testing_utils import prepare_example_batch
+from tests.test_models.model_testing_utils import (
+    check_eir_model,
+    prepare_example_test_batch,
+)
 
 
 def test_make_conv_layers():
@@ -30,6 +32,8 @@ def test_make_conv_layers():
         rb_do=0.1,
         first_channel_expansion=1,
         channel_exp_base=5,
+        down_sample_every_n_blocks=None,
+        attention_inclusion_cutoff=0,
     )
     test_data_dimensions = DataDimensions(channels=1, height=4, width=int(8e5))
     conv_layers = models_cnn._make_conv_layers(
@@ -425,7 +429,7 @@ def test_omics_models(
 ):
     model = create_test_model
 
-    example_batch = prepare_example_batch(
+    example_batch = prepare_example_test_batch(
         configs=create_test_config, labels=create_test_labels, model=model
     )
 

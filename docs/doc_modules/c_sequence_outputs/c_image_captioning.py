@@ -9,7 +9,10 @@ from PIL import Image
 from docs.doc_modules.c_sequence_outputs.utils import get_content_root
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
 from docs.doc_modules.serve_experiments_utils import copy_inputs, load_data_for_serve
-from docs.doc_modules.serving_experiments import AutoDocServingInfo
+from docs.doc_modules.serving_experiments import (
+    AutoDocServingInfo,
+    build_request_example_module_from_function,
+)
 from docs.doc_modules.utils import add_model_path_to_command
 
 CONTENT_ROOT = CR = get_content_root()
@@ -40,7 +43,7 @@ def get_image_captioning_01_text_only() -> AutoDocExperimentInfo:
         ),
     ]
 
-    data_output_path = Path(f"eir_tutorials/{CR}/{TN}/data/image_captions.zip")
+    data_output_path = Path(f"eir_tutorials/{CR}/{TN}/image_captions.zip")
 
     get_tutorial_folder = (
         run_capture_and_save,
@@ -49,7 +52,7 @@ def get_image_captioning_01_text_only() -> AutoDocExperimentInfo:
                 "tree",
                 f"eir_tutorials/{CR}/{TN}",
                 "-L",
-                "3",
+                "2",
                 "-I",
                 "*.zip",
                 "--noreport",
@@ -110,7 +113,7 @@ def get_image_captioning_02_image_and_text() -> AutoDocExperimentInfo:
             )
         )
 
-    data_output_path = Path(f"eir_tutorials/{CR}/{TN}/data/image_captions.zip")
+    data_output_path = Path(f"eir_tutorials/{CR}/{TN}/image_captions.zip")
 
     save_image_func = (
         generate_image_grid,
@@ -168,23 +171,16 @@ def get_image_captioning_02_image_and_text_serve() -> AutoDocServingInfo:
 
     server_command = ["eirserve", "--model-path", "FILL_MODEL"]
 
-    image_base = (
-        "eir_tutorials/c_sequence_output/03_image_captioning/"
-        "data/image_captioning/images"
-    )
+    image_base = "eir_tutorials/c_sequence_output/03_image_captioning/" "data/images"
     example_requests = [
-        {
-            "image_captioning": f"{image_base}/000000000009.jpg",
-            "captions": "",
-        },
-        {
-            "image_captioning": f"{image_base}/000000000034.jpg",
-            "captions": "",
-        },
-        {
-            "image_captioning": f"{image_base}/000000581929.jpg",
-            "captions": "A horse",
-        },
+        [
+            {"image_captioning": f"{image_base}/000000000009.jpg", "captions": ""},
+            {"image_captioning": f"{image_base}/000000000034.jpg", "captions": ""},
+            {
+                "image_captioning": f"{image_base}/000000581929.jpg",
+                "captions": "A horse",
+            },
+        ],
     ]
 
     add_model_path = partial(
@@ -195,9 +191,15 @@ def get_image_captioning_02_image_and_text_serve() -> AutoDocServingInfo:
     copy_inputs_to_serve = (
         copy_inputs,
         {
-            "example_requests": example_requests,
+            "example_requests": example_requests[0],
             "output_folder": str(Path(base_path) / "serve_results"),
         },
+    )
+
+    example_request_module_python = build_request_example_module_from_function(
+        function=example_request_function_python,
+        name="python",
+        language="python",
     )
 
     ade = AutoDocServingInfo(
@@ -208,9 +210,59 @@ def get_image_captioning_02_image_and_text_serve() -> AutoDocServingInfo:
         post_run_functions=(copy_inputs_to_serve,),
         example_requests=example_requests,
         data_loading_function=load_data_for_serve,
+        request_example_modules=[
+            example_request_module_python,
+        ],
     )
 
     return ade
+
+
+def example_request_function_python():
+    import base64
+    from io import BytesIO
+
+    import requests
+    from PIL import Image
+
+    def encode_image_to_base64(file_path: str) -> str:
+        with Image.open(file_path) as image:
+            buffered = BytesIO()
+            image.save(buffered, format="JPEG")
+            return base64.b64encode(buffered.getvalue()).decode("utf-8")
+
+    def send_request(url: str, payload: list[dict]) -> list[dict]:
+        response = requests.post(url, json=payload)
+        response.raise_for_status()
+        return response.json()
+
+    image_base = "eir_tutorials/c_sequence_output/03_image_captioning/data/images"
+    payload = [
+        {
+            "image_captioning": encode_image_to_base64(
+                f"{image_base}/000000000009.jpg"
+            ),
+            "captions": "",
+        },
+        {
+            "image_captioning": encode_image_to_base64(
+                f"{image_base}/000000000034.jpg"
+            ),
+            "captions": "",
+        },
+        {
+            "image_captioning": encode_image_to_base64(
+                f"{image_base}/000000581929.jpg"
+            ),
+            "captions": "A horse",
+        },
+    ]
+
+    response = send_request(url="http://localhost:8000/predict", payload=payload)
+    print(response)
+
+    # --skip-after
+    return response
 
 
 def get_experiments() -> Sequence[AutoDocExperimentInfo]:

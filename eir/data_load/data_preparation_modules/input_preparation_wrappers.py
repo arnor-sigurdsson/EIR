@@ -33,6 +33,7 @@ from eir.setup.input_setup_modules.setup_omics import ComputedOmicsInputInfo
 from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
 from eir.setup.schemas import (
     ByteInputDataConfig,
+    ImageInputDataConfig,
     OmicsInputDataConfig,
     SequenceInputDataConfig,
     al_input_type_info,
@@ -111,9 +112,12 @@ def prepare_inputs_disk(
                 )
 
             case ComputedImageInputInfo():
+                input_type_info = input_object.input_config.input_type_info
+                assert isinstance(input_type_info, ImageInputDataConfig)
                 image_data = image_load_wrapper(
                     input_source=input_source,
                     data_pointer=data_pointer,
+                    image_mode=input_type_info.mode,
                     deeplake_inner_key=deeplake_inner_key,
                 )
                 input_prepared = prepare_image_data(
@@ -155,7 +159,9 @@ def _should_skip_modality(modality_dropout_rate: float, test_mode: bool) -> bool
 
 
 def prepare_inputs_memory(
-    inputs: Dict[str, Any], inputs_objects: "al_input_objects_as_dict", test_mode: bool
+    inputs: Dict[str, Any],
+    inputs_objects: "al_input_objects_as_dict",
+    test_mode: bool,
 ) -> Dict[str, torch.Tensor]:
     prepared_inputs = {}
 
@@ -254,9 +260,12 @@ def get_input_data_loading_hooks(
                 )
 
             case ComputedImageInputInfo():
+                input_type_info = input_object.input_config.input_type_info
+                assert isinstance(input_type_info, ImageInputDataConfig)
                 mapping[input_name] = typed_partial_for_hook(
                     image_load_wrapper,
                     **common_kwargs,
+                    image_mode=input_type_info.mode,
                 )
 
             case ComputedSequenceInputInfo():

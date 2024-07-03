@@ -2,12 +2,13 @@ import math
 from typing import Optional
 
 import torch
-from aislib.misc_utils import get_logger
-from aislib.pytorch_modules import Swish
 from torch import nn
 from torch.nn import Parameter
 from torch.nn import functional as F
 from torchvision.ops import StochasticDepth
+
+from eir.models.layers.norm_layers import LayerScale
+from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__)
 
@@ -156,7 +157,7 @@ class LCLResidualBlock(nn.Module):
             kernel_size=self.kernel_size,
         )
 
-        self.act_1 = Swish()
+        self.act_1 = nn.GELU()
         self.do = nn.Dropout(p=dropout_p)
 
         fc_2_kwargs = _get_lcl_2_kwargs(
@@ -169,6 +170,8 @@ class LCLResidualBlock(nn.Module):
         self.fc_2 = LCL(**fc_2_kwargs)
 
         self.out_features = self.fc_2.out_features
+
+        self.ls = LayerScale(dim=self.out_features, init_values=1.0)
 
         if in_features == self.out_features:
             self.downsample_identity = lambda x: x
@@ -193,6 +196,7 @@ class LCLResidualBlock(nn.Module):
         out = self.act_1(out)
         out = self.do(out)
         out = self.fc_2(out)
+        out = self.ls(out)
 
         out = self.stochastic_depth(out)
 
@@ -216,7 +220,8 @@ def _get_lcl_2_kwargs(
         common_kwargs["kernel_size"] = kernel_size
     else:
         num_chunks = _calculate_num_chunks_for_equal_lcl_out_features(
-            in_features=in_features, out_feature_sets=out_feature_sets
+            in_features=in_features,
+            out_feature_sets=out_feature_sets,
         )
         common_kwargs["num_chunks"] = num_chunks
 

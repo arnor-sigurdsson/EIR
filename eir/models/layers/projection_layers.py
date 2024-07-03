@@ -7,12 +7,22 @@ from torch import nn
 from eir.models.layers.lcl_layers import LCL, LCLResidualBlock
 
 
-def get_projection_layer(
+def get_1d_projection_layer(
     input_dimension: int,
     target_dimension: int,
-    projection_layer_type: Literal["auto", "lcl", "lcl_residual", "linear"] = "auto",
+    projection_layer_type: Literal[
+        "auto",
+        "lcl",
+        "lcl_residual",
+        "linear",
+        "cnn",
+    ] = "auto",
     lcl_diff_tolerance: int = 0,
 ) -> LCLResidualBlock | LCL | nn.Linear | nn.Identity:
+    """
+    Note: These currently (and possibly will only continue to) support
+          projection from 1D to 1D.
+    """
     if projection_layer_type == "auto":
         if input_dimension == target_dimension:
             return nn.Identity()
@@ -58,11 +68,11 @@ def get_projection_layer(
         else:
             return layer
 
-    elif projection_layer_type == "lcl":
+    elif projection_layer_type == "lcl" or projection_layer_type == "lcl_residual":
         layer = get_lcl_projection_layer(
             input_dimension=input_dimension,
             target_dimension=target_dimension,
-            layer_type="lcl",
+            layer_type=projection_layer_type,
             diff_tolerance=lcl_diff_tolerance,
         )
         if layer is None:
@@ -84,6 +94,10 @@ def get_projection_layer(
                 out_features=target_dimension,
                 bias=True,
             )
+
+    elif projection_layer_type == "cnn":
+        raise NotImplementedError()
+
     else:
         raise ValueError(f"Invalid projection_layer_type: {projection_layer_type}")
 

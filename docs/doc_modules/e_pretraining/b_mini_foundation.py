@@ -38,7 +38,7 @@ def train_01_mini_foundation_model() -> AutoDocExperimentInfo:
         ),
     ]
 
-    data_output_path = Path(f"eir_tutorials/{CR}/{TN}/data/mini_foundation.zip")
+    data_output_path = Path(f"eir_tutorials/{CR}/{TN}/mini_foundation.zip")
 
     get_tutorial_folder = (
         run_capture_and_save,
@@ -114,7 +114,7 @@ def train_02_imdb_from_scratch_model() -> AutoDocExperimentInfo:
         ),
     ]
 
-    data_output_path = Path(f"eir_tutorials/{CR}/{TN}/data/mini_foundation.zip")
+    data_output_path = Path(f"eir_tutorials/{CR}/{TN}/mini_foundation.zip")
 
     ade = AutoDocExperimentInfo(
         name="1_MINI_FOUNDATION_PRETRAIN_IMDB_FROM_SCRATCH",
@@ -158,7 +158,7 @@ def train_03_imdb_from_pretrained_model() -> AutoDocExperimentInfo:
         ),
     ]
 
-    data_output_path = Path(f"eir_tutorials/{CR}/{TN}/data/mini_foundation.zip")
+    data_output_path = Path(f"eir_tutorials/{CR}/{TN}/mini_foundation.zip")
 
     ade = AutoDocExperimentInfo(
         name="2_MINI_FOUNDATION_PRETRAIN_IMDB_FROM_PRETRAINED",
@@ -201,7 +201,7 @@ def train_04_cifar_from_scratch_model() -> AutoDocExperimentInfo:
         ),
     ]
 
-    data_output_path = Path(f"eir_tutorials/{CR}/{TN}/data/mini_foundation.zip")
+    data_output_path = Path(f"eir_tutorials/{CR}/{TN}/mini_foundation.zip")
 
     ade = AutoDocExperimentInfo(
         name="3_MINI_FOUNDATION_PRETRAIN_CIFAR_FROM_SCRATCH",
@@ -245,7 +245,7 @@ def train_05_cifar_from_pretrained_model() -> AutoDocExperimentInfo:
         ),
     ]
 
-    data_output_path = Path(f"eir_tutorials/{CR}/{TN}/data/mini_foundation.zip")
+    data_output_path = Path(f"eir_tutorials/{CR}/{TN}/mini_foundation.zip")
 
     ade = AutoDocExperimentInfo(
         name="4_MINI_FOUNDATION_PRETRAIN_CIFAR_FROM_PRETRAINED",

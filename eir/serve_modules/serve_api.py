@@ -1,6 +1,5 @@
 from typing import Any, Sequence
 
-from aislib.misc_utils import get_logger
 from fastapi import FastAPI
 
 from eir.predict_modules.predict_tabular_input_setup import (
@@ -21,6 +20,7 @@ from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputIn
 from eir.setup.input_setup_modules.setup_tabular import ComputedTabularInputInfo
 from eir.setup.output_setup import al_output_objects_as_dict
 from eir.setup.output_setup_modules.array_output_setup import ComputedArrayOutputInfo
+from eir.setup.output_setup_modules.image_output_setup import ComputedImageOutputInfo
 from eir.setup.output_setup_modules.sequence_output_setup import (
     ComputedSequenceOutputInfo,
 )
@@ -28,6 +28,7 @@ from eir.setup.output_setup_modules.tabular_output_setup import (
     ComputedTabularOutputInfo,
 )
 from eir.setup.schemas import InputConfig
+from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -38,17 +39,21 @@ async def process_request(data: Sequence, serve_experiment: ServeExperiment) -> 
         serve_experiment=serve_experiment,
     )
 
-    prediction = run_serve_prediction(
+    predictions = run_serve_prediction(
         serve_experiment=serve_experiment,
         batch=batch,
     )
 
-    response = general_post_process(
-        outputs=prediction,
-        input_objects=serve_experiment.inputs,
-        output_objects=serve_experiment.outputs,
-    )
-    return response
+    responses = []
+    for prediction in predictions:
+        response = general_post_process(
+            outputs=prediction,
+            input_objects=serve_experiment.inputs,
+            output_objects=serve_experiment.outputs,
+        )
+        responses.append(response)
+
+    return responses
 
 
 def create_predict_endpoint(
@@ -59,14 +64,15 @@ def create_predict_endpoint(
     input_model = create_input_model(configs=configs)
 
     @app.post("/predict", response_model=ResponseModel)
-    async def predict(request: input_model) -> ResponseModel:  # type: ignore
-        data = [request.model_dump()]  # type: ignore
+    async def predict(requests: list[input_model]) -> ResponseModel:  # type: ignore
+        logger.info(f"Received {len(requests)} samples in request.")
+        data = [request.model_dump() for request in requests]  # type: ignore
         response_data = await process_request(
             data=data,
             serve_experiment=serve_experiment,
         )
 
-        return ResponseModel(result=response_data[0])
+        return ResponseModel(result=response_data)
 
 
 def create_info_endpoint(app: FastAPI, serve_experiment: ServeExperiment) -> None:
@@ -102,7 +108,11 @@ def get_model_info(
                 pass
 
             case ComputedImageInputInfo():
-                pass
+                shape = input_object.data_dimensions.full_shape()
+                model_info["inputs"][name] = {
+                    "type": "image",
+                    "shape": shape,
+                }
 
             case (
                 ComputedTabularInputInfo()
@@ -137,6 +147,13 @@ def get_model_info(
                     "type": "array",
                     "shape": shape,
                     "dtype": output_object.dtype.str,
+                }
+
+            case ComputedImageOutputInfo():
+                shape = output_object.data_dimensions.full_shape()
+                model_info["outputs"][name] = {
+                    "type": "image",
+                    "shape": shape,
                 }
 
             case _:

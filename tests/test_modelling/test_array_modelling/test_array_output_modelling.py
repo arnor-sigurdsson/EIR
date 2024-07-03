@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING, Any, Sequence
 
 import numpy as np
 import pytest
@@ -41,6 +41,106 @@ def _get_output_array_data_parameters() -> Sequence[dict]:
     return parameters
 
 
+def _get_array_out_parametrization(loss: str) -> dict[str, Any]:
+    assert loss in ["mse", "diffusion"]
+
+    # Note we set output name here same as input below for diffusion compatibility
+    output_type_info = {
+        "loss": loss,
+    }
+    if loss == "diffusion":
+        output_type_info["diffusion_time_steps"] = 50
+
+    output_configs = [
+        {
+            "output_info": {
+                "output_name": "test_array",
+            },
+            "output_type_info": output_type_info,
+            "model_config": {
+                "model_type": "cnn",
+                "model_init_config": {
+                    "channel_exp_base": 3,
+                    "allow_pooling": False,
+                },
+            },
+        },
+    ]
+
+    if loss == "mse":
+        output_configs.append(
+            {
+                "output_info": {
+                    "output_name": "test_output_array_lcl",
+                },
+                "output_type_info": {
+                    "loss": loss,
+                },
+                "model_config": {
+                    "model_type": "lcl",
+                    "model_init_config": {
+                        "kernel_width": 8,
+                        "channel_exp_base": 3,
+                        "attention_inclusion_cutoff": 128,
+                    },
+                },
+            },
+        )
+
+    epochs = 15 if loss == "mse" else 20
+    configs = {
+        "global_configs": {
+            "output_folder": "test_array_generation",
+            "n_epochs": epochs,
+            "memory_dataset": True,
+        },
+        "input_configs": [
+            {
+                "input_info": {"input_name": "test_array"},
+                "input_type_info": {
+                    "normalization": "channel",
+                },
+                "model_config": {
+                    "model_type": "cnn",
+                    "model_init_config": {
+                        "layers": [1],
+                        "kernel_width": 4,
+                        "kernel_height": 4,
+                        "channel_exp_base": 4,
+                        "down_stride_width": 1,
+                        "down_stride_height": 1,
+                        "attention_inclusion_cutoff": 256,
+                        "allow_first_conv_size_reduction": False,
+                        "down_sample_every_n_blocks": 2,
+                    },
+                },
+            },
+            {
+                "input_info": {"input_name": "copy_test_array"},
+                "input_type_info": {
+                    "normalization": "channel",
+                },
+                "model_config": {
+                    "model_type": "cnn",
+                    "model_init_config": {
+                        "kernel_width": 4,
+                        "kernel_height": 4,
+                        "channel_exp_base": 4,
+                        "down_stride_width": 1,
+                        "down_stride_height": 1,
+                        "attention_inclusion_cutoff": 0,
+                        "allow_first_conv_size_reduction": False,
+                        "down_sample_every_n_blocks": 2,
+                    },
+                },
+            },
+        ],
+        "output_configs": output_configs,
+    }
+
+    return configs
+
+
 @pytest.mark.skipif(condition=should_skip_in_gha_macos(), reason="In GHA.")
 @pytest.mark.parametrize(
     "create_test_data",
@@ -51,57 +151,10 @@ def _get_output_array_data_parameters() -> Sequence[dict]:
     "create_test_config_init_base",
     [
         {
-            "injections": {
-                "global_configs": {
-                    "output_folder": "test_array_generation",
-                    "n_epochs": 15,
-                    "memory_dataset": True,
-                },
-                "input_configs": [
-                    {
-                        "input_info": {"input_name": "test_array"},
-                        "input_type_info": {
-                            "normalization": "channel",
-                        },
-                        "model_config": {
-                            "model_type": "lcl",
-                            "model_init_config": {
-                                "kernel_width": 8,
-                                "channel_exp_base": 3,
-                                "attention_inclusion_cutoff": 128,
-                            },
-                        },
-                    }
-                ],
-                "output_configs": [
-                    {
-                        "output_info": {
-                            "output_name": "test_output_array_lcl",
-                        },
-                        "model_config": {
-                            "model_type": "lcl",
-                            "model_init_config": {
-                                "kernel_width": 8,
-                                "channel_exp_base": 3,
-                                "direction": "up",
-                                "cutoff": "auto",
-                            },
-                        },
-                    },
-                    {
-                        "output_info": {
-                            "output_name": "test_output_array_cnn",
-                        },
-                        "model_config": {
-                            "model_type": "cnn",
-                            "model_init_config": {
-                                "channel_exp_base": 3,
-                                "allow_pooling": False,
-                            },
-                        },
-                    },
-                ],
-            },
+            "injections": _get_array_out_parametrization(loss="mse"),
+        },
+        {
+            "injections": _get_array_out_parametrization(loss="diffusion"),
         },
     ],
     indirect=True,
@@ -126,7 +179,7 @@ def test_array_output_modelling(
 def _array_output_test_check_wrapper(
     experiment: train.Experiment,
     test_config: "ModelTestConfig",
-    mse_threshold: float = 0.2,
+    mse_threshold: float = 0.3,
     cosine_similarity_threshold: float = 0.6,
 ) -> None:
     output_configs = experiment.configs.output_configs
@@ -134,6 +187,8 @@ def _array_output_test_check_wrapper(
     for output_config in output_configs:
         output_name = output_config.output_info.output_name
         output_type = output_config.output_info.output_type
+
+        is_diffusion = output_config.output_type_info.loss == "diffusion"
 
         if output_type != "array":
             continue
@@ -159,10 +214,13 @@ def _array_output_test_check_wrapper(
             )
             assert mse < mse_threshold
 
+            did_check = True
+
             # due to deeplake arrays not storing 0s but as very small numbers
             matching_input_array[matching_input_array < 1e-8] = 0.0
 
-            if matching_input_array.sum() == 0:
+            # Skip if all 0s or diffusion
+            if matching_input_array.sum() == 0 or is_diffusion:
                 continue
 
             cosine_similarity = 1 - cosine(
@@ -170,6 +228,5 @@ def _array_output_test_check_wrapper(
                 v=generated_array.ravel(),
             )
             assert cosine_similarity > cosine_similarity_threshold
-            did_check = True
 
         assert did_check

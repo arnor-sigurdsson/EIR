@@ -65,6 +65,7 @@ from eir.setup.config_setup_modules.output_config_setup_sequence import (
 from eir.setup.config_validation import validate_train_configs
 from eir.setup.schema_modules.latent_analysis_schemas import LatentSamplingConfig
 from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
+from eir.setup.tensor_broker_setup import set_up_tensor_broker_config
 from eir.train_utils.utils import configure_global_eir_logging
 from eir.utils.logging import get_logger
 
@@ -405,12 +406,17 @@ def init_input_config(yaml_config_as_dict: Dict[str, Any]) -> schemas.InputConfi
         interpretation_config_dict=cfg.get("interpretation_config", None),
     )
 
+    tensor_broker_config = set_up_tensor_broker_config(
+        tensor_broker_config=cfg.get("tensor_broker_config", {})
+    )
+
     input_config = schemas.InputConfig(
         input_info=input_info_object,
         input_type_info=input_type_info_object,
         pretrained_config=pretrained_config,
         model_config=model_config,
         interpretation_config=interpretation_config,
+        tensor_broker_config=tensor_broker_config,
     )
 
     return input_config
@@ -559,8 +565,8 @@ def get_is_not_eir_model_condition(
         "bytes",
         "image",
     )
-    is_unknown_sequence_model = model_type not in ("sequence-default",)
-    not_from_eir = is_possibly_external and is_unknown_sequence_model
+    is_unknown_model = model_type not in ("sequence-default", "cnn", "lcl")
+    not_from_eir = is_possibly_external and is_unknown_model
     return not_from_eir
 
 
@@ -652,8 +658,14 @@ def load_fusion_configs(fusion_configs: Iterable[dict]) -> schemas.FusionConfig:
     fusion_config_kwargs = combined_config["model_config"]
     fusion_model_config = model_dataclass_config_class(**fusion_config_kwargs)
 
+    tensor_broker_config = set_up_tensor_broker_config(
+        tensor_broker_config=combined_config.get("tensor_broker_config", {})
+    )
+
     fusion_config = schemas.FusionConfig(
-        model_type=combined_config["model_type"], model_config=fusion_model_config
+        model_type=combined_config["model_type"],
+        model_config=fusion_model_config,
+        tensor_broker_config=tensor_broker_config,
     )
 
     return fusion_config
@@ -718,11 +730,16 @@ def init_output_config(
         sampling_config=cfg.get("sampling_config", {}),
     )
 
+    tensor_broker_config = set_up_tensor_broker_config(
+        tensor_broker_config=cfg.get("tensor_broker_config", {})
+    )
+
     output_config = schemas.OutputConfig(
         output_info=output_info_object,
         output_type_info=output_type_info_object,
         model_config=model_config,
         sampling_config=sampling_config,
+        tensor_broker_config=tensor_broker_config,
     )
 
     return output_config
@@ -730,17 +747,24 @@ def init_output_config(
 
 def _set_up_basic_sampling_config(
     output_type_config: schemas.al_output_type_configs, sampling_config: dict
-) -> dict | schemas.ArrayOutputSamplingConfig:
+) -> dict | schemas.ArrayOutputSamplingConfig | schemas.ImageOutputSamplingConfig:
     """
     Note that the sequence sampling config currently has it's own logic
     in output_config_setup_sequence.py.
     """
-    sampling_config_object: dict | schemas.ArrayOutputSamplingConfig
+    sampling_config_object: (
+        dict | schemas.ArrayOutputSamplingConfig | schemas.ImageOutputSamplingConfig
+    )
     match output_type_config:
         case schemas.ArrayOutputTypeConfig():
             sampling_config_object = schemas.ArrayOutputSamplingConfig(
                 **sampling_config
             )
+        case schemas.ImageOutputTypeConfig():
+            sampling_config_object = schemas.ImageOutputSamplingConfig(
+                **sampling_config
+            )
+
         case schemas.TabularOutputTypeConfig() | schemas.SequenceOutputTypeConfig():
             sampling_config_object = sampling_config
         case _:
@@ -753,12 +777,14 @@ def get_outputs_types_schema_map() -> Dict[
     str,
     Type[schemas.TabularOutputTypeConfig]
     | Type[schemas.SequenceOutputTypeConfig]
-    | Type[schemas.ArrayOutputTypeConfig],
+    | Type[schemas.ArrayOutputTypeConfig]
+    | Type[schemas.ImageOutputTypeConfig],
 ]:
     mapping = {
         "tabular": schemas.TabularOutputTypeConfig,
         "sequence": schemas.SequenceOutputTypeConfig,
         "array": schemas.ArrayOutputTypeConfig,
+        "image": schemas.ImageOutputTypeConfig,
     }
 
     return mapping
@@ -779,6 +805,7 @@ def get_output_module_config_class_map() -> (
         "tabular": TabularOutputModuleConfig,
         "sequence": SequenceOutputModuleConfig,
         "array": ArrayOutputModuleConfig,
+        "image": ArrayOutputModuleConfig,
     }
 
     return mapping
@@ -862,6 +889,10 @@ def get_output_config_type_init_callable_map() -> al_output_model_init_map:
             "lcl": LCLOutputModelConfig,
             "cnn": CNNUpscaleModelConfig,
         },
+        "image": {
+            "lcl": LCLOutputModelConfig,
+            "cnn": CNNUpscaleModelConfig,
+        },
     }
 
     return mapping
@@ -901,7 +932,7 @@ def get_all_tabular_targets(
 def _check_input_and_output_config_names(
     input_configs: Sequence[schemas.InputConfig],
     output_configs: Sequence[schemas.OutputConfig],
-    skip_keys: Sequence[str] = ("sequence",),
+    skip_keys: Sequence[str] = ("sequence", "array", "image"),
 ) -> None:
     """
     We allow for the same name to be used for sequence inputs and outputs,

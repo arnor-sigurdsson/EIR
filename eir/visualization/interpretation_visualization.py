@@ -132,7 +132,9 @@ def plot_top_gradients(
 
 
 def plot_snp_manhattan_plots(
-    df_snp_grads: pd.DataFrame, outfolder: Path, title_extra: str = ""
+    df_snp_grads: pd.DataFrame,
+    outfolder: Path,
+    title_extra: str = "",
 ):
     df_snp_grads_copy = df_snp_grads.copy()
 
@@ -318,10 +320,10 @@ def initialize_plot(
     color_list: List[str],
     figure_size: Tuple[int, int],
     dot_size: int,
-    alpha_value: int,
+    alpha_value: float,
 ) -> Tuple[List[str], List[int], Figure, Axes]:
-    x_labels = []
-    x_ticks = []
+    x_labels: List[str] = []
+    x_ticks: List[int] = []
     fig, ax = plt.subplots(figsize=figure_size)
 
     for i, (label, df1) in enumerate(df.groupby(chr_column_name)):
@@ -336,8 +338,8 @@ def initialize_plot(
         )
         df1_max_ind = df1["ind"].iloc[-1]
         df1_min_ind = df1["ind"].iloc[0]
-        x_labels.append(label)
-        x_ticks.append((df1_max_ind - (df1_max_ind - df1_min_ind) / 2))
+        x_labels.append(str(label))
+        x_ticks.append(int((df1_max_ind - (df1_max_ind - df1_min_ind) / 2)))
 
     return x_labels, x_ticks, fig, ax
 

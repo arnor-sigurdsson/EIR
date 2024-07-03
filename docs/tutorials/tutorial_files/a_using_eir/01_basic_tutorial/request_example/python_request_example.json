@@ -1,0 +1,16 @@
+{
+    "result": [
+        {
+            "ancestry_output": {
+                "Origin": {
+                    "Asia": 0.025698956102132797,
+                    "Eastern_Asia": 0.0031392008531838655,
+                    "Europe": 0.9096882343292236,
+                    "Latin_America_and_the_Caribbean": 0.005675802007317543,
+                    "Middle_East": 0.054381344467401505,
+                    "Sub-Saharan_Africa": 0.0014164539752528071
+                }
+            }
+        }
+    ]
+}

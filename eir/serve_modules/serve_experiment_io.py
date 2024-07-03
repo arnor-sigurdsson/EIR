@@ -2,8 +2,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Union
 
-from aislib.misc_utils import get_logger
-
 from eir.experiment_io.experiment_io import (
     LoadedTrainExperiment,
     load_serialized_train_experiment,
@@ -13,6 +11,7 @@ from eir.models.meta.meta import MetaModel
 from eir.serve_modules.serve_input_setup import set_up_inputs_for_serve
 from eir.setup.config import Configs
 from eir.setup.input_setup import al_input_objects_as_dict
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from eir.train import Hooks, al_output_objects_as_dict
@@ -81,7 +80,7 @@ def load_pytorch_eir_model_for_serve(
     device: str,
 ) -> model_setup.al_meta_model:
     func = model_setup.get_meta_model_class_and_kwargs_from_configs
-    fusion_model_class, fusion_model_kwargs = func(
+    meta_model_class, meta_model_kwargs = func(
         global_config=loaded_train_experiment.configs.global_config,
         fusion_config=loaded_train_experiment.configs.fusion_config,
         inputs_as_dict=inputs,
@@ -90,8 +89,8 @@ def load_pytorch_eir_model_for_serve(
 
     model = model_setup.load_model(
         model_path=Path(model_pt_path),
-        model_class=fusion_model_class,
-        model_init_kwargs=fusion_model_kwargs,
+        model_class=meta_model_class,
+        model_init_kwargs=meta_model_kwargs,
         device=device,
         test_mode=True,
         strict_shapes=True,

@@ -1,162 +1,154 @@
 [
     {
-        "request": {
-            "pets_tabular": {
-                "Type": "Cat",
-                "Name": "Nibble",
-                "Age": 1.0,
-                "Breed1": "Tabby",
-                "Breed2": "0",
-                "Gender": "Male",
-                "Color1": "Black",
-                "Color2": "White",
-                "Color3": "0",
-                "MaturitySize": "Small",
-                "FurLength": "Short",
-                "Vaccinated": "No",
-                "Dewormed": "No",
-                "Sterilized": "No",
-                "Health": "Healthy",
-                "Quantity": 1.0,
-                "Fee": "Free",
-                "State": "Selangor",
-                "VideoAmt": 0.0,
-                "PhotoAmt": 1.0
+        "request": [
+            {
+                "pets_tabular": {
+                    "Type": "Cat",
+                    "Name": "Nibble",
+                    "Age": 1.0,
+                    "Breed1": "Tabby",
+                    "Breed2": "0",
+                    "Gender": "Male",
+                    "Color1": "Black",
+                    "Color2": "White",
+                    "Color3": "0",
+                    "MaturitySize": "Small",
+                    "FurLength": "Short",
+                    "Vaccinated": "No",
+                    "Dewormed": "No",
+                    "Sterilized": "No",
+                    "Health": "Healthy",
+                    "Quantity": 1.0,
+                    "Fee": "Free",
+                    "State": "Selangor",
+                    "VideoAmt": 0.0,
+                    "PhotoAmt": 1.0
+                },
+                "pet_descriptions": "A super cute tabby cat!!!",
+                "cute_pet_images": "eir_tutorials/a_using_eir/07_multimodal_tutorial/data/images/86e1089a3.jpg"
             },
-            "pet_descriptions": "A super cute tabby cat!!!",
-            "cute_pet_images": "eir_tutorials/a_using_eir/07_multimodal_tutorial/data/images/86e1089a3.jpg"
-        },
+            {
+                "pets_tabular": {
+                    "Type": "Cat",
+                    "Name": "Nibble",
+                    "Age": 5.0,
+                    "Breed1": "Tabby",
+                    "Breed2": "0",
+                    "Gender": "Male",
+                    "Color1": "Black",
+                    "Color2": "White",
+                    "Color3": "0",
+                    "MaturitySize": "Small",
+                    "FurLength": "Short",
+                    "Vaccinated": "No",
+                    "Dewormed": "No",
+                    "Sterilized": "No",
+                    "Health": "Healthy",
+                    "Quantity": 1.0,
+                    "Fee": "Free",
+                    "State": "Selangor",
+                    "VideoAmt": 0.0,
+                    "PhotoAmt": 1.0
+                },
+                "pet_descriptions": "A super cute tabby cat!!!",
+                "cute_pet_images": "eir_tutorials/a_using_eir/07_multimodal_tutorial/data/images/86e1089a3.jpg"
+            },
+            {
+                "pets_tabular": {
+                    "Type": "Cat",
+                    "Name": "Nibble",
+                    "Age": 10.0,
+                    "Breed1": "Tabby",
+                    "Breed2": "0",
+                    "Gender": "Male",
+                    "Color1": "Black",
+                    "Color2": "White",
+                    "Color3": "0",
+                    "MaturitySize": "Small",
+                    "FurLength": "Short",
+                    "Vaccinated": "No",
+                    "Dewormed": "No",
+                    "Sterilized": "No",
+                    "Health": "Healthy",
+                    "Quantity": 1.0,
+                    "Fee": "Free",
+                    "State": "Selangor",
+                    "VideoAmt": 0.0,
+                    "PhotoAmt": 1.0
+                },
+                "pet_descriptions": "A super cute tabby cat!!!",
+                "cute_pet_images": "eir_tutorials/a_using_eir/07_multimodal_tutorial/data/images/86e1089a3.jpg"
+            },
+            {
+                "pets_tabular": {
+                    "Type": "Cat",
+                    "Name": "Nibble",
+                    "Age": 3000.0,
+                    "Breed1": "Tabby",
+                    "Breed2": "0",
+                    "Gender": "Male",
+                    "Color1": "Black",
+                    "Color2": "White",
+                    "Color3": "0",
+                    "MaturitySize": "Small",
+                    "FurLength": "Short",
+                    "Vaccinated": "No",
+                    "Dewormed": "No",
+                    "Sterilized": "No",
+                    "Health": "Healthy",
+                    "Quantity": 1.0,
+                    "Fee": "Free",
+                    "State": "Selangor",
+                    "VideoAmt": 0.0,
+                    "PhotoAmt": 1.0
+                },
+                "pet_descriptions": "A super cute tabby cat!!!",
+                "cute_pet_images": "eir_tutorials/a_using_eir/07_multimodal_tutorial/data/images/86e1089a3.jpg"
+            }
+        ],
         "response": {
-            "result": {
-                "pet_adoption": {
-                    "AdoptionSpeed": {
-                        "A: 0-7 Days": 0.5612660050392151,
-                        "B: 8-30 Days": 0.2135147899389267,
-                        "C: 31-90 Days": 0.10258349031209946,
-                        "D: 100+ Days": 0.12263575941324234
+            "result": [
+                {
+                    "pet_adoption": {
+                        "AdoptionSpeed": {
+                            "A: 0-7 Days": 0.2518094480037689,
+                            "B: 8-30 Days": 0.31764793395996094,
+                            "C: 31-90 Days": 0.25399652123451233,
+                            "D: 100+ Days": 0.17654603719711304
+                        }
+                    }
+                },
+                {
+                    "pet_adoption": {
+                        "AdoptionSpeed": {
+                            "A: 0-7 Days": 0.24980023503303528,
+                            "B: 8-30 Days": 0.31699708104133606,
+                            "C: 31-90 Days": 0.25447240471839905,
+                            "D: 100+ Days": 0.1787303239107132
+                        }
+                    }
+                },
+                {
+                    "pet_adoption": {
+                        "AdoptionSpeed": {
+                            "A: 0-7 Days": 0.24728940427303314,
+                            "B: 8-30 Days": 0.3161616325378418,
+                            "C: 31-90 Days": 0.25504863262176514,
+                            "D: 100+ Days": 0.18150033056735992
+                        }
+                    }
+                },
+                {
+                    "pet_adoption": {
+                        "AdoptionSpeed": {
+                            "A: 0-7 Days": 0.0077264439314603806,
+                            "B: 8-30 Days": 0.03268815577030182,
+                            "C: 31-90 Days": 0.08214958012104034,
+                            "D: 100+ Days": 0.8774358630180359
+                        }
                     }
                 }
-            }
-        }
-    },
-    {
-        "request": {
-            "pets_tabular": {
-                "Type": "Cat",
-                "Name": "Nibble",
-                "Age": 5.0,
-                "Breed1": "Tabby",
-                "Breed2": "0",
-                "Gender": "Male",
-                "Color1": "Black",
-                "Color2": "White",
-                "Color3": "0",
-                "MaturitySize": "Small",
-                "FurLength": "Short",
-                "Vaccinated": "No",
-                "Dewormed": "No",
-                "Sterilized": "No",
-                "Health": "Healthy",
-                "Quantity": 1.0,
-                "Fee": "Free",
-                "State": "Selangor",
-                "VideoAmt": 0.0,
-                "PhotoAmt": 1.0
-            },
-            "pet_descriptions": "A super cute tabby cat!!!",
-            "cute_pet_images": "eir_tutorials/a_using_eir/07_multimodal_tutorial/data/images/86e1089a3.jpg"
-        },
-        "response": {
-            "result": {
-                "pet_adoption": {
-                    "AdoptionSpeed": {
-                        "A: 0-7 Days": 0.5546148419380188,
-                        "B: 8-30 Days": 0.21321046352386475,
-                        "C: 31-90 Days": 0.10370028018951416,
-                        "D: 100+ Days": 0.12847435474395752
-                    }
-                }
-            }
-        }
-    },
-    {
-        "request": {
-            "pets_tabular": {
-                "Type": "Cat",
-                "Name": "Nibble",
-                "Age": 10.0,
-                "Breed1": "Tabby",
-                "Breed2": "0",
-                "Gender": "Male",
-                "Color1": "Black",
-                "Color2": "White",
-                "Color3": "0",
-                "MaturitySize": "Small",
-                "FurLength": "Short",
-                "Vaccinated": "No",
-                "Dewormed": "No",
-                "Sterilized": "No",
-                "Health": "Healthy",
-                "Quantity": 1.0,
-                "Fee": "Free",
-                "State": "Selangor",
-                "VideoAmt": 0.0,
-                "PhotoAmt": 1.0
-            },
-            "pet_descriptions": "A super cute tabby cat!!!",
-            "cute_pet_images": "eir_tutorials/a_using_eir/07_multimodal_tutorial/data/images/86e1089a3.jpg"
-        },
-        "response": {
-            "result": {
-                "pet_adoption": {
-                    "AdoptionSpeed": {
-                        "A: 0-7 Days": 0.5458986759185791,
-                        "B: 8-30 Days": 0.2128952294588089,
-                        "C: 31-90 Days": 0.10505900532007217,
-                        "D: 100+ Days": 0.13614711165428162
-                    }
-                }
-            }
-        }
-    },
-    {
-        "request": {
-            "pets_tabular": {
-                "Type": "Cat",
-                "Name": "Nibble",
-                "Age": 3000.0,
-                "Breed1": "Tabby",
-                "Breed2": "0",
-                "Gender": "Male",
-                "Color1": "Black",
-                "Color2": "White",
-                "Color3": "0",
-                "MaturitySize": "Small",
-                "FurLength": "Short",
-                "Vaccinated": "No",
-                "Dewormed": "No",
-                "Sterilized": "No",
-                "Health": "Healthy",
-                "Quantity": 1.0,
-                "Fee": "Free",
-                "State": "Selangor",
-                "VideoAmt": 0.0,
-                "PhotoAmt": 1.0
-            },
-            "pet_descriptions": "A super cute tabby cat!!!",
-            "cute_pet_images": "eir_tutorials/a_using_eir/07_multimodal_tutorial/data/images/86e1089a3.jpg"
-        },
-        "response": {
-            "result": {
-                "pet_adoption": {
-                    "AdoptionSpeed": {
-                        "A: 0-7 Days": 0.08935897797346115,
-                        "B: 8-30 Days": 0.12761463224887848,
-                        "C: 31-90 Days": 0.17728523910045624,
-                        "D: 100+ Days": 0.6057411432266235
-                    }
-                }
-            }
+            ]
         }
     }
 ]

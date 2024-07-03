@@ -69,6 +69,7 @@ def create_test_config_init_base(
         test_path=create_test_data.scoped_tmp_path,
         output_configs_dicts=injections.get("output_configs", {}),
         split_to_test=create_test_data.request_params.get("split_to_test", False),
+        source=create_test_data.source,
     )
 
     test_config = TestConfigInits(

@@ -1,14 +1,17 @@
 import argparse
 
+import torchtext
 import uvicorn
-from aislib.misc_utils import get_logger
 from fastapi import FastAPI
+
+torchtext.disable_torchtext_deprecation_warning()
 
 from eir.serve_modules.serve_api import create_info_endpoint, create_predict_endpoint
 from eir.serve_modules.serve_experiment_io import (
     ServeExperiment,
     load_experiment_for_serve,
 )
+from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 

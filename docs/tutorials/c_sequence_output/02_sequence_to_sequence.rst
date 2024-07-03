@@ -143,35 +143,28 @@ With the server running, we can now send requests for translating text from Span
 
 Here's an example Python function demonstrating this process:
 
-.. code-block:: python
+.. literalinclude:: ../tutorial_files/c_sequence_output/02_sequence_to_sequence/request_example/python_request_example_module.py
+    :language: python
+    :caption: request_example_module.py
 
-    import requests
+When running this, we get the following output:
 
-    def send_request(url: str, payload: dict):
-        response = requests.post(url, json=payload)
-        return response.json()
+.. literalinclude:: ../tutorial_files/c_sequence_output/02_sequence_to_sequence/request_example/python_request_example.json
+    :language: json
+    :caption: request_example.json
 
-    example_requests = [
-        {"english": "", "spanish": "Tengo mucho hambre"},
-        {"english": "", "spanish": "¿Por qué Tomás sigue en Boston?"},
-    ]
+Additionally, you can send requests using bash:
 
-    for payload in example_requests:
-        response = send_request('http://localhost:8000/predict', payload)
-        print(f"Spanish: {payload['spanish']}")
-        print(f"Translated to English: {response['english']}\n")
+.. literalinclude:: ../tutorial_files/c_sequence_output/02_sequence_to_sequence/request_example/bash_request_example_module.sh
+    :language: console
+    :caption: request_example_module.sh
 
-Additionally, you can send requests using `bash`:
+When running this, we get the following output:
 
-.. code-block:: bash
+.. literalinclude:: ../tutorial_files/c_sequence_output/02_sequence_to_sequence/request_example/bash_request_example.json
+    :language: json
+    :caption: request_example.json
 
-    curl -X 'POST' \\
-      'http://localhost:8000/predict' \\
-      -H 'accept: application/json' \\
-      -H 'Content-Type: application/json' \\
-      -d '{
-          "english": "", "spanish": "Tengo mucho hambre"
-      }'
 
 Analyzing Responses
 """""""""""""""""""

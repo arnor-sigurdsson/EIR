@@ -1,10 +1,13 @@
-from typing import Tuple
+from typing import Literal, Tuple
 
 import torch
-from aislib.misc_utils import get_logger
-from aislib.pytorch_modules import Swish
+from einops import rearrange
 from torch import nn
 from torchvision.ops import StochasticDepth
+
+from eir.models.layers.attention_layers import LinearAttention
+from eir.models.layers.norm_layers import GRN
+from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__)
 
@@ -22,7 +25,7 @@ class SEBlock(nn.Module):
             padding=0,
             bias=True,
         )
-        self.act_1 = Swish()
+        self.act_1 = nn.GELU()
 
         self.conv_up = nn.Conv2d(
             in_channels=reduced_channels,
@@ -54,43 +57,76 @@ class ConvAttentionBlock(nn.Module):
         width: int,
         num_heads: int = 4,
         dropout_p: float = 0.1,
-        num_layers: int = 2,
+        attention_mode: Literal["spatial", "channel"] = "spatial",
+        attention_type: Literal["full", "linear"] = "full",
     ):
         super().__init__()
         self.in_channels = channels
         self.out_channels = channels
         self.in_height = height
         self.in_width = width
+        self.attention_mode = attention_mode
+        self.attention_type = attention_type
 
-        self.embedding_dim = height * width
-        self.num_heads = _adjust_num_heads(
-            num_heads=num_heads, embedding_dim=self.embedding_dim
+        self.embedding_dim = channels if attention_mode == "spatial" else height * width
+        self.num_heads = adjust_num_heads(
+            num_heads=num_heads,
+            embedding_dim=self.embedding_dim,
         )
 
-        encoder_layer = nn.TransformerEncoderLayer(
-            d_model=self.embedding_dim,
-            nhead=self.num_heads,
-            dim_feedforward=self.embedding_dim * 4,
-            activation="gelu",
-            norm_first=True,
-            batch_first=True,
-            dropout=dropout_p,
-        )
+        self.attention: nn.MultiheadAttention | LinearAttention
+        if attention_type == "full":
+            self.attention = nn.MultiheadAttention(
+                embed_dim=self.embedding_dim,
+                num_heads=self.num_heads,
+                batch_first=True,
+                dropout=dropout_p,
+            )
+        elif attention_type == "linear":
+            self.attention = LinearAttention(
+                embed_dim=self.embedding_dim,
+                heads=self.num_heads,
+                dim_head=self.embedding_dim // self.num_heads,
+            )
 
-        self.encoder = nn.TransformerEncoder(
-            encoder_layer=encoder_layer,
-            num_layers=num_layers,
-            enable_nested_tensor=False,
-        )
+        self.norm = nn.LayerNorm(normalized_shape=self.embedding_dim)
+        self.grn = GRN(in_channels=channels)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        out = x.view(-1, self.in_channels, self.in_height * self.in_width)
-        out = self.encoder(out)
-        out = out.view(-1, self.in_channels, self.in_height, self.in_width)
-        return out
+        batch_size, channels, height, width = x.size()
+
+        if self.attention_type == "full":
+            if self.attention_mode == "spatial":
+                out = rearrange(x, "b c h w -> b (h w) c")
+            elif self.attention_mode == "channel":
+                out = rearrange(x, "b c h w -> b (h w) c").permute(0, 2, 1)
+            else:
+                raise ValueError()
+
+            attn_output, _ = self.attention(out, out, out)
+            out = self.norm(out + attn_output)
+
+            if self.attention_mode == "spatial":
+                out = rearrange(out, "b (h w) c -> b c h w", h=height, w=width)
+            elif self.attention_mode == "channel":
+                out = rearrange(out, "b c (h w) -> b c h w", h=height, w=width)
+            else:
+                raise ValueError()
+
+        elif self.attention_type == "linear":
+            assert self.attention_mode == "spatial"
+            attn_output = self.attention(x)
+            out = self.norm(x + attn_output)
+
+        else:
+            raise ValueError()
+
+        out = self.grn(out)
+
+        return x + out
 
 
-def _adjust_num_heads(num_heads: int, embedding_dim: int) -> int:
+def adjust_num_heads(num_heads: int, embedding_dim: int) -> int:
     while embedding_dim % num_heads != -0:
         num_heads -= 1
 
@@ -137,7 +173,18 @@ class CNNResidualBlockBase(nn.Module):
         self.stochastic_depth_p = stochastic_depth_p
 
         self.rb_do = nn.Dropout2d(rb_do)
-        self.act_1 = Swish()
+
+        self.conv_ds = nn.Conv2d(
+            in_channels=self.in_channels,
+            out_channels=self.in_channels,
+            kernel_size=3,
+            stride=1,
+            padding=1,
+            bias=True,
+            groups=in_channels,
+        )
+
+        self.act_1 = nn.GELU()
 
         self.norm_1 = nn.GroupNorm(num_groups=1, num_channels=in_channels)
         self.conv_1 = nn.Conv2d(
@@ -146,6 +193,7 @@ class CNNResidualBlockBase(nn.Module):
             kernel_size=(self.conv_1_kernel_h, self.conv_1_kernel_w),
             stride=(self.down_stride_h, self.down_stride_w),
             padding=(self.conv_1_padding_h, self.conv_1_padding_w),
+            dilation=(self.dilation_h, self.dilation_w),
             bias=True,
         )
 
@@ -156,6 +204,8 @@ class CNNResidualBlockBase(nn.Module):
         conv_2_kernel_w, conv_2_padding_w = _compute_conv_2_parameters(
             conv_1_kernel_size=conv_1_kernel_w, dilation=dilation_w
         )
+
+        self.grn = GRN(in_channels=out_channels)
 
         self.conv_2 = nn.Conv2d(
             in_channels=self.out_channels,
@@ -174,6 +224,7 @@ class CNNResidualBlockBase(nn.Module):
                 kernel_size=(self.conv_1_kernel_h, self.conv_1_kernel_w),
                 stride=(self.down_stride_h, self.down_stride_w),
                 padding=(self.conv_1_padding_h, self.conv_1_padding_w),
+                dilation=(self.dilation_h, self.dilation_w),
                 bias=True,
             )
         )
@@ -204,12 +255,15 @@ class FirstCNNBlock(CNNResidualBlockBase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        delattr(self, "conv_ds")
         delattr(self, "norm_1")
         delattr(self, "downsample_identity")
         delattr(self, "act_1")
+        delattr(self, "grn")
         delattr(self, "rb_do")
         delattr(self, "conv_2")
         delattr(self, "se_block")
+        delattr(self, "stochastic_depth")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         out = self.conv_1(x)
@@ -224,7 +278,10 @@ class CNNResidualBlock(CNNResidualBlockBase):
         self.full_preact = full_preact
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        out = self.norm_1(x)
+
+        out = self.conv_ds(x)
+
+        out = self.norm_1(out)
 
         if self.full_preact:
             identity = self.downsample_identity(out)
@@ -234,6 +291,7 @@ class CNNResidualBlock(CNNResidualBlockBase):
         out = self.conv_1(out)
 
         out = self.act_1(out)
+        out = self.grn(out)
         out = self.rb_do(out)
         out = self.conv_2(out)
 
@@ -245,3 +303,145 @@ class CNNResidualBlock(CNNResidualBlockBase):
         out = out + identity
 
         return out
+
+
+class DownSamplingResidualBlock(nn.Module):
+    def __init__(
+        self,
+        in_channels: int,
+        in_height: int,
+        in_width: int,
+    ):
+        super().__init__()
+
+        self.in_channels = in_channels
+        self.out_channels = in_channels
+        self.in_height = in_height
+        self.in_width = in_width
+
+        self.stride_h, self.stride_w = _compute_params_for_down_sampling(
+            cur_height=in_height,
+            cur_width=in_width,
+        )
+
+        self.norm_1 = nn.GroupNorm(num_groups=1, num_channels=in_channels)
+        self.act_1 = nn.GELU()
+
+        self.conv_1 = nn.Conv2d(
+            in_channels=self.in_channels,
+            out_channels=self.out_channels,
+            kernel_size=3,
+            stride=(self.stride_h, self.stride_w),
+            padding=1,
+            bias=True,
+        )
+
+        self.identity = nn.Conv2d(
+            in_channels=self.in_channels,
+            out_channels=self.out_channels,
+            kernel_size=3,
+            stride=(self.stride_h, self.stride_w),
+            padding=1,
+            bias=True,
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        identity = self.identity(x)
+
+        out = self.norm_1(x)
+        out = self.act_1(out)
+        out = self.conv_1(out)
+
+        out = out + identity
+
+        return out
+
+
+def _compute_params_for_down_sampling(
+    cur_height: int, cur_width: int
+) -> tuple[int, int]:
+
+    if cur_height == 1:
+        stride_h = 1
+    else:
+        stride_h = 2
+
+    if cur_width == 1:
+        stride_w = 1
+    else:
+        stride_w = 2
+
+    return stride_h, stride_w
+
+
+class UpSamplingResidualBlock(nn.Module):
+    def __init__(
+        self,
+        in_channels: int,
+        in_height: int,
+        in_width: int,
+        upsample_height: bool = True,
+        upsample_width: bool = True,
+    ):
+        super(UpSamplingResidualBlock, self).__init__()
+
+        self.in_channels = in_channels
+        self.out_channels = in_channels
+        self.in_height = in_height
+        self.in_width = in_width
+        self.upsample_height = upsample_height
+        self.upsample_width = upsample_width
+
+        self.stride_h, self.stride_w = _compute_params_for_up_sampling(
+            upsample_height=upsample_height,
+            upsample_width=upsample_width,
+        )
+
+        self.upsample = nn.Upsample(
+            scale_factor=(self.stride_h, self.stride_w),
+            mode="bilinear",
+            align_corners=True,
+        )
+
+        self.norm_1 = nn.GroupNorm(num_groups=1, num_channels=in_channels)
+        self.act_1 = nn.GELU()
+
+        self.conv_1 = nn.Conv2d(
+            in_channels=self.in_channels,
+            out_channels=self.out_channels,
+            kernel_size=3,
+            stride=1,
+            padding=1,
+            bias=True,
+        )
+
+        self.identity = nn.Conv2d(
+            in_channels=self.in_channels,
+            out_channels=self.out_channels,
+            kernel_size=1,
+            stride=1,
+            padding=0,
+            bias=True,
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        identity = self.upsample(x)
+        identity = self.identity(identity)
+
+        out = self.norm_1(x)
+        out = self.act_1(out)
+        out = self.upsample(out)
+        out = self.conv_1(out)
+
+        out = out + identity
+
+        return out
+
+
+def _compute_params_for_up_sampling(
+    upsample_height: bool,
+    upsample_width: bool,
+):
+    stride_h = 2 if upsample_height else 1
+    stride_w = 2 if upsample_width else 1
+    return stride_h, stride_w

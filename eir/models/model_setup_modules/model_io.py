@@ -99,9 +99,9 @@ def _load_model_weights(
             "Missing keys: \n%s\n"
             "Unexpected keys: \n%s\n"
             "This is expected if you are loading select modules from a saved model, "
-            "which means you can ignore this message. If you are loading a pre-trained"
-            " model as-is, then this is most likely an error and something unexpected"
-            "has changed between the pre-training and setting up the current model"
+            "which means you can ignore this message. If you are loading a pre-trained "
+            "model as-is, then this is most likely an error and something unexpected "
+            "has changed between the pre-training and setting up the current model "
             "from the pre-trained one.",
             model_state_dict_path,
             repr_object.repr(incompatible_keys.missing_keys),

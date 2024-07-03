@@ -123,44 +123,16 @@ With the server running, we can now send image-based requests for caption genera
 
 Here's an example Python function demonstrating this process:
 
-.. code-block:: python
+.. literalinclude:: ../tutorial_files/c_sequence_output/03_image_captioning/request_example/python_request_example_module.py
+    :language: python
+    :caption: request_example_module.py
 
-    import requests
-    import base64
-    from PIL import Image
-    from io import BytesIO
+When running this, we get the following output:
 
-    def encode_image_to_base64(file_path: str) -> str:
-        with Image.open(file_path) as image:
-            buffered = BytesIO()
-            image.save(buffered, format="JPEG")
-            return base64.b64encode(buffered.getvalue()).decode("utf-8")
+.. literalinclude:: ../tutorial_files/c_sequence_output/03_image_captioning/request_example/python_request_example.json
+    :language: json
+    :caption: request_example.json
 
-    def send_request(url: str, payload: dict):
-        response = requests.post(url, json=payload)
-        return response.json()
-
-    payload = {
-        "image_captioning": encode_image_to_base64("path/to/image.jpg"),
-        "captions": ""
-    }
-
-    response = send_request('http://localhost:8000/predict', payload)
-    print(response)
-
-Additionally, you can send requests using `bash`.
-Note that this requires preparing the base64-encoded image content in advance:
-
-.. code-block:: bash
-
-    curl -X 'POST' \\
-      'http://localhost:8000/predict' \\
-      -H 'accept: application/json' \\
-      -H 'Content-Type: application/json' \\
-      -d '{
-          "image_captioning": "[BASE64_ENCODED_IMAGE]",
-          "captions": ""
-      }'
 
 Analyzing Responses
 """""""""""""""""""

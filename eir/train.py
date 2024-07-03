@@ -3,6 +3,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Callable, List, Optional, Tuple, Union
 
 import torch
+import torchtext
+
+torchtext.disable_torchtext_deprecation_warning()
 import torch.multiprocessing
 
 torch.multiprocessing.set_sharing_strategy("file_system")
@@ -11,7 +14,6 @@ from ignite.engine import Engine
 from torch import nn
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader, DistributedSampler, WeightedRandomSampler
-from torch.utils.tensorboard import SummaryWriter
 
 from eir import __version__
 from eir.data_load import datasets
@@ -92,7 +94,6 @@ class Experiment:
     optimizer: Optimizer
     criteria: al_criteria_dict
     loss_function: Callable
-    writer: SummaryWriter
     metrics: "al_metric_record_dict"
     hooks: Hooks
 
@@ -177,12 +178,14 @@ def get_default_experiment(
         model=model,
         device=torch.device(configs.global_config.device),
     )
+    _log_model(
+        model=model,
+        structure_file=run_folder / "model_info.txt",
+    )
 
     criteria = get_criteria(
         outputs_as_dict=outputs_as_dict,
     )
-
-    writer = get_summary_writer(run_folder=run_folder)
 
     loss_func = get_loss_callable(
         criteria=criteria,
@@ -209,7 +212,6 @@ def get_default_experiment(
         optimizer=optimizer,
         criteria=criteria,
         loss_function=loss_func,
-        writer=writer,
         metrics=metrics,
         hooks=hooks,
     )
@@ -283,13 +285,6 @@ def check_dataset_and_batch_size_compatibility(
         )
 
 
-def get_summary_writer(run_folder: Path) -> SummaryWriter:
-    log_dir = Path(run_folder / "tensorboard_logs")
-    writer = SummaryWriter(log_dir=str(log_dir))
-
-    return writer
-
-
 def _log_model(
     model: nn.Module,
     structure_file: Optional[Path],
@@ -340,10 +335,6 @@ def run_experiment(experiment: Experiment) -> None:
     gc = experiment.configs.global_config
     run_folder = utils.get_run_folder(output_folder=gc.output_folder)
 
-    _log_model(
-        model=experiment.model,
-        structure_file=run_folder / "model_info.txt",
-    )
     _log_eir_version_info(outfile=get_version_file(run_folder=run_folder))
 
     keys_to_serialize = get_default_experiment_keys_to_serialize()

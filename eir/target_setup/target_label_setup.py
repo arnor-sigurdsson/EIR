@@ -2,10 +2,22 @@ import math
 import os
 import reprlib
 from dataclasses import dataclass
+from functools import partial
 from multiprocessing import Pool
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, Iterable, Optional, Sequence, Tuple, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Generator,
+    Iterable,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+)
 
+import numpy as np
 import pandas as pd
 import torch
 from tqdm import tqdm
@@ -249,20 +261,30 @@ def set_up_all_target_labels_wrapper(
 
     For array, we read what files are available on the disk, and flag the missing
     ones as torch.nan.
+
+    TODO:   There is some space inefficiency here, as for many output modalities,
+            when we concatenate the dataframes, we will have NaNs in the columns
+            that are not present in all output modalities.
+
+    Note:   We store the dtypes here as e.g. from int columns, concatenating will
+            create NaNs, which will convert the int columns to float.
     """
-    df_labels_train = pd.DataFrame(index=list(train_ids))
-    df_labels_valid = pd.DataFrame(index=list(valid_ids))
+    df_labels_train = pd.DataFrame()
+    df_labels_valid = pd.DataFrame()
     label_transformers = {}
 
     all_ids: set[str] = set(train_ids).union(set(valid_ids))
     per_modality_missing_ids: dict[str, set[str]] = {}
     within_modality_missing_ids: dict[str, dict[str, set[str]]] = {}
 
+    dtypes: dict[str, dict[str, Any]] = {}
+
     tabular_target_labels_info = get_tabular_target_file_infos(
         output_configs=output_configs
     )
 
     for output_config in output_configs:
+        output_source = output_config.output_info.output_source
         output_name = output_config.output_info.output_name
         output_type = output_config.output_info.output_type
 
@@ -315,7 +337,7 @@ def set_up_all_target_labels_wrapper(
 
                 per_modality_missing_ids[output_name] = missing_sequence_ids
 
-            case "array":
+            case "array" | "image":
                 cur_labels = set_up_file_target_labels(
                     train_ids=train_ids,
                     valid_ids=valid_ids,
@@ -329,6 +351,14 @@ def set_up_all_target_labels_wrapper(
                 )
                 per_modality_missing_ids[output_name] = cur_missing_ids
 
+                # this is needed as having missing modalities in deeplake
+                # will cause conversion of int64 deeplake pointers to float64
+                is_deeplake = is_deeplake_dataset(data_source=output_source)
+                if is_deeplake:
+                    dtypes[output_name] = {output_name: np.dtype("int64")}
+                else:
+                    dtypes[output_name] = {output_name: np.dtype("O")}
+
             case _:
                 raise ValueError(f"Unknown output type: '{output_type}'.")
 
@@ -337,6 +367,9 @@ def set_up_all_target_labels_wrapper(
 
         df_train_cur["Output Name"] = output_name
         df_valid_cur["Output Name"] = output_name
+
+        if output_name not in dtypes:
+            dtypes[output_name] = df_train_cur.dtypes.to_dict()
 
         df_labels_train = pd.concat((df_labels_train, df_train_cur))
         df_labels_valid = pd.concat((df_labels_valid, df_valid_cur))
@@ -347,10 +380,11 @@ def set_up_all_target_labels_wrapper(
     df_labels_train = df_labels_train.dropna(how="all")
     df_labels_valid = df_labels_valid.dropna(how="all")
 
+    dtypes = convert_dtypes(dtypes=dtypes)
     logger.debug("Converting train DF to dict.")
-    train_labels_dict = df_to_nested_dict(df=df_labels_train)
+    train_labels_dict = df_to_nested_dict(df=df_labels_train, dtypes=dtypes)
     logger.debug("Converting valid DF to dict.")
-    valid_labels_dict = df_to_nested_dict(df=df_labels_valid)
+    valid_labels_dict = df_to_nested_dict(df=df_labels_valid, dtypes=dtypes)
 
     output_and_target_names = get_all_output_and_target_names(
         output_configs=output_configs
@@ -418,11 +452,8 @@ def find_sequence_output_missing_ids(
     valid_ids: Sequence[str],
     output_source: str,
 ) -> set[str]:
-    if is_deeplake_dataset(data_source=output_source):
-        deeplake_ds = load_deeplake_dataset(data_source=output_source)
-        seq_ids = set(str(i) for i in deeplake_ds["ID"].numpy())
-    else:
-        seq_ids = set(gather_ids_from_data_source(data_source=Path(output_source)))
+
+    seq_ids = set(gather_ids_from_data_source(data_source=Path(output_source)))
 
     train_ids_set = set(train_ids)
     valid_ids_set = set(valid_ids)
@@ -445,10 +476,12 @@ def set_up_file_target_labels(
     """
     output_name = output_config.output_info.output_name
     output_source = output_config.output_info.output_source
+    output_name_inner_key = output_config.output_info.output_inner_key
 
     id_to_data_pointer_mapping = gather_data_pointers_from_data_source(
         data_source=Path(output_source),
         validate=True,
+        output_inner_key=output_name_inner_key,
     )
 
     train_ids_set = set(train_ids)
@@ -485,21 +518,48 @@ def gather_torch_nan_missing_ids(labels: pd.DataFrame, output_name: str) -> set[
     return missing_ids
 
 
+def convert_dtypes(dtypes: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    dtype_mapping = {
+        "int64": int,
+    }
+
+    converted_dtypes = {}
+    for output_name, inner_target_name in dtypes.items():
+        converted_columns = {}
+        for column_name, dtype in inner_target_name.items():
+            dtype_name = dtype.name
+            if dtype_name in dtype_mapping:
+                primitive_type = dtype_mapping[dtype_name]
+                converted_columns[column_name] = primitive_type
+        converted_dtypes[output_name] = converted_columns
+
+    return converted_dtypes
+
+
 def gather_data_pointers_from_data_source(
     data_source: Path,
     validate: bool = True,
+    output_inner_key: Optional[str] = None,
 ) -> dict[str, Path | int]:
     """
     Disk: ID -> file path
     Deeplake: ID -> integer index
     """
+    iterator: (
+        Generator[tuple[str, Path], None, None] | Generator[tuple[str, int], None, None]
+    )
     if is_deeplake_dataset(data_source=str(data_source)):
-        deeplake_ds = load_deeplake_dataset(data_source=str(data_source))
-        iterator = (sample.numpy().item() for sample in deeplake_ds["ID"])
-        iterator = ((str(i), index) for i, index in enumerate(iterator))
+        assert output_inner_key is not None
+        iterator = build_deeplake_available_pointer_iterator(
+            data_source=data_source,
+            inner_key=output_inner_key,
+        )
     else:
-        iterator = get_file_path_iterator(data_source=data_source, validate=validate)
-        iterator = ((f.stem, f) for f in iterator)
+        iterator_base = get_file_path_iterator(
+            data_source=data_source,
+            validate=validate,
+        )
+        iterator = ((f.stem, f) for f in iterator_base)
 
     logger.debug("Gathering data pointers from %s.", data_source)
     id_to_pointer_mapping = {}
@@ -512,7 +572,27 @@ def gather_data_pointers_from_data_source(
     return id_to_pointer_mapping
 
 
-def df_to_nested_dict(df: pd.DataFrame, num_processes: int = -1) -> Dict:
+def build_deeplake_available_pointer_iterator(
+    data_source: Path, inner_key: str
+) -> Generator[tuple[str, int], None, None]:
+    deeplake_ds = load_deeplake_dataset(data_source=str(data_source))
+    for int_pointer, sample in enumerate(deeplake_ds):
+        inner_key_tensor = sample[inner_key]
+        is_empty = inner_key_tensor.size == 0
+
+        if is_empty:
+            continue
+
+        id_ = sample["ID"].numpy().item()
+
+        yield id_, int(int_pointer)
+
+
+def df_to_nested_dict(
+    df: pd.DataFrame,
+    dtypes: dict[str, dict[str, Any]],
+    num_processes: int = -1,
+) -> Dict:
     """
     Convert a DataFrame with a 2-level multi index ['ID', 'Output Name']
     to a nested dict.
@@ -551,25 +631,33 @@ def df_to_nested_dict(df: pd.DataFrame, num_processes: int = -1) -> Dict:
         end: int = i + chunk_size
         chunks.append(df.iloc[start:end])
 
+    process_func = partial(_process_chunk, dtypes=dtypes)
     with Pool(num_processes) as pool:
-        dicts = pool.map(_process_chunk, chunks)
+        dicts = pool.map(process_func, chunks)
     return _merge_dicts(dicts)
 
 
 def _process_chunk(
     chunk: pd.DataFrame,
+    dtypes: dict[str, dict[str, Any]],
 ) -> Dict[str, Dict[str, Dict[str, float | int | str]]]:
     nested_dict: Dict[str, Dict[str, Dict[str, float | int | str]]] = {}
     for row in chunk.itertuples(index=True, name="Row"):
         # Tuple of (ID, Output Name)
         multi_index = row.Index
+        assert isinstance(multi_index, tuple)
+        assert len(multi_index) == 2
         cur_id, cur_output_name = multi_index
+        cur_output_dtypes = dtypes[cur_output_name]
 
         row_dict = {}
         # Skip the first element as it's the multi-index
         name_value_iter = zip(chunk.columns, row[1:])
         for column_name, value in name_value_iter:
             if pd.notna(value):
+                dtype = cur_output_dtypes.get(column_name, None)
+                if dtype:
+                    value = dtype(value)
                 row_dict[column_name] = value
 
         if cur_id not in nested_dict:

@@ -17,7 +17,7 @@ from eir.setup.output_setup import al_output_objects_as_dict
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
-    from eir.models.meta.meta import al_input_modules
+    from eir.models.meta.meta_utils import al_input_modules
 
 logger = get_logger(name=__name__)
 

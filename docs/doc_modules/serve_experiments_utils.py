@@ -8,8 +8,9 @@ from typing import Any
 
 import numpy as np
 import requests
-from aislib.misc_utils import get_logger
-from torchvision.datasets.folder import default_loader
+
+from eir.setup.input_setup_modules.setup_image import default_image_loader
+from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__)
 
@@ -33,14 +34,14 @@ def load_data_for_serve(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def _serialize_image_to_base64(file_path: str) -> str:
-    image = default_loader(path=file_path)
+    image = default_image_loader(path=file_path)
     buffered = BytesIO()
     image_format = "JPEG" if file_path.lower().endswith((".jpg", ".jpeg")) else "PNG"
     image.save(buffered, format=image_format)
     return base64.b64encode(buffered.getvalue()).decode("utf-8")
 
 
-def send_request(url: str, payload: dict) -> dict:
+def send_request(url: str, payload: list[dict]) -> dict:
     try:
         response = requests.post(url, json=payload)
         response.raise_for_status()

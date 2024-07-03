@@ -19,7 +19,6 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import torch
-from aislib.misc_utils import get_logger
 from captum._utils.common import (
     _expand_additional_forward_args,
     _expand_target,
@@ -34,6 +33,7 @@ from scipy.stats import bootstrap
 from torch import Tensor
 
 from eir.setup import schemas
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from eir.data_load.label_setup import al_label_transformers_object
@@ -336,3 +336,28 @@ class MyIntegratedGradients(IntegratedGradients):
                 for total_grad, input, baseline in zip(total_grads, inputs, baselines)
             )
         return attributions
+
+
+def get_long_format_attribution_df(
+    parsed_attributions: dict[str, list[float]]
+) -> pd.DataFrame:
+    if not isinstance(parsed_attributions, dict):
+        raise TypeError("Input must be a dictionary")
+
+    if not parsed_attributions:
+        return pd.DataFrame(columns=["Input", "Attribution"])
+
+    series_dict: dict[str, pd.Series] = {}
+    for k, v in parsed_attributions.items():
+        if not isinstance(v, list):
+            raise ValueError(f"Value for key '{k}' must be a list")
+        if not all(isinstance(x, (int, float, np.float32, np.float64)) for x in v):
+            raise ValueError(f"All values in list {v} for key '{k}' must be numbers")
+        series_dict[k] = pd.Series(v)
+
+    df: pd.DataFrame = pd.concat(series_dict)
+    df = df.reset_index(level=0).reset_index(drop=True)
+
+    df = df.rename(columns={df.columns[0]: "Input", df.columns[1]: "Attribution"})
+
+    return df

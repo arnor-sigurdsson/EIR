@@ -207,6 +207,7 @@ class ArrayWrapperModel(nn.Module):
         self.pre_normalization = get_pre_normalization_layer(
             normalization=normalization, data_dimensions=self.data_dimensions
         )
+        self.output_shape = self.feature_extractor.output_shape
 
     @property
     def num_out_features(self):

@@ -1,0 +1,14 @@
+input_info:
+  input_source: eir_tutorials/e_pretraining/02_mini_foundation/data/image_captioning/captions.csv
+  input_name: text
+  input_type: sequence
+
+input_type_info:
+  max_length: 128
+  split_on: ""
+  sampling_strategy_if_longer: "uniform"
+  vocab_file: eir_tutorials/e_pretraining/02_mini_foundation/data/vocab.txt
+  modality_dropout_rate: 0.1
+
+model_config:
+  embedding_dim: 64

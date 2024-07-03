@@ -4,7 +4,7 @@ memory_dataset: true
 checkpoint_interval: 200
 sample_interval: 200
 n_epochs: 25
-device: "cpu"
+device: "mps"
 lr: 5.0e-04
 optimizer: adamw
 gradient_clipping: 1.0

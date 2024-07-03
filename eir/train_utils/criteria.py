@@ -6,6 +6,7 @@ from torch import nn
 
 from eir.setup import schemas
 from eir.setup.output_setup_modules.array_output_setup import ComputedArrayOutputInfo
+from eir.setup.output_setup_modules.image_output_setup import ComputedImageOutputInfo
 from eir.setup.output_setup_modules.sequence_output_setup import (
     ComputedSequenceOutputInfo,
 )
@@ -93,7 +94,7 @@ def get_criteria(outputs_as_dict: "al_output_objects_as_dict") -> al_criteria_di
 
                 criteria_dict[output_name][output_name] = criterion
 
-            case ComputedArrayOutputInfo():
+            case ComputedArrayOutputInfo() | ComputedImageOutputInfo():
                 criterion = partial(_calc_con_loss, loss_func=nn.MSELoss())
                 criteria_dict[output_name][output_name] = criterion
 
@@ -169,7 +170,11 @@ def _get_label_smoothing(
             raise ValueError(f"Unknown column type: {column_type}")
 
 
-def _calc_con_loss(input: torch.Tensor, target: torch.Tensor, loss_func: al_con_losses):
+def _calc_con_loss(
+    input: torch.Tensor,
+    target: torch.Tensor,
+    loss_func: al_con_losses,
+) -> torch.Tensor:
     match loss_func:
         case nn.PoissonNLLLoss():
             return loss_func(log_input=input.squeeze(), target=target.squeeze())

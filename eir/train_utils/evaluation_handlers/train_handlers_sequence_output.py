@@ -1,13 +1,21 @@
+import json
 from copy import copy
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, Generator, Iterator, Sequence, Tuple, Union
 
 import torch
 import torch.nn.functional as F
+import torchtext
 from aislib.misc_utils import ensure_path_exists
 from torch.utils.data import Dataset
+from torch.utils.data._utils.collate import default_collate
+
+torchtext.disable_torchtext_deprecation_warning()
 from torchtext.vocab import Vocab
 
+from eir.data_load.data_preparation_modules.imputation import (
+    impute_missing_modalities_wrapper,
+)
 from eir.data_load.datasets import al_getitem_return
 from eir.models.model_training_utils import predict_on_batch
 from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
@@ -20,10 +28,12 @@ from eir.setup.schema_modules.output_schemas_sequence import (
 from eir.setup.schemas import OutputConfig, SequenceOutputTypeConfig
 from eir.train_utils import utils
 from eir.train_utils.evaluation_handlers.evaluation_handlers_utils import (
+    SpecialTokens,
     convert_model_inputs_to_raw,
     decode_tokens,
     extract_input_types,
     general_pre_process_prepared_inputs,
+    get_batch_generator,
     get_dataset_loader_single_sample_generator,
     get_special_tokens,
     post_prepare_manual_inputs,
@@ -63,6 +73,9 @@ def sequence_out_single_sample_evaluation_wrapper(
     iteration: int,
     output_folder: str,
 ) -> None:
+
+    gc = experiment.configs.global_config
+
     default_eir_hooks = experiment.hooks
     assert default_eir_hooks is not None
 
@@ -72,7 +85,8 @@ def sequence_out_single_sample_evaluation_wrapper(
         return
 
     manual_samples = get_sequence_output_manual_input_samples(
-        output_configs=output_configs, input_objects=input_objects
+        output_configs=output_configs,
+        input_objects=input_objects,
     )
 
     auto_validation_generator = get_dataset_loader_single_sample_generator(
@@ -83,8 +97,9 @@ def sequence_out_single_sample_evaluation_wrapper(
         input_objects=input_objects,
         eval_sample_iterator=auto_validation_generator,
     )
-    eval_samples = SequenceOutputEvalSamples(
-        auto_samples=auto_samples, manual_samples=manual_samples
+    eval_samples_base = SequenceOutputEvalSamples(
+        auto_samples=auto_samples,
+        manual_samples=manual_samples,
     )
 
     for config in output_configs:
@@ -94,8 +109,8 @@ def sequence_out_single_sample_evaluation_wrapper(
         cur_input_name = config.output_info.output_name
         cur_output_name = config.output_info.output_name
 
-        not_in_manual_samples = cur_output_name not in eval_samples.manual_samples
-        not_in_auto_samples = cur_output_name not in eval_samples.auto_samples
+        not_in_manual_samples = cur_output_name not in eval_samples_base.manual_samples
+        not_in_auto_samples = cur_output_name not in eval_samples_base.auto_samples
         if not_in_manual_samples and not_in_auto_samples:
             continue
 
@@ -113,14 +128,26 @@ def sequence_out_single_sample_evaluation_wrapper(
 
         if output_type_info.sequence_operation == "autoregressive":
             sample_generator = _get_eval_sample_generator(
-                eval_samples=eval_samples, output_name=cur_output_name
+                eval_samples=eval_samples_base,
+                output_name=cur_output_name,
             )
+
+            batch_generator = get_batch_generator(
+                iterator=enumerate(sample_generator),
+                batch_size=gc.batch_size,
+            )
+
             assert isinstance(config.sampling_config, SequenceOutputSamplingConfig)
 
-            for idx, (eval_type, eval_sample) in enumerate(sample_generator):
-                generated_tokens = autoregressive_sequence_generation(
+            meta = {}
+
+            for batch in batch_generator:
+                batch_indices, batch_eval_data = zip(*batch)
+                batch_eval_types, batch_eval_samples = zip(*batch_eval_data)
+
+                batch_generated_tokens = autoregressive_sequence_generation(
                     input_objects=input_objects,
-                    eval_sample=eval_sample,
+                    eval_samples=batch_eval_samples,
                     seq_output_name=cur_output_name,
                     experiment=experiment,
                     default_eir_hooks=default_eir_hooks,
@@ -131,40 +158,60 @@ def sequence_out_single_sample_evaluation_wrapper(
                 assert isinstance(cur_input_object, ComputedSequenceInputInfo)
                 assert cur_input_object.tokenizer is not None
 
-                generated_sample = decode_tokens(
-                    tokens=generated_tokens,
-                    vocab=cur_input_object.vocab,
-                    split_on=output_type_info.split_on,
-                )
-                special_tokens = get_special_tokens(
-                    tokenizer=cur_input_object.tokenizer,
-                    vocab=cur_input_object.vocab,
-                )
-                generated_sample = remove_special_tokens_from_string(
-                    string=generated_sample,
-                    special_tokens=special_tokens,
-                )
+                for eval_type, idx, eval_sample, generated_tokens in zip(
+                    batch_eval_types,
+                    batch_indices,
+                    batch_eval_samples,
+                    batch_generated_tokens,
+                ):
 
-                cur_output_path = (
-                    cur_sample_output_folder / eval_type / f"{idx}_generated.txt"
-                )
-                ensure_path_exists(path=cur_output_path)
-                cur_output_path.write_text(data=generated_sample)
+                    generated_sample = decode_tokens(
+                        tokens=generated_tokens,
+                        vocab=cur_input_object.vocab,
+                        split_on=output_type_info.split_on,
+                    )
+                    special_tokens = get_special_tokens(
+                        tokenizer=cur_input_object.tokenizer,
+                        vocab=cur_input_object.vocab,
+                    )
+                    generated_sample = remove_special_tokens_from_string(
+                        string=generated_sample,
+                        special_tokens=special_tokens,
+                    )
 
-                cur_inputs_output_path = (
-                    cur_sample_output_folder / eval_type / f"{idx}_inputs"
-                )
+                    cur_output_path = (
+                        cur_sample_output_folder / eval_type / f"{idx}_generated.txt"
+                    )
+                    ensure_path_exists(path=cur_output_path)
+                    cur_output_path.write_text(data=generated_sample)
 
-                raw_inputs = convert_model_inputs_to_raw(
-                    inputs_to_model=eval_sample.inputs_to_model,
-                    input_objects=input_objects,
-                )
+                    cur_inputs_output_path = (
+                        cur_sample_output_folder / eval_type / f"{idx}_inputs"
+                    )
 
-                serialize_raw_inputs(
-                    raw_inputs=raw_inputs,
-                    input_objects=input_objects,
-                    output_path=cur_inputs_output_path,
-                )
+                    raw_inputs = convert_model_inputs_to_raw(
+                        inputs_to_model=eval_sample.inputs_to_model,
+                        input_objects=input_objects,
+                    )
+
+                    serialize_raw_inputs(
+                        raw_inputs=raw_inputs,
+                        input_objects=input_objects,
+                        output_path=cur_inputs_output_path,
+                    )
+
+                    cur_id = eval_sample.sample_id
+                    meta[cur_id] = {
+                        "generated": str(cur_output_path.relative_to(output_folder)),
+                        "inputs": str(
+                            cur_inputs_output_path.relative_to(output_folder)
+                        ),
+                        "index": idx,
+                    }
+
+                meta_path = cur_sample_output_folder / "meta.json"
+                with open(meta_path, "w") as f:
+                    json.dump(meta, f, indent=4)
 
 
 def get_sequence_output_manual_input_samples(
@@ -190,8 +237,13 @@ def get_sequence_output_manual_input_samples(
                 input_objects=input_objects,
             )
 
+            imputed_inputs = impute_missing_modalities_wrapper(
+                inputs_values=prepared_inputs,
+                inputs_objects=input_objects,
+            )
+
             final_inputs = post_prepare_manual_inputs(
-                prepared_inputs=prepared_inputs,
+                prepared_inputs=imputed_inputs,
                 output_name=output_name,
                 input_objects=input_objects,
             )
@@ -237,7 +289,7 @@ def get_sequence_output_auto_validation_samples(
             cur_eval_sample = SequenceOutputEvalSample(
                 inputs_to_model=cur_inputs_masked,
                 target_labels=target_labels,
-                sample_id=cur_id,
+                sample_id=cur_id[0],
             )
 
             prepared_eval_samples[output_name].append(cur_eval_sample)
@@ -255,7 +307,7 @@ def _mask_targets_for_auto_eval_generation(
     for input_name, raw_input in inputs.items():
         if input_name == output_name:
             if input_types[input_name] == "sequence":
-                raw_inputs_masked[output_name] = torch.tensor([[]], dtype=torch.long)
+                raw_inputs_masked[output_name] = torch.tensor([], dtype=torch.long)
             else:
                 raise NotImplementedError()
 
@@ -281,12 +333,12 @@ def _get_eval_sample_generator(
 @torch.inference_mode()
 def autoregressive_sequence_generation(
     input_objects: "al_input_objects_as_dict",
-    eval_sample: SequenceOutputEvalSample,
+    eval_samples: tuple[SequenceOutputEvalSample, ...],
     seq_output_name: str,
     experiment: Union["Experiment", "PredictExperiment", "ServeExperiment"],
     default_eir_hooks: Union["Hooks", "PredictHooks"],
     sampling_config: SequenceOutputSamplingConfig,
-) -> list[int]:
+) -> list[list[int]]:
     """
     Note that it's currently a bit weird / perhaps suboptimal how we are dealing
     with the input data here. While normally one could have the final, prepared
@@ -298,6 +350,7 @@ def autoregressive_sequence_generation(
     """
     output_object = experiment.outputs[seq_output_name]
     input_object = input_objects[seq_output_name]
+    max_length = sampling_config.generated_sequence_length
 
     assert isinstance(output_object, ComputedSequenceOutputInfo)
     assert isinstance(input_object, ComputedSequenceInputInfo)
@@ -313,38 +366,49 @@ def autoregressive_sequence_generation(
         vocab=output_object.vocab,
     )
 
-    prepared_sample_inputs = prepare_base_input(
-        prepared_inputs=eval_sample.inputs_to_model,
-    )
-
-    generated_tokens_base = _extract_base_generated_tokens(
-        prepared_inputs=prepared_sample_inputs,
+    autoregressive_pre_batch = prepare_autoregressive_sampling_batch(
+        eval_samples=eval_samples,
         seq_output_name=seq_output_name,
+        special_tokens=st,
     )
+    prepared_sample_inputs = autoregressive_pre_batch.prepared_inputs
+    prepared_targets = autoregressive_pre_batch.prepared_targets
+    generated_tokens = autoregressive_pre_batch.generated_tokens
+    indices = autoregressive_pre_batch.indices
 
-    generated_tokens = _ensure_no_extra_padding(
-        tokens=generated_tokens_base,
-        pad_idx=st.pad_idx,
-    )
+    indices_has_finished = {}
+    for i in range(0, sampling_config.generated_sequence_length):
 
-    for i in range(len(generated_tokens), sampling_config.generated_sequence_length):
-        prepared_sample_inputs = _prepare_current_autoregressive_input(
-            prepared_sample_inputs=prepared_sample_inputs,
-            generated_tokens=generated_tokens,
-            seq_output_name=seq_output_name,
-            max_length=output_object.computed_max_length,
-            pad_idx=st.pad_idx,
-        )
+        target_indices = []
+        for sample_index, _ in enumerate(eval_samples):
+            cur_generated_tokens = generated_tokens[sample_index]
 
-        target_index = _compute_target_index(
-            current_generated_length=i,
-            max_length=output_object.computed_max_length,
-        )
+            cur_prepared_sample_inputs = prepared_sample_inputs[sample_index]
+            cur_prepared_sample_inputs = _prepare_current_autoregressive_input(
+                prepared_sample_inputs=cur_prepared_sample_inputs,
+                generated_tokens=cur_generated_tokens,
+                seq_output_name=seq_output_name,
+                max_length=output_object.computed_max_length,
+                pad_idx=st.pad_idx,
+            )
+
+            cur_target_index = _compute_target_index(
+                current_generated_length=indices[sample_index],
+                max_length=output_object.computed_max_length,
+            )
+
+            target_indices.append(cur_target_index)
+            prepared_sample_inputs[sample_index] = cur_prepared_sample_inputs
+            indices[sample_index] += 1
+
+        all_inputs = default_collate(prepared_sample_inputs)
+        all_targets = default_collate(prepared_targets)
+        all_ids = [eval_sample.sample_id for eval_sample in eval_samples]
 
         batch = general_pre_process_prepared_inputs(
-            prepared_inputs=prepared_sample_inputs,
-            target_labels=eval_sample.target_labels,
-            sample_id=eval_sample.sample_id,
+            prepared_inputs=all_inputs,
+            target_labels=all_targets,
+            sample_ids=all_ids,
             experiment=experiment,
             custom_hooks=default_eir_hooks,
         )
@@ -354,19 +418,74 @@ def autoregressive_sequence_generation(
             inputs=batch.inputs,
         )
 
-        next_token_index = sample_next_token_index_from_output(
+        next_token_indices = sample_next_token_index_from_output(
             outputs=outputs,
             seq_output_name=seq_output_name,
             sampling_config=sampling_config,
-            current_target_index=target_index,
+            current_target_indices=target_indices,
         )
 
-        if next_token_index == st.eos_idx:
-            break
+        for sample_index, _ in enumerate(eval_samples):
+            if sample_index in indices_has_finished:
+                continue
 
-        generated_tokens.append(next_token_index)
+            next_token_index = next_token_indices[sample_index]
+
+            is_eos = next_token_index == st.eos_idx
+            is_at_max_length = indices[sample_index] == max_length
+
+            if is_eos or is_at_max_length:
+                indices_has_finished[sample_index] = True
+                continue
+
+            generated_tokens[sample_index].append(next_token_index)
 
     return generated_tokens
+
+
+@dataclass(frozen=False)
+class AutoRegressiveSamplingBatch:
+    prepared_inputs: list[dict[str, torch.Tensor]]
+    prepared_targets: list[dict[str, torch.Tensor]]
+    indices: list[int]
+    generated_tokens: list[list[int]]
+
+
+def prepare_autoregressive_sampling_batch(
+    eval_samples: Sequence[SequenceOutputEvalSample],
+    seq_output_name: str,
+    special_tokens: SpecialTokens,
+) -> AutoRegressiveSamplingBatch:
+    prepared_sample_inputs = []
+    prepared_targets = []
+    generated_tokens = []
+    indices = []
+
+    for eval_sample in eval_samples:
+        cur_inputs = eval_sample.inputs_to_model
+        cur_prepared = prepare_base_input(prepared_inputs=cur_inputs)
+        prepared_sample_inputs.append(cur_prepared)
+        prepared_targets.append(eval_sample.target_labels)
+
+        cur_generated_tokens_base = _extract_base_generated_tokens(
+            prepared_inputs=cur_prepared,
+            seq_output_name=seq_output_name,
+        )
+
+        cur_generated_tokens = _ensure_no_extra_padding(
+            tokens=cur_generated_tokens_base,
+            pad_idx=special_tokens.pad_idx,
+        )
+
+        generated_tokens.append(cur_generated_tokens)
+        indices.append(len(cur_generated_tokens))
+
+    return AutoRegressiveSamplingBatch(
+        prepared_inputs=prepared_sample_inputs,
+        prepared_targets=prepared_targets,
+        indices=indices,
+        generated_tokens=generated_tokens,
+    )
 
 
 def _check_vocab_consistency(
@@ -377,16 +496,18 @@ def _check_vocab_consistency(
 
 
 def _extract_base_generated_tokens(
-    prepared_inputs: Dict[str, torch.Tensor], seq_output_name: str
+    prepared_inputs: Dict[str, torch.Tensor],
+    seq_output_name: str,
 ) -> list[int]:
     """
     Note that we are expecting / enforcing the token IDs being passed in here,
     not the embeddings.
     """
     tensor_base = prepared_inputs[seq_output_name]
-    assert tensor_base.dim() == 2, tensor_base.dim()
 
-    list_base = tensor_base.squeeze(0).tolist()
+    assert tensor_base.dim() == 1, (tensor_base, tensor_base.dim())
+
+    list_base = tensor_base.tolist()
     assert isinstance(list_base, list)
 
     return list_base
@@ -435,6 +556,11 @@ def _prepare_current_autoregressive_input(
     as it inserts the bos at the beginning and cuts off at the end, so in the case
     where the sequence is already at max_length, we need to pad it to make sure
     that the latest token is preserved.
+
+    The reason for padding with the BOS token is that the tensor we get here
+    is already at max_length. If we had e.g. a full, long sequence, we could
+    simply slice that directly (+1 for the target), but here we need to pad
+    the input at the beginning, opting for a BOS token.
     """
     current_sequence = torch.tensor(generated_tokens, dtype=torch.long)
     current_sequence = _maybe_truncate_autoregressive_sequence(
@@ -448,9 +574,7 @@ def _prepare_current_autoregressive_input(
     assert pad_size >= 1, pad_size
 
     current_sequence = F.pad(current_sequence, (0, pad_size), value=pad_idx)
-    current_sequence = current_sequence.unsqueeze(0)
-
-    assert current_sequence.dim() == 2, current_sequence.shape
+    assert current_sequence.dim() == 1, current_sequence.shape
 
     current_inputs_copy = copy(prepared_sample_inputs)
     current_inputs_copy[seq_output_name] = current_sequence
@@ -480,10 +604,11 @@ def sample_next_token_index_from_output(
     outputs: dict[str, dict[str, torch.Tensor]],
     seq_output_name: str,
     sampling_config: SequenceOutputSamplingConfig,
-    current_target_index: int,
-) -> int:
-    cur_logits = outputs[seq_output_name][seq_output_name].squeeze()
-    cur_position_logits = cur_logits[current_target_index]
+    current_target_indices: list[int],
+) -> list[int]:
+    cur_logits = outputs[seq_output_name][seq_output_name]
+    batch_indices = torch.arange(cur_logits.size(0))
+    cur_position_logits = cur_logits[batch_indices, current_target_indices, :]
 
     filtered_logits = top_k_top_p_filtering(
         logits=cur_position_logits,
@@ -491,9 +616,10 @@ def sample_next_token_index_from_output(
         top_p=sampling_config.top_p,
     )
     probabilities = F.softmax(input=filtered_logits, dim=-1)
-    next_token_index = torch.multinomial(input=probabilities, num_samples=1).item()
+    next_token_indices = torch.multinomial(input=probabilities, num_samples=1)
+    next_token_indices_list = next_token_indices.squeeze(1).tolist()
 
-    return int(next_token_index)
+    return next_token_indices_list
 
 
 def top_k_top_p_filtering(
@@ -502,7 +628,12 @@ def top_k_top_p_filtering(
     top_p: float = 0.0,
     filter_value: float = -float("Inf"),
 ) -> torch.Tensor:
-    assert logits.dim() == 1
+    assert (
+        logits.dim() == 2
+    ), f"Expected 2D tensor (batch, vocab_scores). Got: {logits.dim()}D."
+
+    batch_size, vocab_size = logits.size()
+
     top_k = min(top_k, logits.size(-1))
     if top_k > 0:
         indices_to_remove = logits < torch.topk(logits, top_k)[0][..., -1, None]
@@ -516,7 +647,8 @@ def top_k_top_p_filtering(
         sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
         sorted_indices_to_remove[..., 0] = 0
 
-        indices_to_remove = sorted_indices[sorted_indices_to_remove]
-        logits[indices_to_remove] = filter_value
+        for i in range(batch_size):
+            indices_to_remove = sorted_indices[i, sorted_indices_to_remove[i]]
+            logits[i, indices_to_remove] = filter_value
 
     return logits

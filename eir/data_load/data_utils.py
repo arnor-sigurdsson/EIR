@@ -15,6 +15,7 @@ from torch.utils.data import DistributedSampler, WeightedRandomSampler
 
 from eir.data_load.data_loading_funcs import get_weighted_random_sampler
 from eir.setup.output_setup_modules.array_output_setup import ComputedArrayOutputInfo
+from eir.setup.output_setup_modules.image_output_setup import ComputedImageOutputInfo
 from eir.setup.output_setup_modules.sequence_output_setup import (
     ComputedSequenceOutputInfo,
 )
@@ -38,7 +39,11 @@ def get_output_info_generator(
                 for column_type, list_of_cols_of_this_type in target_columns.items():
                     for cur_column in list_of_cols_of_this_type:
                         yield output_name, column_type, cur_column
-            case ComputedSequenceOutputInfo() | ComputedArrayOutputInfo():
+            case (
+                ComputedSequenceOutputInfo()
+                | ComputedArrayOutputInfo()
+                | ComputedImageOutputInfo()
+            ):
                 yield output_name, "general", output_name
             case _:
                 raise TypeError(f"Unknown output object: {output_object}")

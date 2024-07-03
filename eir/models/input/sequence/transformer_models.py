@@ -144,9 +144,6 @@ class TransformerWrapperModel(nn.Module):
 
         return length_with_padding * self.embedding_dim
 
-    def script_submodules_for_tracing(self):
-        self.embedding = torch.jit.script(self.embedding)
-
     def init_embedding_weights(self) -> None:
         init_range = 0.1
         self.embedding.weight.data.uniform_(-init_range, init_range)

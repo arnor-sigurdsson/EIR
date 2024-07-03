@@ -18,7 +18,6 @@ import torch
 from ignite.engine import Engine
 from torch import autocast, nn
 from torch.cuda.amp import GradScaler
-from torch.nn.functional import pad
 from torch.nn.utils import clip_grad_norm_
 from torch.optim.optimizer import Optimizer
 
@@ -27,7 +26,6 @@ from eir.data_load.data_utils import Batch
 from eir.data_load.label_setup import al_all_column_ops
 from eir.models import model_training_utils
 from eir.models.input.tabular.tabular import get_tabular_inputs
-from eir.models.model_setup_modules.meta_setup import al_meta_model
 from eir.predict_modules.predict_tabular_input_setup import (
     ComputedPredictTabularInputInfo,
 )
@@ -42,10 +40,8 @@ from eir.setup.input_setup_modules.setup_omics import ComputedOmicsInputInfo
 from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
 from eir.setup.input_setup_modules.setup_tabular import ComputedTabularInputInfo
 from eir.setup.output_setup import al_output_objects_as_dict
-from eir.train_utils.evaluation_handlers.evaluation_handlers_utils import (
-    SpecialTokens,
-    get_special_tokens,
-)
+from eir.setup.output_setup_modules.array_output_setup import ComputedArrayOutputInfo
+from eir.setup.output_setup_modules.image_output_setup import ComputedImageOutputInfo
 from eir.train_utils.metrics import (
     add_loss_to_metrics,
     add_multi_task_average_metrics,
@@ -56,10 +52,15 @@ from eir.train_utils.metrics import (
     hook_add_l1_loss,
 )
 from eir.train_utils.optim import AttrDelegatedSWAWrapper, get_optimizer_backward_kwargs
+from eir.train_utils.step_modules.autoregressive import (
+    prepare_sequence_input_for_sequence_output,
+)
+from eir.train_utils.step_modules.diffusion import prepare_diffusion_batch
 from eir.train_utils.train_handlers import HandlerConfig
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
+    from eir.models.model_setup_modules.meta_setup import al_meta_model
     from eir.train import Experiment
 
 al_training_labels_target = Dict[str, Dict[str, torch.Tensor]]
@@ -271,14 +272,47 @@ def _prepare_inputs_for_model(
 
     for input_name, input_object in input_objects.items():
         match input_object:
-            case (
-                ComputedOmicsInputInfo()
-                | ComputedImageInputInfo()
-                | ComputedArrayInputInfo()
-            ):
+            case ComputedOmicsInputInfo():
                 cur_tensor = batch_inputs[input_name]
                 cur_tensor = cur_tensor.to(dtype=torch.float32)
                 cur_tensor = cur_tensor.to(device=device)
+
+                inputs_prepared[input_name] = cur_tensor
+
+            case ComputedArrayInputInfo() | ComputedImageInputInfo():
+                cur_tensor = batch_inputs[input_name]
+                cur_tensor = cur_tensor.to(dtype=torch.float32)
+                cur_tensor = cur_tensor.to(device=device)
+
+                if input_name in (i for i in output_objects.keys()):
+                    matching_output = output_objects[input_name]
+                    assert isinstance(
+                        matching_output,
+                        (ComputedArrayOutputInfo, ComputedImageOutputInfo),
+                    )
+                    output_config = matching_output.output_config
+                    output_type_info = output_config.output_type_info
+                    assert isinstance(
+                        output_type_info,
+                        (schemas.ArrayOutputTypeConfig, schemas.ImageOutputTypeConfig),
+                    )
+                    loss = output_type_info.loss
+
+                    if loss == "diffusion":
+                        assert matching_output.diffusion_config is not None
+                        num_steps = output_type_info.diffusion_time_steps
+                        assert num_steps is not None
+                        cur_tensor, cur_target, t = prepare_diffusion_batch(
+                            diffusion_config=matching_output.diffusion_config,
+                            inputs=cur_tensor,
+                            batch_size=cur_tensor.shape[0],
+                            num_steps=num_steps,
+                        )
+                        cur_targets = {input_name: cur_target}
+                        targets_prepared[input_name] = cur_targets
+                        output_module = getattr(model.output_modules, input_name)
+                        t_emb = output_module.feature_extractor.timestep_embeddings(t)
+                        inputs_prepared[f"__extras_{input_name}"] = t_emb
 
                 inputs_prepared[input_name] = cur_tensor
 
@@ -314,7 +348,7 @@ def _prepare_inputs_for_model(
                 cur_seq = batch_inputs[input_name]
 
                 if input_name in (i for i in output_objects.keys()):
-                    cur_seq, cur_targets = _prepare_sequence_input_for_sequence_output(
+                    cur_seq, cur_targets = prepare_sequence_input_for_sequence_output(
                         input_object=input_object,
                         cur_seq=cur_seq,
                         input_name=input_name,
@@ -361,74 +395,6 @@ def _prepare_sequence_input_base(
     return cur_embedding
 
 
-def _prepare_sequence_input_for_sequence_output(
-    input_object: ComputedSequenceInputInfo,
-    cur_seq: torch.Tensor,
-    input_name: str,
-    device: str,
-) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
-    assert input_object.tokenizer is not None
-    special_tokens = get_special_tokens(
-        tokenizer=input_object.tokenizer, vocab=input_object.vocab
-    )
-
-    cur_seq, cur_target = sample_autoregressive_batch(
-        batch_tensor=cur_seq,
-        batch_size=cur_seq.shape[0],
-        special_tokens=special_tokens,
-    )
-    assert cur_seq.shape == cur_target.shape
-    assert cur_seq.dim() == 2
-    assert cur_seq.shape[1] == input_object.computed_max_length
-
-    cur_seq = cur_seq.to(device=device)
-
-    cur_target_dict = {input_name: cur_target.to(device=device)}
-
-    return cur_seq, cur_target_dict
-
-
-def sample_autoregressive_batch(
-    batch_tensor: torch.Tensor,
-    batch_size: int,
-    special_tokens: SpecialTokens,
-) -> Tuple[torch.Tensor, torch.Tensor]:
-    st = special_tokens
-
-    inputs = []
-    targets = []
-
-    batch_tensor = pad_batch_with_bos(batch_tensor=batch_tensor, bos_value=st.bos_idx)
-
-    for idx in range(batch_size):
-        cur_sample = batch_tensor[idx]
-
-        cur_sample = _switch_first_pad_with_eos(
-            sample=cur_sample, pad_value=st.pad_idx, eos_value=st.eos_idx
-        )
-
-        cur_target = cur_sample[1:]
-        cur_sample = cur_sample[:-1]
-
-        inputs.append(cur_sample)
-        targets.append(cur_target)
-
-    inputs_tensor = torch.stack(tensors=inputs)
-    target_tensor = torch.stack(tensors=targets)
-    return inputs_tensor, target_tensor
-
-
-def _switch_first_pad_with_eos(
-    sample: torch.Tensor, pad_value: int, eos_value: int
-) -> torch.Tensor:
-    first_pad_match = (sample == pad_value).nonzero(as_tuple=False)
-    if len(first_pad_match) != 0:
-        first_pad_index = first_pad_match[0]
-        sample[first_pad_index] = eos_value
-
-    return sample
-
-
 def hook_default_model_forward(
     experiment: "Experiment", state: Dict, batch: "Batch", *args, **kwargs
 ) -> Dict:
@@ -456,21 +422,27 @@ def hook_default_optimizer_backward(
     )
 
     loss = maybe_scale_loss_with_grad_accumulation_steps(
-        loss=state["loss"], grad_acc_steps=gc.gradient_accumulation_steps
+        loss=state["loss"],
+        grad_acc_steps=gc.gradient_accumulation_steps,
     )
 
     amp_scaler = state.get("amp_scaler")
     loss = maybe_scale_loss_with_amp_scaler(
-        do_amp=gc.amp, loss=loss, amp_scaler=amp_scaler, device=gc.device
+        do_amp=gc.amp,
+        loss=loss,
+        amp_scaler=amp_scaler,
+        device=gc.device,
     )
 
     loss.backward(**optimizer_backward_kwargs)
 
     maybe_apply_gradient_noise_to_model(
-        model=experiment.model, gradient_noise=gc.gradient_noise
+        model=experiment.model,
+        gradient_noise=gc.gradient_noise,
     )
     maybe_apply_gradient_clipping_to_model(
-        model=experiment.model, gradient_clipping=gc.gradient_clipping
+        model=experiment.model,
+        gradient_clipping=gc.gradient_clipping,
     )
 
     step_func = get_optimizer_step_func(
@@ -564,7 +536,7 @@ def should_perform_optimizer_step(
 
 def maybe_update_model_parameters_with_swa(
     n_iter_before_swa: Optional[int],
-    model: al_meta_model,
+    model: "al_meta_model",
     iteration: int,
     sample_interval: int,
 ) -> None:
@@ -693,10 +665,3 @@ def get_hook_amp_objects(device: str) -> Callable[..., Dict[str, Any]]:
         return state_updates
 
     return _get_objects
-
-
-def pad_batch_with_bos(batch_tensor: torch.Tensor, bos_value: int) -> torch.Tensor:
-    left_padding = 1
-    batch_tensor = pad(input=batch_tensor, pad=[left_padding, 0], value=bos_value)
-
-    return batch_tensor

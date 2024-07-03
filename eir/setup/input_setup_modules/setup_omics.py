@@ -75,7 +75,7 @@ def _setup_snp_subset_indices(
 
     if len(df_subset) < len(snps_to_subset):
         num_missing = len(snps_to_subset) - len(df_subset)
-        missing = [i for i in snps_to_subset if i not in df_subset["VAR_ID"]]
+        missing = [i for i in snps_to_subset if i not in df_subset["VAR_ID"].values]
         logger.warning(
             "Did not find all SNPs in subset file '%s' in base .bim file '%s'. "
             "Number of missing SNPs: %d. Example: '%s'.",
@@ -89,7 +89,7 @@ def _setup_snp_subset_indices(
             "Using %d SNPs from subset file %s.", len(df_subset), subset_file_name
         )
 
-    return df_subset.index
+    return np.asarray(df_subset.index)
 
 
 def read_subset_file(subset_snp_file_path: str) -> List[str]:

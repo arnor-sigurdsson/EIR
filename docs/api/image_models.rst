@@ -126,6 +126,10 @@ For example, the ``ResNet`` architecture includes the ``layers`` and ``block`` p
    :members:
    :exclude-members: forward
 
+.. autoclass:: timm.models.inception_next.MetaNeXt
+   :members:
+   :exclude-members: forward
+
 .. autoclass:: timm.models.inception_resnet_v2.InceptionResnetV2
    :members:
    :exclude-members: forward

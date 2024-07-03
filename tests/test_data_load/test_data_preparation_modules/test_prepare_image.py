@@ -13,7 +13,7 @@ from eir.setup.input_setup_modules.setup_image import (
 
 @pytest.mark.parametrize("resize_approach", ["resize", "randomcrop", "centercrop"])
 def test_prepare_image_data(resize_approach):
-    normalization_stats = ImageNormalizationStats(channel_means=[0], channel_stds=[0.1])
+    normalization_stats = ImageNormalizationStats(means=[0], stds=[0.1])
     base_transforms, all_transforms = get_image_transforms(
         target_size=(32, 32),
         normalization_stats=normalization_stats,

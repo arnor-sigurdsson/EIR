@@ -60,14 +60,14 @@ def analyze_image_input_attributions(
             target_column_name=target_column_name,
         )
 
-        attributions = sample_attribution.sample_attributions[input_name].squeeze()
-        raw_input = sample_attribution.raw_inputs[input_name].cpu().numpy().squeeze()
-        attributions = attributions.transpose(1, 2, 0)
-        raw_input = un_normalize(
+        attributions = sample_attribution.sample_attributions[input_name].squeeze(0)
+        raw_input = sample_attribution.raw_inputs[input_name].cpu().numpy().squeeze(0)
+        raw_input = un_normalize_image(
             normalized_img=raw_input,
             normalization_stats=input_object.normalization_stats,
         )
         raw_input = raw_input.transpose(1, 2, 0)
+        attributions = attributions.transpose(1, 2, 0)
 
         figure, _ = visualize_image_attr_multiple(
             attr=attributions,
@@ -85,15 +85,15 @@ def analyze_image_input_attributions(
         plt.close("all")
 
 
-def un_normalize(
+def un_normalize_image(
     normalized_img: np.ndarray, normalization_stats: "ImageNormalizationStats"
 ) -> np.ndarray:
     """
     Clip because sometimes we get values like 1.0000001 which will cause some libraries
     to do =/ 255, resulting in a black image.
     """
-    means = torch.Tensor(normalization_stats.channel_means)
-    stds = torch.Tensor(normalization_stats.channel_stds)
+    means = torch.Tensor(normalization_stats.means)
+    stds = torch.Tensor(normalization_stats.stds)
     un_norm = Normalize(
         mean=(-means / stds).tolist(),
         std=(1.0 / stds).tolist(),
@@ -101,6 +101,6 @@ def un_normalize(
 
     img_as_tensor = torch.Tensor(normalized_img)
     img_un_normalized = un_norm(img_as_tensor).cpu().numpy()
-    img_final = img_un_normalized.clip(None, 1.0)
+    img_final = img_un_normalized.clip(0.0, 1.0)
 
     return img_final

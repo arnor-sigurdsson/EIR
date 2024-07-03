@@ -125,7 +125,6 @@ def prep_modelling_test_configs(
         criteria=criteria,
         loss_function=loss_module,
         metrics=test_metrics,
-        writer=train.get_summary_writer(run_folder=Path(gc.output_folder)),
         hooks=hooks,
     )
 

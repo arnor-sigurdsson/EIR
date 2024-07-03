@@ -9,8 +9,8 @@ import numpy as np
 import pandas as pd
 import pytest
 from _pytest.fixtures import SubRequest
-from torchvision.datasets.folder import default_loader
 
+from eir.setup.input_setup_modules.setup_image import default_image_loader
 from tests.setup_tests.setup_modelling_test_data.setup_array_test_data import (
     create_test_array_data_and_labels,
 )
@@ -205,7 +205,7 @@ def _make_deeplake_test_dataset(
                     sample_data = np.load(str(sample_file))
                 case "image":
                     cur_name = "test_image"
-                    sample_data = default_loader(str(sample_file))
+                    sample_data = default_image_loader(str(sample_file))
                     sample_data = np.array(sample_data)
                 case "sequence":
                     cur_name = "test_sequence"
@@ -224,9 +224,7 @@ def _make_deeplake_test_dataset(
     ds = deeplake.empty(base_output_folder / name, overwrite=True)
 
     ds.create_tensor(name="ID", htype="text")
-    ds.create_tensor(
-        name="test_genotype",
-    )
+    ds.create_tensor(name="test_genotype")
     ds.create_tensor(name="test_image", htype="image", sample_compression="jpg")
     ds.create_tensor(name="test_sequence", htype="text")
     ds.create_tensor(name="test_array")

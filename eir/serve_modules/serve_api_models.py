@@ -1,4 +1,4 @@
-from typing import Any, Dict, Sequence, Type
+from typing import Any, Sequence, Type
 
 from pydantic import BaseModel, create_model
 
@@ -6,7 +6,9 @@ from eir.setup.schemas import InputConfig, TabularInputDataConfig
 
 
 def create_tabular_model(
-    name: str, cat_columns: Sequence[str], con_columns: Sequence[str]
+    name: str,
+    cat_columns: Sequence[str],
+    con_columns: Sequence[str],
 ) -> Type[BaseModel]:
     fields: dict[str, Any] = {col: (str, ...) for col in cat_columns}
     fields.update({col: (float, ...) for col in con_columns})
@@ -37,4 +39,4 @@ def create_input_model(configs: Sequence[InputConfig]) -> Type[BaseModel]:
 
 
 class ResponseModel(BaseModel):
-    result: Dict[str, Any]
+    result: list[dict[str, Any]]

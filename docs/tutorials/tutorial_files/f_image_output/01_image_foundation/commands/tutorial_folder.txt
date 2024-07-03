@@ -1,0 +1,11 @@
+eir_tutorials/f_image_output/01_image_foundation
+├── conf
+│   ├── fusion.yaml
+│   ├── globals.yaml
+│   ├── inputs_image_cnn.yaml
+│   ├── inputs_sequence.yaml
+│   └── output_image.yaml
+└── data
+    ├── 01_image_foundation
+    ├── annotations.csv
+    └── images

@@ -1,14 +1,19 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, Literal, Optional, Protocol, Tuple, Type, Union, cast
 
 from torch import nn
 
 from eir.models.fusion import fusion
+from eir.models.input.array.array_models import CNNModelConfig
 from eir.models.input.image.image_models import get_image_model_class
 from eir.models.input.sequence.sequence_models import get_sequence_model_class
 from eir.models.input.tabular.tabular import get_unique_values_from_transformers
 from eir.models.meta import meta
-from eir.models.meta.meta import al_input_modules
+from eir.models.meta.meta_utils import (
+    al_fusion_modules,
+    al_input_modules,
+    al_output_modules,
+)
 from eir.models.model_setup_modules.input_model_setup.input_model_setup_array import (
     get_array_input_feature_extractor,
     get_array_model,
@@ -27,7 +32,7 @@ from eir.models.model_setup_modules.input_model_setup.input_model_setup_tabular 
     get_tabular_model,
 )
 from eir.models.model_setup_modules.output_model_setup_modules.output_model_setup_array import (  # noqa
-    get_array_output_module_from_model_config,
+    get_array_or_image_output_module_from_model_config,
 )
 from eir.models.model_setup_modules.output_model_setup_modules.output_model_setup_sequence import (  # noqa
     get_sequence_output_module_from_model_config,
@@ -38,6 +43,7 @@ from eir.models.model_setup_modules.output_model_setup_modules.output_model_setu
 from eir.models.output.sequence.sequence_output_modules import (
     SequenceOutputModuleConfig,
 )
+from eir.models.tensor_broker.tensor_broker import get_tensor_broker
 from eir.predict_modules.predict_tabular_input_setup import (
     ComputedPredictTabularInputInfo,
 )
@@ -53,6 +59,7 @@ from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputIn
 from eir.setup.input_setup_modules.setup_tabular import ComputedTabularInputInfo
 from eir.setup.output_setup import al_output_objects_as_dict
 from eir.setup.output_setup_modules.array_output_setup import ComputedArrayOutputInfo
+from eir.setup.output_setup_modules.image_output_setup import ComputedImageOutputInfo
 from eir.setup.output_setup_modules.sequence_output_setup import (
     ComputedSequenceOutputInfo,
 )
@@ -143,6 +150,7 @@ def get_meta_model_kwargs_from_configs(
     outputs_as_dict: "al_output_objects_as_dict",
     strict: bool = True,
 ) -> Dict[str, Any]:
+
     kwargs: dict[str, Any] = {}
     input_modules = get_input_modules(
         inputs_as_dict=inputs_as_dict,
@@ -150,10 +158,11 @@ def get_meta_model_kwargs_from_configs(
     )
     kwargs["input_modules"] = input_modules
 
-    out_feature_per_feature_extractor = _get_feature_extractors_num_output_dimensions(
+    out_feature_per_feature_extractor = _get_feature_extractors_num_output_features(
         input_modules=input_modules
     )
     output_types = _get_output_types(outputs_as_dict=outputs_as_dict)
+    diffusion_targets = _extract_diffusion_targets(outputs_as_dict=outputs_as_dict)
 
     fusion_modules = fusion.get_fusion_modules(
         fusion_model_type=fusion_config.model_type,
@@ -161,25 +170,45 @@ def get_meta_model_kwargs_from_configs(
         modules_to_fuse=input_modules,
         out_feature_per_feature_extractor=out_feature_per_feature_extractor,
         output_types=output_types,
+        any_diffusion=diffusion_targets != {},
         strict=strict,
     )
     kwargs["fusion_modules"] = fusion_modules
 
     computed_out_dimension = _get_maybe_computed_out_dims(fusion_modules=fusion_modules)
     feature_dims_and_types = get_all_feature_extractor_dimensions_and_types(
-        inputs_as_dict=inputs_as_dict, input_modules=input_modules
+        inputs_as_dict=inputs_as_dict,
+        input_modules=input_modules,
     )
     output_modules, output_types = get_output_modules(
         outputs_as_dict=outputs_as_dict,
         device=global_config.device,
         computed_out_dimensions=computed_out_dimension,
         feature_dimensions_and_types=feature_dims_and_types,
+        fusion_model_type=fusion_config.model_type,
     )
     fusion_to_output_mapping = _match_fusion_outputs_to_output_types(
-        output_types=output_types
+        output_types=output_types,
+        diffusion_targets=diffusion_targets,
     )
     kwargs["output_modules"] = output_modules
     kwargs["fusion_to_output_mapping"] = fusion_to_output_mapping
+
+    input_configs = [i.input_config for i in inputs_as_dict.values()]
+    output_configs = [i.output_config for i in outputs_as_dict.values()]
+    tensor_broker = get_tensor_broker(
+        input_objects=inputs_as_dict,
+        output_objects=outputs_as_dict,
+        input_modules=input_modules,
+        fusion_modules=fusion_modules,
+        output_modules=output_modules,
+        fusion_to_output_mapping=fusion_to_output_mapping,
+        input_configs=input_configs,
+        fusion_configs=[fusion_config],
+        output_configs=output_configs,
+        device=global_config.device,
+    )
+    kwargs["tensor_broker"] = tensor_broker
 
     return kwargs
 
@@ -196,7 +225,20 @@ def _get_output_types(
     return outputs_to_types_mapping
 
 
-def _get_maybe_computed_out_dims(fusion_modules: nn.ModuleDict) -> Optional[int]:
+def _extract_diffusion_targets(
+    outputs_as_dict: "al_output_objects_as_dict",
+) -> dict[str, bool]:
+    diffusion_targets = {}
+    for name, output in outputs_as_dict.items():
+        match output:
+            case ComputedArrayOutputInfo() | ComputedImageOutputInfo():
+                if output.diffusion_config is not None:
+                    diffusion_targets[name] = True
+
+    return diffusion_targets
+
+
+def _get_maybe_computed_out_dims(fusion_modules: al_fusion_modules) -> Optional[int]:
     if "computed" in fusion_modules:
         return fusion_modules["computed"].num_out_features
 
@@ -204,16 +246,24 @@ def _get_maybe_computed_out_dims(fusion_modules: nn.ModuleDict) -> Optional[int]
 
 
 def _match_fusion_outputs_to_output_types(
-    output_types: dict[str, Literal["tabular", "sequence", "array"]]
-) -> dict[str, str]:
-    output_name_to_fusion_output_type = {}
+    output_types: dict[str, Literal["tabular", "sequence", "array"]],
+    diffusion_targets: dict[str, bool],
+) -> dict[str, Literal["computed", "pass-through"]]:
+    output_name_to_fusion_output_type: dict[
+        str, Literal["computed", "pass-through"]
+    ] = {}
 
     for output_name, output_type in output_types.items():
         match output_type:
-            case "tabular" | "array":
+            case "tabular":
                 output_name_to_fusion_output_type[output_name] = "computed"
             case "sequence":
                 output_name_to_fusion_output_type[output_name] = "pass-through"
+            case "array" | "image":
+                if output_name in diffusion_targets:
+                    output_name_to_fusion_output_type[output_name] = "pass-through"
+                else:
+                    output_name_to_fusion_output_type[output_name] = "computed"
             case _:
                 raise ValueError(f"Unknown output type '{output_type}'.")
 
@@ -223,33 +273,55 @@ def _match_fusion_outputs_to_output_types(
 @dataclass()
 class FeatureExtractorInfo:
     input_dimension: Union[
-        DataDimensions, "OmicsDataDimensions", "SequenceDataDimensions"
+        DataDimensions,
+        "OmicsDataDimensions",
+        "SequenceDataDimensions",
     ]
     output_dimension: int
     input_type: str
+    output_shape: Optional[Tuple[int, ...]] = None
+    extras: dict = field(default_factory=dict)
 
 
 def get_all_feature_extractor_dimensions_and_types(
     inputs_as_dict: al_input_objects_as_dict,
     input_modules: al_input_modules,
 ) -> Dict[str, FeatureExtractorInfo]:
-    input_dimensionalities_and_types = {}
+    input_dimensionality_and_types = {}
 
-    out_feature_per_feature_extractor = _get_feature_extractors_num_output_dimensions(
+    out_feature_per_feature_extractor = _get_feature_extractors_num_output_features(
         input_modules=input_modules
     )
     in_features_per_input = _get_feature_extractors_input_dimensions_per_axis(
         inputs_as_dict=inputs_as_dict, input_modules=input_modules
     )
 
+    output_shapes = _maybe_get_feature_extractor_out_shapes(input_modules=input_modules)
+
     for input_name, input_object in inputs_as_dict.items():
-        input_dimensionalities_and_types[input_name] = FeatureExtractorInfo(
+
+        cur_output_shape = output_shapes.get(input_name)
+
+        extras = {}
+        match input_object:
+            case ComputedArrayInputInfo() | ComputedImageInputInfo():
+                cur_config = input_object.input_config.model_config
+                assert isinstance(
+                    cur_config, (schemas.ArrayModelConfig, schemas.ImageModelConfig)
+                )
+                mic = cur_config.model_init_config
+                if isinstance(mic, CNNModelConfig):
+                    extras["down_every_n_blocks"] = mic.down_sample_every_n_blocks
+
+        input_dimensionality_and_types[input_name] = FeatureExtractorInfo(
             input_dimension=in_features_per_input[input_name],
             output_dimension=out_feature_per_feature_extractor[input_name],
             input_type=input_object.input_config.input_info.input_type,
+            output_shape=cur_output_shape,
+            extras=extras,
         )
 
-    return input_dimensionalities_and_types
+    return input_dimensionality_and_types
 
 
 def get_input_modules(
@@ -342,10 +414,11 @@ def get_input_modules(
 def get_output_modules(
     outputs_as_dict: "al_output_objects_as_dict",
     device: str,
+    fusion_model_type: str,
     computed_out_dimensions: Optional[int] = None,
     feature_dimensions_and_types: Optional[Dict[str, FeatureExtractorInfo]] = None,
-) -> Tuple[nn.ModuleDict, Dict[str, Literal["tabular", "sequence", "array"]]]:
-    output_modules = nn.ModuleDict()
+) -> Tuple[al_output_modules, Dict[str, Literal["tabular", "sequence", "array"]]]:
+    output_modules: al_output_modules = cast(al_output_modules, nn.ModuleDict())
     output_types = {}
 
     for output_name, output_object in outputs_as_dict.items():
@@ -378,16 +451,35 @@ def get_output_modules(
                 )
                 output_modules[output_name] = sequence_output_module
 
-            case ComputedArrayOutputInfo():
+            case ComputedArrayOutputInfo() | ComputedImageOutputInfo():
                 assert isinstance(output_model_config, schemas.ArrayOutputModuleConfig)
-                assert computed_out_dimensions is not None
-                array_output_module = get_array_output_module_from_model_config(
-                    output_object=output_object,
-                    input_dimension=computed_out_dimensions,
-                    device=device,
-                )
-                output_modules[output_name] = array_output_module
+                feat_dims = feature_dimensions_and_types
 
+                is_diffusion = output_object.diffusion_config is not None
+                setup_func = get_array_or_image_output_module_from_model_config
+                match is_diffusion:
+                    case True:
+                        assert feat_dims is not None
+                        output_module = setup_func(
+                            output_object=output_object,
+                            input_dimension=computed_out_dimensions,
+                            fusion_model_type=fusion_model_type,
+                            feature_extractor_infos=feat_dims,
+                            device=device,
+                        )
+                    case False:
+                        assert computed_out_dimensions is not None
+                        output_module = setup_func(
+                            output_object=output_object,
+                            input_dimension=computed_out_dimensions,
+                            fusion_model_type=fusion_model_type,
+                            feature_extractor_infos=feat_dims,
+                            device=device,
+                        )
+                    case _:
+                        raise ValueError()
+
+                output_modules[output_name] = output_module
             case _:
                 raise NotImplementedError(
                     "Only tabular, sequence and array outputs are supported"
@@ -396,11 +488,23 @@ def get_output_modules(
     return output_modules, output_types
 
 
-def _get_feature_extractors_num_output_dimensions(
+def _get_feature_extractors_num_output_features(
     input_modules: al_input_modules,
 ) -> Dict[str, int]:
     fusion_in_dims = {name: i.num_out_features for name, i in input_modules.items()}
     return fusion_in_dims
+
+
+def _maybe_get_feature_extractor_out_shapes(
+    input_modules: al_input_modules,
+) -> dict[str, tuple[int, ...]]:
+    out_shapes = {
+        name: i.output_shape
+        for name, i in input_modules.items()
+        if hasattr(i, "output_shape")
+    }
+
+    return out_shapes
 
 
 def _get_feature_extractors_input_dimensions_per_axis(

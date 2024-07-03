@@ -16,10 +16,19 @@ class ArrayOutputTypeConfig:
         If using adaptive normalization (channel / element),
         how many samples to use to compute the normalization parameters.
         If None, will use all samples.
+
+    :param loss:
+        Which loss to use for training the model. Either ``mse`` or ``diffusion``.
+
+    :param diffusion_time_steps:
+        Number of time steps to use for diffusion loss. Only used if ``loss`` is
+        set to ``diffusion``.
     """
 
     normalization: Optional[Literal["element", "channel"]] = "channel"
     adaptive_normalization_max_samples: Optional[int] = None
+    loss: Literal["mse", "diffusion"] = "mse"
+    diffusion_time_steps: Optional[int] = 500
 
 
 @dataclass

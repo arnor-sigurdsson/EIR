@@ -31,7 +31,6 @@ from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     # noinspection PyUnresolvedReferences
-    from eir.models.model_setup_modules.meta_setup import al_meta_model
     from eir.setup.output_setup import al_output_objects_as_dict
     from eir.train import Experiment  # noqa: F401
     from eir.train_utils.step_logic import (
@@ -531,10 +530,3 @@ def plot_lr_find_results(
     plt.axvline(x=lr_suggestion, color="red", linewidth=1)
 
     plt.savefig(str(output_folder / "lr_search.pdf"))
-
-
-def check_eir_model(
-    meta_model: "al_meta_model", example_inputs: Dict[str, Any]
-) -> None:
-    with torch.inference_mode():
-        meta_model(inputs=example_inputs)

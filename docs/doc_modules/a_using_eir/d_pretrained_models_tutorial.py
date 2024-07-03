@@ -4,7 +4,10 @@ from typing import Sequence
 
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
 from docs.doc_modules.serve_experiments_utils import load_data_for_serve
-from docs.doc_modules.serving_experiments import AutoDocServingInfo
+from docs.doc_modules.serving_experiments import (
+    AutoDocServingInfo,
+    build_request_example_module_from_function,
+)
 from docs.doc_modules.utils import add_model_path_to_command
 
 
@@ -217,7 +220,7 @@ def get_04_imdb_run_5_combined_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/04_imdb_output.yaml",
         "--04_imdb_globals.output_folder=eir_tutorials/tutorial_runs"
         "/a_using_eir/tutorial_04_imdb_run_combined",
-        "--04_imdb_globals.device='cpu'",
+        "--04_imdb_globals.device='mps'",
     ]
 
     mapping = [
@@ -276,18 +279,29 @@ def get_04_imdb_run_1_serve_info() -> AutoDocServingInfo:
         "imdb_reviews_tiny_bert",
     ]
 
-    example_requests = []
+    example_requests = [[]]
 
     for input_ in base_inputs:
         cur_input = {}
         for feature_extractor_name in feature_extractor_per_input_names:
             cur_input[feature_extractor_name] = input_
-        example_requests.append(cur_input)
+        example_requests[0].append(cur_input)
 
     add_model_path = partial(
         add_model_path_to_command,
         run_path="eir_tutorials/tutorial_runs/a_using_eir/"
         "tutorial_04_imdb_run_combined",
+    )
+
+    example_request_module_python = build_request_example_module_from_function(
+        function=example_request_function_python,
+        name="python",
+        language="python",
+    )
+
+    bash_args = _get_example_request_bash_args()
+    example_request_module_bash = build_request_example_module_from_function(
+        **bash_args
     )
 
     ade = AutoDocServingInfo(
@@ -298,9 +312,63 @@ def get_04_imdb_run_1_serve_info() -> AutoDocServingInfo:
         post_run_functions=(),
         example_requests=example_requests,
         data_loading_function=load_data_for_serve,
+        request_example_modules=[
+            example_request_module_python,
+            example_request_module_bash,
+        ],
     )
 
     return ade
+
+
+def example_request_function_python():
+    import requests
+
+    def send_request(url: str, payload: list[dict]) -> dict:
+        response = requests.post(url, json=payload)
+        response.raise_for_status()
+        return response.json()
+
+    payload = [
+        {
+            "imdb_reviews_windowed": "This movie was great! I loved it!",
+            "imdb_reviews_longformer": "This movie was great! I loved it!",
+            "imdb_reviews_tiny_bert": "This movie was great! I loved it!",
+        },
+    ]
+
+    response = send_request(url="http://localhost:8000/predict", payload=payload)
+    print(response)
+
+    # --skip-after
+    return response
+
+
+def _get_example_request_bash_args():
+    command = """curl -X POST \\
+        "http://localhost:8000/predict" \\
+        -H "accept: application/json" \\
+        -H "Content-Type: application/json" \\
+        -d '[{"imdb_reviews_windowed": "This movie was great! I loved it!",
+        "imdb_reviews_longformer": "This movie was great! I loved it!",
+        "imdb_reviews_tiny_bert": "This movie was great! I loved it!"}]'
+        """
+
+    def _function_to_run_example() -> dict:
+        import json
+        import subprocess
+
+        result = subprocess.run(command, shell=True, capture_output=True, text=True)
+        result_as_dict = json.loads(result.stdout)
+        return result_as_dict
+
+    command_as_text = command
+    return {
+        "function": _function_to_run_example,
+        "custom_body": command_as_text,
+        "name": "bash",
+        "language": "shell",
+    }
 
 
 def get_experiments() -> Sequence[AutoDocExperimentInfo]:

@@ -98,11 +98,21 @@ class WrapperModelForAttribution(nn.Module):
     accept the list libraries expect, but call the wrapped model with a matched dict.
     """
 
-    def __init__(self, wrapped_model, input_names: Iterable[str], *args, **kwargs):
+    def __init__(
+        self,
+        wrapped_model,
+        input_names: Iterable[str],
+        output_name: str,
+        column_name: str,
+        *args,
+        **kwargs,
+    ):
         super().__init__()
         assert not wrapped_model.training
         self.wrapped_model = wrapped_model
         self.input_names = input_names
+        self.output_name = output_name
+        self.column_name = column_name
 
     def match_tuple_inputs_and_names(
         self, input_sequence: Sequence[torch.Tensor]
@@ -110,14 +120,50 @@ class WrapperModelForAttribution(nn.Module):
         if isinstance(input_sequence, torch.Tensor):
             input_sequence = list(input_sequence)
 
-        matched = {k: v for k, v in zip(self.input_names, input_sequence)}
+        matched = {
+            k: v
+            for k, v in zip(self.input_names, input_sequence)
+            if not k.startswith("__extras_")
+        }
 
         return matched
 
     def forward(self, *inputs):
-        matched_inputs = self.match_tuple_inputs_and_names(input_sequence=inputs)
+        """
+        Note that have a slightly custom / different forward here compared with
+        the method in MetaModel. This is because we only compute the attributions
+        for tabular outputs, but we might have models that have e.g. diffusion
+        outputs as well. In this case, the dynamic timestep embeddings do not
+        contribute at all to the tabular output, which when computing the gradients
+        in the Integrated Gradients method, will either lead to (a) differentiated
+        tensors not being used in the graph and/or (b) None gradients showing up
+        in the IG method.
 
-        return self.wrapped_model(matched_inputs)
+        Hence, we manually only call the tabular output module we are currently
+        interested in here, skipping e.g. the time embeddings completely.
+
+        This also allows us to optimize slightly by only calling output modules
+        that are actually needed.
+        """
+        inputs_matched = self.match_tuple_inputs_and_names(input_sequence=inputs)
+        model = self.wrapped_model
+
+        feature_extractors_out = {}
+        for module_name, cur_input_module in model.input_modules.items():
+            module_input = inputs_matched[module_name]
+            feature_extractors_out[module_name] = cur_input_module(module_input)
+
+        fused_features = {}
+        for output_type, fusion_module in model.fusion_modules.items():
+            fused_features[output_type] = fusion_module(feature_extractors_out)
+        cur_fusion_target = model.fusion_to_output_mapping[self.output_name]
+        fused_features = fused_features[cur_fusion_target]
+
+        output_modules_out = {}
+        cur_output = model.output_modules[self.output_name](fused_features)
+        output_modules_out[self.output_name] = cur_output
+
+        return output_modules_out[self.output_name][self.column_name]
 
 
 @contextmanager
@@ -310,8 +356,12 @@ def tabular_attribution_analysis_wrapper(
                 )
 
             elif input_type == "sequence":
+                # Currently we just run the full model here, despite being slightly
+                # redundant, hence we pass in baselines_with_extras. Otherwise, we
+                # would have to have a custom forward call skipping the time embeddings.
                 expected_value = compute_expected_value(
-                    model=model_copy, baselines=ao.baselines
+                    model=model_copy,
+                    baselines=ao.baselines_with_extras,
                 )
                 analyze_sequence_input_attributions(
                     **common_kwargs,
@@ -341,13 +391,16 @@ def _extract_input_names_and_types(
     input_names_and_types = {
         i: input_objects[i].input_config.input_info.input_type
         for i in input_names_ordered
+        if not i.startswith("__extras_")
     }
 
     return input_names_and_types
 
 
 def _do_skip_analyzing_input(
-    input_name: str, input_type: str, output_configs: Sequence[OutputConfig]
+    input_name: str,
+    input_type: str,
+    output_configs: Sequence[OutputConfig],
 ) -> bool:
     """
     Second case is for when an input was generated for an output, e.g.
@@ -358,6 +411,7 @@ def _do_skip_analyzing_input(
 
     input_name_in_output = any(
         input_name == output_config.output_info.output_name
+        and output_config.output_info.output_type == "sequence"
         for output_config in output_configs
     )
     if input_name_in_output:
@@ -379,13 +433,16 @@ class AttributionObject:
     explainer: al_explainers
     hook_handle: RemovableHandle
     input_names_ordered: tuple[str, ...]
-    baselines: Dict[str, torch.Tensor]
+    baselines: dict[str, torch.Tensor]
     baseline_values_ordered: tuple[torch.Tensor, ...]
+    baselines_with_extras: dict[str, torch.Tensor]
 
 
 def get_attribution_object(
     experiment: Union[
-        "Experiment", "PredictExperiment", "LoadedTrainExperimentMixedWithPredict"
+        "Experiment",
+        "PredictExperiment",
+        "LoadedTrainExperimentMixedWithPredict",
     ],
     model: "al_meta_model",
     column_name: str,
@@ -406,6 +463,9 @@ def get_attribution_object(
     )
 
     baseline_data = _detach_all_inputs(tensor_inputs=baseline_data)
+    baseline_data_no_extras = {
+        k: v for k, v in baseline_data.items() if not k.startswith("__extras_")
+    }
 
     hook_partial = partial(
         _grab_single_target_from_model_output_hook,
@@ -415,22 +475,25 @@ def get_attribution_object(
     hook_handle = model.register_forward_hook(hook_partial)
 
     # Convert to list for wrapper model
-    input_names, values_ordered = zip(*baseline_data.items())
+    input_names, values_ordered = zip(*baseline_data_no_extras.items())
     input_names, values_ordered = tuple(input_names), tuple(values_ordered)
 
     assert not model.training
     wrapped_model = WrapperModelForAttribution(
         wrapped_model=model,
         input_names=input_names,
+        output_name=output_name,
+        column_name=column_name,
     )
     explainer = MyIntegratedGradients(forward_func=wrapped_model)
 
     attribution_object = AttributionObject(
         explainer=explainer,
         hook_handle=hook_handle,
-        baselines=baseline_data,
+        baselines=baseline_data_no_extras,
         input_names_ordered=input_names,
         baseline_values_ordered=values_ordered,
+        baselines_with_extras=baseline_data,
     )
 
     return attribution_object
@@ -769,11 +832,12 @@ def get_attributions(
     n_steps: int,
     internal_batch_size: Union[int, None],
 ) -> list[np.ndarray]:
-    list_inputs = tuple(inputs[n] for n in baseline_names_ordered)
+
+    tuple_inputs = tuple(inputs[n] for n in baseline_names_ordered)
     baselines_averaged = tuple(i.mean(0).unsqueeze(0) for i in baselines)
 
     common_kwargs = dict(
-        inputs=list_inputs,
+        inputs=tuple_inputs,
         baselines=baselines_averaged,
         n_steps=n_steps,
         internal_batch_size=internal_batch_size,

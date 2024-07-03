@@ -1,11 +1,10 @@
 import base64
 from io import BytesIO
-from typing import Any, Dict, Union
+from typing import Any, Dict, Literal, Optional, Sequence, Union
 
 import numpy as np
 import numpy.typing as npt
 import torch
-from aislib.misc_utils import get_logger
 from PIL import Image
 from sklearn.preprocessing import StandardScaler
 
@@ -24,21 +23,41 @@ from eir.setup.input_setup_modules.setup_image import ComputedImageInputInfo
 from eir.setup.input_setup_modules.setup_omics import ComputedOmicsInputInfo
 from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
 from eir.setup.input_setup_modules.setup_tabular import ComputedTabularInputInfo
-from eir.setup.schemas import SequenceInputDataConfig
+from eir.setup.schemas import ImageInputDataConfig, SequenceInputDataConfig
 from eir.train_utils.evaluation_handlers.evaluation_handlers_utils import (
     streamline_sequence_manual_data,
 )
+from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
+
+al_inputs_prepared = dict[
+    str,
+    np.ndarray | torch.Tensor | list[str] | str | dict | Image.Image,
+]
+
+
+def prepare_request_input_data_wrapper(
+    request_data: Sequence[dict[str, Any]],
+    input_objects: al_input_objects_as_dict,
+) -> Sequence[al_inputs_prepared]:
+    all_inputs_prepared = []
+
+    for request in request_data:
+        inputs_prepared = prepare_request_input_data(
+            request_data=request,
+            input_objects=input_objects,
+        )
+        all_inputs_prepared.append(inputs_prepared)
+
+    return all_inputs_prepared
 
 
 def prepare_request_input_data(
     request_data: Dict[str, Any],
     input_objects: al_input_objects_as_dict,
 ) -> Dict[str, Any]:
-    inputs_prepared: dict[
-        str, np.ndarray | torch.Tensor | list[str] | str | dict | Image.Image
-    ] = {}
+    inputs_prepared: al_inputs_prepared = {}
 
     for name, serialized_data in request_data.items():
         input_object = input_objects[name]
@@ -82,7 +101,10 @@ def prepare_request_input_data(
 
             case ComputedImageInputInfo():
                 assert input_type == "image"
-                image_data = _deserialize_image(image_str=serialized_data)
+                assert isinstance(input_type_info, ImageInputDataConfig)
+                image_data = _deserialize_image(
+                    image_str=serialized_data, image_mode=input_type_info.mode
+                )
                 inputs_prepared[name] = image_data
 
             case (
@@ -155,10 +177,16 @@ def _deserialize_array(
     return np.frombuffer(array_bytes, dtype=dtype).reshape(shape).copy()
 
 
-def _deserialize_image(image_str: str) -> Image.Image:
+def _deserialize_image(
+    image_str: str, image_mode: Optional[Literal["L", "RGB", "RGBA"]]
+) -> Image.Image:
     """
     Note we convert to RGB to be compatible with the default_loader.
     """
     image_data = base64.b64decode(image_str)
     image = Image.open(BytesIO(image_data))
-    return image.convert("RGB")
+
+    if image_mode is not None:
+        return image.convert(image_mode)
+
+    return image

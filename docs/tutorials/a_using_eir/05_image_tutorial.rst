@@ -232,47 +232,19 @@ Here is an example of the command:
 Sending Requests
 """"""""""""""""
 
-With the server running, we can now send image-based requests. For this model, we send encoded images to different feature extraction endpoints.
+With the server running, we can now send requests. For this model, we send different features extracted from the same input image in a batched format.
 
 Here's an example Python function demonstrating this process:
 
-.. code-block:: python
+.. literalinclude:: ../tutorial_files/a_using_eir/05_image_tutorial/request_example/python_request_example_module.py
+    :language: python
+    :caption: request_example_module.py
 
-    import requests
-    import base64
-    from PIL import Image
-    from io import BytesIO
+When running this, we get the following output:
 
-    def encode_image_to_base64(file_path: str) -> str:
-        with Image.open(file_path) as image:
-            buffered = BytesIO()
-            image.save(buffered, format="JPEG")
-            return base64.b64encode(buffered.getvalue()).decode("utf-8")
-
-    def send_request(url: str, payload: dict):
-        response = requests.post(url, json=payload)
-        return response.json()
-
-    payload = {
-        "hot_dog_efficientnet": encode_image_to_base64("path/to/image1.jpg"),
-        "hot_dog_resnet18": encode_image_to_base64("path/to/image1.jpg")
-    }
-
-    response = send_request('http://localhost:8000/predict', payload)
-    print(response)
-
-Additionally, you can send requests using `bash`. Note that this requires preparing the base64-encoded image content in advance:
-
-.. code-block:: bash
-
-    curl -X 'POST' \\
-      'http://localhost:8000/predict' \\
-      -H 'accept: application/json' \\
-      -H 'Content-Type: application/json' \\
-      -d '{
-          "hot_dog_efficientnet": "[BASE64_ENCODED_IMAGE]",
-          "hot_dog_resnet18": "[BASE64_ENCODED_IMAGE]"
-      }'
+.. literalinclude:: ../tutorial_files/a_using_eir/05_image_tutorial/request_example/python_request_example.json
+    :language: json
+    :caption: request_example.json
 
 Analyzing Responses
 """""""""""""""""""

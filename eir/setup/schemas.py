@@ -26,11 +26,16 @@ from eir.setup.schema_modules.output_schemas_array import (
     ArrayOutputSamplingConfig,
     ArrayOutputTypeConfig,
 )
+from eir.setup.schema_modules.output_schemas_image import (
+    ImageOutputSamplingConfig,
+    ImageOutputTypeConfig,
+)
 from eir.setup.schema_modules.output_schemas_sequence import (
     SequenceOutputSamplingConfig,
     SequenceOutputTypeConfig,
 )
 from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
+from eir.setup.schema_modules.tensor_broker_schemas import TensorBrokerConfig
 from eir.setup.setup_utils import get_all_optimizer_names
 
 if TYPE_CHECKING:
@@ -86,7 +91,10 @@ al_output_module_configs_classes = (
 )
 
 al_output_type_configs = (
-    SequenceOutputTypeConfig | TabularOutputTypeConfig | ArrayOutputTypeConfig
+    SequenceOutputTypeConfig
+    | TabularOutputTypeConfig
+    | ArrayOutputTypeConfig
+    | ImageOutputTypeConfig
 )
 
 al_output_module_configs = (
@@ -297,7 +305,7 @@ class GlobalConfig:
     amp: bool = False
     compile_model: bool = False
     weighted_sampling_columns: Union[None, Sequence[str]] = None
-    lr: float = 1e-03
+    lr: float = 3e-04
     lr_lb: float = 0.0
     find_lr: bool = False
     lr_schedule: Literal["cycle", "plateau", "same", "cosine"] = "plateau"
@@ -311,7 +319,7 @@ class GlobalConfig:
     early_stopping_patience: int = 10
     early_stopping_buffer: Union[None, int] = None
     warmup_steps: Union[Literal["auto"], int] = "auto"
-    optimizer: al_optimizers = "adam"  # type: ignore
+    optimizer: al_optimizers = "adamw"  # type: ignore
     b1: float = 0.9
     b2: float = 0.999
     wd: float = 1e-04
@@ -353,6 +361,10 @@ class InputConfig:
     :param interpretation_config:
         Configuration for interpretation analysis when applicable.
 
+    :param tensor_broker_config:
+        Configuration for tensor broker when applicable. Note that this is an
+        experimental feature.
+
     """
 
     input_info: "InputDataConfig"
@@ -367,6 +379,7 @@ class InputConfig:
     model_config: al_feature_extractor_configs
     pretrained_config: Union[None, "BasicPretrainedConfig"] = None
     interpretation_config: Union[None, "BasicInterpretationConfig"] = None
+    tensor_broker_config: Union[None, TensorBrokerConfig] = None
 
 
 @dataclass
@@ -680,6 +693,11 @@ class ImageInputDataConfig:
         - "centercrop": Resize the image to a larger size than the target and then
         apply a center crop to the target size.
 
+    :param adaptive_normalization_max_samples:
+        If using adaptive normalization (channel),
+        how many samples to use to compute the normalization parameters.
+        If None, will use all samples.
+
     :param mean_normalization_values:
         Average channel values to normalize images with. This can be a sequence matching
         the number of channels, or None. If None and using a pretrained model, the
@@ -694,9 +712,20 @@ class ImageInputDataConfig:
         If None and training from scratch, will iterate over training data and compute
         the running average per channel.
 
+    :param mode:
+        An explicit mode to convert loaded images to. Useful when working with
+        input data with a mixed number of channels, or you want to convert
+        images to a specific mode.
+        Options are
+        - "RGB": Red, Green, Blue (channels=3)
+        - "L": Grayscale (channels=1)
+        - "RGBA": Red, Green, Blue, Alpha (channels=4)
+
     :param num_channels:
         Number of channels in the images. If None, will try to infer the number of
-        channels from a random image in the training data.
+        channels from a random image in the training data. Useful when known
+        ahead of time how many channels the images have, will raise an error if
+        an image with a different number of channels is encountered.
 
     :param mixing_subtype:
         Which type of mixing to use on the image data given that ``mixing_alpha`` is
@@ -710,8 +739,10 @@ class ImageInputDataConfig:
     auto_augment: bool = True
     size: Sequence[int] = (64,)
     resize_approach: Union[Literal["resize", "randomcrop", "centercrop"]] = "resize"
+    adaptive_normalization_max_samples: Optional[int] = None
     mean_normalization_values: Union[None, Sequence[float]] = None
     stds_normalization_values: Union[None, Sequence[float]] = None
+    mode: Optional[Literal["RGB", "L", "RGBA"]] = None
     num_channels: Optional[int] = None
     mixing_subtype: Union[Literal["mixup"], Literal["cutmix"]] = "mixup"
     modality_dropout_rate: float = 0.0
@@ -759,6 +790,7 @@ class FusionConfig:
 
     model_type: Literal["mlp-residual", "identity", "mgmoe", "pass-through"]
     model_config: Union[ResidualMLPConfig, IdentityConfig, MGMoEModelConfig]
+    tensor_broker_config: Union[None, TensorBrokerConfig] = None
 
 
 @dataclass
@@ -800,12 +832,19 @@ class OutputConfig:
 
     output_info: OutputInfoConfig
     output_type_info: (
-        TabularOutputTypeConfig | SequenceOutputTypeConfig | ArrayOutputTypeConfig
+        TabularOutputTypeConfig
+        | SequenceOutputTypeConfig
+        | ArrayOutputTypeConfig
+        | ImageOutputTypeConfig
     )
     model_config: (
         TabularOutputModuleConfig | SequenceOutputModuleConfig | ArrayOutputModuleConfig
     )
 
     sampling_config: Optional[
-        SequenceOutputSamplingConfig | ArrayOutputSamplingConfig | dict
+        SequenceOutputSamplingConfig
+        | ArrayOutputSamplingConfig
+        | ImageOutputSamplingConfig
+        | dict
     ] = None
+    tensor_broker_config: Union[None, TensorBrokerConfig] = None

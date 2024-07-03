@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, Sequence, Union
 
 import torch
-from aislib.misc_utils import get_logger
 from torch.utils.data._utils.collate import default_collate
 
 from eir.data_load.data_preparation_modules.imputation import (
@@ -20,7 +19,7 @@ from eir.predict_modules.predict_input_setup import (
 from eir.predict_modules.predict_tabular_input_setup import (
     ComputedPredictTabularInputInfo,
 )
-from eir.serve_modules.serve_network_utils import prepare_request_input_data
+from eir.serve_modules.serve_network_utils import prepare_request_input_data_wrapper
 from eir.serve_modules.serve_schemas import ComputedServeTabularInputInfo, ServeLabels
 from eir.setup.input_setup import (
     al_input_objects_as_dict,
@@ -30,6 +29,7 @@ from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputIn
 from eir.setup.input_setup_modules.setup_tabular import ComputedTabularInputInfo
 from eir.setup.schemas import InputConfig, TabularInputDataConfig, al_input_configs
 from eir.train_utils.utils import call_hooks_stage_iterable
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from eir.serve_modules.serve_experiment_io import ServeExperiment
@@ -49,6 +49,7 @@ class ServeBatch:
 
     pre_hook_inputs: Dict[str, torch.Tensor]
     inputs: Dict[str, torch.Tensor]
+    inputs_split: Sequence[dict[str, torch.Tensor]]
     target_labels: Dict[str, Dict[str, torch.Tensor]]
     ids: list[str]
 
@@ -93,12 +94,12 @@ def general_pre_process(
         input_objects=deepcopy(exp.inputs),
     )
 
-    inputs_prepared = general_pre_process_raw_inputs(
+    inputs_prepared = general_pre_process_raw_inputs_wrapper(
         raw_inputs=inputs_parsed,
         experiment=exp,
     )
 
-    inputs_final = default_collate((inputs_prepared,))
+    inputs_final = default_collate(inputs_prepared)
     inputs_final = inputs_final
 
     loader_batch = (inputs_final, None, None)
@@ -116,8 +117,9 @@ def general_pre_process(
     batch_final = ServeBatch(
         pre_hook_inputs=inputs_final,
         inputs=batch.inputs,
+        inputs_split=inputs_prepared,
         target_labels={},
-        ids=list(),
+        ids=[f"Serve_{i}" for i in range(len(data))],
     )
 
     return batch_final
@@ -125,10 +127,11 @@ def general_pre_process(
 
 def parse_request_input_data_wrapper(
     data: Sequence, input_objects: al_input_objects_as_dict
-) -> Dict[str, Any]:
+) -> Sequence[dict[str, Any]]:
     loaded_data = _load_request_data(data=data)
-    parsed_data = prepare_request_input_data(
-        request_data=loaded_data, input_objects=input_objects
+    parsed_data = prepare_request_input_data_wrapper(
+        request_data=loaded_data,
+        input_objects=input_objects,
     )
     return parsed_data
 
@@ -167,11 +170,28 @@ def _setup_tabular_input_for_serve(
     return serve_tabular_info
 
 
-def _load_request_data(data: Sequence) -> Dict[str, Any]:
-    input_data = data[0]
+def _load_request_data(data: Sequence) -> Sequence[Dict[str, Any]]:
+    input_data = data
     inputs_loaded = input_data
 
     return inputs_loaded
+
+
+def general_pre_process_raw_inputs_wrapper(
+    raw_inputs: Sequence[dict[str, Any]],
+    experiment: Union["Experiment", "ServeExperiment"],
+) -> Sequence[dict[str, torch.Tensor]]:
+
+    all_preprocessed = []
+
+    for raw_input in raw_inputs:
+        preprocessed = general_pre_process_raw_inputs(
+            raw_inputs=raw_input,
+            experiment=experiment,
+        )
+        all_preprocessed.append(preprocessed)
+
+    return all_preprocessed
 
 
 def general_pre_process_raw_inputs(

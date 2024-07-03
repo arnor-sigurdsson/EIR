@@ -1,4 +1,4 @@
-14:39:17 - INFO - eir.train_utils.utils - Global random seed set to 0.
+10:57:02 - INFO - eir.train_utils.utils - Global random seed set to 0.
 usage: eirtrain [-h] --global_configs GLOBAL_CONFIGS [GLOBAL_CONFIGS ...]
                 [--input_configs [INPUT_CONFIGS ...]]
                 [--fusion_configs [FUSION_CONFIGS ...]] --output_configs

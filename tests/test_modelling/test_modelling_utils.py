@@ -71,10 +71,17 @@ def check_test_performance_results(
 
     df_train = pd.read_csv(train_history_path)
     df_valid = pd.read_csv(valid_history_path)
+
+    fail_msg = (
+        f"Failed for {output_name}, {target_column}, {metric} with "
+        f" direction {direction} and thresholds {thresholds} for "
+        f"run path {run_path}."
+    )
+
     key = f"{output_name}_{target_column}_{metric}"
     if direction == "max":
-        assert df_train.loc[:, key].max() > threshold_train
-        assert df_valid.loc[:, key].max() > threshold_valid
+        assert df_train.loc[:, key].max() > threshold_train, fail_msg
+        assert df_valid.loc[:, key].max() > threshold_valid, fail_msg
     elif direction == "min":
-        assert df_train.loc[:, key].min() < threshold_train
-        assert df_valid.loc[:, key].min() < threshold_valid
+        assert df_train.loc[:, key].min() < threshold_train, fail_msg
+        assert df_valid.loc[:, key].min() < threshold_valid, fail_msg

@@ -211,44 +211,30 @@ we send the payload directly as a Python dictionary.
 
 Here's an example Python function demonstrating this process:
 
-.. code-block:: python
+.. literalinclude:: ../tutorial_files/a_using_eir/02_tabular_tutorial/request_example/python_request_example_module.py
+    :language: python
+    :caption: request_example_module.py
 
-    import requests
 
-    def send_request(url: str, payload: dict):
-        response = requests.post(url, json=payload)
-        return response.json()
+When running this, we get the following output:
 
-    payload = {
-        "poker_hands": {
-            "S1": "3", "C1": "12",
-            "S2": "3", "C2": "2",
-            "S3": "3", "C3": "11",
-            "S4": "4", "C4": "5",
-            "S5": "2", "C5": "5"
-        }
-    }
+.. literalinclude:: ../tutorial_files/a_using_eir/02_tabular_tutorial/request_example/python_request_example.json
+    :language: json
+    :caption: request_example.json
 
-    response = send_request('http://localhost:8000/predict', payload)
-    print(response)
+We can also send the same request using the `curl` command:
 
-Additionally, you can send requests using `bash`:
 
-.. code-block:: bash
+.. literalinclude:: ../tutorial_files/a_using_eir/02_tabular_tutorial/request_example/bash_request_example_module.sh
+    :language: console
+    :caption: request_example_module.sh
 
-    curl -X 'POST' \\
-      'http://localhost:8000/predict' \\
-      -H 'accept: application/json' \\
-      -H 'Content-Type: application/json' \\
-      -d '{
-          "poker_hands": {
-              "S1": "3", "C1": "12",
-              "S2": "3", "C2": "2",
-              "S3": "3", "C3": "11",
-              "S4": "4", "C4": "5",
-              "S5": "2", "C5": "5"
-          }
-      }'
+When running this, we get the following output:
+
+.. literalinclude:: ../tutorial_files/a_using_eir/02_tabular_tutorial/request_example/bash_request_example.json
+    :language: json
+    :caption: request_example.json
+
 
 Analyzing Responses
 """""""""""""""""""

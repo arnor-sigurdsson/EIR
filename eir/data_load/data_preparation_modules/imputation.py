@@ -15,6 +15,7 @@ from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputIn
 from eir.setup.input_setup_modules.setup_tabular import ComputedTabularInputInfo
 from eir.setup.output_setup import al_output_objects_as_dict
 from eir.setup.output_setup_modules.array_output_setup import ComputedArrayOutputInfo
+from eir.setup.output_setup_modules.image_output_setup import ComputedImageOutputInfo
 from eir.setup.output_setup_modules.sequence_output_setup import (
     ComputedSequenceOutputInfo,
 )
@@ -23,6 +24,7 @@ from eir.setup.output_setup_modules.tabular_output_setup import (
 )
 from eir.setup.schemas import (
     ImageInputDataConfig,
+    ImageOutputTypeConfig,
     TabularInputDataConfig,
     TabularOutputTypeConfig,
 )
@@ -286,6 +288,18 @@ def impute_missing_output_modalities(
                     outputs_values[output_name] = fill_value
                     continue
 
+                case ComputedImageOutputInfo():
+                    assert output_type == "image"
+                    output_type_info = output_object.output_config.output_type_info
+                    assert isinstance(output_type_info, ImageOutputTypeConfig)
+                    size = output_type_info.size
+                    if len(size) == 1:
+                        size = [size[0], size[0]]
+
+                    num_channels = output_object.num_channels
+                    shape = (num_channels, *size)
+                    approach = "random"
+
                 case _:
                     raise ValueError(f"Unrecognized output type {output_type}")
 
@@ -310,7 +324,7 @@ def _get_default_output_impute_dtypes(
                 dtypes[output_name] = torch.float
             case ComputedSequenceOutputInfo():
                 dtypes[output_name] = torch.long
-            case ComputedArrayOutputInfo():
+            case ComputedArrayOutputInfo() | ComputedImageOutputInfo():
                 dtypes[output_name] = torch.float
             case _:
                 raise ValueError(
@@ -333,7 +347,7 @@ def _get_default_output_impute_fill_values(
                 )
             case ComputedSequenceOutputInfo():
                 fill_values[output_name] = 0
-            case ComputedArrayOutputInfo():
+            case ComputedArrayOutputInfo() | ComputedImageOutputInfo():
                 fill_values[output_name] = torch.nan
             case _:
                 raise ValueError(
