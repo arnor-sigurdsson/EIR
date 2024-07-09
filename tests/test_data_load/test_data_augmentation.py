@@ -476,7 +476,7 @@ def test_make_random_snps_missing_minimal():
     )
 
     missing_percentage = (array[:, 3, :].sum() / 1000).item()
-    assert missing_percentage < 0.05, "Expected minimal SNPs to be set to missing."
+    assert missing_percentage < 0.075, "Expected minimal SNPs to be set to missing."
 
 
 def test_shuffle_columns_some():

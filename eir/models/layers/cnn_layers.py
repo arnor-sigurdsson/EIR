@@ -152,6 +152,7 @@ class CNNResidualBlockBase(nn.Module):
         down_stride_w: int = 4,
         down_stride_h: int = 1,
         stochastic_depth_p: float = 0.0,
+        conv_downsample_identity: bool = True,
     ):
         super().__init__()
 
@@ -171,6 +172,8 @@ class CNNResidualBlockBase(nn.Module):
         self.down_stride_h = down_stride_h
 
         self.stochastic_depth_p = stochastic_depth_p
+
+        self.conv_downsample_identity = conv_downsample_identity
 
         self.rb_do = nn.Dropout2d(rb_do)
 
@@ -217,8 +220,9 @@ class CNNResidualBlockBase(nn.Module):
             bias=True,
         )
 
-        self.downsample_identity = nn.Sequential(
-            nn.Conv2d(
+        self.downsample_identity = nn.Identity()
+        if self.conv_downsample_identity:
+            self.downsample_identity = nn.Conv2d(
                 in_channels=in_channels,
                 out_channels=out_channels,
                 kernel_size=(self.conv_1_kernel_h, self.conv_1_kernel_w),
@@ -227,7 +231,6 @@ class CNNResidualBlockBase(nn.Module):
                 dilation=(self.dilation_h, self.dilation_w),
                 bias=True,
             )
-        )
 
         self.stochastic_depth = StochasticDepth(p=self.stochastic_depth_p, mode="batch")
 
@@ -312,6 +315,10 @@ class DownSamplingResidualBlock(nn.Module):
         in_height: int,
         in_width: int,
     ):
+        """
+        Note: Slightly different approach here compared to the upsampling below,
+        here we do the downsampling in one-go with a strided convolution.
+        """
         super().__init__()
 
         self.in_channels = in_channels
@@ -345,16 +352,17 @@ class DownSamplingResidualBlock(nn.Module):
             bias=True,
         )
 
+        self.grn = GRN(in_channels=self.out_channels)
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         identity = self.identity(x)
 
         out = self.norm_1(x)
         out = self.act_1(out)
         out = self.conv_1(out)
+        out = self.grn(out)
 
-        out = out + identity
-
-        return out
+        return out + identity
 
 
 def _compute_params_for_down_sampling(
@@ -384,6 +392,10 @@ class UpSamplingResidualBlock(nn.Module):
         upsample_width: bool = True,
     ):
         super(UpSamplingResidualBlock, self).__init__()
+        """
+        Note: Always applying a Conv to the upsampled identity seems to help
+        stabilize training.
+        """
 
         self.in_channels = in_channels
         self.out_channels = in_channels
@@ -424,18 +436,19 @@ class UpSamplingResidualBlock(nn.Module):
             bias=True,
         )
 
+        self.grn = GRN(in_channels=self.out_channels)
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        identity = self.upsample(x)
-        identity = self.identity(identity)
+        upsampled = self.upsample(x)
+        identity = self.identity(upsampled)
 
-        out = self.norm_1(x)
+        out = upsampled
+        out = self.norm_1(out)
         out = self.act_1(out)
-        out = self.upsample(out)
         out = self.conv_1(out)
+        out = self.grn(out)
 
-        out = out + identity
-
-        return out
+        return out + identity
 
 
 def _compute_params_for_up_sampling(

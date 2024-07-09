@@ -127,14 +127,16 @@ class CNNUpscaleResidualBlock(nn.Module):
             bias=True,
         )
 
-        self.upsample_identity = nn.ConvTranspose2d(
-            in_channels=in_channels,
-            out_channels=out_channels,
-            kernel_size=3,
-            stride=stride,
-            padding=1,
-            bias=True,
-        )
+        self.upsample_identity = nn.Identity()
+        if in_channels != out_channels or stride != (1, 1):
+            self.upsample_identity = nn.ConvTranspose2d(
+                in_channels=in_channels,
+                out_channels=out_channels,
+                kernel_size=3,
+                stride=stride,
+                padding=1,
+                bias=True,
+            )
 
         self.stochastic_depth = StochasticDepth(
             p=self.stochastic_depth_p,
@@ -147,12 +149,11 @@ class CNNUpscaleResidualBlock(nn.Module):
         )
 
     def forward(self, x: Any) -> Any:
+        identity = self.upsample_identity(x)
 
         out = self.conv_ds(x)
 
         out = self.norm_1(out)
-
-        identity = self.upsample_identity(x)
 
         out = self.conv_1(out)
 
@@ -218,7 +219,6 @@ def setup_blocks(
             module=cur_attention_block,
         )
 
-    n_blocks = 0
     while current_height < target_height or current_width < target_width:
         stride_height = 1
         stride_width = 1
@@ -240,7 +240,6 @@ def setup_blocks(
                 stride=stride,
             ),
         )
-        n_blocks += 1
 
         in_channels = out_channels
 
@@ -546,6 +545,8 @@ class TimeStepMixingBlock(nn.Module):
             heads=1,
         )
 
+        self.grn = GRN(in_channels=input_channels)
+
     def forward(self, input: torch.Tensor, t_emb: torch.Tensor) -> torch.Tensor:
         identity = input
 
@@ -572,9 +573,9 @@ class TimeStepMixingBlock(nn.Module):
             self.input_width,
         )
 
-        out = out + identity
+        out = self.grn(out)
 
-        return out
+        return out + identity
 
 
 class CrossAttentionArrayOutBlock(nn.Module):
@@ -633,6 +634,8 @@ class CrossAttentionArrayOutBlock(nn.Module):
             bias=True,
         )
 
+        self.grn = GRN(in_channels=input_channels)
+
     def forward(self, input: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
         identity = input
 
@@ -664,7 +667,6 @@ class CrossAttentionArrayOutBlock(nn.Module):
         )
 
         out = self.conv_1(out)
+        out = self.grn(out)
 
-        out = out + identity
-
-        return out
+        return out + identity

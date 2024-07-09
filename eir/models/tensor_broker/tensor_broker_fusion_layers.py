@@ -7,6 +7,7 @@ from torch import nn
 
 from eir.models.fusion.fusion_attention import UniDirectionalCrossAttention
 from eir.models.layers.cnn_layers import adjust_num_heads
+from eir.models.layers.norm_layers import LayerScale
 from eir.models.tensor_broker.projection_modules.sequence import (
     get_reshape_to_attention_dims_func,
 )
@@ -133,6 +134,8 @@ class ConcatenationFusionLayer(nn.Module):
         self.norm = nn.GroupNorm(1, self.out_channels)
         self.act = nn.GELU()
 
+        self.ls = LayerScale(dim=1, init_values=1e-05)
+
     def forward(
         self, input_tensor: torch.Tensor, projected_context_tensor: torch.Tensor
     ) -> torch.Tensor:
@@ -141,6 +144,8 @@ class ConcatenationFusionLayer(nn.Module):
         out = self.conv_1(out)
         out = self.norm(out)
         out = self.act(out)
+        out = self.ls(out)
+
         return out + residual
 
 
@@ -176,6 +181,8 @@ class CrossAttentionFusionLayer(nn.Module):
             heads=self.n_heads,
         )
 
+        self.ls = LayerScale(dim=1, init_values=1e-5)
+
     def forward(
         self, input_tensor: torch.Tensor, projected_context_tensor: torch.Tensor
     ) -> torch.Tensor:
@@ -186,6 +193,7 @@ class CrossAttentionFusionLayer(nn.Module):
 
         out = self.cross_attention(x=out, context=projected_context_tensor)
         out = self.act_1(out)
+        out = self.ls(out)
 
         out = out.reshape(identity.shape)
 

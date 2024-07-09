@@ -553,6 +553,14 @@ def _get_conv_residual_block(
     cur_in_channels = conv_blocks[-1].out_channels
     cur_out_channels = 2 ** (mc.channel_exp_base + layer_arch_idx)
 
+    w_stays_same = conv_param_suggestion_h.target_size == cur_height
+    h_stays_same = conv_param_suggestion_w.target_size == cur_width
+    channels_stays_same = cur_in_channels == cur_out_channels
+
+    need_identity_downsample = True
+    if w_stays_same and h_stays_same and channels_stays_same:
+        need_identity_downsample = False
+
     cur_layer = CNNResidualBlock(
         in_channels=cur_in_channels,
         out_channels=cur_out_channels,
@@ -567,6 +575,7 @@ def _get_conv_residual_block(
         full_preact=True if len(conv_blocks) == 1 else False,
         rb_do=mc.rb_do,
         stochastic_depth_p=mc.stochastic_depth_p,
+        conv_downsample_identity=need_identity_downsample,
     )
 
     return cur_layer

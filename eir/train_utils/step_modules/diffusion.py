@@ -73,6 +73,7 @@ def q_sample(
     x_start: torch.Tensor,
     t: torch.Tensor,
     noise: torch.Tensor,
+    input_scale: float = 1.0,
 ) -> torch.Tensor:
     """
     This and other functions adapted from
@@ -91,7 +92,11 @@ def q_sample(
         x_shape=x_start.shape,
     )
 
-    x_noisy = sqrt_alphas_cumprod_t * x_start + sqrt_one_minus_alphas_cumprod_t * noise
+    scaled_x_start = input_scale * x_start
+
+    x_noisy = (
+        sqrt_alphas_cumprod_t * scaled_x_start + sqrt_one_minus_alphas_cumprod_t * noise
+    )
 
     return x_noisy
 

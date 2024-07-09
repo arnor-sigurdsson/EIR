@@ -201,6 +201,10 @@ def overload_embeddings_with_pretrained(
     run_folder = Path(pretrained_checkpoint).parent.parent
     serialized_inputs = run_folder / "serializations/sequence_input_serializations"
 
+    any_serialized_sequence_inputs = serialized_inputs.exists()
+    if not any_serialized_sequence_inputs:
+        return model
+
     input_objects_loaded = {}
     for serialized_input in serialized_inputs.iterdir():
         input_name = serialized_input.stem
