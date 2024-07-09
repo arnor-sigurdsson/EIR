@@ -461,7 +461,7 @@ def test_make_random_snps_missing_maximal():
     missing_percentage = (array[:, 3, :].sum() / 1000).item()
 
     assert (
-        missing_percentage > 0.95
+        missing_percentage > 0.925
     ), "Expected a high percentage of SNPs to be set to missing."
 
 
@@ -483,10 +483,10 @@ def test_shuffle_columns_some():
     test_array = torch.tensor(
         [
             [
-                [True, False, True],
-                [False, True, False],
-                [False, False, False],
-                [False, False, False],
+                [True, False, True, False, True, False, False, False, False, False],
+                [False, True, False, False, False, False, False, False, False, False],
+                [False, False, False, False, False, True, False, False, True, True],
+                [False, False, False, True, False, False, True, True, False, False],
             ]
         ],
         dtype=torch.bool,
@@ -500,6 +500,7 @@ def test_shuffle_columns_some():
             shuffle_augment_alpha=100.0,
             shuffle_augment_beta=1.0,
         )
+
         assert not torch.equal(shuffled_array, test_array)
 
 

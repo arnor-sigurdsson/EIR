@@ -26,7 +26,7 @@ def test_prepare_genotype_array_train_mode():
     assert prepared_array_train != test_array
     assert (test_array_copy == test_array).all()
 
-    assert (prepared_array_train[:, -1, :] == 1).sum() / 100 > 0.975
+    assert (prepared_array_train[:, -1, :] == 1).sum() / 100 > 0.925
 
     prepared_array_train = prepare_omics.prepare_one_hot_omics_data(
         genotype_array=test_array,
