@@ -902,7 +902,7 @@ Args:
     num_key_value_heads (`int`, *optional*):
         This is the number of key_value heads that should be used to implement Grouped Query Attention. If
         `num_key_value_heads=num_attention_heads`, the model will use Multi Head Attention (MHA), if
-        `num_key_value_heads=1 the model will use Multi Query Attention (MQA) otherwise GQA is used. When
+        `num_key_value_heads=1` the model will use Multi Query Attention (MQA) otherwise GQA is used. When
         converting a multi-head checkpoint to a GQA checkpoint, each group key and value head should be constructed
         by meanpooling all the original heads within that group. For more details checkout `this
         paper <https://arxiv.org/pdf/2305.13245.pdf>`__. If it is not specified, will default to
@@ -1051,7 +1051,7 @@ Args:
     num_key_value_heads (`int`, *optional*):
         This is the number of key_value heads that should be used to implement Grouped Query Attention. If
         `num_key_value_heads=num_attention_heads`, the model will use Multi Head Attention (MHA), if
-        `num_key_value_heads=1 the model will use Multi Query Attention (MQA) otherwise GQA is used. When
+        `num_key_value_heads=1` the model will use Multi Query Attention (MQA) otherwise GQA is used. When
         converting a multi-head checkpoint to a GQA checkpoint, each group key and value head should be constructed
         by meanpooling all the original heads within that group. For more details checkout `this
         paper <https://arxiv.org/pdf/2305.13245.pdf>`__. If it is not specified, will default to
@@ -1937,7 +1937,7 @@ Args:
     num_key_value_heads (`int`, *optional*, defaults to 16):
         This is the number of key_value heads that should be used to implement Grouped Query Attention. If
         `num_key_value_heads=num_attention_heads`, the model will use Multi Head Attention (MHA), if
-        `num_key_value_heads=1 the model will use Multi Query Attention (MQA) otherwise GQA is used. When
+        `num_key_value_heads=1` the model will use Multi Query Attention (MQA) otherwise GQA is used. When
         converting a multi-head checkpoint to a GQA checkpoint, each group key and value head should be constructed
         by meanpooling all the original heads within that group. For more details checkout `this
         paper <https://arxiv.org/pdf/2305.13245.pdf>`__. If it is not specified, will default to
@@ -1972,17 +1972,91 @@ Args:
         Whether to use a bias in the query, key, value and output projection layers during self-attention.
     attention_dropout (`float`, *optional*, defaults to 0.0):
         The dropout ratio for the attention probabilities.
-
 ::
 
 >>> from transformers import GemmaModel, GemmaConfig
-
 >>> # Initializing a Gemma gemma-7b style configuration
 >>> configuration = GemmaConfig()
-
 >>> # Initializing a model from the gemma-7b style configuration
 >>> model = GemmaModel(configuration)
+>>> # Accessing the model configuration
+>>> configuration = model.config
 
+.. class:: transformers.models.gemma2.configuration_gemma2.Gemma2Config(vocab_size=256000, hidden_size=3072, intermediate_size=24576, num_hidden_layers=28, num_attention_heads=16, num_key_value_heads=16, head_dim=256, hidden_activation='gelu_pytorch_tanh', max_position_embeddings=8192, initializer_range=0.02, rms_norm_eps=1e-06, use_cache=True, pad_token_id=0, eos_token_id=1, bos_token_id=2, tie_word_embeddings=True, rope_theta=10000.0, attention_bias=False, attention_dropout=0.0, final_logit_softcapping=30.0, attn_logit_softcapping=50.0, query_pre_attn_scalar=224, sliding_window=4096, **kwargs)
+
+The Gemma2 model was proposed in `Gemma2: Open Models Based on Gemini Technology and Research <https://blog.google/technology/developers/google-gemma-2/>`__ by Gemma2 Team, Google.
+Two Gemma2 models are released, with parameters sizes of 9 billion (9B) and 27 billion (27B).
+
+The abstract from the blog post is the following:
+
+*Now we’re officially releasing Gemma 2 to researchers and developers globally. Available in both 9 billion (9B) and 27 billion (27B) parameter sizes, Gemma 2 is higher-performing and more efficient at inference than the first generation, with significant safety advancements built in. In fact, at 27B, it offers competitive alternatives to models more than twice its size, delivering the kind of performance that was only possible with proprietary models as recently as December.*
+
+Tips:
+
+- The original checkpoints can be converted using the conversion script `src/transformers/models/Gemma2/convert_Gemma2_weights_to_hf.py` 
+
+This model was contributed by `Arthur Zucker <https://huggingface.co/ArthurZ>`__, `Pedro Cuenca <https://huggingface.co/pcuenq>`__ and `Tom Arsen <>`__.
+
+
+Args:
+    vocab_size (`int`, *optional*, defaults to 256000):
+        Vocabulary size of the Gemma2 model. Defines the number of different tokens that can be represented by the
+        `inputs_ids` passed when calling ``Gemma2Model``
+    hidden_size (`int`, *optional*, defaults to 3072):
+        Dimension of the hidden representations.
+    intermediate_size (`int`, *optional*, defaults to 24576):
+        Dimension of the MLP representations.
+    num_hidden_layers (`int`, *optional*, defaults to 28):
+        Number of hidden layers in the Transformer decoder.
+    num_attention_heads (`int`, *optional*, defaults to 16):
+        Number of attention heads for each attention layer in the Transformer decoder.
+    num_key_value_heads (`int`, *optional*, defaults to 16):
+        This is the number of key_value heads that should be used to implement Grouped Query Attention. If
+        `num_key_value_heads=num_attention_heads`, the model will use Multi Head Attention (MHA), if
+        `num_key_value_heads=1` the model will use Multi Query Attention (MQA) otherwise GQA is used. When
+        converting a multi-head checkpoint to a GQA checkpoint, each group key and value head should be constructed
+        by meanpooling all the original heads within that group. For more details checkout `this
+        paper <https://arxiv.org/pdf/2305.13245.pdf>`__. If it is not specified, will default to
+        `num_attention_heads`.
+    head_dim (`int`, *optional*, defaults to 256):
+        The attention head dimension.
+    hidden_activation (`str` or `function`, *optional*, defaults to `"gelu_pytorch_tanh"`):
+        The non-linear activation function (function or string) in the decoder.
+    max_position_embeddings (`int`, *optional*, defaults to 8192):
+        The maximum sequence length that this model might ever be used with.
+    initializer_range (`float`, *optional*, defaults to 0.02):
+        The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
+    rms_norm_eps (`float`, *optional*, defaults to 1e-06):
+        The epsilon used by the rms normalization layers.
+    use_cache (`bool`, *optional*, defaults to `True`):
+        Whether or not the model should return the last key/values attentions (not used by all models). Only
+        relevant if `config.is_decoder=True`.
+    pad_token_id (`int`, *optional*, defaults to 0):
+        Padding token id.
+    eos_token_id (`int`, *optional*, defaults to 1):
+        End of stream token id.
+    bos_token_id (`int`, *optional*, defaults to 2):
+        Beginning of stream token id.
+    tie_word_embeddings (`bool`, *optional*, defaults to `True`):
+        Whether to tie weight embeddings
+    rope_theta (`float`, *optional*, defaults to 10000.0):
+        The base period of the RoPE embeddings.
+    attention_bias (`bool`, defaults to `False`, *optional*, defaults to `False`):
+        Whether to use a bias in the query, key, value and output projection layers during self-attention.
+    attention_dropout (`float`, *optional*, defaults to 0.0):
+        The dropout ratio for the attention probabilities.
+    final_logit_softcapping (`float`, *optional*, defaults to 30.0): scaling factor when applying tanh softcapping on the logits.
+    attn_logit_softcapping (`float`, *optional*, defaults to 50.0): scaling factor when applying tanh softcapping on the attention scores.
+    query_pre_attn_scalar (`float`, *optional*, defaults to 224): scaling factor used on the attention scores
+    sliding_window (`int`, *optional*, defaults to 4096): in Gemma2, every other layer uses sliding window attention. This is the
+        size of the sliding window.
+::
+
+>>> from transformers import Gemma2Model, Gemma2Config
+>>> # Initializing a Gemma2 gemma2-9b style configuration
+>>> configuration = Gemma2Config()
+>>> # Initializing a model from the gemma2-9b style configuration
+>>> model = Gemma2Model(configuration)
 >>> # Accessing the model configuration
 >>> configuration = model.config
 
@@ -2815,7 +2889,7 @@ Args:
     num_key_value_heads (`int`, *optional*):
         This is the number of key_value heads that should be used to implement Grouped Query Attention. If
         `num_key_value_heads=num_attention_heads`, the model will use Multi Head Attention (MHA), if
-        `num_key_value_heads=1 the model will use Multi Query Attention (MQA) otherwise GQA is used. When
+        `num_key_value_heads=1` the model will use Multi Query Attention (MQA) otherwise GQA is used. When
         converting a multi-head checkpoint to a GQA checkpoint, each group key and value head should be constructed
         by meanpooling all the original heads within that group. For more details checkout `this
         paper <https://arxiv.org/pdf/2305.13245.pdf>`__. If it is not specified, will default to
@@ -3446,7 +3520,7 @@ This model was contributed by `valhalla <https://huggingface.co/valhalla>`__. Th
         The id of the token to force as the last generated token when `max_length` is reached. Usually set to
         `eos_token_id`.
 
-.. class:: transformers.models.mega.configuration_mega.MegaConfig(vocab_size=30522, hidden_size=128, num_hidden_layers=4, intermediate_size=256, ema_projection_size=16, bidirectional=True, shared_representation_size=64, use_chunking=False, chunk_size=-1, truncation=None, normalize_before_mega=True, normalization_type='scalenorm', norm_affine=True, activation='silu', attention_activation='softmax', dropout_prob=0.1, hidden_dropout_prob=0.1, attention_probs_dropout_prob=0.1, use_feature_dropout=False, use_normalized_ffn=True, nffn_hidden_size=256, normalize_before_ffn=True, nffn_activation_dropout_prob=0.1, max_positions=2048, add_token_type_embeddings=False, type_vocab_size=2, initializer_range=0.02, ema_delta_alpha_range=0.2, ema_beta_range=0.02, ema_gamma_omega_range=1.0, pad_token_id=1, bos_token_id=0, eos_token_id=2, relative_positional_bias='rotary', classifier_dropout=None, use_cache=True, add_lm_hidden_dense_layer=True, **kwargs)
+.. class:: transformers.models.deprecated.mega.configuration_mega.MegaConfig(vocab_size=30522, hidden_size=128, num_hidden_layers=4, intermediate_size=256, ema_projection_size=16, bidirectional=True, shared_representation_size=64, use_chunking=False, chunk_size=-1, truncation=None, normalize_before_mega=True, normalization_type='scalenorm', norm_affine=True, activation='silu', attention_activation='softmax', dropout_prob=0.1, hidden_dropout_prob=0.1, attention_probs_dropout_prob=0.1, use_feature_dropout=False, use_normalized_ffn=True, nffn_hidden_size=256, normalize_before_ffn=True, nffn_activation_dropout_prob=0.1, max_positions=2048, add_token_type_embeddings=False, type_vocab_size=2, initializer_range=0.02, ema_delta_alpha_range=0.2, ema_beta_range=0.02, ema_gamma_omega_range=1.0, pad_token_id=1, bos_token_id=0, eos_token_id=2, relative_positional_bias='rotary', classifier_dropout=None, use_cache=True, add_lm_hidden_dense_layer=True, **kwargs)
 
 The MEGA model was proposed in `Mega: Moving Average Equipped Gated Attention <https://arxiv.org/abs/2209.10655>`__ by Xuezhe Ma, Chunting Zhou, Xiang Kong, Junxian He, Liangke Gui, Graham Neubig, Jonathan May, and Luke Zettlemoyer.
 MEGA proposes a new approach to self-attention with each encoder layer having a multi-headed exponential moving average in addition to a single head of standard dot-product attention, giving the attention mechanism 
@@ -3705,7 +3779,7 @@ The original code can be found `here <https://github.com/mistralai/mistral-src>`
     num_key_value_heads (`int`, *optional*, defaults to 8):
         This is the number of key_value heads that should be used to implement Grouped Query Attention. If
         `num_key_value_heads=num_attention_heads`, the model will use Multi Head Attention (MHA), if
-        `num_key_value_heads=1 the model will use Multi Query Attention (MQA) otherwise GQA is used. When
+        `num_key_value_heads=1` the model will use Multi Query Attention (MQA) otherwise GQA is used. When
         converting a multi-head checkpoint to a GQA checkpoint, each group key and value head should be constructed
         by meanpooling all the original heads within that group. For more details checkout `this
         paper <https://arxiv.org/pdf/2305.13245.pdf>`__. If it is not specified, will default to `8`.
@@ -4093,7 +4167,7 @@ Args:
     prompt_mid_dim (`int`, *optional*, defaults to 800):
         Dimensionality of the "intermediate" layer in prompt.
 
-.. class:: transformers.models.nezha.configuration_nezha.NezhaConfig(vocab_size=21128, hidden_size=768, num_hidden_layers=12, num_attention_heads=12, intermediate_size=3072, hidden_act='gelu', hidden_dropout_prob=0.1, attention_probs_dropout_prob=0.1, max_position_embeddings=512, max_relative_position=64, type_vocab_size=2, initializer_range=0.02, layer_norm_eps=1e-12, classifier_dropout=0.1, pad_token_id=0, bos_token_id=2, eos_token_id=3, use_cache=True, **kwargs)
+.. class:: transformers.models.deprecated.nezha.configuration_nezha.NezhaConfig(vocab_size=21128, hidden_size=768, num_hidden_layers=12, num_attention_heads=12, intermediate_size=3072, hidden_act='gelu', hidden_dropout_prob=0.1, attention_probs_dropout_prob=0.1, max_position_embeddings=512, max_relative_position=64, type_vocab_size=2, initializer_range=0.02, layer_norm_eps=1e-12, classifier_dropout=0.1, pad_token_id=0, bos_token_id=2, eos_token_id=3, use_cache=True, **kwargs)
 
 The Nezha model was proposed in `NEZHA: Neural Contextualized Representation for Chinese Language Understanding <https://arxiv.org/abs/1909.00204>`__ by Junqiu Wei et al.
 
@@ -4338,7 +4412,7 @@ Args:
     num_key_value_heads (`int`, *optional*):
         This is the number of key_value heads that should be used to implement Grouped Query Attention. If
         `num_key_value_heads=num_attention_heads`, the model will use Multi Head Attention (MHA), if
-        `num_key_value_heads=1 the model will use Multi Query Attention (MQA) otherwise GQA is used. When
+        `num_key_value_heads=1` the model will use Multi Query Attention (MQA) otherwise GQA is used. When
         converting a multi-head checkpoint to a GQA checkpoint, each group key and value head should be constructed
         by meanpooling all the original heads within that group. For more details checkout `this
         paper <https://arxiv.org/pdf/2305.13245.pdf>`__. If it is not specified, will default to
@@ -4807,7 +4881,7 @@ The Phi-1.5 model was proposed in `Textbooks Are All You Need II: phi-1.5 techni
     num_key_value_heads (`int`, *optional*):
         This is the number of key_value heads that should be used to implement Grouped Query Attention. If
         `num_key_value_heads=num_attention_heads`, the model will use Multi Head Attention (MHA), if
-        `num_key_value_heads=1 the model will use Multi Query Attention (MQA) otherwise GQA is used. When
+        `num_key_value_heads=1` the model will use Multi Query Attention (MQA) otherwise GQA is used. When
         converting a multi-head checkpoint to a GQA checkpoint, each group key and value head should be constructed
         by meanpooling all the original heads within that group. For more details checkout `this
         paper <https://arxiv.org/pdf/2305.13245.pdf>`__. If it is not specified, will default to
@@ -4870,7 +4944,7 @@ The Phi-3 model was proposed in `Phi-3 Technical Report: A Highly Capable Langua
     num_key_value_heads (`int`, *optional*):
         This is the number of key_value heads that should be used to implement Grouped Query Attention. If
         `num_key_value_heads=num_attention_heads`, the model will use Multi Head Attention (MHA), if
-        `num_key_value_heads=1 the model will use Multi Query Attention (MQA) otherwise GQA is used. When
+        `num_key_value_heads=1` the model will use Multi Query Attention (MQA) otherwise GQA is used. When
         converting a multi-head checkpoint to a GQA checkpoint, each group key and value head should be constructed
         by meanpooling all the original heads within that group. For more details checkout `this
         paper <https://arxiv.org/pdf/2305.13245.pdf>`__. If it is not specified, will default to
@@ -5090,7 +5164,7 @@ Qwen2 is the new model series of large language models from the Qwen team. Previ
     num_key_value_heads (`int`, *optional*, defaults to 32):
         This is the number of key_value heads that should be used to implement Grouped Query Attention. If
         `num_key_value_heads=num_attention_heads`, the model will use Multi Head Attention (MHA), if
-        `num_key_value_heads=1 the model will use Multi Query Attention (MQA) otherwise GQA is used. When
+        `num_key_value_heads=1` the model will use Multi Query Attention (MQA) otherwise GQA is used. When
         converting a multi-head checkpoint to a GQA checkpoint, each group key and value head should be constructed
         by meanpooling all the original heads within that group. For more details checkout `this
         paper <https://arxiv.org/pdf/2305.13245.pdf>`__. If it is not specified, will default to `32`.
@@ -5150,7 +5224,7 @@ Qwen2MoE is the new model series of large language models from the Qwen team. Pr
     num_key_value_heads (`int`, *optional*, defaults to 16):
         This is the number of key_value heads that should be used to implement Grouped Query Attention. If
         `num_key_value_heads=num_attention_heads`, the model will use Multi Head Attention (MHA), if
-        `num_key_value_heads=1 the model will use Multi Query Attention (MQA) otherwise GQA is used. When
+        `num_key_value_heads=1` the model will use Multi Query Attention (MQA) otherwise GQA is used. When
         converting a multi-head checkpoint to a GQA checkpoint, each group key and value head should be constructed
         by meanpooling all the original heads within that group. For more details checkout `this
         paper <https://arxiv.org/pdf/2305.13245.pdf>`__. If it is not specified, will default to `32`.
@@ -5999,7 +6073,7 @@ Args:
     num_key_value_heads (`int`, *optional*, defaults to 32):
         This is the number of key_value heads that should be used to implement Grouped Query Attention. If
         `num_key_value_heads=num_attention_heads`, the model will use Multi Head Attention (MHA), if
-        `num_key_value_heads=1 the model will use Multi Query Attention (MQA) otherwise GQA is used. When
+        `num_key_value_heads=1` the model will use Multi Query Attention (MQA) otherwise GQA is used. When
         converting a multi-head checkpoint to a GQA checkpoint, each group key and value head should be constructed
         by meanpooling all the original heads within that group. For more details checkout `this
         paper <https://arxiv.org/pdf/2305.13245.pdf>`__. If it is not specified, will default to
@@ -6069,7 +6143,7 @@ Args:
     num_key_value_heads (`int`, *optional*, defaults to 2):
         This is the number of key_value heads that should be used to implement Grouped Query Attention. If
         `num_key_value_heads=num_attention_heads`, the model will use Multi Head Attention (MHA), if
-        `num_key_value_heads=1 the model will use Multi Query Attention (MQA) otherwise GQA is used. When
+        `num_key_value_heads=1` the model will use Multi Query Attention (MQA) otherwise GQA is used. When
         converting a multi-head checkpoint to a GQA checkpoint, each group key and value head should be constructed
         by meanpooling all the original heads within that group. For more details checkout `this
         paper <https://arxiv.org/pdf/2305.13245.pdf>`__. If it is not specified, will default to `8`.
@@ -6548,7 +6622,7 @@ Args:
     lang_id (`int`, *optional*, defaults to 1):
         The ID of the language used by the model. This parameter is used when generating text in a given language.
 
-.. class:: transformers.models.xlm_prophetnet.configuration_xlm_prophetnet.XLMProphetNetConfig(activation_dropout: Optional[float] = 0.1, activation_function: Union[str, Callable, NoneType] = 'gelu', vocab_size: Optional[int] = 30522, hidden_size: Optional[int] = 1024, encoder_ffn_dim: Optional[int] = 4096, num_encoder_layers: Optional[int] = 12, num_encoder_attention_heads: Optional[int] = 16, decoder_ffn_dim: Optional[int] = 4096, num_decoder_layers: Optional[int] = 12, num_decoder_attention_heads: Optional[int] = 16, attention_dropout: Optional[float] = 0.1, dropout: Optional[float] = 0.1, max_position_embeddings: Optional[int] = 512, init_std: Optional[float] = 0.02, is_encoder_decoder: Optional[bool] = True, add_cross_attention: Optional[bool] = True, decoder_start_token_id: Optional[int] = 0, ngram: Optional[int] = 2, num_buckets: Optional[int] = 32, relative_max_distance: Optional[int] = 128, disable_ngram_loss: Optional[bool] = False, eps: Optional[float] = 0.0, use_cache: Optional[bool] = True, pad_token_id: Optional[int] = 0, bos_token_id: Optional[int] = 1, eos_token_id: Optional[int] = 2, **kwargs)
+.. class:: transformers.models.deprecated.xlm_prophetnet.configuration_xlm_prophetnet.XLMProphetNetConfig(activation_dropout: Optional[float] = 0.1, activation_function: Union[str, Callable, NoneType] = 'gelu', vocab_size: Optional[int] = 30522, hidden_size: Optional[int] = 1024, encoder_ffn_dim: Optional[int] = 4096, num_encoder_layers: Optional[int] = 12, num_encoder_attention_heads: Optional[int] = 16, decoder_ffn_dim: Optional[int] = 4096, num_decoder_layers: Optional[int] = 12, num_decoder_attention_heads: Optional[int] = 16, attention_dropout: Optional[float] = 0.1, dropout: Optional[float] = 0.1, max_position_embeddings: Optional[int] = 512, init_std: Optional[float] = 0.02, is_encoder_decoder: Optional[bool] = True, add_cross_attention: Optional[bool] = True, decoder_start_token_id: Optional[int] = 0, ngram: Optional[int] = 2, num_buckets: Optional[int] = 32, relative_max_distance: Optional[int] = 128, disable_ngram_loss: Optional[bool] = False, eps: Optional[float] = 0.0, use_cache: Optional[bool] = True, pad_token_id: Optional[int] = 0, bos_token_id: Optional[int] = 1, eos_token_id: Optional[int] = 2, **kwargs)
 
 The XLM-ProphetNet model was proposed in `ProphetNet: Predicting Future N-gram for Sequence-to-Sequence Pre-training, <https://arxiv.org/abs/2001.04063>`__ by Yu Yan, Weizhen Qi, Yeyun Gong, Dayiheng Liu, Nan Duan, Jiusheng Chen, Ruofei
 Zhang, Ming Zhou on 13 Jan, 2020.

@@ -1,0 +1,14 @@
+output_folder: eir_tutorials/tutorial_runs/f_image_output/01_image_foundation
+valid_size: 1024
+n_saved_models: 1
+checkpoint_interval: 500
+plot_skip_steps: 1000
+sample_interval: 500
+memory_dataset: false
+dataloader_workers: 8
+n_epochs: 10
+early_stopping_patience: 16
+batch_size: 64
+lr: 0.0003
+optimizer: "adamw"
+device: "mps"

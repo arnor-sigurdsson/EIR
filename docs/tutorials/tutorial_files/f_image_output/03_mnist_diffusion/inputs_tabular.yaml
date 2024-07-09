@@ -1,0 +1,11 @@
+input_info:
+  input_source: eir_tutorials/f_image_output/03_mnist_diffusion/data/data/annotations.csv
+  input_name: mnist_tabular
+  input_type: tabular
+
+input_type_info:
+  input_cat_columns:
+          - CLASS
+
+model_config:
+  model_type: tabular

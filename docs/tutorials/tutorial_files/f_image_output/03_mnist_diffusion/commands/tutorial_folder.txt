@@ -1,0 +1,9 @@
+eir_tutorials/f_image_output/03_mnist_diffusion
+├── conf
+│   ├── fusion.yaml
+│   ├── globals.yaml
+│   ├── inputs_image_cnn.yaml
+│   ├── inputs_tabular.yaml
+│   └── output_image.yaml
+└── data
+    └── data

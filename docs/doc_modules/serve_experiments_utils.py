@@ -54,12 +54,13 @@ def send_request(url: str, payload: list[dict]) -> dict:
 def copy_inputs(example_requests: list[dict[str, Any]], output_folder: str) -> None:
     os.makedirs(output_folder, exist_ok=True)
 
-    for request in example_requests:
+    for idx, request in enumerate(example_requests):
         for key, file_path in request.items():
             if isinstance(file_path, str) and Path(file_path).is_file():
-                shutil.copy(file_path, Path(output_folder) / Path(file_path).name)
+                out_name = f"{Path(file_path).stem}_{idx}{Path(file_path).suffix}"
+                shutil.copy(file_path, Path(output_folder) / out_name)
             else:
-                with open(Path(output_folder) / f"{key}.json", "w") as f:
+                with open(Path(output_folder) / f"{key}_{idx}.json", "w") as f:
                     json.dump(file_path, f, ensure_ascii=False, indent=4)
 
 
