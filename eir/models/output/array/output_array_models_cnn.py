@@ -127,7 +127,7 @@ class CNNUpscaleResidualBlock(nn.Module):
             bias=True,
         )
 
-        self.upsample_identity = nn.Identity()
+        self.upsample_identity: nn.Module = nn.Identity()
         if in_channels != out_channels or stride != (1, 1):
             self.upsample_identity = nn.ConvTranspose2d(
                 in_channels=in_channels,

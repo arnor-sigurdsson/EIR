@@ -220,7 +220,7 @@ class CNNResidualBlockBase(nn.Module):
             bias=True,
         )
 
-        self.downsample_identity = nn.Identity()
+        self.downsample_identity: nn.Module = nn.Identity()
         if self.conv_downsample_identity:
             self.downsample_identity = nn.Conv2d(
                 in_channels=in_channels,

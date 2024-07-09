@@ -104,10 +104,12 @@ def generate_validation_curve_from_series(
 
     xlim_upper = valid_series_cut.index.max()
 
+    values = np.asarray(valid_series_cut.values)
+
     validation_xticks = valid_series_cut.index
     lines = ax.plot(
         validation_xticks,
-        valid_series_cut.values,
+        values,
         c="red",
         linewidth=0.8,
         alpha=1.0,
@@ -128,7 +130,7 @@ def generate_validation_curve_from_series(
     if xlim_upper > 1e4:
         ax.ticklabel_format(style="sci", axis="x", scilimits=(0, 0))
 
-    labels = [line.get_label() for line in lines]
+    labels = [str(line.get_label()) for line in lines]
     ax.legend(lines, labels)
 
     plt.grid()
@@ -577,6 +579,7 @@ def generate_confusion_matrix(
     ax.set_xlabel("Predicted Label", fontsize=label_fontsize)
 
     color_bar = ax.collections[0].colorbar
+    assert color_bar is not None
     color_bar.ax.tick_params(labelsize=label_fontsize)
 
     plt.setp(
