@@ -251,13 +251,13 @@ Analyzing Responses
 
 Before we going into the responses, let's view the images that were used for predictions:
 
-.. figure:: ../tutorial_files/a_using_eir/05_image_tutorial/serve_results/1040579.jpg
+.. figure:: ../tutorial_files/a_using_eir/05_image_tutorial/serve_results/1040579_0.jpg
    :alt: Image 1040579
    :align: center
 
 1040579.jpg
 
-.. figure:: ../tutorial_files/a_using_eir/05_image_tutorial/serve_results/108743.jpg
+.. figure:: ../tutorial_files/a_using_eir/05_image_tutorial/serve_results/108743_1.jpg
    :alt: Image 108743
    :align: center
 

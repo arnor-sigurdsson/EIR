@@ -3,11 +3,26 @@ input_info:
   input_name: image_input
   input_type: image
 
+input_type_info:
+  adaptive_normalization_max_samples: 10000
+  size:
+    - 32
+
 model_config:
   model_type: cnn
   model_init_config:
     channel_exp_base: 5
-    kernel_width: 2
-    down_stride_width: 2
-    kernel_height: 2
-    down_stride_height: 2
+    kernel_width: 3
+    down_stride_width: 1
+    first_stride_expansion_width: 1
+    first_kernel_expansion_width: 1.7
+    kernel_height: 3
+    down_stride_height: 1
+    first_stride_expansion_height: 1
+    first_kernel_expansion_height: 1.7
+    allow_first_conv_size_reduction: false
+    attention_inclusion_cutoff: 256
+    down_sample_every_n_blocks: 1
+    layers:
+      - 1
+      - 1

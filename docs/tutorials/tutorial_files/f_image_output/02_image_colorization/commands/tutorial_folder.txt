@@ -5,7 +5,6 @@ eir_tutorials/f_image_output/02_image_colorization
 │   ├── inputs_image_cnn.yaml
 │   ├── inputs_image_cnn_both.yaml
 │   ├── inputs_image_cnn_super_res.yaml
-│   ├── inputs_sequence.yaml
 │   ├── output_image.yaml
 │   └── output_image_super_res.yaml
 └── data

@@ -161,10 +161,10 @@ def get_03_imdb_run_1_serve_info() -> AutoDocServingInfo:
     example_requests = [
         [
             {
-                "imdb_reviews": "This move was great! I loved it!",
+                "imdb_reviews": "This movie was great! I loved it!",
             },
             {
-                "imdb_reviews": "This move was terrible! I hated it!",
+                "imdb_reviews": "This movie was terrible! I hated it!",
             },
             {
                 "imdb_reviews": "You'll have to have your wits about "

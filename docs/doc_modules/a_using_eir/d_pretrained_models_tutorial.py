@@ -256,8 +256,8 @@ def get_04_imdb_run_1_serve_info() -> AutoDocServingInfo:
     server_command = ["eirserve", "--model-path", "FILL_MODEL"]
 
     base_inputs = [
-        "This move was great! I loved it!",
-        "This move was terrible! I hated it!",
+        "This movie was great! I loved it!",
+        "This movie was terrible! I hated it!",
         "You'll have to have your wits about "
         "you and your brain fully switched"
         " on watching Oppenheimer as it could easily get away from a "

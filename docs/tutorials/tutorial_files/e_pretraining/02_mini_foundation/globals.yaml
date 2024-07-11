@@ -4,8 +4,8 @@ n_saved_models: 1
 checkpoint_interval: 500
 plot_skip_steps: 200
 sample_interval: 500
-memory_dataset: true
-dataloader_workers: 0
+memory_dataset: false
+dataloader_workers: 8
 n_epochs: 20
 batch_size: 256
 lr: 0.0005

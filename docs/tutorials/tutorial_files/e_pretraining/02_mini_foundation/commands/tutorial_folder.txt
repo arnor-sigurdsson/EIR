@@ -1,4 +1,26 @@
 eir_tutorials/e_pretraining/02_mini_foundation
+├── 02_mini_foundation
+│   ├── configs
+│   │   ├── fusion_config.yaml
+│   │   ├── global_config.yaml
+│   │   ├── input_configs.yaml
+│   │   └── output_configs.yaml
+│   ├── logging_history.log
+│   ├── meta
+│   │   └── eir_version.txt
+│   ├── model_info.txt
+│   ├── results
+│   │   └── text
+│   ├── saved_models
+│   │   └── 02_mini_foundation_model_18000_perf-average=0.1780.pt
+│   ├── serializations
+│   │   ├── filtered_experiment.dill
+│   │   ├── image_input_serializations
+│   │   └── sequence_input_serializations
+│   ├── train_average_history.log
+│   ├── training_curve_LOSS-AVERAGE.pdf
+│   ├── training_curve_PERF-AVERAGE.pdf
+│   └── validation_average_history.log
 ├── conf
 │   ├── cifar
 │   │   ├── cifar_fusion.yaml
@@ -24,7 +46,6 @@ eir_tutorials/e_pretraining/02_mini_foundation
     │   ├── results
     │   ├── saved_models
     │   ├── serializations
-    │   ├── tensorboard_logs
     │   ├── train_average_history.log
     │   ├── training_curve_LOSS-AVERAGE.pdf
     │   ├── training_curve_PERF-AVERAGE.pdf

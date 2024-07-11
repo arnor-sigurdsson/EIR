@@ -224,7 +224,7 @@ After sending requests to the served model, the responses can be analyzed.
 For example, we can take a look at the image input as well as the generated output
 from the model:
 
-.. image:: ../tutorial_files/f_image_output/01_image_foundation/serve_results/image_0.png
+.. image:: ../tutorial_files/f_image_output/01_image_foundation/serve_results/image_0_0.png
     :width: 33%
     :align: center
 

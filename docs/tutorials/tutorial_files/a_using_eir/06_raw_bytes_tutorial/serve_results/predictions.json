@@ -13,16 +13,16 @@
                 {
                     "imdb_output": {
                         "Sentiment": {
-                            "Negative": 0.6905774474143982,
-                            "Positive": 0.3094225525856018
+                            "Negative": 0.37855562567710876,
+                            "Positive": 0.6214444041252136
                         }
                     }
                 },
                 {
                     "imdb_output": {
                         "Sentiment": {
-                            "Negative": 0.18255534768104553,
-                            "Positive": 0.8174446225166321
+                            "Negative": 0.1312161386013031,
+                            "Positive": 0.8687838912010193
                         }
                     }
                 }

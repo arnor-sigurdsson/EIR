@@ -313,7 +313,7 @@ Let's examine the input and output images:
 
 Input image:
 
-.. image:: ../tutorial_files/f_image_output/02_image_colorization/serve_results/image_grayscale_0.png
+.. image:: ../tutorial_files/f_image_output/02_image_colorization/serve_results/image_grayscale_0_0.png
     :width: 45%
     :align: center
 

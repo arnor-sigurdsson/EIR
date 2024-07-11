@@ -2,6 +2,6 @@ eirpredict \
 --global_configs eir_tutorials/a_using_eir/01_basic_tutorial/conf/tutorial_01_globals.yaml \
 --input_configs eir_tutorials/a_using_eir/01_basic_tutorial/conf/tutorial_01_input.yaml \
 --output_configs eir_tutorials/a_using_eir/01_basic_tutorial/conf/tutorial_01_outputs.yaml \
---model_path eir_tutorials/tutorial_runs/a_using_eir/tutorial_01_run/saved_models/tutorial_01_run_model_600_perf-average=0.8685.pt \
+--model_path eir_tutorials/tutorial_runs/a_using_eir/tutorial_01_run/saved_models/tutorial_01_run_model_600_perf-average=0.8624.pt \
 --evaluate \
 --output_folder eir_tutorials/tutorial_runs/a_using_eir/tutorial_01_run/test_predictions/known_outputs

@@ -17,8 +17,34 @@ MetaModel(
     )
   )
   (fusion_modules): ModuleDict(
-    (computed): MyLSTMFusionModule(
-      (fusion): LSTM(128, 128, batch_first=True)
+    (computed): MLPResidualFusionModule(
+      (fusion_modules): ModuleDict(
+        (fusion): Sequential(
+          (0): Sequential(
+            (0): MLPResidualBlock(
+              (norm_1): LayerNorm((128,), eps=1e-05, elementwise_affine=True)
+              (fc_1): Linear(in_features=128, out_features=256, bias=True)
+              (act_1): GELU(approximate='none')
+              (do): Dropout(p=0.1, inplace=False)
+              (fc_2): Linear(in_features=256, out_features=256, bias=True)
+              (downsample_identity): Linear(in_features=128, out_features=256, bias=True)
+              (ls): LayerScale(dim=256, init_values=1.0)
+              (stochastic_depth): StochasticDepth(p=0.1, mode=batch)
+            )
+          )
+          (1): Sequential(
+            (0): MLPResidualBlock(
+              (norm_1): LayerNorm((256,), eps=1e-05, elementwise_affine=True)
+              (fc_1): Linear(in_features=256, out_features=256, bias=True)
+              (act_1): GELU(approximate='none')
+              (do): Dropout(p=0.1, inplace=False)
+              (fc_2): Linear(in_features=256, out_features=256, bias=True)
+              (ls): LayerScale(dim=256, init_values=1.0)
+              (stochastic_depth): StochasticDepth(p=0.1, mode=batch)
+            )
+          )
+        )
+      )
     )
   )
   (output_modules): ModuleDict(
@@ -28,12 +54,11 @@ MetaModel(
           (0): Sequential(
             (0): Sequential(
               (0): MLPResidualBlock(
-                (norm_1): LayerNorm((128,), eps=1e-05, elementwise_affine=True)
-                (fc_1): Linear(in_features=128, out_features=256, bias=True)
+                (norm_1): LayerNorm((256,), eps=1e-05, elementwise_affine=True)
+                (fc_1): Linear(in_features=256, out_features=256, bias=True)
                 (act_1): GELU(approximate='none')
                 (do): Dropout(p=0.1, inplace=False)
                 (fc_2): Linear(in_features=256, out_features=256, bias=True)
-                (downsample_identity): Linear(in_features=128, out_features=256, bias=True)
                 (ls): LayerScale(dim=256, init_values=1.0)
                 (stochastic_depth): StochasticDepth(p=0.1, mode=batch)
               )
@@ -62,4 +87,5 @@ MetaModel(
       )
     )
   )
+  (tensor_broker): ModuleDict()
 )
