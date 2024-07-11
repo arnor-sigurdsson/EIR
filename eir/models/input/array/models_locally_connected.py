@@ -561,11 +561,13 @@ class LCLAttentionBlock(nn.Module):
         out = self.pos_emb(out)
 
         if self.attention_type == "full":
+            out = self.norm(out)
             attn_output, _ = self.attention(out, out, out)
-            out = self.norm(out + attn_output)
+            out = out + attn_output
         elif self.attention_type == "linear":
+            out = self.norm(out)
             attn_output = self.attention(out)
-            out = self.norm(out + attn_output)
+            out = out + attn_output
         else:
             raise ValueError("attention_type must be either 'full' or 'linear'")
 

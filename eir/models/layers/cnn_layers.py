@@ -76,6 +76,7 @@ class ConvAttentionBlock(nn.Module):
 
         self.attention: nn.MultiheadAttention | LinearAttention
         if attention_type == "full":
+            self.norm = nn.LayerNorm(normalized_shape=self.embedding_dim)
             self.attention = nn.MultiheadAttention(
                 embed_dim=self.embedding_dim,
                 num_heads=self.num_heads,
@@ -83,13 +84,13 @@ class ConvAttentionBlock(nn.Module):
                 dropout=dropout_p,
             )
         elif attention_type == "linear":
+            self.norm = nn.LayerNorm(normalized_shape=[channels, height, width])
             self.attention = LinearAttention(
                 embed_dim=self.embedding_dim,
                 heads=self.num_heads,
                 dim_head=self.embedding_dim // self.num_heads,
             )
 
-        self.norm = nn.LayerNorm(normalized_shape=self.embedding_dim)
         self.grn = GRN(in_channels=channels)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -103,8 +104,9 @@ class ConvAttentionBlock(nn.Module):
             else:
                 raise ValueError()
 
+            out = self.norm(out)
             attn_output, _ = self.attention(out, out, out)
-            out = self.norm(out + attn_output)
+            out = out + attn_output
 
             if self.attention_mode == "spatial":
                 out = rearrange(out, "b (h w) c -> b c h w", h=height, w=width)
@@ -115,8 +117,9 @@ class ConvAttentionBlock(nn.Module):
 
         elif self.attention_type == "linear":
             assert self.attention_mode == "spatial"
+            out = self.norm(x)
             attn_output = self.attention(x)
-            out = self.norm(x + attn_output)
+            out = out + attn_output
 
         else:
             raise ValueError()
