@@ -2,5 +2,5 @@ eirpredict \
 --global_configs eir_tutorials/c_sequence_output/01_sequence_generation/conf/globals.yaml \
 --fusion_configs eir_tutorials/c_sequence_output/01_sequence_generation/conf/fusion.yaml \
 --output_configs eir_tutorials/c_sequence_output/01_sequence_generation/conf/output_test.yaml \
---model_path eir_tutorials/tutorial_runs/c_sequence_output/01_sequence_generation/saved_models/01_sequence_generation_model_9000_perf-average=-0.4188.pt \
+--model_path eir_tutorials/tutorial_runs/c_sequence_output/01_sequence_generation/saved_models/01_sequence_generation_model_9500_perf-average=-0.4378.pt \
 --output_folder eir_tutorials/tutorial_runs/c_sequence_output/01_sequence_generation/test_results

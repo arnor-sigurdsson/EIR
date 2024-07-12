@@ -5,12 +5,3 @@ output_info:
 output_type_info:
   target_cat_columns:
     - Origin
-
-tensor_broker_config:
-  message_configs:
-    - name: last_upscale_cnn_layers
-      layer_path: output_modules.ancestry_output.multi_task_branches.Origin.2.final
-      use_from_cache:
-        - first_cnn_layer
-      cache_fusion_type: "cross-attention"
-      projection_type: "sequence"

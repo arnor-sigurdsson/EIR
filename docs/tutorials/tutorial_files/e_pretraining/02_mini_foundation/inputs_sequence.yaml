@@ -8,7 +8,9 @@ input_type_info:
   split_on: ""
   sampling_strategy_if_longer: "uniform"
   vocab_file: eir_tutorials/e_pretraining/02_mini_foundation/data/vocab.txt
-  modality_dropout_rate: 0.1
+  modality_dropout_rate: 0.05
 
 model_config:
   embedding_dim: 64
+  model_init_config:
+    num_layers: 4

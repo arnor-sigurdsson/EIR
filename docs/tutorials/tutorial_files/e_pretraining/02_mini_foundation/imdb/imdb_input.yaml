@@ -11,3 +11,5 @@ input_type_info:
 
 model_config:
   embedding_dim: 64
+  model_init_config:
+    num_layers: 4

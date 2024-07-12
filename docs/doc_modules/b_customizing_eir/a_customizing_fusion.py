@@ -4,7 +4,8 @@ import torch
 from torch import nn
 
 from eir import train
-from eir.models.meta.meta import MetaModel, al_fused_features
+from eir.models.fusion.fusion import al_fused_features
+from eir.models.meta.meta import MetaModel
 from eir.models.meta.meta_utils import FeatureExtractorProtocol
 from eir.models.model_setup_modules.meta_setup import get_output_modules
 from eir.setup.config import get_configs
@@ -80,6 +81,7 @@ def modify_experiment(experiment: train.Experiment) -> train.Experiment:
         fusion_modules=my_fusion_modules,
         output_modules=my_output_modules,
         fusion_to_output_mapping={"ancestry_output": "computed"},
+        tensor_broker=nn.ModuleDict(),
     )
 
     my_optimizer = torch.optim.Adam(

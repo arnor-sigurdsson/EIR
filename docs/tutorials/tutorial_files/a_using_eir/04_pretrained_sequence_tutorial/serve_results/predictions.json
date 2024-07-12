@@ -2,14 +2,14 @@
     {
         "request": [
             {
-                "imdb_reviews_windowed": "This move was great! I loved it!",
-                "imdb_reviews_longformer": "This move was great! I loved it!",
-                "imdb_reviews_tiny_bert": "This move was great! I loved it!"
+                "imdb_reviews_windowed": "This movie was great! I loved it!",
+                "imdb_reviews_longformer": "This movie was great! I loved it!",
+                "imdb_reviews_tiny_bert": "This movie was great! I loved it!"
             },
             {
-                "imdb_reviews_windowed": "This move was terrible! I hated it!",
-                "imdb_reviews_longformer": "This move was terrible! I hated it!",
-                "imdb_reviews_tiny_bert": "This move was terrible! I hated it!"
+                "imdb_reviews_windowed": "This movie was terrible! I hated it!",
+                "imdb_reviews_longformer": "This movie was terrible! I hated it!",
+                "imdb_reviews_tiny_bert": "This movie was terrible! I hated it!"
             },
             {
                 "imdb_reviews_windowed": "You'll have to have your wits about you and your brain fully switched on watching Oppenheimer as it could easily get away from a nonattentive viewer. This is intelligent filmmaking which shows it's audience great respect. It fires dialogue packed with information at a relentless pace and jumps to very different times in Oppenheimer's life continuously through it's 3 hour runtime. There are visual clues to guide the viewer through these times but again you'll have to get to grips with these quite quickly. This relentlessness helps to express the urgency with which the US attacked it's chase for the atomic bomb before Germany could do the same. An absolute career best performance from (the consistenly brilliant) Cillian Murphy anchors the film. ",
@@ -22,24 +22,24 @@
                 {
                     "imdb_output": {
                         "Sentiment": {
-                            "Negative": 0.029793541878461838,
-                            "Positive": 0.9702064990997314
+                            "Negative": 0.011156515218317509,
+                            "Positive": 0.9888434410095215
                         }
                     }
                 },
                 {
                     "imdb_output": {
                         "Sentiment": {
-                            "Negative": 0.9490542411804199,
-                            "Positive": 0.050945740193128586
+                            "Negative": 0.9540585875511169,
+                            "Positive": 0.045941416174173355
                         }
                     }
                 },
                 {
                     "imdb_output": {
                         "Sentiment": {
-                            "Negative": 0.021800605580210686,
-                            "Positive": 0.9781994223594666
+                            "Negative": 0.011152182705700397,
+                            "Positive": 0.9888478517532349
                         }
                     }
                 }

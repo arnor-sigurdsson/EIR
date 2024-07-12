@@ -25,7 +25,11 @@ from docs.doc_modules.experiments import (
     AutoDocExperimentInfo,
     make_training_or_predict_tutorial_data,
 )
-from docs.doc_modules.f_image_outputs import a_image_foundation, b_image_colorization
+from docs.doc_modules.f_image_outputs import (
+    a_image_foundation,
+    b_image_colorization,
+    c_mnist_diffusion,
+)
 from docs.doc_modules.serving_experiments import (
     AutoDocServingInfo,
     make_serving_tutorial_data,
@@ -97,10 +101,12 @@ def _get_e_pretraining_outputs_experiments() -> Iterable[AutoDocExperimentInfo]:
 def _get_f_image_outputs_experiments() -> Iterable[AutoDocExperimentInfo]:
     a_experiments = a_image_foundation.get_experiments()
     b_experiments = b_image_colorization.get_experiments()
+    c_experiments = c_mnist_diffusion.get_experiments()
 
     return chain(
         a_experiments,
         b_experiments,
+        c_experiments,
     )
 
 

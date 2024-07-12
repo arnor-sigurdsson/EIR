@@ -71,7 +71,8 @@ def _load_model_weights(
                 replace_tuple[1],
             )
             loaded_weights_state_dict = _replace_dict_key_names(
-                dict_=loaded_weights_state_dict, replace_pattern=replace_tuple
+                dict_=loaded_weights_state_dict,
+                replace_pattern=replace_tuple,
             )
 
     if not strict_shapes:
@@ -108,9 +109,10 @@ def _load_model_weights(
             repr_object.repr(incompatible_keys.unexpected_keys),
         )
 
+    num_loaded = total_keys - no_incompatible_keys
     logger.info(
         "Successfully loaded %d/%d modules from %s.",
-        total_keys,
+        num_loaded,
         total_keys,
         model_state_dict_path,
     )

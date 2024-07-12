@@ -135,11 +135,11 @@ After sending requests to the served model, you will receive responses that prov
 
 Let's take a look at some of the text data used for predictions:
 
-.. literalinclude:: ../tutorial_files/a_using_eir/06_raw_bytes_tutorial/serve_results/10021_2.txt
+.. literalinclude:: ../tutorial_files/a_using_eir/06_raw_bytes_tutorial/serve_results/10021_2_0.txt
    :language: text
    :caption: 10021_2.txt
 
-.. literalinclude:: ../tutorial_files/a_using_eir/06_raw_bytes_tutorial/serve_results/10132_9.txt
+.. literalinclude:: ../tutorial_files/a_using_eir/06_raw_bytes_tutorial/serve_results/10132_9_1.txt
    :language: text
    :caption: 10132_9.txt
 

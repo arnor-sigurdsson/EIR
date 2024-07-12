@@ -288,7 +288,7 @@ would not want to adopt a 250 year old sage cat? :)
 
 While not visible in the JSON above, here is the image used:
 
-.. figure:: ../tutorial_files/a_using_eir/07_multimodal_tutorial/serve_results/86e1089a3.jpg
+.. figure:: ../tutorial_files/a_using_eir/07_multimodal_tutorial/serve_results/86e1089a3_0.jpg
    :alt: Example Pet Image
    :align: center
 

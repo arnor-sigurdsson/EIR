@@ -43,6 +43,7 @@ Image Generation
 
     f_image_output/01_foundational_autoencoder.rst
     f_image_output/02_image_coloring_and_upscaling.rst
+    f_image_output/03_mnist_diffusion.rst
 
 Pretraining
 ============

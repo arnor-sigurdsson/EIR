@@ -139,19 +139,19 @@ Analyzing Responses
 
 Before analyzing the responses, let's view the images that were used for generating captions:
 
-.. figure:: ../tutorial_files/c_sequence_output/03_image_captioning/serve_results/000000000009.jpg
+.. figure:: ../tutorial_files/c_sequence_output/03_image_captioning/serve_results/000000000009_0.jpg
    :alt: Image 000000000009
    :align: center
 
 000000000009.jpg
 
-.. figure:: ../tutorial_files/c_sequence_output/03_image_captioning/serve_results/000000000034.jpg
+.. figure:: ../tutorial_files/c_sequence_output/03_image_captioning/serve_results/000000000034_1.jpg
    :alt: Image 000000000034
    :align: center
 
 000000000034.jpg
 
-.. figure:: ../tutorial_files/c_sequence_output/03_image_captioning/serve_results//000000581929.jpg
+.. figure:: ../tutorial_files/c_sequence_output/03_image_captioning/serve_results//000000581929_2.jpg
    :alt: Image 000000581929
    :align: center
 

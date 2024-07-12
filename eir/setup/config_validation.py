@@ -195,7 +195,7 @@ def validate_tensor_broker_configs(
     if len(all_message_names) != len(set(all_message_names)):
         counts = {name: all_message_names.count(name) for name in all_message_names}
         raise ValueError(
-            f"All tensor message names must be unique across all configs."
+            f"All tensor message names must be unique across all configs. "
             f"Got counts: {counts}"
         )
 

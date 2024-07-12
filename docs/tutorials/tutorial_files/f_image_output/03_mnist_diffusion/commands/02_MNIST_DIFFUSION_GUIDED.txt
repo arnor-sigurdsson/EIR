@@ -1,0 +1,6 @@
+eirtrain \
+--global_configs eir_tutorials/f_image_output/03_mnist_diffusion/conf/globals.yaml \
+--input_configs eir_tutorials/f_image_output/03_mnist_diffusion/conf/inputs_image_cnn.yaml eir_tutorials/f_image_output/03_mnist_diffusion/conf/inputs_tabular.yaml \
+--fusion_configs eir_tutorials/f_image_output/03_mnist_diffusion/conf/fusion.yaml \
+--output_configs eir_tutorials/f_image_output/03_mnist_diffusion/conf/output_image.yaml \
+--globals.output_folder=eir_tutorials/tutorial_runs/f_image_output/03_mnist_diffusion_guided
