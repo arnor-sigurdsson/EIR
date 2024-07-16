@@ -16,6 +16,11 @@ from tqdm.asyncio import tqdm
 from eir.serve_modules.serve_network_utils import deserialize_array, deserialize_image
 from eir.setup.config import Configs
 from eir.setup.schemas import InputConfig, OutputConfig
+from eir.setup.streaming_data_setup.protocol import PROTOCOL_VERSION
+from eir.setup.streaming_data_setup.streaming_data_utils import (
+    connect_to_server,
+    receive_with_timeout,
+)
 from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__)
@@ -64,8 +69,8 @@ class StreamDataGatherer:
                 }
             )
         )
-        response = await websocket.recv()
-        info_data = json.loads(s=response)
+
+        info_data = await receive_with_timeout(websocket=websocket)
 
         if info_data["type"] != "info":
             raise ValueError(f"Unexpected response type: {info_data['type']}")
@@ -76,9 +81,9 @@ class StreamDataGatherer:
     async def gather_and_save_data(self):
         self.base_path.mkdir(parents=True, exist_ok=True)
 
-        async with websockets.connect(
-            uri=self.websocket_url,
-            max_size=10_000_000,
+        async with connect_to_server(
+            websocket_url=self.websocket_url,
+            protocol_version=PROTOCOL_VERSION,
         ) as websocket:
             await self.get_dataset_info(websocket=websocket)
 
@@ -98,8 +103,7 @@ class StreamDataGatherer:
                     )
                 )
 
-                response = await websocket.recv()
-                batch_data = json.loads(s=response)
+                batch_data = await receive_with_timeout(websocket=websocket)
 
                 if batch_data["type"] != "data":
                     logger.error(f"Unexpected response type: {batch_data['type']}")
@@ -152,9 +156,9 @@ class StreamDataGatherer:
             df.to_csv(output_path / f"{name}.csv", index=False)
 
     async def reset(self):
-        async with websockets.connect(
-            uri=self.websocket_url,
-            max_size=10_000_000,
+        async with connect_to_server(
+            websocket_url=self.websocket_url,
+            protocol_version=PROTOCOL_VERSION,
         ) as websocket:
             await websocket.send(
                 message=json.dumps(
@@ -166,8 +170,7 @@ class StreamDataGatherer:
             )
 
             for _ in range(2):
-                response = await websocket.recv()
-                reset_message = json.loads(s=response)
+                reset_message = await receive_with_timeout(websocket=websocket)
 
                 if reset_message["type"] == "reset":
                     logger.info(
@@ -181,9 +184,9 @@ class StreamDataGatherer:
                     )
 
     async def get_status(self):
-        async with websockets.connect(
-            uri=self.websocket_url,
-            max_size=10_000_000,
+        async with connect_to_server(
+            websocket_url=self.websocket_url,
+            protocol_version=PROTOCOL_VERSION,
         ) as websocket:
             await websocket.send(
                 message=json.dumps(
@@ -194,8 +197,7 @@ class StreamDataGatherer:
                 )
             )
 
-            response = await websocket.recv()
-            status_data = json.loads(s=response)
+            status_data = await receive_with_timeout(websocket=websocket)
 
             if status_data["type"] == "status":
                 logger.info(f"Current status: {status_data['payload']}")

@@ -9,6 +9,8 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from PIL import Image
 from pydantic import BaseModel
 
+from eir.setup.streaming_data_setup.protocol import PROTOCOL_VERSION
+
 app = FastAPI()
 
 
@@ -20,6 +22,20 @@ class ConnectionManager:
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
+        handshake_message = await websocket.receive_json()
+        is_not_handshake = handshake_message["type"] != "handshake"
+        is_incompatible_version = handshake_message["version"] != PROTOCOL_VERSION
+        if is_not_handshake or is_incompatible_version:
+            await websocket.send_json(
+                {
+                    "type": "error",
+                    "payload": {"message": "Incompatible protocol version"},
+                }
+            )
+            await websocket.close()
+            return
+
+        await websocket.send_json({"type": "handshake", "version": PROTOCOL_VERSION})
         self.active_connections.append(websocket)
 
     def disconnect(self, websocket: WebSocket):

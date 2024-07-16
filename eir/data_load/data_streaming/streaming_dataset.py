@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any, Iterator, Literal, Sequence, Union
 
 import numpy as np
 import torch
-import websockets
 from PIL import Image
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from torch.utils.data import IterableDataset
@@ -44,6 +43,11 @@ from eir.setup.output_setup_modules.tabular_output_setup import (
     ComputedTabularOutputInfo,
 )
 from eir.setup.schemas import ImageOutputTypeConfig, SequenceOutputTypeConfig
+from eir.setup.streaming_data_setup.protocol import PROTOCOL_VERSION
+from eir.setup.streaming_data_setup.streaming_data_utils import (
+    connect_to_server,
+    receive_with_timeout,
+)
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -75,7 +79,7 @@ class StreamingDataset(IterableDataset):
         self.outputs = outputs
         self.test_mode = test_mode
         self.batch_size = batch_size
-        self.queue: queue.Queue = queue.Queue(maxsize=queue_size)
+        self.message_queue: queue.Queue = queue.Queue(maxsize=queue_size)
         self.fetch_timeout = fetch_timeout
         self.max_consecutive_timeouts = max_consecutive_timeouts
         self.current_batch: list[dict] = []
@@ -92,10 +96,12 @@ class StreamingDataset(IterableDataset):
         asyncio.run(self._async_batch_fetcher())
 
     async def _async_batch_fetcher(self):
-        async with websockets.connect(
-            uri=self.websocket_url,
+        async with connect_to_server(
+            websocket_url=self.websocket_url,
+            protocol_version=PROTOCOL_VERSION,
             max_size=10_000_000,
         ) as websocket:
+
             while True:
                 try:
                     await websocket.send(
@@ -106,14 +112,14 @@ class StreamingDataset(IterableDataset):
                             }
                         )
                     )
-                    batch_data = await websocket.recv()
-                    batch = json.loads(s=batch_data)
 
-                    if not batch or batch.get("payload") == ["terminate"]:
-                        self.queue.put(None)
+                    batch_msg = await receive_with_timeout(websocket=websocket)
+
+                    if not batch_msg or batch_msg.get("payload") == ["terminate"]:
+                        self.message_queue.put(None)
                         break
 
-                    self.queue.put(item=batch, timeout=self.fetch_timeout)
+                    self.message_queue.put(item=batch_msg, timeout=self.fetch_timeout)
                 except queue.Full:
                     await asyncio.sleep(1)
                 except Exception as e:
@@ -128,7 +134,7 @@ class StreamingDataset(IterableDataset):
         while not self.stop_event.is_set():
             try:
                 if not self.current_batch:
-                    batch_message = self.queue.get(timeout=self.fetch_timeout)
+                    batch_message = self.message_queue.get(timeout=self.fetch_timeout)
                     if batch_message is None:
                         logger.info("Received termination signal, stopping.")
                         self.stop_event.set()
@@ -147,7 +153,7 @@ class StreamingDataset(IterableDataset):
                         raise StopIteration
 
                     self.current_batch = current_payload
-                    self.queue.task_done()
+                    self.message_queue.task_done()
 
                 if self.current_batch:
                     sample_dict = self.current_batch.pop(0)
