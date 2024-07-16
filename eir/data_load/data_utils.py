@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
+    Any,
     Dict,
     Generator,
     List,
@@ -25,7 +26,7 @@ from eir.setup.output_setup_modules.tabular_output_setup import (
 from eir.train_utils.distributed import in_distributed_env
 
 if TYPE_CHECKING:
-    from eir.data_load.datasets import DatasetBase
+    from eir.data_load.datasets import al_local_datasets, al_sample_label_dict_target
     from eir.setup.output_setup import al_output_objects_as_dict
 
 
@@ -58,13 +59,13 @@ class Batch:
 
 @overload
 def get_train_sampler(
-    columns_to_sample: None, train_dataset: "DatasetBase"
+    columns_to_sample: None, train_dataset: "al_local_datasets"
 ) -> None: ...
 
 
 @overload
 def get_train_sampler(
-    columns_to_sample: Sequence[str], train_dataset: "DatasetBase"
+    columns_to_sample: Sequence[str], train_dataset: "al_local_datasets"
 ) -> Union[WeightedRandomSampler, DistributedSampler]: ...
 
 
@@ -140,3 +141,10 @@ def _gather_all_loaded_columns(outputs: "al_output_objects_as_dict") -> Sequence
     loaded_target_columns = loaded_cat_columns + loaded_con_columns
 
     return loaded_target_columns
+
+
+@dataclass
+class Sample:
+    sample_id: str
+    inputs: Dict[str, Any]
+    target_labels: "al_sample_label_dict_target"

@@ -135,9 +135,14 @@ def _attach_sample_interval_handlers(
     exp = handler_config.experiment
     gc = exp.configs.global_config
 
+    try:
+        iter_per_epoch = len(exp.train_loader)
+    except TypeError:
+        iter_per_epoch = None
+
     validation_handler_and_event = _get_validation_handler_and_event(
         sample_interval_base=gc.sample_interval,
-        iter_per_epoch=len(exp.train_loader),
+        iter_per_epoch=iter_per_epoch,
         n_epochs=gc.n_epochs,
         early_stopping_patience=gc.early_stopping_patience,
         validation_handler_callable=validation_handler_callable,
@@ -145,8 +150,14 @@ def _attach_sample_interval_handlers(
     all_handler_events = [validation_handler_and_event]
 
     if gc.compute_attributions:
+
+        try:
+            iter_per_epoch = len(exp.train_loader)
+        except TypeError:
+            iter_per_epoch = None
+
         attribution_handler_and_event = _get_attribution_handler_and_event(
-            iter_per_epoch=len(exp.train_loader),
+            iter_per_epoch=iter_per_epoch,
             n_epochs=gc.n_epochs,
             sample_interval_base=gc.sample_interval,
             attributions_every_sample_factor=gc.attributions_every_sample_factor,
@@ -166,12 +177,15 @@ def _attach_sample_interval_handlers(
 
 def _get_validation_handler_and_event(
     sample_interval_base: int,
-    iter_per_epoch: int,
+    iter_per_epoch: Optional[int],
     n_epochs: int,
     early_stopping_patience: int,
     validation_handler_callable: Callable,
 ) -> al_handler_and_event:
     validation_event: al_event = Events.ITERATION_COMPLETED(every=sample_interval_base)
+
+    if iter_per_epoch is None:
+        return validation_handler_callable, validation_event
 
     do_run_when_training_complete = _do_run_completed_handler(
         iter_per_epoch=iter_per_epoch,
@@ -186,7 +200,7 @@ def _get_validation_handler_and_event(
 
 
 def _get_attribution_handler_and_event(
-    iter_per_epoch: int,
+    iter_per_epoch: Optional[int],
     n_epochs: int,
     sample_interval_base: int,
     attributions_every_sample_factor: int,
@@ -204,6 +218,9 @@ def _get_attribution_handler_and_event(
         sample_interval_base * attributions_every_sample_factor
     )
     attribution_event = Events.ITERATION_COMPLETED(every=attribution_handler_interval)
+
+    if iter_per_epoch is None:
+        return attribution_handler_callable, attribution_event
 
     do_run_when_training_complete = _do_run_completed_handler(
         iter_per_epoch=iter_per_epoch,
@@ -573,6 +590,15 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
     )
 
     for plot_event in _get_plot_events(sample_interval=gc.sample_interval):
+
+        try:
+            iter_per_epoch = len(exp.train_loader)
+        except TypeError:
+            iter_per_epoch = None
+
+        if plot_event == Events.COMPLETED and iter_per_epoch is None:
+            continue
+
         if plot_event == Events.COMPLETED and not _do_run_completed_handler(
             iter_per_epoch=len(exp.train_loader),
             n_epochs=gc.n_epochs,

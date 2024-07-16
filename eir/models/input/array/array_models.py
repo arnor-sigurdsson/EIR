@@ -19,7 +19,7 @@ from eir.models.input.array.models_transformers import (
 if TYPE_CHECKING:
     from eir.setup.input_setup_modules.common import DataDimensions
 
-al_array_model_types = Literal["cnn", "lcl"]
+al_array_model_types = Literal["cnn", "lcl", "transformer"]
 
 al_array_model_classes = Type[CNNModel] | Type[LCLModel] | Type[ArrayTransformer]
 al_array_models = CNNModel | LCLModel | ArrayTransformer

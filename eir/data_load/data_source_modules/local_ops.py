@@ -24,8 +24,7 @@ from eir.setup.input_setup_modules.setup_sequence import get_sequence_split_func
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
-    from eir.data_load.datasets import Sample
-
+    from eir.data_load.data_utils import Sample
 
 logger = get_logger(name=__name__)
 

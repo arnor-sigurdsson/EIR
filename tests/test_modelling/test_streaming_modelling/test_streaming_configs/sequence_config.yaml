@@ -1,0 +1,8 @@
+input_info:
+  input_source: ws://localhost:8000/ws
+  input_name: sequence_data
+  input_type: sequence
+
+input_type_info:
+  max_length: 10
+  split_on: ""

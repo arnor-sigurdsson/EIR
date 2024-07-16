@@ -1,0 +1,8 @@
+output_info:
+  output_source: ws://localhost:8000/ws
+  output_name: test_output
+  output_type: tabular
+output_type_info:
+  target_con_columns:
+    - test_target
+

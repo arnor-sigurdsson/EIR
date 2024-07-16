@@ -1,0 +1,16 @@
+output_info:
+  output_source: ws://localhost:8000/ws
+  output_name: output_sequence
+  output_type: sequence
+
+output_type_info:
+  max_length: 10
+  split_on: ""
+
+model_config:
+    embedding_dim: 8
+    model_init_config:
+      dim_feedforward: auto
+      dropout: 0.1
+      num_heads: 1
+      num_layers: 1
