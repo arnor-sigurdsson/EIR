@@ -1,4 +1,3 @@
-import asyncio
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, List, Optional, Tuple, Union
@@ -114,13 +113,11 @@ def get_default_experiment(
     output_folder = gc.output_folder
     run_folder = _prepare_run_folder(output_folder=output_folder)
 
-    streaming_data = asyncio.run(
-        setup_and_gather_streaming_data(
-            configs=configs,
-            output_folder=output_folder,
-            batch_size=gc.batch_size,
-            max_samples=5000,
-        )
+    streaming_data = setup_and_gather_streaming_data(
+        configs=configs,
+        output_folder=output_folder,
+        batch_size=gc.batch_size,
+        max_samples=5000,
     )
 
     if streaming_data is not None:
@@ -144,11 +141,9 @@ def get_default_experiment(
     )
 
     if ws_url is not None:
-        asyncio.run(
-            send_validation_ids(
-                ws_url=ws_url,
-                valid_ids=list(valid_ids),
-            )
+        send_validation_ids(
+            ws_url=ws_url,
+            valid_ids=list(valid_ids),
         )
 
     target_labels = set_up_all_targets_wrapper(

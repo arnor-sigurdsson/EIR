@@ -1,11 +1,9 @@
-import asyncio
 import json
-import queue
-import threading
-from typing import TYPE_CHECKING, Any, Iterator, Literal, Sequence, Union
+from typing import TYPE_CHECKING, Any, Iterator, Literal, Optional, Sequence, Union
 
 import numpy as np
 import torch
+import websocket
 from PIL import Image
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from torch.utils.data import IterableDataset
@@ -44,10 +42,7 @@ from eir.setup.output_setup_modules.tabular_output_setup import (
 )
 from eir.setup.schemas import ImageOutputTypeConfig, SequenceOutputTypeConfig
 from eir.setup.streaming_data_setup.protocol import PROTOCOL_VERSION
-from eir.setup.streaming_data_setup.streaming_data_utils import (
-    connect_to_server,
-    receive_with_timeout,
-)
+from eir.setup.streaming_data_setup.streaming_data_utils import connect_to_server
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -70,7 +65,6 @@ class StreamingDataset(IterableDataset):
         outputs: al_output_objects_as_dict,
         test_mode: bool,
         batch_size: int = 32,
-        queue_size: int = 5,
         fetch_timeout: float = 10.0,
         max_consecutive_timeouts: int = 3,
     ):
@@ -79,103 +73,73 @@ class StreamingDataset(IterableDataset):
         self.outputs = outputs
         self.test_mode = test_mode
         self.batch_size = batch_size
-        self.message_queue: queue.Queue = queue.Queue(maxsize=queue_size)
         self.fetch_timeout = fetch_timeout
         self.max_consecutive_timeouts = max_consecutive_timeouts
+        self.ws: Optional[websocket.WebSocket] = None
         self.current_batch: list[dict] = []
 
-        self.stop_event = threading.Event()
-
-        self.fetcher_thread = threading.Thread(
-            target=self._batch_fetcher,
-            daemon=True,
-        )
-        self.fetcher_thread.start()
-
-    def _batch_fetcher(self):
-        asyncio.run(self._async_batch_fetcher())
-
-    async def _async_batch_fetcher(self):
-        async with connect_to_server(
+    def __iter__(self) -> Iterator[Any]:
+        self.connection_context = connect_to_server(
             websocket_url=self.websocket_url,
             protocol_version=PROTOCOL_VERSION,
-            max_size=10_000_000,
-        ) as websocket:
-
-            while True:
-                try:
-                    await websocket.send(
-                        message=json.dumps(
-                            {
-                                "type": "getData",
-                                "batch_size": self.batch_size,
-                            }
-                        )
-                    )
-
-                    batch_msg = await receive_with_timeout(websocket=websocket)
-
-                    if not batch_msg or batch_msg.get("payload") == ["terminate"]:
-                        self.message_queue.put(None)
-                        break
-
-                    self.message_queue.put(item=batch_msg, timeout=self.fetch_timeout)
-                except queue.Full:
-                    await asyncio.sleep(1)
-                except Exception as e:
-                    logger.error(f"Error fetching batch: {e}")
-                    break
-
-    def __iter__(self) -> Iterator["al_getitem_return"]:
+        )
+        self.ws = self.connection_context.__enter__()
         return self
 
-    def __next__(self) -> "al_getitem_return":
+    def __next__(self) -> Any:
+        if not self.current_batch:
+            self._fetch_batch()
+
+        if not self.current_batch:
+            raise StopIteration
+
+        sample_dict = self.current_batch.pop(0)
+        sample = Sample(**sample_dict)
+        return self._process_sample(sample)
+
+    def _fetch_batch(self):
         consecutive_timeouts = 0
-        while not self.stop_event.is_set():
+        assert self.ws is not None
+        while consecutive_timeouts < self.max_consecutive_timeouts:
             try:
-                if not self.current_batch:
-                    batch_message = self.message_queue.get(timeout=self.fetch_timeout)
-                    if batch_message is None:
-                        logger.info("Received termination signal, stopping.")
-                        self.stop_event.set()
-                        raise StopIteration
+                self.ws.send(
+                    json.dumps(
+                        {
+                            "type": "getData",
+                            "payload": {"batch_size": self.batch_size},
+                        }
+                    )
+                )
 
-                    if batch_message["type"] != "data":
-                        logger.warning(
-                            f"Unexpected message type: {batch_message['type']}"
-                        )
-                        continue
+                batch_msg = json.loads(self.ws.recv())
 
-                    current_payload = batch_message["payload"]
-                    if current_payload == ["terminate"]:
-                        logger.info("Received termination signal, stopping.")
-                        self.stop_event.set()
-                        raise StopIteration
+                if batch_msg["type"] != "data":
+                    logger.warning(f"Unexpected message type: {batch_msg['type']}")
+                    continue
 
-                    self.current_batch = current_payload
-                    self.message_queue.task_done()
+                if not batch_msg["payload"] or batch_msg["payload"] == ["terminate"]:
+                    logger.info(
+                        "Received termination signal or empty payload, stopping."
+                    )
+                    raise StopIteration
 
-                if self.current_batch:
-                    sample_dict = self.current_batch.pop(0)
-                    sample = Sample(**sample_dict)
-                    consecutive_timeouts = 0
-                    return self._process_sample(sample=sample)
+                self.current_batch = batch_msg["payload"]
+                return
 
-            except queue.Empty:
+            except websocket.WebSocketTimeoutException:
                 consecutive_timeouts += 1
                 logger.warning(
                     f"Timeout waiting for next batch. "
                     f"Consecutive timeouts: {consecutive_timeouts}"
                 )
-                if consecutive_timeouts >= self.max_consecutive_timeouts:
-                    logger.error(
-                        f"Max consecutive timeouts ({self.max_consecutive_timeouts}) "
-                        f"reached. Stopping iterator."
-                    )
-                    self.stop_event.set()
-                    raise StopIteration
+            except Exception as e:
+                logger.error(f"Error fetching batch: {e}")
+                raise StopIteration
 
-        logger.info("End of data, terminating.")
+        logger.error(
+            f"Max consecutive timeouts ({self.max_consecutive_timeouts}) reached."
+            f" Stopping iterator."
+        )
         raise StopIteration
 
     def _process_sample(self, sample: Sample) -> "al_getitem_return":

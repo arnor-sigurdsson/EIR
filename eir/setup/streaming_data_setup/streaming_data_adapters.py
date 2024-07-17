@@ -8,10 +8,10 @@ from urllib.parse import urlparse
 
 import numpy as np
 import pandas as pd
-import websockets
+import websocket
 from aislib.misc_utils import ensure_path_exists
 from PIL import Image
-from tqdm.asyncio import tqdm
+from tqdm import tqdm
 
 from eir.serve_modules.serve_network_utils import deserialize_array, deserialize_image
 from eir.setup.config import Configs
@@ -61,16 +61,10 @@ class StreamDataGatherer:
 
         atexit.register(cleanup_streaming_setup, self.base_path)
 
-    async def get_dataset_info(self, websocket: websockets.WebSocketClientProtocol):
-        await websocket.send(
-            message=json.dumps(
-                {
-                    "type": "getInfo",
-                }
-            )
-        )
+    def get_dataset_info(self, ws: websocket.WebSocket):
+        ws.send(json.dumps({"type": "getInfo"}))
 
-        info_data = await receive_with_timeout(websocket=websocket)
+        info_data = receive_with_timeout(websocket=ws)
 
         if info_data["type"] != "info":
             raise ValueError(f"Unexpected response type: {info_data['type']}")
@@ -78,14 +72,14 @@ class StreamDataGatherer:
         self.dataset_info = info_data["payload"]
         logger.info("Received dataset information.")
 
-    async def gather_and_save_data(self):
+    def gather_and_save_data(self):
         self.base_path.mkdir(parents=True, exist_ok=True)
 
-        async with connect_to_server(
+        with connect_to_server(
             websocket_url=self.websocket_url,
             protocol_version=PROTOCOL_VERSION,
-        ) as websocket:
-            await self.get_dataset_info(websocket=websocket)
+        ) as ws:
+            self.get_dataset_info(ws=ws)
 
             total_samples = 0
             pbar = tqdm(
@@ -94,7 +88,7 @@ class StreamDataGatherer:
                 unit=" sample",
             )
             while total_samples < self.max_samples:
-                await websocket.send(
+                ws.send(
                     json.dumps(
                         {
                             "type": "getData",
@@ -103,7 +97,7 @@ class StreamDataGatherer:
                     )
                 )
 
-                batch_data = await receive_with_timeout(websocket=websocket)
+                batch_data = receive_with_timeout(websocket=ws)
 
                 if batch_data["type"] != "data":
                     logger.error(f"Unexpected response type: {batch_data['type']}")
@@ -122,14 +116,14 @@ class StreamDataGatherer:
                         dataset_info=self.dataset_info,
                     )
 
-                    await save_inputs(
+                    save_inputs(
                         processed_input=processed_input,
                         sample_id=sample["sample_id"],
                         base_path=self.base_path,
                         inputs=self.dataset_info["inputs"],
                         dataframes=self.input_dataframes,
                     )
-                    await save_outputs(
+                    save_outputs(
                         processed_output=processed_output,
                         sample_id=sample["sample_id"],
                         base_path=self.base_path,
@@ -155,13 +149,13 @@ class StreamDataGatherer:
             ensure_path_exists(path=output_path, is_folder=True)
             df.to_csv(output_path / f"{name}.csv", index=False)
 
-    async def reset(self):
-        async with connect_to_server(
+    def reset(self):
+        with connect_to_server(
             websocket_url=self.websocket_url,
             protocol_version=PROTOCOL_VERSION,
-        ) as websocket:
-            await websocket.send(
-                message=json.dumps(
+        ) as ws:
+            ws.send(
+                json.dumps(
                     {
                         "type": "reset",
                         "payload": {},
@@ -170,7 +164,7 @@ class StreamDataGatherer:
             )
 
             for _ in range(2):
-                reset_message = await receive_with_timeout(websocket=websocket)
+                reset_message = receive_with_timeout(websocket=ws)
 
                 if reset_message["type"] == "reset":
                     logger.info(
@@ -183,13 +177,13 @@ class StreamDataGatherer:
                         f"Unexpected response to reset command: {reset_message}"
                     )
 
-    async def get_status(self):
-        async with connect_to_server(
+    def get_status(self):
+        with connect_to_server(
             websocket_url=self.websocket_url,
             protocol_version=PROTOCOL_VERSION,
-        ) as websocket:
-            await websocket.send(
-                message=json.dumps(
+        ) as ws:
+            ws.send(
+                json.dumps(
                     {
                         "type": "status",
                         "payload": {},
@@ -197,7 +191,7 @@ class StreamDataGatherer:
                 )
             )
 
-            status_data = await receive_with_timeout(websocket=websocket)
+            status_data = receive_with_timeout(websocket=ws)
 
             if status_data["type"] == "status":
                 logger.info(f"Current status: {status_data['payload']}")
@@ -283,7 +277,7 @@ def process_outputs(
     return processed_outputs
 
 
-async def save_data(
+def save_data(
     data_type: str,
     data_name: str,
     data: Any,
@@ -314,7 +308,7 @@ async def save_data(
         logger.warning(f"Unsupported data type: {data_type}")
 
 
-async def save_inputs(
+def save_inputs(
     processed_input: Dict[str, Any],
     sample_id: str,
     base_path: Path,
@@ -332,7 +326,7 @@ async def save_inputs(
         save_path = base_path / "input" / input_name
         save_path.mkdir(parents=True, exist_ok=True)
 
-        await save_data(
+        save_data(
             data_type=input_type,
             data_name=input_name,
             data=input_data,
@@ -342,7 +336,7 @@ async def save_inputs(
         )
 
 
-async def save_outputs(
+def save_outputs(
     processed_output: Dict[str, Any],
     sample_id: str,
     base_path: Path,
@@ -360,7 +354,7 @@ async def save_outputs(
         save_path = base_path / "output" / output_name
         save_path.mkdir(parents=True, exist_ok=True)
 
-        await save_data(
+        save_data(
             data_type=output_type,
             data_name=output_name,
             data=output_data,
@@ -403,7 +397,7 @@ def validate_streaming_setup(configs: Configs) -> Optional[str]:
     return websocket_address
 
 
-async def gather_streaming_data_for_setup(
+def gather_streaming_data_for_setup(
     websocket_url: str,
     output_folder: str,
     configs: Configs,
@@ -434,13 +428,13 @@ async def gather_streaming_data_for_setup(
         max_samples=max_samples,
     )
 
-    await gatherer.get_status()
+    gatherer.get_status()
 
-    await gatherer.gather_and_save_data()
+    gatherer.gather_and_save_data()
 
-    await gatherer.reset()
+    gatherer.reset()
 
-    await gatherer.get_status()
+    gatherer.get_status()
 
     return websocket_url, gatherer.base_path
 
@@ -530,7 +524,7 @@ def _inject_correct_sequence_input_from_linked_output(
     return new_input_configs
 
 
-async def setup_and_gather_streaming_data(
+def setup_and_gather_streaming_data(
     output_folder: str,
     configs: Configs,
     batch_size: int,
@@ -539,7 +533,7 @@ async def setup_and_gather_streaming_data(
     try:
         websocket_url = validate_streaming_setup(configs=configs)
         if websocket_url:
-            return await gather_streaming_data_for_setup(
+            return gather_streaming_data_for_setup(
                 websocket_url=websocket_url,
                 output_folder=output_folder,
                 configs=configs,
