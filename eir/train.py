@@ -277,12 +277,31 @@ def get_dataloaders(
     num_workers: int = 0,
 ) -> Tuple:
 
+    train_num_workers = num_workers
+
     if isinstance(train_dataset, (datasets.DiskDataset, datasets.MemoryDataset)):
         check_dataset_and_batch_size_compatibility(
             dataset=train_dataset,
             batch_size=batch_size,
             name="Training",
         )
+    else:
+        if num_workers > 0:
+            logger.warning(
+                "When using a streaming dataset with multiple "
+                " workers (num_workers > 0), "
+                "each worker will create its own "
+                "connection to the data server. This can "
+                "potentially lead to duplicate data "
+                "being processed if the server is not "
+                "properly configured to handle multiple connections. "
+                "Ensure that your "
+                "data server implements proper coordination "
+                "to distribute unique samples "
+                "across all connections. If you're unsure about your server's "
+                "implementation, consider using num_workers=0 or consult your data "
+                "server's documentation."
+            )
 
     check_dataset_and_batch_size_compatibility(
         dataset=valid_dataset,
@@ -299,7 +318,7 @@ def get_dataloaders(
         batch_size=batch_size,
         sampler=train_sampler,
         shuffle=shuffle,
-        num_workers=num_workers,
+        num_workers=train_num_workers,
         pin_memory=False,
         drop_last=True,
     )

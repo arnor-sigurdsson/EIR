@@ -1,4 +1,7 @@
+import atexit
 import json
+import threading
+import time
 from typing import TYPE_CHECKING, Any, Iterator, Literal, Optional, Sequence, Union
 
 import numpy as np
@@ -42,7 +45,10 @@ from eir.setup.output_setup_modules.tabular_output_setup import (
 )
 from eir.setup.schemas import ImageOutputTypeConfig, SequenceOutputTypeConfig
 from eir.setup.streaming_data_setup.protocol import PROTOCOL_VERSION
-from eir.setup.streaming_data_setup.streaming_data_utils import connect_to_server
+from eir.setup.streaming_data_setup.streaming_data_utils import (
+    connect_to_server,
+    receive_with_timeout,
+)
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -67,6 +73,7 @@ class StreamingDataset(IterableDataset):
         batch_size: int = 32,
         fetch_timeout: float = 10.0,
         max_consecutive_timeouts: int = 3,
+        heartbeat_interval: float = 30.0,
     ):
         self.websocket_url = websocket_url
         self.inputs = inputs
@@ -75,15 +82,17 @@ class StreamingDataset(IterableDataset):
         self.batch_size = batch_size
         self.fetch_timeout = fetch_timeout
         self.max_consecutive_timeouts = max_consecutive_timeouts
+        self.heartbeat_interval = heartbeat_interval
         self.ws: Optional[websocket.WebSocket] = None
         self.current_batch: list[dict] = []
+        self.heartbeat_thread: Optional[threading.Thread] = None
+        self.stop_event = threading.Event()
+        self._is_closed = False
+
+        atexit.register(self.close)
 
     def __iter__(self) -> Iterator[Any]:
-        self.connection_context = connect_to_server(
-            websocket_url=self.websocket_url,
-            protocol_version=PROTOCOL_VERSION,
-        )
-        self.ws = self.connection_context.__enter__()
+        self._connect()
         return self
 
     def __next__(self) -> Any:
@@ -96,6 +105,32 @@ class StreamingDataset(IterableDataset):
         sample_dict = self.current_batch.pop(0)
         sample = Sample(**sample_dict)
         return self._process_sample(sample)
+
+    def _connect(self):
+        if self.heartbeat_thread and self.heartbeat_thread.is_alive():
+            self.stop_event.set()
+            self.heartbeat_thread.join(timeout=5)
+
+        self.connection_context = connect_to_server(
+            websocket_url=self.websocket_url,
+            protocol_version=PROTOCOL_VERSION,
+        )
+        self.ws = self.connection_context.__enter__()
+        self.stop_event.clear()
+        self.heartbeat_thread = threading.Thread(
+            target=self._send_heartbeats,
+            daemon=True,
+        )
+        self.heartbeat_thread.start()
+
+    def _send_heartbeats(self):
+        while not self.stop_event.is_set():
+            if self.ws:
+                try:
+                    self.ws.send(json.dumps({"type": "heartbeat"}))
+                except Exception as e:
+                    logger.error(f"Error sending heartbeat: {e}")
+            time.sleep(self.heartbeat_interval)
 
     def _fetch_batch(self):
         consecutive_timeouts = 0
@@ -111,7 +146,10 @@ class StreamingDataset(IterableDataset):
                     )
                 )
 
-                batch_msg = json.loads(self.ws.recv())
+                batch_msg = receive_with_timeout(websocket=self.ws)
+
+                if batch_msg["type"] == "heartbeat":
+                    continue
 
                 if batch_msg["type"] != "data":
                     logger.warning(f"Unexpected message type: {batch_msg['type']}")
@@ -132,6 +170,16 @@ class StreamingDataset(IterableDataset):
                     f"Timeout waiting for next batch. "
                     f"Consecutive timeouts: {consecutive_timeouts}"
                 )
+            except websocket.WebSocketConnectionClosedException:
+                logger.warning("WebSocket connection closed. Attempting to reconnect.")
+                self._reconnect()
+            except OSError as e:
+                if e.errno == 32:
+                    logger.warning("Broken pipe detected. Attempting to reconnect.")
+                    self._reconnect()
+                else:
+                    logger.error(f"Unexpected OSError: {e}")
+                    raise StopIteration
             except Exception as e:
                 logger.error(f"Error fetching batch: {e}")
                 raise StopIteration
@@ -141,6 +189,19 @@ class StreamingDataset(IterableDataset):
             f" Stopping iterator."
         )
         raise StopIteration
+
+    def _reconnect(self):
+        if self.ws:
+            self.connection_context.__exit__(None, None, None)
+        self._connect()
+
+    def close(self):
+        if not self._is_closed:
+            self._is_closed = True
+            self.stop_event.set()
+            if self.ws:
+                self.connection_context.__exit__(None, None, None)
+            atexit.unregister(self.close)
 
     def _process_sample(self, sample: Sample) -> "al_getitem_return":
 

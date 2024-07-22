@@ -67,7 +67,7 @@ def validate_output_configs(output_configs: Sequence[schemas.OutputConfig]) -> N
     for output_config in output_configs:
 
         output_source = output_config.output_info.output_source
-        is_websocket = output_source.startswith("ws://")
+        is_websocket = output_source is not None and output_source.startswith("ws://")
         if is_websocket:
             continue
 

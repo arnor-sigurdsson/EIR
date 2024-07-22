@@ -225,13 +225,13 @@ class LCLModel(nn.Module):
             base=kernel_width,
             expansion=self.model_config.first_kernel_expansion,
         )
-        fc_0_channel_exponent = calc_value_after_expansion(
-            base=self.model_config.channel_exp_base,
+        fc_0_out_feature_sets = calc_value_after_expansion(
+            base=2**self.model_config.channel_exp_base,
             expansion=self.model_config.first_channel_expansion,
         )
         self.fc_0 = LCL(
             in_features=self.fc_1_in_features,
-            out_feature_sets=2**fc_0_channel_exponent,
+            out_feature_sets=fc_0_out_feature_sets,
             kernel_size=fc_0_kernel_size,
             bias=True,
         )
