@@ -427,7 +427,7 @@ def log_empty_loss_once() -> LogEmptyLossProtocol:
 
 
 def calculate_prediction_losses(
-    criteria: al_criteria_dict,
+    criteria: "al_criteria_dict",
     inputs: dict[str, dict[str, torch.Tensor]],
     targets: dict[str, dict[str, torch.Tensor]],
     log_empty_loss_callable: LogEmptyLossProtocol,
