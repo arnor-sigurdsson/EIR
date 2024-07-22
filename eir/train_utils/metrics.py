@@ -851,27 +851,35 @@ def parse_averaging_metrics(
     cat_averaging_metrics: Optional[al_cat_averaging_metric_choices],
     con_averaging_metrics: Optional[al_con_averaging_metric_choices],
 ) -> tuple[al_cat_averaging_metric_choices, al_con_averaging_metric_choices]:
-    base = _get_default_averaging_metrics()
+    cat_parsed, con_parsed = _get_default_averaging_metrics()
 
     if cat_averaging_metrics:
         _validate_metrics(
             passed_in_metrics=cat_averaging_metrics,
-            expected_metrics=["loss", "acc", "mcc", "roc-auc-macro", "ap-macro"],
+            expected_metrics=[
+                "loss",
+                "acc",
+                "mcc",
+                "roc-auc-macro",
+                "ap-macro",
+            ],
             target_type="categorical",
         )
-        base["cat_metric_names"] = cat_averaging_metrics
+        cat_parsed = cat_averaging_metrics
     if con_averaging_metrics:
         _validate_metrics(
             passed_in_metrics=con_averaging_metrics,
-            expected_metrics=["loss", "rmse", "pcc", "r2"],
+            expected_metrics=[
+                "loss",
+                "rmse",
+                "pcc",
+                "r2",
+            ],
             target_type="continuous",
         )
-        base["con_metric_names"] = con_averaging_metrics
+        con_parsed = con_averaging_metrics
 
-    assert cat_averaging_metrics is not None
-    assert con_averaging_metrics is not None
-
-    return cat_averaging_metrics, con_averaging_metrics
+    return cat_parsed, con_parsed
 
 
 def _validate_metrics(
@@ -886,7 +894,7 @@ def _validate_metrics(
 
 
 def _get_default_averaging_metrics() -> (
-    dict[str, al_cat_averaging_metric_choices | al_con_averaging_metric_choices]
+    tuple[al_cat_averaging_metric_choices, al_con_averaging_metric_choices]
 ):
 
     cat_names: list[Literal["mcc", "roc-auc-macro", "ap-macro", "acc"]]
@@ -894,10 +902,8 @@ def _get_default_averaging_metrics() -> (
 
     cat_names = ["mcc", "roc-auc-macro", "ap-macro"]
     con_names = ["loss", "pcc", "r2"]
-    return {
-        "cat_metric_names": cat_names,
-        "con_metric_names": con_names,
-    }
+
+    return cat_names, con_names
 
 
 def get_performance_averaging_functions(
