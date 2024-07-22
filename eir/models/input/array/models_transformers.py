@@ -48,7 +48,7 @@ class ArrayTransformerConfig:
         The dropout rate to use in the position encoding/embedding.
     """
 
-    patch_size: tuple[int, ...]
+    patch_size: tuple[int, int, int]
     embedding_dim: int
 
     num_heads: int = 8

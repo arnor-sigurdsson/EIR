@@ -345,7 +345,8 @@ def _get_lcl_block_factory(
         return generate_lcl_residual_blocks_auto
 
     auto_factory = partial(
-        _generate_lcl_blocks_from_spec, block_layer_spec=block_layer_spec
+        _generate_lcl_blocks_from_spec,
+        block_layer_spec=block_layer_spec,
     )
 
     return auto_factory
@@ -353,10 +354,10 @@ def _get_lcl_block_factory(
 
 def _generate_lcl_blocks_from_spec(
     lcl_parameter_spec: LCParameterSpec,
-    block_layer_spec: List[int],
+    block_layer_spec: Sequence[int],
 ) -> nn.Sequential:
     s = lcl_parameter_spec
-    block_layer_spec_copy = copy(block_layer_spec)
+    block_layer_spec_copy: list[int] = list(copy(block_layer_spec))
 
     first_block = LCLResidualBlock(
         in_features=s.in_features,
