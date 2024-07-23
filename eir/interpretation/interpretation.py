@@ -43,7 +43,7 @@ from torch.utils.data import DataLoader, Subset
 from torch.utils.hooks import RemovableHandle
 
 from eir.data_load.data_utils import Batch, get_output_info_generator
-from eir.data_load.datasets import al_datasets
+from eir.data_load.datasets import al_local_datasets
 from eir.interpretation.interpret_array import (
     ArrayConsumerCallable,
     analyze_array_input_attributions,
@@ -242,7 +242,7 @@ def tabular_attribution_analysis_wrapper(
         "Experiment", "PredictExperiment", "LoadedTrainExperimentMixedWithPredict"
     ],
     output_folder_target_callable: Callable,
-    dataset_to_interpret: al_datasets,
+    dataset_to_interpret: al_local_datasets,
     background_loader: torch.utils.data.DataLoader,
 ) -> None:
     """
@@ -866,7 +866,7 @@ def _get_interpretation_data_producer(
     column_name: str,
     column_type: str,
     output_name: str,
-    dataset: al_datasets,
+    dataset: al_local_datasets,
 ) -> Generator[Tuple[Batch, dict[str, Any]], None, None]:
     output_object = experiment.outputs[output_name]
     assert isinstance(output_object, ComputedTabularOutputInfo)
@@ -919,7 +919,7 @@ def _detach_all_inputs(tensor_inputs: Dict[str, torch.Tensor]):
 
 
 def _get_attributions_dataloader(
-    dataset: al_datasets,
+    dataset: al_local_datasets,
     max_attributions_per_class: Optional[int],
     output_name: str,
     target_column: str,
@@ -947,7 +947,7 @@ def _get_attributions_dataloader(
 
 
 def _get_categorical_sample_indices_for_attributions(
-    dataset: al_datasets,
+    dataset: al_local_datasets,
     max_attributions_per_class: int,
     output_name: str,
     target_column: str,
@@ -977,7 +977,7 @@ def _get_categorical_sample_indices_for_attributions(
 
 
 def _get_continuous_sample_indices_for_attributions(
-    dataset: al_datasets, max_attributions_per_class: int, *args, **kwargs
+    dataset: al_local_datasets, max_attributions_per_class: int, *args, **kwargs
 ) -> Tuple[int, ...]:
     acc_label_limit = max_attributions_per_class
     num_sample = len(dataset)
@@ -986,7 +986,7 @@ def _get_continuous_sample_indices_for_attributions(
     return tuple(indices)
 
 
-def _subsample_dataset(dataset: al_datasets, indices: Sequence[int]):
+def _subsample_dataset(dataset: al_local_datasets, indices: Sequence[int]):
     dataset_subset = Subset(dataset=dataset, indices=indices)
     return dataset_subset
 

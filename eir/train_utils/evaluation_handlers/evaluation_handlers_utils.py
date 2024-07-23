@@ -13,6 +13,10 @@ from PIL import Image
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from torch.utils.data import DataLoader, Dataset
 
+from eir.data_load.data_streaming.streaming_dataset_utils import (
+    streamline_sequence_manual_data,
+)
+
 torchtext.disable_torchtext_deprecation_warning()
 from torchtext.vocab import Vocab
 
@@ -61,7 +65,6 @@ from eir.setup.input_setup_modules.setup_sequence import (
     ComputedSequenceInputInfo,
     TokenizerProtocolPreSplit,
     TokenizerProtocolRaw,
-    get_sequence_split_function,
 )
 from eir.setup.input_setup_modules.setup_tabular import ComputedTabularInputInfo
 from eir.setup.schemas import (
@@ -604,27 +607,6 @@ def prepare_base_input(
 ) -> dict[str, Any]:
     prepared_sample_inputs_copy = deepcopy(prepared_inputs)
     return prepared_sample_inputs_copy
-
-
-def streamline_sequence_manual_data(
-    data: str, split_on: Optional[str]
-) -> list[str] | str:
-    """
-    This is to specifically handle the case of an empty string / None being passed
-    here. If e.g. we call the split_func on '', we will get [''], which will
-    end up being encoded as a <unk> token. Instead, we want to return an empty
-    list here. In e.g. the validation handler code, this is also set explicitly.
-    """
-
-    sequence_streamlined: list[str] | str
-    if data == "" or data is None:
-        sequence_streamlined = []
-    else:
-        split_func = get_sequence_split_function(split_on=split_on)
-        split_data = split_func(data)
-        sequence_streamlined = split_data
-
-    return sequence_streamlined
 
 
 def get_batch_generator(

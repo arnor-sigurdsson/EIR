@@ -2,7 +2,17 @@ import inspect
 import math
 from dataclasses import dataclass
 from functools import partial
-from typing import Callable, Dict, Literal, Optional, Sequence, Tuple, Type, Union
+from typing import (
+    Callable,
+    Dict,
+    Literal,
+    Optional,
+    Protocol,
+    Sequence,
+    Tuple,
+    Type,
+    Union,
+)
 
 import torch
 from torch import Tensor, nn
@@ -173,6 +183,23 @@ def get_embedding_dim_for_sequence_model(
     return embedding_dim
 
 
+class SimpleFeatureExtractorForwardProtocol(Protocol):
+    def __call__(
+        self,
+        input: torch.Tensor,
+        feature_extractor: Union[nn.Module, "TransformerFeatureExtractor"],
+    ) -> torch.Tensor: ...
+
+
+class HFFeatureExtractorForwardProtocol(Protocol):
+    def __call__(
+        self,
+        input: torch.Tensor,
+        feature_extractor: Union[nn.Module, "TransformerFeatureExtractor"],
+        key: str = "last_hidden_state",
+    ) -> torch.Tensor: ...
+
+
 def _get_transformer_wrapper_feature_extractor(
     feature_extractor: Union["TransformerFeatureExtractor", nn.Module],
     external_feature_extractor: bool,
@@ -194,7 +221,8 @@ def _get_transformer_wrapper_feature_extractor(
     )
     if not window_size:
         extractor = partial(
-            feature_extractor_forward, feature_extractor=feature_extractor
+            feature_extractor_forward,
+            feature_extractor=feature_extractor,
         )
     else:
         num_chunks = int(math.ceil(max_length / window_size))
@@ -232,9 +260,7 @@ def _get_feature_extractor_forward(
     embedding_size: int,
     device: str,
     pool: Union[Literal["avg"], Literal["max"], None] = None,
-) -> Callable[
-    [torch.Tensor, Union["TransformerFeatureExtractor", nn.Module]], torch.Tensor
-]:
+) -> SimpleFeatureExtractorForwardProtocol | HFFeatureExtractorForwardProtocol:
     if is_hf_model:
         return get_hf_transformer_forward(
             feature_extractor_=feature_extractor,
@@ -341,10 +367,10 @@ def _build_transformer_forward_kwargs(
 
 def _conv_transformer_forward(
     input: torch.Tensor,
-    feature_extractor: "TransformerFeatureExtractor",
-    feature_extractor_forward_callable: Callable[
-        [torch.Tensor, Callable], torch.Tensor
-    ],
+    feature_extractor: Union[nn.Module, "TransformerFeatureExtractor"],
+    feature_extractor_forward_callable: (
+        SimpleFeatureExtractorForwardProtocol | HFFeatureExtractorForwardProtocol
+    ),
     max_length: int,
     window_size: int,
     padding: int,

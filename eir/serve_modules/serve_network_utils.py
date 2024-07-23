@@ -1,6 +1,6 @@
 import base64
 from io import BytesIO
-from typing import Any, Dict, Literal, Optional, Sequence, Union
+from typing import TYPE_CHECKING, Any, Dict, Literal, Optional, Sequence, Union
 
 import numpy as np
 import numpy.typing as npt
@@ -8,6 +8,9 @@ import torch
 from PIL import Image
 from sklearn.preprocessing import StandardScaler
 
+from eir.data_load.data_streaming.streaming_dataset_utils import (
+    streamline_sequence_manual_data,
+)
 from eir.data_load.label_setup import (
     al_label_transformers,
     al_label_transformers_object,
@@ -16,7 +19,6 @@ from eir.predict_modules.predict_tabular_input_setup import (
     ComputedPredictTabularInputInfo,
 )
 from eir.serve_modules.serve_schemas import ComputedServeTabularInputInfo
-from eir.setup.input_setup import al_input_objects_as_dict
 from eir.setup.input_setup_modules.setup_array import ComputedArrayInputInfo
 from eir.setup.input_setup_modules.setup_bytes import ComputedBytesInputInfo
 from eir.setup.input_setup_modules.setup_image import ComputedImageInputInfo
@@ -24,10 +26,11 @@ from eir.setup.input_setup_modules.setup_omics import ComputedOmicsInputInfo
 from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
 from eir.setup.input_setup_modules.setup_tabular import ComputedTabularInputInfo
 from eir.setup.schemas import ImageInputDataConfig, SequenceInputDataConfig
-from eir.train_utils.evaluation_handlers.evaluation_handlers_utils import (
-    streamline_sequence_manual_data,
-)
 from eir.utils.logging import get_logger
+
+if TYPE_CHECKING:
+    from eir.setup.input_setup import al_input_objects_as_dict
+
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -39,7 +42,7 @@ al_inputs_prepared = dict[
 
 def prepare_request_input_data_wrapper(
     request_data: Sequence[dict[str, Any]],
-    input_objects: al_input_objects_as_dict,
+    input_objects: "al_input_objects_as_dict",
 ) -> Sequence[al_inputs_prepared]:
     all_inputs_prepared = []
 
@@ -55,7 +58,7 @@ def prepare_request_input_data_wrapper(
 
 def prepare_request_input_data(
     request_data: Dict[str, Any],
-    input_objects: al_input_objects_as_dict,
+    input_objects: "al_input_objects_as_dict",
 ) -> Dict[str, Any]:
     inputs_prepared: al_inputs_prepared = {}
 
@@ -68,7 +71,7 @@ def prepare_request_input_data(
             case ComputedOmicsInputInfo():
                 assert input_type == "omics"
                 shape = input_object.data_dimensions.full_shape()[1:]
-                array_np = _deserialize_array(
+                array_np = deserialize_array(
                     array_str=serialized_data,
                     dtype=np.bool_,
                     shape=shape,
@@ -91,7 +94,7 @@ def prepare_request_input_data(
 
             case ComputedBytesInputInfo():
                 assert input_type == "bytes"
-                array_np = _deserialize_array(
+                array_np = deserialize_array(
                     array_str=serialized_data,
                     dtype=np.uint8,
                     shape=(-1,),
@@ -102,8 +105,9 @@ def prepare_request_input_data(
             case ComputedImageInputInfo():
                 assert input_type == "image"
                 assert isinstance(input_type_info, ImageInputDataConfig)
-                image_data = _deserialize_image(
-                    image_str=serialized_data, image_mode=input_type_info.mode
+                image_data = deserialize_image(
+                    image_str=serialized_data,
+                    image_mode=input_type_info.mode,
                 )
                 inputs_prepared[name] = image_data
 
@@ -121,7 +125,7 @@ def prepare_request_input_data(
 
             case ComputedArrayInputInfo():
                 assert input_type == "array"
-                array_np = _deserialize_array(
+                array_np = deserialize_array(
                     array_str=serialized_data,
                     dtype=input_object.dtype,
                     shape=input_object.data_dimensions.full_shape(),
@@ -142,7 +146,8 @@ def _streamline_tabular_request_data(
         cur_transformer = transformers[name]
 
         value_transformed = _parse_transformer_output(
-            transformer=cur_transformer, value=value
+            transformer=cur_transformer,
+            value=value,
         )
 
         parsed_output[name] = value_transformed
@@ -170,14 +175,12 @@ def _parse_transformer_output(
     return value_transformed
 
 
-def _deserialize_array(
-    array_str: str, dtype: npt.DTypeLike, shape: tuple
-) -> np.ndarray:
+def deserialize_array(array_str: str, dtype: npt.DTypeLike, shape: tuple) -> np.ndarray:
     array_bytes = base64.b64decode(array_str)
     return np.frombuffer(array_bytes, dtype=dtype).reshape(shape).copy()
 
 
-def _deserialize_image(
+def deserialize_image(
     image_str: str, image_mode: Optional[Literal["L", "RGB", "RGBA"]]
 ) -> Image.Image:
     """

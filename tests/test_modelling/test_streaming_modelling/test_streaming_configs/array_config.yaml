@@ -1,0 +1,7 @@
+input_info:
+  input_source: ws://localhost:8000/ws
+  input_name: array_data
+  input_type: array
+
+model_config:
+  model_type: cnn

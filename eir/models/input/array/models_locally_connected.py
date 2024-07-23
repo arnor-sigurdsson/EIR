@@ -225,13 +225,13 @@ class LCLModel(nn.Module):
             base=kernel_width,
             expansion=self.model_config.first_kernel_expansion,
         )
-        fc_0_channel_exponent = calc_value_after_expansion(
-            base=self.model_config.channel_exp_base,
+        fc_0_out_feature_sets = calc_value_after_expansion(
+            base=2**self.model_config.channel_exp_base,
             expansion=self.model_config.first_channel_expansion,
         )
         self.fc_0 = LCL(
             in_features=self.fc_1_in_features,
-            out_feature_sets=2**fc_0_channel_exponent,
+            out_feature_sets=fc_0_out_feature_sets,
             kernel_size=fc_0_kernel_size,
             bias=True,
         )
@@ -345,7 +345,8 @@ def _get_lcl_block_factory(
         return generate_lcl_residual_blocks_auto
 
     auto_factory = partial(
-        _generate_lcl_blocks_from_spec, block_layer_spec=block_layer_spec
+        _generate_lcl_blocks_from_spec,
+        block_layer_spec=block_layer_spec,
     )
 
     return auto_factory
@@ -353,10 +354,10 @@ def _get_lcl_block_factory(
 
 def _generate_lcl_blocks_from_spec(
     lcl_parameter_spec: LCParameterSpec,
-    block_layer_spec: List[int],
+    block_layer_spec: Sequence[int],
 ) -> nn.Sequential:
     s = lcl_parameter_spec
-    block_layer_spec_copy = copy(block_layer_spec)
+    block_layer_spec_copy: list[int] = list(copy(block_layer_spec))
 
     first_block = LCLResidualBlock(
         in_features=s.in_features,

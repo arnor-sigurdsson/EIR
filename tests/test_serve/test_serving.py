@@ -12,7 +12,7 @@ from sklearn.metrics import mean_squared_error
 from docs.doc_modules.serve_experiments_utils import load_data_for_serve
 from docs.doc_modules.serving_experiments import run_serve_experiment_from_command
 from eir import train
-from eir.serve_modules.serve_network_utils import _deserialize_array
+from eir.serve_modules.serve_network_utils import deserialize_array
 from eir.setup.schemas import InputConfig, OutputConfig
 from eir.utils.logging import get_logger
 from tests.test_modelling.test_modelling_utils import check_performance_result_wrapper
@@ -424,7 +424,7 @@ def _validate_array_output(
     cosine_similarity_threshold: float = 0.6,
     is_diffusion: bool = False,
 ) -> bool:
-    array_np = _deserialize_array(
+    array_np = deserialize_array(
         array_str=actual_output,
         dtype=np.float32,
         shape=data_dimensions,

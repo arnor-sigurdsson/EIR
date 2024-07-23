@@ -1,0 +1,6 @@
+batch_size: 32
+memory_dataset: false
+n_epochs: 10
+sample_interval: 100
+checkpoint_interval: 100
+output_folder: runs/test_streaming_run

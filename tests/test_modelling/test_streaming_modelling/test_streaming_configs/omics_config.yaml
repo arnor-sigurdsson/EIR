@@ -1,0 +1,7 @@
+input_info:
+  input_source: ws://localhost:8000/ws
+  input_name: omics_data
+  input_type: omics
+
+model_config:
+  model_type: genome-local-net

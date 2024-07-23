@@ -38,6 +38,11 @@ from eir.setup.output_setup import (
 from eir.setup.output_setup_modules.sequence_output_setup import (
     converge_sequence_input_and_output,
 )
+from eir.setup.streaming_data_setup.streaming_data_adapters import (
+    patch_configs_for_local_data,
+    setup_and_gather_streaming_data,
+)
+from eir.setup.streaming_data_setup.streaming_data_utils import send_validation_ids
 from eir.target_setup.target_label_setup import (
     gather_all_ids_from_output_configs,
     read_manual_ids_if_exist,
@@ -89,7 +94,7 @@ class Experiment:
     outputs: al_output_objects_as_dict
     train_loader: torch.utils.data.DataLoader
     valid_loader: torch.utils.data.DataLoader
-    valid_dataset: datasets.al_datasets
+    valid_dataset: datasets.al_local_datasets
     model: al_meta_model
     optimizer: Optimizer
     criteria: al_criteria_dict
@@ -102,20 +107,44 @@ def get_default_experiment(
     configs: Configs,
     hooks: Hooks,
 ) -> "Experiment":
-    run_folder = _prepare_run_folder(output_folder=configs.global_config.output_folder)
 
-    all_array_ids = gather_all_ids_from_output_configs(
-        output_configs=configs.output_configs
+    gc = configs.global_config
+
+    output_folder = gc.output_folder
+    run_folder = _prepare_run_folder(output_folder=output_folder)
+
+    streaming_data = setup_and_gather_streaming_data(
+        configs=configs,
+        output_folder=output_folder,
+        batch_size=gc.batch_size,
+        max_samples=5000,
     )
+
+    if streaming_data is not None:
+        ws_url, streaming_local_folder = streaming_data
+        configs_original, configs = patch_configs_for_local_data(
+            configs=configs,
+            local_data_path=streaming_local_folder,
+        )
+    else:
+        ws_url = None
+
+    all_ids = gather_all_ids_from_output_configs(output_configs=configs.output_configs)
     manual_valid_ids = read_manual_ids_if_exist(
-        manual_valid_ids_file=configs.global_config.manual_valid_ids_file
+        manual_valid_ids_file=gc.manual_valid_ids_file
     )
 
     train_ids, valid_ids = split_ids(
-        ids=all_array_ids,
-        valid_size=configs.global_config.valid_size,
+        ids=all_ids,
+        valid_size=gc.valid_size,
         manual_valid_ids=manual_valid_ids,
     )
+
+    if ws_url is not None:
+        send_validation_ids(
+            ws_url=ws_url,
+            valid_ids=list(valid_ids),
+        )
 
     target_labels = set_up_all_targets_wrapper(
         train_ids=train_ids,
@@ -151,32 +180,35 @@ def get_default_experiment(
         outputs_as_dict=outputs_as_dict,
         train_ids_to_keep=train_ids,
         valid_ids_to_keep=valid_ids,
+        websocket_url=ws_url,
     )
 
-    train_sampler = get_train_sampler(
-        columns_to_sample=configs.global_config.weighted_sampling_columns,
-        train_dataset=train_dataset,
-    )
+    train_sampler = None
+    if isinstance(train_dataset, (datasets.DiskDataset, datasets.MemoryDataset)):
+        train_sampler = get_train_sampler(
+            columns_to_sample=gc.weighted_sampling_columns,
+            train_dataset=train_dataset,
+        )
 
     train_dataloader, valid_dataloader = get_dataloaders(
         train_dataset=train_dataset,
         train_sampler=train_sampler,
         valid_dataset=valid_dataset,
-        batch_size=configs.global_config.batch_size,
-        num_workers=configs.global_config.dataloader_workers,
+        batch_size=gc.batch_size,
+        num_workers=gc.dataloader_workers,
     )
 
     model = get_model(
-        global_config=configs.global_config,
+        global_config=gc,
         inputs_as_dict=inputs_as_dict,
         fusion_config=configs.fusion_config,
         outputs_as_dict=outputs_as_dict,
     )
 
     model = maybe_wrap_model_with_swa(
-        n_iter_before_swa=configs.global_config.n_iter_before_swa,
+        n_iter_before_swa=gc.n_iter_before_swa,
         model=model,
-        device=torch.device(configs.global_config.device),
+        device=torch.device(gc.device),
     )
     _log_model(
         model=model,
@@ -192,13 +224,15 @@ def get_default_experiment(
     )
 
     optimizer = get_optimizer(
-        model=model, loss_callable=loss_func, global_config=configs.global_config
+        model=model,
+        loss_callable=loss_func,
+        global_config=gc,
     )
 
     metrics = get_default_metrics(
         target_transformers=target_labels.label_transformers,
-        cat_averaging_metrics=configs.global_config.cat_averaging_metrics,
-        con_averaging_metrics=configs.global_config.con_averaging_metrics,
+        cat_averaging_metrics=gc.cat_averaging_metrics,
+        con_averaging_metrics=gc.con_averaging_metrics,
     )
 
     experiment = Experiment(
@@ -236,25 +270,55 @@ def _prepare_run_folder(output_folder: str) -> Path:
 
 
 def get_dataloaders(
-    train_dataset: datasets.DatasetBase,
+    train_dataset: datasets.al_datasets,
     train_sampler: Union[None, WeightedRandomSampler, DistributedSampler],
-    valid_dataset: datasets.DatasetBase,
+    valid_dataset: datasets.al_local_datasets,
     batch_size: int,
     num_workers: int = 0,
 ) -> Tuple:
-    check_dataset_and_batch_size_compatibility(
-        dataset=train_dataset, batch_size=batch_size, name="Training"
-    )
+
+    train_num_workers = num_workers
+
+    if isinstance(train_dataset, (datasets.DiskDataset, datasets.MemoryDataset)):
+        check_dataset_and_batch_size_compatibility(
+            dataset=train_dataset,
+            batch_size=batch_size,
+            name="Training",
+        )
+    else:
+        if num_workers > 0:
+            logger.warning(
+                "When using a streaming dataset with multiple "
+                " workers (num_workers > 0), "
+                "each worker will create its own "
+                "connection to the data server. This can "
+                "potentially lead to duplicate data "
+                "being processed if the server is not "
+                "properly configured to handle multiple connections. "
+                "Ensure that your "
+                "data server implements proper coordination "
+                "to distribute unique samples "
+                "across all connections. If you're unsure about your server's "
+                "implementation, consider using num_workers=0 or consult your data "
+                "server's documentation."
+            )
 
     check_dataset_and_batch_size_compatibility(
-        dataset=valid_dataset, batch_size=batch_size, name="Validation"
+        dataset=valid_dataset,
+        batch_size=batch_size,
+        name="Validation",
     )
+
+    shuffle: Optional[bool] = False if train_sampler else True
+    if isinstance(train_dataset, datasets.StreamingDataset):
+        shuffle = None
+
     train_dataloader = DataLoader(
         dataset=train_dataset,
         batch_size=batch_size,
         sampler=train_sampler,
-        shuffle=False if train_sampler else True,
-        num_workers=num_workers,
+        shuffle=shuffle,
+        num_workers=train_num_workers,
         pin_memory=False,
         drop_last=True,
     )

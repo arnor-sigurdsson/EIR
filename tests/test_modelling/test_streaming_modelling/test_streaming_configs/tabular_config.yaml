@@ -1,0 +1,11 @@
+input_info:
+  input_source: ws://localhost:8000/ws
+  input_name: tabular_data
+  input_type: tabular
+input_type_info:
+  input_cat_columns:
+  - column1
+  input_con_columns:
+  - column2
+model_config:
+  model_type: tabular

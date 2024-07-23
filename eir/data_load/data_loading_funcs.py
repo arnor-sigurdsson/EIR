@@ -8,7 +8,8 @@ from torch.utils.data import WeightedRandomSampler
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
-    from eir.data_load.datasets import DatasetBase, Sample  # noqa: F401
+    from eir.data_load.data_utils import Sample
+    from eir.data_load.datasets import DatasetBase  # noqa: F401
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 

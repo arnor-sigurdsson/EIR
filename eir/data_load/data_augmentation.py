@@ -204,12 +204,14 @@ def hook_mix_loss(
 ) -> Dict:
     target_columns_gen = get_output_info_generator(outputs_as_dict=experiment.outputs)
 
+    valid_dataset = experiment.valid_dataset
+
     mixed_losses, filtered_outputs = calc_all_mixed_losses(
         target_columns_gen=target_columns_gen,
         criteria=experiment.criteria,
         outputs=state["model_outputs"],
         mixed_object=state["mixing_info"],
-        missing_ids_per_output=experiment.valid_dataset.missing_ids_per_output,
+        missing_ids_per_output=valid_dataset.missing_ids_per_output,
     )
 
     state_updates = {

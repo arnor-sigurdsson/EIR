@@ -1,0 +1,12 @@
+input_info:
+  input_source: ws://localhost:8000/ws
+  input_name: image_data
+  input_type: image
+
+input_type_info:
+  adaptive_normalization_max_samples: 1000
+  size:
+    - 64
+
+model_config:
+  model_type: cnn

@@ -6,7 +6,7 @@ from tqdm import tqdm
 from eir.data_load.data_source_modules.common_utils import add_id_to_samples
 
 if TYPE_CHECKING:
-    from eir.data_load.datasets import Sample
+    from eir.data_load.data_utils import Sample
 
 
 def add_tabular_data_to_samples(

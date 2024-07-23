@@ -1,0 +1,9 @@
+output_info:
+  output_source: ws://localhost:8000/ws
+  output_name: output_array
+  output_type: array
+
+model_config:
+    model_type: cnn
+    model_init_config:
+      channel_exp_base: 0

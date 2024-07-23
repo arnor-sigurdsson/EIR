@@ -9,7 +9,7 @@ from hypothesis import given, settings
 from hypothesis.strategies import integers, lists
 
 from eir.data_load import data_loading_funcs
-from eir.data_load.datasets import Sample
+from eir.data_load.data_utils import Sample
 from eir.setup.config import get_all_tabular_targets
 from eir.train import get_dataloaders
 

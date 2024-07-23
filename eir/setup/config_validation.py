@@ -30,23 +30,33 @@ def validate_train_configs(configs: "Configs") -> None:
 
 def validate_input_configs(input_configs: Sequence[schemas.InputConfig]) -> None:
     for input_config in input_configs:
+
+        input_source: str = input_config.input_info.input_source
+        is_websocket = input_source.startswith("ws://")
+        if is_websocket:
+            continue
+
+        input_source_path = Path(input_source)
+
         base_validate_input_info(input_info=input_config.input_info)
-        input_source = Path(input_config.input_info.input_source)
 
         match input_config.input_type_info:
             case schemas.TabularInputDataConfig(
                 input_cat_columns, input_con_columns, _, _
             ):
                 expected_columns = list(input_cat_columns) + list(input_con_columns)
-                validate_tabular_file(
-                    file_to_check=input_source,
+                validate_tabular_source(
+                    source_to_check=input_source_path,
                     expected_columns=expected_columns,
                     name="Tabular input",
                 )
 
 
 def base_validate_input_info(input_info: schemas.InputDataConfig) -> None:
-    if not Path(input_info.input_source).exists():
+
+    input_source = input_info.input_source
+
+    if not Path(input_source).exists():
         raise ValueError(
             f"Input source {input_info.input_source} does not exist. "
             f"Please check the path is correct."
@@ -55,6 +65,12 @@ def base_validate_input_info(input_info: schemas.InputDataConfig) -> None:
 
 def validate_output_configs(output_configs: Sequence[schemas.OutputConfig]) -> None:
     for output_config in output_configs:
+
+        output_source = output_config.output_info.output_source
+        is_websocket = output_source is not None and output_source.startswith("ws://")
+        if is_websocket:
+            continue
+
         base_validate_output_info(output_info=output_config.output_info)
         name = output_config.output_info.output_name
 
@@ -74,8 +90,8 @@ def validate_output_configs(output_configs: Sequence[schemas.OutputConfig]) -> N
                 output_source_path = Path(output_source)
 
                 expected_columns = list(target_cat_columns) + list(target_con_columns)
-                validate_tabular_file(
-                    file_to_check=output_source_path,
+                validate_tabular_source(
+                    source_to_check=output_source_path,
                     expected_columns=expected_columns,
                     name="Tabular output",
                 )
@@ -110,27 +126,27 @@ def base_validate_output_info(output_info: schemas.OutputInfoConfig) -> None:
         )
 
 
-def validate_tabular_file(
-    file_to_check: Path,
+def validate_tabular_source(
+    source_to_check: Path,
     expected_columns: Sequence[str],
     name: str,
 ) -> None:
-    header = pd.read_csv(file_to_check, nrows=0).columns.tolist()
+    header = pd.read_csv(source_to_check, nrows=0).columns.tolist()
     if "ID" not in header:
         raise ValueError(
-            f"{name} file {file_to_check} does not contain a column named 'ID'. "
+            f"{name} file {source_to_check} does not contain a column named 'ID'. "
             f"Please check the input file."
         )
 
     if not set(expected_columns).issubset(header):
         raise ValueError(
-            f"{name} file {file_to_check} does not contain all expected columns: "
+            f"{name} file {source_to_check} does not contain all expected columns: "
             f"{reprlib.repr(expected_columns)}. "
             f"Please check the input file."
         )
 
     series_ids = pd.read_csv(
-        filepath_or_buffer=file_to_check,
+        filepath_or_buffer=source_to_check,
         usecols=["ID"],
         engine="pyarrow",
         dtype_backend="pyarrow",
@@ -138,7 +154,7 @@ def validate_tabular_file(
     if not series_ids.is_unique:
         non_unique = series_ids[series_ids.duplicated()].tolist()
         raise ValueError(
-            f"{name} file {file_to_check} contains non-unique"
+            f"{name} file {source_to_check} contains non-unique"
             f" IDs: {reprlib.repr(non_unique)}. "
             f"Please check the input file."
         )

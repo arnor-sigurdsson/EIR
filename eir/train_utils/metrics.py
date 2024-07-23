@@ -427,17 +427,17 @@ def log_empty_loss_once() -> LogEmptyLossProtocol:
 
 
 def calculate_prediction_losses(
-    criteria: "Dict[str, Dict[str, torch.nn.Module]]",
-    inputs: Dict[str, Dict[str, torch.Tensor]],
-    targets: Dict[str, Dict[str, torch.Tensor]],
+    criteria: "al_criteria_dict",
+    inputs: dict[str, dict[str, torch.Tensor]],
+    targets: dict[str, dict[str, torch.Tensor]],
     log_empty_loss_callable: LogEmptyLossProtocol,
-) -> Dict[str, Dict[str, torch.Tensor]]:
+) -> dict[str, dict[str, torch.Tensor]]:
     """
     We check for empty output tensors and log a warning if we encounter them.
     This can happen when modelling on multiple outputs, which can vary in their
     sparsity, and by chance some outputs are empty in a batch.
     """
-    losses_dict: Dict[str, Dict[str, torch.Tensor]] = {}
+    losses_dict: dict[str, dict[str, torch.Tensor]] = {}
 
     for output_name, target_dict in targets.items():
         for output_head_name, cur_inner_target in target_dict.items():
@@ -466,7 +466,7 @@ def calculate_prediction_losses(
     return losses_dict
 
 
-def aggregate_losses(losses_dict: Dict[str, Dict[str, torch.Tensor]]) -> torch.Tensor:
+def aggregate_losses(losses_dict: dict[str, dict[str, torch.Tensor]]) -> torch.Tensor:
     losses_values = []
     for output_name, targets_for_output_dict in losses_dict.items():
         for loss in targets_for_output_dict.values():
@@ -830,13 +830,13 @@ def get_default_metrics(
         only_val=True,
     )
 
-    avg_metrics = parse_averaging_metrics(
+    cat_for_avg, con_for_avg = parse_averaging_metrics(
         cat_averaging_metrics=cat_averaging_metrics,
         con_averaging_metrics=con_averaging_metrics,
     )
     averaging_functions = get_performance_averaging_functions(
-        cat_metric_names=avg_metrics["cat_metric_names"],
-        con_metric_names=avg_metrics["con_metric_names"],
+        cat_metric_names=cat_for_avg,
+        con_metric_names=con_for_avg,
     )
 
     default_metrics: al_metric_record_dict = {
@@ -850,25 +850,36 @@ def get_default_metrics(
 def parse_averaging_metrics(
     cat_averaging_metrics: Optional[al_cat_averaging_metric_choices],
     con_averaging_metrics: Optional[al_con_averaging_metric_choices],
-) -> Dict[str, Sequence[str]]:
-    base = _get_default_averaging_metrics()
+) -> tuple[al_cat_averaging_metric_choices, al_con_averaging_metric_choices]:
+    cat_parsed, con_parsed = _get_default_averaging_metrics()
 
     if cat_averaging_metrics:
         _validate_metrics(
             passed_in_metrics=cat_averaging_metrics,
-            expected_metrics=["loss", "acc", "mcc", "roc-auc-macro", "ap-macro"],
+            expected_metrics=[
+                "loss",
+                "acc",
+                "mcc",
+                "roc-auc-macro",
+                "ap-macro",
+            ],
             target_type="categorical",
         )
-        base["cat_metric_names"] = cat_averaging_metrics
+        cat_parsed = cat_averaging_metrics
     if con_averaging_metrics:
         _validate_metrics(
             passed_in_metrics=con_averaging_metrics,
-            expected_metrics=["loss", "rmse", "pcc", "r2"],
+            expected_metrics=[
+                "loss",
+                "rmse",
+                "pcc",
+                "r2",
+            ],
             target_type="continuous",
         )
-        base["con_metric_names"] = con_averaging_metrics
+        con_parsed = con_averaging_metrics
 
-    return base
+    return cat_parsed, con_parsed
 
 
 def _validate_metrics(
@@ -882,16 +893,22 @@ def _validate_metrics(
             )
 
 
-def _get_default_averaging_metrics() -> Dict[str, Sequence[str]]:
-    return {
-        "cat_metric_names": ["mcc", "roc-auc-macro", "ap-macro"],
-        "con_metric_names": ["loss", "pcc", "r2"],
-    }
+def _get_default_averaging_metrics() -> (
+    tuple[al_cat_averaging_metric_choices, al_con_averaging_metric_choices]
+):
+
+    cat_names: list[Literal["mcc", "roc-auc-macro", "ap-macro", "acc"]]
+    con_names: list[Literal["loss", "pcc", "r2"]]
+
+    cat_names = ["mcc", "roc-auc-macro", "ap-macro"]
+    con_names = ["loss", "pcc", "r2"]
+
+    return cat_names, con_names
 
 
 def get_performance_averaging_functions(
-    cat_metric_names: Sequence[str],
-    con_metric_names: Sequence[str],
+    cat_metric_names: al_cat_averaging_metric_choices,
+    con_metric_names: al_con_averaging_metric_choices,
 ) -> al_averaging_functions_dict:
     """
     Note that we have the mean(values) else 0.0 to account for some values not being

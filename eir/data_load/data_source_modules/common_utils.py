@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, DefaultDict
 
 if TYPE_CHECKING:
-    from eir.data_load.datasets import Sample
+    from eir.data_load.data_utils import Sample
 
 
 def add_id_to_samples(

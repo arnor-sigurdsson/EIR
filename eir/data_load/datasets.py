@@ -1,7 +1,6 @@
 import reprlib
 from collections import defaultdict
 from copy import copy
-from dataclasses import dataclass
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -47,6 +46,8 @@ from eir.data_load.data_source_modules.local_ops import (
     add_sequence_data_from_csv_to_samples,
     get_file_sample_id_iterator_basic,
 )
+from eir.data_load.data_streaming.streaming_dataset import StreamingDataset
+from eir.data_load.data_utils import Sample
 from eir.data_load.label_setup import al_target_label_dict
 from eir.predict_modules.predict_tabular_input_setup import (
     ComputedPredictTabularInputInfo,
@@ -68,11 +69,12 @@ if TYPE_CHECKING:
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 # Type Aliases
-al_datasets = Union["MemoryDataset", "DiskDataset"]
+al_datasets = Union["MemoryDataset", "DiskDataset", "StreamingDataset"]
+al_local_datasets = Union["MemoryDataset", "DiskDataset"]
 al_dataset_types = Type[al_datasets]
 # embeddings --> remain str, cat targets --> int, con extra/target --> float
-al_sample_label_dict_target = Dict[str, Dict[str, Union[int, float, torch.Tensor]]]
-al_inputs = Union[Dict[str, torch.Tensor], Dict[str, Any]]
+al_sample_label_dict_target = dict[str, dict[str, int | float | torch.Tensor]]
+al_inputs = dict[str, torch.Tensor] | dict[str, Any]
 al_getitem_return = tuple[dict[str, torch.Tensor], al_sample_label_dict_target, str]
 
 
@@ -83,8 +85,13 @@ def set_up_datasets_from_configs(
     outputs_as_dict: "al_output_objects_as_dict",
     train_ids_to_keep: Optional[Sequence[str]] = None,
     valid_ids_to_keep: Optional[Sequence[str]] = None,
-) -> Tuple[al_datasets, al_datasets]:
-    dataset_class: al_dataset_types = (
+    websocket_url: Optional[str] = None,
+) -> Tuple[al_datasets, al_local_datasets]:
+
+    train_dataset_class: al_dataset_types = (
+        MemoryDataset if configs.global_config.memory_dataset else DiskDataset
+    )
+    valid_dataset_class: al_dataset_types = (
         MemoryDataset if configs.global_config.memory_dataset else DiskDataset
     )
 
@@ -97,6 +104,16 @@ def set_up_datasets_from_configs(
         missing_ids_per_output=target_labels.missing_ids_per_output,
     )
 
+    if websocket_url:
+        train_dataset_class = StreamingDataset
+        train_kwargs = {
+            "websocket_url": websocket_url,
+            "inputs": inputs_as_dict,
+            "outputs": outputs_as_dict,
+            "test_mode": False,
+            "batch_size": configs.global_config.batch_size,
+        }
+
     valid_kwargs = construct_default_dataset_kwargs_from_cl_args(
         target_labels_dict=target_labels.valid_labels,
         inputs=inputs_as_dict,
@@ -106,13 +123,17 @@ def set_up_datasets_from_configs(
         missing_ids_per_output=target_labels.missing_ids_per_output,
     )
 
-    train_dataset: al_datasets = dataset_class(**train_kwargs)
-    valid_dataset: al_datasets = dataset_class(**valid_kwargs)
+    train_dataset: al_datasets = train_dataset_class(**train_kwargs)
+    valid_dataset: al_datasets = valid_dataset_class(**valid_kwargs)
 
-    _check_valid_and_train_datasets(
-        train_dataset=train_dataset, valid_dataset=valid_dataset
-    )
+    if not websocket_url:
+        assert isinstance(train_dataset, (MemoryDataset, DiskDataset))
+        assert isinstance(valid_dataset, (MemoryDataset, DiskDataset))
+        _check_valid_and_train_datasets(
+            train_dataset=train_dataset, valid_dataset=valid_dataset
+        )
 
+    assert isinstance(valid_dataset, (MemoryDataset, DiskDataset))
     return train_dataset, valid_dataset
 
 
@@ -139,7 +160,7 @@ def construct_default_dataset_kwargs_from_cl_args(
 
 
 def _check_valid_and_train_datasets(
-    train_dataset: al_datasets, valid_dataset: al_datasets
+    train_dataset: al_local_datasets, valid_dataset: al_local_datasets
 ) -> None:
     if len(train_dataset) < len(valid_dataset):
         logger.warning(
@@ -153,13 +174,6 @@ def _check_valid_and_train_datasets(
     assert set(valid_dataset.target_labels_dict.keys()).isdisjoint(
         train_dataset.target_labels_dict.keys()
     )
-
-
-@dataclass
-class Sample:
-    sample_id: str
-    inputs: Dict[str, Any]
-    target_labels: al_sample_label_dict_target
 
 
 class DatasetBase(Dataset):
