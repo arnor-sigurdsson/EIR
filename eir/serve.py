@@ -1,10 +1,7 @@
 import argparse
 
-import torchtext
 import uvicorn
 from fastapi import FastAPI
-
-torchtext.disable_torchtext_deprecation_warning()
 
 from eir.serve_modules.serve_api import create_info_endpoint, create_predict_endpoint
 from eir.serve_modules.serve_experiment_io import (

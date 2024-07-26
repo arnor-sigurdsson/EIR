@@ -2,13 +2,9 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 
-import torchtext
-
-torchtext.disable_torchtext_deprecation_warning()
-from torchtext.vocab import Vocab
-
 from eir.models.input.sequence.transformer_models import SequenceModelConfig
 from eir.setup.input_setup_modules import setup_sequence
+from eir.setup.input_setup_modules.torchtext_port.vocab import Vocab
 from eir.setup.schemas import InputConfig, OutputConfig, SequenceOutputTypeConfig
 from eir.utils.logging import get_logger
 
