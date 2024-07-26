@@ -183,6 +183,7 @@ def get_unsupported_hf_models() -> dict:
         "clipseg": "Not strictly sequence model.",
         "clip_vision_model": "Not strictly sequence model.",
         "clvp": "Not strictly sequence model.",
+        "chameleon": "Not strictly sequence model.",
         "chinese_clip": "Not strictly sequence model.",
         "chinese_clip_vision_model": "Not strictly sequence model.",
         "conditional_detr": "Not strictly sequence model.",
@@ -223,6 +224,7 @@ def get_unsupported_hf_models() -> dict:
         "gptsan-japanese": "AttributeError: 'MoECausalLMOutputWithPast' object "
         "has no attribute 'last_hidden_state'.",
         "hubert": "Cannot do straightforward look up of embeddings.",
+        "hiera": "Not strictly sequence model.",
         "informer": "Not strictly sequence model.",
         "idefics": "Not strictly sequence model.",
         "idefics2": "Not strictly sequence model.",
