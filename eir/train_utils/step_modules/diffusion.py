@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+import numpy as np
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -109,7 +110,7 @@ def p_sample_loop(
     model: nn.Module,
     output_shape: tuple,
     time_steps: int,
-) -> torch.Tensor:
+) -> np.ndarray:
     device = next(model.parameters()).device
 
     current_state: torch.Tensor = torch.randn(output_shape, device=device)
