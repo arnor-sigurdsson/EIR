@@ -145,7 +145,8 @@ def general_post_process(
 
             case _:
                 raise NotImplementedError(
-                    "Only tabular, sequence and array outputs are supported"
+                    "Only tabular, sequence and array outputs are supported, got %s",
+                    output_object,
                 )
 
     post_processed = object_to_primitives(obj=post_processed)
