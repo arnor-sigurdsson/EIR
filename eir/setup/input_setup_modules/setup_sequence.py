@@ -17,16 +17,10 @@ from typing import (
     overload,
 )
 
-import torchtext
-
-torchtext.disable_torchtext_deprecation_warning()
 import pandas as pd
 from tokenizers import Tokenizer
 from tokenizers.models import BPE
 from tokenizers.trainers import BpeTrainer
-from torchtext.data import get_tokenizer as get_pytorch_tokenizer
-from torchtext.vocab import Vocab, build_vocab_from_iterator
-from torchtext.vocab import vocab as pytorch_vocab_builder
 from tqdm import tqdm
 from transformers import AutoTokenizer, PreTrainedTokenizer
 from transformers.tokenization_utils_base import (
@@ -43,6 +37,16 @@ from eir.data_load.data_source_modules.deeplake_ops import (
 from eir.models.input.sequence.transformer_models import SequenceModelConfig
 from eir.setup import schemas
 from eir.setup.input_setup_modules.common import get_default_sequence_specials
+from eir.setup.input_setup_modules.torchtext_port.utils import (
+    get_tokenizer as get_pytorch_tokenizer,
+)
+from eir.setup.input_setup_modules.torchtext_port.vocab import Vocab
+from eir.setup.input_setup_modules.torchtext_port.vocab_factory import (
+    build_vocab_from_iterator,
+)
+from eir.setup.input_setup_modules.torchtext_port.vocab_factory import (
+    vocab as pytorch_vocab_builder,
+)
 from eir.setup.schemas import al_tokenizer_choices
 from eir.utils.logging import get_logger
 

@@ -7,18 +7,12 @@ from typing import TYPE_CHECKING, Dict, Iterable, Mapping, Sequence, Tuple
 import numpy as np
 import pandas as pd
 import torch
-import torchtext
-
-torchtext.disable_torchtext_deprecation_warning()
-
-import torchtext.vocab
 from aislib.misc_utils import ensure_path_exists
 from captum.attr._utils.visualization import (
     _get_color,
     format_classname,
     format_word_importances,
 )
-from torchtext.vocab import Vocab
 
 from eir.interpretation.interpretation_utils import (
     get_basic_sample_attributions_to_analyse_generator,
@@ -28,6 +22,7 @@ from eir.interpretation.interpretation_utils import (
     stratify_attributions_by_target_classes,
 )
 from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
+from eir.setup.input_setup_modules.torchtext_port.vocab import Vocab
 from eir.setup.output_setup_modules.tabular_output_setup import (
     ComputedTabularOutputInfo,
 )
@@ -201,9 +196,7 @@ def extract_sample_info_for_sequence_attribution(
     return extracted_sequence_info
 
 
-def extract_raw_inputs_from_tokens(
-    tokens: torch.Tensor, vocab: torchtext.vocab.Vocab
-) -> Sequence[str]:
+def extract_raw_inputs_from_tokens(tokens: torch.Tensor, vocab: Vocab) -> Sequence[str]:
     raw_inputs = vocab.lookup_tokens(tokens.squeeze().tolist())
     return raw_inputs
 

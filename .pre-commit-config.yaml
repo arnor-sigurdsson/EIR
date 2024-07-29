@@ -31,13 +31,6 @@ repos:
         types: [ python ]
         stages: [ commit ]
 
-      - id: test
-        name: Run tests
-        entry: tox
-        language: system
-        types: [ python ]
-        stages: [ push ]
-
       - id: check-versions
         name: Check project versions
         entry: python ./misc/check_versions.py

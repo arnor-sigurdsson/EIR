@@ -145,7 +145,10 @@ def get_input_setup_function_for_serve(input_type: str) -> Callable:
 
 
 def _setup_tabular_input_for_serve(
-    input_config: InputConfig, output_folder: Path, *args, **kwargs
+    input_config: InputConfig,
+    output_folder: Path,
+    *args,
+    **kwargs,
 ) -> ComputedServeTabularInputInfo:
     input_info = input_config.input_info
     input_type_info = input_config.input_type_info

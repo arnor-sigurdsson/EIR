@@ -3,9 +3,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Callable, List, Optional, Tuple, Union
 
 import torch
-import torchtext
-
-torchtext.disable_torchtext_deprecation_warning()
 import torch.multiprocessing
 
 torch.multiprocessing.set_sharing_strategy("file_system")

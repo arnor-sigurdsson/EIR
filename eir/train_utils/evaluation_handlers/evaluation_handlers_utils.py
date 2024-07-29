@@ -7,18 +7,10 @@ from typing import TYPE_CHECKING, Any, Dict, Iterator, Optional, Tuple, Union
 
 import numpy as np
 import torch
-import torchtext
 from aislib.misc_utils import ensure_path_exists, get_logger
 from PIL import Image
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from torch.utils.data import DataLoader, Dataset
-
-from eir.data_load.data_streaming.streaming_dataset_utils import (
-    streamline_sequence_manual_data,
-)
-
-torchtext.disable_torchtext_deprecation_warning()
-from torchtext.vocab import Vocab
 
 from eir.data_load.data_preparation_modules.prepare_array import (
     array_load_wrapper,
@@ -39,6 +31,9 @@ from eir.data_load.data_preparation_modules.prepare_omics import (
 )
 from eir.data_load.data_preparation_modules.prepare_sequence import (
     prepare_sequence_data,
+)
+from eir.data_load.data_streaming.streaming_dataset_utils import (
+    streamline_sequence_manual_data,
 )
 from eir.data_load.data_utils import Batch
 from eir.data_load.datasets import al_getitem_return
@@ -67,6 +62,7 @@ from eir.setup.input_setup_modules.setup_sequence import (
     TokenizerProtocolRaw,
 )
 from eir.setup.input_setup_modules.setup_tabular import ComputedTabularInputInfo
+from eir.setup.input_setup_modules.torchtext_port.vocab import Vocab
 from eir.setup.schemas import (
     ArrayInputDataConfig,
     ByteInputDataConfig,

@@ -5,13 +5,9 @@ from typing import TYPE_CHECKING, Any, Dict, Generator, Iterator, Sequence, Tupl
 
 import torch
 import torch.nn.functional as F
-import torchtext
 from aislib.misc_utils import ensure_path_exists
 from torch.utils.data import Dataset
 from torch.utils.data._utils.collate import default_collate
-
-torchtext.disable_torchtext_deprecation_warning()
-from torchtext.vocab import Vocab
 
 from eir.data_load.data_preparation_modules.imputation import (
     impute_missing_modalities_wrapper,
@@ -19,6 +15,7 @@ from eir.data_load.data_preparation_modules.imputation import (
 from eir.data_load.datasets import al_getitem_return
 from eir.models.model_training_utils import predict_on_batch
 from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
+from eir.setup.input_setup_modules.torchtext_port.vocab import Vocab
 from eir.setup.output_setup_modules.sequence_output_setup import (
     ComputedSequenceOutputInfo,
 )
