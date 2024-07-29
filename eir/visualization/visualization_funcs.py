@@ -615,7 +615,9 @@ def generate_all_training_curves(
         valid_series = valid_history_df[metric_suffix]
 
         figure_object, axis_object = generate_validation_curve_from_series(
-            series=valid_series, title_extra=title_extra, skiprows=plot_skip_steps
+            series=valid_series,
+            title_extra=title_extra,
+            skiprows=plot_skip_steps,
         )
 
         if figure_object is None:

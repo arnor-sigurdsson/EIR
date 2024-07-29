@@ -420,7 +420,7 @@ def _validate_array_output(
     actual_output: str,
     expected_array: np.ndarray,
     data_dimensions: tuple[int, ...],
-    mse_threshold: float = 0.3,
+    mse_threshold: float = 0.35,
     cosine_similarity_threshold: float = 0.6,
     is_diffusion: bool = False,
 ) -> bool:

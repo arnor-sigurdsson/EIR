@@ -662,6 +662,7 @@ def persist_metrics(
 
     hc = handler_config
     exp = handler_config.experiment
+    gc = exp.configs.global_config
 
     target_generator = get_output_info_generator(outputs_as_dict=exp.outputs)
 
@@ -669,6 +670,7 @@ def persist_metrics(
         target_generator=target_generator,
         run_folder=hc.run_folder,
         train_or_val_target_prefix=f"{prefixes['metrics']}",
+        detail_level=gc.saved_result_detail_level,
     )
 
     if write_header:
@@ -695,17 +697,25 @@ def get_metrics_files(
     target_generator: Generator[Tuple[str, str, str], None, None],
     run_folder: Path,
     train_or_val_target_prefix: str,
+    detail_level: int,
 ) -> dict[str, dict[str, Path]]:
     assert train_or_val_target_prefix in ["validation_", "train_"]
 
     path_dict: dict[str, dict[str, Path]] = {}
     for output_name, column_type, target_column in target_generator:
+        if detail_level <= 1:
+            continue
+
         if output_name not in path_dict:
             path_dict[output_name] = {}
 
         cur_file_name = train_or_val_target_prefix + target_column + "_history.log"
         cur_path = Path(
-            run_folder, "results", output_name, target_column, cur_file_name
+            run_folder,
+            "results",
+            output_name,
+            target_column,
+            cur_file_name,
         )
         path_dict[output_name][target_column] = cur_path
 

@@ -94,7 +94,7 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
         prefixes={"metrics": "validation_", "writer": "validation"},
     )
 
-    if gc.save_evaluation_sample_results:
+    if gc.saved_result_detail_level >= 5:
         save_tabular_evaluation_results_wrapper(
             val_outputs=evaluation_results.gathered_outputs,
             val_labels=evaluation_results.gathered_labels,

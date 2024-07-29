@@ -235,10 +235,17 @@ class GlobalConfig:
         Iteration interval to perform validation and possibly attribution analysis if
         set.
 
-    :param save_evaluation_sample_results:
-        Whether to save evaluation results (e.g. confusion matrix for classification
-        tasks, regression plot and predictions for regression tasks). Setting to
-        False can be useful to save space during large scale experiments.
+    :param saved_result_detail_level:
+        Level of detail to save in the results file. Higher levels will save more
+        information, but will take up more space and might be slow especially when
+        using many tabular targets. The details are as follows (each step skips
+        a level of detail in addition to the previous):
+        - 5: The default, save all metrics and plots.
+        - 4: Skip validation plots and generated samples under the 'samples' folder.
+        - 3: Skip plots for individual targets.
+        - 2: Skip individual target plots (e.g. R2 training curve for
+        regression targets).
+        - 1: Skip individual target metrics (including loss).
 
     :param checkpoint_interval:
         Iteration interval to checkpoint (i.e. save) model.
@@ -325,7 +332,7 @@ class GlobalConfig:
     wd: float = 1e-04
     memory_dataset: bool = False
     sample_interval: int = 200
-    save_evaluation_sample_results: bool = True
+    saved_result_detail_level: int = 5
     checkpoint_interval: Union[None, int] = None
     n_saved_models: int = 1
     compute_attributions: bool = False
