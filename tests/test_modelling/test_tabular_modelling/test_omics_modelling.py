@@ -614,7 +614,7 @@ def _should_compile():
                 "global_configs": {
                     "output_folder": "mgmoe",
                     "lr": 1e-03,
-                    "save_evaluation_sample_results": False,
+                    "saved_result_detail_level": 4,
                 },
                 "input_configs": [
                     {

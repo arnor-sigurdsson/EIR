@@ -581,6 +581,7 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
         sample_interval=gc.sample_interval,
         outputs_as_dict=exp.outputs,
         run_folder=handler_config.run_folder,
+        detail_level=gc.saved_result_detail_level,
     )
     trainer.add_event_handler(
         event_name=Events.ITERATION_COMPLETED,
@@ -590,6 +591,9 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
     )
 
     for plot_event in _get_plot_events(sample_interval=gc.sample_interval):
+
+        if gc.saved_result_detail_level <= 1:
+            continue
 
         try:
             iter_per_epoch = len(exp.train_loader)
@@ -607,7 +611,9 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
             continue
 
         trainer = _attach_plot_progress_handler(
-            trainer=trainer, plot_event=plot_event, handler_config=handler_config
+            trainer=trainer,
+            plot_event=plot_event,
+            handler_config=handler_config,
         )
 
     if exp.hooks.custom_handler_attachers is not None:
@@ -688,7 +694,10 @@ def _add_checkpoint_handler_wrapper(
 
 
 def _get_metric_writing_funcs(
-    sample_interval: int, outputs_as_dict: al_output_objects_as_dict, run_folder: Path
+    sample_interval: int,
+    outputs_as_dict: al_output_objects_as_dict,
+    run_folder: Path,
+    detail_level: int,
 ) -> Dict[str, Dict[str, Callable]]:
     buffer_interval = sample_interval // 2
 
@@ -698,6 +707,7 @@ def _get_metric_writing_funcs(
         target_generator=target_generator,
         run_folder=run_folder,
         train_or_val_target_prefix="train_",
+        detail_level=detail_level,
     )
 
     writer_funcs: Dict[str, Dict[str, Callable]] = {}
@@ -859,29 +869,31 @@ def _iterdir_ignore_hidden(path: Path) -> Iterator[Path]:
 
 
 def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> None:
-    ca = handler_config.experiment.configs.global_config
+    gc = handler_config.experiment.configs.global_config
 
     # if no val data is available yet
-    if engine.state.iteration < ca.sample_interval:
+    if engine.state.iteration < gc.sample_interval:
         return
 
-    run_folder = get_run_folder(ca.output_folder)
+    run_folder = get_run_folder(output_folder=gc.output_folder)
 
-    for output_dir in _iterdir_ignore_hidden(path=run_folder / "results"):
-        for target_dir in _iterdir_ignore_hidden(path=output_dir):
-            target_column = target_dir.name
+    if gc.saved_result_detail_level >= 3:
+        for output_dir in _iterdir_ignore_hidden(path=run_folder / "results"):
+            for target_dir in _iterdir_ignore_hidden(path=output_dir):
+                target_column = target_dir.name
 
-            train_history_df, valid_history_df = get_metrics_dataframes(
-                results_dir=target_dir, target_string=target_column
-            )
+                train_history_df, valid_history_df = get_metrics_dataframes(
+                    results_dir=target_dir,
+                    target_string=target_column,
+                )
 
-            vf.generate_all_training_curves(
-                training_history_df=train_history_df,
-                valid_history_df=valid_history_df,
-                output_folder=target_dir,
-                title_extra=target_column,
-                plot_skip_steps=ca.plot_skip_steps,
-            )
+                vf.generate_all_training_curves(
+                    training_history_df=train_history_df,
+                    valid_history_df=valid_history_df,
+                    output_folder=target_dir,
+                    title_extra=target_column,
+                    plot_skip_steps=gc.plot_skip_steps,
+                )
 
     train_avg_history_df, valid_avg_history_df = get_metrics_dataframes(
         results_dir=run_folder, target_string="average"
@@ -892,7 +904,7 @@ def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> Non
         valid_history_df=valid_avg_history_df,
         output_folder=run_folder,
         title_extra="Multi Task Average",
-        plot_skip_steps=ca.plot_skip_steps,
+        plot_skip_steps=gc.plot_skip_steps,
     )
 
 
