@@ -48,7 +48,9 @@ from eir.train_utils.optim import AttrDelegatedSWAWrapper
         {
             "injections": {
                 "global_configs": {
-                    "gradient_accumulation_steps": 4,
+                    "optimization": {
+                        "gradient_accumulation_steps": 4,
+                    }
                 },
                 "input_configs": [
                     {
@@ -84,7 +86,7 @@ def test_hook_default_optimizer_backward(prep_modelling_test_configs):
         step_logic.hook_default_optimizer_backward(experiment=experiment, state=state)
         state["iteration"] += 1
 
-    grad_acc_steps = experiment.configs.global_config.gradient_accumulation_steps
+    grad_acc_steps = experiment.configs.gc.opt.gradient_accumulation_steps
 
     if grad_acc_steps:
         assert state["loss"].__truediv__.call_count == num_test_steps

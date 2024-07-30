@@ -1,9 +1,8 @@
 import argparse
 import types
-from argparse import Namespace
 from collections import Counter
 from copy import copy
-from dataclasses import dataclass, fields, is_dataclass
+from dataclasses import dataclass, field, fields, is_dataclass
 from typing import (
     Any,
     Callable,
@@ -65,6 +64,18 @@ from eir.setup.config_setup_modules.output_config_setup_sequence import (
 from eir.setup.config_validation import validate_train_configs
 from eir.setup.schema_modules.latent_analysis_schemas import LatentSamplingConfig
 from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
+from eir.setup.schemas import (
+    AttributionAnalysisConfig,
+    BasicExperimentConfig,
+    EvaluationCheckpointConfig,
+    GlobalConfig,
+    GlobalModelConfig,
+    LRScheduleConfig,
+    OptimizationConfig,
+    SupervisedMetricsConfig,
+    TrainingControlConfig,
+    VisualizationLoggingConfig,
+)
 from eir.setup.tensor_broker_setup import set_up_tensor_broker_config
 from eir.train_utils.utils import configure_global_eir_logging
 from eir.utils.logging import get_logger
@@ -149,8 +160,10 @@ def get_output_folder_and_log_level_from_cl_args(
         with open(config, "r") as f:
             config_dict = yaml.safe_load(f)
 
-            output_folder = config_dict.get("output_folder")
-            log_level = config_dict.get("log_level", "info")
+            output_folder = config_dict.get("basic_experiment", {}).get("output_folder")
+            log_level = config_dict.get("visualization_logging", {}).get(
+                "log_level", "info"
+            )
 
             if output_folder and log_level:
                 break
@@ -237,6 +250,11 @@ class Configs:
     fusion_config: schemas.FusionConfig
     output_configs: Sequence[schemas.OutputConfig]
 
+    gc: schemas.GlobalConfig = field(init=False, repr=False)
+
+    def __post_init__(self):
+        self.gc = self.global_config
+
 
 def generate_aggregated_config(
     cl_args: Union[argparse.Namespace, types.SimpleNamespace],
@@ -281,23 +299,58 @@ def generate_aggregated_config(
     return aggregated_configs
 
 
-def get_global_config(global_configs: Iterable[dict]) -> schemas.GlobalConfig:
+def get_global_config(global_configs: Iterable[dict]) -> GlobalConfig:
     combined_config = combine_dicts(dicts=global_configs)
-    combined_config = _maybe_add_latent_sampling_to_combined_config(
-        combined_config=combined_config
+
+    basic_experiment_config = BasicExperimentConfig(
+        **combined_config.get("basic_experiment", {})
+    )
+    model_config = GlobalModelConfig(**combined_config.get("model", {}))
+    optimization_config = OptimizationConfig(**combined_config.get("optimization", {}))
+    lr_schedule_config = LRScheduleConfig(**combined_config.get("lr_schedule", {}))
+    training_control_config = TrainingControlConfig(
+        **combined_config.get("training_control", {})
+    )
+    evaluation_checkpoint_config = EvaluationCheckpointConfig(
+        **combined_config.get("evaluation_checkpoint", {})
+    )
+    attribution_analysis_config = AttributionAnalysisConfig(
+        **combined_config.get("attribution_analysis", {})
+    )
+    metrics_config = SupervisedMetricsConfig(**combined_config.get("metrics", {}))
+    visualization_logging_config = VisualizationLoggingConfig(
+        **combined_config.get("visualization_logging", {})
     )
 
-    validate_keys_against_dataclass(
-        input_dict=combined_config, dataclass_type=schemas.GlobalConfig
+    latent_sampling = None
+    if "latent_sampling" in combined_config and isinstance(
+        combined_config["latent_sampling"], dict
+    ):
+        latent_sampling = LatentSamplingConfig(**combined_config["latent_sampling"])
+
+    global_config = GlobalConfig(
+        basic_experiment=basic_experiment_config,
+        model=model_config,
+        optimization=optimization_config,
+        lr_schedule=lr_schedule_config,
+        training_control=training_control_config,
+        evaluation_checkpoint=evaluation_checkpoint_config,
+        attribution_analysis=attribution_analysis_config,
+        metrics=metrics_config,
+        visualization_logging=visualization_logging_config,
+        latent_sampling=latent_sampling,
     )
 
-    combined_config_namespace = Namespace(**combined_config)
+    return modify_global_config(global_config)
 
-    global_config_object = schemas.GlobalConfig(**combined_config_namespace.__dict__)
 
-    global_config_object_mod = modify_global_config(global_config=global_config_object)
+def modify_global_config(global_config: GlobalConfig) -> GlobalConfig:
+    gc_copy = copy(global_config)
 
-    return global_config_object_mod
+    if gc_copy.basic_experiment.valid_size > 1.0:
+        gc_copy.basic_experiment.valid_size = int(gc_copy.basic_experiment.valid_size)
+
+    return gc_copy
 
 
 def _maybe_add_latent_sampling_to_combined_config(combined_config: dict) -> dict:
@@ -309,15 +362,6 @@ def _maybe_add_latent_sampling_to_combined_config(combined_config: dict) -> dict
         )
 
     return combined_config
-
-
-def modify_global_config(global_config: schemas.GlobalConfig) -> schemas.GlobalConfig:
-    gc_copy = copy(global_config)
-
-    if gc_copy.valid_size > 1.0:
-        gc_copy.valid_size = int(gc_copy.valid_size)
-
-    return gc_copy
 
 
 def get_input_configs(
@@ -352,7 +396,7 @@ def validate_keys_against_dataclass(
     if not is_dataclass(dataclass_type):
         raise TypeError(f"Provided type {dataclass_type.__name__} is not a dataclass")
 
-    expected_keys = {field.name for field in fields(dataclass_type)}
+    expected_keys = {field_.name for field_ in fields(dataclass_type)}
 
     actual_keys = set(input_dict.keys())
 

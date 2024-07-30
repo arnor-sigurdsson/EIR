@@ -53,7 +53,9 @@ from tests.test_predict_modules.test_predict_config import (
         },
         {
             "injections": {
-                "global_configs": {"n_iter_before_swa": 20},
+                "global_configs": {
+                    "model": {"n_iter_before_swa": 20},
+                },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
@@ -94,7 +96,7 @@ def test_load_model(create_test_config: config.Configs, tmp_path: Path):
         data_dimensions=data_dimension,
     )
     model = CNNModel(**cnn_init_kwargs)
-    model = model.to(device=gc.device)
+    model = model.to(device=gc.be.device)
 
     model_path = tmp_path / "model.pt"
     torch.save(obj=model.state_dict(), f=model_path)
@@ -103,7 +105,7 @@ def test_load_model(create_test_config: config.Configs, tmp_path: Path):
         model_path=model_path,
         model_class=CNNModel,
         model_init_kwargs=cnn_init_kwargs,
-        device=gc.device,
+        device=gc.be.device,
         test_mode=True,
     )
     # make sure we're in eval model
@@ -189,15 +191,25 @@ def _get_predict_test_data_parametrization() -> List[Dict[str, Any]]:
         {
             "injections": {
                 "global_configs": {
-                    "n_iter_before_swa": 200,
-                    "output_folder": "test_run_predict",
-                    "n_epochs": 8,
-                    "checkpoint_interval": 200,
-                    "sample_interval": 200,
-                    "lr": 0.001,
-                    "attribution_background_samples": 128,
-                    "compute_attributions": False,
-                    "batch_size": 64,
+                    "basic_experiment": {
+                        "output_folder": "test_run_predict",
+                        "n_epochs": 8,
+                        "batch_size": 64,
+                    },
+                    "model": {
+                        "n_iter_before_swa": 200,
+                    },
+                    "optimization": {
+                        "lr": 0.001,
+                    },
+                    "evaluation_checkpoint": {
+                        "checkpoint_interval": 200,
+                        "sample_interval": 200,
+                    },
+                    "attribution_analysis": {
+                        "compute_attributions": False,
+                        "attribution_background_samples": 128,
+                    },
                     "latent_sampling": {
                         "layers_to_sample": [
                             "fusion_modules.computed.fusion_modules.fusion.0.0.fc_1",

@@ -137,7 +137,7 @@ def analyze_tabular_input_attributions(
                 input_name=input_name,
             )
             cat_column_transformers = load_transformers(
-                output_folder=experiment.configs.global_config.output_folder,
+                output_folder=experiment.configs.gc.be.output_folder,
                 transformers_to_load={input_name: [cat_column]},
             )
 

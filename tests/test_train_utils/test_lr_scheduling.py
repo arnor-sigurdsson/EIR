@@ -59,7 +59,14 @@ def create_dummy_test_optimizer(request):
     [
         {
             "injections": {
-                "global_configs": {"lr_schedule": "plateau", "lr": 1e-03},
+                "global_configs": {
+                    "lr_schedule": {
+                        "lr_schedule": "plateau",
+                    },
+                    "optimization": {
+                        "lr": 1e-03,
+                    },
+                },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
@@ -91,10 +98,10 @@ def test_get_reduce_lr_on_plateu_step_params(
         global_config=gc, optimizer=optimizer
     )
 
-    assert params["lr_upper_bound"] == gc.lr
-    assert params["lr_lower_bound"] == gc.lr_lb
-    assert params["sample_interval"] == gc.sample_interval
-    assert params["warmup_steps"] == gc.warmup_steps
+    assert params["lr_upper_bound"] == gc.opt.lr
+    assert params["lr_lower_bound"] == gc.opt.lr_lb
+    assert params["sample_interval"] == gc.evaluation_checkpoint.sample_interval
+    assert params["warmup_steps"] == gc.lr.warmup_steps
     assert params["optimizer"] == optimizer
     assert params["validation_history_fpath"].name == "validation_average_history.log"
 
@@ -110,7 +117,7 @@ def get_dummy_handler_config(
     handler_config = HandlerConfig(
         experiment=experiment,
         run_folder=test_config.run_path,
-        output_folder=global_config.output_folder,
+        output_folder=global_config.be.output_folder,
         monitoring_metrics=[("tmp_var", "tmp_var")],
     )
 
@@ -123,7 +130,14 @@ def get_dummy_handler_config(
     [
         {
             "injections": {
-                "global_configs": {"lr_schedule": "plateau", "lr": 1e-03},
+                "global_configs": {
+                    "lr_schedule": {
+                        "lr_schedule": "plateau",
+                    },
+                    "optimization": {
+                        "lr": 1e-03,
+                    },
+                },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
@@ -153,7 +167,7 @@ def test_set_up_lr_scheduler_plateau(get_dummy_handler_config):
     assert isinstance(lr_scheduler, ReduceLROnPlateau)
 
     # Note: Check comment in lr_scheduling.set_up_lr_scheduler for why -1
-    expected_patience = gc.lr_plateau_patience - 1
+    expected_patience = gc.lr.lr_plateau_patience - 1
     assert lr_scheduler.patience == expected_patience
     assert lr_scheduler.optimizer == exp.optimizer
 
@@ -165,7 +179,14 @@ def test_set_up_lr_scheduler_plateau(get_dummy_handler_config):
         # Case 1: Cycle
         {
             "injections": {
-                "global_configs": {"lr_schedule": "cycle", "lr": 1e-03},
+                "global_configs": {
+                    "lr_schedule": {
+                        "lr_schedule": "cycle",
+                    },
+                    "optimization": {
+                        "lr": 1e-03,
+                    },
+                },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
@@ -186,7 +207,14 @@ def test_set_up_lr_scheduler_plateau(get_dummy_handler_config):
         # Case 2: Cosine
         {
             "injections": {
-                "global_configs": {"lr_schedule": "cosine", "lr": 1e-03},
+                "global_configs": {
+                    "lr_schedule": {
+                        "lr_schedule": "cosine",
+                    },
+                    "optimization": {
+                        "lr": 1e-03,
+                    },
+                },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
@@ -215,15 +243,16 @@ def test_set_up_lr_scheduler_cycle(get_dummy_handler_config):
     lr_scheduler = lr_scheduling.set_up_lr_scheduler(handler_config=handler_config)
 
     _check_warmup_concat_scheduler(
-        lr_scheduler=lr_scheduler, warmup_steps=gc.warmup_steps
+        lr_scheduler=lr_scheduler,
+        warmup_steps=gc.lr.warmup_steps,
     )
 
     _check_cosine_scheduler(
         cosine_scheduler=lr_scheduler.schedulers[1],
-        lr_schedule=gc.lr_schedule,
+        lr_schedule=gc.lr.lr_schedule,
         cycle_iter_size=len(exp.train_loader),
-        n_epochs=gc.n_epochs,
-        warmup_steps=gc.warmup_steps,
+        n_epochs=gc.be.n_epochs,
+        warmup_steps=gc.lr.warmup_steps,
     )
 
 

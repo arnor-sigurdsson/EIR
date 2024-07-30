@@ -609,7 +609,7 @@ def hook_add_l1_loss(
     """
     model_configs = experiment.inputs
 
-    l1_loss = torch.tensor(0.0, device=experiment.configs.global_config.device)
+    l1_loss = torch.tensor(0.0, device=experiment.configs.gc.be.device)
     for input_name, input_module in experiment.model.input_modules.items():
         cur_model_config = model_configs[input_name].input_config.model_config
         cur_model_init_config = cur_model_config.model_init_config
@@ -670,7 +670,7 @@ def persist_metrics(
         target_generator=target_generator,
         run_folder=hc.run_folder,
         train_or_val_target_prefix=f"{prefixes['metrics']}",
-        detail_level=gc.saved_result_detail_level,
+        detail_level=gc.evaluation_checkpoint.saved_result_detail_level,
     )
 
     if write_header:

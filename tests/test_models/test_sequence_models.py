@@ -29,9 +29,11 @@ from tests.test_models.model_testing_utils import (
         {
             "injections": {
                 "global_configs": {
-                    "output_folder": "test_classification",
-                    "n_epochs": 12,
-                    "memory_dataset": True,
+                    "basic_experiment": {
+                        "output_folder": "test_classification",
+                        "n_epochs": 12,
+                        "memory_dataset": True,
+                    }
                 },
                 "input_configs": [
                     {
@@ -54,9 +56,11 @@ from tests.test_models.model_testing_utils import (
         {
             "injections": {
                 "global_configs": {
-                    "output_folder": "test_classification",
-                    "n_epochs": 12,
-                    "memory_dataset": True,
+                    "basic_experiment": {
+                        "output_folder": "test_classification",
+                        "n_epochs": 12,
+                        "memory_dataset": True,
+                    }
                 },
                 "input_configs": [
                     {

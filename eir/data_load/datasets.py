@@ -89,10 +89,10 @@ def set_up_datasets_from_configs(
 ) -> Tuple[al_datasets, al_local_datasets]:
 
     train_dataset_class: al_dataset_types = (
-        MemoryDataset if configs.global_config.memory_dataset else DiskDataset
+        MemoryDataset if configs.gc.be.memory_dataset else DiskDataset
     )
     valid_dataset_class: al_dataset_types = (
-        MemoryDataset if configs.global_config.memory_dataset else DiskDataset
+        MemoryDataset if configs.gc.be.memory_dataset else DiskDataset
     )
 
     train_kwargs = construct_default_dataset_kwargs_from_cl_args(
@@ -111,7 +111,7 @@ def set_up_datasets_from_configs(
             "inputs": inputs_as_dict,
             "outputs": outputs_as_dict,
             "test_mode": False,
-            "batch_size": configs.global_config.batch_size,
+            "batch_size": configs.gc.be.batch_size,
         }
 
     valid_kwargs = construct_default_dataset_kwargs_from_cl_args(

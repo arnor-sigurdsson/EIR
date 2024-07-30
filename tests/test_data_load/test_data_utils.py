@@ -11,7 +11,9 @@ from eir.data_load.data_utils import get_train_sampler
         # Case 1: Linear
         {
             "injections": {
-                "global_configs": {"lr": 1e-03},
+                "global_configs": {
+                    "optimization": {"lr": 1e-03},
+                },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},

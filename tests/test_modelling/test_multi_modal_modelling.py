@@ -19,11 +19,17 @@ def get_base_parametrization(compiled: bool = False) -> dict:
     params = {
         "injections": {
             "global_configs": {
-                "output_folder": "multi_task_multi_modal",
-                "n_epochs": 10,
-                "gradient_clipping": 1.0,
-                "lr": 0.001,
-                "compile_model": compiled,
+                "basic_experiment": {
+                    "output_folder": "multi_task_multi_modal",
+                    "n_epochs": 10,
+                },
+                "model": {
+                    "compile_model": compiled,
+                },
+                "optimization": {
+                    "gradient_clipping": 1.0,
+                    "lr": 0.001,
+                },
             },
             "input_configs": [
                 {

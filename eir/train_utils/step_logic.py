@@ -116,10 +116,10 @@ def _get_default_step_function_hooks_init_kwargs(
         "metrics": [hook_default_compute_metrics],
     }
 
-    if configs.global_config.mixing_alpha:
+    if configs.gc.tc.mixing_alpha:
         logger.debug(
             "Setting up hooks for mixing with with α=%.2g.",
-            configs.global_config.mixing_alpha,
+            configs.gc.tc.mixing_alpha,
         )
         mix_hook = get_mix_data_hook(input_configs=configs.input_configs)
 
@@ -129,7 +129,7 @@ def _get_default_step_function_hooks_init_kwargs(
     if _should_add_uncertainty_loss_hook(output_configs=configs.output_configs):
         uncertainty_hook = get_uncertainty_loss_hook(
             output_configs=configs.output_configs,
-            device=configs.global_config.device,
+            device=configs.gc.be.device,
         )
         init_kwargs["loss"].append(uncertainty_hook)
 
@@ -139,19 +139,19 @@ def _get_default_step_function_hooks_init_kwargs(
         step_function_hooks_init_kwargs=init_kwargs, configs=configs
     )
 
-    grad_acc_steps = configs.global_config.gradient_accumulation_steps
+    grad_acc_steps = configs.gc.opt.gradient_accumulation_steps
     if grad_acc_steps and grad_acc_steps > 1:
         logger.debug(
             "Adding gradient accumulation hook with steps=%d.",
-            configs.global_config.gradient_accumulation_steps,
+            configs.gc.opt.gradient_accumulation_steps,
         )
     init_kwargs["loss"].append(get_hook_iteration_counter())
 
-    do_amp = configs.global_config.amp
+    do_amp = configs.gc.m.amp
     if do_amp:
         logger.debug("Setting up AMP training.")
         model_forward_with_amp_objects = [
-            get_hook_amp_objects(device=configs.global_config.device)
+            get_hook_amp_objects(device=configs.gc.be.device)
         ] + init_kwargs["model_forward"]
         init_kwargs["model_forward"] = model_forward_with_amp_objects
 
@@ -213,7 +213,7 @@ def hook_default_prepare_batch(
         input_objects=experiment.inputs,
         output_objects=experiment.outputs,
         model=experiment.model,
-        device=experiment.configs.global_config.device,
+        device=experiment.configs.gc.be.device,
     )
 
     state_updates = {"batch": batch}
@@ -418,55 +418,55 @@ def hook_default_optimizer_backward(
 ) -> Dict:
     gc = experiment.configs.global_config
     optimizer_backward_kwargs = get_optimizer_backward_kwargs(
-        optimizer_name=gc.optimizer
+        optimizer_name=gc.opt.optimizer
     )
 
     loss = maybe_scale_loss_with_grad_accumulation_steps(
         loss=state["loss"],
-        grad_acc_steps=gc.gradient_accumulation_steps,
+        grad_acc_steps=gc.opt.gradient_accumulation_steps,
     )
 
     amp_scaler = state.get("amp_scaler")
     loss = maybe_scale_loss_with_amp_scaler(
-        do_amp=gc.amp,
+        do_amp=gc.m.amp,
         loss=loss,
         amp_scaler=amp_scaler,
-        device=gc.device,
+        device=gc.be.device,
     )
 
     loss.backward(**optimizer_backward_kwargs)
 
     maybe_apply_gradient_noise_to_model(
         model=experiment.model,
-        gradient_noise=gc.gradient_noise,
+        gradient_noise=gc.opt.gradient_noise,
     )
     maybe_apply_gradient_clipping_to_model(
         model=experiment.model,
-        gradient_clipping=gc.gradient_clipping,
+        gradient_clipping=gc.opt.gradient_clipping,
     )
 
     step_func = get_optimizer_step_func(
-        do_amp=gc.amp,
+        do_amp=gc.m.amp,
         optimizer=experiment.optimizer,
         amp_scaler=amp_scaler,
-        device=gc.device,
+        device=gc.be.device,
     )
 
     if should_perform_optimizer_step(
         iteration=state["iteration"],
-        grad_acc_steps=gc.gradient_accumulation_steps,
+        grad_acc_steps=gc.opt.gradient_accumulation_steps,
     ):
         step_func()
 
-    if gc.amp and gc.device != "cpu":
+    if gc.m.amp and gc.be.device != "cpu":
         assert amp_scaler is not None
         amp_scaler.update()
 
     maybe_update_model_parameters_with_swa(
-        n_iter_before_swa=gc.n_iter_before_swa,
+        n_iter_before_swa=gc.m.n_iter_before_swa,
         model=experiment.model,
         iteration=state["iteration"],
-        sample_interval=gc.sample_interval,
+        sample_interval=gc.ec.sample_interval,
     )
 
     return {}

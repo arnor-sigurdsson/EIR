@@ -46,18 +46,22 @@ def attach_lr_scheduler(
     """
     gc = experiment.configs.global_config
 
-    if gc.lr_schedule in ["cycle", "cosine"]:
+    if gc.lr_schedule.lr_schedule in ["cycle", "cosine"]:
         engine.add_event_handler(
             event_name=Events.ITERATION_STARTED, handler=lr_scheduler
         )
 
-    elif gc.lr_schedule == "plateau":
-        if gc.warmup_steps:
-            logger.debug("Setting first iteration optimizer LR to %.0e.", gc.lr_lb)
-            update_optimizer_lr(lr=gc.lr_lb, optimizer=experiment.optimizer)
+    elif gc.lr_schedule.lr_schedule == "plateau":
+        if gc.lr.warmup_steps:
+            logger.debug("Setting first iteration optimizer LR to %.0e.", gc.opt.lr_lb)
+            update_optimizer_lr(
+                lr=gc.opt.lr_lb,
+                optimizer=experiment.optimizer,
+            )
 
         step_scheduler_params = _get_reduce_lr_on_plateau_step_params(
-            global_config=gc, optimizer=experiment.optimizer
+            global_config=gc,
+            optimizer=experiment.optimizer,
         )
         engine.add_event_handler(
             event_name=Events.ITERATION_COMPLETED,
@@ -72,21 +76,22 @@ def attach_lr_scheduler(
 def _get_reduce_lr_on_plateau_step_params(
     global_config: GlobalConfig, optimizer: Optimizer
 ) -> Dict:
-    run_folder = get_run_folder(output_folder=global_config.output_folder)
+    run_folder = get_run_folder(output_folder=global_config.be.output_folder)
     validation_history_fpath = get_average_history_filepath(
         run_folder=run_folder, train_or_val_target_prefix="validation_"
     )
 
     warmup_steps = _get_warmup_steps_from_cla(
-        warmup_steps_arg=global_config.warmup_steps, optimizer=optimizer
+        warmup_steps_arg=global_config.lr.warmup_steps,
+        optimizer=optimizer,
     )
 
     params = {
         "validation_history_fpath": validation_history_fpath,
         "optimizer": optimizer,
-        "sample_interval": global_config.sample_interval,
-        "lr_upper_bound": global_config.lr,
-        "lr_lower_bound": global_config.lr_lb,
+        "sample_interval": global_config.ec.sample_interval,
+        "lr_upper_bound": global_config.opt.lr,
+        "lr_lower_bound": global_config.opt.lr_lb,
         "warmup_steps": warmup_steps,
     }
 
@@ -99,8 +104,8 @@ def set_up_lr_scheduler(
     exp = handler_config.experiment
     gc = exp.configs.global_config
 
-    lr_lower_bound = gc.lr_lb
-    lr_upper_bound = gc.lr
+    lr_lower_bound = gc.opt.lr_lb
+    lr_upper_bound = gc.opt.lr
 
     def _get_cycle_iter_size(warmup_steps_: int) -> int:
         """
@@ -110,17 +115,20 @@ def set_up_lr_scheduler(
         compatibility.
         """
         steps = len(exp.train_loader)
-        if gc.lr_schedule == "cosine":
-            steps = max(2, steps * gc.n_epochs - warmup_steps_)
+        schedule: str = gc.lr.lr_schedule
+        assert isinstance(schedule, str)
+        if schedule == "cosine":
+            steps = max(2, steps * gc.be.n_epochs - warmup_steps_)
 
         return steps
 
     def _get_total_num_events(n_epochs: int, iter_per_epoch: int) -> int:
         return n_epochs * iter_per_epoch
 
-    if gc.lr_schedule in ["cycle", "cosine"]:
+    if gc.lr.lr_schedule in ["cycle", "cosine"]:
         warmup_steps = _get_warmup_steps_from_cla(
-            warmup_steps_arg=gc.warmup_steps, optimizer=exp.optimizer
+            warmup_steps_arg=gc.lr.warmup_steps,
+            optimizer=exp.optimizer,
         )
 
         cycle_iter_size = _get_cycle_iter_size(warmup_steps_=warmup_steps)
@@ -131,7 +139,7 @@ def set_up_lr_scheduler(
             lr_upper_bound=lr_upper_bound,
             lr_lower_bound=lr_lower_bound,
             cycle_iter_size=cycle_iter_size,
-            schedule=gc.lr_schedule,
+            schedule=gc.lr.lr_schedule,
         )
 
         if warmup_steps:
@@ -143,10 +151,10 @@ def set_up_lr_scheduler(
             )
 
         num_events = _get_total_num_events(
-            n_epochs=gc.n_epochs, iter_per_epoch=len(exp.train_loader)
+            n_epochs=gc.be.n_epochs, iter_per_epoch=len(exp.train_loader)
         )
 
-        if gc.plot_lr_schedule:
+        if gc.lr.plot_lr_schedule:
             _plot_lr_schedule(
                 lr_scheduler=lr_scheduler,
                 num_events=num_events,
@@ -154,8 +162,8 @@ def set_up_lr_scheduler(
                 lr_scheduler_args=lr_scheduler_args,
             )
 
-    elif gc.lr_schedule == "plateau":
-        logger.debug("Plateau patience set to %d.", gc.lr_plateau_patience)
+    elif gc.lr.lr_schedule == "plateau":
+        logger.debug("Plateau patience set to %d.", gc.lr.lr_plateau_patience)
 
         """
         For compatibility with ignite EarlyStopping handler, we reduce the plateau
@@ -164,11 +172,11 @@ def set_up_lr_scheduler(
         > patience. In order to have a common interface when passing in any type of
         patience steps, we are going to reduce the passed in steps here.
         """
-        patience_steps = gc.lr_plateau_patience - 1
+        patience_steps = gc.lr.lr_plateau_patience - 1
         lr_scheduler = ReduceLROnPlateau(
             optimizer=exp.optimizer,
             mode="max",
-            factor=gc.lr_plateau_factor,
+            factor=gc.lr.lr_plateau_factor,
             patience=patience_steps,
             min_lr=lr_lower_bound,
         )

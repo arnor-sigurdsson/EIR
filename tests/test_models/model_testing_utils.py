@@ -51,7 +51,7 @@ def prepare_example_test_batch(
         input_objects=inputs_as_dict,
         output_objects=outputs_as_dict,
         model=model,
-        device=configs.global_config.device,
+        device=configs.gc.be.device,
     )
 
     return batch

@@ -92,7 +92,9 @@ def create_test_column_ops():
         {
             "injections": {
                 "global_configs": {
-                    "output_folder": "tabular_only",
+                    "basic_experiment": {
+                        "output_folder": "tabular_only",
+                    },
                 },
                 "input_configs": [
                     {
@@ -120,7 +122,9 @@ def create_test_column_ops():
         {
             "injections": {
                 "global_configs": {
-                    "output_folder": "tabular_only",
+                    "basic_experiment": {
+                        "output_folder": "tabular_only",
+                    }
                 },
                 "input_configs": [
                     {
@@ -160,7 +164,10 @@ def test_set_up_train_and_valid_tabular_data(
     all_array_ids = gather_all_ids_from_output_configs(
         output_configs=test_configs.output_configs
     )
-    train_ids, valid_ids = train.split_ids(ids=all_array_ids, valid_size=gc.valid_size)
+    train_ids, valid_ids = train.split_ids(
+        ids=all_array_ids,
+        valid_size=gc.be.valid_size,
+    )
 
     target_labels = set_up_all_target_labels_wrapper(
         output_configs=test_configs.output_configs,
@@ -323,7 +330,9 @@ def test_transform_all_labels_in_sample_with_extra_con(
         {
             "injections": {
                 "global_configs": {
-                    "output_folder": "tabular_only",
+                    "basic_experiment": {
+                        "output_folder": "tabular_only",
+                    }
                 },
                 "input_configs": [
                     {
@@ -351,7 +360,9 @@ def test_transform_all_labels_in_sample_with_extra_con(
         {
             "injections": {
                 "global_configs": {
-                    "output_folder": "tabular_only",
+                    "basic_experiment": {
+                        "output_folder": "tabular_only",
+                    }
                 },
                 "input_configs": [
                     {

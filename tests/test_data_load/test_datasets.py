@@ -84,10 +84,10 @@ def test_set_up_datasets(
     assert len(all_array_ids) > test_data_config.n_per_class * n_classes
 
     train_ids, valid_ids = train.split_ids(
-        ids=all_array_ids, valid_size=test_configs.global_config.valid_size
+        ids=all_array_ids, valid_size=test_configs.gc.be.valid_size
     )
 
-    run_folder = get_run_folder(output_folder=test_configs.global_config.output_folder)
+    run_folder = get_run_folder(output_folder=test_configs.gc.be.output_folder)
 
     target_labels = set_up_all_targets_wrapper(
         train_ids=train_ids,
@@ -240,10 +240,10 @@ def test_set_up_datasets_fails(
         output_configs=test_configs.output_configs
     )
     train_ids, valid_ids = train.split_ids(
-        ids=all_array_ids, valid_size=test_configs.global_config.valid_size
+        ids=all_array_ids, valid_size=test_configs.gc.be.valid_size
     )
 
-    run_folder = get_run_folder(output_folder=test_configs.global_config.output_folder)
+    run_folder = get_run_folder(output_folder=test_configs.gc.be.output_folder)
 
     target_labels = set_up_all_targets_wrapper(
         train_ids=train_ids,
@@ -338,7 +338,9 @@ def _corrupt_arrays_for_testing(
         {
             "injections": {
                 "global_configs": {
-                    "output_folder": "extra_inputs",
+                    "basic_experiment": {
+                        "output_folder": "extra_inputs",
+                    }
                 },
                 "input_configs": [
                     {
@@ -377,10 +379,10 @@ def test_construct_dataset_init_params_from_cl_args(
         output_configs=test_configs.output_configs
     )
     train_ids, valid_ids = train.split_ids(
-        ids=all_array_ids, valid_size=test_configs.global_config.valid_size
+        ids=all_array_ids, valid_size=test_configs.gc.be.valid_size
     )
 
-    run_folder = get_run_folder(output_folder=test_configs.global_config.output_folder)
+    run_folder = get_run_folder(output_folder=test_configs.gc.be.output_folder)
 
     target_labels = set_up_all_targets_wrapper(
         train_ids=train_ids,
@@ -475,21 +477,21 @@ def test_datasets(
     classes_tested = sorted(list(c.target_classes.keys()))
 
     if dataset_type == "disk":
-        gc.memory_dataset = False
+        gc.be.memory_dataset = False
     elif dataset_type == "memory":
-        gc.memory_dataset = True
+        gc.be.memory_dataset = True
 
-    train_no_samples = int(len(classes_tested) * c.n_per_class * (1 - gc.valid_size))
-    valid_no_sample = int(len(classes_tested) * c.n_per_class * gc.valid_size)
+    train_no_samples = int(len(classes_tested) * c.n_per_class * (1 - gc.be.valid_size))
+    valid_no_sample = int(len(classes_tested) * c.n_per_class * gc.be.valid_size)
 
     all_array_ids = gather_all_ids_from_output_configs(
         output_configs=test_configs.output_configs
     )
     train_ids, valid_ids = train.split_ids(
-        ids=all_array_ids, valid_size=test_configs.global_config.valid_size
+        ids=all_array_ids, valid_size=test_configs.gc.be.valid_size
     )
 
-    run_folder = get_run_folder(output_folder=test_configs.global_config.output_folder)
+    run_folder = get_run_folder(output_folder=test_configs.gc.be.output_folder)
 
     target_labels = set_up_all_targets_wrapper(
         train_ids=train_ids,

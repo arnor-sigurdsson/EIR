@@ -485,7 +485,7 @@ def patch_configs_for_local_data(
         output_configs=patched_configs.output_configs,
     )
 
-    patched_configs.global_config.n_epochs = 1
+    patched_configs.global_config.basic_experiment.n_epochs = 1
 
     return configs, patched_configs
 

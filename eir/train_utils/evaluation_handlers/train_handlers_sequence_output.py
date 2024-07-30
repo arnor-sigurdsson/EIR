@@ -131,7 +131,7 @@ def sequence_out_single_sample_evaluation_wrapper(
 
             batch_generator = get_batch_generator(
                 iterator=enumerate(sample_generator),
-                batch_size=gc.batch_size,
+                batch_size=gc.be.batch_size,
             )
 
             assert isinstance(config.sampling_config, SequenceOutputSamplingConfig)

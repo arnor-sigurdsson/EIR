@@ -196,7 +196,7 @@ def attribution_analysis_handler(
             "Got compute_attributions: %s but none of the input types in %s currently "
             "support attribution analysis. "
             "Attribution analysis will be skipped. ",
-            gc.compute_attributions,
+            gc.aa.compute_attributions,
             types,
         )
         return
@@ -205,7 +205,7 @@ def attribution_analysis_handler(
 
     attribution_output_folder_callable = partial(
         _prepare_eval_attribution_outfolder,
-        output_folder=gc.output_folder,
+        output_folder=gc.be.output_folder,
         iteration=iteration,
     )
 
@@ -269,7 +269,7 @@ def tabular_attribution_analysis_wrapper(
             column_name=target_column_name,
             output_name=output_name,
             background_loader=background_loader,
-            n_background_samples=gc.attribution_background_samples,
+            n_background_samples=gc.aa.attribution_background_samples,
         )
 
         act_callable = get_oom_adaptive_attribution_callable(
@@ -277,7 +277,7 @@ def tabular_attribution_analysis_wrapper(
             column_type=target_column_type,
             baseline_values=ao.baseline_values_ordered,
             baseline_names_ordered=ao.input_names_ordered,
-            batch_size=gc.batch_size,
+            batch_size=gc.be.batch_size,
         )
 
         act_func = partial(
@@ -881,7 +881,7 @@ def _get_interpretation_data_producer(
 
     attributions_data_loader = _get_attributions_dataloader(
         dataset=dataset,
-        max_attributions_per_class=gc.max_attributions_per_class,
+        max_attributions_per_class=gc.aa.max_attributions_per_class,
         output_name=output_name,
         target_column=column_name,
         column_type=column_type,

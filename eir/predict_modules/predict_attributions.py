@@ -46,11 +46,11 @@ def compute_predict_attributions(
         predict_configs=predict_config.configs,
     )
     background_dataloader = _get_predict_background_loader(
-        batch_size=gc.batch_size,
-        num_attribution_background_samples=gc.attribution_background_samples,
+        batch_size=gc.be.batch_size,
+        num_attribution_background_samples=gc.aa.attribution_background_samples,
         outputs_as_dict=loaded_train_experiment.outputs,
         configs=background_source_config,
-        dataloader_workers=gc.dataloader_workers,
+        dataloader_workers=gc.be.dataloader_workers,
         loaded_hooks=loaded_train_experiment.hooks,
     )
 
@@ -95,7 +95,7 @@ def get_background_source_config(
         logger.info(
             "Background for attribution analysis will be loaded from sources "
             "previously used for training run with name '%s'.",
-            train_configs.global_config.output_folder,
+            train_configs.gc.be.output_folder,
         )
         return train_configs
 
@@ -169,7 +169,7 @@ def _get_predict_background_loader(
         test_inputs_configs=configs.input_configs,
         ids=background_ids_sampled,
         hooks=loaded_hooks,
-        output_folder=configs.global_config.output_folder,
+        output_folder=configs.gc.be.output_folder,
     )
     background_dataset = set_up_default_dataset(
         configs=configs,

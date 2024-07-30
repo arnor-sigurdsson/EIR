@@ -72,8 +72,8 @@ def prep_modelling_test_configs(
 
     test_metrics = metrics.get_default_metrics(
         target_transformers=target_labels.label_transformers,
-        cat_averaging_metrics=gc.cat_averaging_metrics,
-        con_averaging_metrics=gc.con_averaging_metrics,
+        cat_averaging_metrics=gc.met.cat_averaging_metrics,
+        con_averaging_metrics=gc.met.con_averaging_metrics,
     )
     test_metrics = _patch_metrics(metrics_=test_metrics)
 
@@ -103,7 +103,7 @@ def prep_modelling_test_configs(
         criteria=criteria,
     )
 
-    run_folder = get_run_folder(output_folder=gc.output_folder)
+    run_folder = get_run_folder(output_folder=gc.be.output_folder)
     train._log_model(
         model=model,
         structure_file=run_folder / "model_info.txt",
@@ -131,7 +131,7 @@ def prep_modelling_test_configs(
     keys_to_serialize = get_default_experiment_keys_to_serialize()
     serialize_experiment(
         experiment=experiment,
-        run_folder=get_run_folder(gc.output_folder),
+        run_folder=get_run_folder(gc.be.output_folder),
         keys_to_serialize=keys_to_serialize,
     )
 
@@ -170,13 +170,13 @@ def get_cur_modelling_test_config(
     output_configs: Sequence[schemas.OutputConfig],
     input_names: Iterable[str],
 ) -> ModelTestConfig:
-    last_iter = len(train_loader) * global_config.n_epochs
+    last_iter = len(train_loader) * global_config.be.n_epochs
 
     last_valid_iter = last_iter
-    if global_config.early_stopping_patience:
-        last_valid_iter -= last_valid_iter % global_config.sample_interval
+    if global_config.tc.early_stopping_patience:
+        last_valid_iter -= last_valid_iter % global_config.ec.sample_interval
 
-    run_path = Path(f"{global_config.output_folder}/")
+    run_path = Path(f"{global_config.be.output_folder}/")
 
     last_sample_folders = _get_all_last_sample_folders(
         output_configs=output_configs,

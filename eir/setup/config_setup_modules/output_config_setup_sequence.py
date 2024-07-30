@@ -40,6 +40,8 @@ def get_configs_object_with_seq_output_configs(
     seq_config_object_kwargs["output_configs"] = seq_configs
     seq_config_object_kwargs["input_configs"] = seq_input_configs
 
+    seq_config_object_kwargs.pop("gc")
+
     configs_object = config.Configs(**seq_config_object_kwargs)
 
     return configs_object

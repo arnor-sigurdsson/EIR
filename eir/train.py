@@ -107,13 +107,14 @@ def get_default_experiment(
 
     gc = configs.global_config
 
-    output_folder = gc.output_folder
+    output_folder = gc.be.output_folder
     run_folder = _prepare_run_folder(output_folder=output_folder)
 
     streaming_data = setup_and_gather_streaming_data(
         configs=configs,
         output_folder=output_folder,
-        batch_size=gc.batch_size,
+        batch_size=gc.be.batch_size,
+        # TODO: Make this configurable
         max_samples=5000,
     )
 
@@ -128,12 +129,12 @@ def get_default_experiment(
 
     all_ids = gather_all_ids_from_output_configs(output_configs=configs.output_configs)
     manual_valid_ids = read_manual_ids_if_exist(
-        manual_valid_ids_file=gc.manual_valid_ids_file
+        manual_valid_ids_file=gc.be.manual_valid_ids_file
     )
 
     train_ids, valid_ids = split_ids(
         ids=all_ids,
-        valid_size=gc.valid_size,
+        valid_size=gc.be.valid_size,
         manual_valid_ids=manual_valid_ids,
     )
 
@@ -183,7 +184,7 @@ def get_default_experiment(
     train_sampler = None
     if isinstance(train_dataset, (datasets.DiskDataset, datasets.MemoryDataset)):
         train_sampler = get_train_sampler(
-            columns_to_sample=gc.weighted_sampling_columns,
+            columns_to_sample=gc.tc.weighted_sampling_columns,
             train_dataset=train_dataset,
         )
 
@@ -191,8 +192,8 @@ def get_default_experiment(
         train_dataset=train_dataset,
         train_sampler=train_sampler,
         valid_dataset=valid_dataset,
-        batch_size=gc.batch_size,
-        num_workers=gc.dataloader_workers,
+        batch_size=gc.be.batch_size,
+        num_workers=gc.be.dataloader_workers,
     )
 
     model = get_model(
@@ -203,9 +204,9 @@ def get_default_experiment(
     )
 
     model = maybe_wrap_model_with_swa(
-        n_iter_before_swa=gc.n_iter_before_swa,
+        n_iter_before_swa=gc.m.n_iter_before_swa,
         model=model,
-        device=torch.device(gc.device),
+        device=torch.device(gc.be.device),
     )
     _log_model(
         model=model,
@@ -228,8 +229,8 @@ def get_default_experiment(
 
     metrics = get_default_metrics(
         target_transformers=target_labels.label_transformers,
-        cat_averaging_metrics=gc.cat_averaging_metrics,
-        con_averaging_metrics=gc.con_averaging_metrics,
+        cat_averaging_metrics=gc.met.cat_averaging_metrics,
+        con_averaging_metrics=gc.met.con_averaging_metrics,
     )
 
     experiment = Experiment(
@@ -394,7 +395,7 @@ def _log_eir_version_info(outfile: Path) -> None:
 
 def run_experiment(experiment: Experiment) -> None:
     gc = experiment.configs.global_config
-    run_folder = utils.get_run_folder(output_folder=gc.output_folder)
+    run_folder = utils.get_run_folder(output_folder=gc.be.output_folder)
 
     _log_eir_version_info(outfile=get_version_file(run_folder=run_folder))
 
@@ -414,20 +415,20 @@ def train(experiment: Experiment) -> None:
 
     trainer = get_base_trainer(experiment=experiment)
 
-    if gc.find_lr:
+    if gc.lr.find_lr:
         logger.info("Running LR find and exiting.")
         run_lr_find(
             trainer_engine=trainer,
             train_dataloader=exp.train_loader,
             model=exp.model,
             optimizer=exp.optimizer,
-            output_folder=utils.get_run_folder(output_folder=gc.output_folder),
+            output_folder=utils.get_run_folder(output_folder=gc.be.output_folder),
         )
         return
 
     trainer = configure_trainer(trainer=trainer, experiment=experiment)
 
-    trainer.run(data=exp.train_loader, max_epochs=gc.n_epochs)
+    trainer.run(data=exp.train_loader, max_epochs=gc.be.n_epochs)
 
 
 def get_base_trainer(experiment: Experiment) -> Engine:

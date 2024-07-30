@@ -119,10 +119,8 @@ al_max_sequence_length = Union[int, Literal["max", "average"]]
 
 
 @dataclass
-class GlobalConfig:
+class BasicExperimentConfig:
     """
-    Global configurations that are common / relevant for the whole experiment to run.
-
     :param output_folder:
         What to name the experiment and output folder where results are saved.
 
@@ -133,91 +131,76 @@ class GlobalConfig:
         Size of batches during training.
 
     :param valid_size:
-        Size if the validation set, if float then uses a percentage. If int,
-        then raw counts.
+        Size if the validation set, if float then uses a percentage. If int, then raw
+        counts.
 
     :param manual_valid_ids_file:
-        File with IDs of those samples to manually use as the validation set. Should
-        be one ID per line in the file.
+        File with IDs of those samples to manually use as the validation set.
+        Should be one ID per line in the file.
 
     :param dataloader_workers:
         Number of workers for multiprocess training and validation data loading.
 
     :param device:
-        Device to run the training on (e.g. 'cuda:0' / 'cpu' / 'mps').
-        'mps' is currently experimental, and might not work for all models.
+        Device to run the training on (e.g. 'cuda:0' / 'cpu' / 'mps'). 'mps' is
+        currently experimental, and might not work for all models.
+
+    :param memory_dataset:
+        Whether to load all sample into memory during training.
+    """
+
+    output_folder: str
+    n_epochs: int = 10
+    batch_size: int = 64
+    valid_size: Union[float, int] = 0.1
+    manual_valid_ids_file: Union[str, None] = None
+    dataloader_workers: int = 0
+    device: str = "cpu"
+    memory_dataset: bool = False
+
+
+@dataclass
+class GlobalModelConfig:
+    """
+    :param compile_model:
+        Whether to compile the model before training. This can be useful to speed
+        up training, but may not work for all models.
 
     :param n_iter_before_swa:
-        Number of iterations to run before activating Stochastic Weight Averaging
-        (SWA).
+        Number of iterations to run before activating Stochastic Weight Averaging (SWA).
 
     :param amp:
         Whether to use Automatic Mixed Precision. Currently only supported when
         training on GPUs.
 
-    :param compile_model:
-        Whether to compile the model before training. This can be useful to
-        speed up training, but may not work for all models.
+    :param pretrained_checkpoint:
+        Path to a pretrained checkpoint model file (under saved_models/ in the
+        experiment output folder) to load and use as a starting point for training.
 
-    :param weighted_sampling_columns:
-        Target column to apply weighted sampling on. Only applies to categorical
-        columns. Passing in 'all' here will use an average of all the target columns.
+    :param strict_pretrained_loading:
+        Whether to enforce that the loaded pretrained model exactly the same
+        architecture as the current model. If False, will only load the layers that
+        match between the two models.
+    """
+
+    compile_model: bool = False
+    n_iter_before_swa: Union[None, int] = None
+    amp: bool = False
+    pretrained_checkpoint: Union[None, str] = None
+    strict_pretrained_loading: bool = True
+
+
+@dataclass
+class OptimizationConfig:
+    """
+    :param optimizer:
+        What optimizer to use.
 
     :param lr:
         Base learning rate for optimizer.
 
     :param lr_lb:
         Lower bound for learning rate when using LR scheduling
-
-    :param find_lr:
-        Whether to perform a range test of different learning rates, with
-        the lower limit being what is passed in for the --lr flag.
-        Produces a plot and exits with status 0 before training if this flag
-        is active.
-
-    :param lr_schedule:
-        Whether to use cyclical, cosine or reduce on plateau learning rate
-        schedule. Otherwise keeps same learning rate
-
-    :param lr_plateau_patience:
-        Number of validation performance steps without improvement over
-        best performance before reducing LR (only relevant when --lr_schedule is
-        'plateau'.
-
-    :param lr_plateau_factor:
-        Factor to reduce LR when running with plateau schedule.
-
-    :param gradient_clipping:
-        Max norm used for gradient clipping, with p=2.
-
-    :param gradient_accumulation_steps:
-        Number of steps to use for gradient accumulation.
-
-    :param gradient_noise:
-        Gradient noise to inject during training.
-
-    :param cat_averaging_metrics:
-        Which metrics to use for averaging categorical targets. If not set, will
-        use the default metrics for the task type.
-
-    :param con_averaging_metrics:
-        Which metrics to use for averaging continuous targets. If not set, will
-        use the default metrics for the task type.
-
-    :param early_stopping_patience:
-        Number of validation performance steps without improvement over
-        best performance before terminating run.
-
-    :param early_stopping_buffer:
-        Number of iterations to run before activating early stopping checks,
-        useful if networks take a while to 'kick into gear'.
-
-    :param warmup_steps:
-        How many steps to use in warmup. If not set, will automatically compute the
-        number of steps if using an adaptive optimizer, otherwise use 2000.
-
-    :param optimizer:
-        What optimizer to use.
 
     :param b1:
         Decay of first order momentum of gradient for relevant optimizers.
@@ -228,23 +211,106 @@ class GlobalConfig:
     :param wd:
         Weight decay.
 
-    :param memory_dataset:
-        Whether to load all sample into memory during training.
+    :param gradient_clipping:
+        Max norm used for gradient clipping, with p=2.
 
+    :param gradient_accumulation_steps:
+        Number of steps to use for gradient accumulation.
+
+    :param gradient_noise:
+        Gradient noise to inject during training.
+    """
+
+    optimizer: str = "adamw"
+    lr: float = 3e-04
+    lr_lb: float = 0.0
+    b1: float = 0.9
+    b2: float = 0.999
+    wd: float = 1e-04
+    gradient_clipping: float = 1.0
+    gradient_accumulation_steps: Union[None, int] = None
+    gradient_noise: float = 0.0
+
+
+@dataclass
+class LRScheduleConfig:
+    """
+    :param find_lr:
+        Whether to perform a range test of different learning rates, with the lower
+        limit being what is passed in for the --lr flag. Produces a plot and exits
+        with status 0 before training if this flag is active.
+
+    :param lr_schedule:
+        Whether to use cyclical, cosine or reduce on plateau learning rate schedule.
+        Otherwise, keeps same learning rate
+
+    :param lr_plateau_patience:
+        Number of validation performance steps without improvement over best
+        performance before reducing LR (only relevant when --lr_schedule is 'plateau'.
+
+    :param lr_plateau_factor:
+        Factor to reduce LR when running with plateau schedule.
+
+    :param warmup_steps:
+        How many steps to use in warmup. If not set, will automatically compute the
+        number of steps if using an adaptive optimizer, otherwise use 2000.
+
+    :param plot_lr_schedule:
+        Whether to run LR search, plot the results and exit with status 0.
+    """
+
+    find_lr: bool = False
+    lr_schedule: Literal["cycle", "plateau", "same", "cosine"] = "plateau"
+    lr_plateau_patience: int = 10
+    lr_plateau_factor: float = 0.2
+    warmup_steps: Union[Literal["auto"], int] = "auto"
+    plot_lr_schedule: bool = False
+
+
+@dataclass
+class TrainingControlConfig:
+    """
+    :param early_stopping_patience:
+        Number of validation performance steps without improvement over best
+        performance before terminating run.
+
+    :param early_stopping_buffer:
+        Number of iterations to run before activating early stopping checks, useful
+        if networks take a while to 'kick into gear'.
+
+    :param weighted_sampling_columns:
+        Target column to apply weighted sampling on, relevant for supervised
+        (tabular) targets.
+        Only applies to categorical columns.
+        Passing in 'all' here will use an average of all the target columns.
+
+    :param mixing_alpha:
+        Alpha parameter used for mixing (higher means more mixing).
+    """
+
+    early_stopping_patience: int = 10
+    early_stopping_buffer: Union[None, int] = None
+    weighted_sampling_columns: Union[None, Sequence[str]] = None
+    mixing_alpha: float = 0.0
+
+
+@dataclass
+class EvaluationCheckpointConfig:
+    """
     :param sample_interval:
-        Iteration interval to perform validation and possibly attribution analysis if
-        set.
+        Iteration interval to perform validation and possibly attribution analysis
+         if set.
 
     :param saved_result_detail_level:
         Level of detail to save in the results file. Higher levels will save more
-        information, but will take up more space and might be slow especially when
-        using many tabular targets. The details are as follows (each step skips
-        a level of detail in addition to the previous):
+        information, but will take up more space and might be slow especially
+        when using many tabular targets. The details are as follows
+        (each step skips a level of detail in addition to the previous):
         - 5: The default, save all metrics and plots.
         - 4: Skip validation plots and generated samples under the 'samples' folder.
         - 3: Skip plots for individual targets.
-        - 2: Skip individual target plots (e.g. R2 training curve for
-        regression targets).
+        - 2: Skip individual target plots (e.g. R2 training curve for regression
+        targets).
         - 1: Skip individual target metrics (including loss).
 
     :param checkpoint_interval:
@@ -252,101 +318,117 @@ class GlobalConfig:
 
     :param n_saved_models:
         Number of top N models to saved during training.
+    """
 
+    sample_interval: int = 200
+    saved_result_detail_level: int = 5
+    checkpoint_interval: Union[None, int] = None
+    n_saved_models: int = 1
+
+
+@dataclass
+class AttributionAnalysisConfig:
+    """
     :param compute_attributions:
         Whether to compute attributions / feature importance scores
         (using integrated gradients) assigned by the model with respect to the
         input features.
 
     :param max_attributions_per_class:
-        Maximum number of samples per class to gather for attribution / feature
-        importance analysis. Good to use when modelling on imbalanced data.
+        Maximum number of samples per class to gather for
+        attribution / feature importance
+        analysis. Good to use when modelling on imbalanced data.
 
     :param attributions_every_sample_factor:
-        Controls whether the attributions / feature importance values
-        are computed at every sample interval (=1), every other sample interval (=2),
-        etc. Useful when computing the attributions takes a long time and we
-        don't want to do it every time we evaluate.
+        Controls whether the attributions / feature importance
+        values are computed at every
+        sample interval (=1), every other sample interval (=2), etc.
+        Useful when computing the attributions takes a long time, and
+        we don't want to do it every time we evaluate.
 
     :param attribution_background_samples:
         Number of samples to use for the background in attribution / feature importance
-        computations.
-
-    :param plot_lr_schedule:
-        Whether to run LR search, plot the results and exit with status 0.
-
-    :param no_pbar:
-        Whether to not use progress bars. Useful when stdout/stderr is written
-        to files.
-
-    :param log_level:
-        Logging level to use. Can be one of 'debug', 'info', 'warning', 'error',
-        'critical'.
-
-    :param mixing_alpha:
-        Alpha parameter used for mixing (higher means more mixing).
-
-    :param plot_skip_steps:
-        How many iterations to skip in plots.
-
-    :param pretrained_checkpoint:
-        Path to a pretrained checkpoint model file (under saved_models/ in the
-        experiment output folder) to load and use as a starting point for training.
-
-    :param strict_pretrained_loading:
-        Whether to enforce that the loaded pretrained model exactly the same
-        architecture as the current model. If False, will only load the layers
-        that match between the two models.
-
-    :param latent_sampling: Configuration to use for latent sampling.
+         computations.
     """
 
-    output_folder: str
-    n_epochs: int = 10
-    batch_size: int = 64
-    valid_size: Union[float, int] = 0.1
-    manual_valid_ids_file: Union[str, None] = None
-    dataloader_workers: int = 0
-    device: str = "cpu"
-    n_iter_before_swa: Union[None, int] = None
-    amp: bool = False
-    compile_model: bool = False
-    weighted_sampling_columns: Union[None, Sequence[str]] = None
-    lr: float = 3e-04
-    lr_lb: float = 0.0
-    find_lr: bool = False
-    lr_schedule: Literal["cycle", "plateau", "same", "cosine"] = "plateau"
-    lr_plateau_patience: int = 10
-    lr_plateau_factor: float = 0.2
-    gradient_clipping: float = 1.0
-    gradient_accumulation_steps: Union[None, int] = None
-    gradient_noise: float = 0.0
-    cat_averaging_metrics: Optional["al_cat_averaging_metric_choices"] = None
-    con_averaging_metrics: Optional["al_con_averaging_metric_choices"] = None
-    early_stopping_patience: int = 10
-    early_stopping_buffer: Union[None, int] = None
-    warmup_steps: Union[Literal["auto"], int] = "auto"
-    optimizer: al_optimizers = "adamw"  # type: ignore
-    b1: float = 0.9
-    b2: float = 0.999
-    wd: float = 1e-04
-    memory_dataset: bool = False
-    sample_interval: int = 200
-    saved_result_detail_level: int = 5
-    checkpoint_interval: Union[None, int] = None
-    n_saved_models: int = 1
     compute_attributions: bool = False
     max_attributions_per_class: Union[None, int] = None
     attributions_every_sample_factor: int = 1
     attribution_background_samples: int = 256
-    plot_lr_schedule: bool = False
+
+
+@dataclass
+class SupervisedMetricsConfig:
+    """
+    :param cat_averaging_metrics:
+        Which metrics to use for averaging categorical targets. If not set, will use
+        the default metrics for the task type.
+
+    :param con_averaging_metrics:
+        Which metrics to use for averaging continuous targets. If not set, will use
+        the default metrics for the task type.
+    """
+
+    cat_averaging_metrics: Optional["al_cat_averaging_metric_choices"] = None
+    con_averaging_metrics: Optional["al_con_averaging_metric_choices"] = None
+
+
+@dataclass
+class VisualizationLoggingConfig:
+    """
+    :param plot_skip_steps:
+        How many iterations to skip in plots.
+    :param no_pbar:
+        Whether to not use progress bars. Useful when stdout/stderr is written to files.
+    :param log_level:
+        Logging level to use. Can be one of 'debug', 'info', 'warning', 'error',
+         'critical'.
+    """
+
+    plot_skip_steps: int = 200
     no_pbar: bool = False
     log_level: Literal["debug", "info", "warning", "error", "critical"] = "info"
-    mixing_alpha: float = 0.0
-    plot_skip_steps: int = 200
-    pretrained_checkpoint: Union[None, str] = None
-    strict_pretrained_loading: bool = True
+
+
+@dataclass
+class GlobalConfig:
+    """
+    Global configurations that are common / relevant for the whole experiment to run.
+    """
+
+    basic_experiment: BasicExperimentConfig
+    model: GlobalModelConfig
+    optimization: OptimizationConfig
+    lr_schedule: LRScheduleConfig
+    training_control: TrainingControlConfig
+    evaluation_checkpoint: EvaluationCheckpointConfig
+    attribution_analysis: AttributionAnalysisConfig
+    metrics: SupervisedMetricsConfig
+    visualization_logging: VisualizationLoggingConfig
     latent_sampling: Optional[LatentSamplingConfig] = None
+
+    be: BasicExperimentConfig = field(init=False, repr=False)
+    m: GlobalModelConfig = field(init=False, repr=False)
+    opt: OptimizationConfig = field(init=False, repr=False)
+    lr: LRScheduleConfig = field(init=False, repr=False)
+    tc: TrainingControlConfig = field(init=False, repr=False)
+    ec: EvaluationCheckpointConfig = field(init=False, repr=False)
+    aa: AttributionAnalysisConfig = field(init=False, repr=False)
+    met: SupervisedMetricsConfig = field(init=False, repr=False)
+    vl: VisualizationLoggingConfig = field(init=False, repr=False)
+    ls: Optional[LatentSamplingConfig] = field(init=False, repr=False)
+
+    def __post_init__(self):
+        self.be = self.basic_experiment
+        self.m = self.model
+        self.opt = self.optimization
+        self.lr = self.lr_schedule
+        self.tc = self.training_control
+        self.ec = self.evaluation_checkpoint
+        self.aa = self.attribution_analysis
+        self.met = self.metrics
+        self.vl = self.visualization_logging
+        self.ls = self.latent_sampling
 
 
 @dataclass

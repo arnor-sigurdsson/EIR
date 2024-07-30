@@ -154,7 +154,7 @@ def get_meta_model_kwargs_from_configs(
     kwargs: dict[str, Any] = {}
     input_modules = get_input_modules(
         inputs_as_dict=inputs_as_dict,
-        device=global_config.device,
+        device=global_config.be.device,
     )
     kwargs["input_modules"] = input_modules
 
@@ -182,7 +182,7 @@ def get_meta_model_kwargs_from_configs(
     )
     output_modules, output_types = get_output_modules(
         outputs_as_dict=outputs_as_dict,
-        device=global_config.device,
+        device=global_config.be.device,
         computed_out_dimensions=computed_out_dimension,
         feature_dimensions_and_types=feature_dims_and_types,
         fusion_model_type=fusion_config.model_type,
@@ -206,7 +206,7 @@ def get_meta_model_kwargs_from_configs(
         input_configs=input_configs,
         fusion_configs=[fusion_config],
         output_configs=output_configs,
-        device=global_config.device,
+        device=global_config.be.device,
     )
     kwargs["tensor_broker"] = tensor_broker
 

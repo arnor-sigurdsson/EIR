@@ -23,12 +23,18 @@ seed_everything(seed=0)
         {
             "injections": {
                 "global_configs": {
-                    "output_folder": "test_image_classification",
-                    "n_epochs": 6,
-                    "memory_dataset": True,
-                    "compute_attributions": True,
-                    "attribution_background_samples": 256,
-                    "mixing_alpha": 1.0,
+                    "basic_experiment": {
+                        "output_folder": "test_image_classification",
+                        "n_epochs": 6,
+                        "memory_dataset": True,
+                    },
+                    "attribution_analysis": {
+                        "compute_attributions": True,
+                        "attribution_background_samples": 256,
+                    },
+                    "training_control": {
+                        "mixing_alpha": 1.0,
+                    },
                 },
                 "input_configs": [
                     {
@@ -62,14 +68,22 @@ seed_everything(seed=0)
         {
             "injections": {
                 "global_configs": {
-                    "output_folder": "test_image_classification",
-                    "n_epochs": 6,
-                    "memory_dataset": True,
-                    "compute_attributions": True,
-                    "attribution_background_samples": 256,
-                    "mixing_alpha": 0.0,
-                    "lr": 1e-03,
-                    "wd": 0.0,
+                    "basic_experiment": {
+                        "output_folder": "test_image_classification",
+                        "n_epochs": 6,
+                        "memory_dataset": True,
+                    },
+                    "attribution_analysis": {
+                        "compute_attributions": True,
+                        "attribution_background_samples": 256,
+                    },
+                    "training_control": {
+                        "mixing_alpha": 0.0,
+                    },
+                    "optimization": {
+                        "lr": 1e-03,
+                        "wd": 0.0,
+                    },
                 },
                 "input_configs": [
                     {
@@ -102,9 +116,7 @@ def test_image_modelling(prep_modelling_test_configs):
 
     train.train(experiment=experiment)
 
-    thresholds = get_image_test_args(
-        mixing=experiment.configs.global_config.mixing_alpha
-    )
+    thresholds = get_image_test_args(mixing=experiment.configs.gc.tc.mixing_alpha)
 
     check_performance_result_wrapper(
         outputs=experiment.outputs,

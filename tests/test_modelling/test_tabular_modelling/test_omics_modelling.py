@@ -60,8 +60,12 @@ def _get_classification_output_configs(
         {
             "injections": {
                 "global_configs": {
-                    "weighted_sampling_columns": ["all"],
-                    "n_iter_before_swa": 50,
+                    "training_control": {
+                        "weighted_sampling_columns": ["all"],
+                    },
+                    "model": {
+                        "n_iter_before_swa": 50,
+                    },
                 },
                 "input_configs": [
                     {
@@ -87,8 +91,12 @@ def _get_classification_output_configs(
         {
             "injections": {
                 "global_configs": {
-                    "weighted_sampling_columns": ["Origin"],
-                    "gradient_noise": 0.01,
+                    "training_control": {
+                        "weighted_sampling_columns": ["Origin"],
+                    },
+                    "optimization": {
+                        "gradient_noise": 0.01,
+                    },
                 },
                 "input_configs": [
                     {
@@ -109,7 +117,11 @@ def _get_classification_output_configs(
         # Case 3: Identity Fusion
         {
             "injections": {
-                "global_configs": {"lr": 1e-03},
+                "global_configs": {
+                    "optimization": {
+                        "lr": 1e-03,
+                    },
+                },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
@@ -184,7 +196,11 @@ def test_classification(prep_modelling_test_configs):
         # Case 1: Identity Fusion, SNP subset
         {
             "injections": {
-                "global_configs": {"lr": 1e-03},
+                "global_configs": {
+                    "optimization": {
+                        "lr": 1e-03,
+                    },
+                },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
@@ -207,7 +223,14 @@ def test_classification(prep_modelling_test_configs):
         # Case 2: Identity Fusion, SNP subset, memory dataset
         {
             "injections": {
-                "global_configs": {"lr": 1e-03, "memory_dataset": True},
+                "global_configs": {
+                    "optimization": {
+                        "lr": 1e-03,
+                    },
+                    "basic_experiment": {
+                        "memory_dataset": True,
+                    },
+                },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
@@ -334,7 +357,9 @@ def _get_regression_output_configs() -> Sequence[Dict]:
         # Case 1: Identity Fusion
         {
             "injections": {
-                "global_configs": {"lr": 1e-03},
+                "global_configs": {
+                    "optimization": {"lr": 1e-03},
+                },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
@@ -381,8 +406,12 @@ def _get_regression_output_configs() -> Sequence[Dict]:
         {
             "injections": {
                 "global_configs": {
-                    "lr_schedule": "cycle",
-                    "output_folder": "test_lr-cycle",
+                    "lr_schedule": {
+                        "lr_schedule": "cycle",
+                    },
+                    "basic_experiment": {
+                        "output_folder": "test_lr-cycle",
+                    },
                 },
                 "input_configs": [
                     {
@@ -474,9 +503,11 @@ def _should_compile():
         {
             "injections": {
                 "global_configs": {
-                    "output_folder": "extra_inputs",
-                    "cat_averaging_metrics": ["roc-auc-macro"],
-                    "con_averaging_metrics": ["r2"],
+                    "basic_experiment": {"output_folder": "extra_inputs"},
+                    "metrics": {
+                        "cat_averaging_metrics": ["roc-auc-macro"],
+                        "con_averaging_metrics": ["r2"],
+                    },
                 },
                 "input_configs": [
                     {
@@ -505,7 +536,9 @@ def _should_compile():
         {
             "injections": {
                 "global_configs": {
-                    "mixing_alpha": 0.2,
+                    "training_control": {
+                        "mixing_alpha": 0.2,
+                    }
                 },
                 "input_configs": [
                     {
@@ -537,7 +570,9 @@ def _should_compile():
         # stability and add L1 for regularization
         {
             "injections": {
-                "global_configs": {"lr": 1e-03},
+                "global_configs": {
+                    "optimization": {"lr": 1e-03},
+                },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
@@ -556,7 +591,9 @@ def _should_compile():
         # Case 4: Using the Simple LCL model
         {
             "injections": {
-                "global_configs": {"lr": 1e-03},
+                "global_configs": {
+                    "optimization": {"lr": 1e-03},
+                },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
@@ -577,9 +614,13 @@ def _should_compile():
         {
             "injections": {
                 "global_configs": {
-                    "lr": 1e-03,
-                    "gradient_noise": 0.001,
-                    "compile_model": _should_compile(),
+                    "optimization": {
+                        "lr": 1e-03,
+                        "gradient_noise": 0.001,
+                    },
+                    "model": {
+                        "compile_model": _should_compile(),
+                    },
                 },
                 "input_configs": [
                     {
@@ -612,9 +653,15 @@ def _should_compile():
         {
             "injections": {
                 "global_configs": {
-                    "output_folder": "mgmoe",
-                    "lr": 1e-03,
-                    "saved_result_detail_level": 4,
+                    "basic_experiment": {
+                        "output_folder": "mgmoe",
+                    },
+                    "optimization": {
+                        "lr": 1e-03,
+                    },
+                    "evaluation_checkpoint": {
+                        "saved_result_detail_level": 4,
+                    },
                 },
                 "input_configs": [
                     {
@@ -642,8 +689,12 @@ def _should_compile():
         {
             "injections": {
                 "global_configs": {
-                    "output_folder": "mixing_multi",
-                    "mixing_alpha": 0.2,
+                    "basic_experiment": {
+                        "output_folder": "mixing_multi",
+                    },
+                    "training_control": {
+                        "mixing_alpha": 0.2,
+                    },
                 },
                 "input_configs": [
                     {
@@ -675,12 +726,20 @@ def _should_compile():
         {
             "injections": {
                 "global_configs": {
-                    "output_folder": "limited_attributions",
-                    "lr": 1e-03 * 4,
-                    "batch_size": 16,
-                    "gradient_accumulation_steps": 4,
-                    "max_attributions_per_class": 100,
-                    "mixing_alpha": 0.2,
+                    "basic_experiment": {
+                        "output_folder": "limited_attributions",
+                        "batch_size": 16,
+                    },
+                    "optimization": {
+                        "lr": 1e-03 * 4,
+                        "gradient_accumulation_steps": 4,
+                    },
+                    "training_control": {
+                        "mixing_alpha": 0.2,
+                    },
+                    "attribution_analysis": {
+                        "max_attributions_per_class": 100,
+                    },
                 },
                 "input_configs": [
                     {
@@ -735,7 +794,7 @@ def test_multi_task(
             threshold, at_least_n = _get_multi_task_test_args(
                 extra_columns=extra_columns,
                 target_copy=target_copy,
-                mixing=gc.mixing_alpha,
+                mixing=gc.training_control.mixing_alpha,
             )
             check_performance_result_wrapper(
                 outputs=experiment.outputs,
@@ -761,7 +820,7 @@ def test_multi_task(
             threshold, at_least_n = _get_multi_task_test_args(
                 extra_columns=extra_columns,
                 target_copy=target_copy,
-                mixing=gc.mixing_alpha,
+                mixing=gc.tc.mixing_alpha,
             )
             check_performance_result_wrapper(
                 outputs=experiment.outputs,
@@ -800,9 +859,13 @@ def test_multi_task(
         {
             "injections": {
                 "global_configs": {
-                    "lr": 1e-03,
-                    "gradient_noise": 0.001,
-                    "compile_model": _should_compile(),
+                    "optimization": {
+                        "lr": 1e-03,
+                        "gradient_noise": 0.001,
+                    },
+                    "model": {
+                        "compile_model": _should_compile(),
+                    },
                 },
                 "input_configs": [
                     {

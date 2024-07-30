@@ -199,7 +199,7 @@ def get_target_labels_for_testing(
             case TabularOutputTypeConfig():
                 cur_tabular_info = tabular_target_files_info[output_name]
                 cur_labels = get_tabular_target_labels_for_predict(
-                    output_folder=pc.global_config.output_folder,
+                    output_folder=pc.global_config.basic_experiment.output_folder,
                     tabular_info=cur_tabular_info,
                     output_name=output_name,
                     custom_column_label_parsing_ops=custom_column_label_parsing_ops,

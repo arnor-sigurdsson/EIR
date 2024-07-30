@@ -36,9 +36,9 @@ def create_test_model(
     )
 
     model = maybe_wrap_model_with_swa(
-        n_iter_before_swa=gc.n_iter_before_swa,
+        n_iter_before_swa=gc.m.n_iter_before_swa,
         model=model,
-        device=torch.device(gc.device),
+        device=torch.device(gc.be.device),
     )
 
     return model

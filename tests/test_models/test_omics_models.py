@@ -120,7 +120,9 @@ def test_get_cur_dilation(test_input, expected):
         # Case 3: Linear
         {
             "injections": {
-                "global_configs": {"lr": 1e-03},
+                "global_configs": {
+                    "optimization": {"lr": 1e-03},
+                },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
@@ -145,7 +147,9 @@ def test_get_cur_dilation(test_input, expected):
         {
             "injections": {
                 "global_configs": {
-                    "output_folder": "extra_inputs",
+                    "basic_experiment": {
+                        "output_folder": "extra_inputs",
+                    }
                 },
                 "input_configs": [
                     {
@@ -210,7 +214,9 @@ def test_get_cur_dilation(test_input, expected):
         # stability and add L1 for regularization
         {
             "injections": {
-                "global_configs": {"lr": 1e-03},
+                "global_configs": {
+                    "optimization": {"lr": 1e-03},
+                },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
@@ -237,7 +243,11 @@ def test_get_cur_dilation(test_input, expected):
         # Case 7: Using the Simple LCL model
         {
             "injections": {
-                "global_configs": {"lr": 1e-03},
+                "global_configs": {
+                    "optimization": {
+                        "lr": 1e-03,
+                    },
+                },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
@@ -266,7 +276,9 @@ def test_get_cur_dilation(test_input, expected):
         {
             "injections": {
                 "global_configs": {
-                    "lr": 1e-03,
+                    "optimization": {
+                        "lr": 1e-03,
+                    }
                 },
                 "input_configs": [
                     {
@@ -304,8 +316,12 @@ def test_get_cur_dilation(test_input, expected):
         {
             "injections": {
                 "global_configs": {
-                    "output_folder": "mgmoe",
-                    "lr": 1e-03,
+                    "basic_experiment": {
+                        "output_folder": "mgmoe",
+                    },
+                    "optimization": {
+                        "lr": 1e-03,
+                    },
                 },
                 "input_configs": [
                     {
@@ -339,9 +355,15 @@ def test_get_cur_dilation(test_input, expected):
         {
             "injections": {
                 "global_configs": {
-                    "output_folder": "mixing_multi",
-                    "lr": 1e-03,
-                    "mixing_alpha": 0.5,
+                    "basic_experiment": {
+                        "output_folder": "mixing_multi",
+                    },
+                    "optimization": {
+                        "lr": 1e-03,
+                    },
+                    "training_control": {
+                        "mixing_alpha": 0.5,
+                    },
                 },
                 "input_configs": [
                     {
@@ -381,9 +403,15 @@ def test_get_cur_dilation(test_input, expected):
         {
             "injections": {
                 "global_configs": {
-                    "output_folder": "limited_attributions",
-                    "lr": 1e-03,
-                    "max_attributions_per_class": 100,
+                    "basic_experiment": {
+                        "output_folder": "limited_attributions",
+                    },
+                    "optimization": {
+                        "lr": 1e-03,
+                    },
+                    "attribution_analysis": {
+                        "max_attributions_per_class": 100,
+                    },
                 },
                 "input_configs": [
                     {

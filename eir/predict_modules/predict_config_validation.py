@@ -22,7 +22,7 @@ def _validate_predict_cl_args_and_config_synergy(
 ) -> None:
     gc = predict_configs.global_config
 
-    if gc.compute_attributions and not predict_cl_args.evaluate:
+    if gc.aa.compute_attributions and not predict_cl_args.evaluate:
         raise ValueError(
             "When doing prediction, if compute_attributions is True, "
             "--evaluate in the eirpredict CL arguments must be used. "

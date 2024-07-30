@@ -45,24 +45,24 @@ def get_model(
         meta_class_getter=meta_class_getter,
     )
 
-    if global_config.pretrained_checkpoint:
+    if global_config.m.pretrained_checkpoint:
         logger.info(
             "Loading pretrained checkpoint from '%s'.",
-            global_config.pretrained_checkpoint,
+            global_config.m.pretrained_checkpoint,
         )
         loaded_meta_model = load_model(
-            model_path=Path(global_config.pretrained_checkpoint),
+            model_path=Path(global_config.m.pretrained_checkpoint),
             model_class=meta_class,
             model_init_kwargs=meta_kwargs,
-            device=global_config.device,
+            device=global_config.be.device,
             test_mode=False,
-            strict_shapes=global_config.strict_pretrained_loading,
+            strict_shapes=global_config.m.strict_pretrained_loading,
         )
 
         loaded_meta_model = overload_embeddings_with_pretrained(
             model=loaded_meta_model,
             inputs=inputs_as_dict,
-            pretrained_checkpoint=global_config.pretrained_checkpoint,
+            pretrained_checkpoint=global_config.m.pretrained_checkpoint,
         )
 
         return loaded_meta_model
@@ -76,15 +76,16 @@ def get_model(
     meta_kwargs["input_modules"] = input_modules
 
     meta_model = meta_class(**meta_kwargs)
-    device = torch.device(device=global_config.device)
+    device = torch.device(device=global_config.be.device)
     meta_model = meta_model.to(device=device)
 
     meta_model = maybe_make_model_distributed(
-        device=global_config.device, model=meta_model
+        device=global_config.be.device,
+        model=meta_model,
     )
 
     compiled_model: al_meta_model
-    if global_config.compile_model:
+    if global_config.m.compile_model:
         compiled_model = cast(al_meta_model, torch.compile(model=meta_model))
     else:
         compiled_model = meta_model

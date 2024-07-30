@@ -124,7 +124,7 @@ def run_predict(predict_cl_args: Namespace):
     loaded_train_experiment = load_serialized_train_experiment(run_folder=run_folder)
 
     set_log_level_for_eir_loggers(
-        log_level=loaded_train_experiment.configs.global_config.log_level
+        log_level=loaded_train_experiment.configs.gc.vl.log_level
     )
 
     predict_experiment = get_default_predict_experiment(
@@ -137,7 +137,7 @@ def run_predict(predict_cl_args: Namespace):
         predict_cl_args=predict_cl_args,
     )
 
-    if predict_experiment.configs.global_config.compute_attributions:
+    if predict_experiment.configs.gc.aa.compute_attributions:
         compute_predict_attributions(
             loaded_train_experiment=loaded_train_experiment,
             predict_config=predict_experiment,
@@ -169,7 +169,7 @@ def predict(
         output_objects=predict_experiment.outputs,
         experiment_metrics=predict_experiment.metrics,
         loss_function=loss_func,
-        device=predict_experiment.configs.global_config.device,
+        device=predict_experiment.configs.gc.be.device,
         with_labels=predict_cl_args.evaluate,
         missing_ids_per_output=predict_experiment.test_dataset.missing_ids_per_output,
     )
@@ -300,7 +300,7 @@ def get_default_predict_experiment(
         test_inputs_configs=configs_overloaded_for_predict.input_configs,
         ids=test_ids,
         hooks=default_train_hooks,
-        output_folder=loaded_train_experiment.configs.global_config.output_folder,
+        output_folder=loaded_train_experiment.configs.gc.be.output_folder,
     )
 
     label_dict = target_labels.label_dict if target_labels else {}
@@ -312,7 +312,7 @@ def get_default_predict_experiment(
         missing_ids_per_output=missing_ids_per_output,
     )
     predict_batch_size = _auto_set_test_batch_size(
-        batch_size=configs_overloaded_for_predict.global_config.batch_size,
+        batch_size=configs_overloaded_for_predict.gc.be.batch_size,
         test_set_size=len(test_dataset),
     )
 
@@ -325,7 +325,7 @@ def get_default_predict_experiment(
         dataset=test_dataset,
         batch_size=predict_batch_size,
         shuffle=False,
-        num_workers=configs_overloaded_for_predict.global_config.dataloader_workers,
+        num_workers=configs_overloaded_for_predict.gc.be.dataloader_workers,
     )
 
     func = get_meta_model_class_and_kwargs_from_configs
@@ -341,7 +341,7 @@ def get_default_predict_experiment(
         model_path=Path(predict_cl_args.model_path),
         model_class=fusion_model_class,
         model_init_kwargs=fusion_model_kwargs,
-        device=configs_overloaded_for_predict.global_config.device,
+        device=configs_overloaded_for_predict.gc.be.device,
         test_mode=True,
         strict_shapes=True,
     )
@@ -402,7 +402,7 @@ def _hook_default_predict_prepare_batch(
         input_objects=experiment.inputs,
         output_objects=experiment.outputs,
         model=experiment.model,
-        device=experiment.configs.global_config.device,
+        device=experiment.configs.gc.be.device,
     )
 
     state_updates = {"batch": batch}

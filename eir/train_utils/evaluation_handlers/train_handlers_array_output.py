@@ -135,7 +135,7 @@ def array_out_single_sample_evaluation_wrapper(
 
         batch_generator = get_batch_generator(
             iterator=enumerate(sample_generator),
-            batch_size=experiment.configs.global_config.batch_size,
+            batch_size=experiment.configs.gc.be.batch_size,
         )
 
         for batch in batch_generator:

@@ -46,7 +46,8 @@ def create_test_config_init_base(
 
     test_global_init = get_test_base_global_init()
     test_global_init = general_sequence_inject(
-        sequence=test_global_init, inject_dict=injections.get("global_configs", {})
+        sequence=test_global_init,
+        inject_dict=injections.get("global_configs", {}),
     )
 
     test_input_init = get_test_inputs_inits(
@@ -152,13 +153,13 @@ def build_test_output_folder(
     This is done after in case tests modify output_folder.
     """
 
-    test_configs_copy = copy(test_configs)
+    tcc = copy(test_configs)
 
-    output_folder_base = test_configs_copy.global_configs[0]["output_folder"]
+    output_folder_base = tcc.global_configs[0]["basic_experiment"]["output_folder"]
     input_model_types = "_".join(
-        i["model_config"]["model_type"] for i in test_configs_copy.input_configs
+        i["model_config"]["model_type"] for i in tcc.input_configs
     )
-    output_model_type = test_configs_copy.output_configs[0]["model_config"].get(
+    output_model_type = tcc.output_configs[0]["model_config"].get(
         "model_type", "default"
     )
     task_type = test_data_config.request_params["task_type"]
@@ -176,10 +177,10 @@ def build_test_output_folder(
     if not output_folder.startswith("runs/"):
         output_folder = "runs/" + output_folder
 
-    for gc in test_configs_copy.global_configs:
-        gc["output_folder"] = output_folder
+    for gc in tcc.global_configs:
+        gc["basic_experiment"]["output_folder"] = output_folder
 
-    return test_configs_copy, output_folder
+    return tcc, output_folder
 
 
 def teardown_logger():

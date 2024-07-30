@@ -16,7 +16,7 @@ from eir.train_utils.utils import configure_global_eir_logging
 def main():
     configs = get_configs()
 
-    configure_global_eir_logging(output_folder=configs.global_config.output_folder)
+    configure_global_eir_logging(output_folder=configs.gc.be.output_folder)
 
     default_hooks = step_logic.get_default_hooks(configs=configs)
     default_experiment = train.get_default_experiment(
