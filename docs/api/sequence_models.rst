@@ -927,21 +927,50 @@ Args:
         End of stream token id.
     pretraining_tp (`int`, *optional*, defaults to 1):
         Experimental feature. Tensor parallelism rank used during pretraining. Please refer to `this
-        document <https://huggingface.co/docs/transformers/main/perf_train_gpu_many#tensor-parallelism>`__ to understand more about it. This value is
-        necessary to ensure exact reproducibility of the pretraining results. Please refer to `this
-        issue <https://github.com/pytorch/pytorch/issues/76232>`__.
+        document <https://huggingface.co/docs/transformers/main/perf_train_gpu_many#tensor-parallelism>`__ to
+        understand more about it. This value is necessary to ensure exact reproducibility of the pretraining
+        results. Please refer to `this issue <https://github.com/pytorch/pytorch/issues/76232>`__.
     tie_word_embeddings (`bool`, *optional*, defaults to `False`):
         Whether to tie weight embeddings
     rope_theta (`float`, *optional*, defaults to 10000.0):
         The base period of the RoPE embeddings.
     rope_scaling (`Dict`, *optional*):
-        Dictionary containing the scaling configuration for the RoPE embeddings. Currently supports two scaling
-        strategies: linear and dynamic. Their scaling factor must be a float greater than 1. The expected format is
-        `{"type": strategy name, "factor": scaling factor}`. When using this flag, don't update
-        `max_position_embeddings` to the expected new maximum. See the following thread for more information on how
-        these scaling strategies behave:
-        https://www.reddit.com/r/LocalLLaMA/comments/14mrgpr/dynamically_scaled_rope_further_increases/. This is an
-        experimental feature, subject to breaking API changes in future versions.
+        Dictionary containing the scaling configuration for the RoPE embeddings. NOTE: if you apply new rope type
+        and you expect the model to work on longer `max_position_embeddings`, we recommend you to update this value
+        accordingly.
+        Expected contents:
+            `rope_type` (`str`):
+                The sub-variant of RoPE to use. Can be one of ['default', 'linear', 'dynamic', 'yarn', 'longrope',
+                'llama3'], with 'default' being the original RoPE implementation.
+            `factor` (`float`, *optional*):
+                Used with all rope types except 'default'. The scaling factor to apply to the RoPE embeddings. In
+                most scaling types, a `factor` of x will enable the model to handle sequences of length x *
+                original maximum pre-trained length.
+            `original_max_position_embeddings` (`int`, *optional*):
+                Used with 'dynamic', 'longrope' and 'llama3'. The original max position embeddings used during
+                pretraining.
+            `attention_factor` (`float`, *optional*):
+                Used with 'yarn' and 'longrope'. The scaling factor to be applied on the attention
+                computation. If unspecified, it defaults to value recommended by the implementation, using the
+                `factor` field to infer the suggested value.
+            `beta_fast` (`float`, *optional*):
+                Only used with 'yarn'. Parameter to set the boundary for extrapolation (only) in the linear
+                ramp function. If unspecified, it defaults to 32.
+            `beta_slow` (`float`, *optional*):
+                Only used with 'yarn'. Parameter to set the boundary for interpolation (only) in the linear
+                ramp function. If unspecified, it defaults to 1.
+            `short_factor` (`List[float]`, *optional*):
+                Only used with 'longrope'. The scaling factor to be applied to short contexts (<
+                `original_max_position_embeddings`). Must be a list of numbers with the same length as the hidden
+                size divided by the number of attention heads divided by 2
+            `long_factor` (`List[float]`, *optional*):
+                Only used with 'longrope'. The scaling factor to be applied to long contexts (<
+                `original_max_position_embeddings`). Must be a list of numbers with the same length as the hidden
+                size divided by the number of attention heads divided by 2
+            `low_freq_factor` (`float`, *optional*):
+                Only used with 'llama3'. Scaling factor applied to low frequency components of the RoPE
+            `high_freq_factor` (`float`, *optional*):
+                Only used with 'llama3'. Scaling factor applied to high frequency components of the RoPE
     attention_bias (`bool`, *optional*, defaults to `False`):
         Whether to use a bias in the query, key, value and output projection layers during self-attention.
     attention_dropout (`float`, *optional*, defaults to 0.0):
@@ -2914,21 +2943,50 @@ Args:
         End of stream token id.
     pretraining_tp (`int`, *optional*, defaults to 1):
         Experimental feature. Tensor parallelism rank used during pretraining. Please refer to `this
-        document <https://huggingface.co/docs/transformers/main/perf_train_gpu_many#tensor-parallelism>`__ to understand more about it. This value is
-        necessary to ensure exact reproducibility of the pretraining results. Please refer to `this
-        issue <https://github.com/pytorch/pytorch/issues/76232>`__.
+        document <https://huggingface.co/docs/transformers/main/perf_train_gpu_many#tensor-parallelism>`__ to
+        understand more about it. This value is necessary to ensure exact reproducibility of the pretraining
+        results. Please refer to `this issue <https://github.com/pytorch/pytorch/issues/76232>`__.
     tie_word_embeddings (`bool`, *optional*, defaults to `False`):
         Whether to tie weight embeddings
     rope_theta (`float`, *optional*, defaults to 10000.0):
         The base period of the RoPE embeddings.
     rope_scaling (`Dict`, *optional*):
-        Dictionary containing the scaling configuration for the RoPE embeddings. Currently supports two scaling
-        strategies: linear and dynamic. Their scaling factor must be a float greater than 1. The expected format is
-        `{"type": strategy name, "factor": scaling factor}`. When using this flag, don't update
-        `max_position_embeddings` to the expected new maximum. See the following thread for more information on how
-        these scaling strategies behave:
-        https://www.reddit.com/r/LocalLLaMA/comments/14mrgpr/dynamically_scaled_rope_further_increases/. This is an
-        experimental feature, subject to breaking API changes in future versions.
+        Dictionary containing the scaling configuration for the RoPE embeddings. NOTE: if you apply new rope type
+        and you expect the model to work on longer `max_position_embeddings`, we recommend you to update this value
+        accordingly.
+        Expected contents:
+            `rope_type` (`str`):
+                The sub-variant of RoPE to use. Can be one of ['default', 'linear', 'dynamic', 'yarn', 'longrope',
+                'llama3'], with 'default' being the original RoPE implementation.
+            `factor` (`float`, *optional*):
+                Used with all rope types except 'default'. The scaling factor to apply to the RoPE embeddings. In
+                most scaling types, a `factor` of x will enable the model to handle sequences of length x *
+                original maximum pre-trained length.
+            `original_max_position_embeddings` (`int`, *optional*):
+                Used with 'dynamic', 'longrope' and 'llama3'. The original max position embeddings used during
+                pretraining.
+            `attention_factor` (`float`, *optional*):
+                Used with 'yarn' and 'longrope'. The scaling factor to be applied on the attention
+                computation. If unspecified, it defaults to value recommended by the implementation, using the
+                `factor` field to infer the suggested value.
+            `beta_fast` (`float`, *optional*):
+                Only used with 'yarn'. Parameter to set the boundary for extrapolation (only) in the linear
+                ramp function. If unspecified, it defaults to 32.
+            `beta_slow` (`float`, *optional*):
+                Only used with 'yarn'. Parameter to set the boundary for interpolation (only) in the linear
+                ramp function. If unspecified, it defaults to 1.
+            `short_factor` (`List[float]`, *optional*):
+                Only used with 'longrope'. The scaling factor to be applied to short contexts (<
+                `original_max_position_embeddings`). Must be a list of numbers with the same length as the hidden
+                size divided by the number of attention heads divided by 2
+            `long_factor` (`List[float]`, *optional*):
+                Only used with 'longrope'. The scaling factor to be applied to long contexts (<
+                `original_max_position_embeddings`). Must be a list of numbers with the same length as the hidden
+                size divided by the number of attention heads divided by 2
+            `low_freq_factor` (`float`, *optional*):
+                Only used with 'llama3'. Scaling factor applied to low frequency components of the RoPE
+            `high_freq_factor` (`float`, *optional*):
+                Only used with 'llama3'. Scaling factor applied to high frequency components of the RoPE
     attention_bias (`bool`, *optional*, defaults to `False`):
         Whether to use a bias in the query, key, value and output projection layers during self-attention.
     attention_dropout (`float`, *optional*, defaults to 0.0):
@@ -3253,7 +3311,7 @@ This model was contributed by `valhalla <https://huggingface.co/valhalla>`__.
     use_cache (`bool`, *optional*, defaults to `True`):
         Whether or not the model should return the last key/values attentions (not used by all models).
 
-.. class:: transformers.models.mamba.configuration_mamba.MambaConfig(vocab_size=50280, hidden_size=768, state_size=16, num_hidden_layers=32, layer_norm_epsilon=1e-05, pad_token_id=0, bos_token_id=0, eos_token_id=0, expand=2, conv_kernel=4, use_bias=False, use_conv_bias=True, hidden_act='silu', initializer_range=0.1, residual_in_fp32=True, time_step_rank='auto', time_step_scale=1.0, time_step_min=0.001, time_step_max=0.1, time_step_init_scheme='random', time_step_floor=0.0001, rescale_prenorm_residual=False, use_cache=True, **kwargs)
+.. class:: transformers.models.mamba.configuration_mamba.MambaConfig(vocab_size=50280, hidden_size=768, state_size=16, num_hidden_layers=32, layer_norm_epsilon=1e-05, pad_token_id=0, bos_token_id=0, eos_token_id=0, expand=2, conv_kernel=4, use_bias=False, use_conv_bias=True, hidden_act='silu', initializer_range=0.1, residual_in_fp32=True, time_step_rank='auto', time_step_scale=1.0, time_step_min=0.001, time_step_max=0.1, time_step_init_scheme='random', time_step_floor=0.0001, rescale_prenorm_residual=False, use_cache=True, use_mambapy=False, **kwargs)
 
 The Mamba model was proposed in `Mamba: Linear-Time Sequence Modeling with Selective State Spaces <https://arxiv.org/abs/2312.00752>`__ by Albert Gu and Tri Dao.
 
@@ -3321,6 +3379,8 @@ The original code can be found `here <https://github.com/state-spaces/mamba>`__.
         Whether or not to rescale `out_proj` weights when initializing.
     use_cache (`bool`, *optional*, defaults to `True`):
         Whether or not the cache should be used.
+    use_mambapy (`bool`, *optional*, defaults to `False`):
+        Determines the fallback strategy during training if the CUDA-based official implementation of Mamba is not avaiable. If `True`, the mamba.py implementation is used. If `False`, the naive and slower implementation is used. Consider switching to the naive version if memory is limited.
 
 .. class:: transformers.models.marian.configuration_marian.MarianConfig(vocab_size=58101, decoder_vocab_size=None, max_position_embeddings=1024, encoder_layers=12, encoder_ffn_dim=4096, encoder_attention_heads=16, decoder_layers=12, decoder_ffn_dim=4096, decoder_attention_heads=16, encoder_layerdrop=0.0, decoder_layerdrop=0.0, use_cache=True, is_encoder_decoder=True, activation_function='gelu', d_model=1024, dropout=0.1, attention_dropout=0.0, activation_dropout=0.0, init_std=0.02, decoder_start_token_id=58100, scale_embedding=False, pad_token_id=58100, eos_token_id=0, forced_eos_token_id=0, share_encoder_decoder_embeddings=True, **kwargs)
 
@@ -4975,7 +5035,7 @@ The Phi-3 model was proposed in `Phi-3 Technical Report: A Highly Capable Langua
         The base period of the RoPE embeddings.
     rope_scaling (`dict`, *optional*):
         The scaling strategy for the RoPE embeddings. If `None`, no scaling is applied. If a dictionary, it must
-        contain the following keys: `type`, `short_factor` and `long_factor`. The `type` must be either `su` or `yarn` and
+        contain the following keys: `type`, `short_factor` and `long_factor`. The `type` must be `longrope` and
         the `short_factor` and `long_factor` must be lists of numbers with the same length as the hidden size
         divided by the number of attention heads divided by 2.
     bos_token_id (`int`, *optional*, defaults to 1):

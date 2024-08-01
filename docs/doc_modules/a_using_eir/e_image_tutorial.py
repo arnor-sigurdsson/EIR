@@ -80,7 +80,7 @@ def get_05_hot_dog_run_2_resnet_pretrained_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/inputs_resnet18.yaml",
         "--output_configs",
         f"{conf_output_path}/output.yaml",
-        "--globals.output_folder=eir_tutorials/tutorial_runs"
+        "--globals.basic_experiment.output_folder=eir_tutorials/tutorial_runs"
         "/a_using_eir/tutorial_05_is_it_a_hot_dog_pretrained_resnet",
     ]
 
@@ -127,7 +127,7 @@ def get_05_hot_dog_run_2_combined_pretrained_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/inputs_resnet18.yaml",
         "--output_configs",
         f"{conf_output_path}/output.yaml",
-        "--globals.output_folder=eir_tutorials/tutorial_runs"
+        "--globals.basic_experiment.output_folder=eir_tutorials/tutorial_runs"
         "/a_using_eir/tutorial_05_is_it_a_hot_dog_pretrained_combined",
     ]
 

@@ -1,14 +1,19 @@
-output_folder: eir_tutorials/tutorial_runs/f_image_output/01_image_foundation
-valid_size: 1024
-n_saved_models: 1
-checkpoint_interval: 500
-plot_skip_steps: 1000
-sample_interval: 500
-memory_dataset: false
-dataloader_workers: 8
-n_epochs: 10
-early_stopping_patience: 16
-batch_size: 64
-lr: 0.0003
-optimizer: "adamw"
-device: "mps"
+basic_experiment:
+  batch_size: 64
+  dataloader_workers: 8
+  device: mps
+  memory_dataset: false
+  n_epochs: 10
+  output_folder: eir_tutorials/tutorial_runs/f_image_output/01_image_foundation
+  valid_size: 1024
+evaluation_checkpoint:
+  checkpoint_interval: 500
+  n_saved_models: 1
+  sample_interval: 500
+optimization:
+  lr: 0.0003
+  optimizer: adamw
+training_control:
+  early_stopping_patience: 16
+visualization_logging:
+  plot_skip_steps: 1000

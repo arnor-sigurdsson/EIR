@@ -41,7 +41,7 @@ def train_image_col_01_one_shot_colorization() -> AutoDocExperimentInfo:
         f"{conf_output_path}/fusion.yaml",
         "--output_configs",
         f"{conf_output_path}/output_image.yaml",
-        f"--globals.output_folder={run_output_folder}",
+        f"--globals.basic_experiment.output_folder={run_output_folder}",
     ]
 
     mapping = [
@@ -147,7 +147,7 @@ def train_image_col_02_one_shot_super_resolution() -> AutoDocExperimentInfo:
         f"{conf_output_path}/fusion.yaml",
         "--output_configs",
         f"{conf_output_path}/output_image_super_res.yaml",
-        f"--globals.output_folder={run_output_folder}",
+        f"--globals.basic_experiment.output_folder={run_output_folder}",
     ]
 
     mapping = [
@@ -220,8 +220,8 @@ def train_image_col_03_both() -> AutoDocExperimentInfo:
         f"{conf_output_path}/fusion.yaml",
         "--output_configs",
         f"{conf_output_path}/output_image_super_res.yaml",
-        f"--globals.output_folder={run_output_folder}",
-        "--globals.n_epochs=20",
+        f"--globals.basic_experiment.output_folder={run_output_folder}",
+        "--globals.basic_experiment.n_epochs=20",
     ]
 
     mapping = [

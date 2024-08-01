@@ -32,8 +32,8 @@ def get_07_multimodal_run_1_tabular_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/07_fusion.yaml",
         "--output_configs",
         f"{conf_output_path}/07_output.yaml",
-        f"--07_globals.output_folder={output_folder}",
-        "--07_globals.compute_attributions=true",
+        f"--07_globals.basic_experiment.output_folder={output_folder}",
+        "--07_globals.attribution_analysis.compute_attributions=true",
     ]
 
     mapping = [
@@ -166,7 +166,7 @@ def get_07_multimodal_run_2_tabular_description_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/07_fusion.yaml",
         "--output_configs",
         f"{conf_output_path}/07_output.yaml",
-        f"--07_globals.output_folder={output_folder}",
+        f"--07_globals.basic_experiment.output_folder={output_folder}",
     ]
 
     mapping = [
@@ -214,7 +214,7 @@ def get_07_multimodal_run_3_tabular_description_image_info() -> AutoDocExperimen
         f"{conf_output_path}/07_fusion.yaml",
         "--output_configs",
         f"{conf_output_path}/07_output.yaml",
-        f"--07_globals.output_folder={output_folder}",
+        f"--07_globals.basic_experiment.output_folder={output_folder}",
     ]
 
     mapping = [
@@ -397,7 +397,7 @@ def get_07_mm_apx_run_1_tab_desc_pre_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/07_fusion.yaml",
         "--output_configs",
         f"{conf_output_path}/07_output.yaml",
-        f"--07_globals.output_folder={output_folder}",
+        f"--07_globals.basic_experiment.output_folder={output_folder}",
     ]
 
     mapping = [
@@ -447,7 +447,7 @@ def get_07_mm_apx_run_2_tab_desc_mt_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/07_fusion.yaml",
         "--output_configs",
         f"{conf_output_path}/07_apx-b_mt_output.yaml",
-        f"--07_globals.output_folder={output_folder}",
+        f"--07_globals.basic_experiment.output_folder={output_folder}",
     ]
 
     mapping = [

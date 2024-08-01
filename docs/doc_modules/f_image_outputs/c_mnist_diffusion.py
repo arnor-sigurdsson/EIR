@@ -40,7 +40,7 @@ def train_image_col_01_mnist_diffusion() -> AutoDocExperimentInfo:
         f"{conf_output_path}/fusion.yaml",
         "--output_configs",
         f"{conf_output_path}/output_image.yaml",
-        f"--globals.output_folder={run_output_folder}",
+        f"--globals.basic_experiment.output_folder={run_output_folder}",
     ]
 
     mapping = [
@@ -154,7 +154,7 @@ def train_image_col_02_mnist_guided_diffusion() -> AutoDocExperimentInfo:
         f"{conf_output_path}/fusion.yaml",
         "--output_configs",
         f"{conf_output_path}/output_image.yaml",
-        f"--globals.output_folder={run_output_folder}",
+        f"--globals.basic_experiment.output_folder={run_output_folder}",
     ]
 
     mapping = [

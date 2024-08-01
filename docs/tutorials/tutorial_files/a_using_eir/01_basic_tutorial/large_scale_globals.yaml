@@ -1,18 +1,24 @@
-output_folder: "FILL"
-sample_interval: 500
-checkpoint_interval: 500
-batch_size: "FILL"
-lr: 0.0002
-lr_plateau_patience: 5
-gradient_clipping: 1.0
-valid_size: "FILL"
-n_epochs: 50
-dataloader_workers: "FILL"
-device: "FILL"
-early_stopping_buffer: 2000
-early_stopping_patience: 10
-mixing_alpha: 0.2
-optimizer: "adabelief"
-weighted_sampling_columns: # for categorical targets, remove if only doing regression
-  - "all"
-log_level: "debug"
+basic_experiment:
+  batch_size: FILL
+  dataloader_workers: FILL
+  device: FILL
+  n_epochs: 50
+  output_folder: FILL
+  valid_size: FILL
+evaluation_checkpoint:
+  checkpoint_interval: 500
+  sample_interval: 500
+lr_schedule:
+  lr_plateau_patience: 5
+optimization:
+  gradient_clipping: 1.0
+  lr: 0.0002
+  optimizer: adabelief
+training_control:
+  early_stopping_buffer: 2000
+  early_stopping_patience: 10
+  mixing_alpha: 0.2
+  weighted_sampling_columns:
+  - all
+visualization_logging:
+  log_level: debug

@@ -30,7 +30,7 @@ def get_sequence_to_sequence_01_english_only() -> AutoDocExperimentInfo:
         f"{conf_output_path}/fusion.yaml",
         "--output_configs",
         f"{conf_output_path}/output.yaml",
-        "--globals.output_folder=eir_tutorials/tutorial_runs"
+        "--globals.basic_experiment.output_folder=eir_tutorials/tutorial_runs"
         "/c_sequence_output/02_seq_to_seq_eng_only",
     ]
 

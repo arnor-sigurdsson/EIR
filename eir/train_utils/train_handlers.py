@@ -629,6 +629,10 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
 
 def _save_yaml_configs(run_folder: Path, configs: "Configs"):
     for config_name, config_object in configs.__dict__.items():
+
+        if config_name == "gc":
+            continue
+
         cur_output_path = Path(run_folder / "configs" / config_name).with_suffix(
             ".yaml"
         )

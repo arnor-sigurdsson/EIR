@@ -1,6 +1,8 @@
-output_folder: eir_tutorials/tutorial_runs/a_using_eir/tutorial_08_run
-checkpoint_interval: 200
-sample_interval: 200
-n_epochs: 20
-memory_dataset: True
-device: "mps"
+basic_experiment:
+  device: mps
+  memory_dataset: true
+  n_epochs: 20
+  output_folder: eir_tutorials/tutorial_runs/a_using_eir/tutorial_08_run
+evaluation_checkpoint:
+  checkpoint_interval: 200
+  sample_interval: 200

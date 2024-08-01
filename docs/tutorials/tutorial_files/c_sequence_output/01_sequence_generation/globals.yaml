@@ -1,9 +1,11 @@
-output_folder: eir_tutorials/tutorial_runs/c_sequence_output/01_sequence_generation
-valid_size: 500
-n_saved_models: 1
-checkpoint_interval: 500
-sample_interval: 500
-memory_dataset: true
-n_epochs: 100
-batch_size: 256
-device: "mps"
+basic_experiment:
+  batch_size: 256
+  device: mps
+  memory_dataset: true
+  n_epochs: 100
+  output_folder: eir_tutorials/tutorial_runs/c_sequence_output/01_sequence_generation
+  valid_size: 500
+evaluation_checkpoint:
+  checkpoint_interval: 500
+  n_saved_models: 1
+  sample_interval: 500

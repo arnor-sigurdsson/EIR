@@ -32,7 +32,7 @@ def get_image_captioning_01_text_only() -> AutoDocExperimentInfo:
         f"{conf_output_path}/fusion.yaml",
         "--output_configs",
         f"{conf_output_path}/output.yaml",
-        "--globals.output_folder=eir_tutorials/tutorial_runs"
+        "--globals.basic_experiment.output_folder=eir_tutorials/tutorial_runs"
         "/c_sequence_output/03_image_captioning_text_only",
     ]
 

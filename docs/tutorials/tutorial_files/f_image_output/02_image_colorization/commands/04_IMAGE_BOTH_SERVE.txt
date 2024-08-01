@@ -1,2 +1,2 @@
 eirserve \
---model-path eir_tutorials/tutorial_runs/f_image_output/02_image_colorization_and_super_resolution/saved_models/02_image_colorization_and_super_resolution_model_31000_perf-average=0.8735.pt
+--model-path eir_tutorials/tutorial_runs/f_image_output/02_image_colorization_and_super_resolution/saved_models/02_image_colorization_and_super_resolution_model_31000_perf-average=0.8746.pt

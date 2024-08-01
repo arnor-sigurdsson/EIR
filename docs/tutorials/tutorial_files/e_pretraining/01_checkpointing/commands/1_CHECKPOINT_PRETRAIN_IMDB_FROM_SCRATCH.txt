@@ -3,4 +3,4 @@ eirtrain \
 --input_configs eir_tutorials/e_pretraining/01_checkpointing/conf/imdb_input.yaml \
 --fusion_configs eir_tutorials/e_pretraining/01_checkpointing/conf/imdb_fusion.yaml \
 --output_configs eir_tutorials/e_pretraining/01_checkpointing/conf/imdb_output.yaml \
---imdb_globals.output_folder=eir_tutorials/tutorial_runs/e_pretraining/01_checkpointing/
+--imdb_globals.basic_experiment.output_folder=eir_tutorials/tutorial_runs/e_pretraining/01_checkpointing/

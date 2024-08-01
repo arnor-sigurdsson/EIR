@@ -24,7 +24,8 @@ def train_01_imdb_from_scratch_model() -> AutoDocExperimentInfo:
         f"{conf_output_path}/imdb_fusion.yaml",
         "--output_configs",
         f"{conf_output_path}/imdb_output.yaml",
-        f"--imdb_globals.output_folder=eir_tutorials/tutorial_runs/{CR}/{TN}/",
+        f"--imdb_globals.basic_experiment.output_folder="
+        f"eir_tutorials/tutorial_runs/{CR}/{TN}/",
     ]
 
     mapping = [
@@ -81,9 +82,9 @@ def train_02_imdb_from_pretrained_global_loading() -> AutoDocExperimentInfo:
         f"{conf_output_path}/imdb_fusion.yaml",
         "--output_configs",
         f"{conf_output_path}/imdb_output.yaml",
-        "--imdb_globals.output_folder=eir_tutorials/tutorial_runs/"
+        "--imdb_globals.basic_experiment.output_folder=eir_tutorials/tutorial_runs/"
         "e_pretraining/01_checkpointing_imdb_from_pretrained_global",
-        "--imdb_globals.pretrained_checkpoint=FILL_MODEL",
+        "--imdb_globals.model.pretrained_checkpoint=FILL_MODEL",
     ]
 
     mapping = [
@@ -125,11 +126,11 @@ def train_03_imdb_from_pretrained_global_loading_non_strict() -> AutoDocExperime
         f"{conf_output_path}/imdb_fusion.yaml",
         "--output_configs",
         f"{conf_output_path}/imdb_output.yaml",
-        "--imdb_globals.output_folder=eir_tutorials/tutorial_runs/"
+        "--imdb_globals.basic_experiment.output_folder=eir_tutorials/tutorial_runs/"
         "e_pretraining/01_checkpointing_imdb_from_pretrained_global_non_strict",
         "--imdb_fusion.model_config.fc_task_dim=64",
-        "--imdb_globals.pretrained_checkpoint=FILL_MODEL",
-        "--imdb_globals.strict_pretrained_loading=False",
+        "--imdb_globals.model.pretrained_checkpoint=FILL_MODEL",
+        "--imdb_globals.model.strict_pretrained_loading=False",
     ]
 
     mapping = [

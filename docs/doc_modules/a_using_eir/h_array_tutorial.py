@@ -28,7 +28,7 @@ def get_tutorial_08_run_cnn_1_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/input_1d_cnn.yaml",
         "--output_configs",
         f"{conf_output_path}/outputs.yaml",
-        "--globals.output_folder=eir_tutorials/tutorial_runs/"
+        "--globals.basic_experiment.output_folder=eir_tutorials/tutorial_runs/"
         "a_using_eir/tutorial_08_run_cnn-1d",
     ]
 
@@ -94,7 +94,7 @@ def get_tutorial_08_run_cnn_2_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/input_2d_cnn.yaml",
         "--output_configs",
         f"{conf_output_path}/outputs.yaml",
-        "--globals.output_folder=eir_tutorials/tutorial_runs/"
+        "--globals.basic_experiment.output_folder=eir_tutorials/tutorial_runs/"
         "a_using_eir/tutorial_08_run_cnn-2d",
     ]
 
@@ -133,7 +133,7 @@ def get_tutorial_08_run_cnn_3_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/input_3d_cnn.yaml",
         "--output_configs",
         f"{conf_output_path}/outputs.yaml",
-        "--globals.output_folder=eir_tutorials/tutorial_runs/"
+        "--globals.basic_experiment.output_folder=eir_tutorials/tutorial_runs/"
         "a_using_eir/tutorial_08_run_cnn-3d",
     ]
 
@@ -172,7 +172,7 @@ def get_tutorial_08_run_lcl_1_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/input_1d_lcl.yaml",
         "--output_configs",
         f"{conf_output_path}/outputs.yaml",
-        "--globals.output_folder=eir_tutorials/tutorial_runs/"
+        "--globals.basic_experiment.output_folder=eir_tutorials/tutorial_runs/"
         "a_using_eir/tutorial_08_run_lcl-1d",
     ]
 
@@ -211,7 +211,7 @@ def get_tutorial_08_run_lcl_2_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/input_2d_lcl.yaml",
         "--output_configs",
         f"{conf_output_path}/outputs.yaml",
-        "--globals.output_folder=eir_tutorials/tutorial_runs/"
+        "--globals.basic_experiment.output_folder=eir_tutorials/tutorial_runs/"
         "a_using_eir/tutorial_08_run_lcl-2d",
     ]
 
@@ -250,7 +250,7 @@ def get_tutorial_08_run_lcl_3_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/input_3d_lcl.yaml",
         "--output_configs",
         f"{conf_output_path}/outputs.yaml",
-        "--globals.output_folder=eir_tutorials/tutorial_runs/"
+        "--globals.basic_experiment.output_folder=eir_tutorials/tutorial_runs/"
         "a_using_eir/tutorial_08_run_lcl-3d",
     ]
 
@@ -288,7 +288,7 @@ def get_tutorial_08_run_transformer_1_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/input_1d_transformer.yaml",
         "--output_configs",
         f"{conf_output_path}/outputs.yaml",
-        "--globals.output_folder=eir_tutorials/tutorial_runs/"
+        "--globals.basic_experiment.output_folder=eir_tutorials/tutorial_runs/"
         "a_using_eir/tutorial_08_run_transformer-1d",
     ]
 
@@ -330,7 +330,7 @@ def get_tutorial_08_run_transformer_2_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/input_2d_transformer.yaml",
         "--output_configs",
         f"{conf_output_path}/outputs.yaml",
-        "--globals.output_folder=eir_tutorials/tutorial_runs/"
+        "--globals.basic_experiment.output_folder=eir_tutorials/tutorial_runs/"
         "a_using_eir/tutorial_08_run_transformer-2d",
     ]
 
@@ -372,7 +372,7 @@ def get_tutorial_08_run_transformer_3_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/input_3d_transformer.yaml",
         "--output_configs",
         f"{conf_output_path}/outputs.yaml",
-        "--globals.output_folder=eir_tutorials/tutorial_runs/"
+        "--globals.basic_experiment.output_folder=eir_tutorials/tutorial_runs/"
         "a_using_eir/tutorial_08_run_transformer-3d",
     ]
 

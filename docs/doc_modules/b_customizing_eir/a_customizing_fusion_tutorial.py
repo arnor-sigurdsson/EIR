@@ -9,7 +9,7 @@ def get_tutorial_01_run_1_fusion_info() -> AutoDocExperimentInfo:
         "docs/tutorials/tutorial_files/b_customizing_eir/01_customizing_fusion_tutorial"
     )
 
-    conf_output_path = "eir_tutorials/b_customizing_eir/01_customizing_fusion.rst/conf"
+    conf_output_path = "eir_tutorials/b_customizing_eir/01_customizing_fusion/conf"
 
     command = [
         "python",

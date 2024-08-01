@@ -158,7 +158,7 @@ def get_sequence_gen_02_imdb_generation_bpe() -> AutoDocExperimentInfo:
         f"{conf_output_path}/fusion.yaml",
         "--output_configs",
         f"{conf_output_path}/output_bpe.yaml",
-        "--globals.output_folder=eir_tutorials/tutorial_runs"
+        "--globals.basic_experiment.output_folder=eir_tutorials/tutorial_runs"
         "/c_sequence_output/01_sequence_generation_bpe",
     ]
 

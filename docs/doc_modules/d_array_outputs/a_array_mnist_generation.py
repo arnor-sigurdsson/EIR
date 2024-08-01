@@ -244,7 +244,8 @@ def get_array_gen_02_mnist_generation() -> AutoDocExperimentInfo:
         f"{conf_output_path}/input_mnist_label.yaml",
         "--output_configs",
         f"{conf_output_path}/output_with_label.yaml",
-        "--globals.output_folder=eir_tutorials/tutorial_runs/d_array_output/"
+        "--globals.basic_experiment.output_folder="
+        "eir_tutorials/tutorial_runs/d_array_output/"
         "02_array_mnist_generation_with_labels",
     ]
 

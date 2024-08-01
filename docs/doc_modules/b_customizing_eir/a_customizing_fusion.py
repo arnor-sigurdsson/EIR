@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Dict
 
 import torch
@@ -72,7 +73,7 @@ def modify_experiment(experiment: train.Experiment) -> train.Experiment:
     my_output_modules, _ = get_output_modules(
         outputs_as_dict=experiment.outputs,
         computed_out_dimensions=my_fusion_module.num_out_features,
-        device=experiment.configs.global_config.device,
+        device=experiment.configs.global_config.basic_experiment.device,
         fusion_model_type="computed",
     )
 
@@ -93,6 +94,12 @@ def modify_experiment(experiment: train.Experiment) -> train.Experiment:
     my_experiment_attributes["optimizer"] = my_optimizer
 
     my_experiment = train.Experiment(**my_experiment_attributes)
+
+    output_folder = my_experiment.configs.global_config.be.output_folder
+    train._log_model(
+        model=my_model,
+        structure_file=Path(output_folder, "model_info.txt"),
+    )
 
     return my_experiment
 

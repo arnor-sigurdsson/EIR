@@ -2,4 +2,4 @@ eirtrain \
 --global_configs eir_tutorials/c_sequence_output/03_image_captioning/conf/globals.yaml \
 --fusion_configs eir_tutorials/c_sequence_output/03_image_captioning/conf/fusion.yaml \
 --output_configs eir_tutorials/c_sequence_output/03_image_captioning/conf/output.yaml \
---globals.output_folder=eir_tutorials/tutorial_runs/c_sequence_output/03_image_captioning_text_only
+--globals.basic_experiment.output_folder=eir_tutorials/tutorial_runs/c_sequence_output/03_image_captioning_text_only

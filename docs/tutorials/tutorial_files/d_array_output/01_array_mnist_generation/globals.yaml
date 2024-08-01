@@ -1,13 +1,16 @@
-output_folder: eir_tutorials/tutorial_runs/d_array_output/01_array_mnist_generation
-checkpoint_interval: 1000
-sample_interval: 1000
-valid_size: 1000
-batch_size: 64
-n_epochs: 10
-device: "mps"
-optimizer: adabelief
-lr: 0.001
-memory_dataset: true
+basic_experiment:
+  batch_size: 64
+  device: mps
+  memory_dataset: true
+  n_epochs: 10
+  output_folder: eir_tutorials/tutorial_runs/d_array_output/01_array_mnist_generation
+  valid_size: 1000
+evaluation_checkpoint:
+  checkpoint_interval: 1000
+  sample_interval: 1000
 latent_sampling:
   layers_to_sample:
-    - "fusion_modules.computed.fusion_modules.fusion.1.0"
+  - fusion_modules.computed.fusion_modules.fusion.1.0
+optimization:
+  lr: 0.001
+  optimizer: adabelief

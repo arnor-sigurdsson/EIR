@@ -22,24 +22,24 @@
                 {
                     "imdb_output": {
                         "Sentiment": {
-                            "Negative": 0.011156515218317509,
-                            "Positive": 0.9888434410095215
+                            "Negative": 0.021065587177872658,
+                            "Positive": 0.9789343476295471
                         }
                     }
                 },
                 {
                     "imdb_output": {
                         "Sentiment": {
-                            "Negative": 0.9540585875511169,
-                            "Positive": 0.045941416174173355
+                            "Negative": 0.7883924245834351,
+                            "Positive": 0.21160760521888733
                         }
                     }
                 },
                 {
                     "imdb_output": {
                         "Sentiment": {
-                            "Negative": 0.011152182705700397,
-                            "Positive": 0.9888478517532349
+                            "Negative": 0.016870304942131042,
+                            "Positive": 0.9831296801567078
                         }
                     }
                 }
