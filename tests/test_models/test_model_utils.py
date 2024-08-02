@@ -353,7 +353,14 @@ def test_calc_conv_params_needed_fuzzy(test_input: Tuple[int, int, int, int]) ->
     [
         {
             "injections": {
-                "global_configs": {"lr": 1e-03, "find_lr": True},
+                "global_configs": {
+                    "optimization": {
+                        "lr": 1e-03,
+                    },
+                    "lr_schedule": {
+                        "find_lr": True,
+                    },
+                },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},

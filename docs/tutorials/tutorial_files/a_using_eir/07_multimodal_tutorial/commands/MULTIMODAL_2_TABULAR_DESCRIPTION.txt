@@ -3,4 +3,4 @@ eirtrain \
 --input_configs eir_tutorials/a_using_eir/07_multimodal_tutorial/conf/07_input_tabular.yaml eir_tutorials/a_using_eir/07_multimodal_tutorial/conf/07_input_description.yaml \
 --fusion_configs eir_tutorials/a_using_eir/07_multimodal_tutorial/conf/07_fusion.yaml \
 --output_configs eir_tutorials/a_using_eir/07_multimodal_tutorial/conf/07_output.yaml \
---07_globals.output_folder=eir_tutorials/tutorial_runs/a_using_eir/tutorial_07b_multimodal_tabular_description
+--07_globals.basic_experiment.output_folder=eir_tutorials/tutorial_runs/a_using_eir/tutorial_07b_multimodal_tabular_description

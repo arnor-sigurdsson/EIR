@@ -30,7 +30,7 @@ def get_protein_sequence_generation_sequence_only() -> AutoDocExperimentInfo:
         f"{conf_output_path}/fusion.yaml",
         "--output_configs",
         f"{conf_output_path}/output.yaml",
-        "--globals.output_folder=eir_tutorials/tutorial_runs"
+        "--globals.basic_experiment.output_folder=eir_tutorials/tutorial_runs"
         "/c_sequence_output/04_protein_sequence_generation_sequence_only",
     ]
 
@@ -94,7 +94,7 @@ def get_protein_sequence_generation_tabular() -> AutoDocExperimentInfo:
         f"{conf_output_path}/fusion.yaml",
         "--output_configs",
         f"{conf_output_path}/output_conditioned.yaml",
-        "--globals.output_folder=eir_tutorials/tutorial_runs"
+        "--globals.basic_experiment.output_folder=eir_tutorials/tutorial_runs"
         "/c_sequence_output/04_protein_sequence_generation_tabular",
     ]
 

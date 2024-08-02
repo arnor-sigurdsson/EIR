@@ -39,12 +39,20 @@ def get_base_parametrization(compiled: bool = False) -> dict:
     params = {
         "injections": {
             "global_configs": {
-                "output_folder": "multi_task_multi_modal",
-                "n_epochs": 10,
-                "gradient_clipping": 1.0,
-                "lr": 0.001,
-                "compile_model": compiled,
-                "checkpoint_interval": 200,
+                "basic_experiment": {
+                    "output_folder": "multi_task_multi_modal",
+                    "n_epochs": 10,
+                },
+                "optimization": {
+                    "gradient_clipping": 1.0,
+                    "lr": 0.001,
+                },
+                "model": {
+                    "compile_model": compiled,
+                },
+                "evaluation_checkpoint": {
+                    "checkpoint_interval": 200,
+                },
             },
             "input_configs": [
                 {

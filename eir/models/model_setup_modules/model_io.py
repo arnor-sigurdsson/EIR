@@ -48,7 +48,11 @@ def _load_model_weights(
     state_dict_key_rename: Union[None, Sequence[Tuple[str, str]]] = None,
     strict_shapes: bool = True,
 ) -> al_meta_model:
-    loaded_weights_state_dict = torch.load(model_state_dict_path, map_location=device)
+    loaded_weights_state_dict = torch.load(
+        model_state_dict_path,
+        map_location=device,
+        weights_only=True,
+    )
 
     if state_dict_keys_to_keep:
         no_keys_before = len(loaded_weights_state_dict)

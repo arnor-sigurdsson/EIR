@@ -24,3 +24,5 @@ extensions = [
 ]
 copybutton_prompt_text = r">>> |\.\.\. |\$ |In \[\d*\]: | {2,5}\.\.\.: | {5,8}: "
 copybutton_prompt_is_regexp = True
+
+python_maximum_signature_line_length = 80

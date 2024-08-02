@@ -81,7 +81,7 @@ def test_generate_aggregated_config_basic(
     aggregated_config = config.generate_aggregated_config(
         cl_args=test_cl_args,
     )
-    assert aggregated_config.global_config.output_folder == "runs/test_run"
+    assert aggregated_config.gc.be.output_folder == "runs/test_run"
 
     assert len(aggregated_config.input_configs) == 1
     assert aggregated_config.input_configs[0].input_info.input_name == "test_genotype"
@@ -188,7 +188,7 @@ def test_generate_aggregated_config_with_overload(create_cl_args_config_files):
         cl_args=test_cl_args,
         extra_cl_args_overload=["--input_0.input_info.input_source=test_value"],
     )
-    assert aggregated_config.global_config.output_folder == "runs/test_run"
+    assert aggregated_config.gc.be.output_folder == "runs/test_run"
     assert len(aggregated_config.input_configs) == 1
     assert aggregated_config.input_configs[0].input_info.input_source == "test_value"
 
@@ -253,8 +253,8 @@ def test_get_output_folder_and_log_level_from_cl_args():
     temp_dir = tempfile.TemporaryDirectory()
     temp_file = tempfile.NamedTemporaryFile(delete=False, dir=temp_dir.name)
     test_config = {
-        "output_folder": "expected_output_folder",
-        "log_level": "expected_log_level",
+        "basic_experiment": {"output_folder": "expected_output_folder"},
+        "visualization_logging": {"log_level": "expected_log_level"},
     }
     with open(temp_file.name, "w") as f:
         yaml.safe_dump(test_config, f)
@@ -267,19 +267,22 @@ def test_get_output_folder_and_log_level_from_cl_args():
         extra_cl_args=extra_cl_args,
     )
 
-    assert output_folder == test_config["output_folder"]
-    assert log_level == test_config["log_level"]
+    assert output_folder == test_config["basic_experiment"]["output_folder"]
+    assert log_level == test_config["visualization_logging"]["log_level"]
 
-    extra_cl_args = ["output_folder=new_output_folder"]
+    extra_cl_args = ["basic_experiment.output_folder=new_output_folder"]
     output_folder, log_level = config.get_output_folder_and_log_level_from_cl_args(
         main_cl_args=main_cl_args,
         extra_cl_args=extra_cl_args,
     )
 
     assert output_folder == "new_output_folder"
-    assert log_level == test_config["log_level"]
+    assert log_level == test_config["visualization_logging"]["log_level"]
 
-    test_config = {"log_level": "expected_log_level", "output_folder": None}
+    test_config = {
+        "basic_experiment": {"output_folder": None},
+        "visualization_logging": {"log_level": "expected_log_level"},
+    }
     with open(temp_file.name, "w") as f:
         yaml.safe_dump(test_config, f)
 

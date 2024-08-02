@@ -134,7 +134,9 @@ def _generate_manual_sample_test_data(tmp_path) -> dict[str, Any]:
         {
             "injections": {
                 "global_configs": {
-                    "output_folder": "test_manual_samples_preparation",
+                    "basic_experiment": {
+                        "output_folder": "test_manual_samples_preparation",
+                    }
                 },
                 "input_configs": [
                     {

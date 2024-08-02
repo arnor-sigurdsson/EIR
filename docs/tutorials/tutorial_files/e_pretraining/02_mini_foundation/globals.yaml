@@ -1,13 +1,17 @@
-output_folder: eir_tutorials/tutorial_runs/e_pretraining/02_mini_foundation
-valid_size: 1024
-n_saved_models: 1
-checkpoint_interval: 500
-plot_skip_steps: 200
-sample_interval: 500
-memory_dataset: false
-dataloader_workers: 8
-n_epochs: 20
-batch_size: 256
-lr: 0.0005
-optimizer: "adabelief"
-device: "mps"
+basic_experiment:
+  batch_size: 256
+  dataloader_workers: 8
+  device: mps
+  memory_dataset: false
+  n_epochs: 20
+  output_folder: eir_tutorials/tutorial_runs/e_pretraining/02_mini_foundation
+  valid_size: 1024
+evaluation_checkpoint:
+  checkpoint_interval: 500
+  n_saved_models: 1
+  sample_interval: 500
+optimization:
+  lr: 0.0005
+  optimizer: adabelief
+visualization_logging:
+  plot_skip_steps: 200

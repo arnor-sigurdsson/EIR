@@ -3,4 +3,4 @@ eirtrain \
 --input_configs eir_tutorials/e_pretraining/02_mini_foundation/conf/cifar/cifar_input.yaml \
 --fusion_configs eir_tutorials/e_pretraining/02_mini_foundation/conf/cifar/cifar_fusion.yaml \
 --output_configs eir_tutorials/e_pretraining/02_mini_foundation/conf/cifar/cifar_output.yaml \
---cifar_globals.output_folder=eir_tutorials/tutorial_runs/e_pretraining/02_mini_foundation_cifar_from_scratch
+--cifar_globals.basic_experiment.output_folder=eir_tutorials/tutorial_runs/e_pretraining/02_mini_foundation_cifar_from_scratch

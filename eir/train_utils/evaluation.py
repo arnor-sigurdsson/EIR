@@ -69,7 +69,7 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
         output_objects=exp.outputs,
         experiment_metrics=exp.metrics,
         loss_function=exp.loss_function,
-        device=gc.device,
+        device=gc.be.device,
         missing_ids_per_output=exp.valid_dataset.missing_ids_per_output,
         with_labels=True,
     )
@@ -85,7 +85,7 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
         iteration=iteration,
     )
 
-    write_eval_header = True if iteration == gc.sample_interval else False
+    write_eval_header = True if iteration == gc.ec.sample_interval else False
     metrics.persist_metrics(
         handler_config=handler_config,
         metrics_dict=evaluation_results.metrics_with_averages,
@@ -94,7 +94,7 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
         prefixes={"metrics": "validation_", "writer": "validation"},
     )
 
-    if gc.saved_result_detail_level >= 5:
+    if gc.ec.saved_result_detail_level >= 5:
         save_tabular_evaluation_results_wrapper(
             val_outputs=evaluation_results.gathered_outputs,
             val_labels=evaluation_results.gathered_labels,
@@ -108,7 +108,7 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
             experiment=exp,
             iteration=iteration,
             auto_dataset_to_load_from=exp.valid_dataset,
-            output_folder=gc.output_folder,
+            output_folder=gc.be.output_folder,
         )
 
         array_out_single_sample_evaluation_wrapper(
@@ -116,7 +116,7 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
             experiment=exp,
             iteration=iteration,
             auto_dataset_to_load_from=exp.valid_dataset,
-            output_folder=gc.output_folder,
+            output_folder=gc.be.output_folder,
         )
 
     exp.model.train()
@@ -471,7 +471,7 @@ def save_tabular_evaluation_results_wrapper(
         for column_type, list_of_cols_of_this_type in target_columns.items():
             for column_name in list_of_cols_of_this_type:
                 cur_sample_output_folder = utils.prepare_sample_output_folder(
-                    output_folder=experiment.configs.global_config.output_folder,
+                    output_folder=experiment.configs.gc.be.output_folder,
                     column_name=column_name,
                     output_name=output_name,
                     iteration=iteration,

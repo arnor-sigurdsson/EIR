@@ -90,9 +90,11 @@ def _get_array_out_parametrization(loss: str) -> dict[str, Any]:
     epochs = 15 if loss == "mse" else 20
     configs = {
         "global_configs": {
-            "output_folder": "test_array_generation",
-            "n_epochs": epochs,
-            "memory_dataset": True,
+            "basic_experiment": {
+                "output_folder": "test_array_generation",
+                "n_epochs": epochs,
+                "memory_dataset": True,
+            },
         },
         "input_configs": [
             {

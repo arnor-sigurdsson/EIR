@@ -68,7 +68,7 @@ def test_impute_missing_modalities(
         output_configs=test_experiment_config.output_configs
     )
     train_ids, valid_ids = train.split_ids(
-        ids=all_array_ids, valid_size=test_experiment_config.global_config.valid_size
+        ids=all_array_ids, valid_size=test_experiment_config.gc.be.valid_size
     )
 
     input_objects = train.set_up_inputs_for_training(

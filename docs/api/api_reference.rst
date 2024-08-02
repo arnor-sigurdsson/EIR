@@ -12,6 +12,61 @@ Global Configurations
 ---------------------
 
 .. autoclass:: eir.setup.schemas.GlobalConfig
+   :members:
+
+Basic Experiment Configuration
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. autoclass:: eir.setup.schemas.BasicExperimentConfig
+   :members:
+
+Model Configuration
+^^^^^^^^^^^^^^^^^^^
+
+.. autoclass:: eir.setup.schemas.GlobalModelConfig
+   :members:
+
+Optimization Configuration
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. autoclass:: eir.setup.schemas.OptimizationConfig
+   :members:
+
+Learning Rate Schedule Configuration
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. autoclass:: eir.setup.schemas.LRScheduleConfig
+   :members:
+
+Training Control Configuration
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. autoclass:: eir.setup.schemas.TrainingControlConfig
+   :members:
+
+Evaluation and Checkpoint Configuration
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. autoclass:: eir.setup.schemas.EvaluationCheckpointConfig
+   :members:
+
+Attribution Analysis Configuration
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. autoclass:: eir.setup.schemas.AttributionAnalysisConfig
+   :members:
+
+Metrics Configuration
+^^^^^^^^^^^^^^^^^^^^^
+
+.. autoclass:: eir.setup.schemas.SupervisedMetricsConfig
+   :members:
+
+Visualization and Logging Configuration
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. autoclass:: eir.setup.schemas.VisualizationLoggingConfig
+   :members:
 
 Input Configurations
 --------------------

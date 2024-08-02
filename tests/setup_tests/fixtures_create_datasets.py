@@ -52,11 +52,17 @@ def create_test_dataloaders(create_test_config: config.Configs, create_test_data
     train_dataset, valid_dataset = create_test_datasets
 
     train_dataloader = DataLoader(
-        train_dataset, batch_size=gc.batch_size, shuffle=True, drop_last=True
+        train_dataset,
+        batch_size=gc.be.batch_size,
+        shuffle=True,
+        drop_last=True,
     )
 
     valid_dataloader = DataLoader(
-        valid_dataset, batch_size=gc.batch_size, shuffle=False, drop_last=False
+        valid_dataset,
+        batch_size=gc.be.batch_size,
+        shuffle=False,
+        drop_last=False,
     )
 
     return train_dataloader, valid_dataloader, train_dataset, valid_dataset

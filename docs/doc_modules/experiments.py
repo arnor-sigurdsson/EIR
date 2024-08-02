@@ -136,7 +136,7 @@ def find_and_copy_files(
 def run_experiment_from_command(command: List[str], force_run: bool = False):
     globals_file = next(i for i in command if "globals" in i)
     globals_dict = load_yaml_config(config_path=globals_file)
-    run_folder = Path(globals_dict["output_folder"])
+    run_folder = Path(globals_dict["basic_experiment"]["output_folder"])
 
     output_folder_injected = tuple(i for i in command if ".output_folder=" in i)
     if output_folder_injected:

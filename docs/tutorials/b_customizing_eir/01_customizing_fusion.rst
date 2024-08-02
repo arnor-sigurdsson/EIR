@@ -110,7 +110,7 @@ Let's confirm that we used our now model by looking at the ``model_info.txt`` fi
 
 .. literalinclude:: ../tutorial_files/b_customizing_eir/01_customizing_fusion_tutorial/commands/model_info.txt
     :language: console
-    :emphasize-lines: 18-20
+    :emphasize-lines: 19-21
 
 So, we can use that our experiment used our custom fusion module,
 ``MyLSTMFusionModule``.

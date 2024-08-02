@@ -79,7 +79,7 @@ def configure_trainer(
     validation_handler_callable: al_handler = validation_handler,
 ) -> Engine:
     gc = experiment.configs.global_config
-    run_folder = get_run_folder(output_folder=gc.output_folder)
+    run_folder = get_run_folder(output_folder=gc.be.output_folder)
 
     monitoring_metrics = _get_monitoring_metrics(
         outputs_as_dict=experiment.outputs, metric_record_dict=experiment.metrics
@@ -88,7 +88,7 @@ def configure_trainer(
     handler_config = HandlerConfig(
         experiment=experiment,
         run_folder=run_folder,
-        output_folder=gc.output_folder,
+        output_folder=gc.be.output_folder,
         monitoring_metrics=monitoring_metrics,
     )
 
@@ -100,7 +100,7 @@ def configure_trainer(
         kwargs={"engine": trainer, "monitoring_metrics": train_monitoring_metrics},
     )
 
-    _maybe_attach_progress_bar(trainer=trainer, do_not_attach=gc.no_pbar)
+    _maybe_attach_progress_bar(trainer=trainer, do_not_attach=gc.vl.no_pbar)
 
     _attach_sample_interval_handlers(
         trainer=trainer,
@@ -108,7 +108,7 @@ def configure_trainer(
         validation_handler_callable=validation_handler_callable,
     )
 
-    if gc.early_stopping_patience:
+    if gc.tc.early_stopping_patience:
         _attach_early_stopping_handler(trainer=trainer, handler_config=handler_config)
 
     # TODO: Implement warmup for same LR scheduling
@@ -117,7 +117,7 @@ def configure_trainer(
         attach_lr_scheduler(
             engine=trainer, lr_scheduler=lr_scheduler, experiment=experiment
         )
-    elif gc.lr_schedule == "same" and gc.warmup_steps:
+    elif gc.lr_schedule == "same" and gc.lr.warmup_steps:
         raise NotImplementedError("Warmup not yet implemented for 'same' LR schedule.")
 
     if handler_config.output_folder:
@@ -141,15 +141,15 @@ def _attach_sample_interval_handlers(
         iter_per_epoch = None
 
     validation_handler_and_event = _get_validation_handler_and_event(
-        sample_interval_base=gc.sample_interval,
+        sample_interval_base=gc.ec.sample_interval,
         iter_per_epoch=iter_per_epoch,
-        n_epochs=gc.n_epochs,
-        early_stopping_patience=gc.early_stopping_patience,
+        n_epochs=gc.be.n_epochs,
+        early_stopping_patience=gc.tc.early_stopping_patience,
         validation_handler_callable=validation_handler_callable,
     )
     all_handler_events = [validation_handler_and_event]
 
-    if gc.compute_attributions:
+    if gc.aa.compute_attributions:
 
         try:
             iter_per_epoch = len(exp.train_loader)
@@ -158,10 +158,10 @@ def _attach_sample_interval_handlers(
 
         attribution_handler_and_event = _get_attribution_handler_and_event(
             iter_per_epoch=iter_per_epoch,
-            n_epochs=gc.n_epochs,
-            sample_interval_base=gc.sample_interval,
-            attributions_every_sample_factor=gc.attributions_every_sample_factor,
-            early_stopping_patience=gc.early_stopping_patience,
+            n_epochs=gc.be.n_epochs,
+            sample_interval_base=gc.ec.sample_interval,
+            attributions_every_sample_factor=gc.aa.attributions_every_sample_factor,
+            early_stopping_patience=gc.tc.early_stopping_patience,
         )
         all_handler_events.append(attribution_handler_and_event)
 
@@ -317,12 +317,12 @@ def _attach_early_stopping_handler(trainer: Engine, handler_config: "HandlerConf
     early_stopping_handler = _get_early_stopping_handler(
         trainer=trainer,
         handler_config=handler_config,
-        patience_steps=gc.early_stopping_patience,
+        patience_steps=gc.tc.early_stopping_patience,
     )
 
     early_stopping_event_kwargs = _get_early_stopping_event_filter_kwargs(
-        early_stopping_iteration_buffer=gc.early_stopping_buffer,
-        sample_interval=gc.sample_interval,
+        early_stopping_iteration_buffer=gc.tc.early_stopping_buffer,
+        sample_interval=gc.ec.sample_interval,
     )
 
     assert isinstance(early_stopping_event_kwargs, dict)
@@ -566,22 +566,22 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
 
     _save_yaml_configs(run_folder=handler_config.run_folder, configs=exp.configs)
 
-    if gc.checkpoint_interval is not None:
+    if gc.ec.checkpoint_interval is not None:
         trainer = _add_checkpoint_handler_wrapper(
             trainer=trainer,
             run_folder=handler_config.run_folder,
-            output_folder=Path(gc.output_folder),
-            n_to_save=gc.n_saved_models,
-            checkpoint_interval=gc.checkpoint_interval,
-            sample_interval=gc.sample_interval,
+            output_folder=Path(gc.be.output_folder),
+            n_to_save=gc.ec.n_saved_models,
+            checkpoint_interval=gc.ec.checkpoint_interval,
+            sample_interval=gc.ec.sample_interval,
             model=exp.model,
         )
 
     metric_writing_funcs = _get_metric_writing_funcs(
-        sample_interval=gc.sample_interval,
+        sample_interval=gc.ec.sample_interval,
         outputs_as_dict=exp.outputs,
         run_folder=handler_config.run_folder,
-        detail_level=gc.saved_result_detail_level,
+        detail_level=gc.ec.saved_result_detail_level,
     )
     trainer.add_event_handler(
         event_name=Events.ITERATION_COMPLETED,
@@ -590,9 +590,9 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
         writer_funcs=metric_writing_funcs,
     )
 
-    for plot_event in _get_plot_events(sample_interval=gc.sample_interval):
+    for plot_event in _get_plot_events(sample_interval=gc.ec.sample_interval):
 
-        if gc.saved_result_detail_level <= 1:
+        if gc.ec.saved_result_detail_level <= 1:
             continue
 
         try:
@@ -605,8 +605,8 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
 
         if plot_event == Events.COMPLETED and not _do_run_completed_handler(
             iter_per_epoch=len(exp.train_loader),
-            n_epochs=gc.n_epochs,
-            sample_interval=gc.sample_interval,
+            n_epochs=gc.be.n_epochs,
+            sample_interval=gc.ec.sample_interval,
         ):
             continue
 
@@ -629,6 +629,10 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
 
 def _save_yaml_configs(run_folder: Path, configs: "Configs"):
     for config_name, config_object in configs.__dict__.items():
+
+        if config_name == "gc":
+            continue
+
         cur_output_path = Path(run_folder / "configs" / config_name).with_suffix(
             ".yaml"
         )
@@ -872,12 +876,12 @@ def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> Non
     gc = handler_config.experiment.configs.global_config
 
     # if no val data is available yet
-    if engine.state.iteration < gc.sample_interval:
+    if engine.state.iteration < gc.ec.sample_interval:
         return
 
-    run_folder = get_run_folder(output_folder=gc.output_folder)
+    run_folder = get_run_folder(output_folder=gc.be.output_folder)
 
-    if gc.saved_result_detail_level >= 3:
+    if gc.ec.saved_result_detail_level >= 3:
         for output_dir in _iterdir_ignore_hidden(path=run_folder / "results"):
             for target_dir in _iterdir_ignore_hidden(path=output_dir):
                 target_column = target_dir.name
@@ -892,7 +896,7 @@ def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> Non
                     valid_history_df=valid_history_df,
                     output_folder=target_dir,
                     title_extra=target_column,
-                    plot_skip_steps=gc.plot_skip_steps,
+                    plot_skip_steps=gc.vl.plot_skip_steps,
                 )
 
     train_avg_history_df, valid_avg_history_df = get_metrics_dataframes(
@@ -904,7 +908,7 @@ def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> Non
         valid_history_df=valid_avg_history_df,
         output_folder=run_folder,
         title_extra="Multi Task Average",
-        plot_skip_steps=gc.plot_skip_steps,
+        plot_skip_steps=gc.vl.plot_skip_steps,
     )
 
 

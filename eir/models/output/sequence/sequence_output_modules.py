@@ -212,7 +212,10 @@ def overload_embeddings_with_pretrained(
             input_object = dill.load(file=f)
         input_objects_loaded[input_name] = input_object
 
-    loaded_state_dict = torch.load(f=pretrained_checkpoint)
+    loaded_state_dict = torch.load(
+        f=pretrained_checkpoint,
+        weights_only=True,
+    )
 
     for input_name, input_object in inputs.items():
         input_type = input_object.input_config.input_info.input_type

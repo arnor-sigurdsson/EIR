@@ -20,13 +20,19 @@ def _get_pre_trained_module_setup_parametrization() -> Dict:
     base = {
         "injections": {
             "global_configs": {
-                "output_folder": "multi_task_multi_modal",
-                "n_epochs": 1,
-                "attribution_background_samples": 8,
-                "sample_interval": 50,
-                "checkpoint_interval": 50,
-                "n_saved_models": 2,
-                "compute_attributions": False,
+                "basic_experiment": {
+                    "output_folder": "multi_task_multi_modal",
+                    "n_epochs": 1,
+                },
+                "evaluation_checkpoint": {
+                    "sample_interval": 50,
+                    "checkpoint_interval": 50,
+                    "n_saved_models": 2,
+                },
+                "attribution_analysis": {
+                    "compute_attributions": False,
+                    "attribution_background_samples": 8,
+                },
             },
             "input_configs": [
                 {
@@ -219,12 +225,18 @@ def _add_new_feature_extractor_to_experiment(
         {
             "injections": {
                 "global_configs": {
-                    "output_folder": "multi_task_multi_modal",
-                    "n_epochs": 3,
-                    "attribution_background_samples": 8,
-                    "sample_interval": 50,
-                    "checkpoint_interval": 50,
-                    "n_saved_models": 2,
+                    "basic_experiment": {
+                        "output_folder": "multi_task_multi_modal",
+                        "n_epochs": 3,
+                    },
+                    "evaluation_checkpoint": {
+                        "sample_interval": 50,
+                        "checkpoint_interval": 50,
+                        "n_saved_models": 2,
+                    },
+                    "attribution_analysis": {
+                        "attribution_background_samples": 8,
+                    },
                 },
                 "input_configs": [
                     {
@@ -342,7 +354,7 @@ def test_pre_training_and_loading(
         outputs=pretrained_checkpoint_experiment.outputs,
         run_path=pretrained_checkpoint_test_config.run_path,
         max_thresholds=(0.85, 0.85),
-        min_thresholds=(2.0, 2.0),
+        min_thresholds=(2.1, 2.1),
         con_metric=None,
     )
 
@@ -369,7 +381,7 @@ def _get_experiment_overloaded_for_pretrained_extractor(
         pretrained_configs=pretrained_configs
     )
 
-    run_path = Path(f"{pretrained_configs.global_config.output_folder}/")
+    run_path = Path(f"{pretrained_configs.gc.be.output_folder}/")
     if run_path.exists():
         cleanup(run_path=run_path)
 
@@ -465,11 +477,11 @@ def _get_pretrained_config_with_modified_globals(
 ) -> train.Configs:
     pretrained_configs = deepcopy(pretrained_configs)
 
-    pretrained_configs.global_config.n_epochs = 6
-    pretrained_configs.global_config.sample_interval = 200
-    pretrained_configs.global_config.checkpoint_interval = 200
-    pretrained_configs.global_config.output_folder = (
-        pretrained_configs.global_config.output_folder + "_with_pretrained"
+    pretrained_configs.global_config.basic_experiment.n_epochs = 6
+    pretrained_configs.global_config.evaluation_checkpoint.sample_interval = 200
+    pretrained_configs.global_config.evaluation_checkpoint.checkpoint_interval = 200
+    pretrained_configs.gc.be.output_folder = (
+        pretrained_configs.gc.be.output_folder + "_with_pretrained"
     )
 
     return pretrained_configs
@@ -490,20 +502,20 @@ def _get_experiment_overloaded_for_pretrained_checkpoint(
     pretrained_configs = deepcopy(experiment.configs)
     saved_model_path = next((test_config.run_path / "saved_models").iterdir())
 
-    pretrained_configs.global_config.n_epochs = 6
-    pretrained_configs.global_config.pretrained_checkpoint = str(saved_model_path)
-    pretrained_configs.global_config.sample_interval = 200
-    pretrained_configs.global_config.checkpoint_interval = 200
-    pretrained_configs.global_config.output_folder = (
-        pretrained_configs.global_config.output_folder + "_with_pretrained_checkpoint"
+    pretrained_configs.global_config.basic_experiment.n_epochs = 6
+    pretrained_configs.global_config.model.pretrained_checkpoint = str(saved_model_path)
+    pretrained_configs.global_config.evaluation_checkpoint.sample_interval = 200
+    pretrained_configs.global_config.evaluation_checkpoint.checkpoint_interval = 200
+    pretrained_configs.gc.be.output_folder = (
+        pretrained_configs.gc.be.output_folder + "_with_pretrained_checkpoint"
     )
 
     if change_architecture:
-        pretrained_configs.global_config.strict_pretrained_loading = False
+        pretrained_configs.global_config.model.strict_pretrained_loading = False
         fus_task_dim = pretrained_configs.fusion_config.model_config.fc_task_dim
         pretrained_configs.fusion_config.model_config.fc_task_dim = fus_task_dim * 2
 
-    run_path = Path(f"{pretrained_configs.global_config.output_folder}/")
+    run_path = Path(f"{pretrained_configs.gc.be.output_folder}/")
     if run_path.exists():
         cleanup(run_path=run_path)
 

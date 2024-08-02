@@ -43,7 +43,7 @@ def load_experiment_for_serve(
     default_train_hooks = loaded_train_experiment.hooks
     train_configs = loaded_train_experiment.configs
 
-    loaded_train_experiment.configs.global_config.device = device
+    loaded_train_experiment.configs.gc.be.device = device
 
     inputs = set_up_inputs_for_serve(
         test_inputs_configs=train_configs.input_configs,

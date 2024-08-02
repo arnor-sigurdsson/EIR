@@ -37,12 +37,16 @@ def get_optimizer(
     model: nn.Module, loss_callable: Callable, global_config: "GlobalConfig"
 ) -> Optimizer:
     all_params = _get_all_params_to_optimize(
-        model=model, weight_decay=global_config.wd, loss_callable=loss_callable
+        model=model,
+        weight_decay=global_config.opt.wd,
+        loss_callable=loss_callable,
     )
 
-    optimizer_class = _get_optimizer_class(optimizer_name=global_config.optimizer)
+    optimizer_class = _get_optimizer_class(optimizer_name=global_config.opt.optimizer)
     optimizer_args = _get_constructor_arguments(
-        params=all_params, global_config=global_config, optimizer_class=optimizer_class
+        params=all_params,
+        global_config=global_config,
+        optimizer_class=optimizer_class,
     )
     optimizer = optimizer_class(**optimizer_args)
 
@@ -115,9 +119,14 @@ def get_base_optimizers_dict() -> Dict[str, Type[Optimizer]]:
 def _get_constructor_arguments(
     params: List, global_config: "GlobalConfig", optimizer_class: Type[Optimizer]
 ) -> dict[str, Any]:
-    base = {"params": params, "lr": global_config.lr, "weight_decay": global_config.wd}
+    base = {
+        "params": params,
+        "lr": global_config.opt.lr,
+        "weight_decay": global_config.opt.wd,
+    }
+
     all_extras = {
-        "betas": (global_config.b1, global_config.b2),
+        "betas": (global_config.opt.b1, global_config.opt.b2),
         "momentum": 0.9,
         "amsgrad": False,
     }

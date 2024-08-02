@@ -22,7 +22,7 @@ from tests.test_data_load.test_datasets import check_dataset
     [
         {
             "injections": {
-                "global_configs": {"memory_dataset": True},
+                "global_configs": {"basic_experiment": {"memory_dataset": True}},
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
@@ -42,7 +42,7 @@ from tests.test_data_load.test_datasets import check_dataset
         },
         {
             "injections": {
-                "global_configs": {"memory_dataset": False},
+                "global_configs": {"basic_experiment": {"memory_dataset": False}},
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
@@ -136,7 +136,7 @@ def set_random_con_targets_to_missing(
     [
         {
             "injections": {
-                "global_configs": {"memory_dataset": True},
+                "global_configs": {"basic_experiment": {"memory_dataset": True}},
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
@@ -156,7 +156,7 @@ def set_random_con_targets_to_missing(
         },
         {
             "injections": {
-                "global_configs": {"memory_dataset": False},
+                "global_configs": {"basic_experiment": {"memory_dataset": False}},
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
@@ -215,7 +215,7 @@ def test_set_up_test_dataset(
         test_inputs_configs=test_configs.input_configs,
         ids=test_ids,
         hooks=None,
-        output_folder=test_configs.global_config.output_folder,
+        output_folder=test_configs.gc.be.output_folder,
     )
 
     outputs_as_dict = set_up_outputs_for_training(

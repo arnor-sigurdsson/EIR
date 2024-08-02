@@ -127,8 +127,8 @@ def hook_default_mix_data(
 
     mixing_info = get_mixing_info(
         ids=batch.ids,
-        mixing_alpha=gc.mixing_alpha,
-        batch_size=gc.batch_size,
+        mixing_alpha=gc.training_control.mixing_alpha,
+        batch_size=gc.basic_experiment.batch_size,
         target_labels=batch.target_labels,
         target_columns_gen=target_columns_gen,
     )

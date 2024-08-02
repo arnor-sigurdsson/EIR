@@ -127,10 +127,11 @@ def get_tutorial_01_run_2_gln_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/tutorial_01_input.yaml",
         "--output_configs",
         f"{conf_output_path}/tutorial_01_outputs.yaml",
-        "--tutorial_01_globals.output_folder=eir_tutorials/tutorial_runs"
+        "--tutorial_01_globals.basic_experiment."
+        "output_folder=eir_tutorials/tutorial_runs"
         "/a_using_eir/tutorial_01_run_lr-0.002_epochs-20",
-        "--tutorial_01_globals.lr=0.002",
-        "--tutorial_01_globals.n_epochs=20",
+        "--tutorial_01_globals.optimization.lr=0.002",
+        "--tutorial_01_globals.basic_experiment.n_epochs=20",
     ]
 
     mapping = [

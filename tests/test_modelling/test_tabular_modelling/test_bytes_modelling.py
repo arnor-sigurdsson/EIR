@@ -23,12 +23,19 @@ seed_everything(seed=0)
         {
             "injections": {
                 "global_configs": {
-                    "output_folder": "test_classification_vanilla_transformer_bytes",
-                    "n_epochs": 12,
-                    "memory_dataset": True,
-                    "mixing_alpha": 0.1,
-                    "early_stopping_patience": 5,
-                    "attribution_background_samples": 8,
+                    "basic_experiment": {
+                        "output_folder": "test_classification_vanilla_"
+                        "transformer_bytes",
+                        "n_epochs": 12,
+                        "memory_dataset": True,
+                    },
+                    "training_control": {
+                        "early_stopping_patience": 5,
+                        "mixing_alpha": 0.1,
+                    },
+                    "attribution_analysis": {
+                        "attribution_background_samples": 8,
+                    },
                 },
                 "input_configs": [
                     {
@@ -68,7 +75,7 @@ def test_bytes_modelling(prep_modelling_test_configs):
     train.train(experiment=experiment)
 
     thresholds = get_bytes_test_args(
-        mixing=experiment.configs.global_config.mixing_alpha
+        mixing=experiment.configs.gc.training_control.mixing_alpha
     )
 
     check_performance_result_wrapper(

@@ -1,16 +1,21 @@
-output_folder: eir_tutorials/tutorial_runs/a_using_eir/tutorial_07_multimodal_run
-valid_size: 0.10
-memory_dataset: true
-checkpoint_interval: 200
-sample_interval: 200
-n_epochs: 25
-device: "mps"
-lr: 5.0e-04
-optimizer: adamw
-gradient_clipping: 1.0
-early_stopping_patience: 5
-early_stopping_buffer: 2000
-compute_attributions: false
-attributions_every_sample_factor: 10
-max_attributions_per_class: 512
-mixing_alpha: 0.2
+attribution_analysis:
+  attributions_every_sample_factor: 10
+  compute_attributions: false
+  max_attributions_per_class: 512
+basic_experiment:
+  device: mps
+  memory_dataset: true
+  n_epochs: 25
+  output_folder: eir_tutorials/tutorial_runs/a_using_eir/tutorial_07_multimodal_run
+  valid_size: 0.1
+evaluation_checkpoint:
+  checkpoint_interval: 200
+  sample_interval: 200
+optimization:
+  gradient_clipping: 1.0
+  lr: 0.0005
+  optimizer: adamw
+training_control:
+  early_stopping_buffer: 2000
+  early_stopping_patience: 5
+  mixing_alpha: 0.2

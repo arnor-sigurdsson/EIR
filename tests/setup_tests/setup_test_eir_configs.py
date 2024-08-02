@@ -21,21 +21,33 @@ def get_test_base_global_init(
 
     global_inits = [
         {
-            "output_folder": "runs/test_run",
-            "plot_skip_steps": 0,
-            "device": device,
-            "compute_attributions": True,
-            "attributions_every_sample_factor": 0,
-            "attribution_background_samples": 64,
-            "n_epochs": 12,
-            "warmup_steps": 100,
-            "early_stopping_patience": 0,
-            "lr": 2e-03,
-            "optimizer": "adabelief",
-            "lr_lb": 1e-05,
-            "batch_size": 32,
-            "valid_size": 0.05,
-            "wd": 1e-03,
+            "basic_experiment": {
+                "output_folder": "runs/test_run",
+                "device": device,
+                "n_epochs": 12,
+                "batch_size": 32,
+                "valid_size": 0.05,
+            },
+            "visualization_logging": {
+                "plot_skip_steps": 0,
+            },
+            "attribution_analysis": {
+                "compute_attributions": True,
+                "attributions_every_sample_factor": 0,
+                "attribution_background_samples": 64,
+            },
+            "training_control": {
+                "early_stopping_patience": 0,
+            },
+            "optimization": {
+                "lr": 2e-03,
+                "optimizer": "adabelief",
+                "lr_lb": 1e-05,
+                "wd": 1e-03,
+            },
+            "lr_schedule": {
+                "warmup_steps": 100,
+            },
         }
     ]
     return global_inits

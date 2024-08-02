@@ -33,8 +33,8 @@ def maybe_initialize_distributed_environment(
     configs_copy = copy(configs)
 
     local_rank = int(os.environ["LOCAL_RANK"])
-    if "cuda" in configs.global_config.device:
-        configs_copy.global_config.device = f"cuda:{local_rank}"
+    if "cuda" in configs.gc.be.device:
+        configs_copy.gc.be.device = f"cuda:{local_rank}"
 
     return configs_copy, local_rank
 

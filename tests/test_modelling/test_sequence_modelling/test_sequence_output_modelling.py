@@ -53,9 +53,11 @@ seed_everything(seed=0)
         {
             "injections": {
                 "global_configs": {
-                    "output_folder": "test_generation",
-                    "n_epochs": 15,
-                    "memory_dataset": True,
+                    "basic_experiment": {
+                        "output_folder": "test_generation",
+                        "n_epochs": 15,
+                        "memory_dataset": True,
+                    }
                 },
                 "input_configs": [],
                 "fusion_configs": {
@@ -119,9 +121,11 @@ def test_sequence_output_modelling(
         {
             "injections": {
                 "global_configs": {
-                    "output_folder": "test_generation",
-                    "n_epochs": 15,
-                    "memory_dataset": True,
+                    "basic_experiment": {
+                        "output_folder": "test_generation",
+                        "n_epochs": 15,
+                        "memory_dataset": True,
+                    }
                 },
                 "input_configs": [],
                 "fusion_configs": {

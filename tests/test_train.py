@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import create_autospec, patch
 
 import pytest
 from torch import nn
@@ -14,7 +14,7 @@ from eir.models.model_setup import get_model
 from eir.setup.config import Configs
 from eir.setup.input_setup import set_up_inputs_for_training
 from eir.setup.output_setup import set_up_outputs_for_training
-from eir.setup.schemas import GlobalConfig
+from eir.setup.schemas import GlobalConfig, OptimizationConfig
 from eir.train_utils import optim
 
 
@@ -48,8 +48,12 @@ def test_prepare_run_folder_fail(patched_get_run_folder, tmp_path):
         {
             "injections": {
                 "global_configs": {
-                    "lr": 1e-03,
-                    "output_folder": "test_get_default_experiment",
+                    "optimization": {
+                        "lr": 1e-03,
+                    },
+                    "basic_experiment": {
+                        "output_folder": "test_get_default_experiment",
+                    },
                 },
                 "input_configs": [
                     {
@@ -103,7 +107,7 @@ def test_get_default_experiment(
         # Case 1: Linear
         {
             "injections": {
-                "global_configs": {"lr": 1e-03},
+                "global_configs": {"optimization": {"lr": 1e-03}},
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
@@ -129,24 +133,28 @@ def test_get_dataloaders(
 ):
     test_config = create_test_config
     gc = test_config.global_config
-    gc.weighted_sampling_columns = ["test_output_tabular.Origin"]
+    gc.training_control.weighted_sampling_columns = ["test_output_tabular.Origin"]
 
     train_dataset, valid_dataset = create_test_datasets
     train_sampler = get_train_sampler(
-        columns_to_sample=gc.weighted_sampling_columns, train_dataset=train_dataset
+        columns_to_sample=gc.training_control.weighted_sampling_columns,
+        train_dataset=train_dataset,
     )
 
     train_dataloader, valid_dataloader = train.get_dataloaders(
-        train_dataset, train_sampler, valid_dataset, gc.batch_size
+        train_dataset, train_sampler, valid_dataset, gc.be.batch_size
     )
 
-    assert train_dataloader.batch_size == gc.batch_size
-    assert valid_dataloader.batch_size == gc.batch_size
+    assert train_dataloader.batch_size == gc.be.batch_size
+    assert valid_dataloader.batch_size == gc.be.batch_size
     assert isinstance(train_dataloader.sampler, WeightedRandomSampler)
     assert isinstance(valid_dataloader.sampler, SequentialSampler)
 
     train_dataloader, valid_dataloader = train.get_dataloaders(
-        train_dataset, None, valid_dataset, gc.batch_size
+        train_dataset,
+        None,
+        valid_dataset,
+        gc.be.batch_size,
     )
 
     assert isinstance(train_dataloader.sampler, RandomSampler)
@@ -165,16 +173,41 @@ def test_get_optimizer():
 
     model = FakeModel()
 
-    gc_adamw = GlobalConfig(output_folder="test", optimizer="adamw")
+    gc_adamw = create_autospec(GlobalConfig, instance=True)
+    gc_adamw.optimization = create_autospec(OptimizationConfig, instance=True)
+    gc_adamw.optimization.optimizer = "adamw"
+    gc_adamw.optimization.lr = 1e-03
+    gc_adamw.optimization.b1 = 0.9
+    gc_adamw.optimization.b2 = 0.999
+    gc_adamw.wd = 1e-04
+    gc_adamw.opt = create_autospec(OptimizationConfig, instance=True)
+    gc_adamw.opt.optimizer = "adamw"
+    gc_adamw.opt.lr = 1e-03
+    gc_adamw.opt.b1 = 0.9
+    gc_adamw.opt.b2 = 0.999
+    gc_adamw.opt.wd = 1e-04
 
     adamw_optimizer = optim.get_optimizer(
-        model=model, loss_callable=lambda x: x, global_config=gc_adamw
+        model=model,
+        loss_callable=lambda x: x,
+        global_config=gc_adamw,
     )
     assert isinstance(adamw_optimizer, AdamW)
 
-    gc_sgdm = GlobalConfig(output_folder="test", optimizer="sgdm")
+    gc_sgdm = create_autospec(GlobalConfig, instance=True)
+    gc_sgdm.optimization = create_autospec(OptimizationConfig, instance=True)
+    gc_sgdm.optimization.optimizer = "sgdm"
+    gc_sgdm.optimization.lr = 1e-03
+    gc_sgdm.optimization.wd = 1e-04
+    gc_sgdm.opt = create_autospec(OptimizationConfig, instance=True)
+    gc_sgdm.opt.optimizer = "sgdm"
+    gc_sgdm.opt.lr = 1e-03
+    gc_sgdm.opt.wd = 1e-04
+
     sgdm_optimizer = optim.get_optimizer(
-        model=model, loss_callable=lambda x: x, global_config=gc_sgdm
+        model=model,
+        loss_callable=lambda x: x,
+        global_config=gc_sgdm,
     )
     assert isinstance(sgdm_optimizer, SGD)
     assert sgdm_optimizer.param_groups[0]["momentum"] == 0.9

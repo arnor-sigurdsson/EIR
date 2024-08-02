@@ -16,11 +16,18 @@ from tests.test_models.model_testing_utils import (
         {
             "injections": {
                 "global_configs": {
-                    "output_folder": "test_classification_vanilla_transformer_bytes",
-                    "n_epochs": 12,
-                    "memory_dataset": True,
-                    "mixing_alpha": 1.0,
-                    "attribution_background_samples": 8,
+                    "basic_experiment": {
+                        "output_folder": "test_classification_vanilla_"
+                        "transformer_bytes",
+                        "n_epochs": 12,
+                        "memory_dataset": True,
+                    },
+                    "training_control": {
+                        "mixing_alpha": 1.0,
+                    },
+                    "attribution_analysis": {
+                        "attribution_background_samples": 8,
+                    },
                 },
                 "input_configs": [
                     {

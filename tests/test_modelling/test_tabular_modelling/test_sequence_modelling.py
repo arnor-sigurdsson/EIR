@@ -46,9 +46,11 @@ def _get_sequence_test_specific_fusion_configs() -> Dict:
         {
             "injections": {
                 "global_configs": {
-                    "output_folder": "test_classification",
-                    "n_epochs": 12,
-                    "memory_dataset": True,
+                    "basic_experiment": {
+                        "output_folder": "test_classification",
+                        "n_epochs": 12,
+                        "memory_dataset": True,
+                    }
                 },
                 "input_configs": [
                     {
@@ -73,10 +75,14 @@ def _get_sequence_test_specific_fusion_configs() -> Dict:
         {
             "injections": {
                 "global_configs": {
-                    "output_folder": "test_classification",
-                    "n_epochs": 12,
-                    "memory_dataset": True,
-                    "mixing_alpha": 0.1,
+                    "basic_experiment": {
+                        "output_folder": "test_classification",
+                        "n_epochs": 12,
+                        "memory_dataset": True,
+                    },
+                    "training_control": {
+                        "mixing_alpha": 0.1,
+                    },
                 },
                 "input_configs": [
                     {
@@ -105,9 +111,11 @@ def _get_sequence_test_specific_fusion_configs() -> Dict:
         {
             "injections": {
                 "global_configs": {
-                    "n_epochs": 12,
-                    "memory_dataset": True,
-                    "output_folder": "test_regression",
+                    "basic_experiment": {
+                        "n_epochs": 12,
+                        "memory_dataset": True,
+                        "output_folder": "test_regression",
+                    }
                 },
                 "input_configs": [
                     {
@@ -151,11 +159,17 @@ def test_sequence_modelling(prep_modelling_test_configs):
         {
             "injections": {
                 "global_configs": {
-                    "n_epochs": 12,
-                    "memory_dataset": True,
-                    "output_folder": "test_multi_task",
-                    "gradient_noise": 0.001,
-                    "attribution_background_samples": 8,
+                    "basic_experiment": {
+                        "n_epochs": 12,
+                        "memory_dataset": True,
+                        "output_folder": "test_multi_task",
+                    },
+                    "optimization": {
+                        "gradient_noise": 0.001,
+                    },
+                    "attribution_analysis": {
+                        "attribution_background_samples": 8,
+                    },
                 },
                 "input_configs": [
                     {
@@ -179,11 +193,17 @@ def test_sequence_modelling(prep_modelling_test_configs):
         {
             "injections": {
                 "global_configs": {
-                    "n_epochs": 12,
-                    "memory_dataset": True,
-                    "output_folder": "test_multi_task_with_mixing",
-                    "mixing_alpha": 0.5,
-                    "attribution_background_samples": 8,
+                    "basic_experiment": {
+                        "n_epochs": 12,
+                        "memory_dataset": True,
+                        "output_folder": "test_multi_task_with_mixing",
+                    },
+                    "training_control": {
+                        "mixing_alpha": 0.5,
+                    },
+                    "attribution_analysis": {
+                        "attribution_background_samples": 8,
+                    },
                 },
                 "input_configs": [
                     {
@@ -206,11 +226,17 @@ def test_sequence_modelling(prep_modelling_test_configs):
         {
             "injections": {
                 "global_configs": {
-                    "n_epochs": 12,
-                    "memory_dataset": True,
-                    "output_folder": "test_albert",
-                    "mixing_alpha": 0.0,
-                    "attribution_background_samples": 8,
+                    "basic_experiment": {
+                        "n_epochs": 12,
+                        "memory_dataset": True,
+                        "output_folder": "test_albert",
+                    },
+                    "training_control": {
+                        "mixing_alpha": 0.0,
+                    },
+                    "attribution_analysis": {
+                        "attribution_background_samples": 8,
+                    },
                 },
                 "input_configs": [
                     {
@@ -280,9 +306,11 @@ def test_mt_sequence_modelling(prep_modelling_test_configs):
         {
             "injections": {
                 "global_configs": {
-                    "output_folder": "test_classification",
-                    "n_epochs": 12,
-                    "memory_dataset": True,
+                    "basic_experiment": {
+                        "output_folder": "test_classification",
+                        "n_epochs": 12,
+                        "memory_dataset": True,
+                    }
                 },
                 "input_configs": [
                     {
@@ -316,9 +344,7 @@ def test_sequence_modelling_csv(prep_modelling_test_configs):
 def _sequence_test_check_wrapper(experiment: train.Experiment, test_config):
     output_configs = experiment.configs.output_configs
 
-    thresholds = get_sequence_test_args(
-        mixing=experiment.configs.global_config.mixing_alpha
-    )
+    thresholds = get_sequence_test_args(mixing=experiment.configs.gc.tc.mixing_alpha)
 
     for output_config in output_configs:
         output_name = output_config.output_info.output_name

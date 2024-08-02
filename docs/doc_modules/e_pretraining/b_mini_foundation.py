@@ -5,6 +5,9 @@ from typing import Sequence
 from docs.doc_modules.e_pretraining.utils import get_content_root
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
 from docs.doc_modules.utils import get_saved_model_path
+from eir.utils.logging import get_logger
+
+logger = get_logger(name=__name__, tqdm_compatible=True)
 
 CONTENT_ROOT = CR = get_content_root()
 TUTORIAL_NAME = TN = "02_mini_foundation"
@@ -28,7 +31,7 @@ def train_01_mini_foundation_model() -> AutoDocExperimentInfo:
         f"{conf_output_path}/fusion.yaml",
         "--output_configs",
         f"{conf_output_path}/output_sequence.yaml",
-        f"--globals.output_folder={run_output_folder}",
+        f"--globals.basic_experiment.output_folder={run_output_folder}",
     ]
 
     mapping = [
@@ -60,7 +63,7 @@ def train_01_mini_foundation_model() -> AutoDocExperimentInfo:
         _copy_run_folder_to_data_path,
         {
             "src": run_output_folder,
-            "dst": str(data_output_path.parent / "02_mini_foundation"),
+            "dst": str(data_output_path.parent / "data" / "02_mini_foundation"),
         },
     )
 
@@ -83,9 +86,10 @@ def train_01_mini_foundation_model() -> AutoDocExperimentInfo:
 
 def _copy_run_folder_to_data_path(src: str, dst: str) -> None:
     if not Path(dst).exists():
+        logger.info(f"Creating folder at {dst}")
         Path(dst).mkdir(parents=True, exist_ok=True)
 
-    copytree(src, dst, dirs_exist_ok=True)
+    copytree(src=src, dst=dst, dirs_exist_ok=True)
 
 
 def train_02_imdb_from_scratch_model() -> AutoDocExperimentInfo:
@@ -103,7 +107,7 @@ def train_02_imdb_from_scratch_model() -> AutoDocExperimentInfo:
         f"{conf_output_path}/imdb/imdb_fusion.yaml",
         "--output_configs",
         f"{conf_output_path}/imdb/imdb_output.yaml",
-        "--imdb_globals.output_folder=eir_tutorials/tutorial_runs/"
+        "--imdb_globals.basic_experiment.output_folder=eir_tutorials/tutorial_runs/"
         "e_pretraining/02_mini_foundation_imdb_from_scratch",
     ]
 
@@ -145,7 +149,7 @@ def train_03_imdb_from_pretrained_model() -> AutoDocExperimentInfo:
         f"{conf_output_path}/imdb/imdb_fusion.yaml",
         "--output_configs",
         f"{conf_output_path}/imdb/imdb_output.yaml",
-        "--imdb_globals.output_folder=eir_tutorials/tutorial_runs/"
+        "--imdb_globals.basic_experiment.output_folder=eir_tutorials/tutorial_runs/"
         "e_pretraining/02_mini_foundation_imdb_from_pretrained",
         "--imdb_input.pretrained_config.model_path=FILL_MODEL",
         "--imdb_input.pretrained_config.load_module_name=text",
@@ -190,7 +194,7 @@ def train_04_cifar_from_scratch_model() -> AutoDocExperimentInfo:
         f"{conf_output_path}/cifar/cifar_fusion.yaml",
         "--output_configs",
         f"{conf_output_path}/cifar/cifar_output.yaml",
-        "--cifar_globals.output_folder=eir_tutorials/tutorial_runs/"
+        "--cifar_globals.basic_experiment.output_folder=eir_tutorials/tutorial_runs/"
         "e_pretraining/02_mini_foundation_cifar_from_scratch",
     ]
 
@@ -232,7 +236,7 @@ def train_05_cifar_from_pretrained_model() -> AutoDocExperimentInfo:
         f"{conf_output_path}/cifar/cifar_fusion.yaml",
         "--output_configs",
         f"{conf_output_path}/cifar/cifar_output.yaml",
-        "--cifar_globals.output_folder=eir_tutorials/tutorial_runs/"
+        "--cifar_globals.basic_experiment.output_folder=eir_tutorials/tutorial_runs/"
         "e_pretraining/02_mini_foundation_cifar_from_pretrained",
         "--cifar_input.pretrained_config.model_path=FILL_MODEL",
         "--cifar_input.pretrained_config.load_module_name=image_input",

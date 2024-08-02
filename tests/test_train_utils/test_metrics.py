@@ -400,7 +400,7 @@ def test_get_model_l1_loss(get_l1_test_model):
         # Case 3: Omics feature extractor: Simple LCL
         {
             "injections": {
-                "global_configs": {"lr": 1e-03},
+                "global_configs": {"optimization": {"lr": 1e-03}},
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
@@ -428,9 +428,7 @@ def test_get_model_l1_loss(get_l1_test_model):
         # Case 4: Omics feature extractor: GLN
         {
             "injections": {
-                "global_configs": {
-                    "lr": 1e-03,
-                },
+                "global_configs": {"optimization": {"lr": 1e-03}},
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
@@ -459,7 +457,7 @@ def test_get_model_l1_loss(get_l1_test_model):
         # Case 5: Omics feature extractor: Linear
         {
             "injections": {
-                "global_configs": {"lr": 1e-03},
+                "global_configs": {"optimization": {"lr": 1e-03}},
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
@@ -487,7 +485,9 @@ def test_get_model_l1_loss(get_l1_test_model):
         {
             "injections": {
                 "global_configs": {
-                    "output_folder": "extra_inputs",
+                    "basic_experiment": {
+                        "output_folder": "extra_inputs",
+                    }
                 },
                 "input_configs": [
                     {

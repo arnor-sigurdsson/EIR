@@ -23,7 +23,9 @@ from eir.train import get_dataloaders
         {
             "injections": {
                 "global_configs": {
-                    "output_folder": "extra_inputs",
+                    "basic_experiment": {
+                        "output_folder": "extra_inputs",
+                    },
                 },
                 "input_configs": [
                     {

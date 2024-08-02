@@ -1,14 +1,18 @@
-output_folder: eir_tutorials/tutorial_runs/a_using_eir/tutorial_03_anti_breast_cancer_peptides_run
-valid_size: 0.25
-n_saved_models: 1
-checkpoint_interval: 200
-sample_interval: 200
-n_epochs: 500
-memory_dataset: True
-batch_size: 32
-early_stopping_buffer: 2000
-compute_attributions: True
-attributions_every_sample_factor: 3
-max_attributions_per_class: 512
-weighted_sampling_columns:
+attribution_analysis:
+  attributions_every_sample_factor: 3
+  compute_attributions: true
+  max_attributions_per_class: 512
+basic_experiment:
+  batch_size: 32
+  memory_dataset: true
+  n_epochs: 500
+  output_folder: eir_tutorials/tutorial_runs/a_using_eir/tutorial_03_anti_breast_cancer_peptides_run
+  valid_size: 0.25
+evaluation_checkpoint:
+  checkpoint_interval: 200
+  n_saved_models: 1
+  sample_interval: 200
+training_control:
+  early_stopping_buffer: 2000
+  weighted_sampling_columns:
   - all
