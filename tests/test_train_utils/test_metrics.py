@@ -82,7 +82,7 @@ def get_calculate_batch_metrics_data_test_kwargs():
     metrics_ = metrics.get_default_metrics(
         target_transformers=target_transformers,
         cat_metrics=["mcc", "acc", "roc-auc-macro", "ap-macro"],
-        con_metrics=["loss", "pcc", "r2"],
+        con_metrics=["loss", "pcc", "r2", "rmse"],
         cat_averaging_metrics=None,
         con_averaging_metrics=None,
     )

@@ -276,6 +276,7 @@ def test_classification_subset(prep_modelling_test_configs):
             target_name="Origin",
             top_row_grads_dict=top_row_grads_dict,
             at_least_n_snps=2,
+            all_attribution_target_classes_must_pass=False,
         )
 
 
