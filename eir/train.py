@@ -229,6 +229,8 @@ def get_default_experiment(
 
     metrics = get_default_metrics(
         target_transformers=target_labels.label_transformers,
+        cat_metrics=gc.met.cat_metrics,
+        con_metrics=gc.met.con_metrics,
         cat_averaging_metrics=gc.met.cat_averaging_metrics,
         con_averaging_metrics=gc.met.con_averaging_metrics,
     )

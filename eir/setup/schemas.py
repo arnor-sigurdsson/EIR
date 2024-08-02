@@ -39,10 +39,7 @@ from eir.setup.schema_modules.tensor_broker_schemas import TensorBrokerConfig
 from eir.setup.setup_utils import get_all_optimizer_names
 
 if TYPE_CHECKING:
-    from eir.train_utils.metrics import (
-        al_cat_averaging_metric_choices,
-        al_con_averaging_metric_choices,
-    )
+    from eir.train_utils.metrics import al_cat_metric_choices, al_con_metric_choices
 
 al_input_configs = Sequence["InputConfig"]
 al_output_configs = Sequence["OutputConfig"]
@@ -360,6 +357,15 @@ class AttributionAnalysisConfig:
 @dataclass
 class SupervisedMetricsConfig:
     """
+
+    :param cat_metrics:
+        Which metrics to calculate for categorical targets.
+        If not set, will use the default metrics for the task type.
+
+    :param con_metrics:
+        Which metrics to calculate for continuous targets.
+        If not set, will use the default metrics for the task type.
+
     :param cat_averaging_metrics:
         Which metrics to use for averaging categorical targets. If not set, will use
         the default metrics for the task type.
@@ -369,8 +375,11 @@ class SupervisedMetricsConfig:
         the default metrics for the task type.
     """
 
-    cat_averaging_metrics: Optional["al_cat_averaging_metric_choices"] = None
-    con_averaging_metrics: Optional["al_con_averaging_metric_choices"] = None
+    cat_metrics: "al_cat_metric_choices" = ("mcc", "acc", "roc-auc-macro", "ap-macro")
+    con_metrics: "al_con_metric_choices" = ("r2", "pcc", "loss")
+
+    cat_averaging_metrics: Optional["al_cat_metric_choices"] = None
+    con_averaging_metrics: Optional["al_con_metric_choices"] = None
 
 
 @dataclass

@@ -29,8 +29,14 @@ from scipy.stats import pearsonr
 from sklearn.metrics import (
     accuracy_score,
     average_precision_score,
+    cohen_kappa_score,
+    explained_variance_score,
+    f1_score,
     matthews_corrcoef,
+    mean_absolute_error,
+    precision_score,
     r2_score,
+    recall_score,
     roc_auc_score,
 )
 from sklearn.preprocessing import StandardScaler, label_binarize
@@ -87,10 +93,29 @@ al_metric_record_dict = Dict[
     str, Tuple["MetricRecord", ...] | "al_averaging_functions_dict"
 ]
 
-al_cat_averaging_metric_choices = Sequence[
-    Literal["mcc", "acc", "roc-auc-macro", "ap-macro"]
+al_cat_metric_choices = Sequence[
+    Literal[
+        "mcc",
+        "acc",
+        "roc-auc-macro",
+        "ap-macro",
+        "f1-macro",
+        "precision-macro",
+        "recall-macro",
+        "cohen-kappa",
+    ]
 ]
-al_con_averaging_metric_choices = Sequence[Literal["r2", "pcc", "loss"]]
+al_con_metric_choices = Sequence[
+    Literal[
+        "r2",
+        "pcc",
+        "loss",
+        "rmse",
+        "mae",
+        "mape",
+        "explained-variance",
+    ]
+]
 
 
 @dataclass()
@@ -359,6 +384,40 @@ def calc_acc(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
     return accuracy
 
 
+@handle_empty(default_value=np.nan, metric_name="F1-MACRO")
+def calc_f1_score_macro(
+    outputs: np.ndarray, labels: np.ndarray, *args, **kwargs
+) -> float:
+    pred = np.argmax(outputs, axis=1)
+    f1 = f1_score(y_true=labels, y_pred=pred, average="macro")
+    return f1
+
+
+@handle_empty(default_value=np.nan, metric_name="PRECISION-MACRO")
+def calc_precision_macro(
+    outputs: np.ndarray, labels: np.ndarray, *args, **kwargs
+) -> float:
+    pred = np.argmax(outputs, axis=1)
+    precision = precision_score(y_true=labels, y_pred=pred, average="macro")
+    return precision
+
+
+@handle_empty(default_value=np.nan, metric_name="RECALL-MACRO")
+def calc_recall_macro(
+    outputs: np.ndarray, labels: np.ndarray, *args, **kwargs
+) -> float:
+    pred = np.argmax(outputs, axis=1)
+    recall = recall_score(y_true=labels, y_pred=pred, average="macro")
+    return recall
+
+
+@handle_empty(default_value=np.nan, metric_name="COHEN-KAPPA")
+def calc_cohen_kappa(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
+    pred = np.argmax(outputs, axis=1)
+    kappa = cohen_kappa_score(y1=labels, y2=pred)
+    return kappa
+
+
 @handle_empty(default_value=np.nan, metric_name="PCC")
 def calc_pcc(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
     if len(outputs) < 2:
@@ -404,6 +463,27 @@ def calc_rmse(
         rmse = np.sqrt((labels - predictions) ** 2)
 
     return rmse
+
+
+@handle_empty(default_value=np.nan, metric_name="MAE")
+def calc_mae(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
+    mae = mean_absolute_error(y_true=labels.squeeze(), y_pred=outputs.squeeze())
+    return mae
+
+
+@handle_empty(default_value=np.nan, metric_name="MAPE")
+def calc_mape(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
+    labels, outputs = labels.squeeze(), outputs.squeeze()
+    mask = labels != 0
+    return np.mean(np.abs((labels[mask] - outputs[mask]) / labels[mask])) * 100
+
+
+@handle_empty(default_value=np.nan, metric_name="EXPLAINED-VARIANCE")
+def calc_explained_variance(
+    outputs: np.ndarray, labels: np.ndarray, *args, **kwargs
+) -> float:
+    ev = explained_variance_score(y_true=labels.squeeze(), y_pred=outputs.squeeze())
+    return ev
 
 
 class LogEmptyLossProtocol(Protocol):
@@ -800,45 +880,106 @@ def get_metrics_dataframes(
     return train_history_path, valid_history_path
 
 
+def get_available_metrics() -> Tuple[Dict[str, MetricRecord], Dict[str, MetricRecord]]:
+    cat_metrics: Dict[str, MetricRecord] = {
+        "mcc": MetricRecord(
+            name="mcc",
+            function=calc_mcc,
+        ),
+        "acc": MetricRecord(
+            name="acc",
+            function=calc_acc,
+        ),
+        "roc-auc-macro": MetricRecord(
+            name="roc-auc-macro",
+            function=calc_roc_auc_ovo,
+            only_val=True,
+        ),
+        "ap-macro": MetricRecord(
+            name="ap-macro",
+            function=calc_average_precision,
+            only_val=True,
+        ),
+        "f1-macro": MetricRecord(
+            name="f1-macro",
+            function=calc_f1_score_macro,
+        ),
+        "precision-macro": MetricRecord(
+            name="precision-macro",
+            function=calc_precision_macro,
+        ),
+        "recall-macro": MetricRecord(
+            name="recall-macro",
+            function=calc_recall_macro,
+        ),
+        "cohen-kappa": MetricRecord(
+            name="cohen-kappa",
+            function=calc_cohen_kappa,
+        ),
+    }
+
+    con_metrics: Dict[str, MetricRecord] = {
+        "rmse": MetricRecord(
+            name="rmse",
+            function=partial(calc_rmse, target_transformers=None),
+            minimize_goal=True,
+        ),
+        "r2": MetricRecord(
+            name="r2",
+            function=calc_r2,
+            only_val=True,
+        ),
+        "pcc": MetricRecord(
+            name="pcc",
+            function=calc_pcc,
+            only_val=True,
+        ),
+        "mae": MetricRecord(
+            name="mae",
+            function=calc_mae,
+            minimize_goal=True,
+        ),
+        "mape": MetricRecord(
+            name="mape",
+            function=calc_mape,
+            minimize_goal=True,
+        ),
+        "explained-variance": MetricRecord(
+            name="explained-variance",
+            function=calc_explained_variance,
+            only_val=True,
+        ),
+    }
+
+    return cat_metrics, con_metrics
+
+
 def get_default_metrics(
     target_transformers: Dict[str, "al_label_transformers"],
-    cat_averaging_metrics: Optional[al_cat_averaging_metric_choices],
-    con_averaging_metrics: Optional[al_con_averaging_metric_choices],
+    cat_metrics: al_cat_metric_choices,
+    con_metrics: al_con_metric_choices,
+    cat_averaging_metrics: Optional[al_cat_metric_choices],
+    con_averaging_metrics: Optional[al_con_metric_choices],
 ) -> "al_metric_record_dict":
-    mcc = MetricRecord(
-        name="mcc",
-        function=calc_mcc,
-    )
-    acc = MetricRecord(
-        name="acc",
-        function=calc_acc,
-    )
-    roc_auc_macro = MetricRecord(
-        name="roc-auc-macro",
-        function=calc_roc_auc_ovo,
-        only_val=True,
-    )
-    ap_macro = MetricRecord(
-        name="ap-macro",
-        function=calc_average_precision,
-        only_val=True,
+    available_cat_metrics, available_con_metrics = get_available_metrics()
+
+    cat_metric_records = tuple(
+        available_cat_metrics[metric]
+        for metric in cat_metrics
+        if metric in available_cat_metrics
     )
 
-    rmse = MetricRecord(
-        name="rmse",
-        function=partial(calc_rmse, target_transformers=target_transformers),
-        minimize_goal=True,
+    con_metric_records = tuple(
+        available_con_metrics[metric]
+        for metric in con_metrics
+        if metric in available_con_metrics
     )
-    r2 = MetricRecord(
-        name="r2",
-        function=calc_r2,
-        only_val=True,
-    )
-    pcc = MetricRecord(
-        name="pcc",
-        function=calc_pcc,
-        only_val=True,
-    )
+
+    for metric in con_metric_records:
+        if metric.name == "rmse":
+            metric.function = partial(
+                calc_rmse, target_transformers=target_transformers
+            )
 
     cat_for_avg, con_for_avg = parse_averaging_metrics(
         cat_averaging_metrics=cat_averaging_metrics,
@@ -850,17 +991,17 @@ def get_default_metrics(
     )
 
     default_metrics: al_metric_record_dict = {
-        "cat": (mcc, acc, roc_auc_macro, ap_macro),
-        "con": (rmse, r2, pcc),
+        "cat": cat_metric_records,
+        "con": con_metric_records,
         "averaging_functions": averaging_functions,
     }
     return default_metrics
 
 
 def parse_averaging_metrics(
-    cat_averaging_metrics: Optional[al_cat_averaging_metric_choices],
-    con_averaging_metrics: Optional[al_con_averaging_metric_choices],
-) -> tuple[al_cat_averaging_metric_choices, al_con_averaging_metric_choices]:
+    cat_averaging_metrics: Optional[al_cat_metric_choices],
+    con_averaging_metrics: Optional[al_con_metric_choices],
+) -> tuple[al_cat_metric_choices, al_con_metric_choices]:
     cat_parsed, con_parsed = _get_default_averaging_metrics()
 
     if cat_averaging_metrics:
@@ -904,7 +1045,7 @@ def _validate_metrics(
 
 
 def _get_default_averaging_metrics() -> (
-    tuple[al_cat_averaging_metric_choices, al_con_averaging_metric_choices]
+    tuple[al_cat_metric_choices, al_con_metric_choices]
 ):
 
     cat_names: list[Literal["mcc", "roc-auc-macro", "ap-macro", "acc"]]
@@ -917,8 +1058,8 @@ def _get_default_averaging_metrics() -> (
 
 
 def get_performance_averaging_functions(
-    cat_metric_names: al_cat_averaging_metric_choices,
-    con_metric_names: al_con_averaging_metric_choices,
+    cat_metric_names: al_cat_metric_choices,
+    con_metric_names: al_con_metric_choices,
 ) -> al_averaging_functions_dict:
     """
     Note that we have the mean(values) else 0.0 to account for some values not being
@@ -926,21 +1067,37 @@ def get_performance_averaging_functions(
     raising errors if e.g. there are only negative labels in a batch.
     """
 
+    parsed_con_names = []
+    for metric in con_metric_names:
+        if metric in ["rmse", "mae", "mape"]:
+            logger.warning(
+                "Using metric %s for performance averaging, which is affected by "
+                "the scale of the target. This can lead to the metric dominating "
+                "the performance calculation. Consider using a different metric "
+                "for performance averaging.",
+            )
+
+        if metric in ["loss", "mae", "rmse", "mape"]:
+            parsed_con_names.append(f"1.0-{metric.upper()}")
+        else:
+            parsed_con_names.append(metric.upper())
+
     logger.info(
         "Tabular output performance averaging functions across tasks set to averages "
         "of %s for categorical targets and %s for continuous targets. These "
         "values are used to determine overall performance (using the validation set), "
         "which is used to control factors such as early stopping and LR scheduling. "
-        "Other output cases use 1.0-LOSS by default.",
+        "Other output cases (e.g. sequence generation, image generation) "
+        "use 1.0-LOSS by default.",
         [i.upper() for i in cat_metric_names],
-        [i.upper().replace("LOSS", "1.0-LOSS") for i in con_metric_names],
+        parsed_con_names,
     )
 
     def _calc_cat_averaging_value(
         metric_dict: "al_step_metric_dict",
         output_name: str,
         column_name: str,
-        metric_names: al_cat_averaging_metric_choices,
+        metric_names: al_cat_metric_choices,
     ) -> float:
         values = []
         for metric_name in metric_names:
@@ -958,7 +1115,7 @@ def get_performance_averaging_functions(
         metric_dict: "al_step_metric_dict",
         output_name: str,
         column_name: str,
-        metric_names: al_con_averaging_metric_choices,
+        metric_names: al_con_metric_choices,
     ) -> float:
         values = []
         for metric_name in metric_names:
@@ -968,7 +1125,7 @@ def get_performance_averaging_functions(
             if value is None:
                 continue
 
-            if metric_name == "loss":
+            if metric_name in ["loss", "rmse", "mae", "mape"]:
                 value = 1.0 - value
 
             values.append(value)
