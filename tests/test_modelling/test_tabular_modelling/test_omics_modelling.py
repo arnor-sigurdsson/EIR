@@ -276,6 +276,7 @@ def test_classification_subset(prep_modelling_test_configs):
             target_name="Origin",
             top_row_grads_dict=top_row_grads_dict,
             at_least_n_snps=2,
+            all_attribution_target_classes_must_pass=False,
         )
 
 
@@ -505,6 +506,25 @@ def _should_compile():
                 "global_configs": {
                     "basic_experiment": {"output_folder": "extra_inputs"},
                     "metrics": {
+                        "cat_metrics": [
+                            "mcc",
+                            "acc",
+                            "roc-auc-macro",
+                            "ap-macro",
+                            "f1-macro",
+                            "precision-macro",
+                            "recall-macro",
+                            "cohen-kappa",
+                        ],
+                        "con_metrics": [
+                            "r2",
+                            "pcc",
+                            "loss",
+                            "rmse",
+                            "mae",
+                            "mape",
+                            "explained-variance",
+                        ],
                         "cat_averaging_metrics": ["roc-auc-macro"],
                         "con_averaging_metrics": ["r2"],
                     },
