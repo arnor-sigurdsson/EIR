@@ -237,6 +237,8 @@ def get_unsupported_hf_models() -> dict:
         "levit": "Not strictly sequence model.",
         "lilt": "Matmul incompatible shapes with default params.",
         "lxmert": "Not strictly sequence model.",
+        "mamba2": "An issue with one input dimension being 0 in the hidden states when"
+        " padding in HF forward.",
         "maskformer": "Not strictly sequence model.",
         "mask2former": "Not strictly sequence model.",
         "maskformer-swin": "Not strictly sequence model.",
