@@ -629,7 +629,6 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
 
 def _save_yaml_configs(run_folder: Path, configs: "Configs"):
     for config_name, config_object in configs.__dict__.items():
-
         if config_name == "gc":
             continue
 
@@ -638,7 +637,23 @@ def _save_yaml_configs(run_folder: Path, configs: "Configs"):
         )
         aislib.misc_utils.ensure_path_exists(path=cur_output_path)
 
-        config_object_as_primitives = object_to_primitives(obj=config_object)
+        if config_name == "global_config":
+            main_keys = [
+                "basic_experiment",
+                "model",
+                "optimization",
+                "lr_schedule",
+                "training_control",
+                "evaluation_checkpoint",
+                "attribution_analysis",
+                "metrics",
+                "visualization_logging",
+                "latent_sampling",
+            ]
+            config_dict = {k: getattr(config_object, k) for k in main_keys}
+            config_object_as_primitives = object_to_primitives(obj=config_dict)
+        else:
+            config_object_as_primitives = object_to_primitives(obj=config_object)
 
         with open(str(cur_output_path), "w") as yaml_file_handle:
             yaml.dump(data=config_object_as_primitives, stream=yaml_file_handle)

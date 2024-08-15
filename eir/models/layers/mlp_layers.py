@@ -69,14 +69,16 @@ class MLPResidualBlock(nn.Module):
 
         if in_features == out_features:
             self.downsample_identity = lambda x: x
+            ls_init = 1e-05
         else:
             self.downsample_identity = nn.Linear(
                 in_features=in_features,
                 out_features=out_features,
                 bias=True,
             )
+            ls_init = 1.0
 
-        self.ls = LayerScale(dim=out_features, init_values=1e-05)
+        self.ls = LayerScale(dim=out_features, init_values=ls_init)
 
         self.stochastic_depth = StochasticDepth(p=self.stochastic_depth_p, mode="batch")
 
