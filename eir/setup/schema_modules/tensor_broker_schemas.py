@@ -54,6 +54,7 @@ class TensorMessageConfig:
         - ``pool``: Adaptive average pooling layer.
         - ``grouped_linear``: Grouped linear layer (each dimension is projected
           separately with a learnable linear layer).
+        - ``interpolate``: Interpolates the tensor to the target size.
 
         If the tensor is already of the target size, no projection is performed.
     """
