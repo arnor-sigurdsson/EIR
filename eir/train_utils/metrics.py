@@ -1107,7 +1107,7 @@ def get_performance_averaging_functions(
             if value is None:
                 continue
 
-            values.append(value)
+            values.append(float(value))
 
         return mean(values) if values else 0.0
 
@@ -1128,7 +1128,7 @@ def get_performance_averaging_functions(
             if metric_name in ["loss", "rmse", "mae", "mape"]:
                 value = 1.0 - value
 
-            values.append(value)
+            values.append(float(value))
 
         return mean(values) if values else 0.0
 
