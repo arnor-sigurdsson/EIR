@@ -10,7 +10,6 @@ from typing import (
     Callable,
     Dict,
     Generator,
-    List,
     Literal,
     Optional,
     Protocol,
@@ -40,7 +39,6 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 from sklearn.preprocessing import StandardScaler, label_binarize
-from torch import nn
 from torch.linalg import vector_norm
 
 from eir.data_load.data_utils import get_output_info_generator
@@ -563,8 +561,8 @@ def aggregate_losses(losses_dict: dict[str, dict[str, torch.Tensor]]) -> torch.T
 def get_uncertainty_loss_hook(
     output_configs: Sequence[OutputConfig],
     device: str,
-) -> Callable:
-    uncertainty_loss_modules = {}
+) -> tuple[Callable, dict[str, "UncertaintyMultiTaskLoss"]]:
+    uncertainty_loss_modules: dict[str, UncertaintyMultiTaskLoss] = {}
     for output_config in output_configs:
         if output_config.output_info.output_type != "tabular":
             continue
@@ -595,7 +593,7 @@ def get_uncertainty_loss_hook(
         hook_add_uncertainty_loss, uncertainty_modules=uncertainty_loss_modules
     )
 
-    return hook
+    return hook, uncertainty_loss_modules
 
 
 def hook_add_uncertainty_loss(
@@ -623,6 +621,12 @@ def hook_add_uncertainty_loss(
     return state_updates
 
 
+from typing import Dict, List
+
+import torch
+import torch.nn as nn
+
+
 class UncertaintyMultiTaskLoss(nn.Module):
     def __init__(
         self,
@@ -636,28 +640,22 @@ class UncertaintyMultiTaskLoss(nn.Module):
         self.target_con_columns = target_con_columns
         self.device = device
 
-        self.log_vars = self._construct_params(
+        self._construct_params(
             cur_target_columns=self.target_cat_columns + self.target_con_columns,
             device=self.device,
         )
 
-    @staticmethod
-    def _construct_params(
-        cur_target_columns: List[str], device: str
-    ) -> dict[str, torch.Tensor]:
-        param_dict: dict[str, torch.Tensor] = {}
+    def _construct_params(self, cur_target_columns: List[str], device: str):
         for column_name in cur_target_columns:
-            cur_param = nn.Parameter(torch.zeros(1), requires_grad=True).to(
-                device=device
-            )
-            param_dict[column_name] = cur_param
-
-        return param_dict
+            param = nn.Parameter(torch.zeros(1, device=device), requires_grad=True)
+            self.register_parameter(f"log_var_{column_name}", param)
 
     def _calc_uncertainty_loss(
-        self, name: str, loss_value: torch.Tensor
+        self,
+        name: str,
+        loss_value: torch.Tensor,
     ) -> torch.Tensor:
-        log_var = self.log_vars[name]
+        log_var = getattr(self, f"log_var_{name}")
         scalar = 2.0 if name in self.target_cat_columns else 1.0
 
         precision = torch.exp(-log_var)

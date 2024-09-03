@@ -76,8 +76,8 @@ logger = get_logger(name=__name__)
 
 
 def get_default_hooks(configs: Configs) -> "Hooks":
-    step_func_hooks = _get_default_step_function_hooks(configs=configs)
-    hooks_object = Hooks(step_func_hooks=step_func_hooks)
+    step_func_hooks, extra_state = _get_default_step_function_hooks(configs=configs)
+    hooks_object = Hooks(step_func_hooks=step_func_hooks, extra_state=extra_state)
 
     return hooks_object
 
@@ -87,26 +87,31 @@ class Hooks:
     al_handler_attachers = Iterable[Callable[[Engine, HandlerConfig], Engine]]
 
     step_func_hooks: "StepFunctionHookStages"
+    extra_state: Optional[dict[str, Any]] = None
     custom_column_label_parsing_ops: al_all_column_ops = None
     custom_handler_attachers: Union[None, al_handler_attachers] = None
 
 
-def _get_default_step_function_hooks(configs: Configs) -> "StepFunctionHookStages":
+def _get_default_step_function_hooks(
+    configs: Configs,
+) -> tuple["StepFunctionHookStages", dict[str, Any]]:
     """
     TODO: Add validation, inspect that outputs have correct names.
     TODO: Refactor, split into smaller functions e.g. for L1, mixing and uncertainty.
     """
 
-    init_kwargs = _get_default_step_function_hooks_init_kwargs(configs=configs)
+    init_kwargs, extra_state = _get_default_step_function_hooks_init_kwargs(
+        configs=configs
+    )
 
     step_func_hooks = StepFunctionHookStages(**init_kwargs)
 
-    return step_func_hooks
+    return step_func_hooks, extra_state
 
 
 def _get_default_step_function_hooks_init_kwargs(
     configs: Configs,
-) -> Dict[str, list[Callable]]:
+) -> tuple[dict[str, list[Callable]], dict[str, Any]]:
     init_kwargs: dict[str, list[Callable]] = {
         "base_prepare_batch": [hook_default_prepare_batch],
         "post_prepare_batch": [],
@@ -115,6 +120,8 @@ def _get_default_step_function_hooks_init_kwargs(
         "optimizer_backward": [hook_default_optimizer_backward],
         "metrics": [hook_default_compute_metrics],
     }
+
+    extra_state: dict[str, Any] = {}
 
     if configs.gc.tc.mixing_alpha:
         logger.debug(
@@ -127,11 +134,12 @@ def _get_default_step_function_hooks_init_kwargs(
         init_kwargs["loss"][0] = hook_mix_loss
 
     if _should_add_uncertainty_loss_hook(output_configs=configs.output_configs):
-        uncertainty_hook = get_uncertainty_loss_hook(
+        uncertainty_hook, uncertainty_modules = get_uncertainty_loss_hook(
             output_configs=configs.output_configs,
             device=configs.gc.be.device,
         )
         init_kwargs["loss"].append(uncertainty_hook)
+        extra_state["uncertainty_modules"] = uncertainty_modules
 
     init_kwargs["loss"].append(hook_default_aggregate_losses)
 
@@ -155,7 +163,7 @@ def _get_default_step_function_hooks_init_kwargs(
         ] + init_kwargs["model_forward"]
         init_kwargs["model_forward"] = model_forward_with_amp_objects
 
-    return init_kwargs
+    return init_kwargs, extra_state
 
 
 def _should_add_uncertainty_loss_hook(

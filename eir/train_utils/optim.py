@@ -34,12 +34,16 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
 def get_optimizer(
-    model: nn.Module, loss_callable: Callable, global_config: "GlobalConfig"
+    model: nn.Module,
+    loss_callable: Callable,
+    global_config: "GlobalConfig",
+    extra_modules: Optional[dict[str, nn.Module]] = None,
 ) -> Optimizer:
     all_params = _get_all_params_to_optimize(
         model=model,
         weight_decay=global_config.opt.wd,
         loss_callable=loss_callable,
+        extra_modules=extra_modules,
     )
 
     optimizer_class = _get_optimizer_class(optimizer_name=global_config.opt.optimizer)
@@ -62,15 +66,23 @@ def get_optimizer(
 
 
 def _get_all_params_to_optimize(
-    model: nn.Module, weight_decay: float, loss_callable: Callable
-) -> List:
+    model: nn.Module,
+    weight_decay: float,
+    loss_callable: Callable,
+    extra_modules: Optional[dict[str, nn.Module]] = None,
+) -> list:
     model_params = add_wd_to_model_params(model=model, wd=weight_decay)
 
     loss_params = []
     if isinstance(loss_callable, nn.Module):
         loss_params = [{"params": p} for p in loss_callable.parameters()]
 
-    return model_params + loss_params
+    extra_params = []
+    if extra_modules is not None:
+        for module in extra_modules.values():
+            extra_params = [{"params": p} for p in module.parameters()]
+
+    return model_params + loss_params + extra_params
 
 
 def _get_external_optimizers(optimizer_name: str) -> Type[Optimizer]:
