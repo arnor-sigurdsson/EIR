@@ -221,10 +221,15 @@ def get_default_experiment(
         criteria=criteria,
     )
 
+    extra_modules = None
+    if hooks.extra_state is not None:
+        extra_modules = hooks.extra_state.get("uncertainty_modules", {})
+
     optimizer = get_optimizer(
         model=model,
         loss_callable=loss_func,
         global_config=gc,
+        extra_modules=extra_modules,
     )
 
     metrics = get_default_metrics(

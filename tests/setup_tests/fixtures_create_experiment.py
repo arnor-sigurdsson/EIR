@@ -1,7 +1,7 @@
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, Sequence, Tuple
+from typing import Dict, Iterable, Optional, Sequence, Tuple
 
 import pytest
 from torch import nn
@@ -28,6 +28,7 @@ def create_test_optimizer(
     global_config: schemas.GlobalConfig,
     model: nn.Module,
     criteria,
+    extra_modules: Optional[dict[str, nn.Module]],
 ):
     """
     TODO: Refactor loss module construction out of this function.
@@ -36,7 +37,10 @@ def create_test_optimizer(
     loss_module = train.get_loss_callable(criteria=criteria)
 
     optimizer = optim.get_optimizer(
-        model=model, loss_callable=loss_module, global_config=global_config
+        model=model,
+        loss_callable=loss_module,
+        global_config=global_config,
+        extra_modules=extra_modules,
     )
 
     return optimizer, loss_module
@@ -99,10 +103,17 @@ def prep_modelling_test_configs(
 
     criteria = get_criteria(outputs_as_dict=outputs_as_dict)
 
+    hooks = step_logic.get_default_hooks(configs=c)
+
+    extra_modules = None
+    if hooks.extra_state is not None:
+        extra_modules = hooks.extra_state.get("uncertainty_modules", {})
+
     optimizer, loss_module = create_test_optimizer(
         global_config=gc,
         model=model,
         criteria=criteria,
+        extra_modules=extra_modules,
     )
 
     run_folder = get_run_folder(output_folder=gc.be.output_folder)
@@ -114,7 +125,6 @@ def prep_modelling_test_configs(
     serialize_all_input_transformers(inputs_dict=inputs_as_dict, run_folder=run_folder)
     serialize_chosen_input_objects(inputs_dict=inputs_as_dict, run_folder=run_folder)
 
-    hooks = step_logic.get_default_hooks(configs=c)
     experiment = Experiment(
         configs=c,
         inputs=inputs_as_dict,
