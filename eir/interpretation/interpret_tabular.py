@@ -8,7 +8,7 @@ import seaborn as sns
 from aislib.misc_utils import ensure_path_exists
 from sklearn.preprocessing import LabelEncoder
 
-from eir.experiment_io.experiment_io import load_transformers
+from eir.experiment_io.label_transformer_io import load_transformers
 from eir.interpretation.interpretation_utils import (
     get_long_format_attribution_df,
     plot_attributions_bar,

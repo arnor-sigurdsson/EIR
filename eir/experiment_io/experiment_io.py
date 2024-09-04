@@ -2,18 +2,12 @@ from copy import copy
 from dataclasses import asdict, dataclass, fields
 from pathlib import Path
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Union
+from typing import TYPE_CHECKING, Any, Iterable, Union
 
 import dill
-import joblib
 from aislib.misc_utils import ensure_path_exists
 
 from eir import __version__
-from eir.data_load import label_setup
-from eir.data_load.label_setup import (
-    al_label_transformers,
-    al_label_transformers_object,
-)
 from eir.setup import schemas
 from eir.setup.config import Configs
 from eir.setup.output_setup import al_output_objects_as_dict
@@ -259,56 +253,6 @@ def serialize_chosen_input_objects(
             ensure_path_exists(path=output_path, is_folder=False)
             with open(output_path, "wb") as outfile:
                 dill.dump(obj=input_, file=outfile)
-
-
-def get_transformer_sources(run_folder: Path) -> Dict[str, list[str]]:
-    transformers_to_load = {}
-    transformer_sources = run_folder / "serializations/transformers"
-    for transformer_source in transformer_sources.iterdir():
-        names = sorted([i.stem for i in transformer_source.iterdir()])
-        transformers_to_load[transformer_source.stem] = names
-    return transformers_to_load
-
-
-def load_transformer(
-    run_folder: Path,
-    source_name: str,
-    transformer_name: str,
-) -> al_label_transformers_object:
-    target_transformer_path = label_setup.get_transformer_path(
-        run_path=run_folder,
-        transformer_name=transformer_name,
-        source_name=source_name,
-    )
-    return joblib.load(filename=target_transformer_path)
-
-
-def load_transformers(
-    transformers_to_load: Optional[Dict[str, list[str]]] = None,
-    output_folder: Optional[str] = None,
-    run_folder: Optional[Path] = None,
-) -> Dict[str, al_label_transformers]:
-    if not run_folder and not output_folder:
-        raise ValueError("Either 'run_folder' or 'output_folder' must be provided.")
-
-    if not run_folder:
-        assert output_folder is not None
-        run_folder = get_run_folder(output_folder=output_folder)
-
-    if not transformers_to_load:
-        transformers_to_load = get_transformer_sources(run_folder=run_folder)
-
-    loaded_transformers: Dict[str, al_label_transformers] = {}
-    for source_name, source_transformers_to_load in transformers_to_load.items():
-        loaded_transformers[source_name] = {}
-        for transformer_name in source_transformers_to_load:
-            loaded_transformers[source_name][transformer_name] = load_transformer(
-                run_folder=run_folder,
-                source_name=source_name,
-                transformer_name=transformer_name,
-            )
-
-    return loaded_transformers
 
 
 def check_version(run_folder: Path) -> None:

@@ -5,12 +5,12 @@ from typing import TYPE_CHECKING, Dict, Sequence, Union
 from eir.data_load.label_setup import (
     Labels,
     TabularFileInfo,
-    save_transformer_set,
     set_up_train_and_valid_tabular_data,
 )
-from eir.experiment_io.experiment_io import (
-    get_run_folder_from_model_path,
+from eir.experiment_io.experiment_io import get_run_folder_from_model_path
+from eir.experiment_io.label_transformer_io import (
     load_transformers,
+    save_transformer_set,
 )
 from eir.models.input.tabular.tabular import get_unique_values_from_transformers
 from eir.setup import schemas

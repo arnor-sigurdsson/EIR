@@ -10,7 +10,7 @@ from eir.data_load.label_setup import (
     al_label_transformers,
     transform_label_df,
 )
-from eir.experiment_io.experiment_io import load_transformers
+from eir.experiment_io.label_transformer_io import load_transformers
 from eir.setup import schemas
 from eir.setup.input_setup_modules import setup_tabular
 

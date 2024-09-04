@@ -17,7 +17,7 @@ from eir.data_load.label_setup import (
     al_target_label_dict,
     transform_label_df,
 )
-from eir.experiment_io.experiment_io import load_transformers
+from eir.experiment_io.label_transformer_io import load_transformers
 from eir.predict_modules.predict_tabular_input_setup import prep_missing_con_dict
 from eir.setup.config import Configs
 from eir.setup.schemas import (
