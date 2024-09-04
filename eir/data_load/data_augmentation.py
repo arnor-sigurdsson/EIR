@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from functools import partial
+from functools import lru_cache, partial
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -381,6 +381,11 @@ def calc_mixed_loss(
     return total_loss
 
 
+@lru_cache(maxsize=128)
+def get_beta_distribution(alpha: float, beta: float) -> torch.distributions.beta.Beta:
+    return torch.distributions.beta.Beta(alpha, beta)
+
+
 def make_random_omics_columns_missing(
     omics_array: torch.Tensor,
     na_augment_alpha: float = 1.0,
@@ -389,7 +394,7 @@ def make_random_omics_columns_missing(
     if na_augment_alpha <= 0 or na_augment_beta <= 0:
         raise ValueError("Alpha and Beta must be positive.")
 
-    dist = torch.distributions.beta.Beta(na_augment_alpha, na_augment_beta)
+    dist = get_beta_distribution(alpha=na_augment_alpha, beta=na_augment_beta)
     percentage_sampled = dist.sample().item()
 
     n_snps = omics_array.shape[2]
@@ -416,24 +421,24 @@ def shuffle_random_omics_columns(
     if shuffle_augment_alpha <= 0 or shuffle_augment_beta <= 0:
         raise ValueError("Alpha and Beta must be positive.")
 
-    dist = torch.distributions.beta.Beta(shuffle_augment_alpha, shuffle_augment_beta)
+    dist = get_beta_distribution(alpha=shuffle_augment_alpha, beta=shuffle_augment_beta)
     percentage_sampled = dist.sample().item()
 
     n_snps = omics_array.shape[2]
     n_to_shuffle = int(n_snps * percentage_sampled)
     random_to_shuffle = torch.randperm(n_snps)[:n_to_shuffle].to(dtype=torch.long)
 
+    batch_size = omics_array.shape[0]
     one_hot_random = torch.zeros(
-        omics_array.shape[0],
+        batch_size,
         4,
         n_to_shuffle,
         dtype=torch.bool,
     )
-
     random_indices = torch.randint(
         0,
         4,
-        (omics_array.shape[0], n_to_shuffle),
+        (batch_size, n_to_shuffle),
     )
     one_hot_random.scatter_(1, random_indices.unsqueeze(1), 1)
 
