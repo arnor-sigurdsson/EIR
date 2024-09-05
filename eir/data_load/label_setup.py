@@ -14,10 +14,8 @@ from typing import (
     Union,
 )
 
-import joblib
 import numpy as np
 import pandas as pd
-from aislib.misc_utils import ensure_path_exists
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from tqdm import tqdm
@@ -1222,19 +1220,6 @@ def _get_missing_stats_string(
     return missing_count_dict
 
 
-def get_transformer_path(
-    run_path: Path, source_name: str, transformer_name: str
-) -> Path:
-    if not transformer_name.endswith(".save"):
-        transformer_name = f"{transformer_name}.save"
-
-    transformer_path = (
-        run_path / "serializations/transformers" / source_name / f"{transformer_name}"
-    )
-
-    return transformer_path
-
-
 def merge_target_columns(
     target_con_columns: List[str], target_cat_columns: List[str]
 ) -> al_target_columns:
@@ -1249,31 +1234,3 @@ def merge_target_columns(
     assert len(all_target_columns) > 0
 
     return all_target_columns
-
-
-def save_transformer_set(
-    transformers_per_source: Dict[str, al_label_transformers], run_folder: Path
-) -> None:
-    for output_name, transformers in transformers_per_source.items():
-        for transformer_name, transformer_object in transformers.items():
-            save_label_transformer(
-                run_folder=run_folder,
-                output_name=output_name,
-                transformer_name=transformer_name,
-                target_transformer_object=transformer_object,
-            )
-
-
-def save_label_transformer(
-    run_folder: Path,
-    output_name: str,
-    transformer_name: str,
-    target_transformer_object: al_label_transformers_object,
-) -> Path:
-    target_transformer_outpath = get_transformer_path(
-        run_path=run_folder, source_name=output_name, transformer_name=transformer_name
-    )
-    ensure_path_exists(target_transformer_outpath)
-    joblib.dump(value=target_transformer_object, filename=target_transformer_outpath)
-
-    return target_transformer_outpath

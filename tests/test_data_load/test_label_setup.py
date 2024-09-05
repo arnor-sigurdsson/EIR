@@ -1313,28 +1313,6 @@ def test_fill_continuous_nans(get_test_nan_df):
     assert (test_df_filled["C"] == 3.0).all()
 
 
-def get_joblib_patch_target():
-    return "eir.data_load.label_setup.joblib"
-
-
-@patch(get_joblib_patch_target(), autospec=True)
-def test_save_target_transformer(patched_joblib):
-    test_transformer = StandardScaler()
-    test_transformer.fit([[1, 2, 3, 4, 5]])
-
-    label_setup.save_label_transformer(
-        run_folder=Path("/tmp/"),
-        transformer_name="harry_du_bois",
-        output_name="test_output_tabular",
-        target_transformer_object=test_transformer,
-    )
-    assert patched_joblib.dump.call_count == 1
-
-    _, m_kwargs = patched_joblib.dump.call_args
-    # check that we have correct name, with target_transformers tagged on
-    assert m_kwargs["filename"].name == "harry_du_bois.save"
-
-
 @pytest.mark.parametrize(
     "test_input,expected",
     [  # test case 1

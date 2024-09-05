@@ -36,9 +36,9 @@ from eir.data_load.label_setup import (
     gather_ids_from_data_source,
     gather_ids_from_tabular_file,
     get_file_path_iterator,
-    save_transformer_set,
     set_up_train_and_valid_tabular_data,
 )
+from eir.experiment_io.label_transformer_io import save_transformer_set
 from eir.setup import schemas
 from eir.setup.schema_modules.output_schemas_array import ArrayOutputTypeConfig
 from eir.setup.schema_modules.output_schemas_sequence import SequenceOutputTypeConfig

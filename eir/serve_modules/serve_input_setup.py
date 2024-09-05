@@ -12,7 +12,7 @@ from eir.data_load.data_preparation_modules.imputation import (
 from eir.data_load.data_preparation_modules.input_preparation_wrappers import (
     prepare_inputs_memory,
 )
-from eir.experiment_io.experiment_io import load_transformers
+from eir.experiment_io.label_transformer_io import load_transformers
 from eir.predict_modules.predict_input_setup import (
     get_input_setup_function_map_for_predict,
 )
