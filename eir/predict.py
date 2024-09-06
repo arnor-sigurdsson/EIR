@@ -13,10 +13,10 @@ from eir.data_load import datasets, label_setup
 from eir.data_load.label_setup import al_all_column_ops
 from eir.experiment_io.experiment_io import (
     LoadedTrainExperiment,
-    check_version,
-    get_run_folder_from_model_path,
     load_serialized_train_experiment,
 )
+from eir.experiment_io.input_object_io import check_version
+from eir.experiment_io.io_utils import get_run_folder_from_model_path
 from eir.models.model_setup_modules.meta_setup import (
     al_meta_model,
     get_default_meta_class,

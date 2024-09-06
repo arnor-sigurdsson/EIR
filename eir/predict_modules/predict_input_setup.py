@@ -1,7 +1,7 @@
 from functools import partial
 from typing import Callable, Dict, Sequence, Union
 
-from eir.experiment_io.experiment_io import load_serialized_input_object
+from eir.experiment_io.input_object_io import load_serialized_input_object
 from eir.predict_modules.predict_tabular_input_setup import (
     setup_tabular_input_for_testing,
 )

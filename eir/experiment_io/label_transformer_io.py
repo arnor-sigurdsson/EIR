@@ -90,7 +90,7 @@ def save_label_transformer(
         source_name=output_name,
         transformer_name=transformer_name,
     )
-    ensure_path_exists(target_transformer_outpath)
+    ensure_path_exists(path=target_transformer_outpath)
     serialized_data = serialize_transformer(transformer=target_transformer_object)
     write_json(data=serialized_data, path=target_transformer_outpath)
     return target_transformer_outpath

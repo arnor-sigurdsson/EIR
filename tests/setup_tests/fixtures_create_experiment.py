@@ -10,9 +10,9 @@ from torch.utils.data import DataLoader
 from eir import train
 from eir.experiment_io.experiment_io import (
     get_default_experiment_keys_to_serialize,
-    serialize_chosen_input_objects,
     serialize_experiment,
 )
+from eir.experiment_io.input_object_io import serialize_chosen_input_objects
 from eir.setup import config, input_setup, schemas
 from eir.setup.input_setup_modules.setup_tabular import serialize_all_input_transformers
 from eir.setup.output_setup import set_up_outputs_for_training

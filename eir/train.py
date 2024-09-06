@@ -19,9 +19,9 @@ from eir.data_load.label_setup import split_ids
 from eir.experiment_io.experiment_io import (
     get_default_experiment_keys_to_serialize,
     get_version_file,
-    serialize_chosen_input_objects,
     serialize_experiment,
 )
+from eir.experiment_io.input_object_io import serialize_chosen_input_objects
 from eir.models.model_setup import get_model
 from eir.models.model_setup_modules.meta_setup import al_meta_model
 from eir.models.model_training_utils import run_lr_find

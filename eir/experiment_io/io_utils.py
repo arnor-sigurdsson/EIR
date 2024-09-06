@@ -1,0 +1,110 @@
+import json
+from dataclasses import asdict
+from pathlib import Path
+from typing import Any, Callable, Protocol, cast
+
+import numpy as np
+import torch
+
+
+def encode_numpy(obj: np.ndarray) -> dict[str, Any]:
+    return {"__np_array__": obj.tolist(), "dtype": str(obj.dtype)}
+
+
+def encode_torch(obj: torch.Tensor) -> dict[str, Any]:
+    return {
+        "__torch_tensor__": obj.cpu().numpy().tolist(),
+        "dtype": str(obj.dtype),
+        "device": str(obj.device),
+    }
+
+
+def encode_tuple(obj: tuple) -> list:
+    return list(obj)
+
+
+def encode_primitive(obj: Any) -> Any:
+    return obj
+
+
+class EncoderProtocol(Protocol):
+    def __call__(self, obj: Any) -> Any: ...
+
+
+def get_encoder(obj: Any) -> EncoderProtocol:
+    encoders = {
+        np.ndarray: encode_numpy,
+        torch.Tensor: encode_torch,
+        tuple: encode_tuple,
+        int: encode_primitive,
+        float: encode_primitive,
+        str: encode_primitive,
+        bool: encode_primitive,
+        type(None): encode_primitive,
+    }
+
+    encoder = encoders.get(type(obj), encode_primitive)
+
+    return cast(EncoderProtocol, encoder)
+
+
+def custom_encoder(obj: Any) -> Any:
+    return get_encoder(obj=obj)(obj=obj)
+
+
+def decode_numpy(dct: dict[str, Any]) -> np.ndarray:
+    return np.array(dct["__np_array__"], dtype=np.dtype(dct["dtype"]))
+
+
+def decode_torch(dct: dict[str, Any]) -> torch.Tensor:
+    tensor = torch.tensor(
+        dct["__torch_tensor__"], dtype=getattr(torch, str(dct["dtype"]).split(".")[-1])
+    )
+    return tensor.to(dct["device"])
+
+
+def decode_primitive(dct: Any) -> Any:
+    return dct
+
+
+def get_decoder(dct: Any) -> Callable:
+    if isinstance(dct, dict):
+        decoders = {
+            "__np_array__": decode_numpy,
+            "__torch_tensor__": decode_torch,
+        }
+        for key in decoders:
+            if key in dct:
+                return decoders[key]
+    return decode_primitive
+
+
+def custom_decoder(dct: Any) -> Any:
+    return get_decoder(dct=dct)(dct=dct)
+
+
+def serialize_dataclass(obj: Any) -> str:
+    return json.dumps(obj=asdict(obj), default=custom_encoder, indent=2)
+
+
+def deserialize_dataclass(cls: type, json_str: str) -> Any:
+    data = json.loads(s=json_str, object_hook=custom_decoder)
+    return cls(**data)
+
+
+def save_dataclass(obj: Any, file_path: Path) -> None:
+    file_path.write_text(data=serialize_dataclass(obj=obj))
+
+
+def load_dataclass(cls: type, file_path: Path) -> Any:
+    return deserialize_dataclass(cls=cls, json_str=file_path.read_text())
+
+
+def get_run_folder_from_model_path(model_path: str) -> Path:
+    model_path_object = Path(model_path)
+    assert model_path_object.exists()
+
+    run_folder = model_path_object.parents[1]
+    assert run_folder.exists()
+
+    return run_folder

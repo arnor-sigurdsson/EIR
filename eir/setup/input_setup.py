@@ -10,7 +10,7 @@ from typing import (
     Union,
 )
 
-from eir.experiment_io.experiment_io import get_run_folder_from_model_path
+from eir.experiment_io.io_utils import get_run_folder_from_model_path
 from eir.predict_modules.predict_tabular_input_setup import (
     ComputedPredictTabularInputInfo,
 )
@@ -26,7 +26,7 @@ from eir.setup.input_setup_modules.setup_bytes import (
 )
 from eir.setup.input_setup_modules.setup_image import (
     ComputedImageInputInfo,
-    set_up_image_input_for_training,
+    set_up_computed_image_input_object,
 )
 from eir.setup.input_setup_modules.setup_omics import (
     ComputedOmicsInputInfo,
@@ -174,7 +174,7 @@ def get_input_setup_function_map() -> dict[str, Callable[..., al_input_objects]]
         "tabular": set_up_tabular_input_for_training,
         "sequence": set_up_sequence_input_for_training,
         "bytes": set_up_bytes_input_for_training,
-        "image": set_up_image_input_for_training,
+        "image": set_up_computed_image_input_object,
         "array": set_up_array_input,
     }
 
