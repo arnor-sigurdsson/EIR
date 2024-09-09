@@ -16,6 +16,7 @@ from eir.setup.config_setup_modules.config_setup_utils import (
     convert_cl_str_to_dict,
     get_yaml_iterator_with_injections,
     recursive_dict_replace,
+    validate_keys_against_dataclass,
 )
 from tests.setup_tests.fixtures_create_configs import TestConfigInits
 
@@ -324,19 +325,19 @@ class MockDataclass:
 
 def test_validate_keys_against_dataclass():
     valid_input_dict = {"field1": "value1", "field2": 42}
-    config.validate_keys_against_dataclass(
+    validate_keys_against_dataclass(
         input_dict=valid_input_dict, dataclass_type=MockDataclass
     )
 
     invalid_input_dict = {"field1": "value1", "unexpected_field": 42}
     with pytest.raises(KeyError, match="Unexpected keys found"):
-        config.validate_keys_against_dataclass(
+        validate_keys_against_dataclass(
             input_dict=invalid_input_dict, dataclass_type=MockDataclass
         )
 
     non_dataclass_type = int
     with pytest.raises(TypeError, match="Provided type int is not a dataclass"):
-        config.validate_keys_against_dataclass(
+        validate_keys_against_dataclass(
             input_dict=valid_input_dict, dataclass_type=non_dataclass_type
         )
 

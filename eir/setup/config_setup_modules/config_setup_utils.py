@@ -2,9 +2,19 @@ import ast
 import json
 import operator
 from collections import defaultdict
+from dataclasses import fields, is_dataclass
 from functools import reduce
 from pathlib import Path
-from typing import Any, DefaultDict, Dict, Generator, Iterable, MutableMapping, Optional
+from typing import (
+    Any,
+    DefaultDict,
+    Dict,
+    Generator,
+    Iterable,
+    MutableMapping,
+    Optional,
+    Type,
+)
 
 import yaml
 
@@ -97,3 +107,27 @@ def recursive_dict_replace(
 
 def object_to_primitives(obj):
     return json.loads(json.dumps(obj, default=lambda o: o.__dict__))
+
+
+def validate_keys_against_dataclass(
+    input_dict: Dict[str, Any], dataclass_type: Type, name: str = ""
+) -> None:
+    if not is_dataclass(dataclass_type):
+        raise TypeError(f"Provided type {dataclass_type.__name__} is not a dataclass")
+
+    expected_keys = {field_.name for field_ in fields(dataclass_type)}
+
+    actual_keys = set(input_dict.keys())
+
+    unexpected_keys = actual_keys - expected_keys
+    if unexpected_keys:
+        message = (
+            f"Unexpected keys found in configuration: '{', '.join(unexpected_keys)}'. "
+            f"Expected keys of type '{dataclass_type.__name__}': "
+            f"'{', '.join(expected_keys)}'."
+        )
+
+        if name:
+            message = f"{name}: {message}"
+
+        raise KeyError(message)

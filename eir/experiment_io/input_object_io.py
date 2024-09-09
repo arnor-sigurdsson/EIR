@@ -5,14 +5,21 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Union
 
 import dill
-import yaml
 from aislib.misc_utils import ensure_path_exists
 
 from eir import __version__
-from eir.experiment_io.io_utils import load_dataclass, save_dataclass
+from eir.experiment_io.input_object_io_modules.input_io_utils import (
+    load_input_config_from_yaml,
+)
+from eir.experiment_io.input_object_io_modules.sequence_input_io import (
+    load_sequence_input_object,
+)
+from eir.experiment_io.io_utils import (
+    dump_config_to_yaml,
+    load_dataclass,
+    save_dataclass,
+)
 from eir.setup import schemas
-from eir.setup.config import init_input_config
-from eir.setup.config_setup_modules.config_setup_utils import object_to_primitives
 from eir.setup.input_setup_modules.setup_array import ComputedArrayInputInfo
 from eir.setup.input_setup_modules.setup_bytes import ComputedBytesInputInfo
 from eir.setup.input_setup_modules.setup_image import (
@@ -20,10 +27,7 @@ from eir.setup.input_setup_modules.setup_image import (
     ImageNormalizationStats,
     set_up_computed_image_input_object,
 )
-from eir.setup.input_setup_modules.setup_sequence import (
-    ComputedSequenceInputInfo,
-    set_up_computed_sequence_input,
-)
+from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
 from eir.train_utils.utils import get_logger, get_run_folder
 
 if TYPE_CHECKING:
@@ -241,22 +245,6 @@ def _serialize_input_object(
                 dill.dump(obj=input_object, file=outfile)
 
 
-def dump_config_to_yaml(config: Any, output_path: Path) -> None:
-    object_primitive = object_to_primitives(obj=config)
-    ensure_path_exists(path=output_path, is_folder=False)
-    with open(output_path, "w") as outfile:
-        yaml.dump(data=object_primitive, stream=outfile)
-
-
-def load_input_config_from_yaml(input_config_path: Path) -> schemas.InputConfig:
-    with open(input_config_path, "r") as infile:
-        input_config_dict = yaml.safe_load(stream=infile)
-
-    input_config = init_input_config(yaml_config_as_dict=input_config_dict)
-
-    return input_config
-
-
 def _read_serialized_input_object(
     input_class: "al_serializable_input_classes",
     serialized_input_config_path: Path,
@@ -287,23 +275,8 @@ def _read_serialized_input_object(
         )
 
     elif input_class is ComputedSequenceInputInfo:
-        base_path = serialized_input_config_path
-        config_path = base_path / "input_config.yaml"
-        vocab_ordered_path = base_path / "vocab_ordered.txt"
-        computed_max_length_path = base_path / "computed_max_length.json"
-
-        input_config = load_input_config_from_yaml(input_config_path=config_path)
-        computed_max_length = json.loads(computed_max_length_path.read_text())
-
-        input_config_modified = deepcopy(input_config)
-        input_type_info_modified = deepcopy(input_config.input_type_info)
-        assert isinstance(input_type_info_modified, schemas.SequenceInputDataConfig)
-
-        input_type_info_modified.vocab_file = str(vocab_ordered_path)
-        input_type_info_modified.max_length = computed_max_length
-
-        loaded_object = set_up_computed_sequence_input(
-            input_config=input_config_modified
+        loaded_object = load_sequence_input_object(
+            serialized_input_folder=serialized_input_config_path
         )
 
     elif input_class in (

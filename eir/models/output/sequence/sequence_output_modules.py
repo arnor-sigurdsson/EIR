@@ -1,26 +1,18 @@
 from dataclasses import dataclass
-from pathlib import Path
 from typing import TYPE_CHECKING, Dict, Literal
 
-import dill
 import torch
 from torch import nn
-from torch.nn import functional as F
 
 from eir.models.fusion.fusion_attention import MetaSequenceProjection
 from eir.models.input.sequence.transformer_models import (
     BasicTransformerFeatureExtractorModelConfig,
-    TransformerWrapperModel,
     parse_dim_feedforward,
 )
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
-    from eir.models.model_setup_modules.meta_setup import (
-        FeatureExtractorInfo,
-        al_meta_model,
-    )
-    from eir.setup.input_setup import al_input_objects_as_dict
+    from eir.models.model_setup_modules.meta_setup import FeatureExtractorInfo
     from eir.setup.output_setup_modules.sequence_output_setup import (
         ComputedSequenceOutputInfo,
     )
@@ -160,107 +152,3 @@ class SequenceOutputModule(nn.Module):
         out = self.head(out)
 
         return {self.output_name: out}
-
-
-def overload_embeddings_with_pretrained(
-    model: "al_meta_model",
-    inputs: "al_input_objects_as_dict",
-    pretrained_checkpoint: str,
-) -> "al_meta_model":
-    """
-    Vocab: From serialized input object
-    Embeddings: From loaded model
-
-    - If we have a pretrained checkpoint in global config, we have to initialize inputs
-    from that experiment in order to get the vocab per input.
-
-    - If we are using selected ones, we can just use the vocab from the input object
-    here directly.
-
-    In both cases, we have to load the pretrained model to grab the embeddings.
-    Probably it's enough to just use the torch.load() function here, since it's just
-    giving us a dictionary.
-
-    First, let's just assume the global case.
-    """
-
-    if not pretrained_checkpoint:
-        return model
-
-    any_sequence_inputs = any(
-        input_object.input_config.input_info.input_type == "sequence"
-        for input_object in inputs.values()
-    )
-    if not any_sequence_inputs:
-        return model
-
-    logger.info(
-        f"Overloading embeddings with pretrained checkpoint {pretrained_checkpoint}."
-    )
-
-    run_folder = Path(pretrained_checkpoint).parent.parent
-    serialized_inputs = run_folder / "serializations/sequence_input_serializations"
-
-    any_serialized_sequence_inputs = serialized_inputs.exists()
-    if not any_serialized_sequence_inputs:
-        return model
-
-    input_objects_loaded = {}
-    for serialized_input in serialized_inputs.iterdir():
-        input_name = serialized_input.stem
-        with open(serialized_input, "rb") as f:
-            input_object = dill.load(file=f)
-        input_objects_loaded[input_name] = input_object
-
-    loaded_state_dict = torch.load(
-        f=pretrained_checkpoint,
-        weights_only=True,
-    )
-
-    for input_name, input_object in inputs.items():
-        input_type = input_object.input_config.input_info.input_type
-        if input_type != "sequence":
-            continue
-
-        cur_vocab = input_object.vocab.get_stoi()
-        prev_input_object_vocab = input_objects_loaded[input_name].vocab.get_stoi()
-
-        prev_emb_key = f"input_modules.{input_name}.embedding.weight"
-        prev_embeddings = loaded_state_dict[prev_emb_key]
-
-        cur_input_module = model.input_modules[input_name]
-        assert isinstance(cur_input_module, TransformerWrapperModel)
-
-        cur_embedding = cur_input_module.embedding.weight
-        cur_embedding_copy = cur_embedding.clone().detach()
-
-        for token, idx in cur_vocab.items():
-            if token not in prev_input_object_vocab:
-                continue
-
-            prev_idx = prev_input_object_vocab[token]
-            prev_emb = prev_embeddings[prev_idx]
-
-            cur_emb = cur_embedding_copy[idx]
-
-            if prev_emb.shape != cur_emb.shape:
-                logger.warning(
-                    f"Shape mismatch for token {token} in input {input_name}."
-                    f"Applying average pooling to match dimensions."
-                )
-                prev_emb = prev_emb.view(1, 1, -1)
-                prev_emb = F.adaptive_avg_pool1d(
-                    input=prev_emb,
-                    output_size=cur_emb.shape[0],
-                )
-                prev_emb = prev_emb.view(-1)
-
-            cur_embedding_copy[idx] = prev_emb
-
-        cur_input_module.embedding.weight = nn.Parameter(
-            data=cur_embedding_copy,
-            requires_grad=True,
-        )
-        logger.info(f"Overloaded embeddings for {input_name}.")
-
-    return model

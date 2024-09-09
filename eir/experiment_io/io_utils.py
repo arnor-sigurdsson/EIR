@@ -5,6 +5,10 @@ from typing import Any, Callable, Protocol, cast
 
 import numpy as np
 import torch
+import yaml
+from aislib.misc_utils import ensure_path_exists
+
+from eir.setup.config_setup_modules.config_setup_utils import object_to_primitives
 
 
 def encode_numpy(obj: np.ndarray) -> dict[str, Any]:
@@ -108,3 +112,10 @@ def get_run_folder_from_model_path(model_path: str) -> Path:
     assert run_folder.exists()
 
     return run_folder
+
+
+def dump_config_to_yaml(config: Any, output_path: Path) -> None:
+    object_primitive = object_to_primitives(obj=config)
+    ensure_path_exists(path=output_path, is_folder=False)
+    with open(output_path, "w") as outfile:
+        yaml.dump(data=object_primitive, stream=outfile)
