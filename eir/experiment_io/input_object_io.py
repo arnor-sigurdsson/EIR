@@ -1,5 +1,5 @@
 import json
-from copy import copy, deepcopy
+from copy import copy
 from dataclasses import asdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Union
@@ -8,25 +8,20 @@ import dill
 from aislib.misc_utils import ensure_path_exists
 
 from eir import __version__
-from eir.experiment_io.input_object_io_modules.input_io_utils import (
-    load_input_config_from_yaml,
+from eir.experiment_io.input_object_io_modules.bytes_input_io import (
+    load_bytes_input_object,
+)
+from eir.experiment_io.input_object_io_modules.image_input_io import (
+    load_image_input_object,
 )
 from eir.experiment_io.input_object_io_modules.sequence_input_io import (
     load_sequence_input_object,
 )
-from eir.experiment_io.io_utils import (
-    dump_config_to_yaml,
-    load_dataclass,
-    save_dataclass,
-)
+from eir.experiment_io.io_utils import dump_config_to_yaml, save_dataclass
 from eir.setup import schemas
 from eir.setup.input_setup_modules.setup_array import ComputedArrayInputInfo
 from eir.setup.input_setup_modules.setup_bytes import ComputedBytesInputInfo
-from eir.setup.input_setup_modules.setup_image import (
-    ComputedImageInputInfo,
-    ImageNormalizationStats,
-    set_up_computed_image_input_object,
-)
+from eir.setup.input_setup_modules.setup_image import ComputedImageInputInfo
 from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
 from eir.train_utils.utils import get_logger, get_run_folder
 
@@ -101,9 +96,9 @@ def get_input_serialization_path(
 
     base_path = run_folder / "serializations" / f"{input_type}_input_serializations"
     match input_type:
-        case "image" | "sequence":
+        case "image" | "sequence" | "bytes":
             path = base_path / f"{input_name}/"
-        case "bytes" | "array":
+        case "array":
             path = base_path / f"{input_name}.dill"
         case _:
             raise ValueError(f"Invalid input type: {input_type}")
@@ -240,7 +235,17 @@ def _serialize_input_object(
             with open(output_folder / "computed_max_length.json", "w") as f:
                 json.dump(computed_max_length, f)
 
-        case ComputedBytesInputInfo() | ComputedArrayInputInfo():
+        case ComputedBytesInputInfo():
+            dump_config_to_yaml(config=input_config, output_path=config_path)
+
+            with open(output_folder / "vocab.json", "w") as f:
+                json.dump(input_object.vocab, f)
+
+            computed_max_length = input_object.computed_max_length
+            with open(output_folder / "computed_max_length.json", "w") as f:
+                json.dump(computed_max_length, f)
+
+        case ComputedArrayInputInfo():
             with open(output_folder, "wb") as outfile:
                 dill.dump(obj=input_object, file=outfile)
 
@@ -251,27 +256,8 @@ def _read_serialized_input_object(
 ) -> "al_serializable_input_objects":
     loaded_object: "al_serializable_input_objects"
     if input_class is ComputedImageInputInfo:
-        base_path = serialized_input_config_path
-        config_path = base_path / "input_config.yaml"
-        normalization_stats_path = base_path / "normalization_stats.json"
-        num_channels_path = base_path / "num_channels.json"
-
-        input_config = load_input_config_from_yaml(input_config_path=config_path)
-        input_type_info_modified = deepcopy(input_config.input_type_info)
-        assert isinstance(input_type_info_modified, schemas.ImageInputDataConfig)
-
-        normalization_stats = load_dataclass(
-            cls=ImageNormalizationStats, file_path=normalization_stats_path
-        )
-        num_channels = json.loads(num_channels_path.read_text())["num_channels"]
-
-        input_config_modified = deepcopy(input_config)
-        input_type_info_modified.num_channels = num_channels
-        input_config.input_type_info = input_type_info_modified
-
-        loaded_object = set_up_computed_image_input_object(
-            input_config=input_config_modified,
-            normalization_stats=normalization_stats,
+        loaded_object = load_image_input_object(
+            serialized_input_folder=serialized_input_config_path
         )
 
     elif input_class is ComputedSequenceInputInfo:
@@ -279,11 +265,12 @@ def _read_serialized_input_object(
             serialized_input_folder=serialized_input_config_path
         )
 
-    elif input_class in (
-        ComputedSequenceInputInfo,
-        ComputedBytesInputInfo,
-        ComputedArrayInputInfo,
-    ):
+    elif input_class is ComputedBytesInputInfo:
+        loaded_object = load_bytes_input_object(
+            serialized_input_folder=serialized_input_config_path
+        )
+
+    elif input_class in (ComputedArrayInputInfo,):
 
         with open(serialized_input_config_path, "rb") as infile:
             loaded_object = dill.load(file=infile)
