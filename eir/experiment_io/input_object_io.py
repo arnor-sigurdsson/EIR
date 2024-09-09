@@ -299,7 +299,7 @@ def _read_serialized_input_object(
         input_type_info_modified = deepcopy(input_config.input_type_info)
         assert isinstance(input_type_info_modified, schemas.SequenceInputDataConfig)
 
-        input_type_info_modified.vocab_file = vocab_ordered_path
+        input_type_info_modified.vocab_file = str(vocab_ordered_path)
         input_type_info_modified.max_length = computed_max_length
 
         loaded_object = set_up_computed_sequence_input(
