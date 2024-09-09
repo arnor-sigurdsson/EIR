@@ -98,7 +98,7 @@ class ComputedSequenceInputInfo:
     tokenizer: Optional[al_tokenizers]
 
 
-def set_up_sequence_input_for_training(
+def set_up_computed_sequence_input(
     input_config: schemas.InputConfig, *args, **kwargs
 ) -> ComputedSequenceInputInfo:
     model_config = input_config.model_config

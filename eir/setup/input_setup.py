@@ -37,7 +37,7 @@ from eir.setup.input_setup_modules.setup_pretrained import (
 )
 from eir.setup.input_setup_modules.setup_sequence import (
     ComputedSequenceInputInfo,
-    set_up_sequence_input_for_training,
+    set_up_computed_sequence_input,
 )
 from eir.setup.input_setup_modules.setup_tabular import (
     ComputedTabularInputInfo,
@@ -172,7 +172,7 @@ def get_input_setup_function_map() -> dict[str, Callable[..., al_input_objects]]
     setup_mapping: dict[str, Callable[..., al_input_objects]] = {
         "omics": set_up_omics_input,
         "tabular": set_up_tabular_input_for_training,
-        "sequence": set_up_sequence_input_for_training,
+        "sequence": set_up_computed_sequence_input,
         "bytes": set_up_bytes_input_for_training,
         "image": set_up_computed_image_input_object,
         "array": set_up_array_input,

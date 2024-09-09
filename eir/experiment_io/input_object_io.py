@@ -20,7 +20,10 @@ from eir.setup.input_setup_modules.setup_image import (
     ImageNormalizationStats,
     set_up_computed_image_input_object,
 )
-from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
+from eir.setup.input_setup_modules.setup_sequence import (
+    ComputedSequenceInputInfo,
+    set_up_computed_sequence_input,
+)
 from eir.train_utils.utils import get_logger, get_run_folder
 
 if TYPE_CHECKING:
@@ -62,11 +65,6 @@ def load_serialized_input_object(
     )
 
     assert serialized_input_config_path.exists(), serialized_input_config_path
-    # with open(serialized_input_config_path, "rb") as infile:
-    #     serialized_input_config_object: "al_serializable_input_objects" = dill.load(
-    #         file=infile
-    #     )
-
     serialized_input_config_object = _read_serialized_input_object(
         input_class=input_class,
         serialized_input_config_path=serialized_input_config_path,
@@ -99,9 +97,9 @@ def get_input_serialization_path(
 
     base_path = run_folder / "serializations" / f"{input_type}_input_serializations"
     match input_type:
-        case "image":
+        case "image" | "sequence":
             path = base_path / f"{input_name}/"
-        case "sequence" | "bytes" | "array":
+        case "bytes" | "array":
             path = base_path / f"{input_name}.dill"
         case _:
             raise ValueError(f"Invalid input type: {input_type}")
@@ -197,37 +195,49 @@ def serialize_chosen_input_objects(
             ensure_path_exists(path=output_path, is_folder=output_path.is_dir())
             _serialize_input_object(
                 input_object=input_,
-                output_path=output_path,
+                output_folder=output_path,
             )
 
 
 def _serialize_input_object(
     input_object: "al_serializable_input_objects",
-    output_path: Path,
+    output_folder: Path,
 ) -> None:
 
     input_config = input_object.input_config
+    config_path = output_folder / "input_config.yaml"
 
     match input_object:
         case ComputedImageInputInfo():
-            config_path = output_path / "input_config.yaml"
             dump_config_to_yaml(config=input_config, output_path=config_path)
 
             save_dataclass(
                 obj=input_object.normalization_stats,
-                file_path=output_path / "normalization_stats.json",
+                file_path=output_folder / "normalization_stats.json",
             )
 
             num_channels_obj = {"num_channels": input_object.num_channels}
-            with open(output_path / "num_channels.json", "w") as f:
+            with open(output_folder / "num_channels.json", "w") as f:
                 json.dump(num_channels_obj, f)
 
-        case (
-            ComputedSequenceInputInfo()
-            | ComputedBytesInputInfo()
-            | ComputedArrayInputInfo()
-        ):
-            with open(output_path, "wb") as outfile:
+        case ComputedSequenceInputInfo():
+            dump_config_to_yaml(config=input_config, output_path=config_path)
+
+            index_to_string = input_object.vocab.itos
+            with open(output_folder / "vocab_ordered.txt", "w") as f:
+                for token in index_to_string:
+                    f.write(f"{token}\n")
+
+            string_to_index = input_object.vocab.stoi
+            with open(output_folder / "vocab.json", "w") as f:
+                json.dump(string_to_index, f)
+
+            computed_max_length = input_object.computed_max_length
+            with open(output_folder / "computed_max_length.json", "w") as f:
+                json.dump(computed_max_length, f)
+
+        case ComputedBytesInputInfo() | ComputedArrayInputInfo():
+            with open(output_folder, "wb") as outfile:
                 dill.dump(obj=input_object, file=outfile)
 
 
@@ -274,6 +284,26 @@ def _read_serialized_input_object(
         loaded_object = set_up_computed_image_input_object(
             input_config=input_config_modified,
             normalization_stats=normalization_stats,
+        )
+
+    elif input_class is ComputedSequenceInputInfo:
+        base_path = serialized_input_config_path
+        config_path = base_path / "input_config.yaml"
+        vocab_ordered_path = base_path / "vocab_ordered.txt"
+        computed_max_length_path = base_path / "computed_max_length.json"
+
+        input_config = load_input_config_from_yaml(input_config_path=config_path)
+        computed_max_length = json.loads(computed_max_length_path.read_text())
+
+        input_config_modified = deepcopy(input_config)
+        input_type_info_modified = deepcopy(input_config.input_type_info)
+        assert isinstance(input_type_info_modified, schemas.SequenceInputDataConfig)
+
+        input_type_info_modified.vocab_file = vocab_ordered_path
+        input_type_info_modified.max_length = computed_max_length
+
+        loaded_object = set_up_computed_sequence_input(
+            input_config=input_config_modified
         )
 
     elif input_class in (

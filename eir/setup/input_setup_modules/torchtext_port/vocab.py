@@ -1,13 +1,22 @@
-from typing import Dict, List, Optional, Sequence
+from typing import Optional, Sequence
 
 
 class Vocab:
-    def __init__(self, tokens: Optional[List[str]] = None):
+    def __init__(
+        self,
+        tokens: Optional[list[str]] = None,
+        stoi: Optional[dict[str, int]] = None,
+    ):
         self.itos: list[str] = []  # index to string
         self.stoi: dict[str, int] = {}  # string to index
         self.default_index: int = -1
 
-        if tokens:
+        if stoi:
+            self.stoi = stoi.copy()
+            self.itos = [""] * (max(stoi.values()) + 1)
+            for token, index in stoi.items():
+                self.itos[index] = token
+        elif tokens:
             for token in tokens:
                 self.append_token(token)
 
@@ -20,16 +29,7 @@ class Vocab:
     def __getitem__(self, token: str) -> int:
         return self.stoi.get(token, self.default_index)
 
-    def __call__(self, tokens: Sequence[str]) -> List[int]:
-        """
-        Returns the indices associated with a list of tokens.
-
-        Args:
-            tokens: A list of tokens to lookup.
-
-        Returns:
-            A list of indices corresponding to the input tokens.
-        """
+    def __call__(self, tokens: Sequence[str]) -> list[int]:
         return self.lookup_indices(list(tokens))
 
     def set_default_index(self, index: int) -> None:
@@ -60,14 +60,14 @@ class Vocab:
             raise IndexError(f"Index {index} out of range [0, {len(self.itos)})")
         return self.itos[index]
 
-    def lookup_tokens(self, indices: List[int]) -> List[str]:
+    def lookup_tokens(self, indices: list[int]) -> list[str]:
         return [self.lookup_token(index) for index in indices]
 
-    def lookup_indices(self, tokens: List[str]) -> List[int]:
+    def lookup_indices(self, tokens: list[str]) -> list[int]:
         return [self[token] for token in tokens]
 
-    def get_stoi(self) -> Dict[str, int]:
+    def get_stoi(self) -> dict[str, int]:
         return self.stoi.copy()
 
-    def get_itos(self) -> List[str]:
+    def get_itos(self) -> list[str]:
         return self.itos.copy()
