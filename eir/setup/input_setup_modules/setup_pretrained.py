@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Callable, Dict
 
 from eir.experiment_io.input_object_io import load_serialized_input_object
-from eir.setup.input_setup_modules.setup_array import set_up_array_input
+from eir.setup.input_setup_modules.setup_array import set_up_array_input_object
 from eir.setup.input_setup_modules.setup_bytes import ComputedBytesInputInfo
 from eir.setup.input_setup_modules.setup_image import ComputedImageInputInfo
 from eir.setup.input_setup_modules.setup_omics import set_up_omics_input
@@ -39,7 +39,7 @@ def get_input_setup_from_pretrained_function_map(
             run_folder=run_folder,
             custom_input_name=load_module_name,
         ),
-        "array": set_up_array_input,
+        "array": set_up_array_input_object,
     }
 
     return pretrained_setup_mapping

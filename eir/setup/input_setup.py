@@ -18,7 +18,7 @@ from eir.serve_modules.serve_schemas import ComputedServeTabularInputInfo
 from eir.setup import schemas
 from eir.setup.input_setup_modules.setup_array import (
     ComputedArrayInputInfo,
-    set_up_array_input,
+    set_up_array_input_object,
 )
 from eir.setup.input_setup_modules.setup_bytes import (
     ComputedBytesInputInfo,
@@ -175,7 +175,7 @@ def get_input_setup_function_map() -> dict[str, Callable[..., al_input_objects]]
         "sequence": set_up_computed_sequence_input,
         "bytes": set_up_bytes_input_for_training,
         "image": set_up_computed_image_input_object,
-        "array": set_up_array_input,
+        "array": set_up_array_input_object,
     }
 
     return setup_mapping

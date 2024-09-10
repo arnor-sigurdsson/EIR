@@ -23,7 +23,9 @@ class ComputedOmicsInputInfo:
 
 
 def set_up_omics_input(
-    input_config: schemas.InputConfig, *args, **kwargs
+    input_config: schemas.InputConfig,
+    *args,
+    **kwargs,
 ) -> ComputedOmicsInputInfo:
     data_dimensions = get_data_dimension_from_data_source(
         data_source=Path(input_config.input_info.input_source),

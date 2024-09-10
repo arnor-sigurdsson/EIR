@@ -4,10 +4,12 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Union
 
-import dill
 from aislib.misc_utils import ensure_path_exists
 
 from eir import __version__
+from eir.experiment_io.input_object_io_modules.array_input_io import (
+    load_array_input_object,
+)
 from eir.experiment_io.input_object_io_modules.bytes_input_io import (
     load_bytes_input_object,
 )
@@ -96,10 +98,8 @@ def get_input_serialization_path(
 
     base_path = run_folder / "serializations" / f"{input_type}_input_serializations"
     match input_type:
-        case "image" | "sequence" | "bytes":
+        case "image" | "sequence" | "bytes" | "array":
             path = base_path / f"{input_name}/"
-        case "array":
-            path = base_path / f"{input_name}.dill"
         case _:
             raise ValueError(f"Invalid input type: {input_type}")
 
@@ -246,8 +246,21 @@ def _serialize_input_object(
                 json.dump(computed_max_length, f)
 
         case ComputedArrayInputInfo():
-            with open(output_folder, "wb") as outfile:
-                dill.dump(obj=input_object, file=outfile)
+            dump_config_to_yaml(config=input_config, output_path=config_path)
+
+            save_dataclass(
+                obj=input_object.normalization_stats,
+                file_path=output_folder / "normalization_stats.json",
+            )
+
+            dtype_str = str(input_object.dtype)
+            with open(output_folder / "dtype.json", "w") as f:
+                json.dump(dtype_str, f)
+
+            save_dataclass(
+                obj=input_object.data_dimensions,
+                file_path=output_folder / "data_dimensions.json",
+            )
 
 
 def _read_serialized_input_object(
@@ -270,10 +283,11 @@ def _read_serialized_input_object(
             serialized_input_folder=serialized_input_config_path
         )
 
-    elif input_class in (ComputedArrayInputInfo,):
+    elif input_class is ComputedArrayInputInfo:
+        loaded_object = load_array_input_object(
+            serialized_input_folder=serialized_input_config_path
+        )
 
-        with open(serialized_input_config_path, "rb") as infile:
-            loaded_object = dill.load(file=infile)
     else:
         raise ValueError(f"Invalid input class: {input_class}")
 

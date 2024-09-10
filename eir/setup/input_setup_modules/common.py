@@ -59,7 +59,10 @@ def get_data_dimension_from_data_source(
         extra_dims = shape[3:]
 
     return DataDimensions(
-        channels=channels, height=height, width=width, extra_dims=extra_dims
+        channels=channels,
+        height=height,
+        width=width,
+        extra_dims=extra_dims,
     )
 
 
