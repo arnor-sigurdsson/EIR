@@ -248,10 +248,11 @@ def _serialize_input_object(
         case ComputedArrayInputInfo():
             dump_config_to_yaml(config=input_config, output_path=config_path)
 
-            save_dataclass(
-                obj=input_object.normalization_stats,
-                file_path=output_folder / "normalization_stats.json",
-            )
+            if input_object.normalization_stats is not None:
+                save_dataclass(
+                    obj=input_object.normalization_stats,
+                    file_path=output_folder / "normalization_stats.json",
+                )
 
             dtype_str = str(input_object.dtype)
             with open(output_folder / "dtype.json", "w") as f:

@@ -24,7 +24,7 @@ class DataDimensions:
         return int(base * np.prod(self.extra_dims))
 
     def full_shape(self) -> Tuple[int, ...]:
-        return (self.channels, self.height, self.width) + self.extra_dims
+        return tuple([self.channels, self.height, self.width] + list(self.extra_dims))
 
 
 def get_data_dimension_from_data_source(
