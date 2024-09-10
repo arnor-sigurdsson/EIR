@@ -4,6 +4,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Union
 
+import numpy as np
 from aislib.misc_utils import ensure_path_exists
 
 from eir import __version__
@@ -16,6 +17,9 @@ from eir.experiment_io.input_object_io_modules.bytes_input_io import (
 from eir.experiment_io.input_object_io_modules.image_input_io import (
     load_image_input_object,
 )
+from eir.experiment_io.input_object_io_modules.omics_input_io import (
+    load_omics_input_object,
+)
 from eir.experiment_io.input_object_io_modules.sequence_input_io import (
     load_sequence_input_object,
 )
@@ -24,6 +28,7 @@ from eir.setup import schemas
 from eir.setup.input_setup_modules.setup_array import ComputedArrayInputInfo
 from eir.setup.input_setup_modules.setup_bytes import ComputedBytesInputInfo
 from eir.setup.input_setup_modules.setup_image import ComputedImageInputInfo
+from eir.setup.input_setup_modules.setup_omics import ComputedOmicsInputInfo
 from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
 from eir.train_utils.utils import get_logger, get_run_folder
 
@@ -98,7 +103,7 @@ def get_input_serialization_path(
 
     base_path = run_folder / "serializations" / f"{input_type}_input_serializations"
     match input_type:
-        case "image" | "sequence" | "bytes" | "array":
+        case "image" | "sequence" | "bytes" | "array" | "omics":
             path = base_path / f"{input_name}/"
         case _:
             raise ValueError(f"Invalid input type: {input_type}")
@@ -168,7 +173,14 @@ def _should_skip_warning(key: str, current_value: Any, loaded_value: Any) -> boo
 def serialize_chosen_input_objects(
     inputs_dict: "al_input_objects_as_dict", run_folder: Path
 ) -> None:
-    targets_to_serialize = {"sequence", "bytes", "image", "array"}
+    targets_to_serialize = {
+        "sequence",
+        "bytes",
+        "image",
+        "array",
+        "omics",
+    }
+
     for input_name, input_ in inputs_dict.items():
         input_type = input_.input_config.input_info.input_type
 
@@ -188,6 +200,7 @@ def serialize_chosen_input_objects(
                     ComputedSequenceInputInfo,
                     ComputedBytesInputInfo,
                     ComputedArrayInputInfo,
+                    ComputedOmicsInputInfo,
                 ),
             )
 
@@ -263,6 +276,33 @@ def _serialize_input_object(
                 file_path=output_folder / "data_dimensions.json",
             )
 
+        case ComputedOmicsInputInfo():
+            dump_config_to_yaml(config=input_config, output_path=config_path)
+
+            input_type_info = input_config.input_type_info
+            assert isinstance(input_type_info, schemas.OmicsInputDataConfig)
+
+            subset_indices_file = input_type_info.subset_snps_file
+            if subset_indices_file:
+                subset_indices_file_src = Path(subset_indices_file)
+                subset_indices_file_dst = output_folder / "subset_snps_file.txt"
+                subset_indices_file_dst.write_text(subset_indices_file_src.read_text())
+
+            snp_file = input_type_info.snp_file
+            if snp_file:
+                snp_file_src = Path(snp_file)
+                snp_file_dst = output_folder / "snps.bim"
+                snp_file_dst.write_text(snp_file_src.read_text())
+
+            save_dataclass(
+                obj=input_object.data_dimensions,
+                file_path=output_folder / "data_dimensions.json",
+            )
+
+            subset_indices = input_object.subset_indices
+            if subset_indices is not None:
+                np.save(file=output_folder / "subset_indices.npy", arr=subset_indices)
+
 
 def _read_serialized_input_object(
     input_class: "al_serializable_input_classes",
@@ -286,6 +326,11 @@ def _read_serialized_input_object(
 
     elif input_class is ComputedArrayInputInfo:
         loaded_object = load_array_input_object(
+            serialized_input_folder=serialized_input_config_path
+        )
+
+    elif input_class is ComputedOmicsInputInfo:
+        loaded_object = load_omics_input_object(
             serialized_input_folder=serialized_input_config_path
         )
 

@@ -24,13 +24,16 @@ class ComputedOmicsInputInfo:
 
 def set_up_omics_input(
     input_config: schemas.InputConfig,
+    data_dimensions: Optional["DataDimensions"] = None,
     *args,
     **kwargs,
 ) -> ComputedOmicsInputInfo:
-    data_dimensions = get_data_dimension_from_data_source(
-        data_source=Path(input_config.input_info.input_source),
-        deeplake_inner_key=input_config.input_info.input_inner_key,
-    )
+
+    if data_dimensions is None:
+        data_dimensions = get_data_dimension_from_data_source(
+            data_source=Path(input_config.input_info.input_source),
+            deeplake_inner_key=input_config.input_info.input_inner_key,
+        )
 
     subset_indices = None
     input_type_info = input_config.input_type_info

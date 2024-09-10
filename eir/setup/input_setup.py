@@ -68,6 +68,7 @@ al_serializable_input_objects = Union[
     ComputedImageInputInfo,
     ComputedBytesInputInfo,
     ComputedArrayInputInfo,
+    ComputedOmicsInputInfo,
 ]
 
 al_serializable_input_classes = Union[
@@ -75,6 +76,7 @@ al_serializable_input_classes = Union[
     Type[ComputedImageInputInfo],
     Type[ComputedBytesInputInfo],
     Type[ComputedArrayInputInfo],
+    Type[ComputedOmicsInputInfo],
 ]
 
 
