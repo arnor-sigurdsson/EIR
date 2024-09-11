@@ -8,8 +8,10 @@ from aislib.misc_utils import ensure_path_exists
 
 from eir.experiment_io.configs_io import load_configs
 from eir.experiment_io.input_object_io import check_version
+from eir.experiment_io.label_transformer_io import load_transformers
 from eir.setup.config import Configs
 from eir.setup.output_setup import al_output_objects_as_dict
+from eir.train_utils.metrics import get_default_metrics
 from eir.train_utils.step_logic import get_default_hooks
 from eir.utils.logging import get_logger
 
@@ -49,6 +51,17 @@ def load_serialized_train_experiment(run_folder: Path) -> LoadedTrainExperiment:
 
     hooks = get_default_hooks(configs=configs_loaded)
     train_experiment_as_dict["hooks"] = hooks
+
+    transformers = load_transformers(run_folder=run_folder)
+    gc = configs_loaded.global_config
+    metrics = get_default_metrics(
+        target_transformers=transformers,
+        cat_metrics=gc.metrics.cat_metrics,
+        con_metrics=gc.metrics.con_metrics,
+        cat_averaging_metrics=gc.metrics.cat_averaging_metrics,
+        con_averaging_metrics=gc.metrics.con_averaging_metrics,
+    )
+    train_experiment_as_dict["metrics"] = metrics
 
     loaded_experiment = LoadedTrainExperiment(**train_experiment_as_dict)
 
@@ -98,10 +111,7 @@ def serialize_namespace(namespace: SimpleNamespace, output_path: Path) -> None:
 
 
 def get_default_experiment_keys_to_serialize() -> Iterable[str]:
-    return (
-        "outputs",
-        "metrics",
-    )
+    return ("outputs",)
 
 
 def get_version_file(run_folder: Path) -> Path:
