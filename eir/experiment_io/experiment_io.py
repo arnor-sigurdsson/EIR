@@ -10,6 +10,7 @@ from eir.experiment_io.configs_io import load_configs
 from eir.experiment_io.input_object_io import check_version
 from eir.setup.config import Configs
 from eir.setup.output_setup import al_output_objects_as_dict
+from eir.train_utils.step_logic import get_default_hooks
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -45,6 +46,9 @@ def load_serialized_train_experiment(run_folder: Path) -> LoadedTrainExperiment:
     configs_folder = run_folder / "configs"
     configs_loaded = load_configs(configs_root_folder=configs_folder)
     train_experiment_as_dict["configs"] = configs_loaded
+
+    hooks = get_default_hooks(configs=configs_loaded)
+    train_experiment_as_dict["hooks"] = hooks
 
     loaded_experiment = LoadedTrainExperiment(**train_experiment_as_dict)
 
@@ -97,7 +101,6 @@ def get_default_experiment_keys_to_serialize() -> Iterable[str]:
     return (
         "outputs",
         "metrics",
-        "hooks",
     )
 
 
