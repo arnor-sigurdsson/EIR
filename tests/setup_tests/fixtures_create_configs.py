@@ -44,31 +44,33 @@ def create_test_config_init_base(
         expected_keys = set(TestConfigInits.__dataclass_fields__.keys())
         assert injections_keys.issubset(expected_keys)
 
-    test_global_init = get_test_base_global_init()
+    test_global_init_base = get_test_base_global_init()
     test_global_init = general_sequence_inject(
-        sequence=test_global_init,
+        sequence=test_global_init_base,
         inject_dict=injections.get("global_configs", {}),
     )
 
+    input_init_dicts = injections.get("input_configs", {})
     test_input_init = get_test_inputs_inits(
         test_path=create_test_data.scoped_tmp_path,
-        input_config_dicts=injections.get("input_configs", {}),
+        input_config_dicts=input_init_dicts,
         split_to_test=create_test_data.request_params.get("split_to_test", False),
         source=create_test_data.source,
         extra_kwargs=create_test_data.extras,
     )
 
     model_type = injections.get("fusion_configs", {}).get("model_type", "mlp-residual")
-    test_fusion_init = get_test_base_fusion_init(model_type=model_type)
+    test_fusion_init_base = get_test_base_fusion_init(model_type=model_type)
 
     test_fusion_init = general_sequence_inject(
-        sequence=test_fusion_init,
+        sequence=test_fusion_init_base,
         inject_dict=injections.get("fusion_configs", {}),
     )
 
+    output_init_dicts = injections.get("output_configs", {})
     test_output_init = get_test_outputs_inits(
         test_path=create_test_data.scoped_tmp_path,
-        output_configs_dicts=injections.get("output_configs", {}),
+        output_configs_dicts=output_init_dicts,
         split_to_test=create_test_data.request_params.get("split_to_test", False),
         source=create_test_data.source,
     )

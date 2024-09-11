@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
+from eir import train
 from eir.predict_modules import predict_data, predict_input_setup, predict_target_setup
 from eir.setup import config
 from eir.setup.output_setup import set_up_outputs_for_training
@@ -186,6 +187,9 @@ def test_set_up_test_dataset(
     test_data_config = create_test_data
     test_configs = create_test_config
 
+    hooks = train.get_default_hooks(configs=test_configs)
+    train.get_default_experiment(configs=test_configs, hooks=hooks)
+
     test_ids = gather_all_ids_from_output_configs(
         output_configs=test_configs.output_configs
     )
@@ -245,7 +249,10 @@ def test_set_up_test_dataset(
     )
 
 
-def _get_mock_transformers(cat_target_column: str, con_target_column: str):
+def _get_mock_transformers(
+    cat_target_column: str,
+    con_target_column: str,
+):
     mock_label_encoder = LabelEncoder().fit(["Asia", "Europe", "Africa"])
     transformers = {"test_output_tabular": {cat_target_column: mock_label_encoder}}
     mock_standard_scaler = StandardScaler().fit([[1], [2], [3]])

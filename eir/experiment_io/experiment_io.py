@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Iterable, Union
 import dill
 from aislib.misc_utils import ensure_path_exists
 
+from eir.experiment_io.configs_io import load_configs
 from eir.experiment_io.input_object_io import check_version
 from eir.setup.config import Configs
 from eir.setup.output_setup import al_output_objects_as_dict
@@ -31,15 +32,21 @@ class LoadedTrainExperiment:
 def load_serialized_train_experiment(run_folder: Path) -> LoadedTrainExperiment:
     check_version(run_folder=run_folder)
 
-    train_config_path = get_train_experiment_serialization_path(run_folder=run_folder)
-    with open(train_config_path, "rb") as infile:
-        train_config = dill.load(file=infile)
+    train_experiment_path = get_train_experiment_serialization_path(
+        run_folder=run_folder
+    )
+    with open(train_experiment_path, "rb") as infile:
+        train_experiment_object = dill.load(file=infile)
 
     expected_keys = get_default_experiment_keys_to_serialize()
-    train_config_as_dict = train_config.__dict__
-    assert set(train_config_as_dict.keys()) == set(expected_keys)
+    train_experiment_as_dict = train_experiment_object.__dict__
+    assert set(train_experiment_as_dict.keys()) == set(expected_keys)
 
-    loaded_experiment = LoadedTrainExperiment(**train_config_as_dict)
+    configs_folder = run_folder / "configs"
+    configs_loaded = load_configs(configs_root_folder=configs_folder)
+    train_experiment_as_dict["configs"] = configs_loaded
+
+    loaded_experiment = LoadedTrainExperiment(**train_experiment_as_dict)
 
     return loaded_experiment
 
@@ -88,7 +95,6 @@ def serialize_namespace(namespace: SimpleNamespace, output_path: Path) -> None:
 
 def get_default_experiment_keys_to_serialize() -> Iterable[str]:
     return (
-        "configs",
         "outputs",
         "metrics",
         "hooks",
