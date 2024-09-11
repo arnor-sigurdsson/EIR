@@ -198,7 +198,7 @@ python-json-logger==2.0.7 ; python_full_version >= "3.12.0" and python_version <
 python-multipart==0.0.9 ; python_full_version >= "3.12.0" and python_version < "3.13"
 pytorch-ignite==0.5.1 ; python_full_version >= "3.12.0" and python_version < "3.13"
 pytorch-ranger==0.1.1 ; python_full_version >= "3.12.0" and python_version < "3.13"
-pytz==2024.1 ; python_full_version >= "3.12.0" and python_version < "3.13"
+pytz==2024.2 ; python_full_version >= "3.12.0" and python_version < "3.13"
 pywin32==306 ; sys_platform == "win32" and platform_python_implementation != "PyPy" and python_full_version >= "3.12.0" and python_version < "3.13"
 pywinpty==2.0.13 ; python_full_version >= "3.12.0" and python_version < "3.13" and os_name == "nt"
 pyyaml==6.0.2 ; python_full_version >= "3.12.0" and python_version < "3.13"
