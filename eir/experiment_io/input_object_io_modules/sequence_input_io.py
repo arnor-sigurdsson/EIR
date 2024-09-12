@@ -31,6 +31,9 @@ def load_sequence_input_object(
 
     input_config_modified.input_type_info = input_type_info_modified
 
-    loaded_object = set_up_computed_sequence_input(input_config=input_config_modified)
+    loaded_object = set_up_computed_sequence_input(
+        input_config=input_config_modified,
+        mode="eval",
+    )
 
     return loaded_object
