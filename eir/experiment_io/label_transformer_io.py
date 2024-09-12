@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 
 def get_transformer_sources(run_folder: Path) -> dict[str, list[str]]:
-    transformers_to_load = {}
+    transformers_to_load: dict[str, list[str]] = {}
     transformer_sources = run_folder / "serializations/transformers"
 
     if not transformer_sources.exists():
