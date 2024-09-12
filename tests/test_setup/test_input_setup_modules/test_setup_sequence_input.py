@@ -373,7 +373,7 @@ def test_get_sequence_input_objects_from_pretrained(sync_vocab_mock, tokenizer_m
     tokenizer_mock.return_value.encode.return_value = [1, 2, 3]
 
     func = setup_sequence.get_sequence_input_objects_from_pretrained
-    (vocab, stats, tokenizer, encode) = func(input_config=input_config)
+    (vocab, stats, tokenizer, encode) = func(input_config=input_config, mode="train")
 
     assert tokenizer_mock.called
     assert sync_vocab_mock.called
