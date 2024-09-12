@@ -268,6 +268,12 @@ def get_config_sequence_matching_func(
                     predict_dict_iterator=predict_dict_iterator,
                 )
 
+            case "image":
+                match = _check_matching_general_output_configs(
+                    train_config=train_config,
+                    predict_dict_iterator=predict_dict_iterator,
+                )
+
             case _:
                 raise NotImplementedError(
                     f"Output type '{train_config.output_info.output_type}' "

@@ -16,12 +16,9 @@ from eir import __version__
 from eir.data_load import datasets
 from eir.data_load.data_utils import get_train_sampler
 from eir.data_load.label_setup import split_ids
-from eir.experiment_io.experiment_io import (
-    get_default_experiment_keys_to_serialize,
-    get_version_file,
-    serialize_experiment,
-)
+from eir.experiment_io.experiment_io import get_version_file
 from eir.experiment_io.input_object_io import serialize_chosen_input_objects
+from eir.experiment_io.output_object_io import serialize_output_objects
 from eir.models.model_setup import get_model
 from eir.models.model_setup_modules.meta_setup import al_meta_model
 from eir.models.model_training_utils import run_lr_find
@@ -167,6 +164,8 @@ def get_default_experiment(
         input_objects=inputs_as_dict,
         target_transformers=getattr(target_labels, "label_transformers", None),
     )
+    serialize_output_objects(output_objects=outputs_as_dict, run_folder=run_folder)
+
     inputs_as_dict = converge_sequence_input_and_output(
         inputs=inputs_as_dict, outputs=outputs_as_dict
     )
@@ -405,13 +404,6 @@ def run_experiment(experiment: Experiment) -> None:
     run_folder = utils.get_run_folder(output_folder=gc.be.output_folder)
 
     _log_eir_version_info(outfile=get_version_file(run_folder=run_folder))
-
-    keys_to_serialize = get_default_experiment_keys_to_serialize()
-    serialize_experiment(
-        experiment=experiment,
-        run_folder=run_folder,
-        keys_to_serialize=keys_to_serialize,
-    )
 
     train(experiment=experiment)
 

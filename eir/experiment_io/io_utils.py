@@ -8,7 +8,11 @@ import torch
 import yaml
 from aislib.misc_utils import ensure_path_exists
 
+from eir import __version__
 from eir.setup.config_setup_modules.config_setup_utils import object_to_primitives
+from eir.utils.logging import get_logger
+
+logger = get_logger(name=__name__)
 
 
 def encode_numpy(obj: np.ndarray) -> dict[str, Any]:
@@ -119,3 +123,20 @@ def dump_config_to_yaml(config: Any, output_path: Path) -> None:
     ensure_path_exists(path=output_path, is_folder=False)
     with open(output_path, "w") as outfile:
         yaml.dump(data=object_primitive, stream=outfile)
+
+
+def check_version(run_folder: Path) -> None:
+    version_file = run_folder / "meta/eir_version.txt"
+    if not version_file.exists():
+        return
+
+    cur_version = __version__
+    with open(version_file, "r") as f:
+        loaded_version = f.read().strip()
+
+    if cur_version != loaded_version:
+        logger.warning(
+            f"The version of EIR used to train this model is {loaded_version}, "
+            f"while the current version is {cur_version}. "
+            f"This may cause unexpected behavior and subtle bugs."
+        )

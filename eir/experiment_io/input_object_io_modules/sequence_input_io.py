@@ -29,6 +29,8 @@ def load_sequence_input_object(
     input_type_info_modified.vocab_file = str(vocab_ordered_path)
     input_type_info_modified.max_length = computed_max_length
 
+    input_config_modified.input_type_info = input_type_info_modified
+
     loaded_object = set_up_computed_sequence_input(input_config=input_config_modified)
 
     return loaded_object

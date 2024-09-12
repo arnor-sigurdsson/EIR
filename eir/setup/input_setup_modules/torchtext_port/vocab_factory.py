@@ -67,6 +67,7 @@ def build_vocab_from_iterator(
     specials: Optional[list[str]] = None,
     special_first: bool = True,
     max_tokens: Optional[int] = None,
+    sort_by_freq: bool = False,
 ) -> Vocab:
     """
     Build a Vocab from an iterator.
@@ -80,6 +81,7 @@ def build_vocab_from_iterator(
         or at the end.
         max_tokens: If provided, creates the vocab from the
         `max_tokens - len(specials)` most frequent tokens.
+        sort_by_freq: If true, sort the vocab by frequency in descending order.
 
     Returns:
         Vocab: A `Vocab` object
@@ -93,15 +95,31 @@ def build_vocab_from_iterator(
         >>> print(vocab.get_itos())  # prints ['<unk>', 'the', 'lazy', 'dog', ...]
         >>> vocab.set_default_index(vocab['<unk>'])
         >>> print(vocab['river'])  # prints 0 (index of <unk>)
+
+    Note:
+        We have the isinstance check there as when e.g. reading from a vocabulary file,
+        each token will be yielded as a string, not as a list of strings (as hen
+        e.g. yielding from files split on e.g. whitespace). When the Counter just
+        gets a string, it will count the individual characters, which is not what we
+        want.
+
+        We have the sort_by_freq parameter to ensure that e.g. when building a vocab
+        from a vocab file, the order of the tokens in the file is preserved.
+
     """
     counter: Counter = Counter()
     for tokens in iterator:
+        if isinstance(tokens, str):
+            tokens = [tokens]
         counter.update(tokens)
 
     specials = specials or []
 
-    # Sort by descending frequency, then lexicographically
-    sorted_by_freq_tuples = sorted(counter.items(), key=lambda x: (-x[1], x[0]))
+    if sort_by_freq:
+        # Sort by descending frequency, then lexicographically
+        sorted_order = sorted(counter.items(), key=lambda x: (-x[1], x[0]))
+    else:
+        sorted_order = list(counter.items())
 
     if max_tokens is not None:
         if len(specials) >= max_tokens:
@@ -109,9 +127,9 @@ def build_vocab_from_iterator(
                 "len(specials) >= max_tokens, so the "
                 "vocab will be entirely special tokens."
             )
-        sorted_by_freq_tuples = sorted_by_freq_tuples[: max_tokens - len(specials)]
+        sorted_order = sorted_order[: max_tokens - len(specials)]
 
-    ordered_dict = OrderedDict(sorted_by_freq_tuples)
+    ordered_dict = OrderedDict(sorted_order)
 
     return vocab(
         ordered_dict=ordered_dict,

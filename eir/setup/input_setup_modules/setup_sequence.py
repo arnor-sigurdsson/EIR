@@ -107,6 +107,7 @@ def set_up_computed_sequence_input(
     sequence_input_object_func = _get_sequence_input_object_func(
         pretrained=model_config.pretrained_model
     )
+
     vocab, gathered_stats, tokenizer, encode_callable = sequence_input_object_func(
         input_config=input_config
     )
@@ -218,7 +219,8 @@ def init_vocab(
             deeplake_inner_key=inner_key,
         )
         tokenized_vocab_iter = get_tokenized_vocab_iterator(
-            vocab_iterator=vocab_iter, tokenizer=tokenizer
+            vocab_iterator=vocab_iter,
+            tokenizer=tokenizer,
         )
 
         min_freq = _init_min_freq(
@@ -226,10 +228,12 @@ def init_vocab(
             min_freq=min_freq,
         )
 
+        do_sort_by_freq = False if vocab_file else True
         vocab = build_vocab_from_iterator(
             iterator=tokenized_vocab_iter,
             specials=get_default_sequence_specials(),
             min_freq=min_freq,
+            sort_by_freq=do_sort_by_freq,
         )
 
     vocab.set_default_index(vocab["<unk>"])
@@ -644,7 +648,9 @@ def yield_tokens_from_deeplake_dataset(
 
 
 def yield_tokens_from_file(
-    file_path: str, split_on: Optional[str], gathered_stats: GatheredSequenceStats
+    file_path: str,
+    split_on: Optional[str],
+    gathered_stats: GatheredSequenceStats,
 ) -> Generator[Sequence[str], None, None]:
     gathered_stats.total_files += 1
 

@@ -325,6 +325,22 @@ def _get_predict_test_data_parametrization() -> List[Dict[str, Any]]:
                             },
                         },
                     },
+                    {
+                        "output_info": {
+                            "output_name": "test_image",
+                        },
+                        "output_type_info": {
+                            "loss": "mse",
+                            "size": [16, 16],
+                        },
+                        "model_config": {
+                            "model_type": "cnn",
+                            "model_init_config": {
+                                "channel_exp_base": 4,
+                                "allow_pooling": False,
+                            },
+                        },
+                    },
                 ],
             },
         },

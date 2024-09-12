@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Any, Union
 import numpy as np
 from aislib.misc_utils import ensure_path_exists
 
-from eir import __version__
 from eir.experiment_io.input_object_io_modules.array_input_io import (
     load_array_input_object,
 )
@@ -23,7 +22,11 @@ from eir.experiment_io.input_object_io_modules.omics_input_io import (
 from eir.experiment_io.input_object_io_modules.sequence_input_io import (
     load_sequence_input_object,
 )
-from eir.experiment_io.io_utils import dump_config_to_yaml, save_dataclass
+from eir.experiment_io.io_utils import (
+    check_version,
+    dump_config_to_yaml,
+    save_dataclass,
+)
 from eir.setup import schemas
 from eir.setup.input_setup_modules.setup_array import ComputedArrayInputInfo
 from eir.setup.input_setup_modules.setup_bytes import ComputedBytesInputInfo
@@ -64,16 +67,16 @@ def load_serialized_input_object(
     if custom_input_name:
         input_name = custom_input_name
 
-    serialized_input_config_path = get_input_serialization_path(
+    serialized_input_folder_path = get_input_serialization_path(
         run_folder=run_folder,
         input_name=input_name,
         input_type=input_type,
     )
 
-    assert serialized_input_config_path.exists(), serialized_input_config_path
+    assert serialized_input_folder_path.exists(), serialized_input_folder_path
     serialized_input_config_object = _read_serialized_input_object(
         input_class=input_class,
-        serialized_input_config_path=serialized_input_config_path,
+        serialized_input_folder=serialized_input_folder_path,
     )
 
     assert isinstance(serialized_input_config_object, input_class)
@@ -86,7 +89,7 @@ def load_serialized_input_object(
     _check_current_and_loaded_input_config_compatibility(
         current_input_config=input_config,
         loaded_input_config=serialized_input_config_object.input_config,
-        serialized_input_config_path=serialized_input_config_path,
+        serialized_input_config_path=serialized_input_folder_path,
     )
     loaded_input_info_kwargs["input_config"] = input_config
 
@@ -306,52 +309,35 @@ def _serialize_input_object(
 
 def _read_serialized_input_object(
     input_class: "al_serializable_input_classes",
-    serialized_input_config_path: Path,
+    serialized_input_folder: Path,
 ) -> "al_serializable_input_objects":
     loaded_object: "al_serializable_input_objects"
     if input_class is ComputedImageInputInfo:
         loaded_object = load_image_input_object(
-            serialized_input_folder=serialized_input_config_path
+            serialized_input_folder=serialized_input_folder
         )
 
     elif input_class is ComputedSequenceInputInfo:
         loaded_object = load_sequence_input_object(
-            serialized_input_folder=serialized_input_config_path
+            serialized_input_folder=serialized_input_folder
         )
 
     elif input_class is ComputedBytesInputInfo:
         loaded_object = load_bytes_input_object(
-            serialized_input_folder=serialized_input_config_path
+            serialized_input_folder=serialized_input_folder
         )
 
     elif input_class is ComputedArrayInputInfo:
         loaded_object = load_array_input_object(
-            serialized_input_folder=serialized_input_config_path
+            serialized_input_folder=serialized_input_folder
         )
 
     elif input_class is ComputedOmicsInputInfo:
         loaded_object = load_omics_input_object(
-            serialized_input_folder=serialized_input_config_path
+            serialized_input_folder=serialized_input_folder
         )
 
     else:
         raise ValueError(f"Invalid input class: {input_class}")
 
     return loaded_object
-
-
-def check_version(run_folder: Path) -> None:
-    version_file = run_folder / "meta/eir_version.txt"
-    if not version_file.exists():
-        return
-
-    cur_version = __version__
-    with open(version_file, "r") as f:
-        loaded_version = f.read().strip()
-
-    if cur_version != loaded_version:
-        logger.warning(
-            f"The version of EIR used to train this model is {loaded_version}, "
-            f"while the current version is {cur_version}. "
-            f"This may cause unexpected behavior and subtle bugs."
-        )
