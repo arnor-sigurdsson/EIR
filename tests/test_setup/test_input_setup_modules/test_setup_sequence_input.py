@@ -88,11 +88,14 @@ def test_get_tokenized_vocab_iterator():
         yield "the lazy dog JUMPED over:: the red fox or whatever".split()
 
     basic_english_tokenizer = setup_sequence.get_basic_tokenizer(
-        tokenizer_name="basic_english", tokenizer_language="en"
+        tokenizer_name="basic_english",
+        tokenizer_language="en",
     )
 
     tokenized_vocab_iterator = setup_sequence.get_tokenized_vocab_iterator(
-        vocab_iterator=_test_iterator(), tokenizer=basic_english_tokenizer
+        vocab_iterator=_test_iterator(),
+        tokenizer=basic_english_tokenizer,
+        is_from_file=False,
     )
     results = [i for i in tokenized_vocab_iterator]
     assert len(results) == 1

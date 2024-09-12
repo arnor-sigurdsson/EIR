@@ -221,6 +221,7 @@ def init_vocab(
         tokenized_vocab_iter = get_tokenized_vocab_iterator(
             vocab_iterator=vocab_iter,
             tokenizer=tokenizer,
+            is_from_file=vocab_file is not None,
         )
 
         min_freq = _init_min_freq(
@@ -527,6 +528,7 @@ def get_tokenizer_encode_func(
 def get_tokenized_vocab_iterator(
     vocab_iterator: Iterator[Sequence[str] | str],
     tokenizer: TokenizerProtocolRaw | TokenizerProtocolPreSplit,
+    is_from_file: bool,
 ) -> Generator[Sequence[str], None, None]:
     @overload
     def _do_tokenize(list_of_words_: str) -> Sequence[str]: ...
@@ -537,8 +539,12 @@ def get_tokenized_vocab_iterator(
     def _do_tokenize(list_of_words_):
         return tokenizer(list_of_words_)
 
-    for list_of_words in vocab_iterator:
-        yield _do_tokenize(list_of_words_=list_of_words)
+    if is_from_file:
+        for token in vocab_iterator:
+            yield token
+    else:
+        for list_of_words in vocab_iterator:
+            yield _do_tokenize(list_of_words_=list_of_words)
 
 
 def get_vocab_iterator(
