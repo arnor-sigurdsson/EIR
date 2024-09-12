@@ -15,7 +15,10 @@ from eir.setup.config import (
     load_output_configs,
     validate_train_configs,
 )
-from eir.setup.schemas import InputConfig
+from eir.setup.schema_modules.output_schemas_sequence import (
+    SequenceOutputSamplingConfig,
+)
+from eir.setup.schemas import InputConfig, OutputConfig
 
 
 def load_configs(configs_root_folder: Path) -> Configs:
@@ -46,12 +49,15 @@ def load_configs(configs_root_folder: Path) -> Configs:
     with open(output_path, "r") as infile:
         output_config_list = yaml.safe_load(stream=infile)
     output_configs = load_output_configs(output_configs=output_config_list)
+    output_configs_patched = _patch_sequence_output_configs(
+        output_configs=output_configs
+    )
 
     aggregate_config = Configs(
         global_config=global_config,
         input_configs=input_configs_patched,
         fusion_config=fusion_config,
-        output_configs=output_configs,
+        output_configs=output_configs_patched,
     )
 
     validate_train_configs(configs=aggregate_config)
@@ -102,5 +108,33 @@ def _patch_sequence_input_configs_linked_from_output(
         input_config_copy.model_config.model_init_config = model_init_config
 
         parsed_configs.append(input_config_copy)
+
+    return parsed_configs
+
+
+def _patch_sequence_output_configs(
+    output_configs: Sequence[OutputConfig],
+) -> Sequence[OutputConfig]:
+    parsed_configs = []
+
+    for output_config in output_configs:
+        output_type = output_config.output_info.output_type
+        if output_type != "sequence":
+            parsed_configs.append(output_config)
+            continue
+
+        init_kwargs = output_config.sampling_config
+        if init_kwargs is None:
+            continue
+
+        output_config_copy = deepcopy(output_config)
+        init_kwargs_as_dict = output_config.sampling_config
+        assert isinstance(init_kwargs_as_dict, dict)
+
+        sampling_config = SequenceOutputSamplingConfig(**init_kwargs_as_dict)
+
+        output_config_copy.sampling_config = sampling_config
+
+        parsed_configs.append(output_config_copy)
 
     return parsed_configs

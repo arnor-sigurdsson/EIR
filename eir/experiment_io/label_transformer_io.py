@@ -18,6 +18,10 @@ if TYPE_CHECKING:
 def get_transformer_sources(run_folder: Path) -> dict[str, list[str]]:
     transformers_to_load = {}
     transformer_sources = run_folder / "serializations/transformers"
+
+    if not transformer_sources.exists():
+        return transformers_to_load
+
     for transformer_source in transformer_sources.iterdir():
         names = sorted([i.stem for i in transformer_source.iterdir()])
         transformers_to_load[transformer_source.stem] = names

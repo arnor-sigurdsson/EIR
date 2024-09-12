@@ -116,7 +116,9 @@ def _run_serve_sequence_generation(
         assert config.sampling_config is not None
 
         if output_type_info.sequence_operation == "autoregressive":
-            assert isinstance(config.sampling_config, SequenceOutputSamplingConfig)
+            assert isinstance(
+                config.sampling_config, SequenceOutputSamplingConfig
+            ), config.sampling_config
 
             eval_samples = _build_sequence_eval_samples_batch(
                 serve_batch=batch,
