@@ -592,12 +592,18 @@ def get_vocab_iterator(
             vocab_file,
         )
 
-        vocab_iter = get_vocab_file_iterator(vocab_file=Path(vocab_file))
+        vocab_iter = get_vocab_file_iterator(
+            vocab_file=Path(vocab_file),
+            gathered_stats=gathered_stats,
+        )
 
     return vocab_iter
 
 
-def get_vocab_file_iterator(vocab_file: Path) -> Generator[str, None, None]:
+def get_vocab_file_iterator(
+    vocab_file: Path,
+    gathered_stats: "GatheredSequenceStats",
+) -> Generator[str, None, None]:
     try:
         with vocab_file.open("r") as f:
             vocab_dict = json.load(f)
@@ -612,6 +618,7 @@ def get_vocab_file_iterator(vocab_file: Path) -> Generator[str, None, None]:
     sorted_tokens = sorted(vocab_dict.items(), key=lambda x: x[1])
 
     for token, _ in sorted_tokens:
+        gathered_stats.total_count += 1
         yield token
 
 
