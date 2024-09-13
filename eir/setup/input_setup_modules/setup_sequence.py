@@ -1,3 +1,4 @@
+import json
 import os
 from collections import OrderedDict
 from copy import deepcopy
@@ -590,13 +591,28 @@ def get_vocab_iterator(
             input_source,
             vocab_file,
         )
-        vocab_iter = yield_tokens_from_file(
-            file_path=vocab_file,
-            split_on=None,
-            gathered_stats=gathered_stats,
-        )
+
+        vocab_iter = get_vocab_file_iterator(vocab_file=Path(vocab_file))
 
     return vocab_iter
+
+
+def get_vocab_file_iterator(vocab_file: Path) -> Generator[str, None, None]:
+    try:
+        with vocab_file.open("r") as f:
+            vocab_dict = json.load(f)
+    except json.JSONDecodeError:
+        raise ValueError(f"The file {vocab_file} is not a valid JSON file.")
+    except FileNotFoundError:
+        raise FileNotFoundError(f"The file {vocab_file} was not found.")
+
+    if not isinstance(vocab_dict, dict):
+        raise ValueError(f"The content of {vocab_file} is not a dictionary.")
+
+    sorted_tokens = sorted(vocab_dict.items(), key=lambda x: x[1])
+
+    for token, _ in sorted_tokens:
+        yield token
 
 
 @dataclass

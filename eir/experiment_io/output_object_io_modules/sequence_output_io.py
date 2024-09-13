@@ -21,7 +21,7 @@ def load_sequence_output_object(
     run_folder: Path,
 ) -> ComputedSequenceOutputInfo:
     config_path = serialized_output_folder / "output_config.yaml"
-    vocab_ordered_path = serialized_output_folder / "vocab_ordered.txt"
+    vocab_json_path = _get_vocab_path(serialized_output_folder=serialized_output_folder)
     computed_max_length_path = serialized_output_folder / "computed_max_length.json"
 
     output_config = load_output_config_from_yaml(output_config_path=config_path)
@@ -41,7 +41,7 @@ def load_sequence_output_object(
     output_type_info_modified = deepcopy(output_config.output_type_info)
     assert isinstance(output_type_info_modified, SequenceOutputTypeConfig)
 
-    output_type_info_modified.vocab_file = str(vocab_ordered_path)
+    output_type_info_modified.vocab_file = str(vocab_json_path)
     output_type_info_modified.max_length = computed_max_length
 
     output_config_modified.output_type_info = output_type_info_modified
@@ -52,3 +52,11 @@ def load_sequence_output_object(
     )
 
     return loaded_object
+
+
+def _get_vocab_path(serialized_output_folder: Path) -> Path:
+    vocab_json_path = serialized_output_folder / "vocab.json"
+    bpe_tokenizer_path = serialized_output_folder / "bpe_tokenizer.json"
+    if bpe_tokenizer_path.exists():
+        return bpe_tokenizer_path
+    return vocab_json_path

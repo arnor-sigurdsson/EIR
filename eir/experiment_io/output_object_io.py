@@ -23,6 +23,9 @@ from eir.experiment_io.output_object_io_modules.tabular_output_io import (
     load_tabular_output_object,
 )
 from eir.setup import schemas
+from eir.setup.input_setup_modules.setup_sequence import (
+    extract_tokenizer_object_from_function,
+)
 from eir.setup.output_setup_modules.array_output_setup import ComputedArrayOutputInfo
 from eir.setup.output_setup_modules.image_output_setup import ComputedImageOutputInfo
 from eir.setup.output_setup_modules.sequence_output_setup import (
@@ -163,6 +166,17 @@ def serialize_output_object(
             string_to_index = output_object.vocab.stoi
             with open(output_folder / "vocab.json", "w") as f:
                 json.dump(string_to_index, f)
+
+            output_type_info = output_config.output_type_info
+            assert isinstance(output_type_info, schemas.SequenceOutputTypeConfig)
+            tokenizer = output_type_info.tokenizer
+            if tokenizer == "bpe":
+                tokenizer_callable = output_object.tokenizer
+                assert tokenizer_callable is not None
+                tokenizer_object = extract_tokenizer_object_from_function(
+                    tokenizer_callable=tokenizer_callable
+                )
+                tokenizer_object.save(str(output_folder / "bpe_tokenizer.json"))
 
             computed_max_length = output_object.computed_max_length
             with open(output_folder / "computed_max_length.json", "w") as f:

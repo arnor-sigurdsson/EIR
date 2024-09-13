@@ -32,7 +32,10 @@ from eir.setup.input_setup_modules.setup_array import ComputedArrayInputInfo
 from eir.setup.input_setup_modules.setup_bytes import ComputedBytesInputInfo
 from eir.setup.input_setup_modules.setup_image import ComputedImageInputInfo
 from eir.setup.input_setup_modules.setup_omics import ComputedOmicsInputInfo
-from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
+from eir.setup.input_setup_modules.setup_sequence import (
+    ComputedSequenceInputInfo,
+    extract_tokenizer_object_from_function,
+)
 from eir.train_utils.utils import get_logger, get_run_folder
 
 if TYPE_CHECKING:
@@ -246,6 +249,17 @@ def _serialize_input_object(
             string_to_index = input_object.vocab.stoi
             with open(output_folder / "vocab.json", "w") as f:
                 json.dump(string_to_index, f)
+
+            input_type_info = input_config.input_type_info
+            assert isinstance(input_type_info, schemas.SequenceInputDataConfig)
+            tokenizer = input_type_info.tokenizer
+            if tokenizer == "bpe":
+                tokenizer_callable = input_object.tokenizer
+                assert tokenizer_callable is not None
+                tokenizer_object = extract_tokenizer_object_from_function(
+                    tokenizer_callable=tokenizer_callable
+                )
+                tokenizer_object.save(str(output_folder / "bpe_tokenizer.json"))
 
             computed_max_length = input_object.computed_max_length
             with open(output_folder / "computed_max_length.json", "w") as f:

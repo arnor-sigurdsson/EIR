@@ -15,7 +15,9 @@ class SequenceOutputTypeConfig:
         for the training. If this is not passed in, the framework will automatically
         build the vocabulary from the training data. Passing in a vocabulary file is
         therefore useful if (a) you want to manually specify / limit the vocabulary used
-        and/or (b) you want to save time by pre-computing the vocabulary.
+        and/or (b) you want to save time by pre-computing the vocabulary. The
+        expected format is a json file with an array of tokens, e.g. {"<bos>": 0,
+        "<unk>": 1, "<mask>": 2, "<pad>": 3, "<eos>": 4, "a": 5, ...}.
 
     :param max_length:
         Maximum length to truncate/pad sequences to. This can be an integer or the
