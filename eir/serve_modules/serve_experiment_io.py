@@ -48,7 +48,9 @@ def load_experiment_for_serve(
 
     run_folder = model_path_object.parent.parent
 
-    loaded_train_experiment = load_serialized_train_experiment(run_folder=run_folder)
+    loaded_train_experiment = load_serialized_train_experiment(
+        run_folder=run_folder, device=device
+    )
 
     default_train_hooks = loaded_train_experiment.hooks
     train_configs = loaded_train_experiment.configs

@@ -28,11 +28,16 @@ class LoadedTrainExperiment:
     outputs: al_output_objects_as_dict
 
 
-def load_serialized_train_experiment(run_folder: Path) -> LoadedTrainExperiment:
+def load_serialized_train_experiment(
+    run_folder: Path,
+    device: str,
+) -> LoadedTrainExperiment:
     check_version(run_folder=run_folder)
 
     configs_folder = run_folder / "configs"
     configs_loaded = load_configs(configs_root_folder=configs_folder)
+
+    configs_loaded.global_config.be.device = device
 
     hooks = get_default_hooks(configs=configs_loaded)
 

@@ -376,13 +376,19 @@ def test_predict(
     }
     predict_cl_args = Namespace(**all_predict_kwargs)
 
+    device = predict.maybe_parse_device_from_predict_args(
+        predict_cl_args=predict_cl_args
+    )
+
     train_configs_for_testing = load_serialized_train_experiment(
-        run_folder=model_test_config.run_path
+        run_folder=model_test_config.run_path,
+        device=device,
     )
 
     predict_config = predict.get_default_predict_experiment(
         loaded_train_experiment=train_configs_for_testing,
         predict_cl_args=predict_cl_args,
+        inferred_run_folder=model_test_config.run_path,
     )
 
     predict.predict(predict_cl_args=predict_cl_args, predict_experiment=predict_config)

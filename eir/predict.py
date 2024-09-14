@@ -42,6 +42,7 @@ from eir.predict_modules.predict_target_setup import (
     get_target_labels_for_testing,
 )
 from eir.setup.config import Configs, get_main_parser
+from eir.setup.config_setup_modules.config_setup_utils import load_yaml_config
 from eir.setup.input_setup import al_input_objects_as_dict
 from eir.setup.output_setup import al_output_objects_as_dict
 from eir.target_setup.target_label_setup import gather_all_ids_from_output_configs
@@ -120,7 +121,13 @@ def _verify_predict_cl_args(predict_cl_args: Namespace):
 
 def run_predict(predict_cl_args: Namespace):
     run_folder = get_run_folder_from_model_path(model_path=predict_cl_args.model_path)
-    loaded_train_experiment = load_serialized_train_experiment(run_folder=run_folder)
+
+    device = maybe_parse_device_from_predict_args(predict_cl_args=predict_cl_args)
+
+    loaded_train_experiment = load_serialized_train_experiment(
+        run_folder=run_folder,
+        device=device,
+    )
 
     set_log_level_for_eir_loggers(
         log_level=loaded_train_experiment.configs.gc.vl.log_level
@@ -129,6 +136,7 @@ def run_predict(predict_cl_args: Namespace):
     predict_experiment = get_default_predict_experiment(
         loaded_train_experiment=loaded_train_experiment,
         predict_cl_args=predict_cl_args,
+        inferred_run_folder=run_folder,
     )
 
     predict(
@@ -141,6 +149,22 @@ def run_predict(predict_cl_args: Namespace):
             loaded_train_experiment=loaded_train_experiment,
             predict_config=predict_experiment,
         )
+
+
+def maybe_parse_device_from_predict_args(predict_cl_args: Namespace) -> str:
+    device = "cpu"
+
+    if not predict_cl_args.global_configs:
+        return device
+
+    global_config_path = predict_cl_args.global_configs[0]
+    global_config = load_yaml_config(config_path=global_config_path)
+
+    device_from_config = global_config.get("basic_experiment", {}).get("device", {})
+    if device_from_config:
+        device = device_from_config
+
+    return device
 
 
 def predict(
@@ -265,6 +289,7 @@ class PredictStepFunctionHookStages:
 def get_default_predict_experiment(
     loaded_train_experiment: "LoadedTrainExperiment",
     predict_cl_args: Namespace,
+    inferred_run_folder: Path,
 ) -> PredictExperiment:
     configs_overloaded_for_predict = converge_train_and_predict_configs(
         train_configs=loaded_train_experiment.configs, predict_cl_args=predict_cl_args
@@ -299,7 +324,7 @@ def get_default_predict_experiment(
         test_inputs_configs=configs_overloaded_for_predict.input_configs,
         ids=test_ids,
         hooks=default_train_hooks,
-        output_folder=loaded_train_experiment.configs.gc.be.output_folder,
+        output_folder=str(inferred_run_folder),
     )
 
     label_dict = target_labels.label_dict if target_labels else {}
