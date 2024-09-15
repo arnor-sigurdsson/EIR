@@ -90,22 +90,37 @@ def _build_weighted_sample_dict_from_config_sequence(
 
 
 def _gather_column_sampling_weights(
-    samples: Iterable["Sample"], output_name: str, columns_to_sample: Iterable[str]
+    samples: Iterable["Sample"],
+    output_name: str,
+    columns_to_sample: Iterable[str],
 ) -> Dict[str, al_sample_weight_and_counts]:
-    all_target_label_weight_dicts = {}
+    all_target_label_weight_dicts: Dict[str, al_sample_weight_and_counts] = {}
 
     for column in columns_to_sample:
-        cur_label_iterable = (i.target_labels[output_name][column] for i in samples)
-        cur_label_iterable_int = (int(i) for i in cur_label_iterable)
-        cur_weight_dict = _get_column_label_weights_and_counts(
-            label_iterable=cur_label_iterable_int
-        )
+        try:
+            cur_label_iterable = (
+                i.target_labels[output_name][column]
+                for i in samples
+                if output_name in i.target_labels
+                and column in i.target_labels[output_name]
+            )
+            cur_label_iterable_int = (int(i) for i in cur_label_iterable)
+            cur_weight_dict = _get_column_label_weights_and_counts(
+                label_iterable=cur_label_iterable_int, column_name=column
+            )
 
-        logger.debug(
-            "Label counts in column %s:  %s", column, cur_weight_dict["label_counts"]
-        )
+            logger.debug(
+                "Label counts in column %s: %s", column, cur_weight_dict["label_counts"]
+            )
 
-        all_target_label_weight_dicts[column] = cur_weight_dict
+            all_target_label_weight_dicts[column] = cur_weight_dict
+        except ValueError as e:
+            logger.warning(f"Skipping column {column} due to error: {str(e)}.")
+        except KeyError:
+            logger.warning(f"Skipping column {column} due to missing data.")
+
+    if not all_target_label_weight_dicts:
+        logger.warning("No valid columns found for sampling weights")
 
     return all_target_label_weight_dicts
 
