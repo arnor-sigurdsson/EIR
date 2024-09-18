@@ -10,7 +10,10 @@ from torch import nn
 from torch.utils.data import DataLoader
 
 from eir.data_load import label_setup
-from eir.experiment_io.experiment_io import LoadedTrainExperiment
+from eir.experiment_io.experiment_io import (
+    LoadedTrainExperiment,
+    load_serialized_train_experiment,
+)
 from eir.interpretation.interpretation import tabular_attribution_analysis_wrapper
 from eir.predict_modules.predict_data import set_up_default_dataset
 from eir.predict_modules.predict_input_setup import set_up_inputs_for_predict
@@ -32,14 +35,44 @@ logger = get_logger(name=__name__)
 
 
 def compute_predict_attributions(
+    run_folder: Path,
     loaded_train_experiment: "LoadedTrainExperiment",
     predict_config: "PredictExperiment",
 ) -> None:
+    """
+    The reason why we have the different sources to load the configs from is that
+    when the source is 'train', we need to have the full configs to set up to access
+    the various paths used for training (e.g. input_source), which has been stripped
+    from the serialized configs. In the case of loading from 'predict', we use
+    the already set up paths / objects, e.g. selecting the predict output objects,
+    overloading the train experiment with the predict model, inputs, etc.
+    """
     gc = predict_config.configs.global_config
 
     background_source = (
         predict_config.predict_specific_cl_args.attribution_background_source
     )
+
+    configs_source: Literal["configs", "configs_stripped"] = "configs"
+    if background_source == "predict":
+        configs_source = "configs_stripped"
+
+    loaded_train_experiment = load_serialized_train_experiment(
+        run_folder=run_folder,
+        device=gc.be.device,
+        source_folder=configs_source,
+    )
+
+    if configs_source == "configs":
+        output_objects = loaded_train_experiment.outputs
+    elif configs_source == "configs_stripped":
+        output_objects = predict_config.outputs
+    else:
+        raise ValueError(
+            f"Invalid configs source '{configs_source}'. "
+            f"Expected 'configs' or 'configs_stripped'."
+        )
+
     background_source_config = get_background_source_config(
         background_source_in_predict_cl_args=background_source,
         train_configs=loaded_train_experiment.configs,
@@ -48,7 +81,7 @@ def compute_predict_attributions(
     background_dataloader = _get_predict_background_loader(
         batch_size=gc.be.batch_size,
         num_attribution_background_samples=gc.aa.attribution_background_samples,
-        outputs_as_dict=loaded_train_experiment.outputs,
+        outputs_as_dict=output_objects,
         configs=background_source_config,
         dataloader_workers=gc.be.dataloader_workers,
         loaded_hooks=loaded_train_experiment.hooks,

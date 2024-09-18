@@ -9,7 +9,7 @@ import pytest
 from aislib.misc_utils import ensure_path_exists
 
 from eir.setup import config
-from eir.setup.config_setup_modules.config_setup_utils import recursive_dict_replace
+from eir.setup.config_setup_modules.config_setup_utils import recursive_dict_inject
 from eir.setup.config_setup_modules.output_config_setup_sequence import (
     get_configs_object_with_seq_output_configs,
 )
@@ -91,7 +91,7 @@ def general_sequence_inject(
     injected = []
 
     for dict_ in sequence:
-        dict_injected = recursive_dict_replace(dict_=dict_, dict_to_inject=inject_dict)
+        dict_injected = recursive_dict_inject(dict_=dict_, dict_to_inject=inject_dict)
         injected.append(dict_injected)
 
     return injected

@@ -4,6 +4,7 @@ from functools import partial
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
+    Any,
     Callable,
     Dict,
     Iterator,
@@ -561,10 +562,21 @@ def _log_stats_to_pbar(engine: Engine, pbar: ProgressBar) -> None:
 
 @only_call_on_master_node
 def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
+    """
+    TODO: Move saving of configs to experiment IO module.
+    """
     exp = handler_config.experiment
     gc = handler_config.experiment.configs.global_config
 
-    _save_yaml_configs(run_folder=handler_config.run_folder, configs=exp.configs)
+    _save_yaml_configs(
+        run_folder=handler_config.run_folder,
+        configs=exp.configs,
+    )
+    _save_yaml_configs(
+        run_folder=handler_config.run_folder,
+        configs=exp.configs,
+        for_serialized=True,
+    )
 
     if gc.ec.checkpoint_interval is not None:
         trainer = _add_checkpoint_handler_wrapper(
@@ -627,15 +639,23 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
     return trainer
 
 
-def _save_yaml_configs(run_folder: Path, configs: "Configs"):
+def _save_yaml_configs(
+    run_folder: Path,
+    configs: "Configs",
+    for_serialized: bool = False,
+) -> None:
+
+    output_root = run_folder / "configs"
+    if for_serialized:
+        output_root = run_folder / "serializations" / "configs_stripped"
+
     for config_name, config_object in configs.__dict__.items():
         if config_name == "gc":
             continue
 
-        cur_output_path = Path(run_folder / "configs" / config_name).with_suffix(
-            ".yaml"
-        )
-        aislib.misc_utils.ensure_path_exists(path=cur_output_path)
+        cur_output_path = Path(output_root / config_name)
+        cur_output_path = cur_output_path.with_suffix(".yaml")
+        aislib.misc_utils.ensure_path_exists(path=cur_output_path, is_folder=False)
 
         if config_name == "global_config":
             main_keys = [
@@ -655,8 +675,66 @@ def _save_yaml_configs(run_folder: Path, configs: "Configs"):
         else:
             config_object_as_primitives = object_to_primitives(obj=config_object)
 
+        if for_serialized:
+            config_object_as_primitives = strip_config(
+                config=config_object_as_primitives
+            )
+
         with open(str(cur_output_path), "w") as yaml_file_handle:
             yaml.dump(data=config_object_as_primitives, stream=yaml_file_handle)
+
+
+def strip_config(config: dict | list[dict]) -> dict | list[dict]:
+    keys_to_strip = [
+        "basic_experiment.manual_valid_ids_file",
+        "basic_experiment.output_folder",
+        "input_info.input_source",
+        "output_info.output_source",
+        "input_type_info.vocab_file",
+        "input_type_info.snp_file",
+        "input_type_info.subset_snps_file",
+    ]
+    replacements = {k: None for k in keys_to_strip}
+
+    if isinstance(config, list):
+        stripped_configs = []
+
+        for cur_config in config:
+            cur_config_stripped = replace_dict_values(
+                target=cur_config,
+                replacements=replacements,
+            )
+            stripped_configs.append(cur_config_stripped)
+
+        return stripped_configs
+
+    config_stripped = replace_dict_values(
+        target=config,
+        replacements=replacements,
+    )
+
+    return config_stripped
+
+
+def replace_dict_values(
+    target: dict[str, Any],
+    replacements: dict[str, Any],
+) -> dict[str, Any]:
+
+    def recursive_replace(
+        d: dict[str, Any],
+        path: str = "",
+    ) -> None:
+        for key, value in d.items():
+            current_path = f"{path}.{key}" if path else key
+            if current_path in replacements:
+                d[key] = replacements[current_path]
+            elif isinstance(value, dict):
+                recursive_replace(d=value, path=current_path)
+
+    result = target.copy()
+    recursive_replace(d=result)
+    return result
 
 
 def _add_checkpoint_handler_wrapper(

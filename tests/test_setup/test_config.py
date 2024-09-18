@@ -15,7 +15,7 @@ from eir.setup import config
 from eir.setup.config_setup_modules.config_setup_utils import (
     convert_cl_str_to_dict,
     get_yaml_iterator_with_injections,
-    recursive_dict_replace,
+    recursive_dict_inject,
     validate_keys_against_dataclass,
 )
 from tests.setup_tests.fixtures_create_configs import TestConfigInits
@@ -346,7 +346,7 @@ def test_basic_replacement():
     d = {"key1": "value1"}
     inject = {"key1": "updated", "key2": {"subkey": "subvalue"}}
     expected = {"key1": "updated", "key2": {"subkey": "subvalue"}}
-    result = recursive_dict_replace(d, inject)
+    result = recursive_dict_inject(d, inject)
     assert result == expected
 
 
@@ -354,7 +354,7 @@ def test_nested_replacement():
     d = {"nested": {"key1": "value1"}}
     inject = {"nested": {"key1": "updated"}}
     expected = {"nested": {"key1": "updated"}}
-    result = recursive_dict_replace(d, inject)
+    result = recursive_dict_inject(d, inject)
     assert result == expected
 
 
@@ -362,7 +362,7 @@ def test_adding_dict_to_none():
     d = {"key1": None}
     inject = {"key1": {"newkey": "newvalue"}}
     expected = {"key1": {"newkey": "newvalue"}}
-    result = recursive_dict_replace(d, inject)
+    result = recursive_dict_inject(d, inject)
     assert result == expected
 
 
@@ -370,7 +370,7 @@ def test_adding_none_to_dict():
     d = {"key1": {"newkey": "newvalue"}}
     inject = {"key1": None}
     expected = {"key1": None}
-    result = recursive_dict_replace(d, inject)
+    result = recursive_dict_inject(d, inject)
     assert result == expected
 
 
@@ -378,5 +378,5 @@ def test_mixed_types():
     d = {"key1": {"subkey": "value"}, "key2": "simple"}
     inject = {"key1": "newvalue", "key2": {"newsubkey": "newsubvalue"}}
     expected = {"key1": "newvalue", "key2": {"newsubkey": "newsubvalue"}}
-    result = recursive_dict_replace(d, inject)
+    result = recursive_dict_inject(d, inject)
     assert result == expected

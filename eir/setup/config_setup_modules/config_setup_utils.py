@@ -42,7 +42,7 @@ def get_yaml_iterator_with_injections(
                 dict_to_inject = convert_cl_str_to_dict(str_=str_to_inject)
 
                 logger.debug("Injecting %s into %s", dict_to_inject, loaded_yaml)
-                loaded_yaml = recursive_dict_replace(
+                loaded_yaml = recursive_dict_inject(
                     dict_=loaded_yaml, dict_to_inject=dict_to_inject
                 )
 
@@ -84,7 +84,7 @@ def load_yaml_config(config_path: str) -> Dict[str, Any]:
     return config_as_dict
 
 
-def recursive_dict_replace(
+def recursive_dict_inject(
     dict_: MutableMapping,
     dict_to_inject: MutableMapping,
 ) -> dict:
@@ -98,7 +98,7 @@ def recursive_dict_replace(
         if cur_is_dict and old_is_dict:
             assert isinstance(cur_value, MutableMapping)
             assert isinstance(old_dict_value, MutableMapping)
-            recursive_dict_replace(dict_=old_dict_value, dict_to_inject=cur_value)
+            recursive_dict_inject(dict_=old_dict_value, dict_to_inject=cur_value)
         else:
             dict_[cur_key] = cur_value
 

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from eir.experiment_io.configs_io import load_configs
 from eir.experiment_io.io_utils import check_version
@@ -31,10 +31,20 @@ class LoadedTrainExperiment:
 def load_serialized_train_experiment(
     run_folder: Path,
     device: str,
+    source_folder: Literal["configs", "configs_stripped"] = "configs_stripped",
 ) -> LoadedTrainExperiment:
     check_version(run_folder=run_folder)
 
-    configs_folder = run_folder / "configs"
+    if source_folder == "configs":
+        configs_folder = run_folder / "configs"
+    elif source_folder == "configs_stripped":
+        configs_folder = run_folder / "serializations" / "configs_stripped"
+    else:
+        raise ValueError(
+            f"source_folder must be one of 'configs' or 'configs_stripped', "
+            f"not {source_folder}"
+        )
+
     configs_loaded = load_configs(configs_root_folder=configs_folder)
 
     configs_loaded.global_config.be.device = device

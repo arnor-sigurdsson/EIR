@@ -13,7 +13,6 @@ from eir.setup.config import (
     get_input_configs,
     load_fusion_configs,
     load_output_configs,
-    validate_train_configs,
 )
 from eir.setup.schema_modules.output_schemas_sequence import (
     SequenceOutputSamplingConfig,
@@ -59,8 +58,6 @@ def load_configs(configs_root_folder: Path) -> Configs:
         fusion_config=fusion_config,
         output_configs=output_configs_patched,
     )
-
-    validate_train_configs(configs=aggregate_config)
 
     return aggregate_config
 

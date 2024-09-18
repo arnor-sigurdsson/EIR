@@ -1,8 +1,9 @@
 import json
 from argparse import Namespace
+from copy import copy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Iterable, Literal, Union
+from typing import Callable, Iterable, Literal, Sequence, Union
 
 import numpy as np
 from aislib.misc_utils import ensure_path_exists
@@ -45,6 +46,7 @@ from eir.setup.config import Configs, get_main_parser
 from eir.setup.config_setup_modules.config_setup_utils import load_yaml_config
 from eir.setup.input_setup import al_input_objects_as_dict
 from eir.setup.output_setup import al_output_objects_as_dict
+from eir.setup.schemas import OutputConfig
 from eir.target_setup.target_label_setup import gather_all_ids_from_output_configs
 from eir.train import check_dataset_and_batch_size_compatibility
 from eir.train_utils.evaluation import (
@@ -143,9 +145,9 @@ def run_predict(predict_cl_args: Namespace):
         predict_experiment=predict_experiment,
         predict_cl_args=predict_cl_args,
     )
-
     if predict_experiment.configs.gc.aa.compute_attributions:
         compute_predict_attributions(
+            run_folder=run_folder,
             loaded_train_experiment=loaded_train_experiment,
             predict_config=predict_experiment,
         )
@@ -328,11 +330,15 @@ def get_default_predict_experiment(
     )
 
     label_dict = target_labels.label_dict if target_labels else {}
+    outputs_with_predict_paths = _patch_loaded_output_object_configs(
+        output_as_dict=loaded_train_experiment.outputs,
+        predict_output_configs=configs_overloaded_for_predict.output_configs,
+    )
     test_dataset = set_up_default_dataset(
         configs=configs_overloaded_for_predict,
         target_labels_dict=label_dict,
         inputs_as_dict=test_inputs,
-        outputs_as_dict=loaded_train_experiment.outputs,
+        outputs_as_dict=outputs_with_predict_paths,
         missing_ids_per_output=missing_ids_per_output,
     )
     predict_batch_size = _auto_set_test_batch_size(
@@ -357,7 +363,7 @@ def get_default_predict_experiment(
         global_config=configs_overloaded_for_predict.global_config,
         fusion_config=configs_overloaded_for_predict.fusion_config,
         inputs_as_dict=test_inputs,
-        outputs_as_dict=loaded_train_experiment.outputs,
+        outputs_as_dict=outputs_with_predict_paths,
         meta_class_getter=get_default_meta_class,
     )
 
@@ -379,7 +385,7 @@ def get_default_predict_experiment(
     predict_experiment = PredictExperiment(
         configs=configs_overloaded_for_predict,
         inputs=test_inputs,
-        outputs=loaded_train_experiment.outputs,
+        outputs=outputs_with_predict_paths,
         predict_specific_cl_args=predict_specific_cl_args,
         test_dataset=test_dataset,
         test_dataloader=test_dataloader,
@@ -389,6 +395,39 @@ def get_default_predict_experiment(
     )
 
     return predict_experiment
+
+
+def _patch_loaded_output_object_configs(
+    output_as_dict: al_output_objects_as_dict,
+    predict_output_configs: Sequence[OutputConfig],
+) -> al_output_objects_as_dict:
+    """
+    This is needed as the loaded output objects have the stripped configs from
+    the serializations folder, meaning they have None for e.g. output_source. Here
+    we inject the paths as passed in the predict configs.
+    """
+
+    outputs_patched = {}
+
+    for output_name, output_object in output_as_dict.items():
+        output_object_copy = copy(output_object)
+        matching_config = next(
+            (
+                config
+                for config in predict_output_configs
+                if config.output_info.output_name == output_name
+            ),
+            None,
+        )
+        if matching_config is None:
+            raise ValueError(
+                f"Could not find output config for output '{output_name}'."
+            )
+
+        output_object_copy.output_config = matching_config
+        outputs_patched[output_name] = output_object_copy
+
+    return outputs_patched
 
 
 def _auto_set_test_batch_size(batch_size: int, test_set_size: int) -> int:

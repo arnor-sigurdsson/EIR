@@ -394,14 +394,22 @@ def test_predict(
     predict.predict(predict_cl_args=predict_cl_args, predict_experiment=predict_config)
 
     compute_predict_attributions(
+        run_folder=model_test_config.run_path,
         loaded_train_experiment=train_configs_for_testing,
         predict_config=predict_config,
+    )
+
+    # We set this up here to have access to the tabular output paths (from train)
+    train_configs_for_testing_src_train = load_serialized_train_experiment(
+        run_folder=model_test_config.run_path,
+        device=device,
+        source_folder="configs",
     )
 
     _check_tabular_predict_results(
         tmp_path_=tmp_path,
         base_experiment=experiment,
-        train_configs_for_testing=train_configs_for_testing,
+        train_configs_for_testing=train_configs_for_testing_src_train,
     )
 
     _check_sequence_predict_results(tmp_path=tmp_path, expected_n_samples=10)
