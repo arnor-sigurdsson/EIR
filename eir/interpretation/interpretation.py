@@ -1,9 +1,6 @@
 import copy
-import os
-import sys
 import warnings
 from collections import defaultdict
-from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import partial
 from typing import (
@@ -14,7 +11,6 @@ from typing import (
     Dict,
     Generator,
     Iterable,
-    Iterator,
     Literal,
     Optional,
     Protocol,
@@ -164,20 +160,6 @@ class WrapperModelForAttribution(nn.Module):
         output_modules_out[self.output_name] = cur_output
 
         return output_modules_out[self.output_name][self.column_name]
-
-
-@contextmanager
-def suppress_stdout_and_stderr() -> Iterator[None]:
-    with open(os.devnull, "w") as devnull:
-        old_stdout = sys.stdout
-        sys.stdout = devnull
-        old_stderr = sys.stderr
-        sys.stderr = devnull
-        try:
-            yield
-        finally:
-            sys.stdout = old_stdout
-            sys.stderr = old_stderr
 
 
 @validate_handler_dependencies([validation_handler])

@@ -45,20 +45,3 @@ class LinearOutputModule(nn.Module):
         return {
             target: output for target, output in zip(self.target_names, split_outputs)
         }
-
-
-def _get_linear_multi_task_branches(
-    input_dimension: int,
-    num_outputs_per_target: "al_num_outputs_per_target",
-) -> nn.ModuleDict:
-    multi_task_branches = nn.ModuleDict(
-        {
-            target: nn.Linear(
-                in_features=input_dimension,
-                out_features=num_outputs,
-            )
-            for target, num_outputs in num_outputs_per_target.items()
-        }
-    )
-
-    return multi_task_branches

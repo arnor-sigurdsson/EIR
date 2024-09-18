@@ -311,17 +311,6 @@ def modify_global_config(global_config: GlobalConfig) -> GlobalConfig:
     return gc_copy
 
 
-def _maybe_add_latent_sampling_to_combined_config(combined_config: dict) -> dict:
-    if "latent_sampling" in combined_config and isinstance(
-        combined_config["latent_sampling"], dict
-    ):
-        combined_config["latent_sampling"] = LatentSamplingConfig(
-            **combined_config["latent_sampling"]
-        )
-
-    return combined_config
-
-
 def get_input_configs(
     input_configs: Iterable[dict],
 ) -> Sequence[schemas.InputConfig]:

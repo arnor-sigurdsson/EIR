@@ -2,10 +2,9 @@ from collections import defaultdict
 from copy import copy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, Iterable, Mapping, Sequence, Tuple
+from typing import TYPE_CHECKING, Dict, Iterable, Sequence, Tuple
 
 import numpy as np
-import pandas as pd
 import torch
 from aislib.misc_utils import ensure_path_exists
 from captum.attr._utils.visualization import (
@@ -296,22 +295,6 @@ def get_sequence_token_importance(
             token_importances[token].append(attribution)
 
     return token_importances
-
-
-def get_sequence_feature_importance_df(
-    token_importances: dict[str, list[float]]
-) -> pd.DataFrame:
-
-    series_dict: Mapping[str, pd.Series] = {
-        k: pd.Series(v) for k, v in token_importances.items()
-    }
-
-    df: pd.DataFrame = pd.concat(series_dict)
-    df = df.reset_index(level=0).reset_index(drop=True)
-
-    df = df.rename(columns={df.columns[0]: "Input", df.columns[1]: "Attribution"})
-
-    return df
 
 
 def get_sequence_html(
