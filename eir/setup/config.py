@@ -327,7 +327,18 @@ def get_input_configs(
 def _check_input_config_names(input_configs: Iterable[schemas.InputConfig]) -> None:
     names = []
     for config in input_configs:
-        names.append(config.input_info.input_name)
+        input_name = config.input_info.input_name
+
+        model_name = config.model_config.model_type
+        if model_name.startswith("eir-input-sequence-from-linked-output-"):
+            logger.info(
+                "Skipping input config name check for sequence input config "
+                "(name='%s') as it was automatically generated from a sequence output.",
+                input_name,
+            )
+            continue
+
+        names.append(input_name)
 
     if len(set(names)) != len(names):
         counts = Counter(names)

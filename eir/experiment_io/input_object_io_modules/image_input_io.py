@@ -33,7 +33,7 @@ def load_image_input_object(
 
     input_config_modified = deepcopy(input_config)
     input_type_info_modified.num_channels = num_channels
-    input_config.input_type_info = input_type_info_modified
+    input_config_modified.input_type_info = input_type_info_modified
 
     loaded_object = set_up_computed_image_input_object(
         input_config=input_config_modified,

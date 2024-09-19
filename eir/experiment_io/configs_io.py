@@ -2,8 +2,10 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Sequence
 
+import aislib.misc_utils
 import yaml
 
+from eir.experiment_io.io_utils import strip_config
 from eir.models.input.sequence.transformer_models import (
     BasicTransformerFeatureExtractorModelConfig,
 )
@@ -14,6 +16,7 @@ from eir.setup.config import (
     load_fusion_configs,
     load_output_configs,
 )
+from eir.setup.config_setup_modules.config_setup_utils import object_to_primitives
 from eir.setup.schema_modules.output_schemas_sequence import (
     SequenceOutputSamplingConfig,
 )
@@ -36,6 +39,7 @@ def load_configs(configs_root_folder: Path) -> Configs:
 
     with open(input_path, "r") as infile:
         input_config_list = yaml.safe_load(stream=infile)
+
     input_configs = get_input_configs(input_configs=input_config_list)
     input_configs_patched = _patch_sequence_input_configs_linked_from_output(
         input_configs=input_configs
@@ -135,3 +139,48 @@ def _patch_sequence_output_configs(
         parsed_configs.append(output_config_copy)
 
     return parsed_configs
+
+
+def save_yaml_configs(
+    run_folder: Path,
+    configs: "Configs",
+    for_serialized: bool = False,
+) -> None:
+
+    output_root = run_folder / "configs"
+    if for_serialized:
+        output_root = run_folder / "serializations" / "configs_stripped"
+
+    for config_name, config_object in configs.__dict__.items():
+        if config_name == "gc":
+            continue
+
+        cur_output_path = Path(output_root / config_name)
+        cur_output_path = cur_output_path.with_suffix(".yaml")
+        aislib.misc_utils.ensure_path_exists(path=cur_output_path, is_folder=False)
+
+        if config_name == "global_config":
+            main_keys = [
+                "basic_experiment",
+                "model",
+                "optimization",
+                "lr_schedule",
+                "training_control",
+                "evaluation_checkpoint",
+                "attribution_analysis",
+                "metrics",
+                "visualization_logging",
+                "latent_sampling",
+            ]
+            config_dict = {k: getattr(config_object, k) for k in main_keys}
+            config_object_as_primitives = object_to_primitives(obj=config_dict)
+        else:
+            config_object_as_primitives = object_to_primitives(obj=config_object)
+
+        if for_serialized:
+            config_object_as_primitives = strip_config(
+                config=config_object_as_primitives
+            )
+
+        with open(str(cur_output_path), "w") as yaml_file_handle:
+            yaml.dump(data=config_object_as_primitives, stream=yaml_file_handle)

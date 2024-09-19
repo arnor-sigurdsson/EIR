@@ -34,7 +34,7 @@ def load_image_output_object(
 
     output_config_modified = deepcopy(output_config)
     output_type_info_modified.num_channels = num_channels
-    output_config.output_type_info = output_type_info_modified
+    output_config_modified.output_type_info = output_type_info_modified
 
     diffusion_config = None
     if diffusion_path.exists():

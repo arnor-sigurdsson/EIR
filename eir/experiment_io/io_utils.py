@@ -118,8 +118,16 @@ def get_run_folder_from_model_path(model_path: str) -> Path:
     return run_folder
 
 
-def dump_config_to_yaml(config: Any, output_path: Path) -> None:
+def dump_config_to_yaml(
+    config: Any,
+    output_path: Path,
+    stripped: bool = True,
+) -> None:
     object_primitive = object_to_primitives(obj=config)
+
+    if stripped:
+        object_primitive = strip_config(config=object_primitive)
+
     ensure_path_exists(path=output_path, is_folder=False)
     with open(output_path, "w") as outfile:
         yaml.dump(data=object_primitive, stream=outfile)
@@ -140,3 +148,57 @@ def check_version(run_folder: Path) -> None:
             f"while the current version is {cur_version}. "
             f"This may cause unexpected behavior and subtle bugs."
         )
+
+
+def strip_config(config: dict | list[dict]) -> dict | list[dict]:
+    keys_to_strip = [
+        "basic_experiment.manual_valid_ids_file",
+        "basic_experiment.output_folder",
+        "input_info.input_source",
+        "output_info.output_source",
+        "input_type_info.vocab_file",
+        "input_type_info.snp_file",
+        "input_type_info.subset_snps_file",
+        "output_type_info.vocab_file",
+    ]
+    replacements = {k: None for k in keys_to_strip}
+
+    if isinstance(config, list):
+        stripped_configs = []
+
+        for cur_config in config:
+            cur_config_stripped = replace_dict_values(
+                target=cur_config,
+                replacements=replacements,
+            )
+            stripped_configs.append(cur_config_stripped)
+
+        return stripped_configs
+
+    config_stripped = replace_dict_values(
+        target=config,
+        replacements=replacements,
+    )
+
+    return config_stripped
+
+
+def replace_dict_values(
+    target: dict[str, Any],
+    replacements: dict[str, Any],
+) -> dict[str, Any]:
+
+    def recursive_replace(
+        d: dict[str, Any],
+        path: str = "",
+    ) -> None:
+        for key, value in d.items():
+            current_path = f"{path}.{key}" if path else key
+            if current_path in replacements:
+                d[key] = replacements[current_path]
+            elif isinstance(value, dict):
+                recursive_replace(d=value, path=current_path)
+
+    result = target.copy()
+    recursive_replace(d=result)
+    return result
