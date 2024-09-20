@@ -30,10 +30,15 @@ def load_image_output_object(
     normalization_stats = load_dataclass(
         cls=ImageNormalizationStats, file_path=normalization_stats_path
     )
-    num_channels = json.loads(num_channels_path.read_text())["num_channels"]
+
+    image_mode = output_type_info_modified.mode
+    if not image_mode:
+        num_channels = json.loads(num_channels_path.read_text())["num_channels"]
+        output_type_info_modified.num_channels = num_channels
+    else:
+        output_type_info_modified.num_channels = None
 
     output_config_modified = deepcopy(output_config)
-    output_type_info_modified.num_channels = num_channels
     output_config_modified.output_type_info = output_type_info_modified
 
     diffusion_config = None

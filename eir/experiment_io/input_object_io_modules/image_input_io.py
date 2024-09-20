@@ -29,10 +29,15 @@ def load_image_input_object(
     normalization_stats = load_dataclass(
         cls=ImageNormalizationStats, file_path=normalization_stats_path
     )
-    num_channels = json.loads(num_channels_path.read_text())["num_channels"]
+
+    image_mode = input_type_info_modified.mode
+    if not image_mode:
+        num_channels = json.loads(num_channels_path.read_text())["num_channels"]
+        input_type_info_modified.num_channels = num_channels
+    else:
+        input_type_info_modified.num_channels = None
 
     input_config_modified = deepcopy(input_config)
-    input_type_info_modified.num_channels = num_channels
     input_config_modified.input_type_info = input_type_info_modified
 
     loaded_object = set_up_computed_image_input_object(
