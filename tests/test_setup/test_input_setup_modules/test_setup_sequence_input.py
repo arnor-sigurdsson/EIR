@@ -1,3 +1,4 @@
+import json
 import os
 import random
 from pathlib import Path
@@ -39,11 +40,14 @@ def set_up_simple_sequence_test_data(
     return path
 
 
-def set_up_simple_vocab_file(vocab: Sequence[str], outpath: Path) -> Path:
+def set_up_simple_vocab_file(
+    vocab: Sequence[str],
+    outpath: Path,
+) -> Path:
     ensure_path_exists(path=outpath, is_folder=False)
+    vocab_dict = {word: i for i, word in enumerate(vocab)}
     with open(outpath, "w") as out_file_handle:
-        for word in vocab:
-            out_file_handle.write(word + "\n")
+        json.dump(vocab_dict, out_file_handle)
 
     return outpath
 
@@ -88,11 +92,14 @@ def test_get_tokenized_vocab_iterator():
         yield "the lazy dog JUMPED over:: the red fox or whatever".split()
 
     basic_english_tokenizer = setup_sequence.get_basic_tokenizer(
-        tokenizer_name="basic_english", tokenizer_language="en"
+        tokenizer_name="basic_english",
+        tokenizer_language="en",
     )
 
     tokenized_vocab_iterator = setup_sequence.get_tokenized_vocab_iterator(
-        vocab_iterator=_test_iterator(), tokenizer=basic_english_tokenizer
+        vocab_iterator=_test_iterator(),
+        tokenizer=basic_english_tokenizer,
+        is_from_file=False,
     )
     results = [i for i in tokenized_vocab_iterator]
     assert len(results) == 1
@@ -236,7 +243,7 @@ def test_get_vocab_iterator_basic_diff_split(tmp_path: Path):
 
 def test_get_vocab_iterator_vocab_file(tmp_path: Path):
     seq_path = tmp_path / "test_sequence_using_vocab"
-    vocab_path = tmp_path / "vocab.txt"
+    vocab_path = tmp_path / "vocab.json"
     test_pool = _get_simple_sample_pool()
     vocab_file = set_up_simple_vocab_file(vocab=test_pool, outpath=vocab_path)
 
@@ -296,7 +303,7 @@ def test_get_max_length(tmp_path):
 
 def test_possibly_gather_all_stats_from_input(tmp_path):
     seq_path = tmp_path / "test_sequence_using_vocab"
-    vocab_path = tmp_path / "vocab.txt"
+    vocab_path = tmp_path / "vocab.json"
     test_pool = _get_simple_sample_pool()
     vocab_file = set_up_simple_vocab_file(vocab=test_pool, outpath=vocab_path)
 
@@ -370,7 +377,7 @@ def test_get_sequence_input_objects_from_pretrained(sync_vocab_mock, tokenizer_m
     tokenizer_mock.return_value.encode.return_value = [1, 2, 3]
 
     func = setup_sequence.get_sequence_input_objects_from_pretrained
-    (vocab, stats, tokenizer, encode) = func(input_config=input_config)
+    (vocab, stats, tokenizer, encode) = func(input_config=input_config, mode="train")
 
     assert tokenizer_mock.called
     assert sync_vocab_mock.called
@@ -381,7 +388,7 @@ def test_get_sequence_input_objects_from_pretrained(sync_vocab_mock, tokenizer_m
 def test_yield_tokens_from_file(tmp_path):
     d = tmp_path / "sub"
     d.mkdir()
-    p = d / "vocab.txt"
+    p = d / "vocab.json"
     p.write_text("a\nb\nc\nd")
 
     gathered_stats = setup_sequence.GatheredSequenceStats()

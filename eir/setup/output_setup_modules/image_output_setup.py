@@ -33,7 +33,11 @@ class ComputedImageOutputInfo:
 
 
 def set_up_image_output(
-    output_config: OutputConfig, *args, **kwargs
+    output_config: OutputConfig,
+    normalization_stats: Optional[ImageNormalizationStats] = None,
+    diffusion_config: Optional[DiffusionConfig] = None,
+    *args,
+    **kwargs,
 ) -> ComputedImageOutputInfo:
 
     output_info = output_config.output_info
@@ -62,16 +66,18 @@ def set_up_image_output(
     oti = output_type_info
     model_config = output_config.model_config
     assert isinstance(model_config, ArrayOutputModuleConfig)
-    normalization_stats = get_image_normalization_values(
-        source=output_config.output_info.output_source,
-        inner_key=output_config.output_info.output_inner_key,
-        model_config=model_config,
-        mean_normalization_values=oti.mean_normalization_values,
-        stds_normalization_values=oti.stds_normalization_values,
-        adaptive_normalization_max_samples=oti.adaptive_normalization_max_samples,
-        data_dimensions=data_dimensions,
-        image_mode=oti.mode,
-    )
+
+    if normalization_stats is None:
+        normalization_stats = get_image_normalization_values(
+            source=output_config.output_info.output_source,
+            inner_key=output_config.output_info.output_inner_key,
+            model_config=model_config,
+            mean_normalization_values=oti.mean_normalization_values,
+            stds_normalization_values=oti.stds_normalization_values,
+            adaptive_normalization_max_samples=oti.adaptive_normalization_max_samples,
+            data_dimensions=data_dimensions,
+            image_mode=oti.mode,
+        )
 
     base_transforms, all_transforms = get_image_transforms(
         target_size=(data_dimensions.height, data_dimensions.width),
@@ -80,15 +86,15 @@ def set_up_image_output(
         resize_approach=oti.resize_approach,
     )
 
-    diffusion_config = None
-    if output_type_info.loss == "diffusion":
-        time_steps = output_type_info.diffusion_time_steps
-        if time_steps is None:
-            raise ValueError(
-                "Diffusion loss requires specifying the number of time steps."
-                "Please set `diffusion_time_steps` in the output config."
-            )
-        diffusion_config = initialize_diffusion_config(time_steps=time_steps)
+    if diffusion_config is None:
+        if output_type_info.loss == "diffusion":
+            time_steps = output_type_info.diffusion_time_steps
+            if time_steps is None:
+                raise ValueError(
+                    "Diffusion loss requires specifying the number of time steps."
+                    "Please set `diffusion_time_steps` in the output config."
+                )
+            diffusion_config = initialize_diffusion_config(time_steps=time_steps)
 
     image_output_object = ComputedImageOutputInfo(
         output_config=output_config,

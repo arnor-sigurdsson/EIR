@@ -35,31 +35,39 @@ class ComputedArrayInputInfo:
     normalization_stats: Optional["ArrayNormalizationStats"] = None
 
 
-def set_up_array_input(
-    input_config: schemas.InputConfig, *args, **kwargs
+def set_up_array_input_object(
+    input_config: schemas.InputConfig,
+    normalization_stats: Optional["ArrayNormalizationStats"] = None,
+    data_dimensions: Optional["DataDimensions"] = None,
+    dtype: Optional[np.dtype] = None,
+    *args,
+    **kwargs,
 ) -> ComputedArrayInputInfo:
-    data_dimensions = get_data_dimension_from_data_source(
-        data_source=Path(input_config.input_info.input_source),
-        deeplake_inner_key=input_config.input_info.input_inner_key,
-    )
+
+    if data_dimensions is None:
+        data_dimensions = get_data_dimension_from_data_source(
+            data_source=Path(input_config.input_info.input_source),
+            deeplake_inner_key=input_config.input_info.input_inner_key,
+        )
 
     input_type_info = input_config.input_type_info
     assert isinstance(input_type_info, schemas.ArrayInputDataConfig)
 
-    normalization_stats: Optional[ArrayNormalizationStats] = None
-    if input_type_info.normalization is not None:
-        normalization_stats = get_array_normalization_values(
-            source=input_config.input_info.input_source,
-            inner_key=input_config.input_info.input_inner_key,
-            normalization=input_type_info.normalization,
-            data_dimensions=data_dimensions,
-            max_samples=input_type_info.adaptive_normalization_max_samples,
-        )
+    if normalization_stats is None:
+        if input_type_info.normalization is not None:
+            normalization_stats = get_array_normalization_values(
+                source=input_config.input_info.input_source,
+                inner_key=input_config.input_info.input_inner_key,
+                normalization=input_type_info.normalization,
+                data_dimensions=data_dimensions,
+                max_samples=input_type_info.adaptive_normalization_max_samples,
+            )
 
-    dtype = get_dtype_from_data_source(
-        data_source=Path(input_config.input_info.input_source),
-        deeplake_inner_key=input_config.input_info.input_inner_key,
-    )
+    if dtype is None:
+        dtype = get_dtype_from_data_source(
+            data_source=Path(input_config.input_info.input_source),
+            deeplake_inner_key=input_config.input_info.input_inner_key,
+        )
 
     array_input_info = ComputedArrayInputInfo(
         input_config=input_config,

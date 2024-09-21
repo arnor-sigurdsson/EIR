@@ -1,15 +1,16 @@
 from functools import partial
 from typing import Callable, Dict, Sequence, Union
 
-from eir.experiment_io.experiment_io import load_serialized_input_object
+from eir.experiment_io.input_object_io import load_serialized_input_object
 from eir.predict_modules.predict_tabular_input_setup import (
     setup_tabular_input_for_testing,
 )
 from eir.setup import input_setup, schemas
 from eir.setup.input_setup import al_input_objects_as_dict
-from eir.setup.input_setup_modules import setup_array, setup_omics
+from eir.setup.input_setup_modules import setup_array
 from eir.setup.input_setup_modules.setup_bytes import ComputedBytesInputInfo
 from eir.setup.input_setup_modules.setup_image import ComputedImageInputInfo
+from eir.setup.input_setup_modules.setup_omics import ComputedOmicsInputInfo
 from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
 from eir.train_utils.step_logic import Hooks
 
@@ -47,7 +48,10 @@ def get_input_setup_function_map_for_predict() -> (
     Dict[str, Callable[..., input_setup.al_input_objects]]
 ):
     setup_mapping: Dict[str, Callable[..., input_setup.al_input_objects]] = {
-        "omics": setup_omics.set_up_omics_input,
+        "omics": partial(
+            load_serialized_input_object,
+            input_class=ComputedOmicsInputInfo,
+        ),
         "tabular": setup_tabular_input_for_testing,
         "sequence": partial(
             load_serialized_input_object,

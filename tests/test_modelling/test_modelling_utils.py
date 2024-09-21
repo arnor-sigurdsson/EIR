@@ -74,7 +74,7 @@ def check_test_performance_results(
 
     fail_msg = (
         f"Failed for {output_name}, {target_column}, {metric} with "
-        f" direction {direction} and thresholds {thresholds} for "
+        f"direction {direction} and thresholds {thresholds} for "
         f"run path {run_path}."
     )
 

@@ -37,4 +37,5 @@ eir_tutorials/e_pretraining/02_mini_foundation
     ├── image_captioning
     │   ├── captions.csv
     │   └── images
+    ├── vocab.json
     └── vocab.txt

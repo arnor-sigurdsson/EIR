@@ -8,11 +8,8 @@ from torch import nn
 from torch.utils.data import DataLoader
 
 from eir import train
-from eir.experiment_io.experiment_io import (
-    get_default_experiment_keys_to_serialize,
-    serialize_chosen_input_objects,
-    serialize_experiment,
-)
+from eir.experiment_io.input_object_io import serialize_chosen_input_objects
+from eir.experiment_io.output_object_io import serialize_output_objects
 from eir.setup import config, input_setup, schemas
 from eir.setup.input_setup_modules.setup_tabular import serialize_all_input_transformers
 from eir.setup.output_setup import set_up_outputs_for_training
@@ -97,6 +94,10 @@ def prep_modelling_test_configs(
         input_objects=inputs_as_dict,
         target_transformers=target_labels.label_transformers,
     )
+    serialize_output_objects(
+        output_objects=outputs_as_dict,
+        run_folder=Path(gc.be.output_folder),
+    )
     inputs_as_dict = converge_sequence_input_and_output(
         inputs=inputs_as_dict, outputs=outputs_as_dict
     )
@@ -138,13 +139,6 @@ def prep_modelling_test_configs(
         loss_function=loss_module,
         metrics=test_metrics,
         hooks=hooks,
-    )
-
-    keys_to_serialize = get_default_experiment_keys_to_serialize()
-    serialize_experiment(
-        experiment=experiment,
-        run_folder=get_run_folder(gc.be.output_folder),
-        keys_to_serialize=keys_to_serialize,
     )
 
     targets = config.get_all_tabular_targets(output_configs=c.output_configs)

@@ -16,8 +16,12 @@ if TYPE_CHECKING:
 
 
 def get_transformer_sources(run_folder: Path) -> dict[str, list[str]]:
-    transformers_to_load = {}
+    transformers_to_load: dict[str, list[str]] = {}
     transformer_sources = run_folder / "serializations/transformers"
+
+    if not transformer_sources.exists():
+        return transformers_to_load
+
     for transformer_source in transformer_sources.iterdir():
         names = sorted([i.stem for i in transformer_source.iterdir()])
         transformers_to_load[transformer_source.stem] = names
@@ -90,7 +94,7 @@ def save_label_transformer(
         source_name=output_name,
         transformer_name=transformer_name,
     )
-    ensure_path_exists(target_transformer_outpath)
+    ensure_path_exists(path=target_transformer_outpath)
     serialized_data = serialize_transformer(transformer=target_transformer_object)
     write_json(data=serialized_data, path=target_transformer_outpath)
     return target_transformer_outpath

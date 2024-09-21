@@ -2,7 +2,7 @@ import argparse
 import types
 from collections import Counter
 from copy import copy
-from dataclasses import dataclass, field, fields, is_dataclass
+from dataclasses import dataclass, field
 from typing import (
     Any,
     Callable,
@@ -23,40 +23,15 @@ import yaml
 
 from eir.models.fusion.fusion_identity import IdentityConfig
 from eir.models.fusion.fusion_mgmoe import MGMoEModelConfig
-from eir.models.input.array.array_models import (
-    ArrayModelConfig,
-    LCLModelConfig,
-    get_array_config_dataclass_mapping,
-)
-from eir.models.input.image.image_models import ImageModelConfig
-from eir.models.input.omics.omics_models import (
-    OmicsModelConfig,
-    get_omics_config_dataclass_mapping,
-)
-from eir.models.input.sequence.transformer_models import (
-    BasicTransformerFeatureExtractorModelConfig,
-    SequenceModelConfig,
-)
-from eir.models.input.tabular.tabular import (
-    SimpleTabularModelConfig,
-    TabularModelConfig,
-)
 from eir.models.layers.mlp_layers import ResidualMLPConfig
-from eir.models.output.array.array_output_modules import (
-    ArrayOutputModuleConfig,
-    CNNUpscaleModelConfig,
-    LCLOutputModelConfig,
-)
-from eir.models.output.sequence.sequence_output_modules import (
-    SequenceOutputModuleConfig,
-    TransformerSequenceOutputModuleConfig,
-)
-from eir.models.output.tabular.linear import LinearOutputModuleConfig
-from eir.models.output.tabular.mlp_residual import ResidualMLPOutputModuleConfig
-from eir.models.output.tabular.tabular_output_modules import TabularOutputModuleConfig
 from eir.setup import schemas
 from eir.setup.config_setup_modules.config_setup_utils import (
     get_yaml_iterator_with_injections,
+    validate_keys_against_dataclass,
+)
+from eir.setup.config_setup_modules.input_config_initialization import init_input_config
+from eir.setup.config_setup_modules.output_config_initialization import (
+    init_output_config,
 )
 from eir.setup.config_setup_modules.output_config_setup_sequence import (
     get_configs_object_with_seq_output_configs,
@@ -99,23 +74,6 @@ al_output_types_schema_map = dict[
 al_output_module_config_class_getter = (
     Callable[[str], Union[schemas.al_output_module_configs_classes, Any]],
 )
-
-al_output_model_config_classes = (
-    Type[ResidualMLPOutputModuleConfig]
-    | Type[LinearOutputModuleConfig]
-    | Type[TransformerSequenceOutputModuleConfig]
-    | Type[LCLModelConfig]
-    | Type[CNNUpscaleModelConfig]
-)
-
-al_output_model_configs = (
-    ResidualMLPOutputModuleConfig
-    | LinearOutputModuleConfig
-    | TransformerSequenceOutputModuleConfig
-    | LCLModelConfig
-    | CNNUpscaleModelConfig
-)
-al_output_model_init_map = dict[str, dict[str, al_output_model_config_classes]]
 
 logger = get_logger(name=__name__)
 
@@ -353,17 +311,6 @@ def modify_global_config(global_config: GlobalConfig) -> GlobalConfig:
     return gc_copy
 
 
-def _maybe_add_latent_sampling_to_combined_config(combined_config: dict) -> dict:
-    if "latent_sampling" in combined_config and isinstance(
-        combined_config["latent_sampling"], dict
-    ):
-        combined_config["latent_sampling"] = LatentSamplingConfig(
-            **combined_config["latent_sampling"]
-        )
-
-    return combined_config
-
-
 def get_input_configs(
     input_configs: Iterable[dict],
 ) -> Sequence[schemas.InputConfig]:
@@ -380,7 +327,18 @@ def get_input_configs(
 def _check_input_config_names(input_configs: Iterable[schemas.InputConfig]) -> None:
     names = []
     for config in input_configs:
-        names.append(config.input_info.input_name)
+        input_name = config.input_info.input_name
+
+        model_name = config.model_config.model_type
+        if model_name.startswith("eir-input-sequence-from-linked-output-"):
+            logger.info(
+                "Skipping input config name check for sequence input config "
+                "(name='%s') as it was automatically generated from a sequence output.",
+                input_name,
+            )
+            continue
+
+        names.append(input_name)
 
     if len(set(names)) != len(names):
         counts = Counter(names)
@@ -388,295 +346,6 @@ def _check_input_config_names(input_configs: Iterable[schemas.InputConfig]) -> N
             f"Found duplicates of input names in input configs: {counts}. "
             f"Please make sure each input source has a unique input_name."
         )
-
-
-def validate_keys_against_dataclass(
-    input_dict: Dict[str, Any], dataclass_type: Type, name: str = ""
-) -> None:
-    if not is_dataclass(dataclass_type):
-        raise TypeError(f"Provided type {dataclass_type.__name__} is not a dataclass")
-
-    expected_keys = {field_.name for field_ in fields(dataclass_type)}
-
-    actual_keys = set(input_dict.keys())
-
-    unexpected_keys = actual_keys - expected_keys
-    if unexpected_keys:
-        message = (
-            f"Unexpected keys found in configuration: '{', '.join(unexpected_keys)}'. "
-            f"Expected keys of type '{dataclass_type.__name__}': "
-            f"'{', '.join(expected_keys)}'."
-        )
-
-        if name:
-            message = f"{name}: {message}"
-
-        raise KeyError(message)
-
-
-def init_input_config(yaml_config_as_dict: Dict[str, Any]) -> schemas.InputConfig:
-    cfg = yaml_config_as_dict
-
-    validate_keys_against_dataclass(
-        input_dict=cfg,
-        dataclass_type=schemas.InputConfig,
-        name=cfg.get("input_info", {}).get("input_name", ""),
-    )
-
-    input_info_object = schemas.InputDataConfig(**cfg["input_info"])
-
-    input_schema_map = get_inputs_schema_map()
-    input_type_info_class = input_schema_map[input_info_object.input_type]
-    input_type_info_kwargs = cfg.get("input_type_info", {})
-    input_type_info_object = input_type_info_class(**input_type_info_kwargs)
-
-    _validate_input_type_info_object(
-        input_type_info_object=input_type_info_object,
-        input_source=input_info_object.input_source,
-    )
-
-    model_config = set_up_input_feature_extractor_config(
-        input_info_object=input_info_object,
-        input_type_info_object=input_type_info_object,
-        model_init_kwargs_base=cfg.get("model_config", {}),
-    )
-
-    pretrained_config = set_up_pretrained_config(
-        pretrained_config_dict=cfg.get("pretrained_config", None)
-    )
-
-    interpretation_config = set_up_interpretation_config(
-        input_type=input_info_object.input_type,
-        interpretation_config_dict=cfg.get("interpretation_config", None),
-    )
-
-    tensor_broker_config = set_up_tensor_broker_config(
-        tensor_broker_config=cfg.get("tensor_broker_config", {})
-    )
-
-    input_config = schemas.InputConfig(
-        input_info=input_info_object,
-        input_type_info=input_type_info_object,
-        pretrained_config=pretrained_config,
-        model_config=model_config,
-        interpretation_config=interpretation_config,
-        tensor_broker_config=tensor_broker_config,
-    )
-
-    return input_config
-
-
-def get_inputs_schema_map() -> Dict[
-    str,
-    Union[
-        Type[schemas.OmicsInputDataConfig],
-        Type[schemas.TabularInputDataConfig],
-        Type[schemas.SequenceInputDataConfig],
-        Type[schemas.ByteInputDataConfig],
-    ],
-]:
-    mapping = {
-        "omics": schemas.OmicsInputDataConfig,
-        "tabular": schemas.TabularInputDataConfig,
-        "sequence": schemas.SequenceInputDataConfig,
-        "bytes": schemas.ByteInputDataConfig,
-        "image": schemas.ImageInputDataConfig,
-        "array": schemas.ArrayInputDataConfig,
-    }
-
-    return mapping
-
-
-def _validate_input_type_info_object(
-    input_type_info_object: al_input_types, input_source: str
-) -> None:
-    ito = input_type_info_object
-    match ito:
-        case schemas.TabularInputDataConfig():
-            con = ito.input_con_columns
-            cat = ito.input_cat_columns
-            common = set(con).intersection(set(cat))
-            if common:
-                raise ValueError(
-                    f"Found columns passed in both continuous and categorical inputs: "
-                    f"{common}. In input source: {input_source}."
-                    f"Please make sure that each column is only in one of the two, "
-                    f"or create differently named copies of the columns."
-                )
-
-
-def set_up_input_feature_extractor_config(
-    input_info_object: schemas.InputDataConfig,
-    input_type_info_object: al_input_types,
-    model_init_kwargs_base: dict,
-) -> schemas.al_feature_extractor_configs:
-    input_type = input_info_object.input_type
-
-    model_config_class = get_input_feature_extractor_config_class(input_type=input_type)
-
-    model_type = model_init_kwargs_base.get("model_type", None)
-    if not model_type:
-        try:
-            model_type = getattr(model_config_class, "model_type")
-        except AttributeError:
-            raise AttributeError(
-                "Not model type specified in model config and could not find default "
-                "value for '%s'.",
-                input_type,
-            )
-
-        logger.info(
-            "Input model type not specified in model configuration for input name "
-            "'%s', attempting to grab default value.",
-            input_info_object.input_name,
-        )
-
-    model_type_init_config = set_up_feature_extractor_init_config(
-        input_info_object=input_info_object,
-        input_type_info_object=input_type_info_object,
-        model_init_kwargs=model_init_kwargs_base.get("model_init_config", {}),
-        model_type=model_type,
-    )
-
-    common_kwargs = {
-        "model_type": model_type,
-        "model_init_config": model_type_init_config,
-    }
-    other_specific_kwargs = {
-        k: v for k, v in model_init_kwargs_base.items() if k not in common_kwargs
-    }
-    model_config_kwargs = {**common_kwargs, **other_specific_kwargs}
-    model_config = model_config_class(**model_config_kwargs)
-
-    return model_config
-
-
-def get_input_feature_extractor_config_class(
-    input_type: str,
-) -> schemas.al_feature_extractor_configs_classes:
-    model_config_setup_map = get_input_feature_extractor_config_init_class_map()
-
-    return model_config_setup_map[input_type]
-
-
-def get_input_feature_extractor_config_init_class_map() -> (
-    Dict[str, schemas.al_feature_extractor_configs_classes]
-):
-    mapping = {
-        "tabular": TabularModelConfig,
-        "omics": OmicsModelConfig,
-        "sequence": SequenceModelConfig,
-        "bytes": SequenceModelConfig,
-        "image": ImageModelConfig,
-        "array": ArrayModelConfig,
-    }
-
-    return mapping
-
-
-def set_up_feature_extractor_init_config(
-    input_info_object: schemas.InputDataConfig,
-    input_type_info_object: al_input_types,
-    model_init_kwargs: dict,
-    model_type: str,
-) -> Dict:
-    if getattr(input_type_info_object, "pretrained_model", None):
-        return {}
-
-    not_from_eir = get_is_not_eir_model_condition(
-        input_info_object=input_info_object,
-        model_type=model_type,
-    )
-    if not_from_eir:
-        return model_init_kwargs
-
-    if not model_init_kwargs:
-        model_init_kwargs = {}
-
-    model_config_map = get_feature_extractor_config_type_init_callable_map()
-    model_config_callable = model_config_map[model_type]
-
-    model_config = model_config_callable(**model_init_kwargs)
-
-    return model_config
-
-
-def get_is_not_eir_model_condition(
-    input_info_object: schemas.InputDataConfig, model_type: str
-) -> bool:
-    is_possibly_external = getattr(input_info_object, "input_type") in (
-        "sequence",
-        "bytes",
-        "image",
-    )
-    is_unknown_model = model_type not in ("sequence-default", "cnn", "lcl")
-    not_from_eir = is_possibly_external and is_unknown_model
-    return not_from_eir
-
-
-def get_feature_extractor_config_type_init_callable_map() -> Dict[str, Type]:
-    omics_mapping = get_omics_config_dataclass_mapping()
-    array_mapping = get_array_config_dataclass_mapping()
-    other_mapping = {
-        "tabular": SimpleTabularModelConfig,
-        "sequence-default": BasicTransformerFeatureExtractorModelConfig,
-    }
-
-    mapping = omics_mapping | array_mapping | other_mapping
-    return mapping
-
-
-def set_up_pretrained_config(
-    pretrained_config_dict: Union[None, Dict[str, Any]]
-) -> Union[None, schemas.BasicPretrainedConfig]:
-    if pretrained_config_dict is None:
-        return None
-
-    config_class = get_pretrained_config_class()
-    if config_class is None:
-        return None
-
-    config_object = config_class(**pretrained_config_dict)
-
-    return config_object
-
-
-def get_pretrained_config_class() -> Type[schemas.BasicPretrainedConfig]:
-    return schemas.BasicPretrainedConfig
-
-
-def set_up_interpretation_config(
-    input_type: str, interpretation_config_dict: Union[None, Dict[str, Any]]
-) -> Union[None, schemas.BasicInterpretationConfig]:
-    config_class = get_interpretation_config_class(input_type=input_type)
-    if config_class is None:
-        return None
-
-    if interpretation_config_dict is None:
-        interpretation_config_dict = {}
-
-    config_object = config_class(**interpretation_config_dict)
-
-    return config_object
-
-
-def get_interpretation_config_class(
-    input_type: str,
-) -> Union[None, Type[schemas.BasicInterpretationConfig]]:
-    mapping = get_interpretation_config_schema_map()
-
-    return mapping.get(input_type, None)
-
-
-def get_interpretation_config_schema_map() -> (
-    Dict[str, Type[schemas.BasicInterpretationConfig]]
-):
-    mapping = {
-        "sequence": schemas.BasicInterpretationConfig,
-        "image": schemas.BasicInterpretationConfig,
-    }
-
-    return mapping
 
 
 def load_fusion_configs(fusion_configs: Iterable[dict]) -> schemas.FusionConfig:
@@ -741,205 +410,6 @@ def _check_output_config_names(output_configs: Iterable[schemas.OutputConfig]) -
             f"Found duplicates of input names in input configs: {counts}. "
             f"Please make sure each input source has a unique input_name."
         )
-
-
-def init_output_config(
-    yaml_config_as_dict: Dict[str, Any],
-) -> schemas.OutputConfig:
-    cfg = yaml_config_as_dict
-
-    validate_keys_against_dataclass(
-        input_dict=cfg,
-        dataclass_type=schemas.OutputConfig,
-        name=cfg.get("output_info", {}).get("output_name", ""),
-    )
-
-    output_info_object = schemas.OutputInfoConfig(**cfg["output_info"])
-
-    output_schema_map = get_outputs_types_schema_map()
-    output_type_info_class = output_schema_map[output_info_object.output_type]
-
-    output_type_info_class_init_kwargs = cfg.get("output_type_info", {})
-    output_type_info_object = output_type_info_class(
-        **output_type_info_class_init_kwargs
-    )
-
-    model_config = set_up_output_module_config(
-        output_info_object=output_info_object,
-        model_init_kwargs_base=cfg.get("model_config", {}),
-    )
-
-    sampling_config = _set_up_basic_sampling_config(
-        output_type_config=output_type_info_object,
-        sampling_config=cfg.get("sampling_config", {}),
-    )
-
-    tensor_broker_config = set_up_tensor_broker_config(
-        tensor_broker_config=cfg.get("tensor_broker_config", {})
-    )
-
-    output_config = schemas.OutputConfig(
-        output_info=output_info_object,
-        output_type_info=output_type_info_object,
-        model_config=model_config,
-        sampling_config=sampling_config,
-        tensor_broker_config=tensor_broker_config,
-    )
-
-    return output_config
-
-
-def _set_up_basic_sampling_config(
-    output_type_config: schemas.al_output_type_configs, sampling_config: dict
-) -> dict | schemas.ArrayOutputSamplingConfig | schemas.ImageOutputSamplingConfig:
-    """
-    Note that the sequence sampling config currently has it's own logic
-    in output_config_setup_sequence.py.
-    """
-    sampling_config_object: (
-        dict | schemas.ArrayOutputSamplingConfig | schemas.ImageOutputSamplingConfig
-    )
-    match output_type_config:
-        case schemas.ArrayOutputTypeConfig():
-            sampling_config_object = schemas.ArrayOutputSamplingConfig(
-                **sampling_config
-            )
-        case schemas.ImageOutputTypeConfig():
-            sampling_config_object = schemas.ImageOutputSamplingConfig(
-                **sampling_config
-            )
-
-        case schemas.TabularOutputTypeConfig() | schemas.SequenceOutputTypeConfig():
-            sampling_config_object = sampling_config
-        case _:
-            raise ValueError(f"Unknown output type config '{output_type_config}'.")
-
-    return sampling_config_object
-
-
-def get_outputs_types_schema_map() -> Dict[
-    str,
-    Type[schemas.TabularOutputTypeConfig]
-    | Type[schemas.SequenceOutputTypeConfig]
-    | Type[schemas.ArrayOutputTypeConfig]
-    | Type[schemas.ImageOutputTypeConfig],
-]:
-    mapping = {
-        "tabular": schemas.TabularOutputTypeConfig,
-        "sequence": schemas.SequenceOutputTypeConfig,
-        "array": schemas.ArrayOutputTypeConfig,
-        "image": schemas.ImageOutputTypeConfig,
-    }
-
-    return mapping
-
-
-def get_output_module_config_class(
-    output_type: str,
-) -> schemas.al_output_module_configs_classes:
-    model_config_setup_map = get_output_module_config_class_map()
-
-    return model_config_setup_map[output_type]
-
-
-def get_output_module_config_class_map() -> (
-    Dict[str, schemas.al_output_module_configs_classes]
-):
-    mapping = {
-        "tabular": TabularOutputModuleConfig,
-        "sequence": SequenceOutputModuleConfig,
-        "array": ArrayOutputModuleConfig,
-        "image": ArrayOutputModuleConfig,
-    }
-
-    return mapping
-
-
-def set_up_output_module_config(
-    output_info_object: schemas.OutputInfoConfig,
-    model_init_kwargs_base: dict,
-) -> schemas.al_output_module_configs:
-    output_type = output_info_object.output_type
-
-    model_config_class = get_output_module_config_class(output_type=output_type)
-
-    model_type = None
-    if model_init_kwargs_base:
-        model_type = model_init_kwargs_base.get("model_type", None)
-
-    if not model_type:
-        try:
-            model_type = getattr(model_config_class, "model_type")
-        except AttributeError:
-            raise AttributeError(
-                "Not model type specified in model config and could not find default "
-                "value for '%s'.",
-                output_type,
-            )
-
-        logger.info(
-            "Output model type not specified in model configuration with name '%s', "
-            "attempting to grab default value.",
-            output_info_object.output_name,
-        )
-
-    output_module_init_class_map = get_output_config_type_init_callable_map()
-
-    model_type_config = set_up_output_module_init_config(
-        model_init_kwargs_base=model_init_kwargs_base.get("model_init_config", {}),
-        output_type=output_type,
-        model_type=model_type,
-        output_module_init_class_map=output_module_init_class_map,
-    )
-
-    common_kwargs = {"model_type": model_type, "model_init_config": model_type_config}
-    other_specific_kwargs = {
-        k: v for k, v in model_init_kwargs_base.items() if k not in common_kwargs
-    }
-    model_config_kwargs = {**common_kwargs, **other_specific_kwargs}
-    model_config = model_config_class(**model_config_kwargs)
-
-    return model_config
-
-
-def set_up_output_module_init_config(
-    model_init_kwargs_base: Union[None, dict],
-    output_type: Literal["tabular", "sequence", "array"],
-    model_type: str,
-    output_module_init_class_map: al_output_model_init_map,
-) -> al_output_model_configs:
-    if not model_init_kwargs_base:
-        model_init_kwargs_base = {}
-
-    model_init_kwargs = copy(model_init_kwargs_base)
-
-    model_init_config_callable = output_module_init_class_map[output_type][model_type]
-
-    model_init_config = model_init_config_callable(**model_init_kwargs)
-
-    return model_init_config
-
-
-def get_output_config_type_init_callable_map() -> al_output_model_init_map:
-    mapping: al_output_model_init_map = {
-        "tabular": {
-            "mlp_residual": ResidualMLPOutputModuleConfig,
-            "linear": LinearOutputModuleConfig,
-        },
-        "sequence": {
-            "sequence": TransformerSequenceOutputModuleConfig,
-        },
-        "array": {
-            "lcl": LCLOutputModelConfig,
-            "cnn": CNNUpscaleModelConfig,
-        },
-        "image": {
-            "lcl": LCLOutputModelConfig,
-            "cnn": CNNUpscaleModelConfig,
-        },
-    }
-
-    return mapping
 
 
 @dataclass

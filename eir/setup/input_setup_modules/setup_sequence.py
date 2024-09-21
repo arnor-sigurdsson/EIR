@@ -1,3 +1,4 @@
+import json
 import os
 from collections import OrderedDict
 from copy import deepcopy
@@ -8,6 +9,7 @@ from typing import (
     Callable,
     Generator,
     Iterator,
+    Literal,
     Optional,
     Protocol,
     Sequence,
@@ -98,8 +100,11 @@ class ComputedSequenceInputInfo:
     tokenizer: Optional[al_tokenizers]
 
 
-def set_up_sequence_input_for_training(
-    input_config: schemas.InputConfig, *args, **kwargs
+def set_up_computed_sequence_input(
+    input_config: schemas.InputConfig,
+    mode: Literal["train", "eval"] = "train",
+    *args,
+    **kwargs,
 ) -> ComputedSequenceInputInfo:
     model_config = input_config.model_config
     assert isinstance(model_config, SequenceModelConfig)
@@ -107,8 +112,10 @@ def set_up_sequence_input_for_training(
     sequence_input_object_func = _get_sequence_input_object_func(
         pretrained=model_config.pretrained_model
     )
+
     vocab, gathered_stats, tokenizer, encode_callable = sequence_input_object_func(
-        input_config=input_config
+        input_config=input_config,
+        mode=mode,
     )
 
     input_type_info = input_config.input_type_info
@@ -139,13 +146,17 @@ def set_up_sequence_input_for_training(
 
 class SequenceInputObjectGetterFunctionBasic(Protocol):
     def __call__(
-        self, input_config: schemas.InputConfig
+        self,
+        input_config: schemas.InputConfig,
+        mode: Literal["train", "eval"],
     ) -> al_sequence_input_objects_basic: ...
 
 
 class SequenceInputObjectGetterFunctionHF(Protocol):
     def __call__(
-        self, input_config: schemas.InputConfig
+        self,
+        input_config: schemas.InputConfig,
+        mode: Literal["train", "eval"],
     ) -> al_sequence_input_objects_hf: ...
 
 
@@ -160,6 +171,7 @@ def _get_sequence_input_object_func(
 
 def get_sequence_input_objects_from_input(
     input_config: schemas.InputConfig,
+    mode: Literal["train", "eval"],
 ) -> al_sequence_input_objects_basic:
     gathered_stats = GatheredSequenceStats()
     input_type_info = input_config.input_type_info
@@ -218,7 +230,9 @@ def init_vocab(
             deeplake_inner_key=inner_key,
         )
         tokenized_vocab_iter = get_tokenized_vocab_iterator(
-            vocab_iterator=vocab_iter, tokenizer=tokenizer
+            vocab_iterator=vocab_iter,
+            tokenizer=tokenizer,
+            is_from_file=vocab_file is not None,
         )
 
         min_freq = _init_min_freq(
@@ -226,10 +240,12 @@ def init_vocab(
             min_freq=min_freq,
         )
 
+        do_sort_by_freq = False if vocab_file else True
         vocab = build_vocab_from_iterator(
             iterator=tokenized_vocab_iter,
             specials=get_default_sequence_specials(),
             min_freq=min_freq,
+            sort_by_freq=do_sort_by_freq,
         )
 
     vocab.set_default_index(vocab["<unk>"])
@@ -315,13 +331,15 @@ def _get_default_specials_map() -> dict:
 
 def get_sequence_input_objects_from_pretrained(
     input_config: schemas.InputConfig,
+    mode: Literal["train", "eval"],
 ) -> al_sequence_input_objects_hf:
     input_type_info = input_config.input_type_info
     assert isinstance(input_type_info, schemas.SequenceInputDataConfig)
     vocab_file = input_type_info.vocab_file
-    if vocab_file:
+    do_not_allow_vocab_file = mode == "train"
+    if vocab_file and do_not_allow_vocab_file:
         raise ValueError(
-            "Using a vocabulary file not supported when using pre-trained models as "
+            "Using a vocabulary file not supported when training pre-trained models as "
             "their training vocabulary will be used."
         )
 
@@ -523,6 +541,7 @@ def get_tokenizer_encode_func(
 def get_tokenized_vocab_iterator(
     vocab_iterator: Iterator[Sequence[str] | str],
     tokenizer: TokenizerProtocolRaw | TokenizerProtocolPreSplit,
+    is_from_file: bool,
 ) -> Generator[Sequence[str], None, None]:
     @overload
     def _do_tokenize(list_of_words_: str) -> Sequence[str]: ...
@@ -533,8 +552,12 @@ def get_tokenized_vocab_iterator(
     def _do_tokenize(list_of_words_):
         return tokenizer(list_of_words_)
 
-    for list_of_words in vocab_iterator:
-        yield _do_tokenize(list_of_words_=list_of_words)
+    if is_from_file:
+        for token in vocab_iterator:
+            yield token
+    else:
+        for list_of_words in vocab_iterator:
+            yield _do_tokenize(list_of_words_=list_of_words)
 
 
 def get_vocab_iterator(
@@ -568,13 +591,35 @@ def get_vocab_iterator(
             input_source,
             vocab_file,
         )
-        vocab_iter = yield_tokens_from_file(
-            file_path=vocab_file,
-            split_on=None,
+
+        vocab_iter = get_vocab_file_iterator(
+            vocab_file=Path(vocab_file),
             gathered_stats=gathered_stats,
         )
 
     return vocab_iter
+
+
+def get_vocab_file_iterator(
+    vocab_file: Path,
+    gathered_stats: "GatheredSequenceStats",
+) -> Generator[str, None, None]:
+    try:
+        with vocab_file.open("r") as f:
+            vocab_dict = json.load(f)
+    except json.JSONDecodeError:
+        raise ValueError(f"The file {vocab_file} is not a valid JSON file.")
+    except FileNotFoundError:
+        raise FileNotFoundError(f"The file {vocab_file} was not found.")
+
+    if not isinstance(vocab_dict, dict):
+        raise ValueError(f"The content of {vocab_file} is not a dictionary.")
+
+    sorted_tokens = sorted(vocab_dict.items(), key=lambda x: x[1])
+
+    for token, _ in sorted_tokens:
+        gathered_stats.total_count += 1
+        yield token
 
 
 @dataclass
@@ -644,7 +689,9 @@ def yield_tokens_from_deeplake_dataset(
 
 
 def yield_tokens_from_file(
-    file_path: str, split_on: Optional[str], gathered_stats: GatheredSequenceStats
+    file_path: str,
+    split_on: Optional[str],
+    gathered_stats: GatheredSequenceStats,
 ) -> Generator[Sequence[str], None, None]:
     gathered_stats.total_files += 1
 

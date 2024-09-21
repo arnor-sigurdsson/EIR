@@ -75,7 +75,8 @@ def set_up_sequence_output(
 
 
 def get_sequence_input_objects_from_output(
-    output_config: OutputConfig, matching_input_config: InputConfig
+    output_config: OutputConfig,
+    matching_input_config: InputConfig,
 ) -> setup_sequence.al_sequence_input_objects_basic:
     gathered_stats = setup_sequence.GatheredSequenceStats()
     output_type_info = output_config.output_type_info
@@ -98,7 +99,8 @@ def get_sequence_input_objects_from_output(
     )
 
     encode_func = setup_sequence.get_tokenizer_encode_func(
-        tokenizer=tokenizer, pytorch_vocab=vocab
+        tokenizer=tokenizer,
+        pytorch_vocab=vocab,
     )
 
     return vocab, gathered_stats, tokenizer, encode_func

@@ -59,8 +59,11 @@ class ComputedImageInputInfo:
     data_dimensions: "DataDimensions"
 
 
-def set_up_image_input_for_training(
-    input_config: schemas.InputConfig, *args, **kwargs
+def set_up_computed_image_input_object(
+    input_config: schemas.InputConfig,
+    normalization_stats: Optional["ImageNormalizationStats"] = None,
+    *args,
+    **kwargs,
 ) -> ComputedImageInputInfo:
     input_type_info = input_config.input_type_info
     assert isinstance(input_type_info, schemas.ImageInputDataConfig)
@@ -89,16 +92,18 @@ def set_up_image_input_for_training(
     iti = input_type_info
     model_config = input_config.model_config
     assert isinstance(model_config, ImageModelConfig)
-    normalization_stats = get_image_normalization_values(
-        source=input_config.input_info.input_source,
-        inner_key=input_config.input_info.input_inner_key,
-        model_config=model_config,
-        mean_normalization_values=iti.mean_normalization_values,
-        stds_normalization_values=iti.stds_normalization_values,
-        adaptive_normalization_max_samples=iti.adaptive_normalization_max_samples,
-        data_dimensions=data_dimension,
-        image_mode=iti.mode,
-    )
+
+    if normalization_stats is None:
+        normalization_stats = get_image_normalization_values(
+            source=input_config.input_info.input_source,
+            inner_key=input_config.input_info.input_inner_key,
+            model_config=model_config,
+            mean_normalization_values=iti.mean_normalization_values,
+            stds_normalization_values=iti.stds_normalization_values,
+            adaptive_normalization_max_samples=iti.adaptive_normalization_max_samples,
+            data_dimensions=data_dimension,
+            image_mode=iti.mode,
+        )
 
     base_transforms, all_transforms = get_image_transforms(
         target_size=input_type_info.size,

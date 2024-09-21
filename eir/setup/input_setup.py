@@ -10,7 +10,7 @@ from typing import (
     Union,
 )
 
-from eir.experiment_io.experiment_io import get_run_folder_from_model_path
+from eir.experiment_io.io_utils import get_run_folder_from_model_path
 from eir.predict_modules.predict_tabular_input_setup import (
     ComputedPredictTabularInputInfo,
 )
@@ -18,7 +18,7 @@ from eir.serve_modules.serve_schemas import ComputedServeTabularInputInfo
 from eir.setup import schemas
 from eir.setup.input_setup_modules.setup_array import (
     ComputedArrayInputInfo,
-    set_up_array_input,
+    set_up_array_input_object,
 )
 from eir.setup.input_setup_modules.setup_bytes import (
     ComputedBytesInputInfo,
@@ -26,7 +26,7 @@ from eir.setup.input_setup_modules.setup_bytes import (
 )
 from eir.setup.input_setup_modules.setup_image import (
     ComputedImageInputInfo,
-    set_up_image_input_for_training,
+    set_up_computed_image_input_object,
 )
 from eir.setup.input_setup_modules.setup_omics import (
     ComputedOmicsInputInfo,
@@ -37,7 +37,7 @@ from eir.setup.input_setup_modules.setup_pretrained import (
 )
 from eir.setup.input_setup_modules.setup_sequence import (
     ComputedSequenceInputInfo,
-    set_up_sequence_input_for_training,
+    set_up_computed_sequence_input,
 )
 from eir.setup.input_setup_modules.setup_tabular import (
     ComputedTabularInputInfo,
@@ -68,6 +68,7 @@ al_serializable_input_objects = Union[
     ComputedImageInputInfo,
     ComputedBytesInputInfo,
     ComputedArrayInputInfo,
+    ComputedOmicsInputInfo,
 ]
 
 al_serializable_input_classes = Union[
@@ -75,6 +76,7 @@ al_serializable_input_classes = Union[
     Type[ComputedImageInputInfo],
     Type[ComputedBytesInputInfo],
     Type[ComputedArrayInputInfo],
+    Type[ComputedOmicsInputInfo],
 ]
 
 
@@ -172,10 +174,10 @@ def get_input_setup_function_map() -> dict[str, Callable[..., al_input_objects]]
     setup_mapping: dict[str, Callable[..., al_input_objects]] = {
         "omics": set_up_omics_input,
         "tabular": set_up_tabular_input_for_training,
-        "sequence": set_up_sequence_input_for_training,
+        "sequence": set_up_computed_sequence_input,
         "bytes": set_up_bytes_input_for_training,
-        "image": set_up_image_input_for_training,
-        "array": set_up_array_input,
+        "image": set_up_computed_image_input_object,
+        "array": set_up_array_input_object,
     }
 
     return setup_mapping

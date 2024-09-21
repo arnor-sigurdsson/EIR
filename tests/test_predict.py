@@ -325,6 +325,22 @@ def _get_predict_test_data_parametrization() -> List[Dict[str, Any]]:
                             },
                         },
                     },
+                    {
+                        "output_info": {
+                            "output_name": "test_image",
+                        },
+                        "output_type_info": {
+                            "loss": "mse",
+                            "size": [16, 16],
+                        },
+                        "model_config": {
+                            "model_type": "cnn",
+                            "model_init_config": {
+                                "channel_exp_base": 4,
+                                "allow_pooling": False,
+                            },
+                        },
+                    },
                 ],
             },
         },
@@ -360,26 +376,40 @@ def test_predict(
     }
     predict_cl_args = Namespace(**all_predict_kwargs)
 
+    device = predict.maybe_parse_device_from_predict_args(
+        predict_cl_args=predict_cl_args
+    )
+
     train_configs_for_testing = load_serialized_train_experiment(
-        run_folder=model_test_config.run_path
+        run_folder=model_test_config.run_path,
+        device=device,
     )
 
     predict_config = predict.get_default_predict_experiment(
         loaded_train_experiment=train_configs_for_testing,
         predict_cl_args=predict_cl_args,
+        inferred_run_folder=model_test_config.run_path,
     )
 
     predict.predict(predict_cl_args=predict_cl_args, predict_experiment=predict_config)
 
     compute_predict_attributions(
+        run_folder=model_test_config.run_path,
         loaded_train_experiment=train_configs_for_testing,
         predict_config=predict_config,
+    )
+
+    # We set this up here to have access to the tabular output paths (from train)
+    train_configs_for_testing_src_train = load_serialized_train_experiment(
+        run_folder=model_test_config.run_path,
+        device=device,
+        source_folder="configs",
     )
 
     _check_tabular_predict_results(
         tmp_path_=tmp_path,
         base_experiment=experiment,
-        train_configs_for_testing=train_configs_for_testing,
+        train_configs_for_testing=train_configs_for_testing_src_train,
     )
 
     _check_sequence_predict_results(tmp_path=tmp_path, expected_n_samples=10)

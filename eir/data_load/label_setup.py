@@ -747,6 +747,9 @@ def check_train_valid_df_sync(
                 f"Other solutions include:\n"
                 f"  4. Skipping the column if it's not crucial.\n"
                 f"  5. Binning sparse/rare values into broader categories.\n"
+                f"Finally, this will very likely raise an error during testing, "
+                f"as the label encoder will likely encounter values "
+                f"it has never seen before."
             )
             logger.warning(error_message)
 

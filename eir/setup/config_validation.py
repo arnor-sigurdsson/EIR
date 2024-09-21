@@ -18,7 +18,8 @@ def validate_train_configs(configs: "Configs") -> None:
     validate_output_configs(output_configs=configs.output_configs)
 
     validate_config_sync(
-        input_configs=configs.input_configs, output_configs=configs.output_configs
+        input_configs=configs.input_configs,
+        output_configs=configs.output_configs,
     )
 
     validate_tensor_broker_configs(

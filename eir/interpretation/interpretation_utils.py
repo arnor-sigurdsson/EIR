@@ -214,20 +214,6 @@ def calculate_top_n_tokens(
     return df_token_stats_top_n_sorted
 
 
-def filter_and_sort_attributions(
-    df_attributions: pd.DataFrame, df_token_top_n: pd.DataFrame
-) -> pd.DataFrame:
-    df_attributions_top_n = df_attributions[
-        df_attributions["Input"].isin(df_token_top_n.index)
-    ]
-
-    df_attributions_top_n_sorted = df_attributions_top_n.sort_values(
-        by="Attribution", ascending=False
-    )
-
-    return df_attributions_top_n_sorted
-
-
 def get_basic_sample_attributions_to_analyse_generator(
     interpretation_config: schemas.BasicInterpretationConfig,
     all_attributions: list["SampleAttribution"],

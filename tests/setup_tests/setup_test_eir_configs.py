@@ -4,7 +4,7 @@ from typing import Callable, Dict, Literal, Optional, Sequence
 import torch.backends
 import torch.cuda
 
-from eir.setup.config_setup_modules.config_setup_utils import recursive_dict_replace
+from eir.setup.config_setup_modules.config_setup_utils import recursive_dict_inject
 from tests.conftest import get_system_info
 
 
@@ -82,7 +82,7 @@ def get_test_inputs_inits(
             extra_kwargs=extra_kwargs,
         )
 
-        cur_init_injected = recursive_dict_replace(
+        cur_init_injected = recursive_dict_inject(
             dict_=cur_init_base, dict_to_inject=init_dict
         )
         inits.append(cur_init_injected)
@@ -114,7 +114,7 @@ def get_test_outputs_inits(
             source=source,
         )
 
-        cur_init_injected = recursive_dict_replace(
+        cur_init_injected = recursive_dict_inject(
             dict_=cur_init_base, dict_to_inject=init_dict
         )
 

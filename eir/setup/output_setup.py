@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Protocol
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Protocol, Type
 
 from eir.data_load.label_setup import al_label_transformers
 from eir.setup import schemas
@@ -33,6 +33,13 @@ al_output_objects = (
     | ComputedImageOutputInfo
 )
 al_output_objects_as_dict = Dict[str, al_output_objects]
+
+al_output_classes = (
+    Type[ComputedTabularOutputInfo]
+    | Type[ComputedSequenceOutputInfo]
+    | Type[ComputedArrayOutputInfo]
+    | Type[ComputedImageOutputInfo]
+)
 
 
 def set_up_outputs_for_training(

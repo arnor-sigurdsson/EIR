@@ -1,5 +1,6 @@
 from copy import deepcopy
 from pathlib import Path
+from shutil import copytree
 from typing import TYPE_CHECKING, Dict, Sequence, Tuple
 
 import pytest
@@ -163,8 +164,10 @@ def test_pre_trained_module_setup(
         change_architecture=True,
     )
 
+    run_folder = Path(f"{test_config.run_path}/")
     experiment_overwritten = _add_new_feature_extractor_to_experiment(
-        experiment=experiment
+        experiment=experiment,
+        run_folder=run_folder,
     )
     _get_experiment_overloaded_for_pretrained_extractor(
         experiment=experiment_overwritten,
@@ -181,9 +184,16 @@ def test_pre_trained_module_setup(
 
 def _add_new_feature_extractor_to_experiment(
     experiment: train.Experiment,
+    run_folder: Path,
 ) -> train.Experiment:
     """
     Used to check that we can do a partial loading of pretrained feature extractors.
+
+    Note that we need to make sure to patch / create the copied input
+    serialization as well (as we are imitating as if we trained originally with
+    multiple genotype feature extractors), otherwise loading will fail
+    (as it expects the patched input serialization to be present, even
+    though it is not being loaded for pretraining).
     """
 
     experiment_attrs = experiment.__dict__
@@ -196,6 +206,14 @@ def _add_new_feature_extractor_to_experiment(
     inputs_configs = list(experiment_configs.input_configs)
     inputs_configs_with_extra = inputs_configs + [first_config_modified]
     experiment_attrs["configs"].input_configs = inputs_configs_with_extra
+
+    serialized_path = (
+        run_folder / "serializations/omics_input_serializations/test_genotype"
+    )
+    copied_path = (
+        run_folder / "serializations/omics_input_serializations/test_genotype_copy"
+    )
+    copytree(src=serialized_path, dst=copied_path)
 
     experiment_overwritten = train.Experiment(**experiment_attrs)
 

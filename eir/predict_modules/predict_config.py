@@ -16,7 +16,7 @@ from eir.setup.config import Configs
 from eir.setup.config_setup_modules.config_setup_utils import (
     get_yaml_to_dict_iterator,
     object_to_primitives,
-    recursive_dict_replace,
+    recursive_dict_inject,
 )
 from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
 from eir.utils.logging import get_logger
@@ -268,6 +268,12 @@ def get_config_sequence_matching_func(
                     predict_dict_iterator=predict_dict_iterator,
                 )
 
+            case "image":
+                match = _check_matching_general_output_configs(
+                    train_config=train_config,
+                    predict_dict_iterator=predict_dict_iterator,
+                )
+
             case _:
                 raise NotImplementedError(
                     f"Output type '{train_config.output_info.output_type}' "
@@ -407,7 +413,7 @@ def overload_train_configs_for_predict(
             train_config_dict=train_config_dict,
         )
 
-        overloaded_dict = recursive_dict_replace(
+        overloaded_dict = recursive_dict_inject(
             dict_=train_config_dict, dict_to_inject=predict_config_dict_to_inject
         )
         if name in ("global_config", "fusion_config"):

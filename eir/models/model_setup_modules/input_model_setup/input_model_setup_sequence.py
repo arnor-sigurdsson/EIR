@@ -103,7 +103,9 @@ def _get_sequence_feature_extractor_objects_for_wrapper_model(
 ) -> SequenceModelObjectsForWrapperModel:
     if "sequence-default" in model_type or model_type.startswith("eir-"):
         model_class = model_registry_lookup(model_type=model_type)
-        assert isinstance(model_config, BasicTransformerFeatureExtractorModelConfig)
+        assert isinstance(
+            model_config, BasicTransformerFeatureExtractorModelConfig
+        ), model_config
         objects_for_wrapper = _get_basic_sequence_feature_extractor_objects(
             model_config=model_config,
             num_tokens=num_tokens,

@@ -24,7 +24,8 @@ def set_up_bytes_input_for_training(
     input_type_info = input_config.input_type_info
     assert isinstance(input_type_info, schemas.ByteInputDataConfig)
     bytes_vocab = build_bytes_vocab(
-        byte_encoding=input_type_info.byte_encoding, specials=specials
+        byte_encoding=input_type_info.byte_encoding,
+        specials=specials,
     )
 
     if not isinstance(input_type_info.max_length, int):

@@ -36,9 +36,21 @@ def load_experiment_for_serve(
     device: str,
 ) -> ServeExperiment:
     model_path_object = Path(model_path)
+
+    if not model_path_object.exists():
+        raise FileNotFoundError(f"Model file not found at '{model_path}'")
+    if not model_path_object.is_file():
+        raise ValueError(f"Model path '{model_path}' is not a file.")
+    if model_path_object.suffix != ".pt":
+        raise ValueError(
+            f"Model path '{model_path}' does not have the '.pt' extension as expected."
+        )
+
     run_folder = model_path_object.parent.parent
 
-    loaded_train_experiment = load_serialized_train_experiment(run_folder=run_folder)
+    loaded_train_experiment = load_serialized_train_experiment(
+        run_folder=run_folder, device=device
+    )
 
     default_train_hooks = loaded_train_experiment.hooks
     train_configs = loaded_train_experiment.configs

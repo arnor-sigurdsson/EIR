@@ -17,7 +17,7 @@ from eir.predict_modules.predict_config import (
 from eir.setup import config, schemas
 from eir.setup.config_setup_modules.config_setup_utils import (
     object_to_primitives,
-    recursive_dict_replace,
+    recursive_dict_inject,
 )
 
 al_config_instances = Union[
@@ -185,7 +185,7 @@ def _overload_test_yaml_object_for_predict(
     if cur_key == "input_configs":
         for idx, input_dict in enumerate(obj_as_primitives):
             if do_inject_test_values:
-                input_dict = recursive_dict_replace(
+                input_dict = recursive_dict_inject(
                     dict_=input_dict,
                     dict_to_inject={
                         "input_info": {

@@ -1,10 +1,8 @@
 from pathlib import Path
 from typing import TYPE_CHECKING, Sequence, Tuple, Union
 
-from eir.experiment_io.experiment_io import (
-    get_run_folder_from_model_path,
-    load_serialized_train_experiment,
-)
+from eir.experiment_io.experiment_io import load_serialized_train_experiment
+from eir.experiment_io.io_utils import get_run_folder_from_model_path
 from eir.models.model_setup_modules.meta_setup import (
     MetaClassGetterCallable,
     get_default_meta_class,
@@ -69,7 +67,10 @@ def overload_meta_model_feature_extractors_with_pretrained(
         load_run_folder = get_run_folder_from_model_path(
             model_path=str(load_model_path)
         )
-        load_experiment = load_serialized_train_experiment(run_folder=load_run_folder)
+        load_experiment = load_serialized_train_experiment(
+            run_folder=load_run_folder,
+            device="cpu",
+        )
         load_configs = load_experiment.configs
 
         func = get_meta_model_class_and_kwargs_from_configs

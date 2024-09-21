@@ -14,10 +14,8 @@ from typing import (
     overload,
 )
 
-import aislib.misc_utils
 import numpy as np
 import torch
-import yaml
 from ignite.contrib.handlers import ProgressBar
 from ignite.engine import CallableEventWithFilter, Engine, Events, EventsList, events
 from ignite.handlers import EarlyStopping, ModelCheckpoint
@@ -26,8 +24,8 @@ from ignite.metrics.metric import Metric, RunningBatchWise
 from torch import nn
 
 from eir.data_load.data_utils import get_output_info_generator
+from eir.experiment_io.configs_io import save_yaml_configs
 from eir.interpretation.interpretation import attribution_analysis_handler
-from eir.setup.config_setup_modules.config_setup_utils import object_to_primitives
 from eir.setup.output_setup import al_output_objects_as_dict
 from eir.train_utils.distributed import (
     AttrDelegatedDistributedDataParallel,
@@ -51,7 +49,6 @@ from eir.utils.logging import get_logger
 from eir.visualization import visualization_funcs as vf
 
 if TYPE_CHECKING:
-    from eir.setup.config import Configs
     from eir.train import Experiment
     from eir.train_utils.metrics import al_step_metric_dict
 
@@ -561,10 +558,21 @@ def _log_stats_to_pbar(engine: Engine, pbar: ProgressBar) -> None:
 
 @only_call_on_master_node
 def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
+    """
+    TODO: Move saving of configs to experiment IO module.
+    """
     exp = handler_config.experiment
     gc = handler_config.experiment.configs.global_config
 
-    _save_yaml_configs(run_folder=handler_config.run_folder, configs=exp.configs)
+    save_yaml_configs(
+        run_folder=handler_config.run_folder,
+        configs=exp.configs,
+    )
+    save_yaml_configs(
+        run_folder=handler_config.run_folder,
+        configs=exp.configs,
+        for_serialized=True,
+    )
 
     if gc.ec.checkpoint_interval is not None:
         trainer = _add_checkpoint_handler_wrapper(
@@ -625,38 +633,6 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
         )
 
     return trainer
-
-
-def _save_yaml_configs(run_folder: Path, configs: "Configs"):
-    for config_name, config_object in configs.__dict__.items():
-        if config_name == "gc":
-            continue
-
-        cur_output_path = Path(run_folder / "configs" / config_name).with_suffix(
-            ".yaml"
-        )
-        aislib.misc_utils.ensure_path_exists(path=cur_output_path)
-
-        if config_name == "global_config":
-            main_keys = [
-                "basic_experiment",
-                "model",
-                "optimization",
-                "lr_schedule",
-                "training_control",
-                "evaluation_checkpoint",
-                "attribution_analysis",
-                "metrics",
-                "visualization_logging",
-                "latent_sampling",
-            ]
-            config_dict = {k: getattr(config_object, k) for k in main_keys}
-            config_object_as_primitives = object_to_primitives(obj=config_dict)
-        else:
-            config_object_as_primitives = object_to_primitives(obj=config_object)
-
-        with open(str(cur_output_path), "w") as yaml_file_handle:
-            yaml.dump(data=config_object_as_primitives, stream=yaml_file_handle)
 
 
 def _add_checkpoint_handler_wrapper(
