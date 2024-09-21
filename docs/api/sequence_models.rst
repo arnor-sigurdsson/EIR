@@ -1355,7 +1355,7 @@ Arguments:
     pos_att_type (`List[str]`, *optional*):
         The type of relative position attention, it can be a combination of `["p2c", "c2p"]`, e.g. `["p2c"]`,
         `["p2c", "c2p"]`.
-    layer_norm_eps (`float`, optional, defaults to 1e-12):
+    layer_norm_eps (`float`, *optional*, defaults to 1e-12):
         The epsilon used by the layer normalization layers.
 
 .. class:: transformers.models.deberta_v2.configuration_deberta_v2.DebertaV2Config(vocab_size=128100, hidden_size=1536, num_hidden_layers=24, num_attention_heads=24, intermediate_size=6144, hidden_act='gelu', hidden_dropout_prob=0.1, attention_probs_dropout_prob=0.1, max_position_embeddings=512, type_vocab_size=0, initializer_range=0.02, layer_norm_eps=1e-07, relative_attention=False, max_relative_positions=-1, pad_token_id=0, position_biased_input=True, pos_att_type=None, pooler_dropout=0, pooler_hidden_act='gelu', **kwargs)
@@ -1445,7 +1445,7 @@ Arguments:
     pos_att_type (`List[str]`, *optional*):
         The type of relative position attention, it can be a combination of `["p2c", "c2p"]`, e.g. `["p2c"]`,
         `["p2c", "c2p"]`, `["p2c", "c2p"]`.
-    layer_norm_eps (`float`, optional, defaults to 1e-12):
+    layer_norm_eps (`float`, *optional*, defaults to 1e-12):
         The epsilon used by the layer normalization layers.
 
 .. class:: transformers.models.distilbert.configuration_distilbert.DistilBertConfig(vocab_size=30522, max_position_embeddings=512, sinusoidal_pos_embds=False, n_layers=6, n_heads=12, dim=768, hidden_dim=3072, dropout=0.1, attention_dropout=0.1, activation='gelu', initializer_range=0.02, qa_dropout=0.1, seq_classif_dropout=0.2, pad_token_id=0, **kwargs)
@@ -4226,6 +4226,80 @@ Args:
         The length of prompt.
     prompt_mid_dim (`int`, *optional*, defaults to 800):
         Dimensionality of the "intermediate" layer in prompt.
+
+.. class:: transformers.models.nemotron.configuration_nemotron.NemotronConfig(vocab_size=256000, hidden_size=6144, intermediate_size=24576, num_hidden_layers=32, num_attention_heads=48, head_dim=None, num_key_value_heads=None, hidden_act='relu2', max_position_embeddings=4096, initializer_range=0.0134, norm_eps=1e-05, use_cache=True, pad_token_id=None, bos_token_id=2, eos_token_id=3, tie_word_embeddings=False, rope_theta=10000.0, partial_rotary_factor=0.5, attention_bias=False, attention_dropout=0.0, mlp_bias=False, **kwargs)
+
+This is the configuration class to store the configuration of a ``NemotronModel``. It is used to instantiate an Nemotron
+model according to the specified arguments, defining the model architecture. Instantiating a configuration with the
+defaults will yield a similar configuration to that of the Nemotron-8B.
+e.g. `nvidia/nemotron-3-8b-base-4k-hf <https://huggingface.co/nvidia/nemotron-3-8b-base-4k-hf>`__.
+Configuration objects inherit from ``PretrainedConfig`` and can be used to control the model outputs. Read the
+documentation from ``PretrainedConfig`` for more information.
+
+
+Args:
+    vocab_size (`int`, *optional*, defaults to 256000):
+        Vocabulary size of the Nemotron model. Defines the number of different tokens that can be represented by the
+        `inputs_ids` passed when calling ``NemotronModel``
+    hidden_size (`int`, *optional*, defaults to 6144):
+        Dimension of the hidden representations.
+    intermediate_size (`int`, *optional*, defaults to 24576):
+        Dimension of the MLP representations.
+    num_hidden_layers (`int`, *optional*, defaults to 32):
+        Number of hidden layers in the Transformer decoder.
+    num_attention_heads (`int`, *optional*, defaults to 48):
+        Number of attention heads for each attention layer in the Transformer decoder.
+    head_dim (`int`, *optional*):
+        Projection weights dimension in multi-head attention. Set to hidden_size // num_attention_heads if None
+    num_key_value_heads (`int`, *optional*):
+        This is the number of key_value heads that should be used to implement Grouped Query Attention. If
+        `num_key_value_heads=num_attention_heads`, the model will use Multi Head Attention (MHA), if
+        `num_key_value_heads=1 the model will use Multi Query Attention (MQA) otherwise GQA is used. When
+        converting a multi-head checkpoint to a GQA checkpoint, each group key and value head should be constructed
+        by meanpooling all the original heads within that group. For more details checkout `this
+        paper <https://arxiv.org/pdf/2305.13245.pdf>`__. If it is not specified, will default to
+        `num_attention_heads`.
+    hidden_act (`str` or `function`, *optional*, defaults to `"relu2"`):
+        The non-linear activation function (function or string) in the decoder.
+    max_position_embeddings (`int`, *optional*, defaults to 4096):
+        The maximum sequence length that this model might ever be used with.
+    initializer_range (`float`, *optional*, defaults to 0.0134):
+        The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
+    norm_eps (`float`, *optional*, defaults to 1e-05):
+        The epsilon used by the normalization layers.
+    use_cache (`bool`, *optional*, defaults to `True`):
+        Whether or not the model should return the last key/values attentions (not used by all models). Only
+        relevant if `config.is_decoder=True`.
+    pad_token_id (`int`, *optional*):
+        Padding token id.
+    bos_token_id (`int`, *optional*, defaults to 2):
+        Beginning of stream token id.
+    eos_token_id (`int`, *optional*, defaults to 3):
+        End of stream token id.
+    tie_word_embeddings (`bool`, *optional*, defaults to `False`):
+        Whether to tie weight embeddings
+    rope_theta (`float`, *optional*, defaults to 10000.0):
+        The base period of the RoPE embeddings.
+    partial_rotary_factor (`float`, *optional*, defaults to 0.5): Percentage of the query and keys which will have rotary embedding.
+    attention_bias (`bool`, *optional*, defaults to `False`):
+        Whether to use a bias in the query, key, value and output projection layers during self-attention.
+    attention_dropout (`float`, *optional*, defaults to 0.0):
+        The dropout ratio for the attention probabilities.
+    mlp_bias (`bool`, *optional*, defaults to `False`):
+        Whether to use a bias in up_proj and down_proj layers in the MLP layers.
+
+::
+
+>>> from transformers import NemotronModel, NemotronConfig
+
+>>> # Initializing a Nemotron nemotron-15b style configuration
+>>> configuration = NemotronConfig()
+
+>>> # Initializing a model from the nemotron-15b style configuration
+>>> model = NemotronModel(configuration)
+
+>>> # Accessing the model configuration
+>>> configuration = model.config
 
 .. class:: transformers.models.deprecated.nezha.configuration_nezha.NezhaConfig(vocab_size=21128, hidden_size=768, num_hidden_layers=12, num_attention_heads=12, intermediate_size=3072, hidden_act='gelu', hidden_dropout_prob=0.1, attention_probs_dropout_prob=0.1, max_position_embeddings=512, max_relative_position=64, type_vocab_size=2, initializer_range=0.02, layer_norm_eps=1e-12, classifier_dropout=0.1, pad_token_id=0, bos_token_id=2, eos_token_id=3, use_cache=True, **kwargs)
 

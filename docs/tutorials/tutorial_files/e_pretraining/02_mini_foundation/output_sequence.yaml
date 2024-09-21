@@ -7,7 +7,7 @@ output_type_info:
   max_length: 128
   split_on: ""
   sampling_strategy_if_longer: "uniform"
-  vocab_file: eir_tutorials/e_pretraining/02_mini_foundation/data/vocab.txt
+  vocab_file: eir_tutorials/e_pretraining/02_mini_foundation/data/vocab.json
 
 model_config:
   model_init_config:

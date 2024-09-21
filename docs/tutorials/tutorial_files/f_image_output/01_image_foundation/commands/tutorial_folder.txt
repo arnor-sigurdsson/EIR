@@ -6,5 +6,6 @@ eir_tutorials/f_image_output/01_image_foundation
 │   ├── inputs_sequence.yaml
 │   └── output_image.yaml
 └── data
+    ├── 01_image_foundation
     ├── annotations.csv
     └── images

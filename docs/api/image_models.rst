@@ -90,6 +90,10 @@ For example, the ``ResNet`` architecture includes the ``layers`` and ``block`` p
    :members:
    :exclude-members: forward
 
+.. autoclass:: timm.models.efficientformer_v2.EfficientFormerV2
+   :members:
+   :exclude-members: forward
+
 .. autoclass:: timm.models.efficientnet.EfficientNet
    :members:
    :exclude-members: forward
@@ -106,6 +110,10 @@ For example, the ``ResNet`` architecture includes the ``layers`` and ``block`` p
    :members:
    :exclude-members: forward
 
+.. autoclass:: timm.models.fastvit.FastVit
+   :members:
+   :exclude-members: forward
+
 .. autoclass:: timm.models.focalnet.FocalNet
    :members:
    :exclude-members: forward
@@ -119,6 +127,10 @@ For example, the ``ResNet`` architecture includes the ``layers`` and ``block`` p
    :exclude-members: forward
 
 .. autoclass:: timm.models.hgnet.HighPerfGpuNet
+   :members:
+   :exclude-members: forward
+
+.. autoclass:: timm.models.hiera.Hiera
    :members:
    :exclude-members: forward
 
@@ -170,6 +182,10 @@ For example, the ``ResNet`` architecture includes the ``layers`` and ``block`` p
    :members:
    :exclude-members: forward
 
+.. autoclass:: timm.models.nextvit.NextViT
+   :members:
+   :exclude-members: forward
+
 .. autoclass:: timm.models.nfnet.NormFreeNet
    :members:
    :exclude-members: forward
@@ -183,6 +199,10 @@ For example, the ``ResNet`` architecture includes the ``layers`` and ``block`` p
    :exclude-members: forward
 
 .. autoclass:: timm.models.pvt_v2.PyramidVisionTransformerV2
+   :members:
+   :exclude-members: forward
+
+.. autoclass:: timm.models.rdnet.RDNet
    :members:
    :exclude-members: forward
 

@@ -5,5 +5,5 @@ eirtrain \
 --output_configs eir_tutorials/e_pretraining/01_checkpointing/conf/imdb_output.yaml \
 --imdb_globals.basic_experiment.output_folder=eir_tutorials/tutorial_runs/e_pretraining/01_checkpointing_imdb_from_pretrained_global_non_strict \
 --imdb_fusion.model_config.fc_task_dim=64 \
---imdb_globals.model.pretrained_checkpoint=eir_tutorials/tutorial_runs/e_pretraining/01_checkpointing/saved_models/01_checkpointing_model_1600_perf-average=0.7682.pt \
+--imdb_globals.model.pretrained_checkpoint=eir_tutorials/tutorial_runs/e_pretraining/01_checkpointing/saved_models/01_checkpointing_model_1800_perf-average=0.7690.pt \
 --imdb_globals.model.strict_pretrained_loading=False

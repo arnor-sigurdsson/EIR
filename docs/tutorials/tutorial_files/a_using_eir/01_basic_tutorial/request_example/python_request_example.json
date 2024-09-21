@@ -3,12 +3,12 @@
         {
             "ancestry_output": {
                 "Origin": {
-                    "Asia": 0.023636797443032265,
-                    "Eastern_Asia": 0.002438952215015888,
-                    "Europe": 0.9032291769981384,
-                    "Latin_America_and_the_Caribbean": 0.014887194149196148,
-                    "Middle_East": 0.05435054749250412,
-                    "Sub-Saharan_Africa": 0.001457291655242443
+                    "Asia": 0.0575590543448925,
+                    "Eastern_Asia": 0.006373023148626089,
+                    "Europe": 0.8797104358673096,
+                    "Latin_America_and_the_Caribbean": 0.004579068627208471,
+                    "Middle_East": 0.050320498645305634,
+                    "Sub-Saharan_Africa": 0.00145798793528229
                 }
             }
         }
