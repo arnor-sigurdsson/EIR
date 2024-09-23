@@ -15,7 +15,11 @@ if TYPE_CHECKING:
 
 
 def _get_classification_output_configs(
-    output_type: Literal["linear", "mlp_residual"] = "mlp_residual"
+    output_type: Literal[
+        "linear",
+        "mlp_residual",
+        "shared_mlp_residual",
+    ] = "mlp_residual"
 ) -> Sequence[Dict]:
     output_configs = [
         {
@@ -31,6 +35,10 @@ def _get_classification_output_configs(
         output_configs[0]["model_config"] = {
             "model_type": "linear",
             "model_init_config": {},
+        }
+    elif output_type == "shared_mlp_residual":
+        output_configs[0]["model_config"] = {
+            "model_type": "shared_mlp_residual",
         }
 
     return output_configs
@@ -459,6 +467,11 @@ def test_regression(prep_modelling_test_configs):
 def _get_multi_task_output_configs(
     label_smoothing: float = 0.0,
     uncertainty_mt_loss: bool = True,
+    output_type: Literal[
+        "mlp_residual",
+        "linear",
+        "shared_mlp_residual",
+    ] = "mlp_residual",
 ) -> Sequence[Dict]:
     output_configs = [
         {
@@ -479,6 +492,16 @@ def _get_multi_task_output_configs(
             },
         },
     ]
+
+    if output_type == "linear":
+        output_configs[1]["model_config"] = {
+            "model_type": "linear",
+            "model_init_config": {},
+        }
+    elif output_type == "shared_mlp_residual":
+        output_configs[1]["model_config"] = {
+            "model_type": "shared_mlp_residual",
+        }
 
     return output_configs
 
@@ -549,7 +572,9 @@ def _should_compile():
                         "model_config": {"model_type": "tabular"},
                     },
                 ],
-                "output_configs": _get_multi_task_output_configs(),
+                "output_configs": _get_multi_task_output_configs(
+                    output_type="shared_mlp_residual"
+                ),
             },
         },
         # Case 2: Normal multitask with CNN

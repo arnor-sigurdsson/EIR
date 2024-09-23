@@ -9,6 +9,10 @@ from eir.models.output.tabular.mlp_residual import (
     ResidualMLPOutputModule,
     ResidualMLPOutputModuleConfig,
 )
+from eir.models.output.tabular.shared_mlp_residual import (
+    SharedResidualMLPOutputModule,
+    SharedResidualMLPOutputModuleConfig,
+)
 from eir.models.output.tabular.tabular_output_modules import TabularOutputModuleConfig
 from eir.setup.output_setup_modules.tabular_output_setup import (
     al_num_outputs_per_target,
@@ -29,6 +33,13 @@ def get_tabular_output_module_from_model_config(
         case "mlp_residual":
             assert isinstance(model_init_config, ResidualMLPOutputModuleConfig)
             output_module = ResidualMLPOutputModule(
+                model_config=model_init_config,
+                input_dimension=input_dimension,
+                num_outputs_per_target=num_outputs_per_target,
+            )
+        case "shared_mlp_residual":
+            assert isinstance(model_init_config, SharedResidualMLPOutputModuleConfig)
+            output_module = SharedResidualMLPOutputModule(
                 model_config=model_init_config,
                 input_dimension=input_dimension,
                 num_outputs_per_target=num_outputs_per_target,

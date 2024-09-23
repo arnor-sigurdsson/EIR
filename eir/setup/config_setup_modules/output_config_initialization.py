@@ -13,6 +13,9 @@ from eir.models.output.sequence.sequence_output_modules import (
 )
 from eir.models.output.tabular.linear import LinearOutputModuleConfig
 from eir.models.output.tabular.mlp_residual import ResidualMLPOutputModuleConfig
+from eir.models.output.tabular.shared_mlp_residual import (
+    SharedResidualMLPOutputModuleConfig,
+)
 from eir.models.output.tabular.tabular_output_modules import TabularOutputModuleConfig
 from eir.setup import schemas
 from eir.setup.config_setup_modules.config_setup_utils import (
@@ -24,6 +27,7 @@ from eir.utils.logging import get_logger
 al_output_model_config_classes = (
     Type[ResidualMLPOutputModuleConfig]
     | Type[LinearOutputModuleConfig]
+    | Type[SharedResidualMLPOutputModuleConfig]
     | Type[TransformerSequenceOutputModuleConfig]
     | Type[LCLModelConfig]
     | Type[CNNUpscaleModelConfig]
@@ -31,6 +35,7 @@ al_output_model_config_classes = (
 al_output_model_configs = (
     ResidualMLPOutputModuleConfig
     | LinearOutputModuleConfig
+    | SharedResidualMLPOutputModuleConfig
     | TransformerSequenceOutputModuleConfig
     | LCLModelConfig
     | CNNUpscaleModelConfig
@@ -222,6 +227,7 @@ def get_output_config_type_init_callable_map() -> al_output_model_init_map:
         "tabular": {
             "mlp_residual": ResidualMLPOutputModuleConfig,
             "linear": LinearOutputModuleConfig,
+            "shared_mlp_residual": SharedResidualMLPOutputModuleConfig,
         },
         "sequence": {
             "sequence": TransformerSequenceOutputModuleConfig,
