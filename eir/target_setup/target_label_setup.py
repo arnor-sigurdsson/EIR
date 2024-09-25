@@ -458,15 +458,19 @@ def process_array_or_image_output(
     else:
         dtypes[output_name] = {output_name: np.dtype("O")}
 
+    dtypes = convert_dtypes(dtypes=dtypes)
+
     update_labels_dict(
         labels_dict=train_labels_dict,
         labels_df=cur_labels.train_labels,
         output_name=output_name,
+        dtypes=dtypes,
     )
     update_labels_dict(
         labels_dict=valid_labels_dict,
         labels_df=cur_labels.valid_labels,
         output_name=output_name,
+        dtypes=dtypes,
     )
 
 
@@ -474,6 +478,7 @@ def update_labels_dict(
     labels_dict: Dict[str, Dict[str, Dict[str, Any]]],
     labels_df: pd.DataFrame,
     output_name: str,
+    dtypes: Optional[dict[str, dict[str, Any]]] = None,
 ) -> None:
     """
     We skip storing nan / missing values all together here, as we have a
@@ -483,16 +488,29 @@ def update_labels_dict(
     if "Output Name" in labels_df.columns:
         labels_df = labels_df.drop(columns=["Output Name"])
 
+    if dtypes is None:
+        dtypes = {}
+
+    cur_dtypes = dtypes.get(output_name, {})
+
     records = labels_df.to_dict("records")
     for id_value, record in zip(labels_df.index, records):
-        record = {k: v for k, v in record.items() if pd.notna(v)}
 
-        if not record:
+        parsed_record = {}
+        for k, v in record.items():
+            if pd.notna(v):
+                cur_dtype = cur_dtypes.get(k, None)
+                if cur_dtype:
+                    v = cur_dtype(v)
+
+                parsed_record[k] = v
+
+        if not parsed_record:
             continue
 
         if id_value not in labels_dict:
             labels_dict[id_value] = {}
-        labels_dict[id_value][output_name] = record
+        labels_dict[id_value][output_name] = parsed_record
 
 
 def compute_missing_ids_per_tabular_output(

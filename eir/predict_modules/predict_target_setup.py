@@ -30,11 +30,13 @@ from eir.setup.schemas import (
 from eir.target_setup.target_label_setup import (
     MissingTargetsInfo,
     compute_missing_ids_per_tabular_output,
+    convert_dtypes,
     gather_data_pointers_from_data_source,
     gather_torch_nan_missing_ids,
     get_all_output_and_target_names,
     get_missing_targets_info,
     get_tabular_target_file_infos,
+    update_labels_dict,
 )
 from eir.utils.logging import get_logger
 
@@ -353,23 +355,14 @@ def process_array_or_image_output_for_testing(
     else:
         dtypes[output_name] = {output_name: np.dtype("O")}
 
+    dtypes = convert_dtypes(dtypes=dtypes)
+
     update_labels_dict(
         labels_dict=test_labels_dict,
         labels_df=cur_labels.predict_labels,
         output_name=output_name,
+        dtypes=dtypes,
     )
-
-
-def update_labels_dict(
-    labels_dict: Dict[str, Dict[str, Dict[str, Any]]],
-    labels_df: pd.DataFrame,
-    output_name: str,
-) -> None:
-    records = labels_df.to_dict("records")
-    for id_value, record in zip(labels_df.index, records):
-        if id_value not in labels_dict:
-            labels_dict[id_value] = {}
-        labels_dict[id_value][output_name] = record
 
 
 def _set_up_predict_file_target_labels(

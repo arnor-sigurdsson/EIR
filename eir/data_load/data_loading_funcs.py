@@ -57,6 +57,7 @@ def get_weighted_random_sampler(
 
     all_column_weights = {}
     for output_name, weighted_columns_list in parsed_weighted_sample_columns.items():
+        logger.debug("Setting up weighted sampling for output %s", output_name)
         cur_column_weights = _gather_column_sampling_weights(
             samples=samples,
             output_name=output_name,

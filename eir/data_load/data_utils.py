@@ -24,10 +24,13 @@ from eir.setup.output_setup_modules.tabular_output_setup import (
     ComputedTabularOutputInfo,
 )
 from eir.train_utils.distributed import in_distributed_env
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from eir.data_load.datasets import al_local_datasets, al_sample_label_dict_target
     from eir.setup.output_setup import al_output_objects_as_dict
+
+logger = get_logger(name=__name__)
 
 
 def get_output_info_generator(
@@ -87,6 +90,8 @@ def get_train_sampler(columns_to_sample, train_dataset):
             "Weighted sampling not yet implemented for distributed training."
         )
 
+    logger.debug("Weighted sampling enabled, setting up.")
+
     loaded_target_columns = _gather_all_loaded_columns(outputs=train_dataset.outputs)
 
     is_sample_column_loaded = False
@@ -118,7 +123,8 @@ def get_train_sampler(columns_to_sample, train_dataset):
             columns_to_sample += cat_columns_with_output_prefix
 
     train_sampler = get_weighted_random_sampler(
-        samples=train_dataset.samples, columns_to_sample=columns_to_sample
+        samples=train_dataset.samples,
+        columns_to_sample=columns_to_sample,
     )
     return train_sampler
 
