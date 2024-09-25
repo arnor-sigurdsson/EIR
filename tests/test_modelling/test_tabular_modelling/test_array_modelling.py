@@ -57,7 +57,7 @@ def _get_classification_output_configs() -> Sequence[Dict]:
             "injections": {
                 "global_configs": {
                     "training_control": {
-                        "weighted_sampling_columns": ["Origin"],
+                        "weighted_sampling_columns": ["test_output_tabular.Origin"],
                     }
                 },
                 "input_configs": [
@@ -178,9 +178,6 @@ def _get_regression_output_configs() -> Sequence[Dict]:
         {
             "injections": {
                 "global_configs": {
-                    "training_control": {
-                        "weighted_sampling_columns": ["Origin"],
-                    },
                     "basic_experiment": {
                         "memory_dataset": True,
                     },

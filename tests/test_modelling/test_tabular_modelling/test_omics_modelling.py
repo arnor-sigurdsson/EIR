@@ -100,7 +100,7 @@ def _get_classification_output_configs(
             "injections": {
                 "global_configs": {
                     "training_control": {
-                        "weighted_sampling_columns": ["Origin"],
+                        "weighted_sampling_columns": ["test_output_tabular.Origin"],
                     },
                     "optimization": {
                         "gradient_noise": 0.01,
