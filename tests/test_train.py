@@ -107,7 +107,12 @@ def test_get_default_experiment(
         # Case 1: Linear
         {
             "injections": {
-                "global_configs": {"optimization": {"lr": 1e-03}},
+                "global_configs": {
+                    "optimization": {"lr": 1e-03},
+                    "training_control": {
+                        "weighted_sampling_columns": ["all"],
+                    },
+                },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
@@ -142,7 +147,10 @@ def test_get_dataloaders(
     )
 
     train_dataloader, valid_dataloader = train.get_dataloaders(
-        train_dataset, train_sampler, valid_dataset, gc.be.batch_size
+        train_dataset=train_dataset,
+        train_sampler=train_sampler,
+        valid_dataset=valid_dataset,
+        batch_size=gc.be.batch_size,
     )
 
     assert train_dataloader.batch_size == gc.be.batch_size
@@ -151,10 +159,10 @@ def test_get_dataloaders(
     assert isinstance(valid_dataloader.sampler, SequentialSampler)
 
     train_dataloader, valid_dataloader = train.get_dataloaders(
-        train_dataset,
-        None,
-        valid_dataset,
-        gc.be.batch_size,
+        train_dataset=train_dataset,
+        train_sampler=None,
+        valid_dataset=valid_dataset,
+        batch_size=gc.be.batch_size,
     )
 
     assert isinstance(train_dataloader.sampler, RandomSampler)

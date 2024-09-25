@@ -1,9 +1,6 @@
 import math
-import os
 import reprlib
 from dataclasses import dataclass
-from functools import partial
-from multiprocessing import Pool
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -261,23 +258,16 @@ def set_up_all_target_labels_wrapper(
 
     For array, we read what files are available on the disk, and flag the missing
     ones as torch.nan.
-
-    TODO:   There is some space inefficiency here, as for many output modalities,
-            when we concatenate the dataframes, we will have NaNs in the columns
-            that are not present in all output modalities.
-
-    Note:   We store the dtypes here as e.g. from int columns, concatenating will
-            create NaNs, which will convert the int columns to float.
     """
-    df_labels_train = pd.DataFrame()
-    df_labels_valid = pd.DataFrame()
-    label_transformers = {}
 
     all_ids: set[str] = set(train_ids).union(set(valid_ids))
     per_modality_missing_ids: dict[str, set[str]] = {}
     within_modality_missing_ids: dict[str, dict[str, set[str]]] = {}
-
+    label_transformers: dict[str, Any] = {}
     dtypes: dict[str, dict[str, Any]] = {}
+
+    train_labels_dict: dict[str, dict[str, dict[str, Any]]] = {}
+    valid_labels_dict: dict[str, dict[str, dict[str, Any]]] = {}
 
     tabular_target_labels_info = get_tabular_target_file_infos(
         output_configs=output_configs
@@ -287,104 +277,48 @@ def set_up_all_target_labels_wrapper(
         output_source = output_config.output_info.output_source
         output_name = output_config.output_info.output_name
         output_type = output_config.output_info.output_type
+        logger.info(f"Setting up target labels for {output_name}.")
 
         match output_type:
             case "tabular":
-                tabular_info = tabular_target_labels_info[output_name]
-                cur_labels = set_up_train_and_valid_tabular_data(
-                    tabular_file_info=tabular_info,
+                process_tabular_output(
+                    output_name=output_name,
+                    tabular_target_labels_info=tabular_target_labels_info,
                     custom_label_ops=custom_label_ops,
                     train_ids=train_ids,
                     valid_ids=valid_ids,
+                    all_ids=all_ids,
+                    label_transformers=label_transformers,
+                    per_modality_missing_ids=per_modality_missing_ids,
+                    within_modality_missing_ids=within_modality_missing_ids,
+                    train_labels_dict=train_labels_dict,
+                    valid_labels_dict=valid_labels_dict,
+                    dtypes=dtypes,
                 )
-                cur_transformers = cur_labels.label_transformers
-                label_transformers[output_name] = cur_transformers
-
-                all_labels = cur_labels.all_labels
-                cur_ids = set(all_labels.index)
-                missing_ids = all_ids.difference(cur_ids)
-                per_modality_missing_ids[output_name] = missing_ids
-
-                logger.debug(
-                    "Estimating missing IDs for tabular output %s.", output_name
-                )
-                missing_ids_per_target_column = compute_missing_ids_per_tabular_output(
-                    all_labels_df=all_labels,
-                    tabular_info=tabular_info,
-                    output_name=output_name,
-                )
-
-                within_modality_missing_ids = {
-                    **within_modality_missing_ids,
-                    **missing_ids_per_target_column,
-                }
-
             case "sequence":
-                cur_labels = set_up_delayed_target_labels(
-                    train_ids=train_ids,
-                    valid_ids=valid_ids,
+                process_sequence_output(
                     output_name=output_name,
-                )
-
-                logger.debug(
-                    "Estimating missing IDs for sequence output %s.", output_name
-                )
-                missing_sequence_ids = find_sequence_output_missing_ids(
                     train_ids=train_ids,
                     valid_ids=valid_ids,
-                    output_source=output_config.output_info.output_source,
+                    output_source=output_source,
+                    per_modality_missing_ids=per_modality_missing_ids,
+                    train_labels_dict=train_labels_dict,
+                    valid_labels_dict=valid_labels_dict,
                 )
-
-                per_modality_missing_ids[output_name] = missing_sequence_ids
-
             case "array" | "image":
-                cur_labels = set_up_file_target_labels(
+                process_array_or_image_output(
+                    output_name=output_name,
                     train_ids=train_ids,
                     valid_ids=valid_ids,
                     output_config=output_config,
+                    output_source=output_source,
+                    per_modality_missing_ids=per_modality_missing_ids,
+                    train_labels_dict=train_labels_dict,
+                    valid_labels_dict=valid_labels_dict,
+                    dtypes=dtypes,
                 )
-
-                logger.debug("Estimating missing IDs for array output %s.", output_name)
-                cur_missing_ids = gather_torch_nan_missing_ids(
-                    labels=cur_labels.all_labels,
-                    output_name=output_name,
-                )
-                per_modality_missing_ids[output_name] = cur_missing_ids
-
-                # this is needed as having missing modalities in deeplake
-                # will cause conversion of int64 deeplake pointers to float64
-                is_deeplake = is_deeplake_dataset(data_source=output_source)
-                if is_deeplake:
-                    dtypes[output_name] = {output_name: np.dtype("int64")}
-                else:
-                    dtypes[output_name] = {output_name: np.dtype("O")}
-
             case _:
                 raise ValueError(f"Unknown output type: '{output_type}'.")
-
-        df_train_cur = cur_labels.train_labels
-        df_valid_cur = cur_labels.valid_labels
-
-        df_train_cur["Output Name"] = output_name
-        df_valid_cur["Output Name"] = output_name
-
-        if output_name not in dtypes:
-            dtypes[output_name] = df_train_cur.dtypes.to_dict()
-
-        df_labels_train = pd.concat((df_labels_train, df_train_cur))
-        df_labels_valid = pd.concat((df_labels_valid, df_valid_cur))
-
-    df_labels_train = df_labels_train.set_index("Output Name", append=True)
-    df_labels_valid = df_labels_valid.set_index("Output Name", append=True)
-
-    df_labels_train = df_labels_train.dropna(how="all")
-    df_labels_valid = df_labels_valid.dropna(how="all")
-
-    dtypes = convert_dtypes(dtypes=dtypes)
-    logger.debug("Converting train DF to dict.")
-    train_labels_dict = df_to_nested_dict(df=df_labels_train, dtypes=dtypes)
-    logger.debug("Converting valid DF to dict.")
-    valid_labels_dict = df_to_nested_dict(df=df_labels_valid, dtypes=dtypes)
 
     output_and_target_names = get_all_output_and_target_names(
         output_configs=output_configs
@@ -404,6 +338,161 @@ def set_up_all_target_labels_wrapper(
     )
 
     return labels_data_object
+
+
+def process_tabular_output(
+    output_name: str,
+    tabular_target_labels_info: Dict[str, Any],
+    custom_label_ops: al_all_column_ops,
+    train_ids: Sequence[str],
+    valid_ids: Sequence[str],
+    all_ids: set[str],
+    label_transformers: Dict[str, Any],
+    per_modality_missing_ids: Dict[str, set[str]],
+    within_modality_missing_ids: Dict[str, Dict[str, set[str]]],
+    train_labels_dict: Dict[str, Dict[str, Dict[str, Any]]],
+    valid_labels_dict: Dict[str, Dict[str, Dict[str, Any]]],
+    dtypes: Dict[str, Dict[str, Any]],
+) -> None:
+    tabular_info = tabular_target_labels_info[output_name]
+    cur_labels = set_up_train_and_valid_tabular_data(
+        tabular_file_info=tabular_info,
+        custom_label_ops=custom_label_ops,
+        train_ids=train_ids,
+        valid_ids=valid_ids,
+    )
+    label_transformers[output_name] = cur_labels.label_transformers
+
+    all_labels = cur_labels.all_labels
+    cur_ids = set(all_labels.index)
+    missing_ids = all_ids.difference(cur_ids)
+    per_modality_missing_ids[output_name] = missing_ids
+
+    logger.debug("Estimating missing IDs for tabular output %s.", output_name)
+    missing_ids_per_target_column = compute_missing_ids_per_tabular_output(
+        all_labels_df=all_labels,
+        tabular_info=tabular_info,
+        output_name=output_name,
+    )
+
+    within_modality_missing_ids.update(missing_ids_per_target_column)
+
+    update_labels_dict(
+        labels_dict=train_labels_dict,
+        labels_df=cur_labels.train_labels,
+        output_name=output_name,
+    )
+    update_labels_dict(
+        labels_dict=valid_labels_dict,
+        labels_df=cur_labels.valid_labels,
+        output_name=output_name,
+    )
+
+    if output_name not in dtypes:
+        dtypes[output_name] = cur_labels.train_labels.dtypes.to_dict()
+
+
+def process_sequence_output(
+    output_name: str,
+    train_ids: Sequence[str],
+    valid_ids: Sequence[str],
+    output_source: str,
+    per_modality_missing_ids: Dict[str, set[str]],
+    train_labels_dict: Dict[str, Dict[str, Dict[str, Any]]],
+    valid_labels_dict: Dict[str, Dict[str, Dict[str, Any]]],
+):
+    cur_labels = set_up_delayed_target_labels(
+        train_ids=train_ids,
+        valid_ids=valid_ids,
+        output_name=output_name,
+    )
+
+    logger.debug("Estimating missing IDs for sequence output %s.", output_name)
+    missing_sequence_ids = find_sequence_output_missing_ids(
+        train_ids=train_ids,
+        valid_ids=valid_ids,
+        output_source=output_source,
+    )
+
+    per_modality_missing_ids[output_name] = missing_sequence_ids
+
+    update_labels_dict(
+        labels_dict=train_labels_dict,
+        labels_df=cur_labels.train_labels,
+        output_name=output_name,
+    )
+    update_labels_dict(
+        labels_dict=valid_labels_dict,
+        labels_df=cur_labels.valid_labels,
+        output_name=output_name,
+    )
+
+
+def process_array_or_image_output(
+    output_name: str,
+    train_ids: Sequence[str],
+    valid_ids: Sequence[str],
+    output_config: schemas.OutputConfig,
+    output_source: str,
+    per_modality_missing_ids: Dict[str, set[str]],
+    train_labels_dict: Dict[str, Dict[str, Dict[str, Any]]],
+    valid_labels_dict: Dict[str, Dict[str, Dict[str, Any]]],
+    dtypes: Dict[str, Dict[str, Any]],
+):
+    cur_labels = set_up_file_target_labels(
+        train_ids=train_ids,
+        valid_ids=valid_ids,
+        output_config=output_config,
+    )
+
+    logger.debug("Estimating missing IDs for array output %s.", output_name)
+    cur_missing_ids = gather_torch_nan_missing_ids(
+        labels=cur_labels.all_labels,
+        output_name=output_name,
+    )
+    per_modality_missing_ids[output_name] = cur_missing_ids
+
+    is_deeplake = is_deeplake_dataset(data_source=output_source)
+    if is_deeplake:
+        dtypes[output_name] = {output_name: np.dtype("int64")}
+    else:
+        dtypes[output_name] = {output_name: np.dtype("O")}
+
+    update_labels_dict(
+        labels_dict=train_labels_dict,
+        labels_df=cur_labels.train_labels,
+        output_name=output_name,
+    )
+    update_labels_dict(
+        labels_dict=valid_labels_dict,
+        labels_df=cur_labels.valid_labels,
+        output_name=output_name,
+    )
+
+
+def update_labels_dict(
+    labels_dict: Dict[str, Dict[str, Dict[str, Any]]],
+    labels_df: pd.DataFrame,
+    output_name: str,
+) -> None:
+    """
+    We skip storing nan / missing values all together here, as we have a
+    data structure tracking missing IDs separately.
+    """
+
+    if "Output Name" in labels_df.columns:
+        labels_df = labels_df.drop(columns=["Output Name"])
+
+    records = labels_df.to_dict("records")
+    for id_value, record in zip(labels_df.index, records):
+        record = {k: v for k, v in record.items() if pd.notna(v)}
+
+        if not record:
+            continue
+
+        if id_value not in labels_dict:
+            labels_dict[id_value] = {}
+        labels_dict[id_value][output_name] = record
 
 
 def compute_missing_ids_per_tabular_output(
@@ -586,100 +675,6 @@ def build_deeplake_available_pointer_iterator(
         id_ = sample["ID"].numpy().item()
 
         yield id_, int(int_pointer)
-
-
-def df_to_nested_dict(
-    df: pd.DataFrame,
-    dtypes: dict[str, dict[str, Any]],
-    num_processes: int = -1,
-) -> Dict:
-    """
-    Convert a DataFrame with a 2-level multi index ['ID', 'Output Name']
-    to a nested dict.
-
-    The resulting structure is
-
-    {'ID': {output_name: {inner_output_identifier: inner_output_value}}}.
-
-    For each output_name, only relevant columns are included.
-    """
-
-    if df.empty:
-        return {}
-
-    if num_processes == -1:
-        dataset_size = len(df)
-        if dataset_size < 10000:
-            num_processes = 1
-        else:
-            cpu_count = os.cpu_count()
-            if cpu_count is None:
-                logger.warning("Could not determine number of CPUs. Using 1.")
-                num_processes = 1
-            else:
-                num_processes = min(cpu_count, max(1, dataset_size // 10000))
-
-    logger.debug(
-        "Setting number of processes for parallel processing of DF to dict to %d.",
-        num_processes,
-    )
-
-    chunk_size = max(1, len(df) // num_processes)
-    chunks: list[pd.DataFrame] = []
-    for i in range(0, len(df), chunk_size):
-        start: int = i
-        end: int = i + chunk_size
-        chunks.append(df.iloc[start:end])
-
-    process_func = partial(_process_chunk, dtypes=dtypes)
-    with Pool(num_processes) as pool:
-        dicts = pool.map(process_func, chunks)
-    return _merge_dicts(dicts)
-
-
-def _process_chunk(
-    chunk: pd.DataFrame,
-    dtypes: dict[str, dict[str, Any]],
-) -> Dict[str, Dict[str, Dict[str, float | int | str]]]:
-    nested_dict: Dict[str, Dict[str, Dict[str, float | int | str]]] = {}
-    for row in chunk.itertuples(index=True, name="Row"):
-        # Tuple of (ID, Output Name)
-        multi_index = row.Index
-        assert isinstance(multi_index, tuple)
-        assert len(multi_index) == 2
-        cur_id, cur_output_name = multi_index
-        cur_output_dtypes = dtypes[cur_output_name]
-
-        row_dict = {}
-        # Skip the first element as it's the multi-index
-        name_value_iter = zip(chunk.columns, row[1:])
-        for column_name, value in name_value_iter:
-            if pd.notna(value):
-                dtype = cur_output_dtypes.get(column_name, None)
-                if dtype:
-                    value = dtype(value)
-                row_dict[column_name] = value
-
-        if cur_id not in nested_dict:
-            nested_dict[cur_id] = {}
-        nested_dict[cur_id][cur_output_name] = row_dict
-
-    return nested_dict
-
-
-def _merge_dicts(dicts: list[dict]) -> dict:
-    final_dict = {}
-    for d in dicts:
-        for key, value in d.items():
-            if key not in final_dict:
-                final_dict[key] = value
-            else:
-                for output_name, output_values in value.items():
-                    if output_name not in final_dict[key]:
-                        final_dict[key][output_name] = output_values
-                    else:
-                        final_dict[key][output_name].update(output_values)
-    return final_dict
 
 
 def gather_all_ids_from_output_configs(

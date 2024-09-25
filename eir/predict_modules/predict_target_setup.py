@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Sequence
+from typing import Any, Dict, Sequence, Set
 
 import numpy as np
 import pandas as pd
@@ -30,14 +30,15 @@ from eir.setup.schemas import (
 from eir.target_setup.target_label_setup import (
     MissingTargetsInfo,
     compute_missing_ids_per_tabular_output,
-    convert_dtypes,
-    df_to_nested_dict,
     gather_data_pointers_from_data_source,
     gather_torch_nan_missing_ids,
     get_all_output_and_target_names,
     get_missing_targets_info,
     get_tabular_target_file_infos,
 )
+from eir.utils.logging import get_logger
+
+logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
 @dataclass
@@ -177,14 +178,13 @@ def get_target_labels_for_testing(
     pc = configs_overloaded_for_predict
     output_configs = pc.output_configs
 
-    df_labels_test = pd.DataFrame(index=list(ids))
-    tabular_label_transformers = {}
-
     all_ids: set[str] = set(ids)
     per_modality_missing_ids: dict[str, set[str]] = {}
     within_modality_missing_ids: dict[str, dict[str, set[str]]] = {}
-
+    tabular_label_transformers: dict[str, Any] = {}
     dtypes: dict[str, dict[str, Any]] = {}
+
+    test_labels_dict: dict[str, dict[str, dict[str, Any]]] = {}
 
     tabular_target_files_info = get_tabular_target_file_infos(
         output_configs=pc.output_configs
@@ -194,87 +194,48 @@ def get_target_labels_for_testing(
         output_source = output_config.output_info.output_source
         output_type_info = output_config.output_type_info
         output_name = output_config.output_info.output_name
+        logger.info(f"Setting up target labels for {output_name}.")
 
         match output_type_info:
             case TabularOutputTypeConfig():
-                cur_tabular_info = tabular_target_files_info[output_name]
-                cur_labels = get_tabular_target_labels_for_predict(
-                    output_folder=pc.global_config.basic_experiment.output_folder,
-                    tabular_info=cur_tabular_info,
+                process_tabular_output_for_testing(
                     output_name=output_name,
+                    tabular_target_files_info=tabular_target_files_info,
+                    output_folder=pc.global_config.basic_experiment.output_folder,
                     custom_column_label_parsing_ops=custom_column_label_parsing_ops,
                     ids=ids,
+                    all_ids=all_ids,
+                    tabular_label_transformers=tabular_label_transformers,
+                    per_modality_missing_ids=per_modality_missing_ids,
+                    within_modality_missing_ids=within_modality_missing_ids,
+                    test_labels_dict=test_labels_dict,
+                    dtypes=dtypes,
                 )
-                tabular_label_transformers[output_name] = cur_labels.label_transformers
-
-                all_labels = cur_labels.all_labels
-                cur_ids = set(all_labels.index)
-                missing_ids = all_ids.difference(cur_ids)
-                per_modality_missing_ids[output_name] = missing_ids
-
-                missing_ids_per_target_column = compute_missing_ids_per_tabular_output(
-                    all_labels_df=all_labels,
-                    tabular_info=cur_tabular_info,
-                    output_name=output_name,
-                )
-                within_modality_missing_ids = {
-                    **within_modality_missing_ids,
-                    **missing_ids_per_target_column,
-                }
 
             case SequenceOutputTypeConfig():
-                cur_labels = set_up_delayed_predict_target_labels(
+                process_sequence_output_for_testing(
+                    output_name=output_name,
                     ids=ids,
-                    output_name=output_name,
+                    per_modality_missing_ids=per_modality_missing_ids,
+                    test_labels_dict=test_labels_dict,
+                    dtypes=dtypes,
                 )
-
-                cur_missing_ids = gather_torch_nan_missing_ids(
-                    labels=cur_labels.all_labels,
-                    output_name=output_name,
-                )
-
-                per_modality_missing_ids[output_name] = cur_missing_ids
 
             case ArrayOutputTypeConfig() | ImageOutputTypeConfig():
-                cur_labels = _set_up_predict_file_target_labels(
+                process_array_or_image_output_for_testing(
+                    output_name=output_name,
                     ids=ids,
                     output_config=output_config,
+                    output_source=output_source,
+                    per_modality_missing_ids=per_modality_missing_ids,
+                    test_labels_dict=test_labels_dict,
+                    dtypes=dtypes,
                 )
-
-                cur_missing_ids = gather_torch_nan_missing_ids(
-                    labels=cur_labels.all_labels,
-                    output_name=output_name,
-                )
-                per_modality_missing_ids[output_name] = cur_missing_ids
-
-                # this is needed as having missing modalities in deeplake
-                # will cause conversion of int64 deeplake pointers to float64
-                is_deeplake = is_deeplake_dataset(data_source=output_source)
-                if is_deeplake:
-                    dtypes[output_name] = {output_name: np.dtype("int64")}
-                else:
-                    dtypes[output_name] = {output_name: np.dtype("O")}
 
             case _:
                 raise NotImplementedError(
                     f"Output type {output_type_info} not implemented"
                 )
-
-        df_labels_cur = cur_labels.predict_labels
-
-        df_labels_cur["Output Name"] = output_name
-
-        if output_name not in dtypes:
-            dtypes[output_name] = df_labels_cur.dtypes.to_dict()
-
-        df_labels_test = pd.concat((df_labels_test, df_labels_cur))
-
-    df_labels_test = df_labels_test.set_index("Output Name", append=True)
-
-    df_labels_test = df_labels_test.dropna(how="all")
-
-    dtypes = convert_dtypes(dtypes=dtypes)
-    test_labels_dict = df_to_nested_dict(df=df_labels_test, dtypes=dtypes)
 
     outputs_and_targets = get_all_output_and_target_names(output_configs=output_configs)
     missing_target_info = get_missing_targets_info(
@@ -290,6 +251,125 @@ def get_target_labels_for_testing(
     )
 
     return test_labels_object
+
+
+def process_tabular_output_for_testing(
+    output_name: str,
+    tabular_target_files_info: Dict[str, Any],
+    output_folder: str,
+    custom_column_label_parsing_ops: al_all_column_ops,
+    ids: Sequence[str],
+    all_ids: Set[str],
+    tabular_label_transformers: Dict[str, Any],
+    per_modality_missing_ids: Dict[str, Set[str]],
+    within_modality_missing_ids: Dict[str, Dict[str, Set[str]]],
+    test_labels_dict: Dict[str, Dict[str, Dict[str, Any]]],
+    dtypes: Dict[str, Dict[str, Any]],
+):
+    cur_tabular_info = tabular_target_files_info[output_name]
+    cur_labels = get_tabular_target_labels_for_predict(
+        output_folder=output_folder,
+        tabular_info=cur_tabular_info,
+        output_name=output_name,
+        custom_column_label_parsing_ops=custom_column_label_parsing_ops,
+        ids=ids,
+    )
+    tabular_label_transformers[output_name] = cur_labels.label_transformers
+
+    all_labels = cur_labels.all_labels
+    cur_ids = set(all_labels.index)
+    missing_ids = all_ids.difference(cur_ids)
+    per_modality_missing_ids[output_name] = missing_ids
+
+    missing_ids_per_target_column = compute_missing_ids_per_tabular_output(
+        all_labels_df=all_labels,
+        tabular_info=cur_tabular_info,
+        output_name=output_name,
+    )
+    within_modality_missing_ids.update(missing_ids_per_target_column)
+
+    update_labels_dict(
+        labels_dict=test_labels_dict,
+        labels_df=cur_labels.predict_labels,
+        output_name=output_name,
+    )
+
+    if output_name not in dtypes:
+        dtypes[output_name] = cur_labels.predict_labels.dtypes.to_dict()
+
+
+def process_sequence_output_for_testing(
+    output_name: str,
+    ids: Sequence[str],
+    per_modality_missing_ids: Dict[str, Set[str]],
+    test_labels_dict: Dict[str, Dict[str, Dict[str, Any]]],
+    dtypes: Dict[str, Dict[str, Any]],
+):
+    cur_labels = set_up_delayed_predict_target_labels(
+        ids=ids,
+        output_name=output_name,
+    )
+
+    cur_missing_ids = gather_torch_nan_missing_ids(
+        labels=cur_labels.all_labels,
+        output_name=output_name,
+    )
+
+    per_modality_missing_ids[output_name] = cur_missing_ids
+
+    update_labels_dict(
+        labels_dict=test_labels_dict,
+        labels_df=cur_labels.predict_labels,
+        output_name=output_name,
+    )
+
+    if output_name not in dtypes:
+        dtypes[output_name] = cur_labels.predict_labels.dtypes.to_dict()
+
+
+def process_array_or_image_output_for_testing(
+    output_name: str,
+    ids: Sequence[str],
+    output_config: Any,
+    output_source: str,
+    per_modality_missing_ids: Dict[str, Set[str]],
+    test_labels_dict: Dict[str, Dict[str, Dict[str, Any]]],
+    dtypes: Dict[str, Dict[str, Any]],
+):
+    cur_labels = _set_up_predict_file_target_labels(
+        ids=ids,
+        output_config=output_config,
+    )
+
+    cur_missing_ids = gather_torch_nan_missing_ids(
+        labels=cur_labels.all_labels,
+        output_name=output_name,
+    )
+    per_modality_missing_ids[output_name] = cur_missing_ids
+
+    is_deeplake = is_deeplake_dataset(data_source=output_source)
+    if is_deeplake:
+        dtypes[output_name] = {output_name: np.dtype("int64")}
+    else:
+        dtypes[output_name] = {output_name: np.dtype("O")}
+
+    update_labels_dict(
+        labels_dict=test_labels_dict,
+        labels_df=cur_labels.predict_labels,
+        output_name=output_name,
+    )
+
+
+def update_labels_dict(
+    labels_dict: Dict[str, Dict[str, Dict[str, Any]]],
+    labels_df: pd.DataFrame,
+    output_name: str,
+) -> None:
+    records = labels_df.to_dict("records")
+    for id_value, record in zip(labels_df.index, records):
+        if id_value not in labels_dict:
+            labels_dict[id_value] = {}
+        labels_dict[id_value][output_name] = record
 
 
 def _set_up_predict_file_target_labels(
