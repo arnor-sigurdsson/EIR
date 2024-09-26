@@ -1,7 +1,19 @@
 from collections import Counter
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from functools import partial
 from statistics import mean
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Dict,
+    Generator,
+    Iterable,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+)
 
+import numpy as np
 import torch
 from torch.utils.data import WeightedRandomSampler
 
@@ -14,11 +26,12 @@ if TYPE_CHECKING:
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
-al_sample_weight_and_counts = Dict[str, torch.Tensor]
+al_sample_weight_and_counts = Dict[str, torch.Tensor | list[int]]
 
 
 def get_weighted_random_sampler(
-    samples: Iterable["Sample"], columns_to_sample: List[str]
+    samples: Iterable["Sample"],
+    columns_to_sample: List[str],
 ) -> WeightedRandomSampler:
     """
     Labels spec:
@@ -41,19 +54,46 @@ def get_weighted_random_sampler(
     The list comprehension is going over all the label dicts associated with the IDs,
     then just parsing the label (converting to int in the case of classification).
     """
+
     parsed_weighted_sample_columns = _build_weighted_sample_dict_from_config_sequence(
         config_list=columns_to_sample
     )
 
     all_column_weights = {}
-    for output_name, weighted_columns_list in parsed_weighted_sample_columns.items():
-        cur_column_weights = _gather_column_sampling_weights(
-            samples=samples,
-            output_name=output_name,
-            columns_to_sample=weighted_columns_list,
-        )
-        for cur_target, cur_weight_object in cur_column_weights.items():
-            all_column_weights[f"{output_name}.{cur_target}"] = cur_weight_object
+    samples_list = list(samples)
+    n_samples = len(samples_list)
+
+    if n_samples < 10_000:
+        max_workers = 1
+    else:
+        max_workers = None
+
+    logger.debug(
+        "Using %s workers for weighted sampling setup based on %d samples.",
+        max_workers,
+        n_samples,
+    )
+
+    process_output_partial = partial(_process_output, samples_list)
+    logger.debug("Setting up weighted sampling statistics.")
+
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        futures = []
+        task_iter = parsed_weighted_sample_columns.items()
+        for output_name, weighted_columns_list in task_iter:
+            logger.debug(f"Setting up weighted sampling for output '{output_name}'.")
+            futures.append(
+                executor.submit(
+                    process_output_partial,
+                    output_name,
+                    weighted_columns_list,
+                )
+            )
+
+        for future in as_completed(futures):
+            output_name, cur_column_weights = future.result()
+            for cur_target, cur_weight_object in cur_column_weights.items():
+                all_column_weights[f"{output_name}.{cur_target}"] = cur_weight_object
 
     samples_weighted, num_sample_per_epoch = _aggregate_column_sampling_weights(
         all_target_columns_weights_and_counts=all_column_weights
@@ -69,6 +109,18 @@ def get_weighted_random_sampler(
     )
 
     return sampler
+
+
+def _process_output(
+    samples: Iterable["Sample"], output_name: str, weighted_columns_list: List[str]
+) -> Tuple[str, Dict[str, al_sample_weight_and_counts]]:
+    logger.debug(f"Setting up weighted sampling for output {output_name}")
+    cur_column_weights = _gather_column_sampling_weights(
+        samples=samples,
+        output_name=output_name,
+        columns_to_sample=weighted_columns_list,
+    )
+    return output_name, cur_column_weights
 
 
 def _build_weighted_sample_dict_from_config_sequence(
@@ -94,19 +146,25 @@ def _gather_column_sampling_weights(
     output_name: str,
     columns_to_sample: Iterable[str],
 ) -> Dict[str, al_sample_weight_and_counts]:
-    all_target_label_weight_dicts: Dict[str, al_sample_weight_and_counts] = {}
+    all_target_label_weight_dicts: dict[str, al_sample_weight_and_counts] = {}
 
     for column in columns_to_sample:
         try:
             cur_label_iterable = (
-                i.target_labels[output_name][column]
+                (
+                    i.target_labels[output_name][column]
+                    if output_name in i.target_labels
+                    and column in i.target_labels[output_name]
+                    else np.nan
+                )
                 for i in samples
-                if output_name in i.target_labels
-                and column in i.target_labels[output_name]
             )
-            cur_label_iterable_int = (int(i) for i in cur_label_iterable)
+            cur_label_iterable_int: Generator[int | float, None, None] = (
+                int(i) if not np.isnan(i) else np.nan for i in cur_label_iterable
+            )
             cur_weight_dict = _get_column_label_weights_and_counts(
-                label_iterable=cur_label_iterable_int, column_name=column
+                label_iterable=cur_label_iterable_int,
+                column_name=column,
             )
 
             logger.debug(
@@ -126,7 +184,7 @@ def _gather_column_sampling_weights(
 
 
 def _get_column_label_weights_and_counts(
-    label_iterable: Iterable[int], column_name: Optional[str] = None
+    label_iterable: Iterable[int | float], column_name: Optional[str] = None
 ) -> al_sample_weight_and_counts:
     """
     We have the assertion to make sure we have a unique integer for each label, starting
@@ -136,7 +194,7 @@ def _get_column_label_weights_and_counts(
             a bottleneck.
     """
 
-    def _check_labels(label_list: List[int]):
+    def _check_labels(label_list: list[int | float]):
         labels_set = set(label_list)
         found_labels = sorted(list(labels_set))
         expected_labels = list(range(len(found_labels)))
@@ -155,19 +213,26 @@ def _get_column_label_weights_and_counts(
             )
 
     labels = list(label_iterable)
-    _check_labels(label_list=labels)
+    valid_labels = [label for label in labels if not np.isnan(label)]
 
-    label_counts = [i[1] for i in sorted(Counter(labels).items())]
+    _check_labels(label_list=valid_labels)
+
+    label_counts: list[int] = [int(i[1]) for i in sorted(Counter(valid_labels).items())]
 
     weights = 1.0 / torch.tensor(label_counts, dtype=torch.float32)
-    samples_weighted = weights[labels]
+    samples_weighted = torch.tensor(
+        [weights[int(label)] if not np.isnan(label) else np.nan for label in labels]
+    )
 
-    output_dict = {"samples_weighted": samples_weighted, "label_counts": label_counts}
+    output_dict: al_sample_weight_and_counts = {
+        "samples_weighted": samples_weighted,
+        "label_counts": label_counts,
+    }
     return output_dict
 
 
 def _aggregate_column_sampling_weights(
-    all_target_columns_weights_and_counts: Dict[str, al_sample_weight_and_counts]
+    all_target_columns_weights_and_counts: dict[str, al_sample_weight_and_counts]
 ) -> Tuple[Sequence[float], int]:
     """
     We sum up the normalized weights for each target column to create the final sampling
@@ -178,9 +243,14 @@ def _aggregate_column_sampling_weights(
     """
 
     all_weights = torch.stack(
-        [i["samples_weighted"] for i in all_target_columns_weights_and_counts.values()],
+        [
+            torch.Tensor(i["samples_weighted"])
+            for i in all_target_columns_weights_and_counts.values()
+        ],
         dim=1,
     )
+
+    all_weights = torch.nan_to_num(all_weights, nan=0.0)
     all_weights_summed = all_weights.sum(dim=1)
 
     samples_per_epoch = int(

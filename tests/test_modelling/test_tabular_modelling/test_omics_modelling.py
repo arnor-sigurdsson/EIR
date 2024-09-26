@@ -100,7 +100,7 @@ def _get_classification_output_configs(
             "injections": {
                 "global_configs": {
                     "training_control": {
-                        "weighted_sampling_columns": ["Origin"],
+                        "weighted_sampling_columns": ["test_output_tabular.Origin"],
                     },
                     "optimization": {
                         "gradient_noise": 0.01,
@@ -904,12 +904,18 @@ def test_multi_task(
         {
             "injections": {
                 "global_configs": {
+                    "basic_experiment": {
+                        "n_epochs": 20,
+                    },
                     "optimization": {
                         "lr": 1e-03,
                         "gradient_noise": 0.001,
                     },
                     "model": {
                         "compile_model": _should_compile(),
+                    },
+                    "training_control": {
+                        "weighted_sampling_columns": ["all"],
                     },
                 },
                 "input_configs": [
