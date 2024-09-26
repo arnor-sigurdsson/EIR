@@ -424,12 +424,15 @@ def test_make_random_snps_missing_some():
         mock_return = torch.tensor(np.array([1, 2, 3, 4, 5]))
         mock_target.return_value = mock_return
 
-        array = data_augmentation.make_random_omics_columns_missing(test_array)
+        array = data_augmentation.make_random_omics_columns_missing(
+            omics_array=test_array,
+            na_augment_alpha=99.0,
+            na_augment_beta=1.0,
+        )
 
-        # check that all columns have one filled value
         assert (array.sum(1) != 1).sum() == 0
 
-        expected_missing = torch.tensor([1] * 5, dtype=torch.bool)
+        expected_missing = torch.tensor([True] * 5, dtype=torch.bool)
         assert (array[:, 3, mock_return] == expected_missing).all()
 
 
