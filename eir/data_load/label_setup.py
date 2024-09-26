@@ -1,5 +1,6 @@
 import reprlib
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import (
     Any,
@@ -551,6 +552,7 @@ def build_deeplake_available_id_iterator(
         yield id_
 
 
+@lru_cache()
 def gather_ids_from_tabular_file(file_path: Path) -> Tuple[str, ...]:
     df = pd.read_csv(file_path, usecols=["ID"])
     all_ids = tuple(df["ID"].astype(str))
@@ -670,6 +672,10 @@ def _load_label_df(
     We accept only loading the available columns at this point because the passed
     in columns might be forward referenced, meaning that they might be created
     by the custom library.
+
+    We do the casting there to str as otherwise pandas will automatically
+    cast to e.g. int-CategoricalDtype, but we want to keep categorical columns as
+    a object / str dtype for compatibility with other parts of the cidebase.
     """
 
     dtypes = _ensure_id_str_dtype(dtypes=dtypes)
@@ -687,8 +693,19 @@ def _load_label_df(
         filepath_or_buffer=label_fpath,
         usecols=available_columns,
         dtype=dtypes,
-        low_memory=False,
+        engine="pyarrow",
     )
+
+    for column, dtype in dtypes.items():
+        if dtype == "category" and column in df_labels.columns:
+            df_labels[column] = df_labels[column].astype(str)
+
+    for column, dtype in dtypes.items():
+        if column in df_labels.columns:
+            if dtype == "category":
+                df_labels[column] = pd.Categorical(df_labels[column])
+            else:
+                df_labels[column] = df_labels[column].astype(dtype)
 
     df_labels = df_labels.set_index("ID")
     pre_check_label_df(df=df_labels, name=str(label_fpath))
@@ -956,7 +973,8 @@ def apply_column_op(
 
 
 def _check_parsed_label_df(
-    df_labels: pd.DataFrame, supplied_label_columns: Sequence[str]
+    df_labels: pd.DataFrame,
+    supplied_label_columns: Sequence[str],
 ) -> pd.DataFrame:
     missing_columns = set(supplied_label_columns) - set(df_labels.columns)
     if missing_columns:

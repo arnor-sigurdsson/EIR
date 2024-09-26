@@ -1,6 +1,4 @@
 from collections import Counter
-from concurrent.futures import ProcessPoolExecutor, as_completed
-from functools import partial
 from statistics import mean
 from typing import (
     TYPE_CHECKING,
@@ -24,7 +22,6 @@ if TYPE_CHECKING:
     from eir.data_load.datasets import DatasetBase  # noqa: F401
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
-
 
 al_sample_weight_and_counts = Dict[str, torch.Tensor | list[int]]
 
@@ -61,39 +58,18 @@ def get_weighted_random_sampler(
 
     all_column_weights = {}
     samples_list = list(samples)
-    n_samples = len(samples_list)
 
-    if n_samples < 10_000:
-        max_workers = 1
-    else:
-        max_workers = None
-
-    logger.debug(
-        "Using %s workers for weighted sampling setup based on %d samples.",
-        max_workers,
-        n_samples,
-    )
-
-    process_output_partial = partial(_process_output, samples_list)
     logger.debug("Setting up weighted sampling statistics.")
 
-    with ProcessPoolExecutor(max_workers=max_workers) as executor:
-        futures = []
-        task_iter = parsed_weighted_sample_columns.items()
-        for output_name, weighted_columns_list in task_iter:
-            logger.debug(f"Setting up weighted sampling for output '{output_name}'.")
-            futures.append(
-                executor.submit(
-                    process_output_partial,
-                    output_name,
-                    weighted_columns_list,
-                )
-            )
-
-        for future in as_completed(futures):
-            output_name, cur_column_weights = future.result()
-            for cur_target, cur_weight_object in cur_column_weights.items():
-                all_column_weights[f"{output_name}.{cur_target}"] = cur_weight_object
+    for output_name, weighted_columns_list in parsed_weighted_sample_columns.items():
+        logger.debug(f"Setting up weighted sampling for output '{output_name}'.")
+        cur_column_weights = _gather_column_sampling_weights(
+            samples=samples_list,
+            output_name=output_name,
+            columns_to_sample=weighted_columns_list,
+        )
+        for cur_target, cur_weight_object in cur_column_weights.items():
+            all_column_weights[f"{output_name}.{cur_target}"] = cur_weight_object
 
     samples_weighted, num_sample_per_epoch = _aggregate_column_sampling_weights(
         all_target_columns_weights_and_counts=all_column_weights
@@ -109,18 +85,6 @@ def get_weighted_random_sampler(
     )
 
     return sampler
-
-
-def _process_output(
-    samples: Iterable["Sample"], output_name: str, weighted_columns_list: List[str]
-) -> Tuple[str, Dict[str, al_sample_weight_and_counts]]:
-    logger.debug(f"Setting up weighted sampling for output {output_name}")
-    cur_column_weights = _gather_column_sampling_weights(
-        samples=samples,
-        output_name=output_name,
-        columns_to_sample=weighted_columns_list,
-    )
-    return output_name, cur_column_weights
 
 
 def _build_weighted_sample_dict_from_config_sequence(

@@ -968,7 +968,8 @@ def test_check_parsed_label_df_pass(parse_test_cl_args, create_test_data):
     )
 
     df_labels_checked = label_setup._check_parsed_label_df(
-        df_labels=df_labels, supplied_label_columns=label_columns
+        df_labels=df_labels,
+        supplied_label_columns=label_columns,
     )
     assert df_labels is df_labels_checked
 
