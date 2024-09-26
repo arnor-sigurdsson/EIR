@@ -45,6 +45,14 @@ Image Generation
     f_image_output/02_image_coloring_and_upscaling.rst
     f_image_output/03_mnist_diffusion.rst
 
+Time Series
+===========
+
+.. toctree::
+    :maxdepth: 2
+
+    g_time_series/01_time_series_power.rst
+
 Pretraining
 ============
 

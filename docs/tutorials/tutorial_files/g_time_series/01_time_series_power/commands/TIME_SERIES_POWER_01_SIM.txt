@@ -1,0 +1,5 @@
+eirtrain \
+--global_configs eir_tutorials/g_time_series/01_time_series_power/conf/globals_sim.yaml \
+--fusion_configs eir_tutorials/g_time_series/01_time_series_power/conf/fusion.yaml \
+--input_configs eir_tutorials/g_time_series/01_time_series_power/conf/input_sequence_sim.yaml \
+--output_configs eir_tutorials/g_time_series/01_time_series_power/conf/output_sim.yaml

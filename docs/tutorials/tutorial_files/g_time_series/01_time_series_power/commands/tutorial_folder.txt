@@ -1,0 +1,17 @@
+eir_tutorials/g_time_series/01_time_series_power
+├── conf
+│   ├── fusion.yaml
+│   ├── globals_real.yaml
+│   ├── globals_sim.yaml
+│   ├── input_sequence_real.yaml
+│   ├── input_sequence_sim.yaml
+│   ├── output_real.yaml
+│   └── output_sim.yaml
+└── data
+    ├── real_input_sequences.csv
+    ├── real_output_sequences.csv
+    ├── real_test_input_sequences.csv
+    ├── real_test_output_sequences.csv
+    ├── sim_input_sequences.csv
+    ├── sim_output_sequences.csv
+    └── valid_ids.txt

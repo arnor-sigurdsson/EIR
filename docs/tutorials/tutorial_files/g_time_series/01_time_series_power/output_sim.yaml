@@ -1,0 +1,19 @@
+output_info:
+  output_source: eir_tutorials/g_time_series/01_time_series_power/data/sim_output_sequences.csv
+  output_name: power_output
+  output_type: sequence
+
+output_type_info:
+  max_length: 48
+  split_on: " "
+  sampling_strategy_if_longer: "from_start"
+  min_freq: 1
+
+model_config:
+  embedding_dim: 64
+  model_init_config:
+    num_layers: 4
+
+sampling_config:
+  generated_sequence_length: 64
+  n_eval_inputs: 10

@@ -1,0 +1,15 @@
+input_info:
+  input_source: eir_tutorials/g_time_series/01_time_series_power/data/sim_input_sequences.csv
+  input_name: power_input
+  input_type: sequence
+
+input_type_info:
+  max_length: 48
+  split_on: " "
+  sampling_strategy_if_longer: "from_start"
+  min_freq: 1
+
+model_config:
+  embedding_dim: 64
+  model_init_config:
+    num_layers: 4

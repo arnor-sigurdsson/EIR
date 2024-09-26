@@ -1,0 +1,14 @@
+basic_experiment:
+  batch_size: 32
+  device: mps
+  memory_dataset: true
+  n_epochs: 40
+  output_folder: eir_tutorials/tutorial_runs/g_time_series/01_time_series_power_transformer_real
+  manual_valid_ids_file: eir_tutorials/g_time_series/01_time_series_power/data/valid_ids.txt
+evaluation_checkpoint:
+  checkpoint_interval: 100
+  n_saved_models: 1
+  sample_interval: 100
+optimization:
+  lr: 0.0005
+  optimizer: adabelief

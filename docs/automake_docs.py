@@ -30,6 +30,7 @@ from docs.doc_modules.f_image_outputs import (
     b_image_colorization,
     c_mnist_diffusion,
 )
+from docs.doc_modules.g_time_series import a_time_series_power
 from docs.doc_modules.serving_experiments import (
     AutoDocServingInfo,
     make_serving_tutorial_data,
@@ -110,6 +111,14 @@ def _get_f_image_outputs_experiments() -> Iterable[AutoDocExperimentInfo]:
     )
 
 
+def get_g_time_series_experiments() -> Iterable[AutoDocExperimentInfo]:
+    a_experiments = a_time_series_power.get_experiments()
+
+    return chain(
+        a_experiments,
+    )
+
+
 if __name__ == "__main__":
     a_using_eir_experiments = _get_a_using_eir_experiments()
     c_sequence_outputs_experiments = _get_c_sequence_outputs_experiments()
@@ -117,6 +126,7 @@ if __name__ == "__main__":
     d_array_outputs_experiments = _get_d_array_outputs_experiments()
     e_pretraining_experiments = _get_e_pretraining_outputs_experiments()
     f_image_outputs_experiments = _get_f_image_outputs_experiments()
+    g_time_series_experiments = get_g_time_series_experiments()
 
     experiment_iter = chain.from_iterable(
         [
@@ -126,6 +136,7 @@ if __name__ == "__main__":
             d_array_outputs_experiments,
             e_pretraining_experiments,
             f_image_outputs_experiments,
+            g_time_series_experiments,
         ]
     )
     for experiment in experiment_iter:
