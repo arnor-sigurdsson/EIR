@@ -701,6 +701,7 @@ def gather_all_ids_from_output_configs(
     all_ids: set[str] = set()
     for config in output_configs:
         cur_source = Path(config.output_info.output_source)
+        logger.debug("Gathering IDs from %s.", cur_source)
         if cur_source.suffix == ".csv":
             cur_ids = gather_ids_from_tabular_file(file_path=cur_source)
         elif cur_source.is_dir():

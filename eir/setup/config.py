@@ -82,7 +82,8 @@ def get_configs():
     main_cl_args, extra_cl_args = get_main_cl_args()
 
     output_folder, log_level = get_output_folder_and_log_level_from_cl_args(
-        main_cl_args=main_cl_args, extra_cl_args=extra_cl_args
+        main_cl_args=main_cl_args,
+        extra_cl_args=extra_cl_args,
     )
 
     configure_global_eir_logging(output_folder=output_folder, log_level=log_level)
