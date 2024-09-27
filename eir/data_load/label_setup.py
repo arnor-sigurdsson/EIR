@@ -673,9 +673,9 @@ def _load_label_df(
     in columns might be forward referenced, meaning that they might be created
     by the custom library.
 
-    We do the casting there to str as otherwise pandas will automatically
+    We do the casting there to object as otherwise pandas will automatically
     cast to e.g. int-CategoricalDtype, but we want to keep categorical columns as
-    a object / str dtype for compatibility with other parts of the cidebase.
+    an object / str dtype for compatibility with other parts of the codebase.
     """
 
     dtypes = _ensure_id_str_dtype(dtypes=dtypes)
@@ -695,6 +695,10 @@ def _load_label_df(
         dtype=dtypes,
         engine="pyarrow",
     )
+    # pyarrow fills missing values with None,
+    # which is not compatible with the rest of
+    # the codebase
+    df_labels = df_labels.replace({None: np.nan})
 
     for column, dtype in dtypes.items():
         if dtype == "category" and column in df_labels.columns:
