@@ -149,7 +149,7 @@ def _gather_column_sampling_weights(
 
 def _get_column_label_weights_and_counts(
     label_iterable: Iterable[int | float], column_name: Optional[str] = None
-) -> Dict[str, torch.Tensor | List[int]]:
+) -> dict[str, torch.Tensor | list[int]]:
     def _check_labels(label_list: List[int]):
         labels_set = set(label_list)
         found_labels = sorted(list(labels_set))
@@ -182,7 +182,10 @@ def _get_column_label_weights_and_counts(
     samples_weighted = torch.full((len(labels),), float("nan"), dtype=torch.float32)
     samples_weighted[valid_mask] = weights[valid_labels]
 
-    output_dict = {"samples_weighted": samples_weighted, "label_counts": label_counts}
+    output_dict: dict[str, torch.Tensor | list[int]] = {
+        "samples_weighted": samples_weighted,
+        "label_counts": label_counts,
+    }
     return output_dict
 
 
