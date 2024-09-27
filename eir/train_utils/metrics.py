@@ -314,7 +314,9 @@ def handle_class_mismatch(default_value: float, metric_name: Optional[str] = Non
 def calc_mcc(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
     prediction = np.argmax(a=outputs, axis=1)
 
-    num_classes = max(np.max(labels), np.max(prediction)) + 1
+    labels = labels.astype(int)
+
+    num_classes = int(max(np.max(labels), np.max(prediction))) + 1
 
     conf_matrix = np.zeros((num_classes, num_classes), dtype=np.int64)
     np.add.at(conf_matrix, (labels, prediction), 1)
