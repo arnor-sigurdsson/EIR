@@ -149,16 +149,8 @@ def _gather_column_sampling_weights(
 
 def _get_column_label_weights_and_counts(
     label_iterable: Iterable[int | float], column_name: Optional[str] = None
-) -> al_sample_weight_and_counts:
-    """
-    We have the assertion to make sure we have a unique integer for each label, starting
-    with 0 as we use it to index into the weights directly.
-
-    TODO:   Optimize so we do just one pass over `train_dataset.samples` if this becomes
-            a bottleneck.
-    """
-
-    def _check_labels(label_list: list[int | float]):
+) -> Dict[str, torch.Tensor | List[int]]:
+    def _check_labels(label_list: List[int]):
         labels_set = set(label_list)
         found_labels = sorted(list(labels_set))
         expected_labels = list(range(len(found_labels)))
@@ -176,22 +168,21 @@ def _get_column_label_weights_and_counts(
                 "column."
             )
 
-    labels = list(label_iterable)
-    valid_labels = [label for label in labels if not np.isnan(label)]
+    labels = np.array(list(label_iterable))
 
-    _check_labels(label_list=valid_labels)
+    valid_mask = ~np.isnan(labels)
+    valid_labels = labels[valid_mask].astype(int)
 
-    label_counts: list[int] = [int(i[1]) for i in sorted(Counter(valid_labels).items())]
+    _check_labels(label_list=valid_labels.tolist())
+
+    label_counts = [int(i[1]) for i in sorted(Counter(valid_labels).items())]
 
     weights = 1.0 / torch.tensor(label_counts, dtype=torch.float32)
-    samples_weighted = torch.tensor(
-        [weights[int(label)] if not np.isnan(label) else np.nan for label in labels]
-    )
 
-    output_dict: al_sample_weight_and_counts = {
-        "samples_weighted": samples_weighted,
-        "label_counts": label_counts,
-    }
+    samples_weighted = torch.full((len(labels),), float("nan"), dtype=torch.float32)
+    samples_weighted[valid_mask] = weights[valid_labels]
+
+    output_dict = {"samples_weighted": samples_weighted, "label_counts": label_counts}
     return output_dict
 
 
