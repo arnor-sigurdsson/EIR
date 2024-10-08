@@ -630,12 +630,6 @@ def _get_extra_columns(
     COLUMN_OPS, where the keys are the label columns. That is, "for running with these
     specific label columns, what other columns do we need to grab", as specified
     by the extra_columns_deps attribute of each column operation.
-
-    :param label_columns: The target columns we are modelling on.
-    :param all_column_ops: The ledger of all column ops to be done for each target
-    column.
-    :returns A dict of extra columns and their dtypes if a dtype is specified, otherwise
-    None as the column dtype.
     """
 
     extra_columns = {}
@@ -698,7 +692,7 @@ def _load_label_df(
     # pyarrow fills missing values with None,
     # which is not compatible with the rest of
     # the codebase
-    df_labels = df_labels.replace({None: np.nan})
+    df_labels = df_labels.map(lambda x: np.nan if x is None else x)
 
     for column, dtype in dtypes.items():
         if dtype == "category" and column in df_labels.columns:
