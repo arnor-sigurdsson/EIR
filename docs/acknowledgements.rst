@@ -84,6 +84,8 @@ and so on:
 
 - ``zstandard``  – Gregory Szorc: Zstandard bindings for Python
 
+- ``libdeeplake``  – activeloop.ai: C++ backend for Deep Lake
+
 - ``memory-profiler``  – Fabian Pedregosa: A module for monitoring memory usage of a python program
 
 - ``pytest``  – Holger Krekel, Bruno Oliveira, Ronny Pfannschmidt, Floris Bruynooghe, Brianna Laugher, Florian Bruhin, Others (See AUTHORS): pytest: simple powerful testing with Python
