@@ -10,6 +10,7 @@ from typing import (
     Generator,
     Iterable,
     List,
+    Optional,
     Sequence,
     Tuple,
     Union,
@@ -41,19 +42,19 @@ if TYPE_CHECKING:
 
 # Aliases
 al_dataloader_gathered_predictions = Tuple[
-    Dict[str, Dict[str, torch.Tensor]], "al_training_labels_target", List[str]
+    dict[str, dict[str, torch.Tensor]], Optional["al_training_labels_target"], list[str]
 ]
 al_dataloader_gathered_raw = Tuple[
-    Dict[str, torch.Tensor], "al_training_labels_target", Sequence[str]
+    dict[str, torch.Tensor], "al_training_labels_target", Sequence[str]
 ]
-al_lr_find_results = Dict[str, List[Union[float, List[float]]]]
+al_lr_find_results = dict[str, list[Union[float, list[float]]]]
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
 def predict_on_batch(
-    model: Module, inputs: Dict[str, torch.Tensor]
-) -> Dict[str, Dict[str, torch.Tensor]]:
+    model: Module, inputs: dict[str, torch.Tensor]
+) -> dict[str, dict[str, torch.Tensor]]:
     assert not model.training
     with torch.no_grad():
         val_outputs = model(inputs=inputs)
@@ -218,8 +219,9 @@ def get_prediction_outputs_generator(
 
         outputs = predict_on_batch(model=model, inputs=inputs)
 
+        target_labels_copy: Optional["al_training_labels_target"]
         target_labels_copy = deepcopy(target_labels) if with_labels else None
-        ids_copy = deepcopy(ids)
+        ids_copy: list[str] = deepcopy(ids)
 
         yield outputs, target_labels_copy, ids_copy
 

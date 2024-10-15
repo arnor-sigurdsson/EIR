@@ -328,15 +328,30 @@ class CNNUpscaleModel(nn.Module):
             logger.debug("Using default up_every_n_blocks=2.")
             up_every_n_blocks = 2
 
-        ratio = math.sqrt(self.target_height * self.target_width / input_size)
-        initial_height = int(self.target_height / ratio)
-        initial_width = int(self.target_width / ratio)
+        if self.target_height == 1:
+            initial_height = 1
+            initial_width = input_size
+        elif self.target_width == 1:
+            initial_height = input_size
+            initial_width = 1
+        else:
+            ratio = math.sqrt((self.target_height * self.target_width) / input_size)
+            initial_height = int(self.target_height / ratio)
+            initial_width = int(self.target_width / ratio)
+
+        initial_out_features = initial_height * initial_width
+
+        first_layer: nn.Identity | nn.Linear
+        if initial_out_features == input_size:
+            first_layer = nn.Identity()
+        else:
+            first_layer = nn.Linear(
+                in_features=input_size,
+                out_features=initial_out_features,
+            )
 
         self.initial_layer = nn.Sequential(
-            nn.Linear(
-                in_features=input_size,
-                out_features=initial_height * initial_width,
-            ),
+            first_layer,
             nn.GELU(),
             nn.Unflatten(
                 dim=1,
