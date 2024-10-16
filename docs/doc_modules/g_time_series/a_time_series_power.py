@@ -172,7 +172,7 @@ def get_time_series_power_serve_experiment() -> AutoDocServingInfo:
         f"eir_tutorials/{CR}/01_time_series_power/data/real_test_output_sequences.csv"
     )
 
-    example_requests = generate_example_requests(input_file=Path(test_input_csv))
+    ids, example_requests = generate_example_requests(input_file=Path(test_input_csv))
 
     add_model_path = partial(
         add_model_path_to_command,
@@ -199,6 +199,7 @@ def get_time_series_power_serve_experiment() -> AutoDocServingInfo:
             ),
             "output_csv": Path(test_output_csv),
             "output_folder": Path(base_path) / "figures/01_time_series_power_test",
+            "output_ids": ids,
         },
     )
 
@@ -223,6 +224,7 @@ def plot_time_series_with_uncertainty(
     request_file: Path,
     output_csv: Path,
     output_folder: Path,
+    output_ids: list[str],
     repeat: int = 5,
 ) -> None:
     with open(request_file, "r") as f:
@@ -252,7 +254,8 @@ def plot_time_series_with_uncertainty(
             sequences=generated_sequences
         )
 
-        correct_sequence = [int(x) for x in output_df.iloc[i]["Sequence"].split()]
+        cur_id = output_ids[i]
+        correct_sequence = [int(x) for x in output_df.loc[cur_id]["Sequence"].split()]
 
         plt.figure(figsize=(12, 6))
         plt.plot(range(len(input_sequence)), input_sequence, label="Input", marker="o")
@@ -308,7 +311,7 @@ def generate_example_requests(
     input_file: Path,
     num_sequences: int = 3,
     repeat: int = 5,
-) -> list[list[dict[str, str]]]:
+) -> tuple[list[str], list[list[dict[str, str]]]]:
     df = pd.read_csv(input_file, index_col="ID")
 
     example_requests = []
@@ -325,7 +328,8 @@ def generate_example_requests(
                 }
             )
 
-    return [example_requests]
+    ids = random_rows.index.tolist()
+    return ids, [example_requests]
 
 
 def example_request_function_python():
