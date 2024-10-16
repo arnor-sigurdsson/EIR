@@ -1,0 +1,23 @@
+eir_tutorials/g_time_series/02_time_series_stocks
+├── conf
+│   ├── fusion.yaml
+│   ├── fusion_array.yaml
+│   ├── globals.yaml
+│   ├── globals_diffusion.yaml
+│   ├── globals_one_shot.yaml
+│   ├── input_array.yaml
+│   ├── input_array_diffusion.yaml
+│   ├── input_array_prior.yaml
+│   ├── input_sequence.yaml
+│   ├── output.yaml
+│   ├── output_array.yaml
+│   └── output_array_diffusion.yaml
+└── data
+    ├── deeplake_test
+    ├── deeplake_train
+    ├── stock_input_sequences.csv
+    ├── stock_output_sequences.csv
+    ├── stock_test_input_sequences.csv
+    ├── stock_test_output_sequences.csv
+    ├── test_ids.txt
+    └── train_ids.txt

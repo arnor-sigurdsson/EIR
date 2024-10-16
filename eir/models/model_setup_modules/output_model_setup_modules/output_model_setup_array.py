@@ -130,7 +130,8 @@ def get_array_output_feature_extractor(
 
 
 def parse_model_type(
-    model_type: al_array_model_types, use_passthrough: bool
+    model_type: al_array_model_types,
+    use_passthrough: bool,
 ) -> al_array_model_types:
     if model_type == "cnn" and use_passthrough:
         return "cnn-passthrough"

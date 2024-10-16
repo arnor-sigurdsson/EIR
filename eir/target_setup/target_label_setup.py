@@ -475,7 +475,7 @@ def process_array_or_image_output(
 
 
 def update_labels_dict(
-    labels_dict: Dict[str, Dict[str, Dict[str, Any]]],
+    labels_dict: dict[str, dict[str, dict[str, Any]]],
     labels_df: pd.DataFrame,
     output_name: str,
     dtypes: Optional[dict[str, dict[str, Any]]] = None,

@@ -1,3 +1,4 @@
+import json
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
@@ -138,6 +139,8 @@ def array_out_single_sample_evaluation_wrapper(
             batch_size=experiment.configs.gc.be.batch_size,
         )
 
+        meta = {}
+
         for batch in batch_generator:
             batch_indices, batch_eval_data = zip(*batch)
             batch_eval_types, batch_eval_samples = zip(*batch_eval_data)
@@ -173,12 +176,14 @@ def array_out_single_sample_evaluation_wrapper(
                 match output_type_info:
                     case ArrayOutputTypeConfig():
                         save_array_output(
-                            array=generated_array, output_path=cur_output_path
+                            array=generated_array,
+                            output_path=cur_output_path,
                         )
                     case ImageOutputTypeConfig():
                         cur_output_path = cur_output_path.with_suffix(".png")
                         save_image_output(
-                            array=generated_array, output_path=cur_output_path
+                            array=generated_array,
+                            output_path=cur_output_path,
                         )
 
                 cur_inputs_output_path = (
@@ -195,6 +200,17 @@ def array_out_single_sample_evaluation_wrapper(
                     input_objects=input_objects,
                     output_path=cur_inputs_output_path,
                 )
+
+                cur_id = eval_sample.sample_id[0]
+                meta[cur_id] = {
+                    "generated": str(cur_output_path.relative_to(output_folder)),
+                    "inputs": str(cur_inputs_output_path.relative_to(output_folder)),
+                    "index": idx,
+                }
+
+            meta_path = cur_sample_output_folder / "meta.json"
+            with open(meta_path, "w") as f:
+                json.dump(meta, f, indent=4)
 
 
 @torch.no_grad()

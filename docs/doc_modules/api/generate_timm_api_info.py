@@ -71,7 +71,7 @@ def retrieve_configurable_models(
 
     package_iter = pkgutil.iter_modules(importlib.import_module(package).__path__)
     for importer, modname, is_pkg in package_iter:
-        if not is_pkg and not modname.startswith("_"):
+        if not is_pkg and not modname.startswith("_") and not modname == "registry":
             module = importlib.import_module(f"{package}.{modname}")
 
             if hasattr(module, "__all__"):

@@ -1,0 +1,5 @@
+eirtrain \
+--global_configs eir_tutorials/g_time_series/02_time_series_stocks/conf/globals_diffusion.yaml \
+--fusion_configs eir_tutorials/g_time_series/02_time_series_stocks/conf/fusion_array.yaml \
+--input_configs eir_tutorials/g_time_series/02_time_series_stocks/conf/input_array_prior.yaml eir_tutorials/g_time_series/02_time_series_stocks/conf/input_array_diffusion.yaml \
+--output_configs eir_tutorials/g_time_series/02_time_series_stocks/conf/output_array_diffusion.yaml

@@ -1,5 +1,6 @@
 import reprlib
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import (
     Any,
@@ -551,6 +552,7 @@ def build_deeplake_available_id_iterator(
         yield id_
 
 
+@lru_cache()
 def gather_ids_from_tabular_file(file_path: Path) -> Tuple[str, ...]:
     df = pd.read_csv(file_path, usecols=["ID"])
     all_ids = tuple(df["ID"].astype(str))
@@ -628,12 +630,6 @@ def _get_extra_columns(
     COLUMN_OPS, where the keys are the label columns. That is, "for running with these
     specific label columns, what other columns do we need to grab", as specified
     by the extra_columns_deps attribute of each column operation.
-
-    :param label_columns: The target columns we are modelling on.
-    :param all_column_ops: The ledger of all column ops to be done for each target
-    column.
-    :returns A dict of extra columns and their dtypes if a dtype is specified, otherwise
-    None as the column dtype.
     """
 
     extra_columns = {}
@@ -670,6 +666,10 @@ def _load_label_df(
     We accept only loading the available columns at this point because the passed
     in columns might be forward referenced, meaning that they might be created
     by the custom library.
+
+    We do the casting there to object as otherwise pandas will automatically
+    cast to e.g. int-CategoricalDtype, but we want to keep categorical columns as
+    an object / str dtype for compatibility with other parts of the codebase.
     """
 
     dtypes = _ensure_id_str_dtype(dtypes=dtypes)
@@ -687,8 +687,23 @@ def _load_label_df(
         filepath_or_buffer=label_fpath,
         usecols=available_columns,
         dtype=dtypes,
-        low_memory=False,
+        engine="pyarrow",
     )
+    # pyarrow fills missing values with None,
+    # which is not compatible with the rest of
+    # the codebase
+    df_labels = df_labels.map(lambda x: np.nan if x is None else x)
+
+    for column, dtype in dtypes.items():
+        if dtype == "category" and column in df_labels.columns:
+            df_labels[column] = df_labels[column].astype(str)
+
+    for column, dtype in dtypes.items():
+        if column in df_labels.columns:
+            if dtype == "category":
+                df_labels[column] = pd.Categorical(df_labels[column])
+            else:
+                df_labels[column] = df_labels[column].astype(dtype)
 
     df_labels = df_labels.set_index("ID")
     pre_check_label_df(df=df_labels, name=str(label_fpath))
@@ -956,7 +971,8 @@ def apply_column_op(
 
 
 def _check_parsed_label_df(
-    df_labels: pd.DataFrame, supplied_label_columns: Sequence[str]
+    df_labels: pd.DataFrame,
+    supplied_label_columns: Sequence[str],
 ) -> pd.DataFrame:
     missing_columns = set(supplied_label_columns) - set(df_labels.columns)
     if missing_columns:

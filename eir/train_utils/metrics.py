@@ -1,5 +1,4 @@
 import csv
-import warnings
 from copy import copy
 from dataclasses import dataclass
 from functools import partial, wraps
@@ -26,12 +25,10 @@ from aislib.misc_utils import ensure_path_exists
 from scipy.special import softmax
 from scipy.stats import pearsonr
 from sklearn.metrics import (
-    accuracy_score,
     average_precision_score,
     cohen_kappa_score,
     explained_variance_score,
     f1_score,
-    matthews_corrcoef,
     mean_absolute_error,
     precision_score,
     r2_score,
@@ -317,12 +314,26 @@ def handle_class_mismatch(default_value: float, metric_name: Optional[str] = Non
 def calc_mcc(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
     prediction = np.argmax(a=outputs, axis=1)
 
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", category=RuntimeWarning)
-        warnings.simplefilter("ignore", category=UserWarning)
-        mcc = matthews_corrcoef(labels, prediction)
+    labels = labels.astype(int)
 
-    return mcc
+    num_classes = int(max(np.max(labels), np.max(prediction))) + 1
+
+    conf_matrix = np.zeros((num_classes, num_classes), dtype=np.int64)
+    np.add.at(conf_matrix, (labels, prediction), 1)
+
+    t_sum = conf_matrix.sum(axis=1, dtype=np.float64)
+    p_sum = conf_matrix.sum(axis=0, dtype=np.float64)
+    n_correct = np.sum(np.diag(conf_matrix), dtype=np.float64)
+    n_samples = np.sum(conf_matrix, dtype=np.float64)
+
+    cov_ytyp = n_correct * n_samples - np.dot(t_sum, p_sum)
+    cov_ypyp = n_samples**2 - np.dot(p_sum, p_sum)
+    cov_ytyt = n_samples**2 - np.dot(t_sum, t_sum)
+
+    if cov_ypyp * cov_ytyt == 0:
+        return 0.0
+    else:
+        return cov_ytyp / np.sqrt(cov_ytyt * cov_ypyp)
 
 
 @handle_class_mismatch(default_value=np.nan, metric_name="ROC-AUC")
@@ -377,8 +388,7 @@ def calc_average_precision(
 @handle_empty(default_value=np.nan, metric_name="ACC")
 def calc_acc(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
     pred = np.argmax(outputs, axis=1)
-
-    accuracy = accuracy_score(y_true=labels, y_pred=pred)
+    accuracy = np.mean(pred == labels)
     return accuracy
 
 

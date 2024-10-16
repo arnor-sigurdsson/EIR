@@ -160,7 +160,15 @@ def _set_up_bad_label_file_for_testing(label_file: Path) -> None:
         bad_label_writer = csv.writer(csv_file, delimiter=",")
 
         for i in range(10):
-            row = [f"SampleIgnoreLABEL_{i}", "BadLabel", 0.0, "BadLabel", 0.0]
+            row = [
+                f"SampleIgnoreLABEL_{i}",  # ID
+                "BadLabel",  # Origin
+                0.0,  # Height
+                "BadLabel",  # OriginExtraCol
+                0.0,  # ExtraTarget
+                0.0,  # SparseHeight
+                "BadLabel",  # SpareOrigin
+            ]
             bad_label_writer.writerow(row)
 
 

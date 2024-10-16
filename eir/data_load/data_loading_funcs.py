@@ -1,6 +1,4 @@
 from collections import Counter
-from concurrent.futures import ProcessPoolExecutor, as_completed
-from functools import partial
 from statistics import mean
 from typing import (
     TYPE_CHECKING,
@@ -24,7 +22,6 @@ if TYPE_CHECKING:
     from eir.data_load.datasets import DatasetBase  # noqa: F401
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
-
 
 al_sample_weight_and_counts = Dict[str, torch.Tensor | list[int]]
 
@@ -61,39 +58,18 @@ def get_weighted_random_sampler(
 
     all_column_weights = {}
     samples_list = list(samples)
-    n_samples = len(samples_list)
 
-    if n_samples < 10_000:
-        max_workers = 1
-    else:
-        max_workers = None
-
-    logger.debug(
-        "Using %s workers for weighted sampling setup based on %d samples.",
-        max_workers,
-        n_samples,
-    )
-
-    process_output_partial = partial(_process_output, samples_list)
     logger.debug("Setting up weighted sampling statistics.")
 
-    with ProcessPoolExecutor(max_workers=max_workers) as executor:
-        futures = []
-        task_iter = parsed_weighted_sample_columns.items()
-        for output_name, weighted_columns_list in task_iter:
-            logger.debug(f"Setting up weighted sampling for output '{output_name}'.")
-            futures.append(
-                executor.submit(
-                    process_output_partial,
-                    output_name,
-                    weighted_columns_list,
-                )
-            )
-
-        for future in as_completed(futures):
-            output_name, cur_column_weights = future.result()
-            for cur_target, cur_weight_object in cur_column_weights.items():
-                all_column_weights[f"{output_name}.{cur_target}"] = cur_weight_object
+    for output_name, weighted_columns_list in parsed_weighted_sample_columns.items():
+        logger.debug(f"Setting up weighted sampling for output '{output_name}'.")
+        cur_column_weights = _gather_column_sampling_weights(
+            samples=samples_list,
+            output_name=output_name,
+            columns_to_sample=weighted_columns_list,
+        )
+        for cur_target, cur_weight_object in cur_column_weights.items():
+            all_column_weights[f"{output_name}.{cur_target}"] = cur_weight_object
 
     samples_weighted, num_sample_per_epoch = _aggregate_column_sampling_weights(
         all_target_columns_weights_and_counts=all_column_weights
@@ -109,18 +85,6 @@ def get_weighted_random_sampler(
     )
 
     return sampler
-
-
-def _process_output(
-    samples: Iterable["Sample"], output_name: str, weighted_columns_list: List[str]
-) -> Tuple[str, Dict[str, al_sample_weight_and_counts]]:
-    logger.debug(f"Setting up weighted sampling for output {output_name}")
-    cur_column_weights = _gather_column_sampling_weights(
-        samples=samples,
-        output_name=output_name,
-        columns_to_sample=weighted_columns_list,
-    )
-    return output_name, cur_column_weights
 
 
 def _build_weighted_sample_dict_from_config_sequence(
@@ -185,16 +149,8 @@ def _gather_column_sampling_weights(
 
 def _get_column_label_weights_and_counts(
     label_iterable: Iterable[int | float], column_name: Optional[str] = None
-) -> al_sample_weight_and_counts:
-    """
-    We have the assertion to make sure we have a unique integer for each label, starting
-    with 0 as we use it to index into the weights directly.
-
-    TODO:   Optimize so we do just one pass over `train_dataset.samples` if this becomes
-            a bottleneck.
-    """
-
-    def _check_labels(label_list: list[int | float]):
+) -> dict[str, torch.Tensor | list[int]]:
+    def _check_labels(label_list: List[int]):
         labels_set = set(label_list)
         found_labels = sorted(list(labels_set))
         expected_labels = list(range(len(found_labels)))
@@ -212,19 +168,21 @@ def _get_column_label_weights_and_counts(
                 "column."
             )
 
-    labels = list(label_iterable)
-    valid_labels = [label for label in labels if not np.isnan(label)]
+    labels = np.array(list(label_iterable))
 
-    _check_labels(label_list=valid_labels)
+    valid_mask = ~np.isnan(labels)
+    valid_labels = labels[valid_mask].astype(int)
 
-    label_counts: list[int] = [int(i[1]) for i in sorted(Counter(valid_labels).items())]
+    _check_labels(label_list=valid_labels.tolist())
+
+    label_counts = [int(i[1]) for i in sorted(Counter(valid_labels).items())]
 
     weights = 1.0 / torch.tensor(label_counts, dtype=torch.float32)
-    samples_weighted = torch.tensor(
-        [weights[int(label)] if not np.isnan(label) else np.nan for label in labels]
-    )
 
-    output_dict: al_sample_weight_and_counts = {
+    samples_weighted = torch.full((len(labels),), float("nan"), dtype=torch.float32)
+    samples_weighted[valid_mask] = weights[valid_labels]
+
+    output_dict: dict[str, torch.Tensor | list[int]] = {
         "samples_weighted": samples_weighted,
         "label_counts": label_counts,
     }

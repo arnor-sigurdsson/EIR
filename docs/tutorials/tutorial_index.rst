@@ -52,6 +52,7 @@ Time Series
     :maxdepth: 2
 
     g_time_series/01_time_series_power.rst
+    g_time_series/02_time_series_stocks.rst
 
 Pretraining
 ============

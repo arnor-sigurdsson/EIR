@@ -1,0 +1,15 @@
+basic_experiment:
+  batch_size: 128
+  device: mps
+  memory_dataset: true
+  n_epochs: 20
+  output_folder: eir_tutorials/tutorial_runs/g_time_series/02_time_series_stocks_transformer
+evaluation_checkpoint:
+  checkpoint_interval: 500
+  n_saved_models: 1
+  sample_interval: 500
+optimization:
+  lr: 0.0005
+  optimizer: adabelief
+visualization_logging:
+  plot_skip_steps: 500

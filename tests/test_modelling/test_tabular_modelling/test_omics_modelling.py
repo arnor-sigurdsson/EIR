@@ -99,6 +99,9 @@ def _get_classification_output_configs(
         {
             "injections": {
                 "global_configs": {
+                    "basic_experiment": {
+                        "n_epochs": 20,
+                    },
                     "training_control": {
                         "weighted_sampling_columns": ["test_output_tabular.Origin"],
                     },
@@ -112,7 +115,7 @@ def _get_classification_output_configs(
                         "model_config": {
                             "model_type": "cnn",
                             "model_init_config": {
-                                "rb_do": 0.25,
+                                "rb_do": 0.05,
                                 "channel_exp_base": 3,
                                 "l1": 1e-04,
                             },

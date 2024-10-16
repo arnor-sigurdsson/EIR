@@ -1,0 +1,38 @@
+input_info:
+  input_source: eir_tutorials/g_time_series/02_time_series_stocks/data/deeplake_train
+  input_name: stock_output
+  input_type: array
+  input_inner_key: output_array
+
+input_type_info:
+  normalization: channel
+  adaptive_normalization_max_samples: 100000
+
+model_config:
+  model_type: cnn
+  model_init_config:
+    allow_first_conv_size_reduction: false
+    layers:
+      - 1
+      - 1
+    down_stride_width: 1
+    kernel_width: 4
+    kernel_height: 1
+    channel_exp_base: 6
+    down_sample_every_n_blocks: 1
+    attention_inclusion_cutoff: 0
+
+tensor_broker_config:
+  message_configs:
+    - name: first_cnn_layer
+      layer_path: input_modules.stock_output.feature_extractor.conv.0.conv_1
+      cache_tensor: true
+      layer_cache_target: "input"
+    - name: first_residual_layer
+      layer_path: input_modules.stock_output.feature_extractor.conv.1
+      cache_tensor: true
+      layer_cache_target: "output"
+    - name: second_residual_layer
+      layer_path: input_modules.stock_output.feature_extractor.conv.3
+      cache_tensor: true
+      layer_cache_target: "output"
