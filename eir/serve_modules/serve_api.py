@@ -24,6 +24,9 @@ from eir.setup.output_setup_modules.image_output_setup import ComputedImageOutpu
 from eir.setup.output_setup_modules.sequence_output_setup import (
     ComputedSequenceOutputInfo,
 )
+from eir.setup.output_setup_modules.survival_output_setup import (
+    ComputedSurvivalOutputInfo,
+)
 from eir.setup.output_setup_modules.tabular_output_setup import (
     ComputedTabularOutputInfo,
 )
@@ -155,6 +158,9 @@ def get_model_info(
                     "type": "image",
                     "shape": shape,
                 }
+
+            case ComputedSurvivalOutputInfo():
+                pass
 
             case _:
                 output_type = output_object.output_config.output_info.output_type

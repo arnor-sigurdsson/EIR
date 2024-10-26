@@ -32,7 +32,7 @@ def predict_tabular_wrapper_with_labels(
     )
 
     for output_name, target_head_name, target_column_name in target_columns_gen:
-        if target_head_name == "general":
+        if target_head_name not in ("cat", "con"):
             continue
 
         target_predictions = all_predictions[output_name][target_column_name]

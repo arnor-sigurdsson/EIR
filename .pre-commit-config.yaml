@@ -9,7 +9,7 @@ repos:
     rev: v4.4.0
     hooks:
       - id: check-added-large-files
-        args: ['--maxkb=2048']
+        args: ['--maxkb=8192']
 
   - repo: https://github.com/pycqa/isort
     rev: 5.12.0

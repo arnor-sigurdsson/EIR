@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import numpy as np
 from aislib.misc_utils import ensure_path_exists
-from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.preprocessing import KBinsDiscretizer, LabelEncoder, StandardScaler
 
 from eir.train_utils.utils import get_run_folder
 
@@ -129,12 +129,23 @@ def serialize_label_encoder(encoder: LabelEncoder) -> dict[str, Any]:
     }
 
 
+def serialize_kbins_discretizer(kbins: KBinsDiscretizer) -> dict[str, Any]:
+    return {
+        "type": "KBinsDiscretizer",
+        "n_bins": kbins.n_bins,
+        "encode": kbins.encode,
+        "strategy": kbins.strategy,
+        "bin_edges_": kbins.bin_edges_[0].tolist(),
+    }
+
+
 def serialize_transformer(
     transformer: "al_label_transformers_object",
 ) -> dict[str, Any]:
     serializers: dict[type, Callable] = {
         StandardScaler: serialize_standard_scaler,
         LabelEncoder: serialize_label_encoder,
+        KBinsDiscretizer: serialize_kbins_discretizer,
     }
     serializer = serializers.get(type(transformer))
     if serializer is None:
@@ -156,10 +167,29 @@ def deserialize_label_encoder(data: dict[str, Any]) -> LabelEncoder:
     return encoder
 
 
+def deserialize_kbins_discretizer(data: dict[str, Any]) -> KBinsDiscretizer:
+    kbins = KBinsDiscretizer(
+        n_bins=data["n_bins"],
+        encode=data["encode"],
+        strategy=data["strategy"],
+    )
+
+    # note we need to wrap the bin_edges in an array to match the expected shape,
+    # as KBinsDiscretizer expects a 2D array (if encoding multiple features, even
+    # though we're only encoding one feature here)
+    kbins.bin_edges_ = np.array([data["bin_edges_"]])
+
+    # normally initialized in .fit, but we need to set it here manually for
+    # various functionality to work
+    kbins.n_bins_ = kbins._validate_n_bins(n_features=1)
+    return kbins
+
+
 def deserialize_transformer(data: dict[str, Any]) -> "al_label_transformers_object":
     deserializers: dict[str, Callable] = {
         "StandardScaler": deserialize_standard_scaler,
         "LabelEncoder": deserialize_label_encoder,
+        "KBinsDiscretizer": deserialize_kbins_discretizer,
     }
     deserializer = deserializers.get(data["type"])
     if deserializer is None:

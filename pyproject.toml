@@ -49,6 +49,10 @@ websockets = "^12.0"
 multimethod = "^1.12"
 zstandard = "^0.23.0"
 libdeeplake = "0.0.145"
+lifelines = "^0.29.0"
+scikit-survival = "^0.23.0"
+pycox = "^0.3.0"
+sklearn-pandas = "^2.2.0"
 
 [tool.poetry.group.dev.dependencies]
 memory-profiler = "^0.61.0"

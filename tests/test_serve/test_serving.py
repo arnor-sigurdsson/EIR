@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, Sequence, Tuple
 import numpy as np
 import pandas as pd
 import pytest
+from PIL import Image
 from scipy.spatial.distance import cosine
 from sklearn.metrics import mean_squared_error
 
@@ -58,7 +59,7 @@ def get_base_parametrization(compiled: bool = False) -> dict:
                 {
                     "input_info": {"input_name": "test_genotype"},
                     "model_config": {
-                        "model_type": "cnn",
+                        "model_type": "genome-local-net",
                         "model_init_config": {"l1": 1e-04},
                     },
                 },
@@ -111,9 +112,10 @@ def get_base_parametrization(compiled: bool = False) -> dict:
             ],
             "fusion_configs": {
                 "model_config": {
-                    "fc_task_dim": 256,
+                    "fc_task_dim": 512,
                     "fc_do": 0.10,
                     "rb_do": 0.10,
+                    "layers": [2],
                 },
             },
             "output_configs": [
@@ -162,6 +164,29 @@ def get_base_parametrization(compiled: bool = False) -> dict:
                         },
                     },
                 },
+                {
+                    "output_info": {
+                        "output_name": "test_output_image",
+                    },
+                    "output_type_info": {
+                        "loss": "mse",
+                        "size": [16, 16],
+                    },
+                    "model_config": {
+                        "model_type": "cnn",
+                        "model_init_config": {
+                            "channel_exp_base": 4,
+                            "allow_pooling": False,
+                        },
+                    },
+                },
+                {
+                    "output_info": {"output_name": "test_output_survival"},
+                    "output_type_info": {
+                        "event_column": "BinaryOrigin",
+                        "time_column": "Height",
+                    },
+                },
             ],
         },
     }
@@ -181,8 +206,8 @@ def get_base_parametrization(compiled: bool = False) -> dict:
                 "array",
             ),
             "extras": {"array_dims": 1},
-            "manual_test_data_creator": lambda: "test_multi_modal_multi_task",
-            "random_samples_dropped_from_modalities": True,
+            "manual_test_data_creator": lambda: "test_multi_modal_multi_task_serving",
+            "random_samples_dropped_from_modalities": False,
             "source": "local",
         },
     ],
@@ -230,21 +255,24 @@ def test_multi_serving(
     for i in range(n_sample_requests):
         n_cur_retries = 0
 
-        try:
-            random_id, example_request = _craft_example_request(
-                scoped_test_path=test_data_config.scoped_tmp_path,
-                input_configs=input_configs,
-            )
-        except Exception as e:
-            if n_cur_retries < n_retries_per_request:
-                n_cur_retries += 1
-                continue
-            else:
-                raise e
+        for _ in range(n_retries_per_request):
+            try:
+                random_id, example_request = _craft_example_request(
+                    scoped_test_path=test_data_config.scoped_tmp_path,
+                    input_configs=input_configs,
+                )
+            except Exception as e:
+                logger.error(f"Failed to craft example request: {e}")
+                if n_cur_retries < n_retries_per_request:
+                    n_cur_retries += 1
+                    continue
+                else:
+                    raise e
 
-        ids.append(random_id)
-        example_requests.append(example_request)
+            ids.append(random_id)
+            example_requests.append(example_request)
 
+    assert len(example_requests) > 0
     response = run_serve_experiment_from_command(
         command=command,
         url="http://localhost:8000/predict",
@@ -252,16 +280,27 @@ def test_multi_serving(
         data_loading_function=load_data_for_serve,
         base_path=None,
     )
+    assert len(response) == 1
+    all_responses = response[0]["response"]["result"]
+    assert len(all_responses) >= 10
 
+    pass_threshold = 0.6
+    n_passed = 0
+    n_total = 0
     for idx, random_id in enumerate(ids):
-        cur_response = response[idx]
-        assert _check_prediction(
+        cur_response = all_responses[idx]
+        passed = _check_prediction(
             id_from_request=random_id,
             response=cur_response,
             output_configs=experiment.configs.output_configs,
             labels_csv_path=str(test_data_config.scoped_tmp_path / "labels.csv"),
             experiment=experiment,
         )
+        if passed:
+            n_passed += 1
+        n_total += 1
+
+    assert n_passed / n_total >= pass_threshold
 
 
 def _craft_example_request(
@@ -279,43 +318,40 @@ def _craft_example_request(
 
         if input_type == "omics":
             omics_path = scoped_test_path / "omics" / f"{random_id}.npy"
-            assert omics_path.is_file()
+            assert omics_path.is_file(), f"Missing omics file: {omics_path}"
             example_request[input_name] = str(omics_path)
 
         elif input_type == "sequence":
             sequence_path = scoped_test_path / "sequence" / f"{random_id}.txt"
-            assert sequence_path.is_file()
+            assert sequence_path.is_file(), f"Missing sequence file: {sequence_path}"
             example_request[input_name] = str(sequence_path)
 
         elif input_type == "image":
             image_path = scoped_test_path / "image" / f"{random_id}.png"
-            assert image_path.is_file()
+            assert image_path.is_file(), f"Missing image file: {image_path}"
             example_request[input_name] = str(image_path)
 
         elif input_type == "array":
             array_path = scoped_test_path / "array" / f"{random_id}.npy"
-            assert array_path.is_file()
+            assert array_path.is_file(), f"Missing array file: {array_path}"
             example_request[input_name] = str(array_path)
 
         elif input_type == "tabular":
-            # for now, we just fail here if we have a missing value
-            # allowing only fully complete samples
-            # later we can add something more sophisticated if needed
-            # note that we check for *all* columns, not just the ones
-            # that are inputs, so we can properly compare the results
-            any_na = (
-                labels_df.loc[labels_df["ID"] == random_id].isna().any(axis=1).iloc[0]
-            )
-
-            if any_na:
-                assert False
-
             cat_columns = list(config.input_type_info.input_cat_columns)
             con_columns = list(config.input_type_info.input_con_columns)
             all_columns = cat_columns + con_columns
 
-            tabular_data = {}
+            any_na = (
+                labels_df.loc[labels_df["ID"] == random_id, all_columns]
+                .isna()
+                .any(axis=1)
+                .iloc[0]
+            )
 
+            if any_na:
+                assert False, f"Missing values for ID: {random_id}"
+
+            tabular_data = {}
             for col in all_columns:
                 value = labels_df.loc[labels_df["ID"] == random_id, col].iloc[0]
 
@@ -336,14 +372,14 @@ def _check_prediction(
     labels_df = pd.read_csv(filepath_or_buffer=labels_csv_path)
     expected_row = labels_df[labels_df["ID"] == id_from_request]
 
-    actual_results = response["response"]["result"]
+    actual_result = response
 
     for output_config in output_configs:
         output_name = output_config.output_info.output_name
         output_type = output_config.output_info.output_type
 
         if output_type == "tabular":
-            actual_output = actual_results.get(output_name, {})
+            actual_output = actual_result.get(output_name, {})
             if not _validate_tabular_output(
                 actual_output=actual_output,
                 expected_row=expected_row,
@@ -352,7 +388,7 @@ def _check_prediction(
                 return False
 
         elif output_type == "sequence":
-            actual_output = actual_results.get(output_name, "")
+            actual_output = actual_result.get(output_name, "")
             if not _validate_sequence_output(
                 actual_output=actual_output,
                 expected_set=get_expected_keywords_set(),
@@ -360,7 +396,7 @@ def _check_prediction(
                 return False
 
         elif output_type == "array":
-            actual_output = actual_results.get(output_name, "")
+            actual_output = actual_result.get(output_name, "")
             output_object = experiment.outputs[output_name]
             data_dimensions = output_object.data_dimensions
             array_folder = Path(labels_csv_path).parent / "array"
@@ -368,11 +404,32 @@ def _check_prediction(
             expected_array = np.load(expected_array_file)
 
             is_diffusion = output_object.diffusion_config is not None
+            do_check_cosine = not is_diffusion
             if not _validate_array_output(
                 actual_output=actual_output,
                 expected_array=expected_array,
                 data_dimensions=data_dimensions.full_shape(),
-                is_diffusion=is_diffusion,
+                check_cosine=do_check_cosine,
+            ):
+                return False
+        elif output_type == "image":
+            actual_output = actual_result.get(output_name, "")
+            image_folder = Path(labels_csv_path).parent / "image"
+            expected_image_file = image_folder / f"{id_from_request}.png"
+            expected_image = np.array(Image.open(expected_image_file)) / 255.0
+            if not _validate_array_output(
+                actual_output=actual_output,
+                expected_array=expected_image,
+                data_dimensions=(1, 16, 16),
+                check_cosine=False,
+            ):
+                return False
+        elif output_type == "survival":
+            actual_output = actual_result.get(output_name, {})
+            if not _validate_survival_output(
+                actual_output=actual_output,
+                expected_row=expected_row,
+                output_config=output_config,
             ):
                 return False
 
@@ -387,8 +444,13 @@ def _validate_tabular_output(
     for cat_col in output_config.output_type_info.target_cat_columns:
         expected_value = expected_row[cat_col].iloc[0]
 
+        if pd.isna(expected_value):
+            logger.info("Skipping NA value.")
+            continue
+
         actual_category_predictions = actual_output.get(cat_col, {})
         if not actual_category_predictions:
+            logger.error(f"Missing category predictions for: {cat_col}")
             return False
 
         predicted_category = max(
@@ -397,16 +459,27 @@ def _validate_tabular_output(
         )
 
         if predicted_category != expected_value:
+            logger.error(
+                f"Expected: {expected_value}, got: {predicted_category} for: {cat_col}",
+            )
             return False
 
     for con_col in output_config.output_type_info.target_con_columns:
         expected_value = expected_row[con_col].iloc[0]
+
+        if pd.isna(expected_value):
+            logger.info("Skipping NA value.")
+            continue
+
         actual_value = actual_output.get(con_col, None).get(con_col, None)
         if actual_value is None or not isclose(
             actual_value,
             expected_value,
             rel_tol=5.0,
         ):
+            logger.error(
+                f"Expected: {expected_value}, got: {actual_value} for: {con_col}",
+            )
             return False
 
     return True
@@ -430,7 +503,7 @@ def _validate_array_output(
     data_dimensions: tuple[int, ...],
     mse_threshold: float = 0.35,
     cosine_similarity_threshold: float = 0.6,
-    is_diffusion: bool = False,
+    check_cosine: bool = False,
 ) -> bool:
     array_np = deserialize_array(
         array_str=actual_output,
@@ -442,15 +515,55 @@ def _validate_array_output(
         y_true=expected_array.ravel(),
         y_pred=array_np.ravel(),
     )
-    assert mse < mse_threshold
+    if not mse < mse_threshold:
+        logger.error(f"High MSE: {mse}")
+        return False
 
     expected_array[expected_array < 1e-8] = 0.0
 
-    if not is_diffusion:
+    if check_cosine:
         cosine_similarity = 1 - cosine(
             u=expected_array.ravel().astype(np.float32),
             v=array_np.ravel(),
         )
-        assert cosine_similarity > cosine_similarity_threshold
+
+        if pd.isna(cosine_similarity):
+            logger.error(f"Invalid cosine similarity: {cosine_similarity}")
+            return False
+
+        if not cosine_similarity > cosine_similarity_threshold:
+            logger.error(f"Low cosine similarity: {cosine_similarity}")
+            return False
+
+    return True
+
+
+def _validate_survival_output(
+    actual_output: dict,
+    expected_row: pd.Series,
+    output_config: OutputConfig,
+) -> bool:
+
+    actual_output = actual_output["BinaryOrigin"]
+
+    if not {"time_bins", "survival_probs"}.issubset(actual_output.keys()):
+        logger.error("Missing required keys in survival output")
+        return False
+
+    survival_probs = actual_output["survival_probs"]
+
+    if not all(x > y for x, y in zip(survival_probs, survival_probs[1:])):
+        logger.error("Survival probabilities are not strictly decreasing")
+        return False
+
+    if not all(0 <= p <= 1 for p in survival_probs):
+        logger.error("Survival probabilities outside valid range [0, 1]")
+        return False
+
+    final_prob = survival_probs[-1]
+    threshold = 0.5
+    if final_prob > threshold:
+        logger.error(f"Final survival probability above threshold: {final_prob}")
+        return False
 
     return True

@@ -1,5 +1,5 @@
 from functools import partial
-from typing import TYPE_CHECKING, Callable, Dict, Type, Union
+from typing import TYPE_CHECKING, Callable, Literal, Sequence, Type, Union
 
 import torch
 from torch import nn
@@ -9,6 +9,9 @@ from eir.setup.output_setup_modules.array_output_setup import ComputedArrayOutpu
 from eir.setup.output_setup_modules.image_output_setup import ComputedImageOutputInfo
 from eir.setup.output_setup_modules.sequence_output_setup import (
     ComputedSequenceOutputInfo,
+)
+from eir.setup.output_setup_modules.survival_output_setup import (
+    ComputedSurvivalOutputInfo,
 )
 from eir.setup.output_setup_modules.tabular_output_setup import (
     ComputedTabularOutputInfo,
@@ -30,7 +33,7 @@ al_con_losses = (
 
 al_criteria = al_con_losses | al_cat_losses | Callable
 
-al_criteria_dict = Dict[str, Dict[str, al_criteria]]
+al_criteria_dict = dict[str, dict[str, al_criteria]]
 
 al_losses = (
     nn.CrossEntropyLoss
@@ -97,6 +100,14 @@ def get_criteria(outputs_as_dict: "al_output_objects_as_dict") -> al_criteria_di
             case ComputedArrayOutputInfo() | ComputedImageOutputInfo():
                 criterion = partial(_calc_con_loss, loss_func=nn.MSELoss())
                 criteria_dict[output_name][output_name] = criterion
+
+            case ComputedSurvivalOutputInfo():
+                output_type_info = output_object.output_config.output_type_info
+                assert isinstance(output_type_info, schemas.SurvivalOutputTypeConfig)
+                surv_loss_name = output_type_info.loss_function
+                event_name = output_type_info.event_column
+                criterion = get_survival_criterion(loss_name=surv_loss_name)
+                criteria_dict[output_name][event_name] = criterion
 
     return criteria_dict
 
@@ -182,14 +193,40 @@ def _calc_con_loss(
             return loss_func(input=input.squeeze(), target=target.squeeze())
 
 
-def get_loss_callable(criteria: al_criteria_dict) -> Callable:
+def get_loss_callable(
+    criteria: al_criteria_dict,
+    survival_links: dict[str, dict[str, str]],
+) -> Callable:
     log_empty_callable = log_empty_loss_once()
     single_task_loss_func = partial(
         calculate_prediction_losses,
         criteria=criteria,
         log_empty_loss_callable=log_empty_callable,
+        survival_links=survival_links,
     )
     return single_task_loss_func
+
+
+def build_survival_links_for_criteria(
+    output_configs: Sequence[schemas.OutputConfig],
+) -> dict[str, dict[str, str]]:
+
+    survival_links = {}
+    for output_config in output_configs:
+        output_type_info = output_config.output_type_info
+        if not isinstance(output_type_info, schemas.SurvivalOutputTypeConfig):
+            continue
+
+        output_name = output_config.output_info.output_name
+        event_column = output_type_info.event_column
+        duration_column = output_type_info.time_column
+
+        survival_links[output_name] = {
+            "duration": duration_column,
+            "event": event_column,
+        }
+
+    return survival_links
 
 
 def _sequence_cat_loss(
@@ -197,3 +234,74 @@ def _sequence_cat_loss(
 ) -> torch.Tensor:
     loss = cat_loss_func(input=input.transpose(2, 1), target=target)
     return loss
+
+
+def _survival_loss(
+    input: torch.Tensor,
+    time: torch.Tensor,
+    target: torch.Tensor,
+    loss_func: Literal["NegativeLogLikelihood", "CoxPHLoss"] = "NegativeLogLikelihood",
+) -> torch.Tensor:
+
+    if loss_func == "NegativeLogLikelihood":
+        return _negative_log_likelihood_loss(log_hazards=input, time=time, event=target)
+    elif loss_func == "CoxPHLoss":
+        return _cox_ph_loss(risk_scores=input, time=time, event=target)
+    else:
+        raise ValueError(f"Unsupported loss function: {loss_func}")
+
+
+def _negative_log_likelihood_loss(
+    log_hazards: torch.Tensor,
+    time: torch.Tensor,
+    event: torch.Tensor,
+) -> torch.Tensor:
+    # Convert log-hazards to hazards
+    hazards = torch.sigmoid(log_hazards)
+
+    # Calculate log(survival probability) for each interval
+    log_surv = torch.log(1 - hazards + 1e-8)
+
+    # Calculate cumulative log(survival probability)
+    cum_log_surv = torch.cumsum(log_surv, dim=1)
+
+    # Select the relevant timepoints
+    idx = torch.arange(log_hazards.shape[0], device=log_hazards.device)
+    relevant_log_surv = cum_log_surv[idx, time]
+    relevant_hazards = hazards[idx, time]
+
+    # Calculate log-likelihood
+    uncensored_ll = torch.log(relevant_hazards + 1e-8) + relevant_log_surv
+    censored_ll = relevant_log_surv
+
+    # Combine censored and uncensored log-likelihoods
+    log_likelihood = event * uncensored_ll + (1 - event) * censored_ll
+
+    # Return negative average log-likelihood
+    return -torch.mean(log_likelihood)
+
+
+def _cox_ph_loss(
+    risk_scores: torch.Tensor, time: torch.Tensor, event: torch.Tensor
+) -> torch.Tensor:
+    # Sort by descending duration
+    _, sorted_indices = torch.sort(time, descending=True)
+    risk_scores = risk_scores[sorted_indices]
+    event = event[sorted_indices]
+
+    # Calculate log of cumulative hazard
+    cumulative_hazard = torch.logcumsumexp(risk_scores, dim=0)
+
+    # Calculate the loss
+    loss = -torch.sum(event * (risk_scores - cumulative_hazard))
+
+    return loss / torch.sum(event)
+
+
+def get_survival_criterion(
+    loss_name: Literal["NegativeLogLikelihood", "CoxPHLoss"],
+) -> Callable:
+    return partial(
+        _survival_loss,
+        loss_func=loss_name,
+    )

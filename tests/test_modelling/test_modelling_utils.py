@@ -10,13 +10,16 @@ if TYPE_CHECKING:
 def check_performance_result_wrapper(
     outputs: "al_output_objects_as_dict",
     run_path: Path,
-    max_thresholds: Tuple[float, float],
-    min_thresholds: Tuple[float, float] = (1.5, 1.0),
+    max_thresholds: tuple[float, float],
+    min_thresholds: tuple[float, float] = (1.5, 1.0),
+    survival_max_thresholds: tuple[float, float] = (0.6, 0.6),
+    survival_min_thresholds: tuple[float, float] = (2.0, 2.0),
     cat_metric: Optional[str] = "mcc",
     con_metric: Optional[str] = "r2",
 ) -> None:
     for output_name, output_object in outputs.items():
-        if output_object.output_config.output_info.output_type == "tabular":
+        output_type = output_object.output_config.output_info.output_type
+        if output_type == "tabular":
             cat_target_columns = output_object.target_columns["cat"]
             con_target_columns = output_object.target_columns["con"]
 
@@ -39,7 +42,7 @@ def check_performance_result_wrapper(
                         thresholds=max_thresholds,
                     )
 
-        elif output_object.output_config.output_info.output_type == "sequence":
+        elif output_type in ("sequence",):
             check_test_performance_results(
                 run_path=run_path,
                 output_name=output_name,
@@ -47,6 +50,26 @@ def check_performance_result_wrapper(
                 metric="loss",
                 thresholds=min_thresholds,
                 direction="min",
+            )
+
+        elif output_type in ("survival",):
+            check_test_performance_results(
+                run_path=run_path,
+                output_name=output_name,
+                target_column="BinaryOrigin",
+                metric="loss",
+                thresholds=survival_min_thresholds,
+                direction="min",
+            )
+
+            check_test_performance_results(
+                run_path=run_path,
+                output_name=output_name,
+                target_column="BinaryOrigin",
+                metric="c-index",
+                thresholds=survival_max_thresholds,
+                direction="max",
+                check_train=False,
             )
 
 
@@ -57,6 +80,7 @@ def check_test_performance_results(
     metric: str,
     thresholds: Tuple[float, float],
     direction: str = "max",
+    check_train: bool = True,
 ):
     target_column_results_folder = run_path / "results" / output_name / target_column
 
@@ -80,8 +104,10 @@ def check_test_performance_results(
 
     key = f"{output_name}_{target_column}_{metric}"
     if direction == "max":
-        assert df_train.loc[:, key].max() > threshold_train, fail_msg
+        if check_train:
+            assert df_train.loc[:, key].max() > threshold_train, fail_msg
         assert df_valid.loc[:, key].max() > threshold_valid, fail_msg
     elif direction == "min":
-        assert df_train.loc[:, key].min() < threshold_train, fail_msg
+        if check_train:
+            assert df_train.loc[:, key].min() < threshold_train, fail_msg
         assert df_valid.loc[:, key].min() < threshold_valid, fail_msg

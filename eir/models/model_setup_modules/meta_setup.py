@@ -63,6 +63,9 @@ from eir.setup.output_setup_modules.image_output_setup import ComputedImageOutpu
 from eir.setup.output_setup_modules.sequence_output_setup import (
     ComputedSequenceOutputInfo,
 )
+from eir.setup.output_setup_modules.survival_output_setup import (
+    ComputedSurvivalOutputInfo,
+)
 from eir.setup.output_setup_modules.tabular_output_setup import (
     ComputedTabularOutputInfo,
 )
@@ -255,7 +258,7 @@ def _match_fusion_outputs_to_output_types(
 
     for output_name, output_type in output_types.items():
         match output_type:
-            case "tabular":
+            case "tabular" | "survival":
                 output_name_to_fusion_output_type[output_name] = "computed"
             case "sequence":
                 output_name_to_fusion_output_type[output_name] = "pass-through"
@@ -427,10 +430,14 @@ def get_output_modules(
         output_types[output_name] = output_type
 
         match output_object:
-            case ComputedTabularOutputInfo():
+            case ComputedTabularOutputInfo() | ComputedSurvivalOutputInfo():
                 assert computed_out_dimensions is not None
                 assert isinstance(
-                    output_model_config, schemas.TabularOutputModuleConfig
+                    output_model_config,
+                    (
+                        schemas.TabularOutputModuleConfig,
+                        schemas.SurvivalOutputTypeConfig,
+                    ),
                 )
                 tabular_output_module = get_tabular_output_module_from_model_config(
                     output_model_config=output_model_config,

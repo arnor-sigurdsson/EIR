@@ -7,6 +7,7 @@ import pandas as pd
 from eir.setup import schemas
 from eir.setup.schema_modules.output_schemas_array import ArrayOutputTypeConfig
 from eir.setup.schema_modules.output_schemas_image import ImageOutputTypeConfig
+from eir.setup.schema_modules.output_schemas_survival import SurvivalOutputTypeConfig
 from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
 
 if TYPE_CHECKING:
@@ -114,6 +115,12 @@ def validate_output_configs(output_configs: Sequence[schemas.OutputConfig]) -> N
                             "image model type 'cnn'. Please check the model type for "
                             f"output '{name}'."
                         )
+            case SurvivalOutputTypeConfig(time_column, event_column, _, _, _, _):
+                validate_tabular_source(
+                    source_to_check=Path(output_source),
+                    expected_columns=[time_column, event_column],
+                    name="Survival output",
+                )
 
 
 def base_validate_output_info(output_info: schemas.OutputInfoConfig) -> None:

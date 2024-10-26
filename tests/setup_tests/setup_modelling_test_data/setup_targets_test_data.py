@@ -43,6 +43,11 @@ def get_current_test_label_values(
     values_dict["OriginExtraCol"] = cur_class
     values_dict["SparseOrigin"] = cur_class
 
+    if cur_class == "Asia":
+        values_dict["BinaryOrigin"] = 0
+    else:
+        values_dict["BinaryOrigin"] = 1
+
     return values_dict
 
 
@@ -55,6 +60,7 @@ def get_test_label_file_fieldnames() -> list[str]:
         "ExtraTarget",
         "SparseHeight",
         "SparseOrigin",
+        "BinaryOrigin",
     ]
 
     return fieldnames

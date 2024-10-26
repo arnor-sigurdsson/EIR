@@ -5,7 +5,6 @@ from copy import copy
 from dataclasses import dataclass, field
 from typing import (
     Any,
-    Callable,
     Dict,
     Generator,
     Iterable,
@@ -61,19 +60,6 @@ al_input_types = Union[
     schemas.SequenceInputDataConfig,
     schemas.ByteInputDataConfig,
 ]
-
-
-al_output_types_schema_map = dict[
-    str,
-    Union[
-        Type[TabularOutputTypeConfig],
-        Type,
-    ],
-]
-
-al_output_module_config_class_getter = (
-    Callable[[str], Union[schemas.al_output_module_configs_classes, Any]],
-)
 
 logger = get_logger(name=__name__)
 

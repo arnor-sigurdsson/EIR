@@ -14,6 +14,10 @@ from eir.setup.output_setup_modules.sequence_output_setup import (
     ComputedSequenceOutputInfo,
     set_up_sequence_output,
 )
+from eir.setup.output_setup_modules.survival_output_setup import (
+    ComputedSurvivalOutputInfo,
+    set_up_survival_output,
+)
 from eir.setup.output_setup_modules.tabular_output_setup import (
     ComputedTabularOutputInfo,
     set_up_tabular_output,
@@ -31,6 +35,7 @@ al_output_objects = (
     | ComputedSequenceOutputInfo
     | ComputedArrayOutputInfo
     | ComputedImageOutputInfo
+    | ComputedSurvivalOutputInfo
 )
 al_output_objects_as_dict = Dict[str, al_output_objects]
 
@@ -39,6 +44,7 @@ al_output_classes = (
     | Type[ComputedSequenceOutputInfo]
     | Type[ComputedArrayOutputInfo]
     | Type[ComputedImageOutputInfo]
+    | Type[ComputedSurvivalOutputInfo]
 )
 
 
@@ -113,6 +119,7 @@ def get_output_setup_function_map() -> dict[str, Callable[..., al_output_objects
         "sequence": set_up_sequence_output,
         "array": set_up_array_output,
         "image": set_up_image_output,
+        "survival": set_up_survival_output,
     }
 
     return setup_mapping

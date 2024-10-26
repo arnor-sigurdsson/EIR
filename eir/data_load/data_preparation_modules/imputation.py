@@ -19,12 +19,16 @@ from eir.setup.output_setup_modules.image_output_setup import ComputedImageOutpu
 from eir.setup.output_setup_modules.sequence_output_setup import (
     ComputedSequenceOutputInfo,
 )
+from eir.setup.output_setup_modules.survival_output_setup import (
+    ComputedSurvivalOutputInfo,
+)
 from eir.setup.output_setup_modules.tabular_output_setup import (
     ComputedTabularOutputInfo,
 )
 from eir.setup.schemas import (
     ImageInputDataConfig,
     ImageOutputTypeConfig,
+    SurvivalOutputTypeConfig,
     TabularInputDataConfig,
     TabularOutputTypeConfig,
 )
@@ -247,6 +251,19 @@ def impute_partially_missing_output_modalities(
                     if output_column not in cur_output_value:
                         cur_output_value[output_column] = torch.nan
 
+            case ComputedSurvivalOutputInfo():
+                cur_output_value = outputs_values[output_name]
+                output_type_info = output_object.output_config.output_type_info
+
+                assert isinstance(output_type_info, SurvivalOutputTypeConfig)
+                event_column = output_type_info.event_column
+                time_column = output_type_info.time_column
+
+                if event_column not in cur_output_value:
+                    cur_output_value[event_column] = torch.nan
+                if time_column not in cur_output_value:
+                    cur_output_value[time_column] = torch.nan
+
                 outputs_values[output_name] = cur_output_value
 
     return outputs_values
@@ -283,8 +300,8 @@ def impute_missing_output_modalities(
                     shape = output_object.data_dimensions.full_shape()
                     approach = "random"
 
-                case ComputedTabularOutputInfo():
-                    assert output_type == "tabular"
+                case ComputedTabularOutputInfo() | ComputedSurvivalOutputInfo():
+                    assert output_type in ("tabular", "survival")
                     outputs_values[output_name] = fill_value
                     continue
 
@@ -320,7 +337,7 @@ def _get_default_output_impute_dtypes(
     dtypes = {}
     for output_name, output_object in outputs_objects.items():
         match output_object:
-            case ComputedTabularOutputInfo():
+            case ComputedTabularOutputInfo() | ComputedSurvivalOutputInfo():
                 dtypes[output_name] = torch.float
             case ComputedSequenceOutputInfo():
                 dtypes[output_name] = torch.long
@@ -349,6 +366,10 @@ def _get_default_output_impute_fill_values(
                 fill_values[output_name] = 0
             case ComputedArrayOutputInfo() | ComputedImageOutputInfo():
                 fill_values[output_name] = torch.nan
+            case ComputedSurvivalOutputInfo():
+                fill_values[output_name] = _build_survival_output_fill_value(
+                    output_object=output_object
+                )
             case _:
                 raise ValueError(
                     f"Unrecognized output type"
@@ -359,7 +380,7 @@ def _get_default_output_impute_fill_values(
 
 
 def _build_tabular_output_fill_value(
-    output_object: Union["ComputedTabularOutputInfo",]
+    output_object: Union["ComputedTabularOutputInfo"],
 ) -> dict[str, int | float]:
     fill_value: dict[str, int | float] = {}
 
@@ -373,5 +394,22 @@ def _build_tabular_output_fill_value(
     con_columns = output_type_info.target_con_columns
     for con_column in con_columns:
         fill_value[con_column] = torch.nan
+
+    return fill_value
+
+
+def _build_survival_output_fill_value(
+    output_object: Union["ComputedSurvivalOutputInfo"],
+) -> dict[str, int | float]:
+    fill_value: dict[str, int | float] = {}
+
+    output_type_info = output_object.output_config.output_type_info
+    assert isinstance(output_type_info, SurvivalOutputTypeConfig)
+
+    event_column = output_type_info.event_column
+    time_column = output_type_info.time_column
+
+    fill_value[event_column] = torch.nan
+    fill_value[time_column] = torch.nan
 
     return fill_value

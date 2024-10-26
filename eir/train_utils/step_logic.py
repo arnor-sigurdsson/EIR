@@ -591,7 +591,11 @@ def hook_default_compute_metrics(
 
 
 def hook_default_per_target_loss(
-    experiment: "Experiment", batch: "Batch", state: Dict, *args, **kwargs
+    experiment: "Experiment",
+    batch: "Batch",
+    state: Dict,
+    *args,
+    **kwargs,
 ) -> dict[str, Any]:
     context_manager = get_maybe_amp_context_manager_from_state(state=state)
     with context_manager:

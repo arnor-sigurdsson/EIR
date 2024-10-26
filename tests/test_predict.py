@@ -327,7 +327,7 @@ def _get_predict_test_data_parametrization() -> List[Dict[str, Any]]:
                     },
                     {
                         "output_info": {
-                            "output_name": "test_image",
+                            "output_name": "test_output_image",
                         },
                         "output_type_info": {
                             "loss": "mse",
@@ -339,6 +339,13 @@ def _get_predict_test_data_parametrization() -> List[Dict[str, Any]]:
                                 "channel_exp_base": 4,
                                 "allow_pooling": False,
                             },
+                        },
+                    },
+                    {
+                        "output_info": {"output_name": "test_output_survival"},
+                        "output_type_info": {
+                            "event_column": "BinaryOrigin",
+                            "time_column": "Height",
                         },
                     },
                 ],
@@ -454,7 +461,7 @@ def _check_tabular_predict_results(
     tabular_infos = get_tabular_target_file_infos(
         output_configs=train_configs_for_testing.configs.output_configs
     )
-    assert len(tabular_infos) == 1
+    assert len(tabular_infos) == 2  # both survival and tabular outputs
     target_tabular_info = tabular_infos["test_output_tabular"]
 
     assert len(target_tabular_info.cat_columns) == 1

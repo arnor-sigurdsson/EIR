@@ -34,6 +34,7 @@ from eir.setup.schema_modules.output_schemas_sequence import (
     SequenceOutputSamplingConfig,
     SequenceOutputTypeConfig,
 )
+from eir.setup.schema_modules.output_schemas_survival import SurvivalOutputTypeConfig
 from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
 from eir.setup.schema_modules.tensor_broker_schemas import TensorBrokerConfig
 from eir.setup.setup_utils import get_all_optimizer_names
@@ -92,6 +93,7 @@ al_output_type_configs = (
     | TabularOutputTypeConfig
     | ArrayOutputTypeConfig
     | ImageOutputTypeConfig
+    | SurvivalOutputTypeConfig
 )
 
 al_output_module_configs = (
@@ -934,6 +936,7 @@ class OutputConfig:
         | SequenceOutputTypeConfig
         | ArrayOutputTypeConfig
         | ImageOutputTypeConfig
+        | SurvivalOutputTypeConfig
     )
     model_config: (
         TabularOutputModuleConfig | SequenceOutputModuleConfig | ArrayOutputModuleConfig

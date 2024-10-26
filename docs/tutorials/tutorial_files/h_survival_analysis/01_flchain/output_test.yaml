@@ -1,0 +1,7 @@
+output_info:
+  output_source: eir_tutorials/h_survival_analysis/01_flchain/data/flchain_test.csv
+  output_name: flchain_prediction
+  output_type: survival
+output_type_info:
+  time_column: time
+  event_column: event

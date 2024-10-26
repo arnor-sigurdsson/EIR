@@ -104,6 +104,29 @@ def _get_pre_trained_module_setup_parametrization() -> Dict:
                         },
                     },
                 },
+                {
+                    "output_info": {
+                        "output_name": "test_output_image",
+                    },
+                    "output_type_info": {
+                        "loss": "mse",
+                        "size": [16, 16],
+                    },
+                    "model_config": {
+                        "model_type": "cnn",
+                        "model_init_config": {
+                            "channel_exp_base": 4,
+                            "allow_pooling": False,
+                        },
+                    },
+                },
+                {
+                    "output_info": {"output_name": "test_output_survival"},
+                    "output_type_info": {
+                        "event_column": "BinaryOrigin",
+                        "time_column": "Height",
+                    },
+                },
             ],
         },
     }
@@ -322,6 +345,29 @@ def _add_new_feature_extractor_to_experiment(
                                 "channel_exp_base": 3,
                                 "allow_pooling": False,
                             },
+                        },
+                    },
+                    {
+                        "output_info": {
+                            "output_name": "test_output_image",
+                        },
+                        "output_type_info": {
+                            "loss": "mse",
+                            "size": [16, 16],
+                        },
+                        "model_config": {
+                            "model_type": "cnn",
+                            "model_init_config": {
+                                "channel_exp_base": 4,
+                                "allow_pooling": False,
+                            },
+                        },
+                    },
+                    {
+                        "output_info": {"output_name": "test_output_survival"},
+                        "output_type_info": {
+                            "event_column": "BinaryOrigin",
+                            "time_column": "Height",
                         },
                     },
                 ],

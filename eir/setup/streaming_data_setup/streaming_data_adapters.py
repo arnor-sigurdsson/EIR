@@ -208,7 +208,7 @@ def process_single_data(data: Any, info: Dict[str, Any]) -> Any:
         return process_array(data=data, shape=info["shape"], dtype=dtype)
     elif data_type == "image":
         return process_image(data=data, mode=info.get("mode"))
-    elif data_type in ["tabular", "sequence"]:
+    elif data_type in ["tabular", "sequence", "survival"]:
         return data
     else:
         logger.warning(f"Unsupported data type: {data_type}")
@@ -291,12 +291,12 @@ def save_data(
     elif data_type == "image":
         assert isinstance(data, Image.Image)
         data.save(save_path / f"{sample_id}.png")
-    elif data_type in ["tabular", "sequence"]:
+    elif data_type in ["tabular", "sequence", "survival"]:
         if data_name not in dataframes:
             dataframes[data_name] = pd.DataFrame(columns=["ID"])
 
         df = dataframes[data_name]
-        if data_type == "tabular":
+        if data_type in ("tabular", "survival"):
             assert isinstance(data, dict)
             new_row = pd.DataFrame({"ID": [sample_id], **data})
         else:
@@ -460,7 +460,7 @@ def patch_configs_for_local_data(
                 raise ValueError("Unsupported config type")
 
         new_source: str | Path
-        if data_type in ["tabular", "sequence"]:
+        if data_type in ["tabular", "sequence", "survival"]:
             new_source = local_data_path / config_type / name / f"{name}.csv"
         elif data_type in ["omics", "array", "image"]:
             new_source = str(local_data_path / config_type / name)

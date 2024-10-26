@@ -88,6 +88,8 @@ def generate_deterministic_sample(index: int) -> dict[str, Any]:
     buffer.seek(0)
     image_output_b64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
 
+    random_float = np.random.rand(1).astype(np.float32).item()
+
     sequence_output = "".join(
         string.ascii_lowercase[i % 26] for i in range(index, index + 10)
     )
@@ -108,6 +110,10 @@ def generate_deterministic_sample(index: int) -> dict[str, Any]:
             "output_array": {"output_array": array_output_b64},
             "output_image": {"output_image": image_output_b64},
             "output_sequence": {"output_sequence": sequence_output},
+            "output_survival": {
+                "Origin": str(int(test_target)),
+                "Height": float(test_target) + random_float,
+            },
         },
         "sample_id": str(uuid.uuid4()),
     }
@@ -152,6 +158,7 @@ def get_dataset_info():
             "output_array": OutputInfo(type="array", shape=[5, 3]),
             "output_image": OutputInfo(type="image", shape=[16, 16, 3]),
             "output_sequence": OutputInfo(type="sequence"),
+            "output_survival": OutputInfo(type="survival"),
         },
     )
 

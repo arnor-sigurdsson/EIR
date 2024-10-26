@@ -34,6 +34,10 @@ from eir.predict_modules.predict_output_modules.predict_array_output import (
 from eir.predict_modules.predict_output_modules.predict_sequence_output import (
     predict_sequence_wrapper,
 )
+from eir.predict_modules.predict_output_modules.predict_survival_output import (
+    predict_survival_wrapper_no_labels,
+    predict_survival_wrapper_with_labels,
+)
 from eir.predict_modules.predict_output_modules.predict_tabular_output import (
     predict_tabular_wrapper_no_labels,
     predict_tabular_wrapper_with_labels,
@@ -47,7 +51,10 @@ from eir.setup.config_setup_modules.config_setup_utils import load_yaml_config
 from eir.setup.input_setup import al_input_objects_as_dict
 from eir.setup.output_setup import al_output_objects_as_dict
 from eir.setup.schemas import OutputConfig
-from eir.target_setup.target_label_setup import gather_all_ids_from_output_configs
+from eir.target_setup.target_label_setup import (
+    build_linked_survival_targets_for_missing_ids,
+    gather_all_ids_from_output_configs,
+)
 from eir.train import check_dataset_and_batch_size_compatibility
 from eir.train_utils.evaluation import (
     deregister_pre_evaluation_hooks,
@@ -187,7 +194,13 @@ def predict(
     )
 
     criteria = train.get_criteria(outputs_as_dict=predict_experiment.outputs)
-    loss_func = train.get_loss_callable(criteria=criteria)
+    survival_links = train.build_survival_links_for_criteria(
+        output_configs=predict_experiment.configs.output_configs
+    )
+    loss_func = train.get_loss_callable(
+        criteria=criteria,
+        survival_links=survival_links,
+    )
 
     predict_results = run_split_evaluation(
         output_generator=output_generator,
@@ -223,8 +236,24 @@ def predict(
             all_ids=predict_results.ids_per_output,
             predict_cl_args=predict_cl_args,
         )
+
+        predict_survival_wrapper_with_labels(
+            predict_config=predict_experiment,
+            all_predictions=predict_results.gathered_outputs,
+            all_labels=predict_results.gathered_labels,
+            all_ids=predict_results.ids_per_output,
+            predict_cl_args=predict_cl_args,
+        )
+
     else:
         predict_tabular_wrapper_no_labels(
+            predict_config=predict_experiment,
+            all_predictions=predict_results.gathered_outputs,
+            all_ids=predict_results.ids_per_output,
+            predict_cl_args=predict_cl_args,
+        )
+
+        predict_survival_wrapper_no_labels(
             predict_config=predict_experiment,
             all_predictions=predict_results.gathered_outputs,
             all_ids=predict_results.ids_per_output,
@@ -316,10 +345,14 @@ def get_default_predict_experiment(
             input_configs=configs_overloaded_for_predict.input_configs
         )
         target_labels = None
+        linked_survival_targets = build_linked_survival_targets_for_missing_ids(
+            output_configs=configs_overloaded_for_predict.output_configs,
+        )
         missing_ids_per_output = MissingTargetsInfo(
             missing_ids_per_modality={},
             missing_ids_within_modality={},
             precomputed_missing_ids={},
+            linked_targets=linked_survival_targets,
         )
 
     test_inputs = set_up_inputs_for_predict(

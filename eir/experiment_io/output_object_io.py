@@ -19,6 +19,9 @@ from eir.experiment_io.output_object_io_modules.image_output_io import (
 from eir.experiment_io.output_object_io_modules.sequence_output_io import (
     load_sequence_output_object,
 )
+from eir.experiment_io.output_object_io_modules.survival_output_io import (
+    load_survival_output_object,
+)
 from eir.experiment_io.output_object_io_modules.tabular_output_io import (
     load_tabular_output_object,
 )
@@ -30,6 +33,9 @@ from eir.setup.output_setup_modules.array_output_setup import ComputedArrayOutpu
 from eir.setup.output_setup_modules.image_output_setup import ComputedImageOutputInfo
 from eir.setup.output_setup_modules.sequence_output_setup import (
     ComputedSequenceOutputInfo,
+)
+from eir.setup.output_setup_modules.survival_output_setup import (
+    ComputedSurvivalOutputInfo,
 )
 from eir.setup.output_setup_modules.tabular_output_setup import (
     ComputedTabularOutputInfo,
@@ -61,6 +67,8 @@ def load_all_serialized_output_objects(
                 output_class = ComputedImageOutputInfo
             case "array":
                 output_class = ComputedArrayOutputInfo
+            case "survival":
+                output_class = ComputedSurvivalOutputInfo
             case _:
                 raise ValueError(f"Invalid output type: {output_type}")
 
@@ -117,7 +125,7 @@ def get_output_serialization_path(
 
     base_path = run_folder / "serializations" / f"{output_type}_output_serializations"
     match output_type:
-        case "image" | "sequence" | "array" | "tabular":
+        case "image" | "sequence" | "array" | "tabular" | "survival":
             path = base_path / f"{output_name}/"
         case _:
             raise ValueError(f"Invalid output type: {output_type}")
@@ -153,7 +161,7 @@ def serialize_output_object(
     config_path = output_folder / "output_config.yaml"
 
     match output_object:
-        case ComputedTabularOutputInfo():
+        case ComputedTabularOutputInfo() | ComputedSurvivalOutputInfo():
             dump_config_to_yaml(config=output_config, output_path=config_path)
         case ComputedSequenceOutputInfo():
             dump_config_to_yaml(config=output_config, output_path=config_path)
@@ -240,6 +248,11 @@ def _read_serialized_output_object(
     loaded_object: "al_output_objects"
     if output_class is ComputedTabularOutputInfo:
         loaded_object = load_tabular_output_object(
+            serialized_output_folder=serialized_output_folder,
+            run_folder=run_folder,
+        )
+    elif output_class is ComputedSurvivalOutputInfo:
+        loaded_object = load_survival_output_object(
             serialized_output_folder=serialized_output_folder,
             run_folder=run_folder,
         )

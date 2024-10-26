@@ -39,6 +39,7 @@ def test_streaming_training(api_process):
             f"{base}/test_streaming_configs/output_array_config.yaml",
             f"{base}/test_streaming_configs/output_image_config.yaml",
             f"{base}/test_streaming_configs/output_sequence_config.yaml",
+            f"{base}/test_streaming_configs/output_survival_config.yaml",
         ]
     )
 

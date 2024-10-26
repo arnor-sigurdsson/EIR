@@ -215,6 +215,6 @@ def test_calc_con_loss(loss_func):
 
 def test_get_loss_callable():
     criteria = MagicMock()
-    loss_callable = get_loss_callable(criteria=criteria)
+    loss_callable = get_loss_callable(criteria=criteria, survival_links={})
     assert isinstance(loss_callable, Callable)
     assert loss_callable.keywords["criteria"] == criteria

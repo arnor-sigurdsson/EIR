@@ -111,7 +111,11 @@ def _set_up_basic_sampling_config(
                 **sampling_config
             )
 
-        case schemas.TabularOutputTypeConfig() | schemas.SequenceOutputTypeConfig():
+        case (
+            schemas.TabularOutputTypeConfig()
+            | schemas.SequenceOutputTypeConfig()
+            | schemas.SurvivalOutputTypeConfig()
+        ):
             sampling_config_object = sampling_config
         case _:
             raise ValueError(f"Unknown output type config '{output_type_config}'.")
@@ -124,13 +128,15 @@ def get_outputs_types_schema_map() -> Dict[
     Type[schemas.TabularOutputTypeConfig]
     | Type[schemas.SequenceOutputTypeConfig]
     | Type[schemas.ArrayOutputTypeConfig]
-    | Type[schemas.ImageOutputTypeConfig],
+    | Type[schemas.ImageOutputTypeConfig]
+    | Type[schemas.SurvivalOutputTypeConfig],
 ]:
     mapping = {
         "tabular": schemas.TabularOutputTypeConfig,
         "sequence": schemas.SequenceOutputTypeConfig,
         "array": schemas.ArrayOutputTypeConfig,
         "image": schemas.ImageOutputTypeConfig,
+        "survival": schemas.SurvivalOutputTypeConfig,
     }
 
     return mapping
@@ -152,6 +158,7 @@ def get_output_module_config_class_map() -> (
         "sequence": SequenceOutputModuleConfig,
         "array": ArrayOutputModuleConfig,
         "image": ArrayOutputModuleConfig,
+        "survival": TabularOutputModuleConfig,
     }
 
     return mapping
@@ -239,6 +246,11 @@ def get_output_config_type_init_callable_map() -> al_output_model_init_map:
         "image": {
             "lcl": LCLOutputModelConfig,
             "cnn": CNNUpscaleModelConfig,
+        },
+        "survival": {
+            "mlp_residual": ResidualMLPOutputModuleConfig,
+            "linear": LinearOutputModuleConfig,
+            "shared_mlp_residual": SharedResidualMLPOutputModuleConfig,
         },
     }
 

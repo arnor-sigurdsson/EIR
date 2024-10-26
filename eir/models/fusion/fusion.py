@@ -46,7 +46,7 @@ def get_fusion_modules(
     fusion_modules: al_fusion_modules = cast(al_fusion_modules, nn.ModuleDict())
 
     fusion_in_dim = _get_fusion_input_dimension(modules_to_fuse=modules_to_fuse)
-    any_tabular = any(i for i in output_types.values() if i in ("tabular",))
+    any_tabular = any(i for i in output_types.values() if i in ("tabular", "survival"))
     any_sequence = any(i for i in output_types.values() if i in ("sequence",))
 
     any_array = any(i for i in output_types.values() if i in ("array", "image"))

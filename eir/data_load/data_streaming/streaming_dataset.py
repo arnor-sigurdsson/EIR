@@ -8,7 +8,7 @@ import numpy as np
 import torch
 import websocket
 from PIL import Image
-from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.preprocessing import KBinsDiscretizer, LabelEncoder, StandardScaler
 from torch.utils.data import IterableDataset
 
 from eir.data_load.data_preparation_modules.imputation import (
@@ -39,6 +39,9 @@ from eir.setup.output_setup import ComputedArrayOutputInfo, al_output_objects_as
 from eir.setup.output_setup_modules.image_output_setup import ComputedImageOutputInfo
 from eir.setup.output_setup_modules.sequence_output_setup import (
     ComputedSequenceOutputInfo,
+)
+from eir.setup.output_setup_modules.survival_output_setup import (
+    ComputedSurvivalOutputInfo,
 )
 from eir.setup.output_setup_modules.tabular_output_setup import (
     ComputedTabularOutputInfo,
@@ -322,8 +325,8 @@ def prepare_request_output_data(
 
                 outputs_prepared[output_name] = {output_name: image_data}
 
-            case ComputedTabularOutputInfo():
-                assert output_type == "tabular"
+            case ComputedTabularOutputInfo() | ComputedSurvivalOutputInfo():
+                assert output_type in ("tabular", "survival")
                 tabular_data = apply_tabular_transformers(
                     cur_target=serialized_data,
                     target_transformers=output_object.target_transformers,
@@ -395,6 +398,8 @@ def apply_tabular_transformers(
                 transformed_value = transformer.transform([[value]])[0]
             elif isinstance(transformer, LabelEncoder):
                 transformed_value = transformer.transform([value])
+            elif isinstance(transformer, KBinsDiscretizer):
+                transformed_value = transformer.transform([[value]])[0]
             else:
                 raise ValueError(f"Unknown transformer type for column {column}")
 
