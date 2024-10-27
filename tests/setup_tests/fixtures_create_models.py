@@ -10,7 +10,8 @@ from eir.train_utils.optim import maybe_wrap_model_with_swa
 
 @pytest.fixture()
 def create_test_model(
-    create_test_config: config.Configs, create_test_labels
+    create_test_config: config.Configs,
+    create_test_labels,
 ) -> al_meta_model:
     gc = create_test_config.global_config
     target_labels = create_test_labels
