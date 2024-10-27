@@ -19,7 +19,7 @@ repos:
         entry: isort
         language: system
         types: [ python ]
-        stages: [ commit ]
+        stages: [ pre-commit ]
 
 
   - repo: local
@@ -29,10 +29,10 @@ repos:
         entry: flake8
         language: system
         types: [ python ]
-        stages: [ commit ]
+        stages: [ pre-commit ]
 
       - id: check-versions
         name: Check project versions
         entry: python ./misc/check_versions.py
         language: system
-        stages: [ commit ]
+        stages: [ pre-commit ]
