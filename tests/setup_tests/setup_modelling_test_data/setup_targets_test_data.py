@@ -48,6 +48,15 @@ def get_current_test_label_values(
     else:
         values_dict["BinaryOrigin"] = 1
 
+    base_time = 1000 if cur_class == "Asia" else 700
+
+    height_effect = -0.5 * (height_value - 140)
+
+    time_noise = np.random.normal(0, 100)
+
+    time = max(50, base_time + height_effect + time_noise)
+    values_dict["Time"] = time
+
     return values_dict
 
 
@@ -61,6 +70,7 @@ def get_test_label_file_fieldnames() -> list[str]:
         "SparseHeight",
         "SparseOrigin",
         "BinaryOrigin",
+        "Time",
     ]
 
     return fieldnames

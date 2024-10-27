@@ -184,7 +184,7 @@ def get_base_parametrization(compiled: bool = False) -> dict:
                     "output_info": {"output_name": "test_output_survival"},
                     "output_type_info": {
                         "event_column": "BinaryOrigin",
-                        "time_column": "Height",
+                        "time_column": "Time",
                     },
                 },
             ],
@@ -403,8 +403,7 @@ def _check_prediction(
             expected_array_file = array_folder / f"{id_from_request}.npy"
             expected_array = np.load(expected_array_file)
 
-            is_diffusion = output_object.diffusion_config is not None
-            do_check_cosine = not is_diffusion
+            do_check_cosine = not output_object.diffusion_config
             if not _validate_array_output(
                 actual_output=actual_output,
                 expected_array=expected_array,
@@ -527,6 +526,10 @@ def _validate_array_output(
             v=array_np.ravel(),
         )
 
+        if expected_array.sum() == 0.0:
+            logger.info("Skipping cosine similarity check for zero array.")
+            return True
+
         if pd.isna(cosine_similarity):
             logger.error(f"Invalid cosine similarity: {cosine_similarity}")
             return False
@@ -560,10 +563,23 @@ def _validate_survival_output(
         logger.error("Survival probabilities outside valid range [0, 1]")
         return False
 
+    binary_origin = expected_row["BinaryOrigin"].item()
     final_prob = survival_probs[-1]
-    threshold = 0.5
-    if final_prob > threshold:
-        logger.error(f"Final survival probability above threshold: {final_prob}")
-        return False
+
+    threshold = 0.9
+    if binary_origin == 0:
+        if final_prob < threshold:
+            logger.error(
+                f"Final probability below threshold: {final_prob}, "
+                f"expected >= {threshold} for non-event",
+            )
+            return False
+    else:
+        if final_prob > (1.0 - threshold):
+            logger.error(
+                f"Final probability above threshold: {final_prob}, "
+                f"expected <= {1.0 - threshold} for event",
+            )
+            return False
 
     return True

@@ -15,7 +15,7 @@ def _get_survival_output_configs() -> Sequence[Dict]:
             "output_info": {"output_name": "test_output_survival"},
             "output_type_info": {
                 "event_column": "BinaryOrigin",
-                "time_column": "Height",
+                "time_column": "Time",
             },
         }
     ]

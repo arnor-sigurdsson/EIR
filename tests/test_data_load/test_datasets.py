@@ -169,6 +169,7 @@ def _set_up_bad_label_file_for_testing(label_file: Path) -> None:
                 0.0,  # SparseHeight
                 "BadLabel",  # SparseOrigin
                 0,  # BinaryOrigin
+                1000.0,  # Time
             ]
             bad_label_writer.writerow(row)
 

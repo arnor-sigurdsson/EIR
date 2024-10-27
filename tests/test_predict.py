@@ -345,7 +345,7 @@ def _get_predict_test_data_parametrization() -> List[Dict[str, Any]]:
                         "output_info": {"output_name": "test_output_survival"},
                         "output_type_info": {
                             "event_column": "BinaryOrigin",
-                            "time_column": "Height",
+                            "time_column": "Time",
                         },
                     },
                 ],
