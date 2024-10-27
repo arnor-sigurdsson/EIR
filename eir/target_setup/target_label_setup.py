@@ -668,15 +668,14 @@ def _streamline_duration_transformer_input(
     df_time_train: pd.DataFrame,
     time_column: str,
 ) -> np.ndarray:
-
     train_nan_mask = df_time_train[time_column].isna()
-    dur = (
-        df_time_train[~train_nan_mask][time_column].values.reshape(-1, 1)
-        if train_nan_mask.any()
-        else df_time_train[time_column].values.reshape(-1, 1)
-    )
 
-    return dur
+    if train_nan_mask.any():
+        values = df_time_train[~train_nan_mask][time_column].to_numpy()
+    else:
+        values = df_time_train[time_column].to_numpy()
+
+    return values.reshape(-1, 1)
 
 
 def fit_duration_transformer(
@@ -702,11 +701,13 @@ def transform_durations_with_nans(
     nan_mask = df[time_column].isna()
 
     if not nan_mask.any():
-        return transformer.transform(df[time_column].values.reshape(-1, 1)).flatten()
+        return transformer.transform(
+            df[time_column].to_numpy().reshape(-1, 1)
+        ).flatten()
 
     df_clean = df[~nan_mask]
     transformed = transformer.transform(
-        df_clean[time_column].values.reshape(-1, 1)
+        df_clean[time_column].to_numpy().reshape(-1, 1)
     ).flatten()
 
     result = np.full(len(df), np.nan)
@@ -723,19 +724,23 @@ def discretize_durations(
 ) -> None:
     train_nan_mask = df_time_train[time_column].isna()
     dur = (
-        df_time_train[~train_nan_mask][time_column].values.reshape(-1, 1)
+        df_time_train[~train_nan_mask][time_column].to_numpy().reshape(-1, 1)
         if train_nan_mask.any()
-        else df_time_train[time_column].values.reshape(-1, 1)
+        else df_time_train[time_column].to_numpy().reshape(-1, 1)
     )
 
-    dur_transformer = fit_duration_transformer(dur, n_bins)
+    dur_transformer = fit_duration_transformer(durations=dur, n_bins=n_bins)
 
     cur_labels.train_labels[time_column] = transform_durations_with_nans(
-        df_time_train, time_column, dur_transformer
+        df=df_time_train,
+        time_column=time_column,
+        transformer=dur_transformer,
     )
 
     cur_labels.valid_labels[time_column] = transform_durations_with_nans(
-        df_time_valid, time_column, dur_transformer
+        df=df_time_valid,
+        time_column=time_column,
+        transformer=dur_transformer,
     )
 
 
@@ -743,32 +748,31 @@ def update_labels_dict(
     labels_dict: dict[str, dict[str, dict[str, Any]]],
     labels_df: pd.DataFrame,
     output_name: str,
-    dtypes: Optional[dict[str, dict[str, Any]]] = None,
+    dtypes: Optional[dict[str, dict[str, type]]] = None,
 ) -> None:
     """
     We skip storing nan / missing values all together here, as we have a
     data structure tracking missing IDs separately.
     """
-
     if "Output Name" in labels_df.columns:
         labels_df = labels_df.drop(columns=["Output Name"])
 
     if dtypes is None:
         dtypes = {}
 
-    cur_dtypes = dtypes.get(output_name, {})
+    cur_dtypes: dict[str, Any] = dtypes.get(output_name, {})
 
     records = labels_df.to_dict("records")
     for id_value, record in zip(labels_df.index, records):
+        parsed_record: dict[str, Any] = {}
 
-        parsed_record = {}
         for k, v in record.items():
             if pd.notna(v):
-                cur_dtype = cur_dtypes.get(k, None)
+                cur_dtype = cur_dtypes.get(str(k), None)
                 if cur_dtype:
                     v = cur_dtype(v)
 
-                parsed_record[k] = v
+                parsed_record[str(k)] = v
 
         if not parsed_record:
             continue

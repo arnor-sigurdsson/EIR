@@ -570,7 +570,7 @@ def plot_individual_survival_curves(
     time_bins: np.ndarray,
     output_folder: str,
     n_samples: int = 5,
-):
+) -> None:
     random_samples = df.sample(n=n_samples)
 
     plt.figure(figsize=(12, 8))
@@ -578,8 +578,9 @@ def plot_individual_survival_curves(
     for _, row in random_samples.iterrows():
         surv_probs = row[
             [col for col in df.columns if col.startswith("Surv_Prob_t")]
-        ].values
-        plt.step(time_bins, surv_probs, where="post", label=f"ID: {row['ID']}")
+        ].to_numpy()
+
+        plt.step(x=time_bins, y=surv_probs, where="post", label=f"ID: {row['ID']}")
 
     plt.xlabel("Time")
     plt.ylabel("Survival Probability")
