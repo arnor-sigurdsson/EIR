@@ -173,7 +173,7 @@ partd==1.4.2 ; python_full_version >= "3.12.0" and python_version < "3.13"
 pathspec==0.12.1 ; python_full_version >= "3.12.0" and python_version < "3.13"
 pdf2image==1.17.0 ; python_full_version >= "3.12.0" and python_version < "3.13"
 pexpect==4.9.0 ; python_full_version >= "3.12.0" and python_version < "3.13" and (sys_platform != "win32" and sys_platform != "emscripten")
-pillow==10.2.0 ; python_full_version >= "3.12.0" and python_version < "3.13"
+pillow==11.0.0 ; python_full_version >= "3.12.0" and python_version < "3.13"
 platformdirs==4.3.6 ; python_full_version >= "3.12.0" and python_version < "3.13"
 pluggy==1.5.0 ; python_full_version >= "3.12.0" and python_version < "3.13"
 pre-commit==3.8.0 ; python_full_version >= "3.12.0" and python_version < "3.13"
