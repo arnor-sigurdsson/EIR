@@ -94,6 +94,8 @@ and so on:
 
 - ``sklearn-pandas`` : Pandas integration with sklearn
 
+- ``torchtext``  – PyTorch Text Team: Text utilities, models, transforms, and datasets for PyTorch.
+
 - ``memory-profiler``  – Fabian Pedregosa: A module for monitoring memory usage of a python program
 
 - ``pytest``  – Holger Krekel, Bruno Oliveira, Ronny Pfannschmidt, Floris Bruynooghe, Brianna Laugher, Florian Bruhin, Others (See AUTHORS): pytest: simple powerful testing with Python
