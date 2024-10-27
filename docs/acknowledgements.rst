@@ -56,7 +56,7 @@ and so on:
 
 - ``captum``  – PyTorch Team: Model interpretability for PyTorch
 
-- ``deeplake``  – activeloop.ai: C++ backend for Deep Lake
+- ``deeplake``  – activeloop.ai: Activeloop Deep Lake
 
 - ``aioboto3``  – Terry Cain: Async boto3 wrapper
 
