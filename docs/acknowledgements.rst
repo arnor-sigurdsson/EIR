@@ -86,6 +86,14 @@ and so on:
 
 - ``libdeeplake``  – activeloop.ai: C++ backend for Deep Lake
 
+- ``lifelines``  – Cameron Davidson-Pilon: Survival analysis in Python, including Kaplan Meier, Nelson Aalen and regression
+
+- ``scikit-survival`` : Survival analysis built on top of scikit-learn
+
+- ``pycox``  – Haavard Kvamme: Survival analysis with PyTorch
+
+- ``sklearn-pandas`` : Pandas integration with sklearn
+
 - ``memory-profiler``  – Fabian Pedregosa: A module for monitoring memory usage of a python program
 
 - ``pytest``  – Holger Krekel, Bruno Oliveira, Ronny Pfannschmidt, Floris Bruynooghe, Brianna Laugher, Florian Bruhin, Others (See AUTHORS): pytest: simple powerful testing with Python
