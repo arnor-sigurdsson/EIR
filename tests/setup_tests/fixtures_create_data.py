@@ -231,7 +231,6 @@ def _make_deeplake_test_dataset(
     with ds:
         for sample_id, sample in samples.items():
             ds.append(sample, append_empty=True)
-            ds.commit()
 
 
 def _delete_random_rows_from_csv(csv_file: Path, n_to_drop: int):
