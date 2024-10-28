@@ -2,6 +2,7 @@ import torch
 from torch import nn
 
 from eir.models.input.array.models_cnn import CNNResidualBlock
+from eir.models.layers.mlp_layers import MLPResidualBlock
 from eir.models.layers.projection_layers import get_1d_projection_layer
 from eir.models.tensor_broker.projection_modules.cnn import (
     get_conv_params_for_dimension,
@@ -51,7 +52,7 @@ def get_projection_layer(
                 return nn.Identity(), from_shape_no_batch
 
     projection_layers: list[nn.Module] = []
-    if projection_type in ("lcl", "linear", "lcl_residual"):
+    if projection_type in ("lcl", "linear", "lcl_residual", "lcl+mlp_residual"):
         flatten_layer = nn.Flatten(start_dim=1)
         projection_layers.append(flatten_layer)
 
@@ -66,6 +67,26 @@ def get_projection_layer(
             )
             projection_layers.append(projection_layer)
             projected_shape = to_shape_no_batch
+
+        case "lcl+mlp_residual":
+            lcl_projection_layer = get_1d_projection_layer(
+                input_dimension=from_shape_no_batch.numel(),
+                target_dimension=to_shape_no_batch.numel(),
+                projection_layer_type="lcl",  # type: ignore
+                lcl_diff_tolerance=0,
+            )
+            projected_shape = to_shape_no_batch
+
+            mlp_residual_block = MLPResidualBlock(
+                in_features=projected_shape.numel(),
+                out_features=projected_shape.numel(),
+                dropout_p=0.0,
+                full_preactivation=True,
+                stochastic_depth_p=0.0,
+            )
+
+            projection_layers.append(lcl_projection_layer)
+            projection_layers.append(mlp_residual_block)
 
         case "cnn":
             not_same_n_dims = len(from_shape_no_batch) != len(to_shape_no_batch)
@@ -169,7 +190,7 @@ def get_projection_layer(
         case _:
             raise ValueError(f"Invalid projection_type: {projection_type}")
 
-    if projection_type in ("lcl", "linear", "lcl_residual"):
+    if projection_type in ("lcl", "linear", "lcl_residual", "lcl+mlp_residual"):
         unflatten_layer = nn.Unflatten(dim=1, unflattened_size=to_shape_no_batch)
         projection_layers.append(unflatten_layer)
 
